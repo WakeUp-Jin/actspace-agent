@@ -4,7 +4,7 @@ export type ContextProjectionEvent = { readonly seq: number; readonly type: stri
 
 /** Estimate complete request content before any browse preview truncation. */
 export function projectContextState(
-  snapshot: RuntimeV2SessionSnapshot,
+  snapshot: Pick<RuntimeV2SessionSnapshot, "sessionId" | "throughJournalSeq" | "updatedAt" | "messages"> & { readonly activity: Pick<RuntimeV2SessionSnapshot["activity"], "activeTurnId"> },
   journal: readonly ContextProjectionEvent[],
 ): ContextState {
   const latest = [...journal].reverse().find((event) => event.type === "request/context");

@@ -1,4 +1,5 @@
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, relative, resolve } from "pathe";
+const sep = "/";
 import type { ToolUiPreview } from "@actspace/shared";
 import type { RuntimeV2JsonValue, RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
 type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
@@ -35,8 +36,10 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
   if (localName === "bash" || localName === "bash_output" || localName === "bash_kill") {
     // Summary is diagnostic detail, never the title of a compact tool row.
     // Missing environment/exit facts stay unknown; do not parse them from prose.
+    const backgroundTask = record(detailValue(data, "background-task"));
+    const backgroundTaskId = string(backgroundTask.taskId);
     const detail = terminal ? [summary, errorMessage].filter((value, index, all) => value && all.indexOf(value) === index && !output.includes(value)).join("\n") : undefined;
-    return { kind: "bash", status: !terminal ? "running" : state === "denied" ? "denied" : state === "aborted" ? "cancelled" : failed ? "failed" : "success", title: "Bash command", command: string(args.command) ?? localName, commandPreview: string(args.command) ?? localName, cwd: string(args.cwd) ?? undefined, stdout: failed ? undefined : output, stderr: failed ? output || errorMessage : undefined, reason: detail || undefined, durationMs: tool?.durationMs ?? undefined, intent: string(args.intent) ?? undefined };
+    return { kind: "bash", ...(backgroundTaskId ? { backgroundTaskId, backgroundStatus: "running" as const } : {}), status: !terminal ? "running" : state === "denied" ? "denied" : state === "aborted" ? "cancelled" : failed ? "failed" : "success", title: "Bash command", command: string(args.command) ?? localName, commandPreview: string(args.command) ?? localName, cwd: string(args.cwd) ?? undefined, stdout: failed ? undefined : output, stderr: failed ? output || errorMessage : undefined, reason: detail || undefined, durationMs: tool?.durationMs ?? undefined, intent: string(args.intent) ?? undefined };
   }
   if (localName === "inspect_image") return { kind: "media_analysis", mediaName: string(args.artifact_id) ?? "image", mediaKind: "image", displayText: summary };
   if (localName === "generate_image") { const images = tool?.artifacts.filter((artifact) => artifact.kind === "image").map((artifact) => ({ type: "image" as const, name: artifact.label, path: artifact.artifactId, mimeType: artifact.mimeType })) ?? (Array.isArray(data.artifacts) ? data.artifacts.map(record).filter((artifact) => string(artifact.mediaType)?.startsWith("image/")).map((artifact) => ({ type: "image" as const, name: string(artifact.artifactId) ?? "image", path: string(artifact.artifactId) ?? "", mimeType: string(artifact.mediaType) ?? undefined })) : []); return { kind: "image_generation", status: !terminal ? "running" : failed ? "failed" : images.length > 0 ? "completed" : "partial", promptPreview: string(args.prompt)?.slice(0, 240) ?? "", requestedCount: Math.max(1, nonNegative(args.n) || 1), generatedCount: images.length, size: string(args.size) ?? "1024x1024", displayText: summary, images, ...(errorMessage ? { errorMessage } : {}) }; }

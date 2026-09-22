@@ -13,6 +13,7 @@ export type {
 } from "@actspace/shared/runtime-v2";
 export * from "./runtime/index.js";
 export * from "./config-path.js";
+export { SessionReadModel } from "./projection/durable-session.js";
 export { apply as applyCordisRuntimeEntry } from "./runtime/cordis-entry.js";
 export type { RuntimeCordisHost } from "./runtime/cordis-entry.js";
 export * from "./profiles/index.js";

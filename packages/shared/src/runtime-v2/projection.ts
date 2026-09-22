@@ -5,11 +5,13 @@ export const RUNTIME_V2_PROJECTION_SCHEMA_VERSION = 1 as const;
 /** Stable identifiers for values that can be projected from one Session Journal. */
 export type RuntimeV2ProjectionKey =
   | "surface"
-  | "run"
-  | "composer"
+  | "metadata"
+  | "todos"
+  | "sessionStats"
+  | "delegations"
+  | "pendingInbox"
   | "providerUsage"
-  | "requestContextEstimate"
-  | "trajectory"
+  | "requestContext"
   | (string & {});
 
 export type RuntimeV2ProjectionRevision = {
@@ -20,6 +22,31 @@ export type RuntimeV2ProjectionRevision = {
   readonly stateVersion?: number;
   readonly requestId?: string;
   readonly runtimeInstanceId?: string;
+};
+
+export type RuntimeV2ReadModelWatermarks = {
+  readonly acceptedThroughSeq: number;
+  readonly durableThroughSeq: number | null;
+  readonly projectionThroughSeq: number;
+  readonly windowThroughSeq: number;
+  readonly indexGeneration: number | null;
+};
+
+export type RuntimeV2GlobalSessionSummary = {
+  readonly sessionId: string;
+  readonly throughJournalSeq: number;
+  readonly summaryVersion: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly workspaceRoot: string | null;
+  readonly profileId: string;
+  readonly title: string | null;
+  readonly pinned: boolean;
+  readonly archived: boolean;
+  readonly completedTurnCount: number;
+  readonly usage: RuntimeV2UsageSummary;
+  readonly accessState: RuntimeV2SessionSnapshot["accessState"];
+  readonly lineage: RuntimeV2JsonValue | null;
 };
 
 export type RuntimeV2ProjectionValues = Readonly<Partial<Record<RuntimeV2ProjectionKey, RuntimeV2JsonValue>>>;
@@ -39,13 +66,62 @@ export type RuntimeV2DesktopSessionProjection = {
   readonly throughJournalSeq: number;
   readonly snapshot: RuntimeV2SessionSnapshot;
   readonly values: RuntimeV2ProjectionValues;
+  readonly window: RuntimeV2EventWindow;
+  readonly activeMessageIds: readonly string[];
+  readonly deferredToolCalls: readonly string[];
+  readonly watermarks?: RuntimeV2ReadModelWatermarks;
+};
+
+export type RuntimeV2EventWindow = {
+  readonly events: readonly import("./session-events").SessionEventEnvelopeV1[];
+  readonly fromSeq: number;
+  readonly throughJournalSeq: number;
+  readonly beforeSeq: number | null;
+  readonly turnOffset: number;
+  readonly requestOffset: number;
+  readonly support?: readonly RuntimeV2WindowSupportFact[];
+  readonly deferredDetails?: readonly RuntimeV2DeferredDetailRef[];
+};
+
+export type RuntimeV2DeferredDetailRef = {
+  readonly sessionId: string;
+  readonly callId?: string;
+  readonly artifactId?: string;
+  readonly kind: "tool" | "artifact";
+};
+
+export type RuntimeV2WindowSupportFact =
+  | { readonly kind: "surface"; readonly replaceGeneration: number }
+  | { readonly kind: "tool-call"; readonly callId: string; readonly eventSeqs: readonly number[] }
+  | { readonly kind: "request"; readonly requestId: string; readonly eventSeqs: readonly number[] };
+
+export type RuntimeV2SessionObservation = {
+  readonly kind: "session-observation";
+  readonly schemaVersion: 1;
+  readonly sessionId: string;
+  readonly projection: RuntimeV2SessionProjectionSnapshot;
+  readonly snapshot: RuntimeV2SessionSnapshot;
+  readonly window?: RuntimeV2EventWindow;
+  readonly activeMessageIds: readonly string[];
+  readonly deferredToolCalls: readonly string[];
+  readonly watermarks: RuntimeV2ReadModelWatermarks;
+};
+
+export type RuntimeV2SessionUpdate = {
+  readonly sessionId: string;
+  readonly throughJournalSeq: number;
+  readonly event: import("./session-events").SessionEventEnvelopeV1;
+  readonly values: RuntimeV2ProjectionValues;
+  readonly tool?: RuntimeV2ToolView;
 };
 
 export type RuntimeV2SessionProjectionInput = {
   readonly sessionId: string;
-  /** Oldest requested Journal sequence; omitted on the first page. */
-  readonly trajectoryFromSeq?: number;
-  readonly includeTrajectory?: boolean;
+  readonly beforeSeq?: number;
+  readonly afterSeq?: number;
+  readonly includeToolDetails?: boolean;
+  readonly maxWindowEvents?: number;
+  readonly maxWindowBytes?: number;
 };
 
 /** Unprefixed alias used by the Session Projection package and execution plans. */
@@ -280,7 +356,8 @@ export type RuntimeV2SessionSnapshot = {
 };
 
 export type RuntimeV2LiveEvent = {
-  readonly kind: "assistant-delta" | "reasoning-delta" | "tool-progress" | "run-state" | "runtime-live" | "resync-required";
+  readonly kind: "assistant-delta" | "reasoning-delta" | "tool-progress" | "run-state" | "runtime-live" | "resync-required" | "journal-update";
+  readonly update?: RuntimeV2SessionUpdate;
   readonly schemaVersion: 1;
   readonly runtimeInstanceId: string;
   readonly liveSeq: number;

@@ -3,7 +3,7 @@
 > 2026-09-20 任务边界：Session 事件时序、live/durable 读取接线已由[事件持久化计划](../../completed/20260920-session-event-persistence/README.md)交付；本计划保留其余 UI 映射及既有验收记录。
 
 
-状态：执行中，P00/P01 已达到验收候选状态，P02/P03 基础通道与首批 renderer consumers 已落地；Desktop 全量消息投影收敛与 G1 外部验收待继续。
+生命周期：2026-09-21 已被替代。原计划的生产投影与消息映射已由[2026-09-21 一次性切换](../../completed/20260921-session-projection-cutover.md)接替并完成。本目录保留早期契约和验收记录；当前实现以新计划及其摘要为准，不继续实施旧 Main projection 路径。
 
 ## 1. 目标
 

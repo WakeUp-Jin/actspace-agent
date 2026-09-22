@@ -19,6 +19,7 @@ describe("runtime workspace admission", () => {
     const registryOptions = { ...roots, fallbackWorkspaceRoot: roots.workspaceRoot };
     const app = {
       listSessions: vi.fn(async () => existing ? [{ sessionId: "old-session", workspaceRoot: oldRoot, metadata: {}, updatedAt: "2026-09-19" }] : []),
+      subscribeSessionProjection: vi.fn(() => () => undefined),
       createMainSession: vi.fn(async (_id, workspaceRoot) => {
         expect(await resolveRegisteredWorkspaceSelection(registryOptions, { workspaceRoot })).toMatchObject({ ok: true });
         return { sessionId: "new-session", workspaceRoot, throughJournalSeq: 0 };

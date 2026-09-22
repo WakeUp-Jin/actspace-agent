@@ -26,12 +26,15 @@
 | [P1-B Service 三层](active/20260829-actspace-p1-service-roles/README.md) | slice 已交付；全域 Provider/Consumer 收口待完成。 |
 | [P1-C Profile / Bundle / Patch](active/20260829-actspace-p1-profile-bundle-patch/README.md) | schema/digest/transport 已交付；restart-only、失败清理及 one-shot 回归待完成。 |
 | [P2 Contract Matrix](active/20260829-actspace-p2-contract-matrix/README.md) | 字节漂移检查已恢复通过；语义 validator 与负向 fixtures 未完整交付，不能归档。 |
-| [Session 持久化与投影](active/20260830-actspace-session-persistence-projection/README.md) | 基础通道与首批消费者已落地；最终消息映射和集成验收待完成。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | 仍有组件抽取、迁移与验收工作。 |
 
 2026-09-09 [逐项复核与设计合并清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)：初始 10 个 active 入口逐项复核；中文界面任务自行归档后，Context 补齐全仓回归也进入 completed，当前剩余 8 个入口。P2 按语义检查缺口保留 active。
 
 ## 最近完成
+
+- [Session 三类读模型统一](completed/20260922-session-three-read-models.md)：Canonical fold、三种 DTO/watermark、observation、Global Session/Usage Index、Window resource cap 和 Client target 收口已完成；大型 App UI fixture 门禁保留在执行摘要。
+
+- [Session 投影一次性切换](completed/20260921-session-projection-cutover.md)：Host Registry、可删除 checkpoint 与 Client raw window 已接通，旧路径退役；自动化通过，Electron 缺失可执行文件的环境阻塞见执行摘要。
 
 - [Session 事件持久化与检查点重构](completed/20260920-session-event-persistence/README.md)：accepted/durable 分离、persistence coordinator、必需 checkpoint policy 和生命周期通知已实施；物理 `session-core` 包迁移仍由 P1-A 跟踪。
 
@@ -109,6 +112,8 @@
 更早的完成记录直接从 `completed/` 按日期或主题检索，不在本页重复维护完整清单。
 
 ## 已丢弃或被替代
+
+- [早期 Session 持久化与投影计划](discarded/20260830-actspace-session-persistence-projection/README.md)：2026-09-21 生产切换计划已替代剩余实施路径；保留原契约和验收证据。
 
 - [DSH-native 旧重定向](discarded/20260829-actspace-dsh-native-plugin-runtime/README.md)：无独立任务，当前入口为 Profile-first。
 

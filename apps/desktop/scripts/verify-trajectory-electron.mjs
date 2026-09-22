@@ -44,13 +44,15 @@ try {
   await page.waitForFunction(() => typeof window.actspace?.getSessionProjectionSnapshot === 'function');
   const result = await page.evaluate(async id => {
     const first = await window.actspace.getSessionProjectionSnapshot({ sessionId: id });
-    const earlier = await window.actspace.getSessionProjectionSnapshot({ sessionId: id, trajectoryFromSeq: first.values.trajectory.history.previousFromSeq });
-    return { revision: first.throughJournalSeq, snapshotRevision: first.snapshot.throughJournalSeq, trajectoryRevision: first.values.trajectory.throughJournalSeq, history: first.values.trajectory.history, earlier: earlier.values.trajectory.history, firstNode: first.values.trajectory.nodes[0].eventSeq, earlierNode: earlier.values.trajectory.nodes[0].eventSeq };
+    const earlier = await window.actspace.getSessionProjectionSnapshot({ sessionId: id, beforeSeq: first.window.beforeSeq });
+    const earliest = await window.actspace.getSessionProjectionSnapshot({ sessionId: id, beforeSeq: earlier.window.beforeSeq });
+    return { revision: first.throughJournalSeq, snapshotRevision: first.snapshot.throughJournalSeq, history: first.window, earlier: earlier.window, earliest: earliest.window };
   }, sessionId);
-  assert.equal(result.revision, result.snapshotRevision); assert.equal(result.revision, result.trajectoryRevision);
-  assert.equal(result.history.turnOffset, 5); assert.equal(result.earlier.fromSeq, 0); assert.equal(result.earlierNode, 0);
+  assert.equal(result.revision, result.snapshotRevision);
+  assert.equal(result.history.turnOffset, 15); assert.equal(result.earlier.turnOffset, 5); assert.equal(result.earliest.fromSeq, 0);
   await page.getByRole('button', { name: /Trajectory Phase 5 verification/ }).first().click();
-  await page.getByRole('button', { name: '查看 Trajectory', exact: true }).click();
+  await page.getByRole('button', { name: '查看执行轨迹', exact: true }).click();
+  await page.getByRole('button', { name: 'Load earlier history', exact: true }).click();
   await page.getByRole('button', { name: 'Load earlier history', exact: true }).click();
   await page.getByRole('button', { name: 'USER user/message, Question 1', exact: true }).waitFor();
   await page.getByRole('button', { name: 'ASSISTANT assistant/message, Answer 1', exact: true }).click();
@@ -65,20 +67,20 @@ try {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => { off(); reject(new Error('No committed Journal notification')); }, 10000);
       const off = window.actspace.onSessionLiveEvent(({ event }) => {
-        if (event.sessionId === id && event.message === 'journal-advanced') { clearTimeout(timeout); off(); resolve(event.throughJournalSeq); }
+        if (event.sessionId === id && event.kind === 'journal-update') { clearTimeout(timeout); off(); resolve(event.throughJournalSeq); }
       });
       window.actspace.renameSession({ sessionId: id, title: 'Trajectory Phase 5 verified' }).catch(error => { clearTimeout(timeout); off(); reject(error); });
     });
   }, sessionId);
   assert.ok(committed > result.revision);
-  const composer = page.getByRole('textbox', { name: 'Message composer', exact: true });
+  const composer = page.getByRole('textbox', { name: '消息输入框', exact: true });
   await composer.fill('Unsent verification draft');
-  await page.getByRole('button', { name: '返回 Chat', exact: true }).click();
+  await page.getByRole('button', { name: '返回对话', exact: true }).click();
   assert.equal(await composer.inputValue(), 'Unsent verification draft');
-  await page.getByRole('button', { name: '查看 Trajectory', exact: true }).click();
+  await page.getByRole('button', { name: '查看执行轨迹', exact: true }).click();
   assert.equal(await composer.inputValue(), 'Unsent verification draft');
   await page.reload();
-  const reloaded = await page.evaluate(id => window.actspace.getSessionProjectionSnapshot({ sessionId: id, trajectoryFromSeq: 0 }), sessionId);
+  const reloaded = await page.evaluate(id => window.actspace.getSessionProjectionSnapshot({ sessionId: id }), sessionId);
   assert.equal(reloaded.snapshot.metadata.title, 'Trajectory Phase 5 verified');
   assert.equal(reloaded.throughJournalSeq, committed);
   console.log(JSON.stringify({ passed: true, checks: ['real Journal', 'preload', 'IPC revisions', 'history paging', 'UI history', 'assistant-tool link', 'tool output', 'schema', 'commit notifications', 'Composer draft toggle', 'reload'], evidence: join(dataRoot, 'electron-trajectory.png') }));

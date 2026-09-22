@@ -10,14 +10,14 @@
 
 ## 派生索引与边界
 
-Runtime 在 Session 目录生成可重建的 browse-index.json 和 browse-<fingerprint>.jsonl；前者记录摘要和字节偏移，后者记录回合页与较大工具详情。文件大小、修改/状态时间和 codec digest 决定有效性；Session 提交事件也会使内存缓存失效。写入先用临时文件，再发布索引；旧代文件清理。并发重建去重，读取缺失页会重建一次。
+Runtime 使用 `projection-checkpoint.json` 保存可重建的 Host Registry state、Journal 字节偏移和 Turn/Request/call 索引，替代独立 browse index 与派生消息文件。缓存命中后恢复状态并 replay Journal 尾部，再读取所需事件范围；失效则从 Journal 重建。
 
 Journal 仍是恢复、模型上下文和完整导出的唯一事实源。浏览页不能用于 Agent resume。完整复制对话走 getSession，不使用当前加载的消息窗口。批量归档工作区先读取完整摘要集，不只归档已显示的 10 条。
 
-旧数据第一次使用或缓存过期时需要完整读取并构建派生索引；首次列表重建在后台逐个处理，通过 indexing 状态刷新 UI。缓存命中时只读取摘要文件和所需页的字节范围。这里没有承诺旧数据第一次索引或正在追加的超长会话完全不做全量投影；缓存重建成本仍需在真实大数据上持续测量。
+旧数据首次读取或缓存失效仍需完整扫描；列表逐会话读取摘要，当前不再使用后台 indexing 状态。这里不承诺超长会话首读的性能上限，需在真实数据上测量。
 
 上下文估算先从完整请求计算，浏览页仅保存紧凑的请求预览和估算结果；不以截短后的预览重新估算 Token。完整 Context 详情仍走现有详情入口。
 
 ## 验证
 
-覆盖摘要 10 条分页、25 回合 10/10/5 页、Inbox 用户消息、并发去重、缓存重启/追加/缺失重建、大工具详情、快速切换、轨迹显式开启和普通消息不请求轨迹。真实 Electron 使用隔离数据验证；工程结果和人工边界见[执行摘要](../../exec-runs/20260915-progressive-session-loading/execution-summary.md)。
+覆盖摘要 10 条分页、25 回合 10/10/5 页、Inbox 用户消息、并发去重、缓存重启/追加/缺失重建、大工具详情、快速切换、轨迹显式开启和普通消息不请求轨迹。真实 Electron 使用隔离数据验证；当前切换结果和人工边界见[执行摘要](../../exec-runs/20260921-session-projection-cutover/execution-summary.md)。

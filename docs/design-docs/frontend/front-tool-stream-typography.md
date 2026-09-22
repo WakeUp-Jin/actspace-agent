@@ -25,7 +25,7 @@
 
 1. `ConversationView.tsx`、`ToolActivityGroup.tsx` 的父级间距与 `-mt-1`、Thinking 默认上边距、`tool-result.css` 的组件上边距并存。`bash` 未进入工具紧凑关系集合，且分支不透传关系样式。
 2. `ThinkingBlock.tsx`、`BashRunBlock.tsx` 使用 medium 字重；`toolLogStyles.ts` 使用 normal。结果预览中的文件按钮使用继承字体，可能与普通工具行字号不同。
-3. Main 的 `fixed-renderer-tool-preview.ts` 将终态 Bash summary 用作标题；renderer 再加 Ran / Denied 等前缀，导致执行诊断占据摘要主位置。
+3. 旧 Main tool preview 曾将终态 Bash summary 用作标题；当前 `packages/client/src/sessions/tool-card.ts` 保留稳定标题，把 summary 放在诊断 detail，避免执行诊断占据摘要主位置。
 
 真实组件测量证实：原 Thinking 为 14/20、500，带结果 Read 为 16/23.2，普通 Read 与 Bash 为 14/19.88；实施后统一为 14/22、400。过程间距为 5px，过程与正文之间为 14px。详见执行记录。
 

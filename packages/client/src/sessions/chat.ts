@@ -1,5 +1,4 @@
-import { aggregateActivities, summarizeActivityCosts } from "./usage-aggregates";
-import { toolPreview } from "./fixed-renderer-tool-preview";
+import { toolPreview } from "./tool-card.js";
 import {
   createMessageBlocks,
   type ContextUsageSnapshot,
@@ -7,20 +6,33 @@ import {
   type MessageBlock,
   type SessionEvent,
   type SessionRecord,
-  type UsageStatisticsDailyRow,
-  type UsageStatisticsModelEntry,
-  type UsageStatisticsRequestRow,
-  type UsageStatisticsSnapshot,
   normalizeModelKey,
   type UsageActivityRow,
-  type UsageActivitySnapshot,
   type UsageActivityStatus,
   type UsageActivityTokens,
 } from "@actspace/shared";
 import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot, RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
-import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
 type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
+
+export function projectChatWindow(projection: import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection, workspaceRoot = ""): SessionRecord {
+  const record = projectChatSession(projection.snapshot, projection.window.events, workspaceRoot);
+  const deferred = new Set(projection.deferredToolCalls);
+  for (const block of record.messageBlocks ?? []) {
+    const event = record.events.find(event => event.id === block.id);
+    const callId = event?.type === "tool_result" ? (event.payload as { toolCallId?: string }).toolCallId : undefined;
+    if (callId && deferred.has(callId)) block.deferredToolDetail = { sessionId: projection.sessionId, callId };
+  }
+  const state = projection.values.requestContext as unknown as import("@actspace/shared").ContextState;
+  return { ...record, contextState: state, contextSnapshot: {
+    throughJournalSeq: projection.throughJournalSeq, basis: state.basis, requestId: state.requestId,
+    totalTokens: state.totalEstimatedTokens, maxTokens: state.maxTokens, percentUsed: state.percentUsed,
+    compressionCount: projection.snapshot.activity.compactionCount,
+    cumulativeTokens: projection.snapshot.usage.totalTokens, cumulativeUsage: projection.snapshot.usage,
+    estimator: state.estimator, buckets: state.buckets,
+  } };
+}
 type RequestInfo = { readonly requestId: string; readonly agentRunId: string; readonly turnId: string; readonly stepId: string; readonly model: string; readonly provider: string; readonly time: string };
 type EventIndex = {
   readonly runByTurn: Map<string, string>;
@@ -33,12 +45,12 @@ type EventIndex = {
   readonly childByCall: Map<string, { readonly childSessionId: string; readonly presetId: string; readonly status: string }>;
 };
 
-export function projectFixedRendererSession(
+export function projectChatSession(
   snapshot: RuntimeV2SessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
   fallbackWorkspaceRoot: string,
 ): SessionRecord {
-  const events = projectFixedRendererEvents(snapshot, journal);
+  const events = projectChatEvents(snapshot, journal);
   return {
     meta: {
       schemaVersion: 2,
@@ -58,7 +70,7 @@ export function projectFixedRendererSession(
   };
 }
 
-export function projectFixedRendererEvents(
+export function projectChatEvents(
   snapshot: RuntimeV2SessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
 ): SessionEvent[] {
@@ -194,7 +206,8 @@ function indexActiveSurface(snapshot: RuntimeV2SessionSnapshot, journal: readonl
   for (const event of journal) {
     const surface = event.surface;
     if (surface?.kind !== "replace" || !messageIds.has(surface.node.messageId)) continue;
-    const insertionSeq = surface.sourceEventSeqs[0] ?? event.seq;
+    const origin = surface.sourceEventSeqs[0] ?? event.seq;
+    const insertionSeq = journal.some(item => item.seq === origin) ? origin : event.seq;
     replacementsAt.set(insertionSeq, [...(replacementsAt.get(insertionSeq) ?? []), event]);
   }
   return { messageIds, toolCallIds, replacementsAt };
@@ -220,7 +233,7 @@ export function projectContextSnapshot(snapshot: RuntimeV2SessionSnapshot, journ
 export { projectContextState } from "@actspace/shared";
 
 export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): SessionEvent[] {
-  const events = projectFixedRendererEvents(snapshot, journal);
+  const events = projectChatEvents(snapshot, journal);
   const index = buildIndex(snapshot, journal);
   const completedMessages = new Set(journal.filter((event) => event.type === "assistant/message").map((event) => string(record(event.data).messageId)));
   const chunks = new Map<string, SessionEvent>();
@@ -259,97 +272,6 @@ export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal:
   });
 }
 
-export function projectUsageStatistics(
-  sessions: readonly { readonly snapshot: RuntimeV2SessionSnapshot; readonly journal: readonly SessionEventEnvelopeV1[] }[],
-  input: { readonly scope: "session" | "global"; readonly sessionId?: string; readonly range: UsageStatisticsSnapshot["range"]; readonly page: number },
-): UsageStatisticsSnapshot {
-  const rows = sessions.flatMap(({ snapshot, journal }) => usageRows(snapshot, journal)).filter((row) => inRange(row.timestamp, input.range));
-  const modelDistribution = modelRows(rows);
-  const dailyRows = dailyUsageRows(rows, sessions);
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const page = Math.min(Math.max(1, input.page), totalPages);
-  const selected = sessions[0]?.snapshot;
-  const tools = sessions.flatMap(({ snapshot }) => snapshot.tools);
-  const totalTokens = rows.reduce((sum, row) => sum + row.totalTokens, 0);
-  const promptTokens = rows.reduce((sum, row) => sum + row.promptTokens, 0);
-  const completionTokens = rows.reduce((sum, row) => sum + row.completionTokens, 0);
-  const cacheHitTokens = rows.reduce((sum, row) => sum + row.cacheHitTokens, 0);
-  const cacheMissTokens = rows.reduce((sum, row) => sum + row.cacheMissTokens, 0);
-  return {
-    scope: input.scope,
-    sessionId: input.scope === "session" ? input.sessionId ?? null : null,
-    title: input.scope === "session" ? selected?.metadata.title ?? "New chat" : "全部数据",
-    range: input.range,
-    generatedAt: new Date().toISOString(),
-    sourceCount: sessions.length,
-    summary: { totalTokens, promptTokens, completionTokens, cacheHitTokens, cacheMissTokens, reasoningTokens: rows.reduce((sum, row) => sum + row.reasoningTokens, 0), toolCallCount: tools.length, conversationCount: new Set(rows.map((row) => `${row.sessionId}:${row.agentRunId}`)).size, costUsd: rows.reduce((sum, row) => sum + row.costUsd, 0), cacheEfficiencyPercent: totalTokens === 0 ? 0 : cacheHitTokens / totalTokens * 100 },
-    modelDistribution,
-    toolDistribution: toolRows(tools),
-    dailyRows,
-    requestRows: rows.sort((left, right) => right.timestamp.localeCompare(left.timestamp)).slice((page - 1) * pageSize, page * pageSize),
-    requestRowsPage: { page, pageSize, totalRows: rows.length, totalPages },
-  };
-}
-
-/**
- * Rebuild event-level Usage activities from the durable Journal.
- *
- * `assistant/message` is the preferred LLM terminal because it owns the
- * provider usage payload. `step/end` is only used as a fallback for tool-use
- * steps where the loop intentionally has no assistant surface message. This
- * keeps one activity row per real request and avoids counting both events.
- */
-export function projectUsageActivity(
-  sessions: readonly { readonly snapshot: RuntimeV2SessionSnapshot; readonly journal: readonly SessionEventEnvelopeV1[] }[],
-  input: { readonly scope: "session" | "global"; readonly sessionId?: string; readonly range: UsageActivitySnapshot["range"]; readonly status?: UsageActivityStatus | "all"; readonly search?: string; readonly kind?: UsageActivityRow["kind"]; readonly page: number },
-): UsageActivitySnapshot {
-  const rangeRows = sessions.flatMap(({ snapshot, journal }) => projectSessionUsageActivities(snapshot, journal)).filter((row) => inRange(row.startedAt, input.range));
-  const groups = aggregateActivities(rangeRows);
-  const allRows = rangeRows
-    .filter((row) => (!input.kind || row.kind === input.kind) && (!input.search?.trim() || `${row.model ?? ""} ${row.providerId ?? ""} ${row.connectionId ?? ""} ${row.toolName ?? ""}`.toLowerCase().includes(input.search.trim().toLowerCase())) && inRange(row.startedAt, input.range) && (input.status === undefined || input.status === "all" || row.status === input.status))
-    .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.sourceEventSeq - left.sourceEventSeq);
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(allRows.length / pageSize));
-  const page = Math.min(Math.max(1, input.page), totalPages);
-  const selected = sessions[0]?.snapshot;
-  const summary = allRows.reduce((result, row) => {
-    result.activityCount += 1;
-    if (row.kind === "llm_request") result.requestCount += 1;
-    else result.toolCount += 1;
-    if (row.status === "success") result.successCount += 1;
-    else if (row.status === "error") result.errorCount += 1;
-    else if (row.status === "aborted") result.abortedCount += 1;
-    else if (row.status === "running") result.runningCount += 1;
-    else result.unknownCount += 1;
-    result.inputTokens += row.tokens.inputTokens ?? 0;
-    result.outputTokens += row.tokens.outputTokens ?? 0;
-    result.cacheReadTokens += row.tokens.cacheReadTokens ?? 0;
-    result.cacheWriteTokens += row.tokens.cacheWriteTokens ?? 0;
-    result.reasoningTokens += row.tokens.reasoningTokens ?? 0;
-    result.totalTokens += row.tokens.totalTokens ?? 0;
-    if (row.kind === "llm_request" && row.costAmount == null) result.costUnavailableCount += 1;
-    if (row.costUsd !== null) result.costUsd = (result.costUsd ?? 0) + row.costUsd;
-    return result;
-  }, { activityCount: 0, requestCount: 0, toolCount: 0, successCount: 0, errorCount: 0, abortedCount: 0, runningCount: 0, unknownCount: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, totalTokens: 0, costUsd: null as number | null, costUnavailableCount: 0 });
-  return {
-    schemaVersion: 1,
-    scope: input.scope,
-    sessionId: input.scope === "session" ? input.sessionId ?? null : null,
-    title: input.scope === "session" ? selected?.metadata.title ?? "New chat" : "全部数据",
-    range: input.range,
-    generatedAt: new Date().toISOString(),
-    sourceCount: sessions.length,
-    sourceWatermarks: sessions.map(({ snapshot }) => ({ sessionId: snapshot.sessionId, throughJournalSeq: snapshot.throughJournalSeq })).sort((left, right) => left.sessionId.localeCompare(right.sessionId)),
-    summary,
-    tabCounts: { requests: rangeRows.length, providers: groups.providers.length, models: groups.models.length, tools: groups.tools.length },
-    costSummary: summarizeActivityCosts(allRows),
-    aggregates: aggregateActivities(allRows),
-    rows: allRows.slice((page - 1) * pageSize, page * pageSize),
-    rowsPage: { page, pageSize, totalRows: allRows.length, totalPages },
-  };
-}
-
 type ActivityRequestState = {
   requestId: string;
   agentRunId: string;
@@ -370,7 +292,7 @@ type ActivityRequestState = {
 
 const activityRowsCache = new WeakMap<readonly SessionEventEnvelopeV1[], { revision: number; sessionId: string; rows: UsageActivityRow[] }>();
 
-function projectSessionUsageActivities(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): UsageActivityRow[] {
+export function projectSessionUsageActivities(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): UsageActivityRow[] {
   const cached = activityRowsCache.get(journal);
   if (cached?.revision === snapshot.throughJournalSeq && cached.sessionId === snapshot.sessionId) return cached.rows;
   const runByTurn = new Map<string, string>();
@@ -643,23 +565,6 @@ function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: Ev
   return { requestId, turnId, stepId, agentRunId };
 }
 
-function usageRows(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): UsageStatisticsRequestRow[] {
-  const index = buildIndex(snapshot, journal); const byRun = new Map<string, UsageStatisticsRequestRow & { models: Map<string, number> }>();
-  for (const event of journal) {
-    if (event.type !== "assistant/message" && event.type !== "step/end") continue; const data = record(event.data); const requestId = string(data.requestId); const request = requestId ? index.requestById.get(requestId) : undefined; if (!request) continue;
-    const usage = record(data.usage); const runId = request.agentRunId; const current = byRun.get(runId) ?? { timestamp: event.time, sessionId: snapshot.sessionId, agentRunId: runId, workspaceRoot: snapshot.workspaceRoot ?? undefined, model: request.model, provider: request.provider, modelCallCount: 0, totalTokens: 0, promptTokens: 0, completionTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0, reasoningTokens: 0, costUsd: 0, models: new Map<string, number>() };
-    const input = nonNegative(usage.inputTokens); const output = nonNegative(usage.outputTokens); const cacheRead = nonNegative(usage.cacheReadTokens); const cacheWrite = nonNegative(usage.cacheWriteTokens); const tokens = input + output + cacheRead + cacheWrite;
-    current.timestamp = event.time; current.modelCallCount += 1; current.totalTokens += tokens; current.promptTokens += input; current.completionTokens += output; current.cacheHitTokens += cacheRead; current.cacheMissTokens += cacheWrite; current.reasoningTokens += nonNegative(usage.reasoningTokens); current.costUsd += costUsd(usage); current.models.set(request.model, (current.models.get(request.model) ?? 0) + tokens); const primary = [...current.models].sort((left, right) => right[1] - left[1])[0]?.[0]; if (primary) current.model = primary;
-    byRun.set(runId, current);
-  }
-  return [...byRun.values()].map(({ models: _models, ...row }) => row);
-}
-
-function modelRows(rows: readonly UsageStatisticsRequestRow[]): UsageStatisticsModelEntry[] { const grouped = new Map<string, { tokens: number; calls: number; cost: number; provider?: string }>(); for (const row of rows) { const item = grouped.get(row.model) ?? { tokens: 0, calls: 0, cost: 0, provider: row.provider }; item.tokens += row.totalTokens; item.calls += row.modelCallCount; item.cost += row.costUsd; grouped.set(row.model, item); } const total = rows.reduce((sum, row) => sum + row.totalTokens, 0); return [...grouped].map(([name, item]) => ({ name, provider: item.provider, totalTokens: item.tokens, percent: total === 0 ? 0 : item.tokens / total * 100, callCount: item.calls, costUsd: item.cost })).sort((a, b) => b.totalTokens - a.totalTokens); }
-function dailyUsageRows(rows: readonly UsageStatisticsRequestRow[], sessions: readonly { snapshot: RuntimeV2SessionSnapshot }[]): UsageStatisticsDailyRow[] { const grouped = new Map<string, UsageStatisticsRequestRow[]>(); for (const row of rows) { const date = row.timestamp.slice(0, 10); grouped.set(date, [...(grouped.get(date) ?? []), row]); } return [...grouped].map(([date, items]) => { const total = items.reduce((sum, item) => sum + item.totalTokens, 0); const models = modelRows(items); return { date, totalTokens: total, promptTokens: items.reduce((sum, item) => sum + item.promptTokens, 0), completionTokens: items.reduce((sum, item) => sum + item.completionTokens, 0), cacheHitTokens: items.reduce((sum, item) => sum + item.cacheHitTokens, 0), reasoningTokens: items.reduce((sum, item) => sum + item.reasoningTokens, 0), conversationCount: new Set(items.map((item) => `${item.sessionId}:${item.agentRunId}`)).size, toolCallCount: sessions.flatMap((entry) => entry.snapshot.tools).filter((tool) => tool.startedAt.startsWith(date)).length, costUsd: items.reduce((sum, item) => sum + item.costUsd, 0), modelBreakdown: models.map((model) => ({ name: model.name, totalTokens: model.totalTokens, percent: total === 0 ? 0 : model.totalTokens / total * 100 })) }; }).sort((a, b) => a.date.localeCompare(b.date)); }
-function toolRows(tools: readonly RuntimeV2ToolView[]) { const grouped = new Map<string, { calls: number; failed: number; duration: number; measured: number }>(); for (const tool of tools) { const item = grouped.get(tool.name) ?? { calls: 0, failed: 0, duration: 0, measured: 0 }; item.calls += 1; if (tool.state !== "completed") item.failed += 1; if (tool.durationMs !== null) { item.duration += tool.durationMs; item.measured += 1; } grouped.set(tool.name, item); } const total = tools.length; return [...grouped].map(([name, item]) => ({ name, callCount: item.calls, percent: total === 0 ? 0 : item.calls / total * 100, failedCount: item.failed, ...(item.measured === 0 ? {} : { averageDurationMs: item.duration / item.measured }) })).sort((a, b) => b.callCount - a.callCount); }
-
-
 function appendNode(event: SessionEventEnvelopeV1) { return event.surface?.kind === "append" ? event.surface.node : null; }
 function contentBlocks(value: RuntimeV2JsonValue): readonly EventRecord[] { return Array.isArray(value) ? value.filter(isRecord) : []; }
 function array(value: RuntimeV2JsonValue | undefined): readonly RuntimeV2JsonValue[] { return Array.isArray(value) ? value : []; }
@@ -676,6 +581,4 @@ function string(value: RuntimeV2JsonValue | undefined): string | null { return t
 function nonNegative(value: RuntimeV2JsonValue | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0; }
 function nullableNonNegative(value: RuntimeV2JsonValue | undefined): number | null { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : null; }
 function finiteInteger(value: RuntimeV2JsonValue | undefined): number | null { return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 ? value : null; }
-function costUsd(usage: EventRecord): number { const value = nonNegative(usage.cost); return string(usage.costCurrency)?.toUpperCase() === "CNY" ? value / 7.2 : value; }
 function duration(start: string, end?: string): number { if (!end) return 0; const value = Date.parse(end) - Date.parse(start); return Number.isFinite(value) && value > 0 ? value : 0; }
-function inRange(timestamp: string, range: UsageStatisticsSnapshot["range"]): boolean { if (range === "total") return true; const days = range === "day" ? 1 : range === "week" ? 7 : 30; return Date.parse(timestamp) >= Date.now() - days * 86_400_000; }

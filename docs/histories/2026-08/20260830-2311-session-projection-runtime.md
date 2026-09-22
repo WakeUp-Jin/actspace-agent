@@ -42,7 +42,7 @@ Session Journal 是唯一持久化事实源，UI、Context、Usage、Composer �
 - `apps/desktop/src/preload/index.ts`
 - `apps/desktop/src/renderer/session/**`
 - `apps/desktop/src/renderer/App.tsx`
-- `docs/exec-plans/active/20260830-actspace-session-persistence-projection/**`
+- `docs/exec-plans/discarded/20260830-actspace-session-persistence-projection/**`
 - `docs/exec-runs/20260830-actspace-session-persistence-projection-p00/**`
 - `docs/exec-runs/20260830-actspace-session-persistence-projection-p01/**`
 - `docs/exec-runs/20260830-actspace-session-persistence-projection-p02/**`

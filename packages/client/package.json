@@ -7,8 +7,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" }, "./sessions": { "types": "./dist/sessions/index.d.ts", "import": "./dist/sessions/index.js", "default": "./dist/sessions/index.js" } },
-  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc --noEmit -p tsconfig.json", "test": "vitest run --globals --passWithNoTests" },
-  "dependencies": { "@actspace/shared": "workspace:*" },
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" }, "./sessions": { "types": "./dist/sessions/index.d.ts", "import": "./dist/sessions/index.js", "require": "./dist/sessions.cjs", "default": "./dist/sessions/index.js" } },
+  "typesVersions": { "*": { "sessions": ["dist/sessions/index.d.ts"] } },
+  "scripts": { "build": "tsc -p tsconfig.json && esbuild src/sessions/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/sessions.cjs", "typecheck": "tsc --noEmit -p tsconfig.json", "test": "vitest run --globals --passWithNoTests" },
+  "dependencies": { "@actspace/shared": "workspace:*", "pathe": "2.0.3" },
   "devDependencies": { "@types/node": "^24.0.3", "typescript": "^5.8.3", "vitest": "^3.2.4" }
 }

@@ -1,9 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 import type { RuntimeStreamEvent } from "@actspace/shared";
-import { runToolStreamFixture } from "../../../../../packages/core/agent-loop/src/test/tool-stream-fixture";
-import { projectSessionSnapshot } from "../../../../../packages/runtime/dist/projection/durable-session.js";
-import { projectFixedRendererEvents } from "../runtime-v2/fixed-renderer-projection";
+import { runToolStreamFixture } from "@actspace/core-agent-loop/testing";
+import { SessionReadModel } from "@actspace/runtime";
+import { projectChatEvents } from "@actspace/client/sessions";
 import { FixedRendererStreamAdapter } from "../runtime-v2/fixed-renderer-stream-adapter";
 
 const ids = { sessionId: "session", agentRunId: "run", turnId: "turn", stepId: "step", requestId: "request", messageId: "message" };
@@ -43,8 +43,8 @@ describe("real AgentLoop to fixed renderer stream", () => {
       expect(events.filter((e) => e.type === "assistant_text_delta").map((e) => e.delta).join("")).toBe('Read now. Done. {"valid":"body JSON"}');
       const finished = events.find((e) => e.type === "tool_finished")!;
       expect(finished).toMatchObject({ toolName: "read_file", status: "completed", preview: { kind: "read", filePath: "fixture.txt" } });
-      const snapshot = projectSessionSnapshot({ header: fixture.header, events: fixture.journal, registry: fixture.registry, rendererAllowlist: new Map() });
-      const historical = projectFixedRendererEvents(snapshot, fixture.journal).find((e) => e.type === "tool_result");
+      const snapshot = new SessionReadModel(fixture.header, fixture.registry, new Map()).replay(fixture.journal).snapshot();
+      const historical = projectChatEvents(snapshot, fixture.journal).find((e) => e.type === "tool_result");
       expect(historical?.payload).toMatchObject({ uiPreview: finished.preview, ok: true });
       expect(events.find((e) => e.type === "tool_started")).toMatchObject({ llmCallId: finished.llmCallId });
       expect(events.find((e) => e.type === "llm_call_started")).toMatchObject({ llmCallId: finished.llmCallId });

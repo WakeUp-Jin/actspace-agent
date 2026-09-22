@@ -57,7 +57,7 @@ requestId 是模型请求身份；llmCallId 兼容字段映射实际 requestId�
 
 ## 参数与预览
 
-从 fixed-renderer-projection.ts 提取 `toolPreview` 到 `fixed-renderer-tool-preview.ts`，提供参数生成、准备、执行、终态所需的纯转换。实时与回放共用终态转换和工具名称到 previewKind 的映射。
+`packages/client/src/sessions/tool-card.ts` 提供 `toolPreview` 的纯转换，读取 Host Journal projection 的 ToolView 与结构化 detail；实时和回放共用同一终态映射。Desktop Main 不再维护独立的 renderer tool preview 兼容层。
 
 - Read/List/Grep/Glob：参数明确后显示路径或查询摘要；结果到达才显示条目数量。
 - Bash：参数生成时显示稳定占位，prepared 后一次显示 command 摘要；审批与执行状态继续实时更新，结果展示 stdout/stderr。

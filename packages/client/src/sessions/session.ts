@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeV2DesktopSessionProjection, RuntimeV2JsonValue, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2SessionUpdate } from "@actspace/shared/runtime-v2";
 import { liveOverlayFromEvent, type ClientLiveOverlay } from "./live-overlay.js";
 import { emptyClientSessionCell, type ClientSessionCell } from "./session-snapshot.js";
 
@@ -83,13 +83,91 @@ export class ClientSessionStore {
       return false;
     }
     if (event.liveSeq <= cell.lastLiveSeq) return false;
-    const gap = cell.lastLiveSeq >= 0 && event.liveSeq !== cell.lastLiveSeq + 1;
+    // liveSeq is process-wide; other sessions can legitimately occupy the intervening seqs.
+    const gap = event.kind === "journal-update" && event.update !== undefined && cell.window !== null && event.update.event.seq > cell.window.throughJournalSeq + 1;
     const nextCell = Object.freeze({ ...cell, runtimeInstanceId: event.runtimeInstanceId, lastLiveSeq: event.liveSeq, liveGap: gap || event.kind === "resync-required", status: gap || event.kind === "resync-required" ? "stale" as const : cell.status });
     this.#cells.set(event.sessionId, nextCell);
     if (gap || event.kind === "resync-required") this.#overlays.delete(event.sessionId);
+    else if (event.kind === "journal-update" && event.update) return this.applyJournalUpdate(event.update);
     else this.#overlays.set(event.sessionId, liveOverlayFromEvent(event));
     this.#emit(event.sessionId);
     return !gap && event.kind !== "resync-required";
+  }
+
+  applyEnvelope(envelope: RuntimeV2DesktopSessionProjection, requestGeneration?: number): boolean {
+    const cell = this.#cell(envelope.sessionId);
+    if (requestGeneration !== undefined && requestGeneration !== cell.requestGeneration) return false;
+    if (envelope.snapshot.sessionId !== envelope.sessionId || envelope.snapshot.throughJournalSeq !== envelope.throughJournalSeq) throw new Error("Session projection revision mismatch.");
+    const older = cell.snapshot !== null && envelope.throughJournalSeq < cell.snapshot.throughJournalSeq;
+    const sameRevision = cell.snapshot !== null && envelope.throughJournalSeq === cell.snapshot.throughJournalSeq;
+    if (sameRevision && Object.keys(cell.projectionValues).length > 0 && JSON.stringify(envelope.values) !== JSON.stringify(cell.projectionValues)) {
+      this.#cells.set(envelope.sessionId, Object.freeze({ ...cell, status: "stale", liveGap: true }));
+      this.#emit(envelope.sessionId);
+      return false;
+    }
+    const priorWindow = cell.window;
+    const incoming = envelope.window;
+    let window = incoming;
+    if (priorWindow && incoming.fromSeq <= priorWindow.throughJournalSeq + 1 && incoming.throughJournalSeq >= priorWindow.fromSeq - 1) {
+      const bySeq = new Map(priorWindow.events.map(event => [event.seq, event]));
+      for (const event of incoming.events) if (!older || !bySeq.has(event.seq)) bySeq.set(event.seq, event);
+      const earliest = incoming.fromSeq < priorWindow.fromSeq ? incoming : priorWindow;
+      window = { ...earliest, events: [...bySeq.values()].sort((a, b) => a.seq - b.seq), throughJournalSeq: Math.max(incoming.throughJournalSeq, priorWindow.throughJournalSeq) };
+    }
+    this.batch(() => {
+      const active = new Set(envelope.activeMessageIds);
+      const messages = new Map(cell.snapshot?.messages.map(message => [message.messageId, message]));
+      for (const message of envelope.snapshot.messages) if (!older || !messages.has(message.messageId)) messages.set(message.messageId, message);
+      const tools = new Map(cell.snapshot?.tools.map(tool => [tool.callId, tool]));
+      for (const tool of envelope.snapshot.tools) if (!older || !tools.has(tool.callId)) tools.set(tool.callId, tool);
+      const snapshot = { ...(older ? cell.snapshot! : envelope.snapshot), messages: [...messages.values()].filter(message => older || active.has(message.messageId)), tools: [...tools.values()] };
+      this.applySnapshot(snapshot, { requestGeneration });
+      const current = this.#cell(envelope.sessionId);
+      this.#cells.set(envelope.sessionId, Object.freeze({ ...current, window, watermarks: envelope.watermarks ?? current.watermarks, deferredToolCalls: [...new Set([...cell.deferredToolCalls, ...envelope.deferredToolCalls])] }));
+      if (!older) {
+        const values: Record<string, RuntimeV2JsonValue> = {};
+        const revisions: Record<string, number> = {};
+        for (const [key, value] of Object.entries(envelope.values)) {
+          if (value === undefined) continue;
+          const newer = (current.projectionRevisions[key] ?? -1) >= envelope.throughJournalSeq;
+          values[key] = newer ? current.projectionValues[key]! : value;
+          revisions[key] = newer ? current.projectionRevisions[key]! : envelope.throughJournalSeq;
+        }
+        this.#cells.set(envelope.sessionId, Object.freeze({ ...this.#cell(envelope.sessionId), projectionValues: Object.freeze(values), projectionRevisions: Object.freeze(revisions) }));
+      }
+      this.#emit(envelope.sessionId);
+    });
+    return true;
+  }
+
+  applyJournalUpdate(update: RuntimeV2SessionUpdate): boolean {
+    const cell = this.#cell(update.sessionId);
+    if (!cell.window || !cell.snapshot) return false;
+    const event = update.event;
+    if (event.seq <= cell.window.throughJournalSeq) return true;
+    if (event.seq !== cell.window.throughJournalSeq + 1 || update.throughJournalSeq !== event.seq) return false;
+    const snapshot = cell.snapshot;
+    const transactionBoundary = [...cell.window.events].reverse().find(item => ["compaction/start", "compaction/end", "recovery/start", "recovery/end"].includes(item.type));
+    const pendingTransaction = transactionBoundary?.type.endsWith("/start") === true;
+    const node = !pendingTransaction && event.surface?.kind === "append" ? event.surface.node : null;
+    const messages = node ? [...snapshot.messages, { kind: node.kind, messageId: node.messageId, content: node.content, ...(node.kind === "tool-result" ? { callId: node.callId } : {}) }] : snapshot.messages;
+    const values: Record<string, RuntimeV2JsonValue | undefined> = { ...cell.projectionValues, ...update.values };
+    const tools = update.tool ? [...snapshot.tools.filter(tool => tool.callId !== update.tool!.callId), update.tool] : snapshot.tools;
+    const nextSnapshot = { ...snapshot, throughJournalSeq: event.seq, updatedAt: event.time, messages, tools,
+      metadata: (values.metadata ?? snapshot.metadata) as RuntimeV2SessionSnapshot["metadata"],
+      todos: (values.todos ?? snapshot.todos) as RuntimeV2SessionSnapshot["todos"],
+      usage: (values.providerUsage ?? snapshot.usage) as RuntimeV2SessionSnapshot["usage"],
+      activity: (values.sessionStats ?? snapshot.activity) as RuntimeV2SessionSnapshot["activity"],
+      delegations: (values.delegations ?? snapshot.delegations) as RuntimeV2SessionSnapshot["delegations"],
+      pendingInbox: (values.pendingInbox ?? snapshot.pendingInbox) as RuntimeV2SessionSnapshot["pendingInbox"],
+    };
+    const revisions = { ...cell.projectionRevisions };
+    for (const key of Object.keys(update.values)) revisions[key] = event.seq;
+    this.#cells.set(update.sessionId, Object.freeze({ ...cell, snapshot: nextSnapshot, projectionValues: values as Record<string, RuntimeV2JsonValue>, projectionRevisions: revisions,
+      window: { ...cell.window, events: [...cell.window.events, event], throughJournalSeq: event.seq },
+      liveGap: false, status: "ready" }));
+    this.#emit(update.sessionId);
+    return true;
   }
 
   applyProjectionValue(input: { readonly sessionId: string; readonly key: string; readonly throughJournalSeq: number; readonly value: RuntimeV2JsonValue }): boolean {

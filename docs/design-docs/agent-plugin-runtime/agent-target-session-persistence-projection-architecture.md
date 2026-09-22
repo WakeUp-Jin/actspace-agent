@@ -1,715 +1,99 @@
 # Session 持久化事实源与投影架构
 
-> 状态：目标设计已确认；P00/P01 已达到验收候选，P02/P03 基础通道和首批消费者已落地；完整消息映射与集成验收仍按 active 计划收口。
->
-> 日期：2026-08-30。
->
-> 本文不重新定义 13 种 Session 核心事件、持久化扩展事件、9 个 Agent Loop 插入面或 5 个通知事件。它定义这些事实如何被持久化、重放、投影并提供给 Desktop、CLI 和后续 Trajectory 视图。
+状态：2026-09-21 生产读取路径完成切换；验证结果与外部验收边界见[执行摘要](../../exec-runs/20260921-session-projection-cutover/execution-summary.md)。
 
-## 1. 目标
+## 事实源与分层
 
-ActSpace 将 Session 设计为一次 Agent 运行的唯一持久化事实源。所有对话、工具、Agent Loop、Context、Approval、Retry、Compaction、Plugin/Hook 和恢复事实先进入 Session Journal；Conversation、Context、Usage、Run、Todo、Trajectory、Diagnostics 等都是从已提交 Journal 前缀派生的只读投影。
-
-目标不是给每个 UI 问题增加条件分支，而是让同一个 `sessionId`、同一个 Journal 水位和同一个 projection snapshot 驱动整个 Host。临时流式状态只能作为可丢失 overlay，不能替代或修改持久化事实。
-
-## 2. 依据与范围
-
-### 2.1 依据
-
-本设计承接以下已确认契约：
-
-1. [DSH 风格 Session 事件模型](./agent-spec-dsh-event-model.md) 定义事件平面、13 种核心事件、持久化扩展、Surface 和 replay。
-2. [Session 格式公共契约](./agent-spec-session-format-v1.md) 定义 raw JSONL、Header、Envelope、Surface、repair 和 fork。
-3. [Session Core 与 Persistence Provider 分离规范](./agent-spec-session-core-persistence-separation.md) 定义 live Session、backend-neutral Provider 和 JSONL Provider 的所有权。
-4. [Runtime Projection 公共契约](./agent-spec-runtime-projection.md) 定义 durable、live、diagnostics 三个投影平面和 Host DTO 边界。
-5. DSH 的 Session、Session Projection Registry、客户端 Session snapshot 和 Trajectory projection 源码。
-
-### 2.2 范围
-
-包含：
-
-- Session Journal 到各类投影的统一读取模型；
-- projection definition、registry、watermark、snapshot、change feed 和 cache；
-- Desktop main、preload、renderer 的 Session-bound 消费边界；
-- provider usage 与 request context estimate 的命名和生命周期；
-- Composer phase 和 Trajectory projection 的 Session 来源；
-- 投影不一致、通知丢失、异步旧响应和缓存失效的处理。
-
-不包含：
-
-- 13 种核心事件或其顺序的重新设计；
-- Session 数据迁移、旧 v1 事件兼容、SQLite、远程后端或双写；
-- CLI chat、在线 HMR、运行时 reconcile；
-- `read`、`list`、`grep`、`edit`、`write`、`bash` 和 Browser Bridge executor 的具体实现重写；
-- 不可信插件前端代码或第二套前端插件运行时；
-- Goal/Schedule 的业务 producer。
-
-## 3. 核心不变量
-
-### 3.1 Journal 是唯一事实源
+Session Event Journal 是唯一 Session 事实源。Host 统一维护跨冷读、跨重连复用的派生事实；Client 对同一事件窗口分别生成 Chat、Trajectory 和 Tool Card，不要求它们共享视图结构。
 
 ```text
-User / Agent / LLM / Tool
-          │
-          ▼
-Session Core append
-          │
-          ▼
-validate → assign seq → durable commit
-          │
-          ▼
-Session Journal
+Session Event Journal
+├─ Host Projection Registry
+│  ├─ metadata（title、pinned、archived）
+│  ├─ todos、sessionStats、providerUsage、pendingInbox、delegations
+│  └─ surface、tools、workspaceRoot、updatedAt、requestContext
+├─ Projection Cache
+│  └─ projection-checkpoint.json（状态 checkpoint、JSONL 字节偏移与窗口索引）
+└─ Client Raw Event Window
+   ├─ Chat projection
+   ├─ Trajectory projection
+   └─ Tool Card projection
 ```
 
-Journal 的 append 是唯一提交点：
+Goal 当前没有业务 producer 或 Session event，不预置空壳兼容实现；未来先定义事件与 codec，再注册纯 projection definition。
 
-1. codec、关系、Surface operation、大小和 secret policy 校验先完成；
-2. Session Journal 分配严格连续的 `seq`；
-3. Persistence Provider 写入并完成规定的 durability barrier；
-4. append commit 后发布 `session/event`；
-5. 通知失败、projection 失败和 cache 失败都不能回滚已提交事实。
+## Journal 与持久化水位
 
-`session/event` 只表示某个事实已经提交，不代表它是完整的投影，也不是恢复所需的第二份日志。
+Session Core append 校验事件并分配连续 seq，accepted watermark 与 durable watermark 分离。`session/event` 表示事件已被 Journal 接受，不能据此宣称已经 fsync。Persistence coordinator、checkpoint policy 和 flush barrier 决定 durable prefix；参见[Session Core / Persistence](./agent-spec-session-core-persistence-separation.md)和[Session 格式](./agent-spec-session-format-v1.md)。
 
-### 3.2 Surface 是 Journal 的确定性派生面
+Live Host model 可以反映 accepted prefix。冷读缓存只能从磁盘 Journal 构建；flush callback 在 durability barrier 后刷新缓存。通知、投影或 cache 失败不能撤销已经接受的 Journal 事实。Live progress 是可丢失 overlay，不是第二份恢复日志。
 
-`SessionJournal.surface` 是模型历史和 Conversation 的 canonical source。它包含：
+## Host Projection Registry
 
-- `user`；
-- `assistant`；
-- `tool-result`。
+`packages/session/projection/src/registry.ts` 提供 `register`、`sync`、`apply`、`snapshot`、`checkpoint`、`restore` 和变更订阅。每个 definition 有稳定 key、stateVersion、init、apply、view。
 
-`user/message` 和带 Surface append 的 `agent/inbox/spliced` 都可以产生 user node。`assistant/chunk` 是流式事实，`assistant/message` 是收束后的 assistant node。Surface replacement 只引用并替换派生位置，不删除原始事件。
+- apply 与 view 必须同步、纯、确定；不相关事件返回原 state reference。
+- 状态被冻结，禁止 reducer 原地修改既有状态；所有 definitions 成功后才提交新水位。
+- 输出与 checkpoint 使用 detached JSON，不传递 live handle、闭包或 Provider 对象。
+- 增量事件必须连续；事务使用 effectiveSessionEvents，未闭合事务保留在 pending，不提前形成有效派生事实。
+- restore 验证 definition 版本；checkpoint 保存内部 reducer state，不用展示 value 反推状态。
+- 未知事件遵守 codec 的 required/ignorable 策略，不把不完整恢复伪装成可写会话。
 
-因此，任何 Desktop projection 都必须消费同一份 `SessionJournal.surface.entries` 或与它证明等价的 projector，不能重新实现一个只识别部分事件的 Surface。
+`facts.ts` 注册通用 metadata、todos、sessionStats、providerUsage、pendingInbox 和 delegations。Runtime 的 `SessionReadModel` 注册 Surface、tool lifecycle、workspaceRoot、updatedAt、requestContext，并组合 `RuntimeV2SessionSnapshot`。Surface append/replace 继续使用 SessionSurface 语义；Chat 不能仅凭 user/assistant 事件类型重新推断有效历史。
 
-### 3.3 Projection 不拥有事实
+Provider usage 来自持久化请求结果；requestContext 来自请求快照与模型容量事实。累计 tokens 不等于当前上下文占用，不能拿累计值除以模型窗口。容量缺失时不虚构固定默认容量。
 
-Projection 可以：
+## 缓存与冷读
 
-- 读取已提交事件；
-- 维护可删除的内存状态；
-- 写入可重建 cache；
-- 发布只读 snapshot 和 change feed。
+`packages/session/projection-cache/src/journal-cache.ts` 读取 Journal Header、文件身份和长度，校验 codec digest、definition stateVersions、checkpoint 水位与 anchor。命中时恢复 reducer state 并 replay 新增尾部，同时维护事件字节偏移、Turn 起点、Request 编号和 callId 索引。
 
-Projection 不可以：
+缺失、格式损坏、版本变化、文件替换或截断等失效条件触发 Journal 重建。checkpoint 文件采用临时文件写入后 rename；写缓存失败不阻止 Journal 读取。缓存可删除，不能参与 Agent resume、canonical export 或修复事实。
 
-- append 或修改 Session event；
-- 读取 AgentLoop 私有对象作为历史来源；
-- 读取 renderer state、ToolRuntime 内存对象或通知缓存补全历史；
-- 将 running 状态提升为 durable terminal fact；
-- 把 UI 字段写回 Journal。
+首轮冷读或缓存失效仍需完整扫描。列表逐会话取得摘要，未引入后台索引调度；不能宣称超大历史首读无成本。追加检测以 Journal 的 append-only 约束为前提。
 
-## 4. 三个数据平面
+## IPC 与事件窗口
 
-```text
-┌──────────────────────────────────────────────┐
-│ Session Journal, durable facts                │
-│ seq, event type, payload, surface, provenance │
-└───────────────────────┬──────────────────────┘
-                        │ replay / fold
-                        ▼
-┌──────────────────────────────────────────────┐
-│ Durable Projection                           │
-│ coherent snapshot + throughJournalSeq        │
-└───────────────────────┬──────────────────────┘
-                        │
-              ┌─────────┴─────────┐
-              ▼                   ▼
-┌──────────────────────┐  ┌──────────────────────┐
-│ Live Progress        │  │ Runtime Diagnostics  │
-│ runtimeInstanceId    │  │ boot / host / storage │
-│ liveSeq, overlay     │  │ projection failures  │
-└──────────────────────┘  └──────────────────────┘
-```
+`RuntimeSessionController.readProjection` 返回：
 
-### 4.1 Durable Projection
+- `sessionId`、`throughJournalSeq`：全 Session 派生事实的共同水位；
+- `snapshot`、`values`：Host facts，以及当前窗口需要的 Surface 和 ToolView；
+- `window`：events、fromSeq、throughJournalSeq、beforeSeq、turnOffset、requestOffset；
+- `activeMessageIds`：全 Session 当前有效 Surface 身份，用于清除被 replace 的旧消息；
+- `deferredToolCalls`：从普通页剥离的大工具正文，通过 detail API 按需读取。
 
-Durable Projection 从 Journal 的一个前缀派生，服务：
+默认最近 10 个完整 Turn。`beforeSeq` 向前分页；`afterSeq` 读取尾部补齐。窗口包含 turn/start 前的 Inbox claim。全 Session 水位与历史页末尾水位是不同概念，客户端不能用历史页尾覆盖最新 facts。
 
-- Session 列表、历史和 reload；
-- Conversation Surface；
-- Run、Turn、Step、Tool、Approval、Inbox 和 Todo；
-- Context request snapshot 和 provider usage；
-- CLI resume、冷启动和 canonical export；
-- Trajectory 和 diagnostics 的恢复性读取。
+单个大工具事件超过 24,000 字符时移除传输页中的 modelOutput/detail 和 Surface 正文，Journal 原文不变。该阈值不是整个 IPC envelope 的硬字节上限。完整复制对话使用完整读取，不依赖屏幕已加载页。
 
-同样的事件 codec、同样的 Journal 前缀和同样的 projection version 必须得到相同的 generic projection。
+`journal-update` 通知携带事件、changed values 与相应 ToolView。客户端发现缺口、runtimeInstanceId 变化或 resync-required 后重新读取；通知不是持久历史。
 
-### 4.2 Live Progress
+## Client 与 Desktop 边界
 
-Live Progress 用于：
+`packages/client/src/sessions/session.ts` 按 sessionId 管理 snapshot、raw window、projection values、请求 generation 和 live overlay。相邻或重叠页按 seq 去重合并；旧响应不覆盖新 facts；Surface replacement 按有效 messageId 收敛。
 
-- assistant/reasoning streaming delta；
-- 工具 validating、approval wait、queued、executing、finalizing 阶段；
-- 当前运行状态、百分比和短文本。
+- `chat.ts`：根据有效 Surface、工具结果和错误事实生成聊天展示；
+- `trajectory.ts`：保留原始执行事件、source、surface 和绝对 seq；
+- `tool-card.ts`：从结构化 args/result/detail 生成卡片；后台 Bash taskId 来自 detail，不解析模型输出文字；
+- `selectors.ts`：Context、Usage、Composer 等消费适配；
+- `usage-aggregates.ts`：活动与费用展示聚合。
 
-每条 Live Progress 带：
+Desktop main 保留 Runtime 调用、权限、IPC 和 live stream adapter；preload 暴露 typed API，必要的 Chat 适配复用 Client 包。Renderer 的 SessionProjectionProvider 复用 App 的 store，避免二次读取和双 store。组件可有各自视图结构，但不建立独立历史文件或主进程 renderer projection。
 
-```text
-runtimeInstanceId
-liveSeq
-sessionId
-throughJournalSeq
-```
+## 已移除与保留边界
 
-它可以丢失、合并或重放失败。发现 `runtimeInstanceId` 变化、`liveSeq` 缺口或 buffer overflow 时，Host 必须丢弃 overlay，并从 Durable Projection 重新同步。
+已删除独立 browse index、旧 Main fixed renderer projection/tool preview/usage aggregates、session revision observer、旧 product projections 和 Host trajectory projector，以及被替代的 checkpoint/cold-restore/restore-floor 实现。没有保留旧 IPC cursor fallback 或双轨读取。
 
-### 4.3 Runtime Diagnostics
+仍被 persistence/compaction 使用的 `session/projection/src/projection.ts` 是运行时恢复投影，不因文件名相近而删除。仍使用的流式 adapter、权限系统和工具执行器也不是冗余兼容层。
 
-Diagnostics 描述 boot、Cordis、Host、Storage、Projection 和 Plugin 运行问题，不进入模型 Context，不替代 Session facts，也不混入 CLI 业务 stdout。
+## 验证与入口
 
-## 5. Projection Definition
+验证重点：重放与增量一致、reducer 失败不污染状态、缓存可删除及损坏恢复、25 Turn 的 10/10/5 分页、冷读不打开 writer、Surface replacement、请求身份、重连与过期响应、大工具详情、流式与后台会话隔离。
 
-ActSpace 使用和 DSH 类似的纯 projection unit。现有 `packages/session/projection` 继续作为实现归属，不创建第二套中央状态容器。
+- `packages/runtime/src/runtime/session-projection.test.ts`
+- `packages/session/projection/src/test/registry.test.ts`
+- `packages/session/projection-cache/src/test/cache.test.ts`
+- `packages/client/src/test/session-store.test.ts`
+- `apps/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
+- `apps/desktop/scripts/verify-trajectory-electron.mjs`
 
-```ts
-interface ProjectionDefinition<K, S, V> {
-  readonly key: K
-  readonly stateVersion: number
-  readonly init: () => S
-  readonly apply: (state: S, event: SessionEventEnvelopeV1) => S
-  readonly view: (state: S) => V
-  readonly schema: ProjectionSchema<V>
-}
-```
-
-契约要求：
-
-1. `init`、`apply`、`view` 同步执行；异步 projection 会破坏一致性切面，禁止注册。
-2. 不关心当前事件的 `apply` 必须返回相同 state reference，以避免无意义的下游刷新。
-3. `view` 返回 JSON-safe、脱敏、不可变的全量值，不返回 live object、函数、路径或 credential。
-4. `stateVersion` 变化表示 fold 语义或序列化结构变化，旧 checkpoint 必须失效。
-5. Projection 只能依赖事件和自己的 state，不依赖其他 projection 的私有 state。
-
-## 6. Registry、Snapshot 与 Revision
-
-### 6.1 Registry
-
-`SessionProjectionRegistry` 负责：
-
-- 注册和注销 projection definition；
-- 为每个 `sessionId` 建立惰性 cell；
-- 在一次 `session/event` 订阅中驱动所有已注册 unit；
-- 记录每个 unit 的 watermark；
-- 生成一致 snapshot；
-- 对已变化 unit 发布 change feed；
-- 提供 checkpoint、restore floor 和 cold restore。
-
-领域 projection 不自己订阅 Session event。领域只注册纯 definition，框架拥有驱动、生命周期和 change feed。
-
-### 6.2 一致 Snapshot
-
-```ts
-interface SessionProjectionSnapshot {
-  readonly sessionId: string
-  readonly throughJournalSeq: number
-  readonly values: Readonly<{
-    summary?: SessionSummaryProjection
-    surface?: ConversationProjection
-    run?: RunProjection
-    inbox?: InboxProjection
-    context?: ContextEstimateProjection
-    usage?: ProviderUsageProjection
-    todo?: TodoProjection
-    trajectory?: TrajectoryProjection
-    diagnostics?: SessionDiagnosticsProjection
-  }>
-}
-```
-
-`throughJournalSeq` 是所有值共同反映的 Journal 水位。不存在一个 snapshot 内部的值已经到 seq 570、另一个值仍停在 seq 568 却伪装成同一切片的情况。
-
-如果一个可选 projection 没有注册，它从 `values` 中缺席并被解释为能力缺失；如果已注册但无法追上水位，必须返回结构化 projection diagnostic，不能静默返回旧值并声称最新。
-
-### 6.3 Change Feed
-
-```ts
-interface ProjectionChange {
-  readonly sessionId: string
-  readonly key: string
-  readonly value: unknown
-  readonly throughJournalSeq: number
-}
-```
-
-Change feed 只是低延迟刷新信号。Host 可以丢弃任意 change，并用 `snapshot(sessionId)` 或 `readFrom(sessionId, lastSeq + 1)` 修复缺口。
-
-### 6.4 异步 IPC 身份
-
-所有异步读取或描述请求都必须带：
-
-```text
-sessionId
-requestId
-knownThroughJournalSeq
-```
-
-返回值必须带：
-
-```text
-sessionId
-requestId
-throughJournalSeq
-```
-
-renderer 只接受同时满足以下条件的结果：
-
-1. `sessionId` 仍然是当前绑定的 Session；
-2. `throughJournalSeq` 不早于当前 Store 的水位；
-3. `requestId` 仍然属于当前请求代际；
-4. projection schemaVersion 和 stateVersion 可以消费。
-
-旧响应直接丢弃，不用旧响应覆盖新 snapshot。
-
-## 7. Projection Catalog
-
-| Projection | Journal 输入 | 消费者 | 是否恢复必需 |
-|---|---|---|---|
-| `summary` | Header、session metadata 扩展、turn/end | Session list、标题栏 | 是 |
-| `surface` | user/message、agent/inbox/spliced、assistant/message、tool/result、surface/replaced | Conversation、模型历史 | 是 |
-| `run` | turn、step、tool、approval、retry、error、abort | Composer、运行状态、诊断 | 是 |
-| `inbox` | agent/inbox/spliced enqueue/claim/discard | AgentLoop、Composer、恢复 | 是 |
-| `context` | request/header、request/context、compaction | Context 面板、Composer 容量提示 | 是 |
-| `usage` | assistant/message、step/end、turn/end usage | Usage、费用、统计 | 是 |
-| `todo` | todo/write | Todo 面板和恢复 | 否，可降级 |
-| `trajectory` | turn、step、request、assistant、tool、approval、retry、compaction、error | Trajectory 视图 | 否，可按能力缺失 |
-| `diagnostics` | recovery、unknown event、projection gap、storage health | Diagnostics 面板、日志 | 否 |
-
-这个表是 projection ownership 的基线。新增 projection 必须说明 Journal 输入、稳定 key、watermark、schema、脱敏策略和消费者，不能只在 renderer 中增加一个独立缓存。
-
-## 8. Conversation 与 Surface
-
-Conversation Projection 的唯一来源是 canonical Surface：
-
-```text
-Session Journal
-     │
-     ▼
-SessionJournal.surface.entries
-     │
-     ├─ user
-     ├─ assistant
-     └─ tool-result
-```
-
-临时 streaming overlay 的生命周期是：
-
-```text
-durable user/message or inbox claim
-        │
-        ├─ Live overlay: immediate rendering
-        │
-        └─ Durable projection: final rendering
-```
-
-overlay 结束后必须由同一个 Surface node 接管。任何 Surface 事件未被 renderer projector 识别，都是 projection contract violation，不能通过保留临时 React state 来掩盖。
-
-## 9. Context 与 Usage
-
-ActSpace 固定两个不同投影：
-
-### 9.1 `providerUsage`
-
-来自真实 Provider 返回的 usage：
-
-- input tokens；
-- output tokens；
-- cache read/write；
-- cost；
-- provider-specific usage metadata。
-
-它用于费用、模型请求统计和 Provider 观测。
-
-### 9.2 `requestContextEstimate`
-
-来自最近一次 `request/context`，按当前 Context estimator 重建：
-
-- system sections；
-- rules 和 skills；
-- tool definitions；
-- facts；
-- summarized conversation；
-- conversation messages。
-
-它用于回答“当前请求距离 Context window 还有多少空间”。
-
-两者都属于同一个 Session snapshot，但不得继续共用含糊的 `contextSnapshot` 名称。UI 必须使用明确文案：`Provider usage` 与 `Request context estimate`。如果只显示一个环形占用率，优先显示 `requestContextEstimate`。
-
-## 10. Composer Phase
-
-Composer 的生命周期由 Session Projection 派生，不由 Conversation 组件自行计算 `messages.length`。
-
-```text
-blank
-  └─ 尚未接受任何输入
-
-engaging
-  └─ 已发起或正在等待首个输入结果
-
-active
-  └─ 已有可见内容、运行中 Turn、pending Inbox 或已接受输入
-```
-
-`composerPhase` 由 Session-owned facts 计算一次，组件只消费结果。底部 Composer 是稳定的 resident slot，phase 只改变提示、按钮和禁用状态，不改变其是否存在。
-
-首次 prompt 失败时保留 `engaging` 或错误可重试状态，不能因为临时消息数组为空而回到一个新的 Session 语义。
-
-## 11. Trajectory Projection
-
-Trajectory 是同一个 Session 的只读投影，不创建第二份事件日志：
-
-```text
-Session Journal
-      │
-      ▼
-Trajectory Projection
-      │
-      ▼
-TrajectorySnapshot
-      │
-      ▼
-Trajectory View
-```
-
-第一阶段支持以下节点：
-
-- Turn start/end；
-- Step start/end；
-- request/header/context；
-- user/message 和 agent/inbox/spliced；
-- assistant/chunk/message；
-- tool/call/result；
-- approval、retry、compaction、error。
-
-稳定 key 使用 `sessionId + eventSeq`，工具生命周期额外使用 `callId`。Trajectory builder 支持 `replace` 和 keyed `apply`，全量重建与增量更新必须得到相同的排序和节点状态。
-
-Conversation 只展示 Surface，Trajectory 展示完整执行过程。两者可以拥有不同的 UI 结构，但不能拥有不同的事实来源。
-
-## 12. Cache 与 Cold Read
-
-Projection cache 只用于加速，不是事实源。缓存行的逻辑身份为：
-
-```text
-sessionId
-projectionKey
-stateVersion
-throughJournalSeq
-value
-```
-
-冷读取顺序：
-
-```text
-cached checkpoint
-       │
-       ├─ version match
-       ├─ restore floor tail read
-       ├─ projection apply
-       ├─ snapshot at journal end
-       └─ write-back checkpoint
-```
-
-以下情况必须从更早位置重建：
-
-- `stateVersion` 不匹配；
-- cache row 水位晚于 Journal 尾部；
-- crash repair 让 Journal 变短；
-- required projection 缺少可验证的 checkpoint；
-- projection schema validation 失败。
-
-cache 写入失败不阻塞 Session append。cache 读写失败都要写 Diagnostics，但不能创建第二套历史状态。
-
-## 13. Host 与 Renderer 边界
-
-```text
-Session Core / Journal
-          │
-          ▼
-Projection Registry
-          │
-          ▼
-Desktop Main Session Adapter
-          │ typed IPC
-          ▼
-Preload Session API
-          │
-          ▼
-Renderer SessionStore[sessionId]
-          │ selectors
-          ├─ Conversation
-          ├─ Composer
-          ├─ Context
-          ├─ Usage
-          └─ Trajectory
-```
-
-Main 进程负责：
-
-- 打开 Session 和读取 Journal；
-- 运行 projection registry；
-- 生成完整 snapshot；
-- 发送 post-commit event 和 projection change；
-- 处理冷读、gap repair 和 diagnostics。
-
-Preload 只暴露 typed projection API，不暴露文件路径、writer、live Session handle 或任意插件对象。
-
-Renderer 负责：
-
-- 选择当前 `sessionId`；
-- 保存当前 snapshot 和可丢失 live overlay；
-- 丢弃旧 revision；
-- 通过 selector 向组件提供数据。
-
-Renderer 不应再同时合成 `sessionRecord`、`agentRunResult`、`visibleSessions[0]`、`streamingBlocks` 和单独的 Context describe 结果。
-
-## 14. Session 切换与生命周期
-
-Session 切换必须先更新唯一的当前 Session identity，再启动所有读取和订阅：
-
-```text
-select(sessionId)
-   │
-   ├─ invalidate request generation
-   ├─ detach old live overlay
-   ├─ open durable snapshot(sessionId)
-   ├─ attach session/event subscription
-   └─ render snapshot for this session only
-```
-
-禁止通过 `visibleSessions[0]`、最近一次 `agentRunResult` 或任意异步结果猜测当前 Session。
-
-Session 关闭顺序为：
-
-```text
-reject new work
-  → stop live publication
-  → flush Journal / projection cache
-  → publish final projection
-  → release provider lease
-  → detach Session Store
-```
-
-## 15. 失败与恢复
-
-### 通知丢失
-
-Host 根据 `lastKnownThroughJournalSeq` 读取 Durable Projection 或 Journal tail。通知不是恢复依据。
-
-### Live stream 缺口
-
-丢弃 overlay，保留最后一个 durable snapshot，从 `throughJournalSeq + 1` 重新读取。
-
-### 旧 IPC 响应
-
-按 `sessionId + requestId + throughJournalSeq` 校验，旧响应丢弃。
-
-### Projection 失败
-
-保留 Journal，标记 projection diagnostic；核心 projection 失败时 fail closed，非核心 projection 可以报告 capability unavailable。
-
-### 未知事件
-
-遵循 Session codec 的 required/ignorable 策略。未知 required event 不能伪装成可恢复的完整 Session；可以提供 browse-only raw inspection。
-
-## 16. 迁移映射
-
-| 当前形态 | 目标形态 |
-|---|---|
-| `SessionRecord.events` | Main-only Journal inspection 或 diagnostics/export API |
-| `SessionRecord.messageBlocks` | `surface` projection |
-| `SessionRecord.contextSnapshot` | `providerUsage` projection，完成命名拆分 |
-| `SessionRecord.contextState` | `requestContextEstimate` projection |
-| `agentRunResult` | Durable Run projection + Live Progress overlay |
-| `streamingBlocks` | Renderer Store 的可丢失 overlay |
-| `visibleSessions[0]` fallback | 明确的 `selectedSessionId` |
-| `activeSessionIdRef` | Session Store 的单一 identity 和订阅代际 |
-| `projectFixedRendererEvents` 手工 Surface 判断 | 复用 `SessionJournal.surface` 的 canonical adapter |
-| `ContextRenderView` 独立 describe 请求 | 同一 snapshot cut 的 Context selector，必要时使用 revision-bound revalidation |
-
-迁移期间可以保留兼容字段作为内部适配，但新代码不得以它们作为事实源。完成 Host migration 后，renderer 不再直接接触完整 Journal events。
-
-## 17. 取舍与拒绝方案
-
-### 采用：Journal + Pure Projection + Session Store
-
-原因：
-
-- 与现有 Session Journal、Surface 和 P1-A Provider seam 一致；
-- 可从空 Session 或冷 Journal 重建；
-- 支持 Desktop、CLI 和未来 Trajectory 共用语义；
-- 通知丢失、进程重启和缓存删除不会破坏历史；
-- 能在不修改工具 executor 的前提下重写权限、事件和 Host 适配。
-
-### 拒绝：renderer 继续维护多个并行来源
-
-这种方式可以快速修复单个截图，但无法证明用户输入、Context 和 Agent 状态处于同一 Journal 水位，也无法可靠处理 Session 切换和异步旧响应。
-
-### 拒绝：为 Trajectory 建立独立日志
-
-这会产生 Conversation 与 Trajectory 的双真相、重复持久化和恢复分叉。Trajectory 必须是同一 Journal 的 projection。
-
-### 拒绝：Journal 与 Snapshot 双事实源
-
-Snapshot 可以作为 checkpoint 和读取加速，但必须可删除、可校验和可重建。它不能成为与 Journal 并列的可写事实源。
-
-## 18. 验收标准
-
-1. 删除 projection cache 后，从同一 Journal 得到等价 projection。
-2. 同一个 `sessionId + throughJournalSeq` 的所有核心 projection 可以从一个一致 snapshot 读取。
-3. `agent/inbox/spliced` 的 user Surface 节点在运行结束、reload 和冷启动后仍然可见。
-4. `providerUsage` 与 `requestContextEstimate` 类型、估算器和 UI 标签不再混淆。
-5. Session 切换后，旧 Session 的 IPC、live event 和 Context 响应不会写入新 Session。
-6. Composer 由 Session-owned phase 驱动，最终回复之后保持 resident。
-7. Trajectory 由 Journal replay 得到，增量 `apply` 与全量 `replace` 结果一致。
-8. 通知丢失、live gap、cache failure、unknown required event 和 projection validation failure 都有明确的恢复或 fail-closed 结果。
-9. renderer 不再把完整 Journal、credential、writer、Provider class 或插件对象作为读取 API 暴露。
-10. 工具 executor 行为 parity、13 个核心事件、现有 JSONL recovery 和 CLI run 语义不变。
-
-## 19. 实施入口
-
-实施拆为四个独立计划，具体文件所有权、依赖和命令见：
-
-[Session 持久化与投影实施计划](../../exec-plans/active/20260830-actspace-session-persistence-projection/README.md)
-
-本设计的上游依赖是 P1-A Session Core/Persistence 和 P1-B Service Definition/Provider/Consumer 的 public contract。P1-C Profile/Bundle/Patch 只影响生产 Boot 接线，不改变 projection 的 Journal 语义。P2 Contract Matrix 需要在本计划的 projection metadata 稳定后纳入 projection keys、stateVersion 和验证证据。
-
-## 20. 模块放置与依赖方向
-
-### 20.1 Host Session Runtime
-
-Host Session Runtime 不是一个单独 package，而是以下能力的组合：
-
-```text
-packages/session/journal
-    事件 Envelope、Codec、Surface、Replay
-
-packages/session/core
-    live Session、SessionHandle、append、flush、close
-
-packages/session/persistence
-    backend-neutral Persistence contract
-
-packages/session/jsonl
-    JSONL 文件、writer、lease、recovery
-
-packages/runtime
-    Cordis Boot、Profile、Bundle、Service wiring、Host lifecycle
-```
-
-`packages/runtime` 负责组装这些服务，但不持有 Session 状态。`Session Core` 对应 DSH 的 `ctx.sessions`，是按 `sessionId` 管理 live Session 和 Journal 的服务。物理 Provider 只属于 Persistence 层。
-
-### 20.2 Host Projection Runtime
-
-`packages/session/projection` 是通用 projection framework 和 Host-side projection unit 的归属：
-
-```text
-packages/session/projection/
-    ├─ projection-definition.ts
-    ├─ projection-registry.ts
-    ├─ projection-snapshot.ts
-    ├─ surface.ts
-    ├─ run.ts
-    ├─ inbox.ts
-    └─ trajectory.ts
-```
-
-它只依赖 `@actspace/session-journal` 和 detached shared types，不依赖 Electron、React、文件系统或具体 Persistence Provider。
-
-Projection Cache 是单独的可选能力：
-
-```text
-packages/session/projection-cache/
-    ├─ checkpoint.ts
-    ├─ cold-restore.ts
-    ├─ restore-floor.ts
-    └─ plugin.ts
-```
-
-它可以依赖 `session-projection` 和 Persistence contract，用于 checkpoint、restore floor、tail replay 和 write-back。Cache 删除后，Projection Runtime 必须仍然能够直接从 Journal 重建相同结果。
-
-### 20.3 Client Session Runtime
-
-当前仓库已有 `packages/client`，因此通用的客户端 Session 不应只存在于 Desktop renderer：
-
-```text
-packages/client/src/sessions/
-    ├─ session.ts
-    ├─ projection-store.ts
-    ├─ session-snapshot.ts
-    ├─ live-overlay.ts
-    └─ selectors.ts
-```
-
-它对应 DSH 的 client `Session` 和 `ProjectionValueStore`，负责：
-
-- 按 `sessionId` 保存客户端 projection；
-- 按 `throughJournalSeq` 拒绝旧值；
-- 合并 durable snapshot 与可丢失 Live Progress overlay；
-- 派生 `ConversationSnapshot` 和 `composerPhase`；
-- 为 React 或其他客户端提供稳定订阅接口。
-
-Desktop 只保留 Electron 绑定：
-
-```text
-apps/desktop/src/renderer/session/
-    ├─ electron-session-bridge.ts
-    ├─ use-desktop-session.ts
-    └─ renderer-adapters.ts
-```
-
-这些文件不能重新 fold Journal，也不能成为第二个 Session Store。
-
-### 20.4 领域投影与 UI 投影
-
-第一阶段为了避免 package cycle，核心 projection unit 可以继续放在 `packages/session/projection`，但必须通过 registry 注册。后续依赖稳定后，可以由领域 package 注册贡献：
-
-| 能力 | 首选归属 | 说明 |
-|---|---|---|
-| Surface、Summary、Run、Inbox | `packages/session/projection` | 直接依赖核心 Session 事件 |
-| Provider Usage | `packages/session/projection`，后续可由 `packages/llm` 注册 | 只读取 durable usage 事实 |
-| Request Context Estimate | `packages/session/projection`，后续可由 `packages/context` 注册 | 只读取 request/header/context |
-| Tool projection | `packages/session/projection`，由 `packages/tools/*` 提供定义或 metadata | 不改变 executor |
-| Trajectory | Host builder 在 `session/projection` | 同一 Journal 的只读轨迹 |
-| Conversation、Context、Composer、Trajectory UI | `apps/desktop` | 只消费 `packages/client` snapshot |
-
-领域 package 贡献的是 Projection Definition，不直接订阅 `session/event`，也不直接向 renderer 发送事件。
-
-### 20.5 最终依赖图
-
-```text
-session-journal
-   │
-   ├──────────────► session-core ─────────────► runtime
-   │                      │                       │
-   ├──────────────► session-projection           ├─ Desktop Host adapter
-   │                      ▲                       └─ CLI Host adapter
-   │                      │
-   └─ session-persistence ─┴─ projection-cache
-          │
-          └──────────────► session-jsonl
-
-runtime / Host API
-          │
-          ▼
-      packages/client
-          │
-          ▼
-      Desktop React UI
-```
-
-当前 `session-persistence` 对 `session-projection` 的依赖属于迁移中的旧实现耦合。最终 contract 应使用 detached types，Projection Cache 才是 Persistence 与 Projection 的组合点，避免 projection framework 获得文件和 Provider 语义。
-
-## 21. 参考
-
-- `packages/session/journal/src/surface.ts`
-- `packages/session/projection/src/projection.ts`
-- `packages/runtime/src/projection/durable-session.ts`
-- `apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts`
-- `apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`
-- `apps/desktop/src/renderer/App.tsx`
-- `apps/desktop/src/renderer/components/right-panel/ContextRenderView.tsx`
-- `tmp/deepseek-harness/packages/session/session-projection/src/index.ts`
-- `tmp/deepseek-harness/packages/client/runtime/src/client/sessions/session.ts`
-- `tmp/deepseek-harness/packages/client/runtime/src/client/sessions/conversation.ts`
-- `tmp/deepseek-harness/packages/client/ui-trajectory/src/client/trajectory-snapshot-builder.ts`
+DSH 本地对照：`tmp/deepseek-harness/packages/session/session-projection/src/index.ts`、`packages/client/runtime/src/client/sessions/session.ts` 与 `packages/client/ui-trajectory/src/client/trajectory-snapshot-builder.ts`。它们作为设计参考，不是 ActSpace 的运行依赖。

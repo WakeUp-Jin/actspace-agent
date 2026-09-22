@@ -84,9 +84,9 @@ Session Journal
 - 原始 node 除 `data` 外保留 `surface`、`source`。用户正文可来自 surface；Inbox enqueue/claim/discard 只将 materialized claim 显示为 USER，避免重复。
 - request/context.snapshot 提供 renderedSystemPrompt、systemSections、tools、requestOptions 和 prepared 模型事实。工具 Schema 支持真实 inputSchema；Result 读取 modelOutput，保留 resultRaw 与来源序列。
 - 主进程先读取 Session snapshot，再将 Journal 截取到 snapshot.throughJournalSeq，所有投影共享同一版本；缺失版本范围直接报错，不拼接混合版本。
-- getSessionProjectionSnapshot 的可选 trajectoryFromSeq 驱动真实历史窗口：初始最近 20 个完整 Turn，后续累计扩大；绝对序列、Turn 与 Request 编号保留。窗口纳入 turn/start 前已入 Surface 的 Inbox claim。
-- 分页限制轨迹 DTO 传输和 renderer 构建范围；Session surface snapshot 与 Journal 磁盘读取仍是全量，这不是存储索引分页。
-- Desktop 监听 Cordis session/event 的实际提交版本，每会话 40ms 合并通知；旧 live delta 的零版本不再是轨迹刷新的依据。
+- `getSessionProjectionSnapshot` 的 `beforeSeq` / `afterSeq` 驱动同一 Journal 的事件窗口：初始返回最近 10 个完整 Turn，向前读取时按 `beforeSeq` 继续；绝对序列、Turn 与 Request 编号保留。Chat、Trajectory、Tool Card 分别解释窗口中的原始事件，窗口纳入 turn/start 前已入 Surface 的 Inbox claim。
+- 2026-09-21：Host Registry facts 反映全 Session；窗口传输仅含对应 raw events、Surface 和 tools。持久 checkpoint 与字节偏移用于尾部 replay 和范围读取，缓存失效仍需完整扫描。
+- 2026-09-21：Desktop 传递 journal-update 的事件与 changed values；accepted 与 durable 水位分离，客户端遇到缺口再读窗口，不把 live 通知当作 fsync 证明。
 - Bridge 在刷新时保留已加载窗口，校验会话身份和版本，拒绝失效加载结果。运行中 Assistant 与最终消息维持稳定选择；异常流使用同 requestId 关联终止消息。
 - TTFT 优先从对应 request/header 计时，避免重试时包含前次请求等待；缺失首 token 或 usage 不估造。
 - Electron 隔离实测使用真实临时 Journal、生产 renderer、main/preload/IPC；已覆盖历史加载、内容关联、Schema、提交通知、草稿切换和重载。真实 Provider 连续会话与超大 Journal 性能未在本轮验证。

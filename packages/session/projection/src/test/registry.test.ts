@@ -13,6 +13,22 @@ function eventJournal(): SessionEventEnvelopeV1[] {
 }
 
 describe("SessionProjectionRegistry", () => {
+  it("checkpoints internal state and rejects asynchronous views", () => {
+    const registry = new SessionProjectionRegistry();
+    registry.register({ key: "count", stateVersion: 1, init: () => ({ count: 0, secretState: 4 }), apply: state => ({ ...state, count: state.count + 1 }), view: state => state.count });
+    registry.sync("s", eventJournal());
+    const checkpoint = registry.checkpoint("s");
+    (checkpoint.rows.count!.state as { count: number }).count = 99;
+    expect(registry.snapshot("s").values.count).toBe(3);
+    const restored = new SessionProjectionRegistry();
+    restored.register({ key: "count", stateVersion: 1, init: () => ({ count: 0, secretState: 4 }), apply: state => state, view: state => state.count });
+    restored.restore("s", registry.checkpoint("s"));
+    expect(restored.snapshot("s")).toEqual(registry.snapshot("s"));
+    const invalid = new SessionProjectionRegistry();
+    invalid.register({ key: "bad", stateVersion: 1, init: () => 0, apply: state => state, view: (() => Promise.resolve(1)) as never });
+    expect(() => invalid.snapshot("s")).toThrow("plain JSON");
+  });
+
   it("replays per-session cells, ignores unrelated events by reference, and publishes one change", () => {
     const registry = new SessionProjectionRegistry();
     registry.register({
@@ -47,13 +63,22 @@ describe("SessionProjectionRegistry", () => {
     expect(() => registry.sync("session-1", [events[1]!])).toThrow("contiguous");
   });
 
+  it("rejects mutating reducers without advancing or contaminating committed state", () => {
+    const registry = new SessionProjectionRegistry();
+    registry.register({ key: "count", stateVersion: 1, init: () => ({ count: 0 }), apply: state => { state.count++; throw new Error("broken reducer"); }, view: state => state });
+    registry.ensureSession("s");
+    expect(() => registry.apply("s", eventJournal()[0]!)).toThrow();
+    expect(registry.snapshot("s")).toMatchObject({ throughJournalSeq: -1, values: { count: { count: 0 } } });
+  });
+
   it("fails duplicate keys and event gaps without mutating the cell", () => {
     const registry = new SessionProjectionRegistry();
     registry.register({ key: "count", stateVersion: 1, init: () => 0, apply: (state) => state + 1, view: (state) => state });
     expect(() => registry.register({ key: "count", stateVersion: 1, init: () => 0, apply: (state) => state, view: (state) => state })).toThrow("Duplicate projection key");
     const events = eventJournal();
     registry.sync("session-1", [events[0]!]);
-    expect(() => registry.apply("session-1", events[0]!)).toThrow("event gap");
+    expect(registry.apply("session-1", events[0]!)).toBeNull();
+    expect(() => registry.apply("session-1", { ...events[0]!, time: "2026-08-30T00:00:01.000Z" })).toThrow("resync");
     expect(registry.snapshot("session-1").throughJournalSeq).toBe(0);
   });
 });

@@ -5,6 +5,8 @@ import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { loadTrajectoryFixture } from "../trajectory/fixtures";
 import { TrajectoryView } from "../components/TrajectoryView";
 import { SessionProjectionProvider } from "../session";
+import { projectionFixture } from "./projection-fixture";
+import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
 const snapshot: RuntimeV2TrajectorySnapshot = {
   kind: "trajectory",
@@ -40,29 +42,21 @@ describe("TrajectoryView", () => {
   });
 
   it("reads the active Session trajectory directly from ClientSessionStore selectors", async () => {
+    const events: SessionEventEnvelopeV1[] = snapshot.nodes.map(node => ({
+      recordKind: "event",
+      seq: node.eventSeq,
+      type: node.eventType,
+      eventVersion: 1,
+      criticality: "ignorable",
+      time: node.time,
+      source: { ownerPluginId: "@actspace/core" },
+      data: node.data,
+      surface: null,
+      provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+    }));
+    const projection = projectionFixture("session-1", snapshot.throughJournalSeq, events);
     (window as { actspace?: unknown }).actspace = {
-      getSessionProjectionSnapshot: async () => ({
-        kind: "session-projection",
-        schemaVersion: 1,
-        sessionId: "session-1",
-        throughJournalSeq: 2,
-        snapshot: {
-          kind: "session-snapshot",
-          schemaVersion: 1,
-          sessionId: "session-1",
-          createdAt: "2026-08-31T00:00:00.000Z",
-          updatedAt: "2026-08-31T00:00:02.000Z",
-          workspaceRoot: null,
-          throughJournalSeq: 2,
-          accessState: "read-write",
-          metadata: { title: null, pinned: false, archived: false },
-          messages: [], tools: [], pendingInbox: [], todos: [], delegations: [],
-          usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
-          activity: { turnCount: 1, completedTurnCount: 1, stepCount: 1, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null },
-          lineage: null,
-        },
-        values: { trajectory: snapshot },
-      }),
+      getSessionProjectionSnapshot: async () => projection,
       onSessionLiveEvent: () => () => undefined,
     };
 

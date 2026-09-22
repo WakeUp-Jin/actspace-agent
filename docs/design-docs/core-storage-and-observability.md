@@ -176,9 +176,9 @@ Fork 不是复制一个 v1 会话目录。当前 Profile 的 App Bundle Service 
 - `packages/runtime/src/runtime/session-controller.ts`：Host-facing Session 操作；
 - `packages/runtime/src/projection/durable-session.ts`：durable snapshot；
 - `apps/desktop/src/main/app-paths.ts`：Desktop data / log / tmp root；
-- `apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts`：Context 与 Usage 派生；
+- `packages/runtime/src/projection/durable-session.ts`：Host durable facts、Surface、工具和 request context 派生；`packages/client/src/sessions/`：Client Chat、Trajectory、Tool Card 与 usage selectors；
 - `apps/desktop/src/main/runtime-v2/artifact-store.ts`：Desktop artifact integrity 与 owner 校验。
 
 ## 可重建的会话浏览缓存
 
-Session 目录中的 `browse-index.json` 与 `browse-<fingerprint>.jsonl` 是列表/消息分页的派生读取缓存，不参与 Agent 恢复、模型上下文或 canonical export。失效或缺失时从 Journal 重建；参见[会话浏览按需加载](frontend/front-progressive-session-loading.md)。
+Session 目录中的 `projection-checkpoint.json` 和 Journal byte-offset cache 是可删除的投影加速数据，不参与 Agent 恢复、模型上下文或 canonical export。失效或缺失时从 Journal 重建；参见[会话浏览按需加载](frontend/front-progressive-session-loading.md)。

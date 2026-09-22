@@ -39,6 +39,7 @@ import type {
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { SessionProjectionProvider } from "./session";
+import { ClientSessionStore, selectChatSession, projectChatWindow } from "@actspace/client/sessions";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
 import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
@@ -50,6 +51,7 @@ const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } =
   mode: "agent",
   selectedSkills: [],
 };
+type SessionPageCache = { record: SessionRecord; history: { before: number | null; throughJournalSeq: number } };
 
 function hasActspaceBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace);
@@ -766,6 +768,7 @@ function modelSelectionPayload(model: ModelSelectionId): { model?: ModelId; mode
 }
 
 export function App() {
+  const sessionStore = useMemo(() => new ClientSessionStore(), []);
   const [bootstrapState, setBootstrapState] = useState<BootstrapState | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(null);
@@ -797,7 +800,7 @@ export function App() {
     setBrowseGroups(groups);
     return [...new Map(items.map(s => [s.id, s])).values()];
   }, []);
-  const pageCacheRef = useRef(new Map<string, import("@actspace/shared").SessionMessagePage>());
+  const pageCacheRef = useRef(new Map<string, SessionPageCache>());
   const messageRequestRef = useRef(0);
   const historyPendingRef = useRef<number | null>(null);
   const [localSessionRecords, setLocalSessionRecords] = useState<Record<string, SessionRecord>>({});
@@ -833,6 +836,11 @@ export function App() {
   const draftsRef = useRef(new Map<string, ComposerDraftRestore>());
   const bashUpdatesRef = useRef(new Map<string, Record<string, { status: BashBackgroundStatus; exitCode?: number | null }>>());
   const activeSessionIdRef = useRef<string | null>(null);
+  useEffect(() => sessionStore.subscribe(cell => {
+    if (cell.sessionId !== activeSessionIdRef.current) return;
+    const record = selectChatSession(cell, bootstrapState?.workspaceRoot);
+    if (record) { setSessionRecord(record); setHistoryBefore(cell.window?.beforeSeq ?? null); }
+  }), [sessionStore, bootstrapState?.workspaceRoot]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const refreshStreamingBlocks = useCallback((sessionId: string | null) => {
     if (activeSessionIdRef.current !== sessionId) return;
@@ -1080,7 +1088,7 @@ export function App() {
     if (!hasActspaceBridge() || !window.actspace.onSessionLiveEvent) return;
     let disposed = false;
     const unsubscribe = window.actspace.onSessionLiveEvent(({ event }) => {
-      if (event.kind !== "runtime-live" || event.message !== "session-title-updated" || !event.sessionId) return;
+      if (event.message !== "session-title-updated" || !event.sessionId) return;
       const sessionId = event.sessionId;
       void window.actspace.listSessions().then(items => {
         const item = items.find(s => s.id === sessionId);
@@ -1093,7 +1101,7 @@ export function App() {
     return () => { disposed = true; unsubscribe(); };
   }, []);
 
-  const cacheSessionPage = useCallback((sessionId: string, page: import("@actspace/shared").SessionMessagePage) => {
+  const cacheSessionPage = useCallback((sessionId: string, page: SessionPageCache) => {
     pageCacheRef.current.delete(sessionId);
     pageCacheRef.current.set(sessionId, page);
     while (pageCacheRef.current.size > 3) pageCacheRef.current.delete(pageCacheRef.current.keys().next().value!);
@@ -1119,15 +1127,16 @@ export function App() {
       setMessageLoading(!cachedRecord && !run?.record); setMessageError(null); setEarlierError(null);
     }
     try {
-      const page = window.actspace.getSessionPage
-        ? await window.actspace.getSessionPage({ sessionId })
-        : { record: await window.actspace.getSession({ sessionId }), history: { before: null, throughJournalSeq: -1 } };
+      const projection = await window.actspace.getSessionPage({ sessionId });
+      if (version !== pageVersionsRef.current.get(sessionId)) return null;
+      sessionStore.applyEnvelope(projection);
+      const page = { record: selectChatSession(sessionStore.get(sessionId)), history: { before: projection.window.beforeSeq, throughJournalSeq: projection.throughJournalSeq } };
       if (version !== pageVersionsRef.current.get(sessionId)) return null;
       if (!page.record) throw new Error('会话读取失败，请重试');
       cacheSessionPage(sessionId, { record: page.record, history: page.history });
       if (visible() && request === messageRequestRef.current) {
         setSessionRecord(current => {
-          if (!current || current.meta.id !== sessionId || !window.actspace.getSessionPage) return page.record;
+          if (!current || current.meta.id !== sessionId) return page.record;
           const oldest = Math.min(...page.record!.events.map(e => Number(/^v2-(\d+)/.exec(e.id)?.[1] ?? Infinity)));
           const earlier = current.events.filter(e => Number(/^v2-(\d+)/.exec(e.id)?.[1] ?? Infinity) < oldest);
           const events = [...earlier, ...page.record!.events];
@@ -1143,15 +1152,17 @@ export function App() {
     } finally {
       if (version === pageVersionsRef.current.get(sessionId) && visible() && request === messageRequestRef.current) setMessageLoading(false);
     }
-  }, [cacheSessionPage]);
+  }, [cacheSessionPage, sessionStore]);
 
   const loadEarlierMessages = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
-    if (!sessionId || historyBefore === null || !window.actspace?.getSessionPage || historyPendingRef.current !== null) return;
+    if (!sessionId || historyBefore === null || historyPendingRef.current !== null) return;
     const request = messageRequestRef.current;
     historyPendingRef.current = request; setEarlierLoading(true); setEarlierError(null);
     try {
-      const page = await window.actspace.getSessionPage({ sessionId, before: historyBefore });
+      const projection = await window.actspace.getSessionPage({ sessionId, beforeSeq: historyBefore });
+      sessionStore.applyEnvelope(projection);
+      const page = { record: projectChatWindow(projection, bootstrapState?.workspaceRoot), history: { before: projection.window.beforeSeq, throughJournalSeq: projection.throughJournalSeq } };
       if (request !== messageRequestRef.current || activeSessionIdRef.current !== sessionId) return;
       setSessionRecord(current => {
         if (!current || current.meta.id !== sessionId) return current;
@@ -2118,7 +2129,7 @@ export function App() {
       let transcriptMessages: MessageBlock[];
       let transcriptTitle = listedSession?.title ?? "Untitled session";
 
-      if (sessionId === activeSessionId && !window.actspace?.getSessionPage) {
+      if (!hasActspaceBridge() && sessionId === activeSessionId) {
         transcriptMessages = messages;
         transcriptTitle = sessionRecord?.meta.title ?? transcriptTitle;
       } else {
@@ -2441,7 +2452,7 @@ export function App() {
   }, [refreshReviewSummary]);
 
   return (
-    <SessionProjectionProvider sessionId={activeSessionId}>
+    <SessionProjectionProvider sessionId={activeSessionId} store={sessionStore}>
       <SessionBrowseContext.Provider value={{ groups: browseGroups, listLoading, listError, retryList: () => setListRetry(n => n + 1), loadMore: loadMoreSessions, messageLoading, messageError, retryMessages: () => { if (activeSessionIdRef.current) void readSessionPage(activeSessionIdRef.current); }, hasEarlier: historyBefore !== null, earlierLoading, earlierError, loadEarlier: loadEarlierMessages }}>
       <RightPanelProvider>
         <WorkbenchLayout

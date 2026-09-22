@@ -281,7 +281,7 @@ async function foreground(command: string, cwd: string, status: ProcessStatus, o
 
 function backgrounded(task: BashTask, reason: "explicit" | "block_timeout" | "already_running"): ToolBodyResult {
   const summary = `Bash task ${task.taskId} is running in the background (${reason}).`;
-  return completed(`${summary}\nUse bash_output for a bounded delta or bash_kill to stop it. Do not poll with sleep loops.`, summary);
+  return { ...completed(`${summary}\nUse bash_output for a bounded delta or bash_kill to stop it. Do not poll with sleep loops.`, summary), detail: [{ label: "background-task", value: { taskId: task.taskId, status: "running" } }] };
 }
 
 async function sandboxSpawn(command: string, workspaceRoot: string, outputRoot: string): Promise<{ readonly command: string; readonly args: readonly string[]; readonly env: NodeJS.ProcessEnv; readonly sandboxed: boolean }> {

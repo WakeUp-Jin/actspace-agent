@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCoreCodecRegistry, createSessionHeader, SessionJournal } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import { projectSessionSnapshot } from "./durable-session.js";
+import { SessionReadModel } from "./durable-session.js";
 
 describe("durable usage summary", () => {
   it("counts terminal copies once and distinguishes historical zero from a verified free request", () => {
@@ -15,7 +15,7 @@ describe("durable usage summary", () => {
     append("request/context", { requestId: "r", turnId: "t", stepId: "s", messages: [] });
     append("assistant/message", { messageId: "a", requestId: "r", content: "done", usage });
     append("step/end", { turnId: "t", stepId: "s", status: "completed", usage });
-    const snapshot = () => projectSessionSnapshot({ header, events: journal.events, registry });
+    const snapshot = () => new SessionReadModel(header, registry).replay(journal.events).snapshot();
     expect(snapshot().usage).toMatchObject({ inputTokens: 100, outputTokens: 20, totalTokens: 170, costUsd: null });
     append("step/start", { turnId: "t", stepId: "s2" });
     append("request/header", { requestId: "r2", turnId: "t", stepId: "s2" });

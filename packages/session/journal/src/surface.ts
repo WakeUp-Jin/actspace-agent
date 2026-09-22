@@ -21,6 +21,13 @@ export class SessionSurface {
     return surface;
   }
 
+  static fromView(view: SessionSurfaceView): SessionSurface {
+    const surface = new SessionSurface();
+    surface.#entries = [...view.entries];
+    surface.#replaceGeneration = view.replaceGeneration;
+    return surface;
+  }
+
   clone(): SessionSurface {
     const clone = new SessionSurface();
     clone.#entries = [...this.#entries];

@@ -12,7 +12,7 @@ import { DesktopCredentialResolver } from "../runtime-v2/credential-resolver";
 import { DesktopLegacyLlmAdapter } from "../runtime-v2/legacy-llm-adapter";
 
 const { wire, dispatch } = vi.hoisted(() => ({ wire: vi.fn(), dispatch: vi.fn(async () => (async function* () {})()) }));
-vi.mock("@actspace/llm-pi-ai", () => ({
+vi.mock("@actspace/llm-pi-ai", async (importOriginal) => ({ ...await importOriginal<typeof import("@actspace/llm-pi-ai")>(),
   PiAiAdapter: class { dispatch = dispatch; },
   PiAiWireEngine: class { constructor(options: unknown) { wire(options); } },
   LegacyProxyWireEngine: class {},

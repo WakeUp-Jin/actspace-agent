@@ -20,15 +20,18 @@ const SessionProjectionContext = createContext<SessionProjectionContextValue | n
 export function SessionProjectionProvider({
   sessionId,
   children,
+  store: suppliedStore,
 }: {
   readonly sessionId: string | null;
   readonly children: ReactNode;
+  readonly store?: ClientSessionStore;
 }) {
   const storeRef = useRef<ClientSessionStore | null>(null);
   const bridgeRef = useRef<DesktopSessionBridge | null>(null);
   const [version, setVersion] = useState(0);
   if (storeRef.current === null) storeRef.current = new ClientSessionStore();
-  const store = storeRef.current;
+  const store = suppliedStore ?? storeRef.current;
+  const ownsStore = suppliedStore === undefined;
 
   useEffect(() => {
     const unsubscribeStore = store.subscribe(() => setVersion((value) => value + 1));
@@ -54,13 +57,17 @@ export function SessionProjectionProvider({
       store.select(null);
       return;
     }
+    if (!ownsStore) {
+      store.select(sessionId);
+      return;
+    }
     const bridge = bridgeRef.current;
     if (bridge === null) {
       store.select(sessionId);
       return;
     }
     void bridge.open(sessionId).catch(() => undefined);
-  }, [sessionId, store]);
+  }, [ownsStore, sessionId, store]);
 
   const value = useMemo<SessionProjectionContextValue>(() => ({
     sessionId,

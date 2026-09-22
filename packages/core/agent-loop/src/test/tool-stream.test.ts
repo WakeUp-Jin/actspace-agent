@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCordisRoot } from "@actspace/cordis-adapter";
-import { runToolStreamFixture } from "./tool-stream-fixture.js";
+import { runToolStreamFixture } from "../testing.js";
 
 describe("AgentLoop tool live events", () => {
   it("reserves the last subagent step for a tool-free summary and preserves lineage", async () => {

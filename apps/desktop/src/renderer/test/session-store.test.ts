@@ -1,159 +1,65 @@
 import { describe, expect, it } from "vitest";
 import { createDesktopSessionBridge } from "../session/desktop-session-bridge";
-import type { RuntimeV2LiveEvent, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import { projectionFixture } from "./projection-fixture";
+import type { RuntimeV2DesktopSessionProjection, RuntimeV2LiveEvent, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
-function snapshot(sessionId: string): RuntimeV2SessionSnapshot {
-  return {
-    kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-08-30T00:00:00.000Z", updatedAt: "2026-08-30T00:00:00.000Z", workspaceRoot: null, throughJournalSeq: 0, accessState: "read-write",
-    metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null }, activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null }, lineage: null,
-  };
+function event(seq: number): SessionEventEnvelopeV1 {
+  return { recordKind: "event", seq, type: "session/title-set", eventVersion: 1, criticality: "ignorable", time: "2026-09-21T00:00:00Z", source: { ownerPluginId: "@actspace/core" }, data: { title: "new" }, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
 }
-
-function live(sessionId: string, throughJournalSeq: number): RuntimeV2LiveEvent {
-  return {
-    kind: "run-state",
-    schemaVersion: 1,
-    runtimeInstanceId: "runtime-1",
-    liveSeq: throughJournalSeq + 1,
-    throughJournalSeq,
-    sessionId,
-  };
+function update(seq: number, liveSeq = seq + 1): RuntimeV2LiveEvent {
+  return { kind: "journal-update", schemaVersion: 1, runtimeInstanceId: "r1", liveSeq, sessionId: "s", throughJournalSeq: seq,
+    update: { sessionId: "s", throughJournalSeq: seq, event: event(seq), values: { metadata: { title: "new", pinned: false, archived: false } } } };
 }
-
-describe("DesktopSessionBridge", () => {
-  it("loads only the explicitly selected Session through the typed transport", async () => {
-    const requested: string[] = [];
+describe("Desktop Session event transport", () => {
+  it("applies Host values and raw events without re-reading; process-wide live gaps are not Session gaps", async () => {
+    let emit!: (event: RuntimeV2LiveEvent) => void; let reads = 0;
     const bridge = createDesktopSessionBridge({
-      getSessionProjectionSnapshot: async ({ sessionId }) => { requested.push(sessionId); return { kind: "session-projection", schemaVersion: 1, sessionId, throughJournalSeq: 0, snapshot: snapshot(sessionId), values: {} }; },
-      onSessionLiveEvent: () => () => undefined,
+      getSessionProjectionSnapshot: async () => { reads++; return projectionFixture("s", 0, [event(0)]); },
+      onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; },
     });
-    await bridge.open("session-1");
-    expect(requested).toEqual(["session-1"]);
-    expect(bridge.store.selectedSessionId).toBe("session-1");
-    expect(bridge.store.get("session-1").snapshot?.sessionId).toBe("session-1");
-  });
-
-  it("refreshes a selected projection when a live event advances the Journal revision", async () => {
-    let emit: ((event: RuntimeV2LiveEvent) => void) | undefined;
-    let inspectCount = 0;
-    const bridge = createDesktopSessionBridge({
-      getSessionProjectionSnapshot: async ({ sessionId }) => {
-        inspectCount += 1;
-        const throughJournalSeq = inspectCount === 1 ? 0 : 1;
-        return {
-          kind: "session-projection",
-          schemaVersion: 1,
-          sessionId,
-          throughJournalSeq,
-          snapshot: { ...snapshot(sessionId), throughJournalSeq },
-          values: {
-            composer: {
-              kind: "composer",
-              schemaVersion: 1,
-              sessionId,
-              throughJournalSeq,
-              phase: throughJournalSeq === 0 ? "blank" : "active",
-            },
-          },
-        };
-      },
-      onSessionLiveEvent: (listener) => {
-        emit = (event) => listener({ event });
-        return () => { emit = undefined; };
-      },
-    });
-
-    bridge.start();
-    await bridge.open("session-1");
-    expect(bridge.store.get("session-1").status).toBe("ready");
-    emit?.(live("session-1", 1));
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-
-    expect(inspectCount).toBe(2);
-    expect(bridge.store.get("session-1").snapshot?.throughJournalSeq).toBe(1);
-    expect(bridge.store.get("session-1").projectionValues.composer).toMatchObject({ phase: "active", throughJournalSeq: 1 });
-    expect(bridge.store.getOverlay("session-1")).toBeNull();
+    bridge.start(); await bridge.open("s");
+    emit(update(1, 100)); emit(update(2, 200));
+    expect(reads).toBe(1);
+    expect(bridge.store.get("s").window?.events.map(event => event.seq)).toEqual([0, 1, 2]);
+    expect(bridge.store.get("s").snapshot?.metadata.title).toBe("new");
     bridge.dispose();
   });
-});
 
-it('keeps expanded history on live refresh and rejects mixed-revision envelopes', async () => {
-  let emit: ((event: RuntimeV2LiveEvent) => void) | undefined;
-  const cursors: (number | undefined)[] = [];
-  let revision = 100;
-  let inconsistent = false;
-  const bridge = createDesktopSessionBridge({
-    getSessionProjectionSnapshot: async ({ sessionId, trajectoryFromSeq }) => {
-      cursors.push(trajectoryFromSeq);
-      return { kind: 'session-projection', schemaVersion: 1, sessionId, throughJournalSeq: revision, snapshot: { ...snapshot(sessionId), throughJournalSeq: revision }, values: {
-        trajectory: { kind: 'trajectory', schemaVersion: 1, sessionId, throughJournalSeq: inconsistent ? revision - 1 : revision, nodes: [], history: { fromSeq: trajectoryFromSeq ?? 80, previousFromSeq: trajectoryFromSeq === 0 ? null : 0, turnOffset: 0 } },
-      } };
-    },
-    onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => { emit = undefined; }; },
+  it("repairs a missing Journal event with one baseline read", async () => {
+    let emit!: (event: RuntimeV2LiveEvent) => void; let reads = 0;
+    const bridge = createDesktopSessionBridge({
+      getSessionProjectionSnapshot: async () => { const seq = reads++ ? 2 : 0; return projectionFixture("s", seq, Array.from({ length: seq + 1 }, (_, seq) => event(seq))); },
+      onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; },
+    });
+    bridge.start(); await bridge.open("s"); emit(update(2));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(reads).toBe(2); expect(bridge.store.get("s").window?.throughJournalSeq).toBe(2);
+    expect(bridge.store.get("s").liveGap).toBe(false); bridge.dispose();
   });
-  bridge.start();
-  await bridge.open('s');
-  await bridge.loadEarlierHistory('s');
-  revision++;
-  emit?.(live('s', revision));
-  await new Promise(resolve => setTimeout(resolve, 0));
-  expect(cursors).toEqual([undefined, 0, 0]);
-  expect(bridge.store.get('s').projectionValues.trajectory).toMatchObject({ history: { fromSeq: 0 }, throughJournalSeq: 101 });
-  inconsistent = true;
-  await expect(bridge.open('s')).rejects.toThrow('revision mismatch');
-  expect(bridge.store.get('s').projectionValues.trajectory).toMatchObject({ throughJournalSeq: 101 });
-  bridge.dispose();
-});
 
-it('refreshes after a runtime change even when its live revision is zero', async () => {
-  let emit: ((event: RuntimeV2LiveEvent) => void) | undefined;
-  let reads = 0;
-  const bridge = createDesktopSessionBridge({
-    getSessionProjectionSnapshot: async ({ sessionId }) => { reads++; return { kind: 'session-projection', schemaVersion: 1, sessionId, throughJournalSeq: 50, snapshot: { ...snapshot(sessionId), throughJournalSeq: 50 }, values: {} }; },
-    onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => undefined; },
+  it("prepends old pages without rolling back newer Host facts or reloading the expanded tail", async () => {
+    let resolve!: (value: RuntimeV2DesktopSessionProjection) => void;
+    const tail = projectionFixture("s", 2, [event(2)]);
+    const bridge = createDesktopSessionBridge({
+      getSessionProjectionSnapshot: async input => input.beforeSeq === undefined ? { ...tail, window: { ...tail.window, fromSeq: 2, beforeSeq: 2 } } : new Promise(done => { resolve = done; }),
+      onSessionLiveEvent: () => () => {},
+    });
+    await bridge.open("s"); const loading = bridge.loadEarlierHistory("s");
+    bridge.store.applyJournalUpdate(update(3).update!);
+    const older = projectionFixture("s", 2, [event(0), event(1)]);
+    resolve({ ...older, window: { ...older.window, throughJournalSeq: 1 } });
+    await loading;
+    expect(bridge.store.get("s").window?.events.map(event => event.seq)).toEqual([0, 1, 2, 3]);
+    expect(bridge.store.get("s").snapshot?.metadata.title).toBe("new");
+    bridge.dispose();
   });
-  bridge.start(); await bridge.open('s');
-  emit?.({ ...live('s', 0), liveSeq: 1 });
-  emit?.({ ...live('s', 0), liveSeq: 1, runtimeInstanceId: 'runtime-2' });
-  await new Promise(resolve => setTimeout(resolve, 0));
-  expect(reads).toBe(2);
-  expect(bridge.store.get('s').liveGap).toBe(false);
-  bridge.dispose();
-});
 
-it('does not apply a reply after switching Sessions or disposing the bridge', async () => {
-  let resolve!: (value: import('@actspace/shared/runtime-v2').RuntimeV2DesktopSessionProjection) => void;
-  const bridge = createDesktopSessionBridge({
-    getSessionProjectionSnapshot: () => new Promise(done => { resolve = done; }),
-    onSessionLiveEvent: () => () => undefined,
+  it("rejects mixed identity and does not apply responses after disposal", async () => {
+    const bridge = createDesktopSessionBridge({ getSessionProjectionSnapshot: async () => projectionFixture("other"), onSessionLiveEvent: () => () => {} });
+    await expect(bridge.open("s")).rejects.toThrow("identity mismatch");
+    let resolve!: (value: RuntimeV2DesktopSessionProjection) => void;
+    const pending = createDesktopSessionBridge({ getSessionProjectionSnapshot: () => new Promise(done => { resolve = done; }), onSessionLiveEvent: () => () => {} });
+    const loading = pending.open("s"); pending.dispose(); resolve(projectionFixture("s")); await loading;
+    expect(pending.store.get("s").snapshot).toBeNull();
   });
-  const loading = bridge.open('old');
-  bridge.store.select('new');
-  resolve({ kind: 'session-projection', schemaVersion: 1, sessionId: 'old', throughJournalSeq: 0, snapshot: snapshot('old'), values: {} });
-  await expect(loading).rejects.toThrow('selection changed');
-  expect(bridge.store.get('new').snapshot).toBeNull();
-  const disposed = bridge.open('new'); bridge.dispose();
-  resolve({ kind: 'session-projection', schemaVersion: 1, sessionId: 'new', throughJournalSeq: 0, snapshot: snapshot('new'), values: {} });
-  await expect(disposed).rejects.toThrow();
-  expect(bridge.store.get('new').snapshot).toBeNull();
-});
-
-it('requests trajectory only while the trajectory surface is open', async () => {
-  const requested: boolean[] = [];
-  let emit: ((event: RuntimeV2LiveEvent) => void) | undefined;
-  let revision = 0;
-  const bridge = createDesktopSessionBridge({
-    getSessionProjectionSnapshot: async ({ sessionId, includeTrajectory }) => {
-      requested.push(includeTrajectory === true);
-      return { kind: 'session-projection', schemaVersion: 1, sessionId, throughJournalSeq: revision, snapshot: { ...snapshot(sessionId), throughJournalSeq: revision }, values: {} };
-    },
-    onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; },
-  });
-  bridge.start(); await bridge.open('s');
-  await bridge.setTrajectoryVisible('s', true);
-  await bridge.setTrajectoryVisible('s', false);
-  revision++; emit?.(live('s', revision));
-  await new Promise(resolve => setTimeout(resolve, 0));
-  expect(requested).toEqual([false, true, false]);
-  bridge.dispose();
 });

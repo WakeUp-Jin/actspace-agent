@@ -58,7 +58,7 @@ CLI 的 `runV2Command()` 调用 `headless.runner.run()`；Desktop 通过 `Deskto
 
 当前持久目录是 `sessions-v2/<sessionId>/journal.jsonl`。Session Format 的版本仍为 1，不能按文件名中的 v1 将其归档。可恢复状态来自 Journal，live progress 与 diagnostics 不替代持久事实。
 
-Desktop 的聊天、Trajectory、Context、Usage 等消费投影；统一水位与完整消息映射仍按 [Session 持久化与投影计划](../../exec-plans/active/20260830-actspace-session-persistence-projection/README.md)收口。已退役的分析观测页面不再是当前入口。
+Desktop 的聊天、Trajectory、Context、Usage 等消费投影；Host Registry、checkpoint 与 Client raw window 已按 [Session 投影切换计划](../../exec-plans/completed/20260921-session-projection-cutover.md)接通。已退役的分析观测页面不再是当前入口。
 
 ## 5. 当前、未来与历史
 

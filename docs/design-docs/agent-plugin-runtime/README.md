@@ -23,6 +23,7 @@
 | LLM | [Adapter](agent-target-llm-adapter.md)、[多供应商](../model-context/agent-multi-provider-llm.md) |
 | Tools | [内核与外壳](agent-spec-tool-runtime-boundary.md)、[Prepared execution ABI](agent-spec-tool-runtime-abi.md)、[Tool name](agent-spec-tool-name-contract.md) |
 | Projection | [Runtime Projection](agent-spec-runtime-projection.md)、[持久化与投影收敛](agent-target-session-persistence-projection-architecture.md) |
+| Session 三类读模型 | [设计规范](agent-session-three-read-models.md)、[执行计划](../../exec-plans/completed/20260922-session-three-read-models.md)、[执行记录](../../exec-runs/20260922-session-three-read-models/execution-summary.md) |
 | 英语辅助学习 | [会话双语 Prompt 与英文语音](agent-english-learning.md) |
 
 Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧产品资料。早期逻辑语义与后续事件规范冲突时，以 DSH 事件模型和实际 codec 为准。
@@ -35,7 +36,7 @@ Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧�
 | Service Definition / Provider / Consumer | 三层 contract slice 已交付；核心 Provider 全域迁移与 G1 尚待收口 | [规范](agent-spec-service-definition-provider-consumer.md)、[P1-B](../../exec-plans/active/20260829-actspace-p1-service-roles/README.md) |
 | Profile / Bundle / Patch | schema、digest、transport parity 已交付；restart-only 与 one-shot 回归尚待收口 | [规范](agent-spec-profile-bundle-patch-layering.md)、[P1-C](../../exec-plans/active/20260829-actspace-p1-profile-bundle-patch/README.md) |
 | Contract Matrix | 已有 generator、双产物、字节漂移检查与 CI；2026-09-09 复核确认语义 validator / 负向 fixtures 仍有缺口 | [规范](agent-spec-contract-matrix-generation.md)、[生成矩阵](agent-contract-matrix.generated.md)、[P2](../../exec-plans/active/20260829-actspace-p2-contract-matrix/README.md) |
-| Session Projection | P00/P01 验收候选、P02/P03 基础与首批消费者已实现；最终消息映射与集成验收待继续 | [计划](../../exec-plans/active/20260830-actspace-session-persistence-projection/README.md) |
+| Session Projection | Host Registry、可删除 checkpoint 与 Client raw window 已实现；Electron 环境门禁见摘要 | [计划](../../exec-plans/completed/20260921-session-projection-cutover.md) |
 | 最终事件/CLI 验收 | P00–P04 有通过证据；P05 deterministic retry/error fixture 尚缺 | [计划](../../exec-plans/active/20260829-actspace-cordis-event-abi-final-acceptance/README.md) |
 
 完整依赖与 G1/G2 见 [P1/P2 总计划](../../exec-plans/active/20260829-actspace-p1-p2-contract-and-composition/README.md)。不得把这些部分实施项写成完全未开始，也不得因已有类型或生成产物就声明验收完成。

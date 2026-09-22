@@ -141,6 +141,9 @@ importers:
         specifier: ^4.0.1
         version: 4.0.1
     devDependencies:
+      '@actspace/core-agent-loop':
+        specifier: workspace:*
+        version: link:../../packages/core/agent-loop
       '@tailwindcss/vite':
         specifier: ^4.3.0
         version: 4.3.0(vite@5.4.21(@types/node@22.19.19)(lightningcss@1.32.0))
@@ -291,6 +294,9 @@ importers:
       '@actspace/shared':
         specifier: workspace:*
         version: link:../shared
+      pathe:
+        specifier: 2.0.3
+        version: 2.0.3
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -741,6 +747,12 @@ importers:
       '@actspace/session-persistence':
         specifier: workspace:*
         version: link:../session/persistence
+      '@actspace/session-projection':
+        specifier: workspace:*
+        version: link:../session/projection
+      '@actspace/session-projection-cache':
+        specifier: workspace:*
+        version: link:../session/projection-cache
       '@actspace/shared':
         specifier: workspace:*
         version: link:../shared
@@ -885,6 +897,9 @@ importers:
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../journal
+      '@actspace/session-projection':
+        specifier: workspace:*
+        version: link:../projection
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../shared

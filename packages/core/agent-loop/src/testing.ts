@@ -6,7 +6,7 @@ import { RequestAssembler } from "@actspace/prompt";
 import { LlmRouteRegistry, LlmService, EMPTY_LLM_USAGE, type LlmStreamEvent } from "@actspace/llm-service";
 import { ToolRuntime, type ToolBodyResult, type ToolPolicy } from "@actspace/tools-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
-import { AgentLoop, type AgentLoopLiveEvent } from "../loop.js";
+import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
 
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {

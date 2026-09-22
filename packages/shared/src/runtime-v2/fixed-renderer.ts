@@ -56,6 +56,7 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   listSessions: "runtime-v2:fixed-renderer:list-sessions",
   getSession: "runtime-v2:fixed-renderer:get-session",
   getSessionProjectionSnapshot: "runtime-v2:fixed-renderer:get-session-projection-snapshot",
+  getSessionObservation: "runtime-v2:fixed-renderer:get-session-observation",
   getSessionPreview: "runtime-v2:fixed-renderer:get-session-preview",
   createSession: "runtime-v2:fixed-renderer:create-session",
   forkSession: "runtime-v2:fixed-renderer:fork-session",

@@ -104,6 +104,6 @@ ActSpace 的非敏感模型配置继续写入 `<userData>/settings.json`：
 - `apps/desktop/src/main/model-store-service.ts`
 - `packages/core/agent-loop/src/loop.ts`
 - `packages/prompt/src/request-snapshot.ts`
-- `apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts`
+- `packages/runtime/src/projection/durable-session.ts` 与 `packages/client/src/sessions/selectors.ts`
 - `apps/desktop/src/renderer/components/ContextPopup.tsx`
 - `apps/desktop/src/renderer/components/right-panel/ContextRenderView.tsx`

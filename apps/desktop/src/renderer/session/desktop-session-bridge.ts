@@ -1,149 +1,75 @@
-import { ClientSessionStore, selectTrajectory } from "@actspace/client/sessions";
-import type { RuntimeV2DesktopSessionProjection, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2SessionProjectionInput } from "@actspace/shared/runtime-v2";
+import { ClientSessionStore } from "@actspace/client/sessions";
+import type { RuntimeV2DesktopSessionProjection, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2SessionProjectionInput, RuntimeV2SessionObservation } from "@actspace/shared/runtime-v2";
 
 export type DesktopSessionTransport = {
-  readonly inspectSession: (sessionId: string, trajectoryFromSeq?: number, includeTrajectory?: boolean) => Promise<RuntimeV2DesktopSessionProjection>;
+  readonly inspectSession: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2DesktopSessionProjection>;
+  readonly observeSession?: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2SessionObservation>;
   readonly subscribeLive: (listener: (event: RuntimeV2LiveEvent) => void) => () => void;
 };
-
 export type DesktopSessionApi = {
-  readonly getSessionProjectionSnapshot: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2DesktopSessionProjection>;
+  readonly getSessionProjectionSnapshot: DesktopSessionTransport["inspectSession"];
   readonly onSessionLiveEvent: (listener: (envelope: { readonly event: RuntimeV2LiveEvent }) => void) => () => void;
+  readonly getSessionObservation?: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2SessionObservation>;
 };
-
 export function createDesktopSessionBridge(api: DesktopSessionApi, store = new ClientSessionStore()): DesktopSessionBridge {
-  return new DesktopSessionBridge({
-    inspectSession: (sessionId, trajectoryFromSeq, includeTrajectory) => api.getSessionProjectionSnapshot({ sessionId, includeTrajectory: includeTrajectory === true, ...(trajectoryFromSeq === undefined ? {} : { trajectoryFromSeq }) }),
-    subscribeLive: (listener) => api.onSessionLiveEvent((envelope) => listener(envelope.event)),
-  }, store);
+  return new DesktopSessionBridge({ inspectSession: async input => {
+    if (!api.getSessionObservation) return api.getSessionProjectionSnapshot(input);
+    const observation = await api.getSessionObservation(input);
+    return { kind: "session-projection", schemaVersion: 1, sessionId: observation.sessionId, throughJournalSeq: observation.projection.throughJournalSeq, snapshot: observation.snapshot, values: observation.projection.values, window: observation.window ?? { events: [], fromSeq: observation.projection.throughJournalSeq + 1, throughJournalSeq: observation.projection.throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 }, activeMessageIds: observation.activeMessageIds, deferredToolCalls: observation.deferredToolCalls, watermarks: observation.watermarks };
+  }, ...(api.getSessionObservation ? { observeSession: api.getSessionObservation } : {}), subscribeLive: listener => api.onSessionLiveEvent(({ event }) => listener(event)) }, store);
 }
 
-/**
- * Desktop-only adapter. It translates Electron/preload callbacks into the
- * framework-neutral ClientSessionStore and owns no Journal or projection fold.
- */
+/** One event window for every target, with independent Host values and live overlays. */
 export class DesktopSessionBridge {
-  readonly store: ClientSessionStore;
   #unsubscribeLive: (() => void) | undefined;
-  #refreshPromises = new Map<string, Promise<void>>();
-  #refreshTargets = new Map<string, number>();
-  #historyStarts = new Map<string, number>();
-  #historyLoads = new Map<string, Promise<void>>();
   #disposed = false;
-  #trajectorySession: string | null = null;
-
-  constructor(private readonly transport: DesktopSessionTransport, store = new ClientSessionStore()) {
-    this.store = store;
-  }
-
+  readonly #refreshes = new Map<string, Promise<void>>();
+  readonly #pendingRefresh = new Set<string>();
+  readonly #historyLoads = new Map<string, Promise<void>>();
+  constructor(private readonly transport: DesktopSessionTransport, readonly store = new ClientSessionStore()) {}
   start(): void {
     this.#disposed = false;
-    if (this.#unsubscribeLive !== undefined) return;
-    this.#unsubscribeLive = this.transport.subscribeLive((event) => {
-      this.store.applyLiveEvent(event);
+    this.#unsubscribeLive ??= this.transport.subscribeLive(event => {
+      const applied = this.store.applyLiveEvent(event);
       if (this.store.selectedSessionId !== event.sessionId) return;
-      const currentTarget = this.#refreshTargets.get(event.sessionId) ?? -1;
-      this.#refreshTargets.set(event.sessionId, Math.max(currentTarget, event.throughJournalSeq));
-      if (this.store.get(event.sessionId).liveGap) this.#refreshTargets.set(event.sessionId, Number.MAX_SAFE_INTEGER);
-      this.#scheduleRefresh(event.sessionId);
+      const type = event.update?.event.type;
+      if (!applied || event.kind === "resync-required" || type === "compaction/end" || type === "recovery/end" || type === "surface/replaced") {
+        this.#pendingRefresh.add(event.sessionId); this.#refresh(event.sessionId);
+      }
     });
   }
-
   async open(sessionId: string): Promise<RuntimeV2SessionSnapshot> {
     if (this.#disposed) throw new Error("Session bridge disposed.");
     this.store.select(sessionId);
-    const requestGeneration = this.store.beginRequest(sessionId);
-    try {
-      return await this.#load(sessionId, requestGeneration, true);
-    } catch (error) {
-      this.store.markError(sessionId, error, requestGeneration);
-      throw error;
-    }
+    const generation = this.store.beginRequest(sessionId);
+    return this.#load({ sessionId }, generation);
   }
-
-  async setTrajectoryVisible(sessionId: string, visible: boolean): Promise<void> {
-    this.#trajectorySession = visible ? sessionId : null;
-    if (!visible || this.#disposed || this.store.selectedSessionId !== sessionId) return;
-    const generation = this.store.beginRequest(sessionId, { preserveReady: true, notify: false });
-    await this.#load(sessionId, generation, true);
-  }
-
   loadEarlierHistory(sessionId: string): Promise<void> {
     const pending = this.#historyLoads.get(sessionId);
     if (pending) return pending;
-    const from = selectTrajectory(this.store.get(sessionId))?.history?.previousFromSeq;
-    if (from == null || this.#disposed || this.store.selectedSessionId !== sessionId) return Promise.resolve();
-    // Update before requesting so a concurrent live refresh also includes this page.
-    this.#historyStarts.set(sessionId, from);
-    const generation = this.store.beginRequest(sessionId, { preserveReady: true, notify: false });
-    const load = this.#load(sessionId, generation, true).then(() => undefined).finally(() => this.#historyLoads.delete(sessionId));
-    this.#historyLoads.set(sessionId, load);
-    return load;
+    const beforeSeq = this.store.get(sessionId).window?.beforeSeq;
+    if (beforeSeq == null || this.#disposed) return Promise.resolve();
+    const generation = this.store.get(sessionId).requestGeneration;
+    const job = this.#load({ sessionId, beforeSeq }, generation).then(() => undefined).finally(() => this.#historyLoads.delete(sessionId));
+    this.#historyLoads.set(sessionId, job); return job;
   }
-
-  #scheduleRefresh(sessionId: string): void {
-    if (this.#refreshPromises.has(sessionId)) return;
-    const refresh = this.#drainRefresh(sessionId).finally(() => {
-      this.#refreshPromises.delete(sessionId);
-      if (this.#refreshTargets.has(sessionId) && this.store.selectedSessionId === sessionId) {
-        this.#scheduleRefresh(sessionId);
+  #refresh(sessionId: string): void {
+    if (this.#refreshes.has(sessionId)) return;
+    const job = (async () => {
+      while (this.#pendingRefresh.delete(sessionId) && !this.#disposed && this.store.selectedSessionId === sessionId) {
+        try { await this.#load({ sessionId }, this.store.get(sessionId).requestGeneration); }
+        catch { return; }
       }
-    });
-    this.#refreshPromises.set(sessionId, refresh);
+    })().finally(() => { this.#refreshes.delete(sessionId); if (this.#pendingRefresh.has(sessionId)) this.#refresh(sessionId); });
+    this.#refreshes.set(sessionId, job);
   }
-
-  async #drainRefresh(sessionId: string): Promise<void> {
-    while (!this.#disposed && this.store.selectedSessionId === sessionId) {
-      const target = this.#refreshTargets.get(sessionId);
-      if (target === undefined) return;
-      this.#refreshTargets.delete(sessionId);
-      const cell = this.store.get(sessionId);
-      const current = Math.max(cell.snapshot?.throughJournalSeq ?? -1, ...Object.values(cell.projectionRevisions));
-      if (target !== Number.MAX_SAFE_INTEGER && target <= current) return;
-      // Background refreshes must not make an already-rendered Session look
-      // loading while the durable projection is being refreshed.
-      const requestGeneration = this.store.beginRequest(sessionId, { preserveReady: true, notify: false });
-      try {
-        await this.#load(sessionId, requestGeneration, false);
-      } catch (error) {
-        this.store.markError(sessionId, error, requestGeneration);
-        return;
-      }
-    }
+  async #load(input: RuntimeV2SessionProjectionInput, generation: number): Promise<RuntimeV2SessionSnapshot> {
+    try {
+      const envelope = await this.transport.inspectSession(input);
+      if (envelope.sessionId !== input.sessionId) throw new Error("Session projection identity mismatch.");
+      if (!this.#disposed) this.store.applyEnvelope(envelope, generation);
+      return envelope.snapshot;
+    } catch (error) { this.store.markError(input.sessionId, error, generation); throw error; }
   }
-
-  async #load(sessionId: string, requestGeneration: number, strictSelection: boolean): Promise<RuntimeV2SessionSnapshot> {
-    const envelope = await this.transport.inspectSession(sessionId, this.#historyStarts.get(sessionId), this.#trajectorySession === sessionId);
-    const snapshot = envelope.snapshot;
-    if (this.#disposed || this.store.selectedSessionId !== sessionId) {
-      if (strictSelection) throw new Error("Session selection changed while loading.");
-      return snapshot;
-    }
-    if (envelope.sessionId !== sessionId || snapshot.sessionId !== sessionId || envelope.throughJournalSeq !== snapshot.throughJournalSeq) throw new Error("Session projection revision mismatch.");
-    for (const value of Object.values(envelope.values)) {
-      if (value && typeof value === "object" && !Array.isArray(value) && 'throughJournalSeq' in value && (value.throughJournalSeq !== envelope.throughJournalSeq || value.sessionId !== sessionId)) throw new Error("Projection value revision mismatch.");
-    }
-    const applied = this.store.batch(() => {
-      const appliedSnapshot = this.store.applySnapshot(snapshot, { requestGeneration });
-      if (!appliedSnapshot) return false;
-      for (const [key, value] of Object.entries(envelope.values)) {
-        if (value !== undefined) this.store.applyProjectionValue({ sessionId, key, throughJournalSeq: envelope.throughJournalSeq, value });
-      }
-      return true;
-    });
-    if (applied) {
-      const from = selectTrajectory(this.store.get(sessionId))?.history?.fromSeq;
-      if (from !== undefined) this.#historyStarts.set(sessionId, Math.min(from, this.#historyStarts.get(sessionId) ?? from));
-    }
-    return snapshot;
-  }
-
-  dispose(): void {
-    this.#disposed = true;
-    this.#unsubscribeLive?.();
-    this.#unsubscribeLive = undefined;
-    this.#refreshTargets.clear();
-    this.#refreshPromises.clear();
-    this.#historyLoads.clear();
-  }
+  dispose(): void { this.#disposed = true; this.#unsubscribeLive?.(); this.#unsubscribeLive = undefined; this.#pendingRefresh.clear(); }
 }

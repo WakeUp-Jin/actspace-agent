@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { workspaceDisplayPath, toolPreview } from "../runtime-v2/fixed-renderer-tool-preview";
+import { workspaceDisplayPath, toolPreview } from "@actspace/client/sessions";
 
 describe("shared live and durable tool previews", () => {
   it.each([

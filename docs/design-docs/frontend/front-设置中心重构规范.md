@@ -1195,7 +1195,7 @@ Usage UI
 - [`UsageStatisticsPage.tsx`](../../../apps/desktop/src/renderer/components/UsageStatisticsPage.tsx)
 - [`packages/shared/src/settings.ts`](../../../packages/shared/src/settings.ts)
 - [`packages/shared/src/ipc.ts`](../../../packages/shared/src/ipc.ts)
-- [`fixed-renderer-projection.ts`](../../../apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts)
+- [`durable-session.ts`](../../../packages/runtime/src/projection/durable-session.ts) 与 [`usage-aggregates.ts`](../../../packages/client/src/sessions/usage-aggregates.ts)
 
 ### Maka 参考实现
 

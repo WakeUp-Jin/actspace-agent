@@ -20,6 +20,8 @@
     "@actspace/core-agent-loop": "workspace:*",
     "@actspace/core-scope": "workspace:*",
     "@actspace/session-journal": "workspace:*",
+    "@actspace/session-projection": "workspace:*",
+    "@actspace/session-projection-cache": "workspace:*",
     "@actspace/session-jsonl": "workspace:*",
     "@actspace/session-persistence": "workspace:*",
     "@actspace/session-checkpoint-policy": "workspace:*",

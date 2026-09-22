@@ -11,7 +11,7 @@
 - [Context 面板与模型能力事实规范](../../../design-docs/model-context/agent-context-model-facts-and-composer.md)
 - [Token Usage 与 Context Projection](../../../design-docs/model-context/agent-token-usage-and-context-state.md)
 - [多供应商 LLM 架构](../../../design-docs/model-context/agent-multi-provider-llm.md)
-- [Session 持久化事实源与投影收敛](../../active/20260830-actspace-session-persistence-projection/README.md)
+- [Session 持久化事实源与投影收敛](../../discarded/20260830-actspace-session-persistence-projection/README.md)
 - 参考实现：`tmp/deepseek-harness/docs/user/guide/providers.zh.md`、`tmp/deepseek-harness/packages/core/agent-default-model/src/index.ts`
 
 ## 范围

@@ -462,8 +462,6 @@ export type SessionListItem = {
 
 export type SessionListPageInput = { workspaceRoot?: string; pinned?: boolean; after?: string };
 export type SessionListPage = { items: SessionListItem[]; groups: { workspaceRoot: string; pinned: boolean; hasMore: boolean }[]; indexing: boolean; failed: number };
-export type SessionMessagePageInput = { sessionId: string; before?: number };
-export type SessionMessagePage = { record: SessionRecord; history: { before: number | null; throughJournalSeq: number } };
 
 export type SessionListInput = {
   /** 缺省为 false：普通会话列表只返回未归档会话。 */

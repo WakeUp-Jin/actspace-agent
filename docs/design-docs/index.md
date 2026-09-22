@@ -2,6 +2,8 @@
 
 - [Session 事件持久化重构](agent-plugin-runtime/agent-session-event-persistence-refactor.md)：核心行为已实施；Session 接纳、持久化协调器、检查点与 live/durable 边界。
 
+- [Session 三类读模型设计规范](agent-plugin-runtime/agent-session-three-read-models.md)：已落地；定义 Global Aggregate、Session Projection、Window Presentation 及其水位、缓存和 Client 边界。
+
 - [工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)：Bash 大输出回读、历史引用、Provider 图片转换和失败反馈。
 
 - [日常桌面界面中文文案](frontend/front-desktop-chinese-ui.md)：日常操作中文化，保留模式、思考档位与工具执行名称；验收边界见执行摘要。

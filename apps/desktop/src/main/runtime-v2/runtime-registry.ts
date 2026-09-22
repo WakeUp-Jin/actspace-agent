@@ -2,7 +2,6 @@ import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-l
 import type { EnglishLearningTargetInput, EnglishLearningState } from "@actspace/shared";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
-import { observeSessionRevisions } from "./session-revision-observer";
 import { randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
@@ -86,8 +85,10 @@ export class DesktopRuntimeV2Registry {
   }
 
   browseSessions() { return this.requireApp().browseSessions(); }
+  globalSessionSummaries() { return this.requireApp().globalSessionSummaries(); }
+  readSessionProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.requireApp().readSessionProjection(input); }
+  readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.requireApp().readSessionObservation(input); }
   browseToolDetail(sessionId: string, callId: string) { return this.requireApp().browseToolDetail(sessionId, callId); }
-  browseSession(sessionId: string, before?: number) { return this.requireApp().browseSession(sessionId, before); }
   listSessions() { return this.requireApp().listSessions(); }
   inspectSession(sessionId: string) { return this.requireApp().inspectSession(sessionId); }
   inspectSessionEvents(sessionId: string) { return this.requireApp().inspectSessionEvents(sessionId); }
@@ -355,7 +356,9 @@ export class DesktopRuntimeV2Registry {
           workspaceRoot: session.workspaceRoot ?? undefined,
         })),
       });
-      this.#stopSessionRevisions = observeSessionRevisions(booted.profile.context, (sessionId, seq, titleChanged) => this.#emitDurableChanged(sessionId, seq, titleChanged ? "session-title-updated" : "journal-advanced"));
+      this.#stopSessionRevisions = this.requireApp().subscribeSessionProjection(update => {
+        this.#emit({ kind: "journal-update", sessionId: update.sessionId, throughJournalSeq: update.throughJournalSeq, update, ...(update.event.type === "session/title-set" ? { message: "session-title-updated" } : {}) });
+      });
       this.#artifacts = booted.artifacts;
       this.#bootError = null;
       this.options.log?.("runtime v2 ready", {

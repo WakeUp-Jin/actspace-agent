@@ -121,7 +121,7 @@ declare global {
       ) => Promise<import("@actspace/shared").ContextState | null>;
       listSessionPage?: (input?: import("@actspace/shared").SessionListPageInput) => Promise<import("@actspace/shared").SessionListPage>;
       getSessionToolDetail?: (input: { sessionId: string; callId: string }) => Promise<import("@actspace/shared").MessageBlock[]>;
-      getSessionPage?: (input: import("@actspace/shared").SessionMessagePageInput) => Promise<import("@actspace/shared").SessionMessagePage>;
+      getSessionPage: (input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) => Promise<import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection>;
       listSessions: (
         input?: import("@actspace/shared").SessionListInput
       ) => Promise<import("@actspace/shared").SessionListItem[]>;
@@ -131,6 +131,9 @@ declare global {
       getSessionProjectionSnapshot?: (
         input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput
       ) => Promise<import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection>;
+      getSessionObservation?: (
+        input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput
+      ) => Promise<import("@actspace/shared/runtime-v2").RuntimeV2SessionObservation>;
       getSessionPreview?: (
         input: import("@actspace/shared").SessionPreviewInput
       ) => Promise<import("@actspace/shared").SessionPreviewResult | null>;

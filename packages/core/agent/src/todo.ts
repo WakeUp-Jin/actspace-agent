@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SessionHandle } from "@actspace/session-persistence";
+import { mergeRuntimeV2TodoItems } from "@actspace/shared/runtime-v2";
 
 export type TodoState = "pending" | "in_progress" | "completed" | "cancelled";
 export type TodoItem = {
@@ -16,24 +17,15 @@ export type TodoWriteItem = { readonly id?: string; readonly content: string; re
 export class TodoService {
   constructor(private readonly session: SessionHandle) {}
   list(): readonly TodoItem[] {
-    const items = new Map<string, TodoItem>();
+    let items: readonly import("@actspace/shared/runtime-v2").RuntimeV2TodoItem[] = [];
     for (const event of this.session.journal.events) {
       if (event.type !== "todo/write" || event.data === null || typeof event.data !== "object" || Array.isArray(event.data)) continue;
       const data = event.data as Record<string, unknown>;
       if (!Array.isArray(data.items)) continue;
-      for (const raw of data.items) {
-        if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue;
-        const itemData = raw as Record<string, unknown>; const todoId = itemData.todoId; const revision = itemData.revision;
-        if (typeof todoId !== "string" || !Number.isSafeInteger(revision)) continue;
-        const prior = items.get(todoId); const text = typeof itemData.text === "string" ? itemData.text : prior?.text ?? "";
-        const state: TodoState = isTodoState(itemData.state) ? itemData.state : prior?.state ?? "pending";
-        const createdAt = typeof itemData.createdAt === "string" ? itemData.createdAt : prior?.createdAt ?? event.time;
-        const updatedAt = typeof itemData.updatedAt === "string" ? itemData.updatedAt : event.time;
-        const activeForm = typeof itemData.activeForm === "string" && itemData.activeForm.trim() ? itemData.activeForm : prior?.activeForm;
-        items.set(todoId, Object.freeze({ todoId, revision: revision as number, text, state, ...(activeForm === undefined ? {} : { activeForm }), createdAt, updatedAt }));
-      }
+      const rawItems = data.items.filter((value): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value));
+      items = mergeRuntimeV2TodoItems(items, rawItems, value => value, event.time);
     }
-    return Object.freeze([...items.values()].sort((a, b) => a.todoId.localeCompare(b.todoId)));
+    return Object.freeze(items.map(item => Object.freeze({ ...item, createdAt: item.createdAt ?? "", updatedAt: item.updatedAt ?? item.createdAt ?? "" })) as TodoItem[]);
   }
   async create(text: string, todoId = randomUUID(), state: Exclude<TodoState, "cancelled"> = "pending", activeForm?: string): Promise<TodoItem> {
     const now = new Date().toISOString();
@@ -76,4 +68,3 @@ export class TodoService {
   private require(todoId: string, revision: number): TodoItem { const item = this.list().find((candidate) => candidate.todoId === todoId); if (item === undefined) throw new Error(`Todo ${todoId} does not exist.`); if (item.revision !== revision) throw new Error(`Todo ${todoId} revision conflict.`); return item; }
 }
 function core(type: string, data: Record<string, unknown>) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
-function isTodoState(value: unknown): value is TodoState { return value === "pending" || value === "in_progress" || value === "completed" || value === "cancelled"; }

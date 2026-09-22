@@ -1,6 +1,5 @@
 import { paginateSessionSummaries } from "./session-list-page";
 import { UsageSourceCache } from "./usage-source-cache";
-import { loadDesktopSessionProjection } from "./session-projection";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { dialog, ipcMain, nativeImage, nativeTheme, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
@@ -59,13 +58,12 @@ import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRende
 import {
   projectContextSnapshot,
   projectContextState,
-  projectFixedRendererEvents,
-  projectFixedRendererSession,
+  projectChatEvents,
   projectSubagentTranscript,
   projectSubagentList,
-  projectUsageActivity,
-  projectUsageStatistics,
-} from "./fixed-renderer-projection";
+  projectIndexedUsageActivity,
+  projectIndexedUsageStatistics,
+} from "@actspace/client/sessions";
 import { listVisualizationsV2, visualizeReplyV2 } from "./fixed-renderer-visualization";
 
 export type FixedRendererIpcOptions = {
@@ -120,21 +118,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     const result = await options.registry.browseSessions();
     return paginateSessionSummaries(result, input);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionToolDetail, async (_event, input: { sessionId: string; callId: string }) => {
-    const page = await options.registry.browseToolDetail(input.sessionId, input.callId);
-    return projectFixedRendererSession(page.snapshot, page.journal, options.roots.workspaceRoot).messageBlocks ?? [];
-  });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPage, async (_event, input: import("@actspace/shared").SessionMessagePageInput) => {
-    const page = await options.registry.browseSession(input.sessionId, input.before);
-    const record = projectFixedRendererSession(page.snapshot, page.journal, options.roots.workspaceRoot);
-    const deferred = new Set(page.deferredToolCalls);
-    for (const block of record.messageBlocks ?? []) {
-      const source = record.events.find(e => e.id === block.id);
-      const callId = source?.type === 'tool_result' ? (source.payload as { toolCallId?: string })?.toolCallId : undefined;
-      if (callId && deferred.has(callId)) block.deferredToolDetail = { sessionId: input.sessionId, callId };
-    }
-    return { record, history: page.history };
-  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionToolDetail, (_event, input: { sessionId: string; callId: string }) => options.registry.browseToolDetail(input.sessionId, input.callId));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPage, (_event, input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) => options.registry.readSessionProjection(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessions, async (_event, input: { archived?: boolean } = {}) => {
     const items = await options.registry.listSessions();
     const selected = items.filter((item) => item.metadata.archived === (input.archived === true));
@@ -142,12 +127,13 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSession, async (_event, input: { sessionId: string }) => {
     try {
-      return loadSessionRecord(options.registry, input.sessionId, options.roots.workspaceRoot);
+      return await options.registry.readSessionProjection({ sessionId: input.sessionId, afterSeq: -1, includeToolDetails: true });
     } catch {
       return null;
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionProjectionSnapshot, async (_event, input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput): Promise<RuntimeV2DesktopSessionProjection> => loadDesktopSessionProjection(options.registry, input));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionProjectionSnapshot, (_event, input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) => options.registry.readSessionProjection(input));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionObservation, (_event, input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) => options.registry.readSessionObservation(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPreview, async (_event, input: { sessionId: string }) => {
     try {
       const snapshot = await options.registry.inspectSession(input.sessionId);
@@ -166,7 +152,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     if (input.title?.trim()) {
       snapshot = await options.registry.updateSessionMetadata({ sessionId: snapshot.sessionId, title: input.title.trim() });
     }
-    return loadSessionRecord(options.registry, snapshot.sessionId, options.roots.workspaceRoot);
+    return options.registry.readSessionProjection({ sessionId: snapshot.sessionId });
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.forkSession, async (_event, input: { sessionId: string }) => {
     const parent = await options.registry.inspectSession(input.sessionId);
@@ -175,7 +161,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       boundarySeq: parent.throughJournalSeq,
       newSessionId: randomUUID(),
     });
-    return loadSessionRecord(options.registry, forked.sessionId, options.roots.workspaceRoot);
+    return options.registry.readSessionProjection({ sessionId: forked.sessionId });
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.pinSession, async (_event, input: { sessionId: string; pinned: boolean }) => {
     await options.registry.updateSessionMetadata(input);
@@ -210,7 +196,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return { ok: failedSessionIds.length === 0, archivedSessionIds, failedSessionIds };
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent, async (_event, input: RunAgentInput): Promise<AgentRunResult> => {
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent, async (_event, input: RunAgentInput): Promise<Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection }> => {
     const content = await toRunContent(options.registry, input.sessionId, input.userInput, input.attachments ?? []);
     const result = await options.registry.runTurn({
       sessionId: input.sessionId,
@@ -224,18 +210,18 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       reasoningEffort: input.reasoningEffort,
     });
     const snapshot = result.snapshot;
-    const record = await loadSessionRecord(options.registry, snapshot.sessionId, options.roots.workspaceRoot);
+    const record = await options.registry.readSessionProjection({ sessionId: snapshot.sessionId });
     return {
       sessionId: input.sessionId,
       agentRunId: input.agentRunId,
-      events: record.events,
+      projection: record,
       finalReply: result.finalText ? {
         content: result.finalText,
         stopReason: result.reason === "aborted" ? "aborted" : result.reason === "failed" ? "error" : "stop",
         model: input.modelKey ?? input.model ?? "default",
         provider: "runtime-v2",
       } : undefined,
-      contextSnapshot: projectContextSnapshot(snapshot, await options.registry.inspectSessionEvents(snapshot.sessionId)),
+
       status: result.reason === "aborted" ? "aborted" : result.reason === "failed" ? "failed" : "completed",
       ...(result.reason === "failed" ? { error: { code: "AGENT_RUN_FAILED", message: "The v2 Agent run failed." } } : {}),
     };
@@ -246,7 +232,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   const unsubscribeLive = options.registry.subscribe((envelope) => {
-    if (envelope.event.kind === "runtime-live") usageSourceCaches.get(options.registry)?.invalidate();
+    if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update") usageSourceCaches.get(options.registry)?.invalidate();
     const target = options.getMainWindow();
     if (target === undefined || target.isDestroyed()) return;
     target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, envelope);
@@ -633,8 +619,8 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       return null;
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageStatistics, (_event, input: UsageStatisticsGetInput) => createUsageStatistics(options.registry, input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageActivity, (_event, input: UsageStatisticsGetInput) => createUsageActivity(options.registry, input));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageStatistics, (_event, input: UsageStatisticsGetInput) => createUsageStatistics(options.registry, options.roots.dataRoot, input));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageActivity, (_event, input: UsageStatisticsGetInput) => createUsageActivity(options.registry, options.roots.dataRoot, input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSubagents, async (_event, input: { sessionId: string }) => {
     return projectSubagentList(await options.registry.inspectSession(input.sessionId), await options.registry.inspectSessionEvents(input.sessionId));
   });
@@ -650,7 +636,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       sessionId: input.sessionId,
       agentRunId: input.agentRunId,
       status: result.compacted ? "compacted" : "skipped",
-      events: projectFixedRendererEvents(result.snapshot, await options.registry.inspectSessionEvents(input.sessionId)),
+      events: projectChatEvents(result.snapshot, await options.registry.inspectSessionEvents(input.sessionId)),
       contextSnapshot: projectContextSnapshot(result.snapshot, await options.registry.inspectSessionEvents(input.sessionId)),
     };
   });
@@ -671,11 +657,6 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
     pinned: item.metadata.pinned,
     archived: item.metadata.archived,
   };
-}
-
-async function loadSessionRecord(registry: DesktopRuntimeV2Registry, sessionId: string, fallbackWorkspaceRoot: string): Promise<SessionRecord> {
-  const snapshot = await registry.inspectSession(sessionId);
-  return projectFixedRendererSession(snapshot, await registry.inspectSessionEvents(sessionId), fallbackWorkspaceRoot);
 }
 
 async function toRunContent(
@@ -758,26 +739,20 @@ function toModelMutationResult(result: ModelStoreResult) {
 
 async function createUsageStatistics(
   registry: DesktopRuntimeV2Registry,
+  dataRoot: string,
   input: UsageStatisticsGetInput,
 ): Promise<UsageStatisticsSnapshot | null> {
-  const scope = input.scope ?? (input.sessionId ? "session" : "global");
-  const list = await registry.listSessions();
-  const selected = scope === "session" ? list.filter((item) => item.sessionId === input.sessionId) : list;
-  if (scope === "session" && selected.length === 0) return null;
-  const sessions = await Promise.all(selected.map(async (item) => ({ snapshot: await registry.inspectSession(item.sessionId), journal: await registry.inspectSessionEvents(item.sessionId) })));
-  return projectUsageStatistics(sessions, { scope, ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), range: input.range ?? "month", page: input.requestRowsPage?.page ?? 1 });
+  let cache = usageSourceCaches.get(registry);
+  if (!cache) { cache = new UsageSourceCache(registry, dataRoot); usageSourceCaches.set(registry, cache); }
+  return projectIndexedUsageStatistics(await cache.read(), input);
 }
 
 const usageSourceCaches = new WeakMap<DesktopRuntimeV2Registry, UsageSourceCache>();
 
-async function createUsageActivity(registry: DesktopRuntimeV2Registry, input: UsageStatisticsGetInput): Promise<UsageActivitySnapshot | null> {
+async function createUsageActivity(registry: DesktopRuntimeV2Registry, dataRoot: string, input: UsageStatisticsGetInput): Promise<UsageActivitySnapshot | null> {
   let cache = usageSourceCaches.get(registry);
-  if (!cache) { cache = new UsageSourceCache(registry); usageSourceCaches.set(registry, cache); }
-  const all = await cache.read();
-  const scope = input.scope ?? (input.sessionId ? "session" : "global");
-  const sessions = scope === "session" ? all.filter(({ snapshot }) => snapshot.sessionId === input.sessionId) : all;
-  if (scope === "session" && !sessions.length) return null;
-  return projectUsageActivity(sessions, { scope, ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), range: input.range ?? "month", status: input.status ?? "all", search: input.search?.slice(0, 300), kind: input.kind, page: input.requestRowsPage?.page ?? 1 });
+  if (!cache) { cache = new UsageSourceCache(registry, dataRoot); usageSourceCaches.set(registry, cache); }
+  return projectIndexedUsageActivity(await cache.read(), { ...input, search: input.search?.slice(0, 300) });
 }
 
 async function imagePreviewDataUrl(path: string): Promise<string | undefined> {

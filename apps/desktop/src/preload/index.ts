@@ -1,4 +1,7 @@
 import { ENGLISH_LEARNING_CHANNELS } from "@actspace/shared";
+import { projectChatWindow, projectChatEvents } from "@actspace/client/sessions";
+import { createMessageBlocks } from "@actspace/shared";
+import type { RuntimeV2DesktopSessionProjection } from "@actspace/shared/runtime-v2";
 import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 import type {
   AbortAgentRunInput,
@@ -215,6 +218,7 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "session:list": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessions,
   "session:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSession,
   "session:get-projection-snapshot": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionProjectionSnapshot,
+  "session:get-observation": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionObservation,
   "session:get-preview": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPreview,
   "subagent:list": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSubagents,
   "subagent:get-transcript": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSubAgentTranscript,
@@ -296,7 +300,11 @@ function invokeFixedRenderer(channel: string, ...args: unknown[]): Promise<unkno
 
 contextBridge.exposeInMainWorld("actspace", {
   getBootstrapState: () => invokeFixedRenderer("app:get-bootstrap-state") as Promise<BootstrapState>,
-  runAgent: (input: RunAgentInput) => invokeFixedRenderer("agent:run", input) as Promise<AgentRunResult>,
+  runAgent: async (input: RunAgentInput): Promise<AgentRunResult> => {
+    const { projection, ...result } = await invokeFixedRenderer("agent:run", input) as Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection };
+    const record = projectChatWindow(projection);
+    return { ...result, events: record.events, contextSnapshot: record.contextSnapshot };
+  },
   compactContext: (input: CompactContextInput) =>
     invokeFixedRenderer("context:compact", input) as Promise<CompactContextResult>,
   abortAgentRun: (input: AbortAgentRunInput) => invokeFixedRenderer("agent:abort-run", input) as Promise<boolean>,
@@ -378,12 +386,20 @@ contextBridge.exposeInMainWorld("actspace", {
   describeContext: (input: DescribeContextInput) =>
     invokeFixedRenderer("context:describe", input) as Promise<ContextState | null>,
   listSessionPage: (input?: import("@actspace/shared").SessionListPageInput) => invokeFixedRenderer("session:list-page", input ?? {}) as Promise<import("@actspace/shared").SessionListPage>,
-  getSessionToolDetail: (input: { sessionId: string; callId: string }) => invokeFixedRenderer("session:tool-detail", input) as Promise<import("@actspace/shared").MessageBlock[]>,
-  getSessionPage: (input: import("@actspace/shared").SessionMessagePageInput) => invokeFixedRenderer("session:get-page", input) as Promise<import("@actspace/shared").SessionMessagePage>,
+  getSessionToolDetail: async (input: { sessionId: string; callId: string }) => {
+    const page = await invokeFixedRenderer("session:tool-detail", input) as import("@actspace/desktop-app").DesktopBrowsePage;
+    return createMessageBlocks(projectChatEvents(page.snapshot, page.journal));
+  },
+  getSessionPage: (input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) => invokeFixedRenderer("session:get-page", input) as Promise<RuntimeV2DesktopSessionProjection>,
   listSessions: (input?: SessionListInput) => invokeFixedRenderer("session:list", input ?? {}) as Promise<SessionListItem[]>,
-  getSession: (input: SessionGetInput) => invokeFixedRenderer("session:get", input) as Promise<SessionRecord | null>,
+  getSession: async (input: SessionGetInput) => {
+    const projection = await invokeFixedRenderer("session:get", input) as RuntimeV2DesktopSessionProjection | null;
+    return projection ? projectChatWindow(projection) : null;
+  },
   getSessionProjectionSnapshot: (input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) =>
     invokeFixedRenderer("session:get-projection-snapshot", input) as Promise<import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection>,
+  getSessionObservation: (input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) =>
+    invokeFixedRenderer("session:get-observation", input) as Promise<import("@actspace/shared/runtime-v2").RuntimeV2SessionObservation>,
   getSessionPreview: (input: SessionPreviewInput) =>
     invokeFixedRenderer("session:get-preview", input) as Promise<SessionPreviewResult | null>,
   getSubagents: (input: { sessionId: string }) => invokeFixedRenderer("subagent:list", input) as Promise<import("@actspace/shared").MessageBlock[]>,
@@ -399,8 +415,8 @@ contextBridge.exposeInMainWorld("actspace", {
     invokeFixedRenderer("kimi:balance:get") as Promise<KimiBalanceSnapshot>,
   getProviderBalance: (input: ProviderBalanceGetInput) =>
     invokeFixedRenderer("provider:balance:get", input) as Promise<ProviderBalanceSnapshot>,
-  createSession: (input?: SessionCreateInput) => invokeFixedRenderer("session:create", input ?? {}) as Promise<SessionRecord>,
-  forkSession: (input: SessionForkInput) => invokeFixedRenderer("session:fork", input) as Promise<SessionRecord>,
+  createSession: async (input?: SessionCreateInput) => projectChatWindow(await invokeFixedRenderer("session:create", input ?? {}) as RuntimeV2DesktopSessionProjection),
+  forkSession: async (input: SessionForkInput) => projectChatWindow(await invokeFixedRenderer("session:fork", input) as RuntimeV2DesktopSessionProjection),
   pinSession: (input: SessionPinInput) => invokeFixedRenderer("session:pin", input) as Promise<SessionPinResult>,
   renameSession: (input: SessionRenameInput) =>
     invokeFixedRenderer("session:rename", input) as Promise<SessionRenameResult>,

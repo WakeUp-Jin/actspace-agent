@@ -21,7 +21,7 @@
 | [P1-A Session Core / Persistence](../../exec-plans/active/20260829-actspace-p1-session-core-persistence/README.md) | 保留 active | SessionHandle 已依赖 backend-neutral driver；CLI persist/resume 与生产接线仍需独立 G1 交接。 |
 | [P1-B Service Roles](../../exec-plans/active/20260829-actspace-p1-service-roles/README.md) | 保留 active | 三层 metadata 已实现，不能据此证明所有 Consumer 已脱离 Provider 私有实现；逐项核对真实 Service ID、exports、inject/provide 与生产消费链。 |
 | [P1-C Profile / Bundle / Patch](../../exec-plans/active/20260829-actspace-p1-profile-bundle-patch/README.md) | 保留 active | schema/digest/transport 已实现；restart-only、失败清理和 one-shot 回归仍需 G1。 |
-| [Session 持久化与投影](../../exec-plans/active/20260830-actspace-session-persistence-projection/README.md) | 保留 active | 基础通道和首批消费者已实现；Conversation 最终 durable Surface 映射、剩余消费者与集成验收尚未完成。 |
+| [Session 持久化与投影](../../exec-plans/discarded/20260830-actspace-session-persistence-projection/README.md) | 保留 active | 基础通道和首批消费者已实现；Conversation 最终 durable Surface 映射、剩余消费者与集成验收尚未完成。 |
 | [Context 模型事实](../../exec-plans/completed/20260901-actspace-context-model-facts/README.md) | 已归档 completed | P00/P01 完成；中文界面任务收口后，本次重跑全仓 typecheck/test 通过（Desktop 97 文件、651 用例）。仅余 G2 人工项。 |
 | [前端基础组件](../../exec-plans/active/frontend-ui-components-foundation.md) | 保留 active | 已有 Tooltip/HoverCard/Sheet；Button、IconButton、DropdownMenu、Switch、Textarea、Tabs 与业务迁移尚未完成。 |
 | 日常主界面中文统一（独立任务） | 保持独立任务状态 | 状态以该独立计划为准，本轮不修改其代码和验收结果；归档后同步链接。 |

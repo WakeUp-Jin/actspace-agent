@@ -1,7 +1,8 @@
 import { FixedRendererStreamAdapter } from "../../main/runtime-v2/fixed-renderer-stream-adapter";
-import { runToolStreamFixture } from "../../../../../packages/core/agent-loop/src/test/tool-stream-fixture";
-import { projectSessionSnapshot } from "../../../../../packages/runtime/dist/projection/durable-session.js";
-import { projectFixedRendererSession } from "../../main/runtime-v2/fixed-renderer-projection";
+import { runToolStreamFixture } from "@actspace/core-agent-loop/testing";
+import { SessionReadModel } from "@actspace/runtime";
+import { recordProjectionFixture } from "./projection-fixture";
+import { projectChatSession } from "@actspace/client/sessions";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AgentRunResult, AppSettings, BootstrapState, CompactContextInput, ReviewGetSnapshotResult, RunAgentInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
@@ -42,6 +43,7 @@ const defaultSettings: AppSettings = {
 
 /** window.actspace 的设置相关方法默认 stub，供各用例 spread 进 mock。 */
 const settingsApiStub = {
+  getSessionPage: async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(await window.actspace.getSession({ sessionId })),
   getSettings: async () => defaultSettings,
   readAgentSystemPrompt: async () => ({ path: defaultSettings.agent.systemPromptPath, content: "" }),
   writeAgentSystemPrompt: async (input: { content: string }) => ({
@@ -455,6 +457,7 @@ describe("App streaming user message", () => {
       modelId: "deepseek-v4-pro" as const,
       contextSnapshot: {
         totalTokens: 42_000,
+        cumulativeTokens: 42_000,
         maxTokens: 100_000,
         percentUsed: 42,
         buckets: [],
@@ -509,7 +512,7 @@ describe("App streaming user message", () => {
     expect(tooltip).toHaveTextContent(`sessionId: ${sessionId}`);
     expect(tooltip).toHaveTextContent("/tmp/workspace");
     expect(tooltip).toHaveTextContent("deepseek-flash");
-    expect(tooltip).toHaveTextContent("42K / 100K");
+    expect(tooltip).toHaveTextContent("累计 Token：42K");
   });
 
   it("keeps New chat as a placeholder and refreshes a background generated title", async () => {
@@ -1428,6 +1431,7 @@ sessionId,
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let storedProjection = recordProjectionFixture(record);
     const adapter = new FixedRendererStreamAdapter();
     let finishTool!: () => void;
     let finishText!: () => void;
@@ -1467,6 +1471,7 @@ sessionId,
       }),
       listPendingApprovals: async () => [],
       ...settingsApiStub,
+      getSessionPage: async () => storedProjection,
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -1481,8 +1486,10 @@ sessionId,
           execute: async () => { await toolGate; return { status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture" }] }; },
           beforeFinalText: () => textGate,
         });
-        const snapshot = projectSessionSnapshot({ header: fixture.header, events: fixture.journal, registry: fixture.registry, rendererAllowlist: new Map() });
-        record = projectFixedRendererSession(snapshot, fixture.journal, "/tmp/workspace");
+        const model = new SessionReadModel(fixture.header, fixture.registry, new Map()).replay(fixture.journal);
+        const snapshot = model.snapshot();
+        storedProjection = { ...recordProjectionFixture(record), throughJournalSeq: snapshot.throughJournalSeq, snapshot, values: model.projections.snapshot(input.sessionId).values, activeMessageIds: snapshot.messages.map(message => message.messageId), window: { events: fixture.journal, fromSeq: 0, throughJournalSeq: snapshot.throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 } };
+        record = projectChatSession(snapshot, fixture.journal, "/tmp/workspace");
         return { sessionId: input.sessionId, agentRunId: input.agentRunId, status: "completed", events: record.events, contextSnapshot: { totalTokens: 0, maxTokens: 200_000, percentUsed: 0, buckets: [] }, contextState: null };
       },
     };
@@ -1602,8 +1609,8 @@ sessionId: input.sessionId,
     await userEvent.click(screen.getByLabelText("发送消息"));
 
     for (const filePath of ["first.ts", "second.ts", "third.ts"]) {
-      const runningText = await screen.findByText(`Write ${filePath}`);
-      expect(runningText.closest(".file-diff-block")).toHaveClass("is-streaming");
+      const runningText = await screen.findByText(`Write ${filePath} · 正在生成`);
+      expect(runningText.closest(".tool-log-line")).toHaveClass("is-running");
     }
 
     const finishWrite = async (index: number, filePath: string) => {
@@ -1633,12 +1640,12 @@ sessionId,
 
     await finishWrite(1, "first.ts");
     expect(screen.getByRole("button", { name: /Write first\.ts/ })).toBeInTheDocument();
-    expect(screen.getByText("Write second.ts").closest(".file-diff-block")).toHaveClass("is-streaming");
-    expect(screen.getByText("Write third.ts").closest(".file-diff-block")).toHaveClass("is-streaming");
+    expect(screen.getByText("Write second.ts · 正在生成").closest(".tool-log-line")).toHaveClass("is-running");
+    expect(screen.getByText("Write third.ts · 正在生成").closest(".tool-log-line")).toHaveClass("is-running");
 
     await finishWrite(2, "second.ts");
     expect(screen.getByRole("button", { name: /Write second\.ts/ })).toBeInTheDocument();
-    expect(screen.getByText("Write third.ts").closest(".file-diff-block")).toHaveClass("is-streaming");
+    expect(screen.getByText("Write third.ts · 正在生成").closest(".tool-log-line")).toHaveClass("is-running");
 
     await finishWrite(3, "third.ts");
     expect(screen.getByRole("button", { name: /Write third\.ts/ })).toBeInTheDocument();
@@ -3218,15 +3225,28 @@ sessionId: input.sessionId,
     latest.events = [{ id: 'v2-20', sessionId: 'paged', agentRunId: 'r2', schemaVersion: 2, timestamp: latest.meta.createdAt, type: 'user_message', payload: { content: 'Latest question' } }];
     const earlier = { ...latest, events: [{ ...latest.events[0], id: 'v2-0', agentRunId: 'r1', payload: { content: 'Earlier question' } }] } as SessionRecord;
     const getSession = vi.fn(async () => ({ ...latest, events: [...earlier.events, ...latest.events] }));
-    const getSessionPage = vi.fn(async ({ before }: { sessionId: string; before?: number }) => ({ record: before === undefined ? latest : earlier, history: { before: before === undefined ? 20 : null, throughJournalSeq: 30 } }));
+    const projectionPage = (record: SessionRecord, eventSeq: number, beforeSeq: number | null) => {
+      const base = recordProjectionFixture(record);
+      const events = base.window.events.map((event) => ({ ...event, seq: eventSeq }));
+      return {
+        ...base,
+        throughJournalSeq: 20,
+        snapshot: { ...base.snapshot, throughJournalSeq: 20 },
+        activeMessageIds: ["v2-20", "v2-0"],
+        window: { ...base.window, events, fromSeq: eventSeq, throughJournalSeq: beforeSeq === null ? 9 : 20, beforeSeq },
+      };
+    };
+    const latestProjection = projectionPage(latest, 10, 10);
+    const earlierProjection = projectionPage(earlier, 0, null);
+    const getSessionPage = vi.fn(async ({ beforeSeq }: { sessionId: string; beforeSeq?: number }) => beforeSeq === undefined ? latestProjection : earlierProjection);
     const listSessions = vi.fn(async () => []);
     window.actspace = {
       getBootstrapState: async () => bootstrapState,
       listWorkspaces: async () => createWorkspaceRegistryFixture(latest.meta.createdAt),
       listSessionPage: async () => ({ items: [{ id: 'paged', title: 'Paged session', updatedAt: latest.meta.updatedAt, agentRunCount: 2 }], groups: [], indexing: false, failed: 0 }),
-      listSessions, getSession, getSessionPage,
+      listSessions, getSession,
       createSession: async () => latest, abortAgentRun: async () => true, submitApproval: async () => ({ ok: true }), pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null, listPendingApprovals: async () => [], ...settingsApiStub,
+      getUsageStatistics: async () => null, listPendingApprovals: async () => [], ...settingsApiStub, getSessionPage,
       onAgentStream: () => () => {}, runAgent: vi.fn(),
     } as unknown as Window['actspace'];
     renderApp();
@@ -3235,7 +3255,7 @@ sessionId: input.sessionId,
     expect(getSession).not.toHaveBeenCalled(); expect(listSessions).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: '加载更早消息' }));
     await screen.findByText('Earlier question');
-    expect(getSessionPage).toHaveBeenLastCalledWith({ sessionId: 'paged', before: 20 });
+    expect(getSessionPage).toHaveBeenLastCalledWith({ sessionId: 'paged', beforeSeq: 10 });
     expect(screen.getByText('Latest question')).toBeInTheDocument();
   });
 
@@ -3243,20 +3263,20 @@ sessionId: input.sessionId,
     const a = createEmptySessionRecord('page-a'); a.meta.title = 'Page A';
     const b = createEmptySessionRecord('page-b'); b.meta.title = 'Page B';
     b.events = [{ id: 'v2-1', sessionId: 'page-b', agentRunId: 'rb', schemaVersion: 2, timestamp: b.meta.createdAt, type: 'user_message', payload: { content: 'B visible question' } }];
-    let resolveA!: (page: import('@actspace/shared').SessionMessagePage) => void;
+    let resolveA!: (page: import('@actspace/shared/runtime-v2').RuntimeV2DesktopSessionProjection) => void;
     window.actspace = {
       getBootstrapState: async () => bootstrapState, listWorkspaces: async () => createWorkspaceRegistryFixture(a.meta.createdAt),
       listSessionPage: async () => ({ items: [a, b].map(record => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0 })), groups: [], indexing: false, failed: 0 }),
       listSessions: async () => [], getSession: vi.fn(),
-      getSessionPage: ({ sessionId }: { sessionId: string }) => sessionId === 'page-a' ? new Promise(resolve => { resolveA = resolve; }) : Promise.resolve({ record: b, history: { before: null, throughJournalSeq: 1 } }),
       createSession: async () => a, abortAgentRun: async () => true, submitApproval: async () => ({ ok: true }), pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null, listPendingApprovals: async () => [], ...settingsApiStub,
+      getSessionPage: ({ sessionId }: { sessionId: string }) => sessionId === 'page-a' ? new Promise(resolve => { resolveA = resolve; }) : Promise.resolve(recordProjectionFixture(b)),
       onAgentStream: () => () => {}, runAgent: vi.fn(),
     } as unknown as Window['actspace'];
     renderApp();
     await userEvent.click(await screen.findByText('Page B'));
     await screen.findByText('B visible question');
-    await act(async () => resolveA({ record: a, history: { before: null, throughJournalSeq: 0 } }));
+    await act(async () => resolveA(recordProjectionFixture(a)));
     expect(screen.getByText('B visible question')).toBeInTheDocument();
   });
 
@@ -3374,7 +3394,12 @@ sessionId: input.sessionId,
     await act(async () => fixture.complete('background-a'));
     for (const id of ['background-a', 'background-b']) {
       const record = fixture.records.get(id)!;
-      record.messageBlocks = [{ kind: 'bash', id: `bash-${id}`, title: id, command: 'sleep 1', commandPreview: 'sleep 1', status: 'success', backgroundTaskId: 'task-shared', backgroundStatus: 'running', createdAt: record.meta.createdAt }];
+      const base = { sessionId: id, agentRunId: `run-${id}`, schemaVersion: 2 as const, timestamp: record.meta.createdAt };
+      record.events = [
+        { ...base, id: `user-${id}`, type: 'user_message', payload: { content: 'Launch background Bash' } },
+        { ...base, id: `call-${id}`, type: 'tool_call', payload: { toolCallId: `bash-${id}`, name: 'bash', args: { command: 'sleep 1' } } },
+        { ...base, id: `result-${id}`, type: 'tool_result', payload: { toolCallId: `bash-${id}`, toolName: 'bash', ok: true, detail: [{ label: 'background-task', value: { taskId: 'task-shared', status: 'running' } }] } },
+      ] as SessionEvent[];
     }
     await act(async () => fixture.event('background-a', { type: 'bash_task_update', taskId: 'task-shared', status: 'completed', exitCode: 0 }));
     await fixture.select('background-a');

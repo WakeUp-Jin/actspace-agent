@@ -2,7 +2,7 @@ import type { AgentLoopLiveEvent } from "@actspace/runtime";
 import type { RuntimeStreamEvent } from "@actspace/shared";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { FileGenerationCounter } from "./file-generation-counter";
-import { toolPreview } from "./fixed-renderer-tool-preview";
+import { toolPreview } from "@actspace/client/sessions";
 import { SubagentActivity } from "./subagent-activity";
 
 type Identity = { sessionId: string; agentRunId: string; turnId: string; llmCallId: string; toolCallId: string; toolName: string };

@@ -12,6 +12,9 @@ import type {
 } from "@actspace/shared/runtime-v2";
 
 type SessionService = {
+  readProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput): Promise<import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection>;
+  readObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput): Promise<import("@actspace/shared/runtime-v2").RuntimeV2SessionObservation>;
+  subscribeProjection(listener: (update: import("@actspace/shared/runtime-v2").RuntimeV2SessionUpdate) => void): () => void;
   readonly store: {
     inspect(sessionId: string): Promise<{ readonly header: SessionHandle["header"] | null; readonly events: readonly SessionEventEnvelopeV1[] }>;
     fork(options: {
@@ -29,8 +32,8 @@ type SessionService = {
   inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]>;
   list(): Promise<readonly RuntimeV2SessionListItem[]>;
   browseSessions(): Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
+  globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]>;
   browseToolDetail(sessionId: string, callId: string): Promise<DesktopBrowsePage>;
-  browseSession(sessionId: string, before?: number): Promise<DesktopBrowsePage>;
   export(sessionId: string): Promise<string>;
   getOpen(sessionId: string): SessionHandle | undefined;
 };
@@ -51,10 +54,13 @@ type RunService = {
 type AgentRuntimeService = { readonly runs: RunService };
 
 export type DesktopAppServiceContract = {
+  readonly readSessionProjection: SessionService["readProjection"];
+  readonly readSessionObservation: SessionService["readObservation"];
+  readonly subscribeSessionProjection: SessionService["subscribeProjection"];
   readonly listSessions: () => Promise<readonly RuntimeV2SessionListItem[]>;
   readonly browseSessions: () => Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
+  readonly globalSessionSummaries: () => Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]>;
   readonly browseToolDetail: (sessionId: string, callId: string) => Promise<DesktopBrowsePage>;
-  readonly browseSession: (sessionId: string, before?: number) => Promise<DesktopBrowsePage>;
   readonly inspectSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly inspectSessionEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]>;
   readonly exportSession: (sessionId: string) => Promise<string>;
@@ -91,9 +97,12 @@ export class DesktopAppService implements DesktopAppServiceContract {
   }
 
   listSessions() { return this.#sessions.list(); }
+  readSessionProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.#sessions.readProjection(input); }
+  readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.#sessions.readObservation(input); }
+  subscribeSessionProjection(listener: (update: import("@actspace/shared/runtime-v2").RuntimeV2SessionUpdate) => void) { return this.#sessions.subscribeProjection(listener); }
   browseSessions() { return this.#sessions.browseSessions(); }
+  globalSessionSummaries() { return this.#sessions.globalSessionSummaries(); }
   browseToolDetail(sessionId: string, callId: string) { return this.#sessions.browseToolDetail(sessionId, callId); }
-  browseSession(sessionId: string, before?: number) { return this.#sessions.browseSession(sessionId, before); }
   inspectSession(sessionId: string) { return this.#sessions.inspect(sessionId); }
   inspectSessionEvents(sessionId: string) { return this.#sessions.inspectEvents(sessionId); }
   exportSession(sessionId: string) { return this.#sessions.export(sessionId); }

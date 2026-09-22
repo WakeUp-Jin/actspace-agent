@@ -2,3 +2,8 @@ export * from "./live-overlay.js";
 export * from "./selectors.js";
 export * from "./session-snapshot.js";
 export * from "./session.js";
+export * from "./trajectory.js";
+export * from "./chat.js";
+export * from "./tool-card.js";
+export * from "./usage-aggregates.js";
+export * from "./indexed-usage.js";

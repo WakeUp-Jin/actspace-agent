@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-import { projectSubagentList, projectSubagentTranscript, projectContextSnapshot, projectContextState, projectFixedRendererEvents, projectFixedRendererSession, projectUsageActivity } from "../runtime-v2/fixed-renderer-projection";
+import { projectSubagentList, projectSubagentTranscript, projectContextSnapshot, projectContextState, projectChatEvents, projectChatSession, projectSessionUsageActivities, projectIndexedUsageActivity } from "@actspace/client/sessions";
 
 it("restores a durable failed turn as an error block, including old failures without details", () => {
   for (const failure of [undefined, { kind: "invalid-request", message: "Cannot send tool image", retryable: false }]) {
     const journal = [event(0, "turn/start", { turnId: "turn", agentRunId: "run" }), event(1, "turn/end", { turnId: "turn", reason: "failed", ...(failure ? { failure } : {}) })];
-    const restored = projectFixedRendererSession(baseSnapshot(), journal, "/fixture");
+    const restored = projectChatSession(baseSnapshot(), journal, "/fixture");
     expect(restored.events.filter((e) => e.type === "error")).toHaveLength(1);
     expect(restored.messageBlocks).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "error", content: failure?.message ?? "LLM request failed." })]));
   }
@@ -25,7 +25,7 @@ describe("fixed renderer v2 projection", () => {
       messages: [{ kind: "user", messageId: "user-inbox-claim", content: "hello" }],
     });
 
-    const projected = projectFixedRendererSession(snapshot, journal, "/tmp/workspace");
+    const projected = projectChatSession(snapshot, journal, "/tmp/workspace");
 
     expect(projected.messageBlocks).toEqual([
       expect.objectContaining({
@@ -48,7 +48,7 @@ describe("fixed renderer v2 projection", () => {
       messages: [{ kind: "user", messageId: "user-next-step", content: "continue" }],
     });
 
-    const projected = projectFixedRendererSession(snapshot, journal, "/tmp/workspace");
+    const projected = projectChatSession(snapshot, journal, "/tmp/workspace");
 
     expect(projected.messageBlocks).toEqual([
       expect.objectContaining({
@@ -73,7 +73,7 @@ describe("fixed renderer v2 projection", () => {
       ],
     });
 
-    const messages = projectFixedRendererEvents(snapshot, journal)
+    const messages = projectChatEvents(snapshot, journal)
       .filter((item) => item.type === "user_message" || item.type === "assistant_message");
 
     expect(messages).toEqual([
@@ -92,8 +92,8 @@ describe("fixed renderer v2 projection", () => {
       messages: [{ kind: "user", messageId: "notify-1", content: "<task_notification>done</task_notification>" }],
     });
 
-    const projected = projectFixedRendererSession(snapshot, notification, "/tmp/workspace");
-    const userEvent = projectFixedRendererEvents(snapshot, notification).find((item) => item.type === "user_message");
+    const projected = projectChatSession(snapshot, notification, "/tmp/workspace");
+    const userEvent = projectChatEvents(snapshot, notification).find((item) => item.type === "user_message");
 
     expect(userEvent?.payload).toMatchObject({ source: "task_notification" });
     expect(projected.messageBlocks).toEqual([]);
@@ -116,7 +116,7 @@ describe("fixed renderer v2 projection", () => {
     ];
     const snapshot = baseSnapshot({ messages: [{ kind: "user", messageId: "summary-1", content: "summary" }], throughJournalSeq: 5, activity: { ...baseSnapshot().activity, compactionCount: 1, lastCompactionSummary: "summary" } });
 
-    const projected = projectFixedRendererEvents(snapshot, journal);
+    const projected = projectChatEvents(snapshot, journal);
 
     expect(projected.filter((item) => item.type === "user_message" || item.type === "assistant_message")).toEqual([
       expect.objectContaining({ id: "v2-4", type: "user_message", payload: expect.objectContaining({ content: "summary" }) }),
@@ -135,7 +135,7 @@ describe("fixed renderer v2 projection", () => {
       tools: [{ kind: "tool", schemaVersion: 1, sessionId: "session-1", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1", pluginId: "actspace.core-tools", name: "write_file", callId: "call-1", state: "completed", phase: null, startedAt: TIME, finishedAt: TIME, durationMs: 0, argsSummary: { text: "{}", fields: [] }, modelOutput: [{ type: "text", text: "done" }], summary: "Updated src/a.ts", detail: [], artifacts: [], failure: null, renderer: null }],
     });
 
-    const result = projectFixedRendererEvents(snapshot, journal).find((item) => item.type === "tool_result");
+    const result = projectChatEvents(snapshot, journal).find((item) => item.type === "tool_result");
 
     expect(result?.payload).toMatchObject({
       uiPreview: {
@@ -265,7 +265,7 @@ describe("fixed renderer v2 projection", () => {
     ];
     const snapshot = baseSnapshot({ throughJournalSeq: 11 });
 
-    const result = projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", page: 1 });
+    const result = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
     const requests = result.rows.filter((row) => row.kind === "llm_request");
     const tool = result.rows.find((row) => row.kind === "tool_invocation");
 
@@ -274,8 +274,8 @@ describe("fixed renderer v2 projection", () => {
     expect(requests.find((row) => row.requestId === "request-2")).toMatchObject({ status: "success", attempt: 2, retryOfRequestId: "request-1", modelKey: "deepseek:deepseek-chat", tokens: { reasoningTokens: 3, totalTokens: 30 }, costUsd: 0.2, costBasis: "estimated", historicalUnverified: true });
     expect(tool).toMatchObject({ status: "success", callId: "call-1", durationMs: 300, costUsd: null, costBasis: "unavailable" });
     expect(result.summary).toMatchObject({ activityCount: 3, requestCount: 2, toolCount: 1, successCount: 2, errorCount: 1 });
-    expect(projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", page: 1 }).rows).toEqual(result.rows);
-    expect(projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", status: "success", page: 1 }).rows.every((row) => row.status === "success")).toBe(true);
+    expect(projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!.rows).toEqual(result.rows);
+    expect(projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", status: "success", requestRowsPage: { page: 1 } })!.rows.every((row) => row.status === "success")).toBe(true);
   });
 });
 
@@ -344,11 +344,11 @@ it("keeps unknown, free and original currencies separate across full-query pagin
   ];
   const journal = costs.flatMap((usage, index) => [event(index * 2, "request/header", { requestId: `r${index}`, turnId: "t", stepId: `s${index}`, model: `m${index}`, routeId: "deepseek" }), event(index * 2 + 1, "assistant/message", { requestId: `r${index}`, finishReason: "stop", usage: { ...usage, inputTokens: 10, outputTokens: 5 } } as unknown as RuntimeV2JsonValue)]);
   const snapshot = baseSnapshot({ throughJournalSeq: 6 });
-  const result = projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", page: 1 });
+  const result = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
   expect(result.costSummary).toEqual({ amountsByCurrency: { USD: 0, CNY: 2 }, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 });
   expect(result.summary.costUsd).toBe(0);
   expect(result.aggregates?.models).toHaveLength(3);
-  const filtered = projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", page: 1, search: "m2", status: "success" });
+  const filtered = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 }, search: "m2", status: "success" })!;
   expect(filtered.rowsPage.totalRows).toBe(1);
   expect(filtered.costSummary?.amountsByCurrency).toEqual({ CNY: 2 });
 });
@@ -357,19 +357,19 @@ it("reuses immutable journal projections for 10,000 requests and invalidates on 
   const journal = Array.from({ length: 10_000 }, (_, i) => [event(i * 2, "request/header", { requestId: `perf-r${i}`, turnId: "t", stepId: `perf-s${i}`, model: i % 2 ? "m-a" : "m-b", routeId: "deepseek" }), event(i * 2 + 1, "assistant/message", { requestId: `perf-r${i}`, finishReason: "stop", usage: { inputTokens: 10, outputTokens: 5 } })]).flat();
   const snapshot = baseSnapshot({ throughJournalSeq: 20_000 });
   const start = performance.now();
-  const first = projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", page: 1 });
+  const first = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
   const coldMs = performance.now() - start;
   const warmStart = performance.now();
-  const second = projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", page: 2 });
+  const second = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 2 } })!;
   const warmMs = performance.now() - warmStart;
   expect(first.rowsPage.totalRows).toBe(10_000);
   expect(second.summary).toEqual(first.summary);
   expect(second.rows).toHaveLength(10);
-  const filtered = projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", page: 2, search: "m-a" });
+  const filtered = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 2 }, search: "m-a" })!;
   expect(filtered.rowsPage.totalRows).toBe(5_000);
   expect(filtered.summary.totalTokens).toBe(75_000);
   const changed = [...journal, event(20_000, "request/header", { requestId: "new", turnId: "t", stepId: "new", model: "m-a" }), event(20_001, "assistant/message", { requestId: "new", finishReason: "stop", usage: { inputTokens: 2, outputTokens: 1 } })];
-  const updated = projectUsageActivity([{ snapshot: baseSnapshot({ throughJournalSeq: 20_001 }), journal: changed }], { scope: "global", range: "total", page: 1 });
+  const updated = projectIndexedUsageActivity([{ snapshot: baseSnapshot({ throughJournalSeq: 20_001 }), journal: changed }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
   expect(updated.rowsPage.totalRows).toBe(10_001);
   expect(updated.summary.totalTokens).toBe(150_003);
   console.info(JSON.stringify({ usageBenchmark: { requests: 10_000, coldMs, warmMs, heapMiB: process.memoryUsage().heapUsed / 1024 / 1024 } }));
@@ -383,11 +383,11 @@ it("labels tool-call requests as successful and keeps tab counts independent of 
     event(3, "tool/result", { callId: "c", name: "Bash", status: "completed" }),
   ];
   const snapshot = baseSnapshot({ throughJournalSeq: 3, metadata: { title: "会话标题", pinned: false, archived: false } });
-  const result = projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", page: 1 });
+  const result = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
   expect(result.rows.find((row) => row.kind === "llm_request")?.status).toBe("success");
   expect(result.rows.every((row) => row.sessionTitle === "会话标题")).toBe(true);
   expect(result.tabCounts).toEqual({ requests: 2, providers: 1, models: 1, tools: 1 });
-  const filtered = projectUsageActivity([{ snapshot, journal }], { scope: "global", range: "total", page: 1, search: "Bash", status: "success" });
+  const filtered = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 }, search: "Bash", status: "success" })!;
   expect(filtered.rows).toHaveLength(1);
   expect(filtered.rows[0].kind).toBe("tool_invocation");
   expect(filtered.tabCounts).toEqual(result.tabCounts);
@@ -399,8 +399,12 @@ it("uses step usage when the assistant message has none without counting the req
     event(1, "assistant/message", { requestId: "r", finishReason: "tool-calls" }),
     event(2, "step/end", { stepId: "s", finishReason: "tool-calls", usage: { inputTokens: 10, outputTokens: 2, cost: 0.001, costCurrency: "USD", costProvenance: { version: 1, basis: "estimated", reason: null, pricingSnapshot: null } } }),
   ];
-  const result = projectUsageActivity([{ snapshot: baseSnapshot({ throughJournalSeq: 2 }), journal }], { scope: "global", range: "total", page: 1 });
+  const result = projectIndexedUsageActivity([{ snapshot: baseSnapshot({ throughJournalSeq: 2 }), journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
   expect(result.rows).toHaveLength(1);
   expect(result.rows[0]).toMatchObject({ status: "success", costAmount: 0.001, tokens: { totalTokens: 12 } });
   expect(result.costSummary?.knownCostRequestCount).toBe(1);
 });
+
+function usageSource({ snapshot, journal }: { snapshot: RuntimeV2SessionSnapshot; journal: readonly SessionEventEnvelopeV1[] }) {
+  return { sessionId: snapshot.sessionId, title: snapshot.metadata.title, throughJournalSeq: snapshot.throughJournalSeq, rows: projectSessionUsageActivities(snapshot, journal) };
+}

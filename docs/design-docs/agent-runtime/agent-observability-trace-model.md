@@ -100,7 +100,7 @@ outcome-unknown
 
 ## Projection
 
-`apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts` 提供聊天、Context、Usage 的兼容投影。Trajectory 由 Session projection 提供。专用 Agent Run / Turn 分析汇总与 Trace 读取投影已删除。
+Host 使用 `packages/runtime/src/projection/durable-session.ts` 注册事实、Surface、工具和 request context；Client 在 `packages/client/src/sessions/` 分别生成 Chat、Trajectory、Tool Card 与 Usage 展示投影。专用 Agent Run / Turn 分析汇总与 Trace 读取投影已删除。
 
 投影属于固定 renderer adapter，不属于插件前端。插件只能通过 manifest、service、event 和结构化 renderer hint 提供数据，不能向 renderer 注入任意 HTML / JS / CSS。
 

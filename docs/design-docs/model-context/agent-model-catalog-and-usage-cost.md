@@ -12,7 +12,7 @@
 - `packages/llm/pi-ai/src/pi-ai-wire-engine.ts` 的 `createModel` 将四类 token 单价固定为零；`mapUsage` 又将 SDK 计算出的 `cost.total` 标记成 `provider-reported`。这不是供应商实际返回的账单金额。
 - `packages/llm/pi-ai/src/legacy-proxy-wire-engine.ts` 缺少价格计算，费用保持空值。两条请求路径需要共用计价规则。
 - `apps/desktop/src/main/runtime-v2/legacy-llm-adapter.ts` 未将已解析模型的价格传入请求；现有 `model-runtime-service.ts` 已处理价格倍率，接入时必须避免乘两次。
-- `apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts` 与旧统计快照的空值、币种和聚合规则不同；工具的无费用记录也可能增加“费用未知”数量。
+- `packages/runtime/src/projection/durable-session.ts` 维护 durable provider usage，`packages/client/src/sessions/usage-aggregates.ts` 负责展示聚合；工具活动不混入 provider usage，缺失价格仍显示未知。
 - 本地脱敏样本中，144 条 assistant 记录为零费用且标记为供应商来源，另有 3 条没有费用。这是所检查样本的结果，不代表全部使用历史。
 
 ## 参考 pi，明确移植边界

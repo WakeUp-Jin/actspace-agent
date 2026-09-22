@@ -1,3 +1,4 @@
+export * from "./session-events";
 export {
   freezeRuntimeV2Json,
   isRuntimeV2JsonValue,
@@ -15,6 +16,7 @@ export {
   type RuntimeV2JsonValue,
 } from "./host-dto";
 export * from "./projection";
+export * from "./todo";
 export * from "./runtime";
 export * from "./desktop-ipc";
 export * from "./desktop-shell";

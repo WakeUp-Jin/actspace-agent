@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { LlmMessage } from "@actspace/llm-service";
-import { runToolStreamFixture } from "./tool-stream-fixture.js";
+import { runToolStreamFixture } from "../testing.js";
 
 it("replays a large text tool artifact as a file reference, never an image", async () => {
   const requests: (readonly LlmMessage[])[] = [];

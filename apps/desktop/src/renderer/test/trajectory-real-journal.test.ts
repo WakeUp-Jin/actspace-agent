@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { SessionJournal, createCoreCodecRegistry, type SessionEventCandidateV1 } from '@actspace/session-journal';
-import { projectTrajectory, projectTrajectoryWindow } from '@actspace/session-projection';
+import { projectTrajectoryWindow } from '@actspace/client/sessions';
 import { buildTrajectorySnapshot } from '../trajectory';
 
 const source = { ownerPluginId: '@actspace/core' };
+function projectTrajectory(sessionId: string, events: readonly import('@actspace/shared/runtime-v2').SessionEventEnvelopeV1[]) {
+  return projectTrajectoryWindow(sessionId, { events, fromSeq: 0, throughJournalSeq: events.at(-1)?.seq ?? -1, beforeSeq: null, turnOffset: 0, requestOffset: 0 });
+}
 function makeJournal() {
   let time = Date.parse('2026-09-06T00:00:00Z');
   const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => new Date(time += 1000).toISOString() });
@@ -50,7 +53,7 @@ describe('real Journal → trajectory', () => {
       append('assistant/message', { turnId: `t${i}`, messageId: `a${i}`, content: [], finishReason: i === 25 ? 'aborted' : 'failed' });
       append('turn/end', { turnId: `t${i}`, status: i === 25 ? 'aborted' : 'failed' });
     }
-    const snapshot = buildTrajectorySnapshot(projectTrajectoryWindow('session', journal.events));
+    const snapshot = buildTrajectorySnapshot(projectTrajectoryWindow('session', { events: journal.events.slice(15), fromSeq: 15, throughJournalSeq: journal.lastSeq, beforeSeq: 15, turnOffset: 5, requestOffset: 0 }));
     expect(snapshot.turns[0]?.number).toBe(6);
     expect(snapshot.records[0]?.state).toBe('failed');
     expect(snapshot.records.at(-1)?.state).toBe('aborted');
