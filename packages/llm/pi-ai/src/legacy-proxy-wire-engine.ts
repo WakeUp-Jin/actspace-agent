@@ -7,8 +7,7 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
-import type { PiAiEngine } from "./pi-ai-adapter.js";
-import type { PiAiArtifactReader, PiAiWireRoute } from "./pi-ai-wire-engine.js";
+import type { PiAiArtifactReader, PiAiWireRoute } from "./pi-ai-stream.js";
 import { ProviderProxyError, ProviderProxyPool } from "@actspace/llm-service";
 import { redactLlmText } from "@actspace/llm-service";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
@@ -20,7 +19,7 @@ type SdkConstructor = new (options: Record<string, unknown>) => SdkClient;
 export type LegacyProxySdkLoader = (route: PiAiWireRoute) => Promise<SdkConstructor>;
 
 export type LegacyProxyWireEngineOptions = {
-  readonly modelFacts?: import("./pi-ai-wire-engine.js").PiAiWireEngineOptions["modelFacts"];
+  readonly modelFacts?: import("./pi-ai-stream.js").PiAiConnectionOptions["modelFacts"];
   readonly pricing?: ModelPricingSnapshot | null;
   readonly route: PiAiWireRoute;
   readonly providerId: string;
@@ -42,7 +41,7 @@ type Accumulator = {
 };
 
 /** Public SDK transport for scoped proxies and OpenRouter raw billed usage. */
-export class LegacyProxyWireEngine implements PiAiEngine {
+export class LegacyProxyWireEngine {
   readonly #loadSdk: LegacyProxySdkLoader;
   constructor(private readonly options: LegacyProxyWireEngineOptions) { this.#loadSdk = options.loadSdk ?? loadPublicSdk; }
 

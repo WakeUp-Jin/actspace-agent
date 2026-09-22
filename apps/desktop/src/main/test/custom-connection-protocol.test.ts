@@ -13,9 +13,10 @@ import { DesktopLegacyLlmAdapter } from "../runtime-v2/legacy-llm-adapter";
 
 const { wire, dispatch } = vi.hoisted(() => ({ wire: vi.fn(), dispatch: vi.fn(async () => (async function* () {})()) }));
 vi.mock("@actspace/llm-pi-ai", async (importOriginal) => ({ ...await importOriginal<typeof import("@actspace/llm-pi-ai")>(),
-  PiAiAdapter: class { dispatch = dispatch; },
+  PiAiAdapter: class { dispatch = dispatch; constructor(options: { wire?: unknown }) { if (options.wire !== undefined) wire(options.wire); } },
   PiAiWireEngine: class { constructor(options: unknown) { wire(options); } },
   LegacyProxyWireEngine: class {},
+  DeepSeekFileUploader: class { clear() {} },
 }));
 
 const roots: string[] = [];

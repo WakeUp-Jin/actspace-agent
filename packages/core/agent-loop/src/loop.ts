@@ -123,7 +123,7 @@ export class AgentLoop {
         const requestRouteId = typeof requestRecord.routeId === "string" ? requestRecord.routeId : this.options.descriptor.routeId;
         const requestModel = typeof requestRecord.model === "string" ? requestRecord.model : input.model ?? this.options.descriptor.model;
         let requestMessageList = Array.isArray(requestRecord.messages) ? requestRecord.messages as unknown as readonly LlmMessage[] : requestMessages;
-        const prepared = this.options.llm.prepare({
+        const prepared = await this.options.llm.prepareAsync({
           requestId,
           sessionId: this.options.session.header.sessionId,
           routeId: requestRouteId,
@@ -195,11 +195,11 @@ export class AgentLoop {
             ...(budgetSummary ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
           ]);
           requestId = randomUUID();
-          activePrepared = this.options.llm.prepareCaptured(prepared.registration, {
+          activePrepared = await this.options.llm.prepareCapturedAsync(prepared.registration, {
             ...prepared.request,
             requestId,
             messages: requestMessageList,
-          }, controller.signal);
+          }, controller.signal, prepared.preparedAdapterCall);
           const retrySnapshot = this.options.assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow, attempt }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot: retrySnapshot }));
@@ -391,7 +391,7 @@ function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<
     if (item === null || typeof item !== "object" || Array.isArray(item)) return [{ type: "text", text: JSON.stringify(item) ?? "null" }];
     const block = item as Readonly<Record<string, RuntimeV2JsonValue>>;
     if (block.type === "text" && typeof block.text === "string") return [{ type: "text", text: block.text }];
-    if (block.type === "reasoning" && typeof block.text === "string") return [{ type: "reasoning", text: block.text, ...(typeof block.signature === "string" ? { signature: block.signature } : {}) }];
+    if (block.type === "reasoning" && typeof block.text === "string") return [{ type: "reasoning", text: block.text, ...(typeof block.signature === "string" ? { signature: block.signature } : {}), ...(isRecord(block.replay) ? { replay: block.replay as never } : {}) }];
     if (block.type === "tool-call" && typeof block.callId === "string" && typeof block.name === "string") return [{ type: "tool-call", callId: block.callId, name: block.name, arguments: typeof block.arguments === "string" ? block.arguments : JSON.stringify(block.arguments ?? {}) }];
     if (block.type === "json") return [{ type: "text", text: JSON.stringify(block.value ?? null) }];
     if (block.type === "artifact" && isRecord(block.artifact)) {

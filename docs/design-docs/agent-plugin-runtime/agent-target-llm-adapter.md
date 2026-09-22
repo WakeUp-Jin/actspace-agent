@@ -2,6 +2,8 @@
 
 > 状态：pi-ai adapter、路由/代理和结构化错误契约已实施并有自动化记录；真实 Provider 与 packaged lifecycle 仍需对应执行摘要中的外部验收，不因本次文档校准宣称通过。
 
+> 收敛实现见 [LLM Core Pi](agent-llm-core-pi.md)与[执行计划](../../exec-plans/completed/20260922-llm-core-pi.md)。本文保留 Adapter 的既有目标契约；当前 Host 已通过 prepare 固定模型事实、dispatch 配置和 retry generation，外部验收边界见执行摘要。
+
 ## 1. 决策
 
 ActSpace v2 采用 `@earendil-works/pi-ai` 作为 Provider wire implementation 和模型元数据来源，但不把 pi-ai 当作 Agent Core 的领域模型。

@@ -1,5 +1,7 @@
 # 设计文档索引
 
+- [LLM Core Pi 收敛设计](agent-plugin-runtime/agent-llm-core-pi.md)：已实施 Host prepare、重试 generation、pi-ai 直接调用、backend parity 与 replay；外部验收边界见执行摘要。
+
 - [Session 事件持久化重构](agent-plugin-runtime/agent-session-event-persistence-refactor.md)：核心行为已实施；Session 接纳、持久化协调器、检查点与 live/durable 边界。
 
 - [Session 三类读模型设计规范](agent-plugin-runtime/agent-session-three-read-models.md)：已落地；定义 Global Aggregate、Session Projection、Window Presentation 及其水位、缓存和 Client 边界。

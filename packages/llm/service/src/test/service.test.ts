@@ -64,6 +64,91 @@ describe("LlmService", () => {
     await handle.dispose(100);
   });
 
+  it("uses a request-bound adapter preparation result for snapshot and dispatch", async () => {
+    const dispatched: string[] = [];
+    const routes = new LlmRouteRegistry();
+    const handle = routes.register({
+      routeId: "prepared",
+      providerId: "provider",
+      modelPattern: "*",
+      adapter: {
+        adapterVersion: "prepared-test",
+        prepare: ({ request }) => ({
+          request: { ...request, model: "resolved-model", contextWindow: 1234 },
+          dispatch: async ({ request }) => { dispatched.push(request.model); return completedStream(); },
+        }),
+        dispatch: async () => completedStream(),
+      },
+      credentialRef: "credential",
+      defaults: {},
+    });
+    const prepared = new LlmService(routes, credentials).prepare({ routeId: "prepared", model: "alias", messages: [] });
+    expect(prepared.request).toMatchObject({ model: "resolved-model", contextWindow: 1234 });
+    const stream = await prepared.dispatch();
+    await stream.abort("test");
+    expect(dispatched).toEqual(["resolved-model"]);
+    await handle.dispose(100);
+  });
+
+  it("detaches nested messages, tool schemas, and response format before adapter preparation", () => {
+    const source = {
+      content: [{ type: "text" as const, text: "original" }],
+      schema: { type: "object", properties: { value: { type: "string" } } },
+      responseFormat: { type: "json_schema", schema: { required: ["value"] } },
+    };
+    let captured!: import("../adapter.js").ResolvedLlmRequest;
+    const routes = new LlmRouteRegistry();
+    const handle = routes.register({ routeId: "detached", providerId: "provider", modelPattern: "*", adapter: {
+      adapterVersion: "detached-test",
+      prepare: ({ request }) => { captured = request; return { request, dispatch: async () => completedStream() }; },
+      dispatch: async () => completedStream(),
+    }, credentialRef: "credential", defaults: {} });
+    const prepared = new LlmService(routes, credentials).prepare({ routeId: "detached", model: "model", messages: [{ role: "user", content: source.content }], tools: [{ name: "tool", definitionVersion: 1, definitionDigest: "d", description: "tool", inputSchema: source.schema }], options: { responseFormat: source.responseFormat } });
+    source.content[0].text = "mutated";
+    source.schema.properties.value.type = "number";
+    source.responseFormat.schema.required[0] = "other";
+    expect(captured.messages[0]?.content).toEqual([{ type: "text", text: "original" }]);
+    expect(captured.tools[0]?.inputSchema).toEqual({ type: "object", properties: { value: { type: "string" } } });
+    expect(captured.options.responseFormat).toEqual({ type: "json_schema", schema: { required: ["value"] } });
+    prepared.release();
+    return handle.dispose(100);
+  });
+
+  it("allows an existing retry registration to prepare an attempt while draining", async () => {
+    const calls: string[] = [];
+    const routes = new LlmRouteRegistry();
+    const old = routes.register({ routeId: "retry", providerId: "provider", modelPattern: "*", adapter: adapter(calls), credentialRef: "credential", defaults: {} });
+    const service = new LlmService(routes, credentials);
+    const first = service.prepare({ routeId: "retry", model: "model", messages: [] });
+    old.beginDrain();
+    const retry = service.prepareCaptured(old.registration, { ...first.request, requestId: "retry-request" }, undefined, first.preparedAdapterCall);
+    const stream = await retry.dispatch();
+    await stream.abort("test");
+    expect(calls).toEqual(["retry-request"]);
+    first.release();
+    retry.release();
+    await old.dispose(100);
+  });
+
+  it("acquires before async adapter preparation and permits only that retry scope through draining", async () => {
+    let resolvePreparation!: (call: import("../adapter.js").LlmPreparedAdapterCall) => void;
+    const routes = new LlmRouteRegistry();
+    const old = routes.register({ routeId: "async", providerId: "provider", modelPattern: "*", adapter: {
+      adapterVersion: "async-test",
+      prepareAsync: async ({ request }) => new Promise((resolve) => { resolvePreparation = resolve; }),
+      dispatch: async () => completedStream(),
+    }, credentialRef: "credential", defaults: {} });
+    const service = new LlmService(routes, credentials);
+    const preparing = service.prepareAsync({ routeId: "async", model: "model", messages: [] });
+    old.beginDrain();
+    await Promise.resolve();
+    resolvePreparation!({ request: { requestId: "prepared", routeId: "async", model: "model", messages: [], tools: [], options: {}, credentialRef: "credential" }, dispatch: async () => completedStream() });
+    const prepared = await preparing;
+    expect(prepared.registration.registrationId).toBe(old.registration.registrationId);
+    prepared.release();
+    await old.dispose(100);
+  });
+
   it("keeps legacy transport behind the same ActSpace adapter seam", async () => {
     const calls: string[] = [];
     const { LegacyTransportAdapter } = await import("../legacy-transport-adapter.js");

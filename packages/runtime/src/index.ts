@@ -18,7 +18,7 @@ export { apply as applyCordisRuntimeEntry } from "./runtime/cordis-entry.js";
 export type { RuntimeCordisHost } from "./runtime/cordis-entry.js";
 export * from "./profiles/index.js";
 export { LlmRouteRegistry, LlmService, ProviderProxyPool } from "@actspace/llm-service";
-export { PiAiWireEngine, PiAiAdapter, LegacyProxyWireEngine } from "@actspace/llm-pi-ai";
+export { PiAiAdapter } from "@actspace/llm-pi-ai";
 export { ToolRuntime } from "@actspace/tools-runtime";
 export { registerCoreTools, createNodeCoreToolPorts, createLlmImageInspector } from "@actspace/tools-core-tools";
 export { registerBrowserTools, createNodeBrowserCapability, SocketBrowserBridgeTransport } from "@actspace/tools-browser-tools";
@@ -30,7 +30,7 @@ export type { RuntimePromptSource, RuntimeInstructionSource } from "@actspace/pr
 export type { LlmAdapter, LlmAdapterDispatchInput, LlmContentBlock, LlmMessage, LlmStreamEvent, LlmStreamSource, LlmToolDefinition, CredentialResolver, LlmCredential } from "@actspace/llm-service";
 export { LLM_HOST_PORT_ID } from "@actspace/llm-service";
 export type { LlmHostPort } from "@actspace/llm-service";
-export type { PiAiWireRoute, PiAiWireEngineOptions, LegacyProxyWireEngineOptions } from "@actspace/llm-pi-ai";
+export type { PiAiWireRoute, PiAiConnectionOptions, PiAiAdapterOptions } from "@actspace/llm-pi-ai";
 export type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/tools-approval";
 export type { CoreToolPorts, CoreToolHandler, NodeCoreToolPortsOptions, WebSearchCredentials, WebSearchProviderId, ImageGenerationCredential, ImageInspector, SessionArtifactReader } from "@actspace/tools-core-tools";
 export { CORE_TOOLS_HOST_PORT_ID } from "@actspace/tools-core-tools";

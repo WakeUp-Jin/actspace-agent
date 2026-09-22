@@ -9,8 +9,8 @@ export class LlmActivationLeaseOwner {
   constructor(registrationId: string) { this.registrationId = registrationId; }
   get state(): LlmRegistrationState { return this.#state; }
   get activeLeases(): number { return this.#active; }
-  acquire(): LlmActivationLease {
-    if (this.#state !== "active") throw new Error(`LLM registration ${this.registrationId} is ${this.#state}.`);
+  acquire(allowDraining = false): LlmActivationLease {
+    if (this.#state !== "active" && !(allowDraining && this.#state === "draining")) throw new Error(`LLM registration ${this.registrationId} is ${this.#state}.`);
     this.#active += 1;
     let released = false;
     return Object.freeze({ release: () => { if (released) return; released = true; this.#active -= 1; this.notify(); }, registrationId: this.registrationId });

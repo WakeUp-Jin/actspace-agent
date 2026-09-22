@@ -27,9 +27,24 @@ export type LlmAdapterDispatchInput = {
   readonly signal: AbortSignal;
 };
 
+export type LlmAdapterPrepareInput = {
+  readonly request: ResolvedLlmRequest;
+  readonly signal: AbortSignal;
+};
+
+/** A request-bound adapter entry. Provider-specific facts stay behind this contract. */
+export type LlmPreparedAdapterCall = {
+  readonly request: ResolvedLlmRequest;
+  dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource>;
+  forAttempt?(request: ResolvedLlmRequest): LlmPreparedAdapterCall;
+  cancel?(requestId: string): Promise<void>;
+};
+
 export interface LlmAdapter {
   readonly adapterVersion: string;
   resolveModelFacts?(model: string): LlmRequestModelFacts;
+  prepare?(input: LlmAdapterPrepareInput): LlmPreparedAdapterCall;
+  prepareAsync?(input: LlmAdapterPrepareInput): Promise<LlmPreparedAdapterCall>;
   dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource>;
   cancel?(requestId: string): Promise<void>;
   dispose?(): Promise<void>;

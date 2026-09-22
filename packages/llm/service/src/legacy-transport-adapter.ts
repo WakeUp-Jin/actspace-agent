@@ -3,10 +3,14 @@ import type { LlmStreamSource } from "./stream.js";
 
 export interface LegacyLlmTransport {
   send(input: LlmAdapterDispatchInput): Promise<LlmStreamSource>;
+  cancel?(requestId: string): Promise<void>;
+  dispose?(): Promise<void>;
 }
 
 export class LegacyTransportAdapter implements LlmAdapter {
   readonly adapterVersion = "actspace-legacy-transport-v2";
   constructor(private readonly transport: LegacyLlmTransport) {}
   dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> { return this.transport.send(input); }
+  cancel(requestId: string): Promise<void> { return this.transport.cancel?.(requestId) ?? Promise.resolve(); }
+  dispose(): Promise<void> { return this.transport.dispose?.() ?? Promise.resolve(); }
 }
