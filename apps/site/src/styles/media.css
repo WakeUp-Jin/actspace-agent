@@ -5,6 +5,43 @@
 .product-shot img { display: block; width: 100%; height: auto; border-radius: 10px; }
 .product-shot > figcaption { margin-top: 12px; color: var(--body); font-size: 13px; }
 .screenshot-link { display: block; cursor: zoom-in; }
+.image-loading-frame {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+}
+.prose-image-frame { display: block; border-radius: 8px; }
+.image-loading-frame[data-image-enhanced][data-image-state="loading"] {
+  animation: image-skeleton-pulse 1.4s ease-in-out infinite alternate;
+}
+.image-loading-frame[data-image-enhanced][data-image-state="loading"] img {
+  opacity: 0;
+}
+.image-loading-frame[data-image-enhanced] img {
+  transition: opacity 180ms ease;
+}
+.image-loading-frame[data-image-state="loaded"] {
+  background: transparent;
+}
+.image-loading-frame[data-image-state="error"] img {
+  opacity: 0;
+}
+.image-load-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: var(--body);
+  background: var(--surface);
+  font-size: 13px;
+  text-align: center;
+  pointer-events: none;
+}
+@keyframes image-skeleton-pulse {
+  from { background-color: var(--surface); }
+  to { background-color: var(--line); }
+}
 .screenshot-placeholder {
   display: flex;
   flex-direction: column;
@@ -32,6 +69,10 @@
 @media (max-width: 600px) {
   .screenshot-placeholder { aspect-ratio: auto; min-height: 280px; padding: 24px; }
   .docs-prose .screenshot-placeholder { padding: 24px 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .image-loading-frame[data-image-enhanced][data-image-state="loading"] { animation: none; }
+  .image-loading-frame[data-image-enhanced] img { transition: none; }
 }
 @media (forced-colors: active) {
   .screenshot-placeholder { border-style: solid; }

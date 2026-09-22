@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import {blogHref,getPublicPosts} from '../../lib/blog';
 import {presentationFor} from '../../lib/blog-presentation';
 import {sitePath} from '../../lib/site-path';
+import {Image} from 'astro:assets';
 import '../../styles/blog.css';
 const posts=await getPublicPosts();
 const categories=[...new Set(posts.map(p=>presentationFor(p.id)?.category??p.data.tags[0]))];
@@ -50,8 +51,10 @@ import type {ImageMetadata} from 'astro';
 </div>
 <div class="blog-grid">
 {posts.map(post=>{const meta=presentationFor(post.id);const image=images[`../../assets/blog/covers/character-${meta?.cover}.png`]?.default;return <a class="blog-card" href={sitePath(blogHref(post))} data-category={meta?.category??post.data.tags[0]} data-date={post.data.publishedAt.toISOString()}>
-<div class="blog-cover">
-<img src={image?.src??sitePath(post.data.cover)} width="1254" height="1254" alt="" loading="lazy"/>
+<div class="blog-cover image-loading-frame" data-image-frame data-image-state="loading">
+{image
+  ? <Image src={image} alt="" format="webp" quality={90} widths={[480,800,1254]} sizes="(max-width: 600px) calc(100vw - 48px), (max-width: 1280px) 50vw, 33vw" loading="lazy" data-image-loading />
+  : <img src={sitePath(post.data.cover)} width="1254" height="1254" alt="" loading="lazy" decoding="async" data-image-loading/>}
 </div>
 <div class="blog-card-copy">
 <time datetime={post.data.publishedAt.toISOString()}>{post.data.publishedAt.toISOString().slice(0,10)}</time>
