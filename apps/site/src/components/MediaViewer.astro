@@ -3,6 +3,8 @@
   <img alt="" />
 </dialog>
 <script>
+import { initializeImageLoading } from '../scripts/image-loading';
+
 const dialog = document.querySelector<HTMLDialogElement>('.media-dialog')!;
 const expanded = dialog.querySelector('img')!;
 let trigger: HTMLElement | null = null;
@@ -35,4 +37,6 @@ dialog.addEventListener('close', () => {
   document.documentElement.classList.remove('media-open');
   trigger?.focus({preventScroll:true});
 });
+
+initializeImageLoading();
 </script>

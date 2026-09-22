@@ -13,8 +13,8 @@ const original = source ? await getImage({ src: source, format: 'png' }) : undef
 ---
 <figure class:list={['product-shot', { 'screenshot-placeholder': !source }]} data-screenshot={name}>
   {source ? <>
-    <a class="screenshot-link" href={original!.src} aria-label={`放大：${title}`}>
-      <Image src={source} alt={title} format="webp" quality={85} widths={widths} sizes={sizes} loading={eager ? 'eager' : 'lazy'} fetchpriority={eager ? 'high' : 'auto'} />
+    <a class="screenshot-link image-loading-frame" href={original!.src} aria-label={`放大：${title}`} data-image-frame data-image-state="loading">
+      <Image src={source} alt={title} format="webp" quality={85} widths={widths} sizes={sizes} loading={eager ? 'eager' : 'lazy'} fetchpriority={eager ? 'high' : 'auto'} data-image-loading />
     </a>
     {showCaption && <figcaption>{title}</figcaption>}
   </> : <>
