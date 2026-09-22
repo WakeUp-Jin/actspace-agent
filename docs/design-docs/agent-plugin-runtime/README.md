@@ -20,7 +20,7 @@
 | Session 与上下文 | [Session/Context](agent-target-session-and-context.md)、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)、[Prompt contributors](agent-spec-prompt-context-contributors.md) |
 | Agent 与 Loop | [Core 所有权](agent-target-agent-core.md)、[Agent/Subagent](agent-spec-agent-and-subagent.md)、[Scope](agent-spec-agent-scope-model.md)、[Loop surface](agent-spec-agent-loop-cordis-surface.md) |
 | Cordis Service 与事件 | [Service 三层契约](agent-spec-service-definition-provider-consumer.md)、[Cordis 原生事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md) |
-| LLM | [Adapter](agent-target-llm-adapter.md)、[多供应商](../model-context/agent-multi-provider-llm.md) |
+| LLM | [Adapter](agent-target-llm-adapter.md)、[Core Pi 收敛目标（已实施）](agent-llm-core-pi.md)、[多供应商](../model-context/agent-multi-provider-llm.md) |
 | Tools | [内核与外壳](agent-spec-tool-runtime-boundary.md)、[Prepared execution ABI](agent-spec-tool-runtime-abi.md)、[Tool name](agent-spec-tool-name-contract.md) |
 | Projection | [Runtime Projection](agent-spec-runtime-projection.md)、[持久化与投影收敛](agent-target-session-persistence-projection-architecture.md) |
 | 英语辅助学习 | [会话双语 Prompt 与英文语音](agent-english-learning.md) |

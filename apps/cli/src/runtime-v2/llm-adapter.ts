@@ -1,8 +1,8 @@
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import { resolveModelPricing } from "@actspace/shared";
-import type { LlmAdapter, LlmAdapterDispatchInput, LlmStreamSource, LlmStreamEvent } from "@actspace/llm-service";
+import type { LlmAdapter, LlmAdapterDispatchInput, LlmAdapterPrepareInput, LlmPreparedAdapterCall, LlmStreamSource, LlmStreamEvent } from "@actspace/llm-service";
 import type { PiAiWireRoute } from "@actspace/llm-pi-ai";
-import { DeepSeekFileUploader, LegacyProxyWireEngine, PiAiAdapter, PiAiWireEngine } from "@actspace/llm-pi-ai";
+import { DeepSeekFileUploader, PiAiAdapter } from "@actspace/llm-pi-ai";
 import { ProviderProxyPool } from "@actspace/llm-service";
 
 export type CliPiAiProvider = {
@@ -19,11 +19,11 @@ export class CliV2LlmAdapter implements LlmAdapter {
   readonly #deepSeekFiles = new DeepSeekFileUploader();
   constructor(private readonly options: { readonly mock: boolean; readonly model?: string; readonly provider: CliPiAiProvider; readonly readArtifact: (sessionId: string, artifactId: string) => Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }> }) {}
 
-  async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
-    if (this.options.mock) return mockStream(input.signal);
+  prepare(input: LlmAdapterPrepareInput): LlmPreparedAdapterCall {
+    if (this.options.mock) return { request: input.request, dispatch: ({ signal }) => Promise.resolve(mockStream(signal)) };
     const apiModel = this.options.model ?? input.request.model;
     const engineOptions = {
-      pricing: resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: this.options.provider.providerId, apiModel, modelKey: input.request.model, baseUrl: input.credential.baseUrl ?? this.options.provider.baseUrl }),
+      pricing: resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: this.options.provider.providerId, apiModel, modelKey: input.request.model, baseUrl: this.options.provider.baseUrl }),
       route: this.options.provider.route,
       providerId: this.options.provider.providerId,
       modelId: this.options.model,
@@ -35,19 +35,30 @@ export class CliV2LlmAdapter implements LlmAdapter {
       deepSeekFiles: this.#deepSeekFiles,
     } as const;
     const adapter = new PiAiAdapter({
-      engine: new PiAiWireEngine(engineOptions),
-      legacyProxyEngine: new LegacyProxyWireEngine({ ...engineOptions, proxies: this.#proxies }),
+      wire: engineOptions,
+      legacyProxy: { ...engineOptions, proxies: this.#proxies },
     }, this.adapterVersion);
-    return adapter.dispatch({
-      ...input,
-      credential: {
-        ...input.credential,
-        ...(this.options.provider.apiKey === undefined ? {} : { apiKey: input.credential.apiKey ?? this.options.provider.apiKey }),
-        baseUrl: input.credential.baseUrl ?? this.options.provider.baseUrl,
-        ...(input.credential.proxyUrl === undefined && this.options.provider.proxyUrl === undefined ? {} : { proxyUrl: input.credential.proxyUrl ?? this.options.provider.proxyUrl }),
+    const request = Object.freeze({ ...input.request, model: apiModel });
+    const dispatchBound = (requestForAttempt: typeof request, dispatchInput: LlmAdapterDispatchInput) => adapter.dispatch({
+        ...dispatchInput,
+        request: requestForAttempt,
+        credential: {
+          ...dispatchInput.credential,
+          baseUrl: this.options.provider.baseUrl,
+          ...(this.options.provider.proxyUrl === undefined ? {} : { proxyUrl: this.options.provider.proxyUrl }),
+        },
+      });
+    return {
+      request,
+      dispatch: (dispatchInput) => dispatchBound(request, dispatchInput),
+      forAttempt: (attemptRequest) => {
+        const fixedRequest = Object.freeze({ ...attemptRequest, model: request.model, contextWindow: request.contextWindow });
+        return { request: fixedRequest, dispatch: (dispatchInput) => dispatchBound(fixedRequest, dispatchInput) };
       },
-    });
+    };
   }
+
+  async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> { return this.prepare({ request: input.request, signal: input.signal }).dispatch(input); }
 
   async dispose(): Promise<void> { this.#deepSeekFiles.clear(); await this.#proxies.dispose(); }
 }

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { PiAiWireEngine } from "../pi-ai-wire-engine.js";
+import { PiAiAdapter } from "../pi-ai-adapter.js";
 import { LegacyProxyWireEngine } from "../legacy-proxy-wire-engine.js";
 import { ProviderProxyPool, type LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekPayload } from "../deepseek-images.js";
@@ -18,9 +18,9 @@ afterEach(() => vi.unstubAllGlobals());
 it("uses the real pi-ai serializer for image and reasoning replay without raising the default output budget", async () => {
   let body: any;
   vi.stubGlobal("fetch", vi.fn(async (_url, init) => { body = JSON.parse(init.body); return new Response(chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } }); }));
-  const engine = new PiAiWireEngine({ providerId: "deepseek", route: "openai-completions", baseUrl: "https://api.deepseek.com", modelFacts, readArtifact: async () => ({ data: png, mimeType: "image/wrong" }) });
+  const engine = new PiAiAdapter({ wire: { providerId: "deepseek", route: "openai-completions", baseUrl: "https://api.deepseek.com", modelFacts, readArtifact: async () => ({ data: png, mimeType: "image/wrong" }) } });
   const events = [];
-  for await (const event of await engine.stream(request())) events.push(event);
+  for await (const event of await engine.dispatch(request())) events.push(event);
   expect(events.at(-1)?.type).toBe("done");
   expect(body).toMatchObject({ model: "deepseek-flash", thinking: { type: "enabled" }, reasoning_effort: "low", max_tokens: 32768 });
   expect(body.messages.find((message: any) => message.role === "user").content).toContainEqual({ type: "image_url", image_url: { url: `data:image/png;base64,${png.toString("base64")}` } });

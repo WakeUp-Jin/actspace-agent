@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { PiAiWireEngine } from "../pi-ai-wire-engine.js";
+import { PiAiAdapter } from "../pi-ai-adapter.js";
 import { LegacyProxyWireEngine } from "../legacy-proxy-wire-engine.js";
 import { prepareImageMessages } from "../image-messages.js";
 import type { LlmAdapterDispatchInput, LlmMessage } from "@actspace/llm-service";
@@ -19,9 +19,9 @@ it("sends real DeepSeek tool images after the complete tool-result batch", async
   let body: any;
   vi.stubGlobal("fetch", vi.fn(async (_url, init) => { body = JSON.parse(init.body); return new Response(chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } }); }));
   const readArtifact = vi.fn(async () => ({ data: png, mimeType: "image/png" }));
-  const engine = new PiAiWireEngine({ providerId: "deepseek", route: "openai-completions", baseUrl: "https://api.deepseek.com", modelFacts, readArtifact });
+  const engine = new PiAiAdapter({ wire: { providerId: "deepseek", route: "openai-completions", baseUrl: "https://api.deepseek.com", modelFacts, readArtifact } });
   const events = [];
-  for await (const event of await engine.stream(input())) events.push(event);
+  for await (const event of await engine.dispatch(input())) events.push(event);
   expect(events.at(-1)?.type).toBe("done");
   expect(body.messages.slice(-3).map((message: any) => message.role)).toEqual(["tool", "tool", "user"]);
   expect(body.messages.at(-1).content.filter((part: any) => part.type === "image_url")).toHaveLength(2);
@@ -49,11 +49,11 @@ it("keeps text-only requests explicit and does not load image bytes", async () =
 
 it.each(["openai-responses", "anthropic-messages"] as const)("passes structured tool images to pi-ai for %s", async (route) => {
   let context: any;
-  const engine = new PiAiWireEngine({ providerId: "fixture", route, baseUrl: "https://example.test", modelFacts,
+  const engine = new PiAiAdapter({ wire: { providerId: "fixture", route, baseUrl: "https://example.test", modelFacts,
     readArtifact: async () => ({ data: png, mimeType: "image/png" }),
     load: async () => ({ core: { createProvider: () => ({ id: "fixture" }), createModels: () => ({ setProvider() {}, getModel: () => ({ id: "fixture", provider: "fixture" }), streamSimple(_model: any, value: any) { context = value; return (async function* () { yield { type: "done", message: { content: [], stopReason: "stop" } }; })(); } }) }, api: { stream() {}, streamSimple() {} } }),
-  });
-  for await (const _event of await engine.stream(input())) { /* exhaust */ }
+  } });
+  for await (const _event of await engine.dispatch(input())) { /* exhaust */ }
   if (route === "anthropic-messages") {
     const results = context.messages.filter((m: any) => m.role === "toolResult");
     expect(results).toHaveLength(2);

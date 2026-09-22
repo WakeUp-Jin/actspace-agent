@@ -1,14 +1,12 @@
 import { prepareImageMessages } from "./image-messages.js";
 import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekPayload } from "./deepseek-images.js";
-import { LegacyProxyWireEngine } from "./legacy-proxy-wire-engine.js";
-import { catalogProviderForEndpoint, type ModelPricingSnapshot } from "@actspace/shared";
+import { type ModelPricingSnapshot } from "@actspace/shared";
 import { calculateUsageCost } from "@actspace/llm-service";
 import { withReasoningPayload } from "./reasoning-options.js";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { LlmRuntimeError, providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
-import type { LlmContentBlock, LlmMessage } from "@actspace/llm-service";
-import type { PiAiEngine } from "./pi-ai-adapter.js";
+import type { LlmContentBlock, LlmMessage, LlmReplayEnvelope } from "@actspace/llm-service";
 import { redactLlmText } from "@actspace/llm-service";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
@@ -16,7 +14,7 @@ import type { DeepSeekFileUploader } from "./deepseek-files.js";
 
 export type PiAiWireRoute = "openai-completions" | "openai-responses" | "anthropic-messages";
 export type PiAiArtifactReader = (sessionId: string, artifactId: string) => Promise<{ readonly data: Uint8Array; readonly mimeType: string }>;
-export type PiAiWireEngineOptions = {
+export type PiAiConnectionOptions = {
   readonly modelFacts?: { readonly contextWindow: number | null; readonly maxTokens: number | null; readonly input: readonly ("text" | "image")[]; readonly reasoning: boolean };
   readonly pricing?: ModelPricingSnapshot | null;
   readonly route: PiAiWireRoute;
@@ -42,46 +40,41 @@ type PiAiUsage = { readonly input?: number; readonly output?: number; readonly c
 type PiAiAssistant = { readonly content: readonly RuntimeV2JsonValue[]; readonly stopReason: string; readonly errorMessage?: string; readonly usage?: PiAiUsage; readonly status?: number; readonly code?: string; readonly retryAfterMs?: number };
 type PiAiEvent = { readonly type: string; readonly contentIndex?: number; readonly delta?: string; readonly content?: string; readonly toolCall?: { readonly id: string; readonly name: string; readonly arguments: RuntimeV2JsonValue }; readonly partial?: PiAiAssistant; readonly message?: PiAiAssistant; readonly error?: PiAiAssistant };
 
-export class PiAiWireEngine implements PiAiEngine {
-  readonly #load: PiAiPublicLoader;
-  constructor(private readonly options: PiAiWireEngineOptions) { this.#load = options.load ?? loadPiAiPublicModules; }
-
-  async stream(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
-    const hasImage = input.request.messages.some((message) => typeof message.content !== "string" && message.content.some((block) => block.type === "image"));
-    if (hasImage && this.options.providerId === "deepseek" && this.options.route === "openai-completions" && this.options.deepSeekFiles !== undefined) {
-      return new LegacyProxyWireEngine({ ...this.options, deepSeekFiles: this.options.deepSeekFiles }).stream(input);
-    }
-    if (input.credential.proxyUrl === undefined && catalogProviderForEndpoint(input.credential.baseUrl ?? this.options.baseUrl ?? "") === "openrouter" && this.options.route !== "anthropic-messages") {
-      return new LegacyProxyWireEngine(this.options).stream(input);
-    }
-    if (input.credential.proxyUrl !== undefined) throw failure("proxy", "pi-ai 0.82.1 has no accepted request-scoped proxy injection for this route.");
+/** Private protocol implementation; backend selection belongs to PiAiAdapter. */
+export async function streamPiAi(options: PiAiConnectionOptions, input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
     try {
-      const { core, api } = await this.#load(this.options.route);
+      const { core, api } = await (options.load ?? loadPiAiPublicModules)(options.route);
       if (typeof core.createModels !== "function" || typeof core.createProvider !== "function" || typeof api.streamSimple !== "function") throw failure("unsupported-capability", "pi-ai public stream exports are unavailable.");
-      const baseUrl = input.credential.baseUrl ?? this.options.baseUrl;
+      const baseUrl = input.credential.baseUrl ?? options.baseUrl;
       if (baseUrl === undefined) throw failure("invalid-request", `No base URL is configured for pi-ai route ${input.request.routeId}.`);
-      const modelId = this.options.modelId ?? input.request.model;
-      const model = createModel(this.options, modelId, baseUrl);
-      const provider = core.createProvider({ id: this.options.providerId, name: this.options.providerId, baseUrl, auth: { apiKey: { name: "ActSpace credential", resolve: async () => ({ auth: input.credential.apiKey === undefined ? {} : { apiKey: input.credential.apiKey }, source: "ActSpace credential" }) } }, models: [model], api } as never);
+      const modelId = options.modelId ?? input.request.model;
+      const model = createModel(options, modelId, baseUrl);
+      const provider = core.createProvider({ id: options.providerId, name: options.providerId, baseUrl, auth: { apiKey: { name: "ActSpace credential", resolve: async () => ({ auth: input.credential.apiKey === undefined ? {} : { apiKey: input.credential.apiKey }, source: "ActSpace credential" }) } }, models: [model], api } as never);
       const models = core.createModels(); models.setProvider(provider);
-      const resolved = models.getModel(this.options.providerId, modelId);
+      const resolved = models.getModel(options.providerId, modelId);
       if (resolved === undefined) throw failure("invalid-request", `pi-ai did not publish model ${modelId}.`);
-      const deepseek = this.options.providerId === "deepseek" && this.options.route === "openai-completions";
-      const messages = prepareImageMessages(input.request.messages, this.options.modelFacts?.input.includes("image") ?? true, this.options.route === "anthropic-messages");
-      if (deepseek) validateDeepSeekImageMessages(messages, this.options.modelFacts?.input.includes("image") ?? true);
-      const readArtifact = this.options.readArtifact;
+      const deepseek = options.providerId === "deepseek" && options.route === "openai-completions";
+      const messages = prepareImageMessages(input.request.messages, options.modelFacts?.input.includes("image") ?? true, options.route === "anthropic-messages");
+      if (deepseek) validateDeepSeekImageMessages(messages, options.modelFacts?.input.includes("image") ?? true);
+      const readArtifact = options.readArtifact;
       const checkedReader: PiAiArtifactReader | undefined = deepseek && readArtifact ? async (sessionId, artifactId) => {
         const artifact = await readArtifact(sessionId, artifactId);
         return { ...artifact, mimeType: validateDeepSeekImage(artifact.data) };
       } : readArtifact;
-      const context = await toPiAiContext(messages, input.request.tools, input.request.sessionId, checkedReader, deepseek ? { api: this.options.route, provider: this.options.providerId, model: modelId } : undefined);
-      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, this.options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), onPayload: (payload: Record<string, unknown>) => { const body = withReasoningPayload(payload, this.options.route, this.options.providerId, input.request.options); if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
-      return fromPiAiEvents(events, input.request.requestId, this.options.pricing ?? null);
+      const context = await toPiAiContext(
+        messages,
+        input.request.tools,
+        input.request.sessionId,
+        checkedReader,
+        { api: options.route, provider: options.providerId, model: modelId },
+        { provider: options.providerId, protocol: options.route, model: modelId },
+      );
+      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), onPayload: (payload: Record<string, unknown>) => { const body = withReasoningPayload(payload, options.route, options.providerId, input.request.options); if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
+      return fromPiAiEvents(events, input.request.requestId, options.pricing ?? null, { providerId: options.providerId, protocol: options.route, modelId });
     } catch (error) {
       if (error instanceof LlmRuntimeError) throw error;
       throw new LlmRuntimeError(classifyFailure(error), error);
     }
-  }
 }
 
 async function loadPiAiPublicModules(route: PiAiWireRoute): Promise<{ readonly core: PiAiCoreModule; readonly api: PiAiApiModule }> {
@@ -91,17 +84,17 @@ async function loadPiAiPublicModules(route: PiAiWireRoute): Promise<{ readonly c
   return { core: core as unknown as PiAiCoreModule, api: api as unknown as PiAiApiModule };
 }
 
-function createModel(options: PiAiWireEngineOptions, model: string, baseUrl: string): RuntimeV2JsonValue {
+function createModel(options: PiAiConnectionOptions, model: string, baseUrl: string): RuntimeV2JsonValue {
   return { id: model, name: model, api: options.route, provider: options.providerId, baseUrl, ...(options.providerId === "deepseek" && options.route === "openai-completions" ? { compat: { maxTokensField: "max_tokens" } } : {}), reasoning: options.modelFacts?.reasoning ?? true, input: options.modelFacts ? [...options.modelFacts.input] : ["text", "image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: options.modelFacts?.contextWindow ?? 262_144, maxTokens: options.modelFacts?.maxTokens ?? 32_768 };
 }
 
-async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { readonly name: string; readonly description: string; readonly inputSchema: RuntimeV2JsonValue }[], sessionId?: string, readArtifact?: PiAiArtifactReader, replay?: { api: string; provider: string; model: string }): Promise<PiAiContext> {
+async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { readonly name: string; readonly description: string; readonly inputSchema: RuntimeV2JsonValue }[], sessionId?: string, readArtifact?: PiAiArtifactReader, replay?: { api: string; provider: string; model: string }, replayIdentity?: { provider: string; protocol: string; model: string }): Promise<PiAiContext> {
   const systemPrompt = messages.filter((message) => message.role === "system").map(messageText).join("\n\n");
   const names = new Map<string, string>(); const output: RuntimeV2JsonValue[] = [];
   for (const message of messages) {
     if (message.role === "system") continue;
     if (message.role === "assistant") {
-      const content = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content.map((block) => toPiAssistantBlock(block, names, Boolean(replay)));
+      const content = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content.map((block) => toPiAssistantBlock(block, names, replayIdentity?.provider === "deepseek" && replayIdentity.protocol === "openai-completions", replayIdentity));
       output.push({ role: "assistant", content, api: replay?.api ?? "replay", provider: replay?.provider ?? "actspace", model: replay?.model ?? "replay", usage: zeroUsage(), stopReason: content.some((block) => typeof block === "object" && block !== null && (block as { type?: string }).type === "toolCall") ? "toolUse" : "stop", timestamp: 0 });
       continue;
     }
@@ -114,9 +107,15 @@ async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { 
   return { ...(systemPrompt ? { systemPrompt } : {}), messages: output, ...(tools.length > 0 ? { tools: tools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.inputSchema })) } : {}) };
 }
 
-function toPiAssistantBlock(block: LlmContentBlock, names: Map<string, string>, deepseek = false): RuntimeV2JsonValue {
+function toPiAssistantBlock(block: LlmContentBlock, names: Map<string, string>, deepseek = false, replayIdentity?: { provider: string; protocol: string; model: string }): RuntimeV2JsonValue {
   if (block.type === "text") return { type: "text", text: block.text };
-  if (block.type === "reasoning") return { type: "thinking", thinking: block.text, ...(deepseek ? { thinkingSignature: "reasoning_content" } : block.signature ? { thinkingSignature: block.signature } : {}) };
+  if (block.type === "reasoning") {
+    const replayCompatible = replayIdentity !== undefined && block.replay?.schemaVersion === 1 && block.replay.adapterFamily === "pi-ai" && block.replay.providerId === replayIdentity.provider && block.replay.protocol === replayIdentity.protocol && block.replay.modelId === replayIdentity.model;
+    const replaySignature = replayCompatible && block.replay?.payload !== null && typeof block.replay?.payload === "object" && !Array.isArray(block.replay.payload) && typeof (block.replay.payload as { thinkingSignature?: unknown }).thinkingSignature === "string"
+      ? (block.replay.payload as { thinkingSignature: string }).thinkingSignature
+      : undefined;
+    return { type: "thinking", thinking: block.text, ...(deepseek ? { thinkingSignature: "reasoning_content" } : block.replay === undefined && block.signature ? { thinkingSignature: block.signature } : replaySignature ? { thinkingSignature: replaySignature } : {}) };
+  }
   if (block.type === "tool-call") { names.set(block.callId, block.name); return { type: "toolCall", id: block.callId, name: block.name, arguments: parseArguments(block.arguments) }; }
   if (block.type === "tool-result") return { type: "text", text: block.content };
   return { type: "text", text: block.alt ?? `[image:${block.artifactId}]` };
@@ -133,20 +132,20 @@ async function toPiUserContent(message: LlmMessage, sessionId?: string, readArti
   return content;
 }
 
-async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: string, pricing: ModelPricingSnapshot | null): AsyncGenerator<LlmStreamEvent> {
+async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: string, pricing: ModelPricingSnapshot | null, identity: { readonly providerId: string; readonly protocol: string; readonly modelId: string }): AsyncGenerator<LlmStreamEvent> {
   const calls = new Map<number, { callId: string; name: string }>();
   for await (const event of events) {
     if (event.type === "text_delta") yield { type: "text-delta", text: event.delta ?? "" };
     else if (event.type === "thinking_delta") yield { type: "reasoning-delta", text: event.delta ?? "" };
     else if (event.type === "toolcall_start") { const block = event.partial?.content[event.contentIndex ?? -1] as { id?: string; name?: string } | undefined; calls.set(event.contentIndex ?? -1, { callId: block?.id ?? `${requestId}:${event.contentIndex ?? 0}`, name: block?.name ?? "unknown" }); }
     else if (event.type === "toolcall_delta") { const call = calls.get(event.contentIndex ?? -1) ?? { callId: `${requestId}:${event.contentIndex ?? 0}`, name: "unknown" }; yield { type: "tool-call-delta", callId: call.callId, name: call.name, argumentsDelta: event.delta ?? "" }; }
-    else if (event.type === "done" && event.message !== undefined) { yield { type: "done", stopReason: mapStopReason(event.message.stopReason), usage: calculateUsageCost(mapUsage(event.message.usage), pricing), content: toActSpaceContent(event.message.content) }; return; }
+    else if (event.type === "done" && event.message !== undefined) { yield { type: "done", stopReason: mapStopReason(event.message.stopReason), usage: calculateUsageCost(mapUsage(event.message.usage), pricing), content: toActSpaceContent(event.message.content, identity) }; return; }
     else if (event.type === "error") { const terminal = event.error; if (terminal?.stopReason === "aborted") yield { type: "aborted", usage: calculateUsageCost(mapUsage(terminal.usage), pricing), reason: terminal.errorMessage ?? "pi-ai request aborted" }; else yield { type: "error", usage: calculateUsageCost(mapUsage(terminal?.usage), pricing), failure: classifyFailure(terminal ?? new Error("pi-ai stream failed")) }; return; }
   }
   yield { type: "error", failure: { kind: "malformed-stream", message: "pi-ai stream ended without a terminal event.", retryable: false, attempt: 1 } };
 }
 
-function toActSpaceContent(content: readonly RuntimeV2JsonValue[]): readonly LlmContentBlock[] { return content.flatMap((raw): LlmContentBlock[] => { const block = raw as { type?: string; text?: string; thinking?: string; thinkingSignature?: string; id?: string; name?: string; arguments?: RuntimeV2JsonValue }; if (block.type === "text") return [{ type: "text", text: block.text ?? "" }]; if (block.type === "thinking") return [{ type: "reasoning", text: block.thinking ?? "", ...(block.thinkingSignature ? { signature: block.thinkingSignature } : {}) }]; if (block.type === "toolCall") return [{ type: "tool-call", callId: block.id ?? "unknown", name: block.name ?? "unknown", arguments: JSON.stringify(block.arguments ?? {}) }]; return []; }); }
+function toActSpaceContent(content: readonly RuntimeV2JsonValue[], identity: { readonly providerId: string; readonly protocol: string; readonly modelId: string }): readonly LlmContentBlock[] { return content.flatMap((raw): LlmContentBlock[] => { const block = raw as { type?: string; text?: string; thinking?: string; thinkingSignature?: string; id?: string; name?: string; arguments?: RuntimeV2JsonValue }; if (block.type === "text") return [{ type: "text", text: block.text ?? "" }]; if (block.type === "thinking") { const replay: LlmReplayEnvelope | undefined = block.thinkingSignature === undefined ? undefined : { schemaVersion: 1, adapterFamily: "pi-ai", providerId: identity.providerId, protocol: identity.protocol, modelId: identity.modelId, payload: { thinkingSignature: block.thinkingSignature } }; return [{ type: "reasoning", text: block.thinking ?? "", ...(block.thinkingSignature ? { signature: block.thinkingSignature } : {}), ...(replay === undefined ? {} : { replay }) }]; } if (block.type === "toolCall") return [{ type: "tool-call", callId: block.id ?? "unknown", name: block.name ?? "unknown", arguments: JSON.stringify(block.arguments ?? {}) }]; return []; }); }
 function mapUsage(usage?: PiAiUsage): LlmUsage { return { inputTokens: usage?.input ?? null, outputTokens: usage?.output ?? null, cacheReadTokens: usage?.cacheRead ?? null, cacheWriteTokens: usage?.cacheWrite ?? null, reasoningTokens: usage?.reasoning ?? null, cost: null, costCurrency: null, source: usage === undefined ? "unknown" : "provider-reported" }; }
 function zeroUsage() { return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }; }
 function mapStopReason(reason: string): string { return reason === "toolUse" ? "tool-calls" : reason === "length" ? "max-tokens" : reason; }

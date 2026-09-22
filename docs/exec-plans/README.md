@@ -33,6 +33,8 @@
 
 ## 最近完成
 
+- [LLM Core Pi](completed/20260922-llm-core-pi.md)：M0–M4 的请求配置冻结、retry lease、Host prepare、pi-ai backend policy、replay envelope 和自动化验证已实施；真实 Provider、packaged Electron 与既有全仓基线失败保留在执行摘要。
+
 - [Session 事件持久化与检查点重构](completed/20260920-session-event-persistence/README.md)：accepted/durable 分离、persistence coordinator、必需 checkpoint policy 和生命周期通知已实施；物理 `session-core` 包迁移仍由 P1-A 跟踪。
 
 - [官网功能展示与截图占位](completed/20260919-site-showcase.md)：六组滚动图文、35 张截图对应24篇文档40处占位与浅紫引用完成；真实素材待用户交付。

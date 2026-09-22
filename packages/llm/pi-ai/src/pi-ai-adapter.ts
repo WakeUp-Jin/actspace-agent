@@ -1,31 +1,25 @@
-import type { LlmAdapter, LlmAdapterDispatchInput } from "@actspace/llm-service";
-import type { LlmStreamSource } from "@actspace/llm-service";
+import { catalogProviderForEndpoint } from "@actspace/shared";
+import type { LlmAdapter, LlmAdapterDispatchInput, LlmStreamSource } from "@actspace/llm-service";
+import { LegacyProxyWireEngine, type LegacyProxyWireEngineOptions } from "./legacy-proxy-wire-engine.js";
+import { streamPiAi, type PiAiConnectionOptions } from "./pi-ai-stream.js";
 
-export interface PiAiEngine {
-  stream(input: LlmAdapterDispatchInput): Promise<LlmStreamSource>;
-  dispose?(): Promise<void>;
-}
+export type PiAiAdapterOptions = {
+  readonly wire: PiAiConnectionOptions;
+  readonly legacyProxy?: LegacyProxyWireEngineOptions;
+};
 
-export type PiAiAdapterOptions = { readonly engine: PiAiEngine; readonly legacyProxyEngine?: PiAiEngine };
-
-/** The pi-ai SDK stays behind this boundary; proxied calls use the explicit legacy backend. */
+/** The sole backend selection boundary; no fallback after Provider I/O. */
 export class PiAiAdapter implements LlmAdapter {
-  readonly adapterVersion: string;
-  readonly #engine: PiAiEngine;
-  readonly #legacyProxyEngine: PiAiEngine | undefined;
-  constructor(engine: PiAiEngine | PiAiAdapterOptions, adapterVersion = "pi-ai-0.82.1") {
-    this.#engine = "engine" in engine ? engine.engine : engine;
-    this.#legacyProxyEngine = "engine" in engine ? engine.legacyProxyEngine : undefined;
-    this.adapterVersion = adapterVersion;
-  }
+  constructor(private readonly options: PiAiAdapterOptions, readonly adapterVersion = "pi-ai-0.82.1") {}
+
   async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
-    if (input.credential.proxyUrl !== undefined) {
-      if (this.#legacyProxyEngine === undefined) throw new Error("pi-ai scoped proxy is unavailable; this route requires the ActSpace legacy proxy backend.");
-      return this.#legacyProxyEngine.stream(input);
-    }
-    return this.#engine.stream(input);
-  }
-  async dispose(): Promise<void> {
-    await Promise.all([this.#engine.dispose?.(), this.#legacyProxyEngine?.dispose?.()]);
+    const wire = this.options.wire;
+    const hasImage = input.request.messages.some((message) => typeof message.content !== "string" && message.content.some((block) => block.type === "image"));
+    const endpoint = input.credential.baseUrl ?? wire.baseUrl ?? "";
+    const needsLegacy = input.credential.proxyUrl !== undefined
+      || (catalogProviderForEndpoint(endpoint) === "openrouter" && wire.route !== "anthropic-messages")
+      || (hasImage && wire.providerId === "deepseek" && wire.route === "openai-completions" && wire.deepSeekFiles !== undefined);
+    if (needsLegacy) return new LegacyProxyWireEngine(this.options.legacyProxy ?? wire).stream(input);
+    return streamPiAi(wire, input);
   }
 }

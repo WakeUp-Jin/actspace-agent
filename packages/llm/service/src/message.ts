@@ -6,9 +6,18 @@ export type LlmMessage = {
   readonly callId?: string;
 };
 
+export type LlmReplayEnvelope = {
+  readonly schemaVersion: 1;
+  readonly adapterFamily: string;
+  readonly providerId: string;
+  readonly protocol: string;
+  readonly modelId: string;
+  readonly payload: RuntimeV2JsonValue;
+};
+
 export type LlmContentBlock =
   | { readonly type: "text"; readonly text: string }
-  | { readonly type: "reasoning"; readonly text: string; readonly signature?: string }
+  | { readonly type: "reasoning"; readonly text: string; readonly signature?: string; readonly replay?: LlmReplayEnvelope }
   | { readonly type: "image"; readonly artifactId: string; readonly mimeType: string; readonly alt?: string }
   | { readonly type: "tool-call"; readonly callId: string; readonly name: string; readonly arguments: string }
   | { readonly type: "tool-result"; readonly callId: string; readonly content: string };

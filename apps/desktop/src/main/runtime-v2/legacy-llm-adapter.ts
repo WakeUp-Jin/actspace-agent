@@ -1,8 +1,8 @@
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import { catalogProviderForEndpoint, resolveModelPricing } from "@actspace/shared";
-import type { LlmAdapter, LlmAdapterDispatchInput, LlmRequestModelFacts, LlmStreamSource } from "@actspace/llm-service";
+import type { LlmAdapter, LlmAdapterDispatchInput, LlmAdapterPrepareInput, LlmPreparedAdapterCall, LlmRequestModelFacts, LlmStreamSource } from "@actspace/llm-service";
 import type { PiAiWireRoute } from "@actspace/llm-pi-ai";
-import { DeepSeekFileUploader, LegacyProxyWireEngine, PiAiAdapter, PiAiWireEngine } from "@actspace/llm-pi-ai";
+import { DeepSeekFileUploader, PiAiAdapter } from "@actspace/llm-pi-ai";
 import { ProviderProxyPool } from "@actspace/llm-service";
 import type { ModelApi } from "@actspace/shared";
 import { IMAGE_INSPECTION_CREDENTIAL_REF } from "./credential-resolver";
@@ -14,7 +14,7 @@ type SessionArtifactReader = (sessionId: string, artifactId: string) => Promise<
 export class DesktopLegacyLlmAdapter implements LlmAdapter {
   readonly adapterVersion = "actspace.desktop-pi-ai.v2";
   readonly #proxies = new ProviderProxyPool();
-  readonly #deepSeekFiles = new DeepSeekFileUploader();
+  #deepSeekFiles: DeepSeekFileUploader | undefined;
 
   constructor(private readonly models: DesktopRuntimeV2ModelPort, private readonly readArtifact: SessionArtifactReader, private readonly purpose: "chat" | "utility" = "chat") {}
 
@@ -29,7 +29,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     return { contextWindow: "model" in resolution ? resolution.model.definition.contextWindow : null };
   }
 
-  async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
+  prepare(input: LlmAdapterPrepareInput): LlmPreparedAdapterCall {
     const requested = input.request.model === "default" ? undefined : input.request.model;
     const resolution = input.request.credentialRef === IMAGE_INSPECTION_CREDENTIAL_REF
       ? this.models.resolveImageInspectionModel()
@@ -64,6 +64,9 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     const wireProvider = !customConnection ? model.definition.provider
       : endpointOwner === "openrouter" || endpointOwner === "deepseek" ? endpointOwner
       : endpointOwner === "moonshotai" || endpointOwner === "moonshotai-cn" ? "kimi" : "custom";
+    const deepSeekFiles = wireProvider === "deepseek" && route === "openai-completions" && capabilities?.input?.includes("image")
+      ? (this.#deepSeekFiles ??= new DeepSeekFileUploader())
+      : undefined;
     const engineOptions = {
       pricing,
       ...(capabilities?.input ? { modelFacts: { contextWindow: model.definition.contextWindow, maxTokens: model.definition.maxTokens ?? null, input: capabilities.input, reasoning: capabilities.reasoning } } : {}),
@@ -75,26 +78,38 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
         const artifact = await this.readArtifact(sessionId, artifactId);
         return { data: artifact.bytes, mimeType: artifact.mediaType };
       },
-      deepSeekFiles: this.#deepSeekFiles,
+      ...(deepSeekFiles === undefined ? {} : { deepSeekFiles }),
     } as const;
     const adapter = new PiAiAdapter({
-      engine: new PiAiWireEngine(engineOptions),
-      legacyProxyEngine: new LegacyProxyWireEngine({ ...engineOptions, proxies: this.#proxies }),
+      wire: engineOptions,
+      legacyProxy: { ...engineOptions, proxies: this.#proxies },
     }, this.adapterVersion);
-    return adapter.dispatch({
-      ...input,
-      request: { ...input.request, model: requestModel, options: requestOptions },
-      // Never merge another connection's credentials or proxy into this model.
-      credential: {
-        apiKey: runtime.apiKey,
-        baseUrl: runtime.baseUrl,
-        proxyUrl: runtime.transport?.proxyUrl,
-        pricingMultiplier: runtime.pricingMultiplier,
+    const request = Object.freeze({ ...input.request, model: requestModel, options: Object.freeze(requestOptions), contextWindow: model.definition.contextWindow });
+    const dispatchBound = (requestForAttempt: typeof request, dispatchInput: LlmAdapterDispatchInput) => adapter.dispatch({
+        ...dispatchInput,
+        request: requestForAttempt,
+        // Connection identity is fixed during prepare; secret material is resolved per dispatch.
+        credential: {
+          ...dispatchInput.credential,
+          ...(dispatchInput.credential.apiKey === undefined && runtime.apiKey === undefined ? {} : { apiKey: dispatchInput.credential.apiKey ?? runtime.apiKey }),
+          baseUrl: runtime.baseUrl,
+          proxyUrl: runtime.transport?.proxyUrl,
+          pricingMultiplier: runtime.pricingMultiplier,
+        },
+      });
+    return {
+      request,
+      dispatch: (dispatchInput) => dispatchBound(request, dispatchInput),
+      forAttempt: (attemptRequest) => {
+        const fixedRequest = Object.freeze({ ...attemptRequest, model: request.model, options: request.options, contextWindow: request.contextWindow });
+        return { request: fixedRequest, dispatch: (dispatchInput) => dispatchBound(fixedRequest, dispatchInput) };
       },
-    });
+    };
   }
 
-  async dispose(): Promise<void> { this.#deepSeekFiles.clear(); await this.#proxies.dispose(); }
+  async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> { return this.prepare({ request: input.request, signal: input.signal }).dispatch(input); }
+
+  async dispose(): Promise<void> { this.#deepSeekFiles?.clear(); await this.#proxies.dispose(); }
 }
 
 function toWireRoute(api: ModelApi): PiAiWireRoute { return api; }

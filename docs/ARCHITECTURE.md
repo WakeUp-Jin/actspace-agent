@@ -61,6 +61,8 @@ runtime --(Host capability)--> browser-bridge
 
 ## 架构阅读路线
 
+- [LLM Core Pi 收敛目标](design-docs/agent-plugin-runtime/agent-llm-core-pi.md)：已实施的 LLM prepare、Host 配置绑定、pi-ai 调用、backend policy 和重试生命周期边界；验收边界见执行摘要。
+
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`：Agent Run 从 Host 输入到 Journal、Agent Loop、LLM / Tool 与 Projection 的五层职责边界，并定义 `agentRunId → turnId → stepId → requestId` 的运行层级。
 - `docs/design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md`：v2 Runtime、Profile / Bundle / Patch、基础与生产启动类型、Host 和固定前端边界。
 - `docs/design-docs/agent-runtime/agent-observability-trace-model.md`：Journal 观测的数据契约，解释 Session V2、真实 Turn、LLM Call、重试、Trace 安全边界及投影边界。

@@ -4,7 +4,7 @@ import type { ModelCapabilities } from "@actspace/shared";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { DesktopLegacyLlmAdapter } from "../runtime-v2/legacy-llm-adapter";
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn(async () => (async function* () {})()) }));
-vi.mock("@actspace/llm-pi-ai", () => ({ PiAiAdapter: class { dispatch = dispatch; }, PiAiWireEngine: class {}, LegacyProxyWireEngine: class {} }));
+vi.mock("@actspace/llm-pi-ai", () => ({ PiAiAdapter: class { dispatch = dispatch; }, DeepSeekFileUploader: class {} }));
 beforeEach(() => dispatch.mockClear());
 it("freezes pricing against the selected connection endpoint and final reasoning model", async () => {
   const resolution = { ok: true as const, model: { key: "fixture", definition: { api: "openai-completions" as const, provider: "deepseek", apiModel: "base", contextWindow: 1000, requestModelByReasoningEffort: { high: "actual-high" } }, providerRuntime: { baseUrl: "https://api.deepseek.com" } } };
