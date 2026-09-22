@@ -1,0 +1,224 @@
+---
+import { Image } from 'astro:assets';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import coverImage from '../../assets/blog/covers/character-01.png';
+import screenshotImage from '../../assets/screenshots/workspace-overview.png';
+---
+
+<BaseLayout title="图片骨架预览 | ActSpace" description="查看 ActSpace 官网图片加载骨架的两种展示状态。">
+  <main id="main-content" class="skeleton-preview">
+    <header class="preview-header">
+      <p class="eyebrow">开发预览</p>
+      <h1>图片加载骨架</h1>
+      <p>图片加载前先保留空间，浅色占位会轻微明暗变化；点击重新播放可以重复查看加载过程。</p>
+    </header>
+
+    <div class="preview-grid">
+      <article class="preview-card" data-skeleton-demo="cover">
+        <div class="preview-card-heading">
+          <div>
+            <p class="preview-kicker">01 · 博客列表</p>
+            <h2>博客封面骨架</h2>
+          </div>
+          <span class="preview-ratio">3:2</span>
+        </div>
+        <div class="preview-blog-card">
+          <div class="image-loading-frame blog-cover preview-cover" data-image-frame data-image-state="loading" data-image-enhanced aria-busy="true">
+            <Image src={coverImage} alt="Context 文章封面" width={1254} height={836} loading="eager" data-demo-image />
+          </div>
+          <div class="preview-blog-copy">
+            <time datetime="2026-07-27">2026-07-27</time>
+            <h3>为什么我们把 Context 当成界面，而不是隐藏的 Prompt</h3>
+            <span>上下文工程</span>
+          </div>
+        </div>
+        <p class="preview-caption">对应博客列表卡片的封面区域，文字内容会同时预留。</p>
+        <button class="preview-replay" type="button" data-replay="cover">重新播放</button>
+      </article>
+
+      <article class="preview-card" data-skeleton-demo="shot">
+        <div class="preview-card-heading">
+          <div>
+            <p class="preview-kicker">02 · 首页 / 正文</p>
+            <h2>产品截图骨架</h2>
+          </div>
+          <span class="preview-ratio">原图比例</span>
+        </div>
+        <figure class="preview-shot">
+          <a class="image-loading-frame preview-shot-frame" href={screenshotImage.src} style={`aspect-ratio: ${screenshotImage.width} / ${screenshotImage.height};`} data-image-frame data-image-state="loading" data-image-enhanced aria-busy="true">
+            <Image src={screenshotImage} alt="工作区、会话与代码回复" width={screenshotImage.width} height={screenshotImage.height} loading="eager" data-demo-image />
+          </a>
+          <figcaption>工作区、会话与代码回复</figcaption>
+        </figure>
+        <p class="preview-caption">对应首页产品截图和博客正文图片，按原图比例预留空间。</p>
+        <button class="preview-replay" type="button" data-replay="shot">重新播放</button>
+      </article>
+    </div>
+
+    <p class="preview-note">这里是本地开发预览页，不会出现在官网导航中。正式页面仍保留原有懒加载、首屏优先级和失败提示。</p>
+  </main>
+</BaseLayout>
+
+<script>
+  const delay = 2200;
+
+  function play(frame: HTMLElement) {
+    const image = frame.querySelector<HTMLImageElement>('[data-demo-image]');
+    if (!image) return;
+
+    frame.dataset.imageState = 'loading';
+    frame.setAttribute('aria-busy', 'true');
+    window.setTimeout(() => {
+      frame.dataset.imageState = 'loaded';
+      frame.setAttribute('aria-busy', 'false');
+    }, delay);
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('[data-replay]').forEach((button) => {
+    const demo = button.closest<HTMLElement>('[data-skeleton-demo]');
+    const frame = demo?.querySelector<HTMLElement>('[data-image-frame]');
+    if (!frame) return;
+
+    button.addEventListener('click', () => play(frame));
+    play(frame);
+  });
+</script>
+
+<style>
+  .skeleton-preview {
+    width: var(--site-page);
+    margin: 0 auto;
+    padding-block: clamp(52px, 8vw, 96px) 96px;
+  }
+  .preview-header {
+    max-width: 680px;
+    margin-bottom: 44px;
+  }
+  .eyebrow,
+  .preview-kicker {
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .preview-header h1 {
+    margin-bottom: 16px;
+    font-family: var(--blog-serif);
+    font-size: clamp(34px, 5vw, 56px);
+    line-height: 1.08;
+  }
+  .preview-header p:last-child,
+  .preview-caption,
+  .preview-note {
+    color: var(--body);
+    line-height: 1.8;
+  }
+  .preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px;
+  }
+  .preview-card {
+    min-width: 0;
+    padding: clamp(20px, 3vw, 32px);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--surface);
+  }
+  .preview-card-heading {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .preview-kicker {
+    margin-bottom: 8px;
+  }
+  .preview-card h2 {
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.3;
+  }
+  .preview-ratio {
+    flex: 0 0 auto;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .preview-blog-card {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--site-surface);
+  }
+  .preview-cover {
+    aspect-ratio: 3 / 2;
+  }
+  .preview-cover img,
+  .preview-shot-frame img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .preview-blog-copy {
+    display: grid;
+    gap: 14px;
+    padding: 22px;
+  }
+  .preview-blog-copy time,
+  .preview-blog-copy span {
+    color: var(--body);
+    font-size: 12px;
+  }
+  .preview-blog-copy h3 {
+    margin: 0;
+    font-family: var(--blog-serif);
+    font-size: clamp(20px, 2.2vw, 28px);
+    line-height: 1.3;
+  }
+  .preview-shot {
+    margin: 0;
+  }
+  .preview-shot-frame {
+    display: block;
+    border-radius: 12px;
+  }
+  .preview-shot figcaption {
+    margin-top: 12px;
+    color: var(--body);
+    font-size: 13px;
+  }
+  .preview-caption {
+    min-height: 52px;
+    margin: 20px 0 16px;
+    font-size: 13px;
+  }
+  .preview-replay {
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    padding: 10px 16px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 13px;
+  }
+  .preview-replay:hover {
+    background: var(--line);
+  }
+  .preview-replay:focus-visible {
+    outline: 2px solid var(--site-focus);
+    outline-offset: 3px;
+  }
+  .preview-note {
+    margin: 28px 0 0;
+    font-size: 13px;
+  }
+  @media (max-width: 760px) {
+    .preview-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
