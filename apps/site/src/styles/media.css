@@ -12,10 +12,54 @@
 }
 .prose-image-frame { display: block; border-radius: 8px; }
 .image-loading-frame[data-image-enhanced][data-image-state="loading"] {
-  animation: image-skeleton-pulse 1.4s ease-in-out infinite alternate;
+  animation: none;
+}
+.image-loading-frame[data-image-enhanced][data-image-state="loading"]::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 18%, var(--site-surface) 50%, transparent 82%);
+  opacity: 0.42;
+  transform: translateX(-100%);
+  animation: image-skeleton-shimmer 1.9s ease-in-out infinite;
 }
 .image-loading-frame[data-image-enhanced][data-image-state="loading"] img {
   opacity: 0;
+}
+.image-loading-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid var(--site-line-strong);
+  border-radius: 999px;
+  background: var(--site-surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+.image-loading-frame[data-image-enhanced][data-image-state="loading"] .image-loading-status {
+  opacity: 1;
+}
+.image-loading-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--line);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: image-loading-spin 850ms linear infinite;
 }
 .image-loading-frame[data-image-enhanced] img {
   transition: opacity 180ms ease;
@@ -38,9 +82,12 @@
   text-align: center;
   pointer-events: none;
 }
-@keyframes image-skeleton-pulse {
-  from { background-color: var(--surface); }
-  to { background-color: var(--line); }
+@keyframes image-skeleton-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+@keyframes image-loading-spin {
+  to { transform: rotate(360deg); }
 }
 .screenshot-placeholder {
   display: flex;
@@ -71,7 +118,8 @@
   .docs-prose .screenshot-placeholder { padding: 24px 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .image-loading-frame[data-image-enhanced][data-image-state="loading"] { animation: none; }
+  .image-loading-frame[data-image-enhanced][data-image-state="loading"]::after { animation: none; }
+  .image-loading-spinner { animation: none; }
   .image-loading-frame[data-image-enhanced] img { transition: none; }
 }
 @media (forced-colors: active) {

@@ -10,7 +10,7 @@ import screenshotImage from '../../assets/screenshots/workspace-overview.png';
     <header class="preview-header">
       <p class="eyebrow">开发预览</p>
       <h1>图片加载骨架</h1>
-      <p>图片加载前先保留空间，浅色占位会轻微明暗变化；点击重新播放可以重复查看加载过程。</p>
+      <p>图片加载前先保留空间，微光扫过并显示明确的加载状态；点击重新播放可以重复查看加载过程。</p>
     </header>
 
     <div class="preview-grid">
@@ -24,6 +24,7 @@ import screenshotImage from '../../assets/screenshots/workspace-overview.png';
         </div>
         <div class="preview-blog-card">
           <div class="image-loading-frame blog-cover preview-cover" data-image-frame data-image-state="loading" data-image-enhanced aria-busy="true">
+            <span class="image-loading-status" aria-hidden="true"><span class="image-loading-spinner"></span><span>图片加载中</span></span>
             <Image src={coverImage} alt="Context 文章封面" width={1254} height={836} loading="eager" data-demo-image />
           </div>
           <div class="preview-blog-copy">
@@ -46,6 +47,7 @@ import screenshotImage from '../../assets/screenshots/workspace-overview.png';
         </div>
         <figure class="preview-shot">
           <a class="image-loading-frame preview-shot-frame" href={screenshotImage.src} style={`aspect-ratio: ${screenshotImage.width} / ${screenshotImage.height};`} data-image-frame data-image-state="loading" data-image-enhanced aria-busy="true">
+            <span class="image-loading-status" aria-hidden="true"><span class="image-loading-spinner"></span><span>图片加载中</span></span>
             <Image src={screenshotImage} alt="工作区、会话与代码回复" width={screenshotImage.width} height={screenshotImage.height} loading="eager" data-demo-image />
           </a>
           <figcaption>工作区、会话与代码回复</figcaption>

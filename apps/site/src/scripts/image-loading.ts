@@ -22,6 +22,21 @@ function showImageError(frame: HTMLElement) {
   frame.append(message);
 }
 
+function addLoadingStatus(frame: HTMLElement) {
+  if (frame.querySelector('.image-loading-status')) return;
+
+  const status = document.createElement('span');
+  status.className = 'image-loading-status';
+  status.setAttribute('aria-hidden', 'true');
+
+  const spinner = document.createElement('span');
+  spinner.className = 'image-loading-spinner';
+  const label = document.createElement('span');
+  label.textContent = '图片加载中';
+  status.append(spinner, label);
+  frame.append(status);
+}
+
 export function initializeImageLoading(root: ParentNode = document) {
   const images = root.querySelectorAll<HTMLImageElement>('[data-image-loading], .docs-prose img');
 
@@ -44,6 +59,7 @@ export function initializeImageLoading(root: ParentNode = document) {
 
     image.addEventListener('load', loaded);
     image.addEventListener('error', failed);
+    addLoadingStatus(frame);
     frame.dataset.imageState = 'loading';
     if (image.complete) image.naturalWidth > 0 ? loaded() : failed();
     frame.dataset.imageEnhanced = '';
