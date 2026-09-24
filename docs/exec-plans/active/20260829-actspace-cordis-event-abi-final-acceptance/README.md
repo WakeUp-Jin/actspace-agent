@@ -144,7 +144,7 @@ session/event
 
 - LLM：`llm/retry`、`llm/retry-started`；
 - compaction：`compaction/start`、`compaction/summary`、`compaction/prune`、`compaction/end`；
-- approval/permission：`approval/asked`、`approval/decided`、`approval/policy`、`permission/preset`；
+- approval/permission：`permission/asked`、`permission/decided`、`permission/mode-set`、`permission/scope-denied`；
 - hook/command：`hook/invoked`、`hook/result`、`command/run`、`command/done`；
 - tool workflow：`tool-workflow/*`、`tool/code-dispatch*`；
 - agent/delegation：`agent/inbox/spliced`、`subagent/descriptor`、`delegation/*`；

@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
+import type { GrantSuggestion } from "@actspace/shared/runtime-v2";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_CLASS,
@@ -14,7 +15,44 @@ import {
 type ToolLogMessage = Extract<MessageBlock, {
   kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "image_generation" | "directory_list" | "delete" | "tool" | "error";
 }>;
-type ToolLogStatus = "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown" | undefined;
+type ToolLogStatus = "pending" | "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown" | undefined;
+
+type FileReadApprovalMessage = Extract<MessageBlock, { kind: "read" | "grep" | "glob" }>;
+
+function FileReadApprovalLine({ message, className }: { message: FileReadApprovalMessage; className?: string }) {
+  const [suggestions, setSuggestions] = useState<readonly GrantSuggestion[]>([]);
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [submitting, setSubmitting] = useState<"once" | "session" | "deny" | null>(null);
+  const requestId = message.approvalRequestId;
+  useEffect(() => {
+    let active = true;
+    if (!requestId || !window.actspace?.listPendingApprovals) return;
+    void window.actspace.listPendingApprovals().then((pending) => {
+      if (active) setSuggestions(pending.find((request) => request.requestId === requestId)?.grantSuggestions ?? []);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [requestId]);
+  const decide = async (decision: "once" | "session" | "deny", suggestionId?: string) => {
+    if (!requestId || !window.actspace?.submitApproval || submitting !== null) return;
+    setSubmitting(decision);
+    const input = decision === "session" && suggestionId ? { requestId, decision, suggestionId } as const : { requestId, decision: decision === "session" ? "deny" as const : decision };
+    const result = await window.actspace.submitApproval(input).catch(() => ({ ok: false }));
+    if (!result.ok) setSubmitting(null);
+  };
+  const target = message.kind === "read" ? message.filePath : message.scope ?? message.pattern;
+  return <article className={`${className ?? ""} w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface`}>
+    <div className="border-b border-line bg-surface-subtle px-[var(--conversation-card-padding)] py-2 text-xs font-medium text-text-main">读取范围需要授权</div>
+    <div className="break-all px-[var(--conversation-card-padding)] pt-2 font-mono text-xs text-text-muted">{target}</div>
+    {message.reason ? <div className="px-[var(--conversation-card-padding)] pt-1 text-xs text-text-faint">{message.reason}</div> : null}
+    <div className="flex flex-wrap items-center justify-end gap-1.5 px-[var(--conversation-card-padding)] py-2">
+      <button className="h-7 rounded-act-sm px-2 text-xs text-text-muted hover:bg-surface-subtle" type="button" disabled={submitting !== null} onClick={() => void decide("deny")}>跳过</button>
+      {suggestions.filter((suggestion) => suggestion.selector.kind === "exact").map((suggestion) => <button className="h-7 rounded-act-sm border border-line bg-surface-subtle px-2 text-xs text-text-main hover:bg-surface" type="button" disabled={submitting !== null} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话允许此路径</button>)}
+      {suggestions.some((suggestion) => suggestion.selector.kind === "subtree") ? <button className="h-7 rounded-act-sm px-2 text-xs text-text-muted hover:bg-surface-subtle" type="button" aria-expanded={scopeOpen} onClick={() => setScopeOpen((value) => !value)}>选择目录范围</button> : null}
+      {scopeOpen ? suggestions.filter((suggestion) => suggestion.selector.kind === "subtree").map((suggestion) => <button className="h-7 rounded-act-sm border border-line bg-surface-subtle px-2 text-xs text-text-main hover:bg-surface" type="button" disabled={submitting !== null} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话允许此目录树</button>) : null}
+      <button className="h-7 rounded-act-sm bg-action px-2 text-xs font-medium text-on-action hover:bg-action-hover" type="button" disabled={submitting !== null} onClick={() => void decide("once")}>仅本次</button>
+    </div>
+  </article>;
+}
 
 const TOOL_LOG_LINE_TOOLTIP_CONTAINER_CLASS = "has-overflow-text max-w-full outline-none";
 const TOOL_LOG_LINE_TOOLTIP_OPEN_CLASS = "is-tooltip-open";
@@ -218,6 +256,7 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
 }
 
 export function ToolLogLine({ message, className, onOpenFile, onExpand }: { onExpand?: () => void; message: ToolLogMessage; className?: string; onOpenFile?: (message: Extract<MessageBlock, { kind: "read" }>) => void }) {
+  if ((message.kind === "read" || message.kind === "grep" || message.kind === "glob") && message.status === "pending") return <FileReadApprovalLine message={message} className={className} />;
   if (message.kind === "read") {
     const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;
     return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={(!message.status || message.status === "completed") ? <ToolSummary action="Read" target={message.filePath} meta={message.range} /> : undefined} status={message.status} resultPreview={message.resultPreview} className={className} onOpenFile={onOpenFile ? () => onOpenFile(message) : undefined} />;

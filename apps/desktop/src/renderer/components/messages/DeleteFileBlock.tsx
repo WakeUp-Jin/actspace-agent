@@ -3,7 +3,7 @@ import type { MessageBlock } from "@actspace/shared";
 import { ToolLogLine } from "./ToolLogLine";
 
 type DeleteMessage = Extract<MessageBlock, { kind: "delete" }>;
-type DeleteDecision = "approve_once" | "deny";
+type DeleteDecision = "once" | "deny";
 
 const DELETE_APPROVAL_CLASS =
   "message-row delete-approval w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface";
@@ -104,9 +104,9 @@ export function DeleteFileBlock({ message, className }: { message: DeleteMessage
           className={`${DELETE_ACTION_CLASS} ${DELETE_ACTION_DANGER_CLASS}`}
           type="button"
           disabled={disabled}
-          onClick={() => decide("approve_once")}
+          onClick={() => decide("once")}
         >
-          {submitting === "approve_once" ? "Deleting..." : "Delete"}
+          {submitting === "once" ? "Deleting..." : "Delete"}
         </button>
       </footer>
     </article>

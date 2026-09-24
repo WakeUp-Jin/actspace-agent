@@ -1,5 +1,6 @@
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
 import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
+import type { PermissionMode, SessionGrant } from "@actspace/shared/runtime-v2";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
@@ -214,6 +215,7 @@ export function WorkbenchLayout({
   const effectiveContextState = useLiveContext ? liveContextState : contextState;
   const effectiveContextSnapshot = useLiveContext ? projectedContextSnapshot : contextSnapshot ?? projectedContextSnapshot;
   const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
+  const permissionMode = projectionCell?.snapshot?.permissionMode ?? "default";
   const effectiveIsSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
   const [view, setView] = useState<SidebarView>("chat");
   const sessionViewByIdRef = useRef(new Map<string, SessionMainView>());
@@ -689,18 +691,10 @@ export function WorkbenchLayout({
         getSessionPreview={view === "chat" ? getSessionPreview : undefined}
         sessionView={view === "chat" ? sessionMainView : undefined}
         onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
-        centerTrailing={
-          view === "chat" && selectedWorkspaceRoot ? (
-            <WorkspaceChromeControls
-              workspaceRoot={selectedWorkspaceRoot}
-              title={title}
-              messages={messages}
-              reviewSummary={reviewSummary}
-              onOpenReview={openReviewTab}
-              onWorkspaceChanged={onReviewChanged}
-            />
-          ) : undefined
-        }
+        centerTrailing={view === "chat" ? <>
+          {activeSessionId ? <PermissionModeControl sessionId={activeSessionId} mode={permissionMode} grants={projectionCell?.snapshot?.sessionGrants ?? []} disabled={false} onChanged={async () => { await sessionProjection?.bridge?.open(activeSessionId); }} /> : null}
+          {selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
+        </> : undefined}
         rightLeading={
           view === "chat" ? (
             <>
@@ -769,6 +763,57 @@ export function WorkbenchLayout({
       ) : null}
     </>
   );
+}
+
+export function PermissionModeControl({ sessionId, mode, grants = [], disabled, onChanged }: { sessionId: string; mode: PermissionMode; grants?: readonly SessionGrant[]; disabled: boolean; onChanged: () => void | Promise<void> }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const update = async (next: PermissionMode) => {
+    if (next === mode || !window.actspace?.setSessionPermissionMode) return;
+    setSubmitting(true);
+    try {
+      const result = await window.actspace.setSessionPermissionMode({ sessionId, mode: next });
+      if (result.ok) await onChanged();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  const revoke = async (grantId: string) => {
+    if (!window.actspace?.revokeSessionGrant) return;
+    setRevoking(grantId);
+    try {
+      const result = await window.actspace.revokeSessionGrant({ sessionId, grantId });
+      if (result.ok) await onChanged();
+    } finally {
+      setRevoking(null);
+    }
+  };
+  return <div className="inline-flex items-center gap-1">
+    <label className="inline-flex h-7 items-center gap-1.5 rounded-act-sm border border-line bg-surface-subtle px-2 text-[11px] text-text-muted" title="完全访问仅扩大文件范围，不会自动批准 Bash、删除或敏感文件">
+      <span>权限</span>
+      <select className="bg-transparent text-[11px] font-medium text-text-main outline-none" aria-label="会话权限模式" value={mode} disabled={disabled || submitting} onChange={(event) => void update(event.target.value as PermissionMode)}>
+        <option value="default">默认</option>
+        <option value="full-access">完全访问</option>
+      </select>
+    </label>
+    <details className="relative">
+      <summary className="flex h-7 cursor-pointer list-none items-center rounded-act-sm border border-line bg-surface-subtle px-2 text-[11px] text-text-muted" aria-label="管理会话授权">授权 {grants.length}</summary>
+      <div className="absolute top-8 right-0 z-50 w-[min(420px,calc(100vw-24px))] border border-line bg-surface p-2 shadow-act-float">
+        <div className="px-1 pb-2 text-xs font-semibold text-text-main">当前会话授权</div>
+        {grants.length === 0 ? <div className="px-1 py-2 text-xs text-text-faint">暂无可复用的文件授权</div> : grants.map((grant) => {
+          const scope = grant.selector.kind === "exact" ? grant.selector.canonicalPath : grant.selector.canonicalRoot;
+          return <div className="flex items-start gap-2 border-t border-line py-2 first:border-t-0" key={grant.grantId}>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-text-main">{grant.action === "file.read" ? "读取" : "写入"} · {grant.selector.kind === "exact" ? "仅此文件" : "此目录树"}</div>
+              <div className="mt-0.5 break-all font-mono text-[11px] leading-4 text-text-muted" title={scope}>{scope}</div>
+              <div className="mt-1 text-[10px] text-text-faint">{grant.sourceToolName} · {new Date(grant.issuedAt).toLocaleString()}</div>
+            </div>
+            <button className="h-7 shrink-0 rounded-act-sm px-2 text-xs text-text-muted hover:bg-surface-subtle hover:text-text-main" type="button" disabled={revoking === grant.grantId} onClick={() => void revoke(grant.grantId)}>{revoking === grant.grantId ? "撤销中" : "撤销"}</button>
+          </div>;
+        })}
+      </div>
+    </details>
+  </div>;
 }
 
 /**

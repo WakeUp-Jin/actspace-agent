@@ -167,6 +167,12 @@ declare global {
       setSessionWorkspace?: (
         input: import("@actspace/shared").SessionWorkspaceInput
       ) => Promise<import("@actspace/shared").SessionWorkspaceResult>;
+      setSessionPermissionMode?: (
+        input: import("@actspace/shared").SessionPermissionModeInput
+      ) => Promise<import("@actspace/shared").SessionPermissionModeResult>;
+      revokeSessionGrant?: (
+        input: import("@actspace/shared").SessionGrantRevokeInput
+      ) => Promise<import("@actspace/shared").SessionGrantRevokeResult>;
       archiveSession: (
         input: import("@actspace/shared").SessionArchiveInput
       ) => Promise<import("@actspace/shared").SessionArchiveResult>;

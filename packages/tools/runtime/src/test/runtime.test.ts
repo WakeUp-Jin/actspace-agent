@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeV2JsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
 import type { ApprovalBroker } from "@actspace/tools-approval";
 import type { ToolDefinition } from "../definition.js";
 import type { ToolBodyResult, ToolCapabilitySet } from "../executor.js";
@@ -54,11 +54,21 @@ function environment(
     checkpoint?: () => Promise<void>;
     commits?: ToolExecutionResult[];
     approvalTimeoutMs?: number;
+    permissionEvents?: string[];
+    permissionRecords?: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }>;
+    sessionGrants?: SessionGrant[];
+    sessionGrantCapability?: boolean;
+    trustedGrantAudiences?: ReadonlySet<string>;
   } = {},
 ): ToolPreparedEnvironment {
   const commits = options.commits ?? [];
   const journal: ToolJournalPort = {
     async recordDispatch(fact) { trace.push(`dispatch:${fact.callId}`); },
+    async recordPermission(type, data) {
+      options.permissionEvents?.push(type);
+      options.permissionRecords?.push({ type, data });
+      if (type === "permission/grant-added") options.sessionGrants?.push(data as unknown as SessionGrant);
+    },
     async checkpointBeforeBody() {
       trace.push("checkpoint");
       await options.checkpoint?.();
@@ -75,6 +85,9 @@ function environment(
     capabilitySet,
     approvalBroker: options.approvalBroker,
     approvalTimeoutMs: options.approvalTimeoutMs,
+    sessionGrantCapability: options.sessionGrantCapability,
+    sessionGrants: options.sessionGrants,
+    trustedGrantAudiences: options.trustedGrantAudiences,
     journal,
     createArtifact: async () => ({ artifactId: "artifact-1", mediaType: "text/plain", size: 1, sha256: "digest" }),
   };
@@ -104,14 +117,14 @@ describe("Tool Runtime execution contract", () => {
           return success();
         },
       },
-      policies: [{ id: "policy", layer: 0, order: 0, evaluate: () => { trace.push("policy"); return { kind: "require-approval", reason: "inspect file", risk: "low" }; } }],
+      permission: { extractResources: () => [], evaluate: () => { trace.push("policy"); return { kind: "ask", reason: "inspect file", risk: "low" }; } },
       middleware: [{ id: "middleware", layer: 0, order: 0, before: () => { trace.push("before"); }, after: (_context, result) => { trace.push("after"); return result; } }],
     });
     const broker: ApprovalBroker = {
       async requestApproval(request) {
         trace.push("approval");
-        expect(request.argumentSummary).toEqual({ value: "call-1" });
-        return { requestId: request.requestId, decision: "allow", decidedAt: "2026-08-22T12:00:00.000Z" };
+        expect(request.toolName).toBe("read");
+        return { requestId: request.requestId, kind: "once", decidedAt: new Date().toISOString() };
       },
     };
 
@@ -125,23 +138,84 @@ describe("Tool Runtime execution contract", () => {
     runtime.register({
       definition: definition({ effects: [{ capabilityId: "filesystem.read", mode: "use", resourceScope: "workspace" }] }),
       executor: { concurrencySafe: true, async execute() { return success(); } },
-      resolveResourcePaths: (args) => [String(args.value)],
+      permission: { extractResources: (args) => [{ kind: "file", access: "read", canonicalPath: `/workspace/${String(args.value)}`, targetKind: "file" }], evaluate: () => ({ kind: "allow" }) },
     });
     const [result] = await runtime.executeBatch([call("relative", { value: "src/index.ts" })], environment([]));
     expect(result).toMatchObject({ status: "completed" });
   });
 
-  it("rejects relative resource paths that escape the workspace", async () => {
+  it("asks before admitting a resource outside the workspace", async () => {
     let bodyCalls = 0;
     const runtime = new ToolRuntime();
     runtime.register({
       definition: definition(),
       executor: { concurrencySafe: true, async execute() { bodyCalls += 1; return success(); } },
-      resolveResourcePaths: (args) => [String(args.value)],
+      permission: { extractResources: () => [{ kind: "file", access: "read", canonicalPath: "/outside.txt", targetKind: "file" }], evaluate: () => ({ kind: "allow" }) },
     });
     const [result] = await runtime.executeBatch([call("escape", { value: "../outside.txt" })], environment([]));
-    expect(result).toMatchObject({ status: "denied", failure: { code: "WORKSPACE_BOUNDARY_DENIED" } });
+    expect(result).toMatchObject({ status: "denied", failure: { code: "APPROVAL_REQUIRED" } });
     expect(bodyCalls).toBe(0);
+  });
+
+  it("issues a validated Session Grant and reuses it only through Runtime matching", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({
+      definition: definition(),
+      executor: { concurrencySafe: true, async execute() { return success(); } },
+      permission: {
+        grantAudience: { pluginId: "plugin.test", permissionDomain: "core-files", policyVersion: 1 },
+        extractResources: () => [{ kind: "file", access: "read", canonicalPath: "/outside/a.txt", targetKind: "file" }],
+        evaluate: () => ({ kind: "allow" }),
+        suggestGrants: () => [{ action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/outside/a.txt" }, label: "This file only" }],
+      },
+    });
+    const grants: SessionGrant[] = [];
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const broker: ApprovalBroker = { async requestApproval(request) {
+      expect(request.supportedLifetimes).toEqual(["once", "session"]);
+      expect(request.grantSuggestions).toHaveLength(1);
+      return { requestId: request.requestId, kind: "session", suggestionId: request.grantSuggestions[0]!.suggestionId, decidedAt: new Date().toISOString() };
+    } };
+    const trustedGrantAudiences = new Set(["plugin.test\u0000core-files\u00001"]);
+    const env = environment([], { approvalBroker: broker, permissionRecords: records, sessionGrants: grants, sessionGrantCapability: true, trustedGrantAudiences });
+    expect((await runtime.executeBatch([call("grant-first")], env))[0]).toMatchObject({ status: "completed" });
+    expect(records.map((record) => record.type)).toEqual(["permission/asked", "permission/decided", "permission/grant-added"]);
+    expect(grants).toHaveLength(1);
+    const secondEnv = environment([], { sessionGrants: grants, sessionGrantCapability: true, trustedGrantAudiences });
+    expect((await runtime.executeBatch([call("grant-second")], secondEnv))[0]).toMatchObject({ status: "completed" });
+  });
+
+  it("does not let an untrusted plugin issue or consume a forged core-files Grant", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({
+      definition: definition({ pluginId: "plugin.third-party" }),
+      executor: { concurrencySafe: true, async execute() { return success(); } },
+      permission: {
+        grantAudience: { pluginId: "plugin.third-party", permissionDomain: "core-files", policyVersion: 1 },
+        extractResources: () => [{ kind: "file", access: "read", canonicalPath: "/outside/a.txt", targetKind: "file" }],
+        evaluate: () => ({ kind: "allow" }),
+        suggestGrants: () => [{ action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/outside/a.txt" }, label: "Forged" }],
+      },
+    });
+    const forged: SessionGrant = {
+      schemaVersion: 1, grantId: "forged", sessionId: "session-1", agentId: "main:session-1",
+      audience: { pluginId: "plugin.third-party", permissionDomain: "core-files", policyVersion: 1 },
+      action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/outside/a.txt" },
+      sourceRequestId: "request", sourceCallId: "call", sourceToolName: "read", issuedAt: new Date().toISOString(),
+    };
+    let requestSuggestionCount = -1;
+    const broker: ApprovalBroker = { async requestApproval(request) {
+      requestSuggestionCount = request.grantSuggestions.length;
+      return { requestId: request.requestId, kind: "deny", code: "user-denied", decidedAt: new Date().toISOString() };
+    } };
+    const [result] = await runtime.executeBatch([call("untrusted")], environment([], {
+      approvalBroker: broker,
+      sessionGrantCapability: true,
+      sessionGrants: [forged],
+      trustedGrantAudiences: new Set(["actspace.core-tools\u0000core-files\u00001"]),
+    }));
+    expect(requestSuggestionCount).toBe(0);
+    expect(result).toMatchObject({ status: "denied", failure: { code: "APPROVAL_DENIED" } });
   });
 
   it("fails checkpoint closed before invoking the executor body", async () => {
@@ -163,13 +237,9 @@ describe("Tool Runtime execution contract", () => {
     runtime.register({
       definition: definition(),
       executor: { async execute() { bodyCalls += 1; return success(); } },
-      policies: [
-        { id: "approval", layer: 0, order: 0, evaluate: () => ({ kind: "require-approval", reason: "risk", risk: "high" }) },
-        { id: "deny", layer: 0, order: 1, evaluate: () => ({ kind: "deny", code: "POLICY_DENIED", reason: "blocked" }) },
-        { id: "late", layer: 1, order: 0, evaluate: () => ({ kind: "continue" }) },
-      ],
+      permission: { extractResources: () => [], evaluate: () => ({ kind: "deny", code: "POLICY_DENIED", reason: "blocked" }) },
     });
-    const broker: ApprovalBroker = { async requestApproval(request) { approvalCalls += 1; return { requestId: request.requestId, decision: "allow", decidedAt: "now" }; } };
+    const broker: ApprovalBroker = { async requestApproval(request) { approvalCalls += 1; return { requestId: request.requestId, kind: "once", decidedAt: new Date().toISOString() }; } };
     const [result] = await runtime.executeBatch([call("denied")], environment(trace, { approvalBroker: broker }));
     expect(result?.status).toBe("denied");
     expect(bodyCalls).toBe(0);
@@ -178,13 +248,15 @@ describe("Tool Runtime execution contract", () => {
   });
 
   it.each([
-    { name: "stale", broker: { async requestApproval() { return { requestId: "wrong", decision: "allow" as const, decidedAt: "now" }; } }, code: "APPROVAL_STALE" },
+    { name: "stale", broker: { async requestApproval() { return { requestId: "wrong", kind: "once" as const, decidedAt: new Date().toISOString() }; } }, code: "APPROVAL_STALE" },
     { name: "timeout", broker: { async requestApproval() { return new Promise<never>(() => undefined); } }, code: "APPROVAL_TIMEOUT" },
   ])("fails closed for $name approval", async ({ broker, code }) => {
     const runtime = new ToolRuntime();
-    runtime.register({ definition: definition(), executor: { async execute() { return success(); } }, policies: [{ id: "ask", layer: 0, order: 0, evaluate: () => ({ kind: "require-approval", reason: "risk", risk: "medium" }) }] });
-    const [result] = await runtime.executeBatch([call(`approval-${code}`)], environment([], { approvalBroker: broker, approvalTimeoutMs: 5 }));
+    runtime.register({ definition: definition(), executor: { async execute() { return success(); } }, permission: { extractResources: () => [], evaluate: () => ({ kind: "ask", reason: "risk", risk: "medium" }) } });
+    const permissionEvents: string[] = [];
+    const [result] = await runtime.executeBatch([call(`approval-${code}`)], environment([], { approvalBroker: broker, approvalTimeoutMs: 5, permissionEvents }));
     expect(result).toMatchObject({ status: "denied", failure: { code } });
+    expect(permissionEvents).toEqual(["permission/asked", "permission/decided"]);
   });
 
   it("rejects invalid args with a field path and no body invocation", async () => {

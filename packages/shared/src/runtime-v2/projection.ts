@@ -1,4 +1,5 @@
 import type { RuntimeV2JsonValue } from "./host-dto";
+import type { PermissionMode, SessionGrant } from "./permission";
 
 export const RUNTIME_V2_PROJECTION_SCHEMA_VERSION = 1 as const;
 
@@ -342,6 +343,8 @@ export type RuntimeV2SessionSnapshot = {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly workspaceRoot: string | null;
+  readonly permissionMode: PermissionMode;
+  readonly sessionGrants: readonly SessionGrant[];
   readonly throughJournalSeq: number;
   readonly accessState: "read-write" | "degraded" | "browse-only" | "corrupt";
   readonly metadata: RuntimeV2SessionMetadata;

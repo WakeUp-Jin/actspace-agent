@@ -3,6 +3,7 @@ import type { CompactionPlugin } from "@actspace/compaction";
 import type { LlmMessage, LlmService, LlmUsage } from "@actspace/llm-service";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import type {
   RuntimeV2JsonValue,
   RuntimeV2RunTurnRequest,
@@ -75,6 +76,8 @@ export type DesktopAppServiceContract = {
   readonly flushSession: (sessionId: string) => Promise<void>;
   readonly updateSessionMetadata: (sessionId: string, patch: { readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean }) => Promise<RuntimeV2SessionSnapshot>;
   readonly updateSessionWorkspace: (sessionId: string, workspaceRoot: string) => Promise<RuntimeV2SessionSnapshot>;
+  readonly updateSessionPermissionMode: (sessionId: string, mode: import("@actspace/shared/runtime-v2").PermissionMode) => Promise<RuntimeV2SessionSnapshot>;
+  readonly revokeSessionGrant: (sessionId: string, grantId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly completeText: (input: { readonly messages: readonly LlmMessage[]; readonly model?: string; readonly purpose?: "chat" | "utility"; readonly sessionId?: string; readonly signal?: AbortSignal }) => Promise<{ readonly text: string; readonly model: string; readonly provider: string; readonly usage: LlmUsage; readonly stopReason: string | null }>;
   readonly dispose: () => Promise<void>;
 };
@@ -209,6 +212,34 @@ export class DesktopAppService implements DesktopAppServiceContract {
     return this.#sessions.snapshot(session);
   }
 
+  async updateSessionPermissionMode(sessionId: string, mode: import("@actspace/shared/runtime-v2").PermissionMode) {
+    const session = await this.#sessions.resume(sessionId);
+    const snapshot = this.#sessions.snapshot(session);
+    if (snapshot.permissionMode === mode) return snapshot;
+    const changedAt = new Date().toISOString();
+    const events: SessionEventCandidateV1[] = [];
+    if (snapshot.permissionMode === "full-access" && mode === "default") {
+      for (const grant of snapshot.sessionGrants) {
+        const path = grant.selector.kind === "exact" ? grant.selector.canonicalPath : grant.selector.canonicalRoot;
+        if (snapshot.workspaceRoot === null || !isPathWithin(snapshot.workspaceRoot, path)) events.push(core("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: changedAt, reason: "permission-mode-downgrade" }));
+      }
+    }
+    events.push(core("permission/mode-set", { mode, changedAt, source: "desktop" }));
+    await session.appendMany(events);
+    await session.flush();
+    return this.#sessions.snapshot(session);
+  }
+
+  async revokeSessionGrant(sessionId: string, grantId: string) {
+    const session = await this.#sessions.resume(sessionId);
+    const snapshot = this.#sessions.snapshot(session);
+    const grant = snapshot.sessionGrants.find((candidate) => candidate.grantId === grantId);
+    if (grant === undefined || grant.sessionId !== sessionId || grant.agentId !== `main:${sessionId}`) throw new Error("Session Grant is not active for this main Agent.");
+    await session.append(core("permission/grant-revoked", { schemaVersion: 1, grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "user-revoked" }));
+    await session.flush();
+    return this.#sessions.snapshot(session);
+  }
+
   async completeText(input: { readonly messages: readonly LlmMessage[]; readonly model?: string; readonly purpose?: "chat" | "utility"; readonly sessionId?: string; readonly signal?: AbortSignal }) {
     const model = input.model ?? "default";
     const routeId = input.purpose === "utility" ? "utility" : this.#llm.routes.list()[0]?.routeId ?? "default";
@@ -264,6 +295,11 @@ export class DesktopAppService implements DesktopAppServiceContract {
     for (const job of jobs) job.controller.abort();
     await Promise.allSettled(jobs.map(job => job.done));
   }
+}
+
+function isPathWithin(root: string, candidate: string): boolean {
+  const nested = relative(resolve(root), resolve(candidate));
+  return nested === "" || (!nested.startsWith(`..${sep}`) && nested !== ".." && !isAbsolute(nested));
 }
 
 function required<T>(ctx: CordisContext, id: string): T {

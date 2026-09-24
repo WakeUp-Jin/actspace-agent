@@ -6,7 +6,6 @@ describe("Runtime v2 Host parity", () => {
   it("preserves the exact Desktop Profile turn and Session DTO in CLI artifacts", () => {
     const desktop = response();
     const cli = projectCliArtifactResult(desktop, {
-      permissionMode: "default",
       workspace: "/workspace",
       startedAt: "2026-08-23T00:00:00.000Z",
       endedAt: "2026-08-23T00:00:01.000Z",
@@ -24,6 +23,7 @@ describe("Runtime v2 Host parity", () => {
       snapshot: cli.snapshot,
     }).toEqual(desktop);
     expect(cli.totalUsage).toEqual(desktop.snapshot.usage);
+    expect(cli.permissionMode).toBe("full-access");
     expect(cli.snapshot?.tools[0]).toMatchObject({ callId: "call-1", state: "completed" });
     expect(cli.snapshot?.todos[0]).toMatchObject({ todoId: "todo-1", state: "pending" });
     expect(cli.snapshot?.delegations[0]).toMatchObject({ invocationId: "child-1", state: "completed" });
@@ -43,6 +43,7 @@ function response(): RuntimeV2RunTurnResponse {
       schemaVersion: 1,
       sessionId: "session-1",
       throughJournalSeq: 12,
+      permissionMode: "full-access",
       accessState: "read-write",
       metadata: { title: "Parity", pinned: false, archived: false },
       messages: [{ kind: "user", messageId: "message-1", content: "run" }, { kind: "assistant", messageId: "message-2", content: "done" }],

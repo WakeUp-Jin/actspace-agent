@@ -19,7 +19,7 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
   let liveSeq = 0; let runtimeInstanceId = "booting"; let throughJournalSeq = -1;
   let activeSessionId: string | undefined;
   let activeAbort: (() => boolean) | undefined;
-  const booted = await bootCliV2({ kind: "cli-run", workspace, dataRoot, persistentArtifacts: persistent, permissionMode: options.permissionMode, mock: options.mock, model: options.model, headlessInput: input, headlessSessionId: options.resume, env: io.env, onHeadlessSession: (sessionId, abort) => { activeSessionId = sessionId; activeAbort = abort; io.onControl?.({ sessionId, agentRunId: sessionId, abort }); }, onLiveEvent: (event) => io.onLiveEvent?.({ ...event, schemaVersion: 1, runtimeInstanceId, liveSeq: liveSeq++, throughJournalSeq }) });
+  const booted = await bootCliV2({ kind: "cli-run", workspace, dataRoot, persistentArtifacts: persistent, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, mock: options.mock, model: options.model, headlessInput: input, headlessSessionId: options.resume, env: io.env, onHeadlessSession: (sessionId, abort) => { activeSessionId = sessionId; activeAbort = abort; io.onControl?.({ sessionId, agentRunId: sessionId, abort }); }, onLiveEvent: (event) => io.onLiveEvent?.({ ...event, schemaVersion: 1, runtimeInstanceId, liveSeq: liveSeq++, throughJournalSeq }) });
   runtimeInstanceId = booted.profile.getState().runtimeInstanceId;
   try {
     if (io.isInterrupted?.()) activeAbort?.();
@@ -28,7 +28,7 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
       if (runner === undefined) throw new Error("Headless runner is not enabled for the selected Profile.");
       const result = await runner.run(); activeSessionId = result.sessionId; throughJournalSeq = result.snapshot.throughJournalSeq;
       const approval = booted.approval.approvalRequired;
-      const output = projectCliArtifactResult(result, { permissionMode: options.permissionMode, workspace, startedAt, endedAt: (io.now?.() ?? new Date()).toISOString(), persistent, interrupted: io.isInterrupted?.() ?? false, approvalName: approval?.name });
+      const output = projectCliArtifactResult(result, { workspace, startedAt, endedAt: (io.now?.() ?? new Date()).toISOString(), persistent, interrupted: io.isInterrupted?.() ?? false, approvalName: approval?.toolName });
       if (options.out) {
         const sessions = booted.profile.context.get?.("session.runtime") as { inspectEvents: (sessionId: string) => Promise<readonly unknown[]> } | undefined;
         if (sessions === undefined) throw new Error("Session service is not available for the selected Profile.");
@@ -48,7 +48,6 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
 }
 
 export function projectCliArtifactResult(result: RuntimeV2RunTurnResponse, context: {
-  readonly permissionMode: RuntimeV2RunCommandOptions["permissionMode"];
   readonly workspace: string;
   readonly startedAt: string;
   readonly endedAt: string;
@@ -72,7 +71,7 @@ export function projectCliArtifactResult(result: RuntimeV2RunTurnResponse, conte
     totalUsage: result.snapshot.usage,
     messageCount: result.snapshot.messages.length,
     eventCount: result.snapshot.throughJournalSeq + 1,
-    permissionMode: context.permissionMode,
+    permissionMode: result.snapshot.permissionMode,
     workspace: context.workspace,
     startedAt: context.startedAt,
     endedAt: context.endedAt,

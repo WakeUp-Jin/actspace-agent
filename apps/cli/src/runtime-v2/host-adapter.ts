@@ -11,7 +11,7 @@ import type { RuntimeV2PermissionMode } from "./types";
 let testCordis: BootRuntimeOptions["cordis"] | undefined;
 export function setCliV2CordisForTest(value?: BootRuntimeOptions["cordis"]): void { testCordis = value; }
 
-export async function bootCliV2(options: { readonly kind: "cli-run"; readonly workspace: string; readonly dataRoot: string; readonly persistentArtifacts?: boolean; readonly permissionMode: RuntimeV2PermissionMode; readonly mock: boolean; readonly model?: string; readonly input?: TerminalLineInput; readonly headlessInput?: string; readonly headlessSessionId?: string; readonly writeApproval?: (text: string) => void; readonly env?: NodeJS.ProcessEnv; readonly onLiveEvent?: (event: Omit<RuntimeV2LiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">) => void; readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void }) {
+export async function bootCliV2(options: { readonly kind: "cli-run"; readonly workspace: string; readonly dataRoot: string; readonly persistentArtifacts?: boolean; readonly permissionMode: RuntimeV2PermissionMode; readonly permissionModeExplicit?: boolean; readonly mock: boolean; readonly model?: string; readonly input?: TerminalLineInput; readonly headlessInput?: string; readonly headlessSessionId?: string; readonly writeApproval?: (text: string) => void; readonly env?: NodeJS.ProcessEnv; readonly onLiveEvent?: (event: Omit<RuntimeV2LiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">) => void; readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void }) {
   const runtime = await loadRuntimeV2(); const provider = resolveCliProvider(options.env ?? process.env);
   const host = { hostKind: options.kind, capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const, runtimeContract: "actspace.runtime.v2" as const, invocationId: randomUUID(), workspaceRef: options.workspace };
   // The trusted CLI assembly is now a checked-in cordis.yml tree. External
@@ -24,7 +24,7 @@ export async function bootCliV2(options: { readonly kind: "cli-run"; readonly wo
   const credentials = { resolve: async () => ({ apiKey: provider.apiKey, baseUrl: provider.baseUrl, ...(provider.proxyUrl === undefined ? {} : { proxyUrl: provider.proxyUrl }) }) };
   const disposeResources = onceAsync(async () => { await artifacts.dispose(); });
   try {
-    const approval = new CliV2ApprovalBroker(options.permissionMode, options.input, options.writeApproval);
+    const approval = new CliV2ApprovalBroker(options.input, options.writeApproval);
     const capabilities = host.capabilityCeiling;
     const capabilitySet = Object.freeze({
       ids: Object.freeze([...capabilities]),
@@ -52,7 +52,7 @@ export async function bootCliV2(options: { readonly kind: "cli-run"; readonly wo
     const profile = await runtime.bootProfileRuntime({
       host, dataRoot: options.dataRoot,
       hostServices,
-      toolEnvironment: { workspaceRoot: options.workspace, hostCapabilities: new Set(capabilities), capabilitySet, approvalBroker: approval, createArtifact: (input) => artifacts.create(input), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) },
+      toolEnvironment: { workspaceRoot: options.workspace, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, hostCapabilities: new Set(capabilities), capabilitySet, approvalBroker: approval, createArtifact: (input) => artifacts.create(input), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) },
       composition,
       onLiveEvent: (event) => {
         if (event.kind === "assistant-delta" || event.kind === "reasoning-delta" || event.kind === "run-state") options.onLiveEvent?.({ ...event });

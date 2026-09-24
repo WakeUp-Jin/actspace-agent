@@ -90,6 +90,11 @@ export class AgentLoop {
       const messageId = input.messageId ?? randomUUID();
       const mode = input.mode ?? "agent";
       await this.options.session.append(core("turn/start", { turnId, agentRunId, mode }));
+      const turnEnvironment = this.options.toolEnvironment(this.options.session);
+      const configuredPermissionMode = typeof turnEnvironment.permissionMode === "function" ? turnEnvironment.permissionMode() : turnEnvironment.permissionMode ?? "default";
+      if (turnEnvironment.permissionModeExplicit && currentPermissionMode(this.options.session.journal.events) !== configuredPermissionMode) {
+        await this.options.session.append(core("permission/mode-set", { mode: configuredPermissionMode, changedAt: new Date().toISOString(), source: "host" }));
+      }
       if (!hasUserMessage(this.options.session, messageId)) await this.options.session.append(core("user/message", { messageId, agentRunId, turnId }, { surface: { kind: "append", node: { kind: "user", messageId, content: input.content } } }));
       while (stepCount < this.options.descriptor.maxSteps) {
         if (controller.signal.aborted) throw new AgentRuntimeError("TURN_ABORTED", "Turn was aborted.");
@@ -319,6 +324,7 @@ export class AgentLoop {
       }, notifyAgent: async (content) => { await this.options.inbox.enqueue(content, "next-step", undefined, "task_notification"); }, journal: {
       recordDispatch: async (fact) => { await this.options.session.append(core("tool-workflow/run-start", fact)); },
       checkpointBeforeBody: async () => { await this.checkpoint("before-tool-body"); },
+      recordPermission: async (type, data) => { await this.options.session.append(core(type, data as RuntimeV2JsonValue)); },
       commitResult: async (result) => {
         const data = { callId: result.callId, pluginId: result.pluginId, name: result.name, status: result.status, summary: result.summary, modelOutput: result.modelOutput, detail: result.detail, artifacts: result.artifacts, failure: result.failure ?? null, renderer: result.renderer ?? null } as unknown as RuntimeV2JsonValue;
         const surface = { surface: { kind: "append", node: { kind: "tool-result", messageId: `tool-${result.callId}`, callId: result.callId, content: result.modelOutput as unknown as RuntimeV2JsonValue, isError: result.status !== "completed" } } };
@@ -327,7 +333,7 @@ export class AgentLoop {
         await this.notify("tools/result", data);
       },
     } };
-    const inputs: ToolCallInput[] = resolvedCalls.map(({ call, definition }) => ({ callId: call.callId, name: definition.name, arguments: parseArgs(call.arguments), sessionId: this.options.session.header.sessionId, ...ids, signal }));
+    const inputs: ToolCallInput[] = resolvedCalls.map(({ call, definition }) => ({ callId: call.callId, name: definition.name, arguments: parseArgs(call.arguments), sessionId: this.options.session.header.sessionId, agentId: this.subject.agentId, ...ids, signal }));
     return this.options.tools.executeBatch(inputs, environment);
   }
 }
@@ -416,5 +422,10 @@ function compactionUsage(value: RuntimeV2JsonValue): { inputTokens: number; outp
 function hasUserMessage(session: SessionHandle, messageId: string): boolean {
   if (session.journal.events.some((event) => event.type === "user/message" && isRecord(event.data) && event.data.messageId === messageId)) return true;
   return session.journal.surface.entries.some((entry) => entry.node.kind === "user" && entry.node.messageId === messageId);
+}
+function currentPermissionMode(events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]): "default" | "full-access" {
+  let mode: "default" | "full-access" = "default";
+  for (const event of events) if (event.type === "permission/mode-set" && isRecord(event.data) && (event.data.mode === "default" || event.data.mode === "full-access")) mode = event.data.mode;
+  return mode;
 }
 function core(type: string, data: RuntimeV2JsonValue, extra: Record<string, unknown> = {}) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null, ...extra } as never; }

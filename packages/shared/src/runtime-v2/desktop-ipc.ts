@@ -149,13 +149,17 @@ export type RuntimeV2ApprovalRequest = {
   readonly agentRunId: string;
   readonly toolName: string;
   readonly summary: string;
-  readonly reason: string;
+  readonly reasons: readonly string[];
+  readonly resources: readonly import("./permission").ApprovalResourceSummary[];
+  readonly grantSuggestions: readonly import("./permission").GrantSuggestion[];
+  readonly supportedLifetimes: readonly import("./permission").GrantLifetime[];
   readonly risk: "low" | "medium" | "high";
-  readonly argumentSummary: Readonly<Record<string, unknown>>;
   readonly createdAt: number;
   readonly expiresAt?: number;
 };
-export type RuntimeV2ApprovalDecisionInput = { readonly requestId: string; readonly decision: "allow" | "deny" };
+export type RuntimeV2ApprovalDecisionInput =
+  | { readonly requestId: string; readonly decision: "once" | "deny" }
+  | { readonly requestId: string; readonly decision: "session"; readonly suggestionId: string };
 export type RuntimeV2ApprovalDecisionResult = { readonly ok: true } | { readonly ok: false; readonly reason: string };
 
 export type RuntimeV2DesktopLiveEnvelope = {

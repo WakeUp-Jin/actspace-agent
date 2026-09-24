@@ -1,6 +1,8 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolFailure } from "./errors.js";
 import type { NormalizedToolDefinition } from "./definition.js";
+import type { ToolResource } from "./permission/types.js";
+import type { PermissionMode } from "@actspace/shared/runtime-v2";
 
 export type ToolArtifactRef = {
   readonly artifactId: string;
@@ -65,6 +67,8 @@ export type ToolExecutionContext = {
   readonly callId: string;
   readonly sessionId: string;
   readonly workspaceRoot: string;
+  readonly permissionMode?: PermissionMode;
+  readonly admittedResources?: readonly ToolResource[];
   readonly agentRunId: string;
   readonly turnId: string;
   readonly stepId: string;

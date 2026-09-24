@@ -4,7 +4,7 @@ import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-
 import { SessionHandle } from "@actspace/session-persistence";
 import { RequestAssembler } from "@actspace/prompt";
 import { LlmRouteRegistry, LlmService, EMPTY_LLM_USAGE, type LlmStreamEvent } from "@actspace/llm-service";
-import { ToolRuntime, type ToolBodyResult, type ToolPolicy } from "@actspace/tools-runtime";
+import { ToolRuntime, type ToolBodyResult, type ToolPermissionContract } from "@actspace/tools-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
 
@@ -24,7 +24,7 @@ export async function runToolStreamFixture(options: {
   agentRunId?: string;
   onLiveEvent?: (event: AgentLoopLiveEvent) => void;
   execute?: () => Promise<ToolBodyResult>;
-  policies?: readonly ToolPolicy[];
+  permission?: ToolPermissionContract;
   beforeFinalText?: () => Promise<void>;
   context?: CordisContext;
 } = {}) {
@@ -37,7 +37,7 @@ export async function runToolStreamFixture(options: {
   tools.register({ definition: { abiVersion: 2, pluginId: "test.tools", name: "read_file", definitionVersion: 1,
     description: "Read fixture", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false },
     effects: [], concurrency: "read-only", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
-    policies: options.policies,
+    permission: options.permission,
     executor: { concurrencySafe: true, execute: options.execute ?? (async () => ({ status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture content" }] })) } });
   let requests = 0;
   const args = options.args ?? '{"path":"fixture.txt"}';

@@ -729,7 +729,9 @@ export type MessageBlock = {
       displayText: string;
       resultPreview?: string[];
       createdAt: string;
-      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
+      status?: "pending" | "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
+      approvalRequestId?: string;
+      reason?: string;
     }
   | {
       kind: "search";
@@ -751,7 +753,9 @@ export type MessageBlock = {
       displayText: string;
       resultPreview?: string[];
       createdAt: string;
-      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
+      status?: "pending" | "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
+      approvalRequestId?: string;
+      reason?: string;
     }
   | {
       kind: "glob";
@@ -762,7 +766,9 @@ export type MessageBlock = {
       displayText: string;
       resultPreview?: string[];
       createdAt: string;
-      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
+      status?: "pending" | "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
+      approvalRequestId?: string;
+      reason?: string;
     }
   | {
       kind: "web_search";

@@ -33,7 +33,7 @@ describe("AgentLoop tool live events", () => {
   });
 
   it("finishes denied calls without executing them", async () => {
-    const { events } = await runToolStreamFixture({ policies: [{ id: "deny", layer: 0, order: 0, evaluate: () => ({ kind: "deny", reason: "Fixture policy denied", code: "POLICY_DENIED" }) }], execute: async () => { throw new Error("must not execute"); } });
+    const { events } = await runToolStreamFixture({ permission: { extractResources: () => [], evaluate: () => ({ kind: "deny", reason: "Fixture policy denied", code: "POLICY_DENIED" }) }, execute: async () => { throw new Error("must not execute"); } });
     expect(events.some((e) => e.kind === "tool-started")).toBe(false);
     expect(events.find((e) => e.kind === "tool-finished")).toMatchObject({ result: { status: "denied" } });
   });

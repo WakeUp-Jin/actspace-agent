@@ -1,9 +1,11 @@
-import { resolve } from "node:path";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { dirname, resolve } from "node:path";
+import { homedir } from "node:os";
+import { createHash } from "node:crypto";
+import type { GrantAudience, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutor, ToolExecutionContext } from "@actspace/tools-runtime";
 import type { ToolDefinition } from "@actspace/tools-runtime";
 import type { ToolRuntime } from "@actspace/tools-runtime";
-import type { ToolPolicy } from "@actspace/tools-runtime";
+import { isPathWithin, type ToolGrantSuggestion, type ToolPermissionContract, type ToolResource } from "@actspace/tools-runtime";
 import { CORE_TOOLS_MANIFEST, CORE_TOOLS_PLUGIN_ID } from "./manifest.js";
 import { getBashHardRejectReason } from "./bash/command-rules.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
@@ -45,38 +47,59 @@ export function registerCoreTools(runtime: ToolRuntime, ports: CoreToolPorts): r
     const handle = runtime.register({
       definition: definition.definition,
       executor: executor(handler),
-      policies: approvalPolicies(definition.localName, definition.definition),
-      resolveResourcePaths: (args) => typeof args.path === "string" ? [args.path] : definition.localName === "bash" && typeof args.cwd === "string" ? [args.cwd] : [],
+      permission: permissionContract(definition.localName),
     });
     return Object.freeze({ name: definition.definition.name, localName: definition.localName, handle });
   }));
 }
 
-function approvalPolicies(name: CoreToolName, definition: ToolDefinition): readonly ToolPolicy[] {
-  if (name !== "bash") return [];
-  const policies: ToolPolicy[] = [];
-  if (name === "bash") policies.push(Object.freeze({
-    id: `${CORE_TOOLS_PLUGIN_ID}.hard-reject.bash`,
-    layer: 0,
-    order: 0,
-    evaluate: ({ args, workspaceRoot }) => {
-      const command = typeof args.command === "string" ? args.command : "";
-      const cwd = resolveWorkspaceCwd(workspaceRoot, args.cwd);
-      const reason = getBashHardRejectReason(command, cwd, workspaceRoot);
-      return reason === undefined ? { kind: "continue" as const } : { kind: "deny" as const, code: "BASH_COMMAND_DENIED", reason };
+function permissionContract(name: CoreToolName): ToolPermissionContract {
+  const fileAccess: "read" | "write" | undefined = name === "write_file" || name === "edit_file" ? "write" : name === "read_file" || name === "grep" || name === "glob" ? "read" : undefined;
+  const contract: ToolPermissionContract = {
+    ...(fileAccess === undefined ? {} : { grantAudience: CORE_FILE_GRANT_AUDIENCE }),
+    extractResources: async (args, context): Promise<readonly ToolResource[]> => {
+      if (typeof args.path === "string") {
+        const access = name === "delete_file" ? "delete" : name === "write_file" || name === "edit_file" ? "write" : "read";
+        return [await context.canonicalizeFile(args.path, access)];
+      }
+      if (name === "bash") {
+        const command = typeof args.command === "string" ? args.command : "";
+        return [{ kind: "process", access: "execute", commandDigest: createHash("sha256").update(command).digest("hex"), cwd: resolveWorkspaceCwd(context.workspaceRoot, args.cwd), dynamic: false }];
+      }
+      return [];
     },
-  }));
-  policies.push(Object.freeze({
-    id: `${CORE_TOOLS_PLUGIN_ID}.approval.${name}`,
-    layer: 100,
-    order: 0,
-    evaluate: () => ({
-      kind: "require-approval" as const,
-      reason: `Allow ${name} to ${definition.effects.some((effect) => effect.mode === "execute") ? "run a process" : "change workspace files"}?`,
-      risk: "high" as const,
+    evaluate: (args, _resources, context) => {
+      if (name === "bash") {
+      const command = typeof args.command === "string" ? args.command : "";
+        const cwd = resolveWorkspaceCwd(context.workspaceRoot, args.cwd);
+        const reason = getBashHardRejectReason(command, cwd, context.workspaceRoot);
+        if (reason !== undefined) return { kind: "deny" as const, code: "BASH_COMMAND_DENIED", reason };
+        return { kind: "ask" as const, reason: "Allow Bash to run this command once?", risk: "high" as const };
+      }
+      if (name === "delete_file") return { kind: "ask" as const, reason: "Allow this file to be deleted once?", risk: "high" as const };
+      return { kind: "allow" as const };
+    },
+    ...(fileAccess === undefined ? {} : {
+      suggestGrants: (_args, resources, context) => {
+        if (resources.length !== 1 || resources[0]?.kind !== "file" || resources[0].access !== fileAccess) return [];
+        const resource = resources[0];
+        const action = fileAccess === "read" ? "file.read" as const : "file.write" as const;
+        const suggestions: ToolGrantSuggestion[] = [{ action, access: fileAccess, selector: { kind: "exact", canonicalPath: resource.canonicalPath }, label: "This file only" }];
+        const parent = resource.targetKind === "directory" ? resource.canonicalPath : dirname(resource.canonicalPath);
+        if (isSafeSubtreeCandidate(parent, context.workspaceRoot)) suggestions.push({ action, access: fileAccess, selector: { kind: "subtree" as const, canonicalRoot: parent }, label: "This directory tree" });
+        return suggestions;
+      },
     }),
-  }));
-  return policies;
+  };
+  return Object.freeze(contract);
+}
+
+const CORE_FILE_GRANT_AUDIENCE: GrantAudience = Object.freeze({ pluginId: CORE_TOOLS_PLUGIN_ID, permissionDomain: "core-files", policyVersion: 1 });
+
+function isSafeSubtreeCandidate(path: string, workspaceRoot: string): boolean {
+  const normalized = resolve(path);
+  const home = resolve(homedir());
+  return normalized !== "/" && normalized !== home && normalized !== resolve(home, "Documents") && normalized !== resolve(home, "Desktop") && !isPathWithin(normalized, workspaceRoot);
 }
 
 function resolveWorkspaceCwd(workspaceRoot: string, value: RuntimeV2JsonValue | undefined): string {

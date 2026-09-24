@@ -415,10 +415,9 @@ export type AbortAgentRunInput = {
   agentRunId: string;
 };
 
-export type ApprovalDecideInput = {
-  requestId: string;
-  decision: "approve_once" | "deny" | "allow_similar";
-};
+export type ApprovalDecideInput =
+  | { requestId: string; decision: "once" | "deny" }
+  | { requestId: string; decision: "session"; suggestionId: string };
 
 export type ApprovalDecideResult = {
   ok: boolean;
@@ -438,6 +437,8 @@ export type PendingApprovalInfo = {
   command?: string;
   createdAt: number;
   expiresAt: number;
+  grantSuggestions?: readonly import("./runtime-v2/permission").GrantSuggestion[];
+  supportedLifetimes?: readonly import("./runtime-v2/permission").GrantLifetime[];
 };
 
 export type SessionListItem = {
@@ -878,6 +879,20 @@ export type SessionWorkspaceResult = {
   ok: boolean;
   error?: string;
 };
+
+export type SessionPermissionModeInput = {
+  sessionId: string;
+  mode: import("./runtime-v2/permission").PermissionMode;
+};
+
+export type SessionPermissionModeResult = {
+  ok: boolean;
+  mode?: import("./runtime-v2/permission").PermissionMode;
+  error?: string;
+};
+
+export type SessionGrantRevokeInput = { sessionId: string; grantId: string };
+export type SessionGrantRevokeResult = { ok: boolean; error?: string };
 
 export type SessionArchiveInput = {
   sessionId: string;

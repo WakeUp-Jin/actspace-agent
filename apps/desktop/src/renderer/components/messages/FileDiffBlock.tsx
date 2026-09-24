@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
+import type { GrantSuggestion } from "@actspace/shared/runtime-v2";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_CLASS,
@@ -14,7 +15,7 @@ type FileDiffMessage =
   | Extract<MessageBlock, { kind: "edit_diff" }>
   | Extract<MessageBlock, { kind: "write_diff" }>;
 
-type FileDiffDecision = "approve_once" | "deny";
+type FileDiffDecision = "once" | "session" | "deny";
 
 const DIFF_APPROVAL_CLASS =
   "message-row file-diff-approval w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface";
@@ -37,13 +38,13 @@ const DIFF_ACTION_PRIMARY_CLASS =
 const DIFF_ERROR_DETAIL_CLASS =
   "file-diff-error-detail mx-[var(--conversation-text-inset)] mt-1 rounded-act-sm bg-surface-subtle px-[9px] py-[7px] font-mono text-xs leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
 
-async function submitFileDiffApproval(requestId: string, decision: FileDiffDecision): Promise<boolean> {
+async function submitFileDiffApproval(requestId: string, decision: FileDiffDecision, suggestionId?: string): Promise<boolean> {
   if (typeof window === "undefined" || !window.actspace?.submitApproval) {
     console.warn("submitApproval bridge unavailable");
     return false;
   }
   try {
-    const result = await window.actspace.submitApproval({ requestId, decision });
+    const result = await window.actspace.submitApproval(decision === "session" && suggestionId ? { requestId, decision, suggestionId } : { requestId, decision: decision === "session" ? "deny" : decision });
     if (!result.ok) {
       console.warn("File write approval was not accepted", result.reason);
       return false;
@@ -84,14 +85,25 @@ function FileDiffApprovalCard({
 }) {
   const [submitting, setSubmitting] = useState<FileDiffDecision | null>(null);
   const [resolvedDecision, setResolvedDecision] = useState<FileDiffDecision | null>(null);
+  const [grantSuggestions, setGrantSuggestions] = useState<readonly GrantSuggestion[]>([]);
+  const [scopeOpen, setScopeOpen] = useState(false);
 
   const requestId = message.approvalRequestId;
   const disabled = !requestId || submitting !== null;
 
-  const decide = async (decision: FileDiffDecision) => {
+  useEffect(() => {
+    let active = true;
+    if (!requestId || !window.actspace?.listPendingApprovals) return;
+    void window.actspace.listPendingApprovals().then((pending) => {
+      if (active) setGrantSuggestions(pending.find((request) => request.requestId === requestId)?.grantSuggestions ?? []);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [requestId]);
+
+  const decide = async (decision: FileDiffDecision, suggestionId?: string) => {
     if (!requestId || submitting !== null) return;
     setSubmitting(decision);
-    const submitted = await submitFileDiffApproval(requestId, decision);
+    const submitted = await submitFileDiffApproval(requestId, decision, suggestionId);
     if (submitted) {
       setResolvedDecision(decision);
     } else {
@@ -127,6 +139,12 @@ function FileDiffApprovalCard({
         </div>
       ) : null}
 
+      {grantSuggestions.length > 0 ? <div className="px-[var(--conversation-card-padding)] pt-2 text-xs text-text-muted">
+        {grantSuggestions.filter((suggestion) => suggestion.selector.kind === "exact").map((suggestion) => <button className="mr-1.5 rounded-act-sm border border-line bg-surface-subtle px-2 py-1 text-text-main hover:bg-surface-hover" type="button" disabled={disabled} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话允许此文件</button>)}
+        {grantSuggestions.some((suggestion) => suggestion.selector.kind === "subtree") ? <button className="rounded-act-sm px-2 py-1 text-text-muted hover:bg-surface-subtle" type="button" aria-expanded={scopeOpen} onClick={() => setScopeOpen((value) => !value)}>选择目录范围</button> : null}
+        {scopeOpen ? grantSuggestions.filter((suggestion) => suggestion.selector.kind === "subtree").map((suggestion) => <button className="mt-2 block max-w-full rounded-act-sm border border-line bg-surface-subtle px-2 py-1 text-left text-text-main hover:bg-surface-hover" type="button" disabled={disabled} key={suggestion.suggestionId} title={suggestion.selector.kind === "subtree" ? suggestion.selector.canonicalRoot : undefined} onClick={() => void decide("session", suggestion.suggestionId)}>本会话允许此目录树</button>) : null}
+      </div> : null}
+
       <footer className={DIFF_APPROVAL_FOOTER_CLASS}>
         <button
           className={`${DIFF_ACTION_CLASS} ${DIFF_ACTION_GHOST_CLASS}`}
@@ -140,9 +158,9 @@ function FileDiffApprovalCard({
           className={`${DIFF_ACTION_CLASS} ${DIFF_ACTION_PRIMARY_CLASS}`}
           type="button"
           disabled={disabled}
-          onClick={() => decide("approve_once")}
+          onClick={() => decide("once")}
         >
-          {submitting === "approve_once" ? "Allowing..." : "Allow"}
+          {submitting === "once" ? "Allowing..." : "Allow"}
         </button>
       </footer>
     </article>

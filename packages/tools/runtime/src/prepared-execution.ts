@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { ApprovalReason, ApprovalResourceSummary, GrantAudience, GrantSuggestion, PermissionMode, RuntimeV2JsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
 import type { ToolActivationLease } from "./activation-lease.js";
 import { materializeToolArguments } from "./argument-validator.js";
 import type { ApprovalBroker, ApprovalRequest } from "@actspace/tools-approval";
@@ -8,18 +8,20 @@ import type { ToolArtifactOwner, ToolArtifactRef, ToolBodyResult, ToolCapability
 import { enforceCoreToolGuards } from "./core-guards.js";
 import { ToolRuntimeError, type ToolFailure } from "./errors.js";
 import type { OrderedCommitSlot } from "./ordered-commit.js";
-import { evaluateToolPolicies, sortToolContributions } from "./policy.js";
+import { sortToolContributions } from "./contributions.js";
 import { redactToolText, redactToolValue } from "./redaction.js";
 import type { CapturedToolRegistration } from "./registry.js";
 import type { ToolExecutionResult } from "./result.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { waterfallDispatch } from "@actspace/cordis-adapter";
+import { canonicalizeFileResource, combinePermissionDecisions, evaluateGlobalBoundary, isPathWithin, sessionGrantsCoverResources, type OnceApproval, type ToolGrantSuggestion, type ToolPermissionDecision, type ToolResource } from "./permission/index.js";
 
 export type ToolCallInput = {
   readonly callId: string;
   readonly name: string;
   readonly arguments: unknown;
   readonly sessionId: string;
+  readonly agentId?: string;
   readonly agentRunId: string;
   readonly turnId: string;
   readonly stepId: string;
@@ -39,15 +41,21 @@ export interface ToolJournalPort {
   recordDispatch(fact: ToolDispatchFact): Promise<void>;
   checkpointBeforeBody(): Promise<void>;
   commitResult(result: ToolExecutionResult): Promise<void>;
+  recordPermission?(type: "permission/asked" | "permission/decided" | "permission/scope-denied" | "permission/grant-added" | "permission/grant-revoked", data: Readonly<Record<string, RuntimeV2JsonValue>>): Promise<void>;
 }
 
 export type ToolPreparedEnvironment = {
   readonly resolveArtifact?: import("./executor.js").SessionArtifactResolver;
   readonly workspaceRoot: string;
+  readonly permissionMode?: PermissionMode | (() => PermissionMode);
+  readonly permissionModeExplicit?: boolean;
   readonly hostCapabilities: ReadonlySet<string>;
   readonly capabilitySet: ToolCapabilitySet;
   readonly approvalBroker?: ApprovalBroker;
   readonly approvalTimeoutMs?: number;
+  readonly sessionGrants?: readonly SessionGrant[] | (() => readonly SessionGrant[]);
+  readonly sessionGrantCapability?: boolean;
+  readonly trustedGrantAudiences?: ReadonlySet<string>;
   readonly journal: ToolJournalPort;
   readonly onExecutionStarted?: (call: { readonly callId: string; readonly name: string }) => void;
   readonly reportProgress?: (update: ToolProgressUpdate & {
@@ -92,6 +100,9 @@ export class PreparedToolExecution {
   #committed = false;
   #released = false;
   #forceOutcomeUnknown = false;
+  #resources: readonly ToolResource[] = [];
+  #onceApproval: OnceApproval | undefined;
+  #admittedBySessionGrant = false;
 
   constructor(
     private readonly registration: CapturedToolRegistration,
@@ -128,28 +139,37 @@ export class PreparedToolExecution {
       }
       const middlewareContext = this.#middlewareContext();
       for (const middleware of sortToolContributions(this.registration.middleware)) await middleware.before?.(middlewareContext);
-      const policy = await evaluateToolPolicies(this.registration.policies, {
-        definition: this.registration.definition,
-        callId: this.callId,
-        args: this.#args,
-        hostCapabilities: [...this.environment.hostCapabilities].sort(),
-        workspaceRoot: this.environment.workspaceRoot,
-      });
-      if (policy.kind === "deny") return this.#rememberTerminal(this.#failureResult("denied", { code: policy.code || "POLICY_DENIED", message: policy.reason, retryable: false, phase: "policy" }));
-      if (policy.kind === "require-approval") {
-        const approval = await this.#requestApproval(policy.reason, policy.risk);
-        if (approval !== "allow") return this.#rememberTerminal(this.#failureResult("denied", approval));
-      }
       enforceCoreToolGuards({
         definition: this.registration.definition,
         args: this.#args,
         hostCapabilities: this.environment.hostCapabilities,
-        workspaceRoot: this.environment.workspaceRoot,
-        resourcePaths: this.registration.resolveResourcePaths(this.#args),
         lease: this.#lease,
         signal: this.#controller.signal,
         executorConcurrencySafe: this.registration.executor.concurrencySafe === true,
       });
+      const mode = this.#permissionMode();
+      this.#resources = Object.freeze(await this.registration.permission.extractResources(this.#args, {
+        workspaceRoot: this.environment.workspaceRoot,
+        canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot),
+      }));
+      const global = evaluateGlobalBoundary(mode, this.environment.workspaceRoot, this.#resources);
+      const tool = await this.registration.permission.evaluate(this.#args, this.#resources, {
+        mode,
+        workspaceRoot: this.environment.workspaceRoot,
+        hostCapabilities: [...this.environment.hostCapabilities].sort(),
+      });
+      const globalWithGrant = this.#resolveGlobalGrant(global, tool);
+      const permission = combinePermissionDecisions(globalWithGrant, tool);
+      if (permission.kind === "deny") {
+        await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: permission.code, reason: permission.reason });
+        return this.#rememberTerminal(this.#failureResult("denied", { code: permission.code || "POLICY_DENIED", message: permission.reason, retryable: false, phase: "policy" }));
+      }
+      if (permission.kind === "ask") {
+        const approval = await this.#requestApproval(permission.reasons.map(({ code, message, risk, reusable }) => ({ code, message, risk, reusable })));
+        if (!isOnceApproval(approval)) return this.#rememberTerminal(this.#failureResult("denied", approval));
+        this.#onceApproval = approval;
+      }
+      await this.#recheck(mode);
       await this.environment.journal.recordDispatch({ callId: this.callId, pluginId: this.pluginId, name: this.name, registrationId: this.registrationId, definitionVersion: this.definitionVersion, definitionDigest: this.definitionDigest });
       try {
         await this.environment.journal.checkpointBeforeBody();
@@ -174,6 +194,8 @@ export class PreparedToolExecution {
       callId: this.callId,
       sessionId: this.input.sessionId,
       workspaceRoot: this.environment.workspaceRoot,
+      permissionMode: this.#permissionMode(),
+      admittedResources: this.#resources,
       agentRunId: this.input.agentRunId,
       turnId: this.input.turnId,
       stepId: this.input.stepId,
@@ -268,31 +290,128 @@ export class PreparedToolExecution {
     await this.#releaseAfterUse();
   }
 
-  async #requestApproval(reason: string, risk: "low" | "medium" | "high"): Promise<"allow" | ToolFailure> {
+  async #requestApproval(reasons: readonly RuntimeApprovalReason[]): Promise<OnceApproval | ToolFailure> {
     if (this.environment.approvalBroker === undefined) {
       return { code: "APPROVAL_REQUIRED", message: "Host approval is required but no ApprovalBroker is available.", retryable: false, phase: "approval" };
     }
+    const requestedAt = new Date();
+    const expiresAt = new Date(requestedAt.getTime() + (this.environment.approvalTimeoutMs ?? 10 * 60_000));
+    const normalizedArgsDigest = createHash("sha256").update(canonicalJson(this.#args)).digest("hex");
+    const grantSuggestions = await this.#grantSuggestions(reasons);
     const request: ApprovalRequest = {
+      schemaVersion: 1,
       requestId: randomUUID(),
       callId: this.callId,
       sessionId: this.input.sessionId,
       agentRunId: this.input.agentRunId,
+      agentId: this.input.agentId ?? `main:${this.input.sessionId}`,
       pluginId: this.pluginId,
-      name: this.name,
+      toolName: this.name,
       definitionDigest: this.definitionDigest,
-      normalizedArgsDigest: createHash("sha256").update(canonicalJson(this.#args)).digest("hex"),
-      requestedEffects: this.registration.definition.effects,
-      reason,
-      risk,
-      argumentSummary: redactToolValue(this.#args ?? {}, this.registration.definition.sensitiveArgumentPaths) as Readonly<Record<string, unknown>>,
+      normalizedArgsDigest,
+      reasons: reasons.map(({ code, message, risk }) => ({ code, message, risk })),
+      resources: this.#resources.map(summarizeResource),
+      grantSuggestions,
+      supportedLifetimes: grantSuggestions.length === 0 ? ["once"] : ["once", "session"],
+      requestedAt: requestedAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
     };
+    await this.#recordPermission("permission/asked", request as unknown as Readonly<Record<string, RuntimeV2JsonValue>>);
     try {
-      const decision = await withTimeout(this.environment.approvalBroker.requestApproval(request, this.#controller.signal), this.environment.approvalTimeoutMs ?? 30_000);
-      if (decision.requestId !== request.requestId) return { code: "APPROVAL_STALE", message: "Approval response does not match this request.", retryable: false, phase: "approval" };
-      return decision.decision === "allow" ? "allow" : { code: "APPROVAL_DENIED", message: decision.reason ?? "Host denied tool execution.", retryable: false, phase: "approval" };
+      const decision = await withTimeout(this.environment.approvalBroker.requestApproval(request, this.#controller.signal), this.environment.approvalTimeoutMs ?? 10 * 60_000);
+      if (decision.requestId !== request.requestId) {
+        await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: "invalid-decision", decidedAt: new Date().toISOString() });
+        return { code: "APPROVAL_STALE", message: "Approval response does not match this request.", retryable: false, phase: "approval" };
+      }
+      if (new Date(decision.decidedAt).getTime() > expiresAt.getTime()) {
+        await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: "timeout", decidedAt: new Date().toISOString() });
+        return { code: "APPROVAL_STALE", message: "Approval response arrived after the request expired.", retryable: false, phase: "approval" };
+      }
+      if (decision.kind === "session") {
+        const suggestion = grantSuggestions.find((candidate) => candidate.suggestionId === decision.suggestionId);
+        if (suggestion === undefined) {
+          await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: "invalid-decision", decidedAt: new Date().toISOString() });
+          return { code: "APPROVAL_INVALID", message: "Approval selected an unknown grant suggestion.", retryable: false, phase: "approval" };
+        }
+        await this.#recordPermission("permission/decided", decision as unknown as Readonly<Record<string, RuntimeV2JsonValue>>);
+        const grant: SessionGrant = {
+          schemaVersion: 1,
+          grantId: randomUUID(),
+          sessionId: request.sessionId,
+          agentId: request.agentId,
+          audience: suggestion.audience,
+          action: suggestion.action,
+          access: suggestion.access,
+          selector: suggestion.selector,
+          sourceRequestId: request.requestId,
+          sourceCallId: request.callId,
+          sourceToolName: request.toolName,
+          issuedAt: decision.decidedAt,
+        };
+        await this.#recordPermission("permission/grant-added", grant as unknown as Readonly<Record<string, RuntimeV2JsonValue>>);
+        this.#admittedBySessionGrant = true;
+      } else {
+        await this.#recordPermission("permission/decided", decision as unknown as Readonly<Record<string, RuntimeV2JsonValue>>);
+      }
+      if (decision.kind !== "once" && decision.kind !== "session") return { code: decision.code === "broker-unavailable" ? "APPROVAL_REQUIRED" : "APPROVAL_DENIED", message: decision.code, retryable: false, phase: "approval" };
+      return { kind: "once", requestId: request.requestId, callId: this.callId, sessionId: this.input.sessionId, agentRunId: this.input.agentRunId, pluginId: this.pluginId, toolName: this.name, definitionDigest: this.definitionDigest, normalizedArgsDigest, issuedAt: decision.decidedAt, expiresAt: request.expiresAt };
     } catch (error) {
+      await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: this.#controller.signal.aborted ? "aborted" : "timeout", decidedAt: new Date().toISOString() });
       return { code: "APPROVAL_TIMEOUT", message: this.#controller.signal.aborted ? "Approval was aborted." : "Approval timed out.", retryable: true, phase: "approval" };
     }
+  }
+
+  async #recheck(expectedMode: PermissionMode): Promise<void> {
+    enforceCoreToolGuards({ definition: this.registration.definition, args: this.#args ?? {}, hostCapabilities: this.environment.hostCapabilities, lease: this.#lease, signal: this.#controller.signal, executorConcurrencySafe: this.registration.executor.concurrencySafe === true });
+    if (this.#permissionMode() !== expectedMode) throw new ToolRuntimeError({ code: "PERMISSION_STATE_CHANGED", message: "Permission mode changed while approval was pending.", retryable: true, phase: "guard" });
+    const resources = Object.freeze(await this.registration.permission.extractResources(this.#args ?? {}, { workspaceRoot: this.environment.workspaceRoot, canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot) }));
+    if (canonicalJson(resources) !== canonicalJson(this.#resources)) throw new ToolRuntimeError({ code: "RESOURCE_SCOPE_CHANGED", message: "Tool resources changed while approval was pending.", retryable: true, phase: "guard" });
+    if (this.#admittedBySessionGrant) {
+      const audience = this.registration.permission.grantAudience;
+      if (!this.#isTrustedGrantAudience(audience) || !sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}`, audience })) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "The selected Session Grant no longer covers this call.", retryable: true, phase: "approval" });
+    }
+    if (this.#onceApproval !== undefined) {
+      if (this.#onceApproval.consumedAt !== undefined || Date.now() > new Date(this.#onceApproval.expiresAt).getTime()) throw new ToolRuntimeError({ code: "APPROVAL_STALE", message: "One-time approval is no longer valid.", retryable: false, phase: "approval" });
+      this.#onceApproval.consumedAt = new Date().toISOString();
+    }
+  }
+
+  #permissionMode(): PermissionMode {
+    const value = this.environment.permissionMode;
+    return typeof value === "function" ? value() : value ?? "default";
+  }
+
+  async #recordPermission(type: "permission/asked" | "permission/decided" | "permission/scope-denied" | "permission/grant-added" | "permission/grant-revoked", data: Readonly<Record<string, RuntimeV2JsonValue>>): Promise<void> {
+    await this.environment.journal.recordPermission?.(type, data);
+  }
+
+  #sessionGrants(): readonly SessionGrant[] {
+    const grants = this.environment.sessionGrants;
+    return typeof grants === "function" ? grants() : grants ?? [];
+  }
+
+  #resolveGlobalGrant(global: ReturnType<typeof evaluateGlobalBoundary>, tool: ToolPermissionDecision): ReturnType<typeof evaluateGlobalBoundary> {
+    if (global.kind !== "ask" || tool.kind !== "allow" || !this.environment.sessionGrantCapability) return global;
+    const audience = this.registration.permission.grantAudience;
+    if (!this.#isTrustedGrantAudience(audience) || global.reasons.some((reason) => !reason.reusable)) return global;
+    if (!sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}`, audience })) return global;
+    this.#admittedBySessionGrant = true;
+    return { kind: "pass" };
+  }
+
+  async #grantSuggestions(reasons: readonly RuntimeApprovalReason[]): Promise<readonly GrantSuggestion[]> {
+    if (!this.environment.sessionGrantCapability || reasons.some((reason) => !reason.reusable)) return [];
+    const audience = this.registration.permission.grantAudience;
+    const suggest = this.registration.permission.suggestGrants;
+    if (!this.#isTrustedGrantAudience(audience) || suggest === undefined) return [];
+    const drafts = await suggest(this.#args ?? {}, this.#resources, { mode: this.#permissionMode(), workspaceRoot: this.environment.workspaceRoot, hostCapabilities: [...this.environment.hostCapabilities].sort() });
+    return Object.freeze(drafts.filter((draft) => validGrantDraft(draft, this.#resources)).map((draft) => Object.freeze({ ...draft, suggestionId: randomUUID(), lifetime: "session" as const, audience })));
+  }
+
+  #isTrustedGrantAudience(audience: GrantAudience | undefined): audience is GrantAudience {
+    return audience !== undefined
+      && audience.pluginId === this.pluginId
+      && this.environment.trustedGrantAudiences?.has(grantAudienceKey(audience)) === true;
   }
 
   #normalizeBody(body: ToolBodyResult, finalizerFailures: readonly ToolFailure[]): ToolExecutionResult {
@@ -391,4 +510,29 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+function summarizeResource(resource: ToolResource): ApprovalResourceSummary {
+  return resource.kind === "file"
+    ? { kind: "file", access: resource.access, path: redactToolText(resource.canonicalPath), targetKind: resource.targetKind }
+    : { kind: "process", access: "execute", commandDigest: resource.commandDigest, cwd: redactToolText(resource.cwd), dynamic: resource.dynamic };
+}
+
+function isOnceApproval(value: OnceApproval | ToolFailure): value is OnceApproval {
+  return "kind" in value && value.kind === "once";
+}
+
+function validGrantDraft(draft: ToolGrantSuggestion, resources: readonly ToolResource[]): boolean {
+  if (draft.action !== "file.read" && draft.action !== "file.write") return false;
+  if (draft.access !== (draft.action === "file.read" ? "read" : "write")) return false;
+  if (resources.length === 0 || resources.some((resource) => resource.kind !== "file" || resource.access !== draft.access)) return false;
+  const selector = draft.selector;
+  if (selector.kind === "exact") return resources.every((resource) => resource.kind === "file" && resource.canonicalPath === selector.canonicalPath);
+  return resources.every((resource) => resource.kind === "file" && isPathWithin(selector.canonicalRoot, resource.canonicalPath));
+}
+
+type RuntimeApprovalReason = ApprovalReason & { readonly reusable: boolean };
+
+function grantAudienceKey(audience: GrantAudience): string {
+  return `${audience.pluginId}\u0000${audience.permissionDomain}\u0000${audience.policyVersion}`;
 }

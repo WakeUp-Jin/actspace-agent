@@ -10,6 +10,7 @@ export interface RunCommandOptions {
   inputFile?: string;
   workspace?: string;
   permissionMode: PermissionMode;
+  permissionModeExplicit?: boolean;
   outputFormat: CliOutputFormat;
   out?: string;
   mock: boolean;

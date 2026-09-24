@@ -232,6 +232,8 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "session:pin": RUNTIME_V2_FIXED_RENDERER_CHANNELS.pinSession,
   "session:rename": RUNTIME_V2_FIXED_RENDERER_CHANNELS.renameSession,
   "session:set-workspace": RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionWorkspace,
+  "session:set-permission-mode": RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionPermissionMode,
+  "session:revoke-grant": RUNTIME_V2_FIXED_RENDERER_CHANNELS.revokeSessionGrant,
   "session:archive": RUNTIME_V2_FIXED_RENDERER_CHANNELS.archiveSession,
   "session:archive-many": RUNTIME_V2_FIXED_RENDERER_CHANNELS.archiveSessions,
   "terminal:create": RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalCreate,
@@ -422,6 +424,10 @@ contextBridge.exposeInMainWorld("actspace", {
     invokeFixedRenderer("session:rename", input) as Promise<SessionRenameResult>,
   setSessionWorkspace: (input: SessionWorkspaceInput) =>
     invokeFixedRenderer("session:set-workspace", input) as Promise<SessionWorkspaceResult>,
+  setSessionPermissionMode: (input: import("@actspace/shared").SessionPermissionModeInput) =>
+    invokeFixedRenderer("session:set-permission-mode", input) as Promise<import("@actspace/shared").SessionPermissionModeResult>,
+  revokeSessionGrant: (input: import("@actspace/shared").SessionGrantRevokeInput) =>
+    invokeFixedRenderer("session:revoke-grant", input) as Promise<import("@actspace/shared").SessionGrantRevokeResult>,
   archiveSession: (input: SessionArchiveInput) =>
     invokeFixedRenderer("session:archive", input) as Promise<SessionArchiveResult>,
   archiveSessions: (input: SessionArchiveManyInput) =>

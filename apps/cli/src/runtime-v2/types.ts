@@ -1,6 +1,6 @@
-import type { RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { PermissionMode, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 
-export type RuntimeV2PermissionMode = "default" | "trusted" | "yolo";
+export type RuntimeV2PermissionMode = PermissionMode;
 
 export type RuntimeV2CliExitCode = 0 | 1 | 2 | 3 | 4 | 130;
 export type RuntimeV2CliOutputFormat = "text" | "json" | "jsonl";
@@ -10,6 +10,7 @@ export type RuntimeV2RunCommandOptions = {
   readonly inputFile?: string;
   readonly workspace?: string;
   readonly permissionMode: RuntimeV2PermissionMode;
+  readonly permissionModeExplicit?: boolean;
   readonly outputFormat: RuntimeV2CliOutputFormat;
   readonly out?: string;
   readonly mock: boolean;

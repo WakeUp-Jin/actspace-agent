@@ -1,14 +1,39 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { mergeRuntimeV2TodoItems, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2UsageSummary } from "@actspace/shared/runtime-v2";
+import { mergeRuntimeV2TodoItems, type FileGrantSelector, type GrantAccess, type GrantAction, type GrantAudience, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
 import { SessionProjectionRegistry } from "./registry.js";
 
-export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox">;
+export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;
 type Data = Readonly<Record<string, RuntimeV2JsonValue>>;
+type GrantState = { readonly grantId: string; readonly grant: SessionGrant | null; readonly revokedAt: string | null };
 type UsageState = { activeStep: string | null; requests: Record<string, string>; selected: Record<string, { assistant: boolean; usage: RuntimeV2UsageSummary }>; total: RuntimeV2UsageSummary };
 const emptyUsage = (): RuntimeV2UsageSummary => ({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null });
 
 /** Domain reducers share one drive and one checkpoint protocol, never a second log. */
 export function registerSessionFacts(registry: SessionProjectionRegistry, redact: (text: string, limit?: number) => string): void {
+  registry.register<PermissionMode>({
+    key: "permissionMode", stateVersion: 1, init: () => "default", view: state => state,
+    apply: (state, event) => event.type === "permission/mode-set" && record(event.data).mode === "full-access" ? "full-access" : event.type === "permission/mode-set" && record(event.data).mode === "default" ? "default" : state,
+  });
+  registry.register<readonly GrantState[]>({
+    key: "sessionGrants", stateVersion: 1, init: () => [],
+    view: state => state.flatMap(item => item.grant !== null && item.revokedAt === null ? [item.grant] : []),
+    apply: (state, event) => {
+      const data = record(event.data);
+      if (event.type === "permission/grant-added") {
+        const grant = grantFromData(data);
+        if (grant === null || state.some(item => item.grantId === grant.grantId)) return state;
+        return [...state, { grantId: grant.grantId, grant, revokedAt: null }];
+      }
+      if (event.type === "permission/grant-revoked") {
+        const grantId = text(data.grantId);
+        if (!grantId) return state;
+        const revokedAt = text(data.revokedAt) ?? event.time;
+        if (!state.some(item => item.grantId === grantId)) return [...state, { grantId, grant: null, revokedAt }];
+        return state.map(item => item.grantId === grantId && item.revokedAt === null ? { ...item, revokedAt } : item);
+      }
+      return state;
+    },
+  });
   registry.register<SessionFacts["metadata"]>({
     key: "metadata", stateVersion: 1, init: () => ({ title: null, pinned: false, archived: false }), view: state => state,
     apply: (state, event) => {
@@ -93,7 +118,41 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
 
 export function sessionFacts(registry: SessionProjectionRegistry, sessionId: string): SessionFacts {
   const values = registry.snapshot(sessionId).values;
-  return { metadata: values.metadata as SessionFacts["metadata"], todos: values.todos as SessionFacts["todos"], delegations: values.delegations as SessionFacts["delegations"], activity: values.sessionStats as SessionFacts["activity"], usage: values.providerUsage as SessionFacts["usage"], pendingInbox: values.pendingInbox as SessionFacts["pendingInbox"] };
+  return { permissionMode: values.permissionMode as PermissionMode, sessionGrants: values.sessionGrants as SessionFacts["sessionGrants"], metadata: values.metadata as SessionFacts["metadata"], todos: values.todos as SessionFacts["todos"], delegations: values.delegations as SessionFacts["delegations"], activity: values.sessionStats as SessionFacts["activity"], usage: values.providerUsage as SessionFacts["usage"], pendingInbox: values.pendingInbox as SessionFacts["pendingInbox"] };
+}
+
+export function projectPermissionMode(events: readonly SessionEventEnvelopeV1[]): PermissionMode {
+  let mode: PermissionMode = "default";
+  for (const event of events) {
+    if (event.type !== "permission/mode-set") continue;
+    const value = record(event.data).mode;
+    if (value === "default" || value === "full-access") mode = value;
+  }
+  return mode;
+}
+
+export function projectSessionGrants(events: readonly SessionEventEnvelopeV1[]): readonly SessionGrant[] {
+  const registry = new SessionProjectionRegistry();
+  registerSessionFacts(registry, value => value);
+  const firstGrant = events.find(event => event.type === "permission/grant-added");
+  const sessionId = text(record(firstGrant?.data).sessionId);
+  if (sessionId === null) return [];
+  registry.sync(sessionId, events);
+  return sessionFacts(registry, sessionId).sessionGrants;
+}
+
+function grantFromData(data: Data): SessionGrant | null {
+  const audience = record(data.audience);
+  const selector = record(data.selector);
+  if (data.schemaVersion !== 1 || !isText(data.grantId) || !isText(data.sessionId) || !isText(data.agentId) || !isText(data.sourceRequestId) || !isText(data.sourceCallId) || !isText(data.sourceToolName) || !isText(data.issuedAt)) return null;
+  if ((data.action !== "file.read" && data.action !== "file.write") || (data.access !== "read" && data.access !== "write")) return null;
+  if ((data.action === "file.read") !== (data.access === "read")) return null;
+  if (!isText(audience.pluginId) || !isText(audience.permissionDomain) || !Number.isSafeInteger(audience.policyVersion)) return null;
+  let parsedSelector: FileGrantSelector;
+  if (selector.kind === "exact" && isText(selector.canonicalPath)) parsedSelector = { kind: "exact", canonicalPath: selector.canonicalPath };
+  else if (selector.kind === "subtree" && isText(selector.canonicalRoot)) parsedSelector = { kind: "subtree", canonicalRoot: selector.canonicalRoot };
+  else return null;
+  return { schemaVersion: 1, grantId: data.grantId, sessionId: data.sessionId, agentId: data.agentId, audience: { pluginId: audience.pluginId, permissionDomain: audience.permissionDomain, policyVersion: audience.policyVersion as number }, action: data.action as GrantAction, access: data.access as GrantAccess, selector: parsedSelector, sourceRequestId: data.sourceRequestId, sourceCallId: data.sourceCallId, sourceToolName: data.sourceToolName, issuedAt: data.issuedAt, ...(isText(data.expiresAt) ? { expiresAt: data.expiresAt } : {}) };
 }
 
 function applyUsage(state: UsageState, event: SessionEventEnvelopeV1): UsageState {
@@ -119,4 +178,5 @@ function applyUsage(state: UsageState, event: SessionEventEnvelopeV1): UsageStat
 
 function record(value: RuntimeV2JsonValue | undefined): Data { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Data : {}; }
 function text(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" && value.length ? value : null; }
+function isText(value: RuntimeV2JsonValue | undefined): value is string { return typeof value === "string" && value.length > 0; }
 function number(value: RuntimeV2JsonValue | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0; }

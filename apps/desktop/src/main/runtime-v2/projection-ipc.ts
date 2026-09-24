@@ -46,8 +46,10 @@ type ApprovalRegistryView = {
     readonly args: Readonly<Record<string, unknown>>;
     readonly createdAt: number;
     readonly expiresAt: number;
+    readonly grantSuggestions?: readonly import("@actspace/shared/runtime-v2").GrantSuggestion[];
+    readonly supportedLifetimes?: readonly import("@actspace/shared/runtime-v2").GrantLifetime[];
   }>;
-  readonly decide: (requestId: string, decision: "approve_once" | "deny") => { readonly ok: true } | { readonly ok: false; readonly reason: string };
+  readonly decide: (requestId: string, decision: "once" | "session" | "deny", suggestionId?: string) => { readonly ok: true } | { readonly ok: false; readonly reason: string };
 };
 
 export function registerRuntimeV2Ipc(options: {
@@ -224,7 +226,7 @@ export function registerRuntimeV2Ipc(options: {
   });
   handle(RUNTIME_V2_DESKTOP_CHANNELS.decideApproval, (_event, input: RuntimeV2ApprovalDecisionInput) => {
     if (options.approvals === undefined) return { ok: false as const, reason: "approval_registry_unavailable" };
-    return options.approvals.decide(input.requestId, input.decision === "allow" ? "approve_once" : "deny");
+    return options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined);
   });
   const unsubscribe = options.registry.subscribe((event) => {
     const window = options.getMainWindow();
@@ -282,9 +284,11 @@ function toApprovalDto(request: ReturnType<ApprovalRegistryView["listPending"]>[
     agentRunId: request.agentRunId ?? "",
     toolName: request.toolName,
     summary: request.summary,
-    reason: request.reason,
+    reasons: request.reason.split("\n").filter(Boolean),
+    resources: Array.isArray(request.args.resources) ? request.args.resources as RuntimeV2ApprovalRequest["resources"] : [],
+    grantSuggestions: request.grantSuggestions ?? [],
+    supportedLifetimes: request.supportedLifetimes ?? (["once"] as const),
     risk: request.riskLevel ?? "medium",
-    argumentSummary: request.args,
     createdAt: request.createdAt,
     expiresAt: request.expiresAt,
   });

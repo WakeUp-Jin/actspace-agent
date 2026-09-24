@@ -154,7 +154,7 @@ function recordKind(node: RuntimeV2TrajectoryNode): TrajectoryRecordKind {
   if (type.startsWith("request/")) return type === "request/context" ? "context" : "request";
   if (type.startsWith("turn/")) return "turn";
   if (type.startsWith("step/")) return "step";
-  if (type.startsWith("approval/")) return "approval";
+  if (type.startsWith("permission/")) return "approval";
   if (type.startsWith("llm/retry") || type.startsWith("retry/")) return "retry";
   if (type.startsWith("compaction/")) return "compaction";
   if (type.includes("error") || type === "error") return "error";
@@ -252,7 +252,7 @@ function eventRecordId(node: RuntimeV2TrajectoryNode, index: number): string {
   const callId = node.callId ?? pick(data, ["callId", "toolCallId"]);
   if (messageId !== null && node.eventType.startsWith("assistant/")) return `${node.sessionId}:record:assistant:${messageId}`;
   if (messageId !== null && node.eventType === "user/message") return `${node.sessionId}:record:user:${messageId}`;
-  if (callId !== null && (node.eventType.startsWith("tool/") || node.eventType.startsWith("approval/"))) return `${node.sessionId}:record:tool:${callId}`;
+  if (callId !== null && (node.eventType.startsWith("tool/") || node.eventType.startsWith("permission/"))) return `${node.sessionId}:record:tool:${callId}`;
   return `${node.sessionId}:record:${node.eventType}:${node.eventSeq}:${index}`;
 }
 
@@ -553,7 +553,7 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[]): {
       }
       continue;
     }
-    if (node.eventType.startsWith("approval/") && node.callId !== null) {
+    if ((node.eventType === "permission/asked" || node.eventType === "permission/decided") && node.callId !== null) {
       const existing = calls.get(node.callId);
       if (existing === undefined) {
         pendingApprovals.set(node.callId, [...(pendingApprovals.get(node.callId) ?? []), node]);

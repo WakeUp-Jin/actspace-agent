@@ -130,6 +130,8 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
         hostCapabilities: new Set(capabilities),
         capabilitySet,
         approvalBroker,
+        sessionGrantCapability: true,
+        trustedGrantAudiences: new Set(["actspace.core-tools\u0000core-files\u00001"]),
         reportProgress: options.onToolProgress,
         createArtifact: (input) => artifacts.create(input),
         resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId),

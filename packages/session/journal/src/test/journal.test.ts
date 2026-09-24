@@ -59,6 +59,51 @@ describe("Session Journal", () => {
     journal.append(candidate("tool/result", { callId: "call-1", name: "read_file", status: "completed" }));
   });
 
+  it("validates permission events strictly and fails closed on a newer required version", () => {
+    const registry = createCoreCodecRegistry();
+    const journal = new SessionJournal({ registry, now: () => "2026-09-23T12:00:00.000Z" });
+    expect(() => journal.append(candidate("permission/mode-set", { mode: "trusted" }))).toThrow("default or full-access");
+    expect(() => journal.append(candidate("permission/decided", { requestId: "request-1", kind: "allow", decidedAt: "2026-09-23T12:00:00.000Z" }))).toThrow("once, session or deny");
+    expect(() => journal.append(candidate("permission/decided", { requestId: "request-1", kind: "session", suggestionId: "suggestion-1", decidedAt: "2026-09-23T12:00:00.000Z" }))).not.toThrow();
+
+    const newer = {
+      recordKind: "event" as const,
+      seq: 0,
+      type: "permission/mode-set",
+      eventVersion: 2,
+      criticality: "required" as const,
+      time: "2026-09-23T12:00:00.000Z",
+      source,
+      data: { mode: "default" },
+      surface: null,
+      provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+    } satisfies SessionEventEnvelopeV1;
+    expect(new SessionJournal({ registry, seed: [newer] }).validation.accessState).toBe("browse-only");
+  });
+
+  it("accepts valid grant facts and rejects unsafe grant shapes", () => {
+    const registry = createCoreCodecRegistry();
+    const journal = new SessionJournal({ registry, now: () => "2026-09-23T12:00:00.000Z" });
+    const grant = {
+      schemaVersion: 1,
+      grantId: "grant-1",
+      sessionId: "session-1",
+      agentId: "main:session-1",
+      audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 },
+      action: "file.read",
+      access: "read",
+      selector: { kind: "exact", canonicalPath: "/workspace/src/file.ts" },
+      sourceRequestId: "request-1",
+      sourceCallId: "call-1",
+      sourceToolName: "read_file",
+      issuedAt: "2026-09-23T12:00:00.000Z",
+    };
+    journal.append(candidate("permission/grant-added", grant));
+    journal.append(candidate("permission/grant-revoked", { schemaVersion: 1, grantId: "grant-1", sessionId: "session-1", agentId: "main:session-1", revokedAt: "2026-09-23T12:01:00.000Z" }));
+    expect(() => journal.append(candidate("permission/grant-added", { ...grant, grantId: "grant-2", access: "write" }))).toThrow("action and access must agree");
+    expect(() => journal.append(candidate("permission/grant-added", { ...grant, grantId: "grant-3", selector: { kind: "glob", pattern: "/workspace/**" } }))).toThrow("selector.kind must be exact or subtree");
+  });
+
   it("applies compaction replacement as an append-only transaction", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-08-29T12:00:00.000Z" });
     journal.append(candidate("user/message", { messageId: "user-1" }, { surface: { kind: "append", node: { kind: "user", messageId: "user-1", content: "one" } } }));

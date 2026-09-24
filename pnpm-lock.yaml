@@ -987,6 +987,9 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.3

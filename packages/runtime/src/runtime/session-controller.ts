@@ -192,8 +192,7 @@ export class RuntimeSessionController {
     await this.#cache.idle();
     const entries = [...this.#open];
     this.#open.clear();
-    this.#ephemeral.clear();
-    await Promise.all(entries.map(async ([, session]) => {
+    await Promise.all(entries.map(async ([sessionId, session]) => {
       let error: unknown;
       try {
         if (session.journal.events.at(-1)?.type !== "session/end-seed") await session.append({ type: "session/end-seed", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { sessionId: session.header.sessionId, lastSeq: session.lastSeq }, surface: null });
@@ -202,9 +201,11 @@ export class RuntimeSessionController {
       } catch (caught) { error = caught; }
       this.#models.delete(session.header.sessionId);
       this.#changes.delete(session.header.sessionId);
+      this.#ephemeral.delete(sessionId);
       await this.options.onDisposed?.(session.header.sessionId, error === undefined ? { ok: true } : { ok: false, error });
       if (error !== undefined) throw error;
     }));
+    this.#ephemeral.clear();
   }
 }
 

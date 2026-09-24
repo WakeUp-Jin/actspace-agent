@@ -37,7 +37,7 @@ flowchart LR
 以下部分按 DSH Agent Loop/Tools 事件模型重写：
 
 - `tools/pre-execute`、`tools/execute`、`tools/post-execute` 的 hook 调度；
-- permission preset、policy evaluation、approval broker 和 fail-closed 决策；
+- Session permission mode、结构化资源评估、approval broker 和 fail-closed 决策；
 - `tool/call`/`tool/result` Journal adapter 与 `tools/result` 通知；
 - live progress、diagnostics、artifact 引用和 Host projection；
 - registration lease、plugin disposal、code-dispatch bridge；
@@ -54,7 +54,7 @@ sequenceDiagram
     participant N as Notification Bus
     A->>J: tool/call
     A->>S: tools/pre-execute
-    S->>S: 参数物化 + policy + approval + guard
+    S->>S: 参数物化 + permission + approval + guard
     S->>S: checkpoint / lease
     S->>K: execute(existing implementation)
     K-->>S: raw result / artifact
@@ -73,9 +73,11 @@ captured registration / lease
 → materialize arguments
 → validate schema
 → tools/pre-execute waterfall
-→ resolve permission preset
-→ evaluate policy (fail closed)
-→ request approval when required
+→ resolve Session permission mode
+→ canonicalize structured resources
+→ combine global and tool permission (fail closed)
+→ request once approval when required
+→ re-check mode, resources, lease and Host ceiling
 → checkpoint before side effect
 → tools/execute waterfall
 → existing executor body
@@ -87,7 +89,7 @@ captured registration / lease
 
 规则：
 
-- policy 只授予当前 `toolCallId` 所需的最小权限；
+- permission admission 只授予当前 prepared invocation 所需的最小权限；
 - approval 超时、拒绝、broker 断开或无法解析都视为 deny；
 - `tools/pre-execute` 不能把一次被拒绝的调用悄悄变成另一工具；改写后必须重新验证并写入 provenance；
 - checkpoint 之后才允许产生不可逆副作用；
@@ -98,8 +100,7 @@ captured registration / lease
 
 核心 Session 只保留 `tool/call` 和 `tool/result`。以下属于扩展事件，可按需落盘：
 
-- `approval/asked`, `approval/decided`, `approval/policy`；
-- `permission/preset`；
+- `permission/asked`, `permission/decided`, `permission/mode-set`, `permission/scope-denied`；
 - `tool-workflow/agent-start`, `tool-workflow/agent-end`, `tool-workflow/run-start`, `tool-workflow/run-end`；
 - `tool/code-dispatch-start`, `tool/code-dispatch`；
 - `command/run`, `command/done`。
@@ -132,7 +133,7 @@ subscribeProgress(scope, listener) -> dispose
 register(definition, executor, metadata) -> lease
 ```
 
-`PreparedToolCall` 包含捕获时的 registration version、policy snapshot、approval state、attempt 和 provenance。lease 失效或 plugin dispose 后不得执行新调用；正在执行的调用等待 cancellation/settlement 后再释放。
+`PreparedToolCall` 包含捕获时的 registration version、permission mode、canonical resources、approval state、attempt 和 provenance。lease 失效或 plugin dispose 后不得执行新调用；正在执行的调用等待 cancellation/settlement 后再释放。
 
 不要求把现有 `PreparedExecution`、`ToolScheduler` 的字段原样公开；只要上述行为和测试可以从新 shell 访问即可。
 

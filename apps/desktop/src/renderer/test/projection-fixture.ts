@@ -2,7 +2,7 @@ import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import type { RuntimeV2DesktopSessionProjection, RuntimeV2JsonValue, RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
 export function projectionFixture(sessionId = "s", throughJournalSeq = -1, events: readonly SessionEventEnvelopeV1[] = []): RuntimeV2DesktopSessionProjection {
-  const snapshot: RuntimeV2SessionSnapshot = { kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", throughJournalSeq, workspaceRoot: "/tmp/workspace", accessState: "read-write", metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
+  const snapshot: RuntimeV2SessionSnapshot = { kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", throughJournalSeq, workspaceRoot: "/tmp/workspace", permissionMode: "default", sessionGrants: [], accessState: "read-write", metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
     activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null } };
   return { kind: "session-projection", schemaVersion: 1, sessionId, throughJournalSeq, snapshot, activeMessageIds: [], deferredToolCalls: [],

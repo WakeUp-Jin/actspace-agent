@@ -2651,7 +2651,7 @@ sessionId: input.sessionId,
         agentRunId: activeAgentRunId,
         toolCallId: "tool-bash-approval",
         requestId: "approval-bash-1",
-        decision: "approve_once",
+        decision: "once",
       });
       streamHandler?.({
         type: "tool_finished",
@@ -2800,7 +2800,7 @@ sessionId: input.sessionId,
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-delete-1",
-      decision: "approve_once",
+      decision: "once",
     });
     expect(await screen.findByText("Delete notes.md")).toBeInTheDocument();
 
@@ -2812,7 +2812,7 @@ sessionId: input.sessionId,
         agentRunId: activeAgentRunId,
         toolCallId: "tool-delete-1",
         requestId: "approval-delete-1",
-        decision: "approve_once",
+        decision: "once",
       });
     });
 
@@ -2936,7 +2936,7 @@ sessionId: input.sessionId,
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-browser-1",
-      decision: "approve_once",
+      decision: "once",
     });
 
     await act(async () => {

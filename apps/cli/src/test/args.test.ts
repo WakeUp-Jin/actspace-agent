@@ -10,7 +10,7 @@ describe("parseCliArgs", () => {
       "--workspace",
       "/tmp/work",
       "--permission-mode",
-      "yolo",
+      "full-access",
       "--json",
       "--data-dir",
       "/tmp/data",
@@ -23,7 +23,8 @@ describe("parseCliArgs", () => {
     expect(parsed.options).toMatchObject({
       input: "hello",
       workspace: "/tmp/work",
-      permissionMode: "yolo",
+      permissionMode: "full-access",
+      permissionModeExplicit: true,
       outputFormat: "json",
       out: "/tmp/out",
       dataDir: "/tmp/data",
@@ -33,6 +34,8 @@ describe("parseCliArgs", () => {
 
   it("rejects invalid permission mode", () => {
     expect(() => parseCliArgs(["run", "--permission-mode", "wild"])).toThrow(/Invalid permission mode/);
+    expect(() => parseCliArgs(["run", "--permission-mode", "trusted"])).toThrow(/Invalid permission mode/);
+    expect(() => parseCliArgs(["run", "--permission-mode", "yolo"])).toThrow(/Invalid permission mode/);
   });
 
   it("keeps JSON and JSONL mutually exclusive", () => {

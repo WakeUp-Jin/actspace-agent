@@ -36,6 +36,26 @@ describe("tool stream presentation preserves behavior", () => {
     }
   });
 
+  it("offers once, exact Session and explicitly revealed subtree choices for pending reads", async () => {
+    const submitApproval = vi.fn(async () => ({ ok: true }));
+    window.actspace = {
+      submitApproval,
+      listPendingApprovals: async () => [{
+        requestId: "approval-read-1", toolName: "read_file", summary: "Read", reason: "Outside workspace", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
+        grantSuggestions: [
+          { suggestionId: "exact-read", lifetime: "session", action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/tmp/shared/a.md" }, audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 }, label: "This file only" },
+          { suggestionId: "tree-read", lifetime: "session", action: "file.read", access: "read", selector: { kind: "subtree", canonicalRoot: "/tmp/shared" }, audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 }, label: "This directory tree" },
+        ],
+      }],
+    } as unknown as Window["actspace"];
+    render(<ToolLogLine message={{ ...base, kind: "read", status: "pending", filePath: "/tmp/shared/a.md", displayText: "Read", approvalRequestId: "approval-read-1", reason: "Outside workspace" }} />);
+    expect(await screen.findByRole("button", { name: "本会话允许此路径" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "本会话允许此目录树" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "选择目录范围" }));
+    await userEvent.click(screen.getByRole("button", { name: "本会话允许此目录树" }));
+    expect(submitApproval).toHaveBeenCalledWith({ requestId: "approval-read-1", decision: "session", suggestionId: "tree-read" });
+  });
+
   it("shows compact Bash commands while retaining old diagnostic titles and output", async () => {
     render(<TooltipProvider><BashRunBlock message={{ ...base, kind: "bash", status: "success", title: "Bash completed in 85ms (exit 0, sandboxed=true).", command: "pwd", stdout: "/work", sandboxed: true, durationMs: 85, exitCode: 0 }} /></TooltipProvider>);
     const toggle = screen.getByRole("button", { name: "Ran pwd" });

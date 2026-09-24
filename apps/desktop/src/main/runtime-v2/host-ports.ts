@@ -20,11 +20,14 @@ export type DesktopRuntimeV2ApprovalRequest = {
   readonly sessionId?: string;
   readonly agentRunId?: string;
   readonly createdAt: number;
+  readonly grantSuggestions?: readonly import("@actspace/shared/runtime-v2").GrantSuggestion[];
+  readonly supportedLifetimes?: readonly import("@actspace/shared/runtime-v2").GrantLifetime[];
 };
 
 export type DesktopRuntimeV2ApprovalDecision = {
   readonly requestId: string;
-  readonly decision: "approve_once" | "deny" | "allow_similar" | "timeout" | "abort";
+  readonly decision: "once" | "session" | "deny" | "timeout" | "abort";
+  readonly suggestionId?: string;
   readonly decidedAt: number;
 };
 
@@ -32,6 +35,7 @@ export interface DesktopRuntimeV2ApprovalPort {
   waitForDecision(request: DesktopRuntimeV2ApprovalRequest): Promise<DesktopRuntimeV2ApprovalDecision>;
   onApprovalRequired(request: DesktopRuntimeV2ApprovalRequest): void;
   abortAgentRun?(sessionId: string, agentRunId: string): number;
+  expireAll?(sessionId?: string): number;
 }
 
 export interface DesktopRuntimeV2BrowserPort {

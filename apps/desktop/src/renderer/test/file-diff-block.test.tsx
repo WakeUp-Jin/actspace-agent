@@ -226,7 +226,7 @@ describe("FileDiffBlock approval state", () => {
     });
   }
 
-  it("submits approve_once when allowing an out-of-workspace edit", async () => {
+  it("submits once when allowing an out-of-workspace edit", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
     window.actspace = { submitApproval } as unknown as Window["actspace"];
 
@@ -240,7 +240,7 @@ describe("FileDiffBlock approval state", () => {
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-edit-1",
-      decision: "approve_once",
+      decision: "once",
     });
     expect(await screen.findByText("Edit vocab.md")).toBeInTheDocument();
   });
@@ -258,5 +258,26 @@ describe("FileDiffBlock approval state", () => {
       decision: "deny",
     });
     expect(await screen.findByText("Denied edit vocab.md")).toBeInTheDocument();
+  });
+
+  it("submits only a Runtime suggestion id for Session scope and reveals subtree explicitly", async () => {
+    const submitApproval = vi.fn(async () => ({ ok: true }));
+    window.actspace = {
+      submitApproval,
+      listPendingApprovals: async () => [{
+        requestId: "approval-edit-1", toolName: "edit_file", summary: "Edit", reason: "Outside workspace", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
+        grantSuggestions: [
+          { suggestionId: "exact-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "exact", canonicalPath: "/Users/me/.agents/vocab.md" }, audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 }, label: "This file only" },
+          { suggestionId: "tree-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "subtree", canonicalRoot: "/Users/me/.agents" }, audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 }, label: "This directory tree" },
+        ],
+      }],
+    } as unknown as Window["actspace"];
+
+    render(<FileDiffBlock message={makePendingEditBlock()} />);
+    expect(await screen.findByRole("button", { name: "本会话允许此文件" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "本会话允许此目录树" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "选择目录范围" }));
+    await userEvent.click(screen.getByRole("button", { name: "本会话允许此目录树" }));
+    expect(submitApproval).toHaveBeenCalledWith({ requestId: "approval-edit-1", decision: "session", suggestionId: "tree-1" });
   });
 });

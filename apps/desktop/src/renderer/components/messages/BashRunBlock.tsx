@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { TOOL_LOG_LINE_TEXT_RUNNING_CLASS, getToolLogRunningTextAttrs } from "./toolLogStyles";
 
 type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
-type ApprovalDecision = "approve_once" | "deny" | "allow_similar";
+type ApprovalDecision = "once" | "deny";
 
 const BASH_RUN_CLASS = "message-row bash-run max-w-[800px] px-[var(--conversation-text-inset)]";
 const BASH_RUN_TOGGLE_CLASS =
@@ -271,20 +271,12 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
             {submitting === "deny" ? "Skipping..." : "Skip"}
           </button>
           <button
-            className={`${BASH_ACTION_CLASS} ${BASH_ACTION_SOFT_CLASS}`}
-            type="button"
-            disabled={disabled}
-            onClick={() => decide("allow_similar")}
-          >
-            {submitting === "allow_similar" ? "Allowing..." : "Allow"}
-          </button>
-          <button
             className={`${BASH_ACTION_CLASS} ${BASH_ACTION_PRIMARY_CLASS}`}
             type="button"
             disabled={disabled}
-            onClick={() => decide("approve_once")}
+            onClick={() => decide("once")}
           >
-            {submitting === "approve_once" ? "Running..." : "Run"}
+            {submitting === "once" ? "Running..." : "Run"}
           </button>
         </div>
       </footer>

@@ -33,9 +33,9 @@
 
 ## 文件系统访问控制
 
-- **写类工具受 workspace 守卫**：`write_file` / `edit_file` / `bash` 的文件/目录写操作必须经 `workspace-guard.ts#guardWritablePath`，禁止 `..` 逃逸、禁止逃出 `workspaceRoot`。
-  - **写越界改为用户审批（2026-07-05）**：`write_file` / `edit_file` 目标越界时不再硬拒绝，权限检查器返回 `ask`（medium 风险、不提供 allow_similar），用户批准后 scheduler 以 `sanitizedArgs` 执行，executor 依据其中的 `APPROVED_OUTSIDE_BOUNDARY_ARG` 标记放行该次写入。该标记只由权限检查器写入，模型自行在参数中传入会在检查阶段被剥除，无法绕过审批。bash 的写路径守卫不变。
-- **读类工具边界**：v2 Tool Runtime 由 Host capability、workspace policy 和 plugin manifest 共同约束读写范围；不得沿用 v1 的任意主 Agent 读边界。历史放开读边界的背景见 [v1 上下文压缩历史设计](archive/v1/design-docs/model-context-context-compression.md)。
+- **文件工具边界**：v2 Tool Runtime 在审批前 canonicalize file resource，并由 `default/full-access`、敏感分类、Tool Permission 与 Host capability 合并决策；`default` 的 workspace 外读写需要审批，Desktop 可对非敏感核心文件签发当前 Session/当前主 Agent 的 exact 或显式 subtree Grant，CLI 不签发或消费。Grant 仍按 action/access/audience/policyVersion 和当前资源完整覆盖复验；`full-access` 只扩大非敏感文件范围。executor 在 syscall 前重新解析并核对已准入资源，路径、目标类型、Grant 或符号链接状态变化时 fail-closed。
+- **Bash 边界**：Bash 始终要求一次性批准，并继续受 workspace hard guard 和 macOS sandbox 约束；`full-access` 不扩大 Bash 文件范围，也不批准外部工作目录。
+- **读类工具边界**：v2 Tool Runtime 由 Host capability、Session permission mode 和 plugin manifest 共同约束读写范围；不得沿用 v1 的任意主 Agent 读边界。历史放开读边界的背景见 [v1 上下文压缩历史设计](archive/v1/design-docs/model-context-context-compression.md)。
 -  - **当前取舍**：需要回读 Session artifact、诊断或工具输出时，通过显式 artifact / projection capability 授权，不把整个 `userData` 目录提升为默认 workspace。
 -  - **v1 guard**：旧 scheduler 双校验属于历史实现，已随 v1 产品路径从 v2 删除；迁移背景见 `docs/archive/v1/design-docs/`。
   - **后续收口方向**（记入 `docs/exec-plans/tech-debt-tracker.md`）：补「敏感路径 blocklist + 按需读审核」，而不是恢复 workspace 硬限制。

@@ -32,6 +32,10 @@
 
 ## 最近完成
 
+- [Desktop Session Scope Grant](completed/session-scope-grants.md)：Desktop 核心文件 exact/subtree Session Grant、Journal 恢复、Runtime 匹配、审批选择、管理与撤销已完成；真实 Electron 重启和三态主题矩阵保留人工验收。
+
+- [Permission Runtime 基础切换](completed/permission-runtime-foundation.md)：`default/full-access`、结构化资源、once/deny、敏感边界、审批后复验、Session mode 与 Desktop/CLI Host 直接切换完成；后续 Desktop Session Grant 已独立交付。
+
 - [Session 三类读模型统一](completed/20260922-session-three-read-models.md)：Canonical fold、三种 DTO/watermark、observation、Global Session/Usage Index、Window resource cap 和 Client target 收口已完成；大型 App UI fixture 门禁保留在执行摘要。
 
 - [Session 投影一次性切换](completed/20260921-session-projection-cutover.md)：Host Registry、可删除 checkpoint 与 Client raw window 已接通，旧路径退役；自动化通过，Electron 缺失可执行文件的环境阻塞见执行摘要。

@@ -8,6 +8,7 @@ export type ParsedCli =
 
 const DEFAULT_OPTIONS: RunCommandOptions = {
   permissionMode: "default",
+  permissionModeExplicit: false,
   outputFormat: "text",
   mock: false,
 };
@@ -42,6 +43,7 @@ export function parseCliArgs(argv: string[]): ParsedCli {
         break;
       case "--permission-mode":
         options.permissionMode = parsePermissionMode(readValue(rest, ++i, arg));
+        options.permissionModeExplicit = true;
         break;
       case "--json":
         setOutputFormat(options, "json");
@@ -88,7 +90,7 @@ function readValue(args: string[], index: number, flag: string): string {
 }
 
 function parsePermissionMode(value: string): PermissionMode {
-  if (value === "default" || value === "trusted" || value === "yolo") {
+  if (value === "default" || value === "full-access") {
     return value;
   }
   throw new CliUsageError(`Invalid permission mode: ${value}`);
@@ -110,7 +112,7 @@ export function usage(): string {
     "",
     "Options:",
     "  --workspace <path> (default: current directory)",
-    "  --permission-mode <default|trusted|yolo>",
+    "  --permission-mode <default|full-access>",
     "  --json",
     "  --jsonl",
     "  --out <directory>",

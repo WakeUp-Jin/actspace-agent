@@ -129,9 +129,10 @@ export class ClientSessionStore {
         const revisions: Record<string, number> = {};
         for (const [key, value] of Object.entries(envelope.values)) {
           if (value === undefined) continue;
-          const newer = (current.projectionRevisions[key] ?? -1) >= envelope.throughJournalSeq;
+          const currentRevision = current.projectionRevisions[key];
+          const newer = currentRevision !== undefined && currentRevision >= envelope.throughJournalSeq;
           values[key] = newer ? current.projectionValues[key]! : value;
-          revisions[key] = newer ? current.projectionRevisions[key]! : envelope.throughJournalSeq;
+          revisions[key] = newer ? currentRevision : envelope.throughJournalSeq;
         }
         this.#cells.set(envelope.sessionId, Object.freeze({ ...this.#cell(envelope.sessionId), projectionValues: Object.freeze(values), projectionRevisions: Object.freeze(revisions) }));
       }
@@ -160,6 +161,7 @@ export class ClientSessionStore {
       activity: (values.sessionStats ?? snapshot.activity) as RuntimeV2SessionSnapshot["activity"],
       delegations: (values.delegations ?? snapshot.delegations) as RuntimeV2SessionSnapshot["delegations"],
       pendingInbox: (values.pendingInbox ?? snapshot.pendingInbox) as RuntimeV2SessionSnapshot["pendingInbox"],
+      permissionMode: (values.permissionMode ?? snapshot.permissionMode) as RuntimeV2SessionSnapshot["permissionMode"],
     };
     const revisions = { ...cell.projectionRevisions };
     for (const key of Object.keys(update.values)) revisions[key] = event.seq;

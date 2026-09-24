@@ -4,7 +4,7 @@ import type { RuntimeV2LiveEvent, RuntimeV2SessionSnapshot } from "@actspace/sha
 
 function snapshot(sessionId: string, throughJournalSeq: number): RuntimeV2SessionSnapshot {
   return {
-    kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-08-30T00:00:00.000Z", updatedAt: "2026-08-30T00:00:00.000Z", workspaceRoot: null, throughJournalSeq, accessState: "read-write",
+    kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-08-30T00:00:00.000Z", updatedAt: "2026-08-30T00:00:00.000Z", workspaceRoot: null, throughJournalSeq, permissionMode: "default", accessState: "read-write",
     metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null }, activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null }, lineage: null,
   };
 }
@@ -82,5 +82,12 @@ describe("ClientSessionStore", () => {
     expect(store.applyEnvelope(envelope("session-1", 2, "B"))).toBe(false);
     expect(store.get("session-1")).toMatchObject({ status: "stale", liveGap: true });
     expect(store.get("session-1").snapshot?.metadata.title).toBe("A");
+  });
+
+  it("retains projection values from the initial empty-journal envelope", () => {
+    const store = new ClientSessionStore();
+    expect(store.applyEnvelope(envelope("session-empty", -1, "Empty"))).toBe(true);
+    expect(store.get("session-empty").projectionValues.metadata).toMatchObject({ title: "Empty" });
+    expect(store.get("session-empty").projectionRevisions.metadata).toBe(-1);
   });
 });

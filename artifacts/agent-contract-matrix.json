@@ -950,69 +950,6 @@
     },
     {
       "kind": "event",
-      "id": "session:approval/asked",
-      "owner": "@actspace/session-journal",
-      "status": "active",
-      "sourceRefs": [
-        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
-      ],
-      "tests": [
-        "session-journal/core-codec-contract",
-        "cordis-adapter/event-contract"
-      ],
-      "plane": "session",
-      "category": "extension",
-      "eventType": "approval/asked",
-      "scope": "session",
-      "surface": "internal",
-      "codecStatus": "present",
-      "producerStatus": "none",
-      "required": true
-    },
-    {
-      "kind": "event",
-      "id": "session:approval/decided",
-      "owner": "@actspace/session-journal",
-      "status": "active",
-      "sourceRefs": [
-        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
-      ],
-      "tests": [
-        "session-journal/core-codec-contract",
-        "cordis-adapter/event-contract"
-      ],
-      "plane": "session",
-      "category": "extension",
-      "eventType": "approval/decided",
-      "scope": "session",
-      "surface": "internal",
-      "codecStatus": "present",
-      "producerStatus": "none",
-      "required": true
-    },
-    {
-      "kind": "event",
-      "id": "session:approval/policy",
-      "owner": "@actspace/session-journal",
-      "status": "active",
-      "sourceRefs": [
-        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
-      ],
-      "tests": [
-        "session-journal/core-codec-contract",
-        "cordis-adapter/event-contract"
-      ],
-      "plane": "session",
-      "category": "extension",
-      "eventType": "approval/policy",
-      "scope": "session",
-      "surface": "internal",
-      "codecStatus": "present",
-      "producerStatus": "none",
-      "required": true
-    },
-    {
-      "kind": "event",
       "id": "session:assistant/chunk",
       "owner": "@actspace/session-journal",
       "status": "active",
@@ -1370,7 +1307,7 @@
     },
     {
       "kind": "event",
-      "id": "session:permission/preset",
+      "id": "session:permission/asked",
       "owner": "@actspace/session-journal",
       "status": "active",
       "sourceRefs": [
@@ -1382,7 +1319,112 @@
       ],
       "plane": "session",
       "category": "extension",
-      "eventType": "permission/preset",
+      "eventType": "permission/asked",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:permission/decided",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "permission/decided",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:permission/grant-added",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "permission/grant-added",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:permission/grant-revoked",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "permission/grant-revoked",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:permission/mode-set",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "permission/mode-set",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:permission/scope-denied",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "permission/scope-denied",
       "scope": "session",
       "surface": "internal",
       "codecStatus": "present",
@@ -2995,7 +3037,8 @@
         "./sessions"
       ],
       "dependencies": [
-        "@actspace/shared"
+        "@actspace/shared",
+        "pathe"
       ],
       "packageRole": "domain"
     },
@@ -3144,7 +3187,8 @@
       "exports": [
         ".",
         "./manifest",
-        "./plugin"
+        "./plugin",
+        "./testing"
       ],
       "dependencies": [
         "@actspace/compaction",
@@ -3418,6 +3462,8 @@
         "@actspace/session-journal",
         "@actspace/session-jsonl",
         "@actspace/session-persistence",
+        "@actspace/session-projection",
+        "@actspace/session-projection-cache",
         "@actspace/shared",
         "@actspace/subagent",
         "@actspace/tools-approval",
@@ -3646,7 +3692,8 @@
         "./plugin"
       ],
       "dependencies": [
-        "@actspace/cordis-adapter"
+        "@actspace/cordis-adapter",
+        "@actspace/shared"
       ],
       "packageRole": "domain"
     },
@@ -3949,6 +3996,6 @@
       "required": true
     }
   ],
-  "sourceDigest": "82bc4c58fc05f8f43210a8c28860550f29335a660a77070cf21bdf714c781831",
+  "sourceDigest": "d81adad125e94cab987b2e23c24fb2b6ef4c8bc76a904ea3b4e155b5f67600d9",
   "diagnostics": []
 }

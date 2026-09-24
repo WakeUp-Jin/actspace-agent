@@ -1,5 +1,7 @@
 # 设计文档索引
 
+- [Agent 工具权限模型](execution-safety/agent-tool-permission-model.md)：当前权限事实源；定义已实施的 `default/full-access`、结构化资源、once 与 Desktop 文件 Session Grant。
+
 - [LLM Core Pi 收敛设计](agent-plugin-runtime/agent-llm-core-pi.md)：已实施 Host prepare、重试 generation、pi-ai 直接调用、backend parity 与 replay；外部验收边界见执行摘要。
 
 - [Session 事件持久化重构](agent-plugin-runtime/agent-session-event-persistence-refactor.md)：核心行为已实施；Session 接纳、持久化协调器、检查点与 live/durable 边界。
@@ -45,7 +47,7 @@
 | `agent-runtime/` | 当前 Agent Run / Turn / LLM Call 分层与 Journal 观测数据契约 | `docs/design-docs/agent-runtime/agent-turn-layers.md`、`docs/design-docs/agent-runtime/agent-observability-trace-model.md` |
 | `model-context/` | 当前模型供应商、模型能力、request snapshot、token usage 和 Context Projection | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md` |
 | `tool-system/` | 当前 Skill、Web/图片工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md` |
-| `execution-safety/` | v2 Tool Runtime、Host policy、审批、Bash hard guard 和副作用恢复边界 | `docs/design-docs/execution-safety/README.md` |
+| `execution-safety/` | v2 Tool Runtime、Host policy、权限模式、审批、Grant、Bash hard guard 和副作用恢复边界 | `docs/design-docs/execution-safety/README.md`、`docs/design-docs/execution-safety/agent-tool-permission-model.md` |
 | `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |
 | `collaboration/` | 当前一次性 Subagent / Explore，以及尚未迁入 v2 的未来 Member、Room、Team 产品设计 | `docs/design-docs/collaboration/agent-subagent-runtime.md` |
 | `frontend/` | 桌面端视觉、主题、组件、工作台、页面和前端原型 | `README.md` |

@@ -4,7 +4,7 @@ import type { MessageBlock } from "@actspace/shared";
 import { ToolLogLine } from "./ToolLogLine";
 
 type BrowserApprovalMessage = Extract<MessageBlock, { kind: "tool" }>;
-type BrowserDecision = "approve_once" | "deny";
+type BrowserDecision = "once" | "deny";
 
 const CARD_CLASS =
   "message-row w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface";
@@ -90,9 +90,9 @@ export function BrowserApprovalBlock({
           className={`${BUTTON_CLASS} ${ALLOW_CLASS}`}
           type="button"
           disabled={disabled}
-          onClick={() => decide("approve_once")}
+          onClick={() => decide("once")}
         >
-          {submitting === "approve_once" ? "正在允许…" : "允许"}
+          {submitting === "once" ? "正在允许…" : "允许"}
         </button>
       </footer>
     </article>

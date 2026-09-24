@@ -123,7 +123,7 @@ Journal 的 append 是唯一逻辑提交点：先校验 codec 和序号并接纳
 |---|---|
 | LLM 重试 | `llm/retry`, `llm/retry-started` |
 | 压缩 | `compaction/start`, `compaction/summary`, `compaction/prune`, `compaction/end` |
-| 审批与权限 | `approval/asked`, `approval/decided`, `approval/policy`, `permission/preset` |
+| 审批与权限 | `permission/asked`, `permission/decided`, `permission/mode-set`, `permission/scope-denied` |
 | Hook 与命令 | `hook/invoked`, `hook/result`, `command/run`, `command/done` |
 | 工具工作流 | `tool-workflow/agent-start`, `tool-workflow/agent-end`, `tool-workflow/run-start`, `tool-workflow/run-end`, `tool/code-dispatch-start`, `tool/code-dispatch` |
 | Agent 与协作 | `agent/inbox/spliced`, `subagent/descriptor`, `agent-preset/selected` |

@@ -40,7 +40,7 @@ describe("DeleteFileBlock", () => {
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-delete-1",
-      decision: "approve_once",
+      decision: "once",
     });
     expect(await screen.findByText("Delete notes.md")).toBeInTheDocument();
   });
@@ -70,7 +70,7 @@ describe("DeleteFileBlock", () => {
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-delete-1",
-      decision: "approve_once",
+      decision: "once",
     });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();

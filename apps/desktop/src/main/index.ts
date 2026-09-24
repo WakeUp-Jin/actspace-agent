@@ -54,7 +54,7 @@ let shuttingDown = false;
 
 const approvalRegistry = new PendingApprovalRegistry({
   onApprovalRequired: (request, sessionId, agentRunId) => {
-    const dto: RuntimeV2ApprovalRequest = Object.freeze({ requestId: request.id, sessionId, agentRunId, toolName: request.toolName, summary: request.summary, reason: request.reason, risk: request.riskLevel, argumentSummary: request.args, createdAt: request.createdAt });
+    const dto: RuntimeV2ApprovalRequest = Object.freeze({ requestId: request.id, sessionId, agentRunId, toolName: request.toolName, summary: request.summary, reasons: request.reason.split("\n").filter(Boolean), resources: Array.isArray(request.args.resources) ? request.args.resources as RuntimeV2ApprovalRequest["resources"] : [], grantSuggestions: request.grantSuggestions ?? [], supportedLifetimes: request.supportedLifetimes ?? (["once"] as const), risk: request.riskLevel ?? "medium", createdAt: request.createdAt });
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(RUNTIME_V2_DESKTOP_CHANNELS.approvalRequired, dto);
       const event: RuntimeStreamEvent = {

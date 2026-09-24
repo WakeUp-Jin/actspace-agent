@@ -411,7 +411,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       displayText: tool.finished ? tool.preview.displayText : getStreamingReadText(tool.preview),
       resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      approvalRequestId: tool.approvalRequestId,
+      reason: tool.approvalReason,
     };
   }
 
@@ -439,7 +441,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       displayText: tool.finished ? tool.preview.displayText : getStreamingGrepText(tool.preview),
       resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      approvalRequestId: tool.approvalRequestId,
+      reason: tool.approvalReason,
     };
   }
 
@@ -453,7 +457,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       displayText: tool.finished ? tool.preview.displayText : getStreamingGlobText(tool.preview),
       resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      approvalRequestId: tool.approvalRequestId,
+      reason: tool.approvalReason,
     };
   }
 

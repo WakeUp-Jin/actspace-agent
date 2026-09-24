@@ -62,7 +62,6 @@ describe("v2 Browser Bridge capability", () => {
 
   it("keeps durability checkpoint and Bridge preflight without operation approval", async () => {
     const order: string[] = [];
-    let approvalSummary: Readonly<Record<string, unknown>> | undefined;
     const browser = createNodeBrowserCapability({
       ready: true,
       socketPath: "/unused",
@@ -76,7 +75,7 @@ describe("v2 Browser Bridge capability", () => {
     });
     const runtime = new ToolRuntime();
     registerBrowserTools(runtime, browser);
-    const broker: ApprovalBroker = { async requestApproval(request) { order.push("approval"); approvalSummary = request.argumentSummary; return { requestId: request.requestId, decision: "allow", decidedAt: "now" }; } };
+    const broker: ApprovalBroker = { async requestApproval(request) { order.push("approval"); return { requestId: request.requestId, kind: "once", decidedAt: new Date().toISOString() }; } };
     const journal: ToolJournalPort = {
       async recordDispatch() { order.push("dispatch"); },
       async checkpointBeforeBody() { order.push("checkpoint"); },
@@ -101,7 +100,6 @@ describe("v2 Browser Bridge capability", () => {
     }], environment);
     expect(result?.status).toBe("completed");
     expect(order).toEqual(["dispatch", "checkpoint", "preflight", "run", "dispose", "commit"]);
-    expect(approvalSummary).toBeUndefined();
   });
 
   it("executes canonical read-only actions without approval and rejects unknown actions before the Bridge", async () => {
@@ -116,7 +114,7 @@ describe("v2 Browser Bridge capability", () => {
       workspaceRoot: "/workspace",
       hostCapabilities: new Set(["browser"]),
       capabilitySet: new EmptyCapabilities(),
-      approvalBroker: { async requestApproval(request) { approvalCalls += 1; return { requestId: request.requestId, decision: "allow", decidedAt: "now" }; } },
+      approvalBroker: { async requestApproval(request) { approvalCalls += 1; return { requestId: request.requestId, kind: "once", decidedAt: new Date().toISOString() }; } },
       journal: { async recordDispatch() {}, async checkpointBeforeBody() {}, async commitResult() {} },
       createArtifact: context().createArtifact,
     };

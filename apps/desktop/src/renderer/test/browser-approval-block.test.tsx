@@ -35,7 +35,7 @@ describe("BrowserApprovalBlock", () => {
     await userEvent.click(screen.getByRole("button", { name: "允许" }));
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "browser-approval-1",
-      decision: "approve_once",
+      decision: "once",
     });
     expect(await screen.findByText(/正在连接浏览器/)).toBeInTheDocument();
   });

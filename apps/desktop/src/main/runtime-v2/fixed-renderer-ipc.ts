@@ -178,6 +178,24 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     await options.registry.updateSessionWorkspace(input.sessionId, next);
     return { ok: true };
   });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionPermissionMode, async (_event, input: { sessionId: string; mode: "default" | "full-access" }) => {
+    if (input.mode !== "default" && input.mode !== "full-access") return { ok: false, error: "invalid_permission_mode" };
+    try {
+      const snapshot = await options.registry.updateSessionPermissionMode(input.sessionId, input.mode);
+      return { ok: true, mode: snapshot.permissionMode };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.revokeSessionGrant, async (_event, input: { sessionId: string; grantId: string }) => {
+    if (!input.sessionId || !input.grantId) return { ok: false, error: "invalid_grant_revoke" };
+    try {
+      await options.registry.revokeSessionGrant(input.sessionId, input.grantId);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.archiveSession, async (_event, input: { sessionId: string; archived: boolean }) => {
     await options.registry.updateSessionMetadata(input);
     return { ok: true };
@@ -583,8 +601,10 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     command: typeof request.args.command === "string" ? request.args.command : undefined,
     createdAt: request.createdAt,
     expiresAt: request.expiresAt,
+    grantSuggestions: request.grantSuggestions,
+    supportedLifetimes: request.supportedLifetimes,
   })));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval, (_event, input: { requestId: string; decision: "approve_once" | "deny" }) => options.approvals.decide(input.requestId, input.decision));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval, (_event, input: import("@actspace/shared").ApprovalDecideInput) => options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined));
 
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getBrowserBridgeStatus, () => options.browserBridge.getStatus());
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.installBrowserBridgeFromRepo, (_event, input: { repoRoot: string }) => options.browserBridge.buildAndInstall(input.repoRoot));

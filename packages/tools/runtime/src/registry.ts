@@ -4,23 +4,21 @@ import { ToolRegistrationLeaseOwner } from "./activation-lease.js";
 import { normalizeToolDefinition, type NormalizedToolDefinition, type ToolDefinition } from "./definition.js";
 import type { ToolExecutor, ToolMiddleware } from "./executor.js";
 import { ToolRuntimeError } from "./errors.js";
-import type { ToolPolicy } from "./policy.js";
+import type { ToolPermissionContract } from "./permission/types.js";
 
 export type ToolExecutorRegistration = {
   readonly definition: ToolDefinition;
   readonly executor: ToolExecutor;
-  readonly policies?: readonly ToolPolicy[];
+  readonly permission?: ToolPermissionContract;
   readonly middleware?: readonly ToolMiddleware[];
-  readonly resolveResourcePaths?: (args: Readonly<Record<string, RuntimeV2JsonValue>>) => readonly string[];
 };
 
 export type CapturedToolRegistration = {
   readonly registrationId: string;
   readonly definition: NormalizedToolDefinition;
   readonly executor: ToolExecutor;
-  readonly policies: readonly ToolPolicy[];
+  readonly permission: ToolPermissionContract;
   readonly middleware: readonly ToolMiddleware[];
-  readonly resolveResourcePaths: (args: Readonly<Record<string, RuntimeV2JsonValue>>) => readonly string[];
   readonly leaseOwner: ToolRegistrationLeaseOwner;
 };
 
@@ -58,9 +56,8 @@ export class ToolRegistry {
       registrationId,
       definition,
       executor: input.executor,
-      policies: Object.freeze([...(input.policies ?? [])]),
+      permission: input.permission ?? ALLOW_ALL_PERMISSION,
       middleware: Object.freeze([...(input.middleware ?? [])]),
-      resolveResourcePaths: input.resolveResourcePaths ?? (() => []),
       leaseOwner: new ToolRegistrationLeaseOwner(registrationId),
     });
     this.#byName.set(definition.name, registration);
@@ -85,6 +82,11 @@ export class ToolRegistry {
     return Object.freeze([...this.#byName.values()].map((item) => item.definition).sort((left, right) => left.name.localeCompare(right.name)));
   }
 }
+
+const ALLOW_ALL_PERMISSION: ToolPermissionContract = Object.freeze({
+  extractResources: () => [],
+  evaluate: () => ({ kind: "allow" as const }),
+});
 
 function conflict(message: string): ToolRuntimeError {
   return new ToolRuntimeError({ code: "TOOL_REGISTRATION_CONFLICT", message, retryable: false, phase: "prepare" });

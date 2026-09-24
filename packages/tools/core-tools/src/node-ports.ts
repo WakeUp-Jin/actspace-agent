@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { ToolBodyResult, ToolExecutionContext, SessionArtifactResolver } from "@actspace/tools-runtime";
+import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tools-runtime";
 import type { CoreToolHandler, CoreToolPorts } from "./plugin.js";
 import { createNodeBashToolPorts } from "./bash/node-bash-ports.js";
 import { createNodeWebToolPorts, type WebSearchCredentials } from "./web/node-web-ports.js";
@@ -46,12 +46,12 @@ export function createNodeCoreToolPorts(options: NodeCoreToolPortsOptions): Core
   const image = createNodeImageToolPorts({ generation: options.imageGeneration, readArtifact: options.readArtifact, inspect: options.inspectImage, fetchImpl: options.fetchImpl, resolveHostname: options.resolveHostname });
   return Object.freeze({
     read_file: (args, context) => readFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), readCache, options.resolveArtifact),
-    list_directory: (args, context) => listDirectoryTool(args, contextWorkspaceRoot(context, options.workspaceRoot)),
+    list_directory: (args, context) => listDirectoryTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)),
     grep: (args, context) => grepTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath, options.resolveArtifact),
     glob: (args, context) => globTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath),
     edit_file: (args, context) => editFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)),
     write_file: (args, context) => writeFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)),
-    delete_file: (args, context) => deleteFileTool(args, contextWorkspaceRoot(context, options.workspaceRoot)),
+    delete_file: (args, context) => deleteFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)),
     ...(bash === undefined ? {} : { bash: bash.bash, bash_output: bash.bash_output, bash_kill: bash.bash_kill, dispose: bash.dispose }),
     web_search: web.web_search,
     web_fetch: web.web_fetch,
@@ -75,7 +75,7 @@ async function readFileTool(
   const pathArg = stringArg(args, "path");
   if (!pathArg) return failure("INVALID_ARGUMENTS", "path is required");
   try {
-    const filePath = await resolveReadablePath(pathArg, workspaceRoot, context.sessionId, resolveArtifact);
+    const filePath = await resolveReadablePath(pathArg, workspaceRoot, context.sessionId, resolveArtifact, context);
     const fileStat = await stat(filePath);
     if (!fileStat.isFile()) return failure("NOT_A_FILE", `Path is not a regular file: ${pathArg}`);
     const mimeType = IMAGE_MIME_BY_EXT[extname(filePath).toLowerCase()];
@@ -106,11 +106,11 @@ async function readFileTool(
   }
 }
 
-async function listDirectoryTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, workspaceRoot: string): Promise<ToolBodyResult> {
+async function listDirectoryTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   if (!pathArg) return failure("INVALID_ARGUMENTS", "path is required");
   try {
-    const directory = await resolveExistingPath(pathArg, workspaceRoot);
+    const directory = await resolveExistingPath(pathArg, workspaceRoot, context, "read");
     const info = await stat(directory);
     if (!info.isDirectory()) return failure("NOT_A_DIRECTORY", `Path is not a directory: ${pathArg}`);
     const entries = await readdir(directory, { withFileTypes: true });
@@ -127,7 +127,7 @@ async function grepTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, cont
   if (!pattern) return failure("INVALID_ARGUMENTS", "pattern is required");
   const pathArg = stringArg(args, "path") || ".";
   try {
-    const searchPath = await resolveReadablePath(pathArg, workspaceRoot, context.sessionId, resolveArtifact);
+    const searchPath = await resolveReadablePath(pathArg, workspaceRoot, context.sessionId, resolveArtifact, context);
     const rgArgs = ["--line-number", "--no-heading", "--color", "never", "--max-count", String(MAX_GREP_RESULTS), ...(isWithin(workspaceRoot, searchPath) ? ["--max-filesize", "1M"] : [])];
     const glob = stringArg(args, "glob");
     if (glob) rgArgs.push("--glob", glob);
@@ -149,7 +149,7 @@ async function globTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, cont
   if (!pattern) return failure("INVALID_ARGUMENTS", "pattern is required");
   const pathArg = stringArg(args, "path") || ".";
   try {
-    const searchRoot = await resolveExistingPath(pathArg, workspaceRoot);
+    const searchRoot = await resolveExistingPath(pathArg, workspaceRoot, context, "read");
     const globPattern = pattern.startsWith("**/") || pattern.includes("/") || pattern.startsWith("!") ? pattern : `**/${pattern}`;
     const result = await runRipgrep(ripgrepPath, ["--files", "--glob", globPattern, "--color", "never", searchRoot], workspaceRoot, context.signal);
     if (result.exitCode === 1 || !result.stdout.trim()) return completed(`No files found matching "${pattern}"`);
@@ -179,7 +179,7 @@ async function writeFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>,
   const content = typeof args.content === "string" ? args.content : undefined;
   if (!pathArg || content === undefined) return failure("INVALID_ARGUMENTS", "path and content are required");
   try {
-    const filePath = await resolveWritablePath(pathArg, workspaceRoot);
+    const filePath = await resolveWritablePath(pathArg, workspaceRoot, context);
     const oldContent = existsSync(filePath) ? await readFile(filePath, "utf8") : "";
     const created = !existsSync(filePath);
     const path = displayPath(filePath, workspaceRoot);
@@ -201,7 +201,7 @@ async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, 
   const newText = typeof args.new_string === "string" ? args.new_string : undefined;
   if (!pathArg || oldText === undefined || newText === undefined) return failure("INVALID_ARGUMENTS", "path, old_string and new_string are required");
   try {
-    const filePath = await resolveWritablePath(pathArg, workspaceRoot);
+    const filePath = await resolveWritablePath(pathArg, workspaceRoot, context);
     const exists = existsSync(filePath);
     if (!exists && oldText !== "") return failure("FILE_NOT_FOUND", `File not found: ${pathArg}`);
     const before = exists ? await readFile(filePath, "utf8") : "";
@@ -222,11 +222,11 @@ async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, 
   }
 }
 
-async function deleteFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, workspaceRoot: string): Promise<ToolBodyResult> {
+async function deleteFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   if (!pathArg) return failure("INVALID_ARGUMENTS", "path is required");
   try {
-    const filePath = await resolveExistingPath(pathArg, workspaceRoot);
+    const filePath = await resolveExistingPath(pathArg, workspaceRoot, context, "delete");
     const info = await lstat(filePath);
     if (info.isDirectory()) return failure("NOT_A_FILE", "delete_file only supports files. Directories are not supported.");
     if (!info.isFile()) return failure("NOT_A_FILE", "delete_file only supports regular files.");
@@ -238,8 +238,9 @@ async function deleteFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>
   }
 }
 
-async function resolveReadablePath(input: string, workspaceRoot: string, sessionId: string, resolveArtifact?: SessionArtifactResolver): Promise<string> {
+async function resolveReadablePath(input: string, workspaceRoot: string, sessionId: string, resolveArtifact?: SessionArtifactResolver, context?: ToolExecutionContext): Promise<string> {
   const candidate = isAbsolute(input) ? resolve(input) : resolve(workspaceRoot, input);
+  if (context?.admittedResources?.length) return resolveExistingPath(input, workspaceRoot, context, "read");
   if (isWithin(workspaceRoot, candidate)) return resolveExistingPath(input, workspaceRoot);
   if (resolveArtifact && isAbsolute(input) && /^[0-9a-f-]{36}$/i.test(basename(candidate))) {
     const artifact = await resolveArtifact(sessionId, basename(candidate));
@@ -248,14 +249,16 @@ async function resolveReadablePath(input: string, workspaceRoot: string, session
   throw new Error(`Path escapes workspace boundary: ${input}`);
 }
 
-async function resolveExistingPath(input: string, workspaceRoot: string): Promise<string> {
+async function resolveExistingPath(input: string, workspaceRoot: string, context?: ToolExecutionContext, access: "read" | "delete" = "read"): Promise<string> {
+  if (context?.admittedResources?.length) return recheckAdmittedFile(input, access, workspaceRoot, context);
   const candidate = resolveWorkspacePath(input, workspaceRoot);
   const [realRoot, realCandidate] = await Promise.all([realpath(workspaceRoot), realpath(candidate)]);
   if (!isWithin(realRoot, realCandidate)) throw new Error(`Path escapes workspace boundary: ${input}`);
   return realCandidate;
 }
 
-async function resolveWritablePath(input: string, workspaceRoot: string): Promise<string> {
+async function resolveWritablePath(input: string, workspaceRoot: string, context?: ToolExecutionContext): Promise<string> {
+  if (context?.admittedResources?.length) return recheckAdmittedFile(input, "write", workspaceRoot, context);
   const candidate = resolveWorkspacePath(input, workspaceRoot);
   const realRoot = await realpath(workspaceRoot);
   if (existsSync(candidate)) {
@@ -272,6 +275,14 @@ async function resolveWritablePath(input: string, workspaceRoot: string): Promis
   const realParent = await realpath(parent);
   if (!isWithin(realRoot, realParent)) throw new Error(`Path escapes workspace boundary: ${input}`);
   return candidate;
+}
+
+async function recheckAdmittedFile(input: string, access: "read" | "write" | "delete", workspaceRoot: string, context: ToolExecutionContext): Promise<string> {
+  const expected = context.admittedResources?.find((resource) => resource.kind === "file" && resource.access === access);
+  if (expected?.kind !== "file") throw new Error("No admitted file resource matches this operation.");
+  const actual = await canonicalizeFileResource(input, access, workspaceRoot);
+  if (actual.canonicalPath !== expected.canonicalPath || actual.targetKind !== expected.targetKind) throw new Error("File scope changed after permission admission.");
+  return actual.canonicalPath;
 }
 
 function resolveWorkspacePath(input: string, workspaceRoot: string): string {

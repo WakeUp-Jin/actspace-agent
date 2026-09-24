@@ -176,6 +176,20 @@ export class DesktopRuntimeV2Registry {
     return snapshot;
   }
 
+  async updateSessionPermissionMode(sessionId: string, mode: import("@actspace/shared/runtime-v2").PermissionMode) {
+    this.options.approvals.expireAll?.(sessionId);
+    const snapshot = await this.requireApp().updateSessionPermissionMode(sessionId, mode);
+    this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-permission-mode-updated");
+    return snapshot;
+  }
+
+  async revokeSessionGrant(sessionId: string, grantId: string) {
+    this.options.approvals.expireAll?.(sessionId);
+    const snapshot = await this.requireApp().revokeSessionGrant(sessionId, grantId);
+    this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-grant-revoked");
+    return snapshot;
+  }
+
   async readArtifact(sessionId: string, artifactId: string): Promise<RuntimeV2ReadArtifactResult> {
     const artifact = await this.resolveArtifact(sessionId, artifactId);
     return Object.freeze({ artifactId, mimeType: artifact.mediaType, bytesBase64: Buffer.from(artifact.bytes).toString("base64") });

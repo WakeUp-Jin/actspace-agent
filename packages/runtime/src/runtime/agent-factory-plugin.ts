@@ -11,6 +11,7 @@ import type { CompactionPlugin } from "@actspace/compaction";
 import type { RuntimeSessionController } from "./session-controller.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-jsonl";
+import { projectPermissionMode, projectSessionGrants } from "@actspace/session-projection";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
 
 export type AgentFactoryService = AgentLoopServiceOptions & {
@@ -47,9 +48,14 @@ export function apply(ctx: CordisContext): void {
 
   const toolEnvironmentFor = (session: import("@actspace/session-persistence").SessionHandle) => {
     activeSessions.set(session.header.sessionId, session);
+    const configuredMode = host.toolEnvironment.permissionMode;
     return Object.freeze({
       ...host.toolEnvironment,
       workspaceRoot: resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot),
+      permissionMode: () => host.toolEnvironment.permissionModeExplicit
+        ? (typeof configuredMode === "function" ? configuredMode() : configuredMode ?? "default")
+        : projectPermissionMode(session.journal.events),
+      sessionGrants: () => host.toolEnvironment.sessionGrantCapability ? projectSessionGrants(session.journal.events) : [],
     });
   };
 
@@ -67,7 +73,10 @@ export function apply(ctx: CordisContext): void {
     for (const contributor of prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills })) contributors.register(scope, contributor);
     const assembler = new RequestAssembler({ registry: contributors, prepare: async () => ({ route: descriptor.routeId, model: descriptor.model, registrationId: "cordis-agent", adapterVersion: "cordis-agent", defaults: {}, retryPolicy: {}, contextWindow: null }) });
     const subject: AgentSubject = Object.freeze({ agentId: agentId ?? scope.agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
-    const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), assembler, llm, tools, toolEnvironment: toolEnvironmentFor, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
+    const scopedToolEnvironment = descriptor.kind === "subagent"
+      ? (activeSession: import("@actspace/session-persistence").SessionHandle) => ({ ...toolEnvironmentFor(activeSession), sessionGrantCapability: false, sessionGrants: [] })
+      : toolEnvironmentFor;
+    const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), assembler, llm, tools, toolEnvironment: scopedToolEnvironment, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
     if (signal !== undefined) {
       const abort = () => loop.abort(typeof signal.reason === "string" ? signal.reason : "parent-abort");
       if (signal.aborted) abort(); else signal.addEventListener("abort", abort, { once: true });

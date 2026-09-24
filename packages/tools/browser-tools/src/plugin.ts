@@ -11,19 +11,18 @@ export function registerBrowserTools(runtime: ToolRuntime, browser: BrowserCapab
   return Object.freeze(BROWSER_TOOL_DEFINITIONS.map((definition) => runtime.register({
     definition,
     executor: { concurrencySafe: definition.concurrency === "read-only", execute: commandExecutor(definition.name, browser) },
-    policies: definition.name === "browser_help" ? [] : [browserPolicy(definition.name)],
+    permission: browserPermission(definition.name),
   })));
 }
 
-function browserPolicy(name: string) {
+function browserPermission(name: string) {
   return Object.freeze({
-    id: `${name}.canonical-policy`,
-    layer: 100,
-    order: 0,
-    evaluate: ({ args }: { readonly args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>> }) => {
+    extractResources: () => [],
+    evaluate: (args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>) => {
+      if (name === "browser_help") return { kind: "allow" as const };
       const commands = name === "browser_run" ? batchCommands(args.actions) : [singleCommand(name, args.action)];
       if (commands.some((command) => command === undefined)) return { kind: "deny" as const, code: "BROWSER_COMMAND_UNKNOWN", reason: "Browser command is not present in the canonical registry." };
-      return { kind: "continue" as const };
+      return { kind: "allow" as const };
     },
   });
 }

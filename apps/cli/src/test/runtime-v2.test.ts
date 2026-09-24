@@ -28,11 +28,13 @@ describe("Runtime v2 CLI candidate", () => {
     expect(ephemeral.totalUsage).toEqual(ephemeral.snapshot?.usage);
     expect(ephemeral.messageCount).toBe(ephemeral.snapshot?.messages.length);
     expect(await readdir(dataDir)).toEqual([]);
-    const persistent = await runV2Command({ input: "first", workspace, dataDir, permissionMode: "default", outputFormat: "json", mock: true, persist: true });
+    const persistent = await runV2Command({ input: "first", workspace, dataDir, permissionMode: "full-access", permissionModeExplicit: true, outputFormat: "json", mock: true, persist: true });
     expect(persistent.persistent).toBe(true);
+    expect(persistent.permissionMode).toBe("full-access");
     const journal = await readFile(join(dataDir, "sessions-v2", persistent.sessionId, "journal.jsonl"), "utf8");
     expect(journal).toContain('"recordKind":"header"');
     expect(journal).toContain('"type":"turn/start"');
+    expect(journal).toContain('"type":"permission/mode-set"');
     expect(journal).toContain('"type":"request/header"');
     expect(journal).toContain('"type":"assistant/chunk"');
     expect(journal).toContain('"type":"session/end-seed"');
@@ -41,6 +43,7 @@ describe("Runtime v2 CLI candidate", () => {
     expect(eventTypes.indexOf("agent/inbox/spliced")).toBeLessThan(eventTypes.indexOf("turn/start"));
     const resumed = await runV2Command({ input: "second", workspace, dataDir, permissionMode: "default", outputFormat: "json", mock: true, resume: persistent.sessionId });
     expect(resumed.sessionId).toBe(persistent.sessionId);
+    expect(resumed.permissionMode).toBe("full-access");
     expect(resumed.messageCount).toBeGreaterThan(persistent.messageCount);
   });
 

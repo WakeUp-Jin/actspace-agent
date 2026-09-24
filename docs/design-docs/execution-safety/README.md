@@ -1,11 +1,17 @@
 # v2 执行安全入口
 
-> 状态：当前 v2 Tool Runtime、审批与 Host capability 安全边界。v1 Bash、动态 allowlist 和 ApprovalGate 文档已归档到 [`docs/archive/v1/design-docs/`](../../archive/v1/design-docs/README.md)。
+> 状态：当前 v2 执行安全事实入口。v1 Bash、动态 allowlist 和 ApprovalGate 文档已归档到 [`docs/archive/v1/design-docs/`](../../archive/v1/design-docs/README.md)。
+
+## 当前状态
+
+- [`agent-tool-permission-model.md`](./agent-tool-permission-model.md)：权限模型事实源；只保留 `default/full-access`，once 与 Desktop 文件 Session Grant 已实施。
+- [`permission-runtime-foundation`](../../exec-plans/completed/permission-runtime-foundation.md)：权限 Runtime、文件/Bash once、mode、Journal 与 Host 直接切换计划，自动化实施已完成。
+- [`session-scope-grants`](../../exec-plans/completed/session-scope-grants.md)：Desktop 文件 Session Grant、恢复、管理与撤销计划；真实 Electron 主题/重启矩阵保留人工验收。
 
 ## 当前事实源
 
-- [`../agent-plugin-runtime/agent-spec-tool-runtime-abi.md`](../agent-plugin-runtime/agent-spec-tool-runtime-abi.md)：definition、policy、approval、prepared execution、checkpoint、result 与 recovery 契约；
-- `packages/tools/runtime/`：Tool Registry、Policy、Scheduler、Approval Port、Lease、redaction 与 ordered commit；
+- [`../agent-plugin-runtime/agent-spec-tool-runtime-abi.md`](../agent-plugin-runtime/agent-spec-tool-runtime-abi.md)：definition、permission、approval、prepared execution、checkpoint、result 与 recovery 契约；
+- `packages/tools/runtime/`：Tool Registry、PermissionEngine、prepared execution、Lease、redaction 与 ordered commit；
 - `packages/tools/core-tools/`：文件、Bash、Web、图片等 concrete capability；
 - `packages/tools/approval/`：Host-neutral ApprovalBroker 契约；
 - `apps/desktop/src/main/runtime-v2/approval-broker.ts`：Desktop 审批适配；
@@ -16,9 +22,12 @@
 ```text
 Tool Definition
 → 参数解析与 schema validation
-→ Host capability / Tool policy
-→ deny | require approval | continue
-→ Prepared Execution + activation lease
+→ Host capability / activation lease
+→ 结构化资源提取与 canonicalization
+→ Global Boundary + Tool Permission
+→ resolve Session Grant
+→ deny | ask | allow
+→ once/session approval + admission re-check
 → dispatch checkpoint
 → executor body
 → result redaction / artifact ownership
@@ -30,7 +39,7 @@ Tool Definition
 
 硬拒绝必须在副作用开始前终止，并返回稳定 code / reason。Approval 不能覆盖 manifest Host ceiling、缺失 required capability 或 destructive hard guard。
 
-### require approval
+### ask
 
 审批请求绑定：
 
@@ -43,7 +52,7 @@ Tool Definition
 - requested effects；
 - risk 和脱敏参数摘要。
 
-用户批准只对该 prepared call 有效。当前 v2 ApprovalBroker 的稳定决策是 `allow | deny`；Desktop 旧 UI 的 `approve_once | allow_similar` 会在 Host adapter 中归一化，不能据此推导 v2 已实现持久动态 allowlist。
+一次批准只对该 prepared call 有效。Desktop 的文件范围审批可选择 Runtime 生成的 Session suggestion；Grant 由 Journal 恢复且可撤销，CLI 仍只有 `once | deny`。
 
 ### dispatch checkpoint
 
@@ -72,10 +81,10 @@ Bash executor 通过 Host port 启动进程，可选使用 macOS sandbox profile
 
 ## 当前未实现
 
-- 跨 Session 或用户级持久 Bash allowlist；
-- 可由 `allow_similar` 写入的 prefix store；
+- 跨 Session、project 或用户级持久 Grant；
+- Bash Session Grant 或命令 pattern；
 - 运行中热更新 policy；
 - 不可信第三方插件沙箱；
 - 对任意 shell pipeline / expansion 的安全静态分类。
 
-这些能力若重新立项，必须新增 v2 设计和 execution plan，不能直接恢复归档文档中的 v1 类型或文件路径。
+已立项的权限目标只按上方两份 execution plan 实施。其他能力若重新立项，必须新增 v2 设计和 execution plan，不能直接恢复归档文档中的 v1 类型或文件路径。

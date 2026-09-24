@@ -2,7 +2,9 @@
 
 > 文档等级：current-v2-design
 >
-> 当前实现入口：[`README.md`](./README.md)、[`../agent-plugin-runtime/agent-spec-tool-runtime-abi.md`](../agent-plugin-runtime/agent-spec-tool-runtime-abi.md)。旧 ToolScheduler、`checkPermissions`、`session.jsonl` allowlist 与 v1 审批状态机已经归档，不是当前 API 事实。
+> 权限目标合同：[`agent-tool-permission-model.md`](./agent-tool-permission-model.md)。
+>
+> 当前实现入口：[`README.md`](./README.md)、[`../agent-plugin-runtime/agent-spec-tool-runtime-abi.md`](../agent-plugin-runtime/agent-spec-tool-runtime-abi.md)。目标设计尚未实施；旧 ToolScheduler、`checkPermissions`、`session.jsonl` allowlist 与 v1 审批状态机已经归档，不是当前 API 事实。
 
 ## 目标
 
@@ -54,7 +56,7 @@ Host capability ceiling
 - 一次性或明确的 Session scope；
 - 过期、取消和重放规则。
 
-当前 v2 不承诺动态 Bash allowlist 或全局永久授权。未来若实现，必须以新 execution plan 和 Journal event/codec 设计重新立项，不能复用 v1 `bash_allowlist_added` 事件。
+已确认目标只支持 prepared invocation `once` 与 Desktop 文件 `session` Grant，不支持动态 Bash allowlist、project 或用户级永久授权。实现必须使用新的 strict permission event/codec，不能复用 v1 `bash_allowlist_added` 或当前宽松 approval 事件。
 
 ### 5. Renderer 不拥有执行能力
 
@@ -91,7 +93,7 @@ Bash 是高风险 Host capability，除通用原则外还需要：
 - abort 后若子进程状态不确定，返回 `outcome_unknown`，不伪装成普通取消；
 - stdout/stderr 流式输出受限，完整大输出进入 Artifact，而不是无限写入 Journal。
 
-当前代码已保留 Bash 硬防线和统一 Tool Runtime 边界；“会话级 Allow 相似命令”和用户级 allowlist 尚未作为 v2 能力实现。
+当前代码已保留 Bash 硬防线和统一 Tool Runtime 边界。已确认目标仍只允许 Bash 精确 once；不会恢复“会话级 Allow 相似命令”或用户级 allowlist。
 
 ## Browser Bridge 特别规则
 
