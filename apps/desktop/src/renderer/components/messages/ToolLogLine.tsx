@@ -1,8 +1,16 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronRight, File, Search } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
-import type { GrantSuggestion } from "@actspace/shared/runtime-v2";
+import {
+  ApprovalActions,
+  ApprovalPath,
+  ApprovalPattern,
+  ApprovalReason,
+  ApprovalRow,
+  useApprovalDecision,
+  useExactGrantSuggestion,
+} from "./ApprovalParts";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_CLASS,
@@ -20,35 +28,19 @@ type ToolLogStatus = "pending" | "running" | "completed" | "failed" | "denied" |
 type FileReadApprovalMessage = Extract<MessageBlock, { kind: "read" | "grep" | "glob" }>;
 
 function FileReadApprovalLine({ message, className }: { message: FileReadApprovalMessage; className?: string }) {
-  const [suggestions, setSuggestions] = useState<readonly GrantSuggestion[]>([]);
-  const [submitting, setSubmitting] = useState<"once" | "session" | "deny" | null>(null);
-  const requestId = message.approvalRequestId;
-  useEffect(() => {
-    let active = true;
-    if (!requestId || !window.actspace?.listPendingApprovals) return;
-    void window.actspace.listPendingApprovals().then((pending) => {
-      if (active) setSuggestions(pending.find((request) => request.requestId === requestId)?.grantSuggestions ?? []);
-    }).catch(() => undefined);
-    return () => { active = false; };
-  }, [requestId]);
-  const decide = async (decision: "once" | "session" | "deny", suggestionId?: string) => {
-    if (!requestId || !window.actspace?.submitApproval || submitting !== null) return;
-    setSubmitting(decision);
-    const input = decision === "session" && suggestionId ? { requestId, decision, suggestionId } as const : { requestId, decision: decision === "session" ? "deny" as const : decision };
-    const result = await window.actspace.submitApproval(input).catch(() => ({ ok: false }));
-    if (!result.ok) setSubmitting(null);
-  };
-  const target = message.kind === "read" ? message.filePath : message.scope ?? message.pattern;
-  return <article className={`${className ?? ""} w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface`}>
-    <div className="border-b border-line bg-surface-subtle px-[var(--conversation-card-padding)] py-2 text-xs font-medium text-text-main">读取范围需要授权</div>
-    <div className="break-all px-[var(--conversation-card-padding)] pt-2 font-mono text-xs text-text-muted">{target}</div>
-    {message.reason ? <div className="px-[var(--conversation-card-padding)] pt-1 text-xs text-text-faint">{message.reason}</div> : null}
-    <div className="flex flex-wrap items-center justify-end gap-1.5 px-[var(--conversation-card-padding)] py-2">
-      <button className="h-7 rounded-act-sm px-2 text-xs text-text-muted hover:bg-surface-subtle" type="button" disabled={submitting !== null} onClick={() => void decide("deny")}>拒绝</button>
-      {suggestions.filter((suggestion) => suggestion.selector.kind === "exact").slice(0, 1).map((suggestion) => <button className="h-7 rounded-act-sm border border-line bg-surface-subtle px-2 text-xs text-text-main hover:bg-surface" type="button" disabled={submitting !== null} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话</button>)}
-      <button className="h-7 rounded-act-sm bg-action px-2 text-xs font-medium text-on-action hover:bg-action-hover" type="button" disabled={submitting !== null} onClick={() => void decide("once")}>仅本次</button>
-    </div>
-  </article>;
+  const suggestion = useExactGrantSuggestion(message.approvalRequestId);
+  const decision = useApprovalDecision(message.approvalRequestId);
+  const isRead = message.kind === "read";
+  return (
+    <ApprovalRow
+      className={className}
+      icon={isRead ? <File size={14} strokeWidth={2} /> : <Search size={14} strokeWidth={2} />}
+      verb={isRead ? "读取" : message.kind === "grep" ? "搜索" : "匹配"}
+      target={isRead ? <ApprovalPath path={message.filePath} /> : <ApprovalPattern pattern={message.pattern} scope={message.scope} />}
+      meta={<ApprovalReason reason={message.reason} />}
+      actions={<ApprovalActions state={decision} primaryLabel="允许" suggestion={suggestion} />}
+    />
+  );
 }
 
 const TOOL_LOG_LINE_TOOLTIP_CONTAINER_CLASS = "has-overflow-text max-w-full outline-none";

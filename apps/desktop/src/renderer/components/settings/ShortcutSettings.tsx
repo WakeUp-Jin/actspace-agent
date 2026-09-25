@@ -1,4 +1,4 @@
-import { Keyboard, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_QUICK_OPEN_ACCELERATOR,
@@ -9,7 +9,8 @@ import {
   type SessionListItem,
   type WorkspaceEntry,
 } from "@actspace/shared";
-import { SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
+import { Kbd, SettingGroup, SettingRow, SettingsButton, SettingsSelect, Toggle } from "./SettingsPrimitives";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 
 const FALLBACK_QUICK_OPEN_SETTINGS: QuickOpenShortcutSettings = {
   enabled: true,
@@ -124,27 +125,29 @@ export function ShortcutSettings({
     { value: "session", label: "指定会话" },
   ];
 
+  const keys = acceleratorKeys(formatAccelerator(quickOpen.accelerator));
+  const dependentDisabled = !quickOpen.enabled;
+
   return (
-      <SettingGroup title="快捷键" headingLevel={3} description="从其他应用快速唤起 Actspace。">
-        <div className="flex items-center gap-3.5 px-3.5 py-3.5">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-act-lg bg-surface-subtle text-text-main">
-            <Keyboard size={18} strokeWidth={1.8} aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-medium text-text-main">快速打开 Actspace</div>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">唤起紧凑窗口并将焦点放到输入框。</p>
-          </div>
-          <Toggle checked={quickOpen.enabled} disabled={saving} ariaLabel="启用快速唤起" onChange={(enabled) => void update({ enabled })} />
-        </div>
+      <SettingGroup title="快捷键" headingLevel={3}>
         <SettingRow
+          title="快速唤起"
+          description="在任何应用中唤起紧凑窗口，焦点直达输入框。"
+          control={<Toggle checked={quickOpen.enabled} disabled={saving} ariaLabel="启用快速唤起" onChange={(enabled) => void update({ enabled })} />}
+        />
+        <SettingRow
+          indent
+          disabled={dependentDisabled}
           title="快捷键"
-          description={status?.error ?? (quickOpen.enabled && status?.registered ? "快捷键已生效。" : "点击后按下新的组合键。")}
+          description={status?.error
+            ? <span className="text-on-danger">{status.error}</span>
+            : isRecording ? "按下新的组合键，Esc 取消。" : quickOpen.enabled && status?.registered ? "已生效。" : "点击按键后录制新的组合键。"}
           control={
-            <div className="flex items-center gap-2">
+            <>
               <button
                 ref={recorderRef}
                 type="button"
-                disabled={!quickOpen.enabled || saving}
+                disabled={dependentDisabled || saving}
                 aria-label="录制快速唤起快捷键"
                 onClick={() => setIsRecording(true)}
                 onBlur={() => setIsRecording(false)}
@@ -161,31 +164,46 @@ export function ShortcutSettings({
                   setIsRecording(false);
                   void update({ accelerator });
                 }}
-                className="min-w-[150px] rounded-act-md border border-line bg-surface px-3 py-2 font-mono text-[13px] font-semibold text-text-main outline-none transition hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20 disabled:cursor-not-allowed disabled:opacity-55"
+                className="inline-flex h-[30px] items-center gap-1 rounded-[7px] px-1 outline-none transition-colors hover:bg-hover-overlay focus-visible:ring-[3px] focus-visible:ring-focus-ring/15 disabled:cursor-not-allowed"
               >
-                {isRecording ? "请按下组合键…" : formatAccelerator(quickOpen.accelerator)}
+                {isRecording ? (
+                  <span className="px-1.5 text-[12.5px] text-text-muted">请按下组合键…</span>
+                ) : (
+                  keys.map((key, index) => (
+                    <span key={`${key}-${index}`} className="inline-flex items-center gap-1">
+                      {key.separator ? <span className="text-[11px] text-text-subtle">+</span> : null}
+                      <Kbd>{key.label}</Kbd>
+                    </span>
+                  ))
+                )}
               </button>
-              <button
-                type="button"
-                disabled={!quickOpen.enabled || saving || quickOpen.accelerator === DEFAULT_QUICK_OPEN_ACCELERATOR}
-                aria-label="恢复默认快捷键"
-                title="恢复默认快捷键"
-                onClick={() => void update({ accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR })}
-                className="grid h-9 w-9 place-items-center rounded-act-md border border-line bg-surface text-text-muted transition hover:border-line-strong hover:bg-hover-overlay hover:text-text-main disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <RotateCcw size={15} strokeWidth={1.9} aria-hidden="true" />
-              </button>
-            </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SettingsButton
+                    variant="quiet"
+                    size="icon"
+                    disabled={dependentDisabled || saving || quickOpen.accelerator === DEFAULT_QUICK_OPEN_ACCELERATOR}
+                    aria-label="恢复默认快捷键"
+                    onClick={() => void update({ accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR })}
+                  >
+                    <RotateCcw size={13} strokeWidth={1.9} aria-hidden="true" />
+                  </SettingsButton>
+                </TooltipTrigger>
+                <TooltipContent>恢复默认快捷键</TooltipContent>
+              </Tooltip>
+            </>
           }
         />
         <SettingRow
+          indent
+          disabled={dependentDisabled}
           title="打开目标"
-          description="目标不可用时自动回到第一个项目；项目为空时打开空白会话。"
+          description="目标不可用时回到第一个项目；没有项目时打开空白会话。"
           control={
             <SettingsSelect
               value={targetKind}
               options={targetOptions}
-              disabled={!quickOpen.enabled || saving}
+              disabled={dependentDisabled || saving}
               ariaLabel="快速唤起打开目标"
               onChange={(kind) => {
                 if (kind === "workspace" && projectOptions[0]) void update({ target: { kind, workspaceId: projectOptions[0].value } });
@@ -197,6 +215,8 @@ export function ShortcutSettings({
         />
         {targetKind === "workspace" ? (
           <SettingRow
+            indent
+            disabled={dependentDisabled}
             title="默认工作区"
             control={
               <SettingsSelect
@@ -204,7 +224,7 @@ export function ShortcutSettings({
                 options={projectOptions.some((option) => option.value === selectedWorkspaceId)
                   ? projectOptions
                   : [{ value: selectedWorkspaceId, label: "已移除的工作区（将自动降级）" }, ...projectOptions]}
-                disabled={!quickOpen.enabled || saving || projectOptions.length === 0}
+                disabled={dependentDisabled || saving || projectOptions.length === 0}
                 ariaLabel="快速唤起默认工作区"
                 onChange={(workspaceId) => void update({ target: { kind: "workspace", workspaceId } })}
               />
@@ -213,6 +233,8 @@ export function ShortcutSettings({
         ) : null}
         {targetKind === "session" ? (
           <SettingRow
+            indent
+            disabled={dependentDisabled}
             title="默认会话"
             control={
               <SettingsSelect
@@ -220,7 +242,7 @@ export function ShortcutSettings({
                 options={sessionOptions.some((option) => option.value === selectedSessionId)
                   ? sessionOptions
                   : [{ value: selectedSessionId, label: "已移除的会话（将自动降级）" }, ...sessionOptions]}
-                disabled={!quickOpen.enabled || saving || sessionOptions.length === 0}
+                disabled={dependentDisabled || saving || sessionOptions.length === 0}
                 ariaLabel="快速唤起默认会话"
                 onChange={(sessionId) => void update({ target: { kind: "session", sessionId } })}
               />
@@ -229,4 +251,17 @@ export function ShortcutSettings({
         ) : null}
       </SettingGroup>
   );
+}
+
+/**
+ * 把格式化后的快捷键拆成键帽。macOS 的修饰符是单字符（⌘⇧），其他平台用 "+" 连接；
+ * 非 macOS 保留 "+" 分隔，使按钮文字与原始 accelerator 一致。
+ */
+function acceleratorKeys(formatted: string): Array<{ label: string; separator: boolean }> {
+  if (formatted.includes("+")) {
+    return formatted.split("+").map((label, index) => ({ label, separator: index > 0 }));
+  }
+  const modifiers = formatted.match(/^[⌘⌃⌥⇧]*/)?.[0] ?? "";
+  const rest = formatted.slice(modifiers.length);
+  return [...modifiers.split(""), ...(rest ? [rest] : [])].map((label) => ({ label, separator: false }));
 }

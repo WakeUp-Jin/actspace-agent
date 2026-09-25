@@ -159,6 +159,7 @@ text-[rgba(...)]
 4. 外部品牌 logo 的官方颜色。
 5. 数据可视化局部色，但优先仍应抽成 chart / context token。
 6. 不随主题变化的媒体内容本身。
+7. 外观页主题缩略图：用来展示另一套主题的样子，必须固定颜色。颜色写成 `tokens.css` `:root` 中的 `--act-preview-light-*` / `--act-preview-dark-*`，只定义一次、不被深色块覆盖；组件用 `bg-[var(--act-preview-…)]` 消费（2026-09-25）。
 
 “品牌底 + 白字”不再是通用豁免。ActSpace 主操作需要随主题反色，operational green 也必须有浅深两套值。
 
@@ -201,7 +202,9 @@ text-[rgba(...)]
 ### Settings
 
 - nav selected = neutral。
-- Toggle on = operational。
+- Toggle on = operational，Toggle off = `--act-color-toggle-off`（浅 `#d3d3ce` / 深 `#4a4b45`；`border-strong` 作关闭色太重）。
+- 分组容器 = `surface` + `border`；分组内小节标题行 = `surface-subtle`。
+- 行内提醒 = warning 文字 + 图标；状态点：成功 operational，错误 danger，未配置为空心 `border-strong` 圈。
 - 连接成功 = operational，连接错误 = danger。
 
 ### 已退役页面

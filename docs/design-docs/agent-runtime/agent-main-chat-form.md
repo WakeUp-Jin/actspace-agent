@@ -180,7 +180,7 @@ Chat 文本附件在 Desktop Host 边界读取和校验，避免 renderer 读取
 3. 原始文件不超过 1 MiB；
 4. 使用严格 UTF-8 解码，允许移除 UTF-8 BOM，拒绝 NUL/二进制内容；
 5. 单次消息所有文本附件解码后合计不超过 256,000 个字符；
-6. 不静默截断，超限时整次发送失败并返回可读错误；
+6. 不静默截断，超限时整次发送拒绝并返回结构化附件错误（类型、文件名、附件 id、限制值），不将发送前校验记作 Agent 运行失败；正文和附件恢复到草稿，中文提示说明处理方法，移除目标附件后清除相应错误，总量错误按已解码长度重新计算；
 7. 原始 Artifact 和模型正文使用同一消息内容块持久化。
 
 图片沿用 Session Artifact 的 20 MiB 单文件限制。模型不支持图片输入时必须在请求准备阶段明确失败，不自动改用 `inspect_image`。
@@ -200,6 +200,7 @@ Settings v4 在现有 `general.taskDefaults` 增加 `chatCompactionTriggerRatio`
 - Agent Session 显示 Plan/Agent、Skills、Workspace/Worktree 等现有控制；
 - Chat Session 显示固定 Chat 标识，隐藏 Plan、Skills、Workspace/Worktree 和权限入口；
 - Chat 保留模型、Thinking、图片/文件附件和 Context 入口；
+- Chat 顶栏、Composer、右侧菜单和空态启动器都隐藏开发操作（工作区、分支、运行位置、Review、终端和子 Agent）；切回 Agent 后保留原有开发标签，Chat 下不运行文件新鲜度探测或终端列表同步；
 - 当前 Session 不提供形态切换按钮。
 
 首版不要求在会话列表增加新的 Badge、颜色或独立分组，不重做 Sidebar/Composer 视觉系统。

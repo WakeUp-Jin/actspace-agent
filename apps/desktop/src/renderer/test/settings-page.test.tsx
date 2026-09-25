@@ -233,6 +233,7 @@ describe("SettingsPage", () => {
   it("loads settings and renders the general section by default", async () => {
     renderSettingsPage();
     expect(await screen.findByRole("heading", { name: "通用", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "搜索" })).toBeInTheDocument();
     expect(screen.getByText("偏好")).toBeInTheDocument();
     expect(screen.getByText("能力")).toBeInTheDocument();
     expect(screen.getByText("活动")).toBeInTheDocument();
@@ -309,6 +310,51 @@ describe("SettingsPage", () => {
     });
   });
 
+  it("生成参数失焦即保存，超出范围时在行内提示且不提交", async () => {
+    const snapshot = {
+      version: 4 as const,
+      revision: "revision-1",
+      settings: {
+        version: 4 as const,
+        general: {
+          personalization: { displayName: "", responseStyle: "" },
+          agentInstructions: { systemPromptPath: "/tmp/main-agent.md" },
+          taskDefaults: { temperature: null, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 },
+          shortcuts: { quickOpen: { enabled: true, accelerator: "CommandOrControl+Shift+Space", target: { kind: "automatic" as const } } },
+        },
+        models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, explore: null } },
+        tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {} },
+        media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const } },
+        skills: { disabled: [] },
+        subagents: { routes: {} },
+        activity: { usage: { range: "30d" as const, status: "all" as const, modelFilter: "", showDetails: false, activeTab: "requests" as const } },
+      },
+    } as SettingsV4Snapshot;
+    const updateSettingsV4 = vi.fn(async () => ({ ok: true as const, snapshot: { ...snapshot, revision: "revision-2" } }));
+    window.actspace.getSettingsV4 = vi.fn(async () => snapshot);
+    window.actspace.updateSettingsV4 = updateSettingsV4;
+
+    renderSettingsPage();
+    const temperature = await screen.findByLabelText("默认温度");
+    await waitFor(() => expect(temperature).toBeEnabled());
+    await userEvent.type(temperature, "3");
+    await userEvent.tab();
+    expect(await screen.findByText("温度需在 0–2 之间；留空使用模型默认值。")).toBeInTheDocument();
+    expect(updateSettingsV4).not.toHaveBeenCalled();
+
+    await userEvent.clear(temperature);
+    await userEvent.type(temperature, "0.4");
+    await userEvent.tab();
+    await waitFor(() => {
+      expect(updateSettingsV4).toHaveBeenCalledWith({
+        namespace: "general",
+        patch: { taskDefaults: { temperature: 0.4, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 } },
+        expectedRevision: "revision-1",
+      });
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("已保存");
+  });
+
   it("keeps the settings nav fixed while the content pane owns vertical scrolling", async () => {
     renderSettingsPage();
     expect(await screen.findByRole("heading", { name: "通用", level: 2 })).toBeInTheDocument();
@@ -318,14 +364,22 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("main", { name: "设置内容" })).toHaveClass("overflow-y-auto");
   });
 
-  it("toggling 自动审查 calls updateSettings with bashAlwaysAsk", async () => {
+  it("toggling 执行前确认 calls updateSettings with bashAlwaysAsk", async () => {
     renderSettingsPage();
     await userEvent.click(await screen.findByRole("button", { name: "工具" }));
-    const toggle = await screen.findByRole("switch", { name: "自动审查" });
+    const toggle = await screen.findByRole("switch", { name: "执行前确认" });
     await userEvent.click(toggle);
     await waitFor(() => {
       expect(updateSettings).toHaveBeenCalledWith({ agent: { bashAlwaysAsk: true } });
     });
+  });
+
+  it("disables 执行前确认 while the Bash tool is off", async () => {
+    getSettings.mockResolvedValueOnce(makeSettings({ agent: { ...makeSettings().agent, disabledTools: ["bash"] } }));
+    renderSettingsPage();
+    await userEvent.click(await screen.findByRole("button", { name: "工具" }));
+    expect(await screen.findByRole("switch", { name: "执行前确认" })).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "Bash 终端" })).toHaveAttribute("aria-checked", "false");
   });
 
   it("本地更新分区可选择源码目录并启动更新", async () => {
@@ -457,8 +511,8 @@ describe("SettingsPage", () => {
     await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "通用" }));
-    expect(await screen.findByRole("heading", { name: "媒体默认", level: 3 })).toBeInTheDocument();
-    expect(screen.getByText("图片生成连接")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "媒体", level: 3 })).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: "配置图片生成服务" })).getByText("未配置")).toBeInTheDocument();
     expect(screen.getByText("配置 API Key 后，主 Agent 才能使用图片生成工具。")).toBeInTheDocument();
     expect(screen.queryByLabelText("图片生成服务 API Key")).not.toBeInTheDocument();
 
@@ -496,8 +550,8 @@ describe("SettingsPage", () => {
     await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "通用" }));
-    expect(await screen.findByText(/openai\/gpt-5\.6-luna/)).toBeInTheDocument();
-    expect(screen.getByText("可用")).toBeInTheDocument();
+    expect(await screen.findByText(/openai\/gpt-5\.6-luna · 调用时会把本地图片发送给 OpenRouter/)).toBeInTheDocument();
+    expect(screen.queryByText(/缺少 OpenRouter Key/)).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByLabelText("图片分析模型"));
     await userEvent.click(await screen.findByRole("option", { name: "Kimi K2.7 Code · Kimi" }));
@@ -631,9 +685,11 @@ describe("SettingsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "工具" }));
     expect(await screen.findByRole("heading", { name: "工具", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "联网", level: 3 })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "联网", level: 3 })).not.toBeInTheDocument();
+    expect(screen.queryByText("智谱 Web Search")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "搜索" }));
+    expect(await screen.findByRole("heading", { name: "搜索", level: 2 })).toBeInTheDocument();
     expect(screen.getByText("智谱 Web Search")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "联网搜索", level: 3 })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "通用" }));
     expect(await screen.findByLabelText("默认会话模型")).toBeInTheDocument();
     expect(screen.getByLabelText("轻量任务模型")).toBeInTheDocument();
@@ -653,10 +709,11 @@ describe("SettingsPage", () => {
       }
     };
 
-    await assertHeadingContract("通用", "通用", ["个人偏好", "Agent 指令", "任务默认", "媒体默认", "快捷键"]);
+    await assertHeadingContract("通用", "通用", ["个人偏好", "Agent 指令", "模型与生成", "媒体", "语音播放", "快捷键"]);
     await assertHeadingContract("模型", "模型", ["模型连接"]);
-    await assertHeadingContract("工具", "工具", ["代码库", "终端", "联网", "浏览器", "多媒体"]);
-    await assertHeadingContract("外观", "外观", ["主题", "字体"], 4);
+    await assertHeadingContract("搜索", "搜索", ["搜索通道"]);
+    await assertHeadingContract("工具", "工具", ["代码库", "终端", "浏览器", "多媒体", "显示"]);
+    await assertHeadingContract("外观", "外观", ["主题", "字体与字号"]);
     expect(within(main).queryByRole("heading", { name: "工具总览" })).not.toBeInTheDocument();
     expect(within(main).queryByRole("heading", { name: "联网搜索" })).not.toBeInTheDocument();
   });
@@ -676,9 +733,21 @@ describe("SettingsPage", () => {
     }
 
     await userEvent.click(screen.getByRole("button", { name: "子 Agent" }));
-    expect(screen.getByRole("heading", { name: "路由摘要", level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Explore", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explore 模型" })).toHaveTextContent("跟随会话模型");
     expect(screen.queryByRole("heading", { name: "扩展管理" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Skill 管理" })).not.toBeInTheDocument();
+  });
+
+  it("子 Agent 页选择 Explore 模型写入任务模型", async () => {
+    const usable = [{ key: "deepseek:deepseek-v4-pro", label: "DeepSeek V4 Pro", provider: "deepseek", apiModel: "deepseek-v4-pro", contextWindow: 128000, thinkingDefault: true, capabilities: {} }];
+    listUsableModels.mockImplementation(async () => ({ models: usable }) as never);
+    const updateTaskModels = vi.fn(async () => ({ taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: "deepseek:deepseek-v4-pro" } }));
+    window.actspace.updateTaskModels = updateTaskModels as never;
+    renderSettingsPage({ onBack: () => {}, initialSection: "subagents" });
+    await userEvent.click(await screen.findByRole("button", { name: "Explore 模型" }));
+    await userEvent.click(await screen.findByRole("option", { name: "DeepSeek V4 Pro" }));
+    await waitFor(() => expect(updateTaskModels).toHaveBeenCalledWith({ exploreModel: "deepseek:deepseek-v4-pro" }));
   });
 
   it("归档会话分区加载归档列表并支持恢复", async () => {

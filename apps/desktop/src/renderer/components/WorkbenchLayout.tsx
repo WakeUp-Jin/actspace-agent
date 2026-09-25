@@ -580,8 +580,8 @@ export function WorkbenchLayout({
         draftKey={draftKey}
         readDraft={readDraft}
         writeDraft={writeDraft}
-        reviewSummary={reviewSummary}
-        onOpenReview={openReviewTab}
+        reviewSummary={agentForm === "chat" ? null : reviewSummary}
+        onOpenReview={agentForm === "chat" ? undefined : openReviewTab}
         models={models}
         agentForm={agentForm}
         activeView={sessionMainView}
@@ -667,6 +667,7 @@ export function WorkbenchLayout({
   );
   const rightPanel = (
     <RightPanel
+      developmentEnabled={agentForm !== "chat"}
       contextState={effectiveContextState}
       contextSnapshot={effectiveContextSnapshot}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
@@ -705,13 +706,14 @@ export function WorkbenchLayout({
         sessionView={view === "chat" ? sessionMainView : undefined}
         onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
         centerTrailing={view === "chat" ? <>
-          {selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
+          {agentForm !== "chat" && selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
         </> : undefined}
         rightLeading={
           view === "chat" ? (
             <>
               {isRightPanelOpen ? (
                 <RightPanelObjectMenu
+                  developmentEnabled={agentForm !== "chat"}
                   sessionId={activeSessionId}
                   onOpenReview={openReviewTab}
                 />

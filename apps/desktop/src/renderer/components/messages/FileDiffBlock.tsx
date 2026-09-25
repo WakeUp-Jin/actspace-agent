@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, FilePlus, Pencil } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
-import type { GrantSuggestion } from "@actspace/shared/runtime-v2";
+import { ApprovalActions, ApprovalPath, ApprovalReason, ApprovalRow, useApprovalDecision, useExactGrantSuggestion } from "./ApprovalParts";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_CLASS,
@@ -15,46 +15,10 @@ type FileDiffMessage =
   | Extract<MessageBlock, { kind: "edit_diff" }>
   | Extract<MessageBlock, { kind: "write_diff" }>;
 
-type FileDiffDecision = "once" | "session" | "deny";
-
-const DIFF_APPROVAL_CLASS =
-  "message-row file-diff-approval w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface";
-const DIFF_APPROVAL_HEADER_CLASS =
-  "file-diff-approval-header flex min-h-8 items-center justify-between border-b border-line py-0 pr-[9px] pl-[var(--conversation-card-padding)]";
-const DIFF_APPROVAL_TITLE_CLASS = "file-diff-approval-title min-w-0 text-sm font-medium text-text-muted";
-const DIFF_APPROVAL_TARGET_CLASS =
-  "file-diff-approval-target border-b border-line bg-surface-subtle px-[var(--conversation-card-padding)] py-[9px] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
-const DIFF_APPROVAL_REASON_CLASS =
-  "file-diff-approval-reason px-[var(--conversation-card-padding)] pt-2 text-[13px] leading-[1.45] text-text-muted";
-const DIFF_APPROVAL_REASON_LABEL_CLASS = "font-semibold text-text-faint";
-const DIFF_APPROVAL_FOOTER_CLASS =
-  "file-diff-approval-footer flex min-h-[46px] items-center justify-end gap-1.5 pt-[7px] pr-[10px] pb-[9px] pl-[var(--conversation-card-padding)]";
-const DIFF_ACTION_CLASS =
-  "file-diff-action h-7 min-w-0 rounded-act-sm border-0 px-[9px] text-[13px] font-medium";
-const DIFF_ACTION_GHOST_CLASS =
-  "file-diff-action-ghost bg-transparent text-text-muted hover:bg-surface-subtle focus-visible:bg-surface-subtle";
-const DIFF_ACTION_PRIMARY_CLASS =
-  "file-diff-action-primary bg-action text-on-action hover:bg-action-hover focus-visible:bg-action-hover";
+const DIFF_APPROVAL_STATS_CLASS =
+  "file-diff-approval-stats inline-flex flex-none items-center gap-0.5 rounded-act-xs border-0 bg-transparent px-1 font-mono text-xs text-text-faint hover:bg-hover-overlay hover:text-text-main";
 const DIFF_ERROR_DETAIL_CLASS =
   "file-diff-error-detail mx-[var(--conversation-text-inset)] mt-1 rounded-act-sm bg-surface-subtle px-[9px] py-[7px] font-mono text-xs leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
-
-async function submitFileDiffApproval(requestId: string, decision: FileDiffDecision, suggestionId?: string): Promise<boolean> {
-  if (typeof window === "undefined" || !window.actspace?.submitApproval) {
-    console.warn("submitApproval bridge unavailable");
-    return false;
-  }
-  try {
-    const result = await window.actspace.submitApproval(decision === "session" && suggestionId ? { requestId, decision, suggestionId } : { requestId, decision: decision === "session" ? "deny" : decision });
-    if (!result.ok) {
-      console.warn("File write approval was not accepted", result.reason);
-      return false;
-    }
-    return true;
-  } catch (error) {
-    console.error("Failed to submit file write approval", error);
-    return false;
-  }
-}
 
 function StatusLine({
   text,
@@ -74,6 +38,25 @@ function StatusLine({
   );
 }
 
+function DiffLines({ message }: { message: FileDiffMessage }) {
+  return (
+    <pre className="file-diff-content">
+      {message.diff.split("\n").map((line, index) => (
+        <span
+          className={
+            line.startsWith("+") ? "diff-line is-add"
+            : line.startsWith("-") ? "diff-line is-remove"
+            : "diff-line"
+          }
+          key={`${message.id}-${index}`}
+        >
+          {line || " "}
+        </span>
+      ))}
+    </pre>
+  );
+}
+
 function FileDiffApprovalCard({
   message,
   actionLabel,
@@ -83,84 +66,50 @@ function FileDiffApprovalCard({
   actionLabel: string;
   className?: string;
 }) {
-  const [submitting, setSubmitting] = useState<FileDiffDecision | null>(null);
-  const [resolvedDecision, setResolvedDecision] = useState<FileDiffDecision | null>(null);
-  const [grantSuggestions, setGrantSuggestions] = useState<readonly GrantSuggestion[]>([]);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const suggestion = useExactGrantSuggestion(message.approvalRequestId);
+  const decision = useApprovalDecision(message.approvalRequestId);
+  const isWrite = message.kind === "write_diff";
+  const hasStats = message.additions > 0 || message.deletions > 0;
+  const canOpenDiff = hasStats && message.diff.trim().length > 0;
 
-  const requestId = message.approvalRequestId;
-  const disabled = !requestId || submitting !== null;
-
-  useEffect(() => {
-    let active = true;
-    if (!requestId || !window.actspace?.listPendingApprovals) return;
-    void window.actspace.listPendingApprovals().then((pending) => {
-      if (active) setGrantSuggestions(pending.find((request) => request.requestId === requestId)?.grantSuggestions ?? []);
-    }).catch(() => undefined);
-    return () => { active = false; };
-  }, [requestId]);
-
-  const decide = async (decision: FileDiffDecision, suggestionId?: string) => {
-    if (!requestId || submitting !== null) return;
-    setSubmitting(decision);
-    const submitted = await submitFileDiffApproval(requestId, decision, suggestionId);
-    if (submitted) {
-      setResolvedDecision(decision);
-    } else {
-      setSubmitting(null);
-    }
-  };
-
-  if (resolvedDecision) {
-    return (
-      <StatusLine
-        className={className}
-        isError={resolvedDecision === "deny"}
-        text={
-          resolvedDecision === "deny"
-            ? `Denied ${actionLabel.toLowerCase()} ${message.filePath}`
-            : `${actionLabel} ${message.filePath}`
-        }
-      />
-    );
+  if (decision.resolved === "deny") {
+    return <StatusLine className={className} isError text={`Denied ${actionLabel.toLowerCase()} ${message.filePath}`} />;
+  }
+  if (decision.resolved) {
+    return <StatusLine className={className} text={`${actionLabel} ${message.filePath}`} />;
   }
 
+  const stats = hasStats ? <>
+    {message.additions > 0 ? <span className="diff-additions">+{message.additions}</span> : null}
+    {message.deletions > 0 ? <span className="diff-deletions">-{message.deletions}</span> : null}
+  </> : null;
+
   return (
-    <article className={`${DIFF_APPROVAL_CLASS}${className ? ` ${className}` : ""}`}>
-      <header className={DIFF_APPROVAL_HEADER_CLASS}>
-        <span className={DIFF_APPROVAL_TITLE_CLASS}>{actionLabel} file requires approval</span>
-      </header>
-
-      <div className={DIFF_APPROVAL_TARGET_CLASS}>{message.filePath}</div>
-
-      {message.reason ? (
-        <div className={DIFF_APPROVAL_REASON_CLASS}>
-          <strong className={DIFF_APPROVAL_REASON_LABEL_CLASS}>Reason:</strong> {message.reason}
-        </div>
-      ) : null}
-
-      {grantSuggestions.length > 0 ? <div className="px-[var(--conversation-card-padding)] pt-2 text-xs text-text-muted">
-      </div> : null}
-
-      <footer className={DIFF_APPROVAL_FOOTER_CLASS}>
-        <button
-          className={`${DIFF_ACTION_CLASS} ${DIFF_ACTION_GHOST_CLASS}`}
-          type="button"
-          disabled={disabled}
-          onClick={() => decide("deny")}
-        >
-          {submitting === "deny" ? "正在拒绝…" : "拒绝"}
-        </button>
-        {grantSuggestions.filter((suggestion) => suggestion.selector.kind === "exact").slice(0, 1).map((suggestion) => <button className={`${DIFF_ACTION_CLASS} ${DIFF_ACTION_GHOST_CLASS}`} type="button" disabled={disabled} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话</button>)}
-        <button
-          className={`${DIFF_ACTION_CLASS} ${DIFF_ACTION_PRIMARY_CLASS}`}
-          type="button"
-          disabled={disabled}
-          onClick={() => decide("once")}
-        >
-          {submitting === "once" ? "正在允许…" : actionLabel === "Write" ? "写入一次" : "仅本次"}
-        </button>
-      </footer>
-    </article>
+    <ApprovalRow
+      className={className}
+      icon={isWrite ? <FilePlus size={14} strokeWidth={2} /> : <Pencil size={14} strokeWidth={2} />}
+      verb={isWrite ? "写入" : "编辑"}
+      target={<ApprovalPath path={message.filePath} />}
+      meta={<>
+        {canOpenDiff ? (
+          <button
+            className={DIFF_APPROVAL_STATS_CLASS}
+            type="button"
+            aria-expanded={diffOpen}
+            aria-label={diffOpen ? "收起改动" : "查看改动"}
+            onClick={() => setDiffOpen((value) => !value)}
+          >
+            {stats}
+            {diffOpen ? <ChevronDown size={12} strokeWidth={2.2} /> : <ChevronRight size={12} strokeWidth={2.2} />}
+          </button>
+        ) : stats ? <span className="inline-flex flex-none items-center font-mono text-xs">{stats}</span> : null}
+        <ApprovalReason reason={message.reason} />
+      </>}
+      actions={<ApprovalActions state={decision} primaryLabel={isWrite ? "写入" : "应用"} suggestion={suggestion} />}
+    >
+      {diffOpen ? <div className="px-3 pb-2.5"><DiffLines message={message} /></div> : null}
+    </ApprovalRow>
   );
 }
 
@@ -250,22 +199,7 @@ export function FileDiffBlock({ message, className, onExpand }: { message: FileD
           ? <ChevronDown size={14} strokeWidth={2.2} />
           : <ChevronRight size={14} strokeWidth={2.2} />}
       </button>
-      {expanded ? (
-        <pre className="file-diff-content">
-          {message.diff.split("\n").map((line, index) => (
-            <span
-              className={
-                line.startsWith("+") ? "diff-line is-add"
-                : line.startsWith("-") ? "diff-line is-remove"
-                : "diff-line"
-              }
-              key={`${message.id}-${index}`}
-            >
-              {line || " "}
-            </span>
-          ))}
-        </pre>
-      ) : null}
+      {expanded ? <DiffLines message={message} /> : null}
     </article>
   );
 }

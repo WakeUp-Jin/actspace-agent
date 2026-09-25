@@ -8,6 +8,21 @@ const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 
 describe("DesktopArtifactStore", () => {
+  it("copies independently for a fork, preserves integrity and rejects copying another Session's file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "actspace-artifact-fork-")); roots.push(root);
+    const store = new DesktopArtifactStore(root);
+    const source = await store.create({ bytes: Buffer.from("fork bytes"), mediaType: "image/png", owner: { sessionId: "parent", callId: "call", pluginId: "plugin", name: "image" } });
+    await expect(store.copyForSession("other", "child", source.artifactId)).rejects.toThrow("does not belong");
+    const copy = await store.copyForSession("parent", "child", source.artifactId);
+    expect(copy.artifactId).not.toBe(source.artifactId);
+    expect(copy).toMatchObject({ sha256: source.sha256, size: source.size, mediaType: source.mediaType });
+    await expect(store.readForSession("parent", copy.artifactId)).rejects.toThrow("does not belong");
+    await store.deleteForSession("parent", source.artifactId);
+    expect(Buffer.from((await store.readForSession("child", copy.artifactId)).bytes).toString()).toBe("fork bytes");
+    const grandchild = await store.copyForSession("child", "grandchild", copy.artifactId);
+    await store.deleteForSession("child", copy.artifactId);
+    await expect(store.readForSession("grandchild", grandchild.artifactId)).resolves.toMatchObject({ mediaType: "image/png" });
+  });
   it("persists owner metadata, enforces Session ownership and detects byte tampering", async () => {
     const root = await mkdtemp(join(tmpdir(), "actspace-desktop-artifact-")); roots.push(root);
     const store = new DesktopArtifactStore(root);

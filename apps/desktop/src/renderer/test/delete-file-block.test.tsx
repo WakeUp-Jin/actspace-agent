@@ -32,11 +32,15 @@ describe("DeleteFileBlock", () => {
 
     render(<DeleteFileBlock message={makeDeleteBlock()} />);
 
-    expect(screen.getByText("Delete file requires approval")).toBeInTheDocument();
+    const row = screen.getByRole("article");
+    expect(row).toHaveClass("approval-row", "border-danger/35");
     expect(screen.getByText("notes.md")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+    // 通用删除提示不重复展示，也不提供会话级授权。
+    expect(screen.queryByText(/destructive file operation/)).toBeNull();
+    expect(screen.queryByLabelText("审批原因")).toBeNull();
+    expect(screen.queryByRole("button", { name: "本会话" })).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "删除" }));
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-delete-1",
@@ -51,7 +55,7 @@ describe("DeleteFileBlock", () => {
 
     render(<DeleteFileBlock message={makeDeleteBlock()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    await userEvent.click(screen.getByRole("button", { name: "拒绝" }));
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-delete-1",
@@ -66,16 +70,16 @@ describe("DeleteFileBlock", () => {
 
     render(<DeleteFileBlock message={makeDeleteBlock()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "删除" }));
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-delete-1",
       decision: "once",
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "删除" })).toBeEnabled();
     });
-    expect(screen.getByText("Delete file requires approval")).toBeInTheDocument();
+    expect(screen.getByRole("article")).toHaveClass("approval-row");
     expect(screen.queryByText("Delete notes.md")).toBeNull();
   });
 });

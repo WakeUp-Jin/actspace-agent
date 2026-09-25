@@ -78,6 +78,22 @@ describe("production Session projections", () => {
     expect((await f.controller().browseSessions()).items[0]).toMatchObject({ sessionId: "s", completedTurnCount: 2 });
   });
 
+  it("keeps the global index at the Journal tail after close and repairs stale entries on cold reads", async () => {
+    const f = await fixture(1); const controller = f.controller();
+    await controller.browseSessions(); await controller.resume("s"); await controller.closeAll();
+    const index = join(f.root, "global-session-index.json");
+    const tail = JSON.parse((await readFile(f.path, "utf8")).trim().split("\n").at(-1)!);
+    expect(tail.type).toBe("session/end-seed");
+    const stored = JSON.parse(await readFile(index, "utf8"));
+    expect(stored.summaries[0].throughJournalSeq).toBe(tail.seq);
+    stored.summaries[0].throughJournalSeq = tail.seq - 1; await writeFile(index, JSON.stringify(stored));
+    const reader = f.controller();
+    expect((await reader.globalSessionSummaries())[0].throughJournalSeq).toBe(tail.seq - 1);
+    expect((await reader.inspect("s")).throughJournalSeq).toBe(tail.seq);
+    expect((await reader.globalSessionSummaries())[0].throughJournalSeq).toBe(tail.seq);
+    expect(JSON.parse(await readFile(index, "utf8")).summaries[0].throughJournalSeq).toBe(tail.seq);
+  });
+
   it("defers large tool results for browsing but preserves failed status and complete reads", async () => {
     const f = await fixture(1);
     const output = "x".repeat(26_000);

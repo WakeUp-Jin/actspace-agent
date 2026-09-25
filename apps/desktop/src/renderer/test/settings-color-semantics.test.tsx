@@ -15,11 +15,13 @@ describe("Settings color semantics", () => {
     const primitives = read("components/settings/SettingsPrimitives.tsx");
     const nav = read("components/settings/SettingsNav.tsx");
 
-    expect(page).toContain("bg-action");
-    expect(primitives).toContain('checked ? "bg-operational"');
-    expect(primitives).toContain("bg-selected font-semibold text-text-main");
-    expect(primitives).toContain("focus-visible:ring-focus-ring/20");
-    expect(nav).toContain("bg-selected font-semibold text-text-main");
+    expect(page).toContain("SettingsButton");
+    expect(primitives).toContain("primary: \"border-action bg-action text-on-action");
+    expect(primitives).toContain('checked ? "bg-operational" : "bg-toggle-off"');
+    expect(primitives).toContain("bg-selected font-medium text-text-main");
+    expect(primitives).toContain("focus-visible:ring-focus-ring/30");
+    expect(primitives).toContain("ok: \"h-1.5 w-1.5 bg-operational\"");
+    expect(nav).toContain("bg-selected font-medium text-text-main");
   });
 
   it("contains no legacy color consumers", () => {

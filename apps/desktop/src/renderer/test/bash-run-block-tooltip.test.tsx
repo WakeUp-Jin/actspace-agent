@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
@@ -203,7 +203,7 @@ describe("BashRunBlock tooltips", () => {
     expect(screen.getByText("沙盒")).toBeInTheDocument();
   });
 
-  it("switches an approval card to not executed after Skip", async () => {
+  it("switches an approval card to not executed after deny", async () => {
     const originalActspace = window.actspace;
     const submitApproval = vi.fn(async () => ({ ok: true }));
     window.actspace = { ...originalActspace, submitApproval } as typeof window.actspace;
@@ -219,7 +219,7 @@ describe("BashRunBlock tooltips", () => {
         sandboxed: true,
       });
 
-      await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+      await userEvent.click(screen.getByRole("button", { name: "拒绝" }));
 
       expect(await screen.findByText("未执行")).toBeInTheDocument();
       expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
@@ -232,19 +232,54 @@ describe("BashRunBlock tooltips", () => {
     }
   });
 
-  it("shows a readable tooltip for approval actions", async () => {
-    const user = userEvent.setup();
+  it("shows intent, command and cwd in the approval card with actions in the footer", () => {
     renderBash({
       id: "bash-approval-1",
       kind: "bash",
       createdAt: "2026-06-02T00:00:00.000Z",
-      title: "Approval required",
+      title: "Run Bash command: pnpm",
+      intent: "构建桌面端",
       status: "pending",
       command: "pnpm build",
+      cwd: "/workspace/actspace-agent",
+      reason: "Allow Bash to run this command once?",
+      policyLabel: "Allowlist",
       approvalRequestId: "approval-1",
     });
 
-    await user.hover(screen.getByRole("button", { name: "Open approval actions" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("更多审批操作");
+    const card = screen.getByRole("article");
+    expect(card).toHaveClass("approval-card");
+    expect(card.querySelector(".approval-card-head")).toHaveTextContent("运行构建桌面端");
+    expect(screen.getByText("pnpm build", { exact: false })).toHaveClass("bash-approval-command");
+    expect(screen.getByText("/workspace/actspace-agent")).toBeInTheDocument();
+    const footer = card.querySelector(".approval-card-footer");
+    expect(footer).toContainElement(screen.getByRole("button", { name: "运行" }));
+    expect(footer).toContainElement(screen.getByRole("button", { name: "拒绝" }));
+    // 通用审批提示、策略折叠不再出现。
+    expect(screen.queryByText(/Allow Bash to run/)).toBeNull();
+    expect(screen.queryByText("Allowlist")).toBeNull();
+  });
+
+  it("keeps the Bash approval actionable when the bridge rejects the decision", async () => {
+    const originalActspace = window.actspace;
+    const submitApproval = vi.fn(async () => ({ ok: false, reason: "expired" }));
+    window.actspace = { ...originalActspace, submitApproval } as typeof window.actspace;
+    try {
+      renderBash({
+        id: "bash-approval-reject-1",
+        kind: "bash",
+        createdAt: "2026-06-02T00:00:00.000Z",
+        title: "Run Bash command: pnpm",
+        status: "pending",
+        command: "pnpm build",
+        approvalRequestId: "approval-reject-1",
+      });
+
+      await userEvent.click(screen.getByRole("button", { name: "运行" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "运行" })).toBeEnabled());
+      expect(screen.getByText("Bash 命令")).toBeInTheDocument();
+    } finally {
+      window.actspace = originalActspace;
+    }
   });
 });

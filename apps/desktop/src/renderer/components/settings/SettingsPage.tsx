@@ -1,7 +1,6 @@
 import { SpeechSettingsSection } from "./SpeechSettingsSection";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Image, KeyRound, Loader2, Monitor, Moon, ScanSearch, ShieldCheck, Sun, X } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { CheckCircle2, ChevronRight, CircleAlert, KeyRound, Loader2, ShieldCheck, X } from "lucide-react";
 import {
   DEFAULT_IMAGE_GENERATION_BASE_URL,
   DEFAULT_IMAGE_GENERATION_MODEL,
@@ -12,8 +11,6 @@ import {
   type AppSettings,
   type LocalUpdateProgressPhase,
   type LocalUpdateState,
-  type SearchProviderId,
-  type SearchUsageResult,
   type SecretProviderId,
   type SessionListItem,
   type SetProviderKeyResult,
@@ -37,10 +34,23 @@ import {
 import { ProviderSettings } from "./ProviderSettings";
 import { UsageStatisticsPage } from "../UsageStatisticsPage";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
+import { SearchSettings } from "./SearchSettings";
+import { useToolToggle } from "./useToolToggle";
 import {
   SectionShell,
   PageShell,
+  SettingsSaveNoticeProvider,
   SettingGroup,
+  SettingLinkRow,
+  SettingSubhead,
+  InlineWarning,
+  SettingEditor,
+  SettingsButton,
+  settingsButtonClass,
+  SettingsInput,
+  StatusDot,
+  useSettingsSaveNotice,
+  useSingleEditor,
   SettingRow,
   SettingsSelect,
   Stepper,
@@ -65,14 +75,9 @@ import {
   type UiFontId,
 } from "../../appearance/types";
 
-const BTN_PRIMARY =
-  "inline-flex h-8 items-center rounded-act-md bg-action px-3.5 text-[13px] font-semibold text-on-action transition hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-60";
-const BTN_SECONDARY =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-line-strong hover:bg-hover-overlay disabled:cursor-not-allowed disabled:opacity-60";
-const BTN_DANGER =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-on-danger transition hover:border-on-danger/40 hover:bg-danger-soft";
-const BTN_QUIET =
-  "inline-flex h-8 items-center rounded-act-md px-2.5 text-[12px] font-medium text-text-muted transition-[background-color,color,transform] duration-150 hover:bg-hover-overlay hover:text-text-main active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/20 disabled:cursor-not-allowed disabled:opacity-45";
+const BTN_PRIMARY = settingsButtonClass("primary");
+const BTN_SECONDARY = settingsButtonClass("secondary");
+const BTN_DANGER = settingsButtonClass("danger");
 const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
 const LOCAL_UPDATE_POLL_MS = 700;
 
@@ -187,6 +192,13 @@ export function SettingsPage({
   const [settingsV4, setSettingsV4] = useState<SettingsV4Snapshot | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [keyModalProvider, setKeyModalProvider] = useState<SecretProviderId | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+
+  const navigate = useCallback((nextSection: SettingsSectionId) => {
+    setSection(nextSection);
+    onSectionChange?.(nextSection);
+    mainRef.current?.scrollTo?.({ top: 0 });
+  }, [onSectionChange]);
 
   useEffect(() => {
     if (!focusSpeech || !settings || section !== "general") return;
@@ -287,6 +299,7 @@ export function SettingsPage({
   );
 
   return (
+    <SettingsSaveNoticeProvider>
     <div
       data-testid="settings-page-shell"
       className="flex h-screen min-h-0 flex-col overflow-hidden bg-surface text-text-main"
@@ -300,13 +313,11 @@ export function SettingsPage({
       <div className="flex min-h-0 flex-1 overflow-hidden pt-[var(--window-chrome-strip-height)] max-[820px]:flex-col">
         <SettingsNav
           active={section}
-          onSelect={(nextSection) => {
-            setSection(nextSection);
-            onSectionChange?.(nextSection);
-          }}
+          onSelect={navigate}
           onBack={onBack}
         />
         <main
+          ref={mainRef}
           aria-label="设置内容"
           className={`min-h-0 flex-1 bg-app-bg ${section === "usage" ? "overflow-hidden" : "overflow-y-auto"}`}
         >
@@ -317,6 +328,8 @@ export function SettingsPage({
               onUpdate={handleUpdate}
               onConnectProvider={setKeyModalProvider}
               onClearProvider={handleClearKey}
+              onSaveProviderKey={handleSaveKey}
+              onNavigate={navigate}
               onArchivedSessionsChange={onArchivedSessionsChange}
               onRefresh={refresh}
               settingsV4={settingsV4}
@@ -351,6 +364,7 @@ export function SettingsPage({
         />
       ) : null}
     </div>
+    </SettingsSaveNoticeProvider>
   );
 }
 
@@ -359,6 +373,8 @@ type SectionProps = {
   onUpdate: (input: SettingsUpdateInput) => void;
   onConnectProvider: (provider: SecretProviderId) => void;
   onClearProvider: (provider: SecretProviderId) => Promise<void>;
+  onSaveProviderKey: (provider: SecretProviderId, apiKey: string) => Promise<SetProviderKeyResult>;
+  onNavigate: (section: SettingsSectionId) => void;
   onArchivedSessionsChange?: () => void;
   onRefresh: () => Promise<void>;
   onReplaceSettings: (settings: AppSettings) => void;
@@ -377,7 +393,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
   switch (section) {
     case "general":
       return (
-        <PageShell title="通用">
+        <PageShell title="通用" description="ActSpace 与 Agent 的默认行为。">
           <GeneralSection {...rest} />
           <AgentInstructionsSection {...rest} />
           <TaskModelDefaultsSection
@@ -385,12 +401,14 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
             settingsV4={rest.settingsV4}
             onUpdateNamespace={rest.onUpdateNamespace}
             onChanged={rest.onRefresh}
+            onNavigate={rest.onNavigate}
           />
           <MediaDefaultsSection
             settings={rest.settings}
             onUpdate={rest.onUpdate}
             onClear={rest.onClearProvider}
             onRefresh={rest.onRefresh}
+            onNavigate={rest.onNavigate}
           />
           <SpeechSettingsSection />
           <ShortcutSettings settings={rest.settings} onSettingsChange={rest.onReplaceSettings} />
@@ -398,18 +416,24 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       );
     case "model":
       return (
-        <PageShell title="模型" description="模型连接、API Key 与模型目录管理。" maxWidth="880">
+        <PageShell title="模型" description="模型连接、API Key 与模型目录管理。">
           <ProviderSettings settings={rest.settings} onChanged={rest.onRefresh} />
         </PageShell>
       );
+    case "search":
+      return (
+        <PageShell title="搜索" description="Agent 联网搜索使用的服务。Key 只保存在本机。">
+          <SearchSettings {...rest} />
+        </PageShell>
+      );
     case "tools":
-      return <PageShell title="工具"><ToolsSection {...rest} /></PageShell>;
+      return <PageShell title="工具" description="Agent 可以调用哪些工具，以及执行前是否需要你确认。联网搜索在「搜索」中管理。"><ToolsSection {...rest} /></PageShell>;
     case "appearance":
       return <PageShell title="外观" description="主题、字体与字号。"><AppearanceSection /></PageShell>;
     case "archivedChats":
       return <PageShell title="归档会话"><ArchivedChatsSection onArchivedSessionsChange={rest.onArchivedSessionsChange} /></PageShell>;
     case "subagents":
-      return <PageShell title="子 Agent" description="查看 Explore 及其他子 Agent 路由。"><SubagentSection settings={rest.settings} settingsV4={rest.settingsV4} /></PageShell>;
+      return <PageShell title="子 Agent" description="主 Agent 可以委派任务的专门代理。"><SubagentSection settings={rest.settings} onRefresh={rest.onRefresh} /></PageShell>;
     case "usage":
       return (
         <UsageStatisticsPage
@@ -438,7 +462,9 @@ function ProvidersSection({ settings, onUpdate, onConnectProvider, onClearProvid
 function ImageInspectionSettingsRows({
   settings,
   onUpdate,
-}: Pick<SectionProps, "settings" | "onUpdate">) {
+  onNavigate,
+}: Pick<SectionProps, "settings" | "onUpdate"> & { onNavigate?: (section: SettingsSectionId) => void }) {
+  const notifySaved = useSettingsSaveNotice();
   const current = settings.imageInspection ?? { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY };
   const selectedModel = resolveImageInspectionModel(current.modelKey);
   const provider = settings.providers[selectedModel.provider];
@@ -452,66 +478,59 @@ function ImageInspectionSettingsRows({
     value: model.key,
     label: `${model.label} · ${model.provider === "openrouter" ? "OpenRouter" : "Kimi"}`,
   }));
+  const credentialOptions = [
+    { value: "", label: `默认 Key${provider?.hasApiKey ? "" : "（不可用）"}`, disabled: !provider?.hasApiKey },
+    ...(current.credentialId && !selectedCredential ? [{ value: current.credentialId, label: "已删除的 Key（不可用）", disabled: true }] : []),
+    ...credentials.map((credential) => ({
+      value: credential.id,
+      label: `${credential.label}${credential.hasApiKey ? "" : "（不可用）"}`,
+      disabled: !credential.hasApiKey,
+    })),
+  ];
 
   return (
     <>
-      <div className="flex items-center gap-3.5 px-3.5 py-3.5 max-[600px]:flex-col max-[600px]:items-start">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-act-lg bg-surface text-text-main">
-          <ScanSearch size={18} strokeWidth={1.8} aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] font-medium text-text-main">图片分析模型</span>
-            <span className={`rounded-act-pill px-2 py-0.5 text-[10px] font-semibold ${credentialAvailable ? "bg-operational-soft text-operational" : "bg-surface text-text-faint"}`}>
-              {credentialAvailable ? "可用" : "缺少可用 Key"}
-            </span>
-          </div>
-          <p className="mt-0.5 font-mono text-[11px] leading-relaxed text-text-faint">
-            {selectedModel.apiModel}。调用时会把本地图片发送给 {providerLabel}。
-          </p>
-        </div>
-        <SettingsSelect
-          value={current.modelKey}
-          options={modelOptions}
-          ariaLabel="图片分析模型"
-          onChange={(modelKey) => {
-            const nextModel = resolveImageInspectionModel(modelKey);
-            const nextProvider = settings.providers[nextModel.provider];
-            const fallbackCredential = nextProvider?.hasApiKey
-              ? undefined
-              : nextProvider?.additionalCredentials?.find((credential) => credential.hasApiKey)?.id;
-            onUpdate({ imageInspection: { modelKey: nextModel.key as typeof current.modelKey, credentialId: fallbackCredential } });
-          }}
-        />
-      </div>
+      <SettingRow
+        title="图片分析模型"
+        description={credentialAvailable
+          ? `${selectedModel.apiModel} · 调用时会把本地图片发送给 ${providerLabel}。`
+          : (
+            <InlineWarning actionLabel={onNavigate ? "去连接" : undefined} onAction={onNavigate ? () => onNavigate("model") : undefined}>
+              缺少 {providerLabel} Key，调用会失败。
+            </InlineWarning>
+          )}
+        control={
+          <SettingsSelect
+            value={current.modelKey}
+            options={modelOptions}
+            ariaLabel="图片分析模型"
+            onChange={(modelKey) => {
+              const nextModel = resolveImageInspectionModel(modelKey);
+              const nextProvider = settings.providers[nextModel.provider];
+              const fallbackCredential = nextProvider?.hasApiKey
+                ? undefined
+                : nextProvider?.additionalCredentials?.find((credential) => credential.hasApiKey)?.id;
+              onUpdate({ imageInspection: { modelKey: nextModel.key as typeof current.modelKey, credentialId: fallbackCredential } });
+              notifySaved();
+            }}
+          />
+        }
+      />
       {credentials.length > 0 ? (
         <SettingRow
-          title="图片分析调用 Key"
-          description={`${providerLabel} 已保存的凭据；Key 本身不会进入 renderer 设置。`}
+          indent
+          title="调用 Key"
+          description={`${providerLabel} 已保存的凭据；Key 本身不会进入界面设置。`}
           control={
-            <select
-              aria-label="图片分析调用 Key"
+            <SettingsSelect
               value={current.credentialId ?? ""}
-              onChange={(event) => onUpdate({
-                imageInspection: {
-                  modelKey: current.modelKey,
-                  credentialId: event.target.value || undefined,
-                },
-              })}
-              className="h-9 min-w-[220px] rounded-act-md border border-line bg-surface px-3 text-[13px] font-medium text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 max-[600px]:w-full"
-            >
-              <option value="" disabled={!provider?.hasApiKey}>
-                默认 Key{provider?.hasApiKey ? "" : "（不可用）"}
-              </option>
-              {current.credentialId && !selectedCredential ? (
-                <option value={current.credentialId} disabled>已删除的 Key（不可用）</option>
-              ) : null}
-              {credentials.map((credential) => (
-                <option key={credential.id} value={credential.id} disabled={!credential.hasApiKey}>
-                  {credential.label}{credential.hasApiKey ? "" : "（不可用）"}
-                </option>
-              ))}
-            </select>
+              options={credentialOptions}
+              ariaLabel="图片分析调用 Key"
+              onChange={(credentialId) => {
+                onUpdate({ imageInspection: { modelKey: current.modelKey, credentialId: credentialId || undefined } });
+                notifySaved();
+              }}
+            />
           }
         />
       ) : null}
@@ -524,11 +543,13 @@ function MediaDefaultsSection({
   onUpdate,
   onClear,
   onRefresh,
+  onNavigate,
 }: {
   settings: AppSettings;
   onUpdate: (input: SettingsUpdateInput) => void;
   onClear: (provider: SecretProviderId) => Promise<void>;
   onRefresh: () => Promise<void>;
+  onNavigate?: (section: SettingsSectionId) => void;
 }) {
   const current = settings.imageGeneration ?? {
     hasApiKey: false,
@@ -536,50 +557,25 @@ function MediaDefaultsSection({
     model: DEFAULT_IMAGE_GENERATION_MODEL,
   };
   const [dialogOpen, setDialogOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const endpointLabel = formatImageGenerationEndpoint(current.baseUrl);
 
   return (
     <>
-      <SettingGroup
-        title="媒体默认"
-        headingLevel={3}
-        description="选择图片生成连接和图片分析模型。"
-      >
-          <div className="flex items-center gap-3.5 px-3.5 py-3.5 max-[600px]:flex-col max-[600px]:items-start">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-act-lg bg-surface text-text-main">
-              <Image size={18} strokeWidth={1.8} aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[13px] font-medium text-text-main">图片生成连接</span>
-                <span className={`rounded-act-pill px-2 py-0.5 text-[10px] font-semibold ${current.hasApiKey ? "bg-operational-soft text-operational" : "bg-surface text-text-faint"}`}>
-                  {current.hasApiKey ? "已配置" : "未配置"}
-                </span>
-              </div>
-              <p className="mt-1 truncate text-[12px] text-text-faint">
-                {current.hasApiKey
-                  ? `${current.model} · ${endpointLabel}`
-                  : "配置 API Key 后，主 Agent 才能使用图片生成工具。"}
-              </p>
-              {current.hasApiKey ? (
-                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-text-faint">
-                  <ShieldCheck size={12} aria-hidden="true" />
-                  API Key 已安全保存在本机
-                </p>
-              ) : null}
-            </div>
-            <button
-              ref={triggerRef}
-              type="button"
-              className={current.hasApiKey ? BTN_SECONDARY : BTN_PRIMARY}
-              aria-label={current.hasApiKey ? "编辑图片生成服务配置" : "配置图片生成服务"}
-              onClick={() => setDialogOpen(true)}
-            >
-              {current.hasApiKey ? "编辑配置" : "立即配置"}
-            </button>
-          </div>
-          <ImageInspectionSettingsRows settings={settings} onUpdate={onUpdate} />
+      <SettingGroup title="媒体" headingLevel={3} description="图片生成与图片分析默认使用的服务。">
+        <SettingLinkRow
+          title="图片生成"
+          description={current.hasApiKey
+            ? `${current.model} · ${endpointLabel}`
+            : "配置 API Key 后，主 Agent 才能使用图片生成工具。"}
+          trailing={<StatusDot tone={current.hasApiKey ? "ok" : "off"}>{current.hasApiKey ? "已配置" : "未配置"}</StatusDot>}
+          ariaLabel={current.hasApiKey ? "编辑图片生成服务配置" : "配置图片生成服务"}
+          onClick={() => {
+            triggerRef.current = document.activeElement as HTMLElement | null;
+            setDialogOpen(true);
+          }}
+        />
+        <ImageInspectionSettingsRows settings={settings} onUpdate={onUpdate} onNavigate={onNavigate} />
       </SettingGroup>
       {dialogOpen ? (
         <ImageGenerationSettingsDialog
@@ -806,26 +802,37 @@ function formatImageGenerationEndpoint(baseUrl: string): string {
 }
 
 function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) {
+  const notifySaved = useSettingsSaveNotice();
+  const editor = useSingleEditor<"displayName" | "responseStyle">();
+  const saved = settingsV4?.settings.general.personalization;
   const [displayName, setDisplayName] = useState("");
   const [responseStyle, setResponseStyle] = useState("");
-  const [editingField, setEditingField] = useState<"displayName" | "responseStyle" | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const v4Ready = Boolean(settingsV4 && settingsV4Available());
 
   useEffect(() => {
-    const general = settingsV4?.settings.general;
-    if (!general) return;
-    setDisplayName(general.personalization.displayName);
-    setResponseStyle(general.personalization.responseStyle);
-  }, [settingsV4]);
+    if (!saved || editor.openId) return;
+    setDisplayName(saved.displayName);
+    setResponseStyle(saved.responseStyle);
+  }, [saved, editor.openId]);
 
   const cancelEditing = () => {
-    const personalization = settingsV4?.settings.general.personalization;
-    setDisplayName(personalization?.displayName ?? "");
-    setResponseStyle(personalization?.responseStyle ?? "");
-    setEditingField(null);
+    setDisplayName(saved?.displayName ?? "");
+    setResponseStyle(saved?.responseStyle ?? "");
     setSaveError(null);
+    editor.close();
+  };
+
+  const toggleEditor = (field: "displayName" | "responseStyle") => {
+    if (editor.isOpen(field)) {
+      cancelEditing();
+      return;
+    }
+    setDisplayName(saved?.displayName ?? "");
+    setResponseStyle(saved?.responseStyle ?? "");
+    setSaveError(null);
+    editor.open(field);
   };
 
   const savePersonalization = async () => {
@@ -836,7 +843,8 @@ function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) {
         namespace: "general",
         patch: { personalization: { displayName: displayName.trim(), responseStyle: responseStyle.trim() } },
       });
-      setEditingField(null);
+      editor.close();
+      notifySaved();
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "个人偏好保存失败。");
     } finally {
@@ -848,87 +856,77 @@ function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) {
     <SettingGroup
       title="个人偏好"
       headingLevel={3}
-      description="影响后续回复的称呼与表达，不覆盖系统规则。"
+      description="影响 Agent 对你的称呼与表达方式，不覆盖系统规则。"
     >
-      <SettingRow
+      <SettingLinkRow
         title="显示名称"
-        description="Agent 在后续回复中使用的称呼。"
-        control={editingField === "displayName" ? (
-          <div className="flex w-[360px] items-center gap-2 max-[600px]:w-full max-[600px]:flex-wrap">
-            <input
-              aria-label="显示名称"
-              value={displayName}
-              maxLength={60}
-              onChange={(event) => setDisplayName(event.target.value)}
-              placeholder="例如：Jin"
-              className="h-9 min-w-0 flex-1 rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20 max-[600px]:basis-full"
-            />
-            <button type="button" className={BTN_QUIET} onClick={cancelEditing} disabled={saving}>取消</button>
-            <button type="button" className={BTN_SECONDARY} aria-label="保存显示名称" onClick={() => void savePersonalization()} disabled={saving}>
-              {saving ? "保存中…" : "保存"}
-            </button>
-          </div>
-        ) : (
-          <div className="flex max-w-[360px] items-center gap-3 max-[600px]:w-full max-[600px]:justify-between">
-            <span className="text-right text-[12px] leading-relaxed text-text-muted max-[600px]:text-left">{displayName || "未设置"}</span>
-            <button
-              type="button"
-              className={BTN_QUIET}
-              aria-label="编辑显示名称"
-              disabled={!v4Ready}
-              onClick={() => {
-                setEditingField("displayName");
-                setSaveError(null);
-              }}
-            >
-              编辑
-            </button>
-          </div>
-        )}
+        value={saved?.displayName || "未设置"}
+        ariaLabel="编辑显示名称"
+        expanded={editor.isOpen("displayName")}
+        controlsId="personalization-display-name"
+        disabled={!v4Ready}
+        onClick={() => toggleEditor("displayName")}
       />
-      <SettingRow
+      {editor.isOpen("displayName") ? (
+        <SettingEditor
+          id="personalization-display-name"
+          hint="最多 60 个字符"
+          error={saveError}
+          saving={saving}
+          saveAriaLabel="保存显示名称"
+          onCancel={cancelEditing}
+          onSave={() => void savePersonalization()}
+        >
+          <SettingsInput
+            aria-label="显示名称"
+            width="full"
+            autoFocus
+            value={displayName}
+            maxLength={60}
+            placeholder="例如：Jin"
+            onChange={(event) => setDisplayName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void savePersonalization();
+            }}
+          />
+        </SettingEditor>
+      ) : null}
+      <SettingLinkRow
         title="回复风格"
-        description="用一句话描述偏好的语气、详略或格式。"
-        align={editingField === "responseStyle" ? "start" : "center"}
-        control={editingField === "responseStyle" ? (
-          <div className="flex w-[360px] flex-col items-end gap-2 max-[600px]:w-full">
-            <textarea
-              aria-label="回复风格偏好"
-              value={responseStyle}
-              maxLength={500}
-              onChange={(event) => setResponseStyle(event.target.value)}
-              placeholder="例如：简洁、直接，优先给结论"
-              className="min-h-[72px] w-full resize-y rounded-act-md border border-line bg-surface px-3 py-2 text-[13px] leading-relaxed text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
-            />
-            <div className="flex items-center gap-2">
-              <button type="button" className={BTN_QUIET} onClick={cancelEditing} disabled={saving}>取消</button>
-              <button type="button" className={BTN_SECONDARY} aria-label="保存回复风格" onClick={() => void savePersonalization()} disabled={saving}>
-                {saving ? "保存中…" : "保存"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex max-w-[360px] items-center gap-3 max-[600px]:w-full max-[600px]:justify-between">
-            <span className="text-right text-[12px] leading-relaxed text-text-muted max-[600px]:text-left">{responseStyle || "未设置"}</span>
-            <button
-              type="button"
-              className={BTN_QUIET}
-              aria-label="编辑回复风格"
-              disabled={!v4Ready}
-              onClick={() => {
-                setEditingField("responseStyle");
-                setSaveError(null);
-              }}
-            >
-              编辑
-            </button>
-          </div>
-        )}
+        value={saved?.responseStyle || "未设置"}
+        ariaLabel="编辑回复风格"
+        expanded={editor.isOpen("responseStyle")}
+        controlsId="personalization-response-style"
+        disabled={!v4Ready}
+        onClick={() => toggleEditor("responseStyle")}
       />
-      {saveError ? <div role="alert" className="px-3.5 py-3 text-[12px] text-on-danger">{saveError}</div> : null}
+      {editor.isOpen("responseStyle") ? (
+        <SettingEditor
+          id="personalization-response-style"
+          hint="一句话描述偏好的语气、详略或格式 · 最多 500 字"
+          error={saveError}
+          saving={saving}
+          saveAriaLabel="保存回复风格"
+          onCancel={cancelEditing}
+          onSave={() => void savePersonalization()}
+        >
+          <textarea
+            aria-label="回复风格偏好"
+            autoFocus
+            value={responseStyle}
+            maxLength={500}
+            onChange={(event) => setResponseStyle(event.target.value)}
+            placeholder="例如：简洁、直接，优先给结论"
+            className={SETTINGS_TEXTAREA_CLASS}
+          />
+        </SettingEditor>
+      ) : null}
     </SettingGroup>
   );
 }
+
+const SETTINGS_TEXTAREA_CLASS =
+  "min-h-[76px] w-full resize-y rounded-[7px] border border-line bg-surface px-2.5 py-2 text-[13px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/15 disabled:cursor-not-allowed disabled:opacity-55";
 
 const EMPTY_TASK_MODELS: TaskModelSettings = {
   defaultChatModel: null,
@@ -936,25 +934,41 @@ const EMPTY_TASK_MODELS: TaskModelSettings = {
   exploreModel: null,
 };
 
+type GenerationDefaults = { temperature: string; maxOutputTokens: string; compactionPercent: number };
+
+function parseTemperature(raw: string): number | null | "invalid" {
+  if (!raw.trim()) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 && value <= 2 ? value : "invalid";
+}
+
+function parseMaxOutputTokens(raw: string): number | null | "invalid" {
+  if (!raw.trim()) return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 1 && value <= 1_000_000 ? value : "invalid";
+}
+
 export function TaskModelDefaultsSection({
   settings,
   settingsV4,
   onUpdateNamespace,
   onChanged,
+  onNavigate,
 }: {
   settings: AppSettings;
   settingsV4?: SettingsV4Snapshot | null;
   onUpdateNamespace?: (input: SettingsV4NamespacePatch) => Promise<SettingsV4Snapshot | null>;
   onChanged?: () => void | Promise<void>;
+  onNavigate?: (section: SettingsSectionId) => void;
 }) {
+  const notifySaved = useSettingsSaveNotice();
   const [taskModels, setTaskModels] = useState<TaskModelSettings>(settings.taskModels ?? EMPTY_TASK_MODELS);
   const [usable, setUsable] = useState<Record<"chat" | "utility" | "explore", UsableModelView[]>>({ chat: [], utility: [], explore: [] });
-  const [temperature, setTemperature] = useState("");
-  const [maxOutputTokens, setMaxOutputTokens] = useState("");
-  const [chatCompactionPercent, setChatCompactionPercent] = useState("80");
-  const [savingDefaults, setSavingDefaults] = useState(false);
+  const [draft, setDraft] = useState<GenerationDefaults>({ temperature: "", maxOutputTokens: "", compactionPercent: 80 });
+  const [fieldError, setFieldError] = useState<{ temperature?: string; maxOutputTokens?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const v4Ready = Boolean(settingsV4 && onUpdateNamespace && settingsV4Available());
+  const savedDefaults = settingsV4?.settings.general.taskDefaults;
 
   const load = async () => {
     if (!window.actspace?.listUsableModels) return;
@@ -969,12 +983,13 @@ export function TaskModelDefaultsSection({
   useEffect(() => { void load(); }, []);
   useEffect(() => { if (settings.taskModels) setTaskModels(settings.taskModels); }, [settings.taskModels]);
   useEffect(() => {
-    const defaults = settingsV4?.settings.general.taskDefaults;
-    if (!defaults) return;
-    setTemperature(defaults.temperature === null ? "" : String(defaults.temperature));
-    setMaxOutputTokens(defaults.maxOutputTokens === null ? "" : String(defaults.maxOutputTokens));
-    setChatCompactionPercent(String(Math.round((defaults.chatCompactionTriggerRatio ?? 0.8) * 100)));
-  }, [settingsV4]);
+    if (!savedDefaults) return;
+    setDraft({
+      temperature: savedDefaults.temperature === null ? "" : String(savedDefaults.temperature),
+      maxOutputTokens: savedDefaults.maxOutputTokens === null ? "" : String(savedDefaults.maxOutputTokens),
+      compactionPercent: Math.round((savedDefaults.chatCompactionTriggerRatio ?? 0.8) * 100),
+    });
+  }, [savedDefaults]);
 
   const updateTask = async (field: keyof TaskModelSettings, value: ModelKey | null) => {
     if (!window.actspace?.updateTaskModels) return;
@@ -982,104 +997,124 @@ export function TaskModelDefaultsSection({
     try {
       const result = await window.actspace.updateTaskModels({ [field]: value });
       setTaskModels(result.taskModels);
+      notifySaved();
       await onChanged?.();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "任务默认模型保存失败。");
     }
   };
 
-  const saveGenerationDefaults = async () => {
-    const parsedTemperature = temperature.trim() ? Number(temperature) : null;
-    const parsedMaxTokens = maxOutputTokens.trim() ? Number(maxOutputTokens) : null;
-    const parsedChatCompactionPercent = Number(chatCompactionPercent);
-    if ((parsedTemperature !== null && (!Number.isFinite(parsedTemperature) || parsedTemperature < 0 || parsedTemperature > 2)) ||
-      (parsedMaxTokens !== null && (!Number.isInteger(parsedMaxTokens) || parsedMaxTokens < 1 || parsedMaxTokens > 1_000_000)) ||
-      (!Number.isInteger(parsedChatCompactionPercent) || parsedChatCompactionPercent < 50 || parsedChatCompactionPercent > 95 || parsedChatCompactionPercent % 5 !== 0)) {
-      setError("请检查温度、最大输出 Token 和 Chat 压缩阈值的范围。");
-      return;
-    }
-    if (!onUpdateNamespace) return;
-    setSavingDefaults(true);
+  /** 失焦或步进时保存；只提交合法且与已保存值不同的生成参数。 */
+  const commitDefaults = async (next: GenerationDefaults) => {
+    const temperature = parseTemperature(next.temperature);
+    const maxOutputTokens = parseMaxOutputTokens(next.maxOutputTokens);
+    const errors = {
+      temperature: temperature === "invalid" ? "温度需在 0–2 之间；留空使用模型默认值。" : undefined,
+      maxOutputTokens: maxOutputTokens === "invalid" ? "需为 1–1,000,000 的整数；留空使用模型默认值。" : undefined,
+    };
+    setFieldError(errors);
+    if (temperature === "invalid" || maxOutputTokens === "invalid" || !onUpdateNamespace) return;
+    const chatCompactionTriggerRatio = next.compactionPercent / 100;
+    if (savedDefaults
+      && savedDefaults.temperature === temperature
+      && savedDefaults.maxOutputTokens === maxOutputTokens
+      && Math.abs((savedDefaults.chatCompactionTriggerRatio ?? 0.8) - chatCompactionTriggerRatio) < 1e-9) return;
     setError(null);
     try {
       await onUpdateNamespace({
         namespace: "general",
-        patch: { taskDefaults: { temperature: parsedTemperature, maxOutputTokens: parsedMaxTokens, chatCompactionTriggerRatio: parsedChatCompactionPercent / 100 } },
+        patch: { taskDefaults: { temperature, maxOutputTokens, chatCompactionTriggerRatio } },
       });
+      notifySaved();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "生成参数保存失败。");
-    } finally {
-      setSavingDefaults(false);
+      setError(cause instanceof Error ? cause.message : "生成参数保存失败，请重试。");
     }
   };
 
+  const exploreModel = taskModels.exploreModel;
+  const exploreLabel = exploreModel
+    ? usable.explore.find((model) => model.key === exploreModel)?.label ?? exploreModel
+    : "跟随会话模型";
+  const fieldDescription = (message: string | undefined, fallback?: string) =>
+    message ? <span className="text-on-danger">{message}</span> : fallback;
+
   return (
-    <SettingGroup title="任务默认" headingLevel={3} description="为新请求选择模型与生成参数。">
-      <ModelPurposeSelect label="默认会话模型" description="新会话与未显式选择模型时使用。" value={taskModels.defaultChatModel} models={usable.chat} onChange={(value) => void updateTask("defaultChatModel", value)} />
-      <ModelPurposeSelect label="轻量任务模型" description="用于标题、工具摘要和上下文压缩。" value={taskModels.utilityModel} models={usable.utility} onChange={(value) => void updateTask("utilityModel", value)} />
-      <ModelPurposeSelect label="Explore 模型" description="用于只读代码探索。" value={taskModels.exploreModel} models={usable.explore} onChange={(value) => void updateTask("exploreModel", value)} />
+    <SettingGroup title="模型与生成" headingLevel={3} description="新请求使用的模型和生成参数，只影响之后的请求。">
+      <ModelPurposeSelect label="默认会话模型" description="新会话和未手动选择模型时使用。" value={taskModels.defaultChatModel} models={usable.chat} onChange={(value) => void updateTask("defaultChatModel", value)} />
+      <ModelPurposeSelect label="轻量任务模型" description="标题、工具摘要和上下文压缩。" value={taskModels.utilityModel} models={usable.utility} onChange={(value) => void updateTask("utilityModel", value)} />
+      <SettingLinkRow
+        title="Explore 模型"
+        description="在「子 Agent」中管理。"
+        value={exploreLabel}
+        ariaLabel="前往子 Agent 设置 Explore 模型"
+        disabled={!onNavigate}
+        onClick={() => onNavigate?.("subagents")}
+      />
       <SettingRow
         title="温度"
-        description="控制回复随机性；留空使用模型默认值。"
+        description={fieldDescription(fieldError.temperature)}
         control={
-          <input
+          <SettingsInput
             aria-label="默认温度"
             type="number"
             min="0"
             max="2"
             step="0.1"
-            value={temperature}
-            onChange={(event) => setTemperature(event.target.value)}
+            width="sm"
+            numeric
+            invalid={Boolean(fieldError.temperature)}
+            value={draft.temperature}
             placeholder="模型默认"
             disabled={!v4Ready}
-            className="h-9 w-[140px] rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20 disabled:cursor-not-allowed disabled:opacity-55 max-[600px]:w-full"
+            onChange={(event) => setDraft((current) => ({ ...current, temperature: event.target.value }))}
+            onBlur={() => void commitDefaults(draft)}
+            onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
           />
         }
       />
       <SettingRow
         title="最大输出 Token"
-        description="限制主 Agent 单次输出长度；留空使用模型默认值。"
+        description={fieldDescription(fieldError.maxOutputTokens)}
         control={
-          <input
+          <SettingsInput
             aria-label="默认最大输出 Token"
             type="number"
             min="1"
             max="1000000"
             step="1"
-            value={maxOutputTokens}
-            onChange={(event) => setMaxOutputTokens(event.target.value)}
+            width="sm"
+            numeric
+            invalid={Boolean(fieldError.maxOutputTokens)}
+            value={draft.maxOutputTokens}
             placeholder="模型默认"
             disabled={!v4Ready}
-            className="h-9 w-[140px] rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20 disabled:cursor-not-allowed disabled:opacity-55 max-[600px]:w-full"
+            onChange={(event) => setDraft((current) => ({ ...current, maxOutputTokens: event.target.value }))}
+            onBlur={() => void commitDefaults(draft)}
+            onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
           />
         }
       />
       <SettingRow
-        title="Chat 自动压缩阈值"
-        description="仅影响 Chat 形态；达到上下文窗口的该比例时沿用现有自动压缩流程。"
+        title="自动压缩阈值"
+        description={fieldDescription(error ?? undefined, "仅 Chat 形态：上下文占用达到该比例时压缩历史。")}
         control={
-          <div className="flex items-center gap-2">
-            <input
-              aria-label="Chat 自动压缩阈值"
-              type="number"
-              min="50"
-              max="95"
-              step="5"
-              value={chatCompactionPercent}
-              onChange={(event) => setChatCompactionPercent(event.target.value)}
-              disabled={!v4Ready}
-              className="h-9 w-[100px] rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20 disabled:cursor-not-allowed disabled:opacity-55"
-            />
-            <span className="text-[13px] text-text-muted">%</span>
-          </div>
+          <Stepper
+            ariaLabel="自动压缩阈值"
+            value={draft.compactionPercent}
+            min={50}
+            max={95}
+            step={5}
+            defaultValue={80}
+            disabled={!v4Ready}
+            format={(value) => `${value}%`}
+            onChange={(compactionPercent) => {
+              const next = { ...draft, compactionPercent };
+              setDraft(next);
+              void commitDefaults(next);
+            }}
+          />
         }
       />
-      <div className="flex items-center justify-between gap-3 px-3.5 py-3 max-[600px]:flex-col max-[600px]:items-start">
-        <span className={`text-[12px] ${error ? "text-on-danger" : "text-text-faint"}`}>{error ?? "生成参数只影响新请求。"}</span>
-        <button type="button" className={BTN_SECONDARY} disabled={!v4Ready || savingDefaults} onClick={() => void saveGenerationDefaults()}>
-          {savingDefaults ? "保存中…" : "保存生成参数"}
-        </button>
-      </div>
     </SettingGroup>
   );
 }
@@ -1177,12 +1212,11 @@ function LocalUpdateSection() {
 
   return (
     <>
-      <SectionShell title="更新来源" description="从本机源码重新构建并替换已安装的 Actspace.app。">
-        <SettingGroup>
+        <SettingGroup title="更新来源" headingLevel={3} description="从本机源码重新构建并替换已安装的 Actspace.app。">
           <SettingRow
             title="源码目录"
             description={
-              <span className="break-all">
+              <span className="break-all font-mono text-[11.5px] text-text-faint">
                 {sourceText}
                 {state?.sourceRoot && !state.sourceValid ? <span className="ml-2 text-on-danger">目录不可用</span> : null}
               </span>
@@ -1198,7 +1232,7 @@ function LocalUpdateSection() {
             title="安装目标"
             description={
               <span className="flex max-w-[430px] flex-col gap-1">
-                <span className="break-all">{appTargetText}</span>
+                <span className="break-all font-mono text-[11.5px] text-text-faint">{appTargetText}</span>
                 {state?.appExecutablePath ? (
                   <span className="break-all text-text-subtle">当前进程：{state.appExecutablePath}</span>
                 ) : null}
@@ -1227,7 +1261,6 @@ function LocalUpdateSection() {
             align="start"
           />
         </SettingGroup>
-      </SectionShell>
       {progressOpen && state ? (
         <LocalUpdateProgressDialog state={state} onClose={() => setProgressOpen(false)} />
       ) : null}
@@ -1390,134 +1423,12 @@ function LocalUpdateProgressDialog({
   );
 }
 
-const SEARCH_PROVIDER_ROWS: Array<{
-  provider: SearchProviderId;
-  label: string;
-  description: string;
-}> = [
-  {
-    provider: "zhipu",
-    label: "智谱 Web Search",
-    description: "国内搜索通道；按次计费（search_pro ¥0.03/次），中文内容覆盖好。",
-  },
-  {
-    provider: "tavily",
-    label: "Tavily",
-    description: "国际搜索通道优先级 1；每月 1000 credits 免费，超出按量计费。",
-  },
-  {
-    provider: "tinyfish",
-    label: "TinyFish",
-    description: "国际搜索通道优先级 2；搜索接口目前免费（按套餐限速）。",
-  },
-  {
-    provider: "exa",
-    label: "Exa",
-    description: "国际搜索通道优先级 3；语义搜索，按量计费。",
-  },
-];
-
-function SearchProviderRow({
-  provider,
-  label,
-  description,
-  hasApiKey,
-  onConnect,
-  onClear,
-}: {
-  provider: SearchProviderId;
-  label: string;
-  description: string;
-  hasApiKey: boolean;
-  onConnect: (provider: SecretProviderId) => void;
-  onClear: (provider: SecretProviderId) => Promise<void>;
-}) {
-  const badge = hasApiKey
-    ? { text: "已连接", className: "bg-success-soft text-on-success" }
-    : { text: "未连接", className: "bg-surface-subtle text-text-faint" };
-
-  return (
-    <div className="flex items-center justify-between gap-4 px-3.5 py-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-medium text-text-main">{label}</span>
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}
-          >
-            {badge.text}
-          </span>
-        </div>
-        <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">{description}</p>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {hasApiKey ? (
-          <button type="button" className={BTN_DANGER} onClick={() => void onClear(provider)}>
-            断开连接
-          </button>
-        ) : (
-          <button type="button" className={BTN_PRIMARY} onClick={() => onConnect(provider)}>
-            连接
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Tavily 额度显示：账户级 plan credits 用量（GET /usage）。其余 provider 无公开用量接口。 */
-function TavilyUsageRow({ hasApiKey }: { hasApiKey: boolean }) {
-  const [usage, setUsage] = useState<SearchUsageResult | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!hasApiKey || typeof window === "undefined" || !window.actspace?.getSearchUsage) {
-      setUsage(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    window.actspace
-      .getSearchUsage()
-      .then((result) => {
-        if (!cancelled) setUsage(result);
-      })
-      .catch(() => {
-        if (!cancelled) setUsage({ ok: false, error: "Tavily 用量查询失败。" });
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hasApiKey]);
-
-  if (!hasApiKey) return null;
-
-  return (
-    <div className="px-4 py-3">
-      <p className="text-[12px] text-text-faint">
-        {loading
-          ? "查询 Tavily 剩余额度中…"
-          : usage?.ok && usage.tavily
-            ? `Tavily 本周期已用 ${usage.tavily.planUsage}${
-                usage.tavily.planLimit !== null ? ` / ${usage.tavily.planLimit}` : ""
-              } credits${
-                usage.tavily.planLimit !== null
-                  ? `，剩余 ${Math.max(usage.tavily.planLimit - usage.tavily.planUsage, 0)}`
-                  : ""
-              }。`
-            : usage?.error ?? "Tavily 用量暂不可用。"}
-      </p>
-    </div>
-  );
-}
-
 function AgentInstructionsSection({ settings }: SectionProps) {
+  const notifySaved = useSettingsSaveNotice();
   const [promptFile, setPromptFile] = useState<AgentSystemPromptFile | null>(null);
   const [draftPrompt, setDraftPrompt] = useState("");
   const [editorOpen, setEditorOpen] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
   const promptBridgeReady = hasPromptFileBridge();
 
@@ -1529,7 +1440,6 @@ function AgentInstructionsSection({ settings }: SectionProps) {
       if (!promptBridgeReady) {
         setPromptFile(null);
         setDraftPrompt("");
-        setSaved(false);
         setPromptError("系统提示词文件接口不可用。");
         return;
       }
@@ -1539,7 +1449,6 @@ function AgentInstructionsSection({ settings }: SectionProps) {
         if (cancelled) return;
         setPromptFile(next);
         setDraftPrompt(next.content);
-        setSaved(false);
       } catch (error) {
         if (cancelled) return;
         console.error("Failed to load agent system prompt", error);
@@ -1556,94 +1465,67 @@ function AgentInstructionsSection({ settings }: SectionProps) {
   }, [promptBridgeReady]);
 
   const dirty = Boolean(promptFile && draftPrompt !== promptFile.content);
-  const charCount = draftPrompt.length;
+  const closeEditor = () => {
+    setDraftPrompt(promptFile?.content ?? "");
+    if (promptFile) setPromptError(null);
+    setEditorOpen(false);
+  };
   const savePrompt = async () => {
     if (!promptBridgeReady || !promptFile) {
       setPromptError("系统提示词文件接口不可用。");
       return;
     }
+    setSaving(true);
     setPromptError(null);
     try {
       const next = await window.actspace.writeAgentSystemPrompt({ content: draftPrompt });
       setPromptFile(next);
       setDraftPrompt(next.content);
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 1800);
+      setEditorOpen(false);
+      notifySaved();
     } catch (error) {
       console.error("Failed to save agent system prompt", error);
-      setPromptError("保存系统提示词文件失败。");
+      setPromptError("保存系统提示词文件失败，内容已保留。");
+    } finally {
+      setSaving(false);
     }
   };
 
+  const path = promptFile?.path ?? settings.agent.systemPromptPath;
   return (
-    <SettingGroup
-      title="Agent 指令"
-      headingLevel={3}
-      description="高级提示词默认收起，保存后从下一次请求开始生效。"
-    >
-      <SettingRow
+    <SettingGroup title="Agent 指令" headingLevel={3}>
+      <SettingLinkRow
         title="系统提示词"
-        description={promptError ?? "由主 Agent 使用，不会覆盖项目指令或安全规则。"}
-        control={
-          <button
-            type="button"
-            className={BTN_QUIET}
-            aria-label={editorOpen ? "收起 Agent 指令" : "编辑 Agent 指令"}
-            aria-expanded={editorOpen}
-            aria-controls="agent-system-prompt-editor"
-            disabled={!promptBridgeReady || !promptFile}
-            onClick={() => setEditorOpen((open) => !open)}
-          >
-            {editorOpen ? "收起" : "编辑"}
-          </button>
-        }
+        description={promptError && !editorOpen ? <span className="font-sans text-[12px] text-on-danger">{promptError}</span> : path}
+        monoDescription
+        value={promptFile ? `${promptFile.content.length.toLocaleString("zh-CN")} 字` : undefined}
+        ariaLabel={editorOpen ? "收起 Agent 指令" : "编辑 Agent 指令"}
+        expanded={editorOpen}
+        controlsId="agent-system-prompt-editor"
+        disabled={!promptBridgeReady || !promptFile}
+        onClick={() => (editorOpen ? closeEditor() : setEditorOpen(true))}
       />
       {editorOpen ? (
-        <div id="agent-system-prompt-editor" className="flex flex-col gap-3 bg-surface px-3.5 py-3.5">
-          <label htmlFor="agent-system-prompt" className="text-[13px] font-medium text-text-main">
-            自定义系统提示词
-          </label>
-          <div className="break-all text-[12px] text-text-faint">
-            {promptFile?.path ?? settings.agent.systemPromptPath}
-          </div>
+        <SettingEditor
+          id="agent-system-prompt-editor"
+          hint={`保存后从下一次请求生效 · ${draftPrompt.length.toLocaleString("zh-CN")} / ${AGENT_SYSTEM_PROMPT_MAX_CHARS.toLocaleString("zh-CN")}`}
+          error={promptError}
+          saving={saving}
+          saveDisabled={!dirty}
+          onCancel={closeEditor}
+          onSave={() => void savePrompt()}
+        >
           <textarea
             id="agent-system-prompt"
             value={draftPrompt}
             maxLength={AGENT_SYSTEM_PROMPT_MAX_CHARS}
-            onChange={(event) => {
-              setDraftPrompt(event.target.value);
-              setSaved(false);
-            }}
-            className="h-[132px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
+            onChange={(event) => setDraftPrompt(event.target.value)}
+            className={`${SETTINGS_TEXTAREA_CLASS} min-h-[180px] font-mono text-[12px]`}
             spellCheck={false}
+            autoFocus
             aria-label="主 Agent 自定义系统提示词"
-            disabled={!promptBridgeReady || !promptFile}
           />
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-[12px] text-text-faint">
-              {charCount.toLocaleString("zh-CN")} / {AGENT_SYSTEM_PROMPT_MAX_CHARS.toLocaleString("zh-CN")}
-              {saved && !dirty ? <span className="ml-2 text-on-success">已保存</span> : null}
-              {promptError ? <span className="ml-2 text-on-danger">{promptError}</span> : null}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className={BTN_SECONDARY}
-                onClick={() => {
-                  setDraftPrompt(promptFile?.content ?? "");
-                  setSaved(false);
-                  setPromptError(null);
-                }}
-                disabled={!dirty}
-              >
-                撤销更改
-              </button>
-              <button type="button" className={BTN_PRIMARY} onClick={() => void savePrompt()} disabled={!dirty}>
-                保存
-              </button>
-            </div>
-          </div>
-        </div>
+        </SettingEditor>
       ) : null}
     </SettingGroup>
   );
@@ -1651,233 +1533,193 @@ function AgentInstructionsSection({ settings }: SectionProps) {
 
 function SubagentSection({
   settings,
-  settingsV4,
-}: Pick<SectionProps, "settings" | "settingsV4">) {
-  const exploreRoute = settingsV4?.settings.subagents.routes.explore;
-  const exploreModel = exploreRoute?.model ?? settings.taskModels?.exploreModel ?? null;
-  const enabled = exploreRoute?.enabled ?? Boolean(exploreModel);
+  onRefresh,
+}: Pick<SectionProps, "settings" | "onRefresh">) {
+  const notifySaved = useSettingsSaveNotice();
+  const [exploreModel, setExploreModel] = useState<ModelKey | null>(settings.taskModels?.exploreModel ?? null);
+  const [models, setModels] = useState<UsableModelView[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { setExploreModel(settings.taskModels?.exploreModel ?? null); }, [settings.taskModels?.exploreModel]);
+  useEffect(() => {
+    if (!window.actspace?.listUsableModels) return;
+    let cancelled = false;
+    void window.actspace.listUsableModels({ purpose: "explore" })
+      .then((result) => { if (!cancelled) setModels(result.models); })
+      .catch(() => { if (!cancelled) setError("可用模型读取失败。"); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const update = async (value: ModelKey | null) => {
+    if (!window.actspace?.updateTaskModels) return;
+    setError(null);
+    try {
+      const result = await window.actspace.updateTaskModels({ exploreModel: value });
+      setExploreModel(result.taskModels.exploreModel);
+      notifySaved();
+      await onRefresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Explore 模型保存失败。");
+    }
+  };
 
   return (
-    <SectionShell>
-      <SettingGroup
-        title="路由摘要"
-        description="查看 Explore 及其他子 Agent 路由。具体模型绑定统一在通用页面管理。"
-      >
-        <SettingRow
-          title="Explore"
-          description="只读代码探索使用的子 Agent；未单独绑定时回退主会话模型。"
-          control={
-            <span className={`rounded-act-pill px-2.5 py-1 text-[11px] font-semibold ${enabled ? "bg-operational-soft text-operational" : "bg-surface-subtle text-text-faint"}`}>
-              {enabled ? "已启用" : "跟随主模型"}
-            </span>
-          }
-        />
-        <SettingRow
-          title="绑定模型"
-          description="使用 provider-qualified ModelKey 保留连接身份，避免仅按展示名称匹配。"
-          control={<span className="max-w-[260px] truncate font-mono text-[11px] text-text-muted">{exploreModel ?? "未单独绑定"}</span>}
-          align="start"
-        />
-        <div className="px-4 py-3 text-[12px] text-text-faint">
-          前往“通用 → 任务默认”修改 Explore 模型；断开连接不会删除历史会话、事件记录或使用统计。
-        </div>
-      </SettingGroup>
-    </SectionShell>
+    <SettingGroup title="Explore" headingLevel={3} description="只读代码探索：读取、搜索、列目录；不写文件，不执行命令。">
+      <ModelPurposeSelect
+        label="Explore 模型"
+        description={error ? undefined : "未单独设置时跟随默认会话模型。"}
+        emptyLabel="跟随会话模型"
+        value={exploreModel}
+        models={models}
+        disabled={!window.actspace?.updateTaskModels}
+        onChange={(value) => void update(value)}
+      />
+      {error ? <div role="alert" className="px-4 py-2.5 text-[12px] text-on-danger">{error}</div> : null}
+    </SettingGroup>
   );
 }
 
-function ToolsSection({ settings, onUpdate, onConnectProvider, onClearProvider, settingsV4, onUpdateNamespace }: SectionProps) {
-  const disabled = settingsV4?.settings.tools.disabledTools ?? settings.agent.disabledTools;
+function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace }: SectionProps) {
+  const notifySaved = useSettingsSaveNotice();
+  const tools = useToolToggle({ settings, settingsV4, onUpdate, onUpdateNamespace });
   const bashAlwaysAsk = settingsV4?.settings.tools.bash.alwaysAsk ?? settings.agent.bashAlwaysAsk;
   const showFileChangeStats = settingsV4?.settings.tools.showFileChangeStats !== false;
   const [browserDetailsOpen, setBrowserDetailsOpen] = useState(false);
-  const browserDisabled = disabled.includes(BROWSER_TOOL_GROUP) || disabled.includes("browser_help");
+  const bashEnabled = tools.isEnabled("bash");
+  const browserEnabled = tools.isEnabled(BROWSER_TOOL_GROUP) && tools.isEnabled("browser_help");
   const browserExecutionTools = BROWSER_TOOL_ITEMS.filter((tool) => tool.kind !== "capability");
   const browserCapabilities = BROWSER_TOOL_ITEMS.filter((tool) => tool.kind === "capability");
   const codeTools = PRIMARY_TOOL_ITEMS.filter((tool) => ["read_file", "grep", "glob", "list_directory", "edit_file_diff", "write_file"].includes(tool.name));
-  const networkTools = PRIMARY_TOOL_ITEMS.filter((tool) => tool.name === "web_search");
   const mediaTools = PRIMARY_TOOL_ITEMS.filter((tool) => ["generate_image", "inspect_image"].includes(tool.name));
+  const enabledCodeTools = codeTools.filter((tool) => tools.isEnabled(tool.name)).length;
+  const imageGenerationReady = settings.imageGeneration?.hasApiKey === true;
+  const imageInspectionModel = resolveImageInspectionModel((settings.imageInspection ?? { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY }).modelKey);
+  const imageInspectionReady = settings.providers[imageInspectionModel.provider]?.hasApiKey === true
+    || Boolean(settings.providers[imageInspectionModel.provider]?.additionalCredentials?.some((credential) => credential.hasApiKey));
 
-  const toggleTool = (name: string, enabled: boolean) => {
-    const set = new Set(disabled);
-    if (enabled) {
-      set.delete(name);
-    } else {
-      set.add(name);
-    }
-    const nextDisabledTools = [...set];
-    if (settingsV4 && settingsV4Available()) {
-      void onUpdateNamespace({ namespace: "tools", patch: { disabledTools: nextDisabledTools } }).catch((error: unknown) => {
-        console.error("Failed to update tool settings", error);
+  const writeToolsPatch = (patch: Extract<SettingsV4NamespacePatch, { namespace: "tools" }>["patch"], legacy: () => void, label: string) => {
+    if (tools.v4Writable) {
+      void onUpdateNamespace({ namespace: "tools", patch }).then(() => notifySaved()).catch((error: unknown) => {
+        console.error(`Failed to update ${label}`, error);
       });
     } else {
-      onUpdate({ agent: { disabledTools: nextDisabledTools } });
+      legacy();
+      notifySaved();
     }
   };
 
   const toggleBrowserGroup = (enabled: boolean) => {
-    const set = new Set(disabled);
-    if (enabled) {
-      set.delete(BROWSER_TOOL_GROUP);
-      set.delete("browser_help");
-    } else {
-      set.add(BROWSER_TOOL_GROUP);
-    }
-    const nextDisabledTools = [...set];
-    if (settingsV4 && settingsV4Available()) {
-      void onUpdateNamespace({ namespace: "tools", patch: { disabledTools: nextDisabledTools } }).catch((error: unknown) => {
-        console.error("Failed to update browser settings", error);
-      });
-    } else {
-      onUpdate({ agent: { disabledTools: nextDisabledTools } });
-    }
+    tools.setToolEnabled(enabled ? [BROWSER_TOOL_GROUP, "browser_help"] : [BROWSER_TOOL_GROUP], enabled);
   };
 
-  const toolDescription = (tool: (typeof PRIMARY_TOOL_ITEMS)[number]) => {
-    if (!tool.conditional) return tool.description;
-    return `${tool.description}（是否可用取决于当前供应商配置）`;
-  };
-
-  const renderBrowserItem = (tool: (typeof BROWSER_TOOL_ITEMS)[number]) => (
+  const renderToolRow = (tool: (typeof PRIMARY_TOOL_ITEMS)[number], options: { indent?: boolean; disabled?: boolean; description?: ReactNode } = {}) => (
     <SettingRow
       key={tool.name}
+      tight
+      indent={options.indent}
+      disabled={options.disabled}
       title={tool.label}
-      description={tool.description}
-      control={
-        <Toggle
-          checked={!disabled.includes(tool.name)}
-          disabled={browserDisabled}
-          onChange={(next) => toggleTool(tool.name, next)}
-          ariaLabel={tool.label}
-        />
-      }
+      description={options.description ?? tool.description}
+      control={<Toggle checked={tools.isEnabled(tool.name)} disabled={options.disabled} onChange={(next) => tools.setToolEnabled(tool.name, next)} ariaLabel={tool.label} />}
     />
   );
 
+  const renderBrowserItem = (tool: (typeof BROWSER_TOOL_ITEMS)[number]) => renderToolRow(tool, {
+    indent: true,
+    disabled: !browserEnabled,
+    description: tool.description,
+  });
+
+  const mediaDescription = (tool: (typeof PRIMARY_TOOL_ITEMS)[number]) => {
+    if (tool.name === "generate_image") {
+      return imageGenerationReady
+        ? "使用「通用 → 媒体」中配置的服务。"
+        : <InlineWarning>图片生成服务尚未配置，工具不会出现。</InlineWarning>;
+    }
+    return imageInspectionReady
+      ? "使用「通用 → 媒体」中选择的模型。"
+      : <InlineWarning>当前图片分析模型缺少可用 Key。</InlineWarning>;
+  };
+
   return (
     <>
-        <SettingGroup title="代码库" headingLevel={3} description="读取、搜索和修改工作区文件。">
-          {codeTools.map((tool) => (
-            <SettingRow
-              key={tool.name}
-              title={tool.label}
-              description={toolDescription(tool)}
-              control={<Toggle checked={!disabled.includes(tool.name)} onChange={(next) => toggleTool(tool.name, next)} ariaLabel={tool.label} />}
-            />
-          ))}
+      <SettingGroup title="代码库" headingLevel={3} description="读取、搜索和修改工作区文件。" meta={`${enabledCodeTools} / ${codeTools.length} 已启用`}>
+        {codeTools.map((tool) => renderToolRow(tool))}
+      </SettingGroup>
+
+      <SettingGroup title="终端" headingLevel={3}>
+        {PRIMARY_TOOL_ITEMS.filter((tool) => tool.name === "bash").map((tool) => (
           <SettingRow
-            title="显示写入变动"
-            description="生成时每秒更新字符量，完成后显示增删行数，不自动展开内容。"
-            control={
-              <Toggle
-                checked={showFileChangeStats}
-                onChange={(next) => {
-                  if (settingsV4 && settingsV4Available()) {
-                    void onUpdateNamespace({ namespace: "tools", patch: { showFileChangeStats: next } }).catch((error: unknown) => {
-                      console.error("Failed to update file change display settings", error);
-                    });
-                  }
-                }}
-                ariaLabel="显示写入变动"
-              />
-            }
+            key={tool.name}
+            title={tool.label}
+            description={tool.description}
+            control={<Toggle checked={bashEnabled} onChange={(next) => tools.setToolEnabled(tool.name, next)} ariaLabel={tool.label} />}
           />
-        </SettingGroup>
-
-        <SettingGroup title="终端" headingLevel={3} description="执行工作区命令，并控制 Bash 运行前确认。">
-          <SettingRow
-            title="自动审查"
-            description="每条 Bash 命令在执行前向你确认；硬性拒绝规则仍然生效。"
-            control={
-              <Toggle
-                checked={bashAlwaysAsk}
-                onChange={(next) => {
-                  if (settingsV4 && settingsV4Available()) {
-                    void onUpdateNamespace({ namespace: "tools", patch: { bash: { alwaysAsk: next } } }).catch((error: unknown) => {
-                      console.error("Failed to update Bash review settings", error);
-                    });
-                  } else {
-                    onUpdate({ agent: { bashAlwaysAsk: next } });
-                  }
-                }}
-                ariaLabel="自动审查"
-              />
-            }
-          />
-          {PRIMARY_TOOL_ITEMS.filter((tool) => tool.name === "bash").map((tool) => (
-            <SettingRow
-              key={tool.name}
-              title={tool.label}
-              description={tool.description}
-              control={<Toggle checked={!disabled.includes(tool.name)} onChange={(next) => toggleTool(tool.name, next)} ariaLabel={tool.label} />}
+        ))}
+        <SettingRow
+          indent
+          disabled={!bashEnabled}
+          title="执行前确认"
+          description="每条命令执行前询问你；硬性拒绝规则始终生效。"
+          control={
+            <Toggle
+              checked={bashAlwaysAsk}
+              disabled={!bashEnabled}
+              onChange={(next) => writeToolsPatch({ bash: { alwaysAsk: next } }, () => onUpdate({ agent: { bashAlwaysAsk: next } }), "Bash review settings")}
+              ariaLabel="执行前确认"
             />
-          ))}
-        </SettingGroup>
+          }
+        />
+      </SettingGroup>
 
-        <SettingGroup title="联网" headingLevel={3} description="控制联网搜索，并配置可用的搜索通道。">
-          {networkTools.map((tool) => (
-            <SettingRow
-              key={tool.name}
-              title={tool.label}
-              description={tool.description}
-              control={<Toggle checked={!disabled.includes(tool.name)} onChange={(next) => toggleTool(tool.name, next)} ariaLabel={tool.label} />}
-            />
-          ))}
-          {SEARCH_PROVIDER_ROWS.map(({ provider, label, description }) => (
-            <SearchProviderRow
-              key={provider}
-              provider={provider}
-              label={label}
-              description={description}
-              hasApiKey={settings.searchProviders[provider].hasApiKey}
-              onConnect={onConnectProvider}
-              onClear={onClearProvider}
-            />
-          ))}
-          <TavilyUsageRow hasApiKey={settings.searchProviders.tavily.hasApiKey} />
-        </SettingGroup>
+      <SettingGroup title="浏览器" headingLevel={3}>
+        <SettingRow
+          title="浏览器工具"
+          description="需要 Browser Bridge 与 Chrome 扩展；修改从下一次模型调用开始生效。"
+          control={<Toggle checked={browserEnabled} onChange={toggleBrowserGroup} ariaLabel="浏览器" />}
+        />
+        <SettingLinkRow
+          indent
+          disabled={!browserEnabled}
+          title="高级设置"
+          description="按类别启用浏览器操作。"
+          ariaLabel="浏览器高级设置"
+          expanded={browserDetailsOpen}
+          controlsId="browser-tool-details"
+          onClick={() => setBrowserDetailsOpen((open) => !open)}
+        />
+        {browserDetailsOpen ? (
+          <div id="browser-tool-details" className="divide-y divide-line/60">
+            <SettingSubhead indent>执行工具</SettingSubhead>
+            {browserExecutionTools.map(renderBrowserItem)}
+            <SettingSubhead indent>敏感能力</SettingSubhead>
+            {browserCapabilities.map((tool) => renderToolRow(tool, {
+              indent: true,
+              disabled: !browserEnabled,
+              description: tool.description,
+            }))}
+          </div>
+        ) : null}
+      </SettingGroup>
 
-        <SettingGroup title="浏览器" headingLevel={3} description="默认只提供一个浏览器入口，高级设置从下一次模型调用开始生效。">
-          <SettingRow
-            title="浏览器工具"
-            description="可用性取决于 Browser Bridge 与 Chrome 扩展配置。"
-            control={
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="inline-flex h-8 items-center gap-1 rounded-act-md px-2 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover-overlay hover:text-text-main"
-                  aria-label="浏览器高级设置"
-                  aria-expanded={browserDetailsOpen}
-                  aria-controls="browser-tool-details"
-                  onClick={() => setBrowserDetailsOpen((open) => !open)}
-                >
-                  {browserDetailsOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
-                  高级设置
-                </button>
-                <Toggle checked={!browserDisabled} onChange={toggleBrowserGroup} ariaLabel="浏览器" />
-              </div>
-            }
-          />
-          {browserDetailsOpen ? (
-            <div id="browser-tool-details" className="divide-y divide-line/70 border-t border-line/70 bg-surface">
-              <div className="px-3.5 py-2 text-[11px] font-medium text-text-faint">执行工具</div>
-              {browserExecutionTools.map(renderBrowserItem)}
-              <div className="px-3.5 py-2 text-[11px] font-medium text-text-faint">敏感能力</div>
-              {browserCapabilities.map(renderBrowserItem)}
-            </div>
-          ) : null}
-        </SettingGroup>
+      <SettingGroup title="多媒体" headingLevel={3}>
+        {mediaTools.map((tool) => renderToolRow(tool, { description: mediaDescription(tool) }))}
+      </SettingGroup>
 
-        <SettingGroup title="多媒体" headingLevel={3} description="控制图片生成与图片分析工具。">
-          {mediaTools.map((tool) => (
-            <SettingRow
-              key={tool.name}
-              title={tool.label}
-              description={tool.description}
-              control={<Toggle checked={!disabled.includes(tool.name)} onChange={(next) => toggleTool(tool.name, next)} ariaLabel={tool.label} />}
+      <SettingGroup title="显示" headingLevel={3}>
+        <SettingRow
+          title="显示写入变动"
+          description="写入时显示增删行数，不自动展开内容。"
+          control={
+            <Toggle
+              checked={showFileChangeStats}
+              disabled={!tools.v4Writable}
+              onChange={(next) => writeToolsPatch({ showFileChangeStats: next }, () => undefined, "file change display settings")}
+              ariaLabel="显示写入变动"
             />
-          ))}
-        </SettingGroup>
+          }
+        />
+      </SettingGroup>
     </>
   );
 }
@@ -1952,23 +1794,22 @@ function ArchivedChatsSection({
           <div className="px-4 py-8 text-center text-[13px] text-text-faint">暂无归档会话</div>
         ) : (
           sessions.map((session) => (
-            <div key={session.id} className="flex items-center justify-between gap-4 px-3.5 py-3">
+            <div key={session.id} className="flex min-h-[52px] items-center justify-between gap-4 px-4 py-2.5">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px] font-medium text-text-main">{session.title}</div>
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-text-faint">
+                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-text-muted">
                   <span>{formatUpdatedAt(session.updatedAt)}</span>
                   <span>{session.agentRunCount} 次运行</span>
                   <span>{workspaceLabelFromRoot(session.workspaceRoot)}</span>
                 </div>
               </div>
-              <button
-                type="button"
-                className={BTN_QUIET}
+              <SettingsButton
+                busy={restoringId === session.id}
                 disabled={restoringId === session.id}
                 onClick={() => void restoreSession(session.id)}
               >
                 {restoringId === session.id ? "恢复中…" : "恢复"}
-              </button>
+              </SettingsButton>
             </div>
           ))
         )}
@@ -1976,20 +1817,49 @@ function ArchivedChatsSection({
   );
 }
 
-const THEME_OPTIONS: { value: ThemeMode; label: string; icon: LucideIcon }[] = [
-  { value: "light", label: "浅色", icon: Sun },
-  { value: "dark", label: "深色", icon: Moon },
-  { value: "system", label: "跟随系统", icon: Monitor },
+const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
+  { value: "light", label: "浅色" },
+  { value: "dark", label: "深色" },
+  { value: "system", label: "跟随系统" },
 ];
 
-function ThemeSegmented({ value, onChange }: { value: ThemeMode; onChange: (value: ThemeMode) => void }) {
+const PREVIEW_PALETTE = {
+  light: {
+    bg: "bg-[var(--act-preview-light-bg)]",
+    sidebar: "bg-[var(--act-preview-light-sidebar)]",
+    line: "bg-[var(--act-preview-light-line)]",
+    ink: "bg-[var(--act-preview-light-ink)]",
+  },
+  dark: {
+    bg: "bg-[var(--act-preview-dark-bg)]",
+    sidebar: "bg-[var(--act-preview-dark-sidebar)]",
+    line: "bg-[var(--act-preview-dark-line)]",
+    ink: "bg-[var(--act-preview-dark-ink)]",
+  },
+} as const;
+
+function ThemeMiniWindow({ tone, className = "" }: { tone: "light" | "dark"; className?: string }) {
+  const palette = PREVIEW_PALETTE[tone];
   return (
-    <div
-      role="radiogroup"
-      aria-label="主题"
-      className="inline-flex items-center gap-0.5 rounded-act-md border border-line bg-surface-subtle p-0.5"
-    >
-      {THEME_OPTIONS.map(({ value: optionValue, label, icon: Icon }) => {
+    <span aria-hidden="true" className={`absolute inset-0 flex ${palette.bg} ${className}`}>
+      <span className={`flex w-[30%] flex-col gap-[5px] px-1.5 py-2.5 ${palette.sidebar}`}>
+        <i className={`block h-[5px] rounded-full ${palette.line}`} />
+        <i className={`block h-[5px] rounded-full ${palette.line}`} />
+        <i className={`block h-[5px] rounded-full ${palette.line}`} />
+      </span>
+      <span className="flex flex-1 flex-col gap-1.5 px-2.5 py-3">
+        <i className={`block h-[5px] w-1/2 rounded-full ${palette.ink}`} />
+        <i className={`block h-[5px] rounded-full ${palette.line}`} />
+        <i className={`block h-[5px] w-[70%] rounded-full ${palette.line}`} />
+      </span>
+    </span>
+  );
+}
+
+function ThemeTiles({ value, onChange }: { value: ThemeMode; onChange: (value: ThemeMode) => void }) {
+  return (
+    <div role="radiogroup" aria-label="主题" className="grid grid-cols-3 gap-3 max-[600px]:gap-2">
+      {THEME_OPTIONS.map(({ value: optionValue, label }) => {
         const selected = value === optionValue;
         return (
           <button
@@ -1999,14 +1869,23 @@ function ThemeSegmented({ value, onChange }: { value: ThemeMode; onChange: (valu
             aria-checked={selected}
             aria-label={label}
             onClick={() => onChange(optionValue)}
-            className={`inline-flex h-7 items-center gap-1.5 rounded-act-sm px-2.5 text-[12px] font-semibold transition-colors ${
-              selected
-                ? "bg-surface text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.12)]"
-                : "text-text-faint hover:text-text-main"
-            }`}
+            className="group rounded-[10px] text-left focus-visible:outline-none"
           >
-            <Icon size={13} strokeWidth={2.2} aria-hidden="true" />
-            {label}
+            <span
+              className={`relative block h-[84px] overflow-hidden rounded-[9px] border transition-shadow duration-150 group-focus-visible:ring-[3px] group-focus-visible:ring-focus-ring/20 ${
+                selected ? "border-transparent ring-2 ring-text-main" : "border-line group-hover:border-line-strong"
+              }`}
+            >
+              {optionValue === "system" ? (
+                <>
+                  <ThemeMiniWindow tone="light" />
+                  <ThemeMiniWindow tone="dark" className="[clip-path:polygon(55%_0,100%_0,100%_100%,45%_100%)]" />
+                </>
+              ) : (
+                <ThemeMiniWindow tone={optionValue} />
+              )}
+            </span>
+            <span className={`mt-2 block text-[12.5px] font-medium ${selected ? "text-text-main" : "text-text-muted"}`}>{label}</span>
           </button>
         );
       })}
@@ -2036,23 +1915,18 @@ function AppearanceSection() {
   };
 
   return (
-    <SectionShell>
-      <SettingGroup title="主题">
-        <SettingRow
-          title="主题"
-          description="“跟随系统”会随 macOS 外观自动在浅色 / 深色间切换。"
-          control={
-            <ThemeSegmented value={prefs.theme} onChange={(value) => update({ theme: value })} />
-          }
-        />
-      </SettingGroup>
+    <>
+      <SectionShell title="主题" description="“跟随系统”会随 macOS 外观自动切换。">
+        <ThemeTiles value={prefs.theme} onChange={(value) => update({ theme: value })} />
+      </SectionShell>
 
-      <SettingGroup title="字体">
+      <SettingGroup title="字体与字号" headingLevel={3}>
         <SettingRow
           title="界面字体"
-          description="应用界面与 AI 回复正文使用的字体。"
+          description="界面与 AI 回复正文。"
           control={
             <SettingsSelect
+              size="sm"
               value={prefs.uiFontId}
               options={UI_FONT_OPTIONS}
               onChange={(value) => update({ uiFontId: value as UiFontId })}
@@ -2061,23 +1935,7 @@ function AppearanceSection() {
           }
         />
         <SettingRow
-          title="代码字体"
-          description="代码块、diff 与终端输出使用的等宽字体。"
-          control={
-            <SettingsSelect
-              value={prefs.codeFontId}
-              options={CODE_FONT_OPTIONS}
-              onChange={(value) => update({ codeFontId: value as CodeFontId })}
-              ariaLabel="代码字体"
-            />
-          }
-        />
-      </SettingGroup>
-
-      <SettingGroup title="字号">
-        <SettingRow
           title="界面字号"
-          description="应用界面与正文的基准字号。"
           control={
             <Stepper
               value={prefs.uiFontSize}
@@ -2092,8 +1950,20 @@ function AppearanceSection() {
           }
         />
         <SettingRow
+          title="代码字体"
+          description="代码块、diff 与终端输出。"
+          control={
+            <SettingsSelect
+              size="sm"
+              value={prefs.codeFontId}
+              options={CODE_FONT_OPTIONS}
+              onChange={(value) => update({ codeFontId: value as CodeFontId })}
+              ariaLabel="代码字体"
+            />
+          }
+        />
+        <SettingRow
           title="代码字号"
-          description="代码块、diff 与终端文本字号。"
           control={
             <Stepper
               value={prefs.codeFontSize}
@@ -2107,8 +1977,16 @@ function AppearanceSection() {
             />
           }
         />
+        <div aria-label="字体预览" className="px-4 py-4">
+          <p className="leading-relaxed text-text-main" style={{ fontSize: prefs.uiFontSize }}>
+            已完成设置页重构：导航分组保持不变，所有页面使用同一套分组和控件。
+          </p>
+          <pre className="mt-2.5 overflow-x-auto rounded-[7px] bg-surface-subtle px-3 py-2.5 font-mono text-text-muted" style={{ fontSize: prefs.codeFontSize }}>
+            pnpm --filter @actspace/desktop test
+          </pre>
+        </div>
       </SettingGroup>
-    </SectionShell>
+    </>
   );
 }
 

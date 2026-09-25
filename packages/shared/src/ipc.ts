@@ -445,6 +445,13 @@ export type ApprovalListPendingInput = {
 
 export type PendingApprovalInfo = {
   requestId: string;
+  /** Live recovery facts; absent on older hosts, never inferred from stale history. */
+  recovery?: {
+    agentRunId: string;
+    toolCallId: string;
+    preview: import("./session").ToolUiPreview;
+    approvalScope?: "browser_session";
+  };
   toolName: string;
   summary: string;
   reason: string;

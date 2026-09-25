@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 import type { SettingsV4NamespacePatch, SettingsV4Snapshot, UsageActivityAggregate, UsageActivityKind, UsageActivitySnapshot, UsageCostSummary, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
-import { PageShell, Toggle } from "./settings/SettingsPrimitives";
+import { PageShell, SettingsSelect, StatusDot, Toggle } from "./settings/SettingsPrimitives";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import { UsageHoverCard } from "./usage/UsageHoverCard";
 import { formatUsageAmount } from "../usage-format";
@@ -22,11 +22,12 @@ type Props = {
   onUpdateNamespace?: (input: SettingsV4NamespacePatch) => Promise<SettingsV4Snapshot | null>;
 };
 const ranges: Array<[Range, string]> = [["day", "24 小时"], ["week", "7 天"], ["month", "30 天"], ["total", "全部"]];
-const tabs: Array<[Tab, string]> = [["requests", "请求日志"], ["providers", "服务商统计"], ["models", "模型统计"], ["tools", "工具统计"]];
+const tabs: Array<[Tab, string]> = [["requests", "请求日志"], ["providers", "服务商"], ["models", "模型"], ["tools", "工具"]];
+const statusOptions: Array<{ value: Status; label: string }> = [{ value: "all", label: "全部状态" }, { value: "success", label: "成功" }, { value: "error", label: "失败" }, { value: "aborted", label: "已中止" }, { value: "unknown", label: "未知" }];
 const button = "inline-flex h-8 items-center justify-center gap-2 rounded-act-md px-2.5 text-[12px] font-medium text-text-muted hover:bg-hover-overlay active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-40";
-const cell = "px-3 py-2 align-middle";
-const tableFrame = "min-w-0 overflow-x-auto rounded-act-lg border border-line bg-surface";
-const tableHead = "border-b border-line text-left text-[12px] font-medium text-text-muted [&_th]:font-medium [&_th]:py-1.5";
+const cell = "h-[38px] px-3 py-1.5 align-middle";
+const tableFrame = "min-w-0 overflow-x-auto rounded-[10px] border border-line bg-surface";
+const tableHead = "border-b border-line bg-surface-subtle text-left text-[12px] font-medium text-text-muted [&_th]:h-[34px] [&_th]:font-medium";
 const numberCell = `${cell} text-right tabular-nums whitespace-nowrap`;
 const labels: Record<string, string> = { success: "成功", error: "失败", aborted: "已中止", running: "进行中", unknown: "未知" };
 const number = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("zh-CN");
@@ -61,43 +62,42 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
   const page = data?.rowsPage;
   const updatePage = (next: number) => onRequestPageChange?.(next, range, queryStatus, search, kind);
   return <main className="h-full min-w-0 overflow-auto bg-app-bg text-text-main">
-    <PageShell maxWidth="880" title="使用统计" description="查看模型调用、Token 用量与费用。">
+    <PageShell width="wide" title="使用统计" description="模型调用、Token 用量与估算费用。">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="统计时间范围">{ranges.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={range === value} className={`${button} ${range === value ? "bg-selected text-text-main" : ""}`} onClick={() => setRange(value)}>{label}</button>)}</div>
+        <div className="inline-flex rounded-[8px] border border-line/60 bg-surface-subtle p-0.5" role="tablist" aria-label="统计时间范围">{ranges.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={range === value} className={`h-6 rounded-[6px] px-3 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30 ${range === value ? "bg-surface font-medium text-text-main shadow-[0_1px_2px_rgba(31,45,61,0.08)]" : "text-text-muted hover:text-text-main"}`} onClick={() => setRange(value)}>{label}</button>)}</div>
         <Tooltip><TooltipTrigger asChild><button type="button" className={button} aria-label="刷新使用统计" disabled={isLoading} onClick={() => onRefresh?.(range, page?.page ?? 1, queryStatus, search, kind)}><RefreshCw size={15} className={isLoading ? "animate-spin motion-reduce:animate-none" : ""} /></button></TooltipTrigger><TooltipContent>刷新使用统计</TooltipContent></Tooltip>
       </div>
       {error ? <div role="alert" className="flex items-center justify-between rounded-act-md bg-danger-soft px-3 py-2 text-[12px] text-on-danger"><span>{error}</span><button className={button} onClick={() => onRefresh?.(range, 1, queryStatus, search, kind)}>重试</button></div> : null}
-      {isLoading && !data ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-[13px] text-text-faint">正在读取使用记录…</div> : <section aria-label="使用概览" className="grid grid-cols-4 gap-2 max-[800px]:grid-cols-2 max-[400px]:grid-cols-1">
+      {isLoading && !data ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-[13px] text-text-faint">正在读取使用记录…</div> : <section aria-label="使用概览" className="-mt-5 grid grid-cols-4 gap-2.5 max-[800px]:grid-cols-2 max-[400px]:grid-cols-1">
         <Metric label="请求数" value={number(summary?.requestCount)} detail="模型调用" />
         <Metric label="Token 用量" value={number(summary?.totalTokens)} detail={`输入 ${number(summary?.inputTokens)} · 输出 ${number(summary?.outputTokens)}`} />
-        <Metric label={cost?.knownCostRequestCount && cost.unknownCostRequestCount ? "已知费用" : "费用"} value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unknownCostRequestCount ? `${cost.knownCostRequestCount ? "另有 " : ""}${cost.unknownCostRequestCount} 次请求缺少费用依据` : cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : "按请求记录 · 各币种分别汇总"} />
+        <Metric label={cost?.knownCostRequestCount && cost.unknownCostRequestCount ? "已知费用" : "费用"} value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unknownCostRequestCount ? `${cost.knownCostRequestCount ? "另有 " : ""}${cost.unknownCostRequestCount} 次请求缺少费用依据` : cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : "按请求记录 · 各币种分别汇总"} warn={Boolean(cost?.unknownCostRequestCount || cost?.unverifiedHistoricalRequestCount)} />
         <Metric label="缓存命中率" value={hitRate} detail={`${number(summary?.cacheReadTokens)} 缓存 Token`} />
       </section>}
-      <section className="flex min-w-0 flex-col gap-4">
-        <div className="flex gap-5 overflow-x-auto border-b border-line" role="tablist" aria-label="统计分类">{tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} className={`shrink-0 border-b-2 px-0.5 pb-3 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${tab === value ? "border-text-main text-text-main" : "border-transparent text-text-faint hover:text-text-main"}`} onClick={() => { setTab(value); setSearch(""); }}>{label} <span className="ml-1 text-[12px] font-normal tabular-nums text-text-faint">{counts[value] ?? "—"}</span></button>)}</div>
+      <section className="flex min-w-0 flex-col gap-3">
+        <div className="mt-1 flex gap-5 overflow-x-auto border-b border-line" role="tablist" aria-label="统计分类">{tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} className={`-mb-px shrink-0 border-b-2 px-0.5 pb-2.5 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${tab === value ? "border-text-main text-text-main" : "border-transparent text-text-faint hover:text-text-main"}`} onClick={() => { setTab(value); setSearch(""); }}>{label} <span className="ml-1 text-[12px] font-normal tabular-nums text-text-subtle">{counts[value] ?? "—"}</span></button>)}</div>
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="日志筛选">
-          <input aria-label="搜索使用记录" placeholder={tab === "requests" ? "按模型或工具筛选…" : tab === "tools" ? "搜索工具…" : "搜索模型或服务商…"} value={search} onChange={(event) => setSearch(event.target.value)} className="h-8 min-w-0 flex-[1_1_240px] rounded-act-md border border-line bg-surface px-2.5 text-[13px] text-text-main outline-none placeholder:text-text-faint focus-visible:ring-2 focus-visible:ring-focus-ring" />
+          <span className="relative flex min-w-0 flex-[0_1_280px] max-[600px]:flex-[1_1_100%]"><Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle" /><input aria-label="搜索使用记录" placeholder={tab === "requests" ? "按模型或工具筛选" : tab === "tools" ? "搜索工具" : "搜索模型或服务商"} value={search} onChange={(event) => setSearch(event.target.value)} className="h-[30px] w-full min-w-0 rounded-[7px] border border-line bg-surface pl-8 pr-2.5 text-[13px] text-text-main outline-none placeholder:text-text-subtle hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/15" /></span>
           {tab === "requests" ? <>
-            <select aria-label="筛选状态" value={status} onChange={(event) => setStatus(event.target.value as Status)} className="h-8 min-w-0 flex-[1_1_180px] rounded-act-md border border-line bg-surface px-2.5 text-[13px] text-text-main focus-visible:ring-2 focus-visible:ring-focus-ring"><option value="all">全部状态</option><option value="success">成功</option><option value="error">失败</option><option value="aborted">已中止</option><option value="unknown">未知</option></select>
-            <label className="flex h-8 shrink-0 items-center gap-2 whitespace-nowrap text-[13px] text-text-main">详细记录<Toggle ariaLabel="详细记录" checked={details} onChange={setDetails} /></label>
-            <span className="flex h-8 shrink-0 items-center text-[12px] tabular-nums text-text-faint">共 {page?.totalRows ?? 0} 条记录</span>
+            <SettingsSelect size="sm" ariaLabel="筛选状态" value={status} options={statusOptions} onChange={(value) => setStatus(value as Status)} />
           </> : null}
           {search || queryStatus !== "all" ? <button className={button} onClick={() => { setSearch(""); setStatus("all"); }}>清除筛选</button> : null}
+          {tab === "requests" ? <label className="ml-auto flex h-[30px] shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-[12.5px] text-text-muted">显示明细<Toggle ariaLabel="显示明细" checked={details} onChange={setDetails} /></label> : null}
         </div>
         {tab === "providers" || tab === "models" || tab === "tools" ? <AggregateTable rows={data?.aggregates?.[tab] ?? []} tools={tab === "tools"} search={search} pending={Boolean(isLoading || error)} /> : !details ? <div className="flex items-center justify-between gap-3 rounded-act-md border border-line px-4 py-4 text-[13px] text-text-muted"><span>当前仅显示汇总，开启详细记录查看模型和工具调用。</span><button className={button} onClick={() => setDetails(true)}>显示记录</button></div> : <>
-          <div className={`${tableFrame} mt-6`}>
+          <div className={tableFrame}>
             <table aria-label="请求日志" className="w-full min-w-[800px] table-fixed text-[13px] leading-5">
               <colgroup><col className="w-[125px]" /><col className="w-[55px]" /><col /><col className="w-[130px]" /><col className="w-[80px]" /><col className="w-[95px]" /><col className="w-[75px]" /><col className="w-[65px]" /></colgroup>
-              <thead className={tableHead}><tr><th className={cell}>时间</th><th className={cell}>类型</th><th className={cell}>对象</th><th className={cell}>会话</th><th className={numberCell}>Token</th><th className={numberCell}>费用</th><th className={numberCell}>延迟</th><th className={cell}>状态</th></tr></thead>
-              <tbody className="divide-y divide-line">{rows.map((row) => <tr key={row.activityId} className="hover:bg-hover-overlay">
-                <td className={cell}><CellHint text={new Date(row.startedAt).toLocaleString("zh-CN")}><span className="block truncate tabular-nums">{new Date(row.startedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></CellHint></td>
-                <td className={cell}>{row.kind === "llm_request" ? "模型" : "工具"}</td>
-                <td className={cell}>{row.kind === "llm_request" ? <UsageHoverCard row={row} view="model"><span className="block truncate">{row.model?.replace(/^[^:]+:/, "") ?? "未知模型"}</span></UsageHoverCard> : <CellHint text={row.toolName ?? "未知工具"}><span className="block truncate">{row.toolName ?? "未知工具"}</span></CellHint>}</td>
-                <td className={cell}><CellHint text={row.sessionTitle ?? row.sessionId}><span className="block truncate">{row.sessionTitle ?? `未命名会话 · ${row.sessionId.slice(0, 8)}`}</span></CellHint></td>
-                <td className={numberCell}>{row.kind === "tool_invocation" ? "—" : <UsageHoverCard row={row} view="tokens">{number(row.tokens.totalTokens)}</UsageHoverCard>}</td>
-                <td className={numberCell}>{row.kind === "tool_invocation" ? "—" : formatUsageAmount(row.costAmount, row.costCurrency ?? "USD")}</td>
+              <thead className={tableHead}><tr><th className={cell}>时间</th><th className={cell}>类型</th><th className={cell}>对象</th><th className={cell}>会话</th><th className={numberCell}>Token</th><th className={numberCell}>费用</th><th className={numberCell}>耗时</th><th className={cell}>状态</th></tr></thead>
+              <tbody className="divide-y divide-line/60">{rows.map((row) => <tr key={row.activityId} className="hover:bg-hover-overlay">
+                <td className={cell}><CellHint text={new Date(row.startedAt).toLocaleString("zh-CN")}><span className="block truncate tabular-nums text-text-muted">{new Date(row.startedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></CellHint></td>
+                <td className={`${cell} text-[12px] text-text-muted`}>{row.kind === "llm_request" ? "模型" : "工具"}</td>
+                <td className={cell}>{row.kind === "llm_request" ? <UsageHoverCard row={row} view="model"><span className="block truncate font-mono text-[12px]">{row.model?.replace(/^[^:]+:/, "") ?? "未知模型"}</span></UsageHoverCard> : <CellHint text={row.toolName ?? "未知工具"}><span className="block truncate">{row.toolName ?? "未知工具"}</span></CellHint>}</td>
+                <td className={cell}><CellHint text={row.sessionTitle ?? row.sessionId}><span className="block truncate text-text-muted">{row.sessionTitle ?? `未命名会话 · ${row.sessionId.slice(0, 8)}`}</span></CellHint></td>
+                <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : <UsageHoverCard row={row} view="tokens">{number(row.tokens.totalTokens)}</UsageHoverCard>}</td>
+                <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : row.costAmount == null ? <span className="text-text-subtle">未知</span> : formatUsageAmount(row.costAmount, row.costCurrency ?? "USD")}</td>
                 <td className={numberCell}>{row.durationMs == null ? "—" : row.durationMs < 1000 ? `${Math.round(row.durationMs)}ms` : `${(row.durationMs / 1000).toFixed(2)}s`}</td>
-                <td className={`${cell} whitespace-nowrap ${row.status === "error" ? "text-on-danger" : "text-text-muted"}`}>{labels[row.status]}</td>
+                <td className={`${cell} whitespace-nowrap`}><StatusDot tone={row.status === "error" ? "error" : row.status === "running" ? "ok" : row.status === "aborted" || row.status === "unknown" ? "warn" : "neutral"}>{labels[row.status]}</StatusDot></td>
               </tr>)}</tbody>
             </table>
             {!rows.length && !isLoading && !error ? <Empty search={search || (status !== "all" ? status : "")} /> : null}
@@ -110,12 +110,12 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
   </main>;
 }
 
-function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return <div className="min-w-0 rounded-act-md bg-surface-subtle px-3 py-3"><div className="text-[11px] text-text-faint">{label}</div><div className="my-1 break-words text-[22px] font-semibold tracking-tight tabular-nums leading-tight">{value}</div><div className="text-[10px] leading-relaxed text-text-faint">{detail}</div></div>;
+function Metric({ label, value, detail, warn = false }: { label: string; value: string; detail: string; warn?: boolean }) {
+  return <div className="min-w-0 rounded-[10px] border border-line bg-surface px-3.5 py-3"><div className="text-[12px] text-text-muted">{label}</div><div className="mb-0.5 mt-1 break-words text-[22px] font-semibold leading-tight tracking-tight tabular-nums">{value}</div><div className={`flex items-start gap-1.5 text-[11px] leading-relaxed ${warn ? "text-warning" : "text-text-faint"}`}>{warn ? <span aria-hidden="true" className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" /> : null}<span>{detail}</span></div></div>;
 }
 function Empty({ search }: { search?: string }) { return <p className="py-12 text-center text-[13px] text-text-faint">{search ? "没有符合筛选条件的记录" : "所选时间范围内暂无使用记录"}</p>; }
 function AggregateTable({ rows, tools, search, pending }: { rows: UsageActivityAggregate[]; tools: boolean; search: string; pending: boolean }) {
-  return <div className={tableFrame}><table className="w-full text-[13px]"><thead className={tableHead}><tr><th className={cell}>{tools ? "工具" : "名称"}</th><th className={numberCell}>调用数</th><th className={numberCell}>{tools ? "失败数" : "Token"}</th><th className={numberCell}>{tools ? "耗时" : "费用"}</th></tr></thead><tbody className="divide-y divide-line/60">{rows.map((row) => <tr key={row.key}><td className={cell}><div tabIndex={0} className="max-w-[230px] truncate font-medium" title={row.label}>{row.label}</div>{<div className="text-text-faint">{row.connectionId ?? row.providerId ?? ""}{row.costSummary.unknownCostRequestCount ? ` · ${row.costSummary.unknownCostRequestCount} 次费用未知` : ""}</div>}</td><td className={numberCell}>{number(row.count)}</td><td className={numberCell}>{number(tools ? row.errorCount : row.totalTokens)}</td><td className={numberCell}>{tools ? `${(row.durationMs / 1000).toFixed(1)} 秒` : money(row.costSummary)}</td></tr>)}</tbody></table>{!rows.length && !pending ? <Empty search={search} /> : null}</div>;
+  return <div className={tableFrame}><table className="w-full text-[13px]"><thead className={tableHead}><tr><th className={cell}>{tools ? "工具" : "名称"}</th><th className={numberCell}>调用数</th><th className={numberCell}>{tools ? "失败数" : "Token"}</th><th className={numberCell}>{tools ? "耗时" : "费用"}</th></tr></thead><tbody className="divide-y divide-line/60">{rows.map((row) => <tr key={row.key} className="hover:bg-hover-overlay"><td className={cell}><div tabIndex={0} className="max-w-[230px] truncate font-medium" title={row.label}>{row.label}</div>{<div className="text-text-faint">{row.connectionId ?? row.providerId ?? ""}{row.costSummary.unknownCostRequestCount ? ` · ${row.costSummary.unknownCostRequestCount} 次费用未知` : ""}</div>}</td><td className={numberCell}>{number(row.count)}</td><td className={numberCell}>{number(tools ? row.errorCount : row.totalTokens)}</td><td className={numberCell}>{tools ? `${(row.durationMs / 1000).toFixed(1)} 秒` : money(row.costSummary)}</td></tr>)}</tbody></table>{!rows.length && !pending ? <Empty search={search} /> : null}</div>;
 }
 
 function CellHint({ text, children }: { text: string; children: React.ReactNode }) {

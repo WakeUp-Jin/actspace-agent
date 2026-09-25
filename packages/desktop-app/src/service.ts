@@ -127,13 +127,18 @@ export class DesktopAppService implements DesktopAppServiceContract {
   async forkMainSession(parentSessionId: string, boundarySeq: number, newSessionId: string): Promise<RuntimeV2SessionSnapshot> {
     const parent = await this.#sessions.store.inspect(parentSessionId);
     if (parent.header === null) throw new Error(`Parent Session ${parentSessionId} has no header.`);
-    const session = await this.#sessions.store.fork({
+    const fork = await this.#sessions.store.fork({
       parentSessionId,
       boundarySeq,
       newSessionId,
       createdAt: new Date().toISOString(),
       createdWith: { ...parent.header.createdWith, manifestDigest: this.#manifestDigest },
     });
+    // Store.fork owns a temporary writer. Reopen through the controller so the
+    // run, projection callbacks and shutdown all share one managed handle.
+    await fork.close();
+    const session = await this.#sessions.resume(newSessionId);
+    await session.flush();
     await this.#runs.attach(session);
     return this.#sessions.snapshot(session);
   }

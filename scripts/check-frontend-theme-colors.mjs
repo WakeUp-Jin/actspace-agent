@@ -19,6 +19,7 @@ const REQUIRED_THEME_TOKENS = [
   "--act-color-border",
   "--act-color-border-strong",
   "--act-color-meter-track",
+  "--act-color-toggle-off",
   "--act-color-text",
   "--act-color-text-muted",
   "--act-color-text-faint",

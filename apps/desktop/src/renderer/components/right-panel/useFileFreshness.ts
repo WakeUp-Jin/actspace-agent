@@ -23,7 +23,9 @@ import { readFailureTab, tabFromFile } from "./workspaceFileTab";
 export function useFileFreshness({
   workspaceRoot,
   revalidateKey,
+  enabled = true,
 }: {
+  enabled?: boolean;
   workspaceRoot?: string;
   /** 外部驱动的重校验触发器（当前会话 turn 结束时递增）。 */
   revalidateKey?: number;
@@ -36,6 +38,7 @@ export function useFileFreshness({
   tabsRef.current = tabs;
 
   const revalidate = useCallback(async () => {
+    if (!enabled) return;
     const api = typeof window !== "undefined" ? window.actspace?.statWorkspaceFile : undefined;
     if (!api) return;
 
@@ -62,7 +65,7 @@ export function useFileFreshness({
         }
       }),
     );
-  }, [workspaceRoot, markFileTabStale]);
+  }, [workspaceRoot, markFileTabStale, enabled]);
 
   // 时机一：Tab 激活（切到某个文件 Tab 时确认手里这份还是最新的）。
   useEffect(() => {

@@ -7,6 +7,7 @@ import {
   createMessageBlocks,
   formatSessionTranscript,
   getLatestContextSnapshot,
+  formatChatAttachmentIssue,
 } from "@actspace/shared";
 import type {
   AbortAgentRunInput,
@@ -944,13 +945,37 @@ export function App() {
       approvalVersionsRef.current.set(sessionId, version);
       try {
         const pending = await window.actspace.listPendingApprovals({ sessionId });
-        return { sessionId, version, hasPending: pending.length > 0 };
+        return { sessionId, version, hasPending: pending.length > 0, pending };
       } catch (error) {
         console.error("Failed to load pending approvals", error);
-        return { sessionId, version, hasPending: null };
+        return { sessionId, version, hasPending: null, pending: [] };
       }
     }));
 
+    // The host owns pending requests across renderer reloads. Reattach only
+    // current host facts, never replay historical approval requests as grants.
+    for (const result of results) {
+      if (approvalVersionsRef.current.get(result.sessionId) !== result.version) continue;
+      for (const pending of result.pending) {
+        const recovery = pending.recovery;
+        if (!recovery || pending.expiresAt <= Date.now()) continue;
+        let run = sessionRunsRef.current.get(result.sessionId);
+        if (run && (!run.recovered || run.agentRunId !== recovery.agentRunId)) continue;
+        if (!run) {
+          run = { sessionId: result.sessionId, agentRunId: recovery.agentRunId, recovered: true,
+            state: createEmptyStreamingState(), userBlock: null, aborting: false, record: null, historyBefore: null };
+          sessionRunsRef.current.set(result.sessionId, run);
+          setBusySessionIds(current => updateStringSet(current, result.sessionId, true));
+        }
+        if (run.state.activeTools.get(recovery.toolCallId)?.terminalStatus) continue;
+        upsertStreamingTool(run.state, recovery.toolCallId, pending.toolName, recovery.preview);
+        Object.assign(run.state.activeTools.get(recovery.toolCallId)!, {
+          approvalPending: true, approvalRequestId: pending.requestId, approvalReason: pending.reason,
+          approvalSummary: pending.summary, approvalScope: recovery.approvalScope,
+        });
+      }
+      refreshStreamingBlocks(result.sessionId);
+    }
     setApprovalPendingSessionIds((current) => {
       let next = current;
       for (const result of results) {
@@ -959,7 +984,7 @@ export function App() {
       }
       return next;
     });
-  }, []);
+  }, [refreshStreamingBlocks]);
 
   useEffect(() => {
     if (!hasActspaceBridge()) return;
@@ -1261,6 +1286,9 @@ export function App() {
   const handleStreamEvent = useCallback((event: Exclude<RuntimeStreamEvent, { type: "bash_task_update" }>) => {
     const run = sessionRunsRef.current.get(event.sessionId);
     if (!run || run.agentRunId !== event.agentRunId) return;
+    // A recovered run keeps its durable transcript, including text completed
+    // before reload. Subsequent text is supplied by the live Journal projection.
+    if (run.recovered && (event.type === "assistant_text_delta" || event.type === "assistant_thinking_delta")) return;
     const state = run.state;
 
     switch (event.type) {
@@ -1523,6 +1551,7 @@ export function App() {
         run?.agentRunId === event.agentRunId && run.state.activeTools.get(event.toolCallId)?.terminalStatus) return;
       if (event.type === "tool_approval_required") {
         setApprovalPendingForSession(event.sessionId, true);
+        if (!run) void refreshPendingApprovalStatuses([event.sessionId]);
       } else if (
         event.type === "tool_approval_resolved" ||
         event.type === "agent_run_aborted" ||
@@ -1548,8 +1577,17 @@ export function App() {
       }
 
       handleStreamEvent(event);
+      if (run?.recovered && (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed")) {
+        // Recovered runs have no renderer-owned runAgent promise to settle them.
+        void readSessionPage(event.sessionId).finally(() => {
+          if (sessionRunsRef.current.get(event.sessionId) !== run) return;
+          sessionRunsRef.current.delete(event.sessionId);
+          setBusySessionIds(current => updateStringSet(current, event.sessionId, false));
+          refreshStreamingBlocks(event.sessionId);
+        });
+      }
     });
-  }, [handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession]);
+  }, [handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshStreamingBlocks]);
 
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
     if (!hasActspaceBridge()) {
@@ -1751,6 +1789,18 @@ export function App() {
           } : {}),
         };
         const result = await window.actspace.runAgent(input);
+        if (result.status === "rejected") {
+          if (!isCurrentRun()) return;
+          const draft: ComposerDraftRestore = {
+            id: Date.now(), sessionId, text, attachments: options.attachments,
+            error: formatChatAttachmentIssue(result.error), attachmentIssue: result.error,
+          };
+          draftsRef.current.set(sessionId, draft);
+          if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
+          setApprovalPendingForSession(sessionId, false);
+          setFailedForSession(sessionId, false);
+          return;
+        }
 
         await settleResult(result);
         const refreshed = await readSidebarSessions();
@@ -1779,7 +1829,7 @@ export function App() {
             sessionId,
             text,
             attachments: options.attachments,
-            error: error instanceof Error ? error.message : "Could not prepare the execution context.",
+            error: "消息未能发送，正文和附件已保留，请重试。",
           };
           draftsRef.current.set(sessionId, draft);
           if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
@@ -1989,8 +2039,9 @@ export function App() {
   }, [handleCreateSession, handleSelectSession, sessionBootstrapComplete, workspaceRegistry]);
 
   const persistedEvents = sessionRecord?.events ?? agentRunResult?.events ?? [];
+  const isRecoveredRun = selectedSessionId ? sessionRunsRef.current.get(selectedSessionId)?.recovered === true : false;
   const persistedMessages = useMemo<MessageBlock[]>(() => {
-    const streamingAgentRunId = streamingBlocks.length > 0 ? activeAgentRunId : null;
+    const streamingAgentRunId = streamingBlocks.length > 0 && !isRecoveredRun ? activeAgentRunId : null;
     const streamingTurnEventIds = streamingAgentRunId
       ? new Set(
           persistedEvents
@@ -2000,6 +2051,10 @@ export function App() {
       : null;
     const fromRecord = sessionRecord?.messageBlocks;
     if (fromRecord && fromRecord.length > 0) {
+      if (isRecoveredRun) {
+        const recoveredToolKeys = new Set(streamingBlocks.filter(block => block.id.includes(":tool:")).map(block => block.id));
+        return fromRecord.filter(block => !recoveredToolKeys.has(block.renderKey ?? block.id));
+      }
       return streamingTurnEventIds
         ? fromRecord.filter((block) => !streamingTurnEventIds.has(block.id) && !block.renderKey?.startsWith(`turn:${streamingAgentRunId}:`))
         : fromRecord;
@@ -2011,7 +2066,7 @@ export function App() {
     const fromEvents = createMessageBlocks(visibleEvents);
     if (fromEvents.length > 0) return fromEvents;
     return [];
-  }, [activeAgentRunId, persistedEvents, sessionRecord?.messageBlocks, streamingBlocks.length]);
+  }, [activeAgentRunId, persistedEvents, sessionRecord?.messageBlocks, streamingBlocks, isRecoveredRun]);
 
   const messages = useMemo<MessageBlock[]>(() => {
     const merged = streamingBlocks.length === 0 ? persistedMessages : [...persistedMessages, ...streamingBlocks];

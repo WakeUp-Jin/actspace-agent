@@ -29,6 +29,17 @@
   --act-color-border: #deded9;
   --act-color-border-strong: #8c8c85;
   --act-color-meter-track: #e9e9e5;
+  --act-color-toggle-off: #d3d3ce;
+
+  /* 外观页主题缩略图：展示另一套主题的样子，故意不随当前主题翻转，只在这里定义一次。 */
+  --act-preview-light-bg: #f7f7f5;
+  --act-preview-light-sidebar: #efefed;
+  --act-preview-light-line: #d6d6d1;
+  --act-preview-light-ink: #20201e;
+  --act-preview-dark-bg: #181916;
+  --act-preview-dark-sidebar: #1e1f1c;
+  --act-preview-dark-line: #3a3b35;
+  --act-preview-dark-ink: #f1f1ed;
 
   --act-color-text: #20201e;
   --act-color-text-muted: #676762;
@@ -231,6 +242,7 @@
   --act-color-border: #353630;
   --act-color-border-strong: #787870;
   --act-color-meter-track: #3a3b35;
+  --act-color-toggle-off: #4a4b45;
 
   --act-color-text: #f1f1ed;
   --act-color-text-muted: #b5b5ae;
@@ -343,6 +355,7 @@
     --act-color-border: #353630;
     --act-color-border-strong: #787870;
     --act-color-meter-track: #3a3b35;
+    --act-color-toggle-off: #4a4b45;
 
     --act-color-text: #f1f1ed;
     --act-color-text-muted: #b5b5ae;

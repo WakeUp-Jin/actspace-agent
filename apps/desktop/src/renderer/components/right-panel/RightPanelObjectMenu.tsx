@@ -21,9 +21,11 @@ const MENU_ITEM_CLASS =
 
 export function RightPanelObjectMenu({
   sessionId,
+  developmentEnabled = true,
   onOpenReview,
 }: {
   sessionId: string | null;
+  developmentEnabled?: boolean;
   onOpenReview?: () => void;
 }) {
   const { openFileTree, openTab } = useRightPanel();
@@ -73,7 +75,7 @@ export function RightPanelObjectMenu({
       </button>
       {open ? (
         <div className={MENU_CLASS} role="menu">
-          <button
+          {developmentEnabled ? <><button
             type="button"
             role="menuitem"
             className={MENU_ITEM_CLASS}
@@ -107,7 +109,7 @@ export function RightPanelObjectMenu({
           >
             <SquareTerminal size={15} strokeWidth={2} />
             {creatingTerminal ? "正在启动…" : "终端"}
-          </button>
+          </button></> : null}
           <button
             type="button"
             role="menuitem"

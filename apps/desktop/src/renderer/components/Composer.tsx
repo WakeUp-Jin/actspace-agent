@@ -36,6 +36,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type {
+  ChatAttachmentIssue,
   ComposerMode,
   ComposerAttachment,
   ContextState,
@@ -100,6 +101,7 @@ export type ComposerDraftRestore = {
   text: string;
   attachments?: ComposerAttachment[];
   error?: string;
+  attachmentIssue?: ChatAttachmentIssue;
 };
 
 export type ComposerDraftReader = (draftKey: string) => string;
@@ -581,6 +583,7 @@ export function Composer({
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const attachmentsRef = useRef<ComposerAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<{ message: string; issue?: ChatAttachmentIssue } | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [message, setMessage] = useState(() => draftKey && readDraft ? readDraft(draftKey) : "");
   const [workspaceFolderName, setWorkspaceFolderName] = useState("");
@@ -694,6 +697,7 @@ export function Composer({
   useEffect(() => {
     if (!draftKey || !readDraft) return;
     setMessage(readDraft(draftKey));
+    setSendError(null);
     historyIndexRef.current = null;
     setSlashDismissed(false);
   }, [draftKey, readDraft]);
@@ -708,6 +712,7 @@ export function Composer({
       return draftRestore.attachments ?? [];
     });
     setAttachmentError(null);
+    setSendError(draftRestore.error ? { message: draftRestore.error, issue: draftRestore.attachmentIssue } : null);
     setSlashDismissed(false);
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }, [draftKey, draftRestore, writeDraft]);
@@ -877,6 +882,15 @@ export function Composer({
       const removed = current.find((attachment) => attachment.id === attachmentId);
       if (removed) revokeAttachmentPreview(removed);
       return current.filter((attachment) => attachment.id !== attachmentId);
+    });
+    setSendError((current) => {
+      if (!current?.issue) return current;
+      if (current.issue.attachmentId === attachmentId) return null;
+      if (current.issue.code !== "total_text_too_large" || !current.issue.textCharacterCounts) return current;
+      const counts = { ...current.issue.textCharacterCounts };
+      delete counts[attachmentId];
+      return Object.values(counts).reduce((sum, count) => sum + count, 0) > (current.issue.limit ?? 256_000)
+        ? { ...current, issue: { ...current.issue, textCharacterCounts: counts } } : null;
     });
   }
 
@@ -1100,6 +1114,7 @@ export function Composer({
     setAttachments([]);
     setAttachmentError(null);
     closeFloatingPanels();
+    setSendError(null);
   }
 
   function navigateInputHistory(direction: -1 | 1): boolean {
@@ -1256,7 +1271,7 @@ export function Composer({
           void handlePasteImages(event);
         }}
         onKeyDown={(event) => {
-          if (event.key === "Tab" && event.shiftKey) {
+          if (!isChatForm && event.key === "Tab" && event.shiftKey) {
             event.preventDefault();
             onModeChange?.("plan");
             return;
@@ -1309,6 +1324,7 @@ export function Composer({
               <div
                 className={IMAGE_ATTACHMENT_WRAPPER_CLASS}
                 aria-label={`已附加的图片 ${attachment.name}`}
+                aria-describedby={sendError?.issue?.attachmentId === attachment.id ? "composer-send-error" : undefined}
                 key={attachment.id}
               >
                 <button
@@ -1341,7 +1357,7 @@ export function Composer({
           }
 
           return (
-            <div className={FILE_ATTACHMENT_CLASS} aria-label={`已附加的文件 ${attachment.name}`} key={attachment.id}>
+            <div className={FILE_ATTACHMENT_CLASS} aria-label={`已附加的文件 ${attachment.name}`} aria-describedby={sendError?.issue?.attachmentId === attachment.id ? "composer-send-error" : undefined} key={attachment.id}>
               <FileText size={17} strokeWidth={1.9} aria-hidden="true" />
               <span className={FILE_ATTACHMENT_NAME_CLASS}>{attachment.name}</span>
               <Tooltip>
@@ -2015,6 +2031,7 @@ export function Composer({
   }
 
   function renderReviewActionsStrip() {
+    if (isChatForm) return null;
     if (surface !== "followup" && surface !== "initial") return null;
     if (!reviewSummary || reviewSummary.status === "empty") return null;
 
@@ -2056,7 +2073,7 @@ export function Composer({
 
     return (
       <div className={STATUS_ROW_CLASS}>
-        <div className={STATUS_GROUP_CLASS}>
+        {!isChatForm ? <div className={STATUS_GROUP_CLASS}>
           {branchLabel ? (
             <span className={STATUS_ITEM_CLASS} title={selectedBranch}>
               <GitBranch className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
@@ -2068,7 +2085,7 @@ export function Composer({
             <span>{runLocation === "worktree" ? "工作树" : "本机"}</span>
           </span>
           {!isChatForm && permissionControl ? <span className={STATUS_ITEM_CLASS}>{permissionControl}</span> : null}
-        </div>
+        </div> : <span />}
         <button
           className={STATUS_USAGE_CLASS}
           type="button"
@@ -2269,7 +2286,7 @@ export function Composer({
   }
 
   function renderInitialContextRow() {
-    if (surface !== "initial") return null;
+    if (surface !== "initial" || isChatForm) return null;
 
     return (
       <div className={INITIAL_CONTEXT_ROW_CLASS} aria-label="初始工作区与运行位置选择">
@@ -2281,10 +2298,10 @@ export function Composer({
   }
 
   function renderDraftError() {
-    if (!draftRestore?.error) return null;
+    if (!sendError) return null;
     return (
-      <div className="rounded-act-md border border-danger/30 bg-danger-subtle px-3 py-2 text-sm text-danger" role="alert">
-        {draftRestore.error}
+      <div id="composer-send-error" className="rounded-act-md border border-danger/30 bg-danger-subtle px-3 py-2 text-sm text-danger" role="alert">
+        {sendError.message}
       </div>
     );
   }

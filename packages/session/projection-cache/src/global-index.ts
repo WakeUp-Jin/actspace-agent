@@ -42,6 +42,7 @@ export class GlobalSessionIndex {
   }
 
   remove(sessionId: string): void { if (this.#summaries.delete(sessionId)) this.#generation += 1; }
+  get(sessionId: string): RuntimeV2GlobalSessionSummary | undefined { return this.#summaries.get(sessionId); }
   values(): readonly RuntimeV2GlobalSessionSummary[] { return Object.freeze([...this.#summaries.values()]); }
 
   async save(): Promise<void> {

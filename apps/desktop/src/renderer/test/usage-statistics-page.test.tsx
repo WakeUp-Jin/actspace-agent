@@ -15,11 +15,11 @@ describe("使用统计", () => {
     expect(screen.getByText(/\$0.12 \/ ¥0.30/)).toBeInTheDocument();
     expect(screen.queryByText("活动分析")).not.toBeInTheDocument();
     const table = screen.getByRole("table", { name: "请求日志" });
-    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["时间", "类型", "对象", "会话", "Token", "费用", "延迟", "状态"]);
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["时间", "类型", "对象", "会话", "Token", "费用", "耗时", "状态"]);
     expect(within(table).getByText("read_file")).toBeInTheDocument();
     expect(within(table).getAllByRole("row")).toHaveLength(4);
     expect(within(table).queryByRole("button", { name: /费用明细/ })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("switch", { name: "详细记录" }));
+    await userEvent.click(screen.getByRole("switch", { name: "显示明细" }));
     expect(screen.queryByRole("table", { name: "请求日志" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "显示记录" }));
     expect(screen.getByRole("table", { name: "请求日志" })).toBeInTheDocument();
@@ -27,7 +27,8 @@ describe("使用统计", () => {
   it("sends search to the full query and preserves status and search on pagination", async () => {
     const refresh = vi.fn(); const next = vi.fn();
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, rowsPage: { page: 1, pageSize: 10, totalRows: 21, totalPages: 3 } }} onRefresh={refresh} onRequestPageChange={next} />);
-    await userEvent.selectOptions(screen.getByLabelText("筛选状态"), "error");
+    await userEvent.click(screen.getByRole("button", { name: "筛选状态" }));
+    await userEvent.click(screen.getByRole("option", { name: "失败" }));
     await userEvent.type(screen.getByLabelText("搜索使用记录"), "deepseek");
     await waitFor(() => expect(refresh).toHaveBeenLastCalledWith("month", 1, "error", "deepseek", undefined));
     await userEvent.click(screen.getByRole("button", { name: "下一页" }));

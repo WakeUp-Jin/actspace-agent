@@ -42,6 +42,12 @@ export class DesktopArtifactStore {
     return metadata.bytes;
   }
 
+  async copyForSession(parentSessionId: string, childSessionId: string, artifactId: string): Promise<ToolArtifactRef> {
+    const verified = await this.#readVerified(artifactId);
+    if (verified.metadata.owner.sessionId !== parentSessionId) throw new Error("Artifact does not belong to this Session.");
+    return this.create({ bytes: verified.bytes, mediaType: verified.metadata.mediaType, owner: { ...verified.metadata.owner, sessionId: childSessionId } });
+  }
+
   async readForSession(sessionId: string, artifactId: string): Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }> {
     const verified = await this.#readVerified(artifactId);
     if (verified.metadata.owner.sessionId !== sessionId) throw new Error("Artifact does not belong to this Session.");

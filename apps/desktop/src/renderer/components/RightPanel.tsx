@@ -97,6 +97,7 @@ const RIGHT_PANEL_LAUNCHER_ICON_CLASS =
   "text-text-faint transition-colors duration-150 group-hover:text-text-muted group-focus-visible:text-text-main";
 
 export function RightPanel({
+  developmentEnabled = true,
   contextState,
   contextSnapshot,
   contextRevision,
@@ -107,6 +108,7 @@ export function RightPanel({
   onReviewChanged,
   onSendToAgent,
 }: {
+  developmentEnabled?: boolean;
   contextState?: ContextState | null;
   contextSnapshot?: ContextUsageSnapshot | null;
   contextRevision?: number;
@@ -119,9 +121,10 @@ export function RightPanel({
   onSendToAgent?: (text: string) => void;
 }) {
   const { activeTab, isFileTreeOpen, isFileTreeCollapsed, syncTerminalTabs } = useRightPanel();
-  useFileFreshness({ workspaceRoot, revalidateKey: fileRevalidateKey });
+  useFileFreshness({ workspaceRoot, revalidateKey: fileRevalidateKey, enabled: developmentEnabled });
 
   useEffect(() => {
+    if (!developmentEnabled) return;
     const listTerminals = window.actspace?.listTerminals;
     if (!sessionId || !listTerminals) {
       if (!sessionId) syncTerminalTabs("", []);
@@ -132,19 +135,19 @@ export function RightPanel({
       if (!cancelled) syncTerminalTabs(sessionId, result.terminals);
     });
     return () => { cancelled = true; };
-  }, [sessionId, syncTerminalTabs]);
+  }, [sessionId, syncTerminalTabs, developmentEnabled]);
 
   // 呈现由「当前 Tab」决定：
   // - 工作区文件 Tab → 进入 shell（树 + 文件预览区），多个文件 Tab 间切换只换 shell 内的内容；
   // - 浏览态显式打开（isFileTreeOpen，例如刚点 + 菜单还没选文件）→ 也进入 shell，但内容区显示占位；
   // - 否则（对象 Tab）→ 走整面板，展示它自己的视图。
   const isFileTab = isWorkspaceFileTab(activeTab);
-  const showShell = isFileTab || isFileTreeOpen;
+  const showShell = developmentEnabled && (isFileTab || isFileTreeOpen);
   const showTree = showShell && !isFileTreeCollapsed;
 
   return (
     <aside className={RIGHT_PANEL_CLASS}>
-      <RightPanelTabs />
+      <RightPanelTabs developmentEnabled={developmentEnabled} />
       {showShell ? <WorkspaceOperationBar activeTab={activeTab} workspaceRoot={workspaceRoot} /> : null}
       <div className={RIGHT_PANEL_SPLIT_CLASS}>
         <div className={RIGHT_PANEL_CONTENT_CLASS}>
@@ -152,7 +155,8 @@ export function RightPanel({
             <WorkspaceFileEmpty />
           ) : (
             <RightPanelBody
-              tab={activeTab}
+              tab={!developmentEnabled && activeTab && isDevelopmentTab(activeTab) ? null : activeTab}
+              developmentEnabled={developmentEnabled}
               contextState={contextState}
               contextSnapshot={contextSnapshot}
               contextRevision={contextRevision}
@@ -302,8 +306,13 @@ function formatBytes(bytes: number): string {
  * - 同时在右侧给出一个「溢出下拉」⌄ 按钮，列出全部 tab 供点选/关闭——这是无滚动条时的可达性兜底；
  * - 整条右侧预留两个浮层 chrome 控件宽度，tab 不会被「+ / 折叠」按钮盖住造成重叠。
  */
-function RightPanelTabs() {
-  const { tabs, activeTabId, setActiveTab, closeTab, isFileTreeOpen } = useRightPanel();
+function isDevelopmentTab(tab: RightPanelTab): boolean {
+  return isWorkspaceFileTab(tab) || ["review", "subagents", "terminal", "terminalStarting", "terminalError"].includes(tab.kind);
+}
+
+function RightPanelTabs({ developmentEnabled }: { developmentEnabled: boolean }) {
+  const { tabs: allTabs, activeTabId, setActiveTab, closeTab, isFileTreeOpen } = useRightPanel();
+  const tabs = developmentEnabled ? allTabs : allTabs.filter((tab) => !isDevelopmentTab(tab));
   const scrollRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState(false);
@@ -404,7 +413,7 @@ function RightPanelTabs() {
     <div className={RIGHT_TABS_CLASS} role="tablist" aria-label="右侧面板">
       <div ref={scrollRef} className={RIGHT_TAB_SCROLL_CLASS}>
         {tabs.length === 0 ? (
-          <span className={RIGHT_PANEL_EMPTY_TITLE_CLASS}>{isFileTreeOpen ? "文件" : "对象"}</span>
+          <span className={RIGHT_PANEL_EMPTY_TITLE_CLASS}>{developmentEnabled && isFileTreeOpen ? "文件" : "对象"}</span>
         ) : null}
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
@@ -509,6 +518,7 @@ function RightPanelTabs() {
 }
 
 function RightPanelBody({
+  developmentEnabled,
   tab,
   contextState,
   contextSnapshot,
@@ -519,6 +529,7 @@ function RightPanelBody({
   onReviewChanged,
   onSendToAgent,
 }: {
+  developmentEnabled: boolean;
   tab: RightPanelTab | null;
   contextState?: ContextState | null;
   contextSnapshot?: ContextUsageSnapshot | null;
@@ -533,6 +544,7 @@ function RightPanelBody({
   if (!tab) {
     return (
       <RightPanelLauncher
+        developmentEnabled={developmentEnabled}
         sessionId={sessionId ?? null}
         onOpenReview={onOpenReview}
       />
@@ -640,9 +652,11 @@ function HtmlTab({ tab }: { tab: Extract<RightPanelTab, { kind: "html" }> }) {
 }
 
 function RightPanelLauncher({
+  developmentEnabled,
   sessionId,
   onOpenReview,
 }: {
+  developmentEnabled: boolean;
   sessionId: string | null;
   onOpenReview?: () => void;
 }) {
@@ -652,27 +666,27 @@ function RightPanelLauncher({
   return (
     <nav className={RIGHT_PANEL_LAUNCHER_CLASS} aria-label="右侧面板对象">
       <div className={RIGHT_PANEL_LAUNCHER_GRID_CLASS}>
-        <LauncherButton label="子 Agent" icon={<MessageSquare size={19} />} disabled={!sessionId} onClick={() => sessionId && openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId })} />
+        {developmentEnabled ? <><LauncherButton label="子 Agent" icon={<MessageSquare size={19} />} disabled={!sessionId} onClick={() => sessionId && openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId })} />
         <LauncherButton label="文件" icon={<FolderTree size={19} strokeWidth={1.7} />} onClick={openFileTree} />
         <LauncherButton
           label="Review"
           icon={<GitBranch size={19} strokeWidth={1.7} />}
           onClick={onOpenReview}
           disabled={!onOpenReview}
-        />
+        /></> : null}
         <LauncherButton
           label="上下文"
           icon={<Eye size={19} strokeWidth={1.7} />}
           onClick={() => openTab({ id: "context", kind: "context", title: "上下文" })}
         />
-        <LauncherButton
+        {developmentEnabled ? <LauncherButton
           label={creatingTerminal ? "正在启动…" : "终端"}
           icon={<SquareTerminal size={19} strokeWidth={1.7} />}
           onClick={() => void openTerminal()}
           onPointerEnter={() => void preloadTerminalRenderView()}
           onFocus={() => void preloadTerminalRenderView()}
           disabled={!sessionId || creatingTerminal}
-        />
+        /> : null}
         <LauncherButton
           label="可视化回复"
           icon={<MessageSquare size={19} strokeWidth={1.7} />}

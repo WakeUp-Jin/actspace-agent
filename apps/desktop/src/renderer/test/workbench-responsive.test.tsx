@@ -170,7 +170,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(container.querySelector(".composer-zone")).toHaveClass("min-w-0");
 
     await user.click(screen.getByRole("button", { name: "Worked" }));
-    expect(screen.getByRole("button", { name: "Run" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "运行" })).toBeInTheDocument();
   });
 
   it("opens the right panel as an overlay and closes it with Escape", async () => {

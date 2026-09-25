@@ -95,6 +95,7 @@
 - `actspace-deepseek-workbench.html`：工作台高保真原型。
 - `agent-subagent-flow-prototype.html`：Agent 工具与 Subagent 执行流原型。
 - `compact-command-states.html`：`/compact` 消息流三态及浅深主题原型。
+- `settings-redesign-demo.html`：2026-09-25 设置中心视觉重设计定稿 demo（内嵌分组 + 翡翠绿开关 + 独立「搜索」页 + 使用统计微调）；右下角调节面板只用于方案对比。
 - `review-v1-git-review-prototype.html`：Review V1 Git-first 右侧面板历史原型；新 Workbench 以 `../core-review-change-sources.md` 为准。
 
 ## 资产约定

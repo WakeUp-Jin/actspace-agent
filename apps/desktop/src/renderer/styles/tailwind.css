@@ -33,6 +33,7 @@
   --color-hover-overlay: var(--act-color-hover-overlay);
   --color-line: var(--act-color-border);
   --color-line-strong: var(--act-color-border-strong);
+  --color-toggle-off: var(--act-color-toggle-off);
   --color-text-main: var(--act-color-text);
   --color-text-muted: var(--act-color-text-muted);
   --color-text-faint: var(--act-color-text-faint);

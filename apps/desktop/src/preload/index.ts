@@ -7,6 +7,7 @@ import type {
   AbortAgentRunInput,
   AgentSystemPromptFile,
   AgentRunResult,
+  RunAgentPreparationFailure,
   AppSettings,
   ApprovalDecideInput,
   ApprovalDecideResult,
@@ -309,8 +310,10 @@ function invokeFixedRenderer(channel: string, ...args: unknown[]): Promise<unkno
 
 contextBridge.exposeInMainWorld("actspace", {
   getBootstrapState: () => invokeFixedRenderer("app:get-bootstrap-state") as Promise<BootstrapState>,
-  runAgent: async (input: RunAgentInput): Promise<AgentRunResult> => {
-    const { projection, ...result } = await invokeFixedRenderer("agent:run", input) as Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection };
+  runAgent: async (input: RunAgentInput): Promise<AgentRunResult | RunAgentPreparationFailure> => {
+    const response = await invokeFixedRenderer("agent:run", input) as RunAgentPreparationFailure | (Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection });
+    if (response.status === "rejected") return response;
+    const { projection, ...result } = response;
     const record = projectChatWindow(projection);
     return { ...result, events: record.events, contextSnapshot: record.contextSnapshot };
   },

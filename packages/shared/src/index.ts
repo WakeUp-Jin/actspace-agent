@@ -1,4 +1,5 @@
 export * from "./ipc";
+export * from "./chat-attachments";
 export * from "./review";
 export {
   PROVIDER_IDS,

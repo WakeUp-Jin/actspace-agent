@@ -26,6 +26,6 @@ window.actspace = {
 createRoot(document.getElementById("root")!).render(
   <div className="mx-auto min-h-screen bg-app-bg" style={{ width: query.get("width") === "375" ? 375 : "100%", maxWidth: "100%" }}>
     <p className="px-4 py-2 text-[12px] text-text-muted">开发预览 · 固定样例 · 不连接服务或保存数据</p>
-    <PageShell title="模型" description="模型连接、API Key 与模型目录管理。" maxWidth="880"><ProviderSettings /></PageShell>
+    <PageShell title="模型" description="模型连接、API Key 与模型目录管理。"><ProviderSettings /></PageShell>
   </div>,
 );

@@ -30,6 +30,12 @@
 
 ## 最近完成
 
+- [审批重载与 Chat fork 修复](completed/20260925-approval-reload-chat-fork-fixes.md)：恢复 pending 卡片与停止能力、统一 fork writer 生命周期、复制附件及替换引用；对应实机批次通过，完整权限/Chat 验收边界见摘要。
+
+- [设置中心视觉重设计](completed/20260925-settings-visual-redesign.md)：统一内嵌分组与控件、即时保存与“已保存”提示，新增「能力 → 搜索」页，使用统计微调；自动化与 fixture 截图已通过，Electron 验收见执行摘要。
+
+- [工具审批卡重设计](completed/20260925-approval-card-redesign.md)：5 类审批组件统一为一行审批条（读取/搜索/编辑/写入/删除）与底部按钮卡片（Bash/浏览器），共享部件与测试已完成；真实 Electron 验收见执行摘要。
+
 - [Anthropic 自定义连接、手动模型与价格](completed/20260924-anthropic-custom-model-pricing.md)：Claude Code 常见的 Anthropic Messages 根地址、显式测试、短缓存开关、连接内手动模型与四类价格已完成；真实 Electron 点击和真实中转站缓存命中保留人工门禁。
 
 - [主 Agent Chat 形态](completed/20260924-main-chat-form.md)：固定 Session preset、Chat 两工具、Prompt cache 动态尾部、首版附件与可调压缩阈值已实施；真实 Electron/Provider/本地文件与主题验收见执行摘要。

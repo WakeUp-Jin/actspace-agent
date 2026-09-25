@@ -45,7 +45,18 @@ export class RuntimeSessionController {
     const read = await this.#cache.read(sessionId);
     const model = new SessionReadModel(read.header, this.options.registry, this.options.rendererAllowlist);
     model.projections.restore(sessionId, read.checkpoint);
-    return { model, snapshot: model.snapshot(read.accessState), read };
+    const snapshot = model.snapshot(read.accessState);
+    await this.repairGlobalIndex(snapshot, model.header.createdWith.profileId);
+    return { model, snapshot, read };
+  }
+
+  /** Journal replay is authoritative: a cold read ahead of its loaded index entry repairs that entry. */
+  private async repairGlobalIndex(snapshot: RuntimeV2SessionSnapshot, profileId: string): Promise<void> {
+    if (!this.#globalIndexLoadedFromDisk) return;
+    const indexed = this.#globalIndex.get(snapshot.sessionId);
+    if (indexed === undefined || indexed.throughJournalSeq >= snapshot.throughJournalSeq) return;
+    this.#globalIndex.replace(this.summary(snapshot, profileId));
+    await this.#globalIndex.save();
   }
 
   private summary(snapshot: RuntimeV2SessionSnapshot, profileId: string): import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary {
@@ -193,11 +204,13 @@ export class RuntimeSessionController {
     await this.#cache.idle();
     const entries = [...this.#open];
     this.#open.clear();
-    await Promise.all(entries.map(async ([sessionId, session]) => {
+    const closed = await Promise.allSettled(entries.map(async ([sessionId, session]) => {
       let error: unknown;
       try {
         if (session.journal.events.at(-1)?.type !== "session/end-seed") await session.append({ type: "session/end-seed", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { sessionId: session.header.sessionId, lastSeq: session.lastSeq }, surface: null });
         await session.flush();
+        // The Session already left #open, so onFlush cannot see the end-seed; record it here.
+        if (!this.#ephemeral.has(sessionId) && this.#globalIndexLoadedFromDisk) this.#globalIndex.replace(this.summary(this.snapshot(session), this.options.profileId));
         await session.close();
       } catch (caught) { error = caught; }
       this.#models.delete(session.header.sessionId);
@@ -206,6 +219,9 @@ export class RuntimeSessionController {
       await this.options.onDisposed?.(session.header.sessionId, error === undefined ? { ok: true } : { ok: false, error });
       if (error !== undefined) throw error;
     }));
+    if (this.#globalIndexLoadedFromDisk) await this.#globalIndex.save();
+    const failed = closed.find(result => result.status === "rejected");
+    if (failed) throw failed.reason;
     this.#ephemeral.clear();
   }
 }

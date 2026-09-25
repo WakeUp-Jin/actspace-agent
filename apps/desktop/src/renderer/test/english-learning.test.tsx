@@ -40,19 +40,22 @@ describe("English learning controls", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("无法更改");
     expect(screen.getByLabelText("英语学习目标会话")).toHaveValue("new");
   });
-  it("saves speech preferences separately and clears the password input after saving", async () => {
+  it("saves speech preferences as they change and saves the key from its own editor", async () => {
     const api = bridge(); const user = userEvent.setup(); render(<SpeechSettingsSection />);
     const voice = screen.getByLabelText("语音音色");
     await waitFor(() => expect(voice).toBeEnabled());
-    expect(screen.getByLabelText("语音模型")).toHaveValue("speech-2.8-turbo");
+    const modelSelect = screen.getByRole("button", { name: "语音模型" });
+    expect(modelSelect).toHaveTextContent("speech-2.8-turbo");
+    await user.click(modelSelect);
     expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["speech-2.8-hd", "speech-2.8-turbo", "speech-2.6-hd", "speech-2.6-turbo", "speech-02-hd", "speech-02-turbo", "speech-01-hd", "speech-01-turbo"]);
-    await user.selectOptions(screen.getByLabelText("语音模型"), "speech-2.8-hd");
-    await user.clear(voice); await user.type(voice, "my-voice");
-    await user.click(screen.getByRole("button", { name: "保存语音配置" }));
-    expect(api.updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "media", patch: { speech: { ...DEFAULT_SPEECH_SETTINGS, model: "speech-2.8-hd", voiceId: "my-voice" } } }));
-    const key = screen.getByLabelText("MiniMax 语音 API Key");
-    await user.type(key, "speech-canary"); await user.click(screen.getByRole("button", { name: "保存 Key" }));
-    await waitFor(() => expect(key).toHaveValue(""));
+    await user.click(screen.getByRole("option", { name: "speech-2.8-hd" }));
+    await waitFor(() => expect(api.updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "media", patch: { speech: { ...DEFAULT_SPEECH_SETTINGS, model: "speech-2.8-hd" } } })));
+    await user.clear(voice); await user.type(voice, "my-voice"); await user.tab();
+    await waitFor(() => expect(api.updateSettingsV4).toHaveBeenLastCalledWith(expect.objectContaining({ namespace: "media", patch: { speech: { ...DEFAULT_SPEECH_SETTINGS, model: "speech-2.8-hd", voiceId: "my-voice" } } })));
+    await user.click(screen.getByRole("button", { name: "设置 MiniMax Key" }));
+    await user.type(screen.getByLabelText("MiniMax 语音 API Key"), "speech-canary");
+    await user.click(screen.getByRole("button", { name: "保存 Key" }));
+    await waitFor(() => expect(screen.queryByLabelText("MiniMax 语音 API Key")).not.toBeInTheDocument());
     expect(api.setProviderKey).toHaveBeenCalledWith({ provider: "speech-minimax", apiKey: "speech-canary" });
   });
 });

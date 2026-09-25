@@ -7,6 +7,7 @@ import {
   PROVIDER_IDS,
   normalizeModelKey,
   type AgentRunResult,
+  type RunAgentPreparationFailure,
   type AppSettings,
   type ArtifactContextMenuInput,
   type BootstrapState,
@@ -54,7 +55,7 @@ import { commitAndPushWorkspaceChanges, commitWorkspaceChanges, createWorkspaceB
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "../workspace-open-service";
 import { selectModelCatalog, type RuntimeV2OpenRouterCatalogService } from "./openrouter-catalog-service";
 import type { ProviderNetworkService } from "./provider-network-service";
-import type { DesktopRuntimeV2Registry } from "./runtime-registry";
+import { ChatAttachmentValidationError, type DesktopRuntimeV2Registry } from "./runtime-registry";
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
 import {
   projectContextSnapshot,
@@ -64,6 +65,7 @@ import {
   projectSubagentList,
   projectIndexedUsageActivity,
   projectIndexedUsageStatistics,
+  toolPreview,
 } from "@actspace/client/sessions";
 import { listVisualizationsV2, visualizeReplyV2 } from "./fixed-renderer-visualization";
 
@@ -215,8 +217,24 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return { ok: failedSessionIds.length === 0, archivedSessionIds, failedSessionIds };
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent, async (_event, input: RunAgentInput): Promise<Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection }> => {
-    const prepared = await toRunContent(options.registry, input.sessionId, input.userInput, input.attachments ?? []);
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent, async (_event, input: RunAgentInput): Promise<RunAgentPreparationFailure | (Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection })> => {
+    let prepared: Awaited<ReturnType<typeof toRunContent>>;
+    try {
+      prepared = await toRunContent(options.registry, input.sessionId, input.userInput, input.attachments ?? []);
+    } catch (error) {
+      if (!(error instanceof ChatAttachmentValidationError)) throw error;
+      const attachments = (input.attachments ?? []).filter((attachment) => Boolean(attachment.path));
+      return {
+        status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId,
+        error: {
+          ...error.issue,
+          ...(error.attachmentIndex === undefined ? {} : { attachmentId: attachments[error.attachmentIndex]?.id }),
+          ...(error.textCharacterCounts === undefined ? {} : {
+            textCharacterCounts: Object.fromEntries(attachments.map((attachment, index) => [attachment.id, error.textCharacterCounts![index] ?? 0])),
+          }),
+        },
+      };
+    }
     let result: Awaited<ReturnType<DesktopRuntimeV2Registry["runTurn"]>>;
     try {
       result = await options.registry.runTurn({
@@ -628,18 +646,37 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return openWorkspaceInTool({ ...input, workspaceRoot }, options.roots);
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listPendingApprovals, (_event, input: { sessionId?: string } = {}): PendingApprovalInfo[] => options.approvals.listPending(input.sessionId).map((request) => ({
-    requestId: request.id,
-    toolName: request.toolName,
-    summary: request.summary,
-    reason: request.reason,
-    riskLevel: request.riskLevel,
-    command: typeof request.args.command === "string" ? request.args.command : undefined,
-    createdAt: request.createdAt,
-    expiresAt: request.expiresAt,
-    grantSuggestions: request.grantSuggestions,
-    supportedLifetimes: request.supportedLifetimes,
-  })));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listPendingApprovals, async (_event, input: { sessionId?: string } = {}): Promise<PendingApprovalInfo[]> => {
+    const pending = await Promise.all(options.approvals.listPending(input.sessionId).map(async (request): Promise<PendingApprovalInfo> => {
+      // Broker args are resource summaries, not tool arguments. Read the
+      // accepted call for a faithful path/command preview after renderer reload.
+      const detail = request.sessionId && request.toolCallId
+        ? await options.registry.browseToolDetail(request.sessionId, request.toolCallId).catch(() => undefined)
+        : undefined;
+      const call = detail?.journal.find(event => event.type === "tool/call" && (event.data as Record<string, unknown>).callId === request.toolCallId);
+      const callData = call?.data as Record<string, RuntimeV2JsonValue> | undefined;
+      return {
+        requestId: request.id,
+        ...(request.sessionId && request.agentRunId && request.toolCallId ? { recovery: {
+          agentRunId: request.agentRunId,
+          toolCallId: request.toolCallId,
+          preview: toolPreview(request.toolName, undefined, { summary: request.summary }, callData ?? { args: request.args as Record<string, RuntimeV2JsonValue> }, undefined, request.sessionId, request.agentRunId, "running", detail?.snapshot.workspaceRoot ?? undefined),
+          approvalScope: request.approvalScope,
+        } } : {}),
+        toolName: request.toolName,
+        summary: request.summary,
+        reason: request.reason,
+        riskLevel: request.riskLevel,
+        command: typeof request.args.command === "string" ? request.args.command : undefined,
+        createdAt: request.createdAt,
+        expiresAt: request.expiresAt,
+        grantSuggestions: request.grantSuggestions,
+        supportedLifetimes: request.supportedLifetimes,
+      };
+    }));
+    const live = new Set(options.approvals.listPending(input.sessionId).map(request => request.id));
+    return pending.filter(request => live.has(request.requestId));
+  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval, (_event, input: import("@actspace/shared").ApprovalDecideInput) => options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined));
 
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getBrowserBridgeStatus, () => options.browserBridge.getStatus());

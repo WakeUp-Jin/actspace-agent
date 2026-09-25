@@ -28,11 +28,12 @@ describe("BrowserApprovalBlock", () => {
     window.actspace = { submitApproval } as unknown as Window["actspace"];
     render(<BrowserApprovalBlock message={makeMessage()} />);
 
-    expect(screen.getByText("允许 ActSpace 在当前会话中使用浏览器？")).toBeInTheDocument();
+    expect(screen.getByText("使用浏览器")).toBeInTheDocument();
+    expect(screen.getByText("整个会话")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "拒绝" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "允许" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "本会话允许" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "允许" }));
+    await userEvent.click(screen.getByRole("button", { name: "本会话允许" }));
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "browser-approval-1",
       decision: "once",
@@ -59,7 +60,7 @@ describe("BrowserApprovalBlock", () => {
     } as unknown as Window["actspace"];
     render(<BrowserApprovalBlock message={makeMessage()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "允许" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "允许" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "本会话允许" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "本会话允许" })).toBeEnabled());
   });
 });

@@ -232,11 +232,13 @@ describe("FileDiffBlock approval state", () => {
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
 
-    expect(screen.getByText("Edit file requires approval")).toBeInTheDocument();
+    expect(screen.getByRole("article")).toHaveClass("approval-row");
+    expect(screen.getByText("编辑")).toBeInTheDocument();
     expect(screen.getByText("vocab.md")).toBeInTheDocument();
-    expect(screen.getByText(/outside the workspace/)).toBeInTheDocument();
+    // 未识别的原因不丢失，收进原因图标的 title。
+    expect(screen.getByLabelText("审批原因")).toHaveAttribute("title", expect.stringContaining("outside the workspace"));
 
-    await userEvent.click(screen.getByRole("button", { name: "Allow" }));
+    await userEvent.click(screen.getByRole("button", { name: "应用" }));
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-edit-1",
@@ -251,7 +253,7 @@ describe("FileDiffBlock approval state", () => {
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    await userEvent.click(screen.getByRole("button", { name: "拒绝" }));
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-edit-1",
@@ -260,7 +262,7 @@ describe("FileDiffBlock approval state", () => {
     expect(await screen.findByText("Denied edit vocab.md")).toBeInTheDocument();
   });
 
-  it("submits only a Runtime suggestion id for Session scope and reveals subtree explicitly", async () => {
+  it("submits only the exact Runtime suggestion id for Session scope", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
     window.actspace = {
       submitApproval,
@@ -274,10 +276,28 @@ describe("FileDiffBlock approval state", () => {
     } as unknown as Window["actspace"];
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
-    expect(await screen.findByRole("button", { name: "本会话允许此文件" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "本会话允许此目录树" })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "选择目录范围" }));
-    await userEvent.click(screen.getByRole("button", { name: "本会话允许此目录树" }));
-    expect(submitApproval).toHaveBeenCalledWith({ requestId: "approval-edit-1", decision: "session", suggestionId: "tree-1" });
+    const sessionButton = await screen.findByRole("button", { name: "本会话" });
+    expect(sessionButton).toHaveAttribute("title", "This file only");
+    expect(screen.queryByText("This directory tree")).toBeNull();
+    await userEvent.click(sessionButton);
+    expect(submitApproval).toHaveBeenCalledWith({ requestId: "approval-edit-1", decision: "session", suggestionId: "exact-1" });
+  });
+
+  it("keeps the diff collapsed until the change stats are opened", async () => {
+    render(<FileDiffBlock message={{ ...makePendingEditBlock(), additions: 1, deletions: 1, diff: "-old line\n+new line" }} />);
+
+    expect(screen.queryByText("+new line")).toBeNull();
+    const stats = screen.getByRole("button", { name: "查看改动" });
+    expect(stats).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(stats);
+    expect(screen.getByText("+new line")).toHaveClass("diff-line", "is-add");
+    expect(screen.getByRole("button", { name: "收起改动" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("labels a pending write with the write verb", () => {
+    render(<FileDiffBlock message={makeWriteBlock({ status: "pending", filePath: "notes/new.md", additions: 3, deletions: 0, diff: "+a\n+b\n+c", approvalRequestId: "approval-write-1" })} />);
+
+    expect(screen.getByRole("button", { name: "写入" })).toBeInTheDocument();
+    expect(screen.getByText("+3")).toBeInTheDocument();
   });
 });

@@ -11,7 +11,7 @@ type Reader = {
 };
 type Stored = { readonly version: 1; readonly sources: readonly IndexedUsageSource[] };
 
-/** Disposable per-Session Usage rows, validated against the durable Global Index. */
+/** Disposable per-Session Usage rows, keyed by the Global Index and validated against Journal replay. */
 export class UsageSourceCache {
   private pending?: Promise<IndexedUsageSource[]>;
   constructor(private readonly reader: Reader, private readonly dataRoot: string) {}
@@ -33,12 +33,13 @@ export class UsageSourceCache {
     for (const summary of summaries) {
       const cached = previous.get(summary.sessionId);
       if (cached?.throughJournalSeq === summary.throughJournalSeq) { sources.push(cached); continue; }
-      const snapshot = await this.reader.inspectSession(summary.sessionId);
-      const observed = await this.reader.inspectSessionEvents(summary.sessionId);
-      const journal = observed.filter(event => event.seq <= summary.throughJournalSeq);
-      if ((journal.at(-1)?.seq ?? -1) !== summary.throughJournalSeq || snapshot.throughJournalSeq !== summary.throughJournalSeq) throw new Error("Usage index revision mismatch");
-      sources.push({ sessionId: summary.sessionId, title: summary.title, throughJournalSeq: summary.throughJournalSeq, rows: projectSessionUsageActivities(snapshot, journal) });
       changed = true;
+      // The Journal-derived snapshot is authoritative; a lagging index entry is repaired by this cold read.
+      const snapshot = await this.reader.inspectSession(summary.sessionId);
+      const revision = snapshot.throughJournalSeq;
+      const journal = (await this.reader.inspectSessionEvents(summary.sessionId)).filter(event => event.seq <= revision);
+      if ((journal.at(-1)?.seq ?? -1) !== revision) { console.warn(`[usage] Skipping Session ${summary.sessionId}: journal does not reach snapshot seq ${revision}.`); continue; }
+      sources.push({ sessionId: summary.sessionId, title: summary.title, throughJournalSeq: revision, rows: projectSessionUsageActivities(snapshot, journal) });
     }
     if (changed) await this.save(sources);
     return sources;

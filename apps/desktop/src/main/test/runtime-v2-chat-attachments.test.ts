@@ -39,12 +39,15 @@ describe("Chat attachment admission", () => {
     await writeFile(join(root, "part-b.md"), "b".repeat(130_000));
     await mkdir(join(root, "folder"));
 
-    await expect(prepareChatAttachments([join(root, "document.pdf")])).rejects.toThrow("support PNG");
-    await expect(prepareChatAttachments([join(root, "document.docx")])).rejects.toThrow("support PNG");
-    await expect(prepareChatAttachments([join(root, "folder")])).rejects.toThrow("regular file");
-    await expect(prepareChatAttachments([join(root, "invalid.txt")])).rejects.toThrow("valid UTF-8");
-    await expect(prepareChatAttachments([join(root, "nul.txt")])).rejects.toThrow("NUL");
+    await expect(prepareChatAttachments([join(root, "missing.txt")])).rejects.toMatchObject({ issue: { code: "unreadable", fileName: "missing.txt" }, attachmentIndex: 0 });
+    await expect(prepareChatAttachments([join(root, "part-a.txt"), join(root, "invalid.txt")])).rejects.toMatchObject({ issue: { code: "invalid_utf8", fileName: "invalid.txt" }, attachmentIndex: 1 });
+    await expect(prepareChatAttachments([join(root, "part-a.txt"), join(root, "part-b.md")])).rejects.toMatchObject({ issue: { code: "total_text_too_large", limit: 256_000 }, textCharacterCounts: [130_000, 130_000] });
+    await expect(prepareChatAttachments([join(root, "document.pdf")])).rejects.toThrow("格式暂不支持");
+    await expect(prepareChatAttachments([join(root, "document.docx")])).rejects.toThrow("格式暂不支持");
+    await expect(prepareChatAttachments([join(root, "folder")])).rejects.toThrow("不是普通文件");
+    await expect(prepareChatAttachments([join(root, "invalid.txt")])).rejects.toThrow("不是 UTF-8");
+    await expect(prepareChatAttachments([join(root, "nul.txt")])).rejects.toThrow("非文本内容");
     await expect(prepareChatAttachments([join(root, "large.txt")])).rejects.toThrow("1 MiB");
-    await expect(prepareChatAttachments([join(root, "part-a.txt"), join(root, "part-b.md")])).rejects.toThrow("256,000 character");
+    await expect(prepareChatAttachments([join(root, "part-a.txt"), join(root, "part-b.md")])).rejects.toThrow("256,000 个字符");
   });
 });

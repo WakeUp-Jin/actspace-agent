@@ -6,7 +6,7 @@ declare global {
       getBootstrapState: () => Promise<import("@actspace/shared").BootstrapState>;
       runAgent: (
         input: import("@actspace/shared").RunAgentInput
-      ) => Promise<import("@actspace/shared").AgentRunResult>;
+      ) => Promise<import("@actspace/shared").AgentRunResult | import("@actspace/shared").RunAgentPreparationFailure>;
       compactContext: (
         input: import("@actspace/shared").CompactContextInput
       ) => Promise<import("@actspace/shared").CompactContextResult>;

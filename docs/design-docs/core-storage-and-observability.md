@@ -130,6 +130,8 @@ CLI ephemeral run 使用系统临时目录中的一次性 artifact store，并�
 
 Fork 不是复制一个 v1 会话目录。当前 Profile 的 App Bundle Service `forkMainSession()` 通过 Session Store 在指定 `boundarySeq` 创建新 Header 与事件种子，并记录 lineage；新 Session 获得独立 writer lease 和后续事件序列。
 
+Desktop fork 会将该前缀实际引用的附件与工具制品复制为子会话独立拥有的新制品。相同旧 ID 只复制一次；事件 data、surface 及请求快照中的结构化引用同步替换，普通文本不做 ID 字符串替换。复制时继续校验父会话归属和内容完整性。新会话目录独占创建，复制或 Journal 写入失败时清理本次副本与目录，不触碰既有会话。Host 未提供制品复制能力时，带制品的 fork 明确失败，纯文本 fork 仍可用。旧版本已经生成的失效 fork 不自动迁移。
+
 恢复分两类：
 
 - **运行中断恢复**：为未完成 request、tool、step 和 turn 追加 `aborted`、`outcome-unknown` 与 recovery transaction；

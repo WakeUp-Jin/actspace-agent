@@ -201,7 +201,7 @@ Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销
 - 主工作台通常不使用阴影。
 - Popover、dialog、Sheet 可以使用低透明度柔和阴影。
 - Composer 可以依赖 surface + border 获得层级，不默认使用蓝色光晕。
-- 设置分组不使用“白卡 + 边框 + 大圆角 + 阴影”四件套。
+- 设置分组只用“白底 + hairline + 10px 圆角”，不加阴影。
 
 建议目标阴影：
 
@@ -260,7 +260,7 @@ Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销
 ### Settings
 
 - 导航选中态为灰底黑字。
-- 内容分组使用 surface-subtle，不堆卡片和阴影。
+- 内容分组使用内嵌分组：`surface` 白底 + 1px hairline + 10px 圆角，无阴影；分组之间 36px 间距（2026-09-25）。
 - Toggle 开启使用 operational green。
 - 内容列保持稳定阅读宽度。
 

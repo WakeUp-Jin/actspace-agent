@@ -174,7 +174,6 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
   - 附件删除 `X`：移除 `{attachment.name}`。
 - `apps/desktop/src/renderer/components/messages/BashRunBlock.tsx`
   - Bash 输出三点：更多 Bash 输出操作。
-  - Bash 审批三点：更多审批操作。
 - `apps/desktop/src/renderer/components/ContextPopup.tsx`
   - 关闭按钮：关闭上下文用量。
 - 已退役页面与原型不在当前 tooltip 迁移范围；历史资产统一见 `docs/archive/v1/design-docs/`。

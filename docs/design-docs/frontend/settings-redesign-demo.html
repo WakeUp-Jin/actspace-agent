@@ -1,0 +1,1035 @@
+<!doctype html>
+<!-- 2026-09-25 定稿：内嵌分组 + 翡翠绿开关 + 独立「搜索」页 + 使用统计微调。右下角「DEMO 调节」仅用于方案对比，不进入实现。实现与差异见 docs/exec-plans/completed/20260925-settings-visual-redesign.md。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>设置中心重设计</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --bg: #f7f7f5;
+  --sidebar: #efefed;
+  --surface: #ffffff;
+  --surface-subtle: #f1f1ef;
+  --selected: #e4e4e1;
+  --hover: #f0f0ed;
+  --line: #deded9;
+  --line-soft: #ebebe7;
+  --line-strong: #8c8c85;
+  --text: #20201e;
+  --muted: #676762;
+  --faint: #72726b;
+  --subtle: #9a9a93;
+  --action: #20201e;
+  --action-hover: #343430;
+  --on-action: #ffffff;
+  --operational: #087a4b;
+  --operational-soft: #e5f2ea;
+  --warning: #91600e;
+  --warning-soft: #f7eedb;
+  --danger: #c74747;
+  --on-danger: #a93a3a;
+  --danger-soft: #f8e9e9;
+  --toggle-off: #d3d3ce;
+  --focus: #4d4d48;
+  --shadow-pop: 0 1px 2px rgba(31, 45, 61, 0.06), 0 12px 32px rgba(31, 45, 61, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #181916; --sidebar: #1e1f1c; --surface: #222320; --surface-subtle: #292a26; --selected: #30312d; --hover: #282925;
+    --line: #353630; --line-soft: #2d2e29; --line-strong: #787870;
+    --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #6f6f68;
+    --action: #f1f1ed; --action-hover: #dbdbd5; --on-action: #181916;
+    --operational: #36c783; --operational-soft: #193a2b; --warning: #d2a14d; --warning-soft: #3e321c;
+    --danger: #e06b6b; --on-danger: #f08a8a; --danger-soft: #452525; --toggle-off: #4a4b45; --focus: #c8c8c0;
+    --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.45);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --sidebar: #1e1f1c; --surface: #222320; --surface-subtle: #292a26; --selected: #30312d; --hover: #282925;
+  --line: #353630; --line-soft: #2d2e29; --line-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #6f6f68;
+  --action: #f1f1ed; --action-hover: #dbdbd5; --on-action: #181916;
+  --operational: #36c783; --operational-soft: #193a2b; --warning: #d2a14d; --warning-soft: #3e321c;
+  --danger: #e06b6b; --on-danger: #f08a8a; --danger-soft: #452525; --toggle-off: #4a4b45; --focus: #c8c8c0;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+/* Demo tweak: toggle-on color */
+body { --toggle-on: var(--operational); --knob: #ffffff; }
+body.tg-ink { --toggle-on: var(--action); --knob: var(--on-action); }
+
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-ui); font-size: 13px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--focus) 45%, transparent); outline-offset: 2px; }
+svg { display: block; }
+
+/* ---------- Shell ---------- */
+.app { display: flex; flex-direction: column; height: 100vh; }
+.titlebar {
+  height: 38px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 14px;
+  background: var(--sidebar); border-bottom: 1px solid var(--line);
+}
+.titlebar i { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
+.titlebar span { margin-left: 10px; font-size: 12px; color: var(--faint); }
+.body { flex: 1; min-height: 0; display: flex; }
+
+.nav {
+  width: 216px; flex-shrink: 0; overflow-y: auto; background: var(--sidebar);
+  border-right: 1px solid var(--line); padding: 10px 10px 16px;
+}
+.nav-back {
+  display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; margin-bottom: 6px;
+  border: 0; background: none; border-radius: 6px; color: var(--muted); font-size: 12px;
+}
+.nav-back { white-space: nowrap; flex-shrink: 0; }
+.nav-back:hover { background: var(--hover); color: var(--text); }
+.nav-grp { padding: 14px 10px 4px; font-size: 11px; font-weight: 500; color: var(--faint); }
+.nav-grp:first-of-type { padding-top: 4px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 0 10px;
+  border: 0; background: none; border-radius: 6px; color: var(--muted); font-size: 13px; text-align: left;
+  transition: background-color 120ms var(--ease), color 120ms var(--ease);
+}
+.nav-item:hover { background: var(--hover); color: var(--text); }
+.nav-item[aria-current="page"] { background: var(--selected); color: var(--text); font-weight: 500; }
+.nav-item svg { color: var(--faint); }
+.nav-item[aria-current="page"] svg { color: var(--text); }
+
+main { flex: 1; min-width: 0; overflow-y: auto; }
+.page { width: 100%; max-width: 736px; margin: 0 auto; padding: 36px 48px 96px; }
+.page[hidden] { display: none; }
+
+/* ---------- Page & section ---------- */
+.crumb {
+  display: inline-flex; align-items: center; gap: 2px; margin: -6px 0 10px -6px; height: 26px; padding: 0 8px 0 4px;
+  border: 0; background: none; border-radius: 6px; color: var(--muted); font-size: 12px;
+}
+.crumb:hover { background: var(--hover); color: var(--text); }
+.page-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 8px; }
+.page-head h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
+.page-head p { margin-top: 4px; font-size: 13px; color: var(--muted); }
+.page-head .grow { flex: 1; min-width: 0; }
+
+.section { margin-top: 36px; }
+.section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 10px; padding: 0 2px; }
+.section-head h3 { font-size: 13px; font-weight: 600; }
+.section-head p { margin-top: 2px; font-size: 12px; color: var(--muted); max-width: 58ch; }
+.section-head .meta { font-size: 12px; color: var(--faint); white-space: nowrap; }
+
+/* Group style A — inset: white surface + hairline, no shadow */
+.group { overflow: hidden; }
+body.g-inset .group { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+body.g-inset .row, body.g-inset .editor, body.g-inset .subhead { padding-left: 16px; padding-right: 16px; }
+body.g-inset .group > * + * { border-top: 1px solid var(--line-soft); }
+/* Group style B — open rows: rules only */
+body.g-open .group { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+body.g-open .row, body.g-open .editor, body.g-open .subhead { padding-left: 2px; padding-right: 2px; }
+body.g-open .group > * + * { border-top: 1px solid var(--line-soft); }
+
+.row { display: flex; align-items: center; gap: 24px; min-height: 52px; padding-top: 10px; padding-bottom: 10px; }
+.row[hidden] { display: none; }
+.row.tight { min-height: 44px; padding-top: 8px; padding-bottom: 8px; }
+.row .label { flex: 1; min-width: 0; }
+.row .t { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+.row .d { margin-top: 2px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.row .d.mono { font-family: var(--font-mono); font-size: 11.5px; color: var(--faint); word-break: break-all; }
+.row .ctl { flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
+.row.link { cursor: pointer; transition: background-color 120ms var(--ease); }
+.row.link:hover { background: var(--hover); }
+body.g-open .row.link:hover { background: none; }
+body.g-open .row.link:hover .t { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.row.sub { padding-left: 36px !important; }
+body.g-open .row.sub { padding-left: 22px !important; }
+.row.disabled .label, .row.disabled .ctl { opacity: 0.45; pointer-events: none; }
+.subhead { padding-top: 10px; padding-bottom: 6px; font-size: 11px; font-weight: 500; color: var(--faint); background: var(--surface-subtle); }
+body.g-open .subhead { background: none; }
+.subhead.sub { padding-left: 36px !important; }
+body.g-open .subhead.sub { padding-left: 22px !important; }
+
+.val { font-size: 13px; color: var(--muted); max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.val.mono { font-family: var(--font-mono); font-size: 12px; }
+.chev { color: var(--subtle); transition: transform 160ms var(--ease); }
+.row[aria-expanded="true"] .chev.rot { transform: rotate(90deg); }
+
+/* ---------- Controls ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; white-space: nowrap;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text);
+  font-size: 12.5px; font-weight: 500; transition: background-color 120ms var(--ease), border-color 120ms var(--ease), transform 120ms var(--ease);
+}
+.btn:hover { border-color: var(--line-strong); }
+.btn:active { transform: scale(0.97); }
+.btn.primary { background: var(--action); border-color: var(--action); color: var(--on-action); }
+.btn.primary:hover { background: var(--action-hover); }
+.btn.quiet { border-color: transparent; background: none; color: var(--muted); }
+.btn.quiet:hover { background: var(--hover); color: var(--text); }
+.btn.danger { color: var(--on-danger); }
+.btn.danger:hover { border-color: color-mix(in srgb, var(--danger) 50%, transparent); background: var(--danger-soft); }
+.btn.icon { width: 28px; padding: 0; justify-content: center; }
+
+.sel { position: relative; display: inline-flex; }
+.sel select {
+  appearance: none; -webkit-appearance: none; height: 30px; min-width: 216px; padding: 0 30px 0 10px;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 13px; cursor: pointer;
+}
+.sel select:hover { border-color: var(--line-strong); }
+.sel svg { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--faint); }
+.sel.sm select { min-width: 140px; }
+
+.input {
+  height: 30px; width: 120px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--surface); font-size: 13px; outline: none;
+}
+.input::placeholder, textarea::placeholder { color: var(--subtle); }
+.input:hover { border-color: var(--line-strong); }
+.input:focus, textarea:focus, .sel select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 16%, transparent); outline: none; }
+.input.num { text-align: right; font-variant-numeric: tabular-nums; }
+.input.mid { width: 220px; }
+.input.wide { width: 100%; }
+
+.tg {
+  position: relative; width: 32px; height: 18px; flex-shrink: 0; border: 0; border-radius: 999px;
+  background: var(--toggle-off); transition: background-color 160ms var(--ease);
+}
+.tg::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--knob); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: transform 160ms var(--ease);
+}
+.tg[aria-checked="true"] { background: var(--toggle-on); }
+.tg[aria-checked="true"]::after { transform: translateX(14px); }
+
+.stepper { display: inline-flex; align-items: center; height: 30px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.stepper button { width: 28px; height: 100%; border: 0; background: none; color: var(--faint); display: grid; place-items: center; }
+.stepper button:hover { color: var(--text); }
+.stepper output { min-width: 52px; text-align: center; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.status .dot { width: 6px; height: 6px; border-radius: 50%; }
+.status.ok .dot { background: var(--operational); }
+.status.off .dot { border: 1.5px solid var(--line-strong); width: 7px; height: 7px; }
+.status.warn { color: var(--warning); }
+.status.warn .dot { background: var(--warning); }
+
+.pill { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 4px; font-size: 11px; font-weight: 500; background: var(--surface-subtle); color: var(--muted); border: 1px solid var(--line-soft); }
+.pill.warn { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
+
+.kbd { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; background: var(--surface); font-size: 12px; font-weight: 500; color: var(--text); }
+.kbds { display: inline-flex; gap: 4px; }
+
+.tile { width: 32px; height: 32px; flex-shrink: 0; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-subtle); font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
+.tile.lg { width: 40px; height: 40px; border-radius: 10px; font-size: 13px; }
+
+.inline-note { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--warning); }
+.inline-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+
+/* Inline editor */
+.editor { padding-top: 12px; padding-bottom: 14px; background: var(--surface-subtle); }
+body.g-open .editor { background: none; }
+.editor[hidden] { display: none; }
+.editor textarea {
+  width: 100%; min-height: 76px; padding: 8px 10px; resize: vertical; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--surface); font-size: 13px; line-height: 1.55;
+}
+.editor textarea.mono { min-height: 180px; font-family: var(--font-mono); font-size: 12px; }
+.editor-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.editor-foot .hint { font-size: 12px; color: var(--faint); }
+.editor-foot .btns { display: flex; gap: 6px; }
+
+/* Appearance */
+.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.theme-tile { display: block; border: 0; background: none; padding: 0; text-align: left; }
+.theme-tile .shot { display: block; position: relative; height: 84px; border-radius: 9px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 0 0 2px transparent; transition: box-shadow 140ms var(--ease); }
+.theme-tile[aria-checked="true"] .shot { box-shadow: 0 0 0 2px var(--text); border-color: transparent; }
+.theme-tile .cap { display: block; margin-top: 8px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.theme-tile[aria-checked="true"] .cap { color: var(--text); }
+.shot .half { position: absolute; inset: 0; display: flex; }
+.shot .half.r { clip-path: polygon(55% 0, 100% 0, 100% 100%, 45% 100%); }
+.mini { flex: 1; display: flex; }
+.mini .sb { width: 30%; padding: 10px 6px; display: flex; flex-direction: column; gap: 5px; }
+.mini .ct { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; }
+.mini i { display: block; height: 5px; border-radius: 3px; }
+.mini.l { background: #f7f7f5; } .mini.l .sb { background: #efefed; } .mini.l i { background: #d6d6d1; } .mini.l .ct i:first-child { background: #20201e; width: 50%; }
+.mini.d { background: #181916; } .mini.d .sb { background: #1e1f1c; } .mini.d i { background: #3a3b35; } .mini.d .ct i:first-child { background: #f1f1ed; width: 50%; }
+.preview { padding: 16px 18px; }
+.preview p { color: var(--text); line-height: 1.6; }
+.preview pre { margin-top: 10px; padding: 10px 12px; border-radius: 7px; background: var(--surface-subtle); font-family: var(--font-mono); color: var(--muted); overflow-x: auto; }
+
+.placeholder { padding: 120px 0; text-align: center; color: var(--faint); font-size: 13px; }
+
+/* Toast & demo panel */
+.toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 8px); opacity: 0; pointer-events: none;
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 8px;
+  background: var(--action); color: var(--on-action); font-size: 12px; font-weight: 500; box-shadow: var(--shadow-pop);
+  transition: opacity 160ms var(--ease), transform 160ms var(--ease);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.tweaks {
+  position: fixed; right: 16px; bottom: 16px; width: 236px; padding: 12px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-pop); font-size: 12px; z-index: 10;
+}
+.tweaks h4 { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--faint); margin-bottom: 8px; }
+.tweaks h4 button { border: 0; background: none; color: var(--faint); font-size: 11px; }
+.tweaks .tw { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+.tweaks .tw:first-of-type { margin-top: 0; }
+.tweaks .tw > span { color: var(--muted); }
+.seg { display: flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line-soft); }
+.seg button { flex: 1; height: 24px; border: 0; border-radius: 5px; background: none; font-size: 12px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.tweaks.min .tw { display: none; }
+.tweaks.min { width: auto; }
+.tweaks.min h4 { margin: 0; gap: 10px; }
+
+/* Search page */
+.editor .input.mono { font-family: var(--font-mono); font-size: 12px; }
+
+/* Usage page tweaks */
+.page.wide { max-width: 928px; }
+.u-toolbar { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; }
+.u-range { width: auto; }
+.u-range button { flex: none; padding: 0 12px; }
+.u-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+.u-metric { padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.u-metric .k { font-size: 12px; color: var(--muted); }
+.u-metric .v { margin: 4px 0 2px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.u-metric .s { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--faint); }
+.u-metric .s.warn { color: var(--warning); }
+.u-metric .s .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.u-tabs { display: flex; gap: 20px; margin-top: 32px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.u-tabs button { flex-shrink: 0; padding: 0 1px 10px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; font-size: 13px; font-weight: 500; color: var(--faint); }
+.u-tabs button:hover { color: var(--text); }
+.u-tabs button[aria-selected="true"] { color: var(--text); border-color: var(--text); }
+.u-tabs button span { margin-left: 5px; font-size: 12px; font-weight: 400; color: var(--subtle); font-variant-numeric: tabular-nums; }
+.u-filter { display: flex; align-items: center; gap: 8px; margin: 12px 0 10px; flex-wrap: wrap; }
+.u-filter .grow { flex: 1; }
+.u-search { position: relative; display: inline-flex; flex: 0 1 280px; }
+.u-search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--subtle); pointer-events: none; }
+.u-search .input { width: 100%; padding-left: 28px; }
+.u-detail { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+.u-table-wrap { overflow-x: auto; }
+.u-table { width: 100%; min-width: 760px; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
+.u-table th { height: 34px; padding: 0 12px; text-align: left; font-size: 12px; font-weight: 500; color: var(--muted); background: var(--surface-subtle); border-bottom: 1px solid var(--line); }
+.u-table td { height: 38px; padding: 0 12px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u-table tbody tr:last-child td { border-bottom: 0; }
+.u-table tbody tr:hover td { background: var(--hover); }
+.u-table .n { text-align: right; font-variant-numeric: tabular-nums; }
+.u-table .time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.u-table .kind { font-size: 12px; color: var(--muted); }
+.u-table .obj.model { font-family: var(--font-mono); font-size: 12px; }
+.u-table .sess { color: var(--muted); }
+.u-table .nil { color: var(--subtle); }
+.u-table .st { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.u-table .st .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
+.u-table .st.err { color: var(--on-danger); }
+.u-table .st.err .dot { background: var(--danger); }
+.u-pager { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.u-pager div { display: flex; align-items: center; gap: 4px; }
+.u-pager .btn:disabled { opacity: 0.4; cursor: default; }
+@media (max-width: 760px) { .u-metrics { grid-template-columns: 1fr 1fr; } .u-search { flex: 1 1 100%; } }
+
+@media (max-width: 760px) {
+  .body { flex-direction: column; }
+  .nav { width: 100%; display: flex; gap: 2px; padding: 8px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .nav-grp { display: none; }
+  .nav-back { margin: 0; }
+  .nav-item { width: auto; flex-shrink: 0; }
+  .page { padding: 24px 16px 120px; }
+  .row { flex-wrap: wrap; gap: 10px; }
+  .row .ctl { width: 100%; }
+  .row.link .ctl, .row .ctl.keep { width: auto; }
+  .sel select { min-width: 0; width: 100%; }
+  .sel { flex: 1; }
+  .themes { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .tweaks { left: 16px; right: 16px; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body class="g-inset">
+<div class="app">
+  <div class="titlebar" aria-hidden="true"><i></i><i></i><i></i><span>ActSpace · 设置</span></div>
+  <div class="body">
+    <nav class="nav" aria-label="设置导航">
+      <button class="nav-back" type="button"><span data-i="arrow-left" data-s="14"></span>返回应用</button>
+      <div class="nav-grp">偏好</div>
+      <button class="nav-item" data-page="general" aria-current="page"><span data-i="sliders"></span>通用</button>
+      <button class="nav-item" data-page="appearance"><span data-i="sun"></span>外观</button>
+      <div class="nav-grp">能力</div>
+      <button class="nav-item" data-page="model"><span data-i="cpu"></span>模型</button>
+      <button class="nav-item" data-page="search"><span data-i="search"></span>搜索</button>
+      <button class="nav-item" data-page="tools"><span data-i="wrench"></span>工具</button>
+      <button class="nav-item" data-page="subagents"><span data-i="users"></span>子 Agent</button>
+      <div class="nav-grp">活动</div>
+      <button class="nav-item" data-page="usage"><span data-i="chart"></span>使用统计</button>
+      <button class="nav-item" data-page="archived"><span data-i="archive"></span>归档会话</button>
+      <div class="nav-grp">系统</div>
+      <button class="nav-item" data-page="update"><span data-i="refresh"></span>更新</button>
+    </nav>
+
+    <main id="main" aria-label="设置内容">
+
+      <!-- ================= 通用 ================= -->
+      <section class="page" data-page="general">
+        <header class="page-head"><div class="grow"><h2>通用</h2><p>ActSpace 与 Agent 的默认行为。所有修改立即保存。</p></div></header>
+
+        <div class="section">
+          <div class="section-head"><div><h3>个人偏好</h3><p>影响 Agent 对你的称呼与表达方式，不覆盖系统规则。</p></div></div>
+          <div class="group">
+            <div class="row link" data-edit="ed-name" tabindex="0">
+              <div class="label"><div class="t">显示名称</div></div>
+              <div class="ctl"><span class="val" id="v-name">Jin</span><span class="chev" data-i="chevron-right" data-s="14"></span></div>
+            </div>
+            <div class="editor" id="ed-name" hidden>
+              <input class="input wide" value="Jin" maxlength="60" aria-label="显示名称" />
+              <div class="editor-foot"><span class="hint">最多 60 个字符</span><div class="btns"><button class="btn quiet" data-cancel>取消</button><button class="btn primary" data-save="v-name">保存</button></div></div>
+            </div>
+            <div class="row link" data-edit="ed-style" tabindex="0">
+              <div class="label"><div class="t">回复风格</div></div>
+              <div class="ctl"><span class="val" id="v-style">简洁直接，先给结论。</span><span class="chev" data-i="chevron-right" data-s="14"></span></div>
+            </div>
+            <div class="editor" id="ed-style" hidden>
+              <textarea maxlength="500" aria-label="回复风格">简洁直接，先给结论。</textarea>
+              <div class="editor-foot"><span class="hint">一句话描述偏好的语气、详略或格式 · 最多 500 字</span><div class="btns"><button class="btn quiet" data-cancel>取消</button><button class="btn primary" data-save="v-style">保存</button></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>Agent 指令</h3></div></div>
+          <div class="group">
+            <div class="row link" data-edit="ed-prompt" tabindex="0">
+              <div class="label">
+                <div class="t">系统提示词</div>
+                <div class="d mono">~/Library/Application Support/ActSpace/prompts/main-agent.md</div>
+              </div>
+              <div class="ctl"><span class="val">1,284 字</span><span class="chev" data-i="chevron-right" data-s="14"></span></div>
+            </div>
+            <div class="editor" id="ed-prompt" hidden>
+              <textarea class="mono" aria-label="系统提示词">你是 ActSpace 的主 Agent。
+- 先理解需求，再动手修改。
+- 改动保持小而清晰，并说明验证方式。
+…</textarea>
+              <div class="editor-foot"><span class="hint">保存后从下一次请求生效 · 1,284 / 20,000</span><div class="btns"><button class="btn quiet" data-cancel>取消</button><button class="btn primary" data-save>保存</button></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>模型与生成</h3><p>新请求使用的模型和生成参数，只影响之后的请求。</p></div></div>
+          <div class="group">
+            <div class="row">
+              <div class="label"><div class="t">默认会话模型</div><div class="d">新会话和未手动选择模型时使用。</div></div>
+              <div class="ctl"><span class="sel"><select aria-label="默认会话模型"><option>DeepSeek V4 Flash · DeepSeek</option><option>Kimi K3 · Moonshot</option></select><span data-i="chevron-down" data-s="14"></span></span></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">轻量任务模型</div><div class="d">标题、工具摘要和上下文压缩。</div></div>
+              <div class="ctl"><span class="sel"><select aria-label="轻量任务模型"><option>跟随会话模型</option><option>DeepSeek V4 Flash · DeepSeek</option></select><span data-i="chevron-down" data-s="14"></span></span></div>
+            </div>
+            <div class="row link" data-go="subagents" tabindex="0">
+              <div class="label"><div class="t">Explore 模型</div><div class="d">在「子 Agent」中管理。</div></div>
+              <div class="ctl"><span class="val">跟随会话模型</span><span class="chev" data-i="chevron-right" data-s="14"></span></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">温度</div></div>
+              <div class="ctl keep"><input class="input num" placeholder="模型默认" aria-label="温度" /></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">最大输出 Token</div></div>
+              <div class="ctl keep"><input class="input num" placeholder="模型默认" aria-label="最大输出 Token" /></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">自动压缩阈值</div><div class="d">仅 Chat 形态：上下文占用达到该比例时压缩历史。</div></div>
+              <div class="ctl keep"><span class="stepper" data-min="50" data-max="95" data-step="5" data-unit="%"><button aria-label="减小"><span data-i="minus" data-s="14"></span></button><output>80%</output><button aria-label="增大"><span data-i="plus" data-s="14"></span></button></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>媒体</h3><p>图片生成与图片分析默认使用的服务。</p></div></div>
+          <div class="group">
+            <div class="row link" tabindex="0" data-toast="demo：打开图片生成配置子页">
+              <div class="label"><div class="t">图片生成</div><div class="d">gpt-image-2 · duckcoding.ai</div></div>
+              <div class="ctl"><span class="status ok"><span class="dot"></span>已配置</span><span class="chev" data-i="chevron-right" data-s="14"></span></div>
+            </div>
+            <div class="row">
+              <div class="label">
+                <div class="t">图片分析模型</div>
+                <div class="inline-note"><span data-i="alert" data-s="13"></span>缺少 OpenRouter Key，调用会失败。<a data-go="model">去连接</a></div>
+              </div>
+              <div class="ctl"><span class="sel"><select aria-label="图片分析模型"><option>GPT-5.6 Luna · OpenRouter</option><option>Kimi K3 · Moonshot</option></select><span data-i="chevron-down" data-s="14"></span></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" id="speech">
+          <div class="section-head"><div><h3>语音播放</h3><p>英语辅助学习的朗读服务（MiniMax 中国站），朗读的英文会发送至 MiniMax。</p></div></div>
+          <div class="group">
+            <div class="row">
+              <div class="label"><div class="t">MiniMax API Key</div><div class="d">未配置时仍可使用双语对照输出。</div></div>
+              <div class="ctl"><span class="status off"><span class="dot"></span>未配置</span><button class="btn" data-toast="demo：展开 Key 输入">设置 Key</button></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">语音模型</div></div>
+              <div class="ctl"><span class="sel"><select aria-label="语音模型"><option>speech-2.8-turbo</option><option>speech-2.8-hd</option></select><span data-i="chevron-down" data-s="14"></span></span></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">音色</div></div>
+              <div class="ctl"><input class="input mid" value="English_Insightful_Speaker" aria-label="音色" /><button class="btn icon" aria-label="试听" title="试听" data-toast="demo：需要先配置 Key"><span data-i="play" data-s="12"></span></button></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">语速</div></div>
+              <div class="ctl keep"><span class="stepper" data-min="0.5" data-max="2" data-step="0.1" data-unit="×" data-dec="1"><button aria-label="减小"><span data-i="minus" data-s="14"></span></button><output>1.0×</output><button aria-label="增大"><span data-i="plus" data-s="14"></span></button></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>快捷键</h3></div></div>
+          <div class="group">
+            <div class="row">
+              <div class="label"><div class="t">快速唤起</div><div class="d">在任何应用中唤起紧凑窗口，焦点直达输入框。</div></div>
+              <div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="快速唤起" data-controls="qo"></button></div>
+            </div>
+            <div class="row" data-dep="qo">
+              <div class="label"><div class="t">快捷键</div></div>
+              <div class="ctl"><span class="kbds"><span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">Space</span></span><button class="btn quiet" data-toast="demo：按下新的组合键">录制</button></div>
+            </div>
+            <div class="row" data-dep="qo">
+              <div class="label"><div class="t">打开目标</div><div class="d">目标不可用时回到第一个项目。</div></div>
+              <div class="ctl"><span class="sel"><select aria-label="打开目标"><option>自动（第一个项目）</option><option>最近的会话</option></select><span data-i="chevron-down" data-s="14"></span></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 外观 ================= -->
+      <section class="page" data-page="appearance" hidden>
+        <header class="page-head"><div class="grow"><h2>外观</h2><p>主题、字体与字号，只影响本机界面。</p></div></header>
+
+        <div class="section">
+          <div class="section-head"><div><h3>主题</h3></div></div>
+          <div class="themes" role="radiogroup" aria-label="主题">
+            <button class="theme-tile" role="radio" aria-checked="false" data-theme-set="light">
+              <span class="shot"><span class="half"><span class="mini l"><span class="sb"><i></i><i></i><i></i></span><span class="ct"><i></i><i></i><i style="width:70%"></i></span></span></span></span>
+              <span class="cap">浅色</span>
+            </button>
+            <button class="theme-tile" role="radio" aria-checked="false" data-theme-set="dark">
+              <span class="shot"><span class="half"><span class="mini d"><span class="sb"><i></i><i></i><i></i></span><span class="ct"><i></i><i></i><i style="width:70%"></i></span></span></span></span>
+              <span class="cap">深色</span>
+            </button>
+            <button class="theme-tile" role="radio" aria-checked="true" data-theme-set="system">
+              <span class="shot">
+                <span class="half"><span class="mini l"><span class="sb"><i></i><i></i><i></i></span><span class="ct"><i></i><i></i><i style="width:70%"></i></span></span></span>
+                <span class="half r"><span class="mini d"><span class="sb"><i></i><i></i><i></i></span><span class="ct"><i></i><i></i><i style="width:70%"></i></span></span></span>
+              </span>
+              <span class="cap">跟随系统</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>字体与字号</h3></div></div>
+          <div class="group">
+            <div class="row">
+              <div class="label"><div class="t">界面字体</div><div class="d">界面与 AI 回复正文。</div></div>
+              <div class="ctl"><span class="sel sm"><select aria-label="界面字体"><option>系统默认</option><option>苹方</option></select><span data-i="chevron-down" data-s="14"></span></span></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">界面字号</div></div>
+              <div class="ctl keep"><span class="stepper" data-min="12" data-max="18" data-step="1" data-unit="px" data-bind="ui"><button aria-label="减小"><span data-i="minus" data-s="14"></span></button><output>14px</output><button aria-label="增大"><span data-i="plus" data-s="14"></span></button></span></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">代码字体</div><div class="d">代码块、diff 与终端输出。</div></div>
+              <div class="ctl"><span class="sel sm"><select aria-label="代码字体"><option>系统等宽</option><option>JetBrains Mono</option></select><span data-i="chevron-down" data-s="14"></span></span></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">代码字号</div></div>
+              <div class="ctl keep"><span class="stepper" data-min="11" data-max="16" data-step="1" data-unit="px" data-bind="code"><button aria-label="减小"><span data-i="minus" data-s="14"></span></button><output>13px</output><button aria-label="增大"><span data-i="plus" data-s="14"></span></button></span></div>
+            </div>
+            <div class="preview" aria-label="预览">
+              <p id="pv-ui" style="font-size:14px">已完成设置页重构：导航分组保持不变，内容列宽度统一为 640px。</p>
+              <pre id="pv-code" style="font-size:13px">pnpm --filter @actspace/desktop test</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 模型 ================= -->
+      <section class="page" data-page="model" hidden>
+        <header class="page-head"><div class="grow"><h2>模型</h2><p>连接模型服务，管理可以被选择的模型。</p></div></header>
+
+        <div class="section">
+          <div class="section-head"><div><h3>连接</h3></div><button class="btn primary" data-toast="demo：打开服务商目录子页"><span data-i="plus" data-s="14"></span>添加连接</button></div>
+          <div class="group">
+            <div class="row link" data-go="model-detail" tabindex="0">
+              <span class="tile">DS</span>
+              <div class="label"><div class="t">DeepSeek</div><div class="d">官方 API · 2 / 3 个模型启用 · 默认 DeepSeek V4 Flash</div></div>
+              <div class="ctl"><span class="status ok"><span class="dot"></span>已连接</span><span class="chev" data-i="chevron-right" data-s="14"></span></div>
+            </div>
+            <div class="row link" data-toast="demo：只做了 DeepSeek 详情" tabindex="0">
+              <span class="tile">MS</span>
+              <div class="label"><div class="t">Moonshot</div><div class="d">官方 API · 2 / 2 个模型启用</div></div>
+              <div class="ctl"><span class="status ok"><span class="dot"></span>已连接</span><span class="chev" data-i="chevron-right" data-s="14"></span></div>
+            </div>
+            <div class="row link" data-toast="demo：只做了 DeepSeek 详情" tabindex="0">
+              <span class="tile">OR</span>
+              <div class="label"><div class="t">OpenRouter</div><div class="d">聚合服务 · 图片分析模型依赖此连接</div></div>
+              <div class="ctl"><span class="status warn"><span class="dot"></span>缺少 Key</span><span class="chev" data-i="chevron-right" data-s="14"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 模型 · 连接详情 ================= -->
+      <section class="page" data-page="model-detail" hidden>
+        <button class="crumb" data-go="model"><span data-i="chevron-left" data-s="14"></span>模型</button>
+        <header class="page-head">
+          <span class="tile lg">DS</span>
+          <div class="grow"><h2>DeepSeek</h2><p>官方 API · <span class="status ok" style="vertical-align:-1px"><span class="dot"></span>已连接</span></p></div>
+        </header>
+
+        <div class="section">
+          <div class="section-head"><div><h3>连接</h3></div></div>
+          <div class="group">
+            <div class="row">
+              <div class="label"><div class="t">API Key</div><div class="d">只保存在本机，不会回显明文。</div></div>
+              <div class="ctl"><span class="val mono">sk-••••3f9a</span><button class="btn" data-toast="demo：展开 Key 输入">更换</button></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">Endpoint</div></div>
+              <div class="ctl"><span class="val mono">https://api.deepseek.com</span><span class="pill">默认</span></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">连接测试</div><div class="d" id="test-result">上次：连接正常 · 312 ms · 2 分钟前</div></div>
+              <div class="ctl"><button class="btn" id="test-btn">测试连接</button></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">余额</div></div>
+              <div class="ctl"><span class="val">¥31.11</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>模型</h3><p>启用的模型会出现在会话模型选择中。</p></div><div style="display:flex;gap:6px"><button class="btn quiet" data-toast="demo：更新模型目录"><span data-i="refresh" data-s="13"></span>更新目录</button><button class="btn" data-toast="demo：从目录添加"><span data-i="plus" data-s="13"></span>添加模型</button></div></div>
+          <div class="group">
+            <div class="row">
+              <div class="label"><div class="t">DeepSeek V4 Flash <span class="pill">默认</span></div><div class="d mono">deepseek-v4-flash · 128K · 思考 · 图片</div></div>
+              <div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="启用 DeepSeek V4 Flash"></button></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">DeepSeek V4 Pro</div><div class="d mono">deepseek-v4-pro · 128K · 思考</div></div>
+              <div class="ctl keep"><button class="btn quiet" data-toast="已设为默认">设为默认</button><button class="tg" role="switch" aria-checked="true" aria-label="启用 DeepSeek V4 Pro"></button></div>
+            </div>
+            <div class="row">
+              <div class="label"><div class="t">DeepSeek Coder V3</div><div class="d mono">deepseek-coder-v3 · 64K</div></div>
+              <div class="ctl keep"><button class="tg" role="switch" aria-checked="false" aria-label="启用 DeepSeek Coder V3"></button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="group">
+            <div class="row link" data-disclose="adv-model" aria-expanded="false" tabindex="0">
+              <div class="label"><div class="t">高级请求设置</div><div class="d">代理、Request Headers、Request Body Overlay</div></div>
+              <div class="ctl"><span class="chev rot" data-i="chevron-right" data-s="14"></span></div>
+            </div>
+            <div class="row sub" data-adv="adv-model" hidden><div class="label"><div class="t">代理</div></div><div class="ctl"><span class="val">未使用</span><button class="btn">编辑</button></div></div>
+            <div class="row sub" data-adv="adv-model" hidden><div class="label"><div class="t">Request Headers</div></div><div class="ctl"><span class="val">0 条</span><button class="btn">编辑</button></div></div>
+            <div class="row sub" data-adv="adv-model" hidden><div class="label"><div class="t">Request Body Overlay</div></div><div class="ctl"><span class="val">未设置</span><button class="btn">编辑</button></div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>危险操作</h3></div></div>
+          <div class="group">
+            <div class="row">
+              <div class="label"><div class="t">删除连接</div><div class="d">清除 Key 和连接配置；模型定义、会话历史与使用统计会保留。</div></div>
+              <div class="ctl"><button class="btn danger" data-toast="demo：二次确认对话框">删除连接…</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 工具 ================= -->
+      <section class="page" data-page="tools" hidden>
+        <header class="page-head"><div class="grow"><h2>工具</h2><p>Agent 可以调用哪些工具，以及执行前是否需要你确认。联网搜索在「搜索」中管理。</p></div></header>
+
+        <div class="section">
+          <div class="section-head"><div><h3>代码库</h3><p>读取、搜索和修改工作区文件。</p></div><span class="meta" data-count>6 / 6 已启用</span></div>
+          <div class="group" data-countable>
+            <div class="row tight"><div class="label"><div class="t">读取文件</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="读取文件"></button></div></div>
+            <div class="row tight"><div class="label"><div class="t">搜索内容</div><div class="d">按正则搜索文件内容（Grep）。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="搜索内容"></button></div></div>
+            <div class="row tight"><div class="label"><div class="t">查找文件</div><div class="d">按通配符匹配路径（Glob）。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="查找文件"></button></div></div>
+            <div class="row tight"><div class="label"><div class="t">列出目录</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="列出目录"></button></div></div>
+            <div class="row tight"><div class="label"><div class="t">编辑文件</div><div class="d">以 diff 形式修改已有文件。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="编辑文件"></button></div></div>
+            <div class="row tight"><div class="label"><div class="t">写入文件</div><div class="d">创建新文件或覆盖已有文件。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="写入文件"></button></div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>终端</h3></div></div>
+          <div class="group">
+            <div class="row"><div class="label"><div class="t">Bash 终端</div><div class="d">在工作区执行 shell 命令。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="Bash 终端" data-controls="bash"></button></div></div>
+            <div class="row sub" data-dep="bash"><div class="label"><div class="t">执行前确认</div><div class="d">每条命令执行前询问你；硬性拒绝规则始终生效。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="false" aria-label="执行前确认"></button></div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>浏览器</h3></div></div>
+          <div class="group">
+            <div class="row"><div class="label"><div class="t">浏览器工具</div><div class="d">需要 Browser Bridge 与 Chrome 扩展。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="浏览器工具" data-controls="browser"></button></div></div>
+            <div class="row link sub" data-dep="browser" data-disclose="adv-browser" aria-expanded="false" tabindex="0"><div class="label"><div class="t">高级设置</div><div class="d">按类别启用浏览器操作。</div></div><div class="ctl"><span class="chev rot" data-i="chevron-right" data-s="14"></span></div></div>
+            <div class="row tight sub" data-dep="browser" data-adv="adv-browser" hidden><div class="label"><div class="t">导航与读取页面</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="导航与读取页面"></button></div></div>
+            <div class="row tight sub" data-dep="browser" data-adv="adv-browser" hidden><div class="label"><div class="t">点击与表单输入</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="点击与表单输入"></button></div></div>
+            <div class="row tight sub" data-dep="browser" data-adv="adv-browser" hidden><div class="label"><div class="t">执行页面脚本 <span class="pill warn">敏感</span></div><div class="d">可读取页面中的任意数据。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="false" aria-label="执行页面脚本"></button></div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>多媒体</h3></div></div>
+          <div class="group">
+            <div class="row tight"><div class="label"><div class="t">图片生成</div><div class="d">使用「通用 → 媒体」中配置的服务。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="图片生成"></button></div></div>
+            <div class="row tight"><div class="label"><div class="t">图片分析</div><div class="inline-note"><span data-i="alert" data-s="13"></span>当前模型缺少可用 Key。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="图片分析"></button></div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>显示</h3></div></div>
+          <div class="group">
+            <div class="row"><div class="label"><div class="t">显示写入变动</div><div class="d">写入时显示增删行数，不自动展开内容。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="显示写入变动"></button></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 子 Agent ================= -->
+      <section class="page" data-page="subagents" hidden>
+        <header class="page-head"><div class="grow"><h2>子 Agent</h2><p>主 Agent 可以委派任务的专门代理。</p></div></header>
+
+        <div class="section">
+          <div class="section-head"><div><h3>Explore</h3><p>只读代码探索：读取、搜索、列目录；不写文件，不执行命令。</p></div></div>
+          <div class="group">
+            <div class="row"><div class="label"><div class="t">启用</div><div class="d">停用后保留配置。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="启用 Explore" data-controls="explore"></button></div></div>
+            <div class="row" data-dep="explore"><div class="label"><div class="t">模型</div><div class="d">未单独设置时跟随默认会话模型。</div></div><div class="ctl"><span class="sel"><select aria-label="Explore 模型"><option>跟随会话模型</option><option>DeepSeek V4 Flash · DeepSeek</option><option>Kimi K3 · Moonshot</option></select><span data-i="chevron-down" data-s="14"></span></span></div></div>
+            <div class="row" data-dep="explore"><div class="label"><div class="t">思考级别</div></div><div class="ctl"><span class="sel sm"><select aria-label="思考级别"><option>中</option><option>低</option><option>高</option></select><span data-i="chevron-down" data-s="14"></span></span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 搜索 ================= -->
+      <section class="page" data-page="search" hidden>
+        <header class="page-head"><div class="grow"><h2>搜索</h2><p>Agent 联网搜索使用的服务。Key 只保存在本机。</p></div></header>
+
+        <div class="section">
+          <div class="group">
+            <div class="row"><div class="label"><div class="t">允许联网搜索</div><div class="d">关闭后 Agent 不会获得联网搜索工具，已连接的通道保留。</div></div><div class="ctl keep"><button class="tg" role="switch" aria-checked="true" aria-label="允许联网搜索" data-controls="web"></button></div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><div><h3>搜索通道</h3><p>国内内容优先使用智谱；国际内容按 Tavily → TinyFish → Exa 的顺序使用第一个已连接的通道。</p></div><span class="meta" id="sp-count">1 / 4 已连接</span></div>
+          <div class="group">
+            <div class="row" data-dep="web">
+              <div class="label"><div class="t">智谱 Web Search</div><div class="d">国内 · search_pro ¥0.03 / 次</div></div>
+              <div class="ctl"><span class="status ok"><span class="dot"></span>已连接</span><button class="btn quiet" data-toast="demo：菜单（更换 Key / 断开连接）">管理</button></div>
+            </div>
+            <div class="row" data-dep="web">
+              <div class="label"><div class="t">Tavily <span class="pill">国际 1</span></div><div class="d">每月 1000 credits 免费，超出按量计费。</div></div>
+              <div class="ctl"><button class="btn" data-sp-connect="sp-tavily">连接</button></div>
+            </div>
+            <div class="editor" id="sp-tavily" hidden>
+              <input class="input wide mono" type="password" placeholder="粘贴 Tavily API Key" aria-label="Tavily API Key" />
+              <div class="editor-foot"><span class="hint">保存后会先测试连接，失败不会覆盖原配置。</span><div class="btns"><button class="btn quiet" data-cancel>取消</button><button class="btn primary" data-sp-save="sp-tavily">保存</button></div></div>
+            </div>
+            <div class="row" data-dep="web">
+              <div class="label"><div class="t">TinyFish <span class="pill">国际 2</span></div><div class="d">搜索接口目前免费（按套餐限速）。</div></div>
+              <div class="ctl"><button class="btn" data-sp-connect="sp-tinyfish">连接</button></div>
+            </div>
+            <div class="editor" id="sp-tinyfish" hidden>
+              <input class="input wide mono" type="password" placeholder="粘贴 TinyFish API Key" aria-label="TinyFish API Key" />
+              <div class="editor-foot"><span class="hint">保存后会先测试连接，失败不会覆盖原配置。</span><div class="btns"><button class="btn quiet" data-cancel>取消</button><button class="btn primary" data-sp-save="sp-tinyfish">保存</button></div></div>
+            </div>
+            <div class="row" data-dep="web">
+              <div class="label"><div class="t">Exa <span class="pill">国际 3</span></div><div class="d">语义搜索，按量计费。</div></div>
+              <div class="ctl"><button class="btn" data-sp-connect="sp-exa">连接</button></div>
+            </div>
+            <div class="editor" id="sp-exa" hidden>
+              <input class="input wide mono" type="password" placeholder="粘贴 Exa API Key" aria-label="Exa API Key" />
+              <div class="editor-foot"><span class="hint">保存后会先测试连接，失败不会覆盖原配置。</span><div class="btns"><button class="btn quiet" data-cancel>取消</button><button class="btn primary" data-sp-save="sp-exa">保存</button></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 使用统计（微调） ================= -->
+      <section class="page wide" data-page="usage" hidden>
+        <header class="page-head"><div class="grow"><h2>使用统计</h2><p>模型调用、Token 用量与估算费用。</p></div></header>
+
+        <div class="u-toolbar">
+          <div class="seg u-range" role="tablist" aria-label="时间范围"><button aria-pressed="false">24 小时</button><button aria-pressed="false">7 天</button><button aria-pressed="true">30 天</button><button aria-pressed="false">全部</button></div>
+          <button class="btn quiet icon" aria-label="刷新" title="刷新" data-toast="已刷新"><span data-i="refresh" data-s="14"></span></button>
+        </div>
+
+        <div class="u-metrics">
+          <div class="u-metric"><div class="k">请求数</div><div class="v">7</div><div class="s">模型调用</div></div>
+          <div class="u-metric"><div class="k">Token 用量</div><div class="v">263,550</div><div class="s">输入 5,383 · 输出 1,015</div></div>
+          <div class="u-metric"><div class="k">已知费用</div><div class="v">$0.0063</div><div class="s warn"><span class="dot"></span>1 次请求缺少费用依据</div></div>
+          <div class="u-metric"><div class="k">缓存命中率</div><div class="v">97.9%</div><div class="s">257,152 缓存 Token</div></div>
+        </div>
+
+        <div class="u-tabs" role="tablist" aria-label="统计分类">
+          <button role="tab" aria-selected="true">请求日志<span>26</span></button>
+          <button role="tab" aria-selected="false">服务商<span>1</span></button>
+          <button role="tab" aria-selected="false">模型<span>1</span></button>
+          <button role="tab" aria-selected="false">工具<span>2</span></button>
+        </div>
+
+        <div class="u-filter">
+          <span class="u-search"><span data-i="search" data-s="14"></span><input class="input" placeholder="按模型或工具筛选" aria-label="筛选" /></span>
+          <span class="sel sm"><select aria-label="状态"><option>全部状态</option><option>成功</option><option>失败</option><option>已中止</option></select><span data-i="chevron-down" data-s="14"></span></span>
+          <span class="grow"></span>
+          <label class="u-detail">显示明细 <button class="tg" role="switch" aria-checked="true" aria-label="显示明细"></button></label>
+        </div>
+
+        <div class="group u-table-wrap">
+          <table class="u-table">
+            <colgroup><col style="width:108px"><col style="width:64px"><col><col style="width:150px"><col style="width:84px"><col style="width:88px"><col style="width:72px"><col style="width:76px"></colgroup>
+            <thead><tr><th>时间</th><th>类型</th><th>对象</th><th>会话</th><th class="n">Token</th><th class="n">费用</th><th class="n">耗时</th><th>状态</th></tr></thead>
+            <tbody id="u-rows"></tbody>
+          </table>
+        </div>
+        <div class="u-pager"><span>1–10 / 26</span><div><button class="btn quiet" disabled>上一页</button><span>1 / 3</span><button class="btn quiet">下一页</button></div></div>
+      </section>
+      <section class="page" data-page="archived" hidden><div class="placeholder">这个 demo 暂未覆盖「归档会话」。</div></section>
+      <section class="page" data-page="update" hidden><div class="placeholder">这个 demo 暂未覆盖「更新」。</div></section>
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"><span data-i="check" data-s="13"></span><span id="toast-text">已保存</span></div>
+
+<aside class="tweaks" id="tweaks" aria-label="Demo 调节">
+  <h4><span>DEMO 调节</span><button id="tw-min" type="button">收起</button></h4>
+  <div class="tw"><span>主题</span><div class="seg" data-tw="theme"><button data-v="light">浅色</button><button data-v="dark">深色</button><button data-v="system" aria-pressed="true">系统</button></div></div>
+  <div class="tw"><span>分组样式</span><div class="seg" data-tw="group"><button data-v="g-inset" aria-pressed="true">内嵌分组</button><button data-v="g-open">开放行</button></div></div>
+  <div class="tw"><span>开关开启色</span><div class="seg" data-tw="toggle"><button data-v="green" aria-pressed="true">翡翠绿</button><button data-v="ink">墨色</button></div></div>
+</aside>
+
+<script>
+const ICONS = {
+  "arrow-left": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  "chevron-right": '<path d="m9 18 6-6-6-6"/>',
+  "chevron-left": '<path d="m15 18-6-6 6-6"/>',
+  "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  minus: '<path d="M5 12h14"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  alert: '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+  sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  cpu: '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  chart: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  archive: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+};
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+$$("[data-i]").forEach((el) => {
+  const size = el.dataset.s || 16;
+  el.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[el.dataset.i] || ""}</svg>`;
+});
+
+let toastTimer;
+function toast(text = "已保存") {
+  $("#toast-text").textContent = text;
+  $("#toast").classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("#toast").classList.remove("show"), 1400);
+}
+
+function show(page) {
+  $$(".page").forEach((s) => (s.hidden = s.dataset.page !== page));
+  const navPage = page.startsWith("model") ? "model" : page;
+  $$(".nav-item").forEach((a) => {
+    if (a.dataset.page === navPage) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+  $("#main").scrollTop = 0;
+  try { localStorage.setItem("sr-demo-page", page); } catch {}
+}
+$$(".nav-item").forEach((a) => a.addEventListener("click", () => show(a.dataset.page)));
+
+function closeEditors(except) {
+  $$(".editor").forEach((ed) => { if (ed !== except) ed.hidden = true; });
+}
+
+function updateDeps(key, on) {
+  $$(`[data-dep="${key}"]`).forEach((el) => {
+    el.classList.toggle("disabled", !on);
+    if (el.classList.contains("subhead")) el.style.opacity = on ? "" : "0.45";
+  });
+}
+
+function updateCounts() {
+  $$("[data-countable]").forEach((group) => {
+    const all = $$(".tg", group);
+    const on = all.filter((t) => t.getAttribute("aria-checked") === "true").length;
+    const meta = group.closest(".section").querySelector("[data-count]");
+    if (meta) meta.textContent = `${on} / ${all.length} 已启用`;
+  });
+}
+
+document.addEventListener("click", (e) => {
+  const tg = e.target.closest(".tg");
+  if (tg) {
+    const next = tg.getAttribute("aria-checked") !== "true";
+    tg.setAttribute("aria-checked", String(next));
+    if (tg.dataset.controls) updateDeps(tg.dataset.controls, next);
+    updateCounts();
+    toast();
+    return;
+  }
+  const go = e.target.closest("[data-go]");
+  if (go) { show(go.dataset.go); return; }
+
+  const disclose = e.target.closest("[data-disclose]");
+  if (disclose) {
+    const open = disclose.getAttribute("aria-expanded") !== "true";
+    disclose.setAttribute("aria-expanded", String(open));
+    $$(`[data-adv="${disclose.dataset.disclose}"]`).forEach((r) => (r.hidden = !open));
+    return;
+  }
+
+  const editRow = e.target.closest("[data-edit]");
+  if (editRow) {
+    const ed = document.getElementById(editRow.dataset.edit);
+    const willOpen = ed.hidden;
+    closeEditors(ed);
+    ed.hidden = !willOpen;
+    if (willOpen) ed.querySelector("input, textarea")?.focus();
+    return;
+  }
+  if (e.target.closest("[data-cancel]")) { closeEditors(); return; }
+  const save = e.target.closest("[data-save]");
+  if (save) {
+    const ed = save.closest(".editor");
+    const field = ed.querySelector("input, textarea");
+    if (save.dataset.save) document.getElementById(save.dataset.save).textContent = field.value;
+    closeEditors();
+    toast();
+    return;
+  }
+
+  const stepBtn = e.target.closest(".stepper button");
+  if (stepBtn) {
+    const st = stepBtn.closest(".stepper");
+    const out = st.querySelector("output");
+    const step = Number(st.dataset.step), dec = Number(st.dataset.dec || 0);
+    const dir = stepBtn === st.querySelector("button") ? -1 : 1;
+    const cur = parseFloat(out.textContent);
+    const next = Math.min(Number(st.dataset.max), Math.max(Number(st.dataset.min), +(cur + dir * step).toFixed(dec)));
+    out.textContent = next.toFixed(dec) + st.dataset.unit;
+    if (st.dataset.bind === "ui") $("#pv-ui").style.fontSize = next + "px";
+    if (st.dataset.bind === "code") $("#pv-code").style.fontSize = next + "px";
+    toast();
+    return;
+  }
+
+  const themeTile = e.target.closest("[data-theme-set]");
+  if (themeTile) { setTheme(themeTile.dataset.themeSet); toast(); return; }
+
+  const toastEl = e.target.closest("[data-toast]");
+  if (toastEl) { toast(toastEl.dataset.toast); return; }
+});
+
+document.addEventListener("keydown", (e) => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".row.link")) { e.preventDefault(); e.target.click(); }
+  if (e.key === "Escape") closeEditors();
+});
+document.addEventListener("change", (e) => { if (e.target.matches("select")) toast(); });
+document.addEventListener("focusout", (e) => { if (e.target.matches(".row .input") && e.target.value !== e.target.defaultValue) { e.target.defaultValue = e.target.value; toast(); } });
+
+$("#test-btn").addEventListener("click", () => {
+  const btn = $("#test-btn"), out = $("#test-result");
+  btn.disabled = true; btn.textContent = "测试中…"; out.textContent = "正在请求 api.deepseek.com…";
+  setTimeout(() => { btn.disabled = false; btn.textContent = "测试连接"; out.textContent = "连接正常 · 287 ms · 刚刚"; }, 900);
+});
+
+function setTheme(v) {
+  if (v === "system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = v;
+  $$("[data-theme-set]").forEach((t) => t.setAttribute("aria-checked", String(t.dataset.themeSet === v)));
+  $$('[data-tw="theme"] button').forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+}
+$$(".seg button").forEach((b) => b.addEventListener("click", () => {
+  const kind = b.parentElement.dataset.tw, v = b.dataset.v;
+  if (kind === "theme") { setTheme(v); return; }
+  $$("button", b.parentElement).forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  if (kind === "group") { document.body.classList.remove("g-inset", "g-open"); document.body.classList.add(v); }
+  if (kind === "toggle") document.body.classList.toggle("tg-ink", v === "ink");
+}));
+$("#tw-min").addEventListener("click", () => {
+  const min = $("#tweaks").classList.toggle("min");
+  $("#tw-min").textContent = min ? "展开" : "收起";
+});
+
+const U_ROWS = [
+  ["09/07 21:30", "模型", "deepseek-v4-flash", "37,650", "$0.0010", "5.48s", "ok"],
+  ["09/07 21:29", "工具", "Bash", null, null, "33ms", "ok"],
+  ["09/07 21:28", "工具", "Read", null, null, "34ms", "ok"],
+  ["09/07 21:27", "工具", "Bash", null, null, "35ms", "ok"],
+  ["09/07 21:26", "模型", "deepseek-v4-flash", "37,650", "$0.0010", "5.48s", "ok"],
+  ["09/07 21:25", "工具", "Bash", null, null, "37ms", "ok"],
+  ["09/07 21:24", "工具", "Read", null, null, "38ms", "ok"],
+  ["09/07 21:23", "工具", "Bash", null, null, "39ms", "ok"],
+  ["09/07 21:22", "模型", "deepseek-v4-flash", "37,650", "未知", "5.48s", "err"],
+  ["09/07 21:21", "工具", "Bash", null, null, "41ms", "ok"],
+];
+document.getElementById("u-rows").innerHTML = U_ROWS.map(([t, k, o, tok, cost, dur, st]) => `<tr>
+  <td class="time">${t}</td><td class="kind">${k}</td><td class="obj ${k === "模型" ? "model" : ""}">${o}</td>
+  <td class="sess">检查模型配置与工作区文件</td>
+  <td class="n ${tok ? "" : "nil"}">${tok ?? "—"}</td><td class="n ${cost && cost !== "未知" ? "" : "nil"}">${cost ?? "—"}</td><td class="n">${dur}</td>
+  <td><span class="st ${st === "err" ? "err" : ""}"><span class="dot"></span>${st === "err" ? "失败" : "成功"}</span></td></tr>`).join("");
+$$(".u-range button").forEach((b) => b.addEventListener("click", () => $$(".u-range button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)))));
+$$(".u-tabs button").forEach((b) => b.addEventListener("click", () => $$(".u-tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)))));
+document.addEventListener("click", (e) => {
+  const c = e.target.closest("[data-sp-connect]");
+  if (c) { const ed = document.getElementById(c.dataset.spConnect); const open = ed.hidden; closeEditors(ed); ed.hidden = !open; if (open) ed.querySelector("input").focus(); return; }
+  const sv = e.target.closest("[data-sp-save]");
+  if (sv) {
+    const ed = document.getElementById(sv.dataset.spSave);
+    const row = ed.previousElementSibling;
+    row.querySelector(".ctl").innerHTML = '<span class="status ok"><span class="dot"></span>已连接</span><button class="btn quiet">管理</button>';
+    ed.hidden = true;
+    const n = $$('[data-page="search"] .status.ok').length;
+    document.getElementById("sp-count").textContent = `${n} / 4 已连接`;
+    toast("已连接");
+  }
+});
+
+const q = new URLSearchParams(location.search);
+if (q.get("theme")) setTheme(q.get("theme"));
+if (q.get("group")) $(`[data-tw="group"] [data-v="${q.get("group")}"]`)?.click();
+if (q.get("toggle")) $(`[data-tw="toggle"] [data-v="${q.get("toggle")}"]`)?.click();
+let initial = q.get("page");
+if (!initial) { try { initial = localStorage.getItem("sr-demo-page"); } catch {} }
+if (initial && $(`.page[data-page="${initial}"]`)) show(initial);
+</script>
+</body>
+</html>

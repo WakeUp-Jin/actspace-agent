@@ -1,5 +1,5 @@
 import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-learning";
-import type { EnglishLearningTargetInput, EnglishLearningState } from "@actspace/shared";
+import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearningTargetInput, type EnglishLearningState } from "@actspace/shared";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
 import { randomUUID } from "node:crypto";
@@ -485,37 +485,60 @@ export type PreparedChatAttachment = {
   readonly textContent?: string;
 };
 
+export class ChatAttachmentValidationError extends Error {
+  constructor(
+    readonly issue: ChatAttachmentIssue,
+    readonly attachmentIndex?: number,
+    readonly textCharacterCounts?: readonly number[],
+  ) {
+    super(formatChatAttachmentIssue(issue));
+    this.name = "ChatAttachmentValidationError";
+  }
+}
+
 export async function prepareChatAttachments(paths: readonly string[]): Promise<readonly PreparedChatAttachment[]> {
-  const prepared = await Promise.all(paths.map(prepareChatAttachment));
+  const prepared: PreparedChatAttachment[] = [];
+  for (const [index, path] of paths.entries()) {
+    try {
+      prepared.push(await prepareChatAttachment(path));
+    } catch (error) {
+      if (error instanceof ChatAttachmentValidationError) throw new ChatAttachmentValidationError(error.issue, index);
+      throw error;
+    }
+  }
   const decodedCharacters = prepared.reduce((total, attachment) => total + (attachment.textContent?.length ?? 0), 0);
   if (decodedCharacters > CHAT_TEXT_TOTAL_CHARACTER_LIMIT) {
-    throw new Error(`Chat text attachments exceed the ${CHAT_TEXT_TOTAL_CHARACTER_LIMIT.toLocaleString("en-US")} character limit.`);
+    throw new ChatAttachmentValidationError({ code: "total_text_too_large", limit: CHAT_TEXT_TOTAL_CHARACTER_LIMIT }, undefined, prepared.map((item) => item.textContent?.length ?? 0));
   }
   return Object.freeze(prepared);
 }
 
 async function prepareChatAttachment(path: string): Promise<PreparedChatAttachment> {
-  const metadata = await stat(path);
-  if (!metadata.isFile()) throw new Error("Attachment must be a regular file.");
+  const fail = (code: ChatAttachmentIssue["code"], limit?: number): never => {
+    throw new ChatAttachmentValidationError({ code, fileName: basename(path).slice(0, 240), ...(limit === undefined ? {} : { limit }) });
+  };
+  const metadata = await stat(path).catch(() => fail("unreadable"));
+  if (!metadata.isFile()) fail("not_file");
   const extension = extname(path).toLowerCase();
   const mediaType = chatAttachmentMediaType(extension);
   if (mediaType === undefined) {
-    throw new Error("Chat attachments support PNG, JPEG, WEBP, GIF, TXT, Markdown, JSON, and CSV files only.");
+    return fail("unsupported_format");
   }
   const isImage = mediaType.startsWith("image/");
   const byteLimit = isImage ? CHAT_IMAGE_BYTE_LIMIT : CHAT_TEXT_BYTE_LIMIT;
   if (metadata.size > byteLimit) {
-    throw new Error(isImage ? "Image attachment exceeds the 20 MiB limit." : "Text attachment exceeds the 1 MiB limit.");
+    fail(isImage ? "image_too_large" : "text_too_large", byteLimit);
   }
-  const bytes = await readFile(path);
+  const bytes = await readFile(path).catch(() => fail("unreadable"));
+  if (bytes.byteLength > byteLimit) fail(isImage ? "image_too_large" : "text_too_large", byteLimit);
   if (isImage) return Object.freeze({ bytes, mediaType, name: basename(path).slice(0, 240) });
   let textContent: string;
   try {
     textContent = new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
   } catch {
-    throw new Error("Chat text attachments must be valid UTF-8.");
+    return fail("invalid_utf8");
   }
-  if (textContent.includes("\0")) throw new Error("Chat text attachments cannot contain NUL bytes.");
+  if (textContent.includes("\0")) fail("binary_content");
   return Object.freeze({ bytes, mediaType, name: basename(path).slice(0, 240), textContent });
 }
 

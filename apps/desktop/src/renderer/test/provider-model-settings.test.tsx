@@ -661,17 +661,17 @@ describe("provider and model settings", () => {
     } as unknown as ActspaceBridge;
 
     render(<TaskModelDefaultsSection settings={settings} />);
-    await screen.findByLabelText("轻量任务模型");
-    const utilitySelect = screen.getByLabelText("轻量任务模型") as HTMLSelectElement;
-    const providerGroups = Array.from(utilitySelect.querySelectorAll("optgroup"));
-    expect(providerGroups.map((group) => group.label)).toEqual(["DeepSeek", "OpenRouter"]);
-    expect(Array.from(utilitySelect.options).map((option) => option.text)).toEqual([
+    await userEvent.click(await screen.findByRole("button", { name: "轻量任务模型" }));
+    const listbox = await screen.findByRole("listbox", { name: "轻量任务模型" });
+    expect(within(listbox).getByText("DeepSeek")).toBeInTheDocument();
+    expect(within(listbox).getByText("OpenRouter")).toBeInTheDocument();
+    expect(within(listbox).getAllByRole("option").map((option) => option.textContent)).toEqual([
       "未配置",
       "DeepSeek V4 Pro · DeepSeek",
       "DeepSeek V4 Pro · OpenRouter",
     ]);
 
-    await userEvent.selectOptions(utilitySelect, openRouterUsableModel.key);
+    await userEvent.click(within(listbox).getByRole("option", { name: "DeepSeek V4 Pro · OpenRouter" }));
     await waitFor(() => expect(updateTaskModels).toHaveBeenCalledWith({ utilityModel: openRouterUsableModel.key }));
 
   });

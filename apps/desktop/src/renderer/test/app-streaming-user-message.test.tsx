@@ -775,7 +775,7 @@ describe("App streaming user message", () => {
 
     await waitFor(() => {
       expect(composer).toHaveValue("keep this input");
-      expect(screen.getByRole("alert")).toHaveTextContent("Git repository has no commits yet.");
+      expect(screen.getByRole("alert")).toHaveTextContent("消息未能发送，正文和附件已保留，请重试。");
     });
   });
 
@@ -2792,11 +2792,11 @@ sessionId: input.sessionId,
     await userEvent.type(composer, "delete notes.md");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByText("Delete file requires approval")).toBeInTheDocument();
-    expect(screen.getByText("notes.md")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+    expect(await screen.findByText("notes.md")).toBeInTheDocument();
+    expect(screen.getByText("notes.md").closest("article")).toHaveClass("approval-row");
+    expect(screen.queryByRole("button", { name: "本会话" })).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "删除" }));
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-delete-1",
@@ -2931,8 +2931,8 @@ sessionId: input.sessionId,
     await userEvent.type(composer, "看看浏览器标签页");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByText("允许 ActSpace 在当前会话中使用浏览器？")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "允许" }));
+    expect(await screen.findByText("使用浏览器")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "本会话允许" }));
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-browser-1",
@@ -3424,7 +3424,7 @@ sessionId: input.sessionId,
     expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 失败')).toBeInTheDocument();
     await fixture.select('background-a');
     expect(screen.getByLabelText('消息输入框')).toHaveValue('A failed input');
-    expect(screen.getByText('Background preparation failed')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('消息未能发送，正文和附件已保留，请重试。');
     errorLog.mockRestore();
   });
 
@@ -3483,7 +3483,7 @@ sessionId: input.sessionId,
       resolveApproval([]);
     });
     expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 等待审批')).toBeInTheDocument();
-    expect(screen.getByText('允许 ActSpace 在当前会话中使用浏览器？')).toBeInTheDocument();
+    expect(screen.getByText('使用浏览器')).toBeInTheDocument();
   });
 
   it('keeps a run pinned while more than three other histories are loaded', async () => {

@@ -36,7 +36,7 @@ describe("tool stream presentation preserves behavior", () => {
     }
   });
 
-  it("offers once, exact Session and explicitly revealed subtree choices for pending reads", async () => {
+  it("offers deny, exact Session and once choices for pending reads", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
     window.actspace = {
       submitApproval,
@@ -48,12 +48,26 @@ describe("tool stream presentation preserves behavior", () => {
         ],
       }],
     } as unknown as Window["actspace"];
-    render(<ToolLogLine message={{ ...base, kind: "read", status: "pending", filePath: "/tmp/shared/a.md", displayText: "Read", approvalRequestId: "approval-read-1", reason: "Outside workspace" }} />);
-    expect(await screen.findByRole("button", { name: "本会话允许此路径" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "本会话允许此目录树" })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "选择目录范围" }));
-    await userEvent.click(screen.getByRole("button", { name: "本会话允许此目录树" }));
-    expect(submitApproval).toHaveBeenCalledWith({ requestId: "approval-read-1", decision: "session", suggestionId: "tree-read" });
+    render(<ToolLogLine message={{ ...base, kind: "read", status: "pending", filePath: "/tmp/shared/a.md", displayText: "Read", approvalRequestId: "approval-read-1", reason: "The requested file is outside the workspace." }} />);
+    expect(screen.getByText("读取")).toBeInTheDocument();
+    expect(screen.getByText("a.md")).toHaveClass("text-text-main");
+    expect(screen.getByText("工作区外")).toBeInTheDocument();
+    expect(screen.queryByText(/outside the workspace/)).toBeNull();
+    expect(screen.getByRole("button", { name: "拒绝" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "允许" })).toBeInTheDocument();
+    const sessionButton = await screen.findByRole("button", { name: "本会话" });
+    expect(screen.queryByText("This directory tree")).toBeNull();
+    await userEvent.click(sessionButton);
+    expect(submitApproval).toHaveBeenCalledWith({ requestId: "approval-read-1", decision: "session", suggestionId: "exact-read" });
+  });
+
+  it("shows a pending grep as pattern and scope on one approval row", () => {
+    render(<ToolLogLine message={{ ...base, kind: "grep", status: "pending", pattern: "TODO|FIXME", scope: "/tmp/other-repo/src", displayText: "Grep", approvalRequestId: "approval-grep-1" }} />);
+    expect(screen.getByText("搜索")).toBeInTheDocument();
+    expect(screen.getByText("TODO|FIXME")).toBeInTheDocument();
+    expect(screen.getByText("于")).toBeInTheDocument();
+    expect(screen.getByText("src")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "本会话" })).toBeNull();
   });
 
   it("shows compact Bash commands while retaining old diagnostic titles and output", async () => {

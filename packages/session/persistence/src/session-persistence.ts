@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { EventCodecRegistry, CreateSessionHeaderInput, SessionHeaderV1 } from "@actspace/session-journal";
 import { SessionError, createSessionForkSeed, createSessionHeader } from "@actspace/session-journal";
@@ -15,6 +15,12 @@ export type SessionPersistenceOptions = {
   readonly dataRoot: string;
   readonly runtimeId: string;
   readonly registry: EventCodecRegistry;
+  readonly forkArtifacts?: SessionForkArtifactPort;
+};
+
+export type SessionForkArtifactPort = {
+  copyForSession(parentSessionId: string, childSessionId: string, artifactId: string): Promise<{ readonly artifactId: string }>;
+  deleteForSession(sessionId: string, artifactId: string): Promise<void>;
 };
 
 export type SessionPersistenceCreateOptions = {
@@ -65,13 +71,14 @@ export class JsonlSessionPersistence implements SessionPersistence {
     await mkdir(layout.artifactsDir, { recursive: true });
     await mkdir(layout.recoveryDir, { recursive: true });
     const lease = await SessionWriterLease.acquire({ sessionDir: layout.sessionDir, sessionId: header.sessionId, runtimeId: this.options.runtimeId, ...options.lease });
+    let writer: JsonlSessionWriter | undefined;
     try {
-      const writer = await JsonlSessionWriter.create(layout.journalPath, header, options.writerHooks);
+      writer = await JsonlSessionWriter.create(layout.journalPath, header, options.writerHooks);
       const seed = options.seed ?? [];
       if (seed.length > 0) await writer.append(seed);
       return { header, layout, events: Object.freeze([...seed]), driver: createJsonlDriver(writer, lease) };
     } catch (error) {
-      await lease.dispose();
+      try { await writer?.close(); } finally { await lease.dispose(); }
       throw error;
     }
   }
@@ -113,7 +120,46 @@ export class JsonlSessionPersistence implements SessionPersistence {
       registry: this.options.registry,
       origin: options.origin,
     });
-    return this.create(seed.header, { seed: seed.events });
+    // Reserve only this new directory; an existing Session must never be cleaned up.
+    const layout = sessionFileLayout(this.options.dataRoot, options.newSessionId);
+    await mkdir(layout.root, { recursive: true });
+    await mkdir(layout.sessionDir);
+    const copied = new Map<string, string>();
+    try {
+      const rewrite = async (value: unknown): Promise<unknown> => {
+        if (Array.isArray(value)) {
+          const result: unknown[] = [];
+          for (const item of value) result.push(await rewrite(item));
+          return result;
+        }
+        if (value === null || typeof value !== "object") return value;
+        const record = value as Record<string, unknown>;
+        // Recognize typed artifact refs and LLM image blocks, never arbitrary text IDs.
+        const artifactId = typeof record.artifactId === "string" &&
+          (typeof record.mediaType === "string" || (record.type === "image" && typeof record.mimeType === "string"))
+          ? record.artifactId : undefined;
+        if (artifactId !== undefined && !copied.has(artifactId)) {
+          if (!this.options.forkArtifacts) throw new Error("This Host cannot copy artifacts for a Session fork.");
+          const ref = await this.options.forkArtifacts.copyForSession(options.parentSessionId, options.newSessionId, artifactId);
+          copied.set(artifactId, ref.artifactId);
+        }
+        const result: Record<string, unknown> = {};
+        for (const [key, item] of Object.entries(record)) {
+          result[key] = key === "artifactId" && artifactId !== undefined ? copied.get(artifactId)! : await rewrite(item);
+        }
+        return result;
+      };
+      const events = await rewrite(seed.events) as typeof seed.events;
+      return await this.create(seed.header, { seed: events });
+    } catch (error) {
+      const cleanup = await Promise.allSettled([
+        ...[...copied.values()].map(id => this.options.forkArtifacts!.deleteForSession(options.newSessionId, id)),
+        rm(layout.sessionDir, { recursive: true, force: true }),
+      ]);
+      const failures = cleanup.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+      if (failures.length > 0) throw new AggregateError([error, ...failures.map(result => result.reason)], "Session fork failed and cleanup was incomplete.");
+      throw error;
+    }
   }
 
   async open(sessionId: string, options: SessionPersistenceOpenOptions = {}): Promise<SessionPersistenceBinding> {
@@ -158,7 +204,10 @@ export class JsonlSessionPersistenceService extends Service implements SessionPe
     const journal = ctx.get("session.journal") as { readonly registry: EventCodecRegistry } | undefined;
     if (host === undefined) throw new Error("Session Persistence Service requires actspace.host.session.");
     if (journal === undefined) throw new Error("Session Persistence Service requires session.journal.");
-    this.provider = createJsonlSessionPersistence({ ...host, registry: journal.registry });
+    const artifacts = ctx.get("host.artifacts") as Partial<SessionForkArtifactPort> | undefined;
+    const forkArtifacts = typeof artifacts?.copyForSession === "function" && typeof artifacts.deleteForSession === "function"
+      ? artifacts as SessionForkArtifactPort : undefined;
+    this.provider = createJsonlSessionPersistence({ ...host, registry: journal.registry, forkArtifacts });
     ctx.effect(() => () => undefined, "session.persistence.provider");
   }
 
