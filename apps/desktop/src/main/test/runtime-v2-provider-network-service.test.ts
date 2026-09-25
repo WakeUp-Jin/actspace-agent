@@ -5,6 +5,25 @@ const NOW = new Date("2026-08-23T06:00:00.000Z");
 
 describe("ProviderNetworkService", () => {
   it.each([
+    ["openai-completions", "https://relay.example/v1/chat/completions", "Authorization", "Bearer secret-provider-key", "max_tokens"],
+    ["openai-responses", "https://relay.example/v1/responses", "Authorization", "Bearer secret-provider-key", "max_output_tokens"],
+    ["anthropic-messages", "https://relay.example/v1/messages", "x-api-key", "secret-provider-key", "max_tokens"],
+  ] as const)("sends an explicit minimal %s model test", async (protocol, expectedUrl, headerName, headerValue, tokenField) => {
+    const fetch = vi.fn(async () => new Response(null, { status: 200 }));
+    const service = new ProviderNetworkService({ directFetch: fetch, now: () => NOW });
+    await expect(service.testCustomConnection({ protocol, apiKey: "secret-provider-key", baseUrl: "https://relay.example/v1".replace(/\/v1$/, protocol === "anthropic-messages" ? "" : "/v1"), model: "vendor/model" })).resolves.toMatchObject({ ok: true, checkedAt: NOW.toISOString() });
+    const [url, init] = fetch.mock.calls[0]!;
+    expect(url).toBe(expectedUrl);
+    expect(init).toMatchObject({ method: "POST" });
+    expect(new Headers(init?.headers).get(headerName)).toBe(headerValue);
+    if (protocol === "anthropic-messages") expect(new Headers(init?.headers).get("anthropic-version")).toBe("2023-06-01");
+    const body = JSON.parse(String(init?.body));
+    expect(body).toMatchObject({ model: "vendor/model", [tokenField]: 1 });
+    expect(body).not.toHaveProperty("tools");
+    expect(JSON.stringify(body)).not.toContain("cache_control");
+  });
+
+  it.each([
     ["deepseek", "https://api.deepseek.com/user/balance"],
     ["kimi", "https://api.moonshot.cn/v1/models"],
     ["openrouter", "https://openrouter.ai/api/v1/models"],

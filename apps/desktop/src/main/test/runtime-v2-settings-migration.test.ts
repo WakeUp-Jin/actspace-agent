@@ -48,7 +48,7 @@ describe("SettingsService v4 migration", () => {
     expect(created.settings.models.connections["proxy-one"]).toMatchObject({ connectionId: "proxy-one", displayName: "Proxy One", defaultModel: "gpt-4o-mini", baseUrl: "https://proxy.example/v1" });
     expect(JSON.stringify(created)).not.toContain("secret-key");
     const updated = await service.updateCustomConnection({ providerId: "openrouter", connectionId: "proxy-one", displayName: "Proxy Renamed", apiKey: "", baseUrl: "https://proxy.example/v2", defaultModel: "gpt-4.1" });
-    expect(updated.settings.models.connections["proxy-one"]).toMatchObject({ displayName: "Proxy Renamed", defaultModel: "gpt-4.1", baseUrl: "https://proxy.example/v2" });
+    expect(updated.settings.models.connections["proxy-one"]).toMatchObject({ displayName: "Proxy Renamed", defaultModel: "gpt-4o-mini", baseUrl: "https://proxy.example/v2" });
     const removed = await service.removeCustomConnection("proxy-one");
     expect(removed.settings.models.connections["proxy-one"]).toBeUndefined();
   });

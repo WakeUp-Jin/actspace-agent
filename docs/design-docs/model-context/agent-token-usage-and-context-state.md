@@ -119,6 +119,7 @@ costProvenance?
 - `source` 表示 Token 来源，`costProvenance.basis` 独立表示费用来源，不把 SDK 估算误标成真实扣款；
 - provider 未返回某字段时允许为 unknown / null，Projection 不应凭空补出精确数字；
 - 新请求的 cost 连同 `costProvenance.pricingSnapshot` 保存当时所用模型的价格、币种、倍率及目录来源，不保存完整目录；历史没有依据的零值按未知展示，更新价目不重算历史，详见[目录与费用设计](agent-model-catalog-and-usage-cost.md)；
+- 自定义模型手动价格使用 `source: configured`，并把缓存读取和缓存写入作为独立计费桶；关闭手动价格后，新请求的费用为未知，但 Token 统计仍保留；
 - retry 的每次真实 request 都有独立 request ID、snapshot 和 usage，不能把多次尝试覆盖为一条。
 
 Durable Session projection 聚合：

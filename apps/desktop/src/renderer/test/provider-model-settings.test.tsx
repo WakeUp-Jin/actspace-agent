@@ -119,6 +119,24 @@ const catalogInstalledModel: InstalledModelView = {
   },
   unavailableReasons: {},
 };
+const customConnectionModel: InstalledModelView = {
+  definition: {
+    key: "openrouter:connection/anthropic-relay/claude-opus-alias",
+    provider: "openrouter",
+    api: "anthropic-messages",
+    apiModel: "claude-opus-alias",
+    label: "Claude Opus Relay",
+    source: "custom",
+    contextWindow: 1_000_000,
+    maxTokens: 128_000,
+    thinkingDefault: true,
+    reasoningConfig: { mode: "manual", support: "supported", efforts: ["low", "medium", "high"], defaultEffort: "medium", allowOff: true },
+    capabilities: { input: ["text", "image"], toolUse: "declared", reasoning: true, thinkingToggle: true, reasoningEfforts: ["low", "medium", "high"], reasoningDefaultEffort: "medium" },
+    pricing: { currency: "USD", inputCacheMissPerMillion: 5, outputPerMillion: 25, inputCacheHitPerMillion: 0.5, inputCacheWritePerMillion: 6.25 },
+  },
+  settings: { enabled: true, addedAt: "2026-09-24T00:00:00.000Z", connectionId: "anthropic-relay" },
+  unavailableReasons: {},
+};
 const settings = {
   version: 2,
   defaultModelId: "deepseek-v4-pro",
@@ -320,14 +338,25 @@ describe("provider and model settings", () => {
     expect(screen.getByRole("button", { name: "保存供应商" })).toBeDisabled();
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(1);
     await userEvent.type(screen.getByLabelText("API Key"), "fixture-secret");
-    await userEvent.type(screen.getByPlaceholderText("https://example.com/v1"), "https://relay.example/v1");
-    await userEvent.type(screen.getByPlaceholderText("填写服务商提供的模型 ID"), "vendor/model-id");
+    const anthropic = protocol === "anthropic-messages";
+    const baseUrl = anthropic ? "https://relay.example" : "https://relay.example/v1";
+    await userEvent.type(screen.getByPlaceholderText(anthropic ? "https://example.com" : "https://example.com/v1"), baseUrl);
+    await userEvent.type(screen.getByPlaceholderText("例如 claude-opus-5-5"), "vendor/model-id");
     await userEvent.click(screen.getByRole("button", { name: "保存供应商" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("暂时无法写入");
     expect(screen.getByLabelText("API Key")).toHaveValue("fixture-secret");
     await userEvent.click(screen.getByRole("button", { name: "保存供应商" }));
     await waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
-    expect(createCustomConnection).toHaveBeenLastCalledWith(expect.objectContaining({ protocol, catalogId, connectionId: undefined, defaultModel: "vendor/model-id", baseUrl: "https://relay.example/v1", apiKey: "fixture-secret" }));
+    expect(createCustomConnection).toHaveBeenLastCalledWith(expect.objectContaining({
+      protocol,
+      catalogId,
+      connectionId: undefined,
+      defaultModel: "vendor/model-id",
+      baseUrl,
+      apiKey: "fixture-secret",
+      promptCacheMode: anthropic ? "short" : "off",
+      initialModel: expect.objectContaining({ apiModel: "vendor/model-id", pricing: null }),
+    }));
     await userEvent.click(screen.getByRole("button", { name: "添加服务" }));
     expect(screen.getByRole("button", { name: `选择 自定义服务（${label}）` })).toBeInTheDocument();
   });
@@ -426,6 +455,56 @@ describe("provider and model settings", () => {
     await userEvent.type(screen.getByLabelText("显示名称"), "My Gateway");
     await userEvent.click(screen.getByRole("button", { name: "保存供应商" }));
     await waitFor(() => expect(updateCustomConnection).toHaveBeenCalledWith(expect.objectContaining({ connectionId: "office", displayName: "My Gateway", apiKey: undefined })));
+  });
+
+  it("shows an Anthropic request URL, tests the default model, and exposes manual model pricing", async () => {
+    const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic-compatible", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-opus-alias", promptCacheMode: "short", proxy: { enabled: false, url: null }, enabled: true };
+    const getSettingsV4 = vi.fn(async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }));
+    const testCustomConnection = vi.fn(async () => ({ ok: true, message: "模型测试成功。", checkedAt: "2026-09-24T00:00:00.000Z" }));
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4,
+      listInstalledModels: async () => ({ models: [customConnectionModel] }),
+      testCustomConnection,
+    } as unknown as ActspaceBridge;
+
+    render(<ProviderSettings />);
+    await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
+    expect(await screen.findByText("https://relay.example/v1/messages")).toBeInTheDocument();
+    expect(screen.getByText("短缓存")).toBeInTheDocument();
+    expect(screen.getByText("手动价格")).toBeInTheDocument();
+    expect(screen.getByText(/写缓存 6.25\/M/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "测试默认模型" }));
+    await waitFor(() => expect(testCustomConnection).toHaveBeenCalledWith({ connectionId: "anthropic-relay" }));
+    expect(await screen.findByText("模型测试成功。")).toBeInTheDocument();
+  });
+
+  it("adds a second custom model with four manual prices", async () => {
+    const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic-compatible", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-opus-alias", promptCacheMode: "short", proxy: { enabled: false, url: null }, enabled: true };
+    const addCustomModel = vi.fn(async () => ({ ok: true as const, model: customConnectionModel }));
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
+      listInstalledModels: async () => ({ models: [customConnectionModel] }),
+      addCustomModel,
+    } as unknown as ActspaceBridge;
+
+    render(<ProviderSettings />);
+    await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "添加模型" }));
+    await userEvent.type(screen.getByPlaceholderText("例如 claude-opus-5-5"), "claude-backup");
+    await userEvent.type(screen.getByPlaceholderText("留空时使用 API 模型 ID"), "Backup");
+    await userEvent.click(screen.getByRole("switch", { name: "启用手动价格" }));
+    const prices = screen.getAllByPlaceholderText("0.00");
+    for (const [index, value] of ["5", "25", "0.5", "6.25"].entries()) await userEvent.type(prices[index], value);
+    await userEvent.click(screen.getByRole("button", { name: "保存模型" }));
+    await waitFor(() => expect(addCustomModel).toHaveBeenCalledWith(expect.objectContaining({
+      connectionId: "anthropic-relay",
+      apiModel: "claude-backup",
+      label: "Backup",
+      setAsConnectionDefault: false,
+      pricing: { currency: "USD", inputCacheMissPerMillion: 5, outputPerMillion: 25, inputCacheHitPerMillion: 0.5, inputCacheWritePerMillion: 6.25 },
+    })));
   });
 
   it("preserves an existing proxy when editing OpenRouter without re-entering its address", async () => {

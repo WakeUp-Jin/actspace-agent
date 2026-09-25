@@ -348,6 +348,10 @@ export type ModelsAddInput = {
   apiModel: string;
 };
 
+export type ModelsAddCustomInput = import("./custom-model-input").CustomModelCreateInput;
+export type ModelsEditCustomInput = import("./custom-model-input").CustomModelEditInput;
+export type ModelsSetCustomDefaultInput = import("./custom-model-input").CustomModelSetDefaultInput;
+
 export type ModelsUpdateInput = {
   reasoningConfig?: import("./custom-model-reasoning").CustomModelReasoning;
   modelKey: ModelKey;
@@ -364,7 +368,17 @@ export type ModelMutationResult =
   | {
       ok: false;
       error: {
-        code: "model_missing" | "model_in_use" | "model_not_removable" | "invalid_model" | "credential_missing" | "write_failed";
+        code:
+          | "model_missing"
+          | "model_in_use"
+          | "model_not_removable"
+          | "invalid_model"
+          | "invalid_pricing"
+          | "connection_missing"
+          | "model_already_exists"
+          | "default_model_requires_replacement"
+          | "credential_missing"
+          | "write_failed";
         message: string;
         references?: Array<"defaultChatModel" | "utilityModel" | "exploreModel">;
       };

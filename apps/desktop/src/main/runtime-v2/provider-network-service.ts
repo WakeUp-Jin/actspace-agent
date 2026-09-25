@@ -1,6 +1,8 @@
 import { ProviderProxyPool } from "@actspace/llm-service";
 import type {
   BalanceProviderId,
+  CustomConnectionTestResult,
+  ModelApi,
   ProviderBalanceSnapshot,
   ProviderConnectionErrorKind,
 } from "@actspace/shared";
@@ -10,6 +12,13 @@ export type ProviderNetworkRuntime = {
   readonly provider: BalanceProviderId;
   readonly apiKey: string;
   readonly baseUrl: string;
+  readonly transport?: { readonly proxyUrl: string };
+};
+export type CustomConnectionProbeRuntime = {
+  readonly protocol: ModelApi;
+  readonly apiKey: string;
+  readonly baseUrl: string;
+  readonly model: string;
   readonly transport?: { readonly proxyUrl: string };
 };
 
@@ -61,6 +70,36 @@ export class ProviderNetworkService {
           ? "Provider proxy connection failed."
           : "Provider network connection failed.";
       return { ok: false, message, checkedAt, errorKind };
+    }
+  }
+
+  async testCustomConnection(runtime: CustomConnectionProbeRuntime): Promise<CustomConnectionTestResult> {
+    const checkedAt = this.#now().toISOString();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
+    timeout.unref?.();
+    try {
+      const fetchImpl = runtime.transport?.proxyUrl
+        ? await this.#proxyFetch(runtime.transport.proxyUrl)
+        : this.#directFetch;
+      const response = await fetchImpl(customConnectionUrl(runtime), {
+        method: "POST",
+        headers: customConnectionHeaders(runtime),
+        body: JSON.stringify(customConnectionBody(runtime)),
+        signal: controller.signal,
+      });
+      if (response.ok) return { ok: true, message: "模型测试成功。", checkedAt };
+      return statusFailure(response.status, checkedAt);
+    } catch (error) {
+      const errorKind = classifyNetworkFailure(error);
+      return {
+        ok: false,
+        checkedAt,
+        errorKind,
+        message: errorKind === "timeout" ? "模型测试超时。" : errorKind === "proxy" ? "代理连接失败。" : "模型测试网络请求失败。",
+      };
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -120,6 +159,24 @@ export class ProviderNetworkService {
       clearTimeout(timeout);
     }
   }
+}
+
+function customConnectionUrl(runtime: CustomConnectionProbeRuntime): string {
+  const base = runtime.baseUrl.replace(/\/+$/, "");
+  if (runtime.protocol === "anthropic-messages") return `${base}/v1/messages`;
+  return runtime.protocol === "openai-responses" ? `${base}/responses` : `${base}/chat/completions`;
+}
+
+function customConnectionHeaders(runtime: CustomConnectionProbeRuntime): Record<string, string> {
+  if (runtime.protocol === "anthropic-messages") {
+    return { Accept: "application/json", "Content-Type": "application/json", "x-api-key": runtime.apiKey, "anthropic-version": "2023-06-01" };
+  }
+  return { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${runtime.apiKey}` };
+}
+
+function customConnectionBody(runtime: CustomConnectionProbeRuntime): Record<string, unknown> {
+  if (runtime.protocol === "openai-responses") return { model: runtime.model, input: "Reply with OK.", max_output_tokens: 1 };
+  return { model: runtime.model, max_tokens: 1, messages: [{ role: "user", content: "Reply with OK." }] };
 }
 
 function connectionUrl(runtime: ProviderNetworkRuntime): string {

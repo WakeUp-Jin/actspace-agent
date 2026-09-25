@@ -58,6 +58,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     if (capabilities?.reasoning === false) { delete requestOptions.reasoning; delete requestOptions.reasoningEffort; }
     const requestModel = reasoningEffort ? model.definition.requestModelByReasoningEffort?.[reasoningEffort] ?? model.definition.apiModel : model.definition.apiModel;
     const route = toWireRoute(model.definition.api);
+    const cacheRetention: "short" | "none" = runtime.promptCacheMode === "off" ? "none" : "short";
     const pricingModel = model;
     const pricing = this.models.resolvePricing ? this.models.resolvePricing(pricingModel, requestModel) : resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: model.definition.provider, apiModel: requestModel, modelKey: model.key, baseUrl: pricingModel.providerRuntime.baseUrl ?? "", connectionId: model.connectionId, multiplier: runtime.pricingMultiplier, configured: model.definition.source === "custom" && requestModel === model.definition.apiModel ? model.definition.pricing : undefined, configuredAlreadyMultiplied: true });
     const endpointOwner = catalogProviderForEndpoint(runtime.baseUrl ?? "");
@@ -74,6 +75,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
       providerId: wireProvider,
       modelId: requestModel,
       baseUrl: runtime.baseUrl,
+      ...(route === "anthropic-messages" ? { cacheRetention } : {}),
       readArtifact: async (sessionId: string, artifactId: string) => {
         const artifact = await this.readArtifact(sessionId, artifactId);
         return { data: artifact.bytes, mimeType: artifact.mediaType };

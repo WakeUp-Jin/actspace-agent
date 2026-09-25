@@ -26,6 +26,7 @@ import {
   type SettingsV4UpdateResult,
   type SettingsV4UpdateInput,
   type CustomConnectionInput,
+  type CustomConnectionTestInput,
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
@@ -331,6 +332,13 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createCustomConnection, (_event, input: CustomConnectionInput) => options.settings.createCustomConnection(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeCustomConnection, (_event, input: { connectionId: string }) => options.settings.removeCustomConnection(input.connectionId));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateCustomConnection, (_event, input: RuntimeV2UpdateCustomConnectionInput) => options.settings.updateCustomConnection(input));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.testCustomConnection, async (_event, input: CustomConnectionTestInput) => {
+    const runtime = options.settings.getCustomConnectionRuntimeConfig(input.connectionId);
+    if ("code" in runtime) return { ok: false, message: runtime.message, checkedAt: new Date().toISOString(), errorKind: "invalid_request" as const };
+    const result = await options.providerNetwork.testCustomConnection(runtime);
+    await options.settings.markCustomConnectionResult(input.connectionId, result);
+    return result;
+  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateSettings, (_event, input: Parameters<SettingsService["update"]>[0]) => options.settings.update(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setProviderKey, (_event, input: Parameters<SettingsService["setProviderKey"]>[0] extends never ? never : { provider: Parameters<SettingsService["setProviderKey"]>[0]; apiKey: string }) => options.settings.setProviderKey(input.provider, input.apiKey));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.clearProviderKey, (_event, input: { provider: Parameters<SettingsService["clearProviderKey"]>[0] }) => options.settings.clearProviderKey(input.provider));
@@ -470,6 +478,15 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.addModel, async (_event, input: { provider: string; apiModel: string }) => {
     if ((input?.provider !== "openrouter" && input?.provider !== "deepseek" && input?.provider !== "kimi") || typeof input.apiModel !== "string") return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
     return toModelMutationResult(await options.models.addCatalogModel(input.provider, input.apiModel));
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.addCustomModel, async (_event, input: import("@actspace/shared").ModelsAddCustomInput) => {
+    return toModelMutationResult(await options.models.addCustomModel(input));
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.editCustomModel, async (_event, input: import("@actspace/shared").ModelsEditCustomInput) => {
+    return toModelMutationResult(await options.models.editCustomModel(input));
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setCustomConnectionDefaultModel, async (_event, input: import("@actspace/shared").ModelsSetCustomDefaultInput) => {
+    return toModelMutationResult(await options.models.setCustomConnectionDefaultModel(input));
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateModel, async (_event, input: import("@actspace/shared").ModelsUpdateInput) => {
     const key = normalizeModelKey(input?.modelKey);
@@ -753,7 +770,7 @@ function toModelMutationResult(result: ModelStoreResult) {
           ? "credential_missing"
           : result.code === "invalid_model" || result.code === "invalid_provider"
             ? "invalid_model"
-            : "write_failed";
+            : result.code;
   return { ok: false as const, error: { code, message: result.message, ...(result.references ? { references: result.references } : {}) } };
 }
 

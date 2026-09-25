@@ -150,6 +150,13 @@ interface ProviderConnectionSettings {
   };
 }
 
+interface CustomConnectionSettings extends ProviderConnectionSettings {
+  connectionId: string;
+  protocol: ModelApi;
+  defaultModel: string | null;
+  promptCacheMode?: "short" | "off";
+}
+
 interface ModelCapabilities {
   input: Array<"text" | "image">;
   toolUse: "verified" | "declared" | "unsupported" | "unknown";
@@ -198,6 +205,21 @@ openrouter:anthropic/claude-...
 ```
 
 原因：相同上游模型经原厂或 OpenRouter 调用时，凭据、价格、可用性和路由行为都不同。
+
+自定义连接进一步把 `connectionId` 编入稳定键：
+
+```text
+<providerId>:connection/<encoded connectionId>/<encoded apiModel>
+```
+
+因此两个中转站可以使用相同的 `apiModel`，但能力、价格、启用状态和默认模型不会互相覆盖。自定义模型由用户手动新增；不自动调用 `/models`，也不按名称猜测官方型号或价格。
+
+### Anthropic Messages 自定义连接
+
+- Base URL 使用服务根地址语义，例如 `https://relay.example` 最终请求 `https://relay.example/v1/messages`。若 pathname 精确以 `/v1` 结尾，renderer 提供移除动作，main 进程拒绝保存，防止 `/v1/v1/messages`。
+- 认证使用 `x-api-key` 与 `anthropic-version`；显式连接测试发送 `max_tokens: 1` 的最小真实 Messages 请求，不带工具和缓存标记。
+- 新建连接默认 `promptCacheMode: "short"`。该模式在 direct pi-ai 和 request-scoped proxy 两条 wire 上标记 system、最后一个工具定义和最后一个 user 内容块；`off` 完全不发送 `cache_control`。
+- 缓存开关只描述请求策略。是否命中以 provider 返回的 `cache_read_input_tokens` / `cache_creation_input_tokens` 为准，不能用一次成功请求推断缓存已生效。
 
 旧 `ModelId` 继续作为兼容 alias。读取旧 session / settings 时映射到对应 `ModelKey`，历史事件不重写。
 
@@ -582,6 +604,8 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 
 - 内置 / 精选模型价格来自受版本控制的模型定义。
 - provider-catalog 模型保存目录返回的 pricing 与 `catalogUpdatedAt`。
+- 自定义连接模型可以手动保存 USD / CNY 的标准输入、输出、缓存读取、缓存写入四类每百万 Token 单价；未配置价格时只统计 Token，费用保持未知。
+- 手动价格写入 `ModelDefinition.pricing`，请求开始时冻结为 `source: "configured"` 的 `ModelPricingSnapshot`，后续编辑价格不会重算历史请求。
 - 每次 `llm_usage` 仍保存当次价格快照与 provider-qualified ModelKey，历史成本不因目录刷新而变化。
 - 目录价格缺失时显示“价格未知”，不能按 0 计费。
 - OpenRouter 同一上游模型与原厂模型分别统计，不按 `apiModel` 合并。

@@ -24,6 +24,7 @@ export type PiAiConnectionOptions = {
   readonly readArtifact?: PiAiArtifactReader;
   readonly deepSeekFiles?: DeepSeekFileUploader;
   readonly load?: PiAiPublicLoader;
+  readonly cacheRetention?: "short" | "none";
 };
 
 type PiAiPublicLoader = (route: PiAiWireRoute) => Promise<{ readonly core: PiAiCoreModule; readonly api: PiAiApiModule }>;
@@ -69,7 +70,7 @@ export async function streamPiAi(options: PiAiConnectionOptions, input: LlmAdapt
         { api: options.route, provider: options.providerId, model: modelId },
         { provider: options.providerId, protocol: options.route, model: modelId },
       );
-      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), onPayload: (payload: Record<string, unknown>) => { const body = withReasoningPayload(payload, options.route, options.providerId, input.request.options); if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
+      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), sessionId: input.request.sessionId, cacheRetention: options.cacheRetention, onPayload: (payload: Record<string, unknown>) => { const body = withReasoningPayload(payload, options.route, options.providerId, input.request.options); if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
       return fromPiAiEvents(events, input.request.requestId, options.pricing ?? null, { providerId: options.providerId, protocol: options.route, modelId });
     } catch (error) {
       if (error instanceof LlmRuntimeError) throw error;
