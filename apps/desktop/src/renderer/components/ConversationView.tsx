@@ -749,6 +749,7 @@ export function ConversationView({
   activeView = "chat",
   trajectory,
   agentForm = "agent",
+  permissionControl,
 }: {
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
@@ -786,6 +787,7 @@ export function ConversationView({
   activeView?: SessionMainView;
   trajectory?: RuntimeV2TrajectorySnapshot | null;
   agentForm?: MainAgentForm;
+  permissionControl?: ReactNode;
 }) {
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
@@ -1071,6 +1073,7 @@ export function ConversationView({
                     models={models}
                     agentForm={agentForm}
                     sessionId={sessionId}
+                    permissionControl={permissionControl}
                   />
                 </div>
               ) : (
@@ -1161,6 +1164,7 @@ export function ConversationView({
             models={models}
             agentForm={agentForm}
             sessionId={sessionId}
+            permissionControl={permissionControl}
           />
         </div>
       ) : null}

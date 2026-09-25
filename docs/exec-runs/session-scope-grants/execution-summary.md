@@ -55,3 +55,21 @@
 - Browser、Network、Bash pattern、delete Grant 与 Subagent 继承未实现。
 - 自动化不替代真实 Electron reload、主题、Session 切换、真实文件系统竞态和 packaged app 验收。
 - 跨平台 sandbox、DMG、签名和 notarization 不在本计划范围。
+
+## 2026-09-25 Computer Use 补验（被锁屏中断）
+
+本轮没有改生产代码；使用合成临时文件，不访问真实凭据。保留前轮修改。
+
+- **通过：subtree 签发**。实际展开目录范围并批准；Journal selector 为 subtree，仅覆盖合成 `scope` 目录。
+- **通过：路径段隔离**。目录内第二个文件直接读取成功；`scope-sibling` 同前缀兄弟目录重新触发审批，点击拒绝后停止。
+- **通过：once-only 优先级**。已授权目录内合成 `.env` 仍弹审批，仅有“跳过/仅本次”，没有 session 选项；本轮拒绝读取。
+- **通过：进程重启恢复与复用**。正常退出并 `pnpm dev:log` 重启；原 Session 恢复授权 1 条，实际 force 读取目录内文件成功且未重新询问。
+- **通过：full-access 不自动放行 Bash**。切换完全访问后 `pwd` 仍等待审批，Journal supportedLifetimes 严格为 once；点击 Skip 后返回 user-denied，没有执行。
+- **UI 问题：Bash 仍展示 Allowlist/prefix**。点击只是展开 prefix 信息，本次没有签发任何 Bash Grant；文案与当前 once-only 模型不符，需独立处理，不能从该文案推断后端存在 allowlist 授权。
+- **UI 问题：目录树批准前没有直观显示实际目录根**。审批卡展示文件路径，展开后只有“本会话允许此目录树”；Journal 的根范围正确，但用户批准前不易确认目录范围。
+- protected 合成 `.ssh/id_qa` 已发送实际工具测试；最终 UI 核验因 macOS 锁屏被阻断，不能记为已完成 Computer Use 验收。
+- 本轮自动补验：tools-runtime 25、tools-approval 1、session-projection 11、compaction 6、CLI 13 tests 通过；不替代剩余桌面验收。
+
+### 暂存状态与剩余项目
+
+锁屏时测试 Session 仍为 **full-access、目录 read Grant 1 条**，仅涉及合成临时目录；解锁后需继续降级撤销并最终恢复默认/授权 0。尚未完成：跨 Session/子 Agent 隔离、write Grant、pending 降级/取消、delete 审批、权限卡三态/键盘/窄窗口，以及 protected 最终 UI 确认。Chat 附件上传还需要用户确认合成附件发送到当前模型，其他已知 Chat 失败与剩余项以 Chat 执行摘要为准。

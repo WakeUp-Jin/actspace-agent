@@ -21,7 +21,6 @@ type FileReadApprovalMessage = Extract<MessageBlock, { kind: "read" | "grep" | "
 
 function FileReadApprovalLine({ message, className }: { message: FileReadApprovalMessage; className?: string }) {
   const [suggestions, setSuggestions] = useState<readonly GrantSuggestion[]>([]);
-  const [scopeOpen, setScopeOpen] = useState(false);
   const [submitting, setSubmitting] = useState<"once" | "session" | "deny" | null>(null);
   const requestId = message.approvalRequestId;
   useEffect(() => {
@@ -45,10 +44,8 @@ function FileReadApprovalLine({ message, className }: { message: FileReadApprova
     <div className="break-all px-[var(--conversation-card-padding)] pt-2 font-mono text-xs text-text-muted">{target}</div>
     {message.reason ? <div className="px-[var(--conversation-card-padding)] pt-1 text-xs text-text-faint">{message.reason}</div> : null}
     <div className="flex flex-wrap items-center justify-end gap-1.5 px-[var(--conversation-card-padding)] py-2">
-      <button className="h-7 rounded-act-sm px-2 text-xs text-text-muted hover:bg-surface-subtle" type="button" disabled={submitting !== null} onClick={() => void decide("deny")}>跳过</button>
-      {suggestions.filter((suggestion) => suggestion.selector.kind === "exact").map((suggestion) => <button className="h-7 rounded-act-sm border border-line bg-surface-subtle px-2 text-xs text-text-main hover:bg-surface" type="button" disabled={submitting !== null} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话允许此路径</button>)}
-      {suggestions.some((suggestion) => suggestion.selector.kind === "subtree") ? <button className="h-7 rounded-act-sm px-2 text-xs text-text-muted hover:bg-surface-subtle" type="button" aria-expanded={scopeOpen} onClick={() => setScopeOpen((value) => !value)}>选择目录范围</button> : null}
-      {scopeOpen ? suggestions.filter((suggestion) => suggestion.selector.kind === "subtree").map((suggestion) => <button className="h-7 rounded-act-sm border border-line bg-surface-subtle px-2 text-xs text-text-main hover:bg-surface" type="button" disabled={submitting !== null} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话允许此目录树</button>) : null}
+      <button className="h-7 rounded-act-sm px-2 text-xs text-text-muted hover:bg-surface-subtle" type="button" disabled={submitting !== null} onClick={() => void decide("deny")}>拒绝</button>
+      {suggestions.filter((suggestion) => suggestion.selector.kind === "exact").slice(0, 1).map((suggestion) => <button className="h-7 rounded-act-sm border border-line bg-surface-subtle px-2 text-xs text-text-main hover:bg-surface" type="button" disabled={submitting !== null} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话</button>)}
       <button className="h-7 rounded-act-sm bg-action px-2 text-xs font-medium text-on-action hover:bg-action-hover" type="button" disabled={submitting !== null} onClick={() => void decide("once")}>仅本次</button>
     </div>
   </article>;

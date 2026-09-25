@@ -6,6 +6,7 @@ import {
   type ClipboardEvent,
   type CSSProperties,
   type DragEvent,
+  type ReactNode,
 } from "react";
 import {
   ArrowUp,
@@ -482,6 +483,7 @@ export function Composer({
   onOpenReview,
   models,
   agentForm = "agent",
+  permissionControl,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   contextState?: ContextState | null;
@@ -517,6 +519,7 @@ export function Composer({
   onOpenReview?: () => void;
   models?: UsableModelView[];
   agentForm?: import("@actspace/shared").MainAgentForm;
+  permissionControl?: ReactNode;
 }) {
   const isChatForm = agentForm === "chat";
   const sessionProjection = useOptionalSessionProjection();
@@ -2012,7 +2015,7 @@ export function Composer({
   }
 
   function renderReviewActionsStrip() {
-    if (surface !== "followup") return null;
+    if (surface !== "followup" && surface !== "initial") return null;
     if (!reviewSummary || reviewSummary.status === "empty") return null;
 
     const showCounts = reviewSummary.status === "changes" || reviewSummary.status === "partial";
@@ -2064,6 +2067,7 @@ export function Composer({
             <Laptop className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
             <span>{runLocation === "worktree" ? "工作树" : "本机"}</span>
           </span>
+          {!isChatForm && permissionControl ? <span className={STATUS_ITEM_CLASS}>{permissionControl}</span> : null}
         </div>
         <button
           className={STATUS_USAGE_CLASS}

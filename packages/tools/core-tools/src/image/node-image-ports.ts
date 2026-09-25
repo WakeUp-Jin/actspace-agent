@@ -86,20 +86,26 @@ async function generateImage(args: Readonly<Record<string, RuntimeV2JsonValue>>,
     }
     const payloads = parsePayloads(parsed).slice(0, count);
     if (!payloads.length) return failed("IMAGE_GENERATION_INVALID_RESPONSE", "Image generation provider returned no usable images.", false);
-    const artifacts = []; let batchBytes = 0; const failures: string[] = [];
+    const artifacts = []; let batchBytes = 0; const failures: ToolBodyResult[] = [];
     for (const payload of payloads) {
+      let stage: "download" | "decode" | "storage" = payload.kind === "url" ? "download" : "decode";
       try {
         const bytes = payload.kind === "base64" ? decodeBase64(payload.value) : await downloadImage(payload.value, context.signal, fetchImpl, options.resolveHostname ?? resolveAddresses);
+        stage = "decode";
         if (bytes.byteLength > MAX_IMAGE_BYTES || batchBytes + bytes.byteLength > MAX_BATCH_BYTES) throw new Error("Generated image exceeds the configured size limit.");
         const mediaType = sniffImage(bytes); if (!mediaType) throw new Error("Generated image format is unsupported.");
+        stage = "storage";
         const artifact = await context.createArtifact({ bytes, mediaType }); artifacts.push(artifact); batchBytes += bytes.byteLength;
-      } catch (error) { failures.push(error instanceof Error ? error.message : String(error)); }
+      } catch (error) {
+        if (context.signal.aborted) return failed("TOOL_ABORTED", "Image generation was aborted.", false);
+        failures.push(imageStageFailure(stage, error));
+      }
     }
-    if (!artifacts.length) return failed("IMAGE_GENERATION_INVALID_RESPONSE", failures[0] ?? "Generated images could not be materialized.", false);
+    if (!artifacts.length) return failures[0] ?? failed("IMAGE_GENERATION_INVALID_RESPONSE", "Generated images could not be materialized.", false);
     const summary = `Generated ${artifacts.length}/${count} image${count === 1 ? "" : "s"}.`;
     return { status: "completed", summary, modelOutput: [{ type: "text", text: summary }, ...artifacts.map((artifact, index) => ({ type: "artifact" as const, artifact, label: `Generated image ${index + 1}` }))], artifacts, renderer: { id: "actspace.image-gallery", schemaVersion: 1, props: { artifactIds: artifacts.map((artifact) => artifact.artifactId) } } };
   } catch (error) {
-    const aborted = context.signal.aborted; return failed(aborted ? "TOOL_ABORTED" : "IMAGE_GENERATION_FAILED", aborted ? "Image generation was aborted." : safeMessage(error), !aborted);
+    return context.signal.aborted ? failed("TOOL_ABORTED", "Image generation was aborted.", false) : imageStageFailure("request", error);
   }
 }
 
@@ -131,7 +137,7 @@ function parsePayloads(value: unknown): readonly ImagePayload[] {
   return payloads;
 }
 function decodeBase64(value: string): Buffer { const compact = value.replace(/\s+/g, ""); if (!compact || compact.length > Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 8 || !/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) throw new Error("Image Base64 payload is invalid or too large."); return Buffer.from(compact, "base64"); }
-async function downloadImage(raw: string, signal: AbortSignal, fetchImpl: typeof fetch, resolveHostname: (hostname: string) => Promise<readonly string[]>): Promise<Buffer> { const url = new URL(raw); if (url.protocol !== "https:" || url.username || url.password) throw new Error("Generated image URL is unsafe."); await assertPublic(url.hostname, resolveHostname); const response = await fetchImpl(url, { redirect: "error", signal }); if (!response.ok) throw new Error(`Generated image download returned HTTP ${response.status}.`); return readBounded(response, MAX_IMAGE_BYTES); }
+async function downloadImage(raw: string, signal: AbortSignal, fetchImpl: typeof fetch, resolveHostname: (hostname: string) => Promise<readonly string[]>): Promise<Buffer> { const url = new URL(raw); if (url.protocol !== "https:" || url.username || url.password) throw new Error("Generated image URL is unsafe."); await assertPublic(url.hostname, resolveHostname); const response = await fetchImpl(url, { redirect: "error", signal: combinedSignal(signal, IMAGE_REQUEST_TIMEOUT_MS) }); if (!response.ok) throw new Error(`Generated image download returned HTTP ${response.status}.`); return readBounded(response, MAX_IMAGE_BYTES); }
 async function assertPublic(hostname: string, resolver: (hostname: string) => Promise<readonly string[]>): Promise<void> { const addresses = isIP(hostname) ? [hostname] : await resolver(hostname); if (!addresses.length || addresses.some(privateAddress)) throw new Error("Generated image URL resolves to a private network."); }
 async function resolveAddresses(hostname: string): Promise<readonly string[]> { return (await lookup(hostname, { all: true, verbatim: true })).map(({ address }) => address); }
 function privateAddress(address: string): boolean { const value = address.toLowerCase(); if (value === "::" || value === "::1" || value === "0.0.0.0" || value.startsWith("fc") || value.startsWith("fd") || /^fe[89ab]/.test(value)) return true; if (value.startsWith("::ffff:")) return privateAddress(value.slice(7)); const parts = value.split(".").map(Number); if (parts.length !== 4 || parts.some(Number.isNaN)) return false; const [a, b] = parts as [number, number, number, number]; return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127); }
@@ -154,6 +160,24 @@ function object(value: unknown): Record<string, unknown> | undefined { return va
 function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
 function integerArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string, fallback: number): number { return typeof args[key] === "number" && Number.isInteger(args[key]) ? args[key] : fallback; }
 function combinedSignal(signal: AbortSignal, timeoutMs: number): AbortSignal { return AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]); }
+// Only controlled messages and known system codes may leave the Host. Never serialize
+// upstream error messages, signed URLs, headers, local paths or arbitrary causes.
+function imageStageFailure(stage: "request" | "download" | "decode" | "storage", error: unknown): ToolBodyResult {
+  const codes = new Set(["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "ENETUNREACH", "EHOSTUNREACH", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT", "UND_ERR_SOCKET", "CERT_HAS_EXPIRED", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "DEPTH_ZERO_SELF_SIGNED_CERT", "ENOSPC", "EACCES", "EPERM", "ENOENT", "EIO"]);
+  let value: unknown = error;
+  let diagnostic = "unknown error";
+  for (let depth = 0; depth < 4 && value instanceof Error; depth += 1) {
+    const code = (value as Error & { code?: unknown }).code;
+    if (typeof code === "string" && codes.has(code)) { diagnostic = code; break; }
+    if (value.name === "TimeoutError" || value.name === "AbortError") diagnostic = value.name;
+    value = value.cause;
+  }
+  const message = error instanceof Error ? error.message : "";
+  if (/^Generated image (URL is unsafe\.|URL resolves to a private network\.|download returned HTTP \d{3}\.|format is unsupported\.|exceeds the configured size limit\.|Base64 payload is invalid or too large\.)$/.test(message) || /^Response exceeds \d+ bytes\.$/.test(message)) diagnostic = message;
+  const code = stage === "decode" ? "IMAGE_GENERATION_INVALID_RESPONSE" : `IMAGE_GENERATION_${stage.toUpperCase()}_FAILED`;
+  // Do not retry the whole paid generation when only materialization failed.
+  return failed(code, `Image generation ${stage} failed: ${diagnostic}`, stage === "request");
+}
 function safeMessage(error: unknown): string { return (error instanceof Error ? error.message : String(error)).replace(/((?:Bearer|api[_-]?key)\s+)[^\s,]+/gi, "$1[REDACTED]"); }
 function escapeText(value: string): string { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
 function failed(code: string, message: string, retryable: boolean): ToolBodyResult { return { status: "failed", summary: message, modelOutput: [{ type: "text", text: message }], failure: { code, message, retryable } }; }

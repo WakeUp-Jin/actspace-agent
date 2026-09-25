@@ -86,7 +86,6 @@ function FileDiffApprovalCard({
   const [submitting, setSubmitting] = useState<FileDiffDecision | null>(null);
   const [resolvedDecision, setResolvedDecision] = useState<FileDiffDecision | null>(null);
   const [grantSuggestions, setGrantSuggestions] = useState<readonly GrantSuggestion[]>([]);
-  const [scopeOpen, setScopeOpen] = useState(false);
 
   const requestId = message.approvalRequestId;
   const disabled = !requestId || submitting !== null;
@@ -140,9 +139,6 @@ function FileDiffApprovalCard({
       ) : null}
 
       {grantSuggestions.length > 0 ? <div className="px-[var(--conversation-card-padding)] pt-2 text-xs text-text-muted">
-        {grantSuggestions.filter((suggestion) => suggestion.selector.kind === "exact").map((suggestion) => <button className="mr-1.5 rounded-act-sm border border-line bg-surface-subtle px-2 py-1 text-text-main hover:bg-surface-hover" type="button" disabled={disabled} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话允许此文件</button>)}
-        {grantSuggestions.some((suggestion) => suggestion.selector.kind === "subtree") ? <button className="rounded-act-sm px-2 py-1 text-text-muted hover:bg-surface-subtle" type="button" aria-expanded={scopeOpen} onClick={() => setScopeOpen((value) => !value)}>选择目录范围</button> : null}
-        {scopeOpen ? grantSuggestions.filter((suggestion) => suggestion.selector.kind === "subtree").map((suggestion) => <button className="mt-2 block max-w-full rounded-act-sm border border-line bg-surface-subtle px-2 py-1 text-left text-text-main hover:bg-surface-hover" type="button" disabled={disabled} key={suggestion.suggestionId} title={suggestion.selector.kind === "subtree" ? suggestion.selector.canonicalRoot : undefined} onClick={() => void decide("session", suggestion.suggestionId)}>本会话允许此目录树</button>) : null}
       </div> : null}
 
       <footer className={DIFF_APPROVAL_FOOTER_CLASS}>
@@ -152,15 +148,16 @@ function FileDiffApprovalCard({
           disabled={disabled}
           onClick={() => decide("deny")}
         >
-          {submitting === "deny" ? "Skipping..." : "Skip"}
+          {submitting === "deny" ? "正在拒绝…" : "拒绝"}
         </button>
+        {grantSuggestions.filter((suggestion) => suggestion.selector.kind === "exact").slice(0, 1).map((suggestion) => <button className={`${DIFF_ACTION_CLASS} ${DIFF_ACTION_GHOST_CLASS}`} type="button" disabled={disabled} key={suggestion.suggestionId} onClick={() => void decide("session", suggestion.suggestionId)}>本会话</button>)}
         <button
           className={`${DIFF_ACTION_CLASS} ${DIFF_ACTION_PRIMARY_CLASS}`}
           type="button"
           disabled={disabled}
           onClick={() => decide("once")}
         >
-          {submitting === "once" ? "Allowing..." : "Allow"}
+          {submitting === "once" ? "正在允许…" : actionLabel === "Write" ? "写入一次" : "仅本次"}
         </button>
       </footer>
     </article>

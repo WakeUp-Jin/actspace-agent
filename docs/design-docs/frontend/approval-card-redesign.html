@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>审批卡重设计</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
+
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-subtle: #f1f1ef;
+  --selected: #e4e4e1;
+  --hover: #eaeae7;
+  --line: #deded9;
+  --line-strong: #8c8c85;
+  --text: #20201e;
+  --muted: #676762;
+  --faint: #72726b;
+  --subtle: #85857e;
+  --action: #20201e;
+  --action-hover: #343430;
+  --on-action: #ffffff;
+  --info: #3978b8;
+  --info-soft: #e8f1f9;
+  --on-info: #315f8e;
+  --warning: #91600e;
+  --warning-soft: #f7eedb;
+  --on-warning: #7a500a;
+  --danger: #c74747;
+  --danger-hover: #a93a3a;
+  --danger-soft: #f8e9e9;
+  --on-danger: #a93a3a;
+  --on-danger-solid: #ffffff;
+  --success: #087a4b;
+  --success-soft: #e5f2ea;
+  --diff-add-bg: rgba(44, 168, 105, 0.12);
+  --diff-add-text: #08784f;
+  --diff-del-bg: rgba(225, 70, 86, 0.12);
+  --diff-del-text: #a43342;
+  --focus: #4d4d48;
+  --shadow-soft: 0 18px 48px rgba(31, 45, 61, 0.08);
+  --shadow-tray: 0 1px 2px rgba(31, 45, 61, 0.06), 0 12px 32px rgba(31, 45, 61, 0.10);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+:root[data-theme="dark"] {
+  --bg: #181916;
+  --surface: #242522;
+  --surface-subtle: #292a26;
+  --selected: #30312d;
+  --hover: #2a2b27;
+  --line: #353630;
+  --line-strong: #787870;
+  --text: #f1f1ed;
+  --muted: #b5b5ae;
+  --faint: #96968f;
+  --subtle: #787870;
+  --action: #f1f1ed;
+  --action-hover: #dbdbd5;
+  --on-action: #181916;
+  --info: #6ca6da;
+  --info-soft: #1e3345;
+  --on-info: #a9cbe7;
+  --warning: #d2a14d;
+  --warning-soft: #3e321c;
+  --on-warning: #e2ba6b;
+  --danger: #e06b6b;
+  --danger-hover: #ef8585;
+  --danger-soft: #452525;
+  --on-danger: #f08a8a;
+  --on-danger-solid: #181916;
+  --success: #36c783;
+  --success-soft: #193a2b;
+  --diff-add-bg: rgba(53, 193, 135, 0.14);
+  --diff-add-text: #5fd49b;
+  --diff-del-bg: rgba(239, 109, 109, 0.16);
+  --diff-del-text: #f08a8a;
+  --focus: #c8c8c0;
+  --shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.3);
+  --shadow-tray: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+code, .mono { font-family: var(--font-mono); }
+
+/* ---------- page chrome ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 24px;
+  background: color-mix(in oklab, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.topbar h1 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
+.topbar .sub { color: var(--faint); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); gap: 2px; }
+.seg button {
+  border: 0; background: transparent; height: 26px; padding: 0 10px; border-radius: 6px;
+  font-size: 13px; color: var(--muted); cursor: pointer;
+  transition: background-color 120ms var(--ease), transform 90ms var(--ease);
+}
+.seg button:hover { background: var(--hover); color: var(--text); }
+.seg button:active { transform: scale(0.97); }
+.seg button[aria-pressed="true"] { background: var(--action); color: var(--on-action); }
+.spacer { flex: 1; }
+
+.page { max-width: 1180px; margin: 0 auto; padding: 28px 24px 96px; display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 40px; }
+@media (max-width: 980px) { .page { grid-template-columns: 1fr; } .notes { position: static !important; } }
+
+.notes { position: sticky; top: 72px; align-self: start; font-size: 13px; color: var(--muted); }
+.notes h2 { font-size: 20px; line-height: 1.3; margin: 0 0 6px; color: var(--text); font-weight: 600; }
+.notes .thesis { margin: 0 0 18px; color: var(--muted); }
+.notes h3 { font-size: 12px; font-weight: 600; color: var(--faint); margin: 18px 0 6px; letter-spacing: 0.04em; }
+.notes ul { margin: 0; padding-left: 16px; }
+.notes li { margin: 4px 0; }
+.notes li b { color: var(--text); font-weight: 500; }
+.notes .verdict { margin-top: 18px; padding: 10px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); color: var(--text); }
+
+.stage { min-width: 0; }
+.convo {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 28px 32px 36px;
+}
+.section-label {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 30px 0 10px; font-size: 12px; color: var(--faint);
+}
+.section-label:first-child { margin-top: 0; }
+.section-label b { font-weight: 600; color: var(--muted); }
+.section-label .n { font-family: var(--font-mono); font-size: 11px; color: var(--subtle); }
+.assistant { max-width: 800px; margin: 0 0 12px; padding: 0 17px; color: var(--text); font-size: 15px; line-height: 1.7; }
+.slot { max-width: 800px; }
+.slot + .slot { margin-top: 10px; }
+.divider { height: 1px; background: var(--line); margin: 36px 0 0; }
+
+/* ---------- shared bits ---------- */
+.ico { display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; color: var(--faint); }
+.ico svg { width: 14px; height: 14px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 20px; padding: 0 6px; border-radius: 4px;
+  font-size: 11.5px; font-weight: 500; line-height: 1; white-space: nowrap;
+  background: var(--surface-subtle); color: var(--muted);
+}
+.chip.warn { background: var(--warning-soft); color: var(--on-warning); }
+.chip.danger { background: var(--danger-soft); color: var(--on-danger); }
+.chip.info { background: var(--info-soft); color: var(--on-info); }
+.chip.stat { font-family: var(--font-mono); font-weight: 500; gap: 6px; background: transparent; padding: 0; }
+.chip.stat.link { border: 0; cursor: pointer; font-size: 12px; gap: 5px; }
+.chip.stat.link svg { width: 11px; height: 11px; color: var(--subtle); margin-left: -2px; }
+.chip.stat.link:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
+.chip.stat.link:hover svg { color: var(--text); }
+.chip.stat .a { color: var(--diff-add-text); }
+.chip.stat .d { color: var(--diff-del-text); }
+.chip svg { width: 11px; height: 11px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid transparent;
+  font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  transition: background-color 120ms var(--ease), border-color 120ms var(--ease), transform 90ms var(--ease);
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.btn:disabled { cursor: default; opacity: 0.55; }
+.btn.ghost { background: transparent; color: var(--muted); }
+.btn.ghost:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.btn.quiet { background: var(--surface); color: var(--text); border-color: var(--line); }
+.btn.quiet:hover:not(:disabled) { background: var(--surface-subtle); }
+.btn.reserved { border-style: dashed; color: var(--faint); }
+.btn.reserved .tag { font-size: 10.5px; padding: 1px 4px; border-radius: 3px; background: var(--surface-subtle); color: var(--faint); font-weight: 500; }
+.btn.primary { background: var(--action); color: var(--on-action); }
+.btn.primary:hover:not(:disabled) { background: var(--action-hover); }
+.btn.danger { background: var(--danger); color: var(--on-danger-solid); }
+.btn.danger:hover:not(:disabled) { background: var(--danger-hover); }
+.btn kbd {
+  font-family: var(--font-ui); font-size: 11px; font-weight: 500; opacity: 0.62;
+  margin-right: -2px;
+}
+.btn .code { font-family: var(--font-mono); font-size: 12px; font-weight: 400; }
+.spin {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 1.5px solid currentColor; border-right-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.path { font-family: var(--font-mono); font-size: 13px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: clip; }
+.path .dir { color: var(--faint); }
+.path .base { color: var(--text); font-weight: 500; }
+.path .kw { color: var(--text); }
+.path .sep { color: var(--faint); font-family: var(--font-ui); padding: 0 4px; }
+.intent { color: var(--text); min-width: 0; overflow: hidden; white-space: nowrap; }
+
+/* preview blocks */
+.pv { border: 1px solid var(--line); border-radius: 6px; background: var(--surface-subtle); overflow: hidden; }
+.pv-cmd {
+  margin: 0; padding: 8px 12px; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.55; color: var(--text);
+}
+.pv-cmd .p { color: var(--faint); user-select: none; }
+.pv-diff { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; }
+.pv-diff .hunk { padding: 3px 12px; color: var(--faint); border-bottom: 1px solid var(--line); background: var(--surface); }
+.pv-diff .row { display: grid; grid-template-columns: 34px 34px 16px minmax(0, 1fr); background: var(--surface); }
+.pv-diff .row span { white-space: pre; overflow: hidden; }
+.pv-diff .ln { color: var(--subtle); text-align: right; padding-right: 8px; user-select: none; font-size: 11.5px; }
+.pv-diff .sg { color: var(--faint); user-select: none; }
+.pv-diff .row.add { background: var(--diff-add-bg); }
+.pv-diff.is-new .row.add { background: var(--surface); }
+.pv-diff.is-new .row.add .sg { color: var(--diff-add-text); }
+.pv-diff.is-new .row.add .tx { color: var(--text); }
+.pv-diff .row.add .sg, .pv-diff .row.add .tx { color: var(--diff-add-text); }
+.pv-diff .row.del { background: var(--diff-del-bg); }
+.pv-diff .row.del .sg, .pv-diff .row.del .tx { color: var(--diff-del-text); }
+.pv-more {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  padding: 5px 12px; border: 0; border-top: 1px solid var(--line); background: var(--surface-subtle);
+  font-size: 12px; color: var(--faint); cursor: pointer; text-align: left;
+}
+.pv-more:hover { color: var(--text); }
+.pv-more svg { width: 12px; height: 12px; }
+.pv-text { padding: 9px 12px; font-size: 13px; color: var(--muted); line-height: 1.6; background: var(--surface); }
+
+/* resolved log line (same rhythm as tool-log-line) */
+.log {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 0 17px; font-size: 14px; line-height: 22px; color: var(--muted);
+}
+.log .t { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.log .t .tg { color: var(--faint); }
+.log.err { color: var(--danger); }
+.log.err .t .tg { color: inherit; opacity: 0.8; }
+.log.faint { color: var(--faint); }
+.log .gtag { font-size: 12px; color: var(--faint); white-space: nowrap; }
+.log .gtag::before { content: "·"; margin-right: 6px; }
+.log .replay { margin-left: auto; border: 0; background: none; color: var(--subtle); font-size: 12px; cursor: pointer; opacity: 0; transition: opacity 120ms; }
+.log:hover .replay { opacity: 1; }
+.log .replay:hover { color: var(--text); }
+
+/* ---------- Direction A: decision card ---------- */
+.ap {
+  border: 1px solid color-mix(in oklab, var(--warning) 30%, var(--line));
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(31, 45, 61, 0.04);
+}
+.ap.risk-high { border-color: color-mix(in oklab, var(--danger) 36%, var(--line)); }
+.ap-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 0 12px; min-height: 30px; }
+.ap-verb { flex: none; font-weight: 500; color: var(--text); }
+.ap-head .path, .ap-head .intent { flex: 0 1 auto; }
+.ap-chips { display: inline-flex; gap: 4px; flex: none; margin-left: 2px; }
+.ap-reason { padding: 2px 12px 0 36px; font-size: 13px; color: var(--muted); }
+.ap-pv { margin: 10px 12px 0 36px; }
+.ap-foot { display: flex; align-items: center; gap: 6px; padding: 10px 10px 10px 36px; }
+.ap-meta { margin-right: auto; font-size: 12px; color: var(--faint); min-width: 0; overflow: hidden; white-space: nowrap; display: flex; gap: 10px; align-items: center; }
+.ap-meta code { font-size: 11.5px; }
+.ap-meta .keys { display: inline-flex; gap: 8px; }
+.ap-meta .keys span { white-space: nowrap; }
+.ap-meta .keys b { font-weight: 500; color: var(--muted); }
+
+/* ---------- Direction B: risk-scaled density ---------- */
+.st {
+  border: 1px solid color-mix(in oklab, var(--warning) 30%, var(--line));
+  border-radius: 8px; background: var(--surface);
+}
+.st.risk-high { border-color: color-mix(in oklab, var(--danger) 36%, var(--line)); }
+.st-head { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 6px 5px 12px; }
+.st-body { padding: 0 6px 6px 36px; }
+.st-cmd { border-radius: 6px; background: var(--surface-subtle); padding: 6px 10px; font-size: 12.5px; }
+.st-note { padding: 0 12px 9px 36px; margin-top: -3px; font-size: 12.5px; color: var(--faint); }
+.st .pending-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warning); flex: none; margin: 0 1px 0 5px; }
+.st .path, .st .intent { flex: 0 1 auto; }
+.st .st-head > .ap-verb { flex: none; }
+.st .acts { display: inline-flex; gap: 4px; flex: none; margin-left: auto; padding-left: 8px; }
+.st .btn { height: 26px; padding: 0 9px; font-size: 12.5px; }
+.stack { display: grid; gap: 6px; }
+.stack-head { display: flex; align-items: center; gap: 8px; padding: 0 4px 2px 13px; font-size: 12px; color: var(--faint); }
+.stack-head .btn { height: 24px; font-size: 12px; margin-left: auto; }
+
+/* ---------- Direction C: docked tray ---------- */
+.window {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  overflow: hidden; display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 760px;
+}
+.win-scroll { overflow: auto; padding: 24px 28px 16px; }
+.win-bottom { padding: 0 20px 18px; display: grid; gap: 8px; }
+.pend {
+  display: flex; align-items: center; gap: 8px; padding: 0 17px; font-size: 14px; line-height: 22px; color: var(--muted);
+}
+.pend .d { width: 6px; height: 6px; border-radius: 50%; background: var(--warning); flex: none; }
+.pend .lbl { color: var(--on-warning); font-size: 12.5px; white-space: nowrap; }
+.pend.current .lbl::after { content: " · 下方"; color: var(--faint); }
+.pend .t { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pend .t .tg { color: var(--faint); }
+
+.tray {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  box-shadow: var(--shadow-tray); overflow: hidden;
+}
+.tray-head { display: flex; align-items: center; gap: 8px; padding: 11px 12px 0 14px; }
+.tray-head .path, .tray-head .intent { flex: 0 1 auto; }
+.pager { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--faint); flex: none; }
+.pager .num { font-family: var(--font-mono); padding: 0 4px; }
+.pager button { width: 22px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: var(--faint); cursor: pointer; display: grid; place-items: center; }
+.pager button:hover { background: var(--hover); color: var(--text); }
+.pager svg { width: 14px; height: 14px; }
+.tray-reason { padding: 2px 14px 0 38px; font-size: 13px; color: var(--muted); }
+.tray-pv { margin: 10px 12px 0 12px; max-height: 188px; overflow: auto; }
+.opts { list-style: none; margin: 8px 0 0; padding: 0 6px 6px; display: grid; gap: 1px; }
+.opt {
+  display: grid; grid-template-columns: 22px auto minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  min-height: 34px; padding: 0 10px 0 8px; border-radius: 7px; cursor: pointer; font-size: 13.5px;
+}
+.opt:hover { background: var(--hover); }
+.opt[aria-selected="true"] { background: var(--selected); }
+.opt .k {
+  width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center;
+  font-size: 11px; font-family: var(--font-mono); color: var(--faint); border: 1px solid var(--line); background: var(--surface);
+}
+.opt .l { font-weight: 500; white-space: nowrap; }
+.opt .l.danger { color: var(--danger); }
+.opt .dsc { color: var(--faint); font-size: 12.5px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.opt .enter { color: var(--faint); font-size: 12px; visibility: hidden; }
+.opt[aria-selected="true"] .enter { visibility: visible; }
+.opt input {
+  width: 100%; height: 26px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px;
+  background: var(--surface); color: var(--text); font: inherit; font-size: 12.5px;
+}
+.opt input:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
+.composer {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  padding: 12px 14px; color: var(--subtle); font-size: 14px; display: flex; align-items: center; gap: 8px;
+}
+.composer .hint { margin-left: auto; font-size: 12px; }
+.tray-empty { padding: 14px; font-size: 13px; color: var(--faint); display: flex; align-items: center; gap: 8px; }
+.tray-empty button { margin-left: auto; }
+
+/* ---------- Current (as-is) recreation ---------- */
+.old { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.old-h { background: var(--surface-subtle); border-bottom: 1px solid var(--line); padding: 7px 16px; font-size: 12px; font-weight: 500; }
+.old-h.plain { background: transparent; font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 16px; }
+.old-h.plain.main { color: var(--text); min-height: 36px; }
+.old-t { padding: 8px 16px 0; font-family: var(--font-mono); font-size: 12px; color: var(--muted); word-break: break-all; }
+.old-t.band { background: var(--surface-subtle); border-bottom: 1px solid var(--line); padding: 9px 16px; font-size: 13px; }
+.old-r { padding: 4px 16px 0; font-size: 12px; color: var(--faint); }
+.old-r b { font-weight: 600; }
+.old-c { margin: 0; padding: 9px 16px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 13px; color: var(--muted); white-space: pre-wrap; }
+.old-i { padding: 9px 16px 0; font-family: var(--font-mono); font-size: 13px; font-style: italic; color: var(--faint); }
+.old-f { display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding: 8px 10px 9px 16px; }
+.old-f .left { margin-right: auto; font-size: 13px; color: var(--muted); }
+.old .b { height: 28px; padding: 0 9px; border-radius: 6px; font-size: 13px; border: 0; background: transparent; color: var(--muted); }
+.old .b.soft { background: var(--surface-subtle); color: var(--text); border: 1px solid var(--line); }
+.old .b.pri { background: var(--action); color: var(--on-action); font-weight: 500; }
+.old .b.dan { background: var(--danger); color: var(--on-danger-solid); font-weight: 500; }
+.old .badge { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--warning-soft); color: var(--on-warning); }
+.issue { margin: 6px 0 0 2px; font-size: 12px; color: var(--danger); display: flex; gap: 6px; }
+.issue::before { content: "↳"; }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>审批卡重设计</h1>
+  <span class="sub">设计稿 · 仅供讨论，未改代码</span>
+  <span class="spacer"></span>
+  <div class="seg" role="group" aria-label="方向" id="dirSeg">
+    <button data-dir="A">A · 决策卡</button>
+    <button data-dir="B">B · 按风险分密度</button>
+    <button data-dir="C">C · 底部审批托盘</button>
+    <button data-dir="O">现状</button>
+  </div>
+  <div class="seg" role="group" aria-label="主题" id="themeSeg">
+    <button data-theme-set="light">浅色</button>
+    <button data-theme-set="dark">深色</button>
+  </div>
+</header>
+
+<main class="page">
+  <aside class="notes" id="notes"></aside>
+  <section class="stage" id="stage"></section>
+</main>
+
+<script>
+/* ---------- icons (lucide, 24 viewBox) ---------- */
+const I = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  file: I('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>'),
+  search: I('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'),
+  pencil: I('<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>'),
+  filePlus: I('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/>'),
+  trash: I('<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>'),
+  terminal: I('<path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2"/>'),
+  globe: I('<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>'),
+  shield: I('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'),
+  alert: I('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
+  down: I('<path d="m6 9 6 6 6-6"/>'),
+  left: I('<path d="m15 18-6-6 6-6"/>'),
+  right: I('<path d="m9 18 6-6-6-6"/>'),
+  globeSm: I('<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/>'),
+};
+
+/* ---------- sample requests ---------- */
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const SAMPLES = [
+  {
+    id: "read", kind: "读取 · 工作区外文件", risk: "low", icon: "file",
+    context: "Call 1：先读取 scope 目录下的 beta.txt，确认格式。",
+    verb: "读取", target: { dir: "/private/tmp/…/scope/", base: "beta.txt", full: "/private/tmp/actspace-acceptance-20260925/scope/beta.txt" },
+    chips: [["工作区外", "warn"]],
+    session: { label: "本会话允许", short: "本会话", scope: "本会话内再次读取 beta.txt 不再询问" },
+    primary: "允许读取", primaryShort: "允许",
+    log: { act: "Read", tgt: "/private/tmp/…/scope/beta.txt" }, denyText: "已拒绝读取 /private/tmp/…/scope/beta.txt",
+  },
+  {
+    id: "grep", kind: "搜索 · 工作区外目录（Grep / Glob）", risk: "low", icon: "search",
+    context: "另一个仓库里可能也有相同的 TODO，我搜一下。",
+    verb: "搜索", target: { kw: "TODO|FIXME", sepText: "于", dir: "~/code/other-repo/", base: "src", full: "/Users/wakeup-jin/code/other-repo/src" },
+    chips: [["工作区外", "warn"]],
+    session: { label: "本会话允许此目录", short: "本会话", scope: "本会话内读取 ~/code/other-repo/src 下的任何文件不再询问" },
+    primary: "允许搜索", primaryShort: "允许",
+    log: { act: "Grep", tgt: "TODO|FIXME in ~/code/other-repo/src" }, denyText: "已拒绝搜索 ~/code/other-repo/src",
+  },
+  {
+    id: "edit", kind: "编辑", risk: "mid", icon: "pencil",
+    context: "把 Chat 表单的占位文案改掉，并把权限入口的显示条件收紧。",
+    verb: "编辑", target: { dir: "apps/desktop/src/renderer/components/", base: "Composer.tsx", full: "apps/desktop/src/renderer/components/Composer.tsx" },
+    chips: [["stat", "+4 −1"]],
+    session: { label: "本会话允许此文件", short: "本会话", scope: "本会话内再次修改 Composer.tsx 不再询问" },
+    primary: "应用修改", primaryShort: "应用",
+    log: { act: "Edit", tgt: "apps/…/components/Composer.tsx", meta: "+4 −1" }, denyText: "已拒绝编辑 apps/…/components/Composer.tsx",
+  },
+  {
+    id: "write", kind: "写入 · 新建文件", risk: "mid", icon: "filePlus",
+    context: "记录这次改动的 history。",
+    verb: "新建", target: { dir: "docs/histories/2026-09/", base: "20260925-1900-approval-redesign.md", full: "docs/histories/2026-09/20260925-1900-approval-redesign.md" },
+    chips: [["stat", "+18"]],
+    session: { label: "本会话允许此文件", short: "本会话", scope: "本会话内再次写入该文件不再询问" },
+    primary: "允许写入", primaryShort: "写入",
+    log: { act: "Write", tgt: "docs/histories/2026-09/20260925-1900-approval-redesign.md" }, denyText: "已拒绝写入 docs/…/20260925-1900-approval-redesign.md",
+  },
+  {
+    id: "delete", kind: "删除文件", risk: "high", icon: "trash",
+    context: "旧的依赖缓存会干扰重新构建，我把它删掉。",
+    verb: "删除", target: { dir: "apps/desktop/.vite-cache/", base: "deps.json", full: "apps/desktop/.vite-cache/deps.json" },
+    primary: "删除", primaryShort: "删除", primaryTone: "danger",
+    log: { act: "Delete", tgt: "apps/desktop/.vite-cache/deps.json" }, denyText: "已拒绝删除 apps/desktop/.vite-cache/deps.json",
+  },
+  {
+    id: "bash", kind: "Bash · 真实环境", risk: "mid", icon: "terminal",
+    context: "跑一下权限模式的单测，确认底栏按钮的改动没有破坏行为。",
+    verb: "运行", intent: "权限模式的单元测试",
+    chips: [["真实环境", "warn"]],
+    reserved: { label: "本会话允许", code: "pnpm --filter …", scope: "命令前缀授权（TODO.md 中的规划项）" },
+    primary: "运行", primaryShort: "运行",
+    preview: { type: "cmd", text: "pnpm --filter @actspace/desktop exec vitest run src/renderer/test/permission-mode-control.test.tsx" },
+    meta: "~/…/actspace-agent",
+    log: { act: "Ran", tgt: "pnpm --filter @actspace/desktop exec vitest run src/renderer/test/permission-mode-control.test.tsx" }, denyText: "已拒绝运行 pnpm --filter @actspace/desktop exec vitest run …",
+  },
+  {
+    id: "bash-high", kind: "Bash · 高风险命令", risk: "high", icon: "terminal",
+    context: "本地分支已经整理好，推送到远端。",
+    verb: "运行", intent: "强制推送到远端 main 分支",
+    chips: [["真实环境", "warn"], ["高风险", "danger"]],
+    primary: "仍然运行", primaryShort: "运行", primaryTone: "danger",
+    preview: { type: "cmd", text: "git push --force origin main" },
+    meta: "~/…/actspace-agent",
+    log: { act: "Ran", tgt: "git push --force origin main" }, denyText: "已拒绝运行 git push --force origin main",
+  },
+  {
+    id: "browser", kind: "浏览器 · 会话级授权", risk: "mid", icon: "globe",
+    context: "我需要打开页面核对一下线上文案。",
+    verb: "使用浏览器", intent: "Chrome",
+    chips: [["整个会话", "info"]],
+    preview: { type: "text", text: "Agent 将可以查看并操作你的 Chrome 标签页：打开网页、点击、输入、截图、读取页面内容。" },
+    primary: "本会话允许", primaryShort: "允许",
+    log: { act: "正在连接浏览器…", tgt: "" }, denyText: "已拒绝本轮浏览器授权",
+  },
+];
+
+/* ---------- state ---------- */
+const state = {}; // id -> { status: pending|submitting|once|session|deny, submitting: act }
+const resetAll = () => SAMPLES.forEach((s) => (state[s.id] = { status: "pending" }));
+resetAll();
+
+function store(k, v) { try { localStorage.setItem("approval-mock:" + k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem("approval-mock:" + k); } catch (e) { return null; } }
+
+/* ---------- render helpers ---------- */
+function targetHtml(s) {
+  if (s.intent) return `<span class="intent">${esc(s.intent)}</span>`;
+  const t = s.target;
+  const kw = t.kw ? `<span class="kw">${esc(t.kw)}</span><span class="sep">${esc(t.sepText)}</span>` : "";
+  return `<span class="path" title="${esc(t.full)}">${kw}<span class="dir">${esc(t.dir)}</span><span class="base">${esc(t.base)}</span></span>`;
+}
+function chipsHtml(s) {
+  return (s.chips || []).map(([text, tone]) => {
+    if (text === "stat") {
+      const [a, d] = tone.split(" ");
+      return `<button class="chip stat link" type="button" title="在右侧面板查看改动"><span class="a">${a}</span>${d ? `<span class="d">${d}</span>` : ""}${ICON.right}</button>`;
+    }
+    const icon = tone === "danger" ? ICON.alert : text === "真实环境" ? "" : "";
+    return `<span class="chip ${tone}">${icon}${esc(text)}</span>`;
+  }).join("");
+}
+function previewHtml(s, maxRows) {
+  const p = s.preview;
+  if (!p) return "";
+  if (p.type === "cmd") return `<div class="pv"><pre class="pv-cmd"><span class="p">$ </span>${esc(p.text)}</pre></div>`;
+  if (p.type === "text") return `<div class="pv"><div class="pv-text">${esc(p.text)}</div></div>`;
+  const rows = (maxRows ? p.rows.slice(0, maxRows) : p.rows).map(([k, o, n, tx]) =>
+    `<div class="row ${k}"><span class="ln">${o}</span><span class="ln">${n}</span><span class="sg">${k === "add" ? "+" : k === "del" ? "−" : " "}</span><span class="tx">${esc(tx)}</span></div>`).join("");
+  return `<div class="pv pv-diff${p.isNew ? " is-new" : ""}">${p.hunk ? `<div class="hunk">${esc(p.hunk)}</div>` : ""}${rows}<button class="pv-more" type="button">${ICON.down}${esc(p.more)}</button></div>`;
+}
+function btn(s, act, cls, label, extra = "") {
+  const st = state[s.id];
+  const busy = st.status === "submitting";
+  const isThis = busy && st.act === act;
+  const text = isThis ? `<span class="spin"></span>${act === "deny" ? "正在拒绝…" : "正在提交…"}` : label;
+  return `<button class="btn ${cls}" type="button" data-id="${s.id}" data-act="${act}" ${busy ? "disabled" : ""} ${extra}>${text}</button>`;
+}
+function logHtml(s) {
+  const st = state[s.id];
+  const replay = `<button class="replay" data-replay="${s.id}" type="button">重置</button>`;
+  if (st.status === "deny") return `<div class="log err"><span class="t">${esc(s.denyText)}</span>${replay}</div>`;
+  const tag = st.status === "session" ? `<span class="gtag">本会话已授权</span>` : "";
+  const meta = s.log.meta ? ` <span class="tg">${esc(s.log.meta)}</span>` : "";
+  return `<div class="log"><span class="t">${esc(s.log.act)} <span class="tg">${esc(s.log.tgt)}</span>${meta}</span>${tag}${replay}</div>`;
+}
+
+/* ---------- Direction A ---------- */
+function cardA(s, { focus = false } = {}) {
+  const st = state[s.id];
+  if (st.status !== "pending" && st.status !== "submitting") return logHtml(s);
+  const primaryCls = s.primaryTone === "danger" ? "danger" : "primary";
+  const keys = focus
+    ? `<span class="keys"><span><b>⏎</b> ${esc(s.primaryShort)}</span>${s.session ? `<span><b>⌘⏎</b> 本会话</span>` : ""}<span><b>Esc</b> 拒绝</span></span>`
+    : "";
+  const meta = s.meta ? `<span>cwd <code>${esc(s.meta)}</code></span>` : "";
+  const session = s.session
+    ? btn(s, "session", "quiet", esc(s.session.label), `title="${esc(s.session.scope)}"`)
+    : s.reserved
+      ? `<button class="btn quiet reserved" type="button" disabled title="${esc(s.reserved.scope)}">${esc(s.reserved.label)} <span class="code">${esc(s.reserved.code)}</span><span class="tag">规划中</span></button>`
+      : "";
+  return `<article class="ap risk-${s.risk}">
+    <div class="ap-head"><span class="ico">${ICON[s.icon]}</span><span class="ap-verb">${esc(s.verb)}</span>${targetHtml(s)}<span class="ap-chips">${chipsHtml(s)}</span></div>
+    ${s.reason ? `<div class="ap-reason">${esc(s.reason)}</div>` : ""}
+    ${s.preview ? `<div class="ap-pv">${previewHtml(s)}</div>` : ""}
+    <div class="ap-foot"><span class="ap-meta">${keys}${meta}</span>
+      ${btn(s, "deny", "ghost", "拒绝")}
+      ${session}
+      ${btn(s, "once", primaryCls, esc(s.primary))}
+    </div>
+  </article>`;
+}
+
+/* ---------- Direction B ---------- */
+function stripB(s) {
+  const st = state[s.id];
+  if (st.status !== "pending" && st.status !== "submitting") return logHtml(s);
+  return `<article class="st">
+    <span class="ico">${ICON[s.icon]}</span><span class="ap-verb">${esc(s.verb)}</span>${targetHtml(s)}<span class="ap-chips">${chipsHtml(s)}</span>
+    <span class="acts">${btn(s, "deny", "ghost", "拒绝")}${s.session ? btn(s, "session", "quiet", esc(s.session.short), `title="${esc(s.session.scope)}"`) : ""}${btn(s, "once", "primary", esc(s.primaryShort))}</span>
+  </article>`;
+}
+function actsB(s) {
+  const primaryCls = s.primaryTone === "danger" ? "danger" : "primary";
+  const session = s.session ? btn(s, "session", "quiet", esc(s.session.short), `title="${esc(s.session.scope)}"`) : "";
+  return `<span class="acts">${btn(s, "deny", "ghost", "拒绝")}${session}${btn(s, "once", primaryCls, esc(s.primaryShort))}</span>`;
+}
+function rowB(s) {
+  const st = state[s.id];
+  if (st.status !== "pending" && st.status !== "submitting") return logHtml(s);
+  const p = s.preview;
+  const body = !p ? ""
+    : p.type === "cmd" ? `<div class="st-body"><pre class="pv-cmd st-cmd">${s.meta ? `<span class="p">${esc(s.meta)} </span>` : ""}<span class="p">$ </span>${esc(p.text)}</pre></div>`
+    : `<div class="st-note">${esc(p.text)}</div>`;
+  return `<article class="st risk-${s.risk}${p ? " has-body" : ""}">
+    <div class="st-head"><span class="ico">${ICON[s.icon]}</span><span class="ap-verb">${esc(s.verb)}</span>${targetHtml(s)}<span class="ap-chips">${chipsHtml(s)}</span>${actsB(s)}</div>
+    ${body}
+  </article>`;
+}
+// 单行条按钮放右侧；有内容要读的（Bash、浏览器）先看内容再决定，按钮回到底部右侧。
+function cardB(s) { return s.preview ? cardA(s) : rowB(s); }
+
+/* ---------- Direction C ---------- */
+let trayIndex = 0;
+let traySel = 0;
+function pendingIds() { return SAMPLES.filter((s) => state[s.id].status === "pending" || state[s.id].status === "submitting").map((s) => s.id); }
+function trayOptions(s) {
+  const o = [{ act: "once", label: s.primary, dsc: s.session ? "仅这一次" : s.id === "browser" ? "本会话内不再询问" : "仅这一次", tone: s.primaryTone }];
+  if (s.session) o.push({ act: "session", label: s.session.label, dsc: s.session.scope });
+  o.push({ act: "deny", label: "拒绝", dsc: "Agent 会收到拒绝结果并换一种做法" });
+  o.push({ act: "deny-note", label: "拒绝并说明", input: true });
+  return o;
+}
+function renderC() {
+  const ids = pendingIds();
+  if (trayIndex >= ids.length) trayIndex = Math.max(0, ids.length - 1);
+  const cur = ids.length ? SAMPLES.find((s) => s.id === ids[trayIndex]) : null;
+  const lines = SAMPLES.map((s) => {
+    const st = state[s.id];
+    const turn = `<p class="assistant">${esc(s.context)}</p>`;
+    if (st.status === "pending" || st.status === "submitting") {
+      const t = s.intent ? `${esc(s.verb)} <span class="tg">${esc(s.intent)}</span>` : `${esc(s.verb)} <span class="tg">${esc(s.target.dir + s.target.base)}</span>`;
+      return `${turn}<div class="pend ${cur && cur.id === s.id ? "current" : ""}"><span class="d"></span><span class="lbl">等待确认</span><span class="t">${t}</span></div>`;
+    }
+    return turn + logHtml(s);
+  }).join('<div style="height:14px"></div>');
+
+  let tray;
+  if (!cur) {
+    tray = `<div class="tray"><div class="tray-empty">没有待确认的操作，Agent 继续运行中。<button class="btn quiet" data-reset-all type="button">重新演示</button></div></div>`;
+  } else {
+    const opts = trayOptions(cur);
+    if (traySel >= opts.length) traySel = 0;
+    const optHtml = opts.map((o, i) => `<li class="opt" role="option" aria-selected="${i === traySel}" data-opt="${i}">
+        <span class="k">${i + 1}</span>
+        <span class="l ${o.tone === "danger" ? "danger" : ""}">${esc(o.label)}</span>
+        ${o.input ? `<input type="text" placeholder="告诉 Agent 应该怎么做，回车发送" data-note />` : `<span class="dsc">${esc(o.dsc)}</span>`}
+        <span class="enter">⏎</span>
+      </li>`).join("");
+    tray = `<div class="tray" role="dialog" aria-label="待确认操作">
+      <div class="tray-head"><span class="ico">${ICON[cur.icon]}</span><span class="ap-verb">${esc(cur.verb)}</span>${targetHtml(cur)}<span class="ap-chips">${chipsHtml(cur)}</span>
+        <span class="pager"><button type="button" data-page="-1" aria-label="上一个">${ICON.left}</button><span class="num">${trayIndex + 1} / ${ids.length}</span><button type="button" data-page="1" aria-label="下一个">${ICON.right}</button></span>
+      </div>
+      ${cur.reason ? `<div class="tray-reason">${esc(cur.reason)}</div>` : ""}
+      ${cur.preview ? `<div class="tray-pv">${previewHtml(cur)}</div>` : ""}
+      <ul class="opts" role="listbox">${optHtml}</ul>
+    </div>`;
+  }
+  return `<div class="window">
+    <div class="win-scroll">${lines}</div>
+    <div class="win-bottom">${tray}
+      <div class="composer">${cur ? "先处理上面的确认，或直接输入新指令（会拒绝当前请求）" : "继续给 Agent 指令…"}<span class="hint">↑↓ 选择 · 1–4 直选 · ⏎ 确认</span></div>
+    </div>
+  </div>`;
+}
+
+/* ---------- As-is ---------- */
+function renderOld() {
+  const issue = (t) => `<div class="issue">${t}</div>`;
+  return `
+  <div class="section-label"><b>读取范围需要授权</b><span class="n">ToolLogLine · FileReadApprovalLine</span></div>
+  <div class="slot"><div class="old"><div class="old-h">读取范围需要授权</div><div class="old-t">/private/tmp/actspace-acceptance-20260925/scope/beta.txt</div><div class="old-r">The requested file is outside the workspace.</div><div class="old-f"><button class="b">拒绝</button><button class="b soft">本会话</button><button class="b pri">仅本次</button></div></div>
+  ${issue("灰色标题栏像表单，标题只说“要授权”，没说要做什么；原因是英文；本会话的范围不明确")}</div>
+
+  <div class="section-label"><b>Bash</b><span class="n">BashRunBlock · BashApprovalBlock</span></div>
+  <div class="slot"><div class="old"><div class="old-h plain"><span class="ico">${ICON.terminal}</span>Bash command <span class="badge">真实环境</span></div><div class="old-i"># 运行权限模式的单元测试</div><pre class="old-c">$ pnpm --filter @actspace/desktop exec vitest run src/renderer/test/permission-mode-control.test.tsx</pre><div class="old-r" style="font-size:13px;padding-top:8px"><b>Reason:</b> Command is not in the allowlist.</div><div class="old-f"><span class="left">Allowlist ›</span><button class="b">拒绝</button><button class="b pri">运行一次</button></div></div>
+  ${issue("标题是 Bash command，意图被塞成斜体注释；Allowlist 折叠按钮只展开 cwd，看起来像个设置")}</div>
+
+  <div class="section-label"><b>编辑 / 写入</b><span class="n">FileDiffBlock · FileDiffApprovalCard</span></div>
+  <div class="slot"><div class="old"><div class="old-h plain">Edit file requires approval</div><div class="old-t band">apps/desktop/src/renderer/components/Composer.tsx</div><div class="old-f"><button class="b">拒绝</button><button class="b">本会话</button><button class="b pri">仅本次</button></div></div>
+  ${issue("数据里明明有 diff，审批时却只给路径，看不到要改什么就要做决定")}</div>
+
+  <div class="section-label"><b>删除</b><span class="n">DeleteFileBlock</span></div>
+  <div class="slot"><div class="old"><div class="old-h plain">Delete file requires approval</div><div class="old-t band">apps/desktop/.vite-cache/deps.json</div><div class="old-f"><button class="b">拒绝</button><button class="b dan">Delete</button></div></div>
+  ${issue("中英混排：标题英文、按钮一半中文一半英文")}</div>
+
+  <div class="section-label"><b>浏览器</b><span class="n">BrowserApprovalBlock</span></div>
+  <div class="slot"><div class="old"><div class="old-h plain main" style="border-bottom:1px solid var(--line)"><span class="ico" style="color:var(--info)">${ICON.globe}</span>允许 ActSpace 在当前会话中使用浏览器？</div><div class="pv-text">Agent 将能够查看和操作你的 Chrome 标签页，包括打开网页、点击、输入、截图和读取页面内容。<div style="font-size:12px;color:var(--faint);margin-top:6px">允许后，本次应用运行期间该会话不再重复询问；拒绝只对当前这轮输入有效。</div></div><div class="old-f" style="border-top:1px solid var(--line)"><button class="b">拒绝</button><button class="b pri">允许</button></div></div>
+  ${issue("五张卡五种结构：标题栏、目标区、按钮文案、内边距各不相同")}</div>`;
+}
+
+/* ---------- notes per direction ---------- */
+const NOTES = {
+  A: {
+    title: "A · 决策卡",
+    thesis: "所有工具用同一套结构：动作 + 目标 + 风险标签，Bash 和浏览器多一块内容，最后一行做决定。去掉灰色标题栏，卡片只靠一圈带琥珀色调的描边表示在等你。",
+    points: [
+      "<b>标题就是那一行动作</b>：「读取 beta.txt」代替「读取范围需要授权」",
+      "<b>目录变淡，文件名加重</b>，一眼扫到重点；工作区内用相对路径",
+      "<b>原因只用标签</b>（工作区外 / 真实环境 / 高风险），不再写解释句",
+      "<b>编辑、写入只给 +/− 统计</b>，点统计在右侧面板看完整 diff",
+      "<b>按钮三层固定</b>：拒绝（幽灵）· 本会话允许（描边）· 工具动词（实心）",
+      "删除和高风险命令的主按钮用红色",
+    ],
+    verdict: "胜在统一、好实现（改的是现有 5 个组件的外壳）。缺点是每张卡至少两行，读取也一样。",
+  },
+  B: {
+    title: "B · 按风险分密度",
+    thesis: "一行为主：动作、目标、标签、按钮都在同一行，和工具日志的节奏一致。只有 Bash（要看命令）和浏览器（要知道授权了什么）展开成卡片，读完内容再在底部做决定。",
+    points: [
+      "<b>一行审批条</b>：40px 高，动作、目标、标签、三个按钮都在同一行",
+      "<b>按钮位置跟着阅读顺序</b>：一行时按钮在最右；Bash、浏览器要先读命令或说明，按钮放在底部右侧",
+      "<b>编辑、写入</b>：只显示 +/− 统计，点统计在右侧面板看 diff",
+      "<b>风险靠颜色</b>：删除和高风险命令的描边、主按钮是红色，不写解释句",
+      "并行请求时一行一条叠起来，不会刷满一屏",
+      "处理完的卡片收成一行普通的工具日志，和 Read / Edit 行看起来一样",
+    ],
+    verdict: "推荐。信息密度最好，在对话流里也最安静；除 Bash 和浏览器外都只占一行。",
+  },
+  C: {
+    title: "C · 底部审批托盘",
+    thesis: "对话流里只留一行「等待确认」，真正的决策面板固定在输入框上方，用键盘 1–4 选，多个请求排队翻页。类似 Claude Code / Cursor 的做法。",
+    points: [
+      "<b>不会被滚走</b>：长回复里的审批永远在视线里",
+      "<b>键盘优先</b>：↑↓ 选、数字直选、回车确认（这个页面里可以直接试）",
+      "<b>拒绝并说明</b>：拒绝时顺手告诉 Agent 该怎么做（需要后端支持）",
+      "多个请求用 1/5 翻页，不再往对话流里堆卡片",
+    ],
+    verdict: "体验上限最高，但改动最大：要新做托盘、队列、焦点管理，还要处理托盘和输入框抢焦点。适合放到第二步。",
+  },
+  O: {
+    title: "现状",
+    thesis: "按当前代码还原的 5 种审批卡，方便对照。",
+    points: [
+      "<b>像表单不像对话</b>：灰色标题栏 + 分隔线，和上下的工具日志行格格不入",
+      "<b>标题没信息量</b>：“需要授权”是废话，动作和对象才是重点",
+      "<b>关键信息反而最淡</b>：路径是 muted 小号等宽字，原因是 faint",
+      "<b>决策所需的内容缺失</b>：编辑 / 写入审批不给 diff",
+      "<b>语言和结构不统一</b>：中英混排，5 张卡 5 种布局",
+      "<b>“本会话”语义不清</b>：看不出授权的是这个文件还是整个目录",
+    ],
+    verdict: "",
+  },
+};
+
+/* ---------- main render ---------- */
+const hash = new URLSearchParams(location.hash.slice(1));
+let dir = hash.get("dir") || load("dir") || "B";
+function render() {
+  document.querySelectorAll("#dirSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.dir === dir)));
+  const n = NOTES[dir];
+  document.getElementById("notes").innerHTML = `<h2>${n.title}</h2><p class="thesis">${n.thesis}</p><h3>要点</h3><ul>${n.points.map((p) => `<li>${p}</li>`).join("")}</ul>${n.verdict ? `<div class="verdict">${n.verdict}</div>` : ""}
+    ${dir !== "O" && dir !== "C" ? `<h3>试一下</h3><ul><li>点任意按钮看提交中和提交后的状态</li><li>悬停「本会话允许」看授权范围</li><li>悬停已处理的日志行，点「重置」恢复</li></ul>` : ""}
+    ${dir === "C" ? `<h3>试一下</h3><ul><li>按 ↑↓、1–4、回车处理托盘</li><li>用 ‹ › 在排队的请求间切换</li></ul>` : ""}`;
+
+  const stage = document.getElementById("stage");
+  if (dir === "O") { stage.innerHTML = `<div class="convo">${renderOld()}</div>`; return; }
+  if (dir === "C") { stage.innerHTML = renderC(); return; }
+
+  const make = dir === "A" ? (s, i) => cardA(s, { focus: i === 0 }) : (s) => cardB(s);
+  let html = SAMPLES.map((s, i) => `
+    <div class="section-label"><span class="n">${String(i + 1).padStart(2, "0")}</span><b>${esc(s.kind)}</b></div>
+    <p class="assistant">${esc(s.context)}</p>
+    <div class="slot">${make(s, i)}</div>`).join("");
+
+  if (dir === "B") {
+    html += `<div class="divider"></div>
+    <div class="section-label"><span class="n">09</span><b>并行请求 · 一次读 3 个文件</b></div>
+    <p class="assistant">三个文件依次读取。</p>
+    <div class="slot"><div class="stack">
+      <div class="stack-head">3 项待确认</div>
+      ${["alpha.txt", "gamma.txt", "delta.txt"].map((f) => `<article class="st"><div class="st-head"><span class="ico">${ICON.file}</span><span class="ap-verb">读取</span><span class="path"><span class="dir">/private/tmp/…/scope/</span><span class="base">${f}</span></span><span class="ap-chips"><span class="chip warn">工作区外</span></span><span class="acts"><button class="btn ghost" type="button">拒绝</button><button class="btn quiet" type="button">本会话</button><button class="btn primary" type="button">允许</button></span></div></article>`).join("")}
+    </div></div>`;
+  }
+  html += `<div class="divider"></div>
+    <div class="section-label"><span class="n">${dir === "B" ? "10" : "09"}</span><b>处理后：收成一行工具日志</b></div>
+    <div class="slot" style="display:grid;gap:4px">
+      <div class="log"><span class="t">Read <span class="tg">/private/tmp/…/scope/beta.txt</span></span></div>
+      <div class="log"><span class="t">Edit <span class="tg">apps/…/components/Composer.tsx +4 −1</span></span><span class="gtag">本会话已授权</span></div>
+      <div class="log err"><span class="t">已拒绝删除 apps/desktop/.vite-cache/deps.json</span></div>
+      <div class="log faint"><span class="t">审批已过期 · Ran <span class="tg">git push --force origin main</span></span></div>
+    </div>`;
+  stage.innerHTML = `<div class="convo">${html}</div>`;
+}
+
+/* ---------- interactions ---------- */
+function decide(id, act) {
+  if (state[id].status !== "pending") return;
+  state[id] = { status: "submitting", act };
+  render();
+  setTimeout(() => { state[id] = { status: act === "deny-note" ? "deny" : act }; render(); }, 650);
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button, .opt");
+  if (!t) return;
+  if (t.dataset.dir) { dir = t.dataset.dir; store("dir", dir); render(); return; }
+  if (t.dataset.themeSet) { setTheme(t.dataset.themeSet); return; }
+  if (t.dataset.replay) { state[t.dataset.replay] = { status: "pending" }; render(); return; }
+  if (t.hasAttribute("data-reset-all")) { resetAll(); trayIndex = 0; traySel = 0; render(); return; }
+  if (t.dataset.page) { const n = pendingIds().length; trayIndex = (trayIndex + Number(t.dataset.page) + n) % n; traySel = 0; render(); return; }
+  if (t.dataset.opt !== undefined) { if (e.target.matches("input")) return; traySel = Number(t.dataset.opt); commitTray(); return; }
+  if (t.dataset.id && t.dataset.act) decide(t.dataset.id, t.dataset.act);
+});
+function commitTray() {
+  const ids = pendingIds(); if (!ids.length) return;
+  const s = SAMPLES.find((x) => x.id === ids[trayIndex]);
+  const o = trayOptions(s)[traySel];
+  if (o.input) { render(); const inp = document.querySelector("[data-note]"); inp && inp.focus(); return; }
+  traySel = 0;
+  decide(s.id, o.act);
+}
+document.addEventListener("keydown", (e) => {
+  if (dir !== "C") return;
+  const ids = pendingIds(); if (!ids.length) return;
+  const s = SAMPLES.find((x) => x.id === ids[trayIndex]);
+  const opts = trayOptions(s);
+  if (e.target.matches("input")) {
+    if (e.key === "Enter") { traySel = 0; decide(s.id, "deny-note"); }
+    if (e.key === "Escape") { e.target.blur(); }
+    return;
+  }
+  if (e.key === "ArrowDown") { traySel = (traySel + 1) % opts.length; render(); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { traySel = (traySel - 1 + opts.length) % opts.length; render(); e.preventDefault(); }
+  else if (/^[1-4]$/.test(e.key) && Number(e.key) <= opts.length) { traySel = Number(e.key) - 1; commitTray(); }
+  else if (e.key === "Enter") { commitTray(); e.preventDefault(); }
+});
+
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  store("theme", t);
+  document.querySelectorAll("#themeSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themeSet === t)));
+}
+setTheme(hash.get("theme") || load("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+render();
+</script>
+</body>
+</html>

@@ -98,7 +98,7 @@ export function DeleteFileBlock({ message, className }: { message: DeleteMessage
           disabled={disabled}
           onClick={() => decide("deny")}
         >
-          {submitting === "deny" ? "Skipping..." : "Skip"}
+          {submitting === "deny" ? "正在拒绝…" : "拒绝"}
         </button>
         <button
           className={`${DELETE_ACTION_CLASS} ${DELETE_ACTION_DANGER_CLASS}`}

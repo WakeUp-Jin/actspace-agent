@@ -27,8 +27,6 @@ const BASH_APPROVAL_HEADER_CLASS =
   "bash-approval-header flex min-h-8 items-center justify-between border-b border-line py-0 pr-[9px] pl-[var(--conversation-card-padding)]";
 const BASH_APPROVAL_TITLE_CLASS =
   "bash-approval-title inline-flex min-w-0 items-center gap-[7px] text-sm font-medium text-text-muted";
-const BASH_APPROVAL_MENU_CLASS =
-  "bash-approval-menu grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-hover-overlay hover:text-text-main focus-visible:bg-selected focus-visible:text-text-main";
 const BASH_INTENT_COMMENT_CLASS =
   "bash-intent-comment font-mono text-[length:var(--act-font-mono-size,13px)] italic leading-[1.55] text-text-faint";
 const BASH_INTENT_BLOCK_CLASS =
@@ -218,14 +216,6 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
           {message.title}
           <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} />
         </span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button className={BASH_APPROVAL_MENU_CLASS} type="button" aria-label="Open approval actions">
-              <MoreHorizontal size={15} strokeWidth={2.1} aria-hidden="true" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>更多审批操作</TooltipContent>
-        </Tooltip>
       </header>
 
       {message.intent ? (
@@ -268,7 +258,7 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
             disabled={disabled}
             onClick={() => decide("deny")}
           >
-            {submitting === "deny" ? "Skipping..." : "Skip"}
+            {submitting === "deny" ? "正在拒绝…" : "拒绝"}
           </button>
           <button
             className={`${BASH_ACTION_CLASS} ${BASH_ACTION_PRIMARY_CLASS}`}
@@ -276,7 +266,7 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
             disabled={disabled}
             onClick={() => decide("once")}
           >
-            {submitting === "once" ? "Running..." : "Run"}
+            {submitting === "once" ? "正在运行…" : "运行一次"}
           </button>
         </div>
       </footer>

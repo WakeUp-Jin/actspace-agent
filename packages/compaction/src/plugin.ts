@@ -41,6 +41,7 @@ export class CompactionService extends Service {
     ctx.effect(() => () => undefined, "compaction.runtime");
   }
 
+  withTriggerRatio(triggerRatio: number | (() => number)): CompactionPlugin { return this.runtime.withTriggerRatio(triggerRatio); }
   maybeCompact(session: SessionHandle, usage: TokenUsage): Promise<boolean> { return this.runtime.maybeCompact(session, usage); }
   compact(session: SessionHandle): Promise<boolean> { return this.runtime.compact(session); }
 }

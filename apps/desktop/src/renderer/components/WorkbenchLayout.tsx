@@ -1,8 +1,8 @@
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
 import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
-import type { PermissionMode, SessionGrant } from "@actspace/shared/runtime-v2";
+import type { PermissionMode } from "@actspace/shared/runtime-v2";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlaskConical } from "lucide-react";
+import { Check, ChevronDown, FlaskConical, ShieldCheck } from "lucide-react";
 import { ConversationView } from "./ConversationView";
 import { PlaceholderView } from "./PlaceholderView";
 import { RightPanel } from "./RightPanel";
@@ -518,6 +518,15 @@ export function WorkbenchLayout({
     });
   }, [view, settingsSection, loadUsageStatistics]);
 
+  const permissionControl = activeSessionId && agentForm !== "chat" ? (
+    <PermissionModeControl
+      sessionId={activeSessionId}
+      mode={permissionMode}
+      disabled={false}
+      onChanged={async () => { await sessionProjection?.bridge?.open(activeSessionId); }}
+    />
+  ) : null;
+
   let mainContent;
   if (view === "extensions") {
     mainContent = (
@@ -577,6 +586,7 @@ export function WorkbenchLayout({
         agentForm={agentForm}
         activeView={sessionMainView}
         trajectory={projectedTrajectory}
+        permissionControl={permissionControl}
       />
     );
   }
@@ -695,7 +705,6 @@ export function WorkbenchLayout({
         sessionView={view === "chat" ? sessionMainView : undefined}
         onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
         centerTrailing={view === "chat" ? <>
-          {activeSessionId ? <PermissionModeControl sessionId={activeSessionId} mode={permissionMode} grants={projectionCell?.snapshot?.sessionGrants ?? []} disabled={false} onChanged={async () => { await sessionProjection?.bridge?.open(activeSessionId); }} /> : null}
           {selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
         </> : undefined}
         rightLeading={
@@ -768,54 +777,74 @@ export function WorkbenchLayout({
   );
 }
 
-export function PermissionModeControl({ sessionId, mode, grants = [], disabled, onChanged }: { sessionId: string; mode: PermissionMode; grants?: readonly SessionGrant[]; disabled: boolean; onChanged: () => void | Promise<void> }) {
+export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: { sessionId: string; mode: PermissionMode; disabled: boolean; onChanged: () => void | Promise<void> }) {
   const [submitting, setSubmitting] = useState(false);
-  const [revoking, setRevoking] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    root.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+    const outside = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [open]);
+  useEffect(() => { setOpen(false); }, [sessionId]);
   const update = async (next: PermissionMode) => {
-    if (next === mode || !window.actspace?.setSessionPermissionMode) return;
+    if (disabled || submitting) return;
+    if (next === mode) { setOpen(false); trigger.current?.focus(); return; }
+    if (!window.actspace?.setSessionPermissionMode) return;
     setSubmitting(true);
     try {
       const result = await window.actspace.setSessionPermissionMode({ sessionId, mode: next });
-      if (result.ok) await onChanged();
+      if (result.ok) {
+        setOpen(false);
+        await onChanged();
+      }
     } finally {
       setSubmitting(false);
+      trigger.current?.focus();
     }
   };
-  const revoke = async (grantId: string) => {
-    if (!window.actspace?.revokeSessionGrant) return;
-    setRevoking(grantId);
-    try {
-      const result = await window.actspace.revokeSessionGrant({ sessionId, grantId });
-      if (result.ok) await onChanged();
-    } finally {
-      setRevoking(null);
+  return <div ref={root} className="relative inline-flex" onBlur={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+  }} onKeyDown={(event) => {
+    if (event.key === "Escape") { event.preventDefault(); setOpen(false); trigger.current?.focus(); }
+    if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      event.preventDefault();
+      if (!open) { setOpen(true); return; }
+      const items = Array.from(root.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []);
+      const index = items.indexOf(document.activeElement as HTMLButtonElement);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
+      items[next]?.focus();
     }
-  };
-  return <div className="inline-flex items-center gap-1">
-    <label className="inline-flex h-7 items-center gap-1.5 rounded-act-sm border border-line bg-surface-subtle px-2 text-[11px] text-text-muted" title="完全访问仅扩大文件范围，不会自动批准 Bash、删除或敏感文件">
-      <span>权限</span>
-      <select className="bg-transparent text-[11px] font-medium text-text-main outline-none" aria-label="会话权限模式" value={mode} disabled={disabled || submitting} onChange={(event) => void update(event.target.value as PermissionMode)}>
-        <option value="default">默认</option>
-        <option value="full-access">完全访问</option>
-      </select>
-    </label>
-    <details className="relative">
-      <summary className="flex h-7 cursor-pointer list-none items-center rounded-act-sm border border-line bg-surface-subtle px-2 text-[11px] text-text-muted" aria-label="管理会话授权">授权 {grants.length}</summary>
-      <div className="absolute top-8 right-0 z-50 w-[min(420px,calc(100vw-24px))] border border-line bg-surface p-2 shadow-act-float">
-        <div className="px-1 pb-2 text-xs font-semibold text-text-main">当前会话授权</div>
-        {grants.length === 0 ? <div className="px-1 py-2 text-xs text-text-faint">暂无可复用的文件授权</div> : grants.map((grant) => {
-          const scope = grant.selector.kind === "exact" ? grant.selector.canonicalPath : grant.selector.canonicalRoot;
-          return <div className="flex items-start gap-2 border-t border-line py-2 first:border-t-0" key={grant.grantId}>
-            <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-text-main">{grant.action === "file.read" ? "读取" : "写入"} · {grant.selector.kind === "exact" ? "仅此文件" : "此目录树"}</div>
-              <div className="mt-0.5 break-all font-mono text-[11px] leading-4 text-text-muted" title={scope}>{scope}</div>
-              <div className="mt-1 text-[10px] text-text-faint">{grant.sourceToolName} · {new Date(grant.issuedAt).toLocaleString()}</div>
-            </div>
-            <button className="h-7 shrink-0 rounded-act-sm px-2 text-xs text-text-muted hover:bg-surface-subtle hover:text-text-main" type="button" disabled={revoking === grant.grantId} onClick={() => void revoke(grant.grantId)}>{revoking === grant.grantId ? "撤销中" : "撤销"}</button>
-          </div>;
-        })}
-      </div>
-    </details>
+  }}>
+    <button
+      ref={trigger}
+      type="button"
+      className="inline-flex h-7 items-center gap-1 rounded-act-sm border-0 bg-transparent px-1.5 text-[12px] text-text-muted hover:bg-surface-subtle hover:text-text-main disabled:cursor-not-allowed disabled:opacity-50"
+      aria-label="会话权限模式"
+      aria-haspopup="menu"
+      aria-expanded={open}
+      disabled={disabled || submitting}
+      title={`权限：${mode === "full-access" ? "完全权限" : "自动"}。完全权限仅扩大文件范围，Bash、删除和敏感文件仍按策略审批。`}
+      onClick={() => setOpen((value) => !value)}
+    >
+      <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
+      <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />
+    </button>
+    {open ? <div className="absolute bottom-[calc(100%+6px)] left-0 z-50 w-[144px] rounded-act-md border border-line bg-surface-raised p-1 shadow-act-popover" role="menu" aria-label="会话权限模式选项">
+      {(["default", "full-access"] as const).map((next) => {
+        const nextLabel = next === "full-access" ? "完全权限" : "自动";
+        return <button key={next} disabled={disabled || submitting} type="button" role="menuitemradio" aria-checked={mode === next} className="flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-[12px] text-text-main outline-none hover:bg-surface-subtle focus-visible:bg-selected disabled:opacity-50" onClick={() => void update(next)}>
+          <ShieldCheck size={14} className="shrink-0 text-text-muted" aria-hidden="true" />
+          <span className="min-w-0 flex-1">{nextLabel}</span>
+          {mode === next ? <Check size={14} className="shrink-0 text-text-main" aria-hidden="true" /> : null}
+        </button>;
+      })}
+    </div> : null}
   </div>;
 }
 

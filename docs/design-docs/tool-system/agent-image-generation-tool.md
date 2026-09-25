@@ -1,6 +1,6 @@
 # Agent 图片生成工具设计规范
 
-> 状态：V0 已实现并通过自动化检查；真实服务与 UI 交互由用户后续手工验收。
+> 状态：V0 已实现；2026-09-25 真实 Chat 单图生成、会话产物保存与右侧预览已通过一次验收。批量、取消与跨重启图片恢复仍需独立验证。
 >
 > V0 范围：通过用户配置的 OpenAI-compatible Images API，为主 Agent 提供 `generate_image` 工具；默认 Base URL 为 DuckCoding，默认模型名称为 `gpt-image-2`，两者都可在设置页修改；图片数量 `n` 由模型按用户意图选择，默认 1、最大 10。
 
@@ -486,3 +486,21 @@ V1 可以引入：
 - 2026-07-28：工具执行状态改为 Read 风格单行日志；生成图片不再直接占据消息流，而是在最终回复后的本轮产物栏中展示。
 - 2026-07-28：开发态 renderer 不加载 `file://`；点击图片时通过按 session artifacts 边界校验的 IPC 返回单张 data URL，再在右侧面板打开。
 - 2026-07-28：Artifacts 行新增完整路径 Tooltip 和 main-owned 原生右键菜单；系统操作仍只允许当前 session artifacts 或 workspace 边界内的真实文件。
+
+## 2026-09-25：配置生效与失败阶段
+
+Desktop `generate_image` 在每次调用时读取当前 Settings 的连接凭据快照，不再持有启动时的图片配置。新增、更换和移除配置从下一次调用生效；已开始的请求继续使用其调用开始时的配置。不重建其他工具端口，不影响文件缓存、Bash 生命周期或搜索配置。
+
+失败分类：
+
+- 请求传输失败：`IMAGE_GENERATION_REQUEST_FAILED`；HTTP 认证、限流、服务端错误继续使用既有分类。
+- 图片 URL 下载或安全检查失败：`IMAGE_GENERATION_DOWNLOAD_FAILED`。
+- 图片解码、格式、大小或上游 JSON 无效：`IMAGE_GENERATION_INVALID_RESPONSE`。
+- 会话产物保存失败：`IMAGE_GENERATION_STORAGE_FAILED`。
+- 用户取消：`TOOL_ABORTED`。
+
+诊断仅输出受控文案和已知网络/系统错误码，例如 `UND_ERR_CONNECT_TIMEOUT`、`ECONNRESET`、`ENOSPC`；不输出任意 cause 消息、签名 URL、Authorization、本地路径。下载 fetch/body 使用 120 秒超时信号，继续禁止不安全地址、私网地址和自动重定向；DNS 预检查不在该 fetch 超时内。
+
+下载/保存失败不标记为可重试，以免上层重新执行整次付费生成；本工具本身不新增自动重试。部分成功保留成功产物，返回实际生成数量。
+
+验收边界：一次真实成功不证明供应商长期稳定，也不证明此前 `fetch failed` 网络故障已根除。配置热更新有确定性同实例回归覆盖；本轮未为了 UI 热更新测试反复更换用户真实凭据。
