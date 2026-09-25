@@ -150,6 +150,9 @@ import type {
   ModelsCatalogListInput,
   ModelsCatalogListResult,
   ModelsAddInput,
+  ModelsAddCustomInput,
+  ModelsEditCustomInput,
+  ModelsSetCustomDefaultInput,
   ModelsUpdateInput,
   ModelsRemoveInput,
   ModelMutationResult,
@@ -258,6 +261,7 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "settings:create-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.createCustomConnection,
   "settings:remove-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeCustomConnection,
   "settings:update-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateCustomConnection,
+  "settings:test-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.testCustomConnection,
   "settings:set-provider-key": RUNTIME_V2_FIXED_RENDERER_CHANNELS.setProviderKey,
   "settings:clear-provider-key": RUNTIME_V2_FIXED_RENDERER_CHANNELS.clearProviderKey,
   "settings:update-image-generation": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateImageGeneration,
@@ -280,6 +284,9 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "models:catalog:list": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listModelCatalog,
   "models:catalog:reload": RUNTIME_V2_FIXED_RENDERER_CHANNELS.reloadModelCatalog,
   "models:add": RUNTIME_V2_FIXED_RENDERER_CHANNELS.addModel,
+  "models:add-custom": RUNTIME_V2_FIXED_RENDERER_CHANNELS.addCustomModel,
+  "models:edit-custom": RUNTIME_V2_FIXED_RENDERER_CHANNELS.editCustomModel,
+  "models:set-custom-default": RUNTIME_V2_FIXED_RENDERER_CHANNELS.setCustomConnectionDefaultModel,
   "models:update": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateModel,
   "models:remove": RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeModel,
   "task-models:update": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateTaskModels,
@@ -492,6 +499,8 @@ contextBridge.exposeInMainWorld("actspace", {
     invokeFixedRenderer("settings:remove-custom-connection", input) as Promise<import("@actspace/shared").SettingsV4Snapshot>,
   updateCustomConnection: (input: import("@actspace/shared/runtime-v2").RuntimeV2UpdateCustomConnectionInput) =>
     invokeFixedRenderer("settings:update-custom-connection", input) as Promise<import("@actspace/shared").SettingsV4Snapshot>,
+  testCustomConnection: (input: import("@actspace/shared").CustomConnectionTestInput) =>
+    invokeFixedRenderer("settings:test-custom-connection", input) as Promise<import("@actspace/shared").CustomConnectionTestResult>,
   onSettingsChangedV4: (callback: (notification: import("@actspace/shared").SettingsV4ChangedNotification) => void) => {
     const handler = (_: unknown, notification: import("@actspace/shared").SettingsV4ChangedNotification) => callback(notification);
     ipcRenderer.on(RUNTIME_V2_FIXED_RENDERER_CHANNELS.settingsChangedV4, handler);
@@ -524,6 +533,9 @@ contextBridge.exposeInMainWorld("actspace", {
   listModelCatalog: (input: ModelsCatalogListInput) => invokeFixedRenderer("models:catalog:list", input) as Promise<ModelsCatalogListResult>,
   reloadModelCatalog: (input: ModelsCatalogListInput) => invokeFixedRenderer("models:catalog:reload", input) as Promise<ModelsCatalogListResult>,
   addModel: (input: ModelsAddInput) => invokeFixedRenderer("models:add", input) as Promise<ModelMutationResult>,
+  addCustomModel: (input: ModelsAddCustomInput) => invokeFixedRenderer("models:add-custom", input) as Promise<ModelMutationResult>,
+  editCustomModel: (input: ModelsEditCustomInput) => invokeFixedRenderer("models:edit-custom", input) as Promise<ModelMutationResult>,
+  setCustomConnectionDefaultModel: (input: ModelsSetCustomDefaultInput) => invokeFixedRenderer("models:set-custom-default", input) as Promise<ModelMutationResult>,
   updateModel: (input: ModelsUpdateInput) => invokeFixedRenderer("models:update", input) as Promise<ModelMutationResult>,
   removeModel: (input: ModelsRemoveInput) => invokeFixedRenderer("models:remove", input) as Promise<ModelMutationResult>,
   updateTaskModels: (input: TaskModelsUpdateInput) => invokeFixedRenderer("task-models:update", input) as Promise<TaskModelsUpdateResult>,

@@ -21,6 +21,7 @@ type ProviderRuntimeConfig = {
   readonly apiKey: string;
   readonly baseUrl: string;
   readonly pricingMultiplier?: number;
+  readonly promptCacheMode?: import("@actspace/shared").CustomConnectionPromptCacheMode;
   readonly transport?: { readonly proxyUrl: string };
 };
 type LegacyLlmConfig = {

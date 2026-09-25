@@ -13,6 +13,7 @@ import { redactLlmText } from "@actspace/llm-service";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
 import { DeepSeekFileUploader } from "./deepseek-files.js";
+import { applyAnthropicPromptCache } from "./anthropic-cache.js";
 
 type SdkClient = Record<string, unknown>;
 type SdkConstructor = new (options: Record<string, unknown>) => SdkClient;
@@ -29,6 +30,7 @@ export type LegacyProxyWireEngineOptions = {
   readonly deepSeekFiles?: DeepSeekFileUploader;
   readonly proxies?: ProviderProxyPool;
   readonly loadSdk?: LegacyProxySdkLoader;
+  readonly cacheRetention?: "short" | "none";
 };
 
 type Accumulator = {
@@ -152,7 +154,7 @@ async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInpu
   try {
     const messagesApi = client.messages as { stream(params: unknown, options: unknown): AsyncIterable<unknown> };
     const converted = await toAnthropicMessages(input.request.messages, input.request.sessionId, options.readArtifact);
-    const stream = messagesApi.stream({
+    const params = applyAnthropicPromptCache({
       model: options.modelId ?? input.request.model,
       max_tokens: input.request.options.maxTokens ?? 32_768,
       messages: converted.messages,
@@ -160,7 +162,8 @@ async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInpu
       ...(input.request.options.temperature === undefined ? {} : { temperature: input.request.options.temperature }),
       ...(options.providerId === "custom" ? reasoningPayload(options.route, options.providerId, input.request.options) : input.request.options.reasoning ? { thinking: { type: "enabled", budget_tokens: Math.min(16_384, Math.max(1_024, (input.request.options.maxTokens ?? 32_768) - 1_024)) } } : {}),
       ...(input.request.tools.length === 0 ? {} : { tools: toAnthropicTools(input.request.tools) }),
-    }, { signal: input.signal });
+    }, options.cacheRetention);
+    const stream = messagesApi.stream(params, { signal: input.signal });
     for await (const raw of stream) {
       const event = raw as Record<string, unknown>; const type = String(event.type ?? "");
       if (type === "message_start") { const usage = (event.message as Record<string, unknown> | undefined)?.usage as Record<string, unknown> | undefined; if (usage) acc.usage = mapAnthropicUsage(usage, acc.usage); continue; }

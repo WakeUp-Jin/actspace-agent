@@ -24,7 +24,11 @@ import {
   type RuntimeV2WriteAgentSystemPromptInput,
   type RuntimeV2SettingsUpdateInput,
   type RuntimeV2AddCatalogModelInput,
+  type RuntimeV2AddCustomModelInput,
+  type RuntimeV2EditCustomModelInput,
+  type RuntimeV2SetCustomConnectionDefaultModelInput,
   type RuntimeV2ModelCatalogQuery,
+  type RuntimeV2CustomConnectionTestInput,
 } from "@actspace/shared/runtime-v2";
 import { PROVIDER_IDS, SEARCH_PROVIDER_IDS, normalizeModelKey, type SecretProviderId } from "@actspace/shared";
 import type { DesktopRuntimeV2Registry } from "./runtime-registry";
@@ -174,6 +178,15 @@ export function registerRuntimeV2Ipc(options: {
     await settings.markProviderConnectionResult(input.provider, result);
     return { ...result, settings: settings.getV2() };
   });
+  handle(RUNTIME_V2_DESKTOP_CHANNELS.testCustomConnection, async (_event, input: RuntimeV2CustomConnectionTestInput) => {
+    const settings = requireSettings(options.settings);
+    const network = requireProviderNetwork(options.providerNetwork);
+    const runtime = settings.getCustomConnectionRuntimeConfig(input.connectionId);
+    if ("code" in runtime) return { ok: false, message: runtime.message, checkedAt: new Date().toISOString(), errorKind: "invalid_request" as const };
+    const result = await network.testCustomConnection(runtime);
+    await settings.markCustomConnectionResult(input.connectionId, result);
+    return result;
+  });
   handle(RUNTIME_V2_DESKTOP_CHANNELS.getProviderBalance, async (_event, input: RuntimeV2ProviderIdInput) => {
     const settings = requireSettings(options.settings);
     const network = requireProviderNetwork(options.providerNetwork);
@@ -212,6 +225,24 @@ export function registerRuntimeV2Ipc(options: {
     const result = await requireModels(options.models).addCatalogModel(provider, input.apiModel.trim());
     if ("message" in result) throw new Error(result.message);
     return requireSettings(options.settings).getV2();
+  });
+  handle(RUNTIME_V2_DESKTOP_CHANNELS.addCustomModel, async (_event, input: RuntimeV2AddCustomModelInput) => {
+    const settings = requireSettings(options.settings);
+    const result = await requireModels(options.models).addCustomModel(input);
+    if ("message" in result) throw new Error(result.message);
+    return settings.getV2();
+  });
+  handle(RUNTIME_V2_DESKTOP_CHANNELS.editCustomModel, async (_event, input: RuntimeV2EditCustomModelInput) => {
+    const settings = requireSettings(options.settings);
+    const result = await requireModels(options.models).editCustomModel(input);
+    if ("message" in result) throw new Error(result.message);
+    return settings.getV2();
+  });
+  handle(RUNTIME_V2_DESKTOP_CHANNELS.setCustomConnectionDefaultModel, async (_event, input: RuntimeV2SetCustomConnectionDefaultModelInput) => {
+    const settings = requireSettings(options.settings);
+    const result = await requireModels(options.models).setCustomConnectionDefaultModel(input);
+    if ("message" in result) throw new Error(result.message);
+    return settings.getV2();
   });
   handle(RUNTIME_V2_DESKTOP_CHANNELS.pickAttachment, async (_event, sessionId: string) => {
     const window = options.getMainWindow();

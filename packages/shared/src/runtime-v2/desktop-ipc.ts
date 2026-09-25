@@ -41,6 +41,7 @@ export const RUNTIME_V2_DESKTOP_CHANNELS = Object.freeze({
   updateModel: "runtime-v2:update-model",
   removeModel: "runtime-v2:remove-model",
   testProvider: "runtime-v2:test-provider",
+  testCustomConnection: "runtime-v2:test-custom-connection",
   getProviderBalance: "runtime-v2:get-provider-balance",
   getSearchUsage: "runtime-v2:get-search-usage",
   readAgentSystemPrompt: "runtime-v2:read-agent-system-prompt",
@@ -48,6 +49,9 @@ export const RUNTIME_V2_DESKTOP_CHANNELS = Object.freeze({
   listModelCatalog: "runtime-v2:list-model-catalog",
   reloadModelCatalog: "runtime-v2:reload-model-catalog",
   addCatalogModel: "runtime-v2:add-catalog-model",
+  addCustomModel: "runtime-v2:add-custom-model",
+  editCustomModel: "runtime-v2:edit-custom-model",
+  setCustomConnectionDefaultModel: "runtime-v2:set-custom-connection-default-model",
   pickAttachment: "runtime-v2:pick-attachment",
   listApprovals: "runtime-v2:list-approvals",
   decideApproval: "runtime-v2:decide-approval",
@@ -98,6 +102,8 @@ export type RuntimeV2ConfigureProviderInput = {
 export type RuntimeV2CreateCustomConnectionInput = CustomConnectionInput;
 export type RuntimeV2RemoveCustomConnectionInput = { readonly connectionId: string };
 export type RuntimeV2UpdateCustomConnectionInput = CustomConnectionInput & { readonly connectionId: string; readonly apiKey?: string };
+export type RuntimeV2CustomConnectionTestInput = import("../settings").CustomConnectionTestInput;
+export type RuntimeV2CustomConnectionTestResult = import("../settings").CustomConnectionTestResult;
 export type RuntimeV2ConfigureSecretInput = {
   readonly provider: SecretProviderId;
   readonly apiKey: string | null;
@@ -138,6 +144,9 @@ export type RuntimeV2ProviderTestResult = {
 export type RuntimeV2WriteAgentSystemPromptInput = { readonly content: string };
 export type RuntimeV2ModelCatalogQuery = { readonly provider?: "openrouter" | "deepseek" | "kimi"; readonly query?: string };
 export type RuntimeV2AddCatalogModelInput = { readonly provider?: "openrouter" | "deepseek" | "kimi"; readonly apiModel: string };
+export type RuntimeV2AddCustomModelInput = import("../custom-model-input").CustomModelCreateInput;
+export type RuntimeV2EditCustomModelInput = import("../custom-model-input").CustomModelEditInput;
+export type RuntimeV2SetCustomConnectionDefaultModelInput = import("../custom-model-input").CustomModelSetDefaultInput;
 export type RuntimeV2AttachmentRef = {
   readonly artifactId: string;
   readonly mimeType: string;
@@ -200,6 +209,7 @@ export type RuntimeV2DesktopBridge = {
   createCustomConnection(input: RuntimeV2CreateCustomConnectionInput): Promise<SettingsV4Snapshot>;
   removeCustomConnection(input: RuntimeV2RemoveCustomConnectionInput): Promise<SettingsV4Snapshot>;
   updateCustomConnection(input: RuntimeV2UpdateCustomConnectionInput): Promise<SettingsV4Snapshot>;
+  testCustomConnection(input: RuntimeV2CustomConnectionTestInput): Promise<RuntimeV2CustomConnectionTestResult>;
   configureProvider(input: RuntimeV2ConfigureProviderInput): Promise<AppSettingsV2>;
   configureSecret(input: RuntimeV2ConfigureSecretInput): Promise<AppSettingsV2>;
   addProviderCredential(input: RuntimeV2ProviderCredentialAddInput): Promise<AppSettingsV2>;
@@ -215,6 +225,9 @@ export type RuntimeV2DesktopBridge = {
   listModelCatalog(input?: RuntimeV2ModelCatalogQuery): Promise<ModelsCatalogListResult>;
   reloadModelCatalog(input?: RuntimeV2ModelCatalogQuery): Promise<ModelsCatalogListResult>;
   addCatalogModel(input: RuntimeV2AddCatalogModelInput): Promise<AppSettingsV2>;
+  addCustomModel(input: RuntimeV2AddCustomModelInput): Promise<AppSettingsV2>;
+  editCustomModel(input: RuntimeV2EditCustomModelInput): Promise<AppSettingsV2>;
+  setCustomConnectionDefaultModel(input: RuntimeV2SetCustomConnectionDefaultModelInput): Promise<AppSettingsV2>;
   pickAttachment(sessionId: string): Promise<RuntimeV2AttachmentRef | null>;
   listApprovals(sessionId?: string): Promise<readonly RuntimeV2ApprovalRequest[]>;
   decideApproval(input: RuntimeV2ApprovalDecisionInput): Promise<RuntimeV2ApprovalDecisionResult>;

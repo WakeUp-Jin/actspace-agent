@@ -8,6 +8,21 @@ import type { PiAiWireRoute } from "../pi-ai-wire-engine.js";
 const routes: readonly PiAiWireRoute[] = ["openai-completions", "openai-responses", "anthropic-messages"];
 
 describe("LegacyProxyWireEngine", () => {
+  it.each(["short", "none"] as const)("applies Anthropic cache markers through the proxy (%s)", async (cacheRetention) => {
+    const observed: { params?: unknown; options?: unknown } = {};
+    const pool = proxyPool();
+    const engine = new LegacyProxyWireEngine({ route: "anthropic-messages", providerId: "custom", baseUrl: "https://relay.example", proxies: pool, cacheRetention, loadSdk: loaderFor("anthropic-messages", observed) });
+    for await (const _event of await engine.stream(input("anthropic-messages"))) { /* drain */ }
+    const serialized = JSON.stringify(observed.params);
+    if (cacheRetention === "short") {
+      expect((serialized.match(/cache_control/g) ?? [])).toHaveLength(3);
+      expect(serialized).toContain('"type":"ephemeral"');
+    } else {
+      expect(serialized).not.toContain("cache_control");
+    }
+    await pool.dispose();
+  });
+
   it.each([0, 0.123])("preserves raw OpenRouter billed cost %s on direct requests", async (cost) => {
     const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "openrouter", baseUrl: "https://openrouter.ai/api/v1",
       loadSdk: loaderFor("openai-completions", {}, (async function* () {

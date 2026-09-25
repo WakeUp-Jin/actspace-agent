@@ -21,6 +21,7 @@ export type DesktopRuntimeV2ResolvedModel = {
     readonly baseUrl?: string;
     readonly transport?: { readonly proxyUrl?: string };
     readonly pricingMultiplier?: number;
+    readonly promptCacheMode?: import("@actspace/shared").CustomConnectionPromptCacheMode;
   };
 };
 

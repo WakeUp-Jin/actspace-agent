@@ -10,6 +10,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join } from "node:path";
 import {
   BUILTIN_MODEL_LIST,
+  buildCustomModelDefinition,
   DEEPSEEK_FLASH_KEY,
   DEFAULT_IMAGE_GENERATION_BASE_URL,
   DEFAULT_IMAGE_GENERATION_MODEL,
@@ -27,6 +28,7 @@ import {
   normalizeModelKey,
   type AgentSettingsV2,
   type CustomConnectionInput,
+  type CustomConnectionPromptCacheMode,
   type AgentSystemPromptFile,
   type AppSettings,
   type AppSettingsV2,
@@ -51,6 +53,7 @@ import {
   type SettingsUpdateInput,
   type SettingsV4,
   type SettingsV4ChangedNotification,
+  type SettingsV4ConnectionSettings,
   type SettingsV4InstalledModelSettings,
   type SettingsV4Models,
   type SettingsV4Namespace,
@@ -77,7 +80,13 @@ type ProviderRuntimeConfig = {
   readonly apiKey: string;
   readonly baseUrl: string;
   readonly pricingMultiplier: number;
+  readonly promptCacheMode?: CustomConnectionPromptCacheMode;
   readonly transport?: { readonly proxyUrl: string };
+};
+export type CustomConnectionRuntimeConfig = ProviderRuntimeConfig & {
+  readonly connectionId: string;
+  readonly protocol: ModelApi;
+  readonly model: string;
 };
 
 const MAIN_AGENT_SYSTEM_PROMPT = "You are ActSpace's main agent. Follow the active tool and safety policies.";
@@ -143,6 +152,7 @@ export type ProviderCredentialMutationResult =
 export interface ModelStorageMutationInput {
   installedModels?: Partial<Record<ModelKey, InstalledModelSettings | null>>;
   customModels?: Partial<Record<ModelKey, ModelDefinition | null>>;
+  connections?: Partial<Record<string, SettingsV4ConnectionSettings | null>>;
 }
 
 export class ProviderSettingsError extends Error {
@@ -478,6 +488,11 @@ export class SettingsService {
           if (value === null) delete this.settings.customModels[key];
           else if (isValidModelDefinition(value, key)) this.settings.customModels[key] = cloneJson(value);
         }
+        if (input.connections) {
+          const current = this.getV4();
+          await this.applyNamespaceV4({ namespace: "models", expectedRevision: current.revision, patch: { connections: input.connections } as Partial<SettingsV4Models> });
+          return;
+        }
         await this.writeSettingsFile();
       } catch (error) {
         this.settings = previous;
@@ -690,6 +705,19 @@ export class SettingsService {
     return this.getProviderRuntimeConfigForCredential(provider);
   }
 
+  getCustomConnectionRuntimeConfig(connectionId: string): CustomConnectionRuntimeConfig | ProviderRuntimeError {
+    const connection = this.getV4().settings.models.connections[connectionId];
+    if (!connection || connectionId === `${connection.providerId}:default`) {
+      return { ok: false, code: "credential_missing", message: "自定义连接不存在。" };
+    }
+    if (!connection.defaultModel) {
+      return { ok: false, code: "credential_missing", message: "该连接尚未设置默认模型。" };
+    }
+    const runtime = this.getProviderRuntimeConfigForCredential(connection.providerId, undefined, connectionId);
+    if ("code" in runtime) return runtime;
+    return { ...runtime, connectionId, protocol: connection.protocol ?? "openai-completions", model: connection.defaultModel };
+  }
+
   getProviderRuntimeConfigForCredential(
     provider: LlmProviderId,
     credentialId?: string,
@@ -741,6 +769,7 @@ export class SettingsService {
     return {
       provider,
       ...(connection && { protocol: connection.protocol ?? "openai-completions" }),
+      ...(connection && { promptCacheMode: resolvePromptCacheMode(connection.protocol ?? "openai-completions", connection.promptCacheMode) }),
       apiKey,
       baseUrl,
       pricingMultiplier: credential?.pricingMultiplier ?? settings.defaultPricingMultiplier ?? 1,
@@ -757,7 +786,7 @@ export class SettingsService {
     const protocol = input.protocol ?? "openai-completions";
     const connectionId = input.connectionId?.trim() || `custom-${randomUUID()}`;
     if (!/^[a-zA-Z0-9._-]{3,80}$/.test(connectionId)) throw new ProviderSettingsError("连接标识无效。", "write_failed");
-    const baseUrl = normalizeBaseUrl(input.baseUrl);
+    const baseUrl = normalizeCustomConnectionBaseUrl(input.baseUrl, protocol);
     const current = this.getV4();
     if (current.settings.models.connections[connectionId]) throw new ProviderSettingsError("连接标识已存在。", "write_failed");
     this.assertCredentialStorageWritable();
@@ -774,7 +803,8 @@ export class SettingsService {
               providerId: input.providerId,
               protocol,
               displayName: input.displayName.trim() || connectionId,
-              defaultModel: input.defaultModel?.trim() || null,
+              defaultModel: (input.initialModel?.apiModel ?? input.defaultModel)?.trim() || null,
+              promptCacheMode: resolvePromptCacheMode(protocol, input.promptCacheMode),
               ...(input.catalogId?.trim() ? { catalogId: input.catalogId.trim().slice(0, 80) } : {}),
               enabled: true,
               baseUrl,
@@ -819,11 +849,12 @@ export class SettingsService {
     const current = this.getV4();
     const existing = current.settings.models.connections[input.connectionId];
     if (!existing) throw new ProviderSettingsError("连接不存在。", "write_failed");
-    validateCustomConnection({ ...input, apiKey: "preserved", protocol: input.protocol ?? existing.protocol });
+    validateCustomConnection({ ...input, apiKey: "preserved", protocol: input.protocol ?? existing.protocol }, { requireModel: false });
     if (input.providerId !== existing.providerId || (input.protocol && input.protocol !== (existing.protocol ?? "openai-completions"))) {
       throw new ProviderSettingsError("连接协议不可更改，请创建新的连接。", "write_failed");
     }
-    const baseUrl = normalizeBaseUrl(input.baseUrl);
+    const protocol = existing.protocol ?? "openai-completions";
+    const baseUrl = normalizeCustomConnectionBaseUrl(input.baseUrl, protocol);
     const previousSecrets = cloneJson(this.secrets);
     try {
     if (input.apiKey?.trim()) {
@@ -835,8 +866,7 @@ export class SettingsService {
       namespace: "models",
       expectedRevision: current.revision,
       patch: {
-        connections: { [input.connectionId]: { ...existing, protocol: existing.protocol ?? "openai-completions", displayName: input.displayName.trim() || existing.displayName, defaultModel: input.defaultModel?.trim() || null, ...(input.catalogId?.trim() ? { catalogId: input.catalogId.trim().slice(0, 80) } : {}), baseUrl, proxy: input.proxy ?? existing.proxy, lastConnection: { status: "untested" } } },
-        ...connectionModelPatch(input, input.connectionId, existing.protocol ?? "openai-completions", current.settings.models),
+        connections: { [input.connectionId]: { ...existing, protocol, displayName: input.displayName.trim() || existing.displayName, promptCacheMode: resolvePromptCacheMode(protocol, input.promptCacheMode ?? existing.promptCacheMode), ...(input.catalogId?.trim() ? { catalogId: input.catalogId.trim().slice(0, 80) } : {}), baseUrl, proxy: input.proxy ?? existing.proxy, lastConnection: { status: "untested" } } },
       },
     });
     } catch (error) {
@@ -1045,6 +1075,31 @@ export class SettingsService {
         this.settings = previous;
         throw error;
       }
+    });
+  }
+
+  async markCustomConnectionResult(connectionId: string, result: ProviderConnectionProbeResult): Promise<void> {
+    await this.enqueueMutation(async () => {
+      const current = this.getV4();
+      const connection = current.settings.models.connections[connectionId];
+      if (!connection) throw new ProviderSettingsError("连接不存在。", "write_failed");
+      await this.applyNamespaceV4({
+        namespace: "models",
+        expectedRevision: current.revision,
+        patch: {
+          connections: {
+            [connectionId]: {
+              ...connection,
+              lastConnection: {
+                status: result.ok ? "available" : "unavailable",
+                checkedAt: result.checkedAt,
+                ...(result.errorKind && { errorKind: result.errorKind }),
+                message: result.message?.slice(0, 300),
+              },
+            },
+          },
+        },
+      });
     });
   }
 
@@ -1758,8 +1813,16 @@ function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string): {
           providerId: value.providerId,
           protocol: isConnectionProtocol(value.protocol) ? value.protocol : "openai-completions",
           ...(typeof value.displayName === "string" ? { displayName: value.displayName.slice(0, 120) } : {}),
-          ...(typeof value.defaultModel === "string" ? { defaultModel: value.defaultModel.slice(0, 200) } : {}),
+          ...(value.defaultModel === null
+            ? { defaultModel: null }
+            : typeof value.defaultModel === "string"
+              ? { defaultModel: value.defaultModel.slice(0, 200) }
+              : {}),
           ...(typeof value.catalogId === "string" ? { catalogId: value.catalogId.slice(0, 80) } : {}),
+          promptCacheMode: resolvePromptCacheMode(
+            isConnectionProtocol(value.protocol) ? value.protocol : "openai-completions",
+            value.promptCacheMode === "short" || value.promptCacheMode === "off" ? value.promptCacheMode : undefined,
+          ),
           ...sanitizeProviderSettings(value, seed.providers[value.providerId], value.providerId),
         } satisfies SettingsV4["models"]["connections"][string]]];
       })),
@@ -2186,6 +2249,19 @@ function normalizeBaseUrl(value: string): string {
   return parsed.toString().replace(/\/$/, "");
 }
 
+function normalizeCustomConnectionBaseUrl(value: string, protocol: ModelApi): string {
+  const normalized = normalizeBaseUrl(value);
+  if (protocol === "anthropic-messages" && /\/v1$/i.test(new URL(normalized).pathname.replace(/\/+$/, ""))) {
+    throw new ProviderSettingsError("Anthropic 服务地址请填写根地址，不要包含 /v1。", "invalid_base_url");
+  }
+  return normalized;
+}
+
+function resolvePromptCacheMode(protocol: ModelApi, value?: CustomConnectionPromptCacheMode): CustomConnectionPromptCacheMode {
+  if (protocol !== "anthropic-messages") return "off";
+  return value === "off" ? "off" : "short";
+}
+
 function sanitizeConnectionState(input: unknown, fallback: ProviderConnectionState): ProviderConnectionState {
   if (!isRecord(input)) return { ...fallback };
   const status = input.status === "available" || input.status === "unavailable" || input.status === "untested"
@@ -2229,22 +2305,30 @@ function sanitizeInstalledModel(input: unknown, fallback: InstalledModelSettings
   };
 }
 
-function validateCustomConnection(input: CustomConnectionInput): void {
+function validateCustomConnection(input: CustomConnectionInput, options: { requireModel?: boolean } = { requireModel: true }): void {
   if (input.modelReasoning !== undefined) validateCustomModelReasoning(input.modelReasoning);
   if (!isProviderId(input.providerId) || (input.protocol !== undefined && !isConnectionProtocol(input.protocol))) {
     throw new ProviderSettingsError("连接协议无效。", "write_failed");
   }
   if (!input.apiKey?.trim()) throw new ProviderSettingsError("请输入 API Key。", "write_failed");
-  if (!input.defaultModel?.trim() || input.defaultModel.trim().length > 200) {
+  const defaultModel = input.initialModel?.apiModel ?? input.defaultModel;
+  if (options.requireModel !== false && (!defaultModel?.trim() || defaultModel.trim().length > 200)) {
     throw new ProviderSettingsError("请输入有效的默认模型 ID（最多 200 字符）。", "write_failed");
   }
 }
 
 /** Separate keys for identical upstream model IDs on different connections. */
 function connectionModelPatch(input: CustomConnectionInput, connectionId: string, protocol: ModelApi, models: SettingsV4Models): Pick<SettingsV4Models, "definitions" | "installed"> {
-  const apiModel = input.defaultModel!.trim();
+  const apiModel = (input.initialModel?.apiModel ?? input.defaultModel)!.trim();
   const key: ModelKey = `${input.providerId}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}`;
   const previous = models.definitions[key];
+  if (input.initialModel) {
+    const definition = buildCustomModelDefinition({ ...input.initialModel, enabled: true }, { providerId: input.providerId, protocol, connectionId });
+    return {
+      definitions: { [key]: definition },
+      installed: { [key]: { enabled: true, addedAt: models.installed[key]?.addedAt ?? new Date().toISOString(), connectionId } },
+    };
+  }
   return {
     definitions: { [key]: applyCustomModelReasoning({
       ...previous,

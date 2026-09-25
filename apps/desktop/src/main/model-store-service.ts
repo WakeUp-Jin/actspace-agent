@@ -1,5 +1,9 @@
 import {
   applyCustomModelReasoning,
+  buildCustomModelDefinition,
+  type CustomModelCreateInput,
+  type CustomModelEditInput,
+  type CustomModelSetDefaultInput,
   type CustomModelReasoning,
   BUILTIN_MODEL_LIST,
   deepSeekModelDefinition,
@@ -23,7 +27,7 @@ const PURPOSES: readonly ModelPurpose[] = ["chat", "utility", "explore", "vision
 
 export type ModelStoreResult =
   | { ok: true; model?: InstalledModelView }
-  | { ok: false; code: "invalid_provider" | "invalid_model" | "model_not_found" | "model_not_installed" | "model_not_removable" | "model_in_use" | "credential_missing"; message: string; references?: string[] };
+  | { ok: false; code: "invalid_provider" | "invalid_model" | "invalid_pricing" | "connection_missing" | "model_already_exists" | "default_model_requires_replacement" | "model_not_found" | "model_not_installed" | "model_not_removable" | "model_in_use" | "credential_missing"; message: string; references?: string[] };
 
 export interface ModelStoreServiceOptions {
   settings: SettingsService;
@@ -138,6 +142,72 @@ export class ModelStoreService {
     return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
   }
 
+  async addCustomModel(input: CustomModelCreateInput): Promise<ModelStoreResult> {
+    const settings = this.settings.getV4().settings.models;
+    if (typeof input?.connectionId !== "string" || typeof input?.enabled !== "boolean" || typeof input?.setAsConnectionDefault !== "boolean") {
+      return { ok: false, code: "invalid_model", message: "模型添加参数无效。" };
+    }
+    const connection = settings.connections[input.connectionId];
+    if (!connection || input.connectionId === `${connection.providerId}:default`) {
+      return { ok: false, code: "connection_missing", message: "自定义连接不存在。" };
+    }
+    let definition: ModelDefinition;
+    try {
+      definition = buildCustomModelDefinition(input, { providerId: connection.providerId, protocol: connection.protocol ?? "openai-completions", connectionId: input.connectionId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "模型配置无效。";
+      return { ok: false, code: /价格|币种/.test(message) ? "invalid_pricing" : "invalid_model", message };
+    }
+    if (settings.definitions[definition.key] || settings.installed[definition.key]) {
+      return { ok: false, code: "model_already_exists", message: "该连接中已存在相同的 API 模型 ID。" };
+    }
+    await this.settings.updateModelStorage({
+      customModels: { [definition.key]: definition },
+      installedModels: { [definition.key]: { enabled: input.enabled, addedAt: this.now().toISOString(), connectionId: input.connectionId } },
+      ...(input.setAsConnectionDefault ? { connections: { [input.connectionId]: { ...connection, defaultModel: definition.apiModel } } } : {}),
+    });
+    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === definition.key) };
+  }
+
+  async editCustomModel(input: CustomModelEditInput): Promise<ModelStoreResult> {
+    const settings = this.settings.getV4().settings.models;
+    if (typeof input?.modelKey !== "string" || typeof input?.enabled !== "boolean") {
+      return { ok: false, code: "invalid_model", message: "模型编辑参数无效。" };
+    }
+    const current = settings.definitions[input.modelKey];
+    const installed = settings.installed[input.modelKey];
+    if (!current || current.source !== "custom") return { ok: false, code: "model_not_found", message: "自定义模型不存在。" };
+    if (!installed) return { ok: false, code: "model_not_installed", message: "模型尚未添加。" };
+    const connection = settings.connections[installed.connectionId];
+    if (!connection) return { ok: false, code: "connection_missing", message: "模型绑定的连接不存在。" };
+    let definition: ModelDefinition;
+    try {
+      definition = buildCustomModelDefinition({ ...input, apiModel: current.apiModel }, { providerId: connection.providerId, protocol: connection.protocol ?? "openai-completions", connectionId: connection.connectionId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "模型配置无效。";
+      return { ok: false, code: /价格|币种/.test(message) ? "invalid_pricing" : "invalid_model", message };
+    }
+    await this.settings.updateModelStorage({
+      customModels: { [input.modelKey]: { ...definition, key: input.modelKey } },
+      installedModels: { [input.modelKey]: { ...installed, enabled: input.enabled } },
+    });
+    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === input.modelKey) };
+  }
+
+  async setCustomConnectionDefaultModel(input: CustomModelSetDefaultInput): Promise<ModelStoreResult> {
+    const settings = this.settings.getV4().settings.models;
+    if (typeof input?.connectionId !== "string" || typeof input?.modelKey !== "string") {
+      return { ok: false, code: "invalid_model", message: "默认模型参数无效。" };
+    }
+    const connection = settings.connections[input.connectionId];
+    const definition = settings.definitions[input.modelKey];
+    const installed = settings.installed[input.modelKey];
+    if (!connection) return { ok: false, code: "connection_missing", message: "自定义连接不存在。" };
+    if (!definition || !installed || installed.connectionId !== input.connectionId) return { ok: false, code: "model_not_found", message: "模型不属于该连接。" };
+    await this.settings.updateModelStorage({ connections: { [input.connectionId]: { ...connection, defaultModel: definition.apiModel } } });
+    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === input.modelKey) };
+  }
+
   async refreshInstalledCatalogModels(provider: LlmProviderId = "openrouter"): Promise<number> {
     const stored = this.settings.getModelStorageState();
     const updates: Partial<Record<ModelKey, ModelDefinition>> = {};
@@ -216,9 +286,18 @@ export class ModelStoreService {
     if (references.length > 0) {
       return { ok: false, code: "model_in_use", message: "模型仍被任务配置引用。", references };
     }
+    const installed = snapshot.installedModels[modelKey];
+    const connectionId = installed?.connectionId;
+    const connection = connectionId ? this.settings.getV4().settings.models.connections[connectionId] : undefined;
+    const isConnectionDefault = connection?.defaultModel === definition.apiModel;
+    if (isConnectionDefault) {
+      const alternatives = Object.entries(snapshot.installedModels).filter(([key, value]) => key !== modelKey && value?.connectionId === connectionId);
+      if (alternatives.length > 0) return { ok: false, code: "default_model_requires_replacement", message: "请先选择新的连接默认模型，再删除当前默认模型。" };
+    }
     await this.settings.updateModelStorage({
       installedModels: { [modelKey]: null },
       customModels: { [modelKey]: null },
+      ...(isConnectionDefault && connectionId && connection ? { connections: { [connectionId]: { ...connection, defaultModel: null } } } : {}),
     });
     return { ok: true };
   }

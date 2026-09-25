@@ -202,6 +202,7 @@ Adapter 在 Provider I/O 之前完成模型级配置校验和默认值物化：
 - `reasoning: false`、自动模式和显式 effort 保持不同语义。
 - SDK 内部 retry 关闭，避免一次 ActSpace dispatch 对应多个不可见 wire attempt。
 - request-scoped `AbortSignal` 始终传到 pi-ai。
+- Anthropic 自定义连接的 `promptCacheMode` 在 prepare 阶段归一为 wire 级 `cacheRetention: "short" | "none"`。direct `streamSimple` 与 request-scoped proxy 必须消费同一语义：short 标记稳定 system、最后一个工具定义和最后一个 user 内容块，none 不发送 `cache_control`。不得因代理与否改变缓存断点，也不得在 provider 拒绝缓存字段后自动重发同一生成请求。
 
 ## 6. PreparedLlmCall 与 Adapter generation
 

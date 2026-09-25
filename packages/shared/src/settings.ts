@@ -251,7 +251,11 @@ export interface SettingsV4ConnectionSettings extends ProviderConnectionSettings
   displayName?: string;
   defaultModel?: string | null;
   catalogId?: string;
+  /** Anthropic prompt caching. Missing legacy Anthropic values resolve to short. */
+  promptCacheMode?: CustomConnectionPromptCacheMode;
 }
+
+export type CustomConnectionPromptCacheMode = "short" | "off";
 
 export interface CustomConnectionInput {
   modelReasoning?: import("./custom-model-reasoning").CustomModelReasoning;
@@ -263,8 +267,19 @@ export interface CustomConnectionInput {
   baseUrl: string;
   defaultModel?: string | null;
   catalogId?: string;
+  promptCacheMode?: CustomConnectionPromptCacheMode;
   proxy?: ProviderProxySettings;
+  initialModel?: Omit<import("./custom-model-input").CustomModelCreateInput, "connectionId" | "setAsConnectionDefault">;
 }
+
+export type CustomConnectionTestInput = { readonly connectionId: string };
+export type CustomConnectionTestResult = {
+  readonly ok: boolean;
+  readonly message: string;
+  readonly checkedAt: string;
+  readonly errorKind?: ProviderConnectionErrorKind;
+  readonly statusCode?: number;
+};
 
 export interface SettingsV4InstalledModelSettings extends InstalledModelSettings {
   connectionId: string;

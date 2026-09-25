@@ -22,6 +22,17 @@ it.each([true, false])("carries thinking and effort through direct transport (en
   else expect(streamOptions.reasoning).toBeUndefined();
 });
 
+it.each(["short", "none"] as const)("passes Anthropic cache retention and session identity to pi-ai (%s)", async (cacheRetention) => {
+  let streamOptions: Record<string, unknown> = {};
+  const engine = new PiAiAdapter({ wire: { route: "anthropic-messages", providerId: "custom", baseUrl: "https://relay.example", cacheRetention, load: async () => ({
+    core: { createProvider: () => ({ id: "custom" }), createModels: () => ({ setProvider: () => {}, getModel: () => ({ id: "claude", provider: "custom" }), streamSimple: (_model, _context, options) => { streamOptions = options as Record<string, unknown>; return (async function* () { yield { type: "done", message: { content: [], stopReason: "stop" } }; })(); } }) },
+    api: { stream: () => {}, streamSimple: () => {} },
+  }) } });
+  const input = { request: { requestId: "cache", sessionId: "session-cache", model: "claude", messages: [], tools: [], options: {} }, credential: { apiKey: "fixture" }, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput;
+  for await (const _event of await engine.dispatch(input)) { /* drain */ }
+  expect(streamOptions).toMatchObject({ sessionId: "session-cache", cacheRetention });
+});
+
 it("ignores the SDK zero-price cost and freezes an estimated price for the request", async () => {
   const { calculateCost } = await import("@earendil-works/pi-ai");
   const usage = { input: 1000, output: 500, cacheRead: 2000, cacheWrite: 0, totalTokens: 3500, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };

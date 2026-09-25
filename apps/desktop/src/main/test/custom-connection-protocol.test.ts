@@ -91,7 +91,7 @@ it("isolates duplicate upstream model IDs and never falls back after a connectio
   expect(settings.getProviderRuntimeConfigForCredential("openrouter", undefined, "relay-one")).toMatchObject({ ok: false });
 });
 
-it("keeps an old connection without protocol on Chat when edited, and preserves models referenced by tasks", async () => {
+it("keeps an old connection without protocol on Chat and does not mutate models while editing the connection", async () => {
   const { root, settings } = await fixture();
   const input = { providerId: "openrouter" as const, connectionId: "old-relay", catalogId: "openai", displayName: "Old", apiKey: "old-secret", baseUrl: "https://old.example/v1", defaultModel: "first" };
   await settings.createCustomConnection(input);
@@ -103,17 +103,153 @@ it("keeps an old connection without protocol on Chat when edited, and preserves 
   await reloaded.updateCustomConnection({ ...input, apiKey: "", defaultModel: "second" });
   const models = new ModelStoreService({ settings: reloaded });
   const runtime = new ModelRuntimeService(reloaded, models);
-  for (const model of models.listUsableModels("chat").filter((model) => ["first", "second"].includes(model.apiModel))) {
+  for (const model of models.listUsableModels("chat").filter((model) => model.apiModel === "first")) {
     expect(runtime.resolveMainModel(model.key)).toMatchObject({ ok: true, model: { definition: { api: "openai-completions" }, providerRuntime: { apiKey: "old-secret" } } });
   }
-  expect(models.listUsableModels("chat").filter((model) => ["first", "second"].includes(model.apiModel))).toHaveLength(2);
+  expect(models.listUsableModels("chat").filter((model) => ["first", "second"].includes(model.apiModel))).toHaveLength(1);
+  expect(reloaded.getV4().settings.models.connections["old-relay"]?.defaultModel).toBe("first");
   await expect(reloaded.updateCustomConnection({ ...input, protocol: "anthropic-messages" })).rejects.toThrow("协议不可更改");
+});
+
+it("manually adds, edits, defaults and deletes connection-scoped models with pricing", async () => {
+  const { root, settings } = await fixture();
+  await settings.createCustomConnection({
+    providerId: "openrouter",
+    protocol: "anthropic-messages",
+    connectionId: "priced-relay",
+    displayName: "Priced Relay",
+    apiKey: "secret",
+    baseUrl: "https://relay.example",
+    initialModel: {
+      apiModel: "claude-primary",
+      label: "Primary",
+      enabled: true,
+      contextWindow: 1_000_000,
+      maxTokens: 128_000,
+      input: ["text", "image"],
+      reasoningConfig: { mode: "manual", support: "supported", efforts: ["low", "medium", "high"], defaultEffort: "medium", allowOff: true },
+      pricing: { currency: "USD", inputCacheMissPerMillion: 5, outputPerMillion: 25, inputCacheHitPerMillion: 0.5, inputCacheWritePerMillion: 6.25 },
+    },
+  });
+  const models = new ModelStoreService({ settings, now: () => new Date("2026-09-24T00:00:00.000Z") });
+  const primary = models.listInstalledModels().find((model) => model.settings.connectionId === "priced-relay")!;
+  expect(primary.definition).toMatchObject({ apiModel: "claude-primary", pricing: { inputCacheWritePerMillion: 6.25 } });
+  const primaryRuntime = new ModelRuntimeService(settings, models).resolveMainModel(primary.definition.key);
+  expect(primaryRuntime).toMatchObject({ ok: true });
+  if (primaryRuntime.ok) expect(new ModelRuntimeService(settings, models).resolvePricing(primaryRuntime.model, primary.definition.apiModel)).toMatchObject({
+    providerId: "openrouter",
+    connectionId: "priced-relay",
+    source: "configured",
+    currency: "USD",
+    rates: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  });
+
+  expect(await models.addCustomModel({
+    connectionId: "priced-relay",
+    apiModel: "claude-backup",
+    label: "Backup",
+    enabled: true,
+    contextWindow: 200_000,
+    maxTokens: 64_000,
+    input: ["text"],
+    reasoningConfig: { mode: "auto" },
+    pricing: null,
+    setAsConnectionDefault: false,
+  })).toMatchObject({ ok: true });
+  expect(await models.addCustomModel({
+    connectionId: "priced-relay",
+    apiModel: "claude-backup",
+    label: "Duplicate",
+    enabled: true,
+    contextWindow: null,
+    maxTokens: null,
+    input: ["text"],
+    reasoningConfig: { mode: "auto" },
+    pricing: null,
+    setAsConnectionDefault: false,
+  })).toMatchObject({ ok: false, code: "model_already_exists" });
+  expect(await models.addCustomModel({
+    connectionId: "priced-relay",
+    apiModel: "claude-invalid-price",
+    label: "Invalid price",
+    enabled: true,
+    contextWindow: null,
+    maxTokens: null,
+    input: ["text"],
+    reasoningConfig: { mode: "auto" },
+    pricing: { currency: "USD", inputCacheMissPerMillion: Number.NaN, outputPerMillion: 1, inputCacheHitPerMillion: 1, inputCacheWritePerMillion: 1 },
+    setAsConnectionDefault: false,
+  })).toMatchObject({ ok: false, code: "invalid_pricing" });
+  const backup = models.listInstalledModels().find((model) => model.definition.apiModel === "claude-backup")!;
+  expect(settings.getV4().settings.models.connections["priced-relay"]?.defaultModel).toBe("claude-primary");
+  expect(await models.removeModel(primary.definition.key)).toMatchObject({ ok: false, code: "default_model_requires_replacement" });
+  expect(await models.setCustomConnectionDefaultModel({ connectionId: "priced-relay", modelKey: backup.definition.key })).toMatchObject({ ok: true });
+  expect(await models.editCustomModel({
+    modelKey: backup.definition.key,
+    label: "Backup Updated",
+    enabled: false,
+    contextWindow: 300_000,
+    maxTokens: 70_000,
+    input: ["text", "image"],
+    reasoningConfig: { mode: "auto" },
+    pricing: { currency: "CNY", inputCacheMissPerMillion: 3, outputPerMillion: 12, inputCacheHitPerMillion: 0.3, inputCacheWritePerMillion: 4 },
+  })).toMatchObject({ ok: true });
+  expect(await models.removeModel(primary.definition.key)).toMatchObject({ ok: true });
+
+  const reloaded = new SettingsService({ dataRoot: root, crypto });
+  await reloaded.load();
+  const persisted = new ModelStoreService({ settings: reloaded }).listInstalledModels().find((model) => model.definition.apiModel === "claude-backup")!;
+  expect(persisted).toMatchObject({
+    definition: { label: "Backup Updated", contextWindow: 300_000, capabilities: { input: ["text", "image"] }, pricing: { currency: "CNY", inputCacheWritePerMillion: 4 } },
+    settings: { enabled: false, connectionId: "priced-relay" },
+  });
+  expect(reloaded.getV4().settings.models.connections["priced-relay"]?.defaultModel).toBe("claude-backup");
+  expect(await new ModelStoreService({ settings: reloaded }).removeModel(persisted.definition.key)).toMatchObject({ ok: true });
+  expect(reloaded.getV4().settings.models.connections["priced-relay"]).toMatchObject({ defaultModel: null });
+});
+
+it("rejects malformed runtime model mutation inputs without throwing", async () => {
+  const { settings } = await fixture();
+  await settings.createCustomConnection({ providerId: "openrouter", connectionId: "validated-relay", displayName: "Relay", apiKey: "secret", baseUrl: "https://relay.example/v1", defaultModel: "model" });
+  const models = new ModelStoreService({ settings });
+  await expect(models.addCustomModel({ connectionId: "validated-relay" } as never)).resolves.toMatchObject({ ok: false, code: "invalid_model" });
+  await expect(models.editCustomModel({ modelKey: "openrouter:missing" } as never)).resolves.toMatchObject({ ok: false, code: "invalid_model" });
+  await expect(models.setCustomConnectionDefaultModel({ connectionId: "validated-relay" } as never)).resolves.toMatchObject({ ok: false, code: "invalid_model" });
+});
+
+it("keeps identical API model ids isolated across custom connections", async () => {
+  const { settings } = await fixture();
+  for (const connectionId of ["isolated-one", "isolated-two"]) {
+    await settings.createCustomConnection({ providerId: "openrouter", connectionId, displayName: connectionId, apiKey: connectionId, baseUrl: "https://relay.example/v1", defaultModel: "shared-alias" });
+  }
+  const models = new ModelStoreService({ settings });
+  const scoped = models.listInstalledModels().filter((model) => model.definition.apiModel === "shared-alias");
+  expect(scoped).toHaveLength(2);
+  expect(new Set(scoped.map((model) => model.definition.key)).size).toBe(2);
+  const first = scoped.find((model) => model.settings.connectionId === "isolated-one")!;
+  expect(await models.editCustomModel({ modelKey: first.definition.key, label: "Only One", enabled: true, contextWindow: null, maxTokens: null, input: ["text"], reasoningConfig: { mode: "auto" }, pricing: null })).toMatchObject({ ok: true });
+  expect(models.listInstalledModels().find((model) => model.settings.connectionId === "isolated-two")?.definition.label).not.toBe("Only One");
 });
 
 it("rejects an invalid protocol before writing a credential or connection", async () => {
   const { settings } = await fixture();
   await expect(settings.createCustomConnection({ providerId: "openrouter", protocol: "invalid" as ModelApi, connectionId: "bad-relay", displayName: "Bad", apiKey: "secret", baseUrl: "https://bad.example", defaultModel: "model" })).rejects.toThrow("协议无效");
   expect(settings.getV4().settings.models.connections["bad-relay"]).toBeUndefined();
+});
+
+it("rejects Anthropic /v1 base URLs and persists short/off cache modes", async () => {
+  const { root, settings } = await fixture();
+  await expect(settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "bad-anthropic", displayName: "Bad", apiKey: "secret", baseUrl: "https://relay.example/v1", defaultModel: "claude" })).rejects.toThrow("不要包含 /v1");
+  expect(settings.getV4().settings.models.connections["bad-anthropic"]).toBeUndefined();
+
+  await settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "anthropic-short", displayName: "Short", apiKey: "secret", baseUrl: "https://relay.example/anthropic", defaultModel: "claude" });
+  await settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "anthropic-off", displayName: "Off", apiKey: "secret", baseUrl: "https://relay.example", defaultModel: "claude", promptCacheMode: "off" });
+  const reloaded = new SettingsService({ dataRoot: root, crypto });
+  await reloaded.load();
+  expect(reloaded.getV4().settings.models.connections["anthropic-short"]?.promptCacheMode).toBe("short");
+  expect(reloaded.getV4().settings.models.connections["anthropic-off"]?.promptCacheMode).toBe("off");
+  expect(reloaded.getCustomConnectionRuntimeConfig("anthropic-short")).toMatchObject({ protocol: "anthropic-messages", promptCacheMode: "short", model: "claude" });
+  expect(reloaded.getCustomConnectionRuntimeConfig("anthropic-off")).toMatchObject({ promptCacheMode: "off" });
 });
 
 it("restores the old key when an edit fails to persist settings", async () => {

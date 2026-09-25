@@ -244,6 +244,7 @@ declare global {
       createCustomConnection?: (input: import("@actspace/shared").CustomConnectionInput) => Promise<import("@actspace/shared").SettingsV4Snapshot>;
       removeCustomConnection?: (input: { connectionId: string }) => Promise<import("@actspace/shared").SettingsV4Snapshot>;
       updateCustomConnection?: (input: import("@actspace/shared/runtime-v2").RuntimeV2UpdateCustomConnectionInput) => Promise<import("@actspace/shared").SettingsV4Snapshot>;
+      testCustomConnection?: (input: import("@actspace/shared").CustomConnectionTestInput) => Promise<import("@actspace/shared").CustomConnectionTestResult>;
       onSettingsChangedV4?: (
         callback: (notification: import("@actspace/shared").SettingsV4ChangedNotification) => void
       ) => () => void;
@@ -277,6 +278,9 @@ declare global {
       listModelCatalog?: (input: import("@actspace/shared").ModelsCatalogListInput) => Promise<import("@actspace/shared").ModelsCatalogListResult>;
       reloadModelCatalog?: (input: import("@actspace/shared").ModelsCatalogListInput) => Promise<import("@actspace/shared").ModelsCatalogListResult>;
       addModel?: (input: import("@actspace/shared").ModelsAddInput) => Promise<import("@actspace/shared").ModelMutationResult>;
+      addCustomModel?: (input: import("@actspace/shared").ModelsAddCustomInput) => Promise<import("@actspace/shared").ModelMutationResult>;
+      editCustomModel?: (input: import("@actspace/shared").ModelsEditCustomInput) => Promise<import("@actspace/shared").ModelMutationResult>;
+      setCustomConnectionDefaultModel?: (input: import("@actspace/shared").ModelsSetCustomDefaultInput) => Promise<import("@actspace/shared").ModelMutationResult>;
       updateModel?: (input: import("@actspace/shared").ModelsUpdateInput) => Promise<import("@actspace/shared").ModelMutationResult>;
       removeModel?: (input: import("@actspace/shared").ModelsRemoveInput) => Promise<import("@actspace/shared").ModelMutationResult>;
       updateTaskModels?: (input: import("@actspace/shared").TaskModelsUpdateInput) => Promise<import("@actspace/shared").TaskModelsUpdateResult>;

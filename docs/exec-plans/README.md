@@ -14,8 +14,6 @@
 
 ## 当前进行中
 
-
-
 | 计划 | 当前状态与下一步 |
 |---|---|
 | [会话切换与后台运行](active/20260916-session-background-runs.md) | 按会话隔离 stream、后台工具状态与历史校准，补切换回归与桌面验收。 |
@@ -31,6 +29,8 @@
 2026-09-09 [逐项复核与设计合并清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)：初始 10 个 active 入口逐项复核；中文界面任务自行归档后，Context 补齐全仓回归也进入 completed，当前剩余 8 个入口。P2 按语义检查缺口保留 active。
 
 ## 最近完成
+
+- [Anthropic 自定义连接、手动模型与价格](completed/20260924-anthropic-custom-model-pricing.md)：Claude Code 常见的 Anthropic Messages 根地址、显式测试、短缓存开关、连接内手动模型与四类价格已完成；真实 Electron 点击和真实中转站缓存命中保留人工门禁。
 
 - [主 Agent Chat 形态](completed/20260924-main-chat-form.md)：固定 Session preset、Chat 两工具、Prompt cache 动态尾部、首版附件与可调压缩阈值已实施；真实 Electron/Provider/本地文件与主题验收见执行摘要。
 
