@@ -22,8 +22,9 @@ export function projectContextState(
   const entries: ContextStateEntry[] = [];
   const push = (kind: ContextStateEntry["kind"], id: string, title: string, value: RuntimeV2JsonValue, pinned = false) => {
     const preview = contextPreview(value);
-    if (!preview) return;
-    entries.push({ id, kind, title, estimatedTokens: estimateTokens(preview), included: true, pinned, removable: false, preview });
+    const tokenText = contextTokenText(value);
+    if (!preview && !tokenText) return;
+    entries.push({ id, kind, title, estimatedTokens: estimateTokens(tokenText), included: true, pinned, removable: false, preview: preview || "Internal runtime context" });
   };
 
   for (const [index, section] of array(request.systemSections).entries()) {
@@ -47,7 +48,7 @@ export function projectContextState(
     push("toolDefinitions", `request-${latest?.seq ?? 0}-tool-${index}`, string(value.name) ?? `Tool ${index + 1}`, tool);
   }
 
-  const facts = array(request.facts);
+  const facts = request.schemaVersion === 2 ? array(request.modelFacts) : array(request.facts);
   if (facts.length > 0) push("systemPrompt", `request-${latest?.seq ?? 0}-facts`, "Runtime facts", facts, true);
   for (const [index, message] of messages.entries()) {
     const value = record(message);
@@ -96,5 +97,21 @@ function requestContextWindow(journal: readonly ContextProjectionEvent[]): numbe
 function record(value: RuntimeV2JsonValue | undefined): Readonly<Record<string, RuntimeV2JsonValue>> { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }
 function string(value: RuntimeV2JsonValue | undefined): string | undefined { return typeof value === "string" ? value : undefined; }
 function array(value: RuntimeV2JsonValue | undefined): readonly RuntimeV2JsonValue[] { return Array.isArray(value) ? value : []; }
-function contextPreview(value: RuntimeV2JsonValue): string { return (typeof value === "string" ? value : JSON.stringify(value, null, 2) ?? "").trim(); }
+function contextPreview(value: RuntimeV2JsonValue): string {
+  const sanitized = sanitizeRuntimeContext(value);
+  return (typeof sanitized === "string" ? sanitized : JSON.stringify(sanitized, null, 2) ?? "").trim();
+}
+function contextTokenText(value: RuntimeV2JsonValue): string { return (typeof value === "string" ? value : JSON.stringify(value) ?? "").trim(); }
+function sanitizeRuntimeContext(value: RuntimeV2JsonValue): RuntimeV2JsonValue {
+  if (typeof value === "string") return value.startsWith("<runtime_context>") ? "" : value;
+  if (Array.isArray(value)) return value.flatMap((item) => isRuntimeContext(item) ? [] : [sanitizeRuntimeContext(item)]);
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, sanitizeRuntimeContext(child)]));
+}
+function isRuntimeContext(value: RuntimeV2JsonValue): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
+  if (record.type === "runtime-context") return true;
+  return record.type === "text" && typeof record.text === "string" && record.text.startsWith("<runtime_context>");
+}
 function estimateTokens(value: string): number { if (!value) return 0; const ascii = [...value].filter(c => c.codePointAt(0)! <= 127).length; return Math.max(1, Math.ceil(ascii / 4 + value.length - ascii)); }

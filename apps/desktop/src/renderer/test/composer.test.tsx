@@ -409,7 +409,7 @@ describe("Composer follow-up bar", () => {
     expect(input.style.height).toBe("96px");
   });
 
-  it("opens the plus command menu with modes, Image, and Skills only", async () => {
+  it("opens the Agent plus command menu with Plan, Agent, Image, and Skills", async () => {
     const user = userEvent.setup();
     renderComposer();
 
@@ -417,9 +417,8 @@ describe("Composer follow-up bar", () => {
 
     const menu = screen.getByRole("menu", { name: "添加上下文或工具" });
     expect(within(menu).getByText("选择模式或添加上下文。")).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Chat" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Plan" })).toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: "Agent" })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Agent" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "图片" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Skills" })).toBeInTheDocument();
     expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|模型|Attach files/)).not.toBeInTheDocument();
@@ -436,10 +435,10 @@ describe("Composer follow-up bar", () => {
 
     const menu = await screen.findByRole("listbox", { name: "斜杠命令" });
     expect(within(menu).getByText("功能")).toBeInTheDocument();
-    const chatCommand = within(menu).getByRole("option", { name: /^chat:/ });
-    expect(chatCommand).toHaveTextContent("chat直接对话，不使用工具。");
-    expect(chatCommand).toHaveClass("min-h-9", "items-center");
-    expect(within(chatCommand).queryByText("Chat 模式")).not.toBeInTheDocument();
+    const planCommand = within(menu).getByRole("option", { name: /^plan:/ });
+    expect(planCommand).toHaveTextContent("plan使用只读工具进行调研和规划。");
+    expect(planCommand).toHaveClass("min-h-9", "items-center");
+    expect(within(menu).queryByRole("option", { name: /^chat:/ })).not.toBeInTheDocument();
     const compactCommand = within(menu).getByRole("option", { name: /^compact:/ });
     expect(compactCommand.querySelector("svg")).toHaveClass("lucide-asterisk");
     const statusCommand = within(menu).getByRole("option", { name: /^status:/ });
@@ -508,8 +507,8 @@ describe("Composer follow-up bar", () => {
     const input = screen.getByLabelText("消息输入框");
 
     await user.type(input, "/");
-    expect(input).toHaveAttribute("aria-activedescendant", "composer-slash-function-chat");
-    await user.keyboard("{ArrowDown}{Enter}");
+    expect(input).toHaveAttribute("aria-activedescendant", "composer-slash-function-plan");
+    await user.keyboard("{Enter}");
 
     expect(onModeChange).toHaveBeenCalledWith("plan");
     expect(onSend).not.toHaveBeenCalled();

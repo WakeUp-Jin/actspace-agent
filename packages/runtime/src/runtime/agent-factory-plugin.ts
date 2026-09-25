@@ -1,6 +1,6 @@
 import { AgentLoop } from "@actspace/core-agent-loop";
 import type { AgentLoopAssembly, AgentLoopServiceOptions } from "@actspace/core-agent-loop";
-import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox } from "@actspace/core-agent";
+import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset } from "@actspace/core-agent";
 import type { AgentSubject } from "@actspace/core-agent";
 import { AgentScope, scopeContext } from "@actspace/core-scope";
 import { ContributorRegistry, RequestAssembler } from "@actspace/prompt";
@@ -86,7 +86,8 @@ export function apply(ctx: CordisContext): void {
   };
 
   const createMainAgent = async (session: import("@actspace/session-persistence").SessionHandle): Promise<AgentLoopAssembly> => {
-    const descriptor = Object.freeze({ ...MAIN_AGENT_DESCRIPTOR, routeId: llm.routes.list()[0]?.routeId ?? MAIN_AGENT_DESCRIPTOR.routeId });
+    const preset = resolveMainAgentPreset(session.header.createdWith.presetId);
+    const descriptor = Object.freeze({ ...preset.descriptor, routeId: llm.routes.list()[0]?.routeId ?? MAIN_AGENT_DESCRIPTOR.routeId });
     const agentId = `main:${session.header.sessionId}`;
     const scope = new AgentScope(agentId, undefined, agentId);
     try {
@@ -95,9 +96,15 @@ export function apply(ctx: CordisContext): void {
       const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot);
       const source = await prompt.resolveSource(workspaceRoot);
       const contributors = new ContributorRegistry();
-      for (const contributor of prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills })) contributors.register(scope, contributor);
+      for (const contributor of prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills, profile: preset.promptProfile })) contributors.register(scope, contributor);
       const assembler = new RequestAssembler({ registry: contributors, prepare: async () => ({ route: descriptor.routeId, model: descriptor.model, registrationId: "cordis-agent", adapterVersion: "cordis-agent", defaults: {}, retryPolicy: {}, contextWindow: null }) });
-    const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox, assembler, llm, tools, toolEnvironment: toolEnvironmentFor, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
+      const allowedToolNames = preset.allowedToolNames === "all-except-web"
+        ? tools.registry.listDefinitions().map((definition) => definition.name).filter((name) => name !== "web")
+        : preset.allowedToolNames;
+      const sessionCompaction = preset.id === "actspace.chat"
+        ? compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))
+        : compaction;
+      const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox, assembler, llm, tools, toolEnvironment: toolEnvironmentFor, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, allowedToolNames: new Set(allowedToolNames), compaction: sessionCompaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
       activeSessions.set(session.header.sessionId, session);
       const unpublish = registry.publish({ agentId: `main:${session.header.sessionId}`, descriptor, scope, session, dispose: async () => { loop.quiesce(); activeSessions.delete(session.header.sessionId); await scope.dispose(); } });
       return Object.freeze({ descriptor, scope, subject, session, inbox, loop, dispose: async () => { unpublish(); loop.quiesce(); activeSessions.delete(session.header.sessionId); await scope.dispose(); } });

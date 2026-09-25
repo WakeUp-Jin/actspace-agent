@@ -271,7 +271,7 @@ describe("SettingsPage", () => {
         general: {
           personalization: { displayName: "", responseStyle: "" },
           agentInstructions: { systemPromptPath: "/tmp/main-agent.md" },
-          taskDefaults: { temperature: null, maxOutputTokens: null },
+          taskDefaults: { temperature: null, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 },
           shortcuts: {
             quickOpen: {
               enabled: true,

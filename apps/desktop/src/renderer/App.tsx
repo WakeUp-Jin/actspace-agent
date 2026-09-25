@@ -233,6 +233,7 @@ function createLocalEmptySession(input: NewSessionInput = {}): SessionRecord {
       createdAt: now,
       updatedAt: now,
       agentRunCount: 0,
+      agentForm: input.agentForm ?? "agent",
       workspaceRoot: input.workspaceRoot,
     },
     events: [],
@@ -1563,6 +1564,7 @@ export function App() {
           title: created.meta.title,
           updatedAt: created.meta.updatedAt,
           agentRunCount: created.meta.agentRunCount,
+          agentForm: created.meta.agentForm,
           workspaceRoot: created.meta.workspaceRoot,
         },
         ...current,
@@ -1575,6 +1577,7 @@ export function App() {
       const created = await window.actspace.createSession({
         ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
         ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
+        ...(input.agentForm ? { agentForm: input.agentForm } : {}),
       });
       if (selectionRequest === messageRequestRef.current) {
         setActiveSessionId(created.meta.id);
@@ -2508,6 +2511,7 @@ export function App() {
         reviewSummary={reviewSummary}
         onReviewChanged={handleReviewChanged}
         models={usableChatModels}
+        agentForm={sessionRecord?.meta.agentForm ?? visibleSessions.find((session) => session.id === activeSessionId)?.agentForm ?? "agent"}
         />
         <ShutdownOverlay />
       </RightPanelProvider>

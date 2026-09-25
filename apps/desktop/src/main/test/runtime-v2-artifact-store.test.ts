@@ -22,4 +22,13 @@ describe("DesktopArtifactStore", () => {
     await writeFile(join(store.root, ref.artifactId), "tampered");
     await expect(store.read(ref.artifactId)).rejects.toThrow("integrity check failed");
   });
+
+  it("deletes staged artifacts only for their owning Session", async () => {
+    const root = await mkdtemp(join(tmpdir(), "actspace-desktop-artifact-delete-")); roots.push(root);
+    const store = new DesktopArtifactStore(root);
+    const ref = await store.create({ bytes: Buffer.from("staged"), mediaType: "text/plain", owner: { sessionId: "session-a", callId: "call", pluginId: "plugin", name: "attachment" } });
+    await expect(store.deleteForSession("session-b", ref.artifactId)).rejects.toThrow("does not belong");
+    await store.deleteForSession("session-a", ref.artifactId);
+    await expect(store.read(ref.artifactId)).rejects.toThrow();
+  });
 });

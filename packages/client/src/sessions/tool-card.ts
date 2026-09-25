@@ -22,7 +22,7 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
   if (localName === "list_directory") return { kind: "directory_list", path: displayPath(string(args.path) ?? "."), entryCount: countOutputLines(output), displayText: summary, resultPreview };
   if (localName === "grep") return { kind: "grep", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "glob") return { kind: "glob", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
-  if (localName === "web_search" || localName === "web_fetch") return { kind: "web_search", mode: localName === "web_fetch" ? "url" : "query", ...(localName === "web_fetch" ? { url: string(args.url) ?? "" } : { query: string(args.query) ?? "" }), displayText: summary, contentPreview: output.slice(0, 2_000) };
+  if (localName === "web" || localName === "web_search" || localName === "web_fetch") { const open = localName === "web_fetch" || string(args.action) === "open"; return { kind: "web_search", mode: open ? "url" : "query", ...(open ? { url: string(args.url) ?? "" } : { query: string(args.query) ?? "" }), displayText: summary, contentPreview: output.slice(0, 2_000) }; }
   if (localName === "write_file" || localName === "edit_file") {
     const result = record(detailValue(data, "result"));
     const filePath = displayPath(string(result.path) ?? string(args.path) ?? "");

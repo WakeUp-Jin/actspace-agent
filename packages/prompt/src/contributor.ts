@@ -2,7 +2,7 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { AgentScope } from "@actspace/core-scope";
 
 export type ContributorLayer = "core" | "profile" | "host" | "agent" | "plugin";
-export type ContributorKind = "prompt-section" | "request-fact";
+export type ContributorKind = "prompt-section" | "model-fact" | "request-fact";
 export type ContributorCriticality = "required" | "optional";
 
 export type AssemblyInput = {

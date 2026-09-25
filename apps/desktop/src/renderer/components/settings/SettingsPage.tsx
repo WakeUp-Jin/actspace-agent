@@ -951,6 +951,7 @@ export function TaskModelDefaultsSection({
   const [usable, setUsable] = useState<Record<"chat" | "utility" | "explore", UsableModelView[]>>({ chat: [], utility: [], explore: [] });
   const [temperature, setTemperature] = useState("");
   const [maxOutputTokens, setMaxOutputTokens] = useState("");
+  const [chatCompactionPercent, setChatCompactionPercent] = useState("80");
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const v4Ready = Boolean(settingsV4 && onUpdateNamespace && settingsV4Available());
@@ -972,6 +973,7 @@ export function TaskModelDefaultsSection({
     if (!defaults) return;
     setTemperature(defaults.temperature === null ? "" : String(defaults.temperature));
     setMaxOutputTokens(defaults.maxOutputTokens === null ? "" : String(defaults.maxOutputTokens));
+    setChatCompactionPercent(String(Math.round((defaults.chatCompactionTriggerRatio ?? 0.8) * 100)));
   }, [settingsV4]);
 
   const updateTask = async (field: keyof TaskModelSettings, value: ModelKey | null) => {
@@ -989,9 +991,11 @@ export function TaskModelDefaultsSection({
   const saveGenerationDefaults = async () => {
     const parsedTemperature = temperature.trim() ? Number(temperature) : null;
     const parsedMaxTokens = maxOutputTokens.trim() ? Number(maxOutputTokens) : null;
+    const parsedChatCompactionPercent = Number(chatCompactionPercent);
     if ((parsedTemperature !== null && (!Number.isFinite(parsedTemperature) || parsedTemperature < 0 || parsedTemperature > 2)) ||
-      (parsedMaxTokens !== null && (!Number.isInteger(parsedMaxTokens) || parsedMaxTokens < 1 || parsedMaxTokens > 1_000_000))) {
-      setError("请检查温度和最大输出 Token 的范围。");
+      (parsedMaxTokens !== null && (!Number.isInteger(parsedMaxTokens) || parsedMaxTokens < 1 || parsedMaxTokens > 1_000_000)) ||
+      (!Number.isInteger(parsedChatCompactionPercent) || parsedChatCompactionPercent < 50 || parsedChatCompactionPercent > 95 || parsedChatCompactionPercent % 5 !== 0)) {
+      setError("请检查温度、最大输出 Token 和 Chat 压缩阈值的范围。");
       return;
     }
     if (!onUpdateNamespace) return;
@@ -1000,7 +1004,7 @@ export function TaskModelDefaultsSection({
     try {
       await onUpdateNamespace({
         namespace: "general",
-        patch: { taskDefaults: { temperature: parsedTemperature, maxOutputTokens: parsedMaxTokens } },
+        patch: { taskDefaults: { temperature: parsedTemperature, maxOutputTokens: parsedMaxTokens, chatCompactionTriggerRatio: parsedChatCompactionPercent / 100 } },
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "生成参数保存失败。");
@@ -1048,6 +1052,26 @@ export function TaskModelDefaultsSection({
             disabled={!v4Ready}
             className="h-9 w-[140px] rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20 disabled:cursor-not-allowed disabled:opacity-55 max-[600px]:w-full"
           />
+        }
+      />
+      <SettingRow
+        title="Chat 自动压缩阈值"
+        description="仅影响 Chat 形态；达到上下文窗口的该比例时沿用现有自动压缩流程。"
+        control={
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="Chat 自动压缩阈值"
+              type="number"
+              min="50"
+              max="95"
+              step="5"
+              value={chatCompactionPercent}
+              onChange={(event) => setChatCompactionPercent(event.target.value)}
+              disabled={!v4Ready}
+              className="h-9 w-[100px] rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20 disabled:cursor-not-allowed disabled:opacity-55"
+            />
+            <span className="text-[13px] text-text-muted">%</span>
+          </div>
         }
       />
       <div className="flex items-center justify-between gap-3 px-3.5 py-3 max-[600px]:flex-col max-[600px]:items-start">

@@ -32,6 +32,8 @@
 
 ## 最近完成
 
+- [主 Agent Chat 形态](completed/20260924-main-chat-form.md)：固定 Session preset、Chat 两工具、Prompt cache 动态尾部、首版附件与可调压缩阈值已实施；真实 Electron/Provider/本地文件与主题验收见执行摘要。
+
 - [Desktop Session Scope Grant](completed/session-scope-grants.md)：Desktop 核心文件 exact/subtree Session Grant、Journal 恢复、Runtime 匹配、审批选择、管理与撤销已完成；真实 Electron 重启和三态主题矩阵保留人工验收。
 
 - [Permission Runtime 基础切换](completed/permission-runtime-foundation.md)：`default/full-access`、结构化资源、once/deny、敏感边界、审批后复验、Session mode 与 Desktop/CLI Host 直接切换完成；后续 Desktop Session Grant 已独立交付。

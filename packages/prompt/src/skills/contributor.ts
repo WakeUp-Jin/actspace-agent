@@ -7,12 +7,12 @@ export function createSkillCatalogContributor(catalog: SkillCatalog, scopeId: st
     id: "core/skills-catalog",
     ownerPluginId: "@actspace/core",
     scopeId,
-    kind: "request-fact",
+    kind: "model-fact",
     layer: "core",
     order: 50,
     criticality: "required",
-    resolve: (input) => ({
-      value: catalog.toPromptCatalog().map((skill) => ({ ...skill, selected: input.selectedSkillIds.includes(skill.id) })) as unknown as Record<string, never>,
+    resolve: () => ({
+      value: catalog.toPromptCatalog() as unknown as Record<string, never>,
       provenance: { skillDigests: catalog.list().map((skill) => ({ id: skill.id, digest: skill.contentDigest })) },
     }),
   });

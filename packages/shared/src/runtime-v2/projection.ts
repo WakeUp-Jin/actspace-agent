@@ -41,6 +41,7 @@ export type RuntimeV2GlobalSessionSummary = {
   readonly updatedAt: string;
   readonly workspaceRoot: string | null;
   readonly profileId: string;
+  readonly agentForm: import("./runtime").MainAgentForm;
   readonly title: string | null;
   readonly pinned: boolean;
   readonly archived: boolean;
@@ -343,6 +344,7 @@ export type RuntimeV2SessionSnapshot = {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly workspaceRoot: string | null;
+  readonly agentForm: import("./runtime").MainAgentForm;
   readonly permissionMode: PermissionMode;
   readonly sessionGrants: readonly SessionGrant[];
   readonly throughJournalSeq: number;

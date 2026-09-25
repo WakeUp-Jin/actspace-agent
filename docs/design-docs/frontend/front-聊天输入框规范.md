@@ -1,6 +1,17 @@
 # 聊天输入框规范
 
 > 2026-09-09 文案更新：日常界面展示名称以[中文文案规范](front-desktop-chinese-ui.md)为准；保留 Chat、Plan、Thinking、Effort 和工具执行展示。本文英文名称仍可用于指代内部概念，协议与行为不变。
+>
+> 2026-09-24 形态更新：Chat 已从逐轮模式升级为创建 Session 时固定的主 Agent 形态；Plan/Agent 仍是 Agent 形态内的单轮模式。下文与此冲突的旧三模式描述由本节及[主 Agent 的 Chat 形态](../agent-runtime/agent-main-chat-form.md)取代。
+
+## 2026-09-24 Chat 形态边界
+
+- 新建会话入口提供 Agent 与 Chat；`Command+N` 默认 Agent。当前会话不原地切换形态。
+- Agent Composer 的 `+` 菜单提供 Plan、Agent、图片与 Skills；Chat Composer 显示固定 Chat 标识，隐藏 Plan/Agent、Skills、Workspace/Worktree 和权限入口。
+- Chat 保留模型、Thinking、Context、图片与文件附件、发送/停止。
+- Chat 文件入口只接受 PNG/JPEG/WEBP/GIF、TXT、Markdown、JSON、CSV；首版明确不支持 PDF、DOC、DOCX。
+- `/chat` 不再是 Slash Command；Chat 只能从新建会话入口创建。
+- Chat 的硬工具边界是 `web` 与 `generate_image`，不是无工具模式；Agent 的 Plan/Agent 工具边界保持原语义。
 
 ## 定位
 
@@ -17,7 +28,7 @@
 ## 内容
 
 - follow-up 输入区域默认一行高，内容较长时向多行扩展（上限内滚动）。
-- 左侧 `+` command menu，用于选择 Chat / Plan / Agent 运行模式，并添加图片或 Skill 上下文。
+- 左侧 `+` command menu：Agent 形态用于选择 Plan / Agent 并添加图片或 Skill；Chat 形态用于添加图片与首版文本附件。
 - 当前运行模式 pill，紧跟 `+` 展示，让用户在发送前持续看到本轮能力边界。
 - `Review / overflow` 操作层。
 - 模型按钮下拉。

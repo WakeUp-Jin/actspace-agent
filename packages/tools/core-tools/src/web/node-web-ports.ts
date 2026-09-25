@@ -22,15 +22,18 @@ export type NodeWebToolPortsOptions = {
   readonly resolveHostname?: (hostname: string) => Promise<readonly string[]>;
 };
 
-export type NodeWebToolPorts = Pick<CoreToolPorts, "web_search" | "web_fetch"> & { readonly dispose: () => Promise<void> };
+export type NodeWebToolPorts = Pick<CoreToolPorts, "web" | "web_search" | "web_fetch"> & { readonly dispose: () => Promise<void> };
 
 export function createNodeWebToolPorts(options: NodeWebToolPortsOptions = {}): NodeWebToolPorts {
   const fetchImpl = options.fetchImpl ?? fetch;
   const resolveHostname = options.resolveHostname ?? resolveHostnameAddresses;
   const cache = new Map<string, { readonly expiresAt: number; readonly value: string }>();
+  const search = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webSearch(args, context, options.credentials ?? {}, fetchImpl);
+  const open = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webFetch(args, context, fetchImpl, resolveHostname, cache);
   return Object.freeze({
-    web_search: (args, context) => webSearch(args, context, options.credentials ?? {}, fetchImpl),
-    web_fetch: (args, context) => webFetch(args, context, fetchImpl, resolveHostname, cache),
+    web: (args, context) => args.action === "search" ? search(args, context) : args.action === "open" ? open(args, context) : Promise.resolve(failed("INVALID_ARGUMENTS", "action must be search or open", false)),
+    web_search: search,
+    web_fetch: open,
     dispose: async () => { cache.clear(); },
   });
 }

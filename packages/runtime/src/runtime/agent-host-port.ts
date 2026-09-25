@@ -11,5 +11,6 @@ export type AgentRuntimeHostPort = {
   readonly compositionDigest: string;
   readonly hostCapabilityDigest: string;
   readonly plugins: readonly { readonly id: string; readonly version: string }[];
+  readonly chatCompactionTriggerRatio?: () => number;
   readonly onLiveEvent?: (event: AgentLoopLiveEvent) => void;
 };

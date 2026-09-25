@@ -3,6 +3,28 @@ import { createCordisRoot } from "@actspace/cordis-adapter";
 import { runToolStreamFixture } from "../testing.js";
 
 describe("AgentLoop tool live events", () => {
+  it.each(["chat", "plan", "agent"] as const)("persists %s mode at the end of the user message", async (mode) => {
+    const requests: string[] = [];
+    const { journal } = await runToolStreamFixture({ mode, terminalOnly: true, onMessages: (messages) => requests.push(JSON.stringify(messages)) });
+    const user = journal.find((event) => event.type === "user/message")?.surface?.node;
+    expect(user?.content).toEqual([
+      { type: "text", text: "Read fixture" },
+      { type: "runtime-context", context: { agentMode: mode } },
+    ]);
+    expect(requests[0]).toContain(`<runtime_context>{\\"agentMode\\":\\"${mode}\\"}</runtime_context>`);
+  });
+
+  it("replays the same persisted runtime context on the next tool step", async () => {
+    const requests: (readonly import("@actspace/llm-service").LlmMessage[])[] = [];
+    await runToolStreamFixture({ mode: "agent", onMessages: (messages) => requests.push(messages) });
+    expect(requests).toHaveLength(2);
+    const marker = '<runtime_context>{"agentMode":"agent"}</runtime_context>';
+    for (const messages of requests) {
+      const content = messages.find((message) => message.role === "user")?.content;
+      expect(Array.isArray(content) ? content.at(-1) : null).toEqual({ type: "text", text: marker });
+    }
+  });
+
   it("reserves the last subagent step for a tool-free summary and preserves lineage", async () => {
     const tools: string[][] = [];
     const messages: string[] = [];

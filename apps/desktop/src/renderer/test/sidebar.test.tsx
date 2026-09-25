@@ -307,14 +307,16 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(onArchive).not.toHaveBeenCalled();
   });
 
-  it("invokes onNewSession when clicking the workspace folder + button", async () => {
+  it("creates Agent or Chat from the workspace folder + menu", async () => {
     const { onNewSession } = renderSidebar();
 
     const addButtons = screen.getAllByRole("button", { name: "在工作区中新建会话" });
     expect(addButtons.length).toBeGreaterThanOrEqual(2); // actspace-agent + agent-harness-dev
     await userEvent.click(addButtons[0]);
+    const menu = screen.getByRole("menu", { name: /选择会话形态/ });
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Chat" }));
 
-    expect(onNewSession).toHaveBeenCalled();
+    expect(onNewSession).toHaveBeenCalledWith(expect.objectContaining({ agentForm: "chat" }));
   });
 
   it("shows See more when a workspace has more than 10 sessions and loads the next batch on click", async () => {

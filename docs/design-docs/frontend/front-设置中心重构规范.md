@@ -848,7 +848,8 @@ settings.json
     },
     "taskDefaults": {
       "temperature": null,
-      "maxOutputTokens": null
+      "maxOutputTokens": null,
+      "chatCompactionTriggerRatio": 0.8
     },
     "shortcuts": {
       "quickOpen": {}
@@ -894,6 +895,8 @@ settings.json
 ```
 
 这段结构表达的是所有权和迁移目标，不要求第一阶段一次性迁移所有字段。`permissionMode`、`thinkingLevel` 等尚未有稳定运行时语义的字段不进入 v4 正式结构；等对应能力真正接入后再扩展 namespace。实现时必须提供 v3 到 v4 的幂等迁移，并继续兼容旧 Renderer 需要的投影视图。
+
+`general.taskDefaults.chatCompactionTriggerRatio` 只覆盖 Chat 形态的自动压缩触发比例，范围 0.5～0.95，默认 0.8。它沿用现有 Compaction 算法、摘要 route 与 replacement 语义，不引入新的 token 硬预算或历史 include/exclude 系统；Agent、Subagent、CLI 和手动 compact 不受影响。Desktop Host 以只读 resolver 提供当前值，使设置保存后无需重启 Runtime 即影响 Chat 下一次自动判断。
 
 ### 8.5 模型数据的正规化
 

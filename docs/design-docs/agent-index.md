@@ -33,6 +33,7 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 
 ## Runtime 观测层
 
+- `agent-runtime/agent-main-chat-form.md`：已实施的主 Agent Chat 形态；固定 Session preset、Prompt cache 分层、两个工具、附件与压缩设置边界。
 - `agent-runtime/agent-turn-layers.md`：Host、Profile Bootstrap / App Bundle、Agent semantics、capability execution、Journal / Projection 五层职责规范。
 - `agent-runtime/agent-observability-trace-model.md`：Journal 派生的 Agent Run / Turn / request / tool Journal 观测契约。
 

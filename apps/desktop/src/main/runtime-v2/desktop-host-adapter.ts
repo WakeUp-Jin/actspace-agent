@@ -17,6 +17,7 @@ export type DesktopRuntimeV2BootOptions = {
   readonly models: DesktopRuntimeV2ModelPort;
   readonly approvals: DesktopRuntimeV2ApprovalPort;
   readonly browser: DesktopRuntimeV2BrowserPort;
+  readonly chatCompactionTriggerRatio: () => number;
   readonly invocationId: string;
   readonly onToolProgress?: (update: {
     readonly sessionId: string;
@@ -85,6 +86,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       services: Object.freeze({
       ...(options.speech ? { "actspace.host.speech": options.speech } : {}),
       "actspace.host.desktop": Object.freeze({ workspaceRoot: options.roots.workspaceRoot }),
+      "actspace.host.chat-settings": Object.freeze({ compactionTriggerRatio: options.chatCompactionTriggerRatio }),
       "host.approval": approvalBroker,
       "host.browser": browser,
       "host.artifacts": artifacts,

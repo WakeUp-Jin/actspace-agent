@@ -5,6 +5,7 @@ import type { ModelsCatalogListResult, ProviderBalanceSnapshot } from "../ipc";
 import type { ProviderId as LlmProviderId } from "../provider-config";
 import type { RuntimeV2DiagnosticsSnapshot, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot } from "./projection";
 import type {
+  MainAgentForm,
   RuntimeV2BootManifest,
   RuntimeV2RunTurnRequest,
   RuntimeV2RunTurnResponse,
@@ -74,7 +75,7 @@ export type RuntimeV2DesktopSnapshot = {
 };
 
 export type RuntimeV2InspectSessionInput = { readonly sessionId: string };
-export type RuntimeV2CreateSessionInput = { readonly sessionId?: string; readonly workspaceRoot?: string };
+export type RuntimeV2CreateSessionInput = { readonly sessionId?: string; readonly workspaceRoot?: string; readonly agentForm?: MainAgentForm };
 export type RuntimeV2ForkSessionInput = { readonly parentSessionId: string; readonly boundarySeq: number; readonly newSessionId: string };
 export type RuntimeV2ExportSessionResult = { readonly sessionId: string; readonly jsonl: string };
 export type RuntimeV2EnqueueMessageInput = { readonly sessionId: string; readonly content: RuntimeV2JsonValue; readonly target: "next-step" | "next-turn"; readonly messageId?: string };
@@ -142,6 +143,8 @@ export type RuntimeV2AttachmentRef = {
   readonly mimeType: string;
   readonly name: string;
   readonly sizeBytes: number;
+  /** Decoded body for Chat text attachments. Persisted in the user/message content, not exposed as a filesystem capability. */
+  readonly textContent?: string;
 };
 export type RuntimeV2ApprovalRequest = {
   readonly requestId: string;

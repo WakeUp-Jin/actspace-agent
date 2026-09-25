@@ -53,6 +53,7 @@ export function createNodeCoreToolPorts(options: NodeCoreToolPortsOptions): Core
     write_file: (args, context) => writeFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)),
     delete_file: (args, context) => deleteFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)),
     ...(bash === undefined ? {} : { bash: bash.bash, bash_output: bash.bash_output, bash_kill: bash.bash_kill, dispose: bash.dispose }),
+    web: web.web,
     web_search: web.web_search,
     web_fetch: web.web_fetch,
     generate_image: image.generate_image,

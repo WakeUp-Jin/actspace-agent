@@ -34,7 +34,12 @@ export class RequestAssembler {
       }
     }
     const systemSections = outputs.flatMap((item) => item.contributor.kind === "prompt-section" && item.output !== undefined ? [item.output] : []);
-    const facts = [{ host: input.hostFacts }, ...outputs.flatMap((item) => item.contributor.kind === "request-fact" && item.output !== undefined ? [item.output] : [])];
+    const modelFacts = outputs.flatMap((item) => item.contributor.kind === "model-fact" && item.output !== undefined ? [item.output] : []);
+    const facts = [
+      { host: input.hostFacts },
+      ...modelFacts,
+      ...outputs.flatMap((item) => item.contributor.kind === "request-fact" && item.output !== undefined ? [item.output] : []),
+    ];
     return freezeRequest({
       sessionId: input.sessionId,
       turnId: input.turnId,
@@ -42,7 +47,8 @@ export class RequestAssembler {
       messages: input.surface,
       systemSections,
       facts,
-      renderedSystemPrompt: renderSystemPrompt(systemSections, facts),
+      modelFacts,
+      renderedSystemPrompt: renderSystemPrompt(systemSections, modelFacts),
       tools,
       contributorProvenance: outputs.map((item) => item.provenance),
       requestOptions,
@@ -50,13 +56,13 @@ export class RequestAssembler {
   }
 
   finalize(candidate: LogicalRequestCandidate, prepared: PreparedRequestMetadata, compositionDigest: string, hostCapabilityDigest: string): LogicalRequestSnapshot {
-    return freezeRequest({ ...candidate, schemaVersion: 1, compositionDigest, hostCapabilityDigest, prepared }) as LogicalRequestSnapshot;
+    return freezeRequest({ ...candidate, schemaVersion: 2, compositionDigest, hostCapabilityDigest, prepared }) as LogicalRequestSnapshot;
   }
 }
 
-export function renderSystemPrompt(systemSections: readonly RuntimeV2JsonValue[], facts: readonly RuntimeV2JsonValue[]): string {
+export function renderSystemPrompt(systemSections: readonly RuntimeV2JsonValue[], modelFacts: readonly RuntimeV2JsonValue[]): string {
   const sections = systemSections.map(renderSection).filter((section) => section.length > 0);
-  if (facts.length > 0) sections.push(`<runtime_facts>\n${JSON.stringify(facts)}\n</runtime_facts>`);
+  if (modelFacts.length > 0) sections.push(`<runtime_facts>\n${JSON.stringify(modelFacts)}\n</runtime_facts>`);
   return sections.join("\n\n");
 }
 

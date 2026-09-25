@@ -1,6 +1,6 @@
 # Web 工具设计：web_fetch 与 web_search
 
-本文是 `web_fetch`（URL 精读）与 `web_search`（关键词搜索）两个工具的设计事实来源。
+本文是 `web_fetch`（URL 精读）、`web_search`（关键词搜索）与 Chat 专用 `web` 门面的设计事实来源。
 
 当前代码位置：
 
@@ -24,6 +24,17 @@
 | `web_search` | 关键词搜索，返回结构化结果列表 | 外部搜索 API | 至少配置一个搜索 provider key（`hasWebSearchKey`） |
 
 两者配合的模式写进了工具描述与输出里：`web_search` 找到候选 URL → `web_fetch` 精读页面全文。
+
+## Chat 的 `web` 门面
+
+`actspace.chat` 只向模型暴露 `web` 与 `generate_image`。其中 `web` 不是第三套联网实现，而是一个判别式门面：
+
+- `action: "search"` 复用 `web_search` 的 provider、failover、超时和结果去重；
+- `action: "open"` 复用 `web_fetch` 的 URL 校验、SSRF 防护、重定向复验、大小限制和 HTML 转换；
+- Agent 形态继续暴露 `web_search` / `web_fetch`，并显式排除 `web`，避免模型同时看到重复工具；
+- 搜索未配置时返回不可重试的配置提示；`open` 不依赖搜索 key。
+
+这个门面只改变 Chat 的工具 schema，不改变底层安全与供应商边界。
 
 > Kimi 作为**公开主模型**时也不再挂 provider-native `$web_search`。所有模型的联网搜索统一走本地 `web_search` / `web_fetch` 工具链。
 
@@ -103,3 +114,4 @@ web_search(query)
 - 2026-07-09：图片理解不再通过独立 Kimi helper 工具兜底；模型是否接收图片由 `MODEL_REGISTRY.input` 统一声明，具体见 `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`。
 - 2026-07-06：不引入 firecrawl（付费、非按量）与火山引擎搜索（与方舟模型 API 耦合的 server tool，非独立 REST）。
 - 2026-07-07：`web_search` 输出以国际线为主参考——国际组排前、去重优先保留国际条目，分组标题附渠道特性说明与 primary/supplementary 标注（双通道有结果时）。放弃「按供应商给结果打静态数字比重」方案：数字权重会让模型直接忽略低分结果，而结果质量实际随 query 语言变化，且国际线内部是 failover（Tavily/TinyFish/Exa 不共存），静态权重只能区分两组，收益薄。描述性说明把判断权留给模型。
+- 2026-09-24：为固定 Chat 形态增加 `web(action=search|open)` 门面；底层继续复用 `web_search` / `web_fetch`，Agent 不暴露该门面。

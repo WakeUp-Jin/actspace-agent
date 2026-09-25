@@ -95,7 +95,8 @@ export class AgentLoop {
       if (turnEnvironment.permissionModeExplicit && currentPermissionMode(this.options.session.journal.events) !== configuredPermissionMode) {
         await this.options.session.append(core("permission/mode-set", { mode: configuredPermissionMode, changedAt: new Date().toISOString(), source: "host" }));
       }
-      if (!hasUserMessage(this.options.session, messageId)) await this.options.session.append(core("user/message", { messageId, agentRunId, turnId }, { surface: { kind: "append", node: { kind: "user", messageId, content: input.content } } }));
+      const persistedContent = this.options.descriptor.presetId === "actspace.chat" ? input.content : appendRuntimeContext(input.content, mode);
+      if (!hasUserMessage(this.options.session, messageId)) await this.options.session.append(core("user/message", { messageId, agentRunId, turnId }, { surface: { kind: "append", node: { kind: "user", messageId, content: persistedContent } } }));
       while (stepCount < this.options.descriptor.maxSteps) {
         if (controller.signal.aborted) throw new AgentRuntimeError("TURN_ABORTED", "Turn was aborted.");
         await this.options.inbox.claim("next-step");
@@ -278,7 +279,6 @@ export class AgentLoop {
   }
 
   private toolDefinitions(mode: RuntimeV2AgentMode): readonly LlmToolDefinition[] {
-    if (mode === "chat") return Object.freeze([]);
     return this.options.tools.registry.listDefinitions()
       .filter((definition) => this.options.allowedToolNames?.has(definition.name) ?? true)
       .filter((definition) => mode === "agent" || isPlanTool(definition))
@@ -400,10 +400,15 @@ function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<
     if (block.type === "reasoning" && typeof block.text === "string") return [{ type: "reasoning", text: block.text, ...(typeof block.signature === "string" ? { signature: block.signature } : {}), ...(isRecord(block.replay) ? { replay: block.replay as never } : {}) }];
     if (block.type === "tool-call" && typeof block.callId === "string" && typeof block.name === "string") return [{ type: "tool-call", callId: block.callId, name: block.name, arguments: typeof block.arguments === "string" ? block.arguments : JSON.stringify(block.arguments ?? {}) }];
     if (block.type === "json") return [{ type: "text", text: JSON.stringify(block.value ?? null) }];
+    if (block.type === "runtime-context" && isRecord(block.context)) return [{ type: "text", text: `<runtime_context>${JSON.stringify(block.context)}</runtime_context>` }];
     if (block.type === "artifact" && isRecord(block.artifact)) {
       const { artifactId, mediaType } = block.artifact;
       if (typeof artifactId === "string" && typeof mediaType === "string") {
         if (mediaType.startsWith("image/")) return [{ type: "image", artifactId, mimeType: mediaType, ...(typeof block.label === "string" ? { alt: block.label } : {}) }];
+        if (typeof block.text === "string") {
+          const label = typeof block.label === "string" ? block.label : "File";
+          return [{ type: "text", text: `<attached_file name=${JSON.stringify(label)} media_type=${JSON.stringify(mediaType)}>\n${block.text}\n</attached_file>` }];
+        }
         return [{ type: "text", text: `${typeof block.label === "string" ? block.label : "File"} (${mediaType}, artifactId=${artifactId}). ${paths.get(artifactId) ?? "File reference only; this Host cannot resolve its read path."}` }];
       }
     }
@@ -411,6 +416,12 @@ function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<
   });
 }
 function parseArgs(value: string): RuntimeV2JsonValue { try { const parsed = JSON.parse(value); return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}; } catch { return {}; } }
+function appendRuntimeContext(content: RuntimeV2JsonValue, mode: RuntimeV2AgentMode): RuntimeV2JsonValue {
+  const block = { type: "runtime-context", context: { agentMode: mode } } as const;
+  if (Array.isArray(content)) return [...content, block];
+  if (typeof content === "string") return [{ type: "text", text: content }, block];
+  return [{ type: "json", value: content }, block];
+}
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function compactionUsage(value: RuntimeV2JsonValue): { inputTokens: number; outputTokens: number } | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;

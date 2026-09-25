@@ -14,5 +14,5 @@ export function injectEnglishLearning<T extends LogicalRequestCandidate>(candida
     ...candidate.contributorProvenance.filter((value) => !(value && typeof value === "object" && !Array.isArray(value) && "contributorId" in value && value.contributorId === PROMPT_ID)),
     { contributorId: PROMPT_ID, ownerPluginId: PLUGIN_ID, layer: "plugin", promptVersion: 1 },
   ];
-  return Object.freeze({ ...candidate, systemSections: Object.freeze(systemSections), contributorProvenance: Object.freeze(contributorProvenance), renderedSystemPrompt: renderSystemPrompt(systemSections, candidate.facts) });
+  return Object.freeze({ ...candidate, systemSections: Object.freeze(systemSections), contributorProvenance: Object.freeze(contributorProvenance), renderedSystemPrompt: renderSystemPrompt(systemSections, candidate.modelFacts) });
 }

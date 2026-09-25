@@ -27,6 +27,8 @@ export async function runToolStreamFixture(options: {
   permission?: ToolPermissionContract;
   beforeFinalText?: () => Promise<void>;
   context?: CordisContext;
+  mode?: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode;
+  terminalOnly?: boolean;
 } = {}) {
   const registry = createCoreCodecRegistry();
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({
@@ -47,7 +49,11 @@ export async function runToolStreamFixture(options: {
       options.onRequest?.(input.request.options);
       options.onTools?.(input.request.tools);
       options.onMessages?.(input.request.messages);
-      if (requests++ === 0) {
+      if (options.terminalOnly) {
+        requests += 1;
+        yield { type: "text-delta", text: "Done." };
+        yield { type: "done", stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "Done." }] };
+      } else if (requests++ === 0) {
         yield { type: "text-delta", text: "Read now. " };
         if (options.deltas !== false) {
           yield { type: "tool-call-delta", callId: "read-1", name: "read_file", argumentsDelta: args.slice(0, 8) };
@@ -72,7 +78,7 @@ export async function runToolStreamFixture(options: {
     context: options.context,
   });
   try {
-    const result = await loop.runTurn({ content: "Read fixture", thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test" });
+    const result = await loop.runTurn({ content: "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test" });
     return { result, events, journal: [...session.journal.events], header: session.header, registry };
   } finally { options.onJournal?.([...session.journal.events]); await session.close(); await handle.dispose(100); }
 }

@@ -147,8 +147,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       return null;
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, async (_event, input: { title?: string; workspaceRoot?: string } = {}) => {
-    let snapshot = await options.registry.createSession(undefined, input.workspaceRoot ?? options.roots.workspaceRoot);
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, async (_event, input: { title?: string; workspaceRoot?: string; agentForm?: import("@actspace/shared/runtime-v2").MainAgentForm } = {}) => {
+    let snapshot = await options.registry.createSession(undefined, input.workspaceRoot ?? options.roots.workspaceRoot, input.agentForm);
     if (input.title?.trim()) {
       snapshot = await options.registry.updateSessionMetadata({ sessionId: snapshot.sessionId, title: input.title.trim() });
     }
@@ -215,18 +215,24 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent, async (_event, input: RunAgentInput): Promise<Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection }> => {
-    const content = await toRunContent(options.registry, input.sessionId, input.userInput, input.attachments ?? []);
-    const result = await options.registry.runTurn({
-      sessionId: input.sessionId,
-      agentRunId: input.agentRunId,
-      messageId: `user-${input.agentRunId}`,
-      content,
-      selectedSkillIds: input.selectedSkills,
-      model: input.modelKey ?? input.model,
-      mode: input.mode,
-      thinkingEnabled: input.thinkingEnabled,
-      reasoningEffort: input.reasoningEffort,
-    });
+    const prepared = await toRunContent(options.registry, input.sessionId, input.userInput, input.attachments ?? []);
+    let result: Awaited<ReturnType<DesktopRuntimeV2Registry["runTurn"]>>;
+    try {
+      result = await options.registry.runTurn({
+        sessionId: input.sessionId,
+        agentRunId: input.agentRunId,
+        messageId: `user-${input.agentRunId}`,
+        content: prepared.content,
+        selectedSkillIds: input.selectedSkills,
+        model: input.modelKey ?? input.model,
+        mode: input.mode,
+        thinkingEnabled: input.thinkingEnabled,
+        reasoningEffort: input.reasoningEffort,
+      });
+    } catch (error) {
+      await options.registry.rollbackImportedAttachments(input.sessionId, prepared.importedArtifactIds);
+      throw error;
+    }
     const snapshot = result.snapshot;
     const record = await options.registry.readSessionProjection({ sessionId: snapshot.sessionId });
     return {
@@ -490,13 +496,26 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
 function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, handle: Handle): void {
   const registryOptions = workspaceRegistryOptions(options.roots);
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectFiles, async () => {
-    const result = await dialog.showOpenDialog(options.getMainWindow(), { properties: ["openFile", "multiSelections"] });
-    return { canceled: result.canceled, attachments: result.filePaths.map((path) => ({ id: `att_${randomUUID()}`, kind: "file" as const, path, name: path.split(/[\\/]/).at(-1) ?? path })) };
+    const result = await dialog.showOpenDialog(options.getMainWindow(), {
+      properties: ["openFile", "multiSelections"],
+      filters: [{ name: "Chat attachments", extensions: ["png", "jpg", "jpeg", "webp", "gif", "txt", "md", "markdown", "json", "csv"] }],
+    });
+    const attachments = await Promise.all(result.filePaths.map(async (path) => {
+      const image = /\.(png|jpe?g|webp|gif)$/i.test(path);
+      return {
+        id: `att_${randomUUID()}`,
+        kind: image ? "image" as const : "file" as const,
+        path,
+        name: path.split(/[\\/]/).at(-1) ?? path,
+        ...(image ? { previewUrl: await imagePreviewDataUrl(path) } : {}),
+      };
+    }));
+    return { canceled: result.canceled, attachments };
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectImages, async () => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), {
       properties: ["openFile", "multiSelections"],
-      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp"] }],
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
     });
     const images = await Promise.all(result.filePaths.map(async (path) => ({
       id: `att_${randomUUID()}`,
@@ -673,6 +692,7 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
     accessState: item.accessState,
     isChildSession: item.lineage !== null,
     agentRunCount,
+    agentForm: item.agentForm,
     workspaceRoot: item.workspaceRoot ?? undefined,
     pinned: item.metadata.pinned,
     archived: item.metadata.archived,
@@ -684,19 +704,36 @@ async function toRunContent(
   sessionId: string,
   userInput: string,
   attachments: readonly ComposerAttachment[],
-): Promise<RuntimeV2JsonValue> {
-  if (attachments.length === 0) return userInput;
+): Promise<{ readonly content: RuntimeV2JsonValue; readonly importedArtifactIds: readonly string[] }> {
+  if (attachments.length === 0) return { content: userInput, importedArtifactIds: [] };
+  const snapshot = await registry.inspectSession(sessionId);
   const blocks: RuntimeV2JsonValue[] = userInput ? [{ type: "text", text: userInput }] : [];
+  const usableAttachments = attachments.filter((attachment) => Boolean(attachment.path));
+  if (snapshot.agentForm === "chat") {
+    const imported = await registry.importChatAttachments(sessionId, usableAttachments.map((attachment) => attachment.path!));
+    for (const attachment of imported) {
+      blocks.push({
+        type: "artifact",
+        artifact: { artifactId: attachment.artifactId, mediaType: attachment.mimeType },
+        label: attachment.name,
+        ...(attachment.textContent === undefined ? {} : { text: attachment.textContent }),
+      });
+    }
+    return { content: blocks, importedArtifactIds: imported.map((attachment) => attachment.artifactId) };
+  }
+
+  const importedArtifactIds: string[] = [];
   for (const attachment of attachments) {
     if (!attachment.path) continue;
     const imported = await registry.importAttachment(sessionId, attachment.path);
+    importedArtifactIds.push(imported.artifactId);
     if (attachment.kind === "image") {
       blocks.push({ type: "artifact", artifact: { artifactId: imported.artifactId, mediaType: imported.mimeType }, label: imported.name });
     } else {
       blocks.push({ type: "text", text: `Attached file: ${imported.name} (${imported.artifactId})` });
     }
   }
-  return blocks;
+  return { content: blocks, importedArtifactIds };
 }
 
 function workspaceRegistryOptions(roots: AppDataRoots): WorkspaceRegistryOptions {

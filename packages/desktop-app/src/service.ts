@@ -5,6 +5,7 @@ import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/
 import type { SessionHandle } from "@actspace/session-persistence";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type {
+  MainAgentForm,
   RuntimeV2JsonValue,
   RuntimeV2RunTurnRequest,
   RuntimeV2RunTurnResponse,
@@ -26,7 +27,7 @@ type SessionService = {
       readonly createdWith: SessionHandle["header"]["createdWith"];
     }): Promise<SessionHandle>;
   };
-  create(sessionId?: string, workspaceRoot?: string): Promise<SessionHandle>;
+  create(sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm): Promise<SessionHandle>;
   resume(sessionId: string): Promise<SessionHandle>;
   snapshot(session: SessionHandle): RuntimeV2SessionSnapshot;
   inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot>;
@@ -65,7 +66,7 @@ export type DesktopAppServiceContract = {
   readonly inspectSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly inspectSessionEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]>;
   readonly exportSession: (sessionId: string) => Promise<string>;
-  readonly createMainSession: (sessionId?: string, workspaceRoot?: string) => Promise<RuntimeV2SessionSnapshot>;
+  readonly createMainSession: (sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm) => Promise<RuntimeV2SessionSnapshot>;
   readonly resumeMainSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly forkMainSession: (parentSessionId: string, boundarySeq: number, newSessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly runTurn: (input: RuntimeV2RunTurnRequest) => Promise<RuntimeV2RunTurnResponse>;
@@ -110,8 +111,8 @@ export class DesktopAppService implements DesktopAppServiceContract {
   inspectSessionEvents(sessionId: string) { return this.#sessions.inspectEvents(sessionId); }
   exportSession(sessionId: string) { return this.#sessions.export(sessionId); }
 
-  async createMainSession(sessionId?: string, workspaceRoot?: string): Promise<RuntimeV2SessionSnapshot> {
-    const session = await this.#sessions.create(sessionId, workspaceRoot);
+  async createMainSession(sessionId?: string, workspaceRoot?: string, agentForm: MainAgentForm = "agent"): Promise<RuntimeV2SessionSnapshot> {
+    const session = await this.#sessions.create(sessionId, workspaceRoot, agentForm);
     await this.#runs.attach(session);
     return this.#sessions.snapshot(session);
   }
@@ -139,7 +140,8 @@ export class DesktopAppService implements DesktopAppServiceContract {
 
   async runTurn(input: RuntimeV2RunTurnRequest): Promise<RuntimeV2RunTurnResponse> {
     const session = await this.#sessions.resume(input.sessionId);
-    if (!this.#disposed && this.#sessions.snapshot(session).metadata.title === null && !this.#titleJobs.has(input.sessionId)) {
+    const snapshot = this.#sessions.snapshot(session);
+    if (!this.#disposed && snapshot.metadata.title === null && !this.#titleJobs.has(input.sessionId)) {
       const title = titleFromContent(input.content);
       if (title !== null) {
         const controller = new AbortController();
@@ -154,11 +156,11 @@ export class DesktopAppService implements DesktopAppServiceContract {
       messageId: input.messageId,
       agentRunId: input.agentRunId,
       model: input.model,
-      mode: input.mode,
+      mode: snapshot.agentForm === "chat" ? "agent" : input.mode,
       thinkingEnabled: input.thinkingEnabled,
       reasoningEffort: input.reasoningEffort,
       keepPendingOnAbort: input.keepPendingOnAbort,
-      selectedSkillIds: input.selectedSkillIds,
+      selectedSkillIds: snapshot.agentForm === "chat" ? [] : input.selectedSkillIds,
     });
   }
 

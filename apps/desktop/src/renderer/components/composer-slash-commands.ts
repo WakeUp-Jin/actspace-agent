@@ -1,7 +1,6 @@
 import type { SkillCatalogItem } from "@actspace/shared";
 
 export type ComposerSlashFunctionId =
-  | "chat"
   | "plan"
   | "agent"
   | "compact"
@@ -18,13 +17,6 @@ export type ComposerSlashFunction = {
 };
 
 export const COMPOSER_SLASH_FUNCTIONS: readonly ComposerSlashFunction[] = [
-  {
-    id: "chat",
-    command: "/chat",
-    label: "Chat 模式",
-    description: "直接对话，不使用工具。",
-    searchAliases: "Chat mode Talk without tools.",
-  },
   {
     id: "plan",
     command: "/plan",

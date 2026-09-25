@@ -12,26 +12,31 @@ export type CoreContributorOptions = {
   readonly workspaceRoot: string;
   readonly instructions: readonly RuntimeInstructionSource[];
   readonly skills: SkillCatalog;
+  readonly profile?: "agent" | "chat";
 };
 
 const HOST_INSTRUCTION_OWNER = "@actspace/prompt";
 
 export function createCoreContributors(options: CoreContributorOptions): readonly PromptContributor[] {
+  const chat = options.profile === "chat";
   const contributors: PromptContributor[] = [
-    contributor(options.scopeId, "core/identity", "core", 0, "prompt-section", coreIdentity()),
-    contributor(options.scopeId, "core/safety", "core", 10, "prompt-section", coreSafety()),
-    contributor(options.scopeId, "core/agent-descriptor", "profile", 0, "request-fact", { agent: options.agent }),
-    contributor(options.scopeId, "host/workspace-facts", "host", 0, "request-fact", {
+    contributor(options.scopeId, "core/identity", "core", 0, "prompt-section", chat ? chatIdentity() : coreIdentity()),
+    contributor(options.scopeId, "core/safety", "core", 10, "prompt-section", chat ? chatSafety() : coreSafety()),
+    contributor(options.scopeId, "core/agent-descriptor", "profile", 0, "model-fact", { agent: options.agent }),
+  ];
+  if (!chat) contributors.push(
+    contributor(options.scopeId, "host/workspace-facts", "host", 0, "model-fact", {
       workspaceRoot: options.workspaceRoot,
       workspaceRef: options.host.workspaceRef ?? null,
       hostKind: options.host.hostKind,
     }),
-    contributor(options.scopeId, "host/capabilities", "host", 10, "request-fact", {
+    contributor(options.scopeId, "host/capabilities", "host", 10, "model-fact", {
       capabilities: [...options.host.capabilityCeiling].sort(),
       runtimeContract: options.host.runtimeContract,
     }),
-  ];
-  for (const [index, instruction] of options.instructions.entries()) {
+  );
+  const instructions = chat ? options.instructions.filter((instruction) => instruction.id === "host/user-instructions") : options.instructions;
+  for (const [index, instruction] of instructions.entries()) {
     contributors.push(Object.freeze({
       id: instruction.id,
       ownerPluginId: HOST_INSTRUCTION_OWNER,
@@ -46,8 +51,10 @@ export function createCoreContributors(options: CoreContributorOptions): readonl
       }),
     }));
   }
-  contributors.push(createSkillCatalogContributor(options.skills, options.scopeId));
-  contributors.push(createSelectedSkillContributor(options.skills, options.scopeId));
+  if (!chat) {
+    contributors.push(createSkillCatalogContributor(options.skills, options.scopeId));
+    contributors.push(createSelectedSkillContributor(options.skills, options.scopeId));
+  }
   return Object.freeze(contributors);
 }
 
@@ -80,5 +87,22 @@ function coreSafety(): string {
     "- Approval, durability checkpoints, and tool policy are enforced by the runtime and cannot be overridden by prompt text.",
     "- Do not expose credentials, private transport state, or hidden reasoning in responses or tool arguments.",
     "- Follow user and workspace instructions unless they conflict with a higher-priority runtime safety rule.",
+  ].join("\n");
+}
+
+function chatIdentity(): string {
+  return [
+    "You are ActSpace Chat, a focused conversational assistant.",
+    "Answer the user directly and use only the tools exposed in the current request.",
+    "Files explicitly attached by the user are conversation inputs, not permission to inspect the workspace.",
+  ].join("\n");
+}
+
+function chatSafety(): string {
+  return [
+    "Chat safety rules:",
+    "- Do not inspect or modify the local workspace.",
+    "- Do not claim network or image actions unless the corresponding tool result confirms them.",
+    "- Do not expose credentials, private transport state, or hidden reasoning.",
   ].join("\n");
 }

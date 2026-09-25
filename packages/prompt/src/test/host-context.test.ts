@@ -31,9 +31,36 @@ describe("runtime Prompt sources", () => {
     expect(snapshot.renderedSystemPrompt).toContain("WORKSPACE_RULE");
     expect(snapshot.renderedSystemPrompt).toContain("SELECTED_SKILL_BODY");
     expect(snapshot.facts).toContainEqual(expect.objectContaining({ capabilities: ["approval", "filesystem.read"] }));
+    expect(snapshot.modelFacts).toContainEqual(expect.objectContaining({ capabilities: ["approval", "filesystem.read"] }));
     expect(JSON.stringify(snapshot.facts)).toContain("SKILL.md");
+    expect(JSON.stringify(snapshot.modelFacts)).not.toContain('"selected"');
     expect(JSON.stringify(snapshot.contributorProvenance)).toContain("contentDigest");
     await scope.dispose();
     expect(registry.visible(scope)).toEqual([]);
+  });
+
+  it("keeps Chat prompts free of workspace instructions and Skill catalog entries", async () => {
+    const scope = new AgentScope("actspace.chat", undefined, "main:chat");
+    const registry = new ContributorRegistry();
+    for (const contributor of createCoreContributors({
+      scopeId: scope.identity.scopeId,
+      agent: { ...MAIN_AGENT_DESCRIPTOR, id: "actspace.chat", presetId: "actspace.chat" },
+      host: { hostKind: "desktop", capabilityCeiling: ["network.provider", "filesystem.read"], runtimeContract: "actspace.runtime.v2", invocationId: "dynamic", workspaceRef: "/workspace" },
+      workspaceRoot: "/workspace",
+      instructions: [
+        { id: "host/user-instructions", title: "User instructions", path: "/data/AGENTS.md", content: "USER_RULE", contentDigest: "user-digest" },
+        { id: "host/workspace-instructions", title: "Workspace instructions", path: "/workspace/AGENTS.md", content: "WORKSPACE_RULE", contentDigest: "workspace-digest" },
+      ],
+      skills: [{ id: "review", name: "review", description: "Review", path: "/workspace/SKILL.md", content: "SKILL_BODY" }],
+      profile: "chat",
+    })) registry.register(scope, contributor);
+    const assembler = new RequestAssembler({ registry, prepare: async () => ({ route: "default", model: "default", registrationId: "registration", adapterVersion: "test", defaults: {}, retryPolicy: {} }) });
+    const snapshot = await assembler.assemble({ sessionId: "session", turnId: "turn", stepId: "step", scope, surface: [{ role: "user", content: "hello" }], hostFacts: { agentRunId: "run" }, selectedSkillIds: ["review"] }, [], {}, "composition", "host");
+    expect(snapshot.renderedSystemPrompt).toContain("USER_RULE");
+    expect(snapshot.renderedSystemPrompt).not.toContain("WORKSPACE_RULE");
+    expect(snapshot.renderedSystemPrompt).not.toContain("SKILL_BODY");
+    expect(snapshot.renderedSystemPrompt).not.toContain("/workspace");
+    expect(snapshot.renderedSystemPrompt).not.toContain("dynamic");
+    await scope.dispose();
   });
 });

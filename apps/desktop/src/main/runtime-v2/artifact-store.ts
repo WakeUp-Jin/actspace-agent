@@ -54,6 +54,15 @@ export class DesktopArtifactStore {
     return Object.freeze({ path: verified.path, bytes: verified.bytes, mediaType: verified.metadata.mediaType });
   }
 
+  async deleteForSession(sessionId: string, artifactId: string): Promise<void> {
+    const verified = await this.#readVerified(artifactId);
+    if (verified.metadata.owner.sessionId !== sessionId) throw new Error("Artifact does not belong to this Session.");
+    await Promise.all([
+      rm(verified.path),
+      rm(`${verified.path}.json`),
+    ]);
+  }
+
   async #readVerified(artifactId: string): Promise<{ readonly path: string; readonly bytes: Buffer; readonly metadata: ArtifactMetadata }> {
     if (!/^[0-9a-f-]{36}$/i.test(artifactId)) throw new Error("Invalid artifact id.");
     const path = join(this.root, artifactId);

@@ -1,5 +1,5 @@
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
-import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import type { PermissionMode, SessionGrant } from "@actspace/shared/runtime-v2";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlaskConical } from "lucide-react";
@@ -138,6 +138,7 @@ export function WorkbenchLayout({
   reviewSummary,
   onReviewChanged,
   models,
+  agentForm = "agent",
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -185,6 +186,7 @@ export function WorkbenchLayout({
   getSessionPreview?: SessionPreviewResolver;
   reviewSummary?: ComposerReviewSummary | null;
   onReviewChanged?: () => void;
+  agentForm?: MainAgentForm;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(() =>
@@ -572,6 +574,7 @@ export function WorkbenchLayout({
         reviewSummary={reviewSummary}
         onOpenReview={openReviewTab}
         models={models}
+        agentForm={agentForm}
         activeView={sessionMainView}
         trajectory={projectedTrajectory}
       />

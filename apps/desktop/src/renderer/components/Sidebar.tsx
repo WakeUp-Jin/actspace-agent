@@ -23,7 +23,7 @@ import {
   Sparkles,
   SquarePen,
 } from "lucide-react";
-import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
+import type { MainAgentForm, SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type SidebarMode = "expanded" | "hidden";
@@ -31,6 +31,7 @@ export type SidebarView = "chat" | "lab" | "settings" | "extensions";
 export type NewSessionInput = {
   workspaceId?: string;
   workspaceRoot?: string;
+  agentForm?: MainAgentForm;
 };
 export type SessionUiStatusKind = "idle" | "running" | "waiting_approval" | "failed";
 type SessionStatusMeta = { label: string; detail: string; dotClass: string; rowClass: string };
@@ -894,6 +895,7 @@ export function Sidebar({
   onArchiveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
   onRemoveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
 }) {
+  const [newSessionMenuOpen, setNewSessionMenuOpen] = useState(false);
   const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
   const [workspacesCollapsed, setWorkspacesCollapsed] = useState(false);
   const busyIds = busySessionIds ?? new Set<string>();
@@ -944,15 +946,42 @@ export function Sidebar({
   return (
     <aside className={SIDEBAR_CLASS}>
       <div className={SIDEBAR_PRIMARY_ACTIONS_CLASS}>
-        <button
-          className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "chat" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
-          type="button"
-          onClick={() => handleNewAgent()}
-        >
-          <SquarePen size={14} strokeWidth={1.9} />
-          <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>新建会话</span>
-          <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">⌘N</span>
-        </button>
+        <div className="relative flex items-center">
+          <button
+            className={`${SIDEBAR_PRIMARY_ACTION_CLASS} min-w-0 flex-1 ${view === "chat" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
+            type="button"
+            onClick={() => handleNewAgent({ agentForm: "agent" })}
+          >
+            <SquarePen size={14} strokeWidth={1.9} />
+            <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>新建会话</span>
+            <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">⌘N</span>
+          </button>
+          <button
+            className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-act-md text-text-faint hover:bg-hover-overlay hover:text-text-main"
+            type="button"
+            aria-label="选择新会话形态"
+            aria-haspopup="menu"
+            aria-expanded={newSessionMenuOpen}
+            onClick={() => setNewSessionMenuOpen((open) => !open)}
+          >
+            <ChevronDown size={13} strokeWidth={2} aria-hidden="true" />
+          </button>
+          {newSessionMenuOpen ? (
+            <div className="absolute left-2 right-2 top-[calc(100%_+_4px)] z-40 rounded-act-md border border-line bg-surface-raised p-1 shadow-act-popover" role="menu" aria-label="选择会话形态">
+              {(["agent", "chat"] as const).map((agentForm) => (
+                <button
+                  className="flex min-h-8 w-full items-center rounded-act-sm px-2 text-left text-sm text-text-main hover:bg-hover-overlay"
+                  key={agentForm}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setNewSessionMenuOpen(false); handleNewAgent({ agentForm }); }}
+                >
+                  {agentForm === "agent" ? "Agent" : "Chat"}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <button
           className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "extensions" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
           type="button"
@@ -1104,9 +1133,11 @@ function WorkspaceSection({
   onRemoveWorkspace,
 }: WorkspaceSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [newSessionMenuOpen, setNewSessionMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const labelRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const newSessionMenuRef = useRef<HTMLDivElement | null>(null);
   const archiveDisabled = allSessions.length === 0 || allSessions.some((session) => {
     const status = resolvedSessionStatus(session.id, busySessionIds, sessionStatuses);
     return status === "running" || status === "waiting_approval";
@@ -1115,6 +1146,22 @@ function WorkspaceSection({
     ? allSessions.length === 0 ? "没有可归档的会话" : "请等待运行中或待处理的会话结束"
     : "归档全部会话";
   const removeDisabled = group.workspaceId === workspaces.find((workspace) => workspace.kind === "default")?.id;
+
+  useEffect(() => {
+    if (!newSessionMenuOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!newSessionMenuRef.current?.contains(event.target as Node)) setNewSessionMenuOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNewSessionMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [newSessionMenuOpen]);
 
   useEffect(() => {
     if (!menuPosition) return;
@@ -1208,22 +1255,39 @@ function WorkspaceSection({
         >
           <span className={WORKSPACE_NAME_CLASS}>{group.label}</span>
         </button>
-        <div className={`nav-section-actions workspace-folder-actions ${WORKSPACE_ACTIONS_CLASS}`} aria-label="工作区操作">
+        <div ref={newSessionMenuRef} className={`nav-section-actions workspace-folder-actions relative ${WORKSPACE_ACTIONS_CLASS}`} aria-label="工作区操作">
           <button
             className={WORKSPACE_ADD_BUTTON_CLASS}
             type="button"
             aria-label="在工作区中新建会话"
             title="在此工作区中新建会话"
+            aria-haspopup="menu"
+            aria-expanded={newSessionMenuOpen}
             onClick={(event) => {
               event.stopPropagation();
-              onNewSession?.({
-                workspaceId: group.workspaceId,
-                workspaceRoot: group.workspaceRoot,
-              });
+              setNewSessionMenuOpen((open) => !open);
             }}
           >
             <Plus size={13} strokeWidth={2} />
           </button>
+          {newSessionMenuOpen ? (
+            <div className="absolute right-0 top-[calc(100%_+_4px)] z-40 w-32 rounded-act-md border border-line bg-surface-raised p-1 shadow-act-popover" role="menu" aria-label={`在 ${group.label} 中选择会话形态`}>
+              {(["agent", "chat"] as const).map((agentForm) => (
+                <button
+                  className="flex min-h-8 w-full items-center rounded-act-sm px-2 text-left text-sm text-text-main hover:bg-hover-overlay"
+                  key={agentForm}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setNewSessionMenuOpen(false);
+                    onNewSession?.({ workspaceId: group.workspaceId, workspaceRoot: group.workspaceRoot, agentForm });
+                  }}
+                >
+                  {agentForm === "agent" ? "Agent" : "Chat"}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
       {collapsed ? null : (

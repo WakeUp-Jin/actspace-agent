@@ -237,6 +237,8 @@ export interface SettingsV4General {
   taskDefaults: {
     temperature: number | null;
     maxOutputTokens: number | null;
+    /** Automatic compaction threshold used only by Chat-form sessions. */
+    chatCompactionTriggerRatio: number;
   };
   shortcuts: ShortcutsSettings;
 }

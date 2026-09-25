@@ -76,7 +76,7 @@ export function registerRuntimeV2Ipc(options: {
   handle(RUNTIME_V2_DESKTOP_CHANNELS.listSessions, () => options.registry.listSessions());
   handle(RUNTIME_V2_DESKTOP_CHANNELS.inspectSession, (_event, input: RuntimeV2InspectSessionInput) => options.registry.inspectSession(input.sessionId));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.exportSession, (_event, input: RuntimeV2InspectSessionInput) => options.registry.exportSession(input.sessionId));
-  handle(RUNTIME_V2_DESKTOP_CHANNELS.createSession, (_event, input: RuntimeV2CreateSessionInput = {}) => options.registry.createSession(input.sessionId, input.workspaceRoot));
+  handle(RUNTIME_V2_DESKTOP_CHANNELS.createSession, (_event, input: RuntimeV2CreateSessionInput = {}) => options.registry.createSession(input.sessionId, input.workspaceRoot, input.agentForm));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.resumeSession, (_event, input: RuntimeV2InspectSessionInput) => options.registry.resumeSession(input.sessionId));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.forkSession, (_event, input: RuntimeV2ForkSessionInput) => options.registry.forkSession(input));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.runTurn, (_event, input: RuntimeV2RunTurnRequest) => options.registry.runTurn(input));

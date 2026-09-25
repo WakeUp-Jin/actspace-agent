@@ -32,6 +32,7 @@ export type DesktopRuntimeV2RegistryOptions = {
   readonly models: DesktopRuntimeV2ModelPort;
   readonly approvals: DesktopRuntimeV2ApprovalPort;
   readonly browser: DesktopRuntimeV2BrowserPort;
+  readonly chatCompactionTriggerRatio?: () => number;
   readonly loadModule?: () => Promise<RuntimeV2Module>;
   readonly log?: (message: string, details?: Record<string, unknown>) => void;
 };
@@ -49,6 +50,7 @@ export class DesktopRuntimeV2Registry {
     create(input: { readonly bytes: Uint8Array; readonly mediaType: string; readonly owner: { readonly sessionId: string; readonly callId: string; readonly pluginId: string; readonly name: string } }): Promise<{ readonly artifactId: string; readonly mediaType: string; readonly size: number }>;
     readForSession(sessionId: string, artifactId: string): Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }>;
     resolveForSession(sessionId: string, artifactId: string): Promise<{ readonly path: string; readonly bytes: Uint8Array; readonly mediaType: string }>;
+    deleteForSession(sessionId: string, artifactId: string): Promise<void>;
   } | undefined;
 
   constructor(private readonly options: DesktopRuntimeV2RegistryOptions) {}
@@ -95,13 +97,15 @@ export class DesktopRuntimeV2Registry {
   completeText(input: Parameters<DesktopAppServiceContract["completeText"]>[0]) { return this.requireApp().completeText(input); }
   async exportSession(sessionId: string) { return Object.freeze({ sessionId, jsonl: await this.requireApp().exportSession(sessionId) }); }
 
-  async createSession(sessionId?: string, workspaceRoot?: string) {
+  async createSession(sessionId?: string, workspaceRoot?: string, agentForm?: import("@actspace/shared/runtime-v2").MainAgentForm) {
     const app = this.requireApp();
     const resolved = await resolveWorkspaceSelection(this.workspaceRegistryOptions(), {
       workspaceRoot: workspaceRoot ?? this.options.roots.workspaceRoot,
     });
     if (resolved.ok === false) throw new Error(resolved.error);
-    const snapshot = await app.createMainSession(sessionId, resolved.workspaceRoot);
+    const snapshot = agentForm === undefined
+      ? await app.createMainSession(sessionId, resolved.workspaceRoot)
+      : await app.createMainSession(sessionId, resolved.workspaceRoot, agentForm);
     this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-created");
     return snapshot;
   }
@@ -216,6 +220,45 @@ export class DesktopRuntimeV2Registry {
     const mediaType = attachmentMediaType(path);
     const created = await this.#artifacts.create({ bytes: await readFile(path), mediaType, owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" } });
     return Object.freeze({ artifactId: created.artifactId, mimeType: created.mediaType, name: basename(path).slice(0, 240), sizeBytes: created.size });
+  }
+
+  async importChatAttachments(sessionId: string, paths: readonly string[]): Promise<readonly RuntimeV2AttachmentRef[]> {
+    const snapshot = await this.requireApp().inspectSession(sessionId);
+    if (snapshot.agentForm !== "chat") throw new Error("Chat attachment import is only available in Chat sessions.");
+    if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
+
+    const prepared = await prepareChatAttachments(paths);
+
+    const imported: RuntimeV2AttachmentRef[] = [];
+    try {
+      for (const attachment of prepared) {
+        const created = await this.#artifacts.create({
+          bytes: attachment.bytes,
+          mediaType: attachment.mediaType,
+          owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" },
+        });
+        imported.push(Object.freeze({
+          artifactId: created.artifactId,
+          mimeType: created.mediaType,
+          name: attachment.name,
+          sizeBytes: created.size,
+          ...(attachment.textContent === undefined ? {} : { textContent: attachment.textContent }),
+        }));
+      }
+      return Object.freeze(imported);
+    } catch (error) {
+      await Promise.allSettled(imported.map((attachment) => this.#artifacts!.deleteForSession(sessionId, attachment.artifactId)));
+      throw error;
+    }
+  }
+
+  async rollbackImportedAttachments(sessionId: string, artifactIds: readonly string[]): Promise<void> {
+    if (this.#artifacts === undefined || artifactIds.length === 0) return;
+    const snapshot = await this.requireApp().inspectSession(sessionId);
+    const unreferenced = artifactIds.filter((artifactId) => (
+      snapshot.messages.every((message) => findArtifactRef(message.content, artifactId) === null)
+    ));
+    await Promise.allSettled(unreferenced.map((artifactId) => this.#artifacts!.deleteForSession(sessionId, artifactId)));
   }
 
   subscribeRendererStream(listener: (event: import("@actspace/shared").RuntimeStreamEvent) => void): () => void { return this.#rendererStream.subscribe(listener); }
@@ -353,6 +396,7 @@ export class DesktopRuntimeV2Registry {
         models: this.options.models,
         approvals: this.options.approvals,
         browser: this.options.browser,
+        chatCompactionTriggerRatio: this.options.chatCompactionTriggerRatio ?? (() => 0.8),
         speech: this.options.speech,
         invocationId: randomUUID(),
         onToolProgress: (update) => this.#emitToolProgress(update),
@@ -427,5 +471,64 @@ function attachmentMediaType(path: string): string {
     case ".csv": return "text/csv";
     case ".md": return "text/markdown";
     default: return "text/plain";
+  }
+}
+
+const CHAT_TEXT_BYTE_LIMIT = 1024 * 1024;
+const CHAT_TEXT_TOTAL_CHARACTER_LIMIT = 256_000;
+const CHAT_IMAGE_BYTE_LIMIT = 20 * 1024 * 1024;
+
+export type PreparedChatAttachment = {
+  readonly bytes: Uint8Array;
+  readonly mediaType: string;
+  readonly name: string;
+  readonly textContent?: string;
+};
+
+export async function prepareChatAttachments(paths: readonly string[]): Promise<readonly PreparedChatAttachment[]> {
+  const prepared = await Promise.all(paths.map(prepareChatAttachment));
+  const decodedCharacters = prepared.reduce((total, attachment) => total + (attachment.textContent?.length ?? 0), 0);
+  if (decodedCharacters > CHAT_TEXT_TOTAL_CHARACTER_LIMIT) {
+    throw new Error(`Chat text attachments exceed the ${CHAT_TEXT_TOTAL_CHARACTER_LIMIT.toLocaleString("en-US")} character limit.`);
+  }
+  return Object.freeze(prepared);
+}
+
+async function prepareChatAttachment(path: string): Promise<PreparedChatAttachment> {
+  const metadata = await stat(path);
+  if (!metadata.isFile()) throw new Error("Attachment must be a regular file.");
+  const extension = extname(path).toLowerCase();
+  const mediaType = chatAttachmentMediaType(extension);
+  if (mediaType === undefined) {
+    throw new Error("Chat attachments support PNG, JPEG, WEBP, GIF, TXT, Markdown, JSON, and CSV files only.");
+  }
+  const isImage = mediaType.startsWith("image/");
+  const byteLimit = isImage ? CHAT_IMAGE_BYTE_LIMIT : CHAT_TEXT_BYTE_LIMIT;
+  if (metadata.size > byteLimit) {
+    throw new Error(isImage ? "Image attachment exceeds the 20 MiB limit." : "Text attachment exceeds the 1 MiB limit.");
+  }
+  const bytes = await readFile(path);
+  if (isImage) return Object.freeze({ bytes, mediaType, name: basename(path).slice(0, 240) });
+  let textContent: string;
+  try {
+    textContent = new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
+  } catch {
+    throw new Error("Chat text attachments must be valid UTF-8.");
+  }
+  if (textContent.includes("\0")) throw new Error("Chat text attachments cannot contain NUL bytes.");
+  return Object.freeze({ bytes, mediaType, name: basename(path).slice(0, 240), textContent });
+}
+
+function chatAttachmentMediaType(extension: string): string | undefined {
+  switch (extension) {
+    case ".png": return "image/png";
+    case ".jpg": case ".jpeg": return "image/jpeg";
+    case ".webp": return "image/webp";
+    case ".gif": return "image/gif";
+    case ".txt": return "text/plain";
+    case ".md": case ".markdown": return "text/markdown";
+    case ".json": return "application/json";
+    case ".csv": return "text/csv";
+    default: return undefined;
   }
 }

@@ -56,7 +56,7 @@ Kairos handoff、tick state 和 autonomous Prompt 不迁移。旧 conversation �
 | `id` | 全局稳定的 contributor id；推荐 `plugin-id/contribution-name` |
 | `owner` | 拥有它的 plugin registration；用于诊断和卸载 |
 | `scope` | 所属 Agent Scope；决定父子可见性和 shadow |
-| `kind` | `prompt-section` 或 `request-fact`；不能直接伪造 Session message |
+| `kind` | `prompt-section`、`model-fact` 或 `request-fact`；不能直接伪造 Session message |
 | `layer` | 组合层，例如 core、profile、host、agent、plugin |
 | `order` | 同一层中的显式整数顺序 |
 | `criticality` | `required` 或 `optional` |
@@ -71,6 +71,16 @@ Contributor 不得：
 - 返回无法序列化的 class instance、function、stream 或 native handle；
 - 通过 Prompt 声明 Host 没有授予的 capability；
 - 依赖全局注册顺序或 JavaScript module import 顺序决定输出。
+
+### 4.1 模型事实与审计事实
+
+`model-fact` 与 `request-fact` 必须分开：
+
+- `model-fact` 是模型确实需要看见、且适合进入稳定 system prompt 前缀的事实，例如 Agent descriptor、稳定 capability 描述与 Agent 形态下的 workspace facts；
+- `request-fact` 是用于审计、诊断和重放解释的动态事实，例如 `agentRunId`、Host invocation identity 与单次 request identity；它进入 snapshot 的 `facts`，但不进入 system prompt；
+- snapshot schema v2 同时保存 `facts` 和 `modelFacts`。读取 schema v1 时可将旧 `facts` 作为历史模型事实解释，不能修改已落盘 Journal。
+
+模型需要的逐轮动态事实不得重新塞回 system prompt。Agent 的 `plan/agent` 模式作为持久化 `runtime-context` 内容块追加在当前 `user/message` 末尾，使现场请求和后续 Surface 重放看到同一份动态尾部。Chat 形态固定，不写该块。renderer、标题和自然语言 Compaction 摘要必须隐藏它，但 Context token estimate 仍计算它。
 
 需要网络、文件或外部进程的动态能力应先由拥有它的 Service 产生受约束事实 snapshot，再由 Contributor 读取该 snapshot。Request Assembly 不是隐藏的工具执行器。
 
@@ -174,7 +184,7 @@ Core Prompt 至少拥有以下不可被普通插件绕过的 section：
 
 | Contributor | 内容 | 生命周期 |
 |---|---|---|
-| Skill catalog | 当前 Scope 可见 Skill 的 name、description、location 和选择信息 | 随 Skill registry registration 撤销 |
+| Skill catalog | 当前 Scope 可见 Skill 的 name、description 和 location；不含逐轮 selected 状态 | 随 Skill registry registration 撤销 |
 | Selected Skill body | 本次已选择 Skill 的完整指令、必要 references 和来源摘要 | 只属于当前 Agent / Turn 的 assembly snapshot |
 
 Skill discovery、选择和内容读取仍由 Skill Service 负责。Prompt Contributor 只接收经过校验的结果，不自己扫描任意路径。Skill 内容影响了模型输入时，最终渲染值或稳定内容引用必须进入 request snapshot。

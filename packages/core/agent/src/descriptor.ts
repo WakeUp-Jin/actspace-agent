@@ -9,4 +9,6 @@ export type AgentDescriptor = {
   readonly maxSteps: number;
 };
 
-export const MAIN_AGENT_DESCRIPTOR: AgentDescriptor = Object.freeze({ id: "actspace.main", version: 1, kind: "main", description: "ActSpace main Agent", presetId: "actspace.main", routeId: "default", model: "default", maxSteps: 32 });
+export { MAIN_AGENT_PRESETS } from "./main-preset.js";
+import { MAIN_AGENT_PRESETS } from "./main-preset.js";
+export const MAIN_AGENT_DESCRIPTOR: AgentDescriptor = MAIN_AGENT_PRESETS["actspace.main"].descriptor;

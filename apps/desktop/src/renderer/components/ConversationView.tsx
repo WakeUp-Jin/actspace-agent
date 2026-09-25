@@ -3,7 +3,7 @@ import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
+import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
 import { Composer, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
@@ -748,6 +748,7 @@ export function ConversationView({
   models,
   activeView = "chat",
   trajectory,
+  agentForm = "agent",
 }: {
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
@@ -784,6 +785,7 @@ export function ConversationView({
   onOpenReview?: () => void;
   activeView?: SessionMainView;
   trajectory?: RuntimeV2TrajectorySnapshot | null;
+  agentForm?: MainAgentForm;
 }) {
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
@@ -1067,6 +1069,7 @@ export function ConversationView({
                     inputHistory={inputHistory}
                     focusRequestId={composerFocusRequestId}
                     models={models}
+                    agentForm={agentForm}
                     sessionId={sessionId}
                   />
                 </div>
@@ -1156,6 +1159,7 @@ export function ConversationView({
             reviewSummary={reviewSummary}
             onOpenReview={onOpenReview}
             models={models}
+            agentForm={agentForm}
             sessionId={sessionId}
           />
         </div>

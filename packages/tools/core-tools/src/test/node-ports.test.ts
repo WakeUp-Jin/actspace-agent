@@ -141,6 +141,17 @@ describe("native v2 Core Tool ports", () => {
     expect(calls).toEqual([{ url: "https://api.tavily.com/search", authorization: "Bearer secret-search-key" }]);
   });
 
+  it("routes the Chat web facade to search and open while rejecting unknown actions", async () => {
+    const root = await workspace();
+    const fetchImpl = (async (input: string | URL | Request) => String(input).includes("api.tavily.com")
+      ? new Response(JSON.stringify({ results: [{ title: "Result", url: "https://example.com/page", content: "Useful result" }] }), { status: 200, headers: { "content-type": "application/json" } })
+      : new Response("public body", { status: 200, headers: { "content-type": "text/plain" } })) as typeof fetch;
+    const ports = createNodeCoreToolPorts({ workspaceRoot: root, searchCredentials: { tavily: "key" }, fetchImpl, resolveHostname: async () => ["93.184.216.34"] });
+    await expect(invoke(ports.web, { action: "search", query: "ActSpace" })).resolves.toMatchObject({ status: "completed" });
+    await expect(invoke(ports.web, { action: "open", url: "https://example.com/page" })).resolves.toMatchObject({ status: "completed" });
+    await expect(invoke(ports.web, { action: "invalid" })).resolves.toMatchObject({ status: "failed", failure: { code: "INVALID_ARGUMENTS", retryable: false } });
+  });
+
   it("blocks private Web fetch targets and revalidates every redirect", async () => {
     const root = await workspace(); let requests = 0;
     const fetchImpl = (async () => { requests += 1; return new Response(null, { status: 302, headers: { location: "http://127.0.0.1/private" } }); }) as typeof fetch;

@@ -1,6 +1,7 @@
 export { manifest } from "./manifest.js";
 export { apply, activate } from "./plugin.js";
 export * from "./descriptor.js";
+export * from "./main-preset.js";
 export * from "./dispatch.js";
 export * from "./agent.js";
 export * from "./errors.js";

@@ -1,5 +1,5 @@
 import { projectContextState } from "@actspace/shared";
-import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot, RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
+import { mainAgentFormFromPresetId, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
 import { SessionSurface, type SessionSurfaceView, type EventCodecRegistry, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
 import { registerSessionFacts, sessionFacts, SessionProjectionRegistry } from "@actspace/session-projection";
 import { createRunningToolView, completeToolView, projectRendererHint, type RendererAllowlist } from "./tool-dto.js";
@@ -62,7 +62,7 @@ export class SessionReadModel {
     return {
       kind: "session-snapshot", schemaVersion: 1, sessionId: this.header.sessionId,
       createdAt: this.header.createdAt, updatedAt: values.updatedAt as string,
-      workspaceRoot: values.workspaceRoot as string | null, throughJournalSeq: projection.throughJournalSeq, accessState,
+      workspaceRoot: values.workspaceRoot as string | null, agentForm: mainAgentFormFromPresetId(this.header.createdWith.presetId), throughJournalSeq: projection.throughJournalSeq, accessState,
       ...sessionFacts(this.projections, this.header.sessionId),
       messages: surface.entries.map(entry => ({ kind: entry.node.kind, messageId: entry.node.messageId, content: entry.node.content, ...(entry.node.kind === "tool-result" ? { callId: entry.node.callId } : {}) })),
       tools: values.tools as readonly RuntimeV2ToolView[], lineage: this.header.lineage as RuntimeV2JsonValue | null,

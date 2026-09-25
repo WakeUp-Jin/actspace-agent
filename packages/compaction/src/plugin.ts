@@ -51,10 +51,24 @@ export function apply(ctx: CordisContext, config: CompactionPluginConfig = {}): 
 }
 
 export class CompactionPlugin {
-  constructor(private readonly policy: CompactionPolicy, private readonly summarizer: CompactionSummarizer) {}
+  constructor(
+    private readonly policy: CompactionPolicy,
+    private readonly summarizer: CompactionSummarizer,
+    private readonly triggerRatioResolver?: () => number,
+  ) {}
+
+  withTriggerRatio(triggerRatio: number | (() => number)): CompactionPlugin {
+    const resolver = typeof triggerRatio === "function" ? triggerRatio : () => triggerRatio;
+    return new CompactionPlugin(this.policy, this.summarizer, resolver);
+  }
 
   async maybeCompact(session: SessionHandle, usage: TokenUsage): Promise<boolean> {
-    if (!shouldCompact(usage, this.policy)) return false;
+    let resolved: number | undefined;
+    try { resolved = this.triggerRatioResolver?.(); } catch { resolved = undefined; }
+    const triggerRatio = typeof resolved === "number" && Number.isFinite(resolved) && resolved > 0 && resolved <= 1
+      ? resolved
+      : this.policy.triggerRatio;
+    if (!shouldCompact(usage, { ...this.policy, triggerRatio })) return false;
     return this.compact(session);
   }
 

@@ -533,7 +533,7 @@ describe("App streaming user message", () => {
     await screen.findByRole("button", { name: "查看会话详情： New chat" });
     await userEvent.click(screen.getByRole("button", { name: "新建会话" }));
     await waitFor(() => expect(createSession).toHaveBeenCalled());
-    expect(createSession.mock.calls[0]).toEqual([{}]);
+    expect(createSession.mock.calls[0]).toEqual([{ agentForm: "agent" }]);
     record = { ...record, meta: { ...record.meta, title: "项目架构分析" } };
     act(() => notify?.({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } }));
     await screen.findByRole("button", { name: "查看会话详情： 项目架构分析" });

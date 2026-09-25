@@ -169,7 +169,6 @@ const COMMAND_BUTTON_CLASS =
 const MODE_BUTTON_BASE_CLASS =
   "mode-button inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border-0 px-2.5 text-sm font-medium transition-[filter,opacity] duration-[120ms] ease-in-out hover:brightness-95";
 const MODE_BUTTON_CLASS: Record<ComposerMode, string> = {
-  chat: "bg-info-soft text-on-info",
   plan: "bg-warning-soft text-on-warning",
   agent: "bg-operational-soft text-operational",
 };
@@ -300,17 +299,15 @@ type ComposerSlashResult =
 type ContextSelectorKind = "workspace" | "branch" | "runtime";
 
 const MODE_MENU_ITEMS: ModeMenuItem[] = [
-  { mode: "chat", label: "Chat", icon: MessageCircle },
   { mode: "plan", label: "Plan", icon: ListChecks },
+  { mode: "agent", label: "Agent", icon: Server },
 ];
 
 const MODE_META: Record<Exclude<ComposerMode, "agent">, Omit<ModeMenuItem, "mode">> = {
-  chat: { label: "Chat", icon: MessageCircle },
   plan: { label: "Plan", icon: ListChecks },
 };
 
 const SLASH_FUNCTION_ICONS: Record<ComposerSlashFunctionId, LucideIcon> = {
-  chat: MessageCircle,
   plan: ListChecks,
   agent: Server,
   compact: Asterisk,
@@ -484,6 +481,7 @@ export function Composer({
   reviewSummary,
   onOpenReview,
   models,
+  agentForm = "agent",
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   contextState?: ContextState | null;
@@ -518,7 +516,9 @@ export function Composer({
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
   models?: UsableModelView[];
+  agentForm?: import("@actspace/shared").MainAgentForm;
 }) {
+  const isChatForm = agentForm === "chat";
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && sessionProjection.sessionId === (sessionId ?? sessionProjection.sessionId)
     ? sessionProjection.cell
@@ -595,7 +595,7 @@ export function Composer({
   const modelSearchInputRef = useRef<HTMLInputElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const modelOptionsRef = useRef<HTMLDivElement | null>(null);
-  const hasAttachments = attachments.length > 0 || selectedSkills.length > 0;
+  const hasAttachments = attachments.length > 0 || (!isChatForm && selectedSkills.length > 0);
   const selectedModelAvailable = modelList.some((model) => model.id === selectedModelId);
   const selectedModelSpec = modelList.find((spec) => spec.id === selectedModelId);
   const canSendMessage = Boolean(
@@ -616,8 +616,8 @@ export function Composer({
   const filteredModelGroups = groupModelsByProvider(filteredModelList);
   const slashQuery = isStreaming ? null : parseComposerSlashQuery(message);
   const slashOpen = slashQuery !== null && !slashDismissed;
-  const filteredSlashFunctions = slashQuery === null ? [] : filterComposerSlashFunctions(slashQuery);
-  const filteredSlashSkills = slashQuery === null ? [] : filterComposerSlashSkills(skillItems, slashQuery);
+  const filteredSlashFunctions = slashQuery === null ? [] : filterComposerSlashFunctions(slashQuery).filter((item) => !isChatForm || ["compact", "status"].includes(item.id));
+  const filteredSlashSkills = slashQuery === null || isChatForm ? [] : filterComposerSlashSkills(skillItems, slashQuery);
   const slashResults: ComposerSlashResult[] = [
     ...filteredSlashFunctions.map((item): ComposerSlashResult => ({ kind: "function", item })),
     ...filteredSlashSkills.map((item): ComposerSlashResult => ({ kind: "skill", item })),
@@ -656,7 +656,7 @@ export function Composer({
   // 单行内容用 inline 紧凑布局；内容折行、有附件或 initial surface 切 stacked（参考 Cursor）。
   const resolvedLayout: "inline" | "stacked" =
     surface === "initial" || hasAttachments || isInputMultiline ? "stacked" : "inline";
-  const placeholder = mode === "chat"
+  const placeholder = isChatForm
     ? surface === "initial" ? "有什么想聊的？" : "继续对话…"
     : mode === "plan"
       ? surface === "initial" ? "先规划和设计，再编写代码…" : "继续完善方案…"
@@ -898,6 +898,25 @@ export function Composer({
     setAttachmentError("当前环境不支持图片选择。");
   }
 
+  async function handleSelectChatFiles() {
+    setCommandOpen(false);
+    setSkillsOpen(false);
+
+    if (window.actspace?.selectFiles) {
+      try {
+        const result = await window.actspace.selectFiles();
+        if (!result.canceled) appendAttachments(result.attachments);
+      } catch (error) {
+        console.error("Failed to select Chat attachments", error);
+        setAttachmentError("附件选择失败。");
+      }
+      return;
+    }
+
+    console.warn("File picker is only available in the desktop app.");
+    setAttachmentError("当前环境不支持附件选择。");
+  }
+
   async function handlePasteImages(event: ClipboardEvent<HTMLTextAreaElement>) {
     const imageFiles = Array.from(event.clipboardData.items)
       .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
@@ -1035,7 +1054,6 @@ export function Composer({
 
   function executeSlashFunction(item: ComposerSlashFunction) {
     switch (item.id) {
-      case "chat":
       case "plan":
       case "agent":
         onModeChange?.(item.id);
@@ -1127,6 +1145,16 @@ export function Composer({
     if (isStreaming) return;
 
     const files = Array.from(event.dataTransfer.files);
+    if (isChatForm) {
+      const unsupported = files.find((file) => {
+        const path = window.actspace?.getPathForFile?.(file) || file.name;
+        return !/\.(png|jpe?g|webp|gif|txt|md|markdown|json|csv)$/i.test(path);
+      });
+      if (unsupported) {
+        setAttachmentError("Chat 仅支持图片、TXT、Markdown、JSON 和 CSV 文件。");
+        return;
+      }
+    }
     appendAttachments(files.map(attachmentFromDroppedFile));
   }
 
@@ -1566,19 +1594,21 @@ export function Composer({
               role="menu"
               aria-label="添加上下文或工具"
             >
-            <div className={COMMAND_MENU_HINT_CLASS}>选择模式或添加上下文。</div>
-              {MODE_MENU_ITEMS.map(renderModeMenuButton)}
-              <div className={COMMAND_MENU_SEPARATOR_CLASS} />
+            <div className={COMMAND_MENU_HINT_CLASS}>{isChatForm ? "添加聊天附件。" : "选择模式或添加上下文。"}</div>
+              {isChatForm ? null : MODE_MENU_ITEMS.map(renderModeMenuButton)}
+              {isChatForm ? null : <div className={COMMAND_MENU_SEPARATOR_CLASS} />}
               <button
                 className={COMMAND_MENU_BUTTON_CLASS}
                 type="button"
                 role="menuitem"
-                onClick={() => void handleSelectImages()}
+                onClick={() => void (isChatForm ? handleSelectChatFiles() : handleSelectImages())}
               >
-                <Image className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
-                <span>图片</span>
+                {isChatForm
+                  ? <FileText className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
+                  : <Image className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />}
+                <span>{isChatForm ? "图片与文件" : "图片"}</span>
               </button>
-              <button
+              {!isChatForm ? <button
                 className={COMMAND_MENU_BUTTON_CLASS}
                 type="button"
                 role="menuitem"
@@ -1590,9 +1620,9 @@ export function Composer({
                 <BookOpen className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
                 <span>Skills</span>
                 <ChevronRight className="ml-auto text-text-faint" size={16} strokeWidth={2} aria-hidden="true" />
-              </button>
+              </button> : null}
             </div>
-            {skillsOpen ? renderSkillsMenu() : null}
+            {!isChatForm && skillsOpen ? renderSkillsMenu() : null}
           </div>
         ) : null}
       </div>
@@ -1600,6 +1630,12 @@ export function Composer({
   }
 
   function renderModeSelector() {
+    if (isChatForm) return (
+      <span className={`${MODE_BUTTON_BASE_CLASS} bg-info-soft text-on-info [grid-area:mode]`}>
+        <MessageCircle size={15} strokeWidth={2} aria-hidden="true" />
+        <span>Chat</span>
+      </span>
+    );
     if (mode === "agent") return null;
     const selectedMode = MODE_META[mode];
     const Icon = selectedMode.icon;
@@ -1935,7 +1971,7 @@ export function Composer({
   }
 
   function renderPanel() {
-    const composerBodyClass = mode === "agent"
+    const composerBodyClass = mode === "agent" && !isChatForm
       ? resolvedLayout === "inline" ? COMPOSER_BODY_AGENT_INLINE_CLASS : COMPOSER_BODY_AGENT_STACKED_CLASS
       : resolvedLayout === "inline" ? COMPOSER_BODY_INLINE_CLASS : COMPOSER_BODY_STACKED_CLASS;
     return (
@@ -2250,7 +2286,7 @@ export function Composer({
   }
 
   function renderPlanNewIdeaChip() {
-    if (surface !== "initial") return null;
+    if (surface !== "initial" || isChatForm) return null;
 
     return (
       <div className={INITIAL_CHIP_ROW_CLASS}>

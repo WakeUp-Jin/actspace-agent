@@ -128,7 +128,8 @@ export {
 
 // ─── IPC 输入类型 ───
 
-export type ComposerMode = "chat" | "plan" | "agent";
+export type ComposerMode = "plan" | "agent";
+export type { MainAgentForm } from "./runtime-v2/runtime";
 
 export type RunAgentInput = {
   sessionId: string;
@@ -449,6 +450,7 @@ export type SessionListItem = {
   title: string;
   updatedAt: string;
   agentRunCount: number;
+  agentForm?: import("./runtime-v2/runtime").MainAgentForm;
   /** workspace registry 的稳定 id；旧 session 可能缺失。 */
   workspaceId?: string;
   /** 创建会话时的工作区根目录；旧 session 缺这个字段时由前端视作 default workspace。 */
@@ -839,6 +841,7 @@ export type WorkspaceVisibilityResult = {
 
 export type SessionCreateInput = {
   title?: string;
+  agentForm?: import("./runtime-v2/runtime").MainAgentForm;
   /** workspace registry 的稳定 id；与 workspaceRoot 一起写入 session meta。 */
   workspaceId?: string;
   /** 创建时指定 workspace 根目录；不传由主进程从 BootstrapState 自动注入。 */

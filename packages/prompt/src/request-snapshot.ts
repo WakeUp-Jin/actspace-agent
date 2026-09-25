@@ -7,6 +7,7 @@ export type LogicalRequestCandidate = {
   readonly messages: readonly RuntimeV2JsonValue[];
   readonly systemSections: readonly RuntimeV2JsonValue[];
   readonly facts: readonly RuntimeV2JsonValue[];
+  readonly modelFacts: readonly RuntimeV2JsonValue[];
   readonly renderedSystemPrompt: string;
   readonly tools: readonly RuntimeV2JsonValue[];
   readonly contributorProvenance: readonly RuntimeV2JsonValue[];
@@ -25,7 +26,7 @@ export type PreparedRequestMetadata = {
 };
 
 export type LogicalRequestSnapshot = LogicalRequestCandidate & {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly compositionDigest: string;
   readonly hostCapabilityDigest: string;
   readonly prepared: PreparedRequestMetadata;

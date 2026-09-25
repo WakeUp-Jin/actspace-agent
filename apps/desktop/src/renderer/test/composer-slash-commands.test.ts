@@ -35,7 +35,6 @@ describe("composer slash commands", () => {
 
   it("filters functions by command, label, and description with command prefixes first", () => {
     expect(filterComposerSlashFunctions("").map((item) => item.id)).toEqual([
-      "chat",
       "plan",
       "agent",
       "compact",

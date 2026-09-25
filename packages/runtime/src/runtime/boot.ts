@@ -118,6 +118,9 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       compositionDigest: composition.digest,
       hostCapabilityDigest: configRevision,
       plugins: runtimeHost.plugins,
+      ...((hostServices.services["actspace.host.chat-settings"] as { readonly compactionTriggerRatio?: () => number } | undefined)?.compactionTriggerRatio
+        ? { chatCompactionTriggerRatio: (hostServices.services["actspace.host.chat-settings"] as { readonly compactionTriggerRatio: () => number }).compactionTriggerRatio }
+        : {}),
       onLiveEvent: options.onLiveEvent,
     } satisfies AgentRuntimeHostPort),
   });

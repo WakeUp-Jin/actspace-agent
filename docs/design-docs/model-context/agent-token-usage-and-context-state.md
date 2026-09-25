@@ -49,6 +49,7 @@ stepId
 messages
 systemSections
 facts
+modelFacts
 renderedSystemPrompt
 tools
 contributorProvenance
@@ -68,6 +69,8 @@ Snapshot 的作用是：
 - 在恢复时结合 request/terminal 关系识别未结束请求；dispatch 的外部效果边界仍由对应恢复契约解释，snapshot 自身不证明请求已发送。
 
 Snapshot 不得包含 API Key、Authorization、Cookie、proxy credential 或其他 secret-like 字段。`packages/prompt/src/request-snapshot.ts` 会拒绝非 JSON 值、非有限数字、过深对象和敏感字段名。
+
+schema v2 中，`facts` 保留完整审计事实，`modelFacts` 只保存真正进入 system prompt 的稳定事实。动态 run/request/Host identity 可以出现在 `facts`，不得因此污染 `renderedSystemPrompt`。逐轮 Agent mode 由用户消息末尾的持久化 `runtime-context` 表达；Context 估算计入该块，但 UI 预览和 Compaction 自然语言摘要不展示它。
 
 ## Request Model Facts
 
@@ -161,7 +164,8 @@ sessions-v2/<sessionId>/journal.jsonl
 | rules contributor | Rules |
 | skills contributor | Skills |
 | `tools` | Tool Definitions |
-| `facts` | System Prompt 中的 Runtime facts entry |
+| `modelFacts` | System Prompt 中模型实际看见的 Runtime facts entry |
+| `facts` | 审计事实；不作为模型上下文 bucket 展示 |
 | `messages` | Conversation |
 | 最近 Compaction summary | Summarized Conversation |
 

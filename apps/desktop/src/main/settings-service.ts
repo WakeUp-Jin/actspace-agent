@@ -1550,7 +1550,7 @@ function defaultSettingsV4Metadata(): SettingsV4Metadata {
       englishLearning: { lastSessionId: null },
       personalization: { displayName: "", responseStyle: "" },
       agentInstructions: { systemPromptPath: "" },
-      taskDefaults: { temperature: null, maxOutputTokens: null },
+      taskDefaults: { temperature: null, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 },
       shortcuts: {
         quickOpen: {
           enabled: true,
@@ -1594,6 +1594,7 @@ function metadataFromSettingsV3(settings: PersistedSettingsV3): SettingsV4Metada
       taskDefaults: {
         temperature: settings.agent.temperature,
         maxOutputTokens: settings.agent.maxTokens,
+        chatCompactionTriggerRatio: defaults.general.taskDefaults.chatCompactionTriggerRatio,
       },
       shortcuts: cloneJson(settings.shortcuts),
     },
@@ -1745,6 +1746,7 @@ function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string): {
       taskDefaults: {
         temperature: sanitizeNullableNumber(taskDefaults.temperature, -0, 2),
         maxOutputTokens: sanitizeNullableInteger(taskDefaults.maxOutputTokens, 1, 1_000_000),
+        chatCompactionTriggerRatio: sanitizeNumber(taskDefaults.chatCompactionTriggerRatio, 0.5, 0.95, 0.8),
       },
       shortcuts: sanitizeShortcuts(general.shortcuts),
     },
@@ -1830,6 +1832,12 @@ function sanitizeNullableNumber(value: unknown, min: number, max: number): numbe
   if (value === null || value === undefined) return null;
   const number = typeof value === "number" ? value : Number(value);
   return Number.isFinite(number) && number >= min && number <= max ? number : null;
+}
+
+function sanitizeNumber(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) return fallback;
+  const rounded = Math.round(value * 20) / 20;
+  return Math.abs(value - rounded) < Number.EPSILON * 10 ? rounded : fallback;
 }
 
 function sanitizeNullableInteger(value: unknown, min: number, max: number): number | null {

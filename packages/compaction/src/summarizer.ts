@@ -10,7 +10,7 @@ export interface CompactionSummarizer {
 
 export class DeterministicCompactionSummarizer implements CompactionSummarizer {
   async summarize(entries: readonly SessionSurfaceEntry[]): Promise<CompactionSummary> {
-    const lines = entries.map((entry) => `${entry.node.kind}: ${typeof entry.node.content === "string" ? entry.node.content : JSON.stringify(entry.node.content) ?? ""}`);
+    const lines = entries.map((entry) => `${entry.node.kind}: ${summaryText(entry.node.content)}`);
     return { content: `Compacted history:\n${lines.join("\n")}` };
   }
 }
@@ -26,7 +26,7 @@ export class LlmCompactionSummarizer implements CompactionSummarizer {
       model: this.options.model,
       messages: [
         { role: "system", content: "Summarize the supplied Agent history faithfully. Preserve user requirements, decisions, file paths, errors, unfinished work, and tool outcomes. Do not invent facts." },
-        { role: "user", content: entries.map((entry) => `${entry.node.kind}: ${typeof entry.node.content === "string" ? entry.node.content : JSON.stringify(entry.node.content) ?? ""}`).join("\n") },
+        { role: "user", content: entries.map((entry) => `${entry.node.kind}: ${summaryText(entry.node.content)}`).join("\n") },
       ],
       tools: [],
       signal: new AbortController().signal,
@@ -45,4 +45,23 @@ export class LlmCompactionSummarizer implements CompactionSummarizer {
       prepared.release();
     }
   }
+}
+
+function summaryText(value: RuntimeV2JsonValue): string {
+  const sanitized = stripRuntimeContext(value);
+  return typeof sanitized === "string" ? sanitized : JSON.stringify(sanitized) ?? "";
+}
+
+function stripRuntimeContext(value: RuntimeV2JsonValue): RuntimeV2JsonValue {
+  if (typeof value === "string") return value.startsWith("<runtime_context>") ? "" : value;
+  if (Array.isArray(value)) return value.flatMap((item) => isRuntimeContext(item) ? [] : [stripRuntimeContext(item)]);
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, stripRuntimeContext(child)]));
+}
+
+function isRuntimeContext(value: RuntimeV2JsonValue): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
+  if (record.type === "runtime-context") return true;
+  return record.type === "text" && typeof record.text === "string" && record.text.startsWith("<runtime_context>");
 }

@@ -2,7 +2,7 @@ import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import type { RuntimeV2DesktopSessionProjection, RuntimeV2JsonValue, RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
 export function projectionFixture(sessionId = "s", throughJournalSeq = -1, events: readonly SessionEventEnvelopeV1[] = []): RuntimeV2DesktopSessionProjection {
-  const snapshot: RuntimeV2SessionSnapshot = { kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", throughJournalSeq, workspaceRoot: "/tmp/workspace", permissionMode: "default", sessionGrants: [], accessState: "read-write", metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
+  const snapshot: RuntimeV2SessionSnapshot = { kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", throughJournalSeq, workspaceRoot: "/tmp/workspace", agentForm: "agent", permissionMode: "default", sessionGrants: [], accessState: "read-write", metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
     activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null } };
   return { kind: "session-projection", schemaVersion: 1, sessionId, throughJournalSeq, snapshot, activeMessageIds: [], deferredToolCalls: [],
@@ -18,7 +18,7 @@ export function recordProjectionFixture(record: SessionRecord): RuntimeV2Desktop
   });
   const events: SessionEventEnvelopeV1[] = sourceEvents.map((event, seq) => legacyEventToJournal(event, seq));
   const value = projectionFixture(record.meta.id, events.length - 1, events);
-  return { ...value, activeMessageIds: events.flatMap(event => event.surface ? [event.surface.node.messageId] : []), snapshot: { ...value.snapshot, metadata: { title: record.meta.title, pinned: record.meta.pinned ?? false, archived: record.meta.archived ?? false }, workspaceRoot: record.meta.workspaceRoot, messages: events.flatMap(event => event.surface ? [event.surface.node] : []), activity: { ...value.snapshot.activity, turnCount: record.meta.agentRunCount, completedTurnCount: record.meta.agentRunCount } } };
+  return { ...value, activeMessageIds: events.flatMap(event => event.surface ? [event.surface.node.messageId] : []), snapshot: { ...value.snapshot, metadata: { title: record.meta.title, pinned: record.meta.pinned ?? false, archived: record.meta.archived ?? false }, workspaceRoot: record.meta.workspaceRoot, agentForm: record.meta.agentForm ?? "agent", messages: events.flatMap(event => event.surface ? [event.surface.node] : []), activity: { ...value.snapshot.activity, turnCount: record.meta.agentRunCount, completedTurnCount: record.meta.agentRunCount } } };
 }
 
 function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnvelopeV1 {
