@@ -8,7 +8,7 @@ const {months}=Astro.props;const labels={feature:'新功能',improvement:'改进
 <article class="release-entry" id={entry.anchor}>
 <aside>
 <time datetime={entry.date}>{entry.date.replaceAll('-','.')}</time>
-<p>产品更新</p>
+<p><span class="site-tag">产品更新</span></p>
 </aside>
 <div class="release-content">
 <h2>{entry.title}</h2>{entry.sections.map(section=>

@@ -75,10 +75,13 @@
   border: 1px solid var(--line);
   background: var(--surface);
   text-decoration: none;
-  transition: background 150ms;
+  position: relative;
+  transition: border-color 200ms ease, transform 200ms ease;
 }
 .blog-card:hover {
-  background: var(--site-line);
+  z-index: 1;
+  border-color: var(--site-accent-line);
+  transform: translateY(-2px);
 }
 .blog-cover {
   display: block;
@@ -229,8 +232,8 @@
   cursor: pointer;
 }
 .blog-filter-options input:checked {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--site-accent);
+  border-color: var(--site-accent);
 }
 .blog-filter-options input:checked::after {
   content: "";

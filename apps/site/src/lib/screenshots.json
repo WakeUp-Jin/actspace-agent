@@ -2,14 +2,20 @@
   "workspace-overview.png": {
     "number": 1,
     "instruction": "工作区、会话列表与代码回复",
-    "usage": "首页首屏；ActSpace 是什么、快速开始",
+    "usage": "ActSpace 是什么、快速开始（首页首屏已改用 review-workspace.png）",
+    "status": "ready"
+  },
+  "review-workspace.png": {
+    "number": 36,
+    "instruction": "一次真实的架构分析任务：左侧对话，右侧 Review 未提交改动列表",
+    "usage": "首页首屏",
     "status": "ready"
   },
   "context-detail.png": {
     "number": 2,
-    "instruction": "上下文面板中的系统提示词、工具和规则分组",
+    "instruction": "上下文面板中的系统提示词、工具和规则分组；需在真实开发任务中重拍（当前是格式测试会话）",
     "usage": "上下文展示；上下文与压缩",
-    "status": "ready"
+    "status": "needs-retake"
   },
   "tool-execution.png": {
     "number": 3,

@@ -4,8 +4,10 @@ export function initializeShowcase() {
   if (!root) return;
   const steps = [...root.querySelectorAll<HTMLElement>('[data-step]')];
   const slides = [...root.querySelectorAll<HTMLElement>('[data-slide]')];
+  const progress = [...root.querySelectorAll<HTMLElement>('[data-progress]')];
   const stage = root.querySelector<HTMLElement>('.showcase-stage')!;
-  const wide = matchMedia('(min-width: 1100px)');
+  // Keep in sync with styles/showcase.css: short viewports fall back to the plain flow.
+  const wide = matchMedia('(min-width: 1100px) and (min-height: 700px)');
   let pending = false;
   function select(index: number) {
     steps.forEach((step, i) => step.classList.toggle('is-active', i === index));
@@ -14,6 +16,7 @@ export function initializeShowcase() {
       slide.inert = i !== index;
       slide.setAttribute('aria-hidden', String(i !== index));
     });
+    progress.forEach((bar, i) => bar.classList.toggle('is-active', i <= index));
   }
   function update() {
     pending = false;

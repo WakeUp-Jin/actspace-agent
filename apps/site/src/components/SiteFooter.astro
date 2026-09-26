@@ -4,18 +4,19 @@ import { Image } from 'astro:assets';
 import logo from '../assets/brand/actspace-logo.png';
 ---
 <footer class="site-footer">
-<div class="wrap footer-inner">
+<div class="wrap">
+<div class="footer-inner">
 <a class="brand" href={sitePath('/')}>
 <Image class="brand-logo" src={logo} alt="" width={150} format="webp" quality={85} widths={[50, 100, 150]} sizes="50px" loading="lazy"/>
 <span>ActSpace</span>
 </a>
 <nav aria-label="页脚导航">
-<a href="https://github.com/wakeup-jin/actspace-agent">GitHub ↗</a>
 <a href={sitePath('/docs/')}>文档</a>
 <a href={sitePath('/updates/')}>更新日志</a>
-<a href={sitePath('/roadmap/')}>开发计划 ↗</a>
+<a href={sitePath('/roadmap/')}>开发计划</a>
+<a href="https://github.com/WakeUp-Jin/actspace-agent" target="_blank" rel="noreferrer noopener">GitHub ↗</a>
 </nav>
-<small>ACT + SPACE. A PLACE TO ACT.</small>
-<small>© {new Date().getFullYear()} ACTSPACE</small>
+</div>
+<small class="footer-note">© {new Date().getFullYear()} ActSpace · 给模型一个真正能行动的空间</small>
 </div>
 </footer>

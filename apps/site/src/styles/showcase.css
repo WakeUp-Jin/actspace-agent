@@ -8,50 +8,81 @@
   border-top: 1px solid var(--line);
   min-width: 0;
 }
-.feature-label { font-size: 13px; color: var(--body); margin: 0 0 18px; }
-.showcase-copy h3 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 500; line-height: 1.4; margin: 0 0 24px; text-wrap: pretty; }
-.feature-description { font-size: 17px; color: var(--body); line-height: 1.85; margin-bottom: 24px; }
-.showcase-copy ul { list-style: none; padding: 0; margin: 0 0 28px; }
-.showcase-copy li { position: relative; padding-left: 24px; margin: 12px 0; font-size: 15px; line-height: 1.8; color: var(--body); }
-.showcase-copy li::before { content: '✓'; position: absolute; left: 0; color: var(--site-muted); }
+.feature-label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--site-accent); margin: 0 0 16px; }
+.feature-label::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.showcase-copy h3 { font-size: clamp(24px, 2.4vw, 32px); font-weight: 600; line-height: 1.35; margin: 0 0 16px; text-wrap: pretty; }
+.feature-description { max-width: 30em; font-size: 16px; color: var(--body); line-height: 1.85; margin-bottom: 20px; }
+.showcase-copy ul { list-style: none; padding: 0; margin: 0 0 24px; }
+.showcase-copy li { position: relative; padding-left: 22px; margin: 8px 0; font-size: 15px; line-height: 1.7; color: var(--body); }
+.showcase-copy li::before { content: ''; position: absolute; left: 2px; top: .62em; width: 10px; height: 6px; border-left: 1.5px solid var(--site-accent-line); border-bottom: 1.5px solid var(--site-accent-line); transform: rotate(-45deg); }
+
+/* 统一 16:10 底板：不同比例的截图都完整居中，不再留出大片空白。 */
+.showcase-frame {
+  container-type: size;
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  padding: 5.5%;
+  border-radius: 18px;
+  background: var(--surface);
+  min-width: 0;
+}
+.showcase-frame .product-shot { width: min(100cqw, 100cqh * var(--shot-ratio, 1.6)); }
+.showcase-frame .screenshot-link { border-radius: 10px; box-shadow: 0 0 0 1px rgba(30, 30, 20, .07), 0 20px 44px -26px rgba(30, 30, 20, .4); }
+
 .showcase-stage { display: none; }
 .showcase-inline { min-width: 0; }
-.capability-section { padding: 96px 0 80px; border-top: 1px solid var(--line); }
-.capability-section h2 { font-size: clamp(28px, 3vw, 40px); font-weight: 500; margin-bottom: 40px; }
-.capability-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 40px 32px; }
-.capability-link { display: block; padding-block: 16px; border-top: 1px solid var(--line); }
-.capability-link h3 { font-size: 19px; font-weight: 500; margin: 0 0 12px; line-height: 1.5; }
-.capability-link h3 span { display: inline-block; margin-left: 8px; transition: transform 180ms ease; }
-.capability-link:hover h3 span { transform: translate(2px, -2px); }
-.capability-link p { font-size: 14px; line-height: 1.8; color: var(--body); margin: 0; }
-@media (min-width: 1100px) {
-  .showcase.is-enhanced { display: grid; grid-template-columns: minmax(0, 42fr) minmax(0, 58fr); column-gap: 48px; }
-  .is-enhanced .showcase-step { grid-column: 1; display: flex; min-height: 72vh; border: 0; padding: 64px 0; }
-  .is-enhanced .showcase-copy { opacity: .35; transition: opacity 260ms ease; }
-  .is-enhanced .showcase-step.is-active .showcase-copy,
-  .is-enhanced .showcase-copy:focus-within { opacity: 1; }
+.capability-section { padding: clamp(72px, 9vw, 120px) 0 clamp(48px, 6vw, 80px); margin-top: 48px; border-top: 1px solid var(--line); }
+.capability-section h2 { font-size: clamp(28px, 3.4vw, 44px); font-weight: 600; margin-bottom: 40px; }
+.capability-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.capability-link { display: block; padding: 22px 22px 24px; border-radius: 14px; background: var(--site-surface); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow 200ms ease, transform 200ms ease; }
+.capability-link:hover { box-shadow: inset 0 0 0 1px var(--site-accent-line); transform: translateY(-2px); }
+.capability-link h3 { display: flex; justify-content: space-between; gap: 8px; font-size: 16px; font-weight: 600; margin: 0 0 8px; line-height: 1.5; }
+.capability-link h3 span { color: var(--muted); transition: transform 180ms ease, color 180ms ease; }
+.capability-link:hover h3 span { color: var(--site-accent); transform: translateX(3px); }
+.capability-link p { font-size: 14px; line-height: 1.7; color: var(--body); margin: 0; }
+.capability-section + .latest { margin-top: 0; }
+
+/* 与 scripts/showcase.ts 的媒体查询保持一致；矮屏退回普通顺序流，避免图文重叠。 */
+@media (min-width: 1100px) and (min-height: 700px) {
+  .showcase.is-enhanced { display: grid; grid-template-columns: minmax(0, 40fr) minmax(0, 60fr); column-gap: 64px; }
+  .is-enhanced .showcase-step { grid-column: 1; display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; min-height: 58vh; border: 0; padding: 40px 0; }
   .is-enhanced .showcase-inline { display: none; }
+  /* 只淡化正文，标题保持可读，不像"没加载完"。 */
+  .is-enhanced .feature-description,
+  .is-enhanced .showcase-copy ul,
+  .is-enhanced .showcase-copy .text-link { opacity: .4; transition: opacity 300ms ease; }
+  .is-enhanced .feature-label { opacity: .5; transition: opacity 300ms ease; }
+  .is-enhanced .showcase-copy h3 { color: var(--muted); transition: color 300ms ease; }
+  .is-enhanced .is-active .showcase-copy > *,
+  .is-enhanced .showcase-copy:focus-within > * { opacity: 1; }
+  .is-enhanced .is-active .showcase-copy h3,
+  .is-enhanced .showcase-copy:focus-within h3 { color: var(--ink); }
   .is-enhanced .showcase-stage { display: block; grid-column: 2; grid-row: 1 / span 6; min-width: 0; }
-  .showcase-sticky { position: sticky; top: calc(var(--site-header-height) + 40px); height: min(620px, calc(100svh - var(--site-header-height) - 80px)); margin-block: 64px; }
-  .showcase-slide { position: absolute; inset: 0; display: flex; align-items: center; opacity: 0; visibility: hidden; transform: translateY(12px); transition: opacity 260ms ease, transform 260ms ease, visibility 260ms; pointer-events: none; }
+  .showcase-sticky { position: sticky; top: calc(var(--site-header-height) + max(40px, (100svh - var(--site-header-height) - 560px) / 2)); }
+  .showcase-slides { position: relative; aspect-ratio: 16 / 10; }
+  .showcase-slide { position: absolute; inset: 0; opacity: 0; visibility: hidden; transform: translateY(10px); transition: opacity 300ms ease, transform 300ms ease, visibility 300ms; pointer-events: none; }
   .showcase-slide.is-active { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }
-  .showcase-slide .product-shot { width: 100%; max-height: 100%; }
-  .showcase-slide img { max-height: calc(100svh - var(--site-header-height) - 130px); object-fit: contain; }
+  .showcase-progress { display: flex; gap: 6px; margin-top: 20px; }
+  .showcase-progress span { flex: 1; height: 3px; border-radius: 3px; background: var(--line); transition: background 300ms ease; }
+  .showcase-progress span.is-active { background: var(--site-accent); }
 }
 @media (max-width: 1099px) {
   .showcase-step { grid-template-columns: 1fr; gap: 32px; }
   .showcase-copy { max-width: 680px; }
+  .showcase-inline { max-width: 760px; }
   .capability-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
   .showcase-step { padding: 40px 0; }
-  .feature-description { font-size: 16px; }
+  .showcase-copy h3 { font-size: 24px; }
+  .showcase-frame { border-radius: 14px; }
   .capability-section { padding: 56px 0; }
-  .capability-grid { grid-template-columns: 1fr; gap: 12px; }
+  .capability-grid { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .showcase-copy, .showcase-slide, .capability-link h3 span { transition: none !important; transform: none !important; }
+  .showcase-copy *, .showcase-slide, .showcase-progress span, .capability-link, .capability-link h3 span { transition: none !important; transform: none !important; }
 }
 @media (forced-colors: active) {
-  .is-enhanced .showcase-copy { opacity: 1; }
+  .is-enhanced .showcase-copy > * { opacity: 1; }
 }

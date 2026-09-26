@@ -16,6 +16,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |
 | [会话切换与后台运行](active/20260916-session-background-runs.md) | 按会话隔离 stream、后台工具状态与历史校准，补切换回归与桌面验收。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [Cordis 事件 ABI 与 CLI 最终验收](active/20260829-actspace-cordis-event-abi-final-acceptance/README.md) | P00–P04 有通过证据；补 P05 deterministic retry/error fixture 后再闭环。 |

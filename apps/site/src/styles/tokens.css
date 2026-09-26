@@ -13,42 +13,29 @@
   --site-line-strong: #b7b9b0;
   --site-action: #202421;
   --site-on-action: #ffffff;
+  /* 品牌紫取自 Logo，是全站唯一强调色；每屏大面积使用不超过两处。 */
+  --site-accent: #6d4fc2;
+  --site-accent-soft: #f0ebfa;
+  --site-accent-line: #cdbdf0;
+  /* 与博客角色插画背景同色，插画放在上面不会出现色差。 */
+  --site-peach: #fde0cf;
   --site-operational: #2b9a68;
   --site-operational-soft: #dceee4;
   --site-warning: #a87218;
   --site-danger: #c74747;
-  --site-focus: #202421;
+  --site-focus: var(--site-accent);
   --site-shadow: rgba(27, 28, 25, 0.12);
   --site-overlay: rgba(11, 18, 15, 0.6);
-  --site-hero-ink: #f0f2ec;
-  --site-hero-muted: rgba(240, 242, 236, 0.68);
-  --site-hero-line: rgba(240, 242, 236, 0.24);
-  --site-hero-surface: rgba(10, 18, 15, 0.58);
-  --site-hero-surface-strong: rgba(10, 18, 15, 0.78);
-  --site-hero-overlay-top: rgba(4, 11, 9, 0.72);
-  --site-hero-overlay-middle: rgba(5, 15, 12, 0.16);
-  --site-hero-overlay-bottom: rgba(4, 10, 8, 0.7);
-  --site-hero-glow: rgba(83, 197, 139, 0.22);
-  --site-hero-on-primary: #111512;
-  --site-backdrop: rgba(243, 242, 236, 0.86);
-  --site-inverse-surface: #111512;
-  --site-inverse-ink: #f0f2ec;
-  --site-inverse-muted: rgba(240, 242, 236, 0.68);
-  --site-inverse-line: rgba(240, 242, 236, 0.22);
-  --site-inverse-panel: rgba(240, 242, 236, 0.05);
-  --site-page: min(1280px, calc(100vw - 64px));
+  --site-page: min(1600px, calc(100% - 2 * clamp(24px, 4.8vw, 64px)));
   --site-reading: min(680px, calc(100vw - 40px));
   --site-font-sans:
-    "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
-    sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --site-font-serif: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif;
   --site-font-mono:
     "SFMono-Regular", "JetBrains Mono", "Cascadia Code", monospace;
-}
 
-:root {
-  --site-focus: #33795c;
-  --site-page: min(1600px, calc(100% - 2 * clamp(24px, 4.8vw, 64px)));
+  /* 短别名：旧代码大量引用，保留；新代码请直接用 --site-*。 */
   --canvas: var(--site-canvas);
   --surface: var(--site-canvas-soft);
   --ink: var(--site-ink);

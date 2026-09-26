@@ -8,14 +8,14 @@
 .docs-prose h2,
 .reading-body h2 {
   color: var(--ink);
-  font: 500 25px/1.5 var(--sans);
+  font: 600 25px/1.5 var(--sans);
   margin: 42px 0 18px;
   scroll-margin-top: 104px;
 }
 .docs-prose h3,
 .reading-body h3 {
   color: var(--ink);
-  font: 500 20px/1.5 var(--sans);
+  font: 600 20px/1.5 var(--sans);
   margin: 28px 0 12px;
   scroll-margin-top: 104px;
 }
@@ -33,7 +33,12 @@
 .docs-prose a {
   color: var(--ink);
   text-decoration: underline;
+  text-decoration-color: var(--site-accent-line);
   text-underline-offset: 4px;
+  transition: text-decoration-color 150ms ease;
+}
+.docs-prose a:hover {
+  text-decoration-color: var(--site-accent);
 }
 .docs-prose pre {
   position: relative;
