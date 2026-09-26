@@ -23,6 +23,8 @@ Chat 不是新的 Runtime Profile，也不是 `default/full-access` 权限模式
 
 主会话创建后不允许原地切换形态。切换 Chat/Agent 必须创建新会话；fork 继承父 Session 的 preset。
 
+2026-09-26 补充：还没发过消息的空会话允许在 Composer 中切换形态，实现方式仍是「用目标形态新建会话、带上草稿、归档原空会话」，不修改任何已存在 Session 的 preset。
+
 ### 2.2 Chat 首版附件
 
 Chat 接受用户主动选择、拖入或粘贴的以下附件：
@@ -196,12 +198,12 @@ Settings v4 在现有 `general.taskDefaults` 增加 `chatCompactionTriggerRatio`
 ## 10. Desktop 交互
 
 - “新建会话”提供 Agent/Chat 两个明确入口；`Command+N` 继续默认创建 Agent，保持现有肌肉记忆；
-- workspace 分组的新增入口同样可以选择形态；Chat 可以沿用该 workspace 作为会话归档分组，但不会把 workspace 内容注入模型；
+- workspace 分组的「+」直接创建 Agent 会话、不弹形态菜单（Chat 不使用工作区，在项目下新建 Chat 不符合入口语义）；需要 Chat 时在空会话 Composer 中切换形态，Chat 可以沿用该 workspace 作为会话归档分组，但不会把 workspace 内容注入模型；
 - Agent Session 显示 Plan/Agent、Skills、Workspace/Worktree 等现有控制；
 - Chat Session 显示固定 Chat 标识，隐藏 Plan、Skills、Workspace/Worktree 和权限入口；
 - Chat 保留模型、Thinking、图片/文件附件和 Context 入口；
 - Chat 顶栏、Composer、右侧菜单和空态启动器都隐藏开发操作（工作区、分支、运行位置、Review、终端和子 Agent）；切回 Agent 后保留原有开发标签，Chat 下不运行文件新鲜度探测或终端列表同步；
-- 当前 Session 不提供形态切换按钮。
+- 已有消息的 Session 不提供形态切换；空会话可通过 `+` 菜单在 Chat / Agent 间切换（Chat 标签本身不带 ×，不暗示可随时切换）（新建目标形态会话替换当前空会话，草稿随行，切到 Agent 时只保留图片附件）。
 
 首版不要求在会话列表增加新的 Badge、颜色或独立分组，不重做 Sidebar/Composer 视觉系统。
 

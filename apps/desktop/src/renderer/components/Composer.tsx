@@ -12,6 +12,7 @@ import {
   ArrowUp,
   Asterisk,
   BookOpen,
+  Bot,
   ChartPie,
   Check,
   ChevronDown,
@@ -21,9 +22,10 @@ import {
   GitBranch,
   Image,
   Laptop,
-  ListChecks,
+  ListTodo,
   Loader2,
   MessageCircle,
+  Paperclip,
   MoreHorizontal,
   Plus,
   Cloud,
@@ -42,6 +44,7 @@ import type {
   ContextState,
   ContextUsageSnapshot,
   LlmProviderId,
+  MainAgentForm,
   ModelReasoningEffort,
   ModelSelectionId,
   SkillCatalogItem,
@@ -106,6 +109,12 @@ export type ComposerDraftRestore = {
 
 export type ComposerDraftReader = (draftKey: string) => string;
 export type ComposerDraftWriter = (draftKey: string, text: string) => void;
+/** 空会话切换形态：由上层用目标形态新建会话替换当前空会话，并带上草稿。 */
+export type ComposerAgentFormSwitch = {
+  agentForm: MainAgentForm;
+  mode: ComposerMode;
+  draft: { text: string; attachments: ComposerAttachment[] };
+};
 
 export type ComposerReviewSummary = {
   status: "loading" | "changes" | "empty" | "notAvailable" | "noBaseline" | "partial" | "failed";
@@ -160,6 +169,12 @@ const COMPOSER_BODY_AGENT_INLINE_CLASS =
   `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_minmax(0,1fr)_auto_auto] [grid-template-areas:'plus_input_model_send'] max-[600px]:gap-y-1 max-[600px]:grid-cols-[auto_auto_minmax(0,1fr)_auto] max-[600px]:[grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
 const COMPOSER_BODY_AGENT_STACKED_CLASS =
   `${COMPOSER_BODY_BASE_CLASS} gap-y-1 grid-cols-[auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
+// Chat followup 没有分支/运行位置/权限，状态行只剩 context 用量，所以把它收进输入框：
+// inline 时位于模型与发送之间，stacked 时跟随模型排在其右侧。
+const COMPOSER_BODY_CHAT_INLINE_CLASS =
+  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto] [grid-template-areas:'plus_mode_input_model_context_send'] max-[600px]:gap-y-1 max-[600px]:grid-cols-[auto_auto_auto_auto_minmax(0,1fr)_auto] max-[600px]:[grid-template-areas:'input_input_input_input_input_input'_'plus_mode_model_context_._send']`;
+const COMPOSER_BODY_CHAT_STACKED_CLASS =
+  `${COMPOSER_BODY_BASE_CLASS} gap-y-1 grid-cols-[auto_auto_auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input_input_input'_'plus_mode_model_context_._send']`;
 const COMPOSER_INPUT_CLASS =
   "composer-input block w-full min-h-[34px] max-h-[142px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-[15px] leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
 const COMPOSER_INITIAL_INPUT_CLASS =
@@ -167,6 +182,9 @@ const COMPOSER_INITIAL_INPUT_CLASS =
 // 单行高度 = 20px line-height + 7px*2 padding = 34px；超过它说明内容折行（显式换行或自动 wrap）。
 const COMPOSER_SINGLE_LINE_MAX_PX = 40;
 const CONTROL_GROUP_CLASS = "control-group relative";
+// 附件按钮对齐主流 Web 聊天：无边框纯图标，只在 hover / focus 时出现浅色圆底。
+const ATTACH_BUTTON_CLASS =
+  "attach-button grid h-9 w-9 shrink-0 place-items-center rounded-full border-0 bg-transparent text-text-muted transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay hover:text-text-main focus-visible:bg-hover-overlay focus-visible:text-text-main focus-visible:outline-none";
 const COMMAND_BUTTON_CLASS =
   "command-button grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface-subtle text-text-muted transition-[background,border,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-hover-overlay hover:text-text-main aria-expanded:border-line-strong aria-expanded:bg-selected aria-expanded:text-text-main";
 const MODE_BUTTON_BASE_CLASS =
@@ -186,22 +204,23 @@ const SEND_BUTTON_CLASS =
 const DROPDOWN_MENU_BASE_CLASS =
   "dropdown-menu absolute bottom-[calc(100%_+_8px)] z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
 const DROPDOWN_MENU_CLASS = `${DROPDOWN_MENU_BASE_CLASS} left-0`;
-const COMMAND_MENU_CLUSTER_CLASS =
-  "command-menu-cluster absolute bottom-[calc(100%_+_8px)] left-0 z-30 flex items-end gap-2 max-[600px]:w-[260px]";
+// + 菜单对齐 Cursor：与输入框同宽的面板，行内「图标 · 名称 · 灰色说明」；Skills 在同一面板内下钻。
 const COMMAND_MENU_CLASS =
-  "command-menu w-[240px] min-w-[240px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-2 shadow-act-popover";
-const SKILL_MENU_CLASS =
-  "skill-menu max-h-[360px] w-[300px] min-w-[300px] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-2 shadow-act-popover max-[600px]:w-[260px] max-[600px]:min-w-[260px]";
+  "command-menu absolute bottom-[calc(100%_+_8px)] left-0 right-0 z-30 max-h-[min(420px,calc(100vh_-_160px))] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
+const COMMAND_MENU_ROW_CLASS =
+  "command-menu-row flex min-h-[34px] w-full items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none";
+const COMMAND_MENU_ROW_LABEL_CLASS = "shrink-0 font-medium";
+const COMMAND_MENU_ROW_DESCRIPTION_CLASS = "min-w-0 truncate text-[13px] text-text-faint";
+const COMMAND_MENU_BACK_ROW_CLASS =
+  "command-menu-back flex min-h-[30px] w-full items-center gap-1.5 rounded-lg border-0 bg-transparent px-2 text-left text-[13px] font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay hover:text-text-main focus-visible:bg-selected focus-visible:outline-none";
 const INITIAL_DROPDOWN_MENU_BASE_CLASS =
   "dropdown-menu absolute top-[calc(100%_+_8px)] z-30 max-h-[min(360px,calc(100vh_-_120px))] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
 const INITIAL_DROPDOWN_MENU_CLASS = `${INITIAL_DROPDOWN_MENU_BASE_CLASS} left-0`;
 const RECENT_WORKSPACE_LIMIT = 5;
-const COMMAND_MENU_HINT_CLASS = "px-2 pb-2 pt-1 text-sm text-text-subtle";
 const COMMAND_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const COMMAND_MENU_BUTTON_CLASS =
   "command-menu-button flex min-h-[34px] w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-sm font-medium text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none";
 const COMMAND_MENU_ICON_CLASS = "text-text-muted";
-const SKILL_DESCRIPTION_CLASS = "line-clamp-2 text-xs font-normal leading-4 text-text-faint";
 const SKILL_SCOPE_CLASS = "ml-auto shrink-0 text-[10px] uppercase tracking-wide text-text-faint";
 const SKILL_PILL_CLASS =
   "group/skill-pill inline-flex h-9 max-w-[240px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-sm font-medium text-text-main shadow-[0_6px_16px_rgba(31,45,61,0.06)]";
@@ -281,12 +300,12 @@ const STATUS_ITEM_CLASS = "inline-flex min-w-0 items-center gap-1.5";
 const STATUS_ICON_CLASS = "shrink-0 text-text-subtle";
 const STATUS_USAGE_CLASS = "inline-flex shrink-0 items-center gap-1.5 text-text-muted";
 const STATUS_USAGE_DOT_CLASS = "h-[15px] w-[15px] shrink-0 rounded-full";
+const INLINE_USAGE_CLASS =
+  "[grid-area:context] inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border-0 bg-transparent px-1.5 text-[13px] text-text-faint transition-colors duration-[120ms] ease-in-out hover:text-text-main aria-expanded:text-text-main";
+const INLINE_USAGE_DOT_CLASS = "h-[13px] w-[13px] shrink-0 rounded-full";
 // 3px 环形进度：conic 填充已用占比，radial mask 挖空中心形成圆环。
 const STATUS_USAGE_DOT_MASK =
   "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))";
-const INITIAL_CHIP_ROW_CLASS = "initial-chip-row flex min-h-8 items-center";
-const INITIAL_CHIP_CLASS =
-  "initial-plan-chip inline-flex h-8 items-center rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
 const COMPOSER_DROP_ACTIVE_CLASS = "border-line-strong bg-selected";
 
 type ModeMenuItem = {
@@ -301,18 +320,24 @@ type ComposerSlashResult =
 
 type ContextSelectorKind = "workspace" | "branch" | "runtime";
 
-const MODE_MENU_ITEMS: ModeMenuItem[] = [
-  { mode: "plan", label: "Plan", icon: ListChecks },
-  { mode: "agent", label: "Agent", icon: Server },
-];
+type CommandMenuModeKey = "agent" | "plan" | "chat";
+
+// + 菜单的模式区是完整的模式选择器，当前模式打勾；Chat 形态绑定 Session，只在空会话里可选。
+// 语义色：Agent 蓝、Plan 黄、Chat 绿，与 Composer 中的模式标签一致。
+const COMMAND_MENU_MODES: Record<CommandMenuModeKey, { label: string; description: string; icon: LucideIcon; iconClass: string }> = {
+  agent: { label: "Agent", description: "读写工作区、执行命令，完成开发任务", icon: Bot, iconClass: "text-info" },
+  plan: { label: "Plan", description: "先规划和设计，再编写代码", icon: ListTodo, iconClass: "text-warning" },
+  chat: { label: "Chat", description: "日常对话、联网查询与生图，不接触工作区", icon: MessageCircle, iconClass: "text-operational" },
+};
+const CHAT_MODE_PILL_CLASS = "bg-operational-soft text-operational";
 
 const MODE_META: Record<Exclude<ComposerMode, "agent">, Omit<ModeMenuItem, "mode">> = {
-  plan: { label: "Plan", icon: ListChecks },
+  plan: { label: "Plan", icon: ListTodo },
 };
 
 const SLASH_FUNCTION_ICONS: Record<ComposerSlashFunctionId, LucideIcon> = {
-  plan: ListChecks,
-  agent: Server,
+  plan: ListTodo,
+  agent: Bot,
   compact: Asterisk,
   status: ChartPie,
   review: GitBranch,
@@ -467,6 +492,7 @@ export function Composer({
   onSelectedModelChange,
   mode = "agent",
   onModeChange,
+  onAgentFormChange,
   selectedSkills = [],
   onSelectedSkillsChange,
   onOpenAttachmentPreview,
@@ -502,6 +528,8 @@ export function Composer({
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   mode?: ComposerMode;
   onModeChange?: (mode: ComposerMode) => void;
+  /** 仅 initial（空会话）生效：提供时 + 菜单与 Chat 标签可在 Chat / Agent 形态间切换。 */
+  onAgentFormChange?: (change: ComposerAgentFormSwitch) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
@@ -520,10 +548,12 @@ export function Composer({
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
   models?: UsableModelView[];
-  agentForm?: import("@actspace/shared").MainAgentForm;
+  agentForm?: MainAgentForm;
   permissionControl?: ReactNode;
 }) {
   const isChatForm = agentForm === "chat";
+  // 形态在 Session 创建时绑定 preset；只有还没发过消息的空会话允许「换一个形态重新开始」。
+  const canSwitchAgentForm = surface === "initial" && Boolean(onAgentFormChange) && !isStreaming;
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && sessionProjection.sessionId === (sessionId ?? sessionProjection.sessionId)
     ? sessionProjection.cell
@@ -563,7 +593,6 @@ export function Composer({
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const skillLoadWorkspaceRef = useRef<string | null>(null);
   const skillLoadRequestRef = useRef(0);
-  const skillsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const slashFocusFrameRef = useRef<number | null>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelOptionsOpen, setModelOptionsOpen] = useState(false);
@@ -660,6 +689,7 @@ export function Composer({
       ? "<1"
       : `${Math.floor(contextUsagePercent)}`;
   // 单行内容用 inline 紧凑布局；内容折行、有附件或 initial surface 切 stacked（参考 Cursor）。
+  const showInlineContextUsage = isChatForm && surface === "followup";
   const resolvedLayout: "inline" | "stacked" =
     surface === "initial" || hasAttachments || isInputMultiline ? "stacked" : "inline";
   const placeholder = isChatForm
@@ -1016,18 +1046,15 @@ export function Composer({
     );
   }
 
-  function cancelSkillsClose() {
-    if (!skillsCloseTimerRef.current) return;
-    clearTimeout(skillsCloseTimerRef.current);
-    skillsCloseTimerRef.current = null;
-  }
-
-  function scheduleSkillsClose() {
-    cancelSkillsClose();
-    skillsCloseTimerRef.current = setTimeout(() => {
-      setSkillsOpen(false);
-      skillsCloseTimerRef.current = null;
-    }, 120);
+  function switchAgentForm(nextForm: MainAgentForm, nextMode: ComposerMode) {
+    setCommandOpen(false);
+    setSkillsOpen(false);
+    onAgentFormChange?.({
+      agentForm: nextForm,
+      mode: nextMode,
+      // Agent 形态只接受图片附件；Chat 形态图片和文本文件都接受。
+      draft: { text: message, attachments: nextForm === "agent" ? attachments.filter((item) => item.kind === "image") : attachments },
+    });
   }
 
   function createSendOptions(includeAttachments: boolean): ComposerSendOptions {
@@ -1217,30 +1244,39 @@ export function Composer({
     document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      cancelSkillsClose();
       cancelSlashFocusFrame();
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
-  function renderModeMenuButton(item: ModeMenuItem) {
+  function renderCommandModeRow(key: CommandMenuModeKey) {
+    const item = COMMAND_MENU_MODES[key];
     const Icon = item.icon;
+    const selected = isChatForm ? key === "chat" : key === mode;
     return (
       <button
-        className={COMMAND_MENU_BUTTON_CLASS}
+        className={COMMAND_MENU_ROW_CLASS}
         type="button"
         role="menuitem"
-        key={item.mode}
+        key={key}
+        aria-label={item.label}
         onClick={() => {
-          onModeChange?.(item.mode);
+          if (selected) {
+            setCommandOpen(false);
+            return;
+          }
+          if (key === "chat") return switchAgentForm("chat", "agent");
+          if (isChatForm) return switchAgentForm("agent", key);
+          onModeChange?.(key);
           setCommandOpen(false);
           setSkillsOpen(false);
         }}
       >
-        <Icon className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
-        <span>{item.label}</span>
-        {mode === item.mode ? <Check className="ml-auto text-text-muted" size={15} strokeWidth={2.2} /> : null}
+        <Icon className={`shrink-0 ${item.iconClass}`} size={16} strokeWidth={1.9} aria-hidden="true" />
+        <span className={COMMAND_MENU_ROW_LABEL_CLASS}>{item.label}</span>
+        <span className={COMMAND_MENU_ROW_DESCRIPTION_CLASS}>{item.description}</span>
+        {selected ? <Check className="ml-auto shrink-0 text-text-muted" size={15} strokeWidth={2.2} aria-hidden="true" /> : null}
       </button>
     );
   }
@@ -1408,16 +1444,17 @@ export function Composer({
 
   function renderSkillsMenu() {
     return (
-      <div className={SKILL_MENU_CLASS} role="menu" aria-label="Skills">
+      <div className={COMMAND_MENU_CLASS} ref={commandMenuRef} role="menu" aria-label="Skills">
         <button
-          className={`${COMMAND_MENU_BUTTON_CLASS} hidden max-[600px]:flex`}
+          className={COMMAND_MENU_BACK_ROW_CLASS}
           type="button"
+          aria-label="返回"
           onClick={() => setSkillsOpen(false)}
         >
-          <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-          <span>返回</span>
+          <ChevronLeft size={15} strokeWidth={2} aria-hidden="true" />
+          <span>Skills</span>
         </button>
-        <div className={COMMAND_MENU_HINT_CLASS}>可用 Skills</div>
+        <div className={COMMAND_MENU_SEPARATOR_CLASS} />
         {skillsLoading ? (
           <div className="flex items-center gap-2 px-2 py-4 text-sm text-text-faint">
             <Loader2 className="animate-spin" size={16} aria-hidden="true" /> 正在加载 Skills…
@@ -1437,20 +1474,18 @@ export function Composer({
           <div className="px-2 py-4 text-sm text-text-faint">暂无已启用的 Skills</div>
         ) : skillItems.map((skill) => (
           <button
-            className={COMMAND_MENU_BUTTON_CLASS}
+            className={COMMAND_MENU_ROW_CLASS}
             type="button"
             role="menuitemcheckbox"
             aria-checked={selectedSkills.includes(skill.name)}
             key={`${skill.scope}:${skill.name}`}
             onClick={() => toggleSkill(skill.name)}
           >
-            <BookOpen className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate">{skill.name}</span>
-              <span className={SKILL_DESCRIPTION_CLASS}>{skill.description || "暂无说明"}</span>
-            </span>
+            <BookOpen className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={1.9} aria-hidden="true" />
+            <span className={COMMAND_MENU_ROW_LABEL_CLASS}>{skill.name}</span>
+            <span className={COMMAND_MENU_ROW_DESCRIPTION_CLASS}>{skill.description || "暂无说明"}</span>
             <span className={SKILL_SCOPE_CLASS}>{skill.scope}</span>
-            {selectedSkills.includes(skill.name) ? <Check size={15} strokeWidth={2.2} aria-hidden="true" /> : null}
+            {selectedSkills.includes(skill.name) ? <Check className="shrink-0 text-text-muted" size={15} strokeWidth={2.2} aria-hidden="true" /> : null}
           </button>
         ))}
       </div>
@@ -1576,6 +1611,29 @@ export function Composer({
   }
 
   function renderAddMenuButton() {
+    // 已开始的 Chat 会话没有可切换的模式，+ 菜单只剩附件一项：直接换成回形针，也暗示形态已锁定。
+    if (isChatForm && !canSwitchAgentForm) return (
+      <div className={`${CONTROL_GROUP_CLASS} [grid-area:plus]`}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={ATTACH_BUTTON_CLASS}
+              type="button"
+              aria-label="添加图片或文件"
+              onClick={() => {
+                setModelOpen(false);
+                setModelOptionsOpen(false);
+                setContextOpen(false);
+                void handleSelectChatFiles();
+              }}
+            >
+              <Paperclip size={18} strokeWidth={1.9} aria-hidden="true" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>添加图片或文件（PNG、JPEG、WEBP、GIF、TXT、Markdown、JSON、CSV）</TooltipContent>
+        </Tooltip>
+      </div>
+    );
     return (
       <div className={`${CONTROL_GROUP_CLASS} [grid-area:plus]`}>
         <Tooltip>
@@ -1601,48 +1659,46 @@ export function Composer({
           </TooltipTrigger>
           <TooltipContent>添加上下文、工具或附件</TooltipContent>
         </Tooltip>
-        {commandOpen ? (
-          <div
-            className={COMMAND_MENU_CLUSTER_CLASS}
-            ref={commandMenuRef}
-            onPointerEnter={cancelSkillsClose}
-            onPointerLeave={scheduleSkillsClose}
+      </div>
+    );
+  }
+
+  function renderCommandMenu() {
+    if (!commandOpen) return null;
+    if (!isChatForm && skillsOpen) return renderSkillsMenu();
+
+    const modeKeys: CommandMenuModeKey[] = canSwitchAgentForm ? ["agent", "plan", "chat"] : isChatForm ? [] : ["agent", "plan"];
+    const AttachmentIcon = isChatForm ? Paperclip : Image;
+    return (
+      <div className={COMMAND_MENU_CLASS} ref={commandMenuRef} role="menu" aria-label="添加上下文或工具">
+        {modeKeys.map(renderCommandModeRow)}
+        {modeKeys.length > 0 ? <div className={COMMAND_MENU_SEPARATOR_CLASS} /> : null}
+        <button
+          className={COMMAND_MENU_ROW_CLASS}
+          type="button"
+          role="menuitem"
+          aria-label={isChatForm ? "图片与文件" : "图片"}
+          onClick={() => void (isChatForm ? handleSelectChatFiles() : handleSelectImages())}
+        >
+          <AttachmentIcon className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={1.9} aria-hidden="true" />
+          <span className={COMMAND_MENU_ROW_LABEL_CLASS}>{isChatForm ? "图片与文件" : "图片"}</span>
+          {isChatForm ? <span className={COMMAND_MENU_ROW_DESCRIPTION_CLASS}>PNG、JPEG、WEBP、GIF、TXT、Markdown、JSON、CSV</span> : null}
+        </button>
+        {!isChatForm ? (
+          <button
+            className={COMMAND_MENU_ROW_CLASS}
+            type="button"
+            role="menuitem"
+            aria-label="Skills"
+            aria-haspopup="menu"
+            aria-expanded={skillsOpen}
+            onClick={() => void handleOpenSkills()}
           >
-            <div
-              className={`${COMMAND_MENU_CLASS}${skillsOpen ? " max-[600px]:hidden" : ""}`}
-              role="menu"
-              aria-label="添加上下文或工具"
-            >
-            <div className={COMMAND_MENU_HINT_CLASS}>{isChatForm ? "添加聊天附件。" : "选择模式或添加上下文。"}</div>
-              {isChatForm ? null : MODE_MENU_ITEMS.map(renderModeMenuButton)}
-              {isChatForm ? null : <div className={COMMAND_MENU_SEPARATOR_CLASS} />}
-              <button
-                className={COMMAND_MENU_BUTTON_CLASS}
-                type="button"
-                role="menuitem"
-                onClick={() => void (isChatForm ? handleSelectChatFiles() : handleSelectImages())}
-              >
-                {isChatForm
-                  ? <FileText className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
-                  : <Image className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />}
-                <span>{isChatForm ? "图片与文件" : "图片"}</span>
-              </button>
-              {!isChatForm ? <button
-                className={COMMAND_MENU_BUTTON_CLASS}
-                type="button"
-                role="menuitem"
-                aria-expanded={skillsOpen}
-                onPointerEnter={() => void handleOpenSkills()}
-                onFocus={() => void handleOpenSkills()}
-                onClick={() => void handleOpenSkills()}
-              >
-                <BookOpen className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
-                <span>Skills</span>
-                <ChevronRight className="ml-auto text-text-faint" size={16} strokeWidth={2} aria-hidden="true" />
-              </button> : null}
-            </div>
-            {!isChatForm && skillsOpen ? renderSkillsMenu() : null}
-          </div>
+            <BookOpen className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={1.9} aria-hidden="true" />
+            <span className={COMMAND_MENU_ROW_LABEL_CLASS}>Skills</span>
+            <span className={COMMAND_MENU_ROW_DESCRIPTION_CLASS}>为本轮加载技能说明</span>
+            <ChevronRight className="ml-auto shrink-0 text-text-faint" size={16} strokeWidth={2} aria-hidden="true" />
+          </button>
         ) : null}
       </div>
     );
@@ -1650,10 +1706,15 @@ export function Composer({
 
   function renderModeSelector() {
     if (isChatForm) return (
-      <span className={`${MODE_BUTTON_BASE_CLASS} bg-info-soft text-on-info [grid-area:mode]`}>
-        <MessageCircle size={15} strokeWidth={2} aria-hidden="true" />
-        <span>Chat</span>
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className={`${MODE_BUTTON_BASE_CLASS} ${CHAT_MODE_PILL_CLASS} [grid-area:mode] hover:brightness-100`} tabIndex={0}>
+            <MessageCircle size={15} strokeWidth={2} aria-hidden="true" />
+            <span>Chat</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{canSwitchAgentForm ? "发送前可在 + 菜单中切换模式" : "对话已开始，需要开发能力请新建 Agent 会话"}</TooltipContent>
+      </Tooltip>
     );
     if (mode === "agent") return null;
     const selectedMode = MODE_META[mode];
@@ -1984,15 +2045,18 @@ export function Composer({
         {renderAddMenuButton()}
         {renderModeSelector()}
         {renderModelSelector()}
+        {showInlineContextUsage ? renderContextUsageButton("inline") : null}
         {renderSendButton()}
       </div>
     );
   }
 
   function renderPanel() {
-    const composerBodyClass = mode === "agent" && !isChatForm
-      ? resolvedLayout === "inline" ? COMPOSER_BODY_AGENT_INLINE_CLASS : COMPOSER_BODY_AGENT_STACKED_CLASS
-      : resolvedLayout === "inline" ? COMPOSER_BODY_INLINE_CLASS : COMPOSER_BODY_STACKED_CLASS;
+    const composerBodyClass = showInlineContextUsage
+      ? resolvedLayout === "inline" ? COMPOSER_BODY_CHAT_INLINE_CLASS : COMPOSER_BODY_CHAT_STACKED_CLASS
+      : mode === "agent" && !isChatForm
+        ? resolvedLayout === "inline" ? COMPOSER_BODY_AGENT_INLINE_CLASS : COMPOSER_BODY_AGENT_STACKED_CLASS
+        : resolvedLayout === "inline" ? COMPOSER_BODY_INLINE_CLASS : COMPOSER_BODY_STACKED_CLASS;
     return (
       <div
         className={`${getComposerPanelClass(surface)}${isDragActive ? ` ${COMPOSER_DROP_ACTIVE_CLASS}` : ""}`}
@@ -2025,6 +2089,7 @@ export function Composer({
           {renderComposerInput()}
           {renderToolbar()}
         </div>
+        {renderCommandMenu()}
         {renderSlashMenu()}
       </div>
     );
@@ -2068,12 +2133,41 @@ export function Composer({
     );
   }
 
+  function renderContextUsageButton(variant: "status" | "inline") {
+    return (
+      <button
+        className={variant === "inline" ? INLINE_USAGE_CLASS : STATUS_USAGE_CLASS}
+        type="button"
+        aria-label={`上下文用量 ${contextPercentLabel}%`}
+        aria-expanded={contextOpen}
+        onClick={() => {
+          setContextOpen((value) => !value);
+          setCommandOpen(false);
+          setModelOpen(false);
+          setModelOptionsOpen(false);
+          setContextSelectorOpen(null);
+        }}
+      >
+        <span
+          className={variant === "inline" ? INLINE_USAGE_DOT_CLASS : STATUS_USAGE_DOT_CLASS}
+          aria-hidden="true"
+          style={{
+            background: `conic-gradient(${contextRingColor} ${contextRingPercent}%, var(--act-color-border) ${contextRingPercent}%)`,
+            WebkitMask: STATUS_USAGE_DOT_MASK,
+            mask: STATUS_USAGE_DOT_MASK
+          }}
+        />
+        <span>{contextPercentLabel}%</span>
+      </button>
+    );
+  }
+
   function renderComposerStatusRow() {
-    if (surface !== "followup") return null;
+    if (surface !== "followup" || isChatForm) return null;
 
     return (
       <div className={STATUS_ROW_CLASS}>
-        {!isChatForm ? <div className={STATUS_GROUP_CLASS}>
+        <div className={STATUS_GROUP_CLASS}>
           {branchLabel ? (
             <span className={STATUS_ITEM_CLASS} title={selectedBranch}>
               <GitBranch className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
@@ -2084,31 +2178,9 @@ export function Composer({
             <Laptop className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
             <span>{runLocation === "worktree" ? "工作树" : "本机"}</span>
           </span>
-          {!isChatForm && permissionControl ? <span className={STATUS_ITEM_CLASS}>{permissionControl}</span> : null}
-        </div> : <span />}
-        <button
-          className={STATUS_USAGE_CLASS}
-          type="button"
-          aria-label={`上下文用量 ${contextPercentLabel}%`}
-          onClick={() => {
-            setContextOpen((value) => !value);
-            setCommandOpen(false);
-            setModelOpen(false);
-            setModelOptionsOpen(false);
-            setContextSelectorOpen(null);
-          }}
-        >
-          <span
-            className={STATUS_USAGE_DOT_CLASS}
-            aria-hidden="true"
-            style={{
-              background: `conic-gradient(${contextRingColor} ${contextRingPercent}%, var(--act-color-border) ${contextRingPercent}%)`,
-              WebkitMask: STATUS_USAGE_DOT_MASK,
-              mask: STATUS_USAGE_DOT_MASK
-            }}
-          />
-          <span>{contextPercentLabel}%</span>
-        </button>
+          {permissionControl ? <span className={STATUS_ITEM_CLASS}>{permissionControl}</span> : null}
+        </div>
+        {renderContextUsageButton("status")}
       </div>
     );
   }
@@ -2306,23 +2378,6 @@ export function Composer({
     );
   }
 
-  function renderPlanNewIdeaChip() {
-    if (surface !== "initial" || isChatForm) return null;
-
-    return (
-      <div className={INITIAL_CHIP_ROW_CLASS}>
-        <button
-          className={INITIAL_CHIP_CLASS}
-          type="button"
-          disabled={isStreaming}
-          onClick={() => onModeChange?.("plan")}
-        >
-          规划新想法 <span className="ml-1 text-text-faint">⇧Tab</span>
-        </button>
-      </div>
-    );
-  }
-
   return (
     <footer className={getComposerWrapClass(surface)} ref={composerRef}>
       {contextOpen ? (
@@ -2345,7 +2400,6 @@ export function Composer({
       {renderDraftError()}
       {renderPanel()}
       {renderComposerStatusRow()}
-      {renderPlanNewIdeaChip()}
     </footer>
   );
 }

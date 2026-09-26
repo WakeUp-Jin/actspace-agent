@@ -3253,7 +3253,8 @@ sessionId: input.sessionId,
     await screen.findByText('Latest question');
     expect(screen.queryByText('Earlier question')).not.toBeInTheDocument();
     expect(getSession).not.toHaveBeenCalled(); expect(listSessions).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: '加载更早消息' }));
+    // 已在顶部时继续向上滚（没有 scroll 事件）也会自动加载更早消息。
+    fireEvent.wheel(screen.getByLabelText('会话消息'), { deltaY: -120 });
     await screen.findByText('Earlier question');
     expect(getSessionPage).toHaveBeenLastCalledWith({ sessionId: 'paged', beforeSeq: 10 });
     expect(screen.getByText('Latest question')).toBeInTheDocument();

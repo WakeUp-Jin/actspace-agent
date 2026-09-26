@@ -14,7 +14,7 @@ import { SplitView } from "./SplitView";
 import { WindowChromeBar } from "./WindowChromeBar";
 import type { SessionMainView } from "./SessionViewToggle";
 import { WorkspaceChromeControls } from "./workspace/WorkspaceChromeControls";
-import type { ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
+import type { ComposerAgentFormSwitch, ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages, selectTrajectory } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
@@ -124,6 +124,7 @@ export function WorkbenchLayout({
   onSelectedModelChange,
   composerMode,
   onComposerModeChange,
+  onAgentFormChange,
   selectedSkills,
   onSelectedSkillsChange,
   onSettingsChange,
@@ -172,6 +173,7 @@ export function WorkbenchLayout({
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   composerMode?: ComposerMode;
   onComposerModeChange?: (mode: ComposerMode) => void;
+  onAgentFormChange?: (change: ComposerAgentFormSwitch) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;
   models?: UsableModelView[];
@@ -570,6 +572,7 @@ export function WorkbenchLayout({
         onSelectedModelChange={onSelectedModelChange}
         composerMode={composerMode}
         onComposerModeChange={onComposerModeChange}
+        onAgentFormChange={onAgentFormChange}
         selectedSkills={selectedSkills}
         onSelectedSkillsChange={onSelectedSkillsChange}
         workspaceOptions={workspaceOptions}

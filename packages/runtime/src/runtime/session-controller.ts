@@ -93,15 +93,21 @@ export class RuntimeSessionController {
     const before = input.beforeSeq ?? end;
     if (!Number.isSafeInteger(before) || before < 0 || before > end || (input.afterSeq !== undefined && (!Number.isSafeInteger(input.afterSeq) || input.afterSeq < -1 || input.afterSeq >= end))) throw new Error("Invalid history cursor.");
     const candidates = starts.filter(seq => seq < before);
-    const from = input.afterSeq !== undefined ? input.afterSeq + 1 : candidates.length <= 10 ? 0 : candidates[candidates.length - 10]!;
+    const from = input.afterSeq !== undefined ? input.afterSeq + 1 : candidates.length <= HISTORY_PAGE_TURNS ? 0 : candidates[candidates.length - HISTORY_PAGE_TURNS]!;
     const until = input.afterSeq !== undefined ? end : before;
     let journal = events ? events.slice(from, until) : await this.#cache.events(read!, from, until);
-    const maxEvents = Math.max(1, Math.min(input.maxWindowEvents ?? 200, 2_000));
-    const maxBytes = Math.max(4_096, Math.min(input.maxWindowBytes ?? 256_000, 2_000_000));
-    while (journal.length > maxEvents || JSON.stringify(journal).length > maxBytes) {
-      if (journal.length <= 1) break;
-      journal = journal.slice(1);
+    if (input.afterSeq === undefined && !input.includeToolDetails) journal = slimHistoryWindow(journal);
+    const maxEvents = Math.max(1, Math.min(input.maxWindowEvents ?? 2_000, 2_000));
+    const maxBytes = Math.max(4_096, Math.min(input.maxWindowBytes ?? 2_000_000, 2_000_000));
+    // 与 JSON.stringify(journal).length 等价的累计字节数（元素长度 + 逗号 + 方括号），从头部逐条裁剪，避免每轮重新序列化。
+    const sizes = journal.map(event => JSON.stringify(event).length);
+    let bytes = sizes.reduce((sum, size) => sum + size, 0) + journal.length + 1;
+    let trimmed = 0;
+    while (journal.length - trimmed > 1 && (journal.length - trimmed > maxEvents || bytes > maxBytes)) {
+      bytes -= sizes[trimmed]! + 1;
+      trimmed += 1;
     }
+    if (trimmed > 0) journal = journal.slice(trimmed);
     const windowFrom = journal[0]?.seq ?? until;
     const messageIds = new Set(journal.flatMap(event => event.surface ? [event.surface.node.messageId] : []));
     const callIds = new Set(journal.flatMap(event => {
@@ -110,7 +116,7 @@ export class RuntimeSessionController {
     }));
     const deferredToolCalls = input.includeToolDetails ? [] : [...callIds].filter(callId => journal.some(event => {
       const data = eventData(event);
-      return data?.callId === callId && JSON.stringify(event).length > 24_000;
+      return data?.callId === callId && JSON.stringify(event).length > DEFERRED_DETAIL_BYTES;
     }));
     const deferred = new Set(deferredToolCalls);
     const boundedJournal = journal.map(event => {
@@ -226,6 +232,56 @@ export class RuntimeSessionController {
   }
 }
 
+// 一页历史按 turn 计：20 轮覆盖绝大多数会话，只有长会话上滑时才需要继续分页。
+const HISTORY_PAGE_TURNS = 20;
+const DEFERRED_DETAIL_BYTES = 24_000;
+
+/**
+ * 历史窗口只服务展示，先剔除体积大但展示用不到的事件，再按事件数/字节上限裁剪：
+ * - 已有 assistant/message 定稿的消息，其 assistant/chunk 流式增量客户端会直接跳过（约占 journal 事件的 97%）；
+ * - request/context 每次请求都记录一份完整上下文，随对话增长累积；窗口内只保留最新一份给 Context 面板，
+ *   其余大快照收敛为模型 / 路由 / 请求参数等身份字段，与大工具事件的 bounded 处理一致。
+ */
+export function slimHistoryWindow(journal: readonly SessionEventEnvelopeV1[]): SessionEventEnvelopeV1[] {
+  const completedMessages = new Set<string>();
+  let latestContextSeq = -1;
+  for (const event of journal) {
+    const data = eventData(event);
+    if (event.type === "assistant/message" && typeof data?.messageId === "string") completedMessages.add(data.messageId);
+    if (event.type === "request/context") latestContextSeq = event.seq;
+  }
+  return journal.flatMap(event => {
+    const data = eventData(event);
+    if (event.type === "assistant/chunk" && typeof data?.messageId === "string" && completedMessages.has(data.messageId)) return [];
+    if (event.type === "request/context" && event.seq !== latestContextSeq && JSON.stringify(event).length > DEFERRED_DETAIL_BYTES) return [boundRequestContextEvent(event)];
+    return [event];
+  });
+}
+
+function boundRequestContextEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
+  const data = eventData(event);
+  if (!data) return event;
+  const bounded: Record<string, RuntimeV2JsonValue> = { deferredDetail: true };
+  for (const key of ["agentRunId", "turnId", "stepId", "requestId"] as const) {
+    const value = data[key];
+    if (value !== undefined) bounded[key] = value;
+  }
+  const snapshot = jsonRecord(data.snapshot);
+  const prepared = jsonRecord(snapshot?.prepared);
+  const boundedSnapshot: Record<string, RuntimeV2JsonValue> = {};
+  if (prepared) {
+    const boundedPrepared: Record<string, RuntimeV2JsonValue> = {};
+    for (const key of ["model", "route", "contextWindow"] as const) {
+      const value = prepared[key];
+      if (value !== undefined) boundedPrepared[key] = value;
+    }
+    boundedSnapshot.prepared = boundedPrepared;
+  }
+  if (snapshot?.requestOptions !== undefined) boundedSnapshot.requestOptions = snapshot.requestOptions;
+  bounded.snapshot = boundedSnapshot;
+  return { ...event, data: bounded };
+}
+
 function publicValues(values: RuntimeV2ProjectionValues): RuntimeV2ProjectionValues {
   return Object.fromEntries(Object.entries(values).filter(([key]) => !["surface", "tools", "updatedAt"].includes(key)));
 }
@@ -241,6 +297,9 @@ function boundToolEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
   if (typeof data.summary === "string") bounded.summary = data.summary.slice(0, 1_000);
   if (data.failure !== undefined) bounded.failure = data.failure;
   return { ...event, data: bounded, surface: event.surface ? { ...event.surface, node: { ...event.surface.node, content: "" } } : null };
+}
+function jsonRecord(value: RuntimeV2JsonValue | undefined): Readonly<Record<string, RuntimeV2JsonValue>> | null {
+  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : null;
 }
 function eventData(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeV2JsonValue>> | null {
   return event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeV2JsonValue>> : null;

@@ -112,7 +112,7 @@ Radix primitives / 原生 HTML
 - [x] 新增 `docs/design-docs/frontend/front-基础组件封装规范.md`。
 - [ ] 盘点现有重复控件和第一批迁移目标。
 - [x] 公共 `components/ui/Tooltip.tsx` 已存在；另有 HoverCard、Sheet。这里只确认文件落地，不代替本计划的统一迁移验收。
-- [ ] 新增 `components/ui/Button.tsx`、`IconButton.tsx`。
+- [ ] 新增 `components/ui/Button.tsx`、`IconButton.tsx`。 2026-09-26 起由 `active/20260926-frontend-design-token-convergence.md` 的 T12 负责（含设置中心、审批卡迁移）；本计划保留其余组件与其他页面的按钮迁移。
 - [ ] 新增 `components/ui/DropdownMenu.tsx`、`Switch.tsx`。
 - [ ] 新增 `components/ui/Textarea.tsx`、`Tabs.tsx`。
 - [ ] 迁移消息操作菜单和右侧 tabs。

@@ -1,0 +1,643 @@
+<!doctype html>
+<!-- 2026-09-26 T0 对比 demo：docs/exec-plans/active/20260926-frontend-design-token-convergence.md。
+     「现状」一侧的数值逐项取自当前代码（tokens.css、Composer.tsx、UserMessage.tsx、ApprovalParts.tsx、BashRunBlock.tsx、electron.css、SettingsPage.tsx 等），
+     「修改后」按计划默认方案；右下角「你的决定」里的备选只影响「修改后」。 -->
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>设计 token 收口对比</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+
+  --bg: #f7f7f5; --sidebar: #efefed; --surface: #ffffff; --surface-subtle: #f1f1ef; --raised: #ffffff;
+  --selected: #e4e4e1; --hover: #eaeae7; --line: #deded9; --line-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #72726b; --subtle: #85857e;
+  --action: #20201e; --action-hover: #343430; --on-action: #ffffff;
+  --operational: #087a4b; --operational-soft: #e5f2ea; --on-operational: #ffffff;
+  --success-soft: #e5f2ea; --on-success: #087a4b;
+  --warning: #91600e; --warning-soft: #f7eedb; --on-warning: #7a500a;
+  --toggle-off: #d3d3ce; --focus: #4d4d48;
+
+  /* 现状阴影（旧冷蓝灰）与修改后（暖色基底） */
+  --sh-composer-old: 0 18px 48px rgba(31, 45, 61, 0.08);
+  --sh-composer-warm: 0 18px 48px rgba(20, 21, 18, 0.08);
+  --sh-card-old: 0 12px 34px rgba(31, 45, 61, 0.045);
+  --sh-card-warm: 0 12px 34px rgba(20, 21, 18, 0.045);
+  --sh-pop-old: 0 24px 64px rgba(31, 45, 61, 0.14);
+  --sh-pop-warm: 0 24px 64px rgba(20, 21, 18, 0.14);
+  --sh-xs: 0 1px 2px rgba(20, 21, 18, 0.06);
+
+  --annot: #c026d3; /* 仅 demo 标注用，不是产品颜色 */
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --sidebar: #1e1f1c; --surface: #242522; --surface-subtle: #292a26; --raised: #30312d;
+  --selected: #30312d; --hover: #2a2b27; --line: #353630; --line-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #787870;
+  --action: #f1f1ed; --action-hover: #dbdbd5; --on-action: #181916;
+  --operational: #36c783; --operational-soft: #193a2b; --on-operational: #181916;
+  --success-soft: #193a2b; --on-success: #36c783;
+  --warning: #d2a14d; --warning-soft: #3e321c; --on-warning: #e2ba6b;
+  --toggle-off: #4a4b45; --focus: #c8c8c0;
+  --sh-composer-old: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --sh-composer-warm: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --sh-card-old: 0 12px 34px rgba(0, 0, 0, 0.3);
+  --sh-card-warm: 0 12px 34px rgba(0, 0, 0, 0.3);
+  --sh-pop-old: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --sh-pop-warm: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --annot: #e879f9;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --bg: #181916; --sidebar: #1e1f1c; --surface: #242522; --surface-subtle: #292a26; --raised: #30312d;
+    --selected: #30312d; --hover: #2a2b27; --line: #353630; --line-strong: #787870;
+    --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #787870;
+    --action: #f1f1ed; --action-hover: #dbdbd5; --on-action: #181916;
+    --operational: #36c783; --operational-soft: #193a2b; --on-operational: #181916;
+    --success-soft: #193a2b; --on-success: #36c783;
+    --warning: #d2a14d; --warning-soft: #3e321c; --on-warning: #e2ba6b;
+    --toggle-off: #4a4b45; --focus: #c8c8c0;
+    --sh-composer-old: 0 18px 48px rgba(0, 0, 0, 0.45);
+    --sh-composer-warm: 0 18px 48px rgba(0, 0, 0, 0.45);
+    --sh-card-old: 0 12px 34px rgba(0, 0, 0, 0.3);
+    --sh-card-warm: 0 12px 34px rgba(0, 0, 0, 0.3);
+    --sh-pop-old: 0 24px 64px rgba(0, 0, 0, 0.55);
+    --sh-pop-warm: 0 24px 64px rgba(0, 0, 0, 0.55);
+    --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --annot: #e879f9;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-ui); font-size: 16px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--focus) 50%, transparent); outline-offset: 2px; }
+svg { display: block; flex: none; }
+code, .mono { font-family: var(--font-mono); }
+
+/* ---------- Demo chrome（不是产品界面） ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 24px; background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+}
+.topbar h1 { font-size: 16px; font-weight: 600; margin-right: auto; }
+.seg { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); }
+.seg button { height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; font-size: 13px; font-weight: 500; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--sh-xs); }
+.seg.view button[aria-pressed="true"] { background: var(--action); color: var(--on-action); }
+.hint { font-size: 12px; color: var(--faint); }
+kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+
+main { max-width: 1120px; margin: 0 auto; padding: 24px 24px 160px; }
+.lede { font-size: 14px; color: var(--muted); max-width: 720px; margin-bottom: 32px; }
+.lede b { color: var(--text); font-weight: 600; }
+
+section.demo { margin-bottom: 48px; }
+.demo-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.demo-head h2 { font-size: 16px; font-weight: 600; }
+.tag { font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+.look { font-size: 13px; color: var(--muted); margin-bottom: 12px; padding-left: 18px; }
+.look li { margin: 2px 0; }
+.stage-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.state-badge {
+  margin-left: auto;
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+  background: var(--action); color: var(--on-action); pointer-events: none;
+}
+body.is-before .state-badge { background: var(--surface-subtle); color: var(--muted); border: 1px solid var(--line); }
+.annot { color: var(--annot); font-size: 11px; font-weight: 600; font-family: var(--font-ui); pointer-events: none; }
+body.no-annot .annot, body.no-annot .annot-line { display: none !important; }
+
+/* ---------- 可切换变量：由 JS 按「现状 / 修改后 + 决定」写入 ---------- */
+body {
+  --composer-r: 22px; --composer-init-r: 18px;
+  --composer-shadow: var(--sh-composer-old);
+  --card-shadow: var(--sh-card-old);
+  --pop-shadow: var(--sh-pop-old);
+  --col-w: 880px; --block-w: 800px;
+  --tiny: 10px; --composer-font: 15px;
+  --row-btn-font: 12.5px; --chip-font: 11.5px;
+}
+
+/* ---------- 1. 会话中 ---------- */
+.pane-chat { background: var(--surface); width: 100%; min-width: 944px; padding: 8px 0 20px; margin: 0 auto; }
+.col { position: relative; width: var(--col-w); margin: 0 auto; }
+.col .guide { position: absolute; top: -8px; bottom: -20px; width: 0; border-left: 1px dashed var(--annot); opacity: .55; }
+.col .guide.l { left: 0; } .col .guide.r { right: 0; }
+body.no-guides .guide { display: none; }
+
+.turn-prompt { padding: 16px 0; }
+.user-card {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  padding: 12px 16px; line-height: 1.55; box-shadow: var(--card-shadow);
+}
+.flow { display: flex; flex-direction: column; gap: 5px; }
+.tool-line { padding: 0 17px; font-size: 14px; line-height: 22px; color: var(--muted); display: flex; gap: 6px; align-items: center; max-width: var(--block-w); }
+.tool-line .t { color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool-line .add { color: var(--operational); font-weight: 500; }
+.reply { max-width: var(--block-w); padding: 4px 17px 6px; line-height: 1.65; }
+
+.appr {
+  position: relative; max-width: var(--block-w); width: 100%;
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+  border-radius: 8px; background: var(--surface); margin: 3px 0;
+}
+.appr-line { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 6px 5px 12px; font-size: 14px; line-height: 20px; }
+.appr-head { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 10px 12px 0; font-size: 14px; line-height: 20px; }
+.appr-icon { width: 16px; height: 16px; display: grid; place-items: center; color: var(--faint); }
+.appr-verb { font-weight: 500; color: var(--text); flex: none; }
+.appr-target { min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.appr-actions { margin-left: auto; display: flex; gap: 4px; padding-left: 8px; flex: none; }
+.appr-body { margin: 10px 12px 0 36px; }
+.appr-body pre {
+  margin: 0; white-space: pre-wrap; background: var(--surface-subtle); border-radius: 6px;
+  padding: 8px 12px; font-family: var(--font-mono); font-size: 13px; line-height: 1.55; color: var(--text);
+}
+.appr-foot { display: flex; align-items: center; gap: 6px; padding: 10px 10px 10px 36px; }
+.appr-meta { margin-right: auto; font-size: 12px; color: var(--faint); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 4px; font-size: var(--chip-font); font-weight: 500; line-height: 1; background: var(--warning-soft); color: var(--on-warning); }
+.btn { display: inline-flex; align-items: center; border: 1px solid transparent; border-radius: 6px; font-weight: 500; white-space: nowrap; }
+.btn.row { height: 26px; padding: 0 9px; font-size: var(--row-btn-font); }
+.btn.card { height: 28px; padding: 0 10px; font-size: 13px; }
+.btn.ghost { background: transparent; color: var(--muted); }
+.btn.quiet { border-color: var(--line); background: var(--surface); color: var(--text); }
+.btn.primary { background: var(--action); color: var(--on-action); }
+.gap-marker {
+  position: absolute; top: 50%; height: 0; border-top: 1px solid var(--annot);
+  left: 100%; width: calc(var(--col-w) - var(--block-w));
+}
+.gap-marker::before, .gap-marker::after { content: ""; position: absolute; top: -5px; height: 9px; border-left: 1px solid var(--annot); }
+.gap-marker::before { left: 0; } .gap-marker::after { right: 0; }
+.gap-marker span { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); white-space: nowrap; }
+
+.composer { margin-top: 20px; }
+.c-panel { border: 1px solid var(--line); border-radius: var(--composer-r); background: var(--surface); box-shadow: var(--composer-shadow); }
+.c-body { display: flex; align-items: center; gap: 6px; min-height: 48px; padding: 6px 8px; }
+.c-plus { width: 36px; height: 36px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-subtle); color: var(--muted); display: grid; place-items: center; flex: none; }
+.c-input { flex: 1; min-width: 0; padding: 7px 6px; font-size: var(--composer-font); line-height: 20px; color: var(--subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-input.typed { color: var(--text); }
+.c-model { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px; font-size: 14px; font-weight: 500; color: var(--muted); flex: none; }
+.c-send { width: 32px; height: 32px; border-radius: 999px; background: var(--text); color: var(--surface); display: grid; place-items: center; flex: none; }
+.c-status { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 0; font-size: 12px; color: var(--faint); }
+.c-status span { display: inline-flex; align-items: center; gap: 6px; }
+.ring { width: 12px; height: 12px; border-radius: 999px; border: 2px solid var(--line); }
+
+/* ---------- 2. 新会话 ---------- */
+.pane-initial { background: var(--surface); min-width: 944px; display: grid; place-items: center; padding: 56px 32px 64px; }
+.initial { width: 706px; display: grid; gap: 8px; }
+.ctx-row { display: flex; gap: 12px; padding: 0 8px; min-height: 28px; align-items: center; font-size: 14px; font-weight: 500; color: var(--muted); }
+.ctx-row span { display: inline-flex; align-items: center; gap: 4px; }
+.i-panel { border: 1px solid var(--line); border-radius: var(--composer-init-r); background: var(--surface); box-shadow: var(--composer-shadow); padding: 6px 8px; }
+.i-input { min-height: 76px; padding: 7px 6px; font-size: var(--composer-font); line-height: 20px; color: var(--text); }
+.i-row { display: flex; align-items: center; gap: 6px; }
+.i-row .c-send { margin-left: auto; }
+.plan-chip { justify-self: start; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--muted); }
+
+/* ---------- 3. 窗口顶部 ---------- */
+.win { position: relative; min-width: 944px; overflow: hidden; }
+.win + .win { border-top: 1px solid var(--line); }
+.lights { position: absolute; left: 14px; top: 16px; display: flex; gap: 8px; z-index: 3; }
+.lights i { width: 12px; height: 12px; border-radius: 999px; background: var(--toggle-off); }
+.wb { display: grid; grid-template-columns: 260px 1fr; height: 132px; }
+.wb-side { background: var(--sidebar); border-right: 1px solid var(--line); }
+.wb-side-top { height: 44px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 0 14px; color: var(--muted); }
+.wb-side-item { display: flex; align-items: center; gap: 8px; padding: 6px 18px; font-size: 13px; color: var(--text); }
+.wb-main { position: relative; background: var(--surface); }
+.wb-strip { height: 44px; display: flex; align-items: center; gap: 6px; padding-left: 16px; font-size: 13px; color: var(--text); }
+.wb-toggle { position: absolute; right: 12px; top: 13px; color: var(--text); }
+.stray { position: absolute; right: 0; top: 43px; width: 34px; border-top: 1px solid var(--line); }
+body.is-after .stray, body.is-after .strip-line { display: none; }
+.annot-line { position: absolute; }
+
+.st { display: grid; grid-template-columns: 215px 1fr; height: 196px; background: var(--surface); position: relative; }
+.st-strip { position: absolute; left: 0; right: 0; top: 0; height: 44px; background: var(--surface); z-index: 1; }
+.strip-line { position: absolute; left: 0; right: 0; top: 43px; border-top: 1px solid var(--line); z-index: 2; }
+body.is-after .st-strip { display: none; }
+.st-nav { background: var(--sidebar); border-right: 1px solid var(--line); padding: 54px 10px 0; }
+.st-back { display: flex; align-items: center; gap: 8px; padding: 0 10px 10px; font-size: 13px; color: var(--muted); }
+.st-label { padding: 0 10px 4px; font-size: 11px; font-weight: 500; color: var(--faint); }
+.st-item { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.st-item.on { background: var(--selected); color: var(--text); font-weight: 600; }
+.st-main { background: var(--bg); padding: 60px 40px 0; }
+.st-title { font-size: 20px; font-weight: 600; }
+.st-desc { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* ---------- 4. 小字号 ---------- */
+.pane-tiny { background: var(--bg); min-width: 944px; padding: 28px 32px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; align-items: start; }
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.g-row { padding: 12px 14px; }
+.g-row + .g-row { border-top: 1px solid var(--line); }
+.m-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.m-title b { font-size: 13px; font-weight: 600; }
+.pill { border-radius: 999px; background: var(--surface-subtle); padding: 2px 8px; font-size: var(--tiny); font-weight: 500; color: var(--muted); }
+.m-api { font-size: 11px; color: var(--faint); margin-top: 2px; }
+.m-cap { font-size: var(--tiny); color: var(--muted); margin-top: 4px; }
+.m-field { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.m-field > span:first-child { font-size: var(--tiny); font-weight: 500; color: var(--muted); width: 48px; }
+.select { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 220px; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; background: var(--surface); }
+.steps { display: flex; gap: 28px; }
+.step { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.dot { width: 20px; height: 20px; border-radius: 999px; border: 1px solid var(--line); display: grid; place-items: center; font-size: var(--tiny); font-weight: 600; color: var(--faint); background: var(--surface); }
+.dot.done { border-color: var(--on-success); background: var(--success-soft); color: var(--on-success); }
+.dot.cur { border-color: var(--operational); background: var(--operational); color: var(--on-operational); }
+.pop { width: 300px; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-shadow: var(--pop-shadow); }
+.pop-row { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 6px; font-size: 13px; }
+.pop-row:first-child { background: var(--hover); }
+.scope { margin-left: auto; font-size: var(--tiny); text-transform: uppercase; letter-spacing: .025em; color: var(--faint); }
+.sub { font-size: 12px; font-weight: 600; color: var(--faint); margin-bottom: 8px; }
+
+/* ---------- 决定面板 ---------- */
+.decide {
+  position: fixed; right: 16px; bottom: 16px; z-index: 30; width: 330px; max-height: calc(100vh - 96px); overflow: auto;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--sh-pop-warm); padding: 14px;
+  font-size: 13px;
+}
+.decide h3 { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.decide h3 button { border: 0; background: none; font-size: 12px; color: var(--faint); }
+.decide .note { font-size: 12px; color: var(--faint); margin-bottom: 10px; }
+.q { padding: 10px 0; border-top: 1px solid var(--line); }
+.q-title { font-weight: 600; font-size: 13px; }
+.q-why { font-size: 12px; color: var(--faint); margin: 2px 0 6px; }
+.opts { display: flex; flex-wrap: wrap; gap: 4px; }
+.opts button { height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font-size: 12px; color: var(--muted); }
+.opts button[aria-pressed="true"] { border-color: var(--action); background: var(--action); color: var(--on-action); }
+.opts button small { font-size: 11px; opacity: .75; margin-left: 3px; }
+.checks { display: flex; gap: 14px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.checks label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.copy { width: 100%; margin-top: 10px; height: 32px; border: 0; border-radius: 8px; background: var(--action); color: var(--on-action); font-weight: 600; font-size: 13px; }
+.decide.min .body { display: none; }
+.decide.min { width: auto; }
+.decide.min h3 { margin: 0; gap: 12px; }
+@media (max-width: 720px) { .decide { left: 16px; width: auto; } .topbar { padding: 10px 16px; } main { padding: 16px 16px 200px; } }
+</style>
+</head>
+<body class="is-before">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 19V5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m7 11 2-2-2-2M11 13h4"/></g></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></g></symbol>
+    <symbol id="i-laptop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></g></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-panel-r" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></g></symbol>
+    <symbol id="i-panel-l" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></g></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m12 5 7 7-7 7M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></g></symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <h1>设计 token 收口 · T0 对比</h1>
+  <div class="seg view" role="group" aria-label="版本">
+    <button type="button" data-view="before" aria-pressed="true">现状</button>
+    <button type="button" data-view="after" aria-pressed="false">修改后</button>
+  </div>
+  <span class="hint">按 <kbd>空格</kbd> 来回切换</span>
+  <div class="seg" role="group" aria-label="主题">
+    <button type="button" data-theme-set="light" aria-pressed="true">浅色</button>
+    <button type="button" data-theme-set="dark" aria-pressed="false">深色</button>
+    <button type="button" data-theme-set="system" aria-pressed="false">跟随系统</button>
+  </div>
+</header>
+
+<main>
+  <p class="lede">
+    每一块都是<b>原尺寸</b>还原：「现状」的数值直接取自当前代码，「修改后」是计划的默认方案。
+    建议在同一块上按空格来回切，比左右并排更容易看出对齐和阴影的差别。
+    右下角「你的决定」里的备选只影响「修改后」；紫色虚线和标注是 demo 辅助，不是界面的一部分。
+  </p>
+
+  <!-- 1. 会话中 -->
+  <section class="demo" aria-labelledby="s1">
+    <div class="demo-head"><h2 id="s1">1 · 会话中</h2><span class="tag">D1 圆角</span><span class="tag">D2 阴影</span><span class="tag">D3 宽度</span></div>
+    <ul class="look">
+      <li>右侧紫色虚线是内容列边缘：现状下审批行、Bash 卡、正文比 Composer 和用户消息卡短 80px。</li>
+      <li>Composer 22px 圆角和上方 12px 的用户消息卡叠在一起，两者都有阴影。</li>
+      <li>审批行按钮 12.5px、"工作区外"标签 11.5px 这两个规范外字号，修改后统一为 12px。</li>
+    </ul>
+    <div class="stage-wrap">
+      <span class="state-badge" data-state-badge>现状</span>
+      <div class="pane-chat">
+        <div class="col">
+          <i class="guide l" aria-hidden="true"></i><i class="guide r" aria-hidden="true"></i>
+          <div class="turn-prompt"><div class="user-card">把设置页的保存逻辑改成即时保存，保存后在右上角提示"已保存"，并补上测试。</div></div>
+          <div class="flow">
+            <div class="tool-line">Thinking</div>
+            <div class="tool-line"><span>Read</span><span class="t">apps/desktop/src/renderer/components/settings/SettingsPage.tsx</span></div>
+            <div class="tool-line"><span>Read</span><span class="t">components/settings/SettingsPrimitives.tsx</span></div>
+            <div class="appr">
+              <div class="appr-line">
+                <span class="appr-icon"><svg width="14" height="14"><use href="#i-edit"/></svg></span>
+                <span class="appr-verb">编辑</span>
+                <span class="appr-target"><span class="mono" style="font-size:13px">~/notes/settings-todo.md</span><span class="chip">工作区外</span></span>
+                <span class="appr-actions"><span class="btn row ghost">拒绝</span><span class="btn row quiet">本会话</span><span class="btn row primary">编辑</span></span>
+              </div>
+              <div class="gap-marker annot" data-gap><span>−80px</span></div>
+            </div>
+            <div class="tool-line"><span>Write</span><span class="t">components/settings/SaveNotice.tsx</span><span class="add">+48</span><svg width="14" height="14" style="color:var(--faint)"><use href="#i-chev-r"/></svg></div>
+            <div class="appr">
+              <div class="appr-head">
+                <span class="appr-icon"><svg width="14" height="14"><use href="#i-term"/></svg></span>
+                <span class="appr-verb">运行</span>
+                <span class="appr-target" style="color:var(--text)">运行设置页相关测试</span>
+              </div>
+              <div class="appr-body"><pre>pnpm --filter @actspace/desktop test -- settings-page</pre></div>
+              <div class="appr-foot">
+                <span class="appr-meta">cwd <code>~/code/actspace</code></span>
+                <span class="btn card ghost">拒绝</span><span class="btn card quiet">本会话</span><span class="btn card primary">运行</span>
+              </div>
+            </div>
+            <div class="reply">设置页改为即时保存：每个控件变更后直接写入，右上角出现"已保存"提示 1.6 秒后淡出。新增的 3 个测试都通过了。</div>
+          </div>
+          <div class="composer">
+            <div class="c-panel">
+              <div class="c-body">
+                <span class="c-plus"><svg width="16" height="16"><use href="#i-plus"/></svg></span>
+                <span class="c-input">继续补充...</span>
+                <span class="c-model">deepseek-flash<svg width="14" height="14"><use href="#i-chev"/></svg></span>
+                <span class="c-send"><svg width="16" height="16"><use href="#i-stop"/></svg></span>
+              </div>
+            </div>
+            <div class="c-status"><span><svg width="13" height="13"><use href="#i-laptop"/></svg>本机</span><span><i class="ring"></i>0%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 新会话 -->
+  <section class="demo" aria-labelledby="s2">
+    <div class="demo-head"><h2 id="s2">2 · 新会话</h2><span class="tag">D1 圆角</span><span class="tag">D2 阴影</span><span class="tag">D5 输入字号</span></div>
+    <ul class="look">
+      <li>初始 Composer 现状是 18px 圆角，和会话中的 22px 又不一样。</li>
+      <li>输入字号现状是 15px；规范写的是 16px，所以单独列成 D5 请你选。</li>
+    </ul>
+    <div class="stage-wrap">
+      <span class="state-badge" data-state-badge>现状</span>
+      <div class="pane-initial">
+        <div class="initial">
+          <div class="ctx-row"><span>工作区<svg width="13" height="13"><use href="#i-chev"/></svg></span><span><svg width="14" height="14"><use href="#i-laptop"/></svg>本机<svg width="13" height="13"><use href="#i-chev"/></svg></span></div>
+          <div class="i-panel">
+            <div class="i-input">把设置页改成即时保存，保存后在右上角提示"已保存"。</div>
+            <div class="i-row">
+              <span class="c-plus"><svg width="16" height="16"><use href="#i-plus"/></svg></span>
+              <span class="c-model">deepseek-flash<svg width="14" height="14"><use href="#i-chev"/></svg></span>
+              <span class="c-send"><svg width="16" height="16"><use href="#i-up"/></svg></span>
+            </div>
+          </div>
+          <span class="plan-chip">规划新想法 <span style="color:var(--faint)">⇧Tab</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 窗口顶部 -->
+  <section class="demo" aria-labelledby="s3">
+    <div class="demo-head"><h2 id="s3">3 · 窗口顶部</h2><span class="tag">问题 1，无需决定</span></div>
+    <ul class="look">
+      <li>主界面：右侧面板收起时，开关下面悬着一截 34px 的横线。</li>
+      <li>设置页：顶部一条白色空带加贯穿全宽的底线，把导航列和内容区拦腰截断。修改后导航灰色和内容底色直接延伸到窗口顶部。</li>
+    </ul>
+    <div class="stage-wrap">
+      <span class="state-badge" data-state-badge>现状</span>
+      <div class="win">
+        <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="wb">
+          <div class="wb-side">
+            <div class="wb-side-top"><svg width="15" height="15"><use href="#i-panel-l"/></svg><svg width="13" height="13" style="color:var(--subtle)"><use href="#i-left"/></svg><svg width="13" height="13" style="color:var(--subtle)"><use href="#i-right"/></svg></div>
+            <div class="wb-side-item"><svg width="14" height="14"><use href="#i-pen"/></svg>新建会话</div>
+          </div>
+          <div class="wb-main">
+            <div class="wb-strip"><svg width="15" height="15"><use href="#i-activity"/></svg>新建会话</div>
+            <span class="wb-toggle"><svg width="16" height="16"><use href="#i-panel-r"/></svg></span>
+            <i class="stray" aria-hidden="true"></i>
+            <span class="annot annot-line" style="right:44px; top:50px" data-before-only>← 孤立横线</span>
+          </div>
+        </div>
+      </div>
+      <div class="win">
+        <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="st">
+          <div class="st-strip" aria-hidden="true"></div>
+          <i class="strip-line" aria-hidden="true"></i>
+          <span class="annot annot-line" style="right:16px; top:16px; z-index:3" data-before-only>白色空带 + 全宽底线</span>
+          <div class="st-nav">
+            <div class="st-back"><svg width="14" height="14"><use href="#i-left"/></svg>返回应用</div>
+            <div class="st-label">偏好</div>
+            <div class="st-item on"><svg width="15" height="15"><use href="#i-sliders"/></svg>通用</div>
+            <div class="st-item"><svg width="15" height="15"><use href="#i-sun"/></svg>外观</div>
+          </div>
+          <div class="st-main">
+            <div class="st-title">通用</div>
+            <div class="st-desc">启动、会话与发送方式。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. 小字号 -->
+  <section class="demo" aria-labelledby="s4">
+    <div class="demo-head"><h2 id="s4">4 · 小于 11px 的字</h2><span class="tag">D4</span></div>
+    <ul class="look">
+      <li>现状 10px 的地方：模型行的"默认 / 手动价格"标签、容量说明、"连接 / 调用 Key"标签、更新步骤序号、技能菜单的来源标签。</li>
+      <li>右下的技能菜单同时演示浮层阴影从冷蓝灰改成暖色（深色主题下两者一样）。</li>
+    </ul>
+    <div class="stage-wrap">
+      <span class="state-badge" data-state-badge>现状</span>
+      <div class="pane-tiny">
+        <div>
+          <div class="sub">设置 → 模型 → 自定义连接</div>
+          <div class="group">
+            <div class="g-row">
+              <div class="m-title"><b>DeepSeek V4.1 Flash</b><span class="pill">默认</span><span class="pill">手动价格</span></div>
+              <div class="m-api">deepseek-v4.1-flash</div>
+              <div class="m-cap">128K 上下文 · 文本、图片 · 输入 ¥1 / 输出 ¥2 每百万 Token</div>
+              <div class="m-field"><span>连接</span><span class="select">DeepSeek 官方<svg width="13" height="13"><use href="#i-chev"/></svg></span></div>
+              <div class="m-field"><span>调用 Key</span><span class="select">默认 Key<svg width="13" height="13"><use href="#i-chev"/></svg></span></div>
+            </div>
+            <div class="g-row">
+              <div class="sub" style="margin-bottom:10px">设置 → 更新</div>
+              <div class="steps">
+                <div class="step"><span class="dot done">1</span>下载</div>
+                <div class="step"><span class="dot cur">2</span>校验</div>
+                <div class="step"><span class="dot">3</span>安装</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="sub">Composer → / 技能菜单</div>
+          <div class="pop">
+            <div class="pop-row">frontend-review<span class="scope">project</span></div>
+            <div class="pop-row">write<span class="scope">user</span></div>
+            <div class="pop-row">hunt<span class="scope">user</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<aside class="decide" id="decide" aria-label="你的决定">
+  <h3><span>你的决定</span><button type="button" id="decide-min">收起</button></h3>
+  <div class="body">
+    <p class="note">只影响「修改后」。选好后点底部按钮复制结论发给我。</p>
+    <div class="q" data-q="d1">
+      <div class="q-title">D1 Composer 圆角</div>
+      <div class="q-why">现状会话中 22px、新会话 18px，用户消息卡 12px。</div>
+      <div class="opts">
+        <button type="button" data-v="12">12px<small>推荐</small></button>
+        <button type="button" data-v="16">16px</button>
+        <button type="button" data-v="keep">保持 22/18</button>
+      </div>
+    </div>
+    <div class="q" data-q="d2">
+      <div class="q-title">D2 常驻阴影</div>
+      <div class="q-why">Composer 与用户消息卡。浮层（菜单、弹窗）的阴影保留，只换暖色。</div>
+      <div class="opts">
+        <button type="button" data-v="none">都去掉<small>推荐</small></button>
+        <button type="button" data-v="xs">Composer 留极轻一道</button>
+        <button type="button" data-v="keep">保留（改暖色）</button>
+      </div>
+    </div>
+    <div class="q" data-q="d3">
+      <div class="q-title">D3 消息块宽度</div>
+      <div class="q-why">现状消息块 800px，Composer 与用户消息卡 880px。</div>
+      <div class="opts">
+        <button type="button" data-v="880">都用 880<small>推荐</small></button>
+        <button type="button" data-v="800">都收到 800</button>
+        <button type="button" data-v="keep">保持不齐</button>
+      </div>
+    </div>
+    <div class="q" data-q="d4">
+      <div class="q-title">D4 小于 11px 的字</div>
+      <div class="q-why">规范最小 11px，现状有 15 处 10px/9px。</div>
+      <div class="opts">
+        <button type="button" data-v="11">提到 11px<small>推荐</small></button>
+        <button type="button" data-v="keep">保留 10px（规范加一档）</button>
+      </div>
+    </div>
+    <div class="q" data-q="d5">
+      <div class="q-title">D5 Composer 输入字号</div>
+      <div class="q-why">现状 15px，规范写 16px；也可以和正文工具行一样用 14px。</div>
+      <div class="opts">
+        <button type="button" data-v="16">16px<small>规范</small></button>
+        <button type="button" data-v="14">14px</button>
+        <button type="button" data-v="keep">保持 15px（规范加一档）</button>
+      </div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="opt-guides" checked /> 对齐辅助线</label>
+      <label><input type="checkbox" id="opt-annot" checked /> 标注</label>
+    </div>
+    <button type="button" class="copy" id="copy">复制结论</button>
+  </div>
+</aside>
+
+<script>
+(() => {
+  const state = { view: "before", d1: "12", d2: "none", d3: "880", d4: "11", d5: "16" };
+  const LABELS = {
+    d1: { "12": "12px", "16": "16px", keep: "保持 22/18px" },
+    d2: { none: "Composer 与用户消息卡都去掉阴影", xs: "Composer 留极轻阴影、用户消息卡去掉", keep: "保留阴影并改暖色" },
+    d3: { "880": "消息块与 Composer 都用 880px", "800": "三者都收到 800px", keep: "保持现状不对齐" },
+    d4: { "11": "全部提到 11px", keep: "保留 10px，规范加一档" },
+    d5: { "16": "16px（规范值）", "14": "14px", keep: "保持 15px，规范加一档" },
+  };
+  const body = document.body;
+
+  function vars() {
+    if (state.view === "before") {
+      return { "--composer-r": "22px", "--composer-init-r": "18px", "--composer-shadow": "var(--sh-composer-old)",
+        "--card-shadow": "var(--sh-card-old)", "--pop-shadow": "var(--sh-pop-old)", "--col-w": "880px", "--block-w": "800px",
+        "--tiny": "10px", "--composer-font": "15px", "--row-btn-font": "12.5px", "--chip-font": "11.5px" };
+    }
+    const r = { "12": ["12px", "12px"], "16": ["16px", "16px"], keep: ["22px", "18px"] }[state.d1];
+    const sh = { none: ["none", "none"], xs: ["var(--sh-xs)", "none"], keep: ["var(--sh-composer-warm)", "var(--sh-card-warm)"] }[state.d2];
+    const w = { "880": ["880px", "880px"], "800": ["800px", "800px"], keep: ["880px", "800px"] }[state.d3];
+    return { "--composer-r": r[0], "--composer-init-r": r[1], "--composer-shadow": sh[0],
+      "--card-shadow": sh[1],
+      "--pop-shadow": "var(--sh-pop-warm)", "--col-w": w[0], "--block-w": w[1],
+      "--tiny": state.d4 === "11" ? "11px" : "10px",
+      "--composer-font": { "16": "16px", "14": "14px", keep: "15px" }[state.d5],
+      "--row-btn-font": "12px", "--chip-font": "12px" };
+  }
+  function render() {
+    const v = vars();
+    for (const [k, val] of Object.entries(v)) body.style.setProperty(k, val);
+    body.classList.toggle("is-before", state.view === "before");
+    body.classList.toggle("is-after", state.view === "after");
+    document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === state.view)));
+    document.querySelectorAll("[data-state-badge]").forEach((el) => { el.textContent = state.view === "before" ? "现状" : "修改后"; });
+    const gap = parseInt(v["--col-w"]) - parseInt(v["--block-w"]);
+    document.querySelectorAll("[data-gap]").forEach((el) => {
+      el.style.display = gap > 0 ? "" : "none";
+      el.querySelector("span").textContent = `−${gap}px`;
+    });
+    document.querySelectorAll("[data-before-only]").forEach((el) => { el.style.display = state.view === "before" ? "" : "none"; });
+    document.querySelectorAll(".q").forEach((q) => {
+      q.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === state[q.dataset.q])));
+    });
+  }
+
+  document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => { state.view = b.dataset.view; render(); }));
+  document.querySelectorAll(".q").forEach((q) => q.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-v]");
+    if (!b) return;
+    state[q.dataset.q] = b.dataset.v;
+    state.view = "after";
+    render();
+  }));
+  document.querySelectorAll("[data-theme-set]").forEach((b) => b.addEventListener("click", () => {
+    document.documentElement.dataset.theme = b.dataset.themeSet;
+    document.querySelectorAll("[data-theme-set]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    render();
+  }));
+  document.addEventListener("keydown", (e) => {
+    if (e.code !== "Space" || e.target.closest("button, input, textarea")) return;
+    e.preventDefault();
+    state.view = state.view === "before" ? "after" : "before";
+    render();
+  });
+  document.getElementById("opt-guides").addEventListener("change", (e) => body.classList.toggle("no-guides", !e.target.checked));
+  document.getElementById("opt-annot").addEventListener("change", (e) => body.classList.toggle("no-annot", !e.target.checked));
+  const panel = document.getElementById("decide");
+  document.getElementById("decide-min").addEventListener("click", (e) => {
+    panel.classList.toggle("min");
+    e.target.textContent = panel.classList.contains("min") ? "展开" : "收起";
+  });
+  document.getElementById("copy").addEventListener("click", async (e) => {
+    const text = "T0 结论：" + ["d1", "d2", "d3", "d4", "d5"].map((k) => `${k.toUpperCase()} ${LABELS[k][state[k]]}`).join("；");
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const ta = Object.assign(document.createElement("textarea"), { value: text });
+      document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove();
+    }
+    e.target.textContent = "已复制";
+    setTimeout(() => { e.target.textContent = "复制结论"; }, 1600);
+  });
+  if (innerWidth < 1480) { panel.classList.add("min"); document.getElementById("decide-min").textContent = "展开"; }
+  document.querySelectorAll(".stage-wrap > .state-badge").forEach((b) => b.closest("section").querySelector(".demo-head").append(b));
+  render();
+})();
+</script>
+</body>
+</html>

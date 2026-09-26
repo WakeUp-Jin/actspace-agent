@@ -6,8 +6,8 @@
 
 ## 2026-09-24 Chat 形态边界
 
-- 新建会话入口提供 Agent 与 Chat；`Command+N` 默认 Agent。当前会话不原地切换形态。
-- Agent Composer 的 `+` 菜单提供 Plan、Agent、图片与 Skills；Chat Composer 显示固定 Chat 标识，隐藏 Plan/Agent、Skills、Workspace/Worktree 和权限入口。
+- 新建会话入口提供 Agent 与 Chat；`Command+N` 默认 Agent。已有消息的会话不切换形态；空会话可在 Composer 内切换（2026-09-26，见下文 `+` 菜单）。
+- Agent Composer 的 `+` 菜单提供 Agent、Plan、图片与 Skills（空会话额外提供 Chat）；Chat Composer 显示不可关闭的 Chat 标识：空会话保留 `+`（Agent / Plan / Chat + 图片与文件），对话开始后 `+` 换成直接选文件的回形针按钮，并隐藏 Plan/Agent、Skills、Workspace/Worktree 和权限入口。以后若支持中途切换，只需让已开始的 Chat 恢复 `+`。
 - Chat 保留模型、Thinking、Context、图片与文件附件、发送/停止。
 - Chat 文件入口只接受 PNG/JPEG/WEBP/GIF、TXT、Markdown、JSON、CSV；首版明确不支持 PDF、DOC、DOCX。
 - `/chat` 不再是 Slash Command；Chat 只能从新建会话入口创建。
@@ -70,7 +70,7 @@
 - 运行 / 停止状态可以使用小型 operational 绿点、细环或中性停止控件。
 - Context usage、branch、This Mac / Worktree 等状态行默认使用 muted / faint 灰阶。
 - operational green 只表示运行、连接或确认，不用于模型选择、附件、普通 `+` 按钮或菜单选中。
-- 模式 pill 是对当前能力 profile 的持续编码，允许使用三种语义色：Chat = info soft，Plan = warning soft，Agent = operational soft。色彩必须同时有文字和图标表达，不能成为唯一区分依据。
+- 模式 pill 是对当前能力 profile 的持续编码，允许使用三种语义色（2026-09-26 调整）：Chat = operational（绿），Plan = warning（黄），Agent = info（蓝，Agent 默认态无 pill，仅用于菜单图标）。色彩必须同时有文字和图标表达，不能成为唯一区分依据。
 - 菜单行的 hover / selected 仍使用中性底色和勾选，不把整行涂成模式色；模式色只出现在图标、文字小范围和 Composer 中的当前模式 pill。
 
 Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布局按内容高度**动态切换**（2026-07-05 定稿）：
@@ -126,12 +126,13 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 
 点击左侧 `+` 打开真实能力菜单。本节取代历史 execution plan 中“只展示 demo 菜单、不接业务行为”的旧边界；后续实现以本文档为事实来源。
 
-菜单固定结构：
+菜单固定结构（2026-09-26 对齐 Cursor）：
 
-1. 顶部弱提示：`Choose mode or add context.`
-2. 显式模式：`Chat`、`Plan`。`Agent` 是无额外标签的默认运行态，不在菜单中展示。
-3. 分隔线。
-4. 上下文入口：`Image`、`Skills`。
+- 面板与输入框同宽，从输入框上方弹出；不设搜索框和顶部提示。每行为「图标 · 名称 · 灰色一句说明」。
+- 模式区是完整的模式选择器，当前模式打勾：空会话（任一形态）显示 `Agent`、`Plan`、`Chat`；已开始的 Agent 会话显示 `Agent`、`Plan`；已开始的 Chat 会话不显示菜单（见回形针按钮）。
+- 分隔线（模式区为空时省略）。
+- 上下文入口：Agent 为 `图片`、`Skills ›`；Chat 为 `图片与文件`。
+- 图标（lucide）：Agent `Bot`、Plan `ListTodo`、Chat `MessageCircle`、图片 `Image`、Chat 附件 `Paperclip`、Skills `BookOpen`；模式图标使用模式语义色。
 
 不再展示：
 
@@ -140,7 +141,9 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 - `Attach files`：显式菜单入口收口为 Image；已有的拖拽普通文件能力可作为兼容行为保留，但不在菜单中暴露。
 - `MCP Servers`：当前不实现 MCP，不展示空入口、占位态或“即将推出”。
 
-菜单与 model menu、model options、Context popup 互斥。选择模式后关闭菜单；Image 在调起系统文件选择器前关闭菜单；鼠标悬浮到 Skills 行时展开二级菜单，鼠标离开主菜单与二级菜单组成的整个浮层后关闭。
+菜单与 model menu、model options、Context popup 互斥。选择模式后关闭菜单；Image 在调起系统文件选择器前关闭菜单；点击 Skills 在同一面板内下钻为技能列表，顶部「‹ Skills」返回主菜单。
+
+初始空态输入框下方不再显示「规划新想法 ⇧Tab」快捷 chip；`Shift+Tab` 快捷键保留。
 
 ### `/` Slash Command 菜单
 
@@ -156,7 +159,7 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 
 - 新会话默认为 `Agent`。
 - `Agent` 默认态不显示 mode pill，输入栏保持最小噪音。只有选中 `Chat` 或 `Plan` 后，才在 `+` 与 model selector 之间显示彩色 pill。
-- Chat / Plan pill 带有关闭图标，点击 pill 直接恢复 Agent；切换到 Chat / Plan 仍从 `+` command menu 完成。
+- Plan pill 带有关闭图标，点击直接恢复 Agent；Chat pill 表示会话形态，不带关闭图标。切换模式统一从 `+` command menu 完成。
 - 切换只影响下一次发送，不改变已在运行的 Turn。流式生成期间模式控件与其他 Composer 编辑控件一样禁用。
 - 模式在当前会话的 initial / follow-up Composer 切换中保持；切换到其他会话时按各会话独立保持。V1 不写入 session 持久化，应用重启后回到 Agent。
 - 每次发送的 user message 仍只展示用户输入，不把“[Plan mode]”之类前缀拼进用户消息文本。

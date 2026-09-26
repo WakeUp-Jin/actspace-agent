@@ -43,7 +43,7 @@ import { SessionProjectionProvider } from "./session";
 import { ClientSessionStore, selectChatSession, projectChatWindow } from "@actspace/client/sessions";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
-import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
+import type { ComposerAgentFormSwitch, ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import { resolveQuickOpenTarget } from "./quick-open-routing";
 
@@ -1899,6 +1899,35 @@ export function App() {
     }
   }, [createSessionForInput]);
 
+  // 形态随 Session preset 固定，空会话切换形态 = 用目标形态新建会话、带上草稿，再归档原来的空会话。
+  const handleSwitchEmptySessionForm = useCallback(async ({ agentForm, mode, draft }: ComposerAgentFormSwitch) => {
+    const previousSessionId = activeSessionIdRef.current;
+    const workspaceRoot = sessionRecord?.meta.workspaceRoot ?? selectedWorkspaceRoot;
+    setAgentRunResult(null);
+    const created = await createSessionForInput({ agentForm, ...(workspaceRoot ? { workspaceRoot } : {}) });
+    if (!created) return;
+    setComposerStateBySession((current) => ({ ...current, [created.meta.id]: { ...DEFAULT_COMPOSER_STATE, mode } }));
+    if (draft.text || draft.attachments.length > 0) {
+      setComposerDraftRestore({ id: Date.now(), sessionId: created.meta.id, text: draft.text, attachments: draft.attachments });
+    }
+    if (!previousSessionId || previousSessionId === created.meta.id) return;
+    if (!hasActspaceBridge()) {
+      setSessions((current) => current.filter((session) => session.id !== previousSessionId));
+      setLocalSessionRecords((current) => {
+        const next = { ...current };
+        delete next[previousSessionId];
+        return next;
+      });
+      return;
+    }
+    try {
+      await window.actspace.archiveSession({ sessionId: previousSessionId, archived: true });
+      setSessions(await readSidebarSessions());
+    } catch (error) {
+      console.error("Failed to archive the replaced empty session", error);
+    }
+  }, [createSessionForInput, readSidebarSessions, selectedWorkspaceRoot, sessionRecord]);
+
   const handleAddWorkspace = useCallback(async () => {
     if (!hasActspaceBridge()) {
       return;
@@ -2552,6 +2581,7 @@ export function App() {
         onSelectedModelChange={handleSelectedChatModelChange}
         composerMode={activeComposerState.mode}
         onComposerModeChange={handleComposerModeChange}
+        onAgentFormChange={handleSwitchEmptySessionForm}
         selectedSkills={activeComposerState.selectedSkills}
         onSelectedSkillsChange={handleSelectedSkillsChange}
         onSettingsChange={handleSettingsChange}

@@ -61,7 +61,7 @@ Provider usage 来自持久化请求结果；requestContext 来自请求快照�
 - `activeMessageIds`：全 Session 当前有效 Surface 身份，用于清除被 replace 的旧消息；
 - `deferredToolCalls`：从普通页剥离的大工具正文，通过 detail API 按需读取。
 
-默认最近 10 个完整 Turn。`beforeSeq` 向前分页；`afterSeq` 读取尾部补齐。窗口包含 turn/start 前的 Inbox claim。全 Session 水位与历史页末尾水位是不同概念，客户端不能用历史页尾覆盖最新 facts。
+默认最近 20 个完整 Turn（2026-09-26 由 10 调整，同时历史页剔除已定稿消息的流式增量并收敛旧请求上下文，详见 `agent-session-three-read-models.md`）。`beforeSeq` 向前分页；`afterSeq` 读取尾部补齐。窗口包含 turn/start 前的 Inbox claim。全 Session 水位与历史页末尾水位是不同概念，客户端不能用历史页尾覆盖最新 facts。
 
 单个大工具事件超过 24,000 字符时移除传输页中的 modelOutput/detail 和 Surface 正文，Journal 原文不变。该阈值不是整个 IPC envelope 的硬字节上限。完整复制对话使用完整读取，不依赖屏幕已加载页。
 

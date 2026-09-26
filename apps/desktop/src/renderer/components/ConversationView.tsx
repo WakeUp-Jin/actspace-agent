@@ -2,9 +2,9 @@ import { messageFlowKind } from "./messages/messageFlowStyles";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, WheelEvent as ReactWheelEvent } from "react";
 import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
-import { Composer, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
+import { Composer, type ComposerAgentFormSwitch, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
@@ -67,6 +67,8 @@ const TURN_ACTIONS_CLASS =
   "turn-actions mt-1 flex min-h-7 items-center justify-between gap-3 px-[var(--conversation-text-inset)] text-[12px] text-text-faint opacity-0 pointer-events-none transition-opacity duration-[150ms] ease-in-out group-hover/assistant-turn:pointer-events-auto group-hover/assistant-turn:opacity-100 group-focus-within/assistant-turn:pointer-events-auto group-focus-within/assistant-turn:opacity-100";
 const TURN_ACTIONS_RIGHT_CLASS = "flex items-center justify-end gap-0.5";
 const TURN_USAGE_META_CLASS = "flex min-w-0 items-center gap-1.5 tabular-nums";
+// 距顶部小于该距离时预取更早消息，让用户上滑时历史已经接上，而不是撞到顶部再等。
+const EARLIER_PRELOAD_THRESHOLD_PX = 240;
 const TURN_ACTION_ANCHOR_CLASS = "turn-action-anchor relative flex-none";
 const TURN_ACTION_TRIGGER_CLASS =
   "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-[150ms] ease-in-out hover:bg-hover-overlay hover:text-text-main hover:opacity-100 aria-disabled:cursor-default aria-expanded:bg-selected aria-expanded:text-text-main aria-expanded:opacity-100";
@@ -733,6 +735,7 @@ export function ConversationView({
   onSelectedModelChange,
   composerMode,
   onComposerModeChange,
+  onAgentFormChange,
   selectedSkills,
   onSelectedSkillsChange,
   workspaceOptions,
@@ -771,6 +774,7 @@ export function ConversationView({
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   composerMode?: ComposerMode;
   onComposerModeChange?: (mode: ComposerMode) => void;
+  onAgentFormChange?: (change: ComposerAgentFormSwitch) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;
   models?: UsableModelView[];
@@ -933,8 +937,13 @@ export function ConversationView({
   }, [browse, sessionId]);
   const handleMessagesScroll = useCallback(() => {
     updateConversationViewport();
-    if ((scrollContainerRef.current?.scrollTop ?? 1000) < 80 && !browse?.earlierError) requestEarlier();
+    if ((scrollContainerRef.current?.scrollTop ?? Infinity) < EARLIER_PRELOAD_THRESHOLD_PX && !browse?.earlierError) requestEarlier();
   }, [updateConversationViewport, requestEarlier, browse?.earlierError]);
+  // 已停在顶部时继续向上滚不会产生 scroll 事件，用 wheel 兜底。
+  const handleMessagesWheel = useCallback((event: ReactWheelEvent<HTMLElement>) => {
+    if (event.deltaY >= 0 || (scrollContainerRef.current?.scrollTop ?? Infinity) > 0 || browse?.earlierError) return;
+    requestEarlier();
+  }, [requestEarlier, browse?.earlierError]);
 
   // 流式输出 / 消息增长时，若仍处于贴底状态则跟随滚动到底部。
   const scrollToBottomIfStuck = useCallback(() => {
@@ -999,6 +1008,17 @@ export function ConversationView({
     updateConversationViewport();
   }, [messages, sessionId, browse?.earlierLoading, scrollToBottomIfStuck, updateConversationViewport]);
 
+  // 已加载的消息填不满视口时没有滚动条，也就不会有上滑动作：继续自动补页直到出现滚动或没有更早消息。
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el || el.clientHeight === 0 || browse?.earlierError) return;
+    if (el.scrollHeight > el.clientHeight + 1) return;
+    // 补页不是用户上滑，保留贴底跟随，避免刚打开会话后流式输出不再自动滚到底。
+    const wasStuckToBottom = stickToBottomRef.current;
+    requestEarlier();
+    stickToBottomRef.current = wasStuckToBottom;
+  }, [messages, browse?.hasEarlier, browse?.earlierLoading, browse?.earlierError, requestEarlier]);
+
   // 同一条 running 消息内部变高时（例如 write_file 持续追加 code preview），
   // messages 引用可能不变；观察消息栈尺寸，保持贴底状态继续跟随尾部。
   useEffect(() => {
@@ -1034,12 +1054,13 @@ export function ConversationView({
           <section
             ref={scrollContainerRef}
             onScroll={handleMessagesScroll}
+            onWheel={handleMessagesWheel}
             className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
             aria-label="会话消息"
           >
               {browse?.messageLoading && <p role="status" className="px-5 py-3 text-sm text-text-muted">正在加载消息…</p>}
               {browse?.messageError && <p role="alert" className="px-5 py-3 text-sm text-text-muted">{browse.messageError} <button onClick={browse.retryMessages}>重试</button></p>}
-              {browse?.hasEarlier && <button type="button" disabled={browse.earlierLoading} className="w-full py-2 text-xs text-text-muted" onClick={requestEarlier}>{browse.earlierLoading ? '正在加载历史消息…' : '加载更早消息'}</button>}
+              {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-xs text-text-faint"><Loader2 className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
               {browse?.earlierError && <p role="alert" className="px-5 text-xs text-text-muted">{browse.earlierError} <button onClick={requestEarlier}>重试</button></p>}
               {isInitialComposer ? (
                 <div className={INITIAL_COMPOSER_STAGE_CLASS}>
@@ -1056,6 +1077,7 @@ export function ConversationView({
                     onSelectedModelChange={onSelectedModelChange}
                     mode={composerMode}
                     onModeChange={onComposerModeChange}
+                    onAgentFormChange={onAgentFormChange}
                     selectedSkills={selectedSkills}
                     onSelectedSkillsChange={onSelectedSkillsChange}
                     onOpenAttachmentPreview={openAttachmentPreview}

@@ -409,16 +409,17 @@ describe("Composer follow-up bar", () => {
     expect(input.style.height).toBe("96px");
   });
 
-  it("opens the Agent plus command menu with Plan, Agent, Image, and Skills", async () => {
+  it("opens the Agent plus command menu with Agent, Plan, Image, and Skills", async () => {
     const user = userEvent.setup();
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
 
     const menu = screen.getByRole("menu", { name: "添加上下文或工具" });
-    expect(within(menu).getByText("选择模式或添加上下文。")).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Plan" })).toBeInTheDocument();
+    // 模式区是完整的模式选择器；Chat 只在空会话且可切换形态时出现。
     expect(within(menu).getByRole("menuitem", { name: "Agent" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Chat" })).not.toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "图片" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Skills" })).toBeInTheDocument();
     expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|模型|Attach files/)).not.toBeInTheDocument();
@@ -633,8 +634,9 @@ describe("Composer follow-up bar", () => {
       onSelectedSkillsChange,
     });
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await user.hover(screen.getByRole("menuitem", { name: "Skills" }));
+    await user.click(screen.getByRole("menuitem", { name: "Skills" }));
     const skillsMenu = await screen.findByRole("menu", { name: "Skills" });
+    expect(screen.queryByRole("menu", { name: "添加上下文或工具" })).not.toBeInTheDocument();
     await user.click(within(skillsMenu).getByRole("menuitemcheckbox", { name: /frontend-design/i }));
     expect(listSkills).toHaveBeenCalledWith({ workspaceRoot: "/work" });
     expect(onSelectedSkillsChange).toHaveBeenCalledWith(["frontend-design"]);

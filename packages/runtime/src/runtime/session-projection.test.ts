@@ -3,7 +3,8 @@ import { appendFile, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/pro
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createCoreCodecRegistry, createSessionHeader, SessionJournal } from "@actspace/session-journal";
-import { RuntimeSessionController } from "./session-controller.js";
+import { RuntimeSessionController, slimHistoryWindow } from "./session-controller.js";
+import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
@@ -26,20 +27,39 @@ async function fixture(turns = 25) {
   return { root, path, cache, journal, turn, controller };
 }
 
+describe("history window slimming", () => {
+  const envelope = (seq: number, type: string, data: Record<string, unknown>) => ({ seq, type, time: "2026-09-26T00:00:00Z", data, surface: null }) as unknown as SessionEventEnvelopeV1;
+  const bigContext = (seq: number, requestId: string) => envelope(seq, "request/context", { requestId, turnId: "t", stepId: "s", snapshot: { prepared: { model: "m", route: "r", contextWindow: 1000, messages: "x".repeat(30_000) }, requestOptions: { temperature: 0 } } });
+
+  it("drops chunks of completed messages but keeps an in-flight message's chunks", () => {
+    const out = slimHistoryWindow([
+      envelope(0, "assistant/chunk", { messageId: "done", content: "a" }),
+      envelope(1, "assistant/message", { messageId: "done", content: "a" }),
+      envelope(2, "assistant/chunk", { messageId: "live", content: "b" }),
+    ]);
+    expect(out.map(event => event.seq)).toEqual([1, 2]);
+  });
+
+  it("keeps the latest request context whole and bounds older large ones to identity fields", () => {
+    const [older, latest] = slimHistoryWindow([bigContext(0, "r0"), bigContext(1, "r1")]);
+    expect(older!.data).toEqual({ deferredDetail: true, turnId: "t", stepId: "s", requestId: "r0", snapshot: { prepared: { model: "m", route: "r", contextWindow: 1000 }, requestOptions: { temperature: 0 } } });
+    expect(JSON.stringify(latest!.data)).toContain("x".repeat(30_000));
+  });
+});
+
 describe("production Session projections", () => {
   it("pages the same raw history for every target while facts cover the full Session", async () => {
     const f = await fixture(); const controller = f.controller();
     const tail = await controller.readProjection({ sessionId: "s" });
-    expect(tail.window.events).toHaveLength(30);
-    expect(tail.window.turnOffset).toBe(15);
+    // 一页 20 轮：25 轮会话首屏 20 轮，第二页取剩余 5 轮即到头。
+    expect(tail.window.events).toHaveLength(60);
+    expect(tail.window.turnOffset).toBe(5);
     expect(tail.snapshot.activity.completedTurnCount).toBe(25);
     const older = await controller.readProjection({ sessionId: "s", beforeSeq: tail.window.beforeSeq! });
-    expect(older.window.events).toHaveLength(30);
-    expect(older.window.turnOffset).toBe(5);
+    expect(older.window.events).toHaveLength(15);
+    expect(older.window.turnOffset).toBe(0);
+    expect(older.window.beforeSeq).toBeNull();
     expect(older.values.sessionStats).toEqual(tail.values.sessionStats);
-    const earliest = await controller.readProjection({ sessionId: "s", beforeSeq: older.window.beforeSeq! });
-    expect(earliest.window.events).toHaveLength(15);
-    expect(earliest.window.beforeSeq).toBeNull();
     const full = await controller.readProjection({ sessionId: "s", afterSeq: -1, includeToolDetails: true });
     expect(full.snapshot.messages).toHaveLength(25);
     expect(full.window.events).toHaveLength(75);
