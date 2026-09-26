@@ -71,6 +71,8 @@ import {
 } from "./composer-slash-commands";
 import { selectRequestContextEstimate } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
+import { Button } from "./ui/Button";
+import { IconButton } from "./ui/IconButton";
 
 export type ComposerSendOptions = {
   model: ModelSelectionId;
@@ -129,29 +131,25 @@ const COMPOSER_WRAP_CLASS =
   "composer-wrap relative mx-auto grid w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] gap-2 max-[600px]:w-[calc(100%_-_36px)]";
 const COMPOSER_INITIAL_WRAP_CLASS =
   "composer-wrap composer-wrap-initial relative mx-auto grid w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),706px)] gap-2 max-[600px]:w-[calc(100%_-_36px)]";
-const INITIAL_CONTEXT_ROW_CLASS = "initial-context-row relative z-20 flex min-h-7 items-center gap-3 overflow-visible px-2 text-sm text-text-muted max-[600px]:flex-wrap";
+const INITIAL_CONTEXT_ROW_CLASS = "initial-context-row relative z-20 flex min-h-7 items-center gap-3 overflow-visible px-2 text-act-md leading-5 text-text-muted max-[600px]:flex-wrap";
 const INITIAL_CONTEXT_SELECTOR_CLASS =
-  "initial-context-selector inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-1 py-1 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
+  "initial-context-selector inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-1 py-1 text-act-md leading-5 font-medium text-text-muted transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main";
 const COMPOSER_ACTION_STRIP_CLASS = "composer-action-strip flex min-h-[34px] items-center gap-2";
-const REVIEW_PREVIEW_BUTTON_CLASS =
-  "review-preview-button inline-flex h-[30px] items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)] transition-[background-color,border-color,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-surface-subtle hover:text-text-main disabled:cursor-default disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-text-muted";
 const REVIEW_ADDITION_CLASS = "font-medium text-success";
 const REVIEW_DELETION_CLASS = "font-medium text-danger";
-const REVIEW_OVERFLOW_BUTTON_CLASS =
-  "review-overflow-button grid h-[30px] w-[30px] place-items-center rounded-full border border-line bg-surface text-text-faint shadow-[0_1px_2px_rgba(31,45,61,0.04)] transition-[background-color,border-color,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-surface-subtle hover:text-text-main";
 const COMPOSER_PANEL_CLASS =
-  "composer-panel relative grid overflow-visible rounded-[22px] border border-line bg-surface shadow-act-soft";
+  "composer-panel relative grid overflow-visible rounded-act-lg border border-line bg-surface transition-colors duration-(--motion-fast) focus-within:border-line-strong";
 const COMPOSER_PANEL_INITIAL_CLASS =
-  "composer-panel composer-panel-initial relative grid overflow-visible rounded-[18px] border border-line bg-surface shadow-act-soft";
+  "composer-panel composer-panel-initial relative grid overflow-visible rounded-act-lg border border-line bg-surface transition-colors duration-(--motion-fast) focus-within:border-line-strong";
 const COMPOSER_ATTACHMENTS_CLASS = "composer-attachments flex min-h-14 flex-wrap items-center gap-2.5 px-3 pb-1 pt-3";
 const IMAGE_ATTACHMENT_WRAPPER_CLASS = "group/image-attachment relative h-12 w-12 shrink-0";
 const IMAGE_ATTACHMENT_CLASS =
-  "image-attachment block h-12 w-12 overflow-hidden rounded-lg border border-line bg-surface-subtle bg-cover bg-center shadow-[0_4px_12px_rgba(20,21,18,0.08)] transition-[border-color,opacity] duration-[120ms] hover:border-line-strong hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring";
+  "image-attachment block h-12 w-12 overflow-hidden rounded-lg border border-line bg-surface-subtle bg-cover bg-center shadow-act-thumb transition-[border-color,opacity] duration-(--motion-fast) hover:border-line-strong hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring";
 const FILE_ATTACHMENT_CLASS =
-  "file-attachment group/file-attachment inline-flex h-9 max-w-[220px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-sm font-medium text-text-main shadow-[0_6px_16px_rgba(31,45,61,0.06)]";
+  "file-attachment group/file-attachment inline-flex h-9 max-w-[220px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-act-md leading-5 font-medium text-text-main shadow-act-thumb";
 const FILE_ATTACHMENT_NAME_CLASS = "truncate";
 const ATTACHMENT_REMOVE_BASE_CLASS =
-  "attachment-remove grid place-items-center rounded-lg opacity-0 pointer-events-none transition-[background,color,opacity] duration-[150ms] ease-in-out";
+  "attachment-remove grid place-items-center rounded-lg opacity-0 pointer-events-none transition-[background,color,opacity] duration-(--motion-base) ease-in-out";
 const IMAGE_ATTACHMENT_REMOVE_CLASS =
   `${ATTACHMENT_REMOVE_BASE_CLASS} image-attachment-remove absolute right-[-4px] top-[-4px] h-[18px] w-[18px] rounded-full bg-text-main text-surface shadow-[0_3px_8px_rgba(20,21,18,0.2)] group-hover/image-attachment:pointer-events-auto group-hover/image-attachment:opacity-100 group-focus-within/image-attachment:pointer-events-auto group-focus-within/image-attachment:opacity-100 hover:opacity-80`;
 const FILE_ATTACHMENT_REMOVE_CLASS =
@@ -176,30 +174,24 @@ const COMPOSER_BODY_CHAT_INLINE_CLASS =
 const COMPOSER_BODY_CHAT_STACKED_CLASS =
   `${COMPOSER_BODY_BASE_CLASS} gap-y-1 grid-cols-[auto_auto_auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input_input_input'_'plus_mode_model_context_._send']`;
 const COMPOSER_INPUT_CLASS =
-  "composer-input block w-full min-h-[34px] max-h-[142px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-[15px] leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
+  "composer-input block w-full min-h-[34px] max-h-[142px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-act-lg leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
 const COMPOSER_INITIAL_INPUT_CLASS =
-  "composer-input block w-full min-h-[76px] max-h-[172px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-[15px] leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
+  "composer-input block w-full min-h-[76px] max-h-[172px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-act-lg leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
 // 单行高度 = 20px line-height + 7px*2 padding = 34px；超过它说明内容折行（显式换行或自动 wrap）。
 const COMPOSER_SINGLE_LINE_MAX_PX = 40;
 const CONTROL_GROUP_CLASS = "control-group relative";
 // 附件按钮对齐主流 Web 聊天：无边框纯图标，只在 hover / focus 时出现浅色圆底。
-const ATTACH_BUTTON_CLASS =
-  "attach-button grid h-9 w-9 shrink-0 place-items-center rounded-full border-0 bg-transparent text-text-muted transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay hover:text-text-main focus-visible:bg-hover-overlay focus-visible:text-text-main focus-visible:outline-none";
-const COMMAND_BUTTON_CLASS =
-  "command-button grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface-subtle text-text-muted transition-[background,border,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-hover-overlay hover:text-text-main aria-expanded:border-line-strong aria-expanded:bg-selected aria-expanded:text-text-main";
 const MODE_BUTTON_BASE_CLASS =
-  "mode-button inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border-0 px-2.5 text-sm font-medium transition-[filter,opacity] duration-[120ms] ease-in-out hover:brightness-95";
+  "mode-button inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border-0 px-2.5 text-act-md leading-5 font-medium transition-[filter,opacity] duration-(--motion-fast) ease-in-out hover:brightness-95";
 const MODE_BUTTON_CLASS: Record<ComposerMode, string> = {
   plan: "bg-warning-soft text-on-warning",
   agent: "bg-operational-soft text-operational",
 };
 const MODEL_BUTTON_CLASS =
-  "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main max-[600px]:max-w-[210px]";
+  "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-act-md leading-5 font-medium text-text-muted transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main max-[600px]:max-w-[210px]";
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
 // 发送按钮对齐 Cursor：反色圆形按钮 + 上箭头。bg-text-main / text-surface 随主题翻转
 // （浅色 = 近黑底白箭头，深色 = 近白底深箭头），禁用态退为灰底。
-const SEND_BUTTON_CLASS =
-  "send-button grid h-8 w-8 shrink-0 place-items-center rounded-full border-0 bg-text-main text-surface transition-[background,opacity] duration-[120ms] ease-in-out hover:opacity-85 disabled:cursor-default aria-disabled:cursor-default aria-disabled:bg-text-subtle aria-disabled:hover:opacity-100";
 // 不含水平锚点（left/right）的基类，方便不同菜单各自选择向左/向右展开，避免 left-0 与 right-0 冲突。
 const DROPDOWN_MENU_BASE_CLASS =
   "dropdown-menu absolute bottom-[calc(100%_+_8px)] z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
@@ -208,100 +200,100 @@ const DROPDOWN_MENU_CLASS = `${DROPDOWN_MENU_BASE_CLASS} left-0`;
 const COMMAND_MENU_CLASS =
   "command-menu absolute bottom-[calc(100%_+_8px)] left-0 right-0 z-30 max-h-[min(420px,calc(100vh_-_160px))] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
 const COMMAND_MENU_ROW_CLASS =
-  "command-menu-row flex min-h-[34px] w-full items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none";
+  "command-menu-row flex min-h-[34px] w-full items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-act-md leading-5 text-text-main transition-colors duration-(--motion-fast) ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none";
 const COMMAND_MENU_ROW_LABEL_CLASS = "shrink-0 font-medium";
-const COMMAND_MENU_ROW_DESCRIPTION_CLASS = "min-w-0 truncate text-[13px] text-text-faint";
+const COMMAND_MENU_ROW_DESCRIPTION_CLASS = "min-w-0 truncate text-act-sm text-text-faint";
 const COMMAND_MENU_BACK_ROW_CLASS =
-  "command-menu-back flex min-h-[30px] w-full items-center gap-1.5 rounded-lg border-0 bg-transparent px-2 text-left text-[13px] font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay hover:text-text-main focus-visible:bg-selected focus-visible:outline-none";
+  "command-menu-back flex min-h-[30px] w-full items-center gap-1.5 rounded-lg border-0 bg-transparent px-2 text-left text-act-sm font-medium text-text-muted transition-colors duration-(--motion-fast) ease-in-out hover:bg-hover-overlay hover:text-text-main focus-visible:bg-selected focus-visible:outline-none";
 const INITIAL_DROPDOWN_MENU_BASE_CLASS =
   "dropdown-menu absolute top-[calc(100%_+_8px)] z-30 max-h-[min(360px,calc(100vh_-_120px))] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
 const INITIAL_DROPDOWN_MENU_CLASS = `${INITIAL_DROPDOWN_MENU_BASE_CLASS} left-0`;
 const RECENT_WORKSPACE_LIMIT = 5;
 const COMMAND_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const COMMAND_MENU_BUTTON_CLASS =
-  "command-menu-button flex min-h-[34px] w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-sm font-medium text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none";
+  "command-menu-button flex min-h-[34px] w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-act-md leading-5 font-medium text-text-main transition-colors duration-(--motion-fast) ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none";
 const COMMAND_MENU_ICON_CLASS = "text-text-muted";
-const SKILL_SCOPE_CLASS = "ml-auto shrink-0 text-[10px] uppercase tracking-wide text-text-faint";
+const SKILL_SCOPE_CLASS = "ml-auto shrink-0 text-act-xxs uppercase tracking-wide text-text-faint";
 const SKILL_PILL_CLASS =
-  "group/skill-pill inline-flex h-9 max-w-[240px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-sm font-medium text-text-main shadow-[0_6px_16px_rgba(31,45,61,0.06)]";
+  "group/skill-pill inline-flex h-9 max-w-[240px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-act-md leading-5 font-medium text-text-main shadow-act-thumb";
 const SLASH_MENU_ID = "composer-slash-command-menu";
 const SLASH_FUNCTIONS_LABEL_ID = "composer-slash-functions-label";
 const SLASH_SKILLS_LABEL_ID = "composer-slash-skills-label";
 const SLASH_MENU_BASE_CLASS =
-  "slash-command-menu absolute left-0 z-40 w-[min(520px,calc(100vw_-_36px))] max-w-full overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover transition-[opacity,transform] duration-[140ms] ease-out motion-reduce:transition-none max-[600px]:right-0 max-[600px]:w-auto";
+  "slash-command-menu absolute left-0 z-40 w-[min(520px,calc(100vw_-_36px))] max-w-full overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover transition-[opacity,transform] duration-(--motion-fast) ease-out motion-reduce:transition-none max-[600px]:right-0 max-[600px]:w-auto";
 const SLASH_MENU_POSITION_CLASS: Record<ComposerSurface, string> = {
   initial: "top-[calc(100%_+_8px)] max-h-[min(280px,calc(50vh_-_90px))]",
   followup: "bottom-[calc(100%_+_8px)] max-h-[min(420px,calc(100vh_-_120px))]",
 };
 const SLASH_GROUP_LABEL_CLASS =
-  "sticky top-0 z-10 bg-surface-raised/96 px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint";
+  "sticky top-0 z-10 bg-surface-raised/96 px-2 pb-1 pt-2 text-act-xxs font-semibold uppercase tracking-[0.08em] text-text-faint";
 const SLASH_FUNCTION_OPTION_CLASS =
-  "slash-command-option flex min-h-9 w-full items-center gap-2 rounded-act-md border-0 bg-transparent px-2 py-1 text-left text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:outline-none";
+  "slash-command-option flex min-h-9 w-full items-center gap-2 rounded-act-md border-0 bg-transparent px-2 py-1 text-left text-text-main transition-colors duration-(--motion-fast) ease-in-out hover:bg-hover-overlay focus-visible:outline-none";
 const SLASH_SKILL_OPTION_CLASS = SLASH_FUNCTION_OPTION_CLASS;
 const SLASH_OPTION_ACTIVE_CLASS = "bg-selected";
 const SLASH_FUNCTION_ICON_CLASS = "shrink-0 text-text-muted";
-const SLASH_FUNCTION_COMMAND_CLASS = "shrink-0 font-mono text-[12px] font-medium leading-5 text-text-main";
-const SLASH_FUNCTION_DESCRIPTION_CLASS = "ml-auto min-w-0 flex-1 truncate text-right text-[12px] font-normal leading-5 text-text-faint";
-const SLASH_SKILL_NAME_CLASS = "max-w-[42%] shrink-0 truncate text-[12px] font-medium leading-5 text-text-main";
+const SLASH_FUNCTION_COMMAND_CLASS = "shrink-0 font-mono text-act-xs font-medium leading-5 text-text-main";
+const SLASH_FUNCTION_DESCRIPTION_CLASS = "ml-auto min-w-0 flex-1 truncate text-right text-act-xs font-normal leading-5 text-text-faint";
+const SLASH_SKILL_NAME_CLASS = "max-w-[42%] shrink-0 truncate text-act-xs font-medium leading-5 text-text-main";
 const SLASH_SKILL_DESCRIPTION_CLASS = SLASH_FUNCTION_DESCRIPTION_CLASS;
-const SLASH_STATUS_CLASS = "px-2 py-4 text-[13px] text-text-faint";
-const SLASH_EMPTY_CLASS = "px-3 py-7 text-center text-[13px] text-text-faint";
+const SLASH_STATUS_CLASS = "px-2 py-4 text-act-sm text-text-faint";
+const SLASH_EMPTY_CLASS = "px-3 py-7 text-center text-act-sm text-text-faint";
 // 模型菜单维持 Cursor 式紧凑单列：主菜单只负责选择，Options 作为贴行的轻量二级浮层。
 const MODEL_MENU_CLUSTER_CLASS =
   "absolute bottom-[calc(100%_+_8px)] z-30 w-[244px]";
 const MODEL_MENU_BASE_CLASS =
-  "model-menu max-h-[292px] w-[244px] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1 shadow-act-popover transition-[opacity,transform] duration-[140ms] ease-out motion-reduce:transition-none";
+  "model-menu max-h-[292px] w-[244px] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1 shadow-act-popover transition-[opacity,transform] duration-(--motion-fast) ease-out motion-reduce:transition-none";
 const MODEL_SEARCH_WRAP_CLASS =
   "sticky top-0 z-10 flex h-9 items-center gap-2 rounded-act-md bg-surface-raised px-2 text-text-faint";
 const MODEL_SEARCH_INPUT_CLASS =
-  "min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] leading-5 text-text-main outline-none placeholder:text-text-subtle";
-const MODEL_SEARCH_EMPTY_CLASS = "px-2.5 py-6 text-center text-[13px] text-text-faint";
+  "min-w-0 flex-1 border-0 bg-transparent p-0 text-act-sm leading-5 text-text-main outline-none placeholder:text-text-subtle";
+const MODEL_SEARCH_EMPTY_CLASS = "px-2.5 py-6 text-center text-act-sm text-text-faint";
 const MODEL_PROVIDER_GROUP_CLASS = "model-provider-group";
 const MODEL_PROVIDER_LABEL_CLASS =
-  "model-provider-label px-2 pb-1 pt-2 text-[11px] font-semibold leading-4 text-text-faint";
+  "model-provider-label px-2 pb-1 pt-2 text-act-xxs font-semibold leading-4 text-text-faint";
 const MODEL_MENU_ROW_CLASS =
-  "model-menu-row relative flex min-h-[34px] items-center rounded-act-md transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-within:bg-selected";
+  "model-menu-row relative flex min-h-[34px] items-center rounded-act-md transition-colors duration-(--motion-fast) ease-in-out hover:bg-hover-overlay focus-within:bg-selected";
 const MODEL_MENU_ROW_SELECTED_CLASS = "is-selected-row";
 const MODEL_SELECT_BUTTON_CLASS =
-  "model-select-button flex min-h-[34px] min-w-0 flex-1 items-center justify-start rounded-act-md border-0 bg-transparent px-2 py-1.5 pr-[46px] text-left text-[14px] font-normal leading-5 text-text-main";
+  "model-select-button flex min-h-[34px] min-w-0 flex-1 items-center justify-start rounded-act-md border-0 bg-transparent px-2 py-1.5 pr-[46px] text-left text-act-md font-normal leading-5 text-text-main";
 const MODEL_SELECT_BUTTON_SELECTED_CLASS = "pr-[58px]";
 const MODEL_ROW_ACTIONS_CLASS =
   "model-row-actions absolute right-2 flex h-full min-w-[34px] items-center justify-end gap-1";
 const MODEL_ROW_ACTIONS_SELECTED_CLASS = "min-w-[50px]";
 const MODEL_EDIT_BUTTON_CLASS =
-  "model-edit-button h-6 min-w-[34px] justify-center rounded-act-sm border-0 bg-transparent px-1.5 text-[11px] font-medium text-text-muted transition-[opacity,background,color] duration-[120ms] ease-in-out focus-visible:bg-selected focus-visible:outline-none hover:bg-selected hover:text-text-main";
+  "model-edit-button h-6 min-w-[34px] justify-center rounded-act-sm border-0 bg-transparent px-1.5 text-act-xxs font-medium text-text-muted transition-[opacity,background,color] duration-(--motion-fast) ease-in-out focus-visible:bg-selected focus-visible:outline-none hover:bg-selected hover:text-text-main";
 const MODEL_CHECK_ICON_CLASS = "model-check-icon text-text-main";
 const MODEL_OPTIONS_MENU_BASE_CLASS =
-  "model-options-menu absolute z-40 w-[210px] rounded-xl border border-line bg-surface-raised/96 p-1 shadow-act-popover transition-[opacity,transform] duration-[140ms] ease-out motion-reduce:transition-none";
+  "model-options-menu absolute z-40 w-[210px] rounded-xl border border-line bg-surface-raised/96 p-1 shadow-act-popover transition-[opacity,transform] duration-(--motion-fast) ease-out motion-reduce:transition-none";
 const MODEL_OPTIONS_ESTIMATED_HEIGHT_PX = 292;
-const DROPDOWN_LABEL_CLASS = "dropdown-label px-2 pb-1 pt-1.5 text-[11px] font-medium text-text-faint";
+const DROPDOWN_LABEL_CLASS = "dropdown-label px-2 pb-1 pt-1.5 text-act-xxs font-medium text-text-faint";
 const OPTION_SEPARATOR_CLASS = "mx-1 my-1 h-px bg-line";
 const OPTION_TOGGLE_ROW_CLASS =
-  "option-toggle-row flex min-h-[34px] cursor-pointer items-center gap-2 rounded-act-md px-2 py-1.5 text-[14px] text-text-main hover:bg-hover-overlay";
+  "option-toggle-row flex min-h-[34px] cursor-pointer items-center gap-2 rounded-act-md px-2 py-1.5 text-act-md text-text-main hover:bg-hover-overlay";
 const OPTION_TOGGLE_LABEL_CLASS = "flex-1";
 const OPTION_TOGGLE_INPUT_CLASS = "absolute opacity-0 pointer-events-none";
 // 注意：track 的底色不写进基类，由 on/off 分支二选一给出，避免同属性 utility 互相覆盖。
 // 同优先级、按样式表顺序覆盖导致开启时不变主题色。
 const TOGGLE_TRACK_CLASS =
-  "toggle-track relative inline-flex h-5 w-8 rounded-full transition-colors duration-[120ms] ease-in-out";
+  "toggle-track relative inline-flex h-5 w-8 rounded-full transition-colors duration-(--motion-fast) ease-in-out";
 const TOGGLE_TRACK_ON_CLASS = "bg-operational";
 const TOGGLE_TRACK_OFF_CLASS = "bg-line";
 const TOGGLE_THUMB_CLASS =
-  "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_4px_rgba(31,45,61,0.22)] transition-transform duration-[120ms] ease-in-out";
+  "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-act-knob transition-transform duration-(--motion-fast) ease-in-out";
 const TOGGLE_THUMB_ON_CLASS = "translate-x-3";
-const OPTION_EMPTY_CLASS = "px-2.5 py-2 text-sm text-text-faint";
+const OPTION_EMPTY_CLASS = "px-2.5 py-2 text-act-md leading-5 text-text-faint";
 const OPTION_CHOICE_CLASS =
-  "flex min-h-[32px] w-full items-center rounded-act-md border-0 bg-transparent px-2 text-left text-[13px] text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
+  "flex min-h-[32px] w-full items-center rounded-act-md border-0 bg-transparent px-2 text-left text-act-sm text-text-main transition-colors duration-(--motion-fast) ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
 const OPTION_CHOICE_LABEL_CLASS = "flex-1 capitalize";
 const STATUS_ROW_CLASS =
-  "composer-status-row flex min-h-5 items-center justify-between gap-3 px-3 text-[13px] leading-5 text-text-faint";
+  "composer-status-row flex min-h-5 items-center justify-between gap-3 px-3 text-act-sm leading-5 text-text-faint";
 const STATUS_GROUP_CLASS = "flex min-w-0 items-center gap-3";
 const STATUS_ITEM_CLASS = "inline-flex min-w-0 items-center gap-1.5";
 const STATUS_ICON_CLASS = "shrink-0 text-text-subtle";
 const STATUS_USAGE_CLASS = "inline-flex shrink-0 items-center gap-1.5 text-text-muted";
 const STATUS_USAGE_DOT_CLASS = "h-[15px] w-[15px] shrink-0 rounded-full";
 const INLINE_USAGE_CLASS =
-  "[grid-area:context] inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border-0 bg-transparent px-1.5 text-[13px] text-text-faint transition-colors duration-[120ms] ease-in-out hover:text-text-main aria-expanded:text-text-main";
+  "[grid-area:context] inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border-0 bg-transparent px-1.5 text-act-sm text-text-faint transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main aria-expanded:text-text-main";
 const INLINE_USAGE_DOT_CLASS = "h-[13px] w-[13px] shrink-0 rounded-full";
 // 3px 环形进度：conic 填充已用占比，radial mask 挖空中心形成圆环。
 const STATUS_USAGE_DOT_MASK =
@@ -1456,11 +1448,11 @@ export function Composer({
         </button>
         <div className={COMMAND_MENU_SEPARATOR_CLASS} />
         {skillsLoading ? (
-          <div className="flex items-center gap-2 px-2 py-4 text-sm text-text-faint">
+          <div className="flex items-center gap-2 px-2 py-4 text-act-md leading-5 text-text-faint">
             <Loader2 className="animate-spin" size={16} aria-hidden="true" /> 正在加载 Skills…
           </div>
         ) : skillsError ? (
-          <div className="px-2 py-4 text-sm text-on-danger">
+          <div className="px-2 py-4 text-act-md leading-5 text-on-danger">
             <span>{skillsError}</span>
             <button
               className="ml-2 rounded-act-sm px-1.5 py-0.5 font-medium text-text-main hover:bg-hover-overlay"
@@ -1471,7 +1463,7 @@ export function Composer({
             </button>
           </div>
         ) : skillItems.length === 0 ? (
-          <div className="px-2 py-4 text-sm text-text-faint">暂无已启用的 Skills</div>
+          <div className="px-2 py-4 text-act-md leading-5 text-text-faint">暂无已启用的 Skills</div>
         ) : skillItems.map((skill) => (
           <button
             className={COMMAND_MENU_ROW_CLASS}
@@ -1614,51 +1606,46 @@ export function Composer({
     // 已开始的 Chat 会话没有可切换的模式，+ 菜单只剩附件一项：直接换成回形针，也暗示形态已锁定。
     if (isChatForm && !canSwitchAgentForm) return (
       <div className={`${CONTROL_GROUP_CLASS} [grid-area:plus]`}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className={ATTACH_BUTTON_CLASS}
-              type="button"
-              aria-label="添加图片或文件"
-              onClick={() => {
-                setModelOpen(false);
-                setModelOptionsOpen(false);
-                setContextOpen(false);
-                void handleSelectChatFiles();
-              }}
-            >
-              <Paperclip size={18} strokeWidth={1.9} aria-hidden="true" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>添加图片或文件（PNG、JPEG、WEBP、GIF、TXT、Markdown、JSON、CSV）</TooltipContent>
-        </Tooltip>
+        <IconButton
+          className="attach-button"
+          label="添加图片或文件"
+          tooltip="添加图片或文件（PNG、JPEG、WEBP、GIF、TXT、Markdown、JSON、CSV）"
+          size="lg"
+          shape="round"
+          onClick={() => {
+            setModelOpen(false);
+            setModelOptionsOpen(false);
+            setContextOpen(false);
+            void handleSelectChatFiles();
+          }}
+        >
+          <Paperclip size={18} strokeWidth={1.9} aria-hidden="true" />
+        </IconButton>
       </div>
     );
     return (
       <div className={`${CONTROL_GROUP_CLASS} [grid-area:plus]`}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className={COMMAND_BUTTON_CLASS}
-              type="button"
-              aria-label="添加 Agent、上下文或工具"
-              aria-expanded={commandOpen}
-              aria-haspopup="menu"
-              ref={commandButtonRef}
-              onClick={() => {
-                setCommandOpen((value) => !value);
-                setSkillsOpen(false);
-                setModelOpen(false);
-                setModelOptionsOpen(false);
-                setContextSelectorOpen(null);
-                setContextOpen(false);
-              }}
-            >
-              <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>添加上下文、工具或附件</TooltipContent>
-        </Tooltip>
+        <IconButton
+          className="command-button"
+          label="添加 Agent、上下文或工具"
+          tooltip="添加上下文、工具或附件"
+          variant="soft"
+          size="lg"
+          shape="round"
+          aria-expanded={commandOpen}
+          aria-haspopup="menu"
+          ref={commandButtonRef}
+          onClick={() => {
+            setCommandOpen((value) => !value);
+            setSkillsOpen(false);
+            setModelOpen(false);
+            setModelOptionsOpen(false);
+            setContextSelectorOpen(null);
+            setContextOpen(false);
+          }}
+        >
+          <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
+        </IconButton>
       </div>
     );
   }
@@ -1856,7 +1843,7 @@ export function Composer({
                           <span className="min-w-0">
                             <span className="block truncate">{spec.label}</span>
                             {showApiModel ? (
-                              <span className="block truncate font-mono text-[10px] leading-3 text-text-faint">
+                              <span className="block truncate font-mono text-act-xxs leading-3 text-text-faint">
                                 {spec.apiModel}
                               </span>
                             ) : null}
@@ -1936,7 +1923,7 @@ export function Composer({
                     </span>
                   </label>
                 ) : editingModelSpec?.reasoningMandatory ? (
-                  <div className="px-2 py-1.5 text-[13px] text-text-muted">此模型始终启用 Thinking。</div>
+                  <div className="px-2 py-1.5 text-act-sm text-text-muted">此模型始终启用 Thinking。</div>
                 ) : null}
                 {editingReasoningEfforts.length > 0 ? (
                   <>
@@ -2008,31 +1995,29 @@ export function Composer({
 
     return (
       <div className="[grid-area:send] grid">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            className={`${SEND_BUTTON_CLASS} send-button${isStreaming ? " is-stop" : ""}${isAborting ? " is-aborting" : ""}`}
-            type="button"
-            aria-label={ariaLabel}
-            aria-disabled={sendDisabled}
-            onClick={() => {
-              if (sendDisabled) return;
-              if (isStreaming) {
-                onAbort?.();
-                return;
-              }
-              sendCurrentMessage();
-            }}
-          >
-            {isStreaming ? (
-              <Square size={12} strokeWidth={2.6} fill="currentColor" aria-hidden="true" />
-            ) : (
-              <ArrowUp size={16} strokeWidth={2.4} aria-hidden="true" />
-            )}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{tooltipLabel}</TooltipContent>
-      </Tooltip>
+      <IconButton
+        className={`send-button${isStreaming ? " is-stop" : ""}${isAborting ? " is-aborting" : ""}`}
+        label={ariaLabel}
+        tooltip={tooltipLabel}
+        variant="primary"
+        size="md"
+        shape="round"
+        aria-disabled={sendDisabled}
+        onClick={() => {
+          if (sendDisabled) return;
+          if (isStreaming) {
+            onAbort?.();
+            return;
+          }
+          sendCurrentMessage();
+        }}
+      >
+        {isStreaming ? (
+          <Square size={12} strokeWidth={2.6} fill="currentColor" aria-hidden="true" />
+        ) : (
+          <ArrowUp size={16} strokeWidth={2.4} aria-hidden="true" />
+        )}
+      </IconButton>
       </div>
     );
   }
@@ -2077,7 +2062,7 @@ export function Composer({
       >
         {renderAttachmentStrip()}
         {attachmentError ? (
-          <div className="px-3 pb-1 text-xs text-danger" role="alert">
+          <div className="px-3 pb-1 text-act-xs leading-4 text-danger" role="alert">
             {attachmentError}
           </div>
         ) : null}
@@ -2111,9 +2096,10 @@ export function Composer({
 
     return (
       <div className={COMPOSER_ACTION_STRIP_CLASS} aria-label="待处理的审查操作">
-        <button
-          className={REVIEW_PREVIEW_BUTTON_CLASS}
-          type="button"
+        <Button
+          className="review-preview-button"
+          variant="secondary"
+          shape="pill"
           aria-label={ariaLabel}
           disabled={isLoading}
           onClick={onOpenReview}
@@ -2125,10 +2111,10 @@ export function Composer({
               <span className={REVIEW_DELETION_CLASS}>-{reviewSummary.deletions ?? 0}</span>
             </>
           ) : null}
-        </button>
-        <button className={REVIEW_OVERFLOW_BUTTON_CLASS} type="button" aria-label="更多审查操作">
+        </Button>
+        <IconButton className="review-overflow-button" label="更多审查操作" variant="secondary" shape="round">
           <MoreHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
-        </button>
+        </IconButton>
       </div>
     );
   }
@@ -2256,14 +2242,14 @@ export function Composer({
                 }}
               >
                 <input
-                  className="min-w-0 flex-1 rounded-act-sm border border-line bg-surface px-2 py-1 text-sm text-text-main outline-none focus:border-line-strong"
+                  className="min-w-0 flex-1 rounded-act-sm border border-line bg-surface px-2 py-1 text-act-md leading-5 text-text-main outline-none focus:border-line-strong"
                   aria-label="新文件夹名称"
                   autoFocus
                   value={workspaceFolderName}
                   onChange={(event) => setWorkspaceFolderName(event.target.value)}
                   placeholder="文件夹名称"
                 />
-                <button className="rounded-act-sm px-2 py-1 text-sm text-text-main hover:bg-hover-overlay" type="submit">
+                <button className="rounded-act-sm px-2 py-1 text-act-md leading-5 text-text-main hover:bg-hover-overlay" type="submit">
                   创建
                 </button>
               </form>
@@ -2307,7 +2293,7 @@ export function Composer({
             <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
               <Cloud className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
               <span className="flex-1">云端</span>
-              <span className="text-[11px] text-text-faint">即将推出</span>
+              <span className="text-act-xxs text-text-faint">即将推出</span>
             </button>
             <button
               className={COMMAND_MENU_BUTTON_CLASS}
@@ -2326,7 +2312,7 @@ export function Composer({
             <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
               <Server className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
               <span className="flex-1">远程 SSH</span>
-              <span className="text-[11px] text-text-faint">即将推出</span>
+              <span className="text-act-xxs text-text-faint">即将推出</span>
             </button>
             {gitReady ? <div className={COMMAND_MENU_SEPARATOR_CLASS} /> : null}
             {gitReady ? (
@@ -2348,7 +2334,7 @@ export function Composer({
               <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
                 <Plus className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
                 <span className="flex-1">新建工作树</span>
-                <span className="text-[11px] text-text-faint">需要先创建提交</span>
+                <span className="text-act-xxs text-text-faint">需要先创建提交</span>
               </button>
             ) : null}
           </div>
@@ -2372,7 +2358,7 @@ export function Composer({
   function renderDraftError() {
     if (!sendError) return null;
     return (
-      <div id="composer-send-error" className="rounded-act-md border border-danger/30 bg-danger-subtle px-3 py-2 text-sm text-danger" role="alert">
+      <div id="composer-send-error" className="rounded-act-md border border-danger/30 bg-danger-subtle px-3 py-2 text-act-md leading-5 text-danger" role="alert">
         {sendError.message}
       </div>
     );

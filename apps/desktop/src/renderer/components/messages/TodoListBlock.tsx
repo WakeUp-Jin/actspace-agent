@@ -5,9 +5,9 @@ import type { MessageBlock, TodoItem } from "@actspace/shared";
 type TodoMessage = Extract<MessageBlock, { kind: "todo" }>;
 
 const SHELL_CLASS =
-  "min-w-0 overflow-hidden rounded-act-md border border-line bg-surface text-sm text-text-main";
+  "min-w-0 overflow-hidden rounded-act-md border border-line bg-surface text-act-md leading-5 text-text-main";
 const ATTACHED_SHELL_CLASS =
-  "min-w-0 overflow-hidden border-t border-line bg-transparent text-sm text-text-main";
+  "min-w-0 overflow-hidden border-t border-line bg-transparent text-act-md leading-5 text-text-main";
 const HEADER_CLASS =
   "flex min-h-9 w-full items-center gap-2 border-0 bg-transparent px-3 py-1.5 text-left transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--act-color-focus-ring)]";
 const LIST_CLASS = "border-t border-line/80 px-3 py-1";
@@ -49,7 +49,7 @@ export function TodoListBlock({
         ) : (
           <ChevronRight className="shrink-0 text-text-faint" size={15} aria-hidden="true" />
         )}
-        <span className="min-w-0 flex-1 truncate text-sm text-text-muted">{summaryText}</span>
+        <span className="min-w-0 flex-1 truncate text-act-md leading-5 text-text-muted">{summaryText}</span>
         {message.status === "failed" ? (
           <AlertCircle className="shrink-0 text-danger" size={15} aria-label="Todo update failed" />
         ) : null}
@@ -89,7 +89,7 @@ function TodoRow({ todo }: { todo: TodoItem }) {
       <div className="min-w-0">
         <p className={contentClass}>{todo.content}</p>
         {inProgress && todo.activeForm ? (
-          <p className="mt-0.5 break-words text-xs leading-4 text-text-faint">{todo.activeForm}</p>
+          <p className="mt-0.5 break-words text-act-xs leading-4 text-text-faint">{todo.activeForm}</p>
         ) : null}
       </div>
     </li>

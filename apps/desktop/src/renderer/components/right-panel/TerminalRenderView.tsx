@@ -210,7 +210,7 @@ export function TerminalRenderView({
     <section className="flex min-h-0 flex-1 flex-col bg-surface" aria-label={`终端 ${shellName}`}>
       <div ref={hostRef} className="min-h-0 flex-1 overflow-hidden px-2 py-2 [&_.scrollbar.horizontal]:hidden [&_.xterm]:h-full" />
       {showStatusBar ? (
-        <div className="flex min-h-7 shrink-0 items-center justify-between gap-3 border-t border-line bg-surface-subtle px-2.5 text-[11px] text-text-faint">
+        <div className="flex min-h-7 shrink-0 items-center justify-between gap-3 border-t border-line bg-surface-subtle px-2.5 text-act-xxs text-text-faint">
           <span className="min-w-0 truncate">{message}</span>
           <div className="flex shrink-0 items-center gap-2">
             <button

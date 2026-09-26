@@ -10,6 +10,7 @@ import {
 import { selectRequestContextEstimate } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../../session";
 import { contextBucketLabel } from "../../context-labels";
+import { Button } from "../ui/Button";
 
 /**
  * 右侧面板 Context 完整只读视图（见 `front-右侧面板与文件渲染规范.md`）。
@@ -41,28 +42,26 @@ const KIND_TO_BUCKET: Record<ContextStateEntry["kind"], string> = {
 };
 
 const TOOLBAR_CLASS = "flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2";
-const TITLE_CLASS = "text-[13px] font-semibold text-text-main";
-const EXPORT_BUTTON_CLASS =
-  "rounded-act-sm border border-line bg-surface-subtle px-2 py-0.5 text-[11px] text-text-muted hover:text-text-main hover:border-line-strong [cursor:pointer]";
+const TITLE_CLASS = "text-act-sm font-semibold text-text-main";
 const BODY_CLASS = "min-h-0 flex-1 overflow-auto p-3";
 const SECTION_CLASS = "mb-3";
 const SECTION_HEADER_CLASS =
   "flex w-full items-center gap-2 border-0 bg-transparent px-0 py-1 text-left [cursor:pointer]";
 const SECTION_BAR_CLASS = "h-[14px] w-[3px] shrink-0 rounded-full";
-const SECTION_LABEL_CLASS = "text-[12px] font-semibold text-text-main";
-const SECTION_META_CLASS = "ml-auto flex items-center gap-1.5 text-[11px] tabular-nums text-text-faint";
+const SECTION_LABEL_CLASS = "text-act-xs font-semibold text-text-main";
+const SECTION_META_CLASS = "ml-auto flex items-center gap-1.5 text-act-xxs tabular-nums text-text-faint";
 const ENTRY_LIST_CLASS = "mt-1.5 grid gap-1.5";
 const ENTRY_CLASS = "rounded-act-sm border border-line bg-surface px-2.5 py-2";
 const ENTRY_HEAD_CLASS = "flex items-baseline justify-between gap-2";
-const ENTRY_TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-medium text-text-main";
-const ENTRY_TOKENS_CLASS = "shrink-0 text-[11px] tabular-nums text-text-faint";
-const ENTRY_PREVIEW_FULL_CLASS = "whitespace-pre-wrap break-words text-[12px] leading-[1.6] text-text-muted";
-const ENTRY_PREVIEW_CLAMP_CLASS = "line-clamp-3 whitespace-pre-wrap break-words text-[12px] leading-[1.55] text-text-muted";
+const ENTRY_TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-act-xs font-medium text-text-main";
+const ENTRY_TOKENS_CLASS = "shrink-0 text-act-xxs tabular-nums text-text-faint";
+const ENTRY_PREVIEW_FULL_CLASS = "whitespace-pre-wrap break-words text-act-xs leading-[1.6] text-text-muted";
+const ENTRY_PREVIEW_CLAMP_CLASS = "line-clamp-3 whitespace-pre-wrap break-words text-act-xs leading-[1.55] text-text-muted";
 const ENTRY_TOGGLE_CLASS =
-  "mt-1 inline-flex items-center border-0 bg-transparent p-0 text-[11px] text-info hover:text-info-hover hover:underline [cursor:pointer]";
-const ENTRY_EMPTY_CLASS = "text-[12px] italic text-text-faint";
-const EMPTY_CLASS = "p-[18px] text-[13px] text-text-muted";
-const CAP_NOTE_CLASS = "px-1 pt-1 text-[11px] text-text-faint";
+  "mt-1 inline-flex items-center border-0 bg-transparent p-0 text-act-xxs text-info hover:text-info-hover hover:underline [cursor:pointer]";
+const ENTRY_EMPTY_CLASS = "text-act-xs italic text-text-faint";
+const EMPTY_CLASS = "p-[18px] text-act-sm text-text-muted";
+const CAP_NOTE_CLASS = "px-1 pt-1 text-act-xxs text-text-faint";
 
 type Section = {
   bucketKey: string;
@@ -300,20 +299,14 @@ export function ContextRenderView({
       <div className={TOOLBAR_CLASS}>
         <span className={TITLE_CLASS}>上下文 · {entryCount} 条</span>
         <span className="flex items-center gap-1.5">
-          <button
-            type="button"
-            className={EXPORT_BUTTON_CLASS}
-            onClick={() => downloadBlob(contextToMarkdown(effectiveState), "text/markdown", "context.md")}
+          <Button variant="secondary" size="xs" onClick={() => downloadBlob(contextToMarkdown(effectiveState), "text/markdown", "context.md")}
           >
             导出 .md
-          </button>
-          <button
-            type="button"
-            className={EXPORT_BUTTON_CLASS}
-            onClick={() => downloadBlob(JSON.stringify(effectiveState, null, 2), "application/json", "context.json")}
+          </Button>
+          <Button variant="secondary" size="xs" onClick={() => downloadBlob(JSON.stringify(effectiveState, null, 2), "application/json", "context.json")}
           >
             导出 .json
-          </button>
+          </Button>
         </span>
       </div>
       <div className={BODY_CLASS}>

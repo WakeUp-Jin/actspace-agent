@@ -16,7 +16,7 @@ import { PreviewSourceToggle, type PreviewMode } from "./PreviewSourceToggle";
 
 // 只有「聊天生成的 markdown」才用到这条工具栏：它没有工作区操作栏可以挂切换按钮。
 const TOOLBAR_CLASS = "flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5";
-const PREVIEW_SCROLL_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] text-[13px] leading-[1.7] text-text-main";
+const PREVIEW_SCROLL_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] text-act-sm leading-[1.7] text-text-main";
 
 const REMARK_PLUGINS = [remarkGfm];
 

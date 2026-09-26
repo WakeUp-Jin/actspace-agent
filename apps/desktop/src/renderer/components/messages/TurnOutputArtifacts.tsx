@@ -19,7 +19,7 @@ type TurnOutputArtifact = {
 const ARTIFACT_PANEL_CLASS =
   "mx-[var(--conversation-text-inset)] mt-3 overflow-hidden rounded-act-lg border border-line bg-surface-raised";
 const ARTIFACT_HEADER_CLASS =
-  "flex min-h-9 items-center justify-between gap-3 px-3 text-xs font-semibold text-text-muted";
+  "flex min-h-9 items-center justify-between gap-3 px-3 text-act-xs leading-4 font-semibold text-text-muted";
 const ARTIFACT_ROW_CLASS =
   "flex min-h-9 w-full items-center gap-2 border-0 border-t border-line bg-transparent px-3 py-1.5 text-left transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:hover:bg-transparent";
 
@@ -272,11 +272,11 @@ export function TurnOutputArtifacts({
                         ? <ImageIcon size={14} />
                         : <FileText size={14} />}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-text-muted">
+                  <span className="min-w-0 flex-1 truncate text-act-xs text-text-muted">
                     {artifact.displayPath}
                   </span>
                   {artifact.kind === "file" ? (
-                    <span className="flex shrink-0 gap-1 text-[11px] font-medium tabular-nums" aria-label={`${artifact.additions ?? 0} additions, ${artifact.deletions ?? 0} deletions`}>
+                    <span className="flex shrink-0 gap-1 text-act-xxs font-medium tabular-nums" aria-label={`${artifact.additions ?? 0} additions, ${artifact.deletions ?? 0} deletions`}>
                       <span className="text-success">+{artifact.additions ?? 0}</span>
                       <span className="text-danger">-{artifact.deletions ?? 0}</span>
                     </span>
@@ -290,7 +290,7 @@ export function TurnOutputArtifacts({
           );
         })}
       </div>
-      {error ? <div className="border-t border-line px-3 py-2 text-xs text-danger">{error}</div> : null}
+      {error ? <div className="border-t border-line px-3 py-2 text-act-xs leading-4 text-danger">{error}</div> : null}
     </section>
   );
 }

@@ -13,13 +13,13 @@ import { CodeRenderView } from "./CodeRenderView";
 
 const ROOT_CLASS = "flex min-h-0 flex-1 flex-col";
 const TOOLBAR_CLASS = "flex shrink-0 items-center gap-2 border-b border-line px-2 py-1.5";
-const TOOLBAR_HINT_CLASS = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-text-faint";
+const TOOLBAR_HINT_CLASS = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-act-xxs text-text-faint";
 const TOGGLE_CLASS =
-  "shrink-0 rounded-act-sm border border-line bg-surface-subtle px-2 py-0.5 text-[11px] text-text-muted hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
+  "shrink-0 rounded-act-sm border border-line bg-surface-subtle px-2 py-0.5 text-act-xxs text-text-muted hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
 const SCROLL_CLASS = "min-h-0 flex-1 overflow-auto";
-const TABLE_CLASS = "w-max min-w-full border-collapse text-[12px] leading-[1.5]";
+const TABLE_CLASS = "w-max min-w-full border-collapse text-act-xs leading-[1.5]";
 const HEAD_CELL_CLASS =
-  "sticky top-0 z-[1] border-b border-r border-line bg-surface-subtle px-2 py-1 text-left font-semibold text-text-main";
+  "sticky top-0 z-1 border-b border-r border-line bg-surface-subtle px-2 py-1 text-left font-semibold text-text-main";
 const ROW_NUMBER_CLASS =
   "select-none border-b border-r border-line bg-surface-subtle px-2 py-1 text-right font-mono text-text-faint [font-variant-numeric:tabular-nums]";
 const CELL_CLASS = "border-b border-r border-line px-2 py-1 align-top text-text-muted [overflow-wrap:anywhere]";

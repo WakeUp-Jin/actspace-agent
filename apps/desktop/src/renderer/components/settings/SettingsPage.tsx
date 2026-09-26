@@ -45,8 +45,6 @@ import {
   SettingSubhead,
   InlineWarning,
   SettingEditor,
-  SettingsButton,
-  settingsButtonClass,
   SettingsInput,
   StatusDot,
   useSettingsSaveNotice,
@@ -74,10 +72,8 @@ import {
   type ThemeMode,
   type UiFontId,
 } from "../../appearance/types";
+import { Button } from "../ui/Button";
 
-const BTN_PRIMARY = settingsButtonClass("primary");
-const BTN_SECONDARY = settingsButtonClass("secondary");
-const BTN_DANGER = settingsButtonClass("danger");
 const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
 const LOCAL_UPDATE_POLL_MS = 700;
 
@@ -302,7 +298,7 @@ export function SettingsPage({
     <SettingsSaveNoticeProvider>
     <div
       data-testid="settings-page-shell"
-      className="flex h-screen min-h-0 flex-col overflow-hidden bg-surface text-text-main"
+      className="flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-text-main"
     >
       <div className="window-chrome-bar" role="presentation">
         <div className="chrome-left" />
@@ -310,7 +306,8 @@ export function SettingsPage({
         <div className="chrome-right" />
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden pt-[var(--window-chrome-strip-height)] max-[820px]:flex-col">
+      {/* 导航列与内容区各自延伸到窗口顶部，顶部 chrome 区域不再是一条独立色带。 */}
+      <div className="flex min-h-0 flex-1 overflow-hidden max-[820px]:flex-col">
         <SettingsNav
           active={section}
           onSelect={navigate}
@@ -319,7 +316,7 @@ export function SettingsPage({
         <main
           ref={mainRef}
           aria-label="设置内容"
-          className={`min-h-0 flex-1 bg-app-bg ${section === "usage" ? "overflow-hidden" : "overflow-y-auto"}`}
+          className={`mt-[var(--window-chrome-strip-height)] min-h-0 flex-1 bg-app-bg max-[820px]:mt-0 ${section === "usage" ? "overflow-hidden" : "overflow-y-auto"}`}
         >
           {settings ? (
             <SettingsContent
@@ -347,11 +344,11 @@ export function SettingsPage({
               workspaces={workspaces}
             />
           ) : settingsError ? (
-            <div className="flex h-full items-center justify-center px-6 text-center text-[13px] text-text-faint">
+            <div className="flex h-full items-center justify-center px-6 text-center text-act-sm text-text-faint">
               {settingsError}
             </div>
           ) : (
-            <div className="flex h-full items-center justify-center text-[13px] text-text-faint">加载设置中…</div>
+            <div className="flex h-full items-center justify-center text-act-sm text-text-faint">加载设置中…</div>
           )}
         </main>
       </div>
@@ -665,7 +662,7 @@ function ImageGenerationSettingsDialog({
     <div
       ref={dialogRef}
       tabIndex={-1}
-      className="fixed inset-0 z-[150] grid place-items-center bg-scrim px-5"
+      className="fixed inset-0 z-(--act-z-modal) grid place-items-center bg-scrim px-5"
       role="dialog"
       aria-modal="true"
       aria-labelledby="image-generation-dialog-title"
@@ -677,10 +674,10 @@ function ImageGenerationSettingsDialog({
       <div className="max-h-[86vh] w-full max-w-[520px] overflow-y-auto rounded-act-xl border border-line bg-surface p-5 shadow-act-float">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="image-generation-dialog-title" className="text-[18px] font-semibold text-text-main">
+            <h2 id="image-generation-dialog-title" className="text-act-lg font-semibold text-text-main">
               配置图片生成服务
             </h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-text-faint">
+            <p className="mt-1 text-act-xs leading-relaxed text-text-faint">
               密钥只在 main 进程解密使用；保存后从下一次图片生成调用生效。
             </p>
           </div>
@@ -702,15 +699,15 @@ function ImageGenerationSettingsDialog({
                 <ShieldCheck size={16} aria-hidden="true" />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold text-text-main">API Key 已安全保存</div>
-                <p className="mt-0.5 text-[11px] text-text-faint">出于安全原因，已保存的 Key 不会回显。</p>
+                <div className="text-act-sm font-semibold text-text-main">API Key 已安全保存</div>
+                <p className="mt-0.5 text-act-xxs text-text-faint">出于安全原因，已保存的 Key 不会回显。</p>
               </div>
-              <button type="button" autoFocus className={BTN_SECONDARY} onClick={() => setReplaceKey(true)}>
+              <Button variant="secondary" autoFocus  onClick={() => setReplaceKey(true)}>
                 更换 Key
-              </button>
+              </Button>
             </div>
           ) : (
-            <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
+            <label className="flex flex-col gap-1.5 text-act-xs font-semibold text-text-muted">
               API Key
               <div className="relative">
                 <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" />
@@ -721,7 +718,7 @@ function ImageGenerationSettingsDialog({
                   placeholder={current.hasApiKey ? "输入新 Key；留空保持现有 Key" : "sk-..."}
                   aria-label="图片生成服务 API Key"
                   onChange={(event) => setApiKey(event.target.value)}
-                  className="h-10 w-full rounded-act-md border border-line bg-surface-subtle pl-9 pr-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+                  className="h-10 w-full rounded-act-md border border-line bg-surface-subtle pl-9 pr-3 text-act-sm text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
                 />
               </div>
             </label>
@@ -738,30 +735,30 @@ function ImageGenerationSettingsDialog({
             >
               <ChevronRight size={16} className={`shrink-0 text-text-faint transition-transform ${advancedOpen ? "rotate-90" : ""}`} aria-hidden="true" />
               <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-semibold text-text-main">高级设置</span>
-                <span className="mt-0.5 block truncate text-[11px] text-text-faint">{model || "未填写模型"} · {endpointLabel}</span>
+                <span className="block text-act-sm font-semibold text-text-main">高级设置</span>
+                <span className="mt-0.5 block truncate text-act-xxs text-text-faint">{model || "未填写模型"} · {endpointLabel}</span>
               </span>
             </button>
             {advancedOpen ? (
               <div id="image-generation-advanced-settings" className="grid gap-4 border-t border-line bg-surface-subtle px-3.5 py-3.5">
-                <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
+                <label className="flex flex-col gap-1.5 text-act-xs font-semibold text-text-muted">
                   Base URL
                   <input
                     value={baseUrl}
                     onChange={(event) => setBaseUrl(event.target.value)}
-                    className="h-10 rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+                    className="h-10 rounded-act-md border border-line bg-surface px-3 text-act-sm text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
                   />
                 </label>
-                <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
+                <label className="flex flex-col gap-1.5 text-act-xs font-semibold text-text-muted">
                   模型名称
                   <input
                     value={model}
                     onChange={(event) => setModel(event.target.value)}
-                    className="h-10 rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+                    className="h-10 rounded-act-md border border-line bg-surface px-3 text-act-sm text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
                   />
                 </label>
                 {baseUrl.trim().toLowerCase().startsWith("http://") ? (
-                  <p className="flex gap-1.5 text-[11px] leading-relaxed text-on-danger">
+                  <p className="flex gap-1.5 text-act-xxs leading-relaxed text-on-danger">
                     <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
                     当前 Base URL 使用 HTTP，API Key 和请求内容可能以未加密网络流量传输。
                   </p>
@@ -770,22 +767,22 @@ function ImageGenerationSettingsDialog({
             ) : null}
           </div>
 
-          {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
+          {error ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}
         </div>
 
         <div className="mt-6 flex items-center justify-between gap-3">
           <div>
             {current.hasApiKey ? (
-              <button type="button" className={BTN_DANGER} onClick={() => void disconnect()} disabled={Boolean(busy)}>
+              <Button variant="danger" onClick={() => void disconnect()} disabled={Boolean(busy)}>
                 {busy === "disconnect" ? "断开中…" : "断开服务"}
-              </button>
+              </Button>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" className={BTN_SECONDARY} onClick={onClose} disabled={Boolean(busy)}>取消</button>
-            <button type="button" className={BTN_PRIMARY} onClick={() => void save()} disabled={Boolean(busy)}>
+            <Button variant="secondary" onClick={onClose} disabled={Boolean(busy)}>取消</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={Boolean(busy)}>
               {busy === "save" ? "保存中…" : "保存配置"}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -926,7 +923,7 @@ function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) {
 }
 
 const SETTINGS_TEXTAREA_CLASS =
-  "min-h-[76px] w-full resize-y rounded-[7px] border border-line bg-surface px-2.5 py-2 text-[13px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/15 disabled:cursor-not-allowed disabled:opacity-55";
+  "min-h-[76px] w-full resize-y rounded-act-sm border border-line bg-surface px-2.5 py-2 text-act-sm leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/15 disabled:cursor-not-allowed disabled:opacity-55";
 
 const EMPTY_TASK_MODELS: TaskModelSettings = {
   defaultChatModel: null,
@@ -1216,15 +1213,15 @@ function LocalUpdateSection() {
           <SettingRow
             title="源码目录"
             description={
-              <span className="break-all font-mono text-[11.5px] text-text-faint">
+              <span className="break-all font-mono text-act-xs text-text-faint">
                 {sourceText}
                 {state?.sourceRoot && !state.sourceValid ? <span className="ml-2 text-on-danger">目录不可用</span> : null}
               </span>
             }
             control={
-              <button type="button" className={BTN_SECONDARY} onClick={() => void chooseSource()} disabled={!bridgeReady || busy || active}>
+              <Button variant="secondary" onClick={() => void chooseSource()} disabled={!bridgeReady || busy || active}>
                 选择目录
-              </button>
+              </Button>
             }
             align="start"
           />
@@ -1232,7 +1229,7 @@ function LocalUpdateSection() {
             title="安装目标"
             description={
               <span className="flex max-w-[430px] flex-col gap-1">
-                <span className="break-all font-mono text-[11.5px] text-text-faint">{appTargetText}</span>
+                <span className="break-all font-mono text-act-xs text-text-faint">{appTargetText}</span>
                 {state?.appExecutablePath ? (
                   <span className="break-all text-text-subtle">当前进程：{state.appExecutablePath}</span>
                 ) : null}
@@ -1254,9 +1251,9 @@ function LocalUpdateSection() {
               </span>
             }
             control={
-              <button type="button" className={BTN_PRIMARY} onClick={() => void startUpdate()} disabled={!canStart}>
+              <Button variant="primary" onClick={() => void startUpdate()} disabled={!canStart}>
                 {busy || active ? "处理中…" : "构建并更新"}
-              </button>
+              </Button>
             }
             align="start"
           />
@@ -1314,12 +1311,12 @@ function LocalUpdateProgressDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[130] flex items-center justify-center bg-overlay px-4"
+      className="fixed inset-0 z-(--act-z-modal) flex items-center justify-center bg-overlay px-4"
       role="presentation"
       onClick={isActive ? undefined : onClose}
     >
       <div
-        className="w-full max-w-[460px] rounded-[14px] border border-line bg-surface-raised p-5 shadow-act-popover"
+        className="w-full max-w-[460px] rounded-act-lg border border-line bg-surface-raised p-5 shadow-act-popover"
         role="dialog"
         aria-modal="true"
         aria-label="本地更新进度"
@@ -1343,8 +1340,8 @@ function LocalUpdateProgressDialog({
               )}
             </span>
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <h3 className="text-[16px] font-bold text-text-main">本地更新</h3>
-              <p className="min-w-0 text-[12px] leading-relaxed text-text-faint">{progress.message}</p>
+              <h3 className="text-act-lg font-bold text-text-main">本地更新</h3>
+              <p className="min-w-0 text-act-xs leading-relaxed text-text-faint">{progress.message}</p>
             </div>
           </div>
           {!isActive ? (
@@ -1369,7 +1366,7 @@ function LocalUpdateProgressDialog({
         >
           <div
             className={[
-              "h-full rounded-act-pill transition-all duration-300",
+              "h-full rounded-act-pill transition-all duration-(--motion-slow)",
               isFailed ? "bg-danger" : isSucceeded ? "bg-success" : "bg-operational",
             ].join(" ")}
             style={{ width: progressWidth }}
@@ -1384,7 +1381,7 @@ function LocalUpdateProgressDialog({
               <li key={step.phase} className="flex min-w-0 flex-col items-center gap-1 text-center">
                 <span
                   className={[
-                    "flex h-5 w-5 items-center justify-center rounded-act-pill border text-[10px] font-semibold",
+                    "flex h-5 w-5 items-center justify-center rounded-act-pill border text-act-xxs font-semibold",
                     current && isActive
                       ? "border-operational bg-operational text-on-operational"
                       : done
@@ -1394,28 +1391,28 @@ function LocalUpdateProgressDialog({
                 >
                   {index + 1}
                 </span>
-                <span className="w-full truncate text-[11px] text-text-faint">{step.label}</span>
+                <span className="w-full truncate text-act-xxs text-text-faint">{step.label}</span>
               </li>
             );
           })}
         </ol>
 
         <div className="mt-4 flex flex-col gap-1 rounded-act-md border border-line bg-surface-subtle px-3 py-2">
-          {updatedAt ? <span className="text-[12px] text-text-faint">更新时间：{updatedAt}</span> : null}
-          <span className="break-all text-[12px] text-text-subtle">日志：{state.logPath}</span>
+          {updatedAt ? <span className="text-act-xs text-text-faint">更新时间：{updatedAt}</span> : null}
+          <span className="break-all text-act-xs text-text-subtle">日志：{state.logPath}</span>
         </div>
 
         {isActive ? (
-          <p className="mt-3 text-[12px] leading-relaxed text-text-faint">
+          <p className="mt-3 text-act-xs leading-relaxed text-text-faint">
             构建阶段不会退出应用；构建完成后才会关闭窗口并执行替换。
           </p>
         ) : null}
 
         {!isActive ? (
           <div className="mt-5 flex justify-end">
-            <button type="button" className={BTN_SECONDARY} onClick={onClose}>
+            <Button variant="secondary" onClick={onClose}>
               关闭
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>
@@ -1496,7 +1493,7 @@ function AgentInstructionsSection({ settings }: SectionProps) {
     <SettingGroup title="Agent 指令" headingLevel={3}>
       <SettingLinkRow
         title="系统提示词"
-        description={promptError && !editorOpen ? <span className="font-sans text-[12px] text-on-danger">{promptError}</span> : path}
+        description={promptError && !editorOpen ? <span className="font-sans text-act-xs text-on-danger">{promptError}</span> : path}
         monoDescription
         value={promptFile ? `${promptFile.content.length.toLocaleString("zh-CN")} 字` : undefined}
         ariaLabel={editorOpen ? "收起 Agent 指令" : "编辑 Agent 指令"}
@@ -1520,7 +1517,7 @@ function AgentInstructionsSection({ settings }: SectionProps) {
             value={draftPrompt}
             maxLength={AGENT_SYSTEM_PROMPT_MAX_CHARS}
             onChange={(event) => setDraftPrompt(event.target.value)}
-            className={`${SETTINGS_TEXTAREA_CLASS} min-h-[180px] font-mono text-[12px]`}
+            className={`${SETTINGS_TEXTAREA_CLASS} min-h-[180px] font-mono`}
             spellCheck={false}
             autoFocus
             aria-label="主 Agent 自定义系统提示词"
@@ -1574,7 +1571,7 @@ function SubagentSection({
         disabled={!window.actspace?.updateTaskModels}
         onChange={(value) => void update(value)}
       />
-      {error ? <div role="alert" className="px-4 py-2.5 text-[12px] text-on-danger">{error}</div> : null}
+      {error ? <div role="alert" className="px-4 py-2.5 text-act-xs text-on-danger">{error}</div> : null}
     </SettingGroup>
   );
 }
@@ -1787,29 +1784,29 @@ function ArchivedChatsSection({
   return (
       <SettingGroup title="已归档" headingLevel={3} description="恢复后会重新出现在左侧会话栏。">
         {loading ? (
-          <div className="px-3.5 py-4 text-[13px] text-text-faint">正在加载归档会话…</div>
+          <div className="px-3.5 py-4 text-act-sm text-text-faint">正在加载归档会话…</div>
         ) : error ? (
-          <div className="px-3.5 py-4 text-[13px] text-on-danger">{error}</div>
+          <div className="px-3.5 py-4 text-act-sm text-on-danger">{error}</div>
         ) : sessions.length === 0 ? (
-          <div className="px-4 py-8 text-center text-[13px] text-text-faint">暂无归档会话</div>
+          <div className="px-4 py-8 text-center text-act-sm text-text-faint">暂无归档会话</div>
         ) : (
           sessions.map((session) => (
             <div key={session.id} className="flex min-h-[52px] items-center justify-between gap-4 px-4 py-2.5">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium text-text-main">{session.title}</div>
-                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-text-muted">
+                <div className="truncate text-act-sm font-medium text-text-main">{session.title}</div>
+                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-act-xs text-text-muted">
                   <span>{formatUpdatedAt(session.updatedAt)}</span>
                   <span>{session.agentRunCount} 次运行</span>
                   <span>{workspaceLabelFromRoot(session.workspaceRoot)}</span>
                 </div>
               </div>
-              <SettingsButton
+              <Button
                 busy={restoringId === session.id}
                 disabled={restoringId === session.id}
                 onClick={() => void restoreSession(session.id)}
               >
                 {restoringId === session.id ? "恢复中…" : "恢复"}
-              </SettingsButton>
+              </Button>
             </div>
           ))
         )}
@@ -1869,10 +1866,10 @@ function ThemeTiles({ value, onChange }: { value: ThemeMode; onChange: (value: T
             aria-checked={selected}
             aria-label={label}
             onClick={() => onChange(optionValue)}
-            className="group rounded-[10px] text-left focus-visible:outline-none"
+            className="group rounded-act-group text-left focus-visible:outline-none"
           >
             <span
-              className={`relative block h-[84px] overflow-hidden rounded-[9px] border transition-shadow duration-150 group-focus-visible:ring-[3px] group-focus-visible:ring-focus-ring/20 ${
+              className={`relative block h-[84px] overflow-hidden rounded-act-md border transition-shadow duration-(--motion-base) group-focus-visible:ring-[3px] group-focus-visible:ring-focus-ring/20 ${
                 selected ? "border-transparent ring-2 ring-text-main" : "border-line group-hover:border-line-strong"
               }`}
             >
@@ -1885,7 +1882,7 @@ function ThemeTiles({ value, onChange }: { value: ThemeMode; onChange: (value: T
                 <ThemeMiniWindow tone={optionValue} />
               )}
             </span>
-            <span className={`mt-2 block text-[12.5px] font-medium ${selected ? "text-text-main" : "text-text-muted"}`}>{label}</span>
+            <span className={`mt-2 block text-act-xs font-medium ${selected ? "text-text-main" : "text-text-muted"}`}>{label}</span>
           </button>
         );
       })}
@@ -1981,7 +1978,7 @@ function AppearanceSection() {
           <p className="leading-relaxed text-text-main" style={{ fontSize: prefs.uiFontSize }}>
             已完成设置页重构：导航分组保持不变，所有页面使用同一套分组和控件。
           </p>
-          <pre className="mt-2.5 overflow-x-auto rounded-[7px] bg-surface-subtle px-3 py-2.5 font-mono text-text-muted" style={{ fontSize: prefs.codeFontSize }}>
+          <pre className="mt-2.5 overflow-x-auto rounded-act-sm bg-surface-subtle px-3 py-2.5 font-mono text-text-muted" style={{ fontSize: prefs.codeFontSize }}>
             pnpm --filter @actspace/desktop test
           </pre>
         </div>
@@ -2039,19 +2036,19 @@ function ProviderKeyModal({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-overlay px-4"
+      className="fixed inset-0 z-(--act-z-modal) flex items-center justify-center bg-overlay px-4"
       role="presentation"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[420px] rounded-[14px] border border-line bg-surface-raised p-5 shadow-act-popover"
+        className="w-full max-w-[420px] rounded-act-lg border border-line bg-surface-raised p-5 shadow-act-popover"
         role="dialog"
         aria-modal="true"
         aria-label={`连接 ${label}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <h3 className="text-[16px] font-bold text-text-main">连接 {label}</h3>
-        <p className="mt-1.5 text-[12px] leading-relaxed text-text-faint">
+        <h3 className="text-act-lg font-bold text-text-main">连接 {label}</h3>
+        <p className="mt-1.5 text-act-xs leading-relaxed text-text-faint">
           输入你的 {label} API Key，将经系统密钥串加密后保存在本机，不会以明文形式落盘或上传。
         </p>
         <input
@@ -2064,16 +2061,16 @@ function ProviderKeyModal({
           onKeyDown={(event) => {
             if (event.key === "Enter") void submit();
           }}
-          className="mt-4 h-10 w-full rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none transition-colors focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+          className="mt-4 h-10 w-full rounded-act-md border border-line bg-surface px-3 text-act-sm text-text-main outline-none transition-colors focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
         />
-        {error ? <p className="mt-2 text-[12px] text-on-danger">{error}</p> : null}
+        {error ? <p className="mt-2 text-act-xs text-on-danger">{error}</p> : null}
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" className={BTN_SECONDARY} onClick={onClose} disabled={saving}>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
             取消
-          </button>
-          <button type="button" className={BTN_PRIMARY} onClick={() => void submit()} disabled={saving}>
+          </Button>
+          <Button variant="primary" onClick={() => void submit()} disabled={saving}>
             {saving ? "保存中…" : "保存"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

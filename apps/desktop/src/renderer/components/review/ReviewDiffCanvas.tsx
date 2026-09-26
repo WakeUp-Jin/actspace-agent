@@ -121,7 +121,7 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
           );
         })}
         {singleFileMode ? (
-          <div className="absolute inset-x-0 flex h-[34px] items-center gap-2 border-t border-line bg-surface px-3 text-[11px] text-text-faint" style={{ top: virtualizer.getTotalSize() }}>
+          <div className="absolute inset-x-0 flex h-[34px] items-center gap-2 border-t border-line bg-surface px-3 text-act-xxs text-text-faint" style={{ top: virtualizer.getTotalSize() }}>
             <span aria-hidden="true">ⓘ</span><span>变更较多，每次显示一个文件</span>
           </div>
         ) : null}
@@ -171,8 +171,8 @@ function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, w
         <button type="button" className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle" onClick={onToggle} aria-label={`${expanded ? "收起" : "展开"} ${file.path}`}>
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
-        <button type="button" className="min-w-0 flex-1 truncate text-left font-mono text-[12px] font-medium text-text-main" onClick={onSelect} title={file.path}>{file.path}</button>
-        {file.additions > 0 || file.deletions > 0 ? <span className="text-[11px] tabular-nums">{file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}{file.additions > 0 && file.deletions > 0 ? " " : null}{file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}</span> : null}
+        <button type="button" className="min-w-0 flex-1 truncate text-left font-mono text-act-xs font-medium text-text-main" onClick={onSelect} title={file.path}>{file.path}</button>
+        {file.additions > 0 || file.deletions > 0 ? <span className="text-act-xxs tabular-nums">{file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}{file.additions > 0 && file.deletions > 0 ? " " : null}{file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}</span> : null}
         <button type="button" className={`inline-flex h-6 w-6 items-center justify-center rounded-act-sm hover:bg-surface-subtle ${file.viewed ? "text-success" : "text-text-faint"}`} onClick={onViewed} aria-label={`${file.viewed ? "标记为未查看" : "标记为已查看"} ${file.path}`}><Check size={14} /></button>
         <FileActions file={file} capabilities={capabilities} canExpandContext={Boolean(!loadFullFiles && expanded && capabilities.canLoadFullFile && file.renderKind === "text")} onExpandContext={onExpandContext} onMutation={onMutation} />
       </div>
@@ -187,7 +187,7 @@ function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, w
       : row.state === "image" ? "图片已变更，启用富预览可查看当前图片。"
         : row.state === "empty" ? "暂无文本差异。"
           : row.message ?? "加载差异失败。";
-  return <div className="flex min-h-16 items-center gap-3 border-b border-line px-12 py-4 text-[12px] text-text-faint"><span className="min-w-0 flex-1">{message}</span>{row.state === "failed" ? <button type="button" className="h-7 rounded-act-sm border border-line px-2 text-[11px] text-text-main hover:bg-surface-subtle" onClick={onRetry}>重试</button> : null}</div>;
+  return <div className="flex min-h-16 items-center gap-3 border-b border-line px-12 py-4 text-act-xs text-text-faint"><span className="min-w-0 flex-1">{message}</span>{row.state === "failed" ? <button type="button" className="h-7 rounded-act-sm border border-line px-2 text-act-xxs text-text-main hover:bg-surface-subtle" onClick={onRetry}>重试</button> : null}</div>;
 }
 
 function buildRows(files: ReviewFileSummary[], diffs: Map<string, ReviewFileDiff>, requests: Map<string, ReviewFileRequestState>, contents: Map<string, ReviewFileContents>, expandedIds: Set<string>, mode: ReviewDiffMode, loadFullFiles: boolean, richPreview: boolean): DiffRow[] {
@@ -306,9 +306,9 @@ function ReviewImageDiff({ workspaceRoot, file }: { workspaceRoot?: string; file
     });
     return () => { active = false; };
   }, [file.path, file.status, workspaceRoot]);
-  if (file.status === "deleted") return <div className="px-12 py-5 text-[12px] text-text-muted">图片已删除，暂未加载历史版本。</div>;
-  if (error) return <div className="px-12 py-5 text-[12px] text-text-muted">{error}</div>;
-  if (!src) return <div className="px-12 py-5 text-[12px] text-text-faint">正在加载图片预览…</div>;
+  if (file.status === "deleted") return <div className="px-12 py-5 text-act-xs text-text-muted">图片已删除，暂未加载历史版本。</div>;
+  if (error) return <div className="px-12 py-5 text-act-xs text-text-muted">{error}</div>;
+  if (!src) return <div className="px-12 py-5 text-act-xs text-text-faint">正在加载图片预览…</div>;
   return <div className="grid min-h-40 place-items-center bg-surface-subtle p-4"><img src={src} alt={`当前版本 ${file.path}`} className="max-h-[520px] max-w-full rounded-act-sm border border-line bg-surface object-contain" /></div>;
 }
 
@@ -324,7 +324,7 @@ function FileActions({ file, capabilities, canExpandContext, onExpandContext, on
 
 function HunkHeader({ file, hunk, capabilities, onMutation }: { file: ReviewFileSummary; hunk: ReviewHunk; capabilities: ReviewCapabilities; onMutation: (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">) => void }) {
   const source = file.source === "index" ? "index" : "workingTree";
-  return <div className="flex min-h-8 items-center gap-2 border-b border-line bg-info-soft px-3 font-mono text-[11px] text-info"><span className="min-w-0 flex-1 truncate">{hunk.header}</span>{capabilities.canStageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-[11px] text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "stage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>暂存此段变更</button> : null}{capabilities.canUnstageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-[11px] text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "unstage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>取消暂存此段变更</button> : null}</div>;
+  return <div className="flex min-h-8 items-center gap-2 border-b border-line bg-info-soft px-3 font-mono text-act-xxs text-info"><span className="min-w-0 flex-1 truncate">{hunk.header}</span>{capabilities.canStageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-act-xxs text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "stage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>暂存此段变更</button> : null}{capabilities.canUnstageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-act-xxs text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "unstage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>取消暂存此段变更</button> : null}</div>;
 }
 
 function SplitDiffLine({ oldLine, newLine, wrap, wordDiff }: { oldLine?: ReviewLine; newLine?: ReviewLine; wrap: boolean; wordDiff: boolean }) {
@@ -334,5 +334,5 @@ function SplitDiffLine({ oldLine, newLine, wrap, wordDiff }: { oldLine?: ReviewL
 function DiffLine({ line, side, wrap, wordDiff }: { line?: ReviewLine; side: "old" | "new"; wrap: boolean; wordDiff: boolean }) {
   const number = side === "old" ? line?.oldLine : line?.newLine;
   const tone = line?.kind === "addition" ? "bg-success-soft" : line?.kind === "deletion" ? "bg-danger-soft" : "bg-surface";
-  return <div className={`${tone} min-w-0`}><div className="grid min-h-[22px] grid-cols-[42px_22px_minmax(0,1fr)] font-mono text-[11px] leading-[22px]"><span className="select-none border-r border-line/70 pr-2 text-right tabular-nums text-text-faint">{number ?? ""}</span><span className="select-none text-center text-text-faint">{line?.kind === "addition" ? "+" : line?.kind === "deletion" ? "−" : ""}</span><code className={`${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"} block min-w-0 pr-8 text-text-main`}>{line && wordDiff && line.wordDiffs?.length ? line.wordDiffs.map((part, index) => <span key={index} className={part.kind === "addition" ? "rounded-[2px] bg-success/20" : part.kind === "deletion" ? "rounded-[2px] bg-danger/20" : ""}>{part.text}</span>) : line?.text || " "}</code></div></div>;
+  return <div className={`${tone} min-w-0`}><div className="grid min-h-[22px] grid-cols-[42px_22px_minmax(0,1fr)] font-mono text-act-xxs leading-[22px]"><span className="select-none border-r border-line/70 pr-2 text-right tabular-nums text-text-faint">{number ?? ""}</span><span className="select-none text-center text-text-faint">{line?.kind === "addition" ? "+" : line?.kind === "deletion" ? "−" : ""}</span><code className={`${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"} block min-w-0 pr-8 text-text-main`}>{line && wordDiff && line.wordDiffs?.length ? line.wordDiffs.map((part, index) => <span key={index} className={part.kind === "addition" ? "rounded-[2px] bg-success/20" : part.kind === "deletion" ? "rounded-[2px] bg-danger/20" : ""}>{part.text}</span>) : line?.text || " "}</code></div></div>;
 }

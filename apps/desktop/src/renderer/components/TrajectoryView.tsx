@@ -99,24 +99,24 @@ export function TrajectoryView({ snapshot }: { snapshot?: RuntimeV2TrajectorySna
     if (focusIds && !focusIds.has(record.id)) setRange(null);
     select(record);
   };
-  const control = 'inline-flex h-6 shrink-0 items-center gap-1 rounded-act-xs px-1.5 text-[12px] text-text-muted hover:bg-hover-overlay hover:text-text-main focus-visible:outline-1 focus-visible:outline-focus-ring';
+  const control = 'inline-flex h-6 shrink-0 items-center gap-1 rounded-act-xs px-1.5 text-act-xs text-text-muted hover:bg-hover-overlay hover:text-text-main focus-visible:outline-1 focus-visible:outline-focus-ring';
   return <section className="flex h-full min-h-0 flex-col bg-surface text-text-main" data-testid="trajectory-view" data-trajectory-source={source.isFixture ? 'mock' : 'projection'} aria-label="Session trajectory">
     <div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-line px-2" role="toolbar" aria-label="Trajectory toolbar">
       <button type="button" className={`${control} ${mode === 'duration' ? 'bg-hover-overlay text-text-main' : ''}`} aria-label="Use actual duration" aria-pressed={mode === 'duration'} title={mode === 'duration' ? 'Use equal-width operations' : 'Use actual duration'} onClick={() => { setMode(mode === 'duration' ? 'sequence' : 'duration'); setRange(null); }}><Clock3 size={12} />Duration</button>
       <button type="button" className={`${control} ${allTurnsCollapsed ? 'bg-hover-overlay' : ''}`} aria-label={allTurnsCollapsed ? 'Expand turns' : 'Collapse turns'} aria-pressed={allTurnsCollapsed} onClick={() => setCollapsedTurns(allTurnsCollapsed ? new Set() : new Set(collapsibleTurns.map(turn => turn.id)))}>{allTurnsCollapsed ? <SquarePlus size={12} /> : <SquareMinus size={12} />}Turns</button>
       <button type="button" className={`${control} ${allCallsCollapsed ? 'bg-hover-overlay' : ''}`} aria-label={allCallsCollapsed ? 'Expand calls' : 'Collapse calls'} aria-pressed={allCallsCollapsed} onClick={() => setCollapsedCalls(allCallsCollapsed ? new Set() : new Set(callIds))}>{allCallsCollapsed ? <SquarePlus size={12} /> : <SquareMinus size={12} />}Calls</button>
-      <div className="ml-auto flex h-6 min-w-[72px] max-w-[200px] flex-1 items-center gap-1 rounded-act-xs border border-line bg-surface px-1.5 text-text-faint focus-within:border-info">
-        <Search size={12} className="shrink-0" /><input type="search" className="min-w-0 w-full bg-transparent text-[12px] text-text-main outline-none placeholder:text-text-faint" aria-label="Search trajectory" placeholder="Search" value={query} onChange={event => { setQuery(event.currentTarget.value); }} />
+      <div className="ml-auto flex h-6 min-w-[72px] max-w-[200px] flex-1 items-center gap-1 rounded-act-xs border border-line bg-surface px-1.5 text-text-faint focus-within:border-focus-ring">
+        <Search size={12} className="shrink-0" /><input type="search" className="min-w-0 w-full bg-transparent text-act-xs text-text-main outline-none placeholder:text-text-faint" aria-label="Search trajectory" placeholder="Search" value={query} onChange={event => { setQuery(event.currentTarget.value); }} />
         {query && <button type="button" aria-label="Clear trajectory search" onClick={() => setQuery('')}><X size={12} /></button>}
       </div>
     </div>
-    {initialError && <p role="alert" className="px-4 text-xs text-text-muted">{initialError} <button onClick={() => { if (bridge && selectedSession) void bridge.open(selectedSession).catch(() => undefined); }}>重试</button></p>}
-    {initialLoading && !runtime && <p role="status" className="px-4 text-xs text-text-muted">正在加载轨迹…</p>}
-    {!runtime || !runtime.records.length ? <p className="m-0 px-4 py-4 text-[12px] text-text-muted">{!runtime ? source.projection?.cell?.status === 'loading' ? '正在加载轨迹…' : source.projection?.cell?.error ?? '当前 Session 暂无可展示的 Agent 轨迹。' : '当前 Session 尚未产生可展示的 Agent Loop 事件。'}</p> : <>
+    {initialError && <p role="alert" className="px-4 text-act-xs leading-4 text-text-muted">{initialError} <button onClick={() => { if (bridge && selectedSession) void bridge.open(selectedSession).catch(() => undefined); }}>重试</button></p>}
+    {initialLoading && !runtime && <p role="status" className="px-4 text-act-xs leading-4 text-text-muted">正在加载轨迹…</p>}
+    {!runtime || !runtime.records.length ? <p className="m-0 px-4 py-4 text-act-xs text-text-muted">{!runtime ? source.projection?.cell?.status === 'loading' ? '正在加载轨迹…' : source.projection?.cell?.error ?? '当前 Session 暂无可展示的 Agent 轨迹。' : '当前 Session 尚未产生可展示的 Agent Loop 事件。'}</p> : <>
       <TrajectoryTimeline runtime={runtime} selectedId={selectedId} matches={matches} range={range} onRange={setRange} onSelect={select} onFocus={focus} />
       <div className="relative flex min-h-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {(historyStart > 0 || remoteHistory?.previousFromSeq != null) && <button type="button" disabled={loadingHistory} className="h-7 shrink-0 border-b border-line text-[11px] text-text-muted hover:bg-hover-overlay" onClick={async () => {
+        {(historyStart > 0 || remoteHistory?.previousFromSeq != null) && <button type="button" disabled={loadingHistory} className="h-7 shrink-0 border-b border-line text-act-xxs text-text-muted hover:bg-hover-overlay" onClick={async () => {
           const anchor = virtualItems.find(item => item.start >= (scrollRef.current?.scrollTop ?? 0));
           const record = rows[anchor?.index ?? 0]?.entries[0]?.record;
           if (remoteHistory && runtime) {
@@ -135,7 +135,7 @@ export function TrajectoryView({ snapshot }: { snapshot?: RuntimeV2TrajectorySna
             if (record) setFocusId(record.id);
           }
         }}>{loadingHistory ? 'Loading earlier history…' : 'Load earlier history'}</button>}
-        {historyError && <p role="alert" className="m-0 px-3 py-2 text-[12px] text-text-muted">{historyError} Retry using Load earlier history.</p>}
+        {historyError && <p role="alert" className="m-0 px-3 py-2 text-act-xs text-text-muted">{historyError} Retry using Load earlier history.</p>}
         <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-auto" role="table" aria-label="Trajectory events">
           <div style={{ height: import.meta.env.MODE === 'test' ? fallback.reduce((sum, row) => sum + row.size, 0) : virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
             {renderItems.map(item => {
@@ -147,14 +147,14 @@ export function TrajectoryView({ snapshot }: { snapshot?: RuntimeV2TrajectorySna
               const selectedRow = row.entries.some(entry => entry.record.id === selectedId);
               const summary = row.rowType === 'turn-summary' || row.rowType === 'call-summary';
               return <div key={row.key} data-index={item.index} ref={virtualizer.measureElement} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${item.start}px)` }}>
-                {summary ? <button type="button" className={`flex h-7 w-full items-center border-b border-line pl-[138px] pr-3 text-left text-[12px] text-text-muted hover:bg-hover-overlay max-[480px]:pl-[104px] ${matched ? '' : 'opacity-35'}`} aria-label={row.rowType === 'turn-summary' ? `Expand Turn ${record.turnNumber}` : 'Expand tool call'} onClick={() => {
+                {summary ? <button type="button" className={`flex h-7 w-full items-center border-b border-line pl-[138px] pr-3 text-left text-act-xs text-text-muted hover:bg-hover-overlay max-[480px]:pl-[104px] ${matched ? '' : 'opacity-35'}`} aria-label={row.rowType === 'turn-summary' ? `Expand Turn ${record.turnNumber}` : 'Expand tool call'} onClick={() => {
                   if (row.rowType === 'turn-summary') setCollapsedTurns(current => { const next = new Set(current); if (record.turnId) next.delete(record.turnId); return next; });
                   else setCollapsedCalls(current => { const next = new Set(current); row.entries.forEach(entry => { if (entry.record.callId) next.delete(entry.record.callId); }); return next; });
                 }}>{row.summary}</button> : <div role="row" data-event-seq={record.sourceSequences[0]} data-record-id={record.id} data-selected={selectedRow || undefined} data-focused={matched} className={`relative border-b border-line ${selectedRow ? 'bg-selected' : 'bg-surface hover:bg-hover-overlay'} ${matched ? '' : 'opacity-35'}`}>
                   {record.callId && parentCalls.has(record.callId) && <button type="button" aria-label={collapsedSubtools.has(record.callId) ? 'Expand nested tools' : 'Collapse nested tools'} aria-expanded={!collapsedSubtools.has(record.callId)} className="absolute left-7 top-3 z-10 text-text-muted" onClick={() => setCollapsedSubtools(current => { const next = new Set(current); if (next.has(record.callId!)) next.delete(record.callId!); else next.add(record.callId!); return next; })}>{collapsedSubtools.has(record.callId) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}</button>}
-                  {showTurn && <span className="pointer-events-none absolute left-0 top-0 rounded-br-act-xs bg-surface-subtle px-1 font-mono text-[9px] leading-3 text-text-faint">Turn {record.turnNumber}</span>}
+                  {showTurn && <span className="pointer-events-none absolute left-0 top-0 rounded-br-act-xs bg-surface-subtle px-1 font-mono text-act-xxs leading-3 text-text-faint">Turn {record.turnNumber}</span>}
                   <button type="button" aria-label={`${roleOf(record)} ${record.eventType}, ${record.summary}`} aria-pressed={selectedRow} className="grid min-h-9 w-full grid-cols-[78px_minmax(0,1fr)] items-center gap-3 py-2 pl-12 pr-3 text-left focus-visible:outline-1 focus-visible:outline-focus-ring max-[480px]:grid-cols-[68px_minmax(0,1fr)] max-[480px]:gap-2 max-[480px]:pl-7" onClick={() => select(record)}>
-                    <RoleBadge record={record} /><span style={depth ? { paddingLeft: depth * 16 } : undefined} className="min-w-0 truncate text-[12px] leading-5" title={record.summary}>{record.partial ? 'Assistant responding…' : record.summary}{record.result ? <span className="text-text-muted"> → {record.result}</span> : null}</span>
+                    <RoleBadge record={record} /><span style={depth ? { paddingLeft: depth * 16 } : undefined} className="min-w-0 truncate text-act-xs leading-5" title={record.summary}>{record.partial ? 'Assistant responding…' : record.summary}{record.result ? <span className="text-text-muted"> → {record.result}</span> : null}</span>
                   </button>
                 </div>}
               </div>;

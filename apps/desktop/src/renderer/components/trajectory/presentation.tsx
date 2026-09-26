@@ -9,7 +9,7 @@ export function RoleBadge({ record }: { record: TrajectoryRecord }) {
     : record.kind === 'user' ? 'bg-info-soft text-info'
       : record.kind === 'tool' ? 'bg-warning-soft text-on-warning'
         : record.isError ? 'bg-danger-soft text-danger' : 'bg-surface-subtle text-text-muted';
-  return <span className={`inline-flex w-fit shrink-0 rounded-act-xs px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ${color}`}>{roleOf(record)}</span>;
+  return <span className={`inline-flex w-fit shrink-0 rounded-act-xs px-1.5 py-0.5 text-act-xxs font-semibold tracking-wide ${color}`}>{roleOf(record)}</span>;
 }
 export function formatDuration(ms: number | null | undefined) {
   if (ms === null || ms === undefined || !Number.isFinite(ms)) return 'Not available';

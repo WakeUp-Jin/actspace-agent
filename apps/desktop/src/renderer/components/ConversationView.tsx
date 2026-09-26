@@ -60,23 +60,23 @@ const MESSAGE_TURN_CLASS = "message-turn relative flex min-w-0 flex-col gap-0";
 const TURN_PROMPT_CLASS =
   "turn-prompt sticky top-0 z-12 min-w-0 bg-[image:var(--act-gradient-surface-fade)] py-4";
 const TURN_PROMPT_CARD_CLASS =
-  "turn-prompt-card overflow-hidden rounded-act-lg border border-line bg-surface shadow-[0_12px_34px_rgba(31,45,61,0.045)] dark:shadow-[0_12px_34px_rgba(0,0,0,0.3)]";
+  "turn-prompt-card overflow-hidden rounded-act-lg border border-line bg-surface";
 const TURN_BODY_CLASS = "turn-body message-flow flex min-w-0 flex-col";
 const ASSISTANT_TURN_GROUP_CLASS = "group/assistant-turn min-w-0";
 const TURN_ACTIONS_CLASS =
-  "turn-actions mt-1 flex min-h-7 items-center justify-between gap-3 px-[var(--conversation-text-inset)] text-[12px] text-text-faint opacity-0 pointer-events-none transition-opacity duration-[150ms] ease-in-out group-hover/assistant-turn:pointer-events-auto group-hover/assistant-turn:opacity-100 group-focus-within/assistant-turn:pointer-events-auto group-focus-within/assistant-turn:opacity-100";
+  "turn-actions mt-1 flex min-h-7 items-center justify-between gap-3 px-[var(--conversation-text-inset)] text-act-xs text-text-faint opacity-0 pointer-events-none transition-opacity duration-(--motion-base) ease-in-out group-hover/assistant-turn:pointer-events-auto group-hover/assistant-turn:opacity-100 group-focus-within/assistant-turn:pointer-events-auto group-focus-within/assistant-turn:opacity-100";
 const TURN_ACTIONS_RIGHT_CLASS = "flex items-center justify-end gap-0.5";
 const TURN_USAGE_META_CLASS = "flex min-w-0 items-center gap-1.5 tabular-nums";
 // 距顶部小于该距离时预取更早消息，让用户上滑时历史已经接上，而不是撞到顶部再等。
 const EARLIER_PRELOAD_THRESHOLD_PX = 240;
 const TURN_ACTION_ANCHOR_CLASS = "turn-action-anchor relative flex-none";
 const TURN_ACTION_TRIGGER_CLASS =
-  "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-[150ms] ease-in-out hover:bg-hover-overlay hover:text-text-main hover:opacity-100 aria-disabled:cursor-default aria-expanded:bg-selected aria-expanded:text-text-main aria-expanded:opacity-100";
+  "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-(--motion-base) ease-in-out hover:bg-hover-overlay hover:text-text-main hover:opacity-100 aria-disabled:cursor-default aria-expanded:bg-selected aria-expanded:text-text-main aria-expanded:opacity-100";
 const TURN_ACTION_MENU_CLASS =
   "turn-action-menu absolute bottom-[30px] right-0 z-40 w-[178px] rounded-act-md border border-line bg-surface-raised/98 p-1.5 shadow-act-popover";
 const TURN_ACTION_MENU_BUTTON_CLASS =
-  "flex min-h-[34px] w-full items-center rounded-act-sm border-0 bg-transparent px-2.5 text-left text-sm font-semibold text-text-main transition-colors duration-[150ms] ease-in-out hover:bg-hover-overlay disabled:cursor-default disabled:text-text-faint";
-const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-[13px] leading-[1.4] text-text-faint";
+  "flex min-h-[34px] w-full items-center rounded-act-sm border-0 bg-transparent px-2.5 text-left text-act-md leading-5 font-semibold text-text-main transition-colors duration-(--motion-base) ease-in-out hover:bg-hover-overlay disabled:cursor-default disabled:text-text-faint";
+const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-act-sm leading-[1.4] text-text-faint";
 const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const MODEL_WAITING_DELAY_MS = 300;
 const SCROLL_BOTTOM_THRESHOLD_PX = 80;
@@ -163,7 +163,7 @@ function DeferredToolMessage({ message, className, onOpenAgentTranscript, replyC
   return <div className={className} aria-busy={loading}>
     {visible.map(block => renderMessage({ ...block, renderKey: block.id === message.id ? message.renderKey : block.renderKey }, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, blocks ? undefined : () => { void load(); }))}
     {loading && <p role="status">正在加载工具详情…</p>}
-    {error && <p role="alert" className="text-xs text-text-muted">{error}（收起后重新展开可重试）</p>}
+    {error && <p role="alert" className="text-act-xs leading-4 text-text-muted">{error}（收起后重新展开可重试）</p>}
   </div>;
 }
 
@@ -240,15 +240,15 @@ function WorkspacePreparationBlock({
 }) {
   const completed = message.status === "completed";
   return (
-    <details className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-sm text-text-muted" open={!completed}>
+    <details className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-act-md leading-5 text-text-muted" open={!completed}>
       <summary className="flex cursor-pointer list-none items-center gap-2 text-text-main">
         {completed ? <Check size={15} aria-hidden="true" /> : <Loader2 className="animate-spin" size={15} aria-hidden="true" />}
         <span className="font-medium">{completed ? "已创建工作树" : "正在创建工作树"}</span>
         {completed && message.durationMs !== undefined ? (
-          <span className="text-xs text-text-faint">{Math.max(0, message.durationMs / 1000).toFixed(1)}s</span>
+          <span className="text-act-xs leading-4 text-text-faint">{Math.max(0, message.durationMs / 1000).toFixed(1)}s</span>
         ) : null}
       </summary>
-      <div className="mt-2 grid gap-1.5 border-t border-line pt-2 text-xs leading-5 text-text-faint">
+      <div className="mt-2 grid gap-1.5 border-t border-line pt-2 text-act-xs leading-5 text-text-faint">
         <div className="flex items-center gap-1.5 text-text-muted">
           <GitBranch size={13} aria-hidden="true" />
           <span>{message.branch ?? `基于 ${message.baseBranch}`}</span>
@@ -1039,7 +1039,7 @@ export function ConversationView({
 
 
   if (browse && messages.length === 0 && (browse.messageLoading || browse.listLoading || browse.messageError)) {
-    return <main className={CONVERSATION_SHELL_CLASS}><p role={browse.messageError ? 'alert' : 'status'} className="px-5 py-4 text-sm text-text-muted">
+    return <main className={CONVERSATION_SHELL_CLASS}><p role={browse.messageError ? 'alert' : 'status'} className="px-5 py-4 text-act-md leading-5 text-text-muted">
       {browse.messageError ?? (browse.messageLoading ? '正在加载消息…' : '正在加载会话…')}
       {browse.messageError && <button onClick={browse.retryMessages}>重试</button>}
     </p></main>;
@@ -1058,10 +1058,10 @@ export function ConversationView({
             className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
             aria-label="会话消息"
           >
-              {browse?.messageLoading && <p role="status" className="px-5 py-3 text-sm text-text-muted">正在加载消息…</p>}
-              {browse?.messageError && <p role="alert" className="px-5 py-3 text-sm text-text-muted">{browse.messageError} <button onClick={browse.retryMessages}>重试</button></p>}
-              {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-xs text-text-faint"><Loader2 className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
-              {browse?.earlierError && <p role="alert" className="px-5 text-xs text-text-muted">{browse.earlierError} <button onClick={requestEarlier}>重试</button></p>}
+              {browse?.messageLoading && <p role="status" className="px-5 py-3 text-act-md leading-5 text-text-muted">正在加载消息…</p>}
+              {browse?.messageError && <p role="alert" className="px-5 py-3 text-act-md leading-5 text-text-muted">{browse.messageError} <button onClick={browse.retryMessages}>重试</button></p>}
+              {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"><Loader2 className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
+              {browse?.earlierError && <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">{browse.earlierError} <button onClick={requestEarlier}>重试</button></p>}
               {isInitialComposer ? (
                 <div className={INITIAL_COMPOSER_STAGE_CLASS}>
                   <Composer
@@ -1147,7 +1147,7 @@ export function ConversationView({
           {isAwayFromBottom ? <ScrollToBottomButton onClick={scrollToBottom} /> : null}
         </div>
         {activeView === "trajectory" ? <div className="flex h-full min-h-0 flex-col">
-          {isStreaming ? <div className="flex shrink-0 justify-end border-b border-line px-4 py-2"><button type="button" className="rounded-act-md border border-line px-3 py-1 text-[12px] text-text-main hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring" onClick={onAbort} disabled={isAborting}>{isAborting ? "正在停止…" : "停止"}</button></div> : null}
+          {isStreaming ? <div className="flex shrink-0 justify-end border-b border-line px-4 py-2"><button type="button" className="rounded-act-md border border-line px-3 py-1 text-act-xs text-text-main hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring" onClick={onAbort} disabled={isAborting}>{isAborting ? "正在停止…" : "停止"}</button></div> : null}
           <div className="min-h-0 flex-1"><TrajectoryView snapshot={trajectory ?? null} /></div>
         </div> : null}
       </div>

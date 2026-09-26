@@ -5,13 +5,13 @@ import { AgentAvatar, AgentStatus } from "./AgentIdentity";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 
-const BLOCK_CLASS = "message-row agent-run max-w-[800px] px-[var(--conversation-text-inset)]";
+const BLOCK_CLASS = "message-row agent-run max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)]";
 const BUTTON_CLASS =
-  "group/agent flex w-full min-w-0 items-center gap-3 rounded-act-md border border-line bg-surface-subtle px-3 py-2 text-left transition-[background-color,border-color,color,transform] duration-[150ms] ease-in-out hover:border-line-strong hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)] active:translate-y-px";
+  "group/agent flex w-full min-w-0 items-center gap-3 rounded-act-md border border-line bg-surface-subtle px-3 py-2 text-left transition-[background-color,border-color,color,transform] duration-(--motion-base) ease-in-out hover:border-line-strong hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)] active:translate-y-px";
 const HEADER_CLASS = "flex min-w-0 items-center gap-2";
-const NAME_CLASS = "min-w-0 truncate text-[14px] leading-[1.4] text-text-muted group-hover/agent:text-text-main group-focus-visible/agent:text-text-main";
-const TYPE_CLASS = "shrink-0 text-[12px] leading-[1.4] text-text-faint";
-const LATEST_CLASS = "min-w-0 truncate text-[12px] leading-[1.45] text-text-muted";
+const NAME_CLASS = "min-w-0 truncate text-act-md leading-[1.4] text-text-muted group-hover/agent:text-text-main group-focus-visible/agent:text-text-main";
+const TYPE_CLASS = "shrink-0 text-act-xs leading-[1.4] text-text-faint";
+const LATEST_CLASS = "min-w-0 truncate text-act-xs leading-[1.45] text-text-muted";
 const ERROR_LATEST_CLASS = "text-on-danger";
 
 function statusLabel(status: AgentMessage["status"]): string {
@@ -81,7 +81,7 @@ export function AgentRunBlock({
           </div>
           <div className="flex min-w-0 items-center gap-1.5">
             <span className={TYPE_CLASS}>{kindLabel(message)}</span>
-            <span aria-hidden="true" className="text-[12px] text-text-faint">·</span>
+            <span aria-hidden="true" className="text-act-xs text-text-faint">·</span>
             <div className={latestClass}><ActivityLine text={latest} running={isRunning} /></div>
           </div>
         </div>

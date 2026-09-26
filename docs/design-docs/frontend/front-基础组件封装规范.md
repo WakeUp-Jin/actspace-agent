@@ -165,13 +165,36 @@ size?: "sm" | "md" | "lg" | "icon";
 
 不要为了早期便利暴露过多 one-off prop，例如 `isComposerModeButton`、`isModelEditButton`。
 
+## 已落地：Button 与 IconButton
+
+2026-09-26 起 `components/ui/Button.tsx`、`components/ui/IconButton.tsx` 已落地，设置中心（含原 `SettingsButton`）、审批卡、Composer（回形针、「+」、发送、Review 胶囊）、Sidebar 行内图标、右侧面板工具条、子 Agent 弹窗、工作区对话框和扩展页已迁移。尺寸、变体和 focus 规则见 [全局视觉语言规范「按钮」](front-全局视觉语言规范.md#按钮)。
+
+约定：
+
+- 业务组件不再新建 `*_BUTTON_CLASS` 样式常量；需要新外观时先在基础组件里加 variant，再使用。
+- `className` 只放布局和显隐类。不要传字号、圆角、颜色去覆盖 variant：同一属性出现两个 utility 时，生效的是 Tailwind 生成顺序，不是书写顺序。
+- `IconButton` 的 `label` 是必填 prop（类型层面保证），默认同时作为 Tooltip 文案；所在组合控件已有可见文字时传 `tooltip={false}`。
+- 需要保留测试或布局计算用的标记类（如 `send-button`）时，放进 `className`。
+- 只要按钮样式、不要 `<button>` 元素时（例如自定义下拉触发器），用导出的 `buttonClass()` / `iconButtonClass()`。
+
+以下形态看起来像按钮，但不属于 `Button` / `IconButton`，保留在原组件中，等对应基础组件落地时再迁移：
+
+| 形态 | 例子 | 归属 |
+|---|---|---|
+| 菜单项、列表行 | Composer 命令菜单项、模型列表项、消息操作菜单项 | `DropdownMenu` |
+| 下拉触发器 | Composer 模式 / 模型选择器、`SettingsSelect`、可视化回复文件选择器 | `DropdownMenu` / `Select` |
+| 分段控件 | 右侧面板「预览 / 源码」切换 | `Tabs` / SegmentedControl |
+| 整块可点的卡片 | 子 Agent 卡片、任务输入卡、右侧面板启动器方块 | 业务组件自身 |
+| 与 36px 输入框同排的表单控件 | API Key 显隐切换、自定义连接模型行内操作 | 与 Input / Textarea 基础组件一起收口 |
+| 已封装的浮动按钮 | `ScrollToBottomButton`、会话轨迹刻度 | 业务组件自身 |
+
 ## 迁移顺序
 
 基础组件层应按低风险、小切片推进。
 
 推荐顺序：
 
-1. `Button` 和 `IconButton`：统一按钮尺寸、圆角、focus、disabled、icon-only 约定。
+1. `Button` 和 `IconButton`：统一按钮尺寸、圆角、focus、disabled、icon-only 约定。（2026-09-26 已完成）
 2. `Tooltip`：为 icon-only 操作提供统一解释能力。
 3. `DropdownMenu`：替换 Composer mode/model 菜单和消息操作菜单的手写浮层逻辑。
 4. `Switch`：替换 model options 中的 Thinking toggle。

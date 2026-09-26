@@ -4,7 +4,7 @@
 
 这份文档把根目录 `DESIGN.md` 的 `Ink & Emerald / 墨色与翡翠绿` 方向转换成桌面端可执行的视觉规则。它约束字体、颜色职责、密度、间距、圆角、边框、阴影、图标和动效，避免组件各自发明局部风格。
 
-本规范描述目标设计。当前代码 token 尚未完成迁移，不能因为文档已经更新就宣称界面已经完成换肤。
+颜色、字号、圆角、阴影、层级和动效时长已在 renderer 落地为 token（2026-09-26，见 `exec-plans/completed/20260926-frontend-design-token-convergence.md`），`pnpm check:frontend-theme` 与 `pnpm check:frontend-tokens` 防止写死值回流。间距仍有历史写死值，见 `exec-plans/tech-debt-tracker.md`。
 
 ## 设计方向
 
@@ -132,7 +132,9 @@ AI 输出正文继续跟随 UI 字体，代码、diff、Bash 和行内 code 使�
 --text-title: 24px;
 ```
 
-- 时间戳、徽标、kicker：11px。
+组件中用 `text-act-xxs / xs / sm / md / lg / xl / title` 消费这组字号（定义在 `styles/tailwind.css` 的 `@theme`，只设字号、不带行高）。不要使用 Tailwind 默认的 `text-xs`、`text-sm` 等：它们与本表同名不同值（`text-sm` 是 14px），且自带行高；也不要写 `text-[13px]` 这类字面量。需要行高时单独写 `leading-*`。
+
+- 时间戳、徽标、kicker：11px；界面中不再出现小于 11px 的字。
 - Sidebar 分区标题：12px。
 - Sidebar 主入口、会话标题、Settings、文件名：13px。
 - 消息正文、Thinking、工具行：14px。
@@ -140,7 +142,9 @@ AI 输出正文继续跟随 UI 字体，代码、diff、Bash 和行内 code 使�
 - 页面和主要面板标题：20–24px。
 - 代码、diff、Bash：13px。
 
-Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销标题。
+Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销标题；这类数字需要在 `scripts/check-frontend-design-tokens.mjs` 的 allowlist 中逐条登记。
+
+同一元素上不要同时出现两个字号类（例如基础常量带 `text-act-xs`、调用处再追加 `text-act-sm`）。Tailwind 按生成顺序而不是书写顺序决定谁生效，改名或 token 化后结果可能翻转；需要不同字号时拆出不含字号的基础常量。
 
 ### 字重与行高
 
@@ -184,13 +188,16 @@ Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销
 --radius-sm: 6px;
 --radius-md: 8px;
 --radius-lg: 12px;
+--radius-group: 10px;
 --radius-pill: 999px;
 ```
+
+组件用 `rounded-act-xs / sm / md / group / lg / xl / pill`。`group`（10px）只用于设置等页面的内嵌分组，是 2026-09-25 批准的独立档位；`xl`（18px）目前仍用于少数 dialog，后续按 dialog 规范收敛到 `lg`。1–3px 的细进度条、刻度和指示点圆角跟随元素厚度，逐条登记在检查脚本 allowlist 中。
 
 - 行内标签、小控件：4px。
 - Sidebar selected、紧凑行：6px。
 - 按钮、输入框、segmented item：8px。
-- Composer、popover、dialog、Sheet：12px。
+- Composer、用户消息卡、popover、dialog、Sheet：12px。
 - 状态点和必要胶囊：999px。
 
 不要把所有容器都做成大圆角卡片。
@@ -198,17 +205,39 @@ Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销
 ## 边框、阴影与层级
 
 - 分栏、输入框和列表分组优先使用 1px hairline。
-- 主工作台通常不使用阴影。
+- 主工作台通常不使用阴影：Composer、用户消息卡、消息块都只靠 surface + 1px hairline。
 - Popover、dialog、Sheet 可以使用低透明度柔和阴影。
-- Composer 可以依赖 surface + border 获得层级，不默认使用蓝色光晕。
 - 设置分组只用“白底 + hairline + 10px 圆角”，不加阴影。
 
-建议目标阴影：
+阴影全部来自 `tokens.css`，暖色基底 `rgba(20, 21, 18, …)`，深色主题换成纯黑低透明度：
 
-```css
---shadow-popover: 0 16px 40px rgba(20, 21, 18, 0.12);
---shadow-dialog: 0 24px 64px rgba(20, 21, 18, 0.18);
-```
+| 类 | 用途 |
+|---|---|
+| `shadow-act-xs` | 小按钮的描边感 |
+| `shadow-act-knob` | Toggle 白色滑块 |
+| `shadow-act-thumb` | 附件、图片缩略图 |
+| `shadow-act-soft` | 大面积浮起：占位页、关机遮罩、Sheet |
+| `shadow-act-popover` | 菜单、tooltip、hover card |
+| `shadow-act-float` | dialog、窄窗口抽屉 |
+
+旧蓝色主题的 `rgba(31, 45, 61, …)` 已退役，检查脚本会拦截。
+
+## 层级（z-index）
+
+层级只用 `tokens.css` 中的分层变量，组件写 `z-(--act-z-*)`；组件内部的局部叠放（sticky 表头、行号列）用 Tailwind 内置 `z-1` / `z-2`，不进分层。
+
+| token | 值 | 用途 |
+|---|---:|---|
+| `--act-z-pane` | 30 | SplitView 拖拽柄 |
+| `--act-z-drawer` | 50 | 窄窗口侧栏 / 右侧面板抽屉（低于标题栏，保证标题栏按钮可点） |
+| `--act-z-chrome` | 60 | 窗口标题栏；右侧面板 tab 行用 `calc(var(--act-z-chrome) + 1)` |
+| `--act-z-dropdown` | 80 | 组件内 absolute / fixed 菜单（Sidebar 右键菜单、右侧面板菜单等） |
+| `--act-z-overlay` | 100 | 工作区内的全屏遮罩（Review 对话框） |
+| `--act-z-modal` | 150 | dialog、Sheet |
+| `--act-z-popover` | 200 | tooltip、hover card、portal 到 body 的菜单与保存提示 |
+| `--act-z-system` | 1000 | 关机遮罩 |
+
+portal 到 body 的菜单放 popover 层，保证在 dialog 里打开的下拉菜单、Sheet 里的 tooltip 都在最上面。
 
 ## 图标语言
 
@@ -232,7 +261,17 @@ Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销
 - completed 回到中性样式，不逐条染绿。
 - error、warning、approval 使用对应语义色。
 - resize、collapse、popover 不超过 300ms。
-- 所有动画尊重 `prefers-reduced-motion`。
+- 组件用 `duration-(--motion-fast | --motion-base | --motion-slow)`，不写 `duration-[130ms]` 或 `duration-150`。
+- 所有动画尊重 `prefers-reduced-motion`：`base.css` 有全局兜底，开启后动画和过渡时长压到 0.01ms（而不是 `none`，依赖 `transitionend` / `animationend` 的逻辑仍会触发）。
+
+## 按钮
+
+文字按钮用 `components/ui/Button.tsx`，纯图标按钮用 `components/ui/IconButton.tsx`，不再在业务组件里写按钮样式常量。
+
+- `Button`：`variant` = `primary`（ink action，每个区域最多一个）/ `secondary`（surface + 描边）/ `ghost`（无底）/ `danger`（描边，设置里的删除入口）/ `danger-solid`（确认框里的破坏性主操作）；`size` = `xs` 26px（审批行）/ `sm` 28px（设置、审批卡、面板，默认）/ `md` 32px（对话框底部、表单提交）；`shape="pill"` 用于胶囊按钮。
+- `IconButton`：`label` 必填，同时作为 `aria-label` 和默认 Tooltip；`size` = `xs` 22 / `sm` 28 / `md` 32 / `lg` 36；`shape` = `square` / `round`；`variant` = `ghost`（默认）/ `soft` / `secondary` / `primary`。
+- focus 统一为 2px `focus-ring` 描边（offset 1px）；disabled 半透明；按下 `scale-[0.97]`。
+- 调用处的 `className` 只放布局和显隐类（margin、宽度、`opacity-0 group-hover:opacity-100`），不覆盖字号、圆角、颜色。
 
 ## 组件视觉基线
 

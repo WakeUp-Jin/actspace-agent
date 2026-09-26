@@ -14,6 +14,8 @@ apps/desktop/src/renderer/components/ui/Tooltip.tsx
 
 业务组件应优先消费这个 wrapper，不要继续新增手写 tooltip 或只依赖浏览器原生 `title`。
 
+2026-09-26 起，新增纯图标按钮一律用 `components/ui/IconButton.tsx`：`label` 必填，自动生成 `aria-label` 和 Tooltip（可用 `tooltip` 传更短的文案，或在已有可见文字的组合控件里传 `tooltip={false}`）。下文的「标准写法」仍适用于无法换成 `IconButton` 的场景。
+
 ## 核心结论
 
 - icon-only button 必须有 `aria-label`。
@@ -169,8 +171,7 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
 ### P0：高频且纯图标
 
 - `apps/desktop/src/renderer/components/Composer.tsx`
-  - Composer 左侧 `+`：添加上下文、工具或附件。
-  - 发送 / 停止按钮：发送消息、停止 Agent、输入消息后发送。
+  - ~~Composer 左侧 `+`、发送 / 停止按钮~~：2026-09-26 已改为 `IconButton`。
   - 附件删除 `X`：移除 `{attachment.name}`。
 - `apps/desktop/src/renderer/components/messages/BashRunBlock.tsx`
   - Bash 输出三点：更多 Bash 输出操作。
@@ -187,17 +188,14 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
 - `apps/desktop/src/renderer/components/Sidebar.tsx`
   - Pin / Unpin。
   - Archive session。
-  - Sort workspaces。
-  - Add workspace。
-  - New chat in workspace。
+  - ~~Sort workspaces~~、~~Add workspace~~、~~New chat in workspace~~、分组折叠、会话状态：2026-09-26 已改为 `IconButton`。
 - `apps/desktop/src/renderer/components/RightPanel.tsx`
   - 展开 / 收起文件树。
   - 关闭 `{tab.title}`。
   - 所有标签页。
 - `apps/desktop/src/renderer/components/right-panel/RightPanelObjectMenu.tsx`
   - 新建右侧对象。
-- `apps/desktop/src/renderer/components/right-panel/ReplyHtmlRenderView.tsx`
-  - 刷新文件列表。
+- ~~`apps/desktop/src/renderer/components/right-panel/ReplyHtmlRenderView.tsx` 刷新文件列表~~：2026-09-26 已改为 `IconButton`。
 
 ### P2：低频或已有文字，但可视情况补充
 

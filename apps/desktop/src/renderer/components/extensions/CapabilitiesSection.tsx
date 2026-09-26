@@ -4,10 +4,10 @@ import { CheckCircle2, ChevronDown, Globe, Copy, ExternalLink, FolderOpen, Loade
 import type { BrowserBridgeStatus } from "@actspace/shared";
 import { SectionShell, SettingGroup, TextField } from "../settings/SettingsPrimitives";
 import {
-  PLUGIN_BTN_SECONDARY,
   hasBrowserBridge,
   useBrowserBridgeStatus,
 } from "../settings/browser-bridge-settings-shared";
+import { Button } from "../ui/Button";
 
 // 保留旧存储键，页面迁移后继续读取已选择的源码目录。
 const PLUGIN_REPO_ROOT_STORAGE_KEY = "actspace.plugin-repo-root.v1";
@@ -102,10 +102,10 @@ export function CapabilitiesSection({ query = "", onConfigureSpeech }: { query?:
 
   return (
     <SectionShell>
-      <p className="text-[12px] text-text-faint">能力 · {Number(matches) + Number(learningMatches)}</p>
+      <p className="text-act-xs text-text-faint">能力 · {Number(matches) + Number(learningMatches)}</p>
       {learningMatches && <EnglishLearningCapability onConfigure={onConfigureSpeech} />}
-      {!matches && !learningMatches && <p className="py-10 text-center text-[13px] text-text-faint">没有找到匹配的能力。</p>}
-      {matches && !bridgeReady && <p className="text-[13px] text-text-faint">Browser Bridge 管理仅在桌面端可用。</p>}
+      {!matches && !learningMatches && <p className="py-10 text-center text-act-sm text-text-faint">没有找到匹配的能力。</p>}
+      {matches && !bridgeReady && <p className="text-act-sm text-text-faint">Browser Bridge 管理仅在桌面端可用。</p>}
       {matches && bridgeReady && (
         <div className="overflow-hidden rounded-act-lg bg-surface-subtle">
           <button
@@ -116,8 +116,8 @@ export function CapabilitiesSection({ query = "", onConfigureSpeech }: { query?:
             className="flex w-full items-center gap-3 px-4 py-4 text-left hover:bg-hover-overlay active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-act-md bg-surface text-text-muted"><Globe size={19} /></span>
-            <span className="min-w-0 flex-1"><span className="block text-[13px] font-medium text-text-main">Browser Bridge</span><span className="mt-0.5 block text-[12px] text-text-faint">连接 Chrome，让 Agent 操作浏览器。</span></span>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${badge.className}`}>{browserStatus ? badge.text : "检查中…"}</span>
+            <span className="min-w-0 flex-1"><span className="block text-act-sm font-medium text-text-main">Browser Bridge</span><span className="mt-0.5 block text-act-xs text-text-faint">连接 Chrome，让 Agent 操作浏览器。</span></span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-act-xxs ${badge.className}`}>{browserStatus ? badge.text : "检查中…"}</span>
             <ChevronDown size={15} className={`shrink-0 text-text-faint ${expanded ? "" : "-rotate-90"}`} />
           </button>
           <div id="browser-bridge-details" hidden={!expanded} className={`${expanded ? "flex" : "hidden"} flex-col gap-6 border-t border-line px-4 py-4`}>
@@ -128,21 +128,18 @@ export function CapabilitiesSection({ query = "", onConfigureSpeech }: { query?:
               <div className="flex flex-col gap-2 px-3.5 py-3">
                 <div className="flex items-center justify-between gap-4 max-[600px]:flex-col max-[600px]:items-stretch">
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-medium text-text-main">源码路径</div>
-                    <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">
+                    <div className="text-act-sm font-medium text-text-main">源码路径</div>
+                    <p className="mt-0.5 text-act-xs leading-relaxed text-text-faint">
                       包含 Browser Bridge 源码的 actspace-agent 仓库路径。设置后可一键编译并安装 Browser Bridge，
                       本机需要 Go 工具链。
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className={PLUGIN_BTN_SECONDARY}
-                    onClick={() => void pickRepoRoot()}
+                  <Button variant="secondary" onClick={() => void pickRepoRoot()}
                     disabled={browserBusy}
                   >
                     <FolderOpen size={14} strokeWidth={2} className="mr-1.5" />
                     选择目录
-                  </button>
+                  </Button>
                 </div>
                 <TextField
                   value={repoRoot ?? ""}
@@ -220,18 +217,18 @@ function BrowserBridgeCard({
       <div className="flex items-start justify-between gap-4 max-[600px]:flex-col max-[600px]:items-stretch">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] font-medium text-text-main">browser-bridge（Browser Use）</span>
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
+            <span className="text-act-sm font-medium text-text-main">browser-bridge（Browser Use）</span>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-act-xxs font-semibold ${badge.className}`}>
               {badge.text}
             </span>
           </div>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">
+          <p className="mt-0.5 text-act-xs leading-relaxed text-text-faint">
             通过 `abb` CLI、本机桥接和 Chrome 扩展接入真实 Chrome。
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2 max-[600px]:justify-start">
           {repoRoot ? (
-            <button type="button" className={PLUGIN_BTN_SECONDARY} onClick={onBuildInstall} disabled={busy}>
+            <Button variant="secondary" onClick={onBuildInstall} disabled={busy}>
               {building ? (
                 <>
                   <Loader2 size={14} className="mr-1.5 animate-spin" /> 编译中…
@@ -241,18 +238,14 @@ function BrowserBridgeCard({
               ) : (
                 "编译并安装"
               )}
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            className={PLUGIN_BTN_SECONDARY}
-            onClick={onInstallHost}
+          <Button variant="secondary" onClick={onInstallHost}
             disabled={busy || !status?.installed}
-            title={!status?.installed ? "请先编译并安装 abb" : "重新写入 Chrome 本机桥接登记"}
-          >
+            title={!status?.installed ? "请先编译并安装 abb" : "重新写入 Chrome 本机桥接登记"}>
             重新注册本机桥接
-          </button>
-          <button type="button" className={PLUGIN_BTN_SECONDARY} onClick={onRefresh} disabled={busy}>
+          </Button>
+          <Button variant="secondary" onClick={onRefresh} disabled={busy}>
             {checking ? (
               <>
                 <Loader2 size={14} className="mr-1.5 animate-spin" /> 检查中…
@@ -260,20 +253,20 @@ function BrowserBridgeCard({
             ) : (
               "检查连接"
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
       {building ? (
-        <p className="text-[12px] text-text-faint">正在构建 `abb` 并注册本机桥接，首次构建可能需要几分钟…</p>
+        <p className="text-act-xs text-text-faint">正在构建 `abb` 并注册本机桥接，首次构建可能需要几分钟…</p>
       ) : null}
       {!status?.installed && !repoRoot ? (
-        <p className="text-[12px] text-text-faint">
+        <p className="text-act-xs text-text-faint">
           提示：在上方设置源码路径后，可一键编译 Browser Bridge。
         </p>
       ) : null}
       {status?.installed ? (
-        <div className="grid gap-1 text-[12px] text-text-faint">
+        <div className="grid gap-1 text-act-xs text-text-faint">
           <StatusLine label="abb" ok={true} text={status.abbPath} />
           <StatusLine label="本机桥接" ok={hostReady} text={hostReady ? "已注册" : "未注册"} />
           <StatusLine label="Chrome 扩展" ok={extensionReady} text={extensionReady ? "已连接" : "等待加载或重新加载"} />
@@ -281,7 +274,7 @@ function BrowserBridgeCard({
       ) : null}
 
       {status?.installed && extensionDir && !bridgeReady ? (
-        <div className="rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 text-[12px] text-text-faint">
+        <div className="rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 text-act-xs text-text-faint">
           <div className="font-semibold text-text-main">浏览器扩展需要手动加载一次</div>
           <ol className="mt-1 grid gap-0.5">
             <li>1. 打开 Chrome 的扩展程序页面，并确认开发者模式已开启。</li>
@@ -290,32 +283,32 @@ function BrowserBridgeCard({
             <li>4. 加载或重新加载后，回到这里点击「检查连接」。</li>
           </ol>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className={PLUGIN_BTN_SECONDARY} onClick={() => void copyExtensionDir()}>
+            <Button variant="secondary" onClick={() => void copyExtensionDir()}>
               <Copy size={14} className="mr-1.5" /> 复制扩展目录
-            </button>
-            <button type="button" className={PLUGIN_BTN_SECONDARY} onClick={() => window.open("chrome://extensions", "_blank")}>
+            </Button>
+            <Button variant="secondary" onClick={() => window.open("chrome://extensions", "_blank")}>
               <ExternalLink size={14} className="mr-1.5" /> 打开扩展页
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
 
       {message ? (
-        <p className={`text-[12px] ${message.includes("失败") ? "text-on-danger" : "text-on-success"}`}>{message}</p>
+        <p className={`text-act-xs ${message.includes("失败") ? "text-on-danger" : "text-on-success"}`}>{message}</p>
       ) : null}
-      {status?.lastError ? <p className="text-[12px] text-on-danger">{status.lastError}</p> : null}
+      {status?.lastError ? <p className="text-act-xs text-on-danger">{status.lastError}</p> : null}
       {status?.doctorChecks.length ? (
         <div className="pt-1">
           <button
             type="button"
-            className="inline-flex items-center text-[12px] font-semibold text-text-faint transition hover:text-text-main"
+            className="inline-flex items-center text-act-xs font-semibold text-text-faint transition hover:text-text-main"
             onClick={() => setShowDiagnostics((value) => !value)}
           >
             <ChevronDown size={14} className={`mr-1 transition ${showDiagnostics ? "" : "-rotate-90"}`} />
             高级诊断
           </button>
           {showDiagnostics ? (
-            <div className="mt-1 grid gap-1 text-[12px] text-text-faint">
+            <div className="mt-1 grid gap-1 text-act-xs text-text-faint">
               {status.doctorChecks.map((check) => (
                 <div key={check.name} className="flex items-start gap-1.5">
                   <CheckCircle2

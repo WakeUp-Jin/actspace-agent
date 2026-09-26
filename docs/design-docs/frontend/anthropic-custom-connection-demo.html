@@ -1,0 +1,1068 @@
+<title>Anthropic 自定义连接</title>
+<!-- 2026-09-26 方案 Demo：设置 › 模型 › 添加连接 › 自定义服务（Anthropic）的「现状」与「新方案」对比。右下角「DEMO 调节」只用于方案对比，不进入实现。沿用 settings-redesign-demo.html 已定稿的 token。 -->
+<style>
+:root {
+  color-scheme: light;
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --bg: #f7f7f5; --sidebar: #efefed; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #f0f0ed;
+  --line: #deded9; --line-soft: #ebebe7; --line-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #72726b; --subtle: #9a9a93;
+  --action: #20201e; --action-hover: #343430; --on-action: #ffffff;
+  --operational: #087a4b; --operational-soft: #e5f2ea; --warning: #91600e; --warning-soft: #f7eedb;
+  --danger: #c74747; --on-danger: #a93a3a; --danger-soft: #f8e9e9;
+  --toggle-off: #d3d3ce; --toggle-on: #087a4b; --knob: #ffffff; --focus: #4d4d48;
+  --scrim: rgba(24, 24, 22, 0.36);
+  --shadow-pop: 0 1px 2px rgba(31, 45, 61, 0.06), 0 12px 32px rgba(31, 45, 61, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #181916; --sidebar: #1e1f1c; --surface: #222320; --surface-subtle: #292a26; --selected: #30312d; --hover: #282925;
+    --line: #353630; --line-soft: #2d2e29; --line-strong: #787870;
+    --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #6f6f68;
+    --action: #f1f1ed; --action-hover: #dbdbd5; --on-action: #181916;
+    --operational: #36c783; --operational-soft: #193a2b; --warning: #d2a14d; --warning-soft: #3e321c;
+    --danger: #e06b6b; --on-danger: #f08a8a; --danger-soft: #452525; --toggle-off: #4a4b45; --toggle-on: #36c783; --focus: #c8c8c0;
+    --scrim: rgba(0, 0, 0, 0.6);
+    --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.45);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #181916; --sidebar: #1e1f1c; --surface: #222320; --surface-subtle: #292a26; --selected: #30312d; --hover: #282925;
+  --line: #353630; --line-soft: #2d2e29; --line-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #6f6f68;
+  --action: #f1f1ed; --action-hover: #dbdbd5; --on-action: #181916;
+  --operational: #36c783; --operational-soft: #193a2b; --warning: #d2a14d; --warning-soft: #3e321c;
+  --danger: #e06b6b; --on-danger: #f08a8a; --danger-soft: #452525; --toggle-off: #4a4b45; --toggle-on: #36c783; --focus: #c8c8c0;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--focus) 45%, transparent); outline-offset: 2px; }
+svg { display: block; flex-shrink: 0; }
+code, .mono { font-family: var(--font-mono); }
+
+/* ---------- Shell ---------- */
+.app { display: flex; flex-direction: column; height: 100%; }
+.titlebar { height: 42px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: var(--sidebar); border-bottom: 1px solid var(--line); }
+.titlebar i { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
+.tb-title { margin-left: 10px; font-size: 12px; color: var(--faint); }
+.tb-ver { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.tb-ver .tag { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; color: var(--faint); }
+.body { flex: 1; min-height: 0; display: flex; }
+.nav { width: 216px; flex-shrink: 0; overflow-y: auto; background: var(--sidebar); border-right: 1px solid var(--line); padding: 10px 10px 16px; }
+.nav-back { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; margin-bottom: 6px; border: 0; background: none; border-radius: 6px; color: var(--muted); font-size: 12px; }
+.nav-grp { padding: 14px 10px 4px; font-size: 11px; font-weight: 500; color: var(--faint); }
+.nav-grp:first-of-type { padding-top: 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 0 10px; border: 0; background: none; border-radius: 6px; color: var(--muted); font-size: 13px; text-align: left; }
+.nav-item:hover { background: var(--hover); color: var(--text); }
+.nav-item[aria-current="page"] { background: var(--selected); color: var(--text); font-weight: 500; }
+.nav-item svg { color: var(--faint); }
+.nav-item[aria-current="page"] svg { color: var(--text); }
+main { flex: 1; min-width: 0; overflow-y: auto; }
+.page { width: 100%; max-width: 736px; margin: 0 auto; padding: 32px 48px 120px; }
+
+/* ---------- Page & section ---------- */
+.crumb { display: inline-flex; align-items: center; gap: 2px; margin: -6px 0 10px -6px; height: 26px; padding: 0 8px 0 4px; border: 0; background: none; border-radius: 6px; color: var(--muted); font-size: 12px; }
+.crumb:hover { background: var(--hover); color: var(--text); }
+.page-head { display: flex; align-items: center; gap: 12px; }
+.page-head .grow { flex: 1; min-width: 0; }
+.page-head h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; text-wrap: balance; }
+.page-head h2.sm { font-size: 17px; }
+.page-head p { margin-top: 3px; font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.section { margin-top: 32px; }
+.section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 10px; padding: 0 2px; }
+.section-head h3 { font-size: 13px; font-weight: 600; }
+.section-head p { margin-top: 2px; font-size: 12px; color: var(--muted); max-width: 58ch; }
+.section-head .acts { display: flex; gap: 6px; flex-shrink: 0; }
+
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: visible; }
+.group > * + * { border-top: 1px solid var(--line-soft); }
+.group > :first-child { border-top-left-radius: 9px; border-top-right-radius: 9px; }
+.group > :last-child { border-bottom-left-radius: 9px; border-bottom-right-radius: 9px; }
+.row { display: flex; align-items: center; gap: 16px 24px; min-height: 52px; padding: 10px 16px; }
+.row .label { flex: 1 1 220px; min-width: 0; }
+.row .t { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
+.row .d { margin-top: 2px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.row .d.mono, .mono-s { font-family: var(--font-mono); font-size: 11.5px; color: var(--faint); word-break: break-all; }
+.row .ctl { position: relative; flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
+.row.link { cursor: pointer; transition: background-color 120ms var(--ease); }
+.row.link:hover { background: var(--hover); }
+.subhead { padding: 9px 16px 6px; font-size: 11px; font-weight: 500; color: var(--faint); background: var(--surface-subtle); }
+.val { font-size: 13px; color: var(--muted); max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.val.mono { font-family: var(--font-mono); font-size: 12px; }
+.chev { color: var(--subtle); }
+
+/* ---------- Controls ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 11px; white-space: nowrap; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 12.5px; font-weight: 500; transition: background-color 120ms var(--ease), border-color 120ms var(--ease), transform 120ms var(--ease); }
+.btn:hover:not(:disabled) { border-color: var(--line-strong); }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; }
+.btn.primary { background: var(--action); border-color: var(--action); color: var(--on-action); }
+.btn.primary:hover:not(:disabled) { background: var(--action-hover); }
+.btn.quiet { border-color: transparent; background: none; color: var(--muted); }
+.btn.quiet:hover:not(:disabled) { background: var(--hover); color: var(--text); border-color: transparent; }
+.btn.danger { color: var(--on-danger); }
+.btn.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 50%, transparent); background: var(--danger-soft); }
+.btn.danger-fill { background: var(--danger-soft); border-color: transparent; color: var(--on-danger); }
+.btn.icon { width: 28px; padding: 0; }
+.btn.lg { height: 32px; padding: 0 14px; font-size: 13px; }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--muted); font-size: 12px; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.linkbtn:hover { color: var(--text); }
+
+.in { width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 13px; outline: none; }
+.in::placeholder { color: var(--subtle); }
+.in:hover { border-color: var(--line-strong); }
+.in:focus, .sel select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 16%, transparent); outline: none; }
+.in.mono-in { font-family: var(--font-mono); font-size: 12.5px; }
+.in.num { width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
+.in.mid { width: 220px; max-width: 100%; }
+.sel { position: relative; display: inline-flex; }
+.sel select { appearance: none; -webkit-appearance: none; height: 30px; min-width: 190px; padding: 0 30px 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 13px; cursor: pointer; max-width: 100%; }
+.sel svg { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--faint); }
+.sel.sm select { min-width: 110px; }
+
+.tg { position: relative; width: 32px; height: 18px; flex-shrink: 0; border: 0; border-radius: 999px; background: var(--toggle-off); transition: background-color 160ms var(--ease); }
+.tg::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--knob); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: transform 160ms var(--ease); }
+.tg[aria-checked="true"] { background: var(--toggle-on); }
+.tg[aria-checked="true"]::after { transform: translateX(14px); }
+
+.seg { display: flex; flex-wrap: wrap; padding: 2px; border-radius: 8px; background: var(--surface-subtle); border: 1px solid var(--line-soft); gap: 2px; }
+.seg button { flex: 1 1 auto; height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: none; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--line-soft); }
+.seg.lg button { height: 28px; font-size: 12.5px; }
+.seg.ver button { height: 24px; padding: 0 12px; }
+
+.stepper { display: inline-flex; align-items: center; height: 30px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.stepper button { width: 28px; height: 100%; border: 0; background: none; color: var(--faint); display: grid; place-items: center; font-size: 15px; }
+.stepper button:hover { color: var(--text); }
+.stepper output { min-width: 56px; text-align: center; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.status .dot { width: 6px; height: 6px; border-radius: 50%; }
+.status.ok .dot { background: var(--operational); }
+.status.off .dot { border: 1.5px solid var(--line-strong); width: 7px; height: 7px; }
+.status.err { color: var(--on-danger); }
+.status.err .dot { background: var(--danger); }
+.pill { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 4px; font-size: 11px; font-weight: 500; background: var(--surface-subtle); color: var(--muted); border: 1px solid var(--line-soft); white-space: nowrap; }
+.pill.warn { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
+.pill.ok { background: var(--operational-soft); color: var(--operational); border-color: transparent; }
+.tile { width: 32px; height: 32px; flex-shrink: 0; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-subtle); font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
+.tile.lg { width: 40px; height: 40px; border-radius: 10px; font-size: 13px; }
+.spin { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--line-strong); border-top-color: transparent; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; border-top-color: var(--line-strong); } * { transition: none !important; } }
+
+.editor { padding: 12px 16px 14px; background: var(--surface-subtle); display: grid; gap: 8px; }
+.editor-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.editor-foot .hint { font-size: 12px; color: var(--faint); }
+.editor-foot .btns { display: flex; gap: 6px; margin-left: auto; }
+
+/* ---------- New: create form ---------- */
+.stack { display: grid; gap: 16px; margin-top: 22px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 16px; }
+.card.locked { background: transparent; border-style: dashed; }
+.card.locked .card-head p { color: var(--faint); }
+.card-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.card-head h3 { font-size: 13px; font-weight: 600; }
+.card-head p { margin-top: 2px; font-size: 12px; color: var(--muted); }
+.card-head .count { font-size: 12px; color: var(--faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.field { display: grid; gap: 6px; }
+.lbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+.help { font-size: 12px; color: var(--faint); line-height: 1.5; display: flex; align-items: flex-start; gap: 5px; }
+.help svg { margin-top: 2px; }
+.help.err { color: var(--on-danger); }
+.help.okc { color: var(--operational); }
+.req { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--muted); }
+.req code { font-size: 11.5px; color: var(--text); background: var(--surface-subtle); border: 1px solid var(--line-soft); padding: 1px 6px; border-radius: 4px; word-break: break-all; }
+.fixed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; height: 34px; font-size: 13px; }
+.keybox { display: flex; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.keybox:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 16%, transparent); }
+.keybox input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 0; background: none; outline: none; font-family: var(--font-mono); font-size: 12.5px; }
+.keybox input::placeholder { color: var(--subtle); font-family: var(--font-ui); font-size: 13px; }
+.keybox button { width: 34px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--faint); display: grid; place-items: center; border-radius: 0 7px 7px 0; }
+.keybox button:hover { color: var(--text); background: var(--hover); }
+.more { border-top: 1px solid var(--line-soft); padding-top: 12px; }
+.more-toggle { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 2px 0; font-size: 13px; font-weight: 500; text-align: left; }
+.more-toggle .sum { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--faint); text-align: right; }
+.more-toggle svg { color: var(--faint); transition: transform 160ms var(--ease); }
+.more-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.more-body { display: grid; gap: 16px; margin-top: 12px; padding: 14px; border-radius: 8px; background: var(--surface-subtle); }
+.line { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.line .t { font-size: 13px; font-weight: 500; }
+.line .d { margin-top: 2px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.test-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line-soft); padding-top: 14px; flex-wrap: wrap; }
+.test-l { display: grid; gap: 6px; flex: 1 1 260px; min-width: 0; }
+.res { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.res svg { margin-top: 2px; }
+.res b { font-weight: 600; color: var(--text); }
+.res p { margin-top: 2px; font-size: 12px; color: var(--muted); }
+.res.ok > svg { color: var(--operational); }
+.res.fail > svg, .res.fail b { color: var(--on-danger); }
+.res.warn > svg { color: var(--warning); }
+.res.run { align-items: center; }
+.steps { display: flex; align-items: center; gap: 10px; list-style: none; padding: 0; margin-top: 18px; font-size: 12.5px; color: var(--faint); flex-wrap: wrap; }
+.steps li { display: flex; align-items: center; gap: 6px; }
+.steps li span { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 600; border: 1px solid var(--line-strong); }
+.steps li.on { color: var(--text); font-weight: 500; }
+.steps li.on span { background: var(--action); border-color: var(--action); color: var(--on-action); }
+.steps li.done span { background: var(--operational-soft); border-color: transparent; color: var(--operational); }
+.steps .bar { width: 28px; height: 1px; background: var(--line); }
+
+.search { position: relative; }
+.search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--subtle); pointer-events: none; }
+.search .in { padding-left: 30px; }
+.mlist { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.mrow { display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; }
+.mrow + .mrow { border-top: 1px solid var(--line-soft); }
+.mrow.sel { background: color-mix(in srgb, var(--surface-subtle) 55%, transparent); }
+.ck { width: 16px; height: 16px; margin-top: 1px; flex-shrink: 0; border: 1.5px solid var(--line-strong); border-radius: 4px; background: var(--surface); display: grid; place-items: center; padding: 0; color: var(--on-action); }
+.ck[aria-checked="true"] { background: var(--action); border-color: var(--action); }
+.mmain { flex: 1; min-width: 0; }
+.mt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
+.mid { font-family: var(--font-mono); font-size: 11.5px; color: var(--faint); word-break: break-all; }
+.mmeta { margin-top: 2px; font-size: 12px; color: var(--muted); }
+.mctl { flex-shrink: 0; display: flex; align-items: center; gap: 4px; margin-top: -3px; }
+.mrow.pick { cursor: pointer; align-items: center; }
+.mrow.pick:hover { background: var(--hover); }
+.mrow.pick .ck { margin-top: 0; }
+.mrow .hov { opacity: 0; transition: opacity 120ms var(--ease); }
+.mrow:hover .hov, .mrow:focus-within .hov, .mrow:focus .hov { opacity: 1; }
+@media (hover: none) { .mrow .hov { opacity: 1; } }
+.mrow .mctl { margin-top: 0; }
+.bill { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+.bill .t { font-size: 13px; font-weight: 500; }
+.bill .d { margin-top: 2px; font-size: 12px; color: var(--muted); }
+.okc { color: var(--operational); font-size: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chips .lbl { margin-right: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px 0 8px; border: 1px dashed var(--line-strong); border-radius: 999px; background: none; font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+.chip:hover { border-style: solid; color: var(--text); background: var(--hover); }
+.add-line { display: flex; gap: 8px; }
+.add-line .in { flex: 1; }
+.example { font-size: 12px; color: var(--muted); background: var(--surface-subtle); border-radius: 7px; padding: 9px 11px; line-height: 1.55; }
+.foot { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-block: 12px; background: var(--bg); border-top: 1px solid var(--line); }
+.foot .hint { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.foot .btns { display: flex; gap: 8px; margin-left: auto; }
+
+.menu { position: absolute; right: 36px; top: 30px; z-index: 6; min-width: 148px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow-pop); display: grid; }
+.menu button { height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: none; text-align: left; font-size: 13px; }
+.menu button:hover:not(:disabled) { background: var(--hover); }
+.menu button:disabled { color: var(--subtle); }
+.menu .dangerc { color: var(--on-danger); }
+.scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: var(--scrim); }
+.dialog { width: 100%; max-width: 420px; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-pop); }
+.dialog h3 { font-size: 16px; font-weight: 600; }
+.dialog p { margin-top: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.dialog .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+.cat-tools { display: flex; align-items: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+.cat-tools .search { flex: 0 1 260px; }
+.eff { display: flex; gap: 6px; flex-wrap: wrap; }
+.eff button { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 12px; color: var(--muted); }
+.eff button[aria-pressed="true"] { border-color: var(--action); background: var(--action); color: var(--on-action); }
+
+/* ---------- Old: replica of current UI ---------- */
+.o-list { margin-top: 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.o-row { cursor: pointer; display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 8px; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; }
+.o-row:last-child { border-bottom: 0; }
+.o-row:hover { background: var(--hover); }
+.o-row .n { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 600; }
+.o-row .s { margin-top: 2px; font-size: 11px; color: var(--faint); }
+.o-form { display: grid; gap: 20px; margin-top: 24px; }
+.o-field { display: grid; gap: 6px; }
+.o-field > .l { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.o-in { width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; outline: none; }
+.o-in:focus { border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent); }
+.o-in::placeholder { color: var(--subtle); }
+.o-sel { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; }
+.o-key { display: flex; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.o-key input { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 0; background: none; outline: none; font-size: 13px; }
+.o-key button { width: 40px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--muted); display: grid; place-items: center; }
+.o-hint { font-size: 11px; color: var(--faint); line-height: 1.5; }
+.o-v1 { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--on-danger); }
+.o-v1 button { border: 0; background: none; padding: 0; font-size: 11px; font-weight: 600; color: var(--text); }
+.o-sec { border-top: 1px solid var(--line); padding-top: 20px; display: grid; gap: 20px; }
+.o-sec h4 { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; }
+.o-sec h4 + p { margin-top: -16px; font-size: 11px; color: var(--faint); }
+.o-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.o-box, .o-fs { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.o-fs legend { padding: 0 4px; font-size: 13px; font-weight: 600; }
+.o-fs label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.o-fs .note { font-size: 11px; color: var(--faint); }
+.o-sw { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.o-sw .t { font-size: 12px; font-weight: 500; }
+.o-sw .d { margin-top: 4px; font-size: 11px; color: var(--faint); line-height: 1.5; }
+.o-sum { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 0; border: 0; background: none; font-size: 13px; font-weight: 600; }
+.o-sum svg { color: var(--faint); }
+.o-err { font-size: 12px; color: var(--on-danger); }
+.o-foot { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 20px; }
+.o-models-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.o-models-top p { font-size: 11px; color: var(--faint); }
+.o-mlist { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.o-mrow { display: flex; align-items: flex-start; gap: 16px; padding: 16px 12px; }
+.o-mrow + .o-mrow { border-top: 1px solid var(--line); }
+.o-mrow .n { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.o-mrow .i { margin-top: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--faint); }
+.o-mrow .m { margin-top: 4px; font-size: 10px; color: var(--muted); }
+.o-mrow .a { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
+.o-mrow .ib { width: 32px; height: 32px; border: 0; border-radius: 7px; background: none; color: var(--muted); display: grid; place-items: center; }
+.o-mrow .ib:hover { background: var(--hover); color: var(--text); }
+
+/* Issue markers (现状 only) */
+.iss { display: none; position: relative; width: 17px; height: 17px; padding: 0; border: 0; border-radius: 50%; background: var(--warning); color: var(--surface); font-size: 10px; font-weight: 700; place-items: center; cursor: help; vertical-align: middle; flex-shrink: 0; font-family: var(--font-ui); line-height: 1; }
+body.show-iss .iss { display: inline-grid; }
+.iss:hover::after, .iss:focus::after { content: attr(data-tip); position: absolute; top: 23px; left: -8px; z-index: 30; width: 270px; padding: 9px 11px; border-radius: 8px; background: var(--action); color: var(--on-action); font-size: 12px; font-weight: 400; line-height: 1.55; text-align: left; white-space: normal; box-shadow: var(--shadow-pop); }
+.iss.r:hover::after, .iss.r:focus::after { left: auto; right: -8px; }
+
+/* Toast & demo panel */
+.toast { position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); z-index: 60; transform: translate(-50%, 8px); opacity: 0; pointer-events: none; max-width: calc(100% - 32px); padding: 7px 12px; border-radius: 8px; background: var(--action); color: var(--on-action); font-size: 12px; font-weight: 500; box-shadow: var(--shadow-pop); transition: opacity 160ms var(--ease), transform 160ms var(--ease); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.tweaks { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 40; width: 268px; max-height: calc(100% - 90px); overflow-y: auto; padding: 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-pop); font-size: 12px; }
+.tw-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tw-head b { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--faint); }
+.tw-head button { border: 0; background: none; color: var(--faint); font-size: 11px; }
+.tw { display: grid; gap: 5px; margin-top: 12px; }
+.tw > span { color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.tw > span em { font-style: normal; color: var(--subtle); font-size: 11px; }
+.tw.dim { opacity: 0.5; }
+.tw .seg button { padding: 0 6px; }
+.tw .seg.g2 { display: grid; grid-template-columns: 1fr 1fr; }
+.tw-acts { display: flex; gap: 6px; margin-top: 14px; }
+.tw-acts .btn { flex: 1; height: 26px; font-size: 12px; }
+.tweaks.min { width: auto; }
+.tweaks.min .tw, .tweaks.min .tw-acts { display: none; }
+
+@media (max-width: 760px) {
+  .nav, .titlebar i { display: none; }
+  .tb-title { margin-left: 0; }
+  .page { padding: 20px 16px 140px; }
+  .tweaks { left: 16px; right: 16px; width: auto; max-height: 62%; }
+  .tweaks.min { left: auto; }
+  .o-grid2 { grid-template-columns: 1fr; }
+  .val { max-width: 150px; }
+  .card { padding: 14px; }
+  .line { align-items: flex-start; }
+}
+</style>
+
+<div class="app">
+  <header class="titlebar"><i></i><i></i><i></i><span class="tb-title">设置</span><div class="tb-ver"><span class="tag">DEMO</span><div id="ver"></div></div></header>
+  <div class="body">
+    <nav class="nav" aria-label="设置分区">
+      <button class="nav-back" type="button" data-act="noop"><span data-i="chevL"></span>返回应用</button>
+      <div class="nav-grp">偏好</div>
+      <button class="nav-item" type="button" data-act="navOther"><span data-i="sliders"></span>通用</button>
+      <button class="nav-item" type="button" data-act="navOther"><span data-i="sun"></span>外观</button>
+      <div class="nav-grp">能力</div>
+      <button class="nav-item" type="button" aria-current="page" data-act="go" data-arg="list"><span data-i="cpu"></span>模型</button>
+      <button class="nav-item" type="button" data-act="navOther"><span data-i="search"></span>搜索</button>
+      <button class="nav-item" type="button" data-act="navOther"><span data-i="wrench"></span>工具</button>
+      <button class="nav-item" type="button" data-act="navOther"><span data-i="users"></span>子 Agent</button>
+      <div class="nav-grp">活动</div>
+      <button class="nav-item" type="button" data-act="navOther"><span data-i="chart"></span>使用统计</button>
+      <button class="nav-item" type="button" data-act="navOther"><span data-i="archive"></span>归档会话</button>
+      <div class="nav-grp">系统</div>
+      <button class="nav-item" type="button" data-act="navOther"><span data-i="refresh"></span>更新</button>
+    </nav>
+    <main id="main"></main>
+  </div>
+</div>
+<aside id="tweaks" class="tweaks" aria-label="Demo 调节"></aside>
+<div id="dlg"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ================= Icons ================= */
+const I = {
+  chevL: '<path d="m15 18-6-6 6-6"/>', chevR: '<path d="m9 18 6-6-6-6"/>', chevD: '<path d="m6 9 6 6 6-6"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', plus: '<path d="M5 12h14M12 5v14"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="m3 3 18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.1M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/>',
+  arrowR: '<path d="M5 12h14M13 6l6 6-6 6"/>', more: '<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
+  plug: '<path d="M9 2v5M15 2v5"/><path d="M6 7h12v4a6 6 0 0 1-12 0Z"/><path d="M12 17v5"/>',
+  refresh: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/>',
+  pencil: '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/>', trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  cpu: '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a6 6 0 0 1-7.9 7.9l-6.4 6.4a2.1 2.1 0 0 1-3-3l6.4-6.4a6 6 0 0 1 7.9-7.9Z"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
+  chart: '<path d="M3 3v18h18"/><path d="M8 16v-4M13 16V8M18 16v-7"/>',
+  archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>'
+};
+function ic(n, s = 14) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`; }
+document.querySelectorAll('[data-i]').forEach((el) => { el.outerHTML = ic(el.dataset.i, 15); });
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ================= Data ================= */
+// Figures from packages/shared/src/generated/model-catalog.generated.ts (models.dev, 2026-09-07).
+const CM = {
+  'claude-fable-5-1': { label: 'Claude Fable 5.1', ctx: 1e6, out: 128e3, r: [10, 50, 0.25, 12.5] },
+  'claude-opus-5': { label: 'Claude Opus 5', ctx: 1e6, out: 128e3, r: [5, 25, 0.5, 6.25] },
+  'claude-sonnet-5': { label: 'Claude Sonnet 5', ctx: 1e6, out: 128e3, r: [2, 10, 0.2, 2.5] },
+  'claude-sonnet-4-6': { label: 'Claude Sonnet 4.6', ctx: 1e6, out: 128e3, r: [3, 15, 0.3, 3.75] },
+  'claude-opus-4-8': { label: 'Claude Opus 4.8', ctx: 1e6, out: 128e3, r: [5, 25, 0.5, 6.25] },
+  'claude-haiku-4-5': { label: 'Claude Haiku 4.5', ctx: 2e5, out: 64e3, r: [1, 5, 0.1, 1.25] },
+  'claude-haiku-4-5-20251001': { label: 'Claude Haiku 4.5 (20251001)', ctx: 2e5, out: 64e3, r: [1, 5, 0.1, 1.25] }
+};
+const RELAY = ['claude-fable-5-1', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-opus-4-8', 'claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-sonnet-5-thinking'];
+const OFFICIAL = ['claude-fable-5-1', 'claude-opus-5', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-opus-4-8', 'claude-haiku-4-5'];
+const OPENAI_LIST = ['gpt-5.2', 'gpt-5.2-mini', 'deepseek-v4.1', 'glm-4.5'];
+const COMMON = ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'];
+const REF_MODELS = ['MiniMax-M2.7', 'claude-fable-5', 'claude-fable-5-1', 'claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-opus-4-5', 'claude-opus-4-5-20251101', 'claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-5', 'claude-sonnet-4-5', 'claude-sonnet-4-5-20250929', 'claude-sonnet-4-6', 'claude-sonnet-5', 'deepseek-v4.1', 'deepseek-v4.1-flash', 'glm-4.5', 'gpt-4o-mini', 'gpt-5.2', 'gpt-5.2-mini', 'kimi-k2.5', 'o5-mini'];
+const PROTO = {
+  anthropic: { label: 'Anthropic Messages', path: '/v1/messages', help: 'Claude Code 中转站和 Anthropic 兼容网关选这个。' },
+  'openai-chat': { label: 'OpenAI Chat', path: '/chat/completions', help: '大多数 OpenAI 兼容中转和自部署网关选这个。' },
+  'openai-responses': { label: 'OpenAI Responses', path: '/responses', help: '支持 OpenAI Responses API 的服务选这个。' }
+};
+const CAT = [
+  { id: 'minimax', label: 'MiniMax', desc: 'MiniMax 官方 API', cat: 'direct', tile: 'M' },
+  { id: 'openai', label: 'OpenAI', desc: 'OpenAI 官方 API', cat: 'direct', tile: 'O' },
+  { id: 'anthropic', label: 'Anthropic', desc: 'Anthropic 官方 API', cat: 'direct', tile: 'A' },
+  { id: 'zai', label: 'Z.AI', desc: '智谱官方接入，GLM 系列模型', cat: 'direct', tile: 'Z' },
+  { id: 'xiaomi', label: 'Xiaomi', desc: '小米官方接入，MiMo 系列模型', cat: 'direct', tile: 'Mi' },
+  { id: 'volc', label: '火山方舟 Coding Plan', desc: '火山方舟 Coding Plan 专用 Key 接入', cat: 'coding', tile: '火' },
+  { id: 'openrouter', label: 'OpenRouter', desc: '聚合模型目录与 OpenAI 兼容接口', cat: 'compatible', tile: 'OR' }
+];
+const OLD_CUSTOM = [
+  { id: 'openai-compatible', label: '自定义服务（OpenAI Chat）', desc: '兼容 Chat Completions 的中转服务或自部署网关', cat: 'custom', tile: 'O' },
+  { id: 'openai-responses-compatible', label: '自定义服务（OpenAI Responses）', desc: '兼容 Responses API 的中转服务或自部署网关', cat: 'custom', tile: 'O' },
+  { id: 'anthropic-compatible', label: '自定义服务（Anthropic）', desc: '兼容 Messages API 的中转服务或自部署网关', cat: 'custom', tile: 'A' }
+];
+const NEW_THREE = [
+  { id: 'c-anthropic', proto: 'anthropic', label: 'Anthropic 兼容服务', desc: 'Claude Code 中转站、自部署网关 · Messages API' },
+  { id: 'c-chat', proto: 'openai-chat', label: 'OpenAI Chat 兼容服务', desc: '中转站、自部署网关 · Chat Completions' },
+  { id: 'c-resp', proto: 'openai-responses', label: 'OpenAI Responses 兼容服务', desc: '中转站、自部署网关 · Responses API' }
+];
+const CATL = { direct: '官方直连', compatible: '第三方兼容', coding: 'Coding Plan', custom: '自定义' };
+const ISSUES = {
+  1: '三条「自定义服务」入口，用户得先懂协议区别才能开始；图标和上面的 Anthropic 官方一样。',
+  2: '光标先落在 API Key，服务地址排在最后。自定义服务应该先填「连哪里」。',
+  3: '名称默认是「自定义服务（Anthropic）」，建两个中转站就有两个同名连接。',
+  4: '要记住「根地址、不能带 /v1」。粘贴 …/v1/messages 能保存，但实际会请求 …/v1/messages/v1/messages。',
+  5: '只发 x-api-key。要求 Authorization: Bearer 的中转站（对应 Claude Code 的 ANTHROPIC_AUTH_TOKEN）连不上，也没有地方改。',
+  6: '上下文、输出上限、图片、推理、价格全要手填。内置目录里其实有这些 Claude 模型的数据。',
+  7: '创建时只能加一个模型，其余的要进详情页，再一个个填整张表。',
+  8: '保存前不能测试；按钮不可点时不说缺什么；格式错误要点了保存才在底部报。',
+  9: '保存后没测试过，也显示绿色「已连接」。',
+  10: '副标题是内部 uuid；每个「编辑」都打开整张表单，进去后返回按钮还写着「返回添加连接」。',
+  11: '删除连接没有确认，点一下就删。'
+};
+function iss(n, right = false) { return `<button type="button" class="iss${right ? ' r' : ''}" data-act="noop" data-tip="${esc(ISSUES[n])}" aria-label="问题 ${n}：${esc(ISSUES[n])}">${n}</button>`; }
+
+const SAMPLE_URL = 'https://cc.gateway.example/v1';
+const SAMPLE_KEY = 'sk-demo-7f3a2c9e41b8d05a';
+
+/* ================= State ================= */
+let S;
+function initState(keep) {
+  const prefs = keep && S
+    ? { ver: S.ver, scen: S.scen, issues: S.issues, theme: S.theme, twMin: S.twMin }
+    : { ver: 'new', scen: 'bearer', issues: true, theme: 'system', twMin: matchMedia('(max-width: 760px)').matches };
+  S = {
+    ...prefs, route: 'list', q: '', cat: 'all', cur: null, curModel: null, menu: null, edit: null, editVal: '', dialog: null, nf: null, of: null, me: null,
+    conns: {
+      old: [{ id: 'custom-7c1e9a42-5b0d-4f7e-9a61-2f0c8d3b6e15', name: '自定义服务（Anthropic）', base: 'https://relay.example.com', status: 'untested', models: [{ id: 'claude-sonnet-5', on: true }], def: 'claude-sonnet-5', proxy: false, cache: true, official: false, msg: null }],
+      new: [{ id: 'n1', name: 'relay.example.com', protocol: 'anthropic', base: 'https://relay.example.com', authMode: 'auto', auth: 'Bearer Token', tail: 'a91f', status: 'ok', testedAt: '2 天前', latency: '380 ms', models: [{ id: 'claude-opus-5', on: true }, { id: 'claude-sonnet-5', on: true }, { id: 'claude-haiku-4-5', on: false }], def: 'claude-sonnet-5', billing: 'reference', mult: 0.3, proxy: false, cache: true, official: false, msg: null }]
+    }
+  };
+}
+const C = () => S.conns[S.ver];
+const curConn = () => C().find((c) => c.id === S.cur);
+
+/* ================= Helpers ================= */
+function fmtN(v) { return v >= 1e6 ? `${v / 1e6}M` : v >= 1e3 ? `${Math.round(v / 1e3)}K` : String(v); }
+function money(v) { return `$${v.toFixed(2)}`; }
+function hostOf(u) { try { return new URL(u).host; } catch { return u; } }
+function mLabel(id, m) { return (m && m.label) || CM[id]?.label || id; }
+function reqUrl(base, proto) { return base + PROTO[proto].path; }
+function normUrl(raw, protocol) {
+  const s = (raw || '').trim();
+  if (!s) return { empty: true };
+  if (!/^https?:\/\//i.test(s)) return { error: '地址需要以 http:// 或 https:// 开头。' };
+  let u; try { u = new URL(s); } catch { return { error: '地址格式不对，检查一下有没有多余的字符。' }; }
+  let path = u.pathname.replace(/\/+$/, '');
+  const notes = []; let inferred = null;
+  if (/\/chat\/completions$/i.test(path)) { inferred = 'openai-chat'; path = path.replace(/\/chat\/completions$/i, ''); notes.push('已去掉 /chat/completions'); }
+  else if (/\/responses$/i.test(path)) { inferred = 'openai-responses'; path = path.replace(/\/responses$/i, ''); notes.push('已去掉 /responses'); }
+  else if (/\/v1\/messages$/i.test(path)) { inferred = 'anthropic'; path = path.replace(/\/v1\/messages$/i, ''); notes.push('已去掉 /v1/messages'); }
+  const proto = inferred || protocol;
+  if (proto === 'anthropic' && /\/v1$/i.test(path)) { path = path.replace(/\/v1$/i, ''); notes.push('已去掉 /v1'); }
+  const base = u.origin + path;
+  return { base, req: reqUrl(base, proto), host: u.host, notes, inferred: inferred && inferred !== protocol ? inferred : null };
+}
+function simulate(protocol, authMode, official) {
+  const sc = S.scen;
+  if (sc === 'badkey') return { ok: false, title: '认证失败（401）', body: '请检查 API Key 是否正确。' };
+  if (official) return { ok: true, auth: 'x-api-key', list: OFFICIAL };
+  if (protocol !== 'anthropic') return { ok: true, auth: 'Bearer Token', list: sc === 'nolist' ? null : OPENAI_LIST };
+  if (sc === 'bearer') {
+    if (authMode === 'x-api-key') return { ok: false, title: '认证失败（401）', body: '这个服务可能要求 Bearer 认证，把下面的认证方式改为「自动」再试。', openMore: true };
+    return { ok: true, auth: 'Bearer Token', note: authMode === 'auto' ? '已自动改用 Bearer 认证' : '', list: RELAY };
+  }
+  return { ok: true, auth: authMode === 'bearer' ? 'Bearer Token' : 'x-api-key', list: sc === 'nolist' ? null : RELAY };
+}
+let toastTimer;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600); }
+function tg(on, act, arg = '', label = '') { return `<button type="button" class="tg" role="switch" aria-checked="${on}" aria-label="${esc(label)}" data-act="${act}" data-arg="${esc(arg)}"></button>`; }
+function seg(items, cur, act, cls = '') { return `<div class="seg ${cls}">${items.map(([v, l]) => `<button type="button" aria-pressed="${v === cur}" data-act="${act}" data-arg="${v}">${l}</button>`).join('')}</div>`; }
+function applyTheme() { const r = document.documentElement; if (S.theme === 'system') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', S.theme); }
+function go(route) { S.route = route; S.menu = null; S.edit = null; render(); $('#main').scrollTop = 0; }
+function setLive(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
+function statusHtml(c) {
+  if (S.ver === 'old') return c.status === 'unavailable' ? '<span class="status err"><span class="dot"></span>连接异常</span>' : '<span class="status ok"><span class="dot"></span>已连接</span>';
+  if (c.status === 'testing') return '<span class="status"><span class="spin"></span>测试中…</span>';
+  if (c.status === 'ok') return '<span class="status ok"><span class="dot"></span>可用</span>';
+  if (c.status === 'fail') return '<span class="status err"><span class="dot"></span>连接异常</span>';
+  return '<span class="status off"><span class="dot"></span>未测试</span>';
+}
+
+/* ================= Screens: list ================= */
+function listScreen() {
+  const old = S.ver === 'old';
+  const builtin = [
+    { id: 'deepseek', tile: 'DS', name: 'DeepSeek', desc: 'DeepSeek 官方 API · 3 / 5 个模型启用', def: true },
+    { id: 'kimi', tile: 'Mo', name: 'Moonshot', desc: 'Moonshot 官方 API · 2 / 4 个模型启用' }
+  ].map((b) => `<div class="row link" data-act="openConn" data-arg="${b.id}"><span class="tile">${b.tile}</span><div class="label"><div class="t">${b.name}${b.def ? '<span class="pill">默认</span>' : ''}</div><div class="d">${b.desc}</div></div><div class="ctl"><span class="status ok"><span class="dot"></span>可用</span>${ic('chevR', 16)}</div></div>`).join('');
+  const custom = C().map((c, i) => {
+    const on = c.models.filter((m) => m.on).length;
+    const desc = old ? `自定义连接 · ${hostOf(c.base)}` : `${c.official ? 'Anthropic 官方 API' : `${PROTO[c.protocol].label} · ${hostOf(c.base)}`} · ${on} / ${c.models.length} 个模型启用`;
+    const tile = old ? 'A' : c.official ? 'A' : ic('plug', 16);
+    return `<div class="row link" data-act="openConn" data-arg="${c.id}"><span class="tile">${tile}</span><div class="label"><div class="t">${esc(c.name)}</div><div class="d">${esc(desc)}</div></div><div class="ctl">${old && i === 0 && c.status !== 'unavailable' ? iss(9, true) : ''}${statusHtml(c)}${ic('chevR', 16)}</div></div>`;
+  }).join('');
+  return `<div class="page-head"><div class="grow"><h2>模型</h2><p>管理模型服务连接，以及每个连接下可用的模型。</p></div></div>
+  <section class="section"><div class="section-head"><div><h3>模型连接</h3></div><div class="acts"><button type="button" class="btn primary" data-act="go" data-arg="catalog">${ic('plus', 14)}添加连接</button></div></div>
+  <div class="group">${builtin}${custom}</div></section>`;
+}
+
+/* ================= Screens: catalog ================= */
+function catalogScreen() {
+  const old = S.ver === 'old';
+  const tools = old
+    ? `<div class="cat-tools"><label class="search">${ic('search', 14)}<input class="in" data-in="catQ" value="${esc(S.q)}" placeholder="搜索服务商" aria-label="搜索模型服务"></label><div class="sel sm" style="margin-left:auto"><select aria-label="服务商类型" data-ch="catSel">${['all', 'direct', 'coding', 'compatible', 'custom'].map((v) => `<option value="${v}" ${S.cat === v ? 'selected' : ''}>${v === 'all' ? '全部' : CATL[v]}</option>`).join('')}</select>${ic('chevD', 13)}</div></div>`
+    : `<div class="cat-tools"><label class="search">${ic('search', 14)}<input class="in" data-in="catQ" value="${esc(S.q)}" placeholder="搜索服务商" aria-label="搜索模型服务"></label></div>`;
+  return `<button type="button" class="crumb" data-act="go" data-arg="list">${ic('chevL', 14)}返回模型连接</button>
+  <div class="page-head"><div class="grow"><h2 class="sm">添加连接</h2>${old ? '<p>选择一个服务商，然后配置 API Key 和连接参数。</p>' : ''}</div></div>
+  ${tools}<div id="catlist">${catalogList()}</div>`;
+}
+function matchQ(e) { const q = S.q.trim().toLowerCase(); return !q || [e.label, e.desc, e.id].some((v) => v.toLowerCase().includes(q)); }
+function catalogList() {
+  if (S.ver === 'old') {
+    const rows = [...CAT, ...OLD_CUSTOM].filter((e) => (S.cat === 'all' || e.cat === S.cat) && matchQ(e));
+    if (!rows.length) return '<p class="help" style="margin-top:16px">没有匹配的服务商。</p>';
+    let first = true;
+    return `<div class="o-list">${rows.map((e) => {
+      const mark = e.cat === 'custom' && first ? (first = false, iss(1)) : '';
+      return `<div class="o-row" role="button" tabindex="0" data-act="pick" data-arg="${e.id}"><span class="tile">${e.tile}</span><span style="flex:1;min-width:0"><span class="n">${e.label}${mark}</span><span class="s" style="display:block">${e.desc} · ${CATL[e.cat]}</span></span>${ic('chevR', 17)}</div>`;
+    }).join('')}</div>`;
+  }
+  const groups = ['direct', 'coding', 'compatible'].map((cat) => {
+    const rows = CAT.filter((e) => e.cat === cat && matchQ(e));
+    if (!rows.length) return '';
+    return `<div class="subhead">${CATL[cat]}</div>${rows.map((e) => `<div class="row link" data-act="pick" data-arg="${e.id}"><span class="tile">${e.tile}</span><div class="label"><div class="t">${e.label}</div><div class="d">${e.desc}</div></div><div class="ctl">${ic('chevR', 16)}</div></div>`).join('')}`;
+  }).join('');
+  const custom = `<div class="row link" data-act="pick" data-arg="custom"><span class="tile">${ic('plug', 16)}</span><div class="label"><div class="t">自定义服务</div><div class="d">中转站、自部署网关 · Anthropic / OpenAI 协议</div></div><div class="ctl">${ic('chevR', 16)}</div></div>`;
+  return `${groups ? `<div class="group" style="margin-top:16px">${groups}</div>` : '<p class="help" style="margin-top:16px">列表里没有匹配的服务商。</p>'}
+  <section class="section"><div class="section-head"><div><h3>没有找到？</h3></div></div><div class="group">${custom}</div></section>`;
+}
+
+/* ================= New: create form ================= */
+// Custom service: two steps (连接 → 选择模型). Official Anthropic: one page, Key only.
+function openNewForm(mode) {
+  S.nf = { mode, protocol: 'anthropic', protoNote: false, url: '', key: '', showKey: false, more: false, auth: 'auto', proxy: false, proxyUrl: '', test: 'idle', result: null, skip: false, step: 1, available: [], extra: [], selected: [], def: null, search: '', manual: '', adding: false, mult: 0.3 };
+  go('setup');
+}
+function nfNorm() { const f = S.nf; return f.mode === 'official' ? { base: 'https://api.anthropic.com', req: 'https://api.anthropic.com/v1/messages', host: 'api.anthropic.com', notes: [] } : normUrl(f.url, f.protocol); }
+function canTest() { return !!(S.nf.key.trim() && nfNorm().base); }
+function invalidate() { const f = S.nf; if (f.test === 'ok') f.test = 'stale'; else if (f.test === 'fail') f.test = 'idle'; }
+function newForm() {
+  const f = S.nf, off = f.mode === 'official';
+  const steps = off ? '' : `<ol class="steps"><li class="${f.step === 1 ? 'on' : 'done'}"><span>${f.step === 1 ? '1' : ic('check', 11)}</span>连接</li><li class="bar" aria-hidden="true"></li><li class="${f.step === 2 ? 'on' : ''}"><span>2</span>选择模型</li></ol>`;
+  const body = off ? connCard() + (f.test === 'ok' ? modelsCard() : '') : f.step === 1 ? connCard() : modelsCard();
+  return `<button type="button" class="crumb" data-act="go" data-arg="catalog">${ic('chevL', 14)}添加连接</button>
+  <div class="page-head"><span class="tile lg">${off ? 'A' : ic('plug', 18)}</span><div class="grow"><h2 class="sm">${off ? '连接 Anthropic' : '连接自定义服务'}</h2>${off ? '<p>填写 API Key 即可，模型和价格自动配置。</p>' : ''}</div></div>${steps}
+  <div class="stack">${body}</div><div id="live-foot">${footHtml()}</div>`;
+}
+function connCard() {
+  const f = S.nf, off = f.mode === 'official';
+  return `<section class="card" id="conn-card">
+  ${off ? '' : `<div class="field" id="live-proto">${protoField()}</div>`}
+  ${off ? '' : `<div class="field"><label class="lbl" for="nf-url">服务地址</label><input id="nf-url" class="in mono-in" data-in="nf" data-k="url" value="${esc(f.url)}" placeholder="https://relay.example.com" spellcheck="false" autocomplete="off"><div id="live-url">${urlPreview()}</div></div>`}
+  <div class="field"><label class="lbl" for="nf-key">API Key</label><div class="keybox"><input id="nf-key" type="${f.showKey ? 'text' : 'password'}" data-in="nf" data-k="key" value="${esc(f.key)}" placeholder="sk-…" autocomplete="off" spellcheck="false"><button type="button" data-act="nfEye" aria-label="${f.showKey ? '隐藏' : '显示'} API Key">${ic(f.showKey ? 'eyeOff' : 'eye', 15)}</button></div></div>
+  <div id="live-more">${moreBlock()}</div>
+  <div id="live-test">${testRow()}</div></section>`;
+}
+function protoField() {
+  const f = S.nf;
+  return `<span class="lbl">协议</span>${seg(Object.entries(PROTO).map(([k, v]) => [k, v.label]), f.protocol, 'proto', 'lg')}${f.protoNote ? `<p class="help okc">${ic('check', 12)}已根据地址切换</p>` : ''}`;
+}
+function urlPreview() {
+  const n = nfNorm();
+  if (n.empty) return '';
+  if (n.error) return `<p class="help err">${ic('alert', 12)}${n.error}</p>`;
+  return `<p class="req">${ic('arrowR', 12)}<code>${esc(n.req)}</code>${n.notes.length ? `<span class="okc">${n.notes.join('，')}</span>` : ''}</p>`;
+}
+function moreBlock() {
+  const f = S.nf, off = f.mode === 'official', anth = f.protocol === 'anthropic';
+  const sum = [!off && anth ? `认证：${{ auto: '自动', 'x-api-key': 'x-api-key', bearer: 'Bearer' }[f.auth]}` : '', f.proxy ? '使用代理' : ''].filter(Boolean).join(' · ');
+  return `<div class="more"><button type="button" class="more-toggle" data-act="nfMore" aria-expanded="${f.more}">更多设置<span class="sum">${sum}</span>${ic('chevD', 15)}</button>
+  ${f.more ? `<div class="more-body">
+    ${!off && anth ? `<div class="line"><div class="t">认证方式</div>${seg([['auto', '自动'], ['x-api-key', 'x-api-key'], ['bearer', 'Bearer']], f.auth, 'nfAuth')}</div>` : ''}
+    <div class="line"><div class="t">使用代理</div>${tg(f.proxy, 'nfProxy', '', '使用代理')}</div>
+    ${f.proxy ? `<input class="in mono-in" data-in="nf" data-k="proxyUrl" value="${esc(f.proxyUrl)}" placeholder="http://127.0.0.1:7890" aria-label="代理地址">` : ''}
+  </div>` : ''}</div>`;
+}
+function testRow() {
+  const f = S.nf;
+  let res = '';
+  if (f.test === 'running') res = '<div class="res run"><span class="spin"></span>正在测试…</div>';
+  else if (f.test === 'ok') { const r = f.result; res = `<div class="res ok">${ic('check', 15)}<div><b>连接成功</b>${r.list ? ` · 找到 ${r.list.length} 个模型` : ' · 服务未提供模型列表'}${r.note ? `<p>${r.note}</p>` : ''}</div></div>`; }
+  else if (f.test === 'fail') res = `<div class="res fail">${ic('alert', 15)}<div><b>${f.result.title}</b><p>${f.result.body}</p></div></div>`;
+  else if (f.test === 'stale') res = `<div class="res warn">${ic('alert', 15)}<div>连接信息已修改，需要重新测试</div></div>`;
+  return res ? `<div class="test-row">${res}</div>` : '';
+}
+function modelIds() { const f = S.nf; return f.available.length ? [...f.available, ...f.extra.filter((x) => !f.available.includes(x))] : f.selected; }
+function modelsCard() {
+  const f = S.nf, off = f.mode === 'official', hasList = f.available.length > 0;
+  const q = f.search.trim().toLowerCase();
+  const ids = modelIds().filter((id) => !q || id.toLowerCase().includes(q) || mLabel(id).toLowerCase().includes(q));
+  const rows = ids.map((id) => {
+    const sel = f.selected.includes(id), known = !!CM[id], isDef = id === f.def;
+    const right = isDef ? '<span class="pill">默认</span>' : sel ? `<button type="button" class="btn quiet hov" data-act="nfDef" data-arg="${esc(id)}">设为默认</button>` : '';
+    const rm = hasList ? '' : `<button type="button" class="btn quiet icon" aria-label="移除 ${esc(id)}" data-act="nfPick" data-arg="${esc(id)}">${ic('x', 14)}</button>`;
+    const attrs = hasList ? `role="checkbox" aria-checked="${sel}" tabindex="0" data-act="nfPick" data-arg="${esc(id)}"` : '';
+    return `<div class="mrow ${hasList ? 'pick' : ''} ${sel && hasList ? 'sel' : ''}" ${attrs}>${hasList ? `<span class="ck" aria-hidden="true">${sel ? ic('check', 11) : ''}</span>` : ''}<div class="mmain"><div class="mt">${esc(mLabel(id))}${known ? '' : '<span class="pill warn">能力未知</span>'}</div>${known ? `<div class="mid">${esc(id)}</div>` : ''}</div><div class="mctl">${right}${rm}</div></div>`;
+  }).join('');
+  const addLine = `<div class="add-line"><input class="in mono-in" id="nf-manual" data-in="nf" data-k="manual" data-enter="nfAddManual" value="${esc(f.manual)}" placeholder="输入模型 ID" aria-label="模型 ID"><button type="button" class="btn lg" data-act="nfAddManual">添加</button></div>`;
+  const chips = COMMON.filter((id) => !f.selected.includes(id));
+  const body = hasList
+    ? `${f.available.length > 8 ? `<label class="search">${ic('search', 14)}<input class="in" id="nf-search" data-in="nf" data-k="search" value="${esc(f.search)}" placeholder="搜索模型" aria-label="搜索模型"></label>` : ''}
+       <div class="mlist">${rows || '<div class="mrow"><span class="help">没有匹配的模型</span></div>'}</div>
+       ${f.adding ? addLine : '<div><button type="button" class="linkbtn" data-act="nfAdding">列表里没有？手动输入模型 ID</button></div>'}`
+    : `${chips.length ? `<div class="chips"><span class="lbl">常用</span>${chips.map((id) => `<button type="button" class="chip" data-act="nfPick" data-arg="${id}">${ic('plus', 12)}${id}</button>`).join('')}</div>` : ''}${addLine}${f.selected.length ? `<div class="mlist">${rows}</div>` : ''}`;
+  const bill = off ? '' : `<div class="bill"><div><div class="t">按官方价计费</div><div class="d">中转站 3 折就填 0.3</div></div><div class="stepper"><button type="button" data-act="nfMult" data-arg="-" aria-label="降低倍率">−</button><output>× ${f.mult.toFixed(2)}</output><button type="button" data-act="nfMult" data-arg="+" aria-label="提高倍率">+</button></div></div>`;
+  return `<section class="card" id="models-card"><div class="card-head"><h3>${hasList ? (off ? '模型' : '选择模型') : '添加模型'}</h3>${hasList ? `<span class="count">已选 ${f.selected.length} 个</span>` : ''}</div>${body}${bill}</section>`;
+}
+function footHtml() {
+  const f = S.nf, off = f.mode === 'official', running = f.test === 'running';
+  const cancel = '<button type="button" class="btn quiet lg" data-act="go" data-arg="catalog">取消</button>';
+  const testBtn = (label) => `<button type="button" class="btn primary lg" data-act="nfTest" ${canTest() && !running ? '' : 'disabled'}>${running ? '测试中…' : label}</button>`;
+  const saveBtn = `<button type="button" class="btn primary lg" data-act="nfSave" ${f.selected.length ? '' : 'disabled'}>保存连接</button>`;
+  const defHint = f.selected.length ? `默认：${esc(mLabel(f.def))}` : '至少选择一个模型';
+  if (off) return `<div class="foot"><span class="hint">${f.test === 'ok' ? defHint : ''}</span><div class="btns">${cancel}${f.test === 'ok' ? saveBtn : testBtn('测试连接')}</div></div>`;
+  if (f.step === 1) {
+    const skip = canTest() && !running && f.test !== 'ok' ? '<button type="button" class="linkbtn" data-act="nfSkip">跳过测试</button>' : '';
+    const next = f.test === 'ok' ? '<button type="button" class="btn primary lg" data-act="nfStep" data-arg="2">下一步</button>' : testBtn('测试并继续');
+    return `<div class="foot"><span class="hint">${skip}</span><div class="btns">${cancel}${next}</div></div>`;
+  }
+  return `<div class="foot"><span class="hint">${defHint}${f.test !== 'ok' ? ' · 保存后自动测试' : ''}</span><div class="btns"><button type="button" class="btn quiet lg" data-act="nfStep" data-arg="1">上一步</button>${saveBtn}</div></div>`;
+}
+function nfSelect(id) { const f = S.nf; if (f.selected.includes(id)) { f.selected = f.selected.filter((x) => x !== id); if (f.def === id) f.def = f.selected[0] || null; } else { f.selected.push(id); if (!f.def) f.def = id; } }
+
+/* ================= New: connection detail ================= */
+function newDetail() {
+  const c = curConn(); if (!c) return listScreen();
+  const anth = c.protocol === 'anthropic';
+  const testDesc = c.status === 'ok' ? `${c.testedAt}通过 · ${c.latency}` : c.status === 'fail' ? `<span style="color:var(--on-danger)">${esc(c.msg)}</span>` : c.status === 'testing' ? '正在测试…' : '未测试';
+  const editor = (inner, save) => `<div class="editor">${inner}<div class="editor-foot"><span class="hint"></span><div class="btns"><button type="button" class="btn quiet" data-act="edCancel">取消</button><button type="button" class="btn primary" data-act="${save}">保存</button></div></div></div>`;
+  const models = c.models.map((m) => {
+    const known = !!CM[m.id], isDef = m.id === c.def;
+    const menu = S.menu === m.id ? `<div class="menu" role="menu"><button type="button" role="menuitem" data-act="mDef" data-arg="${esc(m.id)}" ${isDef ? 'disabled' : ''}>设为默认</button><button type="button" role="menuitem" data-act="openModel" data-arg="${esc(m.id)}">编辑</button><button type="button" role="menuitem" class="dangerc" data-act="mDel" data-arg="${esc(m.id)}" ${isDef ? 'disabled title="默认模型不能删除"' : ''}>删除</button></div>` : '';
+    return `<div class="row link" data-act="openModel" data-arg="${esc(m.id)}"><div class="label"><div class="t">${esc(mLabel(m.id, m))}${isDef ? '<span class="pill">默认</span>' : ''}${known ? '' : '<span class="pill warn">能力未知</span>'}${m.fresh ? '<span class="pill ok">新</span>' : ''}</div><div class="d mono">${esc(m.id)}</div></div><div class="ctl"><button type="button" class="btn quiet icon" aria-label="更多操作" data-act="menu" data-arg="${esc(m.id)}">${ic('more', 16)}</button>${tg(m.on, 'mToggle', m.id, `启用 ${mLabel(m.id, m)}`)}${menu}</div></div>`;
+  }).join('');
+  return `<button type="button" class="crumb" data-act="go" data-arg="list">${ic('chevL', 14)}模型</button>
+  <div class="page-head"><span class="tile lg">${c.official ? 'A' : ic('plug', 18)}</span><div class="grow"><h2 class="sm">${esc(c.name)}</h2><p>${c.official ? 'Anthropic 官方' : `${PROTO[c.protocol].label} · ${esc(hostOf(c.base))}`} · ${statusHtml(c)}</p></div></div>
+  <section class="section"><div class="section-head"><div><h3>连接</h3></div></div><div class="group">
+    ${c.official ? '' : `<div class="row"><div class="label"><div class="t">名称</div></div><div class="ctl"><span class="val">${esc(c.name)}</span><button type="button" class="btn" data-act="edit" data-arg="name">编辑</button></div></div>
+    ${S.edit === 'name' ? editor(`<input class="in" id="ed-input" data-in="ed" data-enter="edSaveName" value="${esc(S.editVal)}" aria-label="名称">`, 'edSaveName') : ''}
+    <div class="row"><div class="label"><div class="t">服务地址</div><div class="d mono">${esc(reqUrl(c.base, c.protocol))}</div></div><div class="ctl"><button type="button" class="btn" data-act="edit" data-arg="url">编辑</button></div></div>
+    ${S.edit === 'url' ? editor(`<input class="in mono-in" id="ed-input" data-in="ed" value="${esc(S.editVal)}" aria-label="服务地址"><div id="live-ed">${edPreview()}</div>`, 'edSaveUrl') : ''}`}
+    <div class="row"><div class="label"><div class="t">API Key</div></div><div class="ctl"><span class="val mono">sk-••••${esc(c.tail)}</span><button type="button" class="btn" data-act="edit" data-arg="key">更换</button></div></div>
+    ${S.edit === 'key' ? editor(`<div class="keybox"><input id="ed-input" type="password" data-in="ed" value="${esc(S.editVal)}" placeholder="新的 API Key" aria-label="新的 API Key"></div>`, 'edSaveKey') : ''}
+    ${anth && !c.official ? `<div class="row"><div class="label"><div class="t">认证方式</div>${c.authMode === 'auto' ? `<div class="d">自动识别为 ${c.auth}</div>` : ''}</div><div class="ctl"><div class="sel sm"><select data-ch="cAuth" aria-label="认证方式">${[['auto', '自动'], ['x-api-key', 'x-api-key'], ['bearer', 'Bearer']].map(([v, l]) => `<option value="${v}" ${c.authMode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>${ic('chevD', 13)}</div></div></div>` : ''}
+    <div class="row"><div class="label"><div class="t">代理</div>${c.proxy ? '<div class="d mono">http://127.0.0.1:7890</div>' : ''}</div><div class="ctl">${tg(c.proxy, 'cProxy', '', '使用代理')}</div></div>
+    ${anth ? `<div class="row"><div class="label"><div class="t">提示缓存</div><div class="d">中转站不支持时关闭</div></div><div class="ctl">${tg(c.cache, 'cCache', '', '提示缓存')}</div></div>` : ''}
+    <div class="row"><div class="label"><div class="t">连接测试</div><div class="d" role="status">${testDesc}</div></div><div class="ctl"><button type="button" class="btn" data-act="cTest" ${c.status === 'testing' ? 'disabled' : ''}>${c.status === 'testing' ? '测试中…' : '测试'}</button></div></div>
+  </div></section>
+  <section class="section"><div class="section-head"><div><h3>模型</h3></div><div class="acts"><button type="button" class="btn quiet" data-act="cRefresh">${ic('refresh', 13)}刷新</button><button type="button" class="btn" data-act="edit" data-arg="addModel">${ic('plus', 13)}添加</button></div></div><div class="group">
+    ${S.edit === 'addModel' ? `<div class="editor"><div class="add-line"><input class="in mono-in" id="ed-input" data-in="ed" data-enter="edAddModel" value="${esc(S.editVal)}" placeholder="输入模型 ID" aria-label="模型 ID"><button type="button" class="btn primary lg" data-act="edAddModel">添加</button><button type="button" class="btn quiet lg" data-act="edCancel">取消</button></div></div>` : ''}${models}</div></section>
+  <section class="section"><div class="section-head"><div><h3>计费</h3></div></div><div class="group">
+    ${c.official ? '<div class="row"><div class="label"><div class="t">按官方价格</div></div></div>' : `<div class="row"><div class="label"><div class="t">计费方式</div></div><div class="ctl"><div class="sel"><select data-ch="cBilling" aria-label="计费方式"><option value="reference" ${c.billing === 'reference' ? 'selected' : ''}>按官方价折算</option><option value="token" ${c.billing === 'token' ? 'selected' : ''}>只统计 Token</option><option value="manual" ${c.billing === 'manual' ? 'selected' : ''}>逐个填写单价</option></select>${ic('chevD', 13)}</div></div></div>
+    ${c.billing === 'reference' ? `<div class="row"><div class="label"><div class="t">倍率</div><div class="d">中转站 3 折就填 0.3</div></div><div class="ctl"><div class="stepper"><button type="button" data-act="cMult" data-arg="-" aria-label="降低倍率">−</button><output>× ${c.mult.toFixed(2)}</output><button type="button" data-act="cMult" data-arg="+" aria-label="提高倍率">+</button></div></div></div>` : ''}`}
+  </div></section>
+  <section class="section"><div class="group"><div class="row"><div class="label"><div class="t">删除连接</div></div><div class="ctl"><button type="button" class="btn danger" data-act="delConn">删除</button></div></div></div></section>`;
+}
+function edPreview() { const c = curConn(); const n = normUrl(S.editVal, c.protocol); if (n.empty) return '<p class="help err">请填写服务地址</p>'; if (n.error) return `<p class="help err">${ic('alert', 12)}${n.error}</p>`; return `<p class="req">${ic('arrowR', 12)}<code>${esc(n.req)}</code>${n.notes.length ? `<span class="okc">${n.notes.join('，')}</span>` : ''}</p>`; }
+function cTestRun(c) {
+  c.status = 'testing'; render();
+  setTimeout(() => {
+    const r = simulate(c.protocol, c.authMode, c.official);
+    if (r.ok) { c.status = 'ok'; c.testedAt = '刚刚'; c.latency = `${320 + Math.round(Math.random() * 180)} ms`; c.auth = r.auth; c.msg = null; }
+    else { c.status = 'fail'; c.msg = `${r.title}：${r.body}`; }
+    render();
+  }, 900);
+}
+
+/* ================= New: model edit ================= */
+function openModel(id) {
+  const c = curConn(), m = c.models.find((x) => x.id === id), k = CM[id];
+  S.curModel = id;
+  S.me = { label: mLabel(id, m), override: !k, ctx: k ? String(k.ctx) : '', out: k ? String(k.out) : '', img: !!k, reason: k ? 'supported' : 'unknown', own: c.billing === 'manual' || !!m.price, price: m.price ? [...m.price] : ['', '', '', ''] };
+  go('model');
+}
+function modelEdit() {
+  const c = curConn(), id = S.curModel, me = S.me, k = CM[id];
+  if (!c || !me) return listScreen();
+  const f = c.official ? 1 : c.mult;
+  const priced = k && (c.official || c.billing === 'reference');
+  const priceSummary = priced ? `输入 ${money(k.r[0] * f)} · 输出 ${money(k.r[1] * f)} · 每百万 Token` : c.billing === 'token' ? '只统计 Token' : '未匹配官方价，只统计 Token';
+  const numRow = (key, label, ph) => `<div class="row"><div class="label"><div class="t">${label}</div></div><div class="ctl"><input class="in num" inputmode="numeric" data-in="me" data-k="${key}" value="${esc(me[key])}" placeholder="${ph}" aria-label="${label}"></div></div>`;
+  const capRows = me.override ? `${numRow('ctx', '上下文窗口', '200000')}${numRow('out', '最大输出', '64000')}
+    <div class="row"><div class="label"><div class="t">图片输入</div></div><div class="ctl">${tg(me.img, 'meImg', '', '图片输入')}</div></div>
+    <div class="row"><div class="label"><div class="t">推理</div></div><div class="ctl"><div class="sel sm"><select data-ch="meReason" aria-label="推理"><option value="supported" ${me.reason === 'supported' ? 'selected' : ''}>支持</option><option value="unsupported" ${me.reason === 'unsupported' ? 'selected' : ''}>不支持</option><option value="unknown" ${me.reason === 'unknown' ? 'selected' : ''}>不确定</option></select>${ic('chevD', 13)}</div></div></div>` : '';
+  const priceRows = me.own ? ['输入', '输出', '缓存读取', '缓存写入'].map((l, i) => `<div class="row"><div class="label"><div class="t">${l}</div></div><div class="ctl"><span class="help">$ / 百万</span><input class="in num" inputmode="decimal" data-in="me" data-k="price" data-i="${i}" value="${esc(me.price[i])}" placeholder="0.00" aria-label="${l}单价"></div></div>`).join('') : '';
+  return `<button type="button" class="crumb" data-act="go" data-arg="detail">${ic('chevL', 14)}${esc(c.name)}</button>
+  <div class="page-head"><div class="grow"><h2 class="sm">${esc(me.label || id)}</h2><p class="mono-s">${esc(id)}</p></div></div>
+  <section class="section"><div class="group">
+    <div class="row"><div class="label"><div class="t">显示名称</div></div><div class="ctl"><input class="in mid" data-in="me" data-k="label" value="${esc(me.label)}" aria-label="显示名称"></div></div>
+  </div></section>
+  <section class="section"><div class="section-head"><div><h3>能力</h3></div></div><div class="group">
+    <div class="row"><div class="label"><div class="t">${k ? `${fmtN(k.ctx)} 上下文 · ${fmtN(k.out)} 输出 · 图片 · 推理` : '能力未知，请手动填写'}</div>${k ? '<div class="d">已从模型目录匹配</div>' : ''}</div>${k ? `<div class="ctl"><span class="help">手动修改</span>${tg(me.override, 'meOverride', '', '手动修改能力')}</div>` : ''}</div>
+    ${capRows}
+  </div></section>
+  <section class="section"><div class="section-head"><div><h3>价格</h3></div></div><div class="group">
+    <div class="row"><div class="label"><div class="t">${me.own ? '单独设置单价' : priceSummary}</div>${!me.own && priced && !c.official ? `<div class="d">官方价 × ${c.mult.toFixed(2)}</div>` : ''}</div>${c.billing !== 'manual' && !c.official ? `<div class="ctl"><span class="help">单独设置</span>${tg(me.own, 'meOwn', '', '单独设置单价')}</div>` : ''}</div>
+    ${priceRows}
+  </div></section>
+  <div class="foot"><span class="hint"></span><div class="btns"><button type="button" class="btn quiet lg" data-act="go" data-arg="detail">取消</button><button type="button" class="btn primary lg" data-act="meSave">保存</button></div></div>`;
+}
+/* ================= Old: replica screens ================= */
+function openOldForm(o = {}) {
+  S.of = { editing: o.editing || null, official: !!o.official, key: '', showKey: false, name: o.name ?? '自定义服务（Anthropic）', url: o.url || '', model: '', mlabel: '', ctx: '', max: '', img: false, rsrc: 'auto', rref: '', rsup: 'unknown', price: false, cur: 'USD', pin: '', pout: '', pcr: '', pcw: '', adv: false, cid: '', proxy: o.proxy || false, proxyUrl: '', cache: o.cache ?? true, err: null };
+  go('setup');
+}
+function oSaveDisabled() { const o = S.of; return (!o.editing && !o.key.trim()) || !o.url.trim() || (!o.editing && !o.model.trim()) || (o.proxy && !o.proxyUrl.trim()); }
+function oV1() { return /\/v1\/?$/.test(S.of.url) ? '<div class="o-v1"><span>Anthropic 服务地址不要包含末尾 /v1。</span><button type="button" data-act="oStripV1">移除 /v1</button></div>' : ''; }
+function oReason() { const o = S.of; const id = (o.rref || o.model).trim(); const k = CM[id]; if (!id || !k) return '<p style="font-size:12px;color:var(--muted)">未找到匹配 · 推理能力未知</p>'; return `<p style="font-size:12px;color:var(--muted)">内置目录 · 支持推理</p><p style="font-size:12px;color:var(--muted)">目录档位：low、medium、high</p>`; }
+function oSaveBtn() { return `${iss(8, true)}<button type="button" class="btn quiet lg" data-act="oBack">取消</button><button type="button" class="btn primary lg" data-act="oSave" ${oSaveDisabled() ? 'disabled' : ''}>保存供应商</button>`; }
+function oldForm() {
+  const o = S.of, ed = !!o.editing;
+  const title = ed ? `编辑 ${o.name}` : o.official ? '连接 Anthropic' : '连接 自定义服务（Anthropic）';
+  const inp = (k, ph, extra = '') => `<input class="o-in" data-in="o" data-k="${k}" value="${esc(o[k])}" placeholder="${ph}" ${extra}>`;
+  const model = ed ? '' : `<div class="o-sec"><h4>第一个模型${iss(6)}${iss(7)}</h4><p>创建连接时至少添加一个模型；首个模型会自动启用并成为连接默认模型。</p>
+    <label class="o-field"><span class="l">API 模型 ID · 必填</span>${inp('model', '例如 claude-opus-5-5')}</label>
+    <label class="o-field"><span class="l">显示名称</span>${inp('mlabel', '留空时使用 API 模型 ID')}</label>
+    <div class="o-grid2"><label class="o-field"><span class="l">上下文窗口</span>${inp('ctx', '可留空', 'inputmode="numeric"')}</label><label class="o-field"><span class="l">最大输出 Token</span>${inp('max', '可留空', 'inputmode="numeric"')}</label></div>
+    <div class="o-box"><div class="o-sw"><div><p class="t">支持图片输入</p><p class="d">声明中转站接受图片内容。</p></div>${tg(o.img, 'oTog', 'img', '支持图片输入')}</div></div>
+    <fieldset class="o-fs"><legend>模型推理能力</legend>
+      <label>能力来源<select class="o-sel" data-ch="o" data-k="rsrc"><option value="auto" ${o.rsrc === 'auto' ? 'selected' : ''}>自动匹配目录</option><option value="manual" ${o.rsrc === 'manual' ? 'selected' : ''}>手动配置</option></select></label>
+      ${o.rsrc === 'auto' ? `<label>参考模型（可选）<select class="o-sel" data-ch="o" data-k="rref"><option value="">按 API 模型 ID 精确匹配</option>${REF_MODELS.map((m) => `<option ${o.rref === m ? 'selected' : ''}>${m}</option>`).join('')}</select></label><div id="live-oreason">${oReason()}</div>`
+        : `<label>推理支持<select class="o-sel" data-ch="o" data-k="rsup"><option value="unknown">未知</option><option value="supported" ${o.rsup === 'supported' ? 'selected' : ''}>支持</option><option value="unsupported" ${o.rsup === 'unsupported' ? 'selected' : ''}>不支持</option></select></label>${o.rsup === 'supported' ? `<span style="font-size:12px;color:var(--muted)">支持的强度</span><div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px">${['minimal', 'low', 'medium', 'high', 'xhigh', 'max'].map((e) => `<label style="display:flex;flex-direction:row;align-items:center;gap:4px;color:var(--text)"><input type="checkbox">${e}</label>`).join('')}</div><label>默认强度<select class="o-sel"><option>自动（不指定强度）</option></select></label><label style="display:flex;flex-direction:row;align-items:center;gap:6px;color:var(--text)"><input type="checkbox">允许关闭推理</label>` : ''}`}
+      <p class="note">中转服务可能只支持部分参数；目录匹配和请求成功均不代表内部推理已经生效。</p></fieldset>
+    <fieldset class="o-fs"><legend>手动价格</legend><div class="o-sw"><div><p class="t">记录此中转站的实际单价</p><p class="d">关闭时只统计 Token，不估算金额。所有价格均为每百万 Token。</p></div>${tg(o.price, 'oTog', 'price', '启用手动价格')}</div>
+      ${o.price ? `<div class="o-grid2"><label>币种<select class="o-sel" data-ch="o" data-k="cur"><option>USD</option><option ${o.cur === 'CNY' ? 'selected' : ''}>CNY</option></select></label>${[['pin', '标准输入'], ['pout', '输出'], ['pcr', '缓存读取'], ['pcw', '缓存写入']].map(([k, l]) => `<label>${l}<input class="o-sel" inputmode="decimal" data-in="o" data-k="${k}" value="${esc(o[k])}" placeholder="0.00"></label>`).join('')}</div>` : ''}</fieldset></div>`;
+  return `<button type="button" class="crumb" data-act="oBack">${ic('chevL', 14)}返回添加连接</button>${ed ? iss(10) : ''}
+  <div class="page-head"><span class="tile lg">A</span><div class="grow"><h2 class="sm">${esc(title)}</h2><p>完成必要配置后，连接会出现在模型页上方。</p></div></div>
+  <div class="o-form">
+    <label class="o-field"><span class="l">${ed ? 'API Key（可选）' : 'API Key · 必填'}${iss(2)}${iss(5)}</span><span class="o-key"><input type="${o.showKey ? 'text' : 'password'}" data-in="o" data-k="key" value="${esc(o.key)}" placeholder="${ed ? '留空以保留当前 Key' : '输入或粘贴 API Key'}" autocomplete="off" aria-label="API Key"><button type="button" data-act="oEye" aria-label="显示 API Key">${ic(o.showKey ? 'eyeOff' : 'eye', 15)}</button></span></label>
+    <label class="o-field"><span class="l">显示名称${iss(3)}</span>${inp('name', '例如 公司中转站')}</label>
+    <div class="o-field"><span class="l">服务地址 · 必填${iss(4)}</span><span class="o-hint">填写站点根地址，例如 https://cheaprouter.cc；系统会调用 /v1/messages。</span>${inp('url', 'https://example.com', 'aria-label="服务地址"')}<div id="live-ov1">${oV1()}</div></div>
+    ${model}
+    <div><button type="button" class="o-sum" data-act="oTog" data-arg="adv" aria-expanded="${o.adv}">高级连接设置${ic('chevD', 15)}</button>
+    ${o.adv ? `<div style="display:grid;gap:16px;padding-top:12px"><label class="o-field"><span class="l">连接标识</span>${inp('cid', '自动生成', ed ? 'disabled' : '')}</label>
+      <div class="o-box"><div class="o-sw"><div><p class="t">仅为此连接启用代理</p><p class="d">不会影响其他模型服务。</p></div>${tg(o.proxy, 'oTog', 'proxy', '启用连接代理')}</div></div>
+      ${o.proxy ? `<label class="o-field"><span class="l">HTTP(S) 代理地址</span>${inp('proxyUrl', 'http://127.0.0.1:7890')}</label>` : ''}
+      <div class="o-box"><div class="o-sw"><div><p class="t">Anthropic Prompt Cache</p><p class="d">短缓存为稳定前缀添加 ephemeral 断点；可关闭以适配不支持缓存的中转站。</p></div>${tg(o.cache, 'oTog', 'cache', 'Anthropic Prompt Cache')}</div></div></div>` : ''}</div>
+    ${o.err ? `<p class="o-err" role="alert">${esc(o.err)}</p>` : ''}
+  </div>
+  <div class="o-foot" id="live-osave">${oSaveBtn()}</div>`;
+}
+function oldDetail() {
+  const c = curConn(); if (!c) return listScreen();
+  const req = `${c.base.replace(/\/+$/, '')}/v1/messages`, dbl = /\/v1\/messages$/i.test(c.base);
+  const row = (t, d, v, act, mono = false, extra = '') => `<div class="row"><div class="label"><div class="t">${t}${extra}</div>${d ? `<div class="d">${d}</div>` : ''}</div><div class="ctl">${v !== null ? `<span class="val ${mono ? 'mono' : ''}" title="${esc(v)}">${esc(v)}</span>` : ''}${act ? `<button type="button" class="btn" data-act="oEdit">编辑</button>` : ''}</div></div>`;
+  const models = c.models.map((m) => {
+    const isDef = m.id === c.def, k = CM[m.id];
+    return `<div class="o-mrow"><div style="min-width:0;flex:1"><p class="n">${esc(m.label || m.id)}${isDef ? '<span class="pill">默认</span>' : ''}${m.price ? '<span class="pill">手动价格</span>' : ''}</p><p class="i">${esc(m.id)}</p><p class="m">${m.ctx ? `${fmtN(+m.ctx)} 上下文` : '上下文未知'} · 输出上限未知 · 仅文本 · ${m.price ? '手动价格' : '仅统计 Token'}</p></div><div class="a">${isDef ? `<span style="color:var(--operational);padding:0 8px">${ic('check', 16)}</span>` : '<button type="button" class="btn quiet">设为默认</button>'}<button type="button" class="ib" data-act="oAddModel" aria-label="编辑">${ic('pencil', 15)}</button><button type="button" class="ib" data-act="oTrash" data-arg="${esc(m.id)}" aria-label="删除">${ic('trash', 15)}</button>${tg(m.on, 'noop', '', '启用')}</div></div>`;
+  }).join('');
+  return `<button type="button" class="crumb" data-act="go" data-arg="list">${ic('chevL', 14)}模型</button>
+  <div class="page-head"><span class="tile lg">A</span><div class="grow"><h2 class="sm">${esc(c.name)}</h2><p>${c.official ? 'Anthropic' : '自定义服务（Anthropic）'} · <span class="mono-s">${esc(c.id)}</span>${iss(10)}</p></div></div>
+  <section class="section"><div class="section-head"><div><h3>连接</h3><p>密钥只保存在本机。</p></div></div><div class="group">
+    ${row('服务名称', '可自定义名称，不影响协议和模型绑定。', c.name, true)}
+    ${row('协议格式', '决定认证头、请求体与接口路径。', 'Anthropic Messages', false)}
+    ${row('基础地址', 'Anthropic 请填写站点根地址，不要带 /v1。', c.base, true, true)}
+    ${row('实际请求地址', '连接测试和模型调用使用的最终接口。', req, false, true, dbl ? iss(4) : '')}
+    ${row('代理', '仅此连接使用。', c.proxy ? '已开启' : '关闭', true)}
+    ${row('Prompt Cache', '短缓存会为系统提示、最后一个工具定义和最近用户消息添加缓存断点。', c.cache ? '短缓存' : '关闭', true)}
+    ${row('默认模型', '连接测试和未显式选择模型时使用。', c.def, false, true)}
+    <div class="row"><div class="label"><div class="t">连接测试</div><div class="d" role="status">${c.testing ? '测试中…' : c.msg ? esc(c.msg) : '发送 1 Token 的最小真实请求，不写缓存。'}</div></div><div class="ctl"><button type="button" class="btn" data-act="oTest" ${c.testing ? 'disabled' : ''}>${c.testing ? '测试中…' : '测试默认模型'}</button></div></div>
+  </div></section>
+  <section class="section"><div class="section-head"><div><h3>模型</h3><p>手动维护此连接可用的模型与计费单价。</p></div></div>
+    <div class="o-models-top"><p>模型 ID、能力和价格均为此连接独立配置，不会从中转站自动拉取。</p><button type="button" class="btn primary" data-act="oAddModel">${ic('plus', 14)}添加模型</button></div><div class="o-mlist">${models}</div></section>
+  <section class="section"><div class="section-head"><div><h3>危险操作</h3></div></div><div class="group"><div class="row"><div class="label"><div class="t">删除连接</div><div class="d">清除 Key 和连接配置；历史会话与使用统计会保留。</div></div><div class="ctl">${iss(11, true)}<button type="button" class="btn danger" data-act="oDel">删除连接</button></div></div></div></section>`;
+}
+
+/* ================= Chrome: version, tweaks, dialog ================= */
+function tweaksHtml() {
+  const old = S.ver === 'old';
+  return `<div class="tw-head"><b>DEMO 调节</b><button type="button" data-act="twMin">${S.twMin ? '展开' : '收起'}</button></div>
+  <div class="tw"><span>模拟服务端<em>影响测试结果</em></span>${seg([['ok', '正常'], ['bearer', '要求 Bearer'], ['nolist', '无模型列表'], ['badkey', 'Key 错误']], S.scen, 'scen', 'g2')}</div>
+  <div class="tw ${old ? '' : 'dim'}"><span>问题标注${old ? '<em>悬停编号查看</em>' : '<em>现状生效</em>'}</span>${seg([['on', '显示'], ['off', '隐藏']], S.issues ? 'on' : 'off', 'iss')}</div>
+  <div class="tw"><span>主题</span>${seg([['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']], S.theme, 'theme')}</div>
+  <div class="tw-acts"><button type="button" class="btn" data-act="fill">填入示例</button><button type="button" class="btn quiet" data-act="reset">重置</button></div>`;
+}
+function dialogHtml() {
+  const d = S.dialog; if (!d) return '';
+  const c = curConn();
+  const t = d.kind === 'delConn' ? { h: `删除 ${c.name}？`, p: 'API Key 和这个连接下的模型会一起删除，历史会话和使用统计会保留。', ok: '删除连接' }
+    : { h: `删除 ${mLabel(d.id, c.models.find((m) => m.id === d.id))}？`, p: '历史会话和使用统计会保留。', ok: '删除模型' };
+  return `<div class="scrim" data-act="dlgClose"><div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t" data-act="noop"><h3 id="dlg-t">${esc(t.h)}</h3><p>${t.p}</p><div class="btns"><button type="button" class="btn lg" data-act="dlgClose" id="dlg-cancel">取消</button><button type="button" class="btn danger-fill lg" data-act="dlgOk">${t.ok}</button></div></div></div>`;
+}
+function screen() {
+  const old = S.ver === 'old';
+  switch (S.route) {
+    case 'catalog': return catalogScreen();
+    case 'setup': return old ? (S.of ? oldForm() : listScreen()) : (S.nf ? newForm() : listScreen());
+    case 'detail': return old ? oldDetail() : newDetail();
+    case 'model': return old ? listScreen() : modelEdit();
+    default: return listScreen();
+  }
+}
+function render() {
+  document.body.classList.toggle('show-iss', S.issues && S.ver === 'old');
+  $('#ver').innerHTML = seg([['old', '现状'], ['new', '新方案']], S.ver, 'ver', 'ver');
+  $('#main').innerHTML = `<div class="page">${screen()}</div>`;
+  const tw = $('#tweaks'); tw.innerHTML = tweaksHtml(); tw.classList.toggle('min', S.twMin);
+  $('#dlg').innerHTML = dialogHtml();
+  if (S.dialog) $('#dlg-cancel')?.focus();
+}
+
+/* ================= Actions ================= */
+const MULTS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.5, 2];
+function stepMult(v, dir) { const i = MULTS.findIndex((x) => Math.abs(x - v) < 1e-9); const j = Math.max(0, Math.min(MULTS.length - 1, (i < 0 ? 5 : i) + (dir === '+' ? 1 : -1))); return MULTS[j]; }
+function uuid() { try { return crypto.randomUUID(); } catch { return 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16)); } }
+function focusEd() { requestAnimationFrame(() => { const el = $('#ed-input'); if (el) { el.focus(); el.setSelectionRange?.(el.value.length, el.value.length); } }); }
+function scrollToModels() { document.getElementById('models-card')?.scrollIntoView({ behavior: RM ? 'auto' : 'smooth', block: 'start' }); }
+
+const A = {
+  noop() {},
+  navOther() { toast('Demo 只演示「模型」里的连接流程'); },
+  ver(a) { S.ver = a; S.menu = null; S.edit = null; S.dialog = null; if (!['list', 'catalog'].includes(S.route)) S.route = 'list'; render(); $('#main').scrollTop = 0; },
+  scen(a) { S.scen = a; render(); },
+  iss(a) { S.issues = a === 'on'; render(); },
+  theme(a) { S.theme = a; applyTheme(); render(); },
+  twMin() { S.twMin = !S.twMin; render(); },
+  reset() { initState(true); applyTheme(); render(); toast('已重置示例数据'); },
+  fill() {
+    if (S.route !== 'setup') { toast('先进入「添加连接」里的表单'); return; }
+    if (S.ver === 'old') { const o = S.of; o.key = SAMPLE_KEY; if (!o.editing) { if (!o.official) o.url = SAMPLE_URL; o.model = 'claude-sonnet-5'; } render(); return; }
+    const f = S.nf; f.key = SAMPLE_KEY;
+    if (f.mode !== 'official' && !f.url) f.url = SAMPLE_URL;
+    invalidate(); render();
+  },
+  go(a) { if (a === 'detail' && !curConn()) a = 'list'; go(a); },
+  openConn(a) { if (a === 'deepseek' || a === 'kimi') { toast('Demo 只演示自定义连接'); return; } S.cur = a; go('detail'); },
+  pick(a) {
+    if (S.ver === 'old') {
+      if (a === 'anthropic') return openOldForm({ official: true, name: 'Anthropic', url: 'https://api.anthropic.com' });
+      if (a === 'anthropic-compatible') return openOldForm({});
+      return toast('Demo 只演示 Anthropic 相关的流程');
+    }
+    if (a === 'anthropic') return openNewForm('official');
+    if (a === 'custom') return openNewForm('custom');
+    toast('Demo 只演示 Anthropic 和自定义服务');
+  },
+  // new form
+  proto(a) { const f = S.nf; f.protocol = a; f.protoNote = false; invalidate(); render(); },
+  nfEye() { S.nf.showKey = !S.nf.showKey; render(); $('#nf-key')?.focus(); },
+  nfMore() { S.nf.more = !S.nf.more; setLive('live-more', moreBlock()); },
+  nfAuth(a) { S.nf.auth = a; invalidate(); render(); },
+  nfProxy() { S.nf.proxy = !S.nf.proxy; setLive('live-more', moreBlock()); },
+  nfTest() {
+    const f = S.nf; if (!canTest() || f.test === 'running') return;
+    f.test = 'running'; f.result = null; render();
+    setTimeout(() => {
+      if (S.nf !== f) return;
+      const r = simulate(f.protocol, f.auth, f.mode === 'official');
+      if (r.ok) {
+        f.test = 'ok'; f.result = r; f.available = r.list || [];
+        if (!f.selected.length && r.list) { const pre = r.list.filter((id) => COMMON.includes(id)); f.selected = pre.length ? pre : [r.list[0]]; f.def = f.selected.includes('claude-sonnet-5') ? 'claude-sonnet-5' : f.selected[0]; }
+        if (f.mode === 'custom') f.step = 2;
+      } else { f.test = 'fail'; f.result = r; if (r.openMore) f.more = true; }
+      render();
+      if (r.ok && f.mode === 'official') scrollToModels();
+      if (r.ok && f.mode === 'custom') $('#main').scrollTop = 0;
+    }, 900);
+  },
+  nfSkip() { const f = S.nf; f.skip = true; f.available = []; f.step = 2; render(); $('#main').scrollTop = 0; },
+  nfStep(a) { S.nf.step = +a; render(); $('#main').scrollTop = 0; },
+  nfPick(a) { const f = S.nf; if (!f.available.includes(a) && !f.extra.includes(a)) f.extra.push(a); nfSelect(a); render(); },
+  nfDef(a) { S.nf.def = a; render(); },
+  nfAdding() { S.nf.adding = true; render(); $('#nf-manual')?.focus(); },
+  nfAddManual() {
+    const f = S.nf, id = f.manual.trim(); if (!id) { $('#nf-manual')?.focus(); return; }
+    if (!f.available.includes(id) && !f.extra.includes(id)) f.extra.push(id);
+    if (!f.selected.includes(id)) nfSelect(id);
+    f.manual = ''; render(); $('#nf-manual')?.focus();
+    toast(CM[id] ? `已添加 ${CM[id].label}` : `已添加 ${id}，能力可在保存后补充`);
+  },
+  nfMult(a) { S.nf.mult = stepMult(S.nf.mult, a); render(); },
+  nfSave() {
+    const f = S.nf; if (!f.selected.length) return;
+    const n = nfNorm(), off = f.mode === 'official';
+    const c = { id: `n${Date.now()}`, name: off ? 'Anthropic' : n.host, protocol: off ? 'anthropic' : f.protocol, base: n.base, authMode: f.auth, auth: f.result?.auth || (f.auth === 'bearer' ? 'Bearer Token' : 'x-api-key'), tail: f.key.trim().slice(-4), status: f.test === 'ok' ? 'ok' : 'untested', testedAt: '刚刚', latency: '412 ms', models: f.selected.map((id) => ({ id, on: true })), def: f.def, billing: off ? 'official' : 'reference', mult: off ? 1 : f.mult, proxy: f.proxy, cache: true, official: off, msg: null };
+    C().push(c); S.cur = c.id; S.nf = null; go('detail');
+    toast(`已保存 ${c.name}`);
+    if (c.status === 'untested') setTimeout(() => cTestRun(c), 400);
+  },
+  // new detail
+  edit(a) { const c = curConn(); S.edit = S.edit === a ? null : a; S.editVal = a === 'url' ? c.base : a === 'name' ? c.name : ''; S.menu = null; render(); focusEd(); },
+  edCancel() { S.edit = null; render(); },
+  edSaveName() { const c = curConn(), v = S.editVal.trim(); if (!v) { toast('名称不能为空'); return; } c.name = v; S.edit = null; render(); toast('已保存'); },
+  edSaveUrl() { const c = curConn(), n = normUrl(S.editVal, c.protocol); if (!n.base) { toast(n.error || '请填写服务地址'); return; } c.base = n.base; S.edit = null; cTestRun(c); },
+  edSaveKey() { const c = curConn(), v = S.editVal.trim(); if (!v) { toast('请填写新的 API Key'); return; } c.tail = v.slice(-4); S.edit = null; cTestRun(c); },
+  edAddModel() {
+    const c = curConn(), id = S.editVal.trim(); if (!id) { focusEd(); return; }
+    if (c.models.some((m) => m.id === id)) { toast('这个模型已在列表里'); return; }
+    c.models.push({ id, on: true }); S.edit = null; render();
+    toast(CM[id] ? `已添加 ${CM[id].label}` : `已添加 ${id}，点开可补充能力`);
+  },
+  cTest() { cTestRun(curConn()); },
+  cProxy() { const c = curConn(); c.proxy = !c.proxy; render(); },
+  cCache() { const c = curConn(); c.cache = !c.cache; render(); },
+  cMult(a) { const c = curConn(); c.mult = stepMult(c.mult, a); render(); },
+  cRefresh() {
+    const c = curConn();
+    if (S.scen === 'nolist' && !c.official) { toast('服务未提供模型列表，请手动添加'); return; }
+    const list = c.official ? OFFICIAL : c.protocol === 'anthropic' ? RELAY : OPENAI_LIST;
+    const fresh = list.filter((id) => !c.models.some((m) => m.id === id)).slice(0, 2);
+    fresh.forEach((id) => c.models.push({ id, on: false, fresh: true }));
+    render(); toast(fresh.length ? `发现 ${fresh.length} 个新模型，默认不启用` : '没有新模型');
+  },
+  menu(a) { S.menu = S.menu === a ? null : a; render(); },
+  mToggle(a) { const c = curConn(), m = c.models.find((x) => x.id === a); if (m.id === c.def && m.on) { toast('默认模型不能停用'); return; } m.on = !m.on; m.fresh = false; render(); },
+  mDef(a) { const c = curConn(); c.def = a; const m = c.models.find((x) => x.id === a); m.on = true; S.menu = null; render(); },
+  mDel(a) { S.menu = null; S.dialog = { kind: 'delModel', id: a }; render(); },
+  openModel(a) { S.menu = null; openModel(a); },
+  delConn() { S.dialog = { kind: 'delConn' }; render(); },
+  dlgClose() { S.dialog = null; render(); },
+  dlgOk() {
+    const d = S.dialog, c = curConn(); S.dialog = null;
+    if (d.kind === 'delConn') { S.conns[S.ver] = C().filter((x) => x.id !== c.id); go('list'); toast(`已删除 ${c.name}`); }
+    else { c.models = c.models.filter((m) => m.id !== d.id); render(); toast('已删除模型'); }
+  },
+  // model edit
+  meOverride() { S.me.override = !S.me.override; render(); },
+  meImg() { S.me.img = !S.me.img; render(); },
+  meOwn() { S.me.own = !S.me.own; render(); },
+  meSave() {
+    const c = curConn(), m = c.models.find((x) => x.id === S.curModel), me = S.me;
+    if (me.own && me.price.some((v) => v === '' || !(Number(v) >= 0))) { toast('请填完四项单价'); return; }
+    m.label = me.label.trim() && me.label.trim() !== (CM[m.id]?.label || m.id) ? me.label.trim() : null;
+    m.price = me.own ? [...me.price] : null;
+    go('detail'); toast('已保存');
+  },
+  // old
+  oBack() { const o = S.of; if (o?.editing) { S.cur = o.editing; go('detail'); } else go('catalog'); },
+  oEye() { S.of.showKey = !S.of.showKey; render(); },
+  oTog(a) { S.of[a] = !S.of[a]; render(); },
+  oStripV1() { S.of.url = S.of.url.replace(/\/v1\/?$/, ''); render(); },
+  oSave() {
+    const o = S.of; o.err = null;
+    let base;
+    try { const u = new URL(o.url.trim()); if (!/^https?:$/.test(u.protocol)) throw new Error(); base = u.toString().replace(/\/$/, ''); } catch { o.err = '服务地址无效。'; render(); return; }
+    if (/\/v1$/i.test(new URL(base).pathname.replace(/\/+$/, ''))) { o.err = 'Anthropic 服务地址请填写根地址，不要包含 /v1。'; render(); return; }
+    if (!o.editing) {
+      const int = (v) => !v.trim() || (Number.isSafeInteger(+v) && +v > 0);
+      if (!int(o.ctx)) { o.err = '上下文窗口必须是正整数或留空。'; render(); return; }
+      if (!int(o.max)) { o.err = '最大输出 Token必须是正整数或留空。'; render(); return; }
+      if (o.price) for (const [k, l] of [['pin', '标准输入'], ['pout', '输出'], ['pcr', '缓存读取'], ['pcw', '缓存写入']]) if (!o[k].trim()) { o.err = `请填写${l}价格。`; render(); return; }
+    }
+    if (o.editing) {
+      const c = C().find((x) => x.id === o.editing);
+      c.name = o.name.trim() || c.name; c.base = base; c.proxy = o.proxy; c.cache = o.cache; c.status = 'untested'; c.msg = null;
+      S.cur = c.id; S.of = null; go('detail'); return;
+    }
+    const id = o.cid.trim() || `custom-${uuid()}`;
+    C().push({ id, name: o.name.trim() || id, base, status: 'untested', models: [{ id: o.model.trim(), on: true, label: o.mlabel.trim() || null, price: o.price, ctx: o.ctx }], def: o.model.trim(), proxy: o.proxy, cache: o.cache, official: o.official, msg: null });
+    S.of = null; go('list'); toast('现状：保存后直接回到列表，没有测试，也显示「已连接」');
+  },
+  oEdit() { const c = curConn(); openOldForm({ editing: c.id, name: c.name, url: c.base, proxy: c.proxy, cache: c.cache }); },
+  oTest() {
+    const c = curConn(); c.testing = true; render();
+    setTimeout(() => {
+      c.testing = false;
+      if (/\/v1\/messages$/i.test(c.base)) { c.status = 'unavailable'; c.msg = '请求失败（404）：接口不存在。'; }
+      else if (S.scen === 'badkey' || S.scen === 'bearer') { c.status = 'unavailable'; c.msg = '认证失败（401）：请检查 API Key。'; }
+      else { c.status = 'available'; c.msg = '连接成功，默认模型可用。'; }
+      render();
+    }, 900);
+  },
+  oDel() { const c = curConn(); S.conns.old = S.conns.old.filter((x) => x.id !== c.id); go('list'); toast('现状：点一下就删了，没有确认'); },
+  oAddModel() { toast('现状：打开和创建页一样的完整模型表单，一次只能加一个'); },
+  oTrash(a) { const c = curConn(); if (a === c.def) { toast('现状：默认模型删除失败，只在页面底部报错'); return; } c.models = c.models.filter((m) => m.id !== a); render(); toast('现状：模型点一下就删了，没有确认'); }
+};
+
+/* ================= Input handlers ================= */
+const IN = {
+  catQ(el) { S.q = el.value; setLive('catlist', catalogList()); },
+  nf(el) {
+    const f = S.nf, k = el.dataset.k; f[k] = el.value;
+    if (k === 'url') {
+      const n = normUrl(f.url, f.protocol);
+      if (n.inferred) { f.protocol = n.inferred; f.protoNote = true; setLive('live-proto', protoField()); setLive('live-more', moreBlock()); }
+      invalidate(); setLive('live-url', urlPreview());
+    }
+    if (k === 'key') invalidate();
+    if (k === 'search') { const mc = $('#models-card'); if (mc) { mc.outerHTML = modelsCard(); const s = $('#nf-search'); s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }
+    if (k === 'url' || k === 'key') setLive('live-test', testRow());
+    setLive('live-foot', footHtml());
+  },
+  ed(el) { S.editVal = el.value; if (S.edit === 'url') setLive('live-ed', edPreview()); },
+  me(el) { const k = el.dataset.k; if (k === 'price') S.me.price[+el.dataset.i] = el.value; else S.me[k] = el.value; },
+  o(el) { const o = S.of, k = el.dataset.k; o[k] = el.value; if (k === 'url') setLive('live-ov1', oV1()); if (k === 'model') setLive('live-oreason', oReason()); setLive('live-osave', oSaveBtn()); }
+};
+const CH = {
+  catSel(el) { S.cat = el.value; setLive('catlist', catalogList()); },
+  cAuth(el) { const c = curConn(); c.authMode = el.value; cTestRun(c); },
+  cBilling(el) { curConn().billing = el.value; render(); },
+  meReason(el) { S.me.reason = el.value; render(); },
+  o(el) { S.of[el.dataset.k] = el.value; render(); }
+};
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-act]');
+  const act = t?.dataset.act;
+  if (S.menu && act !== 'menu' && !e.target.closest('.menu')) { S.menu = null; if (!act || act === 'noop') { render(); return; } }
+  if (!t || !A[act]) return;
+  if (t.disabled) return;
+  if (act !== 'noop') e.preventDefault();
+  A[act](t.dataset.arg, t, e);
+});
+document.addEventListener('input', (e) => { const k = e.target.dataset?.in; if (k && IN[k] && e.target.tagName !== 'SELECT') IN[k](e.target); });
+document.addEventListener('change', (e) => { const k = e.target.dataset?.ch; if (k && CH[k]) CH[k](e.target); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (S.dialog) { S.dialog = null; render(); } else if (S.menu) { S.menu = null; render(); } return; }
+  if (e.key === 'Enter' && e.target.dataset?.enter) { e.preventDefault(); A[e.target.dataset.enter](); return; }
+  if ((e.key === ' ' || e.key === 'Enter') && e.target.getAttribute?.('role') === 'checkbox' && e.target.dataset.act) { e.preventDefault(); A[e.target.dataset.act](e.target.dataset.arg); }
+});
+
+initState(false);
+applyTheme();
+render();
+</script>

@@ -6,14 +6,14 @@ import {
   useEffect,
   useRef,
   useState,
-  type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronRight, CircleAlert, Loader2, Minus, Plus, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, CircleAlert, Minus, Plus, RotateCcw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
+import { Button, buttonClass } from "../ui/Button";
 
 /**
  * 设置页通用展示原子组件。样式所有权：这些组件只负责"长什么样"，
@@ -41,8 +41,8 @@ export function PageShell({
   return (
     <div className={cx("mx-auto w-full px-12 pb-24 pt-9 max-[600px]:px-4 max-[600px]:pb-16 max-[600px]:pt-6", width === "wide" ? "max-w-[928px]" : "max-w-[736px]")}>
       <header className="flex min-w-0 flex-col gap-1">
-        <h2 className="text-[20px] font-semibold leading-tight tracking-tight text-text-main">{title}</h2>
-        {description ? <p className="max-w-[62ch] text-[13px] leading-relaxed text-text-muted">{description}</p> : null}
+        <h2 className="text-act-xl font-semibold leading-tight tracking-tight text-text-main">{title}</h2>
+        {description ? <p className="max-w-[62ch] text-act-sm leading-relaxed text-text-muted">{description}</p> : null}
       </header>
       <div className="mt-9 flex min-w-0 flex-col gap-9 max-[600px]:mt-6 max-[600px]:gap-7">{children}</div>
     </div>
@@ -50,7 +50,7 @@ export function PageShell({
 }
 
 function GroupHeading({ level, children }: { level: 3 | 4; children: ReactNode }) {
-  const className = "text-[13px] font-semibold text-text-main";
+  const className = "text-act-sm font-semibold text-text-main";
   return level === 3 ? <h3 className={className}>{children}</h3> : <h4 className={className}>{children}</h4>;
 }
 
@@ -92,7 +92,7 @@ function GroupHeader({
     <header className="flex items-end justify-between gap-4 px-0.5 max-[600px]:flex-col max-[600px]:items-start max-[600px]:gap-2">
       <div className="flex min-w-0 flex-col gap-0.5">
         {title ? <GroupHeading level={headingLevel}>{title}</GroupHeading> : null}
-        {description ? <p className="max-w-[58ch] text-[12px] leading-relaxed text-text-muted">{description}</p> : null}
+        {description ? <p className="max-w-[58ch] text-act-xs leading-relaxed text-text-muted">{description}</p> : null}
       </div>
       {right ? <div className="flex shrink-0 items-center gap-1.5">{right}</div> : null}
     </header>
@@ -119,11 +119,11 @@ export function SettingGroup({
   id?: string;
   children: ReactNode;
 }) {
-  const right = action ?? (meta ? <span className="whitespace-nowrap text-[12px] text-text-faint">{meta}</span> : null);
+  const right = action ?? (meta ? <span className="whitespace-nowrap text-act-xs text-text-faint">{meta}</span> : null);
   return (
     <section id={id} className="flex min-w-0 flex-col gap-2.5 scroll-mt-8">
       <GroupHeader title={title} description={description} right={right} headingLevel={headingLevel} />
-      <div className="divide-y divide-line/60 overflow-hidden rounded-[10px] border border-line bg-surface">
+      <div className="divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface">
         {children}
       </div>
     </section>
@@ -151,9 +151,9 @@ function RowLabel({
 }) {
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium leading-snug text-text-main">{title}</div>
+      <div className="flex flex-wrap items-center gap-2 text-act-sm font-medium leading-snug text-text-main">{title}</div>
       {description ? (
-        <div className={monoDescription ? "mt-0.5 break-all font-mono text-[11.5px] leading-relaxed text-text-faint" : "mt-0.5 text-[12px] leading-relaxed text-text-muted"}>
+        <div className={monoDescription ? "mt-0.5 break-all font-mono text-act-xs leading-relaxed text-text-faint" : "mt-0.5 text-act-xs leading-relaxed text-text-muted"}>
           {description}
         </div>
       ) : null}
@@ -244,7 +244,7 @@ export function SettingLinkRow({
       aria-expanded={expanded}
       aria-controls={controlsId}
       className={cx(
-        "flex w-full items-center gap-4 text-left transition-colors duration-[120ms] hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none disabled:cursor-not-allowed disabled:hover:bg-transparent",
+        "flex w-full items-center gap-4 text-left transition-colors duration-(--motion-fast) hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none disabled:cursor-not-allowed disabled:hover:bg-transparent",
         rowPadding({ tight, indent }),
       )}
     >
@@ -254,14 +254,14 @@ export function SettingLinkRow({
       </span>
       <span className={cx("flex min-w-0 shrink items-center gap-2", disabled && "opacity-45")}>
         {value !== undefined && value !== null ? (
-          <span className="min-w-0 max-w-[240px] truncate text-[13px] text-text-muted">{value}</span>
+          <span className="min-w-0 max-w-[240px] truncate text-act-sm text-text-muted">{value}</span>
         ) : null}
         {trailing}
         <ChevronRight
           size={14}
           strokeWidth={1.9}
           aria-hidden="true"
-          className={cx("shrink-0 text-text-subtle transition-transform duration-150", expanded && "rotate-90")}
+          className={cx("shrink-0 text-text-subtle transition-transform duration-(--motion-base)", expanded && "rotate-90")}
         />
       </span>
     </button>
@@ -270,7 +270,7 @@ export function SettingLinkRow({
 
 export function SettingSubhead({ children, indent = false }: { children: ReactNode; indent?: boolean }) {
   return (
-    <div className={cx("bg-surface-subtle pb-1.5 pr-4 pt-2.5 text-[11px] font-medium text-text-faint", indent ? "pl-9" : "pl-4")}>
+    <div className={cx("bg-surface-subtle pb-1.5 pr-4 pt-2.5 text-act-xxs font-medium text-text-faint", indent ? "pl-9" : "pl-4")}>
       {children}
     </div>
   );
@@ -311,15 +311,15 @@ export function SettingEditor({
       {children}
       <div className="mt-2.5 flex items-center justify-between gap-3 max-[600px]:flex-col max-[600px]:items-start">
         {error ? (
-          <span role="alert" className="text-[12px] leading-relaxed text-on-danger">{error}</span>
+          <span role="alert" className="text-act-xs leading-relaxed text-on-danger">{error}</span>
         ) : (
-          <span className="text-[12px] leading-relaxed text-text-faint">{hint}</span>
+          <span className="text-act-xs leading-relaxed text-text-faint">{hint}</span>
         )}
         <div className="flex shrink-0 items-center gap-1.5">
-          <SettingsButton variant="quiet" onClick={onCancel} disabled={saving}>取消</SettingsButton>
-          <SettingsButton variant="primary" onClick={onSave} disabled={saving || saveDisabled} busy={saving} aria-label={saveAriaLabel}>
+          <Button variant="ghost" onClick={onCancel} disabled={saving}>取消</Button>
+          <Button variant="primary" onClick={onSave} disabled={saving || saveDisabled} busy={saving} aria-label={saveAriaLabel}>
             {saving ? "保存中…" : saveLabel}
-          </SettingsButton>
+          </Button>
         </div>
       </div>
     </div>
@@ -352,7 +352,7 @@ export function StatusDot({ tone, children }: { tone: StatusTone; children: Reac
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 whitespace-nowrap text-[12px]",
+        "inline-flex items-center gap-1.5 whitespace-nowrap text-act-xs",
         tone === "warn" ? "text-warning" : tone === "error" ? "text-on-danger" : "text-text-muted",
       )}
     >
@@ -373,7 +373,7 @@ export function InlineWarning({
   onAction?: () => void;
 }) {
   return (
-    <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[12px] leading-relaxed text-warning">
+    <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-act-xs leading-relaxed text-warning">
       <CircleAlert size={13} strokeWidth={2} aria-hidden="true" className="shrink-0" />
       <span>{children}</span>
       {actionLabel && onAction ? (
@@ -396,7 +396,7 @@ export function SettingTag({ tone = "neutral", children }: { tone?: "neutral" | 
   return (
     <span
       className={cx(
-        "inline-flex h-[18px] shrink-0 items-center rounded-act-xs border px-1.5 text-[11px] font-medium leading-none",
+        "inline-flex h-[18px] shrink-0 items-center rounded-act-xs border px-1.5 text-act-xxs font-medium leading-none",
         tone === "warn" ? "border-transparent bg-warning-soft text-warning" : "border-line/60 bg-surface-subtle text-text-muted",
       )}
     >
@@ -407,41 +407,13 @@ export function SettingTag({ tone = "neutral", children }: { tone?: "neutral" | 
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-grid h-6 min-w-6 place-items-center rounded-act-sm border border-b-2 border-line bg-surface px-1.5 font-sans text-[12px] font-medium text-text-main">
+    <kbd className="inline-grid h-6 min-w-6 place-items-center rounded-act-sm border border-b-2 border-line bg-surface px-1.5 font-sans text-act-xs font-medium text-text-main">
       {children}
     </kbd>
   );
 }
 
 /* ---------------------------------------------------------------- 按钮与输入 */
-
-export type SettingsButtonVariant = "primary" | "secondary" | "quiet" | "danger";
-
-const BUTTON_BASE =
-  "inline-flex h-7 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[7px] border text-[12.5px] font-medium transition-[background-color,border-color,color,transform] duration-[120ms] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
-
-const BUTTON_VARIANT: Record<SettingsButtonVariant, string> = {
-  primary: "border-action bg-action text-on-action hover:border-action-hover hover:bg-action-hover",
-  secondary: "border-line bg-surface text-text-main hover:border-line-strong",
-  quiet: "border-transparent bg-transparent text-text-muted hover:bg-hover-overlay hover:text-text-main",
-  danger: "border-line bg-surface text-on-danger hover:border-danger/50 hover:bg-danger-soft",
-};
-
-export function settingsButtonClass(variant: SettingsButtonVariant = "secondary", size: "default" | "icon" = "default"): string {
-  return cx(BUTTON_BASE, BUTTON_VARIANT[variant], size === "icon" ? "w-7 px-0" : "px-[11px]");
-}
-
-export const SettingsButton = forwardRef<
-  HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: SettingsButtonVariant; size?: "default" | "icon"; busy?: boolean }
->(function SettingsButton({ variant = "secondary", size = "default", busy = false, className, children, type = "button", ...rest }, ref) {
-  return (
-    <button ref={ref} type={type} className={cx(settingsButtonClass(variant, size), className)} {...rest}>
-      {busy ? <Loader2 size={13} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
-      {children}
-    </button>
-  );
-});
 
 const INPUT_WIDTH = { sm: "w-[120px]", md: "w-[220px]", full: "w-full" } as const;
 
@@ -455,12 +427,12 @@ export const SettingsInput = forwardRef<
       aria-invalid={invalid || undefined}
       spellCheck={false}
       className={cx(
-        "h-[30px] min-w-0 rounded-[7px] border bg-surface px-2.5 text-[13px] text-text-main outline-none transition-colors placeholder:text-text-subtle",
+        "h-[30px] min-w-0 rounded-act-sm border bg-surface px-2.5 text-act-sm text-text-main outline-none transition-colors placeholder:text-text-subtle",
         "hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/15",
         "disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-line max-[600px]:w-full",
         invalid ? "border-danger" : "border-line",
         numeric && "text-right tabular-nums",
-        mono && "font-mono text-[12px]",
+        mono && "font-mono text-act-xs",
         INPUT_WIDTH[width],
         className,
       )}
@@ -489,14 +461,14 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cx(
-        "relative inline-flex h-[18px] w-8 shrink-0 items-center rounded-full transition-[background-color,transform] duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30 focus-visible:ring-offset-1",
+        "relative inline-flex h-[18px] w-8 shrink-0 items-center rounded-full transition-[background-color,transform] duration-(--motion-base) active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30 focus-visible:ring-offset-1",
         checked ? "bg-operational" : "bg-toggle-off",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
       )}
     >
       <span
         className={cx(
-          "inline-block h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_2px_rgba(31,45,61,0.25)] transition-transform duration-150",
+          "inline-block h-3.5 w-3.5 rounded-full bg-white shadow-act-knob transition-transform duration-(--motion-base)",
           checked ? "translate-x-4" : "translate-x-0.5",
         )}
       />
@@ -560,11 +532,11 @@ function useAnchoredMenu<TMenu extends HTMLElement>() {
   };
 }
 
-const MENU_SURFACE = "z-[200] max-h-[280px] overflow-auto rounded-[10px] border border-line bg-surface-raised p-1 shadow-act-popover";
-const MENU_ITEM = "flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-45";
+const MENU_SURFACE = "z-(--act-z-popover) max-h-[280px] overflow-auto rounded-act-group border border-line bg-surface-raised p-1 shadow-act-popover";
+const MENU_ITEM = "flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-act-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45";
 
 const TRIGGER_BASE =
-  "flex h-[30px] items-center justify-between gap-2 rounded-[7px] border bg-surface pl-2.5 pr-2 text-[13px] text-text-main outline-none transition-colors max-[600px]:w-full";
+  "flex h-[30px] items-center justify-between gap-2 rounded-act-sm border bg-surface pl-2.5 pr-2 text-act-sm text-text-main outline-none transition-colors max-[600px]:w-full";
 
 function triggerState(disabled: boolean, open: boolean) {
   if (disabled) return "cursor-not-allowed border-line opacity-60";
@@ -628,7 +600,7 @@ export function SettingsSelect({
         <ChevronDown
           size={14}
           strokeWidth={1.9}
-          className={cx("shrink-0 text-text-faint transition-transform duration-150", menu.open && "rotate-180")}
+          className={cx("shrink-0 text-text-faint transition-transform duration-(--motion-base)", menu.open && "rotate-180")}
           aria-hidden="true"
         />
       </button>
@@ -641,7 +613,7 @@ export function SettingsSelect({
                 lastGroup = option.group;
                 return (
                   <li key={`${option.group ?? ""}:${option.value}`}>
-                    {showGroup ? <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-text-faint">{option.group}</div> : null}
+                    {showGroup ? <div className="px-2 pb-1 pt-2 text-act-xxs font-medium text-text-faint">{option.group}</div> : null}
                     <button
                       type="button"
                       role="option"
@@ -712,7 +684,7 @@ export function MultiSelect({
         <ChevronDown
           size={14}
           strokeWidth={1.9}
-          className={cx("shrink-0 text-text-faint transition-transform duration-150", menu.open && "rotate-180")}
+          className={cx("shrink-0 text-text-faint transition-transform duration-(--motion-base)", menu.open && "rotate-180")}
           aria-hidden="true"
         />
       </button>
@@ -731,7 +703,7 @@ export function MultiSelect({
                       onClick={() => toggle(option.value)}
                       className={cx(MENU_ITEM, isSelected ? "bg-selected font-medium text-text-main" : "text-text-main hover:bg-hover-overlay")}
                     >
-                      <span className={cx("grid h-[15px] w-[15px] shrink-0 place-items-center rounded-[4px] border border-line-strong", isSelected && "bg-surface")}>
+                      <span className={cx("grid h-[15px] w-[15px] shrink-0 place-items-center rounded-act-xs border border-line-strong", isSelected && "bg-surface")}>
                         <Check size={11} strokeWidth={3} className={isSelected ? "" : "opacity-0"} aria-hidden="true" />
                       </span>
                       <span className="truncate">{option.label}</span>
@@ -775,7 +747,7 @@ export function SettingsMenuButton({
         aria-expanded={menu.open}
         disabled={disabled}
         onClick={menu.toggle}
-        className={settingsButtonClass("quiet")}
+        className={buttonClass({ variant: "ghost" })}
       >
         {label}
       </button>
@@ -857,7 +829,7 @@ export function Stepper({
           <TooltipContent>重置 {ariaLabel}</TooltipContent>
         </Tooltip>
       ) : null}
-      <div role="group" aria-label={ariaLabel} className={cx("inline-flex h-[30px] items-center rounded-[7px] border border-line bg-surface", disabled && "opacity-55")}>
+      <div role="group" aria-label={ariaLabel} className={cx("inline-flex h-[30px] items-center rounded-act-sm border border-line bg-surface", disabled && "opacity-55")}>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -868,14 +840,14 @@ export function Stepper({
                 if (atMin) return;
                 onChange(roundToStep(value - step));
               }}
-              className={cx(stepButton, "rounded-l-[7px]")}
+              className={cx(stepButton, "rounded-l-act-sm")}
             >
               <Minus size={14} strokeWidth={2.2} aria-hidden="true" />
             </button>
           </TooltipTrigger>
           <TooltipContent>减小 {ariaLabel}</TooltipContent>
         </Tooltip>
-        <span className="min-w-[52px] text-center text-[13px] font-medium tabular-nums text-text-main">{display}</span>
+        <span className="min-w-[52px] text-center text-act-sm font-medium tabular-nums text-text-main">{display}</span>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -886,7 +858,7 @@ export function Stepper({
                 if (atMax) return;
                 onChange(roundToStep(value + step));
               }}
-              className={cx(stepButton, "rounded-r-[7px]")}
+              className={cx(stepButton, "rounded-r-act-sm")}
             >
               <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
             </button>
@@ -942,7 +914,7 @@ export function NumberField({
           onCommit(Number.isFinite(parsed) ? parsed : null);
         }}
       />
-      {suffix ? <span className="text-[12px] text-text-faint">{suffix}</span> : null}
+      {suffix ? <span className="text-act-xs text-text-faint">{suffix}</span> : null}
     </div>
   );
 }
@@ -1026,7 +998,7 @@ export function SettingsSaveNoticeProvider({ children }: { children: ReactNode }
         role="status"
         aria-live="polite"
         className={cx(
-          "pointer-events-none fixed bottom-7 left-1/2 z-[210] inline-flex h-[30px] -translate-x-1/2 items-center gap-1.5 rounded-act-md bg-action px-3 text-[12px] font-medium text-on-action shadow-act-popover transition-[opacity,transform] duration-150 motion-reduce:transition-none",
+          "pointer-events-none fixed bottom-7 left-1/2 z-(--act-z-popover) inline-flex h-[30px] -translate-x-1/2 items-center gap-1.5 rounded-act-md bg-action px-3 text-act-xs font-medium text-on-action shadow-act-popover transition-[opacity,transform] duration-(--motion-base) motion-reduce:transition-none",
           notice ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
         )}
       >

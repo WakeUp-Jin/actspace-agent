@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Files, RotateCw } from "lucide-react";
 import type { SessionVisualizationItem } from "@actspace/shared";
 import { HtmlRenderView } from "./HtmlRenderView";
+import { IconButton } from "../ui/IconButton";
 
 /**
  * 右侧面板「Reply」视图。
@@ -16,21 +17,19 @@ import { HtmlRenderView } from "./HtmlRenderView";
 const ROOT_CLASS = "flex min-h-0 flex-1 flex-col";
 const TOOLBAR_CLASS = "relative flex shrink-0 items-center gap-1.5 border-b border-line px-2.5 py-1.5";
 const PICKER_BUTTON_CLASS =
-  "inline-flex min-w-0 max-w-[260px] items-center gap-1.5 rounded-act-sm border border-line bg-surface px-2 py-1 text-[12px] text-text-main transition-colors hover:border-line-strong disabled:opacity-60 [cursor:pointer] disabled:[cursor:default]";
+  "inline-flex min-w-0 max-w-[260px] items-center gap-1.5 rounded-act-sm border border-line bg-surface px-2 py-1 text-act-xs text-text-main transition-colors hover:border-line-strong disabled:opacity-60 [cursor:pointer] disabled:[cursor:default]";
 const PICKER_LABEL_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap";
-const ICON_BUTTON_CLASS =
-  "grid h-[26px] w-[26px] place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-hover-overlay hover:text-text-main [cursor:pointer]";
 const POPOVER_CLASS =
-  "absolute left-2.5 top-[calc(100%+4px)] z-[70] max-h-[320px] w-[260px] overflow-auto rounded-act-md border border-line bg-surface-raised p-1 shadow-act-popover";
+  "absolute left-2.5 top-[calc(100%+4px)] z-(--act-z-dropdown) max-h-[320px] w-[260px] overflow-auto rounded-act-md border border-line bg-surface-raised p-1 shadow-act-popover";
 const POPOVER_ITEM_BASE =
-  "block w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-act-sm border-0 bg-transparent px-2.5 py-1.5 text-left text-[12px] transition-colors hover:bg-hover-overlay [cursor:pointer]";
+  "block w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-act-sm border-0 bg-transparent px-2.5 py-1.5 text-left text-act-xs transition-colors hover:bg-hover-overlay [cursor:pointer]";
 const POPOVER_ITEM_ACTIVE = "bg-selected font-semibold text-text-main";
 const POPOVER_ITEM_INACTIVE = "text-text-main";
-const POPOVER_EMPTY_CLASS = "px-2.5 py-2 text-[12px] leading-[1.6] text-text-faint";
+const POPOVER_EMPTY_CLASS = "px-2.5 py-2 text-act-xs leading-[1.6] text-text-faint";
 const RENDER_CELL_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden";
 const EMPTY_CLASS =
-  "grid min-h-0 flex-1 place-items-center whitespace-pre-line p-6 text-center text-[13px] leading-[1.7] text-text-muted";
-const STATE_CLASS = "p-[18px] text-[13px] text-text-muted";
+  "grid min-h-0 flex-1 place-items-center whitespace-pre-line p-6 text-center text-act-sm leading-[1.7] text-text-muted";
+const STATE_CLASS = "p-[18px] text-act-sm text-text-muted";
 
 export function ReplyHtmlRenderView({ sessionId }: { sessionId: string | null }) {
   const [items, setItems] = useState<SessionVisualizationItem[]>([]);
@@ -117,15 +116,9 @@ export function ReplyHtmlRenderView({ sessionId }: { sessionId: string | null })
           </span>
           {hasItems ? <ChevronDown size={13} strokeWidth={2} className="shrink-0 opacity-70" /> : null}
         </button>
-        <button
-          type="button"
-          className={ICON_BUTTON_CLASS}
-          aria-label="刷新文件列表"
-          title="刷新"
-          onClick={() => void refresh()}
-        >
-          <RotateCw size={14} strokeWidth={2} className={status === "loading" ? "animate-spin" : ""} />
-        </button>
+        <IconButton label="刷新文件列表" tooltip="刷新" onClick={() => void refresh()}>
+          <RotateCw size={14} strokeWidth={2} className={status === "loading" ? "animate-spin" : ""} aria-hidden="true" />
+        </IconButton>
 
         {pickerOpen && hasItems ? (
           <div className={POPOVER_CLASS} role="listbox">

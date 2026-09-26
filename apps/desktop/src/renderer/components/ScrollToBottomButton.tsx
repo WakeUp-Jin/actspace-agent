@@ -2,7 +2,7 @@ import { ArrowDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 const BUTTON_CLASS =
-  "grid h-9 w-9 place-items-center rounded-act-pill border border-line bg-surface-raised text-text-muted shadow-act-popover transition-[background-color,border-color,color,transform] duration-[150ms] ease-in-out hover:-translate-y-px hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring motion-reduce:transform-none";
+  "grid h-9 w-9 place-items-center rounded-act-pill border border-line bg-surface-raised text-text-muted shadow-act-popover transition-[background-color,border-color,color,transform] duration-(--motion-base) ease-in-out hover:-translate-y-px hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring motion-reduce:transform-none";
 
 export function ScrollToBottomButton({ onClick }: { onClick: () => void }) {
   return (

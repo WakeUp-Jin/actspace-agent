@@ -290,6 +290,18 @@ Usage Statistics 是第一块完整迁移样板，需满足：
 - 风险：Tailwind arbitrary value 滥用。
   - 处理：只有 hero 数字、特殊 grid、Electron 窗口尺寸等确实需要时才使用。
 
+## 设计 token 的 Tailwind 映射（2026-09-26）
+
+`tailwind.css` 的 `@theme inline` 在颜色之外还映射了：
+
+- 字号：`--text-act-xxs … --text-act-title`（11–24px），生成 `text-act-*`，只设 `font-size`。刻意不覆盖 Tailwind 默认 `text-sm` 等，避免同名不同值；默认字号类由检查脚本禁止。原来用默认 `text-xs` / `text-sm` / `text-xl` 的地方，迁移时补了 `leading-4` / `leading-5` / `leading-7` 保留原行高。
+- 圆角：`--radius-act-*`，新增 `group`（10px）。
+- 阴影：`--shadow-act-xs / knob / thumb / soft / popover / float`。
+
+层级和动效不进 `@theme`，组件直接用 CSS 变量：`z-(--act-z-*)`、`duration-(--motion-*)`。
+
+`pnpm check:frontend-tokens`（`scripts/check-frontend-design-tokens.mjs`）扫描 renderer 组件：禁止 `text-[Npx]`、Tailwind 默认字号、`rounded-[…]`、`z-[N≥3]`、`duration-[…]` / `duration-N` 和旧冷色阴影，并确认组件引用的 `text-act-*`、`rounded-act-*`、`shadow-act-*`、`--act-*`、`--motion-*` 都在样式层有定义。例外按「文件 + 精确匹配串」登记在脚本的 `LITERAL_ALLOWLIST`。
+
 ## 决策记录
 
 - 2026-05-27：采用 Tailwind v4 + `@tailwindcss/vite`。理由是项目基于 Vite，官方文档推荐 Vite 插件，v4 的 CSS-first 模型也更适合把现有视觉 token 映射进 Tailwind。

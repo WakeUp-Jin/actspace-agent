@@ -155,7 +155,7 @@ text-[rgba(...)]
 
 1. 恒定反色 tooltip 或遮罩。
 2. Toggle 白色 thumb 等跨主题恒定部件。
-3. 低 alpha overlay、阴影和非语义装饰。
+3. 低 alpha overlay 和非语义装饰。阴影不再是例外：一律用 `tokens.css` 的 `--act-shadow-*`（浅深各一套），组件写 `shadow-act-*`。
 4. 外部品牌 logo 的官方颜色。
 5. 数据可视化局部色，但优先仍应抽成 chart / context token。
 6. 不随主题变化的媒体内容本身。
@@ -217,7 +217,7 @@ Kairos、Lab 等 v1 页面不属于当前主题契约；历史视觉资产只在
 - 新增语义 token 必须同时定义 light、dark、system-dark 三个分支。
 - Tailwind 颜色映射只能引用 `tokens.css` 已定义的 token。
 - 组件颜色字面量只允许精确用途 allowlist，不允许目录级豁免。
-- 运行 `pnpm check:frontend-theme` 验证上述契约。
+- 运行 `pnpm check:frontend-theme` 验证上述契约；字号、圆角、层级、阴影和时长的 token 契约由 `pnpm check:frontend-tokens` 验证。
 
 ## 自检
 

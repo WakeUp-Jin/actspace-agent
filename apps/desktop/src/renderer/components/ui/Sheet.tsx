@@ -154,7 +154,7 @@ export function Sheet(props: PropsWithChildren<SheetProps>) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1000]"
+      className="fixed inset-0 z-(--act-z-modal)"
       data-state={state}
       data-testid={testId ? `${testId}-root` : undefined}
     >
@@ -164,7 +164,7 @@ export function Sheet(props: PropsWithChildren<SheetProps>) {
         onClick={close}
         className={
           "absolute inset-0 bg-overlay backdrop-blur-[1px] " +
-          "transition-opacity duration-150 motion-reduce:transition-none " +
+          "transition-opacity duration-(--motion-base) motion-reduce:transition-none " +
           "data-[state=open]:opacity-100 data-[state=closed]:opacity-0"
         }
         data-testid={testId ? `${testId}-overlay` : undefined}
@@ -181,18 +181,18 @@ export function Sheet(props: PropsWithChildren<SheetProps>) {
           "absolute top-0 right-0 flex h-screen max-w-full flex-col " +
           "border-l border-line bg-surface " +
           "shadow-act-soft " +
-          "transition-transform duration-200 ease-out motion-reduce:transition-none " +
+          "transition-transform duration-(--motion-slow) ease-out motion-reduce:transition-none " +
           "data-[state=open]:translate-x-0 data-[state=closed]:translate-x-full"
         }
         data-testid={testId}
       >
         <header className="flex items-start justify-between gap-3 border-b border-line px-6 py-4">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="m-0 text-[17px] font-semibold text-text-main">
+            <h2 id={titleId} className="m-0 text-act-lg font-semibold text-text-main">
               {title}
             </h2>
             {description ? (
-              <p className="mt-1 text-[13px] leading-[1.55] text-text-muted">{description}</p>
+              <p className="mt-1 text-act-sm leading-[1.55] text-text-muted">{description}</p>
             ) : null}
           </div>
           <div className="flex items-center gap-2">

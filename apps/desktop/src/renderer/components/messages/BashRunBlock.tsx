@@ -7,9 +7,9 @@ import { TOOL_LOG_LINE_TEXT_RUNNING_CLASS, getToolLogRunningTextAttrs } from "./
 
 type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
 
-const BASH_RUN_CLASS = "message-row bash-run max-w-[800px] px-[var(--conversation-text-inset)]";
+const BASH_RUN_CLASS = "message-row bash-run max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)]";
 const BASH_RUN_TOGGLE_CLASS =
-  "bash-run-toggle flex w-full max-w-full items-center gap-[7px] overflow-hidden border-0 bg-transparent p-0 text-left text-sm font-normal leading-[22px] text-text-muted";
+  "bash-run-toggle flex w-full max-w-full items-center gap-[7px] overflow-hidden border-0 bg-transparent p-0 text-left text-act-md font-normal leading-[22px] text-text-muted";
 const BASH_RUN_SUMMARY_CLASS = "bash-run-summary flex-none whitespace-nowrap";
 const BASH_COMMAND_PREVIEW_CLASS =
   "bash-command-preview min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-normal text-text-faint";
@@ -36,7 +36,7 @@ export function BashRunBlock({ message, replyCompleted = false, onExpand }: { me
 }
 
 const BASH_BACKGROUND_BADGE_CLASS =
-  "bash-background-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-xs font-medium text-text-faint";
+  "bash-background-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
 
 const BACKGROUND_BADGE_TEXT: Record<NonNullable<BashMessage["backgroundStatus"]>, string> = {
   running: "后台运行中",
@@ -48,11 +48,11 @@ const BACKGROUND_BADGE_TEXT: Record<NonNullable<BashMessage["backgroundStatus"]>
 
 // 沙盒标签：沙盒是默认态弱化显示；真实环境是例外态，醒目提示用户命令未受沙盒约束
 const BASH_SANDBOX_BADGE_CLASS =
-  "bash-sandbox-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-xs font-medium text-text-faint";
+  "bash-sandbox-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
 const BASH_REAL_ENV_BADGE_CLASS =
-  "bash-real-env-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-warning-soft px-1.5 py-px text-xs font-medium text-on-warning";
+  "bash-real-env-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-warning-soft px-1.5 py-px text-act-xs leading-4 font-medium text-on-warning";
 const BASH_NOT_EXECUTED_BADGE_CLASS =
-  "bash-not-executed-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-xs font-medium text-text-faint";
+  "bash-not-executed-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
 
 function EnvironmentBadge({ sandboxed, notExecuted }: Pick<BashMessage, "sandboxed" | "notExecuted">) {
   if (notExecuted) {

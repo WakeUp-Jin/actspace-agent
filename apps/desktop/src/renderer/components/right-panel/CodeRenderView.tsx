@@ -20,13 +20,13 @@ const ROOT_CLASS = "flex min-h-0 flex-1 flex-col";
 const SCROLL_CLASS = "min-h-0 flex-1 overflow-auto";
 // 折行时宽度必须是 `w-full`：`w-max` 会让 grid 取内容宽度，代码列那个 `1fr` 跟着变成
 // 「最长行的宽度」，`whitespace-pre-wrap` 就永远没有需要折行的机会。
-const GRID_CLASS = "grid w-full grid-cols-[auto_1fr] font-mono text-[12px] leading-[1.55]";
+const GRID_CLASS = "grid w-full grid-cols-[auto_1fr] font-mono text-act-xs leading-[1.55]";
 // sticky left-0：折行后仍可能有单个超长不可断 token 顶出横向滚动，行号跟着滚走就看不出在第几行。
 // 需要不透明背景（bg-surface-subtle）压住从下面滚过去的代码。
 const GUTTER_CLASS =
-  "sticky left-0 z-[1] select-none border-r border-line bg-surface-subtle px-2 text-right text-text-faint [font-variant-numeric:tabular-nums]";
+  "sticky left-0 z-1 select-none border-r border-line bg-surface-subtle px-2 text-right text-text-faint [font-variant-numeric:tabular-nums]";
 const LINE_CLASS = "whitespace-pre-wrap break-words px-3 text-text-main";
-const FOOTER_CLASS = "border-t border-line bg-surface-subtle px-3 py-1.5 text-[11px] text-text-faint";
+const FOOTER_CLASS = "border-t border-line bg-surface-subtle px-3 py-1.5 text-act-xxs text-text-faint";
 
 /** 超过这个行数就走分块高亮：首屏立即可读，其余交给空闲时间。 */
 const CHUNKED_HIGHLIGHT_LINE_THRESHOLD = 4000;

@@ -26,24 +26,21 @@ import type {
 } from "@actspace/shared";
 import type { ComposerReviewSummary } from "../Composer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
+import { Button } from "../ui/Button";
 
 const BRANCH_PREFIX_KEY = "actspace.workspace.branch-prefix.v1";
 const DEFAULT_BRANCH_PREFIX = "actspace";
 
 const POPOVER_CLASS =
-  "absolute right-0 top-[calc(100%+8px)] z-[90] w-[304px] max-w-[calc(100vw-16px)] overflow-hidden rounded-act-xl border border-line bg-surface-raised shadow-act-popover [-webkit-app-region:no-drag]";
+  "absolute right-0 top-[calc(100%+8px)] z-(--act-z-dropdown) w-[304px] max-w-[calc(100vw-16px)] overflow-hidden rounded-act-xl border border-line bg-surface-raised shadow-act-popover [-webkit-app-region:no-drag]";
 const ROW_CLASS =
-  "flex min-h-8 w-full items-center gap-2 border-0 bg-transparent px-2.5 text-left text-[13px] text-text-main transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
+  "flex min-h-8 w-full items-center gap-2 border-0 bg-transparent px-2.5 text-left text-act-sm text-text-main transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
 const MENU_ITEM_CLASS =
-  "flex min-h-9 w-full items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 text-left text-[13px] text-text-main transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
-const DIALOG_OVERLAY_CLASS = "fixed inset-0 z-[150] grid place-items-center bg-scrim px-4 [-webkit-app-region:no-drag]";
+  "flex min-h-9 w-full items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 text-left text-act-sm text-text-main transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
+const DIALOG_OVERLAY_CLASS = "fixed inset-0 z-(--act-z-modal) grid place-items-center bg-scrim px-4 [-webkit-app-region:no-drag]";
 const DIALOG_CLASS = "w-full max-w-[420px] overflow-hidden rounded-act-xl border border-line bg-surface shadow-act-float";
 const INPUT_CLASS =
-  "h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20";
-const PRIMARY_BUTTON_CLASS =
-  "inline-flex h-9 items-center justify-center rounded-act-md bg-action px-4 text-[13px] font-semibold text-on-action transition hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50";
-const SECONDARY_BUTTON_CLASS =
-  "inline-flex h-9 items-center justify-center rounded-act-md border border-line bg-surface-subtle px-4 text-[13px] font-medium text-text-main transition hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50";
+  "h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-act-sm text-text-main outline-none placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20";
 
 type GitDialogState =
   | { kind: "branch" }
@@ -298,7 +295,7 @@ export function WorkspaceChromeControls({
         {environmentOpen ? (
           <div className={POPOVER_CLASS} role="dialog" aria-label="工作区环境">
             <section className="p-2">
-              <div className="flex items-center justify-between px-0.5 pb-1 text-[12px] font-medium text-text-faint">
+              <div className="flex items-center justify-between px-0.5 pb-1 text-act-xs font-medium text-text-faint">
                 <span>工作区环境</span>
                 {loadingEnvironment ? <Loader2 size={13} className="animate-spin" aria-label="正在加载工作区环境" /> : null}
               </div>
@@ -310,7 +307,7 @@ export function WorkspaceChromeControls({
                     <span className="text-success">+{reviewSummary?.additions ?? 0}</span>
                     <span className="text-danger">-{reviewSummary?.deletions ?? 0}</span>
                   </span>
-                ) : <span className="text-[12px] text-text-faint">无变更</span>}
+                ) : <span className="text-act-xs text-text-faint">无变更</span>}
               </button>
               <div className={ROW_CLASS} title={environment?.workspaceRoot ?? workspaceRoot}>
                 <Laptop size={15} aria-hidden="true" />
@@ -360,7 +357,7 @@ export function WorkspaceChromeControls({
 
             <div className="h-px bg-line" />
             <section className="p-2">
-              <div className="flex items-center justify-between px-0.5 pb-1 text-[12px] font-medium text-text-faint">
+              <div className="flex items-center justify-between px-0.5 pb-1 text-act-xs font-medium text-text-faint">
                 <span>来源</span>
                 <Plus size={13} aria-hidden="true" />
               </div>
@@ -385,7 +382,7 @@ export function WorkspaceChromeControls({
               ) : null}
             </section>
             {feedback ? (
-              <div className={`border-t border-line px-3 py-2 text-[12px] leading-relaxed ${feedback.tone === "success" ? "text-success" : feedback.tone === "danger" ? "text-danger" : "text-text-muted"}`}>
+              <div className={`border-t border-line px-3 py-2 text-act-xs leading-relaxed ${feedback.tone === "success" ? "text-success" : feedback.tone === "danger" ? "text-danger" : "text-text-muted"}`}>
                 {feedback.message}
               </div>
             ) : null}
@@ -517,7 +514,7 @@ function BranchMenu({
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[120] flex w-[288px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-act-xl border border-line bg-surface-raised shadow-act-popover [-webkit-app-region:no-drag]"
+      className="fixed z-(--act-z-popover) flex w-[288px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-act-xl border border-line bg-surface-raised shadow-act-popover [-webkit-app-region:no-drag]"
       role="menu"
       aria-label="分支"
       style={position}
@@ -529,14 +526,14 @@ function BranchMenu({
           <input
             autoFocus
             type="search"
-            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-text-main outline-none placeholder:text-text-faint"
+            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-act-sm text-text-main outline-none placeholder:text-text-faint"
             placeholder="搜索分支"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
       </div>
-      <div className="px-2 pb-1 text-[12px] font-medium text-text-faint">分支</div>
+      <div className="px-2 pb-1 text-act-xs font-medium text-text-faint">分支</div>
       <div className="max-h-[240px] overflow-y-auto px-1.5 pb-1.5">
         {filteredBranches.length ? filteredBranches.map((branch) => {
           const occupied = Boolean(branch.checkedOutPath && !branch.current);
@@ -553,12 +550,12 @@ function BranchMenu({
             >
               <GitBranch size={14} aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate">{branch.name}</span>
-              {occupied ? <span className="shrink-0 text-[11px] text-text-faint">位于工作树</span> : null}
+              {occupied ? <span className="shrink-0 text-act-xxs text-text-faint">位于工作树</span> : null}
               {branch.current ? <Check size={13} className="shrink-0 text-text-main" aria-hidden="true" /> : null}
             </button>
           );
         }) : (
-          <div className="px-2.5 py-4 text-center text-[12px] text-text-faint">暂无分支</div>
+          <div className="px-2.5 py-4 text-center text-act-xs text-text-faint">暂无分支</div>
         )}
       </div>
       <div className="border-t border-line p-1.5">
@@ -633,21 +630,21 @@ function GitActionDialog({
         {state.kind === "branch" ? (
           <form onSubmit={(event) => { event.preventDefault(); if (!busy && branchName.trim()) void onCreateBranch(branchName); }}>
             <div className="flex items-center justify-between gap-4 px-5 pb-3 pt-5">
-              <h2 className="m-0 text-[20px] font-semibold text-text-main">创建并切换分支</h2>
+              <h2 className="m-0 text-act-xl font-semibold text-text-main">创建并切换分支</h2>
               <button type="button" className="grid h-8 w-8 shrink-0 place-items-center rounded-act-md text-text-faint hover:bg-hover-overlay hover:text-text-main" aria-label="关闭 Git 操作" disabled={busy} onClick={onClose}>
                 <X size={15} aria-hidden="true" />
               </button>
             </div>
             <div className="grid gap-3 px-5 pb-5">
-              <div className="grid gap-1.5 text-[12px] font-medium text-text-muted">
+              <div className="grid gap-1.5 text-act-xs font-medium text-text-muted">
                 <div className="flex items-center justify-between">
                   分支名称
-                  <button type="button" className="border-0 bg-transparent text-[12px] text-text-faint hover:text-text-main" onClick={() => setShowPrefix((value) => !value)}>设置前缀</button>
+                  <button type="button" className="border-0 bg-transparent text-act-xs text-text-faint hover:text-text-main" onClick={() => setShowPrefix((value) => !value)}>设置前缀</button>
                 </div>
                 <input autoFocus aria-label="分支名称" className={INPUT_CLASS} value={branchName} onChange={(event) => setBranchName(event.target.value)} />
               </div>
               {showPrefix ? (
-                <label className="grid gap-1.5 text-[12px] font-medium text-text-muted">
+                <label className="grid gap-1.5 text-act-xs font-medium text-text-muted">
                   默认前缀
                   <input
                     className={INPUT_CLASS}
@@ -662,10 +659,10 @@ function GitActionDialog({
               ) : null}
             </div>
             <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
-              <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={busy} onClick={onClose}>关闭</button>
-              <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={busy || !branchName.trim()}>
+              <Button variant="secondary" size="md" disabled={busy} onClick={onClose}>关闭</Button>
+              <Button type="submit" variant="primary" size="md" disabled={busy || !branchName.trim()}>
                 {busy ? <Loader2 size={14} className="mr-2 animate-spin" aria-hidden="true" /> : null} 创建并切换
-              </button>
+              </Button>
             </div>
           </form>
         ) : null}
@@ -676,7 +673,7 @@ function GitActionDialog({
               <div className="relative">
                 <button
                   type="button"
-                  className="flex h-8 items-center gap-2 rounded-act-md border-0 bg-transparent px-2 text-[13px] font-medium text-text-main hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+                  className="flex h-8 items-center gap-2 rounded-act-md border-0 bg-transparent px-2 text-act-sm font-medium text-text-main hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
                   aria-haspopup="menu"
                   aria-expanded={branchMenuOpen}
                   onClick={() => setBranchMenuOpen((value) => !value)}
@@ -698,7 +695,7 @@ function GitActionDialog({
                   </div>
                 ) : null}
               </div>
-              <div className="flex items-center gap-1 text-[13px] font-medium">
+              <div className="flex items-center gap-1 text-act-sm font-medium">
                 <span className="text-success">+{additions}</span>
                 <span className="text-danger">-{deletions}</span>
               </div>
@@ -716,7 +713,7 @@ function GitActionDialog({
                 placeholder="提交说明（留空则自动生成）…"
                 onChange={(event) => setMessage(event.target.value)}
               />
-              <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[13px] text-text-main">
+              <label className="flex min-h-9 cursor-pointer items-center gap-2 text-act-sm text-text-main">
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-line accent-action"
@@ -728,10 +725,10 @@ function GitActionDialog({
             </div>
 
             <div className="border-t border-line p-1.5">
-              <button type="button" aria-label="提交" className="flex min-h-9 w-full items-center gap-2 rounded-act-md border-0 bg-hover-overlay px-2.5 text-left text-[13px] text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:text-text-faint" disabled={!canCommit} onClick={() => void onGitAction("commit", commitInput)}>
+              <button type="button" aria-label="提交" className="flex min-h-9 w-full items-center gap-2 rounded-act-md border-0 bg-hover-overlay px-2.5 text-left text-act-sm text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:text-text-faint" disabled={!canCommit} onClick={() => void onGitAction("commit", commitInput)}>
                 <GitCommitHorizontal size={15} aria-hidden="true" />
                 <span className="flex-1">提交</span>
-                <kbd aria-hidden="true" className="rounded bg-surface-subtle px-1.5 py-0.5 text-[11px] text-text-faint">⌘↵</kbd>
+                <kbd aria-hidden="true" className="rounded bg-surface-subtle px-1.5 py-0.5 text-act-xxs text-text-faint">⌘↵</kbd>
               </button>
               <button type="button" className={MENU_ITEM_CLASS} disabled={!canCommit} onClick={() => void onGitAction("commit_and_push", commitInput)}>
                 <MonitorUp size={15} aria-hidden="true" /> 提交并推送
@@ -747,8 +744,8 @@ function GitActionDialog({
           <div className="p-5">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="m-0 text-[18px] font-semibold text-text-main">选择远程仓库</h2>
-                <p className="mb-0 mt-1 text-[13px] text-text-muted">此仓库有多个推送目标。</p>
+                <h2 className="m-0 text-act-lg font-semibold text-text-main">选择远程仓库</h2>
+                <p className="mb-0 mt-1 text-act-sm text-text-muted">此仓库有多个推送目标。</p>
               </div>
               <button type="button" className="grid h-8 w-8 place-items-center rounded-act-md text-text-faint hover:bg-hover-overlay hover:text-text-main" aria-label="关闭 Git 操作" onClick={onClose}>
                 <X size={15} aria-hidden="true" />
@@ -756,7 +753,7 @@ function GitActionDialog({
             </div>
             <div className="mt-4 grid gap-2">
               {state.remotes.map((remote) => (
-                <button key={remote} type="button" className="flex h-10 items-center gap-2 rounded-act-md border border-line bg-surface px-3 text-left text-[13px] font-medium text-text-main transition hover:border-line-strong hover:bg-surface-subtle" disabled={busy} onClick={() => void onSelectRemote(remote, state.action, state.input)}>
+                <button key={remote} type="button" className="flex h-10 items-center gap-2 rounded-act-md border border-line bg-surface px-3 text-left text-act-sm font-medium text-text-main transition hover:border-line-strong hover:bg-surface-subtle" disabled={busy} onClick={() => void onSelectRemote(remote, state.action, state.input)}>
                   <MonitorUp size={15} aria-hidden="true" /> {remote}
                 </button>
               ))}

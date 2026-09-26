@@ -52,7 +52,7 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
             value={queries[tab]}
             onChange={(event) => setQueries((current) => ({ ...current, [tab]: event.target.value }))}
             disabled={tab === "mcp"}
-            className="min-w-0 flex-1 border-0 bg-transparent text-[13px] text-text-main outline-none placeholder:text-text-faint disabled:cursor-not-allowed"
+            className="min-w-0 flex-1 border-0 bg-transparent text-act-sm text-text-main outline-none placeholder:text-text-faint disabled:cursor-not-allowed"
           />
         </div>
         <div role="tablist" aria-label="扩展分类" className="flex items-center gap-2">
@@ -75,7 +75,7 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
                 setTab(TABS[next].id);
                 document.getElementById(`extension-tab-${TABS[next].id}`)?.focus();
               }}
-              className={`h-9 rounded-full border px-4 text-[13px] transition-colors hover:bg-hover-overlay active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${tab === item.id ? "border-line-strong bg-selected font-medium text-text-main" : "border-line bg-transparent text-text-muted"}`}
+              className={`h-9 rounded-full border px-4 text-act-sm transition-colors hover:bg-hover-overlay active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${tab === item.id ? "border-line-strong bg-selected font-medium text-text-main" : "border-line bg-transparent text-text-muted"}`}
             >
               {item.label}
             </button>
@@ -87,18 +87,18 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
           </section>
           <section role="tabpanel" id="extension-panel-skills" aria-labelledby="extension-tab-skills" hidden={tab !== "skills"}>
             {error ? (
-              <div role="alert" className="flex items-center gap-3 py-8 text-[13px] text-text-faint">
+              <div role="alert" className="flex items-center gap-3 py-8 text-act-sm text-text-faint">
                 {error}
                 {window.actspace?.getSettings ? <button type="button" className="text-text-main underline" onClick={() => setReload((value) => value + 1)}>重试</button> : null}
               </div>
             ) : settings ? <SkillsSection settings={settings} onUpdate={updateSkills} query={queries.skills} />
-              : <p role="status" className="py-8 text-[13px] text-text-faint">加载 Skills 中…</p>}
+              : <p role="status" className="py-8 text-act-sm text-text-faint">加载 Skills 中…</p>}
           </section>
           <section role="tabpanel" id="extension-panel-mcp" aria-labelledby="extension-tab-mcp" hidden={tab !== "mcp"}>
             <div className="flex flex-col items-center gap-3 py-16 text-center">
               <Unplug size={25} strokeWidth={1.5} className="text-text-faint" />
-              <h2 className="text-[15px] font-medium">MCP 暂未接入</h2>
-              <p className="max-w-[34ch] text-[13px] leading-relaxed text-text-faint">接入后，你可以在这里管理 MCP 服务。</p>
+              <h2 className="text-act-md font-medium">MCP 暂未接入</h2>
+              <p className="max-w-[34ch] text-act-sm leading-relaxed text-text-faint">接入后，你可以在这里管理 MCP 服务。</p>
             </div>
           </section>
         </div>

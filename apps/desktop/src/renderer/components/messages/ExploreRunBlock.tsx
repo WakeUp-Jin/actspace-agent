@@ -14,11 +14,11 @@ type ExploreMessage = Extract<MessageBlock, { kind: "agent" }>;
 const BLOCK_CLASS = "explore-run flex flex-col gap-[9px]";
 // 折叠头与工具行同源（单层 conversation-text-inset），保证和外部 thinking / 最终回复对齐。
 const TOGGLE_CLASS =
-  "explore-run-toggle inline-flex w-fit items-center gap-1.5 rounded-act-sm border-0 bg-transparent px-[var(--conversation-text-inset)] py-0.5 text-sm font-normal leading-[1.42] text-text-muted transition-colors duration-[150ms] ease-in-out hover:text-text-main";
+  "explore-run-toggle inline-flex w-fit items-center gap-1.5 rounded-act-sm border-0 bg-transparent px-[var(--conversation-text-inset)] py-0.5 text-act-md font-normal leading-[1.42] text-text-muted transition-colors duration-(--motion-base) ease-in-out hover:text-text-main";
 // 执行中：有界滚动窗口，新行钉底；与主流程同底色（无盒子、无隔离感）。
 const RUNNING_VIEWPORT_CLASS = "explore-run-viewport transcript-message-flow flex max-h-[168px] flex-col overflow-y-auto";
 const DONE_FLOW_CLASS = "transcript-message-flow flex flex-col";
-const EMPTY_CLASS = "px-[var(--conversation-text-inset)] text-sm leading-[1.55] text-text-muted";
+const EMPTY_CLASS = "px-[var(--conversation-text-inset)] text-act-md leading-[1.55] text-text-muted";
 
 function exploredLabel(message: ExploreMessage): string {
   const count = message.stats?.exploredFileCount ?? 0;

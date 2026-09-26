@@ -16,6 +16,7 @@ import {
 import type { WorkspaceDirEntry } from "@actspace/shared";
 import { useRightPanel, workspaceFileTabId } from "./RightPanelContext";
 import { readFailureTab, tabFromFile } from "./workspaceFileTab";
+import { IconButton } from "../ui/IconButton";
 
 /**
  * 右侧面板的工作区文件树 rail（见 `front-右侧面板与文件渲染规范.md`）。
@@ -33,17 +34,15 @@ const RAIL_HEADER_CLASS = "flex shrink-0 items-center gap-0.5 border-b border-li
 // 常态无边框、无填充，只有 hover / 聚焦时浮出底色：一条 200px 窄栏里，
 // 输入框的边框会和下面每一行树项的缩进线抢视觉层级，把最该看的文件名压下去。
 const FILTER_WRAP_CLASS =
-  "flex min-w-0 flex-1 items-center gap-1.5 rounded-act-sm px-1.5 py-1 transition-colors hover:bg-surface-subtle focus-within:bg-surface-subtle";
+  "flex min-w-0 flex-1 items-center gap-1.5 rounded-act-sm px-1.5 py-1 transition-colors hover:bg-surface-subtle focus-within:bg-surface-subtle focus-within:ring-2 focus-within:ring-focus-ring/20";
 const FILTER_INPUT_CLASS =
-  "min-w-0 flex-1 border-0 bg-transparent text-[12px] leading-none text-text-main outline-none placeholder:text-text-faint";
-const RAIL_ICON_BUTTON_CLASS =
-  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
+  "min-w-0 flex-1 border-0 bg-transparent text-act-xs leading-none text-text-main outline-none placeholder:text-text-faint";
 const RAIL_BODY_CLASS = "scrollbar-none min-h-0 flex-1 overflow-auto py-1";
 const ROW_CLASS =
-  "flex w-full items-center gap-1.5 border-0 bg-transparent py-1 pr-2 text-left text-[12px] leading-none text-text-muted hover:bg-hover-overlay hover:text-text-main [cursor:pointer]";
+  "flex w-full items-center gap-1.5 border-0 bg-transparent py-1 pr-2 text-left text-act-xs leading-none text-text-muted hover:bg-hover-overlay hover:text-text-main [cursor:pointer]";
 const ROW_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
-const STATE_CLASS = "px-3 py-2 text-[12px] text-text-faint";
-const NOTICE_CLASS = "px-3 py-1.5 text-[11px] text-text-faint";
+const STATE_CLASS = "px-3 py-2 text-act-xs text-text-faint";
+const NOTICE_CLASS = "px-3 py-1.5 text-act-xxs text-text-faint";
 
 function indentStyle(depth: number): CSSProperties {
   return { paddingLeft: `${10 + depth * 12}px` };
@@ -288,9 +287,9 @@ export function WorkspaceFileTree({ workspaceRoot }: { workspaceRoot?: string })
             onChange={(event) => setFilter(event.target.value)}
           />
         </div>
-        <button type="button" className={RAIL_ICON_BUTTON_CLASS} aria-label="刷新文件树" onClick={refreshFileTree}>
-          <RefreshCw size={13} strokeWidth={1.9} />
-        </button>
+        <IconButton label="刷新文件树" tooltip="刷新" size="xs" onClick={refreshFileTree}>
+          <RefreshCw size={13} strokeWidth={1.9} aria-hidden="true" />
+        </IconButton>
       </div>
       <div className={RAIL_BODY_CLASS}>
         <DirView relativePath="" depth={0} workspaceRoot={workspaceRoot} filter={filter} />

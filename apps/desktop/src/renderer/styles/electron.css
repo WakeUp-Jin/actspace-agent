@@ -24,12 +24,13 @@
 /*
  * Window chrome 浮层（参考 Cursor Agent Window 的 .part.titlebar）：
  *
- *  - 整层 position: fixed 覆盖在所有 split panes 上方，z-index 60。
+ *  - 整层 position: fixed 覆盖在所有 split panes 上方，z-index 为 --act-z-chrome。
  *  - 容器 pointer-events: none → 不会偷下方任何元素的点击（如 sidebar list、
  *    conversation 内容、composer 等）。三段子元素恢复 pointer-events: auto。
  *  - 唯一窗口拖动区在 .chrome-center；所有按钮 -webkit-app-region: no-drag。
  *  - chrome bar 使用与 SplitView 同步的三列 grid，让标题和操作归属于真实 pane。
- *  - chrome bar 自身无背景；底部分隔线只属于右侧对象面板列，左列和中间列与内容自然连贯。
+ *  - chrome bar 自身无背景也无分隔线；右侧对象面板打开时，面板 tab 行自带的 border-b 画出分隔线，
+ *    面板收起时右列只剩按钮，不画线（否则会留下一截孤立横线）。
  */
 .window-chrome-bar {
   position: fixed;
@@ -43,7 +44,7 @@
     minmax(0, 1fr)
     var(--window-chrome-right-column-width);
   align-items: center;
-  z-index: 60;
+  z-index: var(--act-z-chrome);
   pointer-events: none;
 }
 
@@ -82,7 +83,6 @@
 .chrome-right {
   justify-content: flex-end;
   pointer-events: none;
-  box-shadow: inset 0 -1px var(--act-color-border);
 }
 
 .chrome-center-title {
@@ -127,7 +127,7 @@
   height: var(--window-chrome-control-size);
   border-radius: var(--radius-sm);
   color: var(--text-soft);
-  transition: background 130ms ease, color 130ms ease;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
   -webkit-app-region: no-drag;
 }
 

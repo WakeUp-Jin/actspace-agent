@@ -5,7 +5,6 @@ import {
   SettingEditor,
   SettingGroup,
   SettingRow,
-  SettingsButton,
   SettingsInput,
   SettingsMenuButton,
   SettingsSelect,
@@ -14,6 +13,8 @@ import {
   useSettingsSaveNotice,
 } from "./SettingsPrimitives";
 import { SPEECH_STATUS_LABELS } from "../extensions/EnglishLearningCapability";
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
 
 const SPEECH_MODEL_OPTIONS = SPEECH_MODELS.map((value) => ({ value, label: value }));
 
@@ -113,7 +114,7 @@ export function SpeechSettingsSection() {
             ) : (
               <>
                 <StatusDot tone="off">未配置</StatusDot>
-                <SettingsButton aria-label="设置 MiniMax Key" aria-expanded={keyEditorOpen} disabled={busy} onClick={() => setKeyEditorOpen((open) => !open)}>设置 Key</SettingsButton>
+                <Button aria-label="设置 MiniMax Key" aria-expanded={keyEditorOpen} disabled={busy} onClick={() => setKeyEditorOpen((open) => !open)}>设置 Key</Button>
               </>
             )}
           />
@@ -171,13 +172,13 @@ export function SpeechSettingsSection() {
                   onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
                 />
                 {playing ? (
-                  <SettingsButton size="icon" aria-label="停止播放" title="停止播放" disabled={busy} onClick={() => void action(async () => { setState(await window.actspace.stopEnglishLearningSpeech!()); })}>
+                  <IconButton variant="secondary" label="停止播放" disabled={busy} onClick={() => void action(async () => { setState(await window.actspace.stopEnglishLearningSpeech!()); })}>
                     <Square size={11} strokeWidth={2.4} aria-hidden="true" />
-                  </SettingsButton>
+                  </IconButton>
                 ) : (
-                  <SettingsButton size="icon" aria-label="试听已保存配置" title={state?.hasApiKey ? "试听已保存配置" : "需要先配置 Key"} disabled={!canPreview} onClick={() => void action(async () => { setState(await window.actspace.previewEnglishLearningSpeech!()); })}>
+                  <IconButton variant="secondary" label="试听已保存配置" tooltip={state?.hasApiKey ? "试听已保存配置" : "需要先配置 Key"} disabled={!canPreview} onClick={() => void action(async () => { setState(await window.actspace.previewEnglishLearningSpeech!()); })}>
                     <Play size={11} strokeWidth={2.4} aria-hidden="true" />
-                  </SettingsButton>
+                  </IconButton>
                 )}
               </>
             }
@@ -202,9 +203,9 @@ export function SpeechSettingsSection() {
             }
           />
           {problem ? (
-            <div role="alert" className="flex items-center justify-between gap-3 px-4 py-2.5 text-[12px] text-on-danger">
+            <div role="alert" className="flex items-center justify-between gap-3 px-4 py-2.5 text-act-xs text-on-danger">
               <span>{problem}</span>
-              {!snapshot ? <SettingsButton variant="quiet" onClick={() => setReload((value) => value + 1)}>重试</SettingsButton> : null}
+              {!snapshot ? <Button variant="ghost" onClick={() => setReload((value) => value + 1)}>重试</Button> : null}
             </div>
           ) : null}
         </>

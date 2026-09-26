@@ -14,9 +14,10 @@ describe("Settings color semantics", () => {
     const page = read("components/settings/SettingsPage.tsx");
     const primitives = read("components/settings/SettingsPrimitives.tsx");
     const nav = read("components/settings/SettingsNav.tsx");
+    const button = read("components/ui/Button.tsx");
 
-    expect(page).toContain("SettingsButton");
-    expect(primitives).toContain("primary: \"border-action bg-action text-on-action");
+    expect(page).toContain('<Button variant="primary"');
+    expect(button).toContain("primary: \"border-transparent bg-action text-on-action");
     expect(primitives).toContain('checked ? "bg-operational" : "bg-toggle-off"');
     expect(primitives).toContain("bg-selected font-medium text-text-main");
     expect(primitives).toContain("focus-visible:ring-focus-ring/30");

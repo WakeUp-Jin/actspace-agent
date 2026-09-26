@@ -81,13 +81,31 @@
   --color-analysis-tool-soft: var(--act-analysis-tool-soft);
   --color-analysis-thinking-soft: var(--act-analysis-thinking-soft);
 
+  /*
+   * 字号档位（front-全局视觉语言规范「字号」）：text-act-xxs … text-act-title。
+   * 用独立命名而不覆盖 Tailwind 默认 text-sm 等，避免「text-sm = 14px 还是 13px」的同名歧义；
+   * 默认字号类由 pnpm check:frontend-tokens 禁止。只设字号，不带行高（行高继承或由 leading-* 指定）。
+   */
+  --text-act-xxs: 11px;
+  --text-act-xs: 12px;
+  --text-act-sm: 13px;
+  --text-act-md: 14px;
+  --text-act-lg: 16px;
+  --text-act-xl: 20px;
+  --text-act-title: 24px;
+
   --radius-act-xs: var(--act-radius-xs);
   --radius-act-sm: var(--act-radius-sm);
   --radius-act-md: var(--act-radius-md);
   --radius-act-lg: var(--act-radius-lg);
+  --radius-act-group: var(--act-radius-group);
   --radius-act-xl: var(--act-radius-xl);
   --radius-act-pill: var(--act-radius-pill);
 
+  --shadow-act-xs: var(--act-shadow-xs);
+  --shadow-act-knob: var(--act-shadow-knob);
+  --shadow-act-thumb: var(--act-shadow-thumb);
   --shadow-act-soft: var(--act-shadow-soft);
   --shadow-act-popover: var(--act-shadow-popover);
+  --shadow-act-float: var(--act-shadow-float);
 }

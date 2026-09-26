@@ -199,8 +199,8 @@ describe("Composer follow-up bar", () => {
     const reviewButton = screen.getByRole("button", { name: /审查待处理变更/ });
     const reviewOverflowButton = screen.getByRole("button", { name: "更多审查操作" });
     expect(reviewButton).toHaveTextContent("Review+4253-5");
-    expect(reviewButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
-    expect(reviewOverflowButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
+    expect(reviewButton).toHaveClass("rounded-act-pill", "enabled:hover:bg-surface-subtle", "enabled:hover:border-line-strong");
+    expect(reviewOverflowButton).toHaveClass("rounded-act-pill", "enabled:hover:bg-surface-subtle", "enabled:hover:border-line-strong");
     expect(screen.getByPlaceholderText("继续补充…")).toBeInTheDocument();
     expect(screen.queryByText("main")).not.toBeInTheDocument();
     expect(screen.getByText("本机")).toBeInTheDocument();
@@ -367,8 +367,7 @@ describe("Composer follow-up bar", () => {
     renderComposer();
 
     const sendButton = screen.getByRole("button", { name: "输入消息后发送" });
-    expect(sendButton.className).toContain("bg-text-main");
-    expect(sendButton.className).toContain("text-surface");
+    expect(sendButton).toHaveClass("bg-action", "text-on-action", "rounded-act-pill");
     expect(sendButton.className).not.toContain("bg-operational");
   });
 
@@ -924,13 +923,13 @@ describe("Composer follow-up bar", () => {
 
     await user.click(screen.getByRole("button", { name: /GPT-5 High/i }));
     const menu = container.querySelector(".model-menu");
-    expect(menu).toHaveClass("duration-[140ms]");
+    expect(menu).toHaveClass("duration-(--motion-fast)");
 
     const modelMenu = screen.getByRole("menu", { name: "模型" });
     await user.hover(within(modelMenu).getByText("GPT-5 High"));
     await user.click(screen.getByRole("button", { name: "编辑 openrouter:openai/gpt-5 选项" }));
     const options = container.querySelector(".model-options-menu");
-    expect(options).toHaveClass("duration-[140ms]");
+    expect(options).toHaveClass("duration-(--motion-fast)");
     expect(screen.getByRole("button", { name: "Auto" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "High" }));
 

@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { BrowserBridgeStatus } from "@actspace/shared";
 
-export const PLUGIN_BTN_SECONDARY =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-line-strong hover:bg-hover-overlay disabled:cursor-not-allowed disabled:opacity-60";
-
 const STATUS_POLL_MS = 2000;
 const STATUS_ERROR_POLL_MS = 5000;
 

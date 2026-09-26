@@ -1,29 +1,29 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Info, Loader2 } from "lucide-react";
+import { Info } from "lucide-react";
 import type { GrantSuggestion, RuntimeV2ApprovalDecisionInput } from "@actspace/shared/runtime-v2";
+import { Button, type ButtonSize } from "../ui/Button";
 
 // 工具审批的共享外壳：一行审批条（读取/搜索/编辑/写入/删除）与卡片（Bash/浏览器）。
 // 设计稿见 docs/design-docs/frontend/approval-card-redesign.html（B 方向）。
 
 export type ApprovalChoice = "once" | "session" | "deny";
 export type ApprovalChipTone = "neutral" | "warning" | "danger" | "info";
-export type ApprovalButtonVariant = "ghost" | "quiet" | "primary" | "danger";
 type ApprovalSize = "row" | "card";
 
-const APPROVAL_SHELL_CLASS = "message-row w-full max-w-[800px] rounded-act-md border bg-surface";
+const APPROVAL_SHELL_CLASS = "message-row w-full max-w-[var(--conversation-block-max-width)] rounded-act-md border bg-surface";
 const APPROVAL_TONE_BORDER_CLASS = { warning: "border-warning/30", danger: "border-danger/35" } as const;
-const APPROVAL_ROW_LINE_CLASS = "approval-row-line flex min-h-[38px] min-w-0 items-center gap-2 py-[5px] pr-1.5 pl-3 text-sm leading-5";
-const APPROVAL_CARD_HEAD_CLASS = "approval-card-head flex min-h-[30px] min-w-0 items-center gap-2 pt-2.5 pr-3 pl-3 text-sm leading-5";
+const APPROVAL_ROW_LINE_CLASS = "approval-row-line flex min-h-[38px] min-w-0 items-center gap-2 py-[5px] pr-1.5 pl-3 text-act-md leading-5";
+const APPROVAL_CARD_HEAD_CLASS = "approval-card-head flex min-h-[30px] min-w-0 items-center gap-2 pt-2.5 pr-3 pl-3 text-act-md leading-5";
 const APPROVAL_CARD_BODY_CLASS = "approval-card-body mt-2.5 mr-3 ml-9";
 const APPROVAL_CARD_FOOTER_CLASS = "approval-card-footer flex items-center gap-1.5 py-2.5 pr-2.5 pl-9";
-const APPROVAL_CARD_FOOTER_META_CLASS = "approval-card-meta mr-auto min-w-0 truncate text-xs text-text-faint";
+const APPROVAL_CARD_FOOTER_META_CLASS = "approval-card-meta mr-auto min-w-0 truncate text-act-xs leading-4 text-text-faint";
 const APPROVAL_ICON_CLASS = "grid size-4 flex-none place-items-center text-text-faint";
 const APPROVAL_VERB_CLASS = "flex-none font-medium text-text-main";
 const APPROVAL_TARGET_CLASS = "approval-target flex min-w-0 items-center gap-1.5";
 const APPROVAL_ACTIONS_CLASS = "approval-actions ml-auto flex flex-none items-center gap-1 pl-2";
 
-const APPROVAL_CHIP_CLASS = "approval-chip inline-flex h-5 flex-none items-center rounded-act-xs px-1.5 text-[11.5px] font-medium leading-none whitespace-nowrap";
+const APPROVAL_CHIP_CLASS = "approval-chip inline-flex h-5 flex-none items-center rounded-act-xs px-1.5 text-act-xs font-medium leading-none whitespace-nowrap";
 const APPROVAL_CHIP_TONE_CLASS: Record<ApprovalChipTone, string> = {
   neutral: "bg-surface-subtle text-text-muted",
   warning: "bg-warning-soft text-on-warning",
@@ -31,18 +31,8 @@ const APPROVAL_CHIP_TONE_CLASS: Record<ApprovalChipTone, string> = {
   info: "bg-info-soft text-on-info",
 };
 
-const APPROVAL_BUTTON_CLASS =
-  "approval-button inline-flex flex-none items-center gap-1.5 rounded-act-sm border font-medium whitespace-nowrap transition-[transform,background-color,border-color,color] duration-100 enabled:active:scale-[0.97] disabled:cursor-default disabled:opacity-55 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring";
-const APPROVAL_BUTTON_SIZE_CLASS: Record<ApprovalSize, string> = {
-  row: "h-[26px] px-[9px] text-[12.5px]",
-  card: "h-7 px-2.5 text-[13px]",
-};
-const APPROVAL_BUTTON_VARIANT_CLASS: Record<ApprovalButtonVariant, string> = {
-  ghost: "border-transparent bg-transparent text-text-muted enabled:hover:bg-hover-overlay enabled:hover:text-text-main",
-  quiet: "border-line bg-surface text-text-main enabled:hover:bg-surface-subtle",
-  primary: "border-transparent bg-action text-on-action enabled:hover:bg-action-hover",
-  danger: "border-transparent bg-danger text-on-danger-solid enabled:hover:bg-danger-hover",
-};
+// 审批按钮尺寸：行内 26px（xs），卡片 28px（sm）；外观全部来自基础 Button。
+const APPROVAL_BUTTON_SIZE: Record<ApprovalSize, ButtonSize> = { row: "xs", card: "sm" };
 
 const OUTSIDE_WORKSPACE_REASON = "The requested file is outside the workspace.";
 const SENSITIVE_FILE_REASON = "This file may contain credentials and requires one-time approval.";
@@ -159,7 +149,7 @@ export function ApprovalReason({ reason }: { reason?: string }) {
 export function ApprovalPath({ path }: { path: string }) {
   const { dir, base } = splitApprovalPath(path);
   return (
-    <span className="approval-path flex min-w-0 font-mono text-[13px]" title={path}>
+    <span className="approval-path flex min-w-0 font-mono text-act-sm" title={path}>
       {/* 目录先收缩；文件名不参与收缩，只在整行都放不下时按容器宽度截断。 */}
       {dir ? <span className="min-w-0 truncate text-text-faint">{compactApprovalDir(dir)}</span> : null}
       <span className="max-w-full shrink-0 truncate font-medium text-text-main">{base}</span>
@@ -170,30 +160,9 @@ export function ApprovalPath({ path }: { path: string }) {
 export function ApprovalPattern({ pattern, scope }: { pattern: string; scope?: string }) {
   return (
     <span className="approval-pattern flex min-w-0 items-center gap-1">
-      <span className="min-w-0 truncate font-mono text-[13px] text-text-main" title={pattern}>{pattern}</span>
+      <span className="min-w-0 truncate font-mono text-act-sm text-text-main" title={pattern}>{pattern}</span>
       {scope ? <><span className="flex-none text-text-faint">于</span><ApprovalPath path={scope} /></> : null}
     </span>
-  );
-}
-
-export function ApprovalButton({
-  variant,
-  size = "row",
-  busy = false,
-  className,
-  children,
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant: ApprovalButtonVariant; size?: ApprovalSize; busy?: boolean }) {
-  return (
-    <button
-      type="button"
-      aria-busy={busy || undefined}
-      className={`${APPROVAL_BUTTON_CLASS} ${APPROVAL_BUTTON_SIZE_CLASS[size]} ${APPROVAL_BUTTON_VARIANT_CLASS[variant]}${className ? ` ${className}` : ""}`}
-      {...props}
-    >
-      {busy ? <Loader2 className="animate-spin" size={12} strokeWidth={2.2} aria-hidden="true" /> : null}
-      {children}
-    </button>
   );
 }
 
@@ -212,11 +181,11 @@ export function ApprovalActions({
   size?: ApprovalSize;
 }) {
   return <>
-    <ApprovalButton variant="ghost" size={size} busy={state.submitting === "deny"} disabled={state.disabled} onClick={() => void state.decide("deny")}>拒绝</ApprovalButton>
+    <Button variant="ghost" size={APPROVAL_BUTTON_SIZE[size]} busy={state.submitting === "deny"} disabled={state.disabled} onClick={() => void state.decide("deny")}>拒绝</Button>
     {suggestion ? (
-      <ApprovalButton variant="quiet" size={size} busy={state.submitting === "session"} disabled={state.disabled} title={suggestion.label} onClick={() => void state.decide("session", suggestion.suggestionId)}>本会话</ApprovalButton>
+      <Button variant="secondary" size={APPROVAL_BUTTON_SIZE[size]} busy={state.submitting === "session"} disabled={state.disabled} title={suggestion.label} onClick={() => void state.decide("session", suggestion.suggestionId)}>本会话</Button>
     ) : null}
-    <ApprovalButton variant={primaryVariant} size={size} busy={state.submitting === "once"} disabled={state.disabled} onClick={() => void state.decide("once")}>{primaryLabel}</ApprovalButton>
+    <Button variant={primaryVariant === "danger" ? "danger-solid" : "primary"} size={APPROVAL_BUTTON_SIZE[size]} busy={state.submitting === "once"} disabled={state.disabled} onClick={() => void state.decide("once")}>{primaryLabel}</Button>
   </>;
 }
 

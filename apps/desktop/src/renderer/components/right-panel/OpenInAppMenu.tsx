@@ -16,11 +16,11 @@ import { OPEN_TOOL_LABELS, readStoredOpenTool, storeOpenTool, toolIcon } from ".
 const TRIGGER_CLASS =
   "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
 const MENU_CLASS =
-  "absolute right-0 top-[calc(100%+4px)] z-[95] min-w-[196px] overflow-hidden rounded-act-lg border border-line bg-surface-raised p-1.5 shadow-act-popover";
+  "absolute right-0 top-[calc(100%+4px)] z-(--act-z-dropdown) min-w-[196px] overflow-hidden rounded-act-lg border border-line bg-surface-raised p-1.5 shadow-act-popover";
 const MENU_ITEM_CLASS =
-  "flex min-h-8 w-full items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2 text-left text-[12px] text-text-main transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:text-text-faint disabled:hover:bg-transparent [cursor:pointer] disabled:[cursor:default]";
-const MENU_HINT_CLASS = "px-2 py-1 text-[11px] text-text-faint";
-const MENU_ERROR_CLASS = "border-t border-line px-2 pt-1.5 text-[11px] leading-relaxed text-danger";
+  "flex min-h-8 w-full items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2 text-left text-act-xs text-text-main transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:text-text-faint disabled:hover:bg-transparent [cursor:pointer] disabled:[cursor:default]";
+const MENU_HINT_CLASS = "px-2 py-1 text-act-xxs text-text-faint";
+const MENU_ERROR_CLASS = "border-t border-line px-2 pt-1.5 text-act-xxs leading-relaxed text-danger";
 
 export function OpenInAppMenu({
   workspaceRoot,
@@ -136,9 +136,9 @@ export function OpenInAppMenu({
             >
               {toolIcon(tool, 15)}
               <span className="min-w-0 flex-1 truncate">{tool.label}</span>
-              {!tool.available ? <span className="text-[11px] text-text-faint">未安装</span> : null}
+              {!tool.available ? <span className="text-act-xxs text-text-faint">未安装</span> : null}
               {tool.id === preferred && tool.available ? (
-                <span className="text-[11px] text-text-faint">上次</span>
+                <span className="text-act-xxs text-text-faint">上次</span>
               ) : null}
             </button>
           ))}

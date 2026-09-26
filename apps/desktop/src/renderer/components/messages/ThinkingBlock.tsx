@@ -7,11 +7,11 @@ import {
 } from "./toolLogStyles";
 
 const THINKING_BLOCK_CLASS =
-  "message-row thinking-block max-w-[800px] px-[var(--conversation-text-inset)] animate-[rise-in_260ms_ease_both]";
+  "message-row thinking-block max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)] animate-[rise-in_260ms_ease_both]";
 const THINKING_TOGGLE_CLASS =
-  "thinking-toggle flex items-center gap-2 border-0 bg-transparent p-0 text-sm font-normal leading-[22px] text-text-faint";
+  "thinking-toggle flex items-center gap-2 border-0 bg-transparent p-0 text-act-md font-normal leading-[22px] text-text-faint";
 const THINKING_CONTENT_CLASS =
-  "thinking-content mt-[7px] mb-0 whitespace-pre-wrap font-[inherit] text-sm leading-[1.65] text-text-muted";
+  "thinking-content mt-[7px] mb-0 whitespace-pre-wrap font-[inherit] text-act-md leading-[1.65] text-text-muted";
 
 export function ThinkingBlock({ message, className, replyCompleted = false }: {
   message: Extract<MessageBlock, { kind: "thinking" }>;

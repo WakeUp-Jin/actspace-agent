@@ -18,7 +18,7 @@ const MARKER_BUTTON_CLASS =
 const MARKER_BUTTON_DEFAULT_CLASS = "h-3.5";
 const MARKER_BUTTON_DENSE_CLASS = "min-h-[2px] flex-1";
 const MARKER_CLASS =
-  "h-[2px] rounded-act-pill bg-line-strong transition-[width,background-color] duration-[150ms] ease-out group-hover:bg-text-main group-focus-visible:bg-text-main motion-reduce:transition-none";
+  "h-[2px] rounded-act-pill bg-line-strong transition-[width,background-color] duration-(--motion-base) ease-out group-hover:bg-text-main group-focus-visible:bg-text-main motion-reduce:transition-none";
 const MARKER_ACTIVE_CLASS = "bg-text-main";
 const MARKER_RESTING_CLASS = "w-1.5";
 const MARKER_ACTIVE_WIDTH_CLASS = "w-5";
@@ -26,9 +26,9 @@ const MARKER_WAVE_WIDTH_CLASSES = ["w-6", "w-5", "w-4", "w-3", "w-2"] as const;
 const PREVIEW_CARD_CLASS =
   "w-[min(340px,calc(100vw-64px))] rounded-act-md border border-line bg-surface-raised px-3 py-2.5 text-left shadow-act-popover";
 const PREVIEW_INPUT_CLASS =
-  "line-clamp-2 whitespace-pre-wrap break-words text-[13px] font-semibold leading-[1.45] text-text-main";
+  "line-clamp-2 whitespace-pre-wrap break-words text-act-sm font-semibold leading-[1.45] text-text-main";
 const PREVIEW_REPLY_CLASS =
-  "mt-2 border-t border-line pt-2 line-clamp-3 whitespace-pre-wrap break-words text-[12px] leading-[1.5] text-text-muted";
+  "mt-2 border-t border-line pt-2 line-clamp-3 whitespace-pre-wrap break-words text-act-xs leading-[1.5] text-text-muted";
 
 function previewLabel(item: ConversationTurnNavigationItem, index: number): string {
   const compactInput = item.input.replace(/\s+/g, " ").trim();

@@ -52,7 +52,7 @@ export function TrajectoryTimeline({ runtime, selectedId, matches, range, onRang
     element.addEventListener('wheel', wheel, { passive: false });
     return () => element.removeEventListener('wheel', wheel);
   }, [duration, full, model, start]);
-  if (!model) return <section aria-label="Trajectory timeline" className="shrink-0 border-b border-line px-3 py-3 text-[11px] text-text-faint">No timing data</section>;
+  if (!model) return <section aria-label="Trajectory timeline" className="shrink-0 border-b border-line px-3 py-3 text-act-xxs text-text-faint">No timing data</section>;
   const fractionAt = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return clamp((event.clientX - rect.left) / Math.max(1, rect.width), 0, 1);
@@ -110,7 +110,7 @@ export function TrajectoryTimeline({ runtime, selectedId, matches, range, onRang
   const selectionEnd = activeRange ? clamp((activeRange.end - start) / duration, 0, 1) : 0;
   return <section aria-label="Trajectory timeline" className="shrink-0 border-b border-line bg-surface">
     <div className="grid h-[54px] grid-cols-[52px_minmax(0,1fr)]">
-      <div className="grid grid-rows-3 py-1 pr-1 text-right text-[11px] leading-[15px] text-text-faint"><span>Input</span><span>Model</span><span>Tools</span></div>
+      <div className="grid grid-rows-3 py-1 pr-1 text-right text-act-xxs leading-[15px] text-text-faint"><span>Input</span><span>Model</span><span>Tools</span></div>
       <div ref={track} data-testid="trajectory-overview-track" aria-label="Timeline overview; drag horizontally to focus events" tabIndex={0}
         className="relative touch-none select-none overflow-hidden outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-ring"
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel}
@@ -128,7 +128,7 @@ export function TrajectoryTimeline({ runtime, selectedId, matches, range, onRang
           const ttft = metrics?.ttftMs; const generation = metrics?.generationMs;
           return <button key={record.id} type="button" data-timeline-record={record.id} aria-label={`${roleOf(record)} ${record.eventType}, event ${(record.sourceSequences[0] ?? 0) + 1}`} aria-pressed={selectedId === record.id}
             title={`${roleOf(record)}\nStarted ${formatTimestamp(record.startedAt)}\nDuration ${formatDuration(record.durationMs)}`}
-            className={`absolute h-[9px] min-w-[3px] overflow-hidden rounded-[1px] ${color} ${dim ? 'opacity-20' : 'opacity-80 hover:opacity-100'} ${selectedId === record.id ? 'ring-1 ring-info ring-offset-1 ring-offset-surface' : ''} ${animate ? 'transition-[left,width] duration-150 motion-reduce:transition-none' : ''}`}
+            className={`absolute h-[9px] min-w-[3px] overflow-hidden rounded-[1px] ${color} ${dim ? 'opacity-20' : 'opacity-80 hover:opacity-100'} ${selectedId === record.id ? 'ring-1 ring-info ring-offset-1 ring-offset-surface' : ''} ${animate ? 'transition-[left,width] duration-(--motion-base) motion-reduce:transition-none' : ''}`}
             style={{ left: `${(span.start - start) / duration * 100}%`, top: 6 + span.lane * 15, width: `max(3px, calc(${(span.end - span.start) / duration * 100}% - 1px))` }}
             onClick={event => { if (event.detail === 0) { onRange(null); onSelect(record); } }}>
             {ttft != null && generation != null && ttft + generation > 0 && <span className="absolute inset-y-0 left-0 bg-surface/50" style={{ width: `${ttft / (ttft + generation) * 100}%` }} />}

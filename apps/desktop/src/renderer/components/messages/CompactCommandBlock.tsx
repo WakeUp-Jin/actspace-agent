@@ -4,18 +4,18 @@ type CompactMessage = Extract<MessageBlock, { kind: "context_compaction" }>;
 
 const BLOCK_CLASS =
   "message-row compact-command-block w-full px-[var(--conversation-text-inset)] animate-[rise-in_220ms_ease_both]";
-const PENDING_CLASS = "text-sm font-medium text-text-faint";
+const PENDING_CLASS = "text-act-md leading-5 font-medium text-text-faint";
 const RUNNING_CLASS =
   "compact-command-running w-full py-2";
-const RUNNING_TEXT_CLASS = "flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm";
+const RUNNING_TEXT_CLASS = "flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-act-md leading-5";
 const TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold text-text-main";
 const META_CLASS = "text-text-muted";
 const PROGRESS_TRACK_CLASS = "mt-2 h-[3px] w-full overflow-hidden rounded-act-pill bg-line";
 const PROGRESS_BAR_CLASS =
-  "h-full rounded-act-pill bg-operational transition-[width] duration-200 ease-out motion-reduce:transition-none";
+  "h-full rounded-act-pill bg-operational transition-[width] duration-(--motion-slow) ease-out motion-reduce:transition-none";
 const INDETERMINATE_BAR_CLASS =
   "h-full w-1/2 rounded-act-pill bg-operational animate-[compact-progress_1.1s_ease-in-out_infinite] motion-reduce:animate-none";
-const DIVIDER_CLASS = "compact-command-divider flex w-full items-center gap-3 py-3 text-xs font-medium text-text-faint";
+const DIVIDER_CLASS = "compact-command-divider flex w-full items-center gap-3 py-3 text-act-xs leading-4 font-medium text-text-faint";
 const DIVIDER_FAILED_CLASS = "text-on-danger";
 const DIVIDER_LINE_CLASS = "h-px min-w-6 flex-1 bg-line";
 const DIVIDER_FAILED_LINE_CLASS = "bg-danger-soft";

@@ -7,6 +7,7 @@ import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolLogLine } from "./ToolLogLine";
 import { TOOL_LOG_LINE_CLASS, TOOL_LOG_LINE_TEXT_CLASS } from "./toolLogStyles";
 import { formatWorkedDuration } from "./workedDuration";
+import { IconButton } from "../ui/IconButton";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 type AssistantMessage = Extract<MessageBlock, { kind: "assistant" }>;
@@ -31,16 +32,14 @@ type TranscriptSections = {
 const PANEL_CLASS =
   "subagent-transcript-panel mx-auto flex max-h-[min(620px,calc(100vh_-_248px))] w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col overflow-hidden rounded-act-lg border border-line bg-surface-raised shadow-act-popover";
 const PANEL_HEADER_CLASS = "flex items-center justify-between gap-4 border-b border-line px-4 py-3";
-const PANEL_TITLE_CLASS = "m-0 min-w-0 truncate text-[14px] font-medium leading-[1.35] text-text-main";
-const PANEL_ICON_BUTTON_CLASS =
-  "grid h-8 w-8 place-items-center rounded-act-md border-0 bg-transparent text-text-muted transition hover:bg-surface-subtle hover:text-text-main";
+const PANEL_TITLE_CLASS = "m-0 min-w-0 truncate text-act-md font-medium leading-[1.35] text-text-main";
 const PANEL_BODY_CLASS = "min-h-0 flex-1 overflow-y-auto";
 const PANEL_CONTENT_CLASS = "min-h-full bg-surface";
 const TRANSCRIPT_FLOW_CLASS = "transcript-message-flow flex flex-col";
-const EMPTY_CLASS = "px-[var(--conversation-text-inset)] text-sm leading-[1.55] text-text-muted";
+const EMPTY_CLASS = "px-[var(--conversation-text-inset)] text-act-md leading-[1.55] text-text-muted";
 const TASK_INPUT_SECTION_CLASS = "sticky top-0 z-10 bg-surface-raised px-5 py-3";
 const TASK_INPUT_BUTTON_CLASS =
-  "relative block w-full rounded-act-md border border-line bg-surface px-4 py-3 text-left text-[15px] leading-[1.65] text-text-main transition hover:border-line-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)]";
+  "relative block w-full rounded-act-md border border-line bg-surface px-4 py-3 text-left text-act-md leading-[1.65] text-text-main transition hover:border-line-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)]";
 const TASK_INPUT_TEXT_CLASS = "block whitespace-pre-wrap";
 const TASK_INPUT_COLLAPSED_CLASS = "max-h-[98px] overflow-hidden";
 const TASK_INPUT_EXPANDED_CLASS = "max-h-none";
@@ -50,10 +49,10 @@ const WORK_SECTION_CLASS =
   "relative bg-surface px-6 py-4 after:absolute after:inset-x-5 after:bottom-0 after:h-px after:bg-line after:content-['']";
 const WORK_HEADER_CLASS = "flex items-center gap-4";
 const WORK_TOGGLE_CLASS =
-  "inline-flex items-center gap-2 border-0 bg-transparent p-0 text-[15px] font-medium leading-[1.4] text-text-muted transition hover:text-text-main";
+  "inline-flex items-center gap-2 border-0 bg-transparent p-0 text-act-md font-medium leading-[1.4] text-text-muted transition hover:text-text-main";
 const WORK_FLOW_CLASS = "transcript-message-flow mt-4 flex flex-col";
 const FINAL_REPORT_SECTION_CLASS = "bg-surface px-6 py-6";
-const FINAL_REPORT_CONTENT_CLASS = "max-w-[840px] text-[15px] leading-[1.7] text-text-main";
+const FINAL_REPORT_CONTENT_CLASS = "max-w-[840px] text-act-md leading-[1.7] text-text-main";
 
 export function mergeEvents(current: SessionEvent[], next: SessionEvent[] | undefined): SessionEvent[] {
   if (!next?.length) return current;
@@ -450,9 +449,9 @@ export function SubAgentTranscriptPanel({
         <AgentAvatar message={message} size={28} />
         <h2 className={`${PANEL_TITLE_CLASS} flex-1`}>{message.description}</h2>
         <AgentStatus status={message.status} />
-        <button ref={closeButtonRef} className={PANEL_ICON_BUTTON_CLASS} type="button" aria-label="Close transcript" onClick={onClose}>
+        <IconButton ref={closeButtonRef} label="Close transcript" tooltip="关闭" size="md" onClick={onClose}>
           <X size={15} aria-hidden="true" />
-        </button>
+        </IconButton>
       </header>
       <div className={PANEL_BODY_CLASS}>
         <div className={PANEL_CONTENT_CLASS}>

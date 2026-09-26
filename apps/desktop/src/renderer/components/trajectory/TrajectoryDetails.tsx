@@ -10,7 +10,7 @@ function Fields({ items }: { items: [string, ReactNode][] }) {
 }
 function Payload({ value, missing = 'Not recorded', preview = false }: { value: RuntimeV2JsonValue | undefined; missing?: string; preview?: boolean }) {
   if (value == null) return <p className="m-0 text-text-faint">{missing}</p>;
-  return <pre className={`m-0 whitespace-pre-wrap break-words font-mono text-[11px] leading-5 ${preview ? 'max-h-28 overflow-hidden' : ''}`}>{serialize(value)}</pre>;
+  return <pre className={`m-0 whitespace-pre-wrap break-words font-mono text-act-xxs leading-5 ${preview ? 'max-h-28 overflow-hidden' : ''}`}>{serialize(value)}</pre>;
 }
 function Section({ title, onOpen, children }: { title: string; onOpen?: () => void; children: ReactNode }) {
   return <section className="mt-6"><button type="button" className="mb-2 inline-flex items-center gap-1 text-text-muted hover:text-text-main" onClick={onOpen}>{title}<ChevronRight size={12} /></button>{children}</section>;
@@ -29,7 +29,7 @@ function PromptDiff({ record }: { record: TrajectoryRecord }) {
     ...after.slice(prefix, after.length - suffix).map(line => ({ sign: '+', line })),
     ...after.slice(after.length - suffix).map(line => ({ sign: ' ', line })),
   ];
-  return <pre aria-label="Prompt changes" className="m-0 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5">{lines.map(({ sign, line }, index) => <div key={index} className={sign === '+' ? 'bg-success-soft text-success' : sign === '-' ? 'bg-danger-soft text-danger' : 'text-text-muted'}>{sign} {line}</div>)}</pre>;
+  return <pre aria-label="Prompt changes" className="m-0 overflow-auto whitespace-pre-wrap break-words font-mono text-act-xxs leading-5">{lines.map(({ sign, line }, index) => <div key={index} className={sign === '+' ? 'bg-success-soft text-success' : sign === '-' ? 'bg-danger-soft text-danger' : 'text-text-muted'}>{sign} {line}</div>)}</pre>;
 }
 function Timing({ record }: { record: TrajectoryRecord }) {
   const metrics = record.assistantMetrics;
@@ -88,11 +88,11 @@ export function TrajectoryDetails({ runtime, record, onClose, onSelect, initialR
       onKeyDown={event => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); setWidth(current => Math.min(640, Math.max(300, (current ?? panel.current?.getBoundingClientRect().width ?? 400) + (event.key === 'ArrowLeft' ? 24 : -24)))); } }} />
     <div className="flex min-h-12 items-center gap-2 border-b border-line px-3">
       {requestOpen ? <button className="text-text-muted hover:text-text-main" onClick={() => { setRequestOpen(false); setTab('Summary'); }}>Request #{requestNumber}</button> : <RoleBadge record={record} />}
-      <span className="min-w-0 font-mono text-[11px] text-text-faint">{record.turnNumber != null ? `Turn ${record.turnNumber}` : ''}{user ? ' · Message' : record.stepNumber != null ? ` · Step ${record.stepNumber}` : ''}</span>
+      <span className="min-w-0 font-mono text-act-xxs text-text-faint">{record.turnNumber != null ? `Turn ${record.turnNumber}` : ''}{user ? ' · Message' : record.stepNumber != null ? ` · Step ${record.stepNumber}` : ''}</span>
       <button aria-label="Close event details" className="ml-auto p-1 text-text-muted hover:text-text-main" onClick={onClose}><X size={15} /></button>
     </div>
-    <div role="tablist" aria-label="Event details" className="flex shrink-0 overflow-x-auto border-b border-line px-2">{tabs.map(label => <button key={label} type="button" role="tab" aria-selected={label === active} className={`shrink-0 border-b-2 px-2 py-2.5 text-[12px] ${label === active ? 'border-info text-info' : 'border-transparent text-text-muted hover:text-text-main'}`} onClick={() => open(label)}>{label}</button>)}</div>
-    <div role="tabpanel" className="min-h-0 flex-1 overflow-auto p-4 text-[12px] text-text-main">
+    <div role="tablist" aria-label="Event details" className="flex shrink-0 overflow-x-auto border-b border-line px-2">{tabs.map(label => <button key={label} type="button" role="tab" aria-selected={label === active} className={`shrink-0 border-b-2 px-2 py-2.5 text-act-xs ${label === active ? 'border-info text-info' : 'border-transparent text-text-muted hover:text-text-main'}`} onClick={() => open(label)}>{label}</button>)}</div>
+    <div role="tabpanel" className="min-h-0 flex-1 overflow-auto p-4 text-act-xs text-text-main">
       {requestOpen ? <>
         {active === 'Summary' && <><Fields items={ [['Status', status], ['Request', req?.requestId ?? 'Not recorded'], ['Provider', req?.provider ?? 'Not recorded'], ['Model', req?.model ?? 'Not recorded']] } /><Section title="Options" onOpen={() => open('Options')}><Payload value={record.requestOptions} preview /></Section><Section title="Usage" onOpen={() => open('Usage')}><Payload value={usage as RuntimeV2JsonValue} preview /></Section><Section title="Timing" onOpen={() => open('Timing')}><Timing record={record} /></Section></>}
         {active === 'Options' && <Payload value={record.requestOptions} />}{active === 'Usage' && <Payload value={usage as RuntimeV2JsonValue} missing="Usage not reported" />}{active === 'Timing' && <Timing record={record} />}

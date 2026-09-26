@@ -8,9 +8,8 @@ import { useCallback, useEffect, useState } from "react";
 import { CircleAlert, FolderDown, Trash2 } from "lucide-react";
 import type { AppSettings, SettingsUpdateInput, SkillCatalogItem } from "@actspace/shared";
 import { SectionShell, SettingGroup, Toggle } from "../settings/SettingsPrimitives";
+import { Button } from "../ui/Button";
 
-const BTN_SECONDARY =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-line-strong hover:bg-hover-overlay disabled:cursor-not-allowed disabled:opacity-60";
 
 function hasSkillsBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.listSkills);
@@ -110,7 +109,7 @@ export function SkillsSection({
   if (!bridgeReady) {
     return (
       <SectionShell>
-        <div className="rounded-act-lg border border-line bg-surface px-4 py-6 text-center text-[13px] text-text-faint">
+        <div className="rounded-act-lg border border-line bg-surface px-4 py-6 text-center text-act-sm text-text-faint">
           Skill 管理仅在桌面端可用。
         </div>
       </SectionShell>
@@ -124,21 +123,21 @@ export function SkillsSection({
   return (
     <SectionShell>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-[12px] text-text-faint">
+        <span className="text-act-xs text-text-faint">
           Skills · {visible.length}
           {items.length > discovered.length ? `（另有 ${items.length - discovered.length} 个同名被遮蔽）` : ""}
         </span>
         <div className="flex gap-2">
-          <button type="button" className={BTN_SECONDARY} disabled={loading} onClick={() => { setMessage(null); void refresh(); }}>刷新</button>
-          <button type="button" className={BTN_SECONDARY} onClick={() => void install()}>
+          <Button variant="secondary" disabled={loading} onClick={() => { setMessage(null); void refresh(); }}>刷新</Button>
+          <Button variant="secondary" onClick={() => void install()}>
             <FolderDown size={14} strokeWidth={2} className="mr-1.5" />
             安装 Skill
-          </button>
+          </Button>
         </div>
       </div>
 
       {message ? (
-        <p className={`text-[12px] ${message.includes("失败") ? "text-on-danger" : "text-on-success"}`}>{message}</p>
+        <p className={`text-act-xs ${message.includes("失败") ? "text-on-danger" : "text-on-success"}`}>{message}</p>
       ) : null}
 
       <SettingGroup
@@ -146,9 +145,9 @@ export function SkillsSection({
         description="启用后，主 Agent 可在后续对话中使用。"
       >
         {loading ? (
-          <div className="px-4 py-6 text-center text-[13px] text-text-faint">加载 Skill 列表中…</div>
+          <div className="px-4 py-6 text-center text-act-sm text-text-faint">加载 Skill 列表中…</div>
         ) : visible.length === 0 ? (
-          <div className="px-4 py-8 text-center text-[13px] text-text-faint">
+          <div className="px-4 py-8 text-center text-act-sm text-text-faint">
             {needle ? "没有找到匹配的 Skill。" : "尚未发现任何 Skill，可从本机目录安装。"}
           </div>
         ) : (
@@ -157,21 +156,21 @@ export function SkillsSection({
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[13px] font-medium text-text-main">{item.name}</span>
-                    <span className="inline-flex items-center rounded-full bg-surface-subtle px-2 py-0.5 text-[11px] font-medium text-text-faint">
+                    <span className="text-act-sm font-medium text-text-main">{item.name}</span>
+                    <span className="inline-flex items-center rounded-full bg-surface-subtle px-2 py-0.5 text-act-xxs font-medium text-text-faint">
                       {item.scope === "project" ? "项目" : "用户"} · {SOURCE_LABELS[item.source] ?? item.source}
                     </span>
                     {item.status === "warning" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-medium text-on-danger">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-act-xxs font-medium text-on-danger">
                         <CircleAlert size={11} strokeWidth={2.2} /> 异常
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-1 break-words text-[12px] leading-relaxed text-text-faint" title={item.description}>
+                  <p className="mt-1 break-words text-act-xs leading-relaxed text-text-faint" title={item.description}>
                     {item.description || "（无描述）"}
                   </p>
-                  {item.warning ? <p className="mt-1 text-[12px] text-on-danger">{item.warning}</p> : null}
-                  <details className="mt-1 text-[11px] text-text-subtle"><summary className="w-fit cursor-pointer hover:text-text-main">来源路径</summary><p className="mt-1 break-all">{item.directory}</p></details>
+                  {item.warning ? <p className="mt-1 text-act-xs text-on-danger">{item.warning}</p> : null}
+                  <details className="mt-1 text-act-xxs text-text-subtle"><summary className="w-fit cursor-pointer hover:text-text-main">来源路径</summary><p className="mt-1 break-all">{item.directory}</p></details>
                 </div>
                 {item.removable ? (
                   <button
@@ -185,7 +184,7 @@ export function SkillsSection({
                 ) : null}
               </div>
               <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 text-[12px] text-text-muted">
+                <label className="flex items-center gap-2 text-act-xs text-text-muted">
                   <Toggle
                     checked={!settings.skills.disabled.includes(item.name)}
                     disabled={saving}

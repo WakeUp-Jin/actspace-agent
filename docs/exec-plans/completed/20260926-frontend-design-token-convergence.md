@@ -1,6 +1,6 @@
 # 前端设计 token 收口与视觉修复
 
-> 状态：2026-09-26 T0 对比 demo 已完成，等待用户确认 D1–D5；确认前不改代码。
+> 状态：2026-09-26 T0–T14 已实施，D1–D5 按推荐方案执行，T12 按用户选择的方案 B 扩大到全部按钮常量。待用户在 Electron 窗口验收（清单见 `docs/exec-runs/20260926-frontend-design-token-convergence/execution-summary.md`）。
 
 ## 目标
 
@@ -9,7 +9,7 @@
 - 浅色、深色主题下，消息卡片、用户消息卡、Composer 的左右边缘对齐，工作台里没有常驻的大阴影和冷蓝灰阴影。
 - 窗口右上角和设置页顶部不再出现孤立的横线。
 - renderer 组件里不再有 `text-[Npx]`、`rounded-[Npx]`、`z-[N]`（N≥3）和 `rgba(31,45,61,…)`，新增时 `pnpm check:frontend-tokens` 会失败。
-- 设置页和审批卡的按钮来自同一个 `Button` 组件。
+- 设置页、审批卡、Composer、Sidebar 和各对话框的按钮来自同一个 `Button` / `IconButton` 组件。
 
 ## 来源
 
@@ -63,21 +63,22 @@
 
 | 审查条目 | 去向 |
 |---|---|
-| P0-1 基础组件缺失、45 份按钮常量 | **部分覆盖**。T12 只做 `Button` / `IconButton`，只迁移设置中心（`SettingsPage`、`ProviderSettings`、`CustomModelForm`）和 `ApprovalParts`。其余按钮常量（Composer 12、Sidebar 4、PreviewSourceToggle 4、ConversationTurnRail 3、WorkspaceChromeControls 2、ReplyHtmlRenderView 2、SubAgentTranscriptModal 2 等）以及 `DropdownMenu` / `Dialog` / `Switch` / `Tabs` 归 `active/frontend-ui-components-foundation.md`，本计划不迁移 |
+| P0-1 基础组件缺失、45 份按钮常量 | **按钮部分覆盖完成**（2026-09-26 用户选方案 B，Composer 已解锁）。T12 新增 `Button` / `IconButton`，迁移所有「真正的按钮」：设置中心（含原 `SettingsButton` 及 7 个文件的用法）、扩展页、审批卡、Composer 回形针 /「+」/ 发送 / Review 胶囊、Sidebar 行内图标、右侧面板工具条、子 Agent 弹窗关闭、工作区与设置对话框底部按钮。45 份常量中其余是菜单项、下拉触发器、分段控件、可点卡片和已封装的浮动按钮，不属于 Button，归 `DropdownMenu` / `Tabs` 等（清单见 `front-基础组件封装规范.md`）。`DropdownMenu` / `Dialog` / `Switch` / `Tabs` 仍归 `active/frontend-ui-components-foundation.md` |
 | P0-2 字号无 token | T6、T7、T8、T13，完整覆盖 |
 | P1-3 右上角横线 | T2 |
 | P1-4 Composer 圆角 / 阴影、用户卡阴影 | T3、T5（D1、D2、D5） |
 | P1-5 消息块与 Composer 不对齐 | T4（D3） |
 | P1-6 设置页顶部空带 | T2 |
 | P1-6 设置导航分组标签 10px 大写 | 已由设置中心改版（`fd73999`）修复，不再处理 |
-| P1-6 `CustomModelForm.tsx:60/93`、`SettingsPage.tsx` 连接状态块仍是"边框卡片"分组 | **未覆盖**。设置改版计划把表单内部列为范围外；是否改成内嵌分组需要用户决定 |
+| P1-6 `CustomModelForm.tsx:60/93`、`SettingsPage.tsx` 连接状态块仍是"边框卡片"分组 | **未覆盖**。表单底部按钮已迁到 `Button`；分组样式是否改成内嵌分组需要用户决定，记入 `tech-debt-tracker.md` |
 | P2-7 z-index | T10 |
 | P2-8 圆角 | T9 |
 | P2-9 减少动态效果、时长 | T11 |
 | P2-10 `outline-none` 缺焦点环 | T12 内逐条处理 |
 | P2-11 标题栏 `Activity` 波形图标（`SessionViewToggle.tsx:30`，实为"对话 / 轨迹"切换）含义不明 | **未覆盖**。需要设计决定（加文字 / 分段控件 / 换图标），可在 T0 demo 追加一块或另起小任务 |
-| 间距写死值（`p-[7px]`、`gap-[9px]` 等） | 不做，T14 记入 `tech-debt-tracker.md` |
-| `markdown.css` / `diff.css` / `tool-result.css` / `web-tool.css` 内 px 字号 | 不做，T14 记入技术债 |
+| 间距写死值（`p-[7px]`、`gap-[9px]` 等） | 不做，已记入 `tech-debt-tracker.md` |
+| `markdown.css` / `diff.css` / `tool-result.css` / `web-tool.css` 内 px 字号 | 不做，已记入技术债 |
+| （执行中发现）`shadow-act-float` 从未定义，8 处 dialog / 抽屉没有阴影 | T3 补 `--act-shadow-float`；T13 检查脚本新增「引用的 token 必须已定义」规则 |
 
 ## 需要用户确认的视觉决定（T0 demo 里对比）
 
@@ -245,21 +246,22 @@ T2–T4 相互独立，可以分开提交。T7 必须在 T6 验证通过后才�
 
 - [x] 2026-09-26 审查结论在当前 HEAD 复核，写入问题清单。
 - [x] 2026-09-26 T0 对比 demo 完成，headless Chromium 浅 / 深、现状 / 修改后与备选组合截图检查通过。
-- [ ] D1–D5 由用户确认。
-- [ ] T1 样式快照工具与 before 基线。
-- [ ] T2 chrome 横线。
-- [ ] T3 阴影 token。
-- [ ] T4 消息块宽度。
-- [ ] T5 Composer 圆角与阴影（待 Composer 解锁）。
-- [ ] T6 字号 token。
-- [ ] T7 等值替换。
-- [ ] T8 规范外字号。
-- [ ] T9 圆角。
-- [ ] T10 z-index。
-- [ ] T11 动效。
-- [ ] T12 Button / IconButton 与焦点环。
-- [ ] T13 检查脚本。
-- [ ] T14 文档、Electron 验收、history。
+- [x] D1–D5 由用户确认：全部按推荐方案（2026-09-26）。
+- [x] T1 样式快照工具与 before 基线。
+- [x] T2 chrome 横线。
+- [x] T3 阴影 token。
+- [x] T4 消息块宽度。
+- [x] T5 Composer 圆角与阴影（待 Composer 解锁）。
+- [x] T6 字号 token。
+- [x] T7 等值替换。
+- [x] T8 规范外字号。
+- [x] T9 圆角。
+- [x] T10 z-index。
+- [x] T11 动效。
+- [x] T12 Button / IconButton 与焦点环。
+- [x] T13 检查脚本。
+- [x] T14 文档、history、执行记录。
+- [ ] Electron 窗口验收（用户，清单见执行摘要）。
 
 ## 决策记录
 
@@ -267,6 +269,12 @@ T2–T4 相互独立，可以分开提交。T7 必须在 T6 验证通过后才�
 - 2026-09-26：设置内嵌分组 10px 圆角作为具名 token `group` 保留，不并入 8px 或 12px。理由：该值是用户 2026-09-25 批准的设计。
 - 2026-09-26：本计划只做 `Button` / `IconButton`，`DropdownMenu` / `Switch` / `Textarea` / `Tabs` 仍归 `frontend-ui-components-foundation.md`，避免两个计划同时改同一组件。
 - 2026-09-26：审查子代理提出的"审批卡头部与正文未对齐""`size-4` 图标只有 4px"经复核为误判，不纳入。
+
+- 2026-09-26：D1–D5 按推荐方案：Composer 圆角 12px、去掉 Composer 与用户消息卡常驻阴影、消息块与内容列同宽 880px、小于 11px 的字提到 11px、Composer 输入 16px。
+- 2026-09-26：用户选方案 B，T12 从「设置中心 + 审批卡」扩大到全部真正的按钮；菜单项、下拉触发器、分段控件、可点卡片不算按钮，留给 `DropdownMenu` / `Tabs`。理由：把它们硬塞进 `Button` 会让 variant 膨胀，也违背基础组件规范「只从重复出现的控件抽象」。
+- 2026-09-26：`Button` 的 28px 档（`sm`）沿用审批卡的 13px 字、10px 内边距，设置页按钮因此从 12px 变为 13px。理由：审批卡按计划要零差异；规范中设置正文和相邻输入框都是 13px。
+- 2026-09-26：z-index 在计划表之外新增 `--act-z-drawer: 50`（窄窗口侧栏 / 右面板抽屉）。理由：抽屉必须低于标题栏（60）才能保留标题栏按钮点击，又要高于拖拽柄（30），计划表里没有合适的层。portal 到 body 的菜单（Review 工具条、分支菜单）放 popover 层，组件内 absolute 菜单放 dropdown 层。
+- 2026-09-26：T7 发现 3 处「基础常量字号 + 调用处追加字号」的冲突（设置导航返回按钮、Sidebar 工作区标签、提示词编辑器）。原来靠 `text-[13px]` 恰好排在后面生效，token 改名后顺序翻转。按原实际渲染值保留 13px，并拆出不含字号的基础常量。
 
 ## 执行模式
 

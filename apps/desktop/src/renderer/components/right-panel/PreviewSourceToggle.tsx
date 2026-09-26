@@ -1,8 +1,7 @@
+import { Button } from "../ui/Button";
 export type PreviewMode = "preview" | "source";
 
 const GROUP_CLASS = "inline-flex items-center gap-0.5 rounded-act-sm border border-line bg-surface-subtle p-0.5";
-const BAR_BUTTON_CLASS =
-  "shrink-0 rounded-act-sm border-0 bg-transparent px-1.5 py-0.5 text-[12px] leading-none text-text-muted hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
 
 /**
  * 工作区操作栏里的预览 / 源码切换（对齐 Cursor 第二层的 View source / View preview）。
@@ -24,14 +23,14 @@ export function PreviewSourceButton({
   const next: PreviewMode = mode === "preview" ? "source" : "preview";
   const label = next === "source" ? "查看源码" : `查看${previewLabel}`;
   return (
-    <button type="button" className={BAR_BUTTON_CLASS} onClick={() => onChange(next)}>
+    <Button variant="ghost" size="xs" onClick={() => onChange(next)}>
       {label}
-    </button>
+    </Button>
   );
 }
 
 const BUTTON_BASE =
-  "rounded-[5px] border-0 px-2 py-0.5 text-[11px] leading-none [cursor:pointer] [-webkit-app-region:no-drag]";
+  "rounded-act-sm border-0 px-2 py-0.5 text-act-xxs leading-none [cursor:pointer] [-webkit-app-region:no-drag]";
 const BUTTON_ACTIVE = "bg-selected font-semibold text-text-main";
 const BUTTON_INACTIVE = "bg-transparent text-text-muted hover:text-text-main";
 

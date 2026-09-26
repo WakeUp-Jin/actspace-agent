@@ -9,8 +9,9 @@ import {
   type SessionListItem,
   type WorkspaceEntry,
 } from "@actspace/shared";
-import { Kbd, SettingGroup, SettingRow, SettingsButton, SettingsSelect, Toggle } from "./SettingsPrimitives";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
+import { Kbd, SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
 
 const FALLBACK_QUICK_OPEN_SETTINGS: QuickOpenShortcutSettings = {
   enabled: true,
@@ -164,33 +165,26 @@ export function ShortcutSettings({
                   setIsRecording(false);
                   void update({ accelerator });
                 }}
-                className="inline-flex h-[30px] items-center gap-1 rounded-[7px] px-1 outline-none transition-colors hover:bg-hover-overlay focus-visible:ring-[3px] focus-visible:ring-focus-ring/15 disabled:cursor-not-allowed"
+                className="inline-flex h-[30px] items-center gap-1 rounded-act-sm px-1 outline-none transition-colors hover:bg-hover-overlay focus-visible:ring-[3px] focus-visible:ring-focus-ring/15 disabled:cursor-not-allowed"
               >
                 {isRecording ? (
-                  <span className="px-1.5 text-[12.5px] text-text-muted">请按下组合键…</span>
+                  <span className="px-1.5 text-act-xs text-text-muted">请按下组合键…</span>
                 ) : (
                   keys.map((key, index) => (
                     <span key={`${key}-${index}`} className="inline-flex items-center gap-1">
-                      {key.separator ? <span className="text-[11px] text-text-subtle">+</span> : null}
+                      {key.separator ? <span className="text-act-xxs text-text-subtle">+</span> : null}
                       <Kbd>{key.label}</Kbd>
                     </span>
                   ))
                 )}
               </button>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <SettingsButton
-                    variant="quiet"
-                    size="icon"
-                    disabled={dependentDisabled || saving || quickOpen.accelerator === DEFAULT_QUICK_OPEN_ACCELERATOR}
-                    aria-label="恢复默认快捷键"
-                    onClick={() => void update({ accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR })}
-                  >
-                    <RotateCcw size={13} strokeWidth={1.9} aria-hidden="true" />
-                  </SettingsButton>
-                </TooltipTrigger>
-                <TooltipContent>恢复默认快捷键</TooltipContent>
-              </Tooltip>
+              <IconButton
+                label="恢复默认快捷键"
+                disabled={dependentDisabled || saving || quickOpen.accelerator === DEFAULT_QUICK_OPEN_ACCELERATOR}
+                onClick={() => void update({ accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR })}
+              >
+                <RotateCcw size={13} strokeWidth={1.9} aria-hidden="true" />
+              </IconButton>
             </>
           }
         />

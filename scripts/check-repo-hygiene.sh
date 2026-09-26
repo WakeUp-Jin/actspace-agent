@@ -21,6 +21,7 @@ done
 
 "${repo_root}/scripts/check-secrets.sh"
 node "${repo_root}/scripts/check-frontend-theme-colors.mjs"
+node "${repo_root}/scripts/check-frontend-design-tokens.mjs"
 
 if [[ "${failed}" -ne 0 ]]; then
   exit 1

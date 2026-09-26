@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import type { MainAgentForm, SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
+import { IconButton } from "./ui/IconButton";
 
 export type SidebarMode = "expanded" | "hidden";
 export type SidebarView = "chat" | "lab" | "settings" | "extensions";
@@ -191,82 +192,79 @@ const SIDEBAR_CLASS =
   "sidebar relative flex h-full min-h-0 min-w-0 flex-col gap-3 bg-sidebar pb-2.5 pl-2.5 pr-2 pt-[var(--window-chrome-strip-height)]";
 const SIDEBAR_PRIMARY_ACTIONS_CLASS = "mt-1.5 flex min-w-0 flex-col gap-px p-0";
 const SIDEBAR_PRIMARY_ACTION_CLASS =
-  "flex min-h-[34px] min-w-0 items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 py-0 text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
+  "flex min-h-[34px] min-w-0 items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 py-0 text-act-sm font-medium text-text-muted transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 const SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
 const SIDEBAR_PRIMARY_ACTION_LABEL_CLASS = "min-w-0 flex-1 text-left";
-const SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS = "text-xs font-medium tracking-[0.02em] text-text-faint";
+const SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS = "text-act-xs leading-4 font-medium tracking-[0.02em] text-text-faint";
 const SIDEBAR_BUTTON_RESET_CLASS = "appearance-none border-0 bg-transparent font-[inherit]";
 const SESSION_NAV_CLASS = "sidebar-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-x-hidden overflow-y-auto pt-2";
 const NAV_SECTION_CLASS = "flex min-w-0 flex-col gap-0.5 pb-0";
 const NAV_SECTION_WORKSPACES_CLASS = `${NAV_SECTION_CLASS} gap-1`;
 const NAV_SECTION_TITLE_CLASS = "group/nav-title flex min-h-6 items-center justify-between gap-2 px-2";
-const NAV_SECTION_LABEL_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} inline-flex min-w-0 flex-1 items-center gap-1 p-0 text-left text-xs font-medium tracking-[0] text-text-faint transition-colors duration-[130ms] ease-in-out hover:text-text-main`;
+const NAV_SECTION_LABEL_BASE_CLASS =
+  `${SIDEBAR_BUTTON_RESET_CLASS} inline-flex min-w-0 flex-1 items-center gap-1 p-0 text-left leading-4 font-medium tracking-[0] text-text-faint transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main`;
+const NAV_SECTION_LABEL_CLASS = `${NAV_SECTION_LABEL_BASE_CLASS} text-act-xs`;
 const NAV_SECTION_ACTIONS_CLASS = "inline-flex items-center gap-1 text-text-faint";
-const NAV_SECTION_ACTION_BUTTON_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} grid h-5 w-5 place-items-center rounded-act-sm opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/nav-title:opacity-100 group-focus-within/nav-title:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-muted`;
+// 分组标题上的操作按钮默认隐藏，悬停或键盘聚焦到标题行时出现。
+const NAV_SECTION_ACTION_REVEAL_CLASS = "opacity-0 group-hover/nav-title:opacity-100 group-focus-within/nav-title:opacity-100";
 const SESSION_LIST_CLASS = "flex min-w-0 flex-col gap-px";
 const SESSION_ROW_CLASS =
-  "session-row group/session-row relative grid min-h-9 w-full min-w-0 grid-cols-[14px_minmax(0,1fr)_46px_auto] items-center gap-2 rounded-act-md px-2 transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)]";
+  "session-row group/session-row relative grid min-h-9 w-full min-w-0 grid-cols-[14px_minmax(0,1fr)_46px_auto] items-center gap-2 rounded-act-md px-2 transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)]";
 const SESSION_ROW_ACTIVE_CLASS = "is-active bg-sidebar-selected";
 const SESSION_ROW_PINNED_CLASS = "is-pinned";
 const SESSION_ROW_MARKER_CLASS = "relative flex h-[14px] w-[14px] flex-none items-center justify-center";
-const SESSION_ROW_TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium";
-const SESSION_ROW_TIME_CLASS = "min-w-[22px] whitespace-nowrap text-right text-[11px] text-text-faint";
+const SESSION_ROW_TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-act-sm font-medium";
+const SESSION_ROW_TIME_CLASS = "min-w-[22px] whitespace-nowrap text-right text-act-xxs text-text-faint";
 const SESSION_ROW_MAIN_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} grid min-w-0 grid-cols-[minmax(0,1fr)] items-center p-0 text-left text-text-muted transition-colors duration-[130ms] ease-in-out group-hover/session-row:text-text-main group-[.is-active]/session-row:text-text-main`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} grid min-w-0 grid-cols-[minmax(0,1fr)] items-center p-0 text-left text-text-muted transition-colors duration-(--motion-fast) ease-in-out group-hover/session-row:text-text-main group-[.is-active]/session-row:text-text-main`;
 const SESSION_ROW_MAIN_MUTED_CLASS = "text-text-muted";
 const SESSION_ROW_RENAME_INPUT_CLASS =
-  "min-w-0 rounded-act-sm border border-focus-ring bg-surface-raised px-1.5 py-0.5 text-[13px] font-medium text-text-main outline-none ring-2 ring-focus-ring/20";
+  "min-w-0 rounded-act-sm border border-focus-ring bg-surface-raised px-1.5 py-0.5 text-act-sm font-medium text-text-main outline-none ring-2 ring-focus-ring/20";
 const SESSION_ROW_ACTIONS_CLASS = "inline-flex w-[46px] flex-none items-center justify-end gap-0.5";
 const SESSION_ROW_ARCHIVE_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-(--motion-fast) ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
 const SESSION_STATUS_CONTAINER_CLASS = "relative grid h-[22px] w-[14px] flex-none place-items-center";
-const SESSION_STATUS_BUTTON_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} session-status-button grid h-[22px] w-[22px] place-items-center rounded-act-sm text-text-faint transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main focus-visible:bg-[var(--act-color-hover-overlay)] focus-visible:text-text-main`;
 const SESSION_STATUS_MENU_CLASS =
-  "session-status-menu absolute left-0 top-6 z-20 w-44 rounded-act-md border border-line bg-surface-raised px-2 py-1.5 text-left text-[12px] shadow-act-popover";
+  "session-status-menu absolute left-0 top-6 z-20 w-44 rounded-act-md border border-line bg-surface-raised px-2 py-1.5 text-left text-act-xs shadow-act-popover";
 const SESSION_STATUS_MENU_LABEL_CLASS = "font-medium text-text-main";
 const SESSION_STATUS_MENU_DETAIL_CLASS = "mt-0.5 leading-snug text-text-faint";
 const SESSION_ROW_PIN_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} session-row-pin grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-muted opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} session-row-pin grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-muted opacity-0 transition-[opacity,background,color] duration-(--motion-fast) ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
 const SESSION_ROW_PIN_ACTIVE_CLASS = "is-active text-text-main";
 const SESSION_CONTEXT_MENU_CLASS =
-  "session-context-menu fixed z-[80] rounded-act-md border border-line bg-surface-raised p-1 text-[13px] text-text-main shadow-act-popover";
+  "session-context-menu fixed z-(--act-z-dropdown) rounded-act-md border border-line bg-surface-raised p-1 text-act-sm text-text-main shadow-act-popover";
 const SESSION_CONTEXT_SUBMENU_CLASS =
-  "session-context-submenu absolute left-[calc(100%+4px)] top-0 z-[81] w-52 rounded-act-md border border-line bg-surface-raised p-1 text-[13px] text-text-main shadow-act-popover";
+  "session-context-submenu absolute left-[calc(100%+4px)] top-0 z-(--act-z-dropdown) w-52 rounded-act-md border border-line bg-surface-raised p-1 text-act-sm text-text-main shadow-act-popover";
 const SESSION_CONTEXT_MENU_ITEM_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} flex h-8 w-full items-center gap-2 rounded-act-sm px-2 text-left text-text-main transition-[background,color] duration-[120ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] disabled:cursor-not-allowed disabled:text-text-faint disabled:hover:bg-transparent`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} flex h-8 w-full items-center gap-2 rounded-act-sm px-2 text-left text-text-main transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)] disabled:cursor-not-allowed disabled:text-text-faint disabled:hover:bg-transparent`;
 const SESSION_CONTEXT_MENU_ICON_CLASS = "h-4 w-4 text-text-muted";
 const SESSION_CONTEXT_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const SESSION_STATUS_DOT_CLASS =
-  "session-status-dot h-1.5 w-1.5 rounded-full bg-operational transition-opacity duration-[130ms] ease-in-out";
+  "session-status-dot h-1.5 w-1.5 rounded-full bg-operational transition-opacity duration-(--motion-fast) ease-in-out";
 const SESSION_STATUS_DOT_MUTED_CLASS = "is-muted bg-text-faint opacity-55";
 const SESSION_STATUS_DOT_ACTIVE_CLASS = "is-active bg-operational";
 const SESSION_STATUS_DOT_BUSY_CLASS = "is-busy animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-operational";
 const SESSION_LIST_TOGGLE_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} inline-flex h-[26px] items-center px-[18px] pt-0.5 text-left text-xs font-medium text-text-faint transition-colors duration-[130ms] ease-in-out hover:text-text-main`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} inline-flex h-[26px] items-center px-[18px] pt-0.5 text-left text-act-xs leading-4 font-medium text-text-faint transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main`;
 const WORKSPACE_SECTION_CLASS = `${NAV_SECTION_CLASS} gap-0.5`;
 const WORKSPACE_TITLE_ROW_CLASS =
   "workspace-folder-row group/workspace-row relative grid min-h-[26px] grid-cols-[14px_minmax(0,1fr)_auto] gap-2 px-2";
 const WORKSPACE_ICON_SLOT_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} workspace-icon-slot relative inline-flex h-[14px] w-[14px] flex-none items-center justify-center rounded-act-sm p-0 text-text-faint transition-colors duration-[130ms] ease-in-out hover:text-text-muted`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} workspace-icon-slot relative inline-flex h-[14px] w-[14px] flex-none items-center justify-center rounded-act-sm p-0 text-text-faint transition-colors duration-(--motion-fast) ease-in-out hover:text-text-muted`;
 const WORKSPACE_FOLDER_GLYPH_CLASS =
-  "workspace-folder-glyph opacity-100 transition-opacity duration-[130ms] ease-in-out group-hover/workspace-row:opacity-0";
+  "workspace-folder-glyph opacity-100 transition-opacity duration-(--motion-fast) ease-in-out group-hover/workspace-row:opacity-0";
 const WORKSPACE_CHEVRON_GLYPH_CLASS =
-  "workspace-chevron-glyph absolute inset-0 m-auto text-text-muted opacity-0 transition-opacity duration-[130ms] ease-in-out group-hover/workspace-row:opacity-100";
+  "workspace-chevron-glyph absolute inset-0 m-auto text-text-muted opacity-0 transition-opacity duration-(--motion-fast) ease-in-out group-hover/workspace-row:opacity-100";
 const WORKSPACE_LABEL_CLASS =
-  `${NAV_SECTION_LABEL_CLASS} workspace-folder-label text-[13px] text-text-muted hover:text-text-main`;
+  `${NAV_SECTION_LABEL_BASE_CLASS} workspace-folder-label text-act-sm text-text-muted hover:text-text-main`;
 const WORKSPACE_NAME_CLASS = "workspace-folder-name min-w-0 overflow-hidden text-ellipsis whitespace-nowrap";
 const WORKSPACE_ACTIONS_CLASS = NAV_SECTION_ACTIONS_CLASS;
-const WORKSPACE_ADD_BUTTON_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} workspace-add-button grid h-[22px] w-[22px] place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/workspace-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
 const WORKSPACE_CONTEXT_MENU_CLASS =
-  "workspace-context-menu fixed z-[90] rounded-act-md border border-line bg-surface-raised p-1 text-[13px] text-text-main shadow-act-popover";
+  "workspace-context-menu fixed z-(--act-z-dropdown) rounded-act-md border border-line bg-surface-raised p-1 text-act-sm text-text-main shadow-act-popover";
 const WORKSPACE_CONTEXT_MENU_ITEM_CLASS = SESSION_CONTEXT_MENU_ITEM_CLASS;
 const WORKSPACE_CONTEXT_MENU_DANGER_ITEM_CLASS = `${WORKSPACE_CONTEXT_MENU_ITEM_CLASS} text-danger`;
 const SETTINGS_ENTRY_CLASS =
-  "flex min-h-[34px] min-w-0 items-center gap-[9px] rounded-act-md border-0 bg-transparent px-2.5 py-0 text-left text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
+  "flex min-h-[34px] min-w-0 items-center gap-[9px] rounded-act-md border-0 bg-transparent px-2.5 py-0 text-left text-act-sm font-medium text-text-muted transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 
 type NavSectionHeaderProps = {
   label: string;
@@ -293,16 +291,16 @@ function NavSectionHeader({ label, collapsed, onToggle, extraActions }: NavSecti
       </button>
       <div className={`nav-section-actions ${NAV_SECTION_ACTIONS_CLASS}`}>
         {extraActions}
-        <button
-          className={`nav-section-chevron ${NAV_SECTION_ACTION_BUTTON_CLASS}`}
-          type="button"
+        <IconButton
+          className={`nav-section-chevron ${NAV_SECTION_ACTION_REVEAL_CLASS}`}
+          size="xs"
           onClick={onToggle}
-          aria-label={collapsed ? `展开 ${label}` : `收起 ${label}`}
+          label={collapsed ? `展开 ${label}` : `收起 ${label}`}
         >
           {collapsed
-            ? <ChevronRight size={13} strokeWidth={1.9} />
-            : <ChevronDown size={13} strokeWidth={1.9} />}
-        </button>
+            ? <ChevronRight size={13} strokeWidth={1.9} aria-hidden="true" />
+            : <ChevronDown size={13} strokeWidth={1.9} aria-hidden="true" />}
+        </IconButton>
       </div>
     </div>
   );
@@ -352,19 +350,19 @@ function SessionStatusButton({ status, dotClass }: { status: unknown; dotClass: 
 
   return (
     <div className={SESSION_STATUS_CONTAINER_CLASS} ref={rootRef}>
-      <button
-        className={SESSION_STATUS_BUTTON_CLASS}
-        type="button"
-        aria-label={`会话状态： ${meta.label}`}
+      <IconButton
+        className="session-status-button"
+        size="xs"
+        label={`会话状态： ${meta.label}`}
+        tooltip={meta.label}
         aria-expanded={open}
-        title={meta.label}
         onClick={(event) => {
           event.stopPropagation();
           setOpen((value) => !value);
         }}
       >
         <span className={dotClass} aria-hidden="true" />
-      </button>
+      </IconButton>
       {open ? (
         <div className={SESSION_STATUS_MENU_CLASS} role="status">
           <div className={SESSION_STATUS_MENU_LABEL_CLASS}>{meta.label}</div>
@@ -747,8 +745,8 @@ function SessionRow({
         sideOffset={8}
         className="max-w-[360px] select-none px-2.5 py-2 font-normal"
       >
-        <span className="block text-[12px] font-medium text-text-main">{displayTitle}</span>
-        <span className="mt-0.5 block text-[11px] font-normal text-text-muted [overflow-wrap:anywhere]">
+        <span className="block text-act-xs font-medium text-text-main">{displayTitle}</span>
+        <span className="mt-0.5 block text-act-xxs font-normal text-text-muted [overflow-wrap:anywhere]">
           {workspaceRoot ?? "工作区路径不可用"}
         </span>
       </TooltipContent>
@@ -834,7 +832,7 @@ function CollapsibleSessionList({
           onArchive={onArchive ? () => onArchive(session.id) : undefined}
         />
       ))}
-      {error && <p role="alert" className="px-2 text-xs text-text-muted">{error} <button onClick={() => { void loadMore(); }}>重试</button></p>}
+      {error && <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">{error} <button onClick={() => { void loadMore(); }}>重试</button></p>}
       {hasOverflow ? (
         <button
           className={`session-list-toggle ${SESSION_LIST_TOGGLE_CLASS}`}
@@ -970,7 +968,7 @@ export function Sidebar({
             <div className="absolute left-2 right-2 top-[calc(100%_+_4px)] z-40 rounded-act-md border border-line bg-surface-raised p-1 shadow-act-popover" role="menu" aria-label="选择会话形态">
               {(["agent", "chat"] as const).map((agentForm) => (
                 <button
-                  className="flex min-h-8 w-full items-center rounded-act-sm px-2 text-left text-sm text-text-main hover:bg-hover-overlay"
+                  className="flex min-h-8 w-full items-center rounded-act-sm px-2 text-left text-act-md leading-5 text-text-main hover:bg-hover-overlay"
                   key={agentForm}
                   type="button"
                   role="menuitem"
@@ -994,8 +992,8 @@ export function Sidebar({
       </div>
 
       <nav className={SESSION_NAV_CLASS} aria-label="会话">
-        {browse?.listLoading && <p role="status" className="px-2 text-xs text-text-muted">正在加载会话…</p>}
-        {browse?.listError && <p role="alert" className="px-2 text-xs text-text-muted">{browse.listError} <button onClick={browse.retryList}>重试</button></p>}
+        {browse?.listLoading && <p role="status" className="px-2 text-act-xs leading-4 text-text-muted">正在加载会话…</p>}
+        {browse?.listError && <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">{browse.listError} <button onClick={browse.retryList}>重试</button></p>}
         {pinnedSessions.length > 0 ? (
           <section className={`nav-section ${NAV_SECTION_CLASS}`}>
             <NavSectionHeader
@@ -1030,26 +1028,25 @@ export function Sidebar({
             onToggle={() => setWorkspacesCollapsed((value) => !value)}
             extraActions={
               <>
-                <button
-                  className={NAV_SECTION_ACTION_BUTTON_CLASS}
-                  type="button"
-                  aria-label="排序工作区"
-                  title="排序（即将推出）"
+                <IconButton
+                  className={NAV_SECTION_ACTION_REVEAL_CLASS}
+                  size="xs"
+                  label="排序工作区"
+                  tooltip="排序（即将推出）"
                 >
-                  <ArrowDownUp size={13} strokeWidth={1.9} />
-                </button>
-                <button
-                  className={NAV_SECTION_ACTION_BUTTON_CLASS}
-                  type="button"
-                  aria-label="添加工作区"
-                  title="添加工作区"
+                  <ArrowDownUp size={13} strokeWidth={1.9} aria-hidden="true" />
+                </IconButton>
+                <IconButton
+                  className={NAV_SECTION_ACTION_REVEAL_CLASS}
+                  size="xs"
+                  label="添加工作区"
                   onClick={(event) => {
                     event.stopPropagation();
                     onAddWorkspace?.();
                   }}
                 >
-                  <FolderPlus size={13} strokeWidth={1.9} />
-                </button>
+                  <FolderPlus size={13} strokeWidth={1.9} aria-hidden="true" />
+                </IconButton>
               </>
             }
           />
@@ -1238,18 +1235,18 @@ function WorkspaceSection({
           <span className={WORKSPACE_NAME_CLASS}>{group.label}</span>
         </button>
         <div className={`nav-section-actions workspace-folder-actions ${WORKSPACE_ACTIONS_CLASS}`} aria-label="工作区操作">
-          <button
-            className={WORKSPACE_ADD_BUTTON_CLASS}
-            type="button"
-            aria-label="在工作区中新建会话"
-            title="在此工作区中新建会话"
+          <IconButton
+            className="workspace-add-button opacity-0 group-hover/workspace-row:opacity-100 focus-visible:opacity-100"
+            size="xs"
+            label="在工作区中新建会话"
+            tooltip="在此工作区中新建会话"
             onClick={(event) => {
               event.stopPropagation();
               onNewSession?.({ workspaceId: group.workspaceId, workspaceRoot: group.workspaceRoot, agentForm: "agent" });
             }}
           >
-            <Plus size={13} strokeWidth={2} />
-          </button>
+            <Plus size={13} strokeWidth={2} aria-hidden="true" />
+          </IconButton>
         </div>
       </div>
       {collapsed ? null : (

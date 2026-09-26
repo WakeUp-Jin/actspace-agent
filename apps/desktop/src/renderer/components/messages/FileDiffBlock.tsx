@@ -16,9 +16,9 @@ type FileDiffMessage =
   | Extract<MessageBlock, { kind: "write_diff" }>;
 
 const DIFF_APPROVAL_STATS_CLASS =
-  "file-diff-approval-stats inline-flex flex-none items-center gap-0.5 rounded-act-xs border-0 bg-transparent px-1 font-mono text-xs text-text-faint hover:bg-hover-overlay hover:text-text-main";
+  "file-diff-approval-stats inline-flex flex-none items-center gap-0.5 rounded-act-xs border-0 bg-transparent px-1 font-mono text-act-xs leading-4 text-text-faint hover:bg-hover-overlay hover:text-text-main";
 const DIFF_ERROR_DETAIL_CLASS =
-  "file-diff-error-detail mx-[var(--conversation-text-inset)] mt-1 rounded-act-sm bg-surface-subtle px-[9px] py-[7px] font-mono text-xs leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
+  "file-diff-error-detail mx-[var(--conversation-text-inset)] mt-1 rounded-act-sm bg-surface-subtle px-[9px] py-[7px] font-mono text-act-xs leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
 
 function StatusLine({
   text,
@@ -103,7 +103,7 @@ function FileDiffApprovalCard({
             {stats}
             {diffOpen ? <ChevronDown size={12} strokeWidth={2.2} /> : <ChevronRight size={12} strokeWidth={2.2} />}
           </button>
-        ) : stats ? <span className="inline-flex flex-none items-center font-mono text-xs">{stats}</span> : null}
+        ) : stats ? <span className="inline-flex flex-none items-center font-mono text-act-xs leading-4">{stats}</span> : null}
         <ApprovalReason reason={message.reason} />
       </>}
       actions={<ApprovalActions state={decision} primaryLabel={isWrite ? "写入" : "应用"} suggestion={suggestion} />}

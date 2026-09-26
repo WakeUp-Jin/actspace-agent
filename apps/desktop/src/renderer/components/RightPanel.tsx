@@ -47,28 +47,28 @@ const WORKSPACE_BAR_TOGGLE_CLASS =
   "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
 const WORKSPACE_BAR_TOGGLE_ACTIVE_CLASS = "bg-selected text-text-main";
 // 面包屑：根名弱化、文件名主色，中间用 chevron 分隔（与 Cursor 的 `root › file` 同形）。
-const WORKSPACE_BAR_CRUMBS_CLASS = "flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden text-[12px]";
+const WORKSPACE_BAR_CRUMBS_CLASS = "flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden text-act-xs";
 const WORKSPACE_BAR_ROOT_CLASS = "shrink-0 text-text-faint";
 const WORKSPACE_BAR_PATH_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-text-main";
 const WORKSPACE_BAR_HINT_CLASS =
-  "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-text-faint";
+  "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-act-xs text-text-faint";
 // 过期提示用 warning 语义：内容不可信但不是错误，需要用户注意并显式重载。
 const WORKSPACE_STALE_BAR_CLASS =
-  "flex shrink-0 items-center gap-2 border-b border-line bg-warning-soft px-2.5 py-1.5 text-[11px] text-on-warning";
+  "flex shrink-0 items-center gap-2 border-b border-line bg-warning-soft px-2.5 py-1.5 text-act-xxs text-on-warning";
 const WORKSPACE_STALE_ACTION_CLASS =
-  "shrink-0 rounded-act-sm border-0 bg-transparent px-1.5 py-0.5 text-[11px] font-semibold text-on-warning underline decoration-dotted hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
+  "shrink-0 rounded-act-sm border-0 bg-transparent px-1.5 py-0.5 text-act-xxs font-semibold text-on-warning underline decoration-dotted hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
 const WORKSPACE_TRUNCATED_BAR_CLASS =
-  "shrink-0 border-b border-line bg-surface-subtle px-2.5 py-1.5 text-[11px] text-text-faint";
+  "shrink-0 border-b border-line bg-surface-subtle px-2.5 py-1.5 text-act-xxs text-text-faint";
 // 右侧预留两个 chrome 控件（+ 新建对象 / 折叠面板）的宽度，tab 永远不会滑到按钮下方造成重叠。
 const RIGHT_TABS_CLASS =
-  "relative z-[61] flex min-h-[var(--window-chrome-strip-height)] shrink-0 items-center border-b border-line py-0 pl-2.5 pr-[calc(2*var(--window-chrome-control-size)+28px)] [pointer-events:none] max-[600px]:pl-[var(--window-chrome-collapsed-left-width)]";
+  "relative z-[calc(var(--act-z-chrome)+1)] flex min-h-[var(--window-chrome-strip-height)] shrink-0 items-center border-b border-line py-0 pl-2.5 pr-[calc(2*var(--window-chrome-control-size)+28px)] [pointer-events:none] max-[600px]:pl-[var(--window-chrome-collapsed-left-width)]";
 // 横向滚动条隐藏（scrollbar-none 见 electron.css）；溢出靠下拉而非可见滚动条。
 const RIGHT_TAB_SCROLL_CLASS =
   "scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [pointer-events:auto]";
 const RIGHT_PANEL_EMPTY_TITLE_CLASS =
-  "px-2 text-[13px] font-medium leading-none text-text-muted";
+  "px-2 text-act-sm font-medium leading-none text-text-muted";
 const RIGHT_TAB_GROUP_BASE =
-  "group inline-flex h-[30px] shrink-0 items-center gap-2.5 rounded-act-md pl-2.5 pr-1.5 text-[13px] leading-none transition-colors duration-[120ms] ease-in-out [pointer-events:auto] [-webkit-app-region:no-drag]";
+  "group inline-flex h-[30px] shrink-0 items-center gap-2.5 rounded-act-md pl-2.5 pr-1.5 text-act-sm leading-none transition-colors duration-(--motion-fast) ease-in-out [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_INACTIVE_CLASS = "bg-transparent text-text-muted hover:bg-hover-overlay hover:text-text-main";
 const RIGHT_TAB_ACTIVE_CLASS = "bg-surface-subtle font-medium text-text-main";
 const RIGHT_TAB_LABEL_CLASS =
@@ -78,23 +78,23 @@ const RIGHT_TAB_CLOSE_CLASS =
 const RIGHT_TAB_OVERFLOW_CLASS =
   "ml-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main [pointer-events:auto] [-webkit-app-region:no-drag] [cursor:pointer]";
 const RIGHT_TAB_MENU_CLASS =
-  "absolute right-0 top-[calc(100%+4px)] z-[70] max-h-[60vh] w-[220px] overflow-auto rounded-act-md border border-line bg-surface-raised/98 p-1 shadow-act-popover [pointer-events:auto] [-webkit-app-region:no-drag]";
+  "absolute right-0 top-[calc(100%+4px)] z-(--act-z-dropdown) max-h-[60vh] w-[220px] overflow-auto rounded-act-md border border-line bg-surface-raised/98 p-1 shadow-act-popover [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_MENU_ITEM_CLASS =
-  "flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-[12px] text-text-main [cursor:pointer] hover:bg-hover-overlay";
+  "flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-act-xs text-text-main [cursor:pointer] hover:bg-hover-overlay";
 const RIGHT_TAB_MENU_ITEM_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
 const RIGHT_TAB_MENU_LABEL_CLASS = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap";
 const RIGHT_TAB_MENU_CLOSE_CLASS =
   "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main [cursor:pointer]";
 const RIGHT_PANEL_BODY_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] leading-[1.6] text-text-main";
-const RIGHT_PANEL_HEADING_CLASS = "m-0 mb-2 text-[15px] font-semibold";
-const RIGHT_PANEL_TEXT_CLASS = "m-0 text-[13px] text-text-muted";
+const RIGHT_PANEL_HEADING_CLASS = "m-0 mb-2 text-act-md font-semibold";
+const RIGHT_PANEL_TEXT_CLASS = "m-0 text-act-sm text-text-muted";
 const RIGHT_PANEL_LAUNCHER_CLASS =
   "grid min-h-0 flex-1 place-items-center overflow-auto bg-app-bg px-5 py-8";
 const RIGHT_PANEL_LAUNCHER_GRID_CLASS = "grid w-full max-w-[300px] grid-cols-2 gap-3";
 const RIGHT_PANEL_LAUNCHER_BUTTON_CLASS =
-  "group flex h-[108px] min-w-0 flex-col items-center justify-center gap-3 rounded-act-lg border border-line bg-surface px-3 text-[13px] font-medium text-text-muted transition-[background-color,border-color,color,transform] duration-150 hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg disabled:opacity-45 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-text-muted [cursor:pointer] disabled:[cursor:not-allowed]";
+  "group flex h-[108px] min-w-0 flex-col items-center justify-center gap-3 rounded-act-lg border border-line bg-surface px-3 text-act-sm font-medium text-text-muted transition-[background-color,border-color,color,transform] duration-(--motion-base) hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg disabled:opacity-45 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-text-muted [cursor:pointer] disabled:[cursor:not-allowed]";
 const RIGHT_PANEL_LAUNCHER_ICON_CLASS =
-  "text-text-faint transition-colors duration-150 group-hover:text-text-muted group-focus-visible:text-text-main";
+  "text-text-faint transition-colors duration-(--motion-base) group-hover:text-text-muted group-focus-visible:text-text-main";
 
 export function RightPanel({
   developmentEnabled = true,
@@ -736,8 +736,8 @@ function TerminalStartingView() {
         <span className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-act-md border border-line bg-surface-subtle text-text-muted">
           <Loader2 size={17} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
         </span>
-        <h2 className="m-0 text-[13px] font-semibold text-text-main">正在启动终端</h2>
-        <p className="mb-0 mt-1.5 text-[11px] leading-relaxed text-text-faint">正在读取本机 Shell 环境并连接当前工作区。</p>
+        <h2 className="m-0 text-act-sm font-semibold text-text-main">正在启动终端</h2>
+        <p className="mb-0 mt-1.5 text-act-xxs leading-relaxed text-text-faint">正在读取本机 Shell 环境并连接当前工作区。</p>
       </div>
     </section>
   );
@@ -747,8 +747,8 @@ function TerminalErrorView({ message }: { message: string }) {
   return (
     <section className="grid min-h-0 flex-1 place-items-center bg-surface px-6" aria-label="Terminal 启动失败">
       <div className="max-w-[280px] rounded-act-md border border-line bg-surface-subtle px-4 py-3">
-        <h2 className="m-0 text-[13px] font-semibold text-text-main">Terminal 启动失败</h2>
-        <p className="mb-0 mt-1.5 text-[11px] leading-relaxed text-text-muted" role="alert">{message}</p>
+        <h2 className="m-0 text-act-sm font-semibold text-text-main">Terminal 启动失败</h2>
+        <p className="mb-0 mt-1.5 text-act-xxs leading-relaxed text-text-muted" role="alert">{message}</p>
       </div>
     </section>
   );

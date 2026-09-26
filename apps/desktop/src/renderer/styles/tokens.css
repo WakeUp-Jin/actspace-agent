@@ -142,11 +142,23 @@
   --act-radius-sm: 6px;
   --act-radius-md: 8px;
   --act-radius-lg: 12px;
+  /* 设置内嵌分组（surface + hairline）的圆角，2026-09-25 用户批准的独立档位。 */
+  --act-radius-group: 10px;
   --act-radius-xl: 18px;
   --act-radius-pill: 999px;
 
-  --act-shadow-soft: 0 18px 48px rgba(31, 45, 61, 0.08);
-  --act-shadow-popover: 0 24px 64px rgba(31, 45, 61, 0.14);
+  /*
+   * 阴影：暖色基底 rgba(20, 21, 18)，与 Ink & Emerald 灰阶同源。
+   * xs = 小按钮描边感；knob = Toggle 白色滑块；thumb = 附件缩略图；
+   * soft = 大面积浮起（占位页、关机遮罩、Sheet）；popover = 菜单 / tooltip；float = dialog / 抽屉。
+   * 工作台常驻卡片（Composer、用户消息卡）不使用阴影，只靠 surface + hairline。
+   */
+  --act-shadow-xs: 0 1px 2px rgba(20, 21, 18, 0.06);
+  --act-shadow-knob: 0 1px 3px rgba(20, 21, 18, 0.24);
+  --act-shadow-thumb: 0 4px 12px rgba(20, 21, 18, 0.08);
+  --act-shadow-soft: 0 18px 48px rgba(20, 21, 18, 0.08);
+  --act-shadow-popover: 0 24px 64px rgba(20, 21, 18, 0.14);
+  --act-shadow-float: 0 24px 64px rgba(20, 21, 18, 0.18);
 
   --act-scrollbar-thumb: rgba(171, 177, 186, 0.46);
   --act-scrollbar-thumb-hover: rgba(146, 153, 164, 0.56);
@@ -197,6 +209,22 @@
   --shadow-soft: var(--act-shadow-soft);
   --shadow-popover: var(--act-shadow-popover);
 
+  /*
+   * z-index 分层（front-全局视觉语言规范「层级」）。组件用 z-(--act-z-*) 消费；
+   * 组件内部的局部叠放用 Tailwind 内置 z-1 / z-2，不进分层。
+   * pane: SplitView 拖拽柄；drawer: 窄窗口侧栏 / 右面板抽屉（低于 chrome，保证标题栏按钮可点）；
+   * chrome: 窗口标题栏；dropdown: 组件内 absolute / fixed 菜单；overlay: 工作区内的全屏遮罩层；
+   * modal: dialog / Sheet；popover: tooltip、hover card、portal 到 body 的菜单与提示；system: 关机遮罩。
+   */
+  --act-z-pane: 30;
+  --act-z-drawer: 50;
+  --act-z-chrome: 60;
+  --act-z-dropdown: 80;
+  --act-z-overlay: 100;
+  --act-z-modal: 150;
+  --act-z-popover: 200;
+  --act-z-system: 1000;
+
   --motion-fast: 120ms;
   --motion-base: 160ms;
   --motion-slow: 220ms;
@@ -210,6 +238,8 @@
 
   --conversation-inline-padding: 32px;
   --conversation-content-width: 880px;
+  /* 消息块（Thinking、工具、审批、回复）最大宽度：与内容列同宽，左右缘和用户消息卡、Composer 对齐。 */
+  --conversation-block-max-width: var(--conversation-content-width);
   --conversation-card-padding: 16px;
   --conversation-text-inset: calc(var(--conversation-card-padding) + 1px);
 
@@ -329,8 +359,12 @@
     rgba(36, 37, 34, 0) 100%
   );
 
+  --act-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --act-shadow-knob: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --act-shadow-thumb: 0 4px 12px rgba(0, 0, 0, 0.35);
   --act-shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.45);
   --act-shadow-popover: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --act-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.6);
 
   --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
   --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
@@ -442,8 +476,12 @@
       rgba(36, 37, 34, 0) 100%
     );
 
+    --act-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --act-shadow-knob: 0 1px 3px rgba(0, 0, 0, 0.45);
+    --act-shadow-thumb: 0 4px 12px rgba(0, 0, 0, 0.35);
     --act-shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.45);
     --act-shadow-popover: 0 24px 64px rgba(0, 0, 0, 0.55);
+    --act-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.6);
 
     --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
     --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);

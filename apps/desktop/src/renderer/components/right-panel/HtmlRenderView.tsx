@@ -24,9 +24,9 @@ const FIXED_CANVAS_THRESHOLD = 1;
 // 只有「聊天生成的 html」才用到这条工具栏：它没有工作区操作栏可以挂切换按钮。
 const TOOLBAR_CLASS = "flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5";
 const ERROR_BAR_CLASS =
-  "flex shrink-0 items-center gap-1.5 border-b border-line bg-danger-soft px-3 py-1.5 text-[11px] text-danger";
+  "flex shrink-0 items-center gap-1.5 border-b border-line bg-danger-soft px-3 py-1.5 text-act-xxs text-danger";
 const SOURCE_CLASS =
-  "m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[12px] leading-[1.55] text-text-main";
+  "m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-act-xs leading-[1.55] text-text-main";
 
 type ResolvedTheme = "light" | "dark";
 

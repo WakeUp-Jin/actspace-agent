@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { CustomModelReasoningFields } from "./CustomModelReasoningFields";
 import { ModelPricingFields, modelPricingFromDraft, pricingDraftFromModel, type ModelPricingDraft } from "./ModelPricingFields";
 import { Toggle } from "./SettingsPrimitives";
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
 
 export type CustomModelFormDraft = {
   apiModel: string;
@@ -49,13 +51,13 @@ export function customModelInputFromDraft(draft: CustomModelFormDraft): CustomMo
 }
 
 export function CustomModelFields({ draft, onChange, apiModelLocked = false, autoFocusApiModel = true, showEnabled = true }: { draft: CustomModelFormDraft; onChange: (draft: CustomModelFormDraft) => void; apiModelLocked?: boolean; autoFocusApiModel?: boolean; showEnabled?: boolean }) {
-  const inputClass = "h-10 w-full rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 disabled:bg-surface-subtle disabled:text-text-faint";
+  const inputClass = "h-10 w-full rounded-act-md border border-line bg-surface px-3 text-act-sm text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 disabled:bg-surface-subtle disabled:text-text-faint";
   return <div className="grid gap-5">
-    <label className="grid gap-1.5"><span className="text-[12px] font-semibold text-text-muted">API 模型 ID · 必填</span><input autoFocus={autoFocusApiModel && !apiModelLocked} disabled={apiModelLocked} value={draft.apiModel} onChange={(event) => onChange({ ...draft, apiModel: event.target.value })} placeholder="例如 claude-opus-5-5" className={inputClass} /></label>
-    <label className="grid gap-1.5"><span className="text-[12px] font-semibold text-text-muted">显示名称</span><input value={draft.label} onChange={(event) => onChange({ ...draft, label: event.target.value })} placeholder="留空时使用 API 模型 ID" className={inputClass} /></label>
+    <label className="grid gap-1.5"><span className="text-act-xs font-semibold text-text-muted">API 模型 ID · 必填</span><input autoFocus={autoFocusApiModel && !apiModelLocked} disabled={apiModelLocked} value={draft.apiModel} onChange={(event) => onChange({ ...draft, apiModel: event.target.value })} placeholder="例如 claude-opus-5-5" className={inputClass} /></label>
+    <label className="grid gap-1.5"><span className="text-act-xs font-semibold text-text-muted">显示名称</span><input value={draft.label} onChange={(event) => onChange({ ...draft, label: event.target.value })} placeholder="留空时使用 API 模型 ID" className={inputClass} /></label>
     <div className="grid grid-cols-2 gap-3 max-[600px]:grid-cols-1">
-      <label className="grid gap-1.5"><span className="text-[12px] font-semibold text-text-muted">上下文窗口</span><input inputMode="numeric" value={draft.contextWindow} onChange={(event) => onChange({ ...draft, contextWindow: event.target.value })} placeholder="可留空" className={inputClass} /></label>
-      <label className="grid gap-1.5"><span className="text-[12px] font-semibold text-text-muted">最大输出 Token</span><input inputMode="numeric" value={draft.maxTokens} onChange={(event) => onChange({ ...draft, maxTokens: event.target.value })} placeholder="可留空" className={inputClass} /></label>
+      <label className="grid gap-1.5"><span className="text-act-xs font-semibold text-text-muted">上下文窗口</span><input inputMode="numeric" value={draft.contextWindow} onChange={(event) => onChange({ ...draft, contextWindow: event.target.value })} placeholder="可留空" className={inputClass} /></label>
+      <label className="grid gap-1.5"><span className="text-act-xs font-semibold text-text-muted">最大输出 Token</span><input inputMode="numeric" value={draft.maxTokens} onChange={(event) => onChange({ ...draft, maxTokens: event.target.value })} placeholder="可留空" className={inputClass} /></label>
     </div>
     <div className="grid gap-3 rounded-act-md border border-line p-4">
       {showEnabled ? <SwitchRow title="启用模型" description="启用后会出现在 Composer 和任务模型候选中。" checked={draft.enabled} onChange={(enabled) => onChange({ ...draft, enabled })} /> : null}
@@ -86,18 +88,18 @@ export function CustomModelForm({ connection, model, onBack, onSaved }: { connec
   };
   return <div className="w-full" onKeyDown={(event) => { if (event.key === "Escape" && !saving) onBack(); }}>
     <div className="mb-7 flex items-start gap-3">
-      <button type="button" aria-label="返回模型列表" onClick={onBack} className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-act-md text-text-muted hover:bg-hover-overlay hover:text-text-main"><ArrowLeft size={17} /></button>
-      <div><h3 className="text-[16px] font-semibold tracking-tight text-text-main">{model ? "编辑模型" : "添加模型"}</h3><p className="mt-1 text-[12px] text-text-faint">{connection.displayName ?? connection.connectionId} · 模型和价格都由你手动维护</p></div>
+      <IconButton label="返回模型列表" size="md" onClick={onBack} className="mt-0.5"><ArrowLeft size={17} aria-hidden="true" /></IconButton>
+      <div><h3 className="text-act-lg font-semibold tracking-tight text-text-main">{model ? "编辑模型" : "添加模型"}</h3><p className="mt-1 text-act-xs text-text-faint">{connection.displayName ?? connection.connectionId} · 模型和价格都由你手动维护</p></div>
     </div>
     <CustomModelFields draft={draft} onChange={setDraft} apiModelLocked={Boolean(model)} />
     {!model ? <div className="mt-5 rounded-act-md border border-line p-4"><SwitchRow title="设为连接默认模型" description="连接测试和未显式选择模型时使用此模型。" checked={setDefault} onChange={setSetDefault} /></div> : null}
-    {error ? <p role="alert" className="mt-4 text-[12px] text-on-danger">{error}</p> : null}
-    <div className="mt-6 flex justify-end gap-2"><button type="button" disabled={saving} onClick={onBack} className="h-9 rounded-act-md px-3 text-[13px] text-text-main hover:bg-hover-overlay disabled:opacity-60">取消</button><button type="button" disabled={saving || !draft.apiModel.trim()} onClick={() => void save()} className="h-9 rounded-act-md bg-action px-4 text-[13px] font-semibold text-on-action hover:bg-action-hover disabled:opacity-60">{saving ? "保存中…" : "保存模型"}</button></div>
+    {error ? <p role="alert" className="mt-4 text-act-xs text-on-danger">{error}</p> : null}
+    <div className="mt-6 flex justify-end gap-2"><Button variant="ghost" size="md" disabled={saving} onClick={onBack}>取消</Button><Button variant="primary" size="md" disabled={saving || !draft.apiModel.trim()} onClick={() => void save()}>{saving ? "保存中…" : "保存模型"}</Button></div>
   </div>;
 }
 
 function SwitchRow({ title, description, checked, onChange }: { title: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return <div className="flex items-start justify-between gap-4"><div><p className="text-[12px] font-medium text-text-main">{title}</p><p className="mt-1 text-[11px] leading-relaxed text-text-faint">{description}</p></div><Toggle checked={checked} onChange={onChange} ariaLabel={title} /></div>;
+  return <div className="flex items-start justify-between gap-4"><div><p className="text-act-xs font-medium text-text-main">{title}</p><p className="mt-1 text-act-xxs leading-relaxed text-text-faint">{description}</p></div><Toggle checked={checked} onChange={onChange} ariaLabel={title} /></div>;
 }
 
 function parsePositiveInteger(value: string, label: string): number | null {

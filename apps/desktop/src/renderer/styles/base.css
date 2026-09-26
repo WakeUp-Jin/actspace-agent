@@ -166,6 +166,21 @@ svg {
   }
 }
 
+/*
+ * 全局减少动态效果兜底：会话状态脉冲、rise-in、active:scale、hover 过渡等一律近似瞬时。
+ * 用 0.01ms 而不是 none，依赖 transitionend / animationend 的逻辑仍会触发。
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @keyframes compact-progress {
   0% {
     transform: translateX(-110%);

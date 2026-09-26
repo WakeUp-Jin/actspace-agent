@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import type { ReviewBranch, ReviewCommit, ReviewSelection } from "@actspace/shared";
 
-const ITEM = "flex min-h-8 w-full items-center gap-2 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-[13px] text-text-main hover:bg-surface-subtle [cursor:pointer]";
+const ITEM = "flex min-h-8 w-full items-center gap-2 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-act-sm text-text-main hover:bg-surface-subtle [cursor:pointer]";
 
 export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect }: {
   selection: ReviewSelection;
@@ -67,14 +67,14 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
       <div className="grid gap-1 p-1.5" role="menu" aria-label="最近提交">
         <button type="button" className={`${ITEM} text-text-muted`} onClick={() => setPicker(null)}><ChevronLeft size={13} />已提交</button>
         <div className="mx-1 border-t border-line" />
-        {loadingCommits ? <div className="flex min-h-12 items-center justify-center gap-2 text-[12px] text-text-faint"><Loader2 size={13} className="animate-spin" />正在加载提交…</div> : null}
-        {!loadingCommits && commitError ? <div className="px-2.5 py-3 text-[12px] leading-relaxed text-danger">{commitError}</div> : null}
-        {!loadingCommits && !commitError && commits.length === 0 ? <div className="px-2.5 py-3 text-[12px] leading-relaxed text-text-faint">此工作区暂无提交。</div> : null}
+        {loadingCommits ? <div className="flex min-h-12 items-center justify-center gap-2 text-act-xs text-text-faint"><Loader2 size={13} className="animate-spin" />正在加载提交…</div> : null}
+        {!loadingCommits && commitError ? <div className="px-2.5 py-3 text-act-xs leading-relaxed text-danger">{commitError}</div> : null}
+        {!loadingCommits && !commitError && commits.length === 0 ? <div className="px-2.5 py-3 text-act-xs leading-relaxed text-text-faint">此工作区暂无提交。</div> : null}
         {!loadingCommits && !commitError && commits.length > 0 ? <div className="max-h-[min(360px,calc(100vh-120px))] overflow-y-auto">
           {commits.map((commit) => (
             <button key={commit.sha} type="button" role="menuitem" className={`${ITEM} min-w-0`} onClick={() => onSelect({ kind: "commit", sha: commit.sha })} title={`${commit.sha.slice(0, 8)} · ${formatCommitTimestamp(commit.authoredAt)}`}>
               <span className="min-w-0 flex-1 truncate">{commit.subject || commit.sha.slice(0, 8)}</span>
-              <time className="shrink-0 text-[11px] tabular-nums text-text-faint" dateTime={commit.authoredAt}>{formatCommitAge(commit.authoredAt)}</time>
+              <time className="shrink-0 text-act-xxs tabular-nums text-text-faint" dateTime={commit.authoredAt}>{formatCommitAge(commit.authoredAt)}</time>
               {selection.kind === "commit" && selection.sha === commit.sha ? <Check size={14} className="shrink-0" /> : null}
             </button>
           ))}
@@ -88,14 +88,14 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
       <div className="grid gap-1 p-1.5" role="menu" aria-label="已设置上游的分支">
         <button type="button" className={`${ITEM} text-text-muted`} onClick={() => setPicker(null)}><ChevronLeft size={13} />分支</button>
         <div className="mx-1 border-t border-line" />
-        {loadingBranches ? <div className="flex min-h-12 items-center justify-center gap-2 text-[12px] text-text-faint"><Loader2 size={13} className="animate-spin" />正在加载分支…</div> : null}
-        {!loadingBranches && branchError ? <div className="px-2.5 py-3 text-[12px] leading-relaxed text-danger">{branchError}</div> : null}
-        {!loadingBranches && !branchError && branches.length === 0 ? <div className="px-2.5 py-3 text-[12px] leading-relaxed text-text-faint">没有本地分支设置了远程跟踪分支。</div> : null}
+        {loadingBranches ? <div className="flex min-h-12 items-center justify-center gap-2 text-act-xs text-text-faint"><Loader2 size={13} className="animate-spin" />正在加载分支…</div> : null}
+        {!loadingBranches && branchError ? <div className="px-2.5 py-3 text-act-xs leading-relaxed text-danger">{branchError}</div> : null}
+        {!loadingBranches && !branchError && branches.length === 0 ? <div className="px-2.5 py-3 text-act-xs leading-relaxed text-text-faint">没有本地分支设置了远程跟踪分支。</div> : null}
         {branches.map((branch) => (
           <button key={branch.branch} type="button" role="menuitem" className={`${ITEM} min-w-0`} onClick={() => onSelect({ kind: "branch", branch: branch.branch })}>
             <span className="min-w-0 flex-1">
               <span className="block truncate">{branch.branch}</span>
-              <span className="block truncate text-[10px] text-text-faint">→ {branch.upstream}{branch.ahead > 0 ? ` · ${branch.ahead} ahead` : ""}{branch.behind > 0 ? ` · ${branch.behind} behind` : ""}</span>
+              <span className="block truncate text-act-xxs text-text-faint">→ {branch.upstream}{branch.ahead > 0 ? ` · ${branch.ahead} ahead` : ""}{branch.behind > 0 ? ` · ${branch.behind} behind` : ""}</span>
             </span>
             {selection.kind === "branch" && selection.branch === branch.branch ? <Check size={14} /> : null}
           </button>

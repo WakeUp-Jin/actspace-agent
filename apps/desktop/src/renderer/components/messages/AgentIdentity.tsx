@@ -26,14 +26,14 @@ export function agentAvatarSource(message: AgentMessage): string {
 
 export function AgentAvatar({ message, size = 32 }: { message: AgentMessage; size?: 28 | 32 }) {
   return <img src={agentAvatarSource(message)} alt="" aria-hidden="true" draggable={false} width={size} height={size}
-    className={`shrink-0 rounded-[8px] bg-surface-subtle object-cover ${size === 28 ? "h-7 w-7" : "h-8 w-8"}`} />;
+    className={`shrink-0 rounded-act-md bg-surface-subtle object-cover ${size === 28 ? "h-7 w-7" : "h-8 w-8"}`} />;
 }
 
 const labels: Record<AgentMessage["status"], string> = { running: "运行中", completed: "已完成", failed: "失败", aborted: "已停止" };
 
 export function AgentStatus({ status }: { status: AgentMessage["status"] }) {
   const Icon = status === "running" ? Loader2 : status === "completed" ? Check : status === "failed" ? CircleAlert : Square;
-  return <span className={`inline-flex w-[68px] shrink-0 items-center gap-1.5 whitespace-nowrap text-[12px] leading-[1.4] ${status === "failed" ? "text-danger" : "text-text-muted"}`}>
+  return <span className={`inline-flex w-[68px] shrink-0 items-center gap-1.5 whitespace-nowrap text-act-xs leading-[1.4] ${status === "failed" ? "text-danger" : "text-text-muted"}`}>
     <Icon size={13} aria-hidden="true" className={status === "running" ? "animate-spin text-operational motion-reduce:animate-none" : ""} />
     {labels[status]}
   </span>;

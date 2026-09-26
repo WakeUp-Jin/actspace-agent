@@ -15,7 +15,7 @@ import { formatWorkedDuration } from "./workedDuration";
 const RUNNING_FLOW_CLASS = "message-flow flex flex-col";
 const DONE_GROUP_CLASS = "tool-activity-done flex flex-col gap-[9px]";
 const TOGGLE_CLASS =
-  "tool-activity-toggle inline-flex w-fit items-center gap-1.5 rounded-act-sm border-0 bg-transparent px-[var(--conversation-text-inset)] py-0.5 text-sm font-normal leading-[1.42] text-text-muted transition-colors duration-[150ms] ease-in-out hover:text-text-main";
+  "tool-activity-toggle inline-flex w-fit items-center gap-1.5 rounded-act-sm border-0 bg-transparent px-[var(--conversation-text-inset)] py-0.5 text-act-md font-normal leading-[1.42] text-text-muted transition-colors duration-(--motion-base) ease-in-out hover:text-text-main";
 const DONE_FLOW_CLASS = "message-flow flex flex-col";
 
 export function ToolActivityGroup({

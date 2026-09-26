@@ -40,7 +40,7 @@ export function BrowserApprovalBlock({
       meta={<ApprovalChip tone="info">整个会话</ApprovalChip>}
       actions={<ApprovalActions state={decision} primaryLabel="本会话允许" size="card" />}
     >
-      <p className="m-0 text-[13px] leading-[1.6] text-text-muted">
+      <p className="m-0 text-act-sm leading-[1.6] text-text-muted">
         Agent 将可以查看并操作你的 Chrome 标签页：打开网页、点击、输入、截图、读取页面内容。
       </p>
     </ApprovalCard>

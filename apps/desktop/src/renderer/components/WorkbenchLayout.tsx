@@ -753,7 +753,7 @@ export function WorkbenchLayout({
         rightWidth={rightWidth}
       />
       {isCompactLayout && compactSidebarOpen ? (
-        <div className="fixed inset-0 z-[50]" data-testid="compact-sidebar-overlay">
+        <div className="fixed inset-0 z-(--act-z-drawer)" data-testid="compact-sidebar-overlay">
           <button
             type="button"
             className="absolute inset-0 border-0 bg-overlay"
@@ -766,7 +766,7 @@ export function WorkbenchLayout({
         </div>
       ) : null}
       {isCompactLayout && view === "chat" && isRightPanelOpen ? (
-        <div className="fixed inset-0 z-[50]" data-testid="compact-right-panel-overlay">
+        <div className="fixed inset-0 z-(--act-z-drawer)" data-testid="compact-right-panel-overlay">
           <button
             type="button"
             className="absolute inset-0 border-0 bg-overlay"
@@ -829,7 +829,7 @@ export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: 
     <button
       ref={trigger}
       type="button"
-      className="inline-flex h-7 items-center gap-1 rounded-act-sm border-0 bg-transparent px-1.5 text-[12px] text-text-muted hover:bg-surface-subtle hover:text-text-main disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex h-7 items-center gap-1 rounded-act-sm border-0 bg-transparent px-1.5 text-act-xs text-text-muted hover:bg-surface-subtle hover:text-text-main disabled:cursor-not-allowed disabled:opacity-50"
       aria-label="会话权限模式"
       aria-haspopup="menu"
       aria-expanded={open}
@@ -843,7 +843,7 @@ export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: 
     {open ? <div className="absolute bottom-[calc(100%+6px)] left-0 z-50 w-[144px] rounded-act-md border border-line bg-surface-raised p-1 shadow-act-popover" role="menu" aria-label="会话权限模式选项">
       {(["default", "full-access"] as const).map((next) => {
         const nextLabel = next === "full-access" ? "完全权限" : "自动";
-        return <button key={next} disabled={disabled || submitting} type="button" role="menuitemradio" aria-checked={mode === next} className="flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-[12px] text-text-main outline-none hover:bg-surface-subtle focus-visible:bg-selected disabled:opacity-50" onClick={() => void update(next)}>
+        return <button key={next} disabled={disabled || submitting} type="button" role="menuitemradio" aria-checked={mode === next} className="flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-act-xs text-text-main outline-none hover:bg-surface-subtle focus-visible:bg-selected disabled:opacity-50" onClick={() => void update(next)}>
           <ShieldCheck size={14} className="shrink-0 text-text-muted" aria-hidden="true" />
           <span className="min-w-0 flex-1">{nextLabel}</span>
           {mode === next ? <Check size={14} className="shrink-0 text-text-main" aria-hidden="true" /> : null}

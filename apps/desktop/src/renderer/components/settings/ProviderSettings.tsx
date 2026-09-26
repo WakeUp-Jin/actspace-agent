@@ -28,13 +28,15 @@ import {
   type SettingsV4ConnectionSettings,
   type ProviderCatalogDefinition,
 } from "@actspace/shared";
-import { SectionShell, SettingGroup, SettingLinkRow, SettingRow, SettingsButton, SettingTag, StatusDot } from "./SettingsPrimitives";
+import { SectionShell, SettingGroup, SettingLinkRow, SettingRow, SettingTag, StatusDot } from "./SettingsPrimitives";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 import { ModelSettings } from "./ModelSettings";
 import { ProviderLogo } from "./ProviderLogo";
 import { CustomConnectionModels } from "./CustomConnectionModels";
 import { CustomModelFields, CustomModelForm, customModelInputFromDraft, emptyCustomModelFormDraft } from "./CustomModelForm";
 import { Toggle } from "./SettingsPrimitives";
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
 
 const PROVIDERS = PROVIDER_DEFINITIONS;
 
@@ -259,7 +261,7 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
       <SectionShell
         title="模型连接"
         action={
-          <SettingsButton
+          <Button
             ref={addButtonRef}
             variant="primary"
             aria-label="添加服务"
@@ -268,36 +270,36 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
           >
             <Plus size={14} aria-hidden="true" />
             添加连接
-          </SettingsButton>
+          </Button>
         }
       >
         {!loaded ? <ProviderConnectionsSkeleton /> : null}
 
         {loaded && credentialStorage.status === "unavailable" ? (
-          <div role="alert" className="flex items-start gap-2 rounded-[10px] border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-on-danger">
+          <div role="alert" className="flex items-start gap-2 rounded-act-group border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-on-danger">
             <CircleAlert className="mt-0.5 shrink-0" size={15} aria-hidden="true" />
             <div>
-              <p className="text-[12.5px] font-medium">本地凭据暂时无法读取</p>
-              <p className="mt-0.5 text-[12px] leading-relaxed">{credentialStorage.message}</p>
+              <p className="text-act-xs font-medium">本地凭据暂时无法读取</p>
+              <p className="mt-0.5 text-act-xs leading-relaxed">{credentialStorage.message}</p>
             </div>
           </div>
         ) : null}
 
         {loaded && credentialStorage.status === "ready" && !hasRows ? (
-          <div className="rounded-[10px] border border-dashed border-line bg-surface px-5 py-8 text-center">
-            <p className="text-[13px] font-medium text-text-main">还没有连接模型服务</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-text-muted">点击右上角「添加连接」，选择服务商并配置 API Key。</p>
+          <div className="rounded-act-group border border-dashed border-line bg-surface px-5 py-8 text-center">
+            <p className="text-act-sm font-medium text-text-main">还没有连接模型服务</p>
+            <p className="mt-1 text-act-xs leading-relaxed text-text-muted">点击右上角「添加连接」，选择服务商并配置 API Key。</p>
           </div>
         ) : null}
 
         {hasRows ? (
-          <div className="divide-y divide-line/60 overflow-hidden rounded-[10px] border border-line bg-surface">
+          <div className="divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface">
             {connectedProviders.map((provider) => <ConnectionRow key={provider.id} provider={provider} state={providers[provider.id]} isDefault={defaultProviderId === provider.id} onOpen={() => setDetailProvider(provider.id)} />)}
             {customConnections.map((connection) => (
               <SettingLinkRow
                 key={connection.connectionId}
                 leading={<ProviderLogo provider={connection.providerId} logoKey={resolveCatalogLogo(connection.catalogId)} />}
-                title={<h4 className="text-[13px] font-medium">{connection.displayName ?? connection.connectionId}</h4>}
+                title={<h4 className="text-act-sm font-medium">{connection.displayName ?? connection.connectionId}</h4>}
                 description={connection.baseUrl ? `自定义连接 · ${compactAddress(connection.baseUrl)}` : "自定义连接"}
                 trailing={<StatusDot tone={connection.lastConnection?.status === "unavailable" ? "error" : "ok"}>{connection.lastConnection?.status === "unavailable" ? "连接异常" : "已连接"}</StatusDot>}
                 onClick={() => setCustomDetail(connection)}
@@ -306,7 +308,7 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
           </div>
         ) : null}
 
-        {message ? <p role="status" className="px-0.5 text-[12px] text-text-muted">{message}</p> : null}
+        {message ? <p role="status" className="px-0.5 text-act-xs text-text-muted">{message}</p> : null}
       </SectionShell>
 
       {removing ? (
@@ -336,7 +338,7 @@ function ConnectionRow({
     <SettingLinkRow
       ariaLabel={`${provider.label}${isDefault ? "，默认" : ""}`}
       leading={<ProviderLogo provider={provider.id} />}
-      title={<><h4 aria-label={provider.label} className="text-[13px] font-medium">{provider.label}</h4>{isDefault ? <SettingTag>默认</SettingTag> : null}</>}
+      title={<><h4 aria-label={provider.label} className="text-act-sm font-medium">{provider.label}</h4>{isDefault ? <SettingTag>默认</SettingTag> : null}</>}
       description={`${provider.description} · ${state?.enabledModelCount ?? 0} / ${state?.installedModelCount ?? 0} 个模型启用`}
       trailing={<StatusBadge status={state?.lastConnection?.status ?? "untested"} />}
       onClick={onOpen}
@@ -384,14 +386,14 @@ function CustomConnectionDetail({ connection, onConnectionChange, onChanged, onB
         <SettingRow
           title="连接测试"
           description={testMessage ? <span role="status">{testMessage}</span> : connection.defaultModel ? "发送 1 Token 的最小真实请求，不写缓存。" : "请先添加并设置默认模型。"}
-          control={<SettingsButton aria-label="测试默认模型" busy={testing} disabled={testing || !connection.defaultModel} onClick={() => void test()}>{testing ? "测试中…" : "测试默认模型"}</SettingsButton>}
+          control={<Button aria-label="测试默认模型" busy={testing} disabled={testing || !connection.defaultModel} onClick={() => void test()}>{testing ? "测试中…" : "测试默认模型"}</Button>}
         />
       </DetailSection>
       <DetailSection title="模型" description="手动维护此连接可用的模型与计费单价。" plain>
         <CustomConnectionModels key={modelRevision} connection={connection} onConnectionChange={onConnectionChange} onChanged={onChanged} onAdd={() => setModelRoute({ kind: "add" })} onEdit={(model) => setModelRoute({ kind: "edit", model })} revision={modelRevision} />
       </DetailSection>
       <DetailSection title="危险操作">
-        <DetailRow label="删除连接" description="清除 Key 和连接配置；历史会话与使用统计会保留。" control={<SettingsButton variant="danger" onClick={() => void onRemove()}>删除连接</SettingsButton>} />
+        <DetailRow label="删除连接" description="清除 Key 和连接配置；历史会话与使用统计会保留。" control={<Button variant="danger" onClick={() => void onRemove()}>删除连接</Button>} />
       </DetailSection>
     </div>
   );
@@ -415,8 +417,8 @@ function ProviderSetupRoute({
         <RouteBack onBack={onBack} label="返回模型连接" />
         <ProviderLogo provider={meta.id} />
         <div className="min-w-0">
-          <h3 className="text-[16px] font-semibold tracking-tight text-text-main">{isProviderConfigured(current) ? `编辑 ${meta.label}` : `连接 ${meta.label}`}</h3>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">完成必要配置后，连接会出现在模型页上方。</p>
+          <h3 className="text-act-lg font-semibold tracking-tight text-text-main">{isProviderConfigured(current) ? `编辑 ${meta.label}` : `连接 ${meta.label}`}</h3>
+          <p className="mt-0.5 text-act-xs leading-relaxed text-text-faint">完成必要配置后，连接会出现在模型页上方。</p>
         </div>
       </div>
       <ProviderConnectionForm provider={provider} current={current} onClose={onBack} onSaved={onSaved} />
@@ -451,28 +453,28 @@ function CustomConnectionSetup({ initial, catalog, onBack, onSaved }: { initial?
     } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "保存失败。"); }
     finally { setSaving(false); }
   };
-  const inputClass = "h-10 w-full rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 disabled:opacity-60";
+  const inputClass = "h-10 w-full rounded-act-md border border-line bg-surface px-3 text-act-sm text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 disabled:opacity-60";
   return (
     <div className="w-full" onKeyDown={(event) => { if (event.key === "Escape" && !saving) onBack(); }}>
       <div className="mb-7 flex items-center gap-3">
         <RouteBack onBack={onBack} label="返回添加连接" />
         <ProviderLogo provider={catalog?.runtimeProviderId ?? initial?.providerId ?? "openrouter"} logoKey={catalog?.logoKey ?? resolveCatalogLogo(initial?.catalogId)} />
         <div className="min-w-0">
-          <h3 className="text-[16px] font-semibold tracking-tight text-text-main">{initial ? `编辑 ${initial.displayName ?? "自定义兼容服务"}` : `连接 ${catalog?.label ?? "自定义兼容服务"}`}</h3>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">完成必要配置后，连接会出现在模型页上方。</p>
+          <h3 className="text-act-lg font-semibold tracking-tight text-text-main">{initial ? `编辑 ${initial.displayName ?? "自定义兼容服务"}` : `连接 ${catalog?.label ?? "自定义兼容服务"}`}</h3>
+          <p className="mt-0.5 text-act-xs leading-relaxed text-text-faint">完成必要配置后，连接会出现在模型页上方。</p>
         </div>
       </div>
       <div className="grid gap-5">
         <ApiKeyField name="API Key" configured={Boolean(initial)} value={apiKey} onChange={setApiKey} />
         <Field label="显示名称"><input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="例如 公司中转站" className={inputClass} /></Field>
-        <Field label="服务地址 · 必填"><span className="text-[11px] font-normal leading-relaxed text-text-faint">{protocol === "anthropic-messages" ? "填写站点根地址，例如 https://cheaprouter.cc；系统会调用 /v1/messages。" : "填写协议基础地址，例如 https://example.com/v1。"}</span><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder={protocol === "anthropic-messages" ? "https://example.com" : "https://example.com/v1"} className={inputClass} />{protocol === "anthropic-messages" && /\/v1\/?$/.test(baseUrl) ? <div className="flex items-center gap-2"><span className="text-[11px] text-on-danger">Anthropic 服务地址不要包含末尾 /v1。</span><button type="button" onClick={() => setBaseUrl(baseUrl.replace(/\/v1\/?$/, ""))} className="text-[11px] font-semibold text-action hover:text-text-main">移除 /v1</button></div> : null}</Field>
-        {!initial ? <><div className="border-t border-line pt-5"><h4 className="text-[13px] font-semibold text-text-main">第一个模型</h4><p className="mt-1 mb-5 text-[11px] text-text-faint">创建连接时至少添加一个模型；首个模型会自动启用并成为连接默认模型。</p><CustomModelFields draft={modelDraft} onChange={setModelDraft} autoFocusApiModel={false} showEnabled={false} /></div></> : null}
-        <details className="group"><summary className="flex cursor-pointer list-none items-center justify-between py-2 text-[13px] font-semibold text-text-main">高级连接设置<ChevronDown size={15} className="group-open:rotate-180" aria-hidden="true" /></summary><div className="grid gap-4 pt-3"><Field label="连接标识"><input value={connectionId} disabled={Boolean(initial)} onChange={(event) => setConnectionId(event.target.value)} placeholder="自动生成" className={inputClass} /></Field><div className="flex items-start justify-between gap-4 rounded-act-md border border-line p-3"><div><p className="text-[12px] font-medium text-text-main">仅为此连接启用代理</p><p className="mt-1 text-[11px] text-text-faint">不会影响其他模型服务。</p></div><Toggle checked={proxyEnabled} onChange={setProxyEnabled} ariaLabel="启用连接代理" /></div>{proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7890" className={inputClass} /></Field> : null}{protocol === "anthropic-messages" ? <div className="flex items-start justify-between gap-4 rounded-act-md border border-line p-3"><div><p className="text-[12px] font-medium text-text-main">Anthropic Prompt Cache</p><p className="mt-1 text-[11px] leading-relaxed text-text-faint">短缓存为稳定前缀添加 ephemeral 断点；可关闭以适配不支持缓存的中转站。</p></div><Toggle checked={promptCacheMode === "short"} onChange={(enabled) => setPromptCacheMode(enabled ? "short" : "off")} ariaLabel="启用 Anthropic Prompt Cache" /></div> : null}</div></details>
-        {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
+        <Field label="服务地址 · 必填"><span className="text-act-xxs font-normal leading-relaxed text-text-faint">{protocol === "anthropic-messages" ? "填写站点根地址，例如 https://cheaprouter.cc；系统会调用 /v1/messages。" : "填写协议基础地址，例如 https://example.com/v1。"}</span><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder={protocol === "anthropic-messages" ? "https://example.com" : "https://example.com/v1"} className={inputClass} />{protocol === "anthropic-messages" && /\/v1\/?$/.test(baseUrl) ? <div className="flex items-center gap-2"><span className="text-act-xxs text-on-danger">Anthropic 服务地址不要包含末尾 /v1。</span><button type="button" onClick={() => setBaseUrl(baseUrl.replace(/\/v1\/?$/, ""))} className="text-act-xxs font-semibold text-action hover:text-text-main">移除 /v1</button></div> : null}</Field>
+        {!initial ? <><div className="border-t border-line pt-5"><h4 className="text-act-sm font-semibold text-text-main">第一个模型</h4><p className="mt-1 mb-5 text-act-xxs text-text-faint">创建连接时至少添加一个模型；首个模型会自动启用并成为连接默认模型。</p><CustomModelFields draft={modelDraft} onChange={setModelDraft} autoFocusApiModel={false} showEnabled={false} /></div></> : null}
+        <details className="group"><summary className="flex cursor-pointer list-none items-center justify-between py-2 text-act-sm font-semibold text-text-main">高级连接设置<ChevronDown size={15} className="group-open:rotate-180" aria-hidden="true" /></summary><div className="grid gap-4 pt-3"><Field label="连接标识"><input value={connectionId} disabled={Boolean(initial)} onChange={(event) => setConnectionId(event.target.value)} placeholder="自动生成" className={inputClass} /></Field><div className="flex items-start justify-between gap-4 rounded-act-md border border-line p-3"><div><p className="text-act-xs font-medium text-text-main">仅为此连接启用代理</p><p className="mt-1 text-act-xxs text-text-faint">不会影响其他模型服务。</p></div><Toggle checked={proxyEnabled} onChange={setProxyEnabled} ariaLabel="启用连接代理" /></div>{proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7890" className={inputClass} /></Field> : null}{protocol === "anthropic-messages" ? <div className="flex items-start justify-between gap-4 rounded-act-md border border-line p-3"><div><p className="text-act-xs font-medium text-text-main">Anthropic Prompt Cache</p><p className="mt-1 text-act-xxs leading-relaxed text-text-faint">短缓存为稳定前缀添加 ephemeral 断点；可关闭以适配不支持缓存的中转站。</p></div><Toggle checked={promptCacheMode === "short"} onChange={(enabled) => setPromptCacheMode(enabled ? "short" : "off")} ariaLabel="启用 Anthropic Prompt Cache" /></div> : null}</div></details>
+        {error ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}
       </div>
       <div className="mt-5 flex justify-end gap-2">
-        <button type="button" className="h-9 rounded-act-md px-3 text-[13px] font-medium text-text-main hover:bg-hover-overlay" disabled={saving} onClick={onBack}>取消</button>
-        <button type="button" className="h-9 rounded-act-md bg-action px-3 text-[13px] font-medium text-on-action hover:bg-action-hover disabled:opacity-60" disabled={saving || (!initial && !apiKey.trim()) || !baseUrl.trim() || (!initial && !modelDraft.apiModel.trim()) || (proxyEnabled && !proxyUrl.trim())} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</button>
+        <Button variant="ghost" size="md" disabled={saving} onClick={onBack}>取消</Button>
+        <Button variant="primary" size="md" disabled={saving || (!initial && !apiKey.trim()) || !baseUrl.trim() || (!initial && !modelDraft.apiModel.trim()) || (proxyEnabled && !proxyUrl.trim())} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</Button>
       </div>
     </div>
   );
@@ -544,7 +546,7 @@ function ProviderDetailRoute({
         <SettingRow
           title="连接测试"
           description={testMessage ? <span role="status">{testMessage}</span> : "发送一次最小请求，确认 Key 与地址可用。"}
-          control={<SettingsButton busy={testing} disabled={testing} onClick={onTest}>{testing ? "测试中…" : "测试连接"}</SettingsButton>}
+          control={<Button busy={testing} disabled={testing} onClick={onTest}>{testing ? "测试中…" : "测试连接"}</Button>}
         />
         {provider.supportsBalance ? <ProviderBalanceRow provider={provider} balance={balance} loading={balanceLoading} error={balanceError} onRefresh={onRefreshBalance} /> : null}
       </DetailSection>
@@ -555,22 +557,22 @@ function ProviderDetailRoute({
         plain
         action={
           <>
-            <SettingsButton variant="quiet" busy={refreshing} disabled={!provider.supportsModelDiscovery || refreshing} onClick={() => void refreshModels()}>
+            <Button variant="ghost" busy={refreshing} disabled={!provider.supportsModelDiscovery || refreshing} onClick={() => void refreshModels()}>
               {refreshing ? null : <RefreshCw size={13} aria-hidden="true" />}
               {refreshing ? "更新中…" : "更新模型目录"}
-            </SettingsButton>
+            </Button>
             {provider.supportsModelDiscovery ? (
-              <SettingsButton onClick={() => setCatalogOpen(true)}>
+              <Button onClick={() => setCatalogOpen(true)}>
                 <Plus size={13} aria-hidden="true" />
                 从目录添加
-              </SettingsButton>
+              </Button>
             ) : null}
           </>
         }
       >
         {settings ? <ModelSettings key={modelRevision} settings={settings} providerFilter={provider.id} embedded embeddedPlain onChanged={onChanged} /> : null}
-        {catalogStatus ? <p role={catalogStatus.error ? "alert" : "status"} className={`px-0.5 text-[12px] ${catalogStatus.error ? "text-on-danger" : "text-text-muted"}`}>{catalogStatus.text}</p> : null}
-        {provider.id === "deepseek" ? <p className="px-0.5 text-[12px] leading-relaxed text-text-faint">V4.1 Flash 支持图片理解。费用按官方美元高峰价估算；目录刷新发现模型，价格由 ActSpace 官方档案维护。</p> : null}
+        {catalogStatus ? <p role={catalogStatus.error ? "alert" : "status"} className={`px-0.5 text-act-xs ${catalogStatus.error ? "text-on-danger" : "text-text-muted"}`}>{catalogStatus.text}</p> : null}
+        {provider.id === "deepseek" ? <p className="px-0.5 text-act-xs leading-relaxed text-text-faint">V4.1 Flash 支持图片理解。费用按官方美元高峰价估算；目录刷新发现模型，价格由 ActSpace 官方档案维护。</p> : null}
         {catalogOpen && provider.supportsModelDiscovery ? <OpenRouterModelCatalogDialog provider={provider.id} onClose={() => setCatalogOpen(false)} onAdded={modelsChanged} onReloaded={modelsChanged} /> : null}
       </DetailSection>
 
@@ -583,7 +585,7 @@ function ProviderDetailRoute({
         <DetailRow
           label="删除连接"
           description="清除 Key、接入地址和代理；已添加模型、历史会话与使用统计会保留。"
-          control={<SettingsButton variant="danger" onClick={onRemove}>删除</SettingsButton>}
+          control={<Button variant="danger" onClick={onRemove}>删除</Button>}
         />
       </DetailSection>
     </div>
@@ -598,10 +600,10 @@ function DetailHeader({ onBack, logo, title, tag, subtitle }: { onBack: () => vo
         <span className="shrink-0 [&>*]:h-10 [&>*]:w-10">{logo}</span>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-[17px] font-semibold tracking-tight text-text-main">{title}</h3>
+            <h3 className="text-act-lg font-semibold tracking-tight text-text-main">{title}</h3>
             {tag}
           </div>
-          <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[12.5px] text-text-muted">{subtitle}</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-1 text-act-xs text-text-muted">{subtitle}</p>
         </div>
       </div>
     </div>
@@ -620,14 +622,14 @@ function ProviderBalanceRow({ provider, balance, loading, error, onRefresh }: { 
   const helper = loading ? "正在刷新…" : error ? "刷新失败，已保留上次结果" : provider.id === "openrouter" && balance?.isConfigured === false ? "需配置 Management Key" : "每 5 分钟刷新";
   return (
     <SettingRow
-      title={<h4 className="text-[13px] font-medium">账户余额</h4>}
+      title={<h4 className="text-act-sm font-medium">账户余额</h4>}
       description={<span className={error ? "text-on-danger" : undefined} role={error ? "status" : undefined}>{helper}</span>}
       control={
         <>
-          <span className="text-[13px] font-medium tabular-nums text-text-main" aria-label={`${provider.label} 账户余额`}>{value}</span>
-          <SettingsButton variant="quiet" size="icon" aria-label={`刷新 ${provider.label} 账户余额`} disabled={loading} onClick={onRefresh}>
+          <span className="text-act-sm font-medium tabular-nums text-text-main" aria-label={`${provider.label} 账户余额`}>{value}</span>
+          <IconButton label={`刷新 ${provider.label} 账户余额`} tooltip="刷新余额" disabled={loading} onClick={onRefresh}>
             <RefreshCw size={13} className={loading ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" />
-          </SettingsButton>
+          </IconButton>
         </>
       }
     />
@@ -637,12 +639,12 @@ function ProviderBalanceRow({ provider, balance, loading, error, onRefresh }: { 
 function DetailRow({ label, description, value, mono = false, action, onAction, control }: { label: string; description?: string; value?: string; mono?: boolean; action?: string; onAction?: () => void; control?: React.ReactNode }) {
   return (
     <SettingRow
-      title={<h4 className="text-[13px] font-medium">{label}</h4>}
+      title={<h4 className="text-act-sm font-medium">{label}</h4>}
       description={description}
       control={control ?? (
         <>
-          {value !== undefined ? <span title={value} className={`max-w-[240px] truncate text-text-muted ${mono ? "font-mono text-[12px]" : "text-[13px]"}`}>{value}</span> : null}
-          {action && onAction ? <SettingsButton aria-label={`${action}${label}`} onClick={onAction}>{action}</SettingsButton> : null}
+          {value !== undefined ? <span title={value} className={`max-w-[240px] truncate text-text-muted ${mono ? "font-mono text-act-xs" : "text-act-sm"}`}>{value}</span> : null}
+          {action && onAction ? <Button aria-label={`${action}${label}`} onClick={onAction}>{action}</Button> : null}
         </>
       )}
     />
@@ -651,7 +653,7 @@ function DetailRow({ label, description, value, mono = false, action, onAction, 
 
 function RouteBack({ onBack, label }: { onBack: () => void; label: string }) {
   return (
-    <button type="button" aria-label="返回连接" onClick={onBack} className="-ml-1.5 inline-flex h-[26px] items-center gap-0.5 rounded-act-sm pl-1 pr-2 text-[12px] text-text-muted transition-colors hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30">
+    <button type="button" aria-label="返回连接" onClick={onBack} className="-ml-1.5 inline-flex h-[26px] items-center gap-0.5 rounded-act-sm pl-1 pr-2 text-act-xs text-text-muted transition-colors hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30">
       <ChevronLeft size={14} aria-hidden="true" />
       {label}
     </button>
@@ -677,14 +679,14 @@ function RemoveProviderDialog({
     if (nextError) setError(nextError);
   };
   return (
-    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[160] grid place-items-center bg-scrim px-5" role="alertdialog" aria-modal="true" aria-labelledby="remove-provider-dialog-title" aria-describedby="remove-provider-dialog-description" onKeyDown={(event) => { if (event.key === "Escape" && !busy) onClose(); else trapTabKey(event); }}>
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-(--act-z-modal) grid place-items-center bg-scrim px-5" role="alertdialog" aria-modal="true" aria-labelledby="remove-provider-dialog-title" aria-describedby="remove-provider-dialog-description" onKeyDown={(event) => { if (event.key === "Escape" && !busy) onClose(); else trapTabKey(event); }}>
       <div className="w-full max-w-[460px] rounded-act-xl border border-line bg-surface p-5 shadow-act-float">
-        <h2 id="remove-provider-dialog-title" className="text-[18px] font-semibold text-text-main">移除 {provider.label}？</h2>
-        <p id="remove-provider-dialog-description" className="mt-2 text-[12px] leading-relaxed text-text-muted">将清除该服务商的所有 API Key、接入地址、代理和连接状态。已添加模型、历史会话与用量记录会保留，但相关模型将暂时不可用。</p>
-        {error ? <p role="alert" className="mt-3 text-[12px] text-on-danger">{error}</p> : null}
+        <h2 id="remove-provider-dialog-title" className="text-act-lg font-semibold text-text-main">移除 {provider.label}？</h2>
+        <p id="remove-provider-dialog-description" className="mt-2 text-act-xs leading-relaxed text-text-muted">将清除该服务商的所有 API Key、接入地址、代理和连接状态。已添加模型、历史会话与用量记录会保留，但相关模型将暂时不可用。</p>
+        {error ? <p role="alert" className="mt-3 text-act-xs text-on-danger">{error}</p> : null}
         <div className="mt-6 flex justify-end gap-2">
-          <button type="button" autoFocus className="h-10 rounded-act-md border border-line px-4 text-[13px] font-semibold text-text-main hover:bg-surface-subtle disabled:opacity-50" onClick={onClose} disabled={busy}>取消</button>
-          <button type="button" className="h-10 rounded-act-md bg-danger-soft px-4 text-[13px] font-semibold text-on-danger hover:opacity-85 disabled:opacity-50" onClick={() => void confirm()} disabled={busy}>{busy ? "移除中…" : "移除服务商"}</button>
+          <Button variant="secondary" size="md" autoFocus onClick={onClose} disabled={busy}>取消</Button>
+          <Button variant="danger-solid" size="md" onClick={() => void confirm()} disabled={busy}>{busy ? "移除中…" : "移除服务商"}</Button>
         </div>
       </div>
     </div>
@@ -759,8 +761,8 @@ function ProviderCatalogRoute({
       <div className="mb-6 flex items-center gap-3">
         <RouteBack onBack={onBack} label="返回模型连接" />
         <div>
-          <h3 className="text-[16px] font-semibold tracking-tight text-text-main">添加连接</h3>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">选择一个服务商，然后配置 API Key 和连接参数。</p>
+          <h3 className="text-act-lg font-semibold tracking-tight text-text-main">添加连接</h3>
+          <p className="mt-0.5 text-act-xs leading-relaxed text-text-faint">选择一个服务商，然后配置 API Key 和连接参数。</p>
         </div>
       </div>
       <div className="w-full">
@@ -773,13 +775,13 @@ function ProviderCatalogRoute({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="搜索服务商"
-            className="h-10 w-full rounded-act-md border border-line bg-surface-subtle pl-9 pr-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
+            className="h-10 w-full rounded-act-md border border-line bg-surface-subtle pl-9 pr-3 text-act-sm text-text-main outline-none placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
           />
         </label>
-        <select aria-label="服务商类型" value={category} onChange={(event) => onCategoryChange(event.target.value as "all" | ProviderCategory)} className="ml-auto h-10 rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 max-[600px]:ml-0"><option value="all">全部</option><option value="direct">官方直连</option><option value="coding">Coding Plan</option><option value="compatible">第三方兼容</option><option value="custom">自定义</option></select>
+        <select aria-label="服务商类型" value={category} onChange={(event) => onCategoryChange(event.target.value as "all" | ProviderCategory)} className="ml-auto h-10 rounded-act-md border border-line bg-surface px-3 text-act-sm text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 max-[600px]:ml-0"><option value="all">全部</option><option value="direct">官方直连</option><option value="coding">Coding Plan</option><option value="compatible">第三方兼容</option><option value="custom">自定义</option></select>
         </div>
         {filtered.length === 0 ? (
-          <div className="mt-4 border-y border-dashed border-line px-4 py-8 text-center text-[12px] text-text-faint"><p>没有匹配的服务商。</p><button type="button" className="mt-2 rounded-act-md px-3 py-2 text-text-main hover:bg-hover-overlay" onClick={() => { onQueryChange(""); onCategoryChange("all"); }}>清除筛选</button></div>
+          <div className="mt-4 border-y border-dashed border-line px-4 py-8 text-center text-act-xs text-text-faint"><p>没有匹配的服务商。</p><button type="button" className="mt-2 rounded-act-md px-3 py-2 text-text-main hover:bg-hover-overlay" onClick={() => { onQueryChange(""); onCategoryChange("all"); }}>清除筛选</button></div>
         ) : (
           <div className="mt-4 divide-y divide-line border-y border-line">
             {filtered.map((provider) => {
@@ -793,8 +795,8 @@ function ProviderCatalogRoute({
                 >
                   <ProviderLogo provider={provider.kind === "builtin" ? provider.id : provider.runtimeProviderId ?? "openrouter"} logoKey={provider.logoKey} />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-semibold text-text-main">{provider.label}</span>
-                    <span className="mt-0.5 block text-[11px] text-text-faint">{provider.description} · {categoryLabel(provider.category)}</span>
+                    <span className="block text-act-md font-semibold text-text-main">{provider.label}</span>
+                    <span className="mt-0.5 block text-act-xxs text-text-faint">{provider.description} · {categoryLabel(provider.category)}</span>
                   </span>
                   <ChevronRight className="shrink-0 text-text-faint" size={17} aria-hidden="true" />
                 </button>
@@ -866,22 +868,22 @@ function ProviderConnectionForm({
         <div className="grid gap-4">
           <ApiKeyField name={`${meta.label} API Key`} configured={configured} value={apiKey} onChange={setApiKey} />
           <details open={configured} className="group">
-            <summary className="flex cursor-pointer list-none items-center justify-between py-2 text-[13px] font-semibold text-text-main"><span><span className="group-open:hidden">展开</span><span className="hidden group-open:inline">收起</span>高级连接设置</span><ChevronDown size={15} className="text-text-faint group-open:rotate-180" aria-hidden="true" /></summary>
+            <summary className="flex cursor-pointer list-none items-center justify-between py-2 text-act-sm font-semibold text-text-main"><span><span className="group-open:hidden">展开</span><span className="hidden group-open:inline">收起</span>高级连接设置</span><ChevronDown size={15} className="text-text-faint group-open:rotate-180" aria-hidden="true" /></summary>
             <div className="grid gap-4 border-t border-line pb-3 pt-3">
           {provider === "openrouter" ? (
             <Field label="Management Key（可选，用于账户余额）">
-              <div className="flex"><input aria-label="OpenRouter Management Key" type={showManagementKey ? "text" : "password"} value={managementKey} onChange={(event) => setManagementKey(event.target.value)} placeholder={current?.hasManagementKey ? "已配置；留空保持不变" : "sk-or-v1-..."} className="h-10 min-w-0 flex-1 rounded-l-act-md border border-r-0 border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20" /><button type="button" aria-label={showManagementKey ? "隐藏 Management Key" : "显示 Management Key"} className="grid h-10 w-10 place-items-center rounded-r-act-md border border-line bg-surface-subtle text-text-faint hover:text-text-main" onClick={() => setShowManagementKey((visible) => !visible)}>{showManagementKey ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>
-              <span className="text-[11px] leading-relaxed text-text-faint">只用于 OpenRouter /credits 查询；移除服务商时会一并清除。</span>
+              <div className="flex"><input aria-label="OpenRouter Management Key" type={showManagementKey ? "text" : "password"} value={managementKey} onChange={(event) => setManagementKey(event.target.value)} placeholder={current?.hasManagementKey ? "已配置；留空保持不变" : "sk-or-v1-..."} className="h-10 min-w-0 flex-1 rounded-l-act-md border border-r-0 border-line bg-surface-subtle px-3 text-act-sm text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20" /><button type="button" aria-label={showManagementKey ? "隐藏 Management Key" : "显示 Management Key"} className="grid h-10 w-10 place-items-center rounded-r-act-md border border-line bg-surface-subtle text-text-faint hover:text-text-main" onClick={() => setShowManagementKey((visible) => !visible)}>{showManagementKey ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>
+              <span className="text-act-xxs leading-relaxed text-text-faint">只用于 OpenRouter /credits 查询；移除服务商时会一并清除。</span>
             </Field>
           ) : null}
-          <Field label="Base URL（可选）"><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="使用服务商默认地址" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field>
-          <label className="flex min-h-11 items-center justify-between rounded-act-md border border-line px-3"><span className="text-[13px] font-medium text-text-main">仅为此服务商启用代理</span><input type="checkbox" checked={proxyEnabled} onChange={(event) => setProxyEnabled(event.target.checked)} /></label>
-          {proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder={current?.proxy?.enabled ? "已配置；留空保持不变" : "http://127.0.0.1:7890"} className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}
+          <Field label="Base URL（可选）"><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="使用服务商默认地址" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-act-sm text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field>
+          <label className="flex min-h-11 items-center justify-between rounded-act-md border border-line px-3"><span className="text-act-sm font-medium text-text-main">仅为此服务商启用代理</span><input type="checkbox" checked={proxyEnabled} onChange={(event) => setProxyEnabled(event.target.checked)} /></label>
+          {proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder={current?.proxy?.enabled ? "已配置；留空保持不变" : "http://127.0.0.1:7890"} className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-act-sm text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}
             </div>
           </details>
-          {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
+          {error ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}
         </div>
-        <div className="mt-5 flex justify-end gap-2"><button type="button" disabled={saving} className="h-9 rounded-act-md px-3 text-[13px] text-text-main hover:bg-hover-overlay disabled:opacity-60" onClick={onClose}>取消</button><button type="button" aria-label="保存" className="h-9 rounded-act-md bg-action px-4 text-[13px] font-semibold text-on-action transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-60" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim() && !current?.proxy?.enabled)} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</button></div>
+        <div className="mt-5 flex justify-end gap-2"><Button variant="ghost" size="md" disabled={saving} onClick={onClose}>取消</Button><Button variant="primary" size="md" aria-label="保存" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim() && !current?.proxy?.enabled)} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</Button></div>
       </div>
     </div>
   );
@@ -892,7 +894,7 @@ function isProviderConfigured(provider?: ProviderSettingsView): boolean {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid gap-1.5"><span className="text-[12px] font-semibold text-text-muted">{label}</span>{children}</label>;
+  return <label className="grid gap-1.5"><span className="text-act-xs font-semibold text-text-muted">{label}</span>{children}</label>;
 }
 
 function compactAddress(value: string): string {
@@ -917,7 +919,7 @@ function ApiKeyField({ name, configured, value, onChange }: { name: string; conf
   return (
     <Field label={configured ? "API Key（可选）" : "API Key · 必填"}>
       <span className="flex rounded-act-md border border-line bg-surface focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring/20">
-        <input aria-label={name} autoFocus type={visible ? "text" : "password"} autoComplete="off" spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} placeholder={configured ? "留空以保留当前 Key" : "输入或粘贴 API Key"} className="h-9 min-w-0 flex-1 rounded-l-act-md bg-transparent px-3 text-[13px] text-text-main outline-none" />
+        <input aria-label={name} autoFocus type={visible ? "text" : "password"} autoComplete="off" spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} placeholder={configured ? "留空以保留当前 Key" : "输入或粘贴 API Key"} className="h-9 min-w-0 flex-1 rounded-l-act-md bg-transparent px-3 text-act-sm text-text-main outline-none" />
         <button type="button" aria-label={visible ? "隐藏 API Key" : "显示 API Key"} className="grid h-9 w-10 place-items-center rounded-r-act-md border-l border-line text-text-muted hover:bg-hover-overlay" onClick={() => setVisible((current) => !current)}>{visible ? <EyeOff size={15} /> : <Eye size={15} />}</button>
       </span>
     </Field>

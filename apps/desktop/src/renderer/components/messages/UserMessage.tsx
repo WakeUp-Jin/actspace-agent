@@ -4,7 +4,7 @@ import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
 
 const USER_MESSAGE_CLASS = "message-row user-message flex justify-start animate-[rise-in_260ms_ease_both]";
 const USER_CARD_CLASS =
-  "user-card w-full rounded-act-lg border border-line bg-surface px-[var(--conversation-card-padding)] py-3 leading-[1.55] text-text-main shadow-[0_12px_34px_rgba(31,45,61,0.045)] dark:shadow-[0_12px_34px_rgba(0,0,0,0.3)]";
+  "user-card w-full rounded-act-lg border border-line bg-surface px-[var(--conversation-card-padding)] py-3 leading-[1.55] text-text-main";
 const USER_EXECUTION_CARD_CLASS =
   "user-card w-full px-[var(--conversation-card-padding)] py-3 leading-[1.55] text-text-main";
 // 超长用户消息两态折叠（参考 Cursor）：
@@ -18,9 +18,9 @@ const USER_CONTENT_FADE_CLASS =
   "user-content-fade pointer-events-none absolute inset-x-0 bottom-0 h-9 bg-gradient-to-t from-surface to-transparent";
 const USER_ATTACHMENTS_CLASS = "mt-3 flex flex-wrap items-center gap-2";
 const USER_IMAGE_ATTACHMENT_CLASS =
-  "relative block h-14 w-14 cursor-pointer overflow-hidden rounded-act-md border border-line bg-surface-subtle p-0 shadow-[0_6px_16px_rgba(31,45,61,0.06)] transition-[border-color,opacity] duration-[120ms] hover:border-line-strong hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:opacity-100";
+  "relative block h-14 w-14 cursor-pointer overflow-hidden rounded-act-md border border-line bg-surface-subtle p-0 shadow-act-thumb transition-[border-color,opacity] duration-(--motion-fast) hover:border-line-strong hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:opacity-100";
 const USER_FILE_ATTACHMENT_CLASS =
-  "inline-flex h-9 max-w-[240px] items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-sm font-medium text-text-main";
+  "inline-flex h-9 max-w-[240px] items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-act-md leading-5 font-medium text-text-main";
 const USER_FILE_NAME_CLASS = "truncate";
 const EMPTY_ATTACHMENTS: readonly ComposerAttachment[] = [];
 

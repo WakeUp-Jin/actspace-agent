@@ -16,7 +16,6 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [前端设计 token 收口与视觉修复](active/20260926-frontend-design-token-convergence.md) | T0 对比 demo 已完成，等用户确认 D1–D5 后按 T1–T14 实施，Composer 相关任务等在飞改动提交后再做。 |
 | [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |
 | [会话切换与后台运行](active/20260916-session-background-runs.md) | 按会话隔离 stream、后台工具状态与历史校准，补切换回归与桌面验收。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
@@ -26,11 +25,13 @@
 | [P1-B Service 三层](active/20260829-actspace-p1-service-roles/README.md) | slice 已交付；全域 Provider/Consumer 收口待完成。 |
 | [P1-C Profile / Bundle / Patch](active/20260829-actspace-p1-profile-bundle-patch/README.md) | schema/digest/transport 已交付；restart-only、失败清理及 one-shot 回归待完成。 |
 | [P2 Contract Matrix](active/20260829-actspace-p2-contract-matrix/README.md) | 字节漂移检查已恢复通过；语义 validator 与负向 fixtures 未完整交付，不能归档。 |
-| [前端基础组件](active/frontend-ui-components-foundation.md) | 仍有组件抽取、迁移与验收工作。 |
+| [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；剩 DropdownMenu、Switch、Textarea、Tabs 及对应迁移。 |
 
 2026-09-09 [逐项复核与设计合并清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)：初始 10 个 active 入口逐项复核；中文界面任务自行归档后，Context 补齐全仓回归也进入 completed，当前剩余 8 个入口。P2 按语义检查缺口保留 active。
 
 ## 最近完成
+
+- [前端设计 token 收口与视觉修复](completed/20260926-frontend-design-token-convergence.md)：字号、圆角、阴影、z-index、动效时长全部 token 化并由 `pnpm check:frontend-tokens` 防回流；修掉右上角孤立横线、设置页顶部空带，Composer 改 12px 无阴影、消息块与 Composer 对齐；新增 `Button` / `IconButton` 并迁移全部按钮。浏览器 fixture 快照与截图已验证，Electron 验收见执行摘要。
 
 - [审批重载与 Chat fork 修复](completed/20260925-approval-reload-chat-fork-fixes.md)：恢复 pending 卡片与停止能力、统一 fork writer 生命周期、复制附件及替换引用；对应实机批次通过，完整权限/Chat 验收边界见摘要。
 

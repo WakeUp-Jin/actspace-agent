@@ -19,9 +19,9 @@ const SPLIT_VIEW_CLASS = "relative grid h-screen overflow-hidden";
 const SPLIT_VIEW_RESIZING_CLASS = "cursor-col-resize select-none";
 const SPLIT_VIEW_PANE_CLASS = "min-h-0 min-w-0 overflow-hidden";
 const SPLIT_SEPARATOR_CLASS =
-  "group absolute bottom-0 top-0 z-[32] grid w-[14px] -translate-x-1/2 cursor-col-resize touch-none place-items-center focus-visible:outline-offset-[-2px]";
+  "group absolute bottom-0 top-0 z-(--act-z-pane) grid w-[14px] -translate-x-1/2 cursor-col-resize touch-none place-items-center focus-visible:outline-offset-[-2px]";
 const SPLIT_SEPARATOR_LINE_BASE_CLASS =
-  "h-full w-px bg-line transition-colors duration-[160ms] ease-in-out group-hover:bg-line-strong group-active:bg-focus-ring group-focus-visible:bg-focus-ring";
+  "h-full w-px bg-line transition-colors duration-(--motion-base) ease-in-out group-hover:bg-line-strong group-active:bg-focus-ring group-focus-visible:bg-focus-ring";
 const SPLIT_SEPARATOR_LINE_RESIZING_CLASS =
   "bg-focus-ring";
 

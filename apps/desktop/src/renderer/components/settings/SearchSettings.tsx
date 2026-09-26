@@ -13,7 +13,6 @@ import {
   SettingEditor,
   SettingGroup,
   SettingRow,
-  SettingsButton,
   SettingsInput,
   SettingsMenuButton,
   SettingTag,
@@ -23,6 +22,7 @@ import {
   useSingleEditor,
 } from "./SettingsPrimitives";
 import { useToolToggle } from "./useToolToggle";
+import { Button } from "../ui/Button";
 
 const WEB_SEARCH_TOOL = "web_search";
 
@@ -181,9 +181,9 @@ function SearchProviderRow({
               />
             </>
           ) : (
-            <SettingsButton aria-label={`连接 ${label}`} aria-expanded={editing} aria-controls={editorId} onClick={onEdit}>
+            <Button aria-label={`连接 ${label}`} aria-expanded={editing} aria-controls={editorId} onClick={onEdit}>
               连接
-            </SettingsButton>
+            </Button>
           )
         }
       />

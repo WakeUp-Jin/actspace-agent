@@ -9,6 +9,18 @@
 | 2026-09-08 | 历史/学习文档链接 | 全量初扫剩余 16 处候选断链：15 处在旧 history，1 处在学习文档的示例图片。当前设计、归档、计划和执行记录链接已通过门禁。 | 按历史源码证据、错误相对路径、示例路径分别处理，不将历史源码一律指向当前实现；详见本轮执行摘要。 |
 | 2026-09-09 | 当前设计重复与正文漂移 | 设置中心约 1,200 行，与模型/Usage 子规范重复；工具预览中的旧 extractor、参数展示、审批与 Subagent 位置说法仍需逐项校准。 | 按 [后续复核清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)分配主规范和章节去向，保留独有内容与历史依据。P2 实现缺口继续由 active 计划跟踪，不转为文档债务。 |
 
+## 前端设计 token 遗留
+
+2026-09-26 设计 token 收口（`completed/20260926-frontend-design-token-convergence.md`）后仍保留的写死值和未统一控件：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-09-26 | renderer 间距 | 组件中仍有 `p-[7px]`、`gap-[9px]`、`py-[5px]` 等间距写死值，没有纳入 `check:frontend-tokens`。 | 先统计分布，决定是否收敛到 4px 网格或登记例外，再加检查规则。 |
+| 2026-09-26 | 内容边界 CSS | `styles/markdown.css`、`diff.css`、`tool-result.css`、`web-tool.css` 内部仍用 px 字号。 | 这些文件服务模型输出和第三方 DOM，改为 `var(--text-act-*)` 前需逐个对照渲染结果。 |
+| 2026-09-26 | 未迁移的按钮形态 | 菜单项（Composer 命令菜单、模型列表、消息操作菜单）、下拉触发器（模式 / 模型选择器、`SettingsSelect`）、分段控件（预览 / 源码切换）仍是各自的样式常量；Composer 附件删除按钮、Sidebar 会话行按钮等内联按钮未改为 `IconButton`。 | 随 `active/frontend-ui-components-foundation.md` 的 `DropdownMenu`、`Tabs` 落地一起迁移。 |
+| 2026-09-26 | 设置表单内部 | `CustomConnectionModels` 行内操作、API Key 显隐切换等与 36px 输入框同排的控件，以及 `CustomModelForm`、连接状态块的「边框卡片」式分组仍是旧写法。 | 与 Input / Textarea 基础组件一起收口；分组样式需要用户决定是否改为内嵌分组。 |
+| 2026-09-26 | dialog 圆角 | 8 处 dialog 仍用 `rounded-act-xl`（18px），规范为 12px。 | 单独做一次 dialog 外观统一，与 `Dialog` 基础组件一起。 |
+
 ## v1 历史债务记录
 
 以下条目保留原日期与旧实现语境，不作为当前 v2 漏洞、缺陷或可直接执行的修复计划。重新立项前须按当前源码核实；当前安全边界见 [执行安全](../design-docs/execution-safety/README.md)，旧设计见 [v1 归档](../archive/v1/README.md)。
