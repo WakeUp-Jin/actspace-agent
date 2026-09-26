@@ -5,7 +5,8 @@
 - **关联计划**：`docs/exec-plans/completed/20260926-frontend-design-token-convergence.md`
 - **执行过程**：`docs/exec-runs/20260926-frontend-design-token-convergence/execution-process.md`
 - **执行模式**：交互
-- **执行结果**：代码与文档完成；Electron 窗口验收待用户
+- **执行结果**：代码与文档完成；Electron Computer Use 已部分验收，弹窗键盘行为失败，浮层/动效等仍有未覆盖项；模型部分按用户要求延期
+- **实际验收记录**：[Computer Use 验收点、分组路线与结果](computer-use-acceptance.md)（2026-09-26）
 
 ## 核心变更清单
 
@@ -21,7 +22,7 @@
 
 ## 人工验证指引
 
-没有 Computer Use，以下需要在 Electron 窗口里看（`pnpm dev:log`）。浅色、深色、跟随系统三态都看一遍。
+以下为原始验收范围。已通过 Computer Use 执行的项目及未覆盖边界，以[实际验收记录](computer-use-acceptance.md)为准；不得把下面的预期结果视为全部通过。浅色、深色、跟随系统已实际检查，模型相关流程延期。
 
 ### 必须验证
 
