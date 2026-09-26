@@ -42,6 +42,7 @@ export const RUNTIME_V2_DESKTOP_CHANNELS = Object.freeze({
   removeModel: "runtime-v2:remove-model",
   testProvider: "runtime-v2:test-provider",
   testCustomConnection: "runtime-v2:test-custom-connection",
+  probeCustomConnection: "runtime-v2:probe-custom-connection",
   getProviderBalance: "runtime-v2:get-provider-balance",
   getSearchUsage: "runtime-v2:get-search-usage",
   readAgentSystemPrompt: "runtime-v2:read-agent-system-prompt",
@@ -101,9 +102,12 @@ export type RuntimeV2ConfigureProviderInput = {
 };
 export type RuntimeV2CreateCustomConnectionInput = CustomConnectionInput;
 export type RuntimeV2RemoveCustomConnectionInput = { readonly connectionId: string };
-export type RuntimeV2UpdateCustomConnectionInput = CustomConnectionInput & { readonly connectionId: string; readonly apiKey?: string };
+/** apiKey 留空表示保留原 Key。 */
+export type RuntimeV2UpdateCustomConnectionInput = Omit<CustomConnectionInput, "apiKey"> & { readonly connectionId: string; readonly apiKey?: string };
 export type RuntimeV2CustomConnectionTestInput = import("../settings").CustomConnectionTestInput;
 export type RuntimeV2CustomConnectionTestResult = import("../settings").CustomConnectionTestResult;
+export type RuntimeV2CustomConnectionProbeInput = import("../settings").CustomConnectionProbeInput;
+export type RuntimeV2CustomConnectionProbeResult = import("../settings").CustomConnectionProbeResult;
 export type RuntimeV2ConfigureSecretInput = {
   readonly provider: SecretProviderId;
   readonly apiKey: string | null;
@@ -210,6 +214,7 @@ export type RuntimeV2DesktopBridge = {
   removeCustomConnection(input: RuntimeV2RemoveCustomConnectionInput): Promise<SettingsV4Snapshot>;
   updateCustomConnection(input: RuntimeV2UpdateCustomConnectionInput): Promise<SettingsV4Snapshot>;
   testCustomConnection(input: RuntimeV2CustomConnectionTestInput): Promise<RuntimeV2CustomConnectionTestResult>;
+  probeCustomConnection(input: RuntimeV2CustomConnectionProbeInput): Promise<RuntimeV2CustomConnectionProbeResult>;
   configureProvider(input: RuntimeV2ConfigureProviderInput): Promise<AppSettingsV2>;
   configureSecret(input: RuntimeV2ConfigureSecretInput): Promise<AppSettingsV2>;
   addProviderCredential(input: RuntimeV2ProviderCredentialAddInput): Promise<AppSettingsV2>;

@@ -253,9 +253,19 @@ export interface SettingsV4ConnectionSettings extends ProviderConnectionSettings
   catalogId?: string;
   /** Anthropic prompt caching. Missing legacy Anthropic values resolve to short. */
   promptCacheMode?: CustomConnectionPromptCacheMode;
+  /** Anthropic 协议的认证头。旧数据缺省按 x-api-key。 */
+  authMode?: CustomConnectionAuthMode;
+  /** 只有 authMode 为 auto 时才有值：测试时确认能用的那种。 */
+  resolvedAuth?: CustomConnectionResolvedAuth;
+  /** 旧数据缺省按 manual（保持升级前的计费行为）；倍率沿用 defaultPricingMultiplier。 */
+  billingMode?: CustomConnectionBillingMode;
 }
 
 export type CustomConnectionPromptCacheMode = "short" | "off";
+export type CustomConnectionAuthMode = "auto" | "x-api-key" | "bearer";
+export type CustomConnectionResolvedAuth = "x-api-key" | "bearer";
+/** reference：按官方目录价 × 倍率；token：只统计 Token；manual：只用模型上手填的单价。 */
+export type CustomConnectionBillingMode = "reference" | "token" | "manual";
 
 export interface CustomConnectionInput {
   modelReasoning?: import("./custom-model-reasoning").CustomModelReasoning;
@@ -270,6 +280,14 @@ export interface CustomConnectionInput {
   promptCacheMode?: CustomConnectionPromptCacheMode;
   proxy?: ProviderProxySettings;
   initialModel?: Omit<import("./custom-model-input").CustomModelCreateInput, "connectionId" | "setAsConnectionDefault">;
+  authMode?: CustomConnectionAuthMode;
+  resolvedAuth?: CustomConnectionResolvedAuth;
+  billingMode?: CustomConnectionBillingMode;
+  pricingMultiplier?: number;
+  /** 一次创建多个模型；和 initialModel 二选一。 */
+  initialModels?: readonly import("./custom-model-input").CustomModelDraftInput[];
+  /** 必须是 initialModels 里的一个。 */
+  defaultApiModel?: string;
 }
 
 export type CustomConnectionTestInput = { readonly connectionId: string };
@@ -279,6 +297,30 @@ export type CustomConnectionTestResult = {
   readonly checkedAt: string;
   readonly errorKind?: ProviderConnectionErrorKind;
   readonly statusCode?: number;
+  readonly resolvedAuth?: CustomConnectionResolvedAuth;
+};
+
+/** 保存前用草稿参数探测，或刷新已保存连接的模型列表。 */
+export type CustomConnectionProbeInput =
+  | {
+      readonly kind: "draft";
+      readonly protocol: import("./model-config").ModelApi;
+      readonly baseUrl: string;
+      readonly apiKey: string;
+      readonly authMode: CustomConnectionAuthMode;
+      readonly proxy?: ProviderProxySettings;
+    }
+  | { readonly kind: "saved"; readonly connectionId: string };
+
+export type CustomConnectionProbeResult = {
+  readonly ok: boolean;
+  readonly message: string;
+  readonly checkedAt: string;
+  readonly errorKind?: ProviderConnectionErrorKind;
+  readonly statusCode?: number;
+  readonly resolvedAuth?: CustomConnectionResolvedAuth;
+  /** 服务不提供模型列表时为 null（404/405/501） */
+  readonly models: readonly { readonly id: string; readonly label?: string }[] | null;
 };
 
 export interface SettingsV4InstalledModelSettings extends InstalledModelSettings {

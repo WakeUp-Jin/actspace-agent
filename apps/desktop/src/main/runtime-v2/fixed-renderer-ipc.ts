@@ -28,6 +28,7 @@ import {
   type SettingsV4UpdateInput,
   type CustomConnectionInput,
   type CustomConnectionTestInput,
+  type CustomConnectionProbeInput,
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
@@ -55,6 +56,7 @@ import { commitAndPushWorkspaceChanges, commitWorkspaceChanges, createWorkspaceB
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "../workspace-open-service";
 import { selectModelCatalog, type RuntimeV2OpenRouterCatalogService } from "./openrouter-catalog-service";
 import type { ProviderNetworkService } from "./provider-network-service";
+import { probeCustomConnection } from "./custom-connection-probe";
 import { ChatAttachmentValidationError, type DesktopRuntimeV2Registry } from "./runtime-registry";
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
 import {
@@ -363,6 +365,7 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
     await options.settings.markCustomConnectionResult(input.connectionId, result);
     return result;
   });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.probeCustomConnection, (_event, input: CustomConnectionProbeInput) => probeCustomConnection(options.settings, options.providerNetwork, input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateSettings, (_event, input: Parameters<SettingsService["update"]>[0]) => options.settings.update(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setProviderKey, (_event, input: Parameters<SettingsService["setProviderKey"]>[0] extends never ? never : { provider: Parameters<SettingsService["setProviderKey"]>[0]; apiKey: string }) => options.settings.setProviderKey(input.provider, input.apiKey));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.clearProviderKey, (_event, input: { provider: Parameters<SettingsService["clearProviderKey"]>[0] }) => options.settings.clearProviderKey(input.provider));

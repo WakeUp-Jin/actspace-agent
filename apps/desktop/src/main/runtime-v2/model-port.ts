@@ -1,4 +1,4 @@
-import type { ModelApi } from "@actspace/shared";
+import { billingReferenceProvider, type ModelApi, type resolveModelPricing } from "@actspace/shared";
 
 export type DesktopRuntimeV2ResolvedModel = {
   readonly key: string;
@@ -22,6 +22,8 @@ export type DesktopRuntimeV2ResolvedModel = {
     readonly transport?: { readonly proxyUrl?: string };
     readonly pricingMultiplier?: number;
     readonly promptCacheMode?: import("@actspace/shared").CustomConnectionPromptCacheMode;
+    readonly authScheme?: import("@actspace/shared").CustomConnectionResolvedAuth;
+    readonly billingMode?: import("@actspace/shared").CustomConnectionBillingMode;
   };
 };
 
@@ -37,5 +39,20 @@ export interface DesktopRuntimeV2ModelPort {
   getToolEnvironment(): {
     readonly searchCredentials: Partial<Record<"zhipu" | "tavily" | "tinyfish" | "exa", string>>;
     readonly imageGeneration?: { readonly apiKey: string; readonly baseUrl: string; readonly model: string };
+  };
+}
+
+/** 运行时和 legacy 兜底共用的计价参数。definition.pricing 在 resolve 时已按计费方式处理过倍率。 */
+export function customConnectionPricingInput(model: DesktopRuntimeV2ResolvedModel, apiModel: string): Parameters<typeof resolveModelPricing>[1] {
+  return {
+    providerId: model.definition.provider,
+    apiModel,
+    modelKey: model.key,
+    baseUrl: model.providerRuntime.baseUrl ?? "",
+    connectionId: model.connectionId,
+    multiplier: model.providerRuntime.pricingMultiplier,
+    configured: model.definition.source === "custom" && apiModel === model.definition.apiModel ? model.definition.pricing : undefined,
+    configuredAlreadyMultiplied: true,
+    ...(model.providerRuntime.billingMode ? { billingMode: model.providerRuntime.billingMode, referenceProviderId: billingReferenceProvider(model.definition.api) } : {}),
   };
 }

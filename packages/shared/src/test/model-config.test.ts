@@ -16,7 +16,7 @@ import {
   resolveModelSpec,
   resolveModelSpecByApiModel,
 } from "../model-config";
-import { PROVIDER_CATALOG, PROVIDER_IDS, PROVIDER_REGISTRY, isProviderId } from "../provider-config";
+import { PROVIDER_CATALOG, PROVIDER_CATALOG_ORDER, PROVIDER_IDS, PROVIDER_REGISTRY, isProviderId } from "../provider-config";
 
 describe("model config", () => {
   it("exposes Kimi as a public model alongside DeepSeek", () => {
@@ -88,11 +88,16 @@ describe("model config", () => {
     expect(isProviderId("other")).toBe(false);
   });
 
-  it("exposes only approved API Key presets and three explicit custom protocols", () => {
-    expect(PROVIDER_CATALOG.map((provider) => provider.id)).toEqual([
-      "minimax", "openai", "anthropic", "zai", "xiaomi", "volcengine-coding-plan",
+  it("exposes only approved API Key presets and one merged custom entry", () => {
+    expect(PROVIDER_CATALOG.filter((provider) => !provider.hidden).map((provider) => provider.id)).toEqual([
+      "minimax", "openai", "anthropic", "zai", "xiaomi", "volcengine-coding-plan", "custom",
+    ]);
+    // 旧的三条协议入口只隐藏，已保存连接仍能按 catalogId 查到。
+    expect(PROVIDER_CATALOG.filter((provider) => provider.hidden).map((provider) => provider.id)).toEqual([
       "openai-compatible", "openai-responses-compatible", "anthropic-compatible",
     ]);
+    expect(PROVIDER_CATALOG.find((provider) => provider.id === "custom")?.protocol).toBeUndefined();
+    expect(PROVIDER_CATALOG_ORDER).not.toContain("anthropic-compatible");
     expect(PROVIDER_CATALOG.find((provider) => provider.id === "openai")).toMatchObject({
       protocol: "openai-responses",
       logoKey: "openai",

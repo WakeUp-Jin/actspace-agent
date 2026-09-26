@@ -237,10 +237,12 @@ it("rejects an invalid protocol before writing a credential or connection", asyn
   expect(settings.getV4().settings.models.connections["bad-relay"]).toBeUndefined();
 });
 
-it("rejects Anthropic /v1 base URLs and persists short/off cache modes", async () => {
+it("normalizes Anthropic /v1 base URLs to the site root and persists short/off cache modes", async () => {
   const { root, settings } = await fixture();
-  await expect(settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "bad-anthropic", displayName: "Bad", apiKey: "secret", baseUrl: "https://relay.example/v1", defaultModel: "claude" })).rejects.toThrow("不要包含 /v1");
-  expect(settings.getV4().settings.models.connections["bad-anthropic"]).toBeUndefined();
+  await settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "v1-anthropic", displayName: "V1", apiKey: "secret", baseUrl: "https://relay.example/v1/", defaultModel: "claude" });
+  expect(settings.getV4().settings.models.connections["v1-anthropic"]?.baseUrl).toBe("https://relay.example");
+  await expect(settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "mismatch", displayName: "Mismatch", apiKey: "secret", baseUrl: "https://relay.example/v1/chat/completions", defaultModel: "claude" })).rejects.toThrow("协议不一致");
+  expect(settings.getV4().settings.models.connections["mismatch"]).toBeUndefined();
 
   await settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "anthropic-short", displayName: "Short", apiKey: "secret", baseUrl: "https://relay.example/anthropic", defaultModel: "claude" });
   await settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "anthropic-off", displayName: "Off", apiKey: "secret", baseUrl: "https://relay.example", defaultModel: "claude", promptCacheMode: "off" });
@@ -305,5 +307,103 @@ it.each(["low", undefined] as const)("encodes custom Chat with selected effort %
     const sent = dispatch.mock.calls.at(-1) as unknown as [LlmAdapterDispatchInput];
     expect(sent[0].request.options.reasoningEffort).toBe(effort);
     if (!effort) expect(sent[0].request.options.reasoning).toBeUndefined();
+  } finally { await adapter.dispose(); }
+});
+
+it("creates several catalog models at once with a default, a host-derived name and reference billing", async () => {
+  const { settings } = await fixture();
+  const draft = (apiModel: string, enabled = true) => ({ apiModel, enabled, contextWindow: null, maxTokens: null, input: ["text"] as const, reasoningConfig: { mode: "auto" as const }, pricing: null });
+  const input = { providerId: "openrouter" as const, protocol: "anthropic-messages" as const, catalogId: "custom", displayName: "", apiKey: "secret", baseUrl: "https://relay.example/v1", authMode: "auto" as const, resolvedAuth: "bearer" as const, billingMode: "reference" as const, pricingMultiplier: 0.3 };
+  const snapshot = await settings.createCustomConnection({ ...input, connectionId: "batch-one", initialModels: [draft("claude-opus-5"), draft("claude-sonnet-5"), draft("claude-haiku-4-5", false)], defaultApiModel: "claude-sonnet-5" });
+  expect(snapshot.settings.models.connections["batch-one"]).toMatchObject({ displayName: "relay.example", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", authMode: "auto", resolvedAuth: "bearer", billingMode: "reference", defaultPricingMultiplier: 0.3 });
+  const installed = Object.entries(snapshot.settings.models.installed).filter(([, model]) => model?.connectionId === "batch-one");
+  expect(new Set(installed.map(([key]) => key)).size).toBe(3);
+  expect(Object.fromEntries(installed.map(([key, model]) => [key.split("/").pop(), model?.enabled]))).toEqual({ "claude-opus-5": true, "claude-sonnet-5": true, "claude-haiku-4-5": false });
+
+  const second = await settings.createCustomConnection({ ...input, connectionId: "batch-two", initialModels: [draft("claude-sonnet-5")] });
+  expect(second.settings.models.connections["batch-two"]).toMatchObject({ displayName: "relay.example 2", defaultModel: "claude-sonnet-5" });
+  await expect(settings.createCustomConnection({ ...input, connectionId: "batch-bad", initialModels: [draft("a")], defaultApiModel: "b" })).rejects.toThrow("默认模型必须是已选模型之一");
+  await expect(settings.createCustomConnection({ ...input, connectionId: "batch-empty", initialModels: [] })).rejects.toThrow("至少选择一个模型");
+  await expect(settings.createCustomConnection({ ...input, connectionId: "batch-both", initialModels: [draft("a")], initialModel: draft("a") })).rejects.toThrow("只能传一个");
+});
+
+it("prices reference connections from the vendor catalog and never multiplies a model's manual price", async () => {
+  const { settings } = await fixture();
+  const manual = { currency: "USD" as const, inputCacheMissPerMillion: 4, outputPerMillion: 20, inputCacheHitPerMillion: 0.4, inputCacheWritePerMillion: 5 };
+  await settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "ref-relay", displayName: "Ref", apiKey: "secret", baseUrl: "https://relay.example", billingMode: "reference", pricingMultiplier: 0.3, initialModels: [
+    { apiModel: "claude-sonnet-5", enabled: true, contextWindow: null, maxTokens: null, input: ["text"], reasoningConfig: { mode: "auto" }, pricing: null },
+    { apiModel: "claude-manual", enabled: true, contextWindow: null, maxTokens: null, input: ["text"], reasoningConfig: { mode: "auto" }, pricing: manual },
+  ] });
+  const runtime = new ModelRuntimeService(settings, new ModelStoreService({ settings }));
+  const catalogModel = runtime.resolveMainModel("openrouter:connection/ref-relay/claude-sonnet-5");
+  if (!catalogModel.ok) throw new Error(catalogModel.message);
+  expect(runtime.resolvePricing(catalogModel.model, "claude-sonnet-5")?.rates.input).toBeCloseTo(0.6);
+  const manualModel = runtime.resolveMainModel("openrouter:connection/ref-relay/claude-manual");
+  if (!manualModel.ok) throw new Error(manualModel.message);
+  expect(manualModel.model.definition.pricing?.inputCacheMissPerMillion).toBe(4);
+  expect(runtime.resolvePricing(manualModel.model, "claude-manual")).toMatchObject({ source: "configured", rates: { input: 4, output: 20 } });
+
+  await settings.updateCustomConnection({ providerId: "openrouter", connectionId: "ref-relay", displayName: "Ref", apiKey: "", baseUrl: "https://relay.example", billingMode: "token" });
+  const tokenModel = runtime.resolveMainModel("openrouter:connection/ref-relay/claude-sonnet-5");
+  if (!tokenModel.ok) throw new Error(tokenModel.message);
+  expect(runtime.resolvePricing(tokenModel.model, "claude-sonnet-5")).toBeNull();
+});
+
+it("reads legacy connections as x-api-key with manual billing and drops invalid auth fields", async () => {
+  const { root, settings } = await fixture();
+  await settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "legacy", displayName: "Legacy", apiKey: "secret", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5" });
+  await settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "tampered", displayName: "Tampered", apiKey: "secret", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5" });
+  const raw = JSON.parse(await readFile(join(root, "settings.json"), "utf8"));
+  expect(raw.models.connections.legacy).not.toHaveProperty("authMode");
+  expect(raw.models.connections.legacy).not.toHaveProperty("billingMode");
+  Object.assign(raw.models.connections.tampered, { authMode: "basic", resolvedAuth: "bearer", billingMode: "free" });
+  await writeFile(join(root, "settings.json"), JSON.stringify(raw));
+  const reloaded = new SettingsService({ dataRoot: root, crypto });
+  await reloaded.load();
+  expect(reloaded.getV4().settings.models.connections.tampered).not.toHaveProperty("authMode");
+  expect(reloaded.getV4().settings.models.connections.tampered).not.toHaveProperty("resolvedAuth");
+  expect(reloaded.getV4().settings.models.connections.tampered).not.toHaveProperty("billingMode");
+  for (const id of ["legacy", "tampered"]) {
+    expect(reloaded.getProviderRuntimeConfigForCredential("openrouter", undefined, id)).toMatchObject({ authScheme: "x-api-key", billingMode: "manual", pricingMultiplier: 1 });
+  }
+  const runtime = new ModelRuntimeService(reloaded, new ModelStoreService({ settings: reloaded }));
+  const legacyModel = runtime.resolveMainModel("openrouter:connection/legacy/claude-sonnet-5");
+  if (!legacyModel.ok) throw new Error(legacyModel.message);
+  expect(runtime.resolvePricing(legacyModel.model, "claude-sonnet-5")).toBeNull();
+});
+
+it("remembers the auth scheme a test resolved and forgets it when the address changes", async () => {
+  const { settings } = await fixture();
+  const input = { providerId: "openrouter" as const, protocol: "anthropic-messages" as const, connectionId: "auto-relay", displayName: "Auto", apiKey: "secret", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", authMode: "auto" as const };
+  await settings.createCustomConnection(input);
+  expect(settings.getProviderRuntimeConfigForCredential("openrouter", undefined, "auto-relay")).toMatchObject({ authScheme: "x-api-key" });
+  await settings.markCustomConnectionResult("auto-relay", { ok: true, checkedAt: "2026-09-26T00:00:00.000Z", message: "ok", resolvedAuth: "bearer" });
+  expect(settings.getV4().settings.models.connections["auto-relay"]).toMatchObject({ resolvedAuth: "bearer", lastConnection: { status: "available" } });
+  expect(settings.getProviderRuntimeConfigForCredential("openrouter", undefined, "auto-relay")).toMatchObject({ authScheme: "bearer" });
+
+  await settings.updateCustomConnection({ ...input, apiKey: "", displayName: "Renamed" });
+  expect(settings.getV4().settings.models.connections["auto-relay"]).toMatchObject({ displayName: "Renamed", resolvedAuth: "bearer", lastConnection: { status: "available" } });
+  await settings.updateCustomConnection({ ...input, apiKey: "", baseUrl: "https://other.example" });
+  expect(settings.getV4().settings.models.connections["auto-relay"]).not.toHaveProperty("resolvedAuth");
+  expect(settings.getV4().settings.models.connections["auto-relay"]?.lastConnection.status).toBe("untested");
+  await settings.updateCustomConnection({ ...input, apiKey: "", authMode: "bearer" });
+  expect(settings.getProviderRuntimeConfigForCredential("openrouter", undefined, "auto-relay")).toMatchObject({ authScheme: "bearer" });
+});
+
+it("dispatches Bearer connections with an Authorization header and no apiKey", async () => {
+  const { settings } = await fixture();
+  await settings.createCustomConnection({ providerId: "openrouter", protocol: "anthropic-messages", connectionId: "bearer-relay", displayName: "Bearer", apiKey: "bearer-secret", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", authMode: "bearer" });
+  const runtime = new ModelRuntimeService(settings, new ModelStoreService({ settings }));
+  const modelKey = "openrouter:connection/bearer-relay/claude-sonnet-5";
+  const resolved = await new DesktopCredentialResolver(runtime).resolve(`desktop:model:${modelKey}`, new AbortController().signal);
+  expect(resolved).toMatchObject({ headers: { Authorization: "Bearer bearer-secret" } });
+  expect(resolved).not.toHaveProperty("apiKey");
+  const adapter = new DesktopLegacyLlmAdapter(runtime, async () => { throw new Error("unused"); });
+  try {
+    const credential = await new DesktopCredentialResolver(runtime).resolve("desktop:default", new AbortController().signal);
+    await adapter.dispatch({ request: { model: modelKey, options: {} }, credential, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
+    const sent = (dispatch.mock.lastCall as unknown as [{ credential: Record<string, unknown> }])[0].credential;
+    expect(sent).toMatchObject({ headers: { Authorization: "Bearer bearer-secret" }, baseUrl: "https://relay.example" });
+    expect(sent).not.toHaveProperty("apiKey");
   } finally { await adapter.dispose(); }
 });

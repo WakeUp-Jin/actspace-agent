@@ -1,5 +1,5 @@
 import type { ModelPricing } from "@actspace/shared";
-import { Toggle } from "./SettingsPrimitives";
+import { SettingRow, SettingsInput, SettingsSelect } from "./SettingsPrimitives";
 
 export type ModelPricingDraft = {
   currency: ModelPricing["currency"];
@@ -30,50 +30,45 @@ export function pricingDraftFromModel(pricing?: ModelPricing): ModelPricingDraft
 
 export function modelPricingFromDraft(enabled: boolean, draft: ModelPricingDraft): ModelPricing | null {
   if (!enabled) return null;
-  const inputCacheMissPerMillion = parseRate(draft.input, "标准输入");
+  const inputCacheMissPerMillion = parseRate(draft.input, "输入");
   const outputPerMillion = parseRate(draft.output, "输出");
   const inputCacheHitPerMillion = parseRate(draft.cacheRead, "缓存读取");
   const inputCacheWritePerMillion = parseRate(draft.cacheWrite, "缓存写入");
   return { currency: draft.currency, inputCacheMissPerMillion, outputPerMillion, inputCacheHitPerMillion, inputCacheWritePerMillion };
 }
 
-export function ModelPricingFields({ enabled, draft, onEnabledChange, onChange }: {
-  enabled: boolean;
-  draft: ModelPricingDraft;
-  onEnabledChange: (enabled: boolean) => void;
-  onChange: (draft: ModelPricingDraft) => void;
-}) {
-  const inputClass = "h-9 w-full rounded-act-md border border-line bg-surface px-3 text-act-sm text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20";
-  return (
-    <fieldset className="grid gap-4 rounded-act-md border border-line p-4">
-      <legend className="px-1 text-act-sm font-semibold text-text-main">手动价格</legend>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-act-xs font-medium text-text-main">记录此中转站的实际单价</p>
-          <p className="mt-1 text-act-xxs leading-relaxed text-text-faint">关闭时只统计 Token，不估算金额。所有价格均为每百万 Token。</p>
-        </div>
-        <Toggle checked={enabled} onChange={onEnabledChange} ariaLabel="启用手动价格" />
-      </div>
-      {enabled ? (
-        <div className="grid grid-cols-2 gap-3 max-[600px]:grid-cols-1">
-          <label className="grid gap-1.5 text-act-xs font-medium text-text-muted">币种
-            <select value={draft.currency} onChange={(event) => onChange({ ...draft, currency: event.target.value as ModelPricing["currency"] })} className={inputClass}>
-              <option value="USD">USD</option>
-              <option value="CNY">CNY</option>
-            </select>
-          </label>
-          <PriceInput label="标准输入" value={draft.input} onChange={(input) => onChange({ ...draft, input })} className={inputClass} />
-          <PriceInput label="输出" value={draft.output} onChange={(output) => onChange({ ...draft, output })} className={inputClass} />
-          <PriceInput label="缓存读取" value={draft.cacheRead} onChange={(cacheRead) => onChange({ ...draft, cacheRead })} className={inputClass} />
-          <PriceInput label="缓存写入" value={draft.cacheWrite} onChange={(cacheWrite) => onChange({ ...draft, cacheWrite })} className={inputClass} />
-        </div>
-      ) : null}
-    </fieldset>
-  );
-}
+const RATE_FIELDS = [
+  { key: "input", label: "输入" },
+  { key: "output", label: "输出" },
+  { key: "cacheRead", label: "缓存读取" },
+  { key: "cacheWrite", label: "缓存写入" },
+] as const;
 
-function PriceInput({ label, value, onChange, className }: { label: string; value: string; onChange: (value: string) => void; className: string }) {
-  return <label className="grid gap-1.5 text-act-xs font-medium text-text-muted">{label}<input inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} placeholder="0.00" className={className} /></label>;
+/** 币种 + 四项单价，每项一行；放在 SettingGroup 里使用。 */
+export function ModelPricingFields({ draft, onChange }: { draft: ModelPricingDraft; onChange: (draft: ModelPricingDraft) => void }) {
+  const unit = `${draft.currency === "CNY" ? "¥" : "$"} / 百万`;
+  return (
+    <>
+      <SettingRow
+        indent
+        tight
+        title="币种"
+        control={<SettingsSelect size="sm" ariaLabel="币种" value={draft.currency} options={[{ value: "USD", label: "USD" }, { value: "CNY", label: "CNY" }]} onChange={(currency) => onChange({ ...draft, currency: currency as ModelPricing["currency"] })} />}
+      />
+      {RATE_FIELDS.map((field) => (
+        <SettingRow
+          key={field.key}
+          indent
+          tight
+          title={field.label}
+          control={<>
+            <span className="text-act-xs text-text-faint">{unit}</span>
+            <SettingsInput width="sm" numeric inputMode="decimal" aria-label={`${field.label}单价`} placeholder="0.00" value={draft[field.key]} onChange={(event) => onChange({ ...draft, [field.key]: event.target.value })} />
+          </>}
+        />
+      ))}
+    </>
+  );
 }
 
 function parseRate(value: string, label: string): number {

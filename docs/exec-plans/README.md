@@ -31,6 +31,7 @@
 
 ## 最近完成
 
+- [自定义服务与 Anthropic 连接流程重做](completed/20260926-custom-connection-setup-redesign.md)：目录合并为一条「自定义服务」，新增两步向导和只填 Key 的官方 Anthropic 页面；地址自动规范化，Anthropic 认证支持 x-api-key 和 Bearer 自动识别，计费支持按官方价折算；详情页逐项编辑，删除要确认。自动化与 fixture 截图已通过，Electron 验收和真实中转站测试见执行摘要。
 - [前端设计 token 收口与视觉修复](completed/20260926-frontend-design-token-convergence.md)：字号、圆角、阴影、z-index、动效时长全部 token 化并由 `pnpm check:frontend-tokens` 防回流；修掉右上角孤立横线、设置页顶部空带，Composer 改 12px 无阴影、消息块与 Composer 对齐；新增 `Button` / `IconButton` 并迁移全部按钮。浏览器 fixture 快照与截图已验证，Electron 验收见执行摘要。
 
 - [审批重载与 Chat fork 修复](completed/20260925-approval-reload-chat-fork-fixes.md)：恢复 pending 卡片与停止能力、统一 fork writer 生命周期、复制附件及替换引用；对应实机批次通过，完整权限/Chat 验收边界见摘要。

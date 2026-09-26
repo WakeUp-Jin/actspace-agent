@@ -1,6 +1,10 @@
 import { ProviderProxyPool } from "@actspace/llm-service";
+import { customConnectionRequestUrl } from "@actspace/shared";
 import type {
   BalanceProviderId,
+  CustomConnectionAuthMode,
+  CustomConnectionProbeResult,
+  CustomConnectionResolvedAuth,
   CustomConnectionTestResult,
   ModelApi,
   ProviderBalanceSnapshot,
@@ -20,7 +24,13 @@ export type CustomConnectionProbeRuntime = {
   readonly baseUrl: string;
   readonly model: string;
   readonly transport?: { readonly proxyUrl: string };
+  /** 只对 Anthropic 协议生效；缺省按 x-api-key。 */
+  readonly authMode?: CustomConnectionAuthMode;
+  /** auto 模式下已经确认能用的认证方式；有值时不再回退。 */
+  readonly resolvedAuth?: CustomConnectionResolvedAuth;
 };
+
+const MODEL_LIST_MAX_PAGES = 5;
 
 export type ProviderConnectionProbe = {
   readonly ok: boolean;
@@ -73,31 +83,94 @@ export class ProviderNetworkService {
     }
   }
 
+  /** 发 1 Token 的真实请求。auto 模式还没识别过认证方式时，x-api-key 被拒就改用 Bearer 再试一次。 */
   async testCustomConnection(runtime: CustomConnectionProbeRuntime): Promise<CustomConnectionTestResult> {
     const checkedAt = this.#now().toISOString();
+    try {
+      const fetchImpl = await this.#customFetch(runtime);
+      let failure: CustomConnectionTestResult | undefined;
+      for (const scheme of authAttempts(runtime)) {
+        const response = await this.#withTimeout((signal) => fetchImpl(customConnectionRequestUrl(runtime.baseUrl, runtime.protocol), {
+          method: "POST",
+          headers: { ...customConnectionHeaders(runtime, scheme), "Content-Type": "application/json" },
+          body: JSON.stringify(customConnectionBody(runtime)),
+          signal,
+        }));
+        if (response.ok) return { ok: true, message: "模型测试成功。", checkedAt, ...resolvedAuthField(runtime, scheme) };
+        failure = customStatusFailure(response.status, checkedAt);
+        if (failure.errorKind !== "auth") break;
+      }
+      return failure!;
+    } catch (error) {
+      return customNetworkFailure(error, checkedAt, "模型测试");
+    }
+  }
+
+  /**
+   * 读取服务的模型列表，顺带确认地址、Key 和认证方式。
+   * 404/405/501 视为服务没有提供列表：只能证明地址可达，不写 resolvedAuth。
+   */
+  async probeCustomConnection(runtime: CustomConnectionProbeRuntime): Promise<CustomConnectionProbeResult> {
+    const checkedAt = this.#now().toISOString();
+    try {
+      const fetchImpl = await this.#customFetch(runtime);
+      let failure: CustomConnectionProbeResult | undefined;
+      for (const scheme of authAttempts(runtime)) {
+        const listed = await this.#listModels(fetchImpl, runtime, scheme);
+        if ("models" in listed) {
+          return { ok: true, message: `连接成功 · ${listed.models.length} 个模型。`, checkedAt, models: listed.models, ...resolvedAuthField(runtime, scheme) };
+        }
+        if (listed.status === 404 || listed.status === 405 || listed.status === 501) {
+          return { ok: true, message: "已连通 · 服务未提供模型列表。", checkedAt, statusCode: listed.status, models: null };
+        }
+        failure = { ...customStatusFailure(listed.status, checkedAt), models: null };
+        if (failure.errorKind !== "auth") break;
+      }
+      return failure!;
+    } catch (error) {
+      return { ...customNetworkFailure(error, checkedAt, "连接测试"), models: null };
+    }
+  }
+
+  async #listModels(fetchImpl: ProviderFetch, runtime: CustomConnectionProbeRuntime, scheme: CustomConnectionResolvedAuth): Promise<{ readonly models: { id: string; label?: string }[] } | { readonly status: number }> {
+    const base = runtime.baseUrl.replace(/\/+$/, "");
+    const anthropic = runtime.protocol === "anthropic-messages";
+    const models = new Map<string, { id: string; label?: string }>();
+    let afterId: string | undefined;
+    for (let page = 0; page < (anthropic ? MODEL_LIST_MAX_PAGES : 1); page += 1) {
+      const url = anthropic
+        ? `${base}/v1/models?limit=1000${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ""}`
+        : `${base}/models`;
+      const response = await this.#withTimeout((signal) => fetchImpl(url, { method: "GET", headers: customConnectionHeaders(runtime, scheme), signal }));
+      if (!response.ok) {
+        // 后续页失败时保留已经拿到的部分，不让整次探测失败。
+        if (page > 0) break;
+        return { status: response.status };
+      }
+      const payload = await response.json().catch(() => null) as unknown;
+      const rows = isRecord(payload) && Array.isArray(payload.data) ? payload.data.filter(isRecord) : [];
+      for (const row of rows) {
+        if (typeof row.id !== "string" || !row.id.trim() || models.has(row.id)) continue;
+        const label = typeof row.display_name === "string" && row.display_name.trim() ? row.display_name.trim() : undefined;
+        models.set(row.id, { id: row.id, ...(label ? { label } : {}) });
+      }
+      const lastId = isRecord(payload) && typeof payload.last_id === "string" ? payload.last_id : undefined;
+      if (!anthropic || !isRecord(payload) || payload.has_more !== true || !lastId) break;
+      afterId = lastId;
+    }
+    return { models: [...models.values()] };
+  }
+
+  async #customFetch(runtime: CustomConnectionProbeRuntime): Promise<ProviderFetch> {
+    return runtime.transport?.proxyUrl ? await this.#proxyFetch(runtime.transport.proxyUrl) : this.#directFetch;
+  }
+
+  async #withTimeout(request: (signal: AbortSignal) => Promise<Response>): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
     timeout.unref?.();
     try {
-      const fetchImpl = runtime.transport?.proxyUrl
-        ? await this.#proxyFetch(runtime.transport.proxyUrl)
-        : this.#directFetch;
-      const response = await fetchImpl(customConnectionUrl(runtime), {
-        method: "POST",
-        headers: customConnectionHeaders(runtime),
-        body: JSON.stringify(customConnectionBody(runtime)),
-        signal: controller.signal,
-      });
-      if (response.ok) return { ok: true, message: "模型测试成功。", checkedAt };
-      return statusFailure(response.status, checkedAt);
-    } catch (error) {
-      const errorKind = classifyNetworkFailure(error);
-      return {
-        ok: false,
-        checkedAt,
-        errorKind,
-        message: errorKind === "timeout" ? "模型测试超时。" : errorKind === "proxy" ? "代理连接失败。" : "模型测试网络请求失败。",
-      };
+      return await request(controller.signal);
     } finally {
       clearTimeout(timeout);
     }
@@ -161,17 +234,38 @@ export class ProviderNetworkService {
   }
 }
 
-function customConnectionUrl(runtime: CustomConnectionProbeRuntime): string {
-  const base = runtime.baseUrl.replace(/\/+$/, "");
-  if (runtime.protocol === "anthropic-messages") return `${base}/v1/messages`;
-  return runtime.protocol === "openai-responses" ? `${base}/responses` : `${base}/chat/completions`;
+function authAttempts(runtime: CustomConnectionProbeRuntime): readonly CustomConnectionResolvedAuth[] {
+  if (runtime.protocol !== "anthropic-messages") return ["bearer"];
+  if (runtime.authMode === "bearer") return ["bearer"];
+  if (runtime.authMode === "auto") return runtime.resolvedAuth ? [runtime.resolvedAuth] : ["x-api-key", "bearer"];
+  return ["x-api-key"];
 }
 
-function customConnectionHeaders(runtime: CustomConnectionProbeRuntime): Record<string, string> {
-  if (runtime.protocol === "anthropic-messages") {
-    return { Accept: "application/json", "Content-Type": "application/json", "x-api-key": runtime.apiKey, "anthropic-version": "2023-06-01" };
-  }
-  return { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${runtime.apiKey}` };
+function resolvedAuthField(runtime: CustomConnectionProbeRuntime, scheme: CustomConnectionResolvedAuth): { resolvedAuth?: CustomConnectionResolvedAuth } {
+  return runtime.protocol === "anthropic-messages" && runtime.authMode === "auto" ? { resolvedAuth: scheme } : {};
+}
+
+/** 两种认证方式互斥：走 Bearer 时不能同时带 x-api-key，否则部分中转站会按 x-api-key 校验失败。 */
+function customConnectionHeaders(runtime: CustomConnectionProbeRuntime, scheme: CustomConnectionResolvedAuth): Record<string, string> {
+  const auth = scheme === "bearer" ? { Authorization: `Bearer ${runtime.apiKey}` } : { "x-api-key": runtime.apiKey };
+  return { Accept: "application/json", ...auth, ...(runtime.protocol === "anthropic-messages" ? { "anthropic-version": "2023-06-01" } : {}) };
+}
+
+/** 面向自定义连接的中文结果；不包含 Key 或响应正文。 */
+function customStatusFailure(status: number, checkedAt: string): CustomConnectionTestResult {
+  const { errorKind } = statusFailure(status, checkedAt);
+  const reason = errorKind === "auth" ? "API Key 无效，或认证方式不被接受"
+    : errorKind === "insufficient_balance" ? "账户余额不足"
+      : errorKind === "rate_limit" ? "请求过于频繁"
+        : errorKind === "server" ? "服务端出错"
+          : status === 404 ? "接口地址或模型不存在，请检查服务地址和协议"
+            : "请求被拒绝";
+  return { ok: false, message: `${reason}（HTTP ${status}）。`, checkedAt, errorKind, statusCode: status };
+}
+
+function customNetworkFailure(error: unknown, checkedAt: string, action: string): CustomConnectionTestResult {
+  const errorKind = classifyNetworkFailure(error);
+  return { ok: false, checkedAt, errorKind, message: errorKind === "timeout" ? `${action}超时。` : errorKind === "proxy" ? "代理连接失败。" : "网络请求失败，请检查服务地址。" };
 }
 
 function customConnectionBody(runtime: CustomConnectionProbeRuntime): Record<string, unknown> {

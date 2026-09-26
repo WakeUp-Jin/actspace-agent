@@ -1,6 +1,9 @@
 import { applyCustomModelReasoning, validateCustomModelReasoning, type CustomModelReasoning } from "./custom-model-reasoning";
 import type { ModelApi, ModelDefinition, ModelInputKind, ModelKey, ModelPricing } from "./model-config";
 import type { ProviderId } from "./provider-config";
+import type { ModelCatalogEntry } from "./model-catalog";
+import { BUILTIN_MODEL_CATALOG } from "./generated/model-catalog.generated";
+import { billingReferenceProvider } from "./model-pricing";
 
 export type CustomModelPricingInput = ModelPricing | null;
 
@@ -26,6 +29,34 @@ export type CustomModelSetDefaultInput = { readonly connectionId: string; readon
 
 export function customConnectionModelKey(providerId: ProviderId, connectionId: string, apiModel: string): ModelKey {
   return `${providerId}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}`;
+}
+
+/** 按模型 ID 精确查内置目录；同一 ID 有多条时优先厂商官方条目，其次 OpenRouter。 */
+export function findBuiltinCatalogModel(apiModel: string): ModelCatalogEntry | undefined {
+  const id = apiModel.trim();
+  const rows = BUILTIN_MODEL_CATALOG.entries.filter((row) => row.apiModel === id);
+  return rows.find((row) => row.sourceProviderId !== "openrouter") ?? rows[0];
+}
+
+/** 「按官方价折算」时计费实际查的目录条目：只看协议对应厂商（Anthropic / OpenAI）的官方价。 */
+export function findReferenceCatalogModel(apiModel: string, protocol: ModelApi): ModelCatalogEntry | undefined {
+  const id = apiModel.trim();
+  const provider = billingReferenceProvider(protocol);
+  return BUILTIN_MODEL_CATALOG.entries.find((row) => row.sourceProviderId === provider && row.apiModel === id);
+}
+
+/** 向导里勾选的模型：能力从目录自动匹配，价格跟随连接的计费方式，不在模型上手填。 */
+export function customModelDraftFromCatalog(apiModel: string): CustomModelDraftInput {
+  const entry = findBuiltinCatalogModel(apiModel);
+  return {
+    apiModel: apiModel.trim(),
+    enabled: true,
+    contextWindow: entry?.contextWindow ?? null,
+    maxTokens: entry?.maxOutput ?? null,
+    input: entry?.input.includes("image") ? ["text", "image"] : ["text"],
+    reasoningConfig: { mode: "auto" },
+    pricing: null,
+  };
 }
 
 export function buildCustomModelDefinition(

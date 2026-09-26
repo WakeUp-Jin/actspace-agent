@@ -264,15 +264,33 @@ type ModelRoute =
 
 ## 9. 当前实施边界
 
-2026-09-06 用户最终确认覆盖此前目录范围：Moonshot、DeepSeek、MiniMax、OpenAI、Anthropic、Z.AI、Xiaomi、火山方舟 Coding Plan、OpenRouter；接着排列自定义服务（OpenAI Chat）、自定义服务（OpenAI Responses）、自定义服务（Anthropic）。十二个入口共用 Logo、标题、描述与箭头的平面列表行。分类提供全部、官方直连、Coding Plan、第三方兼容、自定义；不增加 OAuth 登录。
+2026-09-06 用户确认目录范围：Moonshot、DeepSeek、MiniMax、OpenAI、Anthropic、Z.AI、Xiaomi、火山方舟 Coding Plan、OpenRouter。不增加 OAuth 登录。
 
-自定义三种协议对应 openai-completions、openai-responses、anthropic-messages。每条连接持久化协议，生成独立连接标识；未含协议的旧连接保持原 Chat 行为。默认模型在保存时进入连接自己的已安装模型目录，不修改任务默认模型。同协议/同模型的多条连接不能相互覆盖。新预设和自定义连接首版使用手填模型，不声称已实现自动发现目录。
+2026-09-26 起，自定义服务和官方 Anthropic 按 `docs/design-docs/frontend/anthropic-custom-connection-demo.html`（「新方案」）实现，计划见 `docs/exec-plans/completed/20260926-custom-connection-setup-redesign.md`：
 
-新建连接表单将连接标识放入高级设置，空值由主进程生成；普通区域顺序为 Key、显示名称、服务地址、默认模型。编辑时协议与连接标识固定，Key 留空保留。已有 xAI/Mistral/Qwen/Groq 连接不删除，只从添加目录移除预设。
+- **入口**：添加目录按「官方直连 / Coding Plan / 第三方兼容」分组，去掉分类下拉。底部另起一组「没有找到？」，只有一条「自定义服务」。原来按协议区分的三条入口（`openai-compatible`、`openai-responses-compatible`、`anthropic-compatible`）只从目录隐藏（`hidden: true`），已保存的旧连接照常显示，`catalogId` 不改写。
+- **自定义服务两步向导**：
+  1. 选协议（分段控件）、粘贴地址、填 Key，点「测试并继续」。认证方式和代理收在「更多设置」里。
+  2. 从服务返回的列表里勾选模型。默认勾选列表里有的 `claude-opus-5 / claude-sonnet-5 / claude-haiku-4-5`，默认模型优先 Sonnet。没有列表时提供「常用」快捷项和手动输入。底部一行「按官方价计费 × 倍率」（默认 0.30）。
+
+  跳过或没测通时，保存后进入详情页并自动测试一次。
+- **官方 Anthropic**：只填 Key，测试通过后同页选模型。地址固定 `https://api.anthropic.com`，认证固定 x-api-key，按官方价计费。
+- **地址规范化**：渲染层预览和主进程保存共用 `normalizeCustomConnectionAddress`。末尾的 `/chat/completions`、`/responses`、`/v1/messages` 会被去掉，并据此推断协议；推断出的协议和当前不同时，渲染层自动切换。Anthropic 协议再去掉末尾 `/v1`。输入框下方实时显示实际请求地址和去掉了什么。
+- **认证**：Anthropic 协议支持 自动 / x-api-key / Bearer。「自动」先试 x-api-key，401/403 再试 Bearer，并把能用的那种记为 `resolvedAuth`。OpenAI 协议固定 Bearer。旧连接缺省 x-api-key。
+- **计费**：连接级 `billingMode`：
+  - reference：按协议对应厂商的官方目录价 × 倍率；
+  - token：只统计 Token；
+  - manual：用模型上手填的单价。
+
+  旧连接缺省 manual。模型可以「单独设置」单价，在 reference 模式下不再乘倍率。
+- **连接详情**：名称、地址、Key（只显示「已设置」）、认证方式、代理、提示缓存、连接测试逐项行内编辑。改地址、Key、认证方式或代理后自动重测；改名和计费不影响测试结果。模型分组有「刷新」（新发现的模型默认不启用，标「新」）和行内「添加」。默认模型不能停用或删除。删除连接和删除模型都要确认。
+- **状态**：自定义连接只显示测试结果：未测试 / 可用 / 连接异常。
+
+其余兼容预设（Z.AI、Xiaomi、火山方舟等）仍用单页表单：Key、显示名称、服务地址、第一个模型，连接标识放在高级设置里。每条连接持久化协议，并有独立连接标识；没有协议字段的旧连接保持原 Chat 行为。同协议、同模型的多条连接不能相互覆盖。已有 xAI/Mistral/Qwen/Groq 连接不删除，只从添加目录移除预设。
 
 第一阶段只实现真实可用的 API Key 连接，不实现 OAuth 或订阅登录流程。
 
-- 内置连接为 Moonshot、DeepSeek、OpenRouter，其余六家及三种自定义协议使用独立 connectionId。存储保留历史 kimi/openrouter 命名空间，显示名称与传输协议独立，不能从命名空间推断协议或借用默认 Key。
+- 内置连接为 Moonshot、DeepSeek、OpenRouter，其余六家和自定义服务使用独立 connectionId。存储保留历史 kimi/openrouter 命名空间，显示名称与传输协议独立，不能从命名空间推断协议或借用默认 Key。
 - OpenAI 使用 Responses；Anthropic 使用 Messages；MiniMax、Z.AI、Xiaomi、火山方舟 Coding Plan 使用 Chat。Coding Plan 使用专用 Key 及专用服务地址，不属于 OAuth 登录。
 - OAuth、订阅和其他帐号型供应商先不展示，避免出现只能进入但无法保存的假连接。
 - API Key setup 使用 Maka 的单页路由表单：路由头、必填 Key、普通高级设置行和主题主按钮。

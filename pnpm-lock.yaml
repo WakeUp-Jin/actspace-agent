@@ -618,6 +618,9 @@ importers:
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../shared
+      '@anthropic-ai/sdk':
+        specifier: 0.91.1
+        version: 0.91.1(zod@4.4.3)
       '@earendil-works/pi-ai':
         specifier: 0.82.1
         version: 0.82.1(ws@8.21.0)(zod@4.4.3)

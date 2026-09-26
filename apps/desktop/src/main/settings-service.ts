@@ -26,9 +26,13 @@ import {
   isImageInspectionModelKey,
   legacyModelIdFromKey,
   normalizeModelKey,
+  normalizeCustomConnectionAddress,
   type AgentSettingsV2,
+  type CustomConnectionAuthMode,
+  type CustomConnectionBillingMode,
   type CustomConnectionInput,
   type CustomConnectionPromptCacheMode,
+  type CustomConnectionResolvedAuth,
   type AgentSystemPromptFile,
   type AppSettings,
   type AppSettingsV2,
@@ -72,6 +76,7 @@ type ProviderConnectionProbeResult = {
   readonly checkedAt: string;
   readonly errorKind?: ProviderConnectionState["errorKind"];
   readonly message?: string;
+  readonly resolvedAuth?: CustomConnectionResolvedAuth;
 };
 
 type ProviderRuntimeConfig = {
@@ -81,12 +86,17 @@ type ProviderRuntimeConfig = {
   readonly baseUrl: string;
   readonly pricingMultiplier: number;
   readonly promptCacheMode?: CustomConnectionPromptCacheMode;
+  /** 只在自定义连接上出现；Anthropic 协议按它选认证头，其他协议固定 Bearer。 */
+  readonly authScheme?: CustomConnectionResolvedAuth;
+  readonly billingMode?: CustomConnectionBillingMode;
   readonly transport?: { readonly proxyUrl: string };
 };
 export type CustomConnectionRuntimeConfig = ProviderRuntimeConfig & {
   readonly connectionId: string;
   readonly protocol: ModelApi;
   readonly model: string;
+  readonly authMode: CustomConnectionAuthMode;
+  readonly resolvedAuth?: CustomConnectionResolvedAuth;
 };
 
 const MAIN_AGENT_SYSTEM_PROMPT = "You are ActSpace's main agent. Follow the active tool and safety policies.";
@@ -705,17 +715,18 @@ export class SettingsService {
     return this.getProviderRuntimeConfigForCredential(provider);
   }
 
-  getCustomConnectionRuntimeConfig(connectionId: string): CustomConnectionRuntimeConfig | ProviderRuntimeError {
+  /** requireModel 为 false 时用于探测模型列表，允许还没有默认模型的连接。 */
+  getCustomConnectionRuntimeConfig(connectionId: string, options: { requireModel?: boolean } = {}): CustomConnectionRuntimeConfig | ProviderRuntimeError {
     const connection = this.getV4().settings.models.connections[connectionId];
     if (!connection || connectionId === `${connection.providerId}:default`) {
       return { ok: false, code: "credential_missing", message: "自定义连接不存在。" };
     }
-    if (!connection.defaultModel) {
+    if (!connection.defaultModel && options.requireModel !== false) {
       return { ok: false, code: "credential_missing", message: "该连接尚未设置默认模型。" };
     }
     const runtime = this.getProviderRuntimeConfigForCredential(connection.providerId, undefined, connectionId);
     if ("code" in runtime) return runtime;
-    return { ...runtime, connectionId, protocol: connection.protocol ?? "openai-completions", model: connection.defaultModel };
+    return { ...runtime, connectionId, protocol: connection.protocol ?? "openai-completions", model: connection.defaultModel ?? "", authMode: connection.authMode ?? "x-api-key", ...(connection.resolvedAuth ? { resolvedAuth: connection.resolvedAuth } : {}) };
   }
 
   getProviderRuntimeConfigForCredential(
@@ -770,6 +781,8 @@ export class SettingsService {
       provider,
       ...(connection && { protocol: connection.protocol ?? "openai-completions" }),
       ...(connection && { promptCacheMode: resolvePromptCacheMode(connection.protocol ?? "openai-completions", connection.promptCacheMode) }),
+      ...(connection && { billingMode: connection.billingMode ?? "manual" }),
+      ...(connection?.protocol === "anthropic-messages" && { authScheme: resolveAuthScheme(connection) }),
       apiKey,
       baseUrl,
       pricingMultiplier: credential?.pricingMultiplier ?? settings.defaultPricingMultiplier ?? 1,
@@ -788,6 +801,7 @@ export class SettingsService {
     if (!/^[a-zA-Z0-9._-]{3,80}$/.test(connectionId)) throw new ProviderSettingsError("连接标识无效。", "write_failed");
     const baseUrl = normalizeCustomConnectionBaseUrl(input.baseUrl, protocol);
     const current = this.getV4();
+    const displayName = uniqueConnectionName(input.displayName.trim() || new URL(baseUrl).hostname, current.settings.models.connections);
     if (current.settings.models.connections[connectionId]) throw new ProviderSettingsError("连接标识已存在。", "write_failed");
     this.assertCredentialStorageWritable();
     this.secrets.providerCredentials[`connection:${connectionId}`] = input.apiKey.trim();
@@ -802,15 +816,17 @@ export class SettingsService {
               connectionId,
               providerId: input.providerId,
               protocol,
-              displayName: input.displayName.trim() || connectionId,
-              defaultModel: (input.initialModel?.apiModel ?? input.defaultModel)?.trim() || null,
+              displayName,
+              defaultModel: customConnectionDefaultModel(input)?.trim() || null,
               promptCacheMode: resolvePromptCacheMode(protocol, input.promptCacheMode),
+              ...connectionAuthFields(protocol, input.authMode, input.resolvedAuth),
+              ...(input.billingMode ? { billingMode: input.billingMode } : {}),
               ...(input.catalogId?.trim() ? { catalogId: input.catalogId.trim().slice(0, 80) } : {}),
               enabled: true,
               baseUrl,
               proxy: input.proxy ?? { enabled: false, url: null },
               lastConnection: { status: "untested" },
-              defaultPricingMultiplier: 1,
+              defaultPricingMultiplier: normalizePricingMultiplier(input.pricingMultiplier ?? 1),
               additionalCredentials: [],
             },
           },
@@ -841,11 +857,11 @@ export class SettingsService {
     return result;
   }
 
-  async updateCustomConnection(input: CustomConnectionInput & { connectionId: string; apiKey?: string }): Promise<SettingsV4Snapshot> {
+  async updateCustomConnection(input: Omit<CustomConnectionInput, "apiKey"> & { connectionId: string; apiKey?: string }): Promise<SettingsV4Snapshot> {
     return this.enqueueMutation(() => this.updateCustomConnectionQueued(input));
   }
 
-  private async updateCustomConnectionQueued(input: CustomConnectionInput & { connectionId: string; apiKey?: string }): Promise<SettingsV4Snapshot> {
+  private async updateCustomConnectionQueued(input: Omit<CustomConnectionInput, "apiKey"> & { connectionId: string; apiKey?: string }): Promise<SettingsV4Snapshot> {
     const current = this.getV4();
     const existing = current.settings.models.connections[input.connectionId];
     if (!existing) throw new ProviderSettingsError("连接不存在。", "write_failed");
@@ -855,6 +871,13 @@ export class SettingsService {
     }
     const protocol = existing.protocol ?? "openai-completions";
     const baseUrl = normalizeCustomConnectionBaseUrl(input.baseUrl, protocol);
+    const proxy = input.proxy ?? existing.proxy;
+    const authMode = input.authMode ?? existing.authMode;
+    const keyChanged = Boolean(input.apiKey?.trim());
+    // 只有影响请求能否打通的字段变化才作废测试结果和已识别的认证方式；改名、计费不需要重测。
+    const reachabilityChanged = keyChanged || baseUrl !== existing.baseUrl || authMode !== existing.authMode
+      || proxy.enabled !== existing.proxy.enabled || (proxy.url ?? null) !== (existing.proxy.url ?? null);
+    const auth = connectionAuthFields(protocol, authMode, reachabilityChanged ? undefined : input.resolvedAuth ?? existing.resolvedAuth);
     const previousSecrets = cloneJson(this.secrets);
     try {
     if (input.apiKey?.trim()) {
@@ -866,7 +889,19 @@ export class SettingsService {
       namespace: "models",
       expectedRevision: current.revision,
       patch: {
-        connections: { [input.connectionId]: { ...existing, protocol, displayName: input.displayName.trim() || existing.displayName, promptCacheMode: resolvePromptCacheMode(protocol, input.promptCacheMode ?? existing.promptCacheMode), ...(input.catalogId?.trim() ? { catalogId: input.catalogId.trim().slice(0, 80) } : {}), baseUrl, proxy: input.proxy ?? existing.proxy, lastConnection: { status: "untested" } } },
+        connections: { [input.connectionId]: {
+          ...withoutConnectionAuth(existing),
+          protocol,
+          displayName: input.displayName.trim() || existing.displayName,
+          promptCacheMode: resolvePromptCacheMode(protocol, input.promptCacheMode ?? existing.promptCacheMode),
+          ...(input.catalogId?.trim() ? { catalogId: input.catalogId.trim().slice(0, 80) } : {}),
+          ...auth,
+          ...(input.billingMode ? { billingMode: input.billingMode } : {}),
+          ...(input.pricingMultiplier !== undefined ? { defaultPricingMultiplier: normalizePricingMultiplier(input.pricingMultiplier) } : {}),
+          baseUrl,
+          proxy,
+          lastConnection: reachabilityChanged ? { status: "untested" } : existing.lastConnection,
+        } },
       },
     });
     } catch (error) {
@@ -1090,6 +1125,7 @@ export class SettingsService {
           connections: {
             [connectionId]: {
               ...connection,
+              ...(connection.authMode === "auto" && result.resolvedAuth ? { resolvedAuth: result.resolvedAuth } : {}),
               lastConnection: {
                 status: result.ok ? "available" : "unavailable",
                 checkedAt: result.checkedAt,
@@ -1823,6 +1859,9 @@ function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string): {
             isConnectionProtocol(value.protocol) ? value.protocol : "openai-completions",
             value.promptCacheMode === "short" || value.promptCacheMode === "off" ? value.promptCacheMode : undefined,
           ),
+          ...(isCustomConnectionAuthMode(value.authMode) ? { authMode: value.authMode } : {}),
+          ...(value.authMode === "auto" && isResolvedAuth(value.resolvedAuth) ? { resolvedAuth: value.resolvedAuth } : {}),
+          ...(value.billingMode === "reference" || value.billingMode === "token" || value.billingMode === "manual" ? { billingMode: value.billingMode } : {}),
           ...sanitizeProviderSettings(value, seed.providers[value.providerId], value.providerId),
         } satisfies SettingsV4["models"]["connections"][string]]];
       })),
@@ -2249,12 +2288,21 @@ function normalizeBaseUrl(value: string): string {
   return parsed.toString().replace(/\/$/, "");
 }
 
+const CUSTOM_CONNECTION_ADDRESS_ERRORS = {
+  empty: "服务地址不能为空。",
+  invalid: "服务地址格式无效。",
+  scheme: "服务地址仅支持 HTTP(S)。",
+  credentials: "服务地址不能包含用户名或密码。",
+} as const;
+
 function normalizeCustomConnectionBaseUrl(value: string, protocol: ModelApi): string {
-  const normalized = normalizeBaseUrl(value);
-  if (protocol === "anthropic-messages" && /\/v1$/i.test(new URL(normalized).pathname.replace(/\/+$/, ""))) {
-    throw new ProviderSettingsError("Anthropic 服务地址请填写根地址，不要包含 /v1。", "invalid_base_url");
+  const result = normalizeCustomConnectionAddress(value, protocol);
+  if ("reason" in result) throw new ProviderSettingsError(CUSTOM_CONNECTION_ADDRESS_ERRORS[result.reason], "invalid_base_url");
+  // 渲染层会按地址自动切换协议；到这里还不一致说明地址和协议对不上，保存了也请求不通。
+  if (result.inferredProtocol && result.inferredProtocol !== protocol) {
+    throw new ProviderSettingsError("服务地址和所选协议不一致。", "invalid_base_url");
   }
-  return normalized;
+  return result.baseUrl;
 }
 
 function resolvePromptCacheMode(protocol: ModelApi, value?: CustomConnectionPromptCacheMode): CustomConnectionPromptCacheMode {
@@ -2311,14 +2359,73 @@ function validateCustomConnection(input: CustomConnectionInput, options: { requi
     throw new ProviderSettingsError("连接协议无效。", "write_failed");
   }
   if (!input.apiKey?.trim()) throw new ProviderSettingsError("请输入 API Key。", "write_failed");
-  const defaultModel = input.initialModel?.apiModel ?? input.defaultModel;
+  if (input.authMode !== undefined && !isCustomConnectionAuthMode(input.authMode)) throw new ProviderSettingsError("认证方式无效。", "write_failed");
+  if (input.resolvedAuth !== undefined && !isResolvedAuth(input.resolvedAuth)) throw new ProviderSettingsError("认证方式无效。", "write_failed");
+  if (input.billingMode !== undefined && !["reference", "token", "manual"].includes(input.billingMode)) throw new ProviderSettingsError("计费方式无效。", "write_failed");
+  if (input.pricingMultiplier !== undefined) normalizePricingMultiplier(input.pricingMultiplier);
+  if (input.initialModels !== undefined) {
+    if (input.initialModel !== undefined) throw new ProviderSettingsError("initialModel 和 initialModels 只能传一个。", "write_failed");
+    if (input.initialModels.length === 0 || input.initialModels.length > 200) throw new ProviderSettingsError("请至少选择一个模型。", "write_failed");
+    const ids = input.initialModels.map((model) => model.apiModel.trim());
+    if (new Set(ids).size !== ids.length) throw new ProviderSettingsError("模型 ID 重复。", "write_failed");
+    if (input.defaultApiModel !== undefined && !ids.includes(input.defaultApiModel.trim())) throw new ProviderSettingsError("默认模型必须是已选模型之一。", "write_failed");
+  }
+  const defaultModel = customConnectionDefaultModel(input);
   if (options.requireModel !== false && (!defaultModel?.trim() || defaultModel.trim().length > 200)) {
     throw new ProviderSettingsError("请输入有效的默认模型 ID（最多 200 字符）。", "write_failed");
   }
 }
 
+function customConnectionDefaultModel(input: CustomConnectionInput): string | null | undefined {
+  if (input.initialModels) return input.defaultApiModel ?? input.initialModels[0]?.apiModel;
+  return input.initialModel?.apiModel ?? input.defaultModel;
+}
+
+function isCustomConnectionAuthMode(value: unknown): value is CustomConnectionAuthMode {
+  return value === "auto" || value === "x-api-key" || value === "bearer";
+}
+
+function isResolvedAuth(value: unknown): value is CustomConnectionResolvedAuth {
+  return value === "x-api-key" || value === "bearer";
+}
+
+/** 认证方式只对 Anthropic 协议有意义；OpenAI 协议固定 Bearer，不存这两个字段。 */
+function connectionAuthFields(protocol: ModelApi, authMode?: CustomConnectionAuthMode, resolvedAuth?: CustomConnectionResolvedAuth): Pick<SettingsV4ConnectionSettings, "authMode" | "resolvedAuth"> {
+  if (protocol !== "anthropic-messages" || !authMode) return {};
+  return { authMode, ...(authMode === "auto" && resolvedAuth ? { resolvedAuth } : {}) };
+}
+
+function withoutConnectionAuth(connection: SettingsV4ConnectionSettings): SettingsV4ConnectionSettings {
+  const { authMode: _authMode, resolvedAuth: _resolvedAuth, ...rest } = connection;
+  return rest;
+}
+
+function resolveAuthScheme(connection: SettingsV4ConnectionSettings): CustomConnectionResolvedAuth {
+  if (connection.authMode === "bearer") return "bearer";
+  if (connection.authMode === "auto") return connection.resolvedAuth ?? "x-api-key";
+  return "x-api-key";
+}
+
+/** 名称为空时取域名；和已有连接重名时加「 2」「 3」。 */
+function uniqueConnectionName(name: string, connections: Record<string, SettingsV4ConnectionSettings>): string {
+  const taken = new Set(Object.values(connections).map((connection) => connection.displayName));
+  if (!taken.has(name)) return name;
+  for (let index = 2; ; index += 1) if (!taken.has(`${name} ${index}`)) return `${name} ${index}`;
+}
+
 /** Separate keys for identical upstream model IDs on different connections. */
 function connectionModelPatch(input: CustomConnectionInput, connectionId: string, protocol: ModelApi, models: SettingsV4Models): Pick<SettingsV4Models, "definitions" | "installed"> {
+  if (input.initialModels) {
+    const addedAt = new Date().toISOString();
+    const defaultApiModel = customConnectionDefaultModel(input)?.trim();
+    const patch: Pick<SettingsV4Models, "definitions" | "installed"> = { definitions: {}, installed: {} };
+    for (const model of input.initialModels) {
+      const definition = buildCustomModelDefinition(model, { providerId: input.providerId, protocol, connectionId });
+      patch.definitions[definition.key] = definition;
+      patch.installed[definition.key] = { enabled: model.enabled || definition.apiModel === defaultApiModel, addedAt, connectionId };
+    }
+    return patch;
+  }
   const apiModel = (input.initialModel?.apiModel ?? input.defaultModel)!.trim();
   const key: ModelKey = `${input.providerId}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}`;
   const previous = models.definitions[key];

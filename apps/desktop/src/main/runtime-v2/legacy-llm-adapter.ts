@@ -5,8 +5,8 @@ import type { PiAiWireRoute } from "@actspace/llm-pi-ai";
 import { DeepSeekFileUploader, PiAiAdapter } from "@actspace/llm-pi-ai";
 import { ProviderProxyPool } from "@actspace/llm-service";
 import type { ModelApi } from "@actspace/shared";
-import { IMAGE_INSPECTION_CREDENTIAL_REF } from "./credential-resolver";
-import type { DesktopRuntimeV2ModelPort } from "./model-port";
+import { IMAGE_INSPECTION_CREDENTIAL_REF, bearerAwareAuth } from "./credential-resolver";
+import { customConnectionPricingInput, type DesktopRuntimeV2ModelPort } from "./model-port";
 
 type SessionArtifactReader = (sessionId: string, artifactId: string) => Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }>;
 
@@ -60,7 +60,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     const route = toWireRoute(model.definition.api);
     const cacheRetention: "short" | "none" = runtime.promptCacheMode === "off" ? "none" : "short";
     const pricingModel = model;
-    const pricing = this.models.resolvePricing ? this.models.resolvePricing(pricingModel, requestModel) : resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: model.definition.provider, apiModel: requestModel, modelKey: model.key, baseUrl: pricingModel.providerRuntime.baseUrl ?? "", connectionId: model.connectionId, multiplier: runtime.pricingMultiplier, configured: model.definition.source === "custom" && requestModel === model.definition.apiModel ? model.definition.pricing : undefined, configuredAlreadyMultiplied: true });
+    const pricing = this.models.resolvePricing ? this.models.resolvePricing(pricingModel, requestModel) : resolveModelPricing(BUILTIN_MODEL_CATALOG, customConnectionPricingInput(pricingModel, requestModel));
     const endpointOwner = catalogProviderForEndpoint(runtime.baseUrl ?? "");
     const wireProvider = !customConnection ? model.definition.provider
       : endpointOwner === "openrouter" || endpointOwner === "deepseek" ? endpointOwner
@@ -91,7 +91,13 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
         ...dispatchInput,
         request: requestForAttempt,
         // Connection identity is fixed during prepare; secret material is resolved per dispatch.
-        credential: {
+        credential: runtime.authScheme === "bearer" ? {
+          ...withoutApiKey(dispatchInput.credential),
+          headers: { ...dispatchInput.credential.headers, ...bearerAwareAuth({ apiKey: dispatchInput.credential.apiKey ?? runtime.apiKey, authScheme: "bearer" }).headers },
+          baseUrl: runtime.baseUrl,
+          proxyUrl: runtime.transport?.proxyUrl,
+          pricingMultiplier: runtime.pricingMultiplier,
+        } : {
           ...dispatchInput.credential,
           ...(dispatchInput.credential.apiKey === undefined && runtime.apiKey === undefined ? {} : { apiKey: dispatchInput.credential.apiKey ?? runtime.apiKey }),
           baseUrl: runtime.baseUrl,
@@ -115,3 +121,8 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
 }
 
 function toWireRoute(api: ModelApi): PiAiWireRoute { return api; }
+
+function withoutApiKey<T extends { readonly apiKey?: string }>(credential: T): Omit<T, "apiKey"> {
+  const { apiKey: _apiKey, ...rest } = credential;
+  return rest;
+}

@@ -212,12 +212,14 @@ openrouter:anthropic/claude-...
 <providerId>:connection/<encoded connectionId>/<encoded apiModel>
 ```
 
-因此两个中转站可以使用相同的 `apiModel`，但能力、价格、启用状态和默认模型不会互相覆盖。自定义模型由用户手动新增；不自动调用 `/models`，也不按名称猜测官方型号或价格。
+因此两个中转站可以使用相同的 `apiModel`，但能力、价格、启用状态和默认模型不会互相覆盖。自 2026-09-26 起，添加连接时会用草稿参数探测一次服务的模型列表（Anthropic `GET /v1/models` 最多翻 5 页，OpenAI `GET /models`；404/405/501 视为「不提供列表」）。用户勾选的模型按 `apiModel` 精确匹配内置目录，得到上下文、输出上限和图片能力，匹配不到就标「能力未知」。探测不写任何持久化数据；详情页「刷新」发现的新模型默认不启用。
 
 ### Anthropic Messages 自定义连接
 
-- Base URL 使用服务根地址语义，例如 `https://relay.example` 最终请求 `https://relay.example/v1/messages`。若 pathname 精确以 `/v1` 结尾，renderer 提供移除动作，main 进程拒绝保存，防止 `/v1/v1/messages`。
-- 认证使用 `x-api-key` 与 `anthropic-version`；显式连接测试发送 `max_tokens: 1` 的最小真实 Messages 请求，不带工具和缓存标记。
+- Base URL 使用服务根地址语义，例如 `https://relay.example` 最终请求 `https://relay.example/v1/messages`。renderer 预览和 main 保存共用 `normalizeCustomConnectionAddress`：末尾的 `/v1/messages`、`/v1` 会被去掉，防止 `/v1/v1/messages`；地址推断出的协议和连接协议不一致时 main 拒绝保存。
+- 认证方式 `authMode`：`auto | x-api-key | bearer`，缺省按 `x-api-key`（旧连接行为不变）。`auto` 在测试或探测时先发 `x-api-key`，遇到 401/403 再发 `Authorization: Bearer`，把能用的那种写入 `resolvedAuth`。`resolvedAuth` 只在 `auto` 下存在；地址、Key、认证方式或代理变化时清空，等下次测试重新识别。运行时 `authScheme` 只在 Anthropic 连接上下发，OpenAI 协议固定 Bearer。
+- Bearer 请求只带 `Authorization`，不带 `x-api-key`：direct pi-ai 线路传 `apiKey: null` 加 `headers.Authorization`；legacy proxy 线路构造 Anthropic SDK 时传 `apiKey: null, authToken: null`。x-api-key 线路也显式传 `authToken: null`，避免 SDK 从 `ANTHROPIC_AUTH_TOKEN` 环境变量读出无关令牌发给中转站。
+- 显式连接测试发送 `max_tokens: 1` 的最小真实 Messages 请求，不带工具和缓存标记。
 - 新建连接默认 `promptCacheMode: "short"`。该模式在 direct pi-ai 和 request-scoped proxy 两条 wire 上标记 system、最后一个工具定义和最后一个 user 内容块；`off` 完全不发送 `cache_control`。
 - 缓存开关只描述请求策略。是否命中以 provider 返回的 `cache_read_input_tokens` / `cache_creation_input_tokens` 为准，不能用一次成功请求推断缓存已生效。
 
@@ -608,6 +610,10 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 - 手动价格写入 `ModelDefinition.pricing`，请求开始时冻结为 `source: "configured"` 的 `ModelPricingSnapshot`，后续编辑价格不会重算历史请求。
 - 每次 `llm_usage` 仍保存当次价格快照与 provider-qualified ModelKey，历史成本不因目录刷新而变化。
 - 目录价格缺失时显示“价格未知”，不能按 0 计费。
+- 自定义连接的计费方式 `billingMode`（旧数据缺省 `manual`，保持升级前行为）：
+  - `reference`：按协议对应厂商（Anthropic 协议查 `anthropic`，OpenAI 协议查 `openai`）的内置目录价 × 连接倍率 `defaultPricingMultiplier`。模型上手填的单价优先，且不再乘倍率。
+  - `token`：只统计 Token，不估算金额。
+  - `manual`：只用模型上手填的单价；没填的只统计 Token。
 - OpenRouter 同一上游模型与原厂模型分别统计，不按 `apiModel` 合并。
 - Usage 活动行从 Journal request / tool 事件重建，并保留 provider、ModelKey、attempt 和 `costBasis`。当 provider 未返回 usage、currency 或价格来源不完整时，活动行保持 unknown / unavailable，不能用默认价格或零值伪造账单结果。
 

@@ -29,12 +29,14 @@ import {
   type RuntimeV2SetCustomConnectionDefaultModelInput,
   type RuntimeV2ModelCatalogQuery,
   type RuntimeV2CustomConnectionTestInput,
+  type RuntimeV2CustomConnectionProbeInput,
 } from "@actspace/shared/runtime-v2";
 import { PROVIDER_IDS, SEARCH_PROVIDER_IDS, normalizeModelKey, type SecretProviderId } from "@actspace/shared";
 import type { DesktopRuntimeV2Registry } from "./runtime-registry";
 import type { SettingsService } from "../settings-service";
 import type { ModelStoreService } from "../model-store-service";
 import type { ProviderNetworkService } from "./provider-network-service";
+import { probeCustomConnection } from "./custom-connection-probe";
 import type { QuickOpenShortcutController } from "../quick-open-shortcut-controller";
 import { selectModelCatalog, type RuntimeV2OpenRouterCatalogService } from "./openrouter-catalog-service";
 
@@ -187,6 +189,7 @@ export function registerRuntimeV2Ipc(options: {
     await settings.markCustomConnectionResult(input.connectionId, result);
     return result;
   });
+  handle(RUNTIME_V2_DESKTOP_CHANNELS.probeCustomConnection, (_event, input: RuntimeV2CustomConnectionProbeInput) => probeCustomConnection(requireSettings(options.settings), requireProviderNetwork(options.providerNetwork), input));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.getProviderBalance, async (_event, input: RuntimeV2ProviderIdInput) => {
     const settings = requireSettings(options.settings);
     const network = requireProviderNetwork(options.providerNetwork);

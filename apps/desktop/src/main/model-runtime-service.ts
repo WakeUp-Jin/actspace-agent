@@ -1,6 +1,6 @@
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import { resolveModelPricing, type ModelCatalogSnapshot } from "@actspace/shared";
-import type { DesktopRuntimeV2ResolvedModel } from "./runtime-v2/model-port";
+import { customConnectionPricingInput, type DesktopRuntimeV2ResolvedModel } from "./runtime-v2/model-port";
 import {
   DEFAULT_MODEL_KEY,
   normalizeModelKey,
@@ -22,6 +22,8 @@ type ProviderRuntimeConfig = {
   readonly baseUrl: string;
   readonly pricingMultiplier?: number;
   readonly promptCacheMode?: import("@actspace/shared").CustomConnectionPromptCacheMode;
+  readonly authScheme?: import("@actspace/shared").CustomConnectionResolvedAuth;
+  readonly billingMode?: import("@actspace/shared").CustomConnectionBillingMode;
   readonly transport?: { readonly proxyUrl: string };
 };
 type LegacyLlmConfig = {
@@ -52,7 +54,7 @@ export class ModelRuntimeService {
   ) {}
 
   resolvePricing(model: DesktopRuntimeV2ResolvedModel, apiModel: string) {
-    return resolveModelPricing(this.catalog(), { providerId: model.definition.provider, apiModel, modelKey: model.key, baseUrl: model.providerRuntime.baseUrl ?? "", connectionId: model.connectionId, multiplier: model.providerRuntime.pricingMultiplier, configured: model.definition.source === "custom" && apiModel === model.definition.apiModel ? model.definition.pricing : undefined, configuredAlreadyMultiplied: true });
+    return resolveModelPricing(this.catalog(), customConnectionPricingInput(model, apiModel));
   }
 
   listUsableModels(purpose: ModelPurpose): UsableModelView[] {
@@ -163,7 +165,9 @@ export class ModelRuntimeService {
     if ("code" in runtime) {
       return { ok: false, code: runtime.code, message: runtime.message, modelKey: model.key };
     }
-    const definition = applyPricingMultiplier(runtime.protocol ? { ...model.definition, api: runtime.protocol } : model.definition, runtime.pricingMultiplier ?? 1);
+    // 按官方价折算时，倍率只作用于目录价；模型上手填的单价是用户实际付的价格，不再乘。
+    const multiplier = runtime.billingMode === "reference" && model.definition.source === "custom" ? 1 : runtime.pricingMultiplier ?? 1;
+    const definition = applyPricingMultiplier(runtime.protocol ? { ...model.definition, api: runtime.protocol } : model.definition, multiplier);
     return {
       ok: true,
       model: {

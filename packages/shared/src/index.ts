@@ -48,5 +48,6 @@ export * from "./deepseek-model-facts";
 
 export * from "./custom-model-reasoning";
 export * from "./custom-model-input";
+export * from "./custom-connection-address";
 
 export * from "./context-projection";

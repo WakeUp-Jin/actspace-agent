@@ -124,6 +124,24 @@ describe("LegacyProxyWireEngine", () => {
     await pool.dispose();
   });
 
+  it.each([
+    ["Bearer", { headers: { Authorization: "Bearer relay-secret" } }, "authorization", "Bearer relay-secret", "x-api-key"],
+    ["x-api-key", { apiKey: "relay-secret" }, "x-api-key", "relay-secret", "authorization"],
+  ] as const)("sends only the %s auth header through the real Anthropic SDK", async (_label, auth, present, value, absent) => {
+    const seen: Headers[] = [];
+    const pool = new ProviderProxyPool(async () => ({
+      ProxyAgent: class { async close(): Promise<void> {} },
+      fetch: async (_url: string | URL | Request, init?: RequestInit) => { seen.push(new Headers(init?.headers)); return new Response("{}", { status: 400 }); },
+    }));
+    const engine = new LegacyProxyWireEngine({ route: "anthropic-messages", providerId: "custom", baseUrl: "https://relay.example", proxies: pool });
+    const original = input("anthropic-messages");
+    for await (const _event of await engine.stream({ ...original, credential: { ...auth, proxyUrl: "http://proxy.example:8080" } })) { /* drain */ }
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.get(present)).toBe(value);
+    expect(seen[0]!.has(absent)).toBe(false);
+    await pool.dispose();
+  });
+
   it("classifies a request-scoped proxy disconnect without leaking its cause", async () => {
     const pool = proxyPool();
     const engine = new LegacyProxyWireEngine({

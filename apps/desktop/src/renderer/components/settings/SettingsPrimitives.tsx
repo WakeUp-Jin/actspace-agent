@@ -392,16 +392,67 @@ export function InlineWarning({
   );
 }
 
-export function SettingTag({ tone = "neutral", children }: { tone?: "neutral" | "warn"; children: ReactNode }) {
+export function SettingTag({ tone = "neutral", children }: { tone?: "neutral" | "warn" | "ok"; children: ReactNode }) {
   return (
     <span
       className={cx(
         "inline-flex h-[18px] shrink-0 items-center rounded-act-xs border px-1.5 text-act-xxs font-medium leading-none",
-        tone === "warn" ? "border-transparent bg-warning-soft text-warning" : "border-line/60 bg-surface-subtle text-text-muted",
+        tone === "warn" ? "border-transparent bg-warning-soft text-warning"
+          : tone === "ok" ? "border-transparent bg-operational-soft text-operational"
+            : "border-line/60 bg-surface-subtle text-text-muted",
       )}
     >
       {children}
     </span>
+  );
+}
+
+/** 分段单选：2–4 个互斥选项。选中项抬起为 surface 底色，其余为中性文字。 */
+export function SegmentedControl<T extends string>({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  size = "default",
+}: {
+  value: T;
+  options: readonly { value: T; label: string }[];
+  onChange: (value: T) => void;
+  ariaLabel: string;
+  size?: "default" | "sm";
+}) {
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    event.preventDefault();
+    const index = options.findIndex((option) => option.value === value);
+    const next = options[(index + (event.key === "ArrowRight" ? 1 : options.length - 1)) % options.length];
+    onChange(next.value);
+    event.currentTarget.querySelector<HTMLButtonElement>(`[data-value="${next.value}"]`)?.focus();
+  };
+  return (
+    <div role="radiogroup" aria-label={ariaLabel} onKeyDown={onKeyDown} className="inline-flex max-w-full rounded-act-sm border border-line bg-surface-subtle p-0.5 max-[600px]:w-full">
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            tabIndex={selected ? 0 : -1}
+            data-value={option.value}
+            onClick={() => onChange(option.value)}
+            className={cx(
+              "whitespace-nowrap rounded-act-xs max-[600px]:min-w-0 max-[600px]:flex-1 font-medium transition-colors duration-(--motion-fast) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30",
+              size === "sm" ? "h-6 px-2.5 text-act-xs" : "h-7 px-3 text-act-sm",
+              selected ? "bg-surface text-text-main shadow-act-thumb" : "text-text-muted hover:text-text-main",
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

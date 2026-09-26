@@ -83,6 +83,7 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   removeCustomConnection: "runtime-v2:fixed-renderer:remove-custom-connection",
   updateCustomConnection: "runtime-v2:fixed-renderer:update-custom-connection",
   testCustomConnection: "runtime-v2:fixed-renderer:test-custom-connection",
+  probeCustomConnection: "runtime-v2:fixed-renderer:probe-custom-connection",
   settingsChangedV4: "runtime-v2:fixed-renderer:settings-changed-v4",
   setProviderKey: "runtime-v2:fixed-renderer:set-provider-key",
   clearProviderKey: "runtime-v2:fixed-renderer:clear-provider-key",

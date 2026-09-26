@@ -23,12 +23,18 @@ export class DesktopCredentialResolver implements CredentialResolver {
     if (!("model" in resolution)) throw new Error(resolution.message);
     const runtime = resolution.model.providerRuntime;
     return Object.freeze({
-      apiKey: runtime.apiKey,
+      ...bearerAwareAuth(runtime),
       baseUrl: runtime.baseUrl,
       proxyUrl: runtime.transport?.proxyUrl,
       pricingMultiplier: runtime.pricingMultiplier,
     });
   }
+}
+
+/** Bearer 连接把 Key 放进 Authorization 头，不再作为 apiKey 下发，避免 SDK 同时发 x-api-key。 */
+export function bearerAwareAuth(runtime: { readonly apiKey?: string; readonly authScheme?: "x-api-key" | "bearer" }): Pick<LlmCredential, "apiKey" | "headers"> {
+  if (runtime.authScheme === "bearer" && runtime.apiKey !== undefined) return { headers: { Authorization: `Bearer ${runtime.apiKey}` } };
+  return { apiKey: runtime.apiKey };
 }
 
 export { DEFAULT_CREDENTIAL_REF, IMAGE_INSPECTION_CREDENTIAL_REF };

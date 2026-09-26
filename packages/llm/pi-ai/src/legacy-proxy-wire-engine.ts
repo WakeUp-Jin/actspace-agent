@@ -57,7 +57,14 @@ export class LegacyProxyWireEngine {
     if (proxyUrl !== undefined && !this.options.proxies) throw new Error("Missing request-scoped proxy pool.");
     const fetch = proxyUrl === undefined ? undefined : await this.options.proxies!.getFetch(proxyUrl);
     const Constructor = await this.#loadSdk(this.options.route);
-    const client = new Constructor({ apiKey: input.credential.apiKey ?? "placeholder", baseURL, maxRetries: 0, fetch, defaultHeaders: input.credential.headers });
+    // Header-owned Bearer auth: a placeholder key would add a second, bogus x-api-key header.
+    // authToken is pinned to null so the Anthropic SDK never falls back to process.env.ANTHROPIC_AUTH_TOKEN.
+    const anthropic = this.options.route === "anthropic-messages";
+    const headerAuth = anthropic && input.credential.apiKey === undefined && hasHeader(input.credential.headers, "authorization");
+    const auth = headerAuth
+      ? { apiKey: null, authToken: null }
+      : { apiKey: input.credential.apiKey ?? "placeholder", ...(anthropic ? { authToken: null } : {}) };
+    const client = new Constructor({ ...auth, baseURL, maxRetries: 0, fetch, defaultHeaders: input.credential.headers });
     if (this.options.route === "anthropic-messages") return anthropicStream(client, input, this.options);
     if (this.options.route === "openai-responses") return responsesStream(client, input, this.options);
     return completionsStream(client, input, this.options);
@@ -266,6 +273,10 @@ function unknownUsage(): LlmUsage { return { inputTokens: null, outputTokens: nu
 function numberOrNull(value: unknown): number | null { return typeof value === "number" && Number.isFinite(value) ? value : null; }
 function numberValue(value: unknown): number { return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0; }
 function responseError(event: Record<string, unknown>): string { const response = event.response as Record<string, unknown> | undefined; const error = response?.error as Record<string, unknown> | undefined; return String(error?.message ?? event.message ?? "Responses stream failed."); }
+
+function hasHeader(headers: Readonly<Record<string, string>> | undefined, name: string): boolean {
+  return Object.entries(headers ?? {}).some(([key, value]) => key.toLowerCase() === name && value.trim() !== "");
+}
 
 async function loadPublicSdk(route: PiAiWireRoute): Promise<SdkConstructor> {
   const packageName: string = route === "anthropic-messages" ? "@anthropic-ai/sdk" : "openai";

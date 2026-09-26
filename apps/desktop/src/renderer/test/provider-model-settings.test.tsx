@@ -298,67 +298,215 @@ describe("provider and model settings", () => {
     expect(screen.getByDisplayValue("gpt-4o-mini")).toBeInTheDocument();
   });
 
-  it("lists exactly nine providers and three reusable custom protocols as equal logo rows", async () => {
+  it("groups the catalog, hides the three old protocol entries, and keeps 自定义服务 at the bottom", async () => {
     window.actspace = {
       listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: { relay: { connectionId: "relay", providerId: "openrouter", catalogId: "anthropic-compatible", displayName: "Existing relay", enabled: true } } } } }),
+      getSettingsV4: async () => ({ settings: { models: { connections: { relay: { connectionId: "relay", providerId: "openrouter", catalogId: "anthropic-compatible", displayName: "Existing relay", baseUrl: "https://relay.example", enabled: true } } } } }),
+    } as unknown as ActspaceBridge;
+    render(<ProviderSettings />);
+    // 已保存的旧连接照常显示。
+    expect(await screen.findByRole("button", { name: /Existing relay/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "添加服务" }));
+    const names = ["Moonshot", "DeepSeek", "MiniMax", "OpenAI", "Anthropic", "Z.AI", "Xiaomi", "火山方舟 Coding Plan", "OpenRouter", "自定义服务"];
+    expect(screen.getAllByRole("button", { name: /^选择 / }).map((row) => row.getAttribute("aria-label"))).toEqual(names.map((name) => `选择 ${name}`));
+    expect(screen.queryByLabelText("服务商类型")).not.toBeInTheDocument();
+    for (const label of ["官方直连", "Coding Plan", "第三方兼容"]) expect(screen.getByText(label)).toBeInTheDocument();
+    const fallback = screen.getByRole("heading", { name: "没有找到？" }).closest("section")!;
+    expect(within(fallback).getByRole("button", { name: "选择 自定义服务" })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("搜索模型服务"), "volc");
+    expect(screen.getAllByRole("button", { name: /^选择 / }).map((row) => row.getAttribute("aria-label"))).toEqual(["选择 火山方舟 Coding Plan", "选择 自定义服务"]);
+    expect(screen.queryByText("官方直连")).not.toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText("搜索模型服务"));
+    await userEvent.type(screen.getByLabelText("搜索模型服务"), "nothing-matches");
+    expect(screen.getByText("列表里没有匹配的服务商。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "选择 自定义服务" })).toBeInTheDocument();
+  });
+
+  it("walks the custom service wizard: test with Bearer fallback, preselect models, save with reference pricing", async () => {
+    const ids = ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5", "claude-opus-4-5", "relay-alpha", "relay-beta", "relay-gamma", "relay-delta", "relay-epsilon"];
+    const probeCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", resolvedAuth: "bearer", models: ids.map((id) => ({ id })) }));
+    const connections: Record<string, unknown> = {};
+    const createCustomConnection = vi.fn(async (input: { connectionId: string }) => {
+      connections[input.connectionId] = { connectionId: input.connectionId, providerId: "openrouter", protocol: "anthropic-messages", catalogId: "custom", displayName: "relay.example", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", proxy: { enabled: false, url: null }, lastConnection: { status: "untested" }, enabled: true };
+      return {};
+    });
+    const testCustomConnection = vi.fn();
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections } } }),
+      listInstalledModels: async () => ({ models: [] }),
+      probeCustomConnection,
+      createCustomConnection,
+      testCustomConnection,
     } as unknown as ActspaceBridge;
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
-    const names = ["Moonshot", "DeepSeek", "MiniMax", "OpenAI", "Anthropic", "Z.AI", "Xiaomi", "火山方舟 Coding Plan", "OpenRouter", "自定义服务（OpenAI Chat）", "自定义服务（OpenAI Responses）", "自定义服务（Anthropic）"];
-    const rows = screen.getAllByRole("button", { name: /^选择 / });
-    expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual(names.map((name) => `选择 ${name}`));
-    expect(new Set(rows.map((row) => row.parentElement)).size).toBe(1);
-    for (const row of rows) expect(row.querySelector('[data-provider-logo]:not([data-provider-logo="generic"])')).not.toBeNull();
-    await userEvent.selectOptions(screen.getByLabelText("服务商类型"), "custom");
-    expect(screen.getAllByRole("button", { name: /^选择 / })).toHaveLength(3);
-    await userEvent.type(screen.getByLabelText("搜索模型服务"), "responses");
-    expect(screen.getAllByRole("button", { name: /^选择 / })).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "选择 自定义服务（OpenAI Responses）" })).toBeInTheDocument();
-    await userEvent.clear(screen.getByLabelText("搜索模型服务"));
-    await userEvent.selectOptions(screen.getByLabelText("服务商类型"), "coding");
-    expect(screen.getAllByRole("button", { name: /^选择 / })).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "选择 火山方舟 Coding Plan" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "选择 自定义服务" }));
+    expect(screen.getByRole("heading", { name: "连接自定义服务" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Anthropic Messages" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "测试并继续" })).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText("服务地址"), "https://relay.example/v1");
+    expect(screen.getByTestId("request-url")).toHaveTextContent("https://relay.example/v1/messages");
+    expect(screen.getByTestId("request-url")).toHaveTextContent("已去掉 /v1");
+    await userEvent.type(screen.getByLabelText("API Key"), "fixture-secret");
+    await userEvent.click(screen.getByRole("button", { name: "测试并继续" }));
+    expect(probeCustomConnection).toHaveBeenCalledWith({ kind: "draft", protocol: "anthropic-messages", baseUrl: "https://relay.example/v1", apiKey: "fixture-secret", authMode: "auto", proxy: { enabled: false, url: null } });
+
+    expect(await screen.findByRole("heading", { name: "选择模型" })).toBeInTheDocument();
+    expect(screen.getByText("已选 3 个")).toBeInTheDocument();
+    expect(screen.getByLabelText("搜索模型")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /relay-alpha/ })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("checkbox", { name: /relay-alpha/ }).textContent).toContain("能力未知");
+    // 行本身可以用键盘勾选。
+    screen.getByRole("checkbox", { name: /relay-alpha/ }).focus();
+    await userEvent.keyboard(" ");
+    expect(screen.getByRole("checkbox", { name: /relay-alpha/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText(/^默认：Claude Sonnet 5/)).not.toHaveTextContent("保存后自动测试");
+    await userEvent.click(screen.getByRole("group", { name: "倍率" }).querySelector("button[aria-label='倍率增大']")!);
+
+    await userEvent.click(screen.getByRole("button", { name: "保存连接" }));
+    await waitFor(() => expect(createCustomConnection).toHaveBeenCalledOnce());
+    const input = createCustomConnection.mock.calls[0]![0] as unknown as Record<string, unknown> & { initialModels: { apiModel: string; pricing: unknown }[] };
+    expect(input).toEqual(expect.objectContaining({
+      providerId: "openrouter",
+      protocol: "anthropic-messages",
+      displayName: "",
+      baseUrl: "https://relay.example/v1",
+      apiKey: "fixture-secret",
+      catalogId: "custom",
+      authMode: "auto",
+      resolvedAuth: "bearer",
+      billingMode: "reference",
+      pricingMultiplier: 0.35,
+      defaultApiModel: "claude-sonnet-5",
+      promptCacheMode: "short",
+    }));
+    expect(input.initialModels.map((model) => model.apiModel)).toEqual(["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5", "relay-alpha"]);
+    expect(input.initialModels.every((model) => model.pricing === null)).toBe(true);
+    // 保存后进入详情页；已经测通并拿到列表，不再自动测试。
+    expect(await screen.findByRole("heading", { name: "relay.example" })).toBeInTheDocument();
+    expect(testCustomConnection).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["OpenAI Chat", "openai-completions", "openai-compatible"],
-    ["OpenAI Responses", "openai-responses", "openai-responses-compatible"],
-    ["Anthropic", "anthropic-messages", "anthropic-compatible"],
-  ])("saves the %s form with its protocol and preserves a failed draft for retry", async (label, protocol, catalogId) => {
-    const createCustomConnection = vi.fn().mockRejectedValueOnce(new Error("暂时无法写入")).mockResolvedValue({});
-    const onChanged = vi.fn();
+  it("switches the protocol from a pasted endpoint and adds models by hand when the service has no list", async () => {
+    const probeCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", models: null }));
+    const connections: Record<string, unknown> = {};
+    const createCustomConnection = vi.fn(async (input: { connectionId: string; protocol: string }) => {
+      connections[input.connectionId] = { connectionId: input.connectionId, providerId: "openrouter", protocol: input.protocol, catalogId: "custom", displayName: "relay.example", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", proxy: { enabled: false, url: null }, enabled: true };
+      return {};
+    });
+    const testCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z" }));
     window.actspace = {
       listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections } } }),
+      listInstalledModels: async () => ({ models: [] }),
+      probeCustomConnection,
+      createCustomConnection,
+      testCustomConnection,
+    } as unknown as ActspaceBridge;
+    render(<ProviderSettings />);
+    await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
+    await userEvent.click(screen.getByRole("button", { name: "选择 自定义服务" }));
+    await userEvent.type(screen.getByLabelText("服务地址"), "https://relay.example/v1/chat/completions");
+    expect(screen.getByRole("radio", { name: "OpenAI Chat" })).toBeChecked();
+    expect(screen.getByText("已根据地址切换")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: "Anthropic Messages" }));
+    expect(screen.getByText("地址和所选协议不一致。")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: "OpenAI Chat" }));
+    await userEvent.type(screen.getByLabelText("API Key"), "fixture-secret");
+    await userEvent.click(screen.getByRole("button", { name: "测试并继续" }));
+    expect(await screen.findByRole("heading", { name: "添加模型" })).toBeInTheDocument();
+    // OpenAI 协议不显示 Claude 常用项。
+    expect(screen.queryByText("常用")).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("模型 ID"), "gpt-relay{Enter}");
+    await userEvent.type(screen.getByLabelText("模型 ID"), "gpt-relay-mini");
+    await userEvent.click(screen.getByRole("button", { name: "添加" }));
+    expect(screen.getByRole("button", { name: "移除 gpt-relay-mini" })).toBeInTheDocument();
+    expect(screen.getByText(/保存后自动测试/)).toHaveTextContent("默认：gpt-relay");
+    await userEvent.click(screen.getByRole("button", { name: "保存连接" }));
+    await waitFor(() => expect(createCustomConnection).toHaveBeenCalledWith(expect.objectContaining({
+      protocol: "openai-completions",
+      defaultApiModel: "gpt-relay",
+      promptCacheMode: "off",
+      initialModels: [expect.objectContaining({ apiModel: "gpt-relay" }), expect.objectContaining({ apiModel: "gpt-relay-mini" })],
+    })));
+    expect(createCustomConnection.mock.calls[0]![0]).not.toHaveProperty("authMode");
+    await waitFor(() => expect(testCustomConnection).toHaveBeenCalledOnce());
+  });
+
+  it("offers Claude shortcuts without a list, stays on step 1 when the test fails, and voids a passed test after the key changes", async () => {
+    const probeCustomConnection = vi.fn()
+      .mockResolvedValueOnce({ ok: false, message: "请检查 API Key 是否正确。", checkedAt: "2026-09-26T00:00:00.000Z", errorKind: "auth", statusCode: 401, models: null })
+      .mockResolvedValue({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", models: null });
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      probeCustomConnection,
+    } as unknown as ActspaceBridge;
+    render(<ProviderSettings />);
+    await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
+    await userEvent.click(screen.getByRole("button", { name: "选择 自定义服务" }));
+    await userEvent.type(screen.getByLabelText("服务地址"), "https://relay.example");
+    await userEvent.type(screen.getByLabelText("API Key"), "wrong-key");
+    await userEvent.click(screen.getByRole("button", { name: /^更多设置/ }));
+    await userEvent.click(screen.getByRole("radio", { name: "x-api-key" }));
+    await userEvent.click(screen.getByRole("button", { name: /^更多设置/ }));
+    expect(screen.getByRole("button", { name: /更多设置/ })).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(screen.getByRole("button", { name: "测试并继续" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("认证失败（401）");
+    expect(screen.getByRole("button", { name: "测试并继续" })).toBeInTheDocument();
+    // 固定了认证方式又认证失败时，展开更多设置提示改用自动。
+    expect(screen.getByRole("button", { name: /更多设置/ })).toHaveAttribute("aria-expanded", "true");
+    expect(probeCustomConnection).toHaveBeenLastCalledWith(expect.objectContaining({ authMode: "x-api-key" }));
+
+    await userEvent.click(screen.getByRole("radio", { name: "自动" }));
+    await userEvent.click(screen.getByRole("button", { name: "测试并继续" }));
+    expect(await screen.findByRole("heading", { name: "添加模型" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "claude-sonnet-5" }));
+    expect(screen.getByRole("button", { name: "移除 claude-sonnet-5" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "claude-sonnet-5" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "上一步" }));
+    expect(screen.getByRole("button", { name: "下一步" })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("API Key"), "-fixed");
+    expect(screen.getByText("连接信息已修改，需要重新测试")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "测试并继续" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "跳过测试" })).toBeInTheDocument();
+  });
+
+  it("connects official Anthropic with only a key and saves it at official prices", async () => {
+    const probeCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", models: [{ id: "claude-opus-5" }, { id: "claude-sonnet-5" }, { id: "claude-haiku-4-5" }] }));
+    const createCustomConnection = vi.fn(async () => ({}));
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections: {} } } }),
+      probeCustomConnection,
       createCustomConnection,
     } as unknown as ActspaceBridge;
-    render(<ProviderSettings onChanged={onChanged} />);
+    render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
-    await userEvent.click(screen.getByRole("button", { name: `选择 自定义服务（${label}）` }));
-    expect(screen.getByRole("button", { name: "保存供应商" })).toBeDisabled();
-    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(1);
-    await userEvent.type(screen.getByLabelText("API Key"), "fixture-secret");
-    const anthropic = protocol === "anthropic-messages";
-    const baseUrl = anthropic ? "https://relay.example" : "https://relay.example/v1";
-    await userEvent.type(screen.getByPlaceholderText(anthropic ? "https://example.com" : "https://example.com/v1"), baseUrl);
-    await userEvent.type(screen.getByPlaceholderText("例如 claude-opus-5-5"), "vendor/model-id");
-    await userEvent.click(screen.getByRole("button", { name: "保存供应商" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("暂时无法写入");
-    expect(screen.getByLabelText("API Key")).toHaveValue("fixture-secret");
-    await userEvent.click(screen.getByRole("button", { name: "保存供应商" }));
-    await waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
-    expect(createCustomConnection).toHaveBeenLastCalledWith(expect.objectContaining({
-      protocol,
-      catalogId,
-      connectionId: undefined,
-      defaultModel: "vendor/model-id",
-      baseUrl,
-      apiKey: "fixture-secret",
-      promptCacheMode: anthropic ? "short" : "off",
-      initialModel: expect.objectContaining({ apiModel: "vendor/model-id", pricing: null }),
-    }));
-    await userEvent.click(screen.getByRole("button", { name: "添加服务" }));
-    expect(screen.getByRole("button", { name: `选择 自定义服务（${label}）` })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "选择 Anthropic" }));
+    expect(screen.getByRole("heading", { name: "连接 Anthropic" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("服务地址")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "协议" })).not.toBeInTheDocument();
+    expect(screen.queryByText("更多设置")).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("API Key"), "sk-ant-fixture");
+    await userEvent.click(screen.getByRole("button", { name: "测试连接" }));
+    expect(probeCustomConnection).toHaveBeenCalledWith({ kind: "draft", protocol: "anthropic-messages", baseUrl: "https://api.anthropic.com", apiKey: "sk-ant-fixture", authMode: "x-api-key" });
+    expect(await screen.findByText("已选 3 个")).toBeInTheDocument();
+    expect(screen.queryByText("按官方价计费")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "保存连接" }));
+    await waitFor(() => expect(createCustomConnection).toHaveBeenCalledWith(expect.objectContaining({
+      protocol: "anthropic-messages",
+      baseUrl: "https://api.anthropic.com",
+      catalogId: "anthropic",
+      displayName: "Anthropic",
+      authMode: "x-api-key",
+      billingMode: "reference",
+      pricingMultiplier: 1,
+      promptCacheMode: "short",
+      defaultApiModel: "claude-sonnet-5",
+    })));
   });
 
   it("uses the Maka flat catalog and a single page h2", async () => {
@@ -435,75 +583,238 @@ describe("provider and model settings", () => {
     await waitFor(() => expect(screen.queryByLabelText("DeepSeek API Key")).not.toBeInTheDocument());
   });
 
-  it("opens custom connection editing, preserves its key, and uses its catalog logo", async () => {
-    const connection = { connectionId: "office", providerId: "openrouter", catalogId: "openai", displayName: "Office API", baseUrl: "https://example.com/v1", defaultModel: "office-model", enabled: true };
-    const updateCustomConnection = vi.fn(async () => ({}));
+  it("renames a custom connection inline without retesting it", async () => {
+    let connection = { connectionId: "office", providerId: "openrouter", protocol: "openai-completions", catalogId: "openai", displayName: "Office API", baseUrl: "https://example.com/v1", defaultModel: "office-model", proxy: { enabled: false, url: null }, lastConnection: { status: "available", checkedAt: "2026-09-26T00:00:00.000Z" }, enabled: true };
+    const updateCustomConnection = vi.fn(async (input: { displayName: string }) => {
+      connection = { ...connection, displayName: input.displayName };
+      return { settings: { models: { connections: { office: connection } } } };
+    });
+    const testCustomConnection = vi.fn();
     window.actspace = {
       listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
       getSettingsV4: async () => ({ settings: { models: { connections: { office: connection } } } }),
+      listInstalledModels: async () => ({ models: [] }),
       updateCustomConnection,
+      testCustomConnection,
     } as unknown as ActspaceBridge;
     render(<ProviderSettings />);
     const row = await screen.findByRole("button", { name: /Office API/ });
     expect(row.querySelector('[data-provider-logo="openai"]')).toBeInTheDocument();
-    expect(screen.queryByText("还没有连接模型服务")).not.toBeInTheDocument();
+    expect(row).toHaveTextContent("OpenAI Chat · example.com");
     await userEvent.click(row);
-    await userEvent.click(screen.getByRole("button", { name: "编辑服务名称" }));
-    expect(screen.getByRole("heading", { name: "编辑 Office API" })).toBeInTheDocument();
-    expect(screen.getByLabelText("API Key")).toHaveValue("");
-    await userEvent.clear(screen.getByLabelText("显示名称"));
-    await userEvent.type(screen.getByLabelText("显示名称"), "My Gateway");
-    await userEvent.click(screen.getByRole("button", { name: "保存供应商" }));
-    await waitFor(() => expect(updateCustomConnection).toHaveBeenCalledWith(expect.objectContaining({ connectionId: "office", displayName: "My Gateway", apiKey: undefined })));
+    expect(screen.getByRole("heading", { name: "Office API" })).toBeInTheDocument();
+    expect(screen.queryByText("office")).not.toBeInTheDocument();
+    expect(screen.getByText("已设置")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "编辑名称" }));
+    await userEvent.clear(screen.getByLabelText("名称"));
+    await userEvent.type(screen.getByLabelText("名称"), "My Gateway");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(updateCustomConnection).toHaveBeenCalledWith(expect.objectContaining({ connectionId: "office", displayName: "My Gateway", baseUrl: "https://example.com/v1" })));
+    expect(updateCustomConnection.mock.calls[0]![0]).not.toHaveProperty("apiKey");
+    expect(await screen.findByRole("heading", { name: "My Gateway" })).toBeInTheDocument();
+    expect(testCustomConnection).not.toHaveBeenCalled();
   });
 
-  it("shows an Anthropic request URL, tests the default model, and exposes manual model pricing", async () => {
-    const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic-compatible", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-opus-alias", promptCacheMode: "short", proxy: { enabled: false, url: null }, enabled: true };
-    const getSettingsV4 = vi.fn(async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }));
-    const testCustomConnection = vi.fn(async () => ({ ok: true, message: "模型测试成功。", checkedAt: "2026-09-24T00:00:00.000Z" }));
+  it("previews an edited address, saves it, and retests the connection", async () => {
+    let connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "custom", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", authMode: "auto", resolvedAuth: "bearer", promptCacheMode: "short", proxy: { enabled: false, url: null }, lastConnection: { status: "untested" } as { status: string; checkedAt?: string }, enabled: true };
+    const snapshot = () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } });
+    const updateCustomConnection = vi.fn(async (input: { baseUrl: string }) => { connection = { ...connection, baseUrl: input.baseUrl.replace(/\/v1\/?$/, "") }; return snapshot(); });
+    const testCustomConnection = vi.fn(async () => {
+      connection = { ...connection, lastConnection: { status: "available", checkedAt: new Date().toISOString() } };
+      return { ok: true, message: "ok", checkedAt: new Date().toISOString() };
+    });
     window.actspace = {
       listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4,
-      listInstalledModels: async () => ({ models: [customConnectionModel] }),
+      getSettingsV4: async () => snapshot(),
+      listInstalledModels: async () => ({ models: [] }),
+      updateCustomConnection,
       testCustomConnection,
     } as unknown as ActspaceBridge;
-
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
-    expect(await screen.findByText("https://relay.example/v1/messages")).toBeInTheDocument();
-    expect(screen.getByText("短缓存")).toBeInTheDocument();
-    expect(screen.getByText("手动价格")).toBeInTheDocument();
-    expect(screen.getByText(/写缓存 6.25\/M/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "测试默认模型" }));
+    expect(screen.getByText("https://relay.example/v1/messages")).toBeInTheDocument();
+    expect(screen.getByText("自动识别为 Bearer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "认证方式" })).toHaveTextContent("自动");
+    await userEvent.click(screen.getByRole("button", { name: "编辑服务地址" }));
+    await userEvent.clear(screen.getByLabelText("服务地址"));
+    await userEvent.type(screen.getByLabelText("服务地址"), "https://relay2.example/v1");
+    expect(screen.getByTestId("request-url")).toHaveTextContent("https://relay2.example/v1/messages");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(updateCustomConnection).toHaveBeenCalledWith(expect.objectContaining({ baseUrl: "https://relay2.example/v1" })));
     await waitFor(() => expect(testCustomConnection).toHaveBeenCalledWith({ connectionId: "anthropic-relay" }));
-    expect(await screen.findByText("模型测试成功。")).toBeInTheDocument();
+    expect(await screen.findByText("刚刚通过")).toBeInTheDocument();
   });
 
-  it("adds a second custom model with four manual prices", async () => {
-    const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic-compatible", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-opus-alias", promptCacheMode: "short", proxy: { enabled: false, url: null }, enabled: true };
-    const addCustomModel = vi.fn(async () => ({ ok: true as const, model: customConnectionModel }));
+  it("hides name, address and auth rows for the official Anthropic connection and prices it officially", async () => {
+    const connection = { connectionId: "official", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic", displayName: "Anthropic", baseUrl: "https://api.anthropic.com", defaultModel: "claude-sonnet-5", authMode: "x-api-key", billingMode: "reference", defaultPricingMultiplier: 1, promptCacheMode: "short", proxy: { enabled: false, url: null }, enabled: true };
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections: { official: connection } } } }),
+      listInstalledModels: async () => ({ models: [] }),
+    } as unknown as ActspaceBridge;
+    render(<ProviderSettings />);
+    const row = await screen.findByRole("button", { name: /Anthropic/ });
+    expect(row).toHaveTextContent("Anthropic 官方 API");
+    await userEvent.click(row);
+    expect(screen.getByText("Anthropic 官方")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "编辑服务地址" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "编辑名称" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "认证方式" })).not.toBeInTheDocument();
+    expect(screen.getByText("按官方价格")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "计费方式" })).not.toBeInTheDocument();
+  });
+
+  it("switches billing to reference pricing and steps the multiplier", async () => {
+    let connection = { connectionId: "relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic-compatible", displayName: "Relay", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", proxy: { enabled: false, url: null }, defaultPricingMultiplier: 1, enabled: true } as Record<string, unknown>;
+    const updateCustomConnection = vi.fn(async (input: Record<string, unknown>) => {
+      connection = { ...connection, ...(input.billingMode ? { billingMode: input.billingMode } : {}), ...(input.pricingMultiplier !== undefined ? { defaultPricingMultiplier: input.pricingMultiplier } : {}) };
+      return { settings: { models: { connections: { relay: connection } } } };
+    });
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections: { relay: connection } } } }),
+      listInstalledModels: async () => ({ models: [] }),
+      updateCustomConnection,
+    } as unknown as ActspaceBridge;
+    render(<ProviderSettings />);
+    await userEvent.click(await screen.findByRole("button", { name: /Relay/ }));
+    // 旧连接缺省按「逐个填写单价」。
+    expect(screen.getByRole("button", { name: "计费方式" })).toHaveTextContent("逐个填写单价");
+    expect(screen.queryByRole("group", { name: "倍率" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "计费方式" }));
+    await userEvent.click(screen.getByRole("option", { name: "按官方价折算" }));
+    await waitFor(() => expect(updateCustomConnection).toHaveBeenCalledWith(expect.objectContaining({ billingMode: "reference" })));
+    expect(await screen.findByRole("group", { name: "倍率" })).toHaveTextContent("× 1.00");
+    await userEvent.click(screen.getByRole("button", { name: "倍率减小" }));
+    await waitFor(() => expect(updateCustomConnection).toHaveBeenLastCalledWith(expect.objectContaining({ pricingMultiplier: 0.9 })));
+  });
+
+  it("labels custom connections by their last test result instead of claiming they are connected", async () => {
+    const base = { providerId: "openrouter", protocol: "openai-completions", baseUrl: "https://relay.example/v1", enabled: true };
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections: {
+        fresh: { ...base, connectionId: "fresh", displayName: "Fresh relay" },
+        good: { ...base, connectionId: "good", displayName: "Good relay", lastConnection: { status: "available", checkedAt: "2026-09-26T00:00:00.000Z" } },
+        bad: { ...base, connectionId: "bad", displayName: "Bad relay", lastConnection: { status: "unavailable", checkedAt: "2026-09-26T00:00:00.000Z" } },
+      } } } }),
+    } as unknown as ActspaceBridge;
+    render(<ProviderSettings />);
+    expect(await screen.findByRole("button", { name: /Fresh relay/ })).toHaveTextContent("未测试");
+    expect(screen.getByRole("button", { name: /Good relay/ })).toHaveTextContent("可用");
+    expect(screen.getByRole("button", { name: /Bad relay/ })).toHaveTextContent("连接异常");
+    expect(screen.queryByText("已连接")).not.toBeInTheDocument();
+  });
+
+  it("asks before deleting a custom connection and keeps it on cancel", async () => {
+    const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic-compatible", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-opus-alias", enabled: true };
+    const removeCustomConnection = vi.fn(async () => ({}));
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
+      listInstalledModels: async () => ({ models: [customConnectionModel] }),
+      removeCustomConnection,
+    } as unknown as ActspaceBridge;
+    render(<ProviderSettings />);
+    await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
+    await userEvent.click(screen.getByRole("button", { name: "删除" }));
+    const dialog = screen.getByRole("alertdialog", { name: "删除 Anthropic Relay？" });
+    expect(within(dialog).getByRole("button", { name: "取消" })).toHaveFocus();
+    await userEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(removeCustomConnection).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "删除" }));
+    await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "删除连接" }));
+    await waitFor(() => expect(removeCustomConnection).toHaveBeenCalledWith({ connectionId: "anthropic-relay" }));
+  });
+
+  it("asks before deleting a custom model, keeps it on Escape, and never deletes the default model", async () => {
+    const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic-compatible", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", proxy: { enabled: false, url: null }, enabled: true };
+    const defaultModel: InstalledModelView = { ...customConnectionModel, definition: { ...customConnectionModel.definition, key: "openrouter:connection/anthropic-relay/claude-sonnet-5", apiModel: "claude-sonnet-5", label: "Claude Sonnet 5" } };
+    const removeModel = vi.fn(async () => ({ ok: true as const, model: customConnectionModel }));
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
+      listInstalledModels: async () => ({ models: [defaultModel, customConnectionModel] }),
+      removeModel,
+    } as unknown as ActspaceBridge;
+    render(<ProviderSettings />);
+    await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
+    expect(await screen.findByRole("switch", { name: "启用 Claude Sonnet 5" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Claude Sonnet 5 更多操作" }));
+    expect(screen.getByRole("menuitem", { name: /删除/ })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: "设为默认" })).toBeDisabled();
+    await userEvent.keyboard("{Escape}");
+
+    await userEvent.click(screen.getByRole("button", { name: "Claude Opus Relay 更多操作" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "删除" }));
+    expect(screen.getByRole("alertdialog", { name: "删除 Claude Opus Relay？" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(removeModel).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Claude Opus Relay 更多操作" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "删除" }));
+    await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "删除模型" }));
+    await waitFor(() => expect(removeModel).toHaveBeenCalledWith({ modelKey: customConnectionModel.definition.key }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+
+  it("adds a model inline and refreshes new models from the service as disabled", async () => {
+    const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "custom", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-opus-alias", proxy: { enabled: false, url: null }, enabled: true };
+    const addCustomModel = vi.fn(async (input: { apiModel: string }) => ({ ok: true as const, model: { ...customConnectionModel, definition: { ...customConnectionModel.definition, key: `k:${input.apiModel}`, label: input.apiModel } } }));
+    const probeCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", models: [{ id: "claude-opus-alias" }, { id: "claude-haiku-4-5", label: "Haiku" }] }));
     window.actspace = {
       listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
       getSettingsV4: async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
       listInstalledModels: async () => ({ models: [customConnectionModel] }),
       addCustomModel,
+      probeCustomConnection,
     } as unknown as ActspaceBridge;
-
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
-    await userEvent.click(await screen.findByRole("button", { name: "添加模型" }));
-    await userEvent.type(screen.getByPlaceholderText("例如 claude-opus-5-5"), "claude-backup");
-    await userEvent.type(screen.getByPlaceholderText("留空时使用 API 模型 ID"), "Backup");
-    await userEvent.click(screen.getByRole("switch", { name: "启用手动价格" }));
-    const prices = screen.getAllByPlaceholderText("0.00");
-    for (const [index, value] of ["5", "25", "0.5", "6.25"].entries()) await userEvent.type(prices[index], value);
-    await userEvent.click(screen.getByRole("button", { name: "保存模型" }));
-    await waitFor(() => expect(addCustomModel).toHaveBeenCalledWith(expect.objectContaining({
-      connectionId: "anthropic-relay",
-      apiModel: "claude-backup",
-      label: "Backup",
-      setAsConnectionDefault: false,
-      pricing: { currency: "USD", inputCacheMissPerMillion: 5, outputPerMillion: 25, inputCacheHitPerMillion: 0.5, inputCacheWritePerMillion: 6.25 },
+    await userEvent.click(await screen.findByRole("button", { name: "添加" }));
+    await userEvent.type(screen.getByLabelText("模型 ID"), "claude-opus-alias{Enter}");
+    expect(await screen.findByText("这个模型已在列表里")).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText("模型 ID"));
+    await userEvent.type(screen.getByLabelText("模型 ID"), "claude-sonnet-5{Enter}");
+    await waitFor(() => expect(addCustomModel).toHaveBeenCalledWith(expect.objectContaining({ connectionId: "anthropic-relay", apiModel: "claude-sonnet-5", enabled: true, contextWindow: 1_000_000, pricing: null, setAsConnectionDefault: false })));
+
+    await userEvent.click(screen.getByRole("button", { name: "刷新" }));
+    await waitFor(() => expect(probeCustomConnection).toHaveBeenCalledWith({ kind: "saved", connectionId: "anthropic-relay" }));
+    await waitFor(() => expect(addCustomModel).toHaveBeenLastCalledWith(expect.objectContaining({ apiModel: "claude-haiku-4-5", label: "Haiku", enabled: false })));
+    expect(await screen.findByText("发现 1 个新模型，默认不启用")).toBeInTheDocument();
+  });
+
+  it("edits a model: capabilities follow the catalog, reference price is catalog × multiplier, and own prices are submitted", async () => {
+    const connection = { connectionId: "relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "custom", displayName: "Relay", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", billingMode: "reference", defaultPricingMultiplier: 0.3, proxy: { enabled: false, url: null }, enabled: true };
+    const sonnet: InstalledModelView = {
+      definition: { key: "openrouter:connection/relay/claude-sonnet-5", provider: "openrouter", api: "anthropic-messages", apiModel: "claude-sonnet-5", label: "Claude Sonnet 5", source: "custom", contextWindow: 1_000_000, maxTokens: 128_000, thinkingDefault: true, reasoningConfig: { mode: "auto" }, capabilities: { input: ["text", "image"], toolUse: "declared", reasoning: true, thinkingToggle: true } },
+      settings: { enabled: true, addedAt: "2026-09-26T00:00:00.000Z", connectionId: "relay" },
+      unavailableReasons: {},
+    };
+    const editCustomModel = vi.fn(async () => ({ ok: true as const, model: sonnet }));
+    window.actspace = {
+      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      getSettingsV4: async () => ({ settings: { models: { connections: { relay: connection } } } }),
+      listInstalledModels: async () => ({ models: [sonnet] }),
+      editCustomModel,
+    } as unknown as ActspaceBridge;
+    render(<ProviderSettings />);
+    await userEvent.click(await screen.findByRole("button", { name: /Relay/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "编辑 Claude Sonnet 5" }));
+    expect(screen.getByText("已从模型目录匹配")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "手动修改能力" })).not.toBeChecked();
+    expect(screen.queryByLabelText("上下文窗口")).not.toBeInTheDocument();
+    expect(screen.getByText("输入 $0.60 · 输出 $3.00 · 每百万 Token")).toBeInTheDocument();
+    expect(screen.getByText("官方价 × 0.30")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("switch", { name: "单独设置单价" }));
+    for (const [label, value] of [["输入单价", "1"], ["输出单价", "4"], ["缓存读取单价", "0.1"], ["缓存写入单价", "1.25"]] as const) await userEvent.type(screen.getByLabelText(label), value);
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(editCustomModel).toHaveBeenCalledWith(expect.objectContaining({
+      modelKey: sonnet.definition.key,
+      contextWindow: 1_000_000,
+      reasoningConfig: { mode: "auto" },
+      pricing: { currency: "USD", inputCacheMissPerMillion: 1, outputPerMillion: 4, inputCacheHitPerMillion: 0.1, inputCacheWritePerMillion: 1.25 },
     })));
   });
 

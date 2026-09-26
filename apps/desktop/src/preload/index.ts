@@ -263,6 +263,7 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "settings:remove-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeCustomConnection,
   "settings:update-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateCustomConnection,
   "settings:test-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.testCustomConnection,
+  "settings:probe-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.probeCustomConnection,
   "settings:set-provider-key": RUNTIME_V2_FIXED_RENDERER_CHANNELS.setProviderKey,
   "settings:clear-provider-key": RUNTIME_V2_FIXED_RENDERER_CHANNELS.clearProviderKey,
   "settings:update-image-generation": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateImageGeneration,
@@ -504,6 +505,8 @@ contextBridge.exposeInMainWorld("actspace", {
     invokeFixedRenderer("settings:update-custom-connection", input) as Promise<import("@actspace/shared").SettingsV4Snapshot>,
   testCustomConnection: (input: import("@actspace/shared").CustomConnectionTestInput) =>
     invokeFixedRenderer("settings:test-custom-connection", input) as Promise<import("@actspace/shared").CustomConnectionTestResult>,
+  probeCustomConnection: (input: import("@actspace/shared").CustomConnectionProbeInput) =>
+    invokeFixedRenderer("settings:probe-custom-connection", input) as Promise<import("@actspace/shared").CustomConnectionProbeResult>,
   onSettingsChangedV4: (callback: (notification: import("@actspace/shared").SettingsV4ChangedNotification) => void) => {
     const handler = (_: unknown, notification: import("@actspace/shared").SettingsV4ChangedNotification) => callback(notification);
     ipcRenderer.on(RUNTIME_V2_FIXED_RENDERER_CHANNELS.settingsChangedV4, handler);

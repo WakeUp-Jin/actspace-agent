@@ -28,12 +28,15 @@ import {
   type SettingsV4ConnectionSettings,
   type ProviderCatalogDefinition,
 } from "@actspace/shared";
-import { SectionShell, SettingGroup, SettingLinkRow, SettingRow, SettingTag, StatusDot } from "./SettingsPrimitives";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
+import { SectionShell, SettingGroup, SettingLinkRow, SettingRow, SettingSubhead, SettingTag, SettingsInput, StatusDot } from "./SettingsPrimitives";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { ModelSettings } from "./ModelSettings";
 import { ProviderLogo } from "./ProviderLogo";
-import { CustomConnectionModels } from "./CustomConnectionModels";
-import { CustomModelFields, CustomModelForm, customModelInputFromDraft, emptyCustomModelFormDraft } from "./CustomModelForm";
+import { CustomModelFields, customModelInputFromDraft, emptyCustomModelFormDraft } from "./CustomModelForm";
+import { CustomConnectionDetail } from "./CustomConnectionDetail";
+import { CustomConnectionWizard } from "./CustomConnectionWizard";
+import { AnthropicKeySetup } from "./AnthropicKeySetup";
+import { ConnectionStatusDot, hostOf, isOfficialAnthropic, protocolLabel } from "./custom-connection-shared";
 import { Toggle } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
@@ -51,13 +54,13 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
   const [loaded, setLoaded] = useState(false);
   const [adding, setAdding] = useState<AddRoute>(null);
   const [catalogQuery, setCatalogQuery] = useState("");
-  const [catalogCategory, setCatalogCategory] = useState<"all" | ProviderCategory>("all");
   const [setup, setSetup] = useState<{ provider: LlmProviderId; origin: "list" | "catalog" } | null>(null);
-  const [customSetup, setCustomSetup] = useState<{ catalog?: ProviderCatalogDefinition } | false>(false);
-  const [editingCustom, setEditingCustom] = useState<SettingsV4ConnectionSettings | null>(null);
+  // 兼容预设（Z.AI 等）仍走旧的单页表单；「自定义服务」和官方 Anthropic 走新流程。
+  const [customSetup, setCustomSetup] = useState<{ catalog: ProviderCatalogDefinition } | null>(null);
+  const [customFlow, setCustomFlow] = useState<"custom" | "anthropic" | null>(null);
   const [detailProvider, setDetailProvider] = useState<LlmProviderId | null>(null);
   const [customConnections, setCustomConnections] = useState<SettingsV4ConnectionSettings[]>([]);
-  const [customDetail, setCustomDetail] = useState<SettingsV4ConnectionSettings | null>(null);
+  const [customDetail, setCustomDetail] = useState<{ connection: SettingsV4ConnectionSettings; autoTest: boolean } | null>(null);
   const [removing, setRemoving] = useState<LlmProviderId | null>(null);
   const [busy, setBusy] = useState<LlmProviderId | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -160,19 +163,53 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
     return <SectionShell title="模型连接" description="仅桌面端可配置模型连接。"><div /></SectionShell>;
   }
 
+  const openSavedConnection = async (connectionId: string, autoTest: boolean) => {
+    setCustomFlow(null);
+    setAdding(null);
+    await load();
+    await onChanged?.();
+    const snapshot = await window.actspace.getSettingsV4?.();
+    const connection = snapshot?.settings.models.connections[connectionId];
+    if (connection) setCustomDetail({ connection, autoTest });
+  };
+
   if (customDetail) {
-    return <CustomConnectionDetail connection={customDetail} onConnectionChange={setCustomDetail} onChanged={onChanged} onBack={() => setCustomDetail(null)} onEdit={(current) => { setEditingCustom(current); setCustomSetup({}); setCustomDetail(null); }} onRemove={async () => { await window.actspace.removeCustomConnection?.({ connectionId: customDetail.connectionId }); setCustomDetail(null); await load(); await onChanged?.(); }} />;
+    return (
+      <CustomConnectionDetail
+        key={customDetail.connection.connectionId}
+        connection={customDetail.connection}
+        autoTest={customDetail.autoTest}
+        logoKey={resolveCatalogLogo(customDetail.connection.catalogId)}
+        onConnectionChange={(connection) => setCustomDetail((current) => current ? { ...current, connection } : current)}
+        onChanged={async () => { await load(); await onChanged?.(); }}
+        onBack={() => setCustomDetail(null)}
+        onRemove={async () => {
+          if (!window.actspace.removeCustomConnection) throw new Error("当前版本不支持删除连接。");
+          await window.actspace.removeCustomConnection({ connectionId: customDetail.connection.connectionId });
+          setCustomDetail(null);
+          await load();
+          await onChanged?.();
+        }}
+      />
+    );
+  }
+
+  if (customFlow) {
+    const back = () => { setCustomFlow(null); setAdding({ kind: "catalog" }); };
+    return customFlow === "anthropic"
+      ? <AnthropicKeySetup onCancel={back} onSaved={openSavedConnection} />
+      : <CustomConnectionWizard onCancel={back} onSaved={openSavedConnection} />;
   }
 
   if (customSetup) {
-    return <CustomConnectionSetup initial={editingCustom ?? undefined} catalog={customSetup.catalog} onBack={() => { setCustomSetup(false); if (editingCustom) setCustomDetail(editingCustom); else setAdding({ kind: "catalog" }); setEditingCustom(null); }} onSaved={async () => { setCustomSetup(false); setAdding(null); setEditingCustom(null); await load(); await onChanged?.(); }} />;
+    return <CustomConnectionSetup catalog={customSetup.catalog} onBack={() => { setCustomSetup(null); setAdding({ kind: "catalog" }); }} onSaved={async () => { setCustomSetup(null); setAdding(null); await load(); await onChanged?.(); }} />;
   }
 
   const connectedProviders = PROVIDERS.filter((provider) => isProviderConfigured(providers[provider.id]));
   const providersToAdd = PROVIDERS.filter((provider) => !isProviderConfigured(providers[provider.id]));
   const catalogEntries: CatalogEntry[] = [
     ...providersToAdd.map((provider) => ({ ...provider, kind: "builtin" as const })),
-    ...PROVIDER_CATALOG.map((provider) => ({ ...provider, kind: "compatible" as const })),
+    ...PROVIDER_CATALOG.filter((provider) => !provider.hidden).map((provider) => ({ ...provider, kind: "compatible" as const })),
   ].sort((a, b) => PROVIDER_CATALOG_ORDER.indexOf(a.id as typeof PROVIDER_CATALOG_ORDER[number]) - PROVIDER_CATALOG_ORDER.indexOf(b.id as typeof PROVIDER_CATALOG_ORDER[number]));
   const canAddProvider = loaded && credentialStorage.status === "ready";
 
@@ -221,12 +258,11 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
         providers={catalogEntries}
         query={catalogQuery}
         onQueryChange={setCatalogQuery}
-        category={catalogCategory}
-        onCategoryChange={setCatalogCategory}
         onBack={() => setAdding(null)}
         onSelect={(provider) => {
           setAdding(null);
           if (provider.kind === "builtin") setSetup({ provider: provider.id, origin: "catalog" });
+          else if (provider.id === "custom" || provider.id === "anthropic") setCustomFlow(provider.id);
           else setCustomSetup({ catalog: provider });
         }}
       />
@@ -300,9 +336,9 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
                 key={connection.connectionId}
                 leading={<ProviderLogo provider={connection.providerId} logoKey={resolveCatalogLogo(connection.catalogId)} />}
                 title={<h4 className="text-act-sm font-medium">{connection.displayName ?? connection.connectionId}</h4>}
-                description={connection.baseUrl ? `自定义连接 · ${compactAddress(connection.baseUrl)}` : "自定义连接"}
-                trailing={<StatusDot tone={connection.lastConnection?.status === "unavailable" ? "error" : "ok"}>{connection.lastConnection?.status === "unavailable" ? "连接异常" : "已连接"}</StatusDot>}
-                onClick={() => setCustomDetail(connection)}
+                description={isOfficialAnthropic(connection) ? "Anthropic 官方 API" : `${protocolLabel(connection.protocol)} · ${hostOf(connection.baseUrl)}`}
+                trailing={<ConnectionStatusDot status={connection.lastConnection?.status} />}
+                onClick={() => setCustomDetail({ connection, autoTest: false })}
               />
             ))}
           </div>
@@ -314,7 +350,6 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
       {removing ? (
         <RemoveProviderDialog
           provider={PROVIDERS.find((provider) => provider.id === removing)!}
-          busy={busy === removing}
           onClose={() => setRemoving(null)}
           onConfirm={() => remove(removing)}
         />
@@ -346,59 +381,6 @@ function ConnectionRow({
   );
 }
 
-function CustomConnectionDetail({ connection, onConnectionChange, onChanged, onBack, onEdit, onRemove }: { connection: SettingsV4ConnectionSettings; onConnectionChange: (connection: SettingsV4ConnectionSettings) => void; onChanged?: () => void | Promise<void>; onBack: () => void; onEdit: (connection: SettingsV4ConnectionSettings) => void; onRemove: () => void | Promise<void> }) {
-  const catalog = findCatalogEntry(connection.catalogId);
-  const [testing, setTesting] = useState(false);
-  const [testMessage, setTestMessage] = useState<string | null>(null);
-  const [modelRoute, setModelRoute] = useState<{ kind: "add" } | { kind: "edit"; model: import("@actspace/shared").InstalledModelView } | null>(null);
-  const [modelRevision, setModelRevision] = useState(0);
-  const requestUrl = customConnectionRequestUrl(connection);
-  const test = async () => {
-    if (!window.actspace.testCustomConnection || !connection.defaultModel) return;
-    setTesting(true); setTestMessage(null);
-    try {
-      const result = await window.actspace.testCustomConnection({ connectionId: connection.connectionId });
-      setTestMessage(result.message);
-      const snapshot = await window.actspace.getSettingsV4?.();
-      const next = snapshot?.settings.models.connections[connection.connectionId];
-      if (next) onConnectionChange(next);
-      await onChanged?.();
-    } catch (error) { setTestMessage(error instanceof Error ? error.message : "模型测试失败。"); }
-    finally { setTesting(false); }
-  };
-  if (modelRoute) return <CustomModelForm connection={connection} model={modelRoute.kind === "edit" ? modelRoute.model : undefined} onBack={() => setModelRoute(null)} onSaved={async () => { setModelRoute(null); setModelRevision((value) => value + 1); await onChanged?.(); }} />;
-  return (
-    <div className="flex w-full flex-col gap-9">
-      <DetailHeader
-        onBack={onBack}
-        logo={<ProviderLogo provider={connection.providerId} logoKey={resolveCatalogLogo(connection.catalogId)} />}
-        title={connection.displayName ?? connection.connectionId}
-        subtitle={`${catalog?.label ?? "自定义兼容连接"} · ${connection.connectionId}`}
-      />
-      <DetailSection title="连接" description="密钥只保存在本机。">
-        <DetailRow label="服务名称" description="可自定义名称，不影响协议和模型绑定。" value={connection.displayName ?? connection.connectionId} action="编辑" onAction={() => onEdit(connection)} />
-        <DetailRow label="协议格式" description="决定认证头、请求体与接口路径。" value={protocolLabel(connection.protocol)} />
-        <DetailRow label="基础地址" description={connection.protocol === "anthropic-messages" ? "Anthropic 请填写站点根地址，不要带 /v1。" : "请求会在此地址后追加协议路径。"} value={connection.baseUrl} mono action="编辑" onAction={() => onEdit(connection)} />
-        <DetailRow label="实际请求地址" description="连接测试和模型调用使用的最终接口。" value={requestUrl} mono />
-        <DetailRow label="代理" description="仅此连接使用。" value={connection.proxy?.enabled ? connection.proxy.url ?? "已开启" : "关闭"} action="编辑" onAction={() => onEdit(connection)} />
-        {connection.protocol === "anthropic-messages" ? <DetailRow label="Prompt Cache" description="短缓存会为系统提示、最后一个工具定义和最近用户消息添加缓存断点。" value={connection.promptCacheMode === "off" ? "关闭" : "短缓存"} action="编辑" onAction={() => onEdit(connection)} /> : null}
-        <DetailRow label="默认模型" description="连接测试和未显式选择模型时使用。" value={connection.defaultModel ?? "未设置"} mono />
-        <SettingRow
-          title="连接测试"
-          description={testMessage ? <span role="status">{testMessage}</span> : connection.defaultModel ? "发送 1 Token 的最小真实请求，不写缓存。" : "请先添加并设置默认模型。"}
-          control={<Button aria-label="测试默认模型" busy={testing} disabled={testing || !connection.defaultModel} onClick={() => void test()}>{testing ? "测试中…" : "测试默认模型"}</Button>}
-        />
-      </DetailSection>
-      <DetailSection title="模型" description="手动维护此连接可用的模型与计费单价。" plain>
-        <CustomConnectionModels key={modelRevision} connection={connection} onConnectionChange={onConnectionChange} onChanged={onChanged} onAdd={() => setModelRoute({ kind: "add" })} onEdit={(model) => setModelRoute({ kind: "edit", model })} revision={modelRevision} />
-      </DetailSection>
-      <DetailSection title="危险操作">
-        <DetailRow label="删除连接" description="清除 Key 和连接配置；历史会话与使用统计会保留。" control={<Button variant="danger" onClick={() => void onRemove()}>删除连接</Button>} />
-      </DetailSection>
-    </div>
-  );
-}
-
 function ProviderSetupRoute({
   provider,
   current,
@@ -426,29 +408,25 @@ function ProviderSetupRoute({
   );
 }
 
-function CustomConnectionSetup({ initial, catalog, onBack, onSaved }: { initial?: SettingsV4ConnectionSettings; catalog?: ProviderCatalogDefinition; onBack: () => void; onSaved: () => void | Promise<void> }) {
-  const [connectionId, setConnectionId] = useState(initial?.connectionId ?? "");
-  const [displayName, setDisplayName] = useState(initial?.displayName ?? catalog?.label ?? "");
+/** 兼容预设（Z.AI、火山方舟等）的单页表单：Key、地址和第一个模型。 */
+function CustomConnectionSetup({ catalog, onBack, onSaved }: { catalog: ProviderCatalogDefinition; onBack: () => void; onSaved: () => void | Promise<void> }) {
+  const [connectionId, setConnectionId] = useState("");
+  const [displayName, setDisplayName] = useState(catalog.label);
   const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? catalog?.defaultBaseUrl ?? "");
-  const protocol = initial?.protocol ?? catalog?.protocol ?? "openai-completions";
-  const [modelDraft, setModelDraft] = useState(() => emptyCustomModelFormDraft(catalog?.defaultModel ?? ""));
-  const [promptCacheMode, setPromptCacheMode] = useState<"short" | "off">(initial?.promptCacheMode ?? (protocol === "anthropic-messages" ? "short" : "off"));
-  const [proxyEnabled, setProxyEnabled] = useState(initial?.proxy?.enabled ?? false);
-  const [proxyUrl, setProxyUrl] = useState(initial?.proxy?.url ?? "");
+  const [baseUrl, setBaseUrl] = useState(catalog.defaultBaseUrl ?? "");
+  const protocol = catalog.protocol ?? "openai-completions";
+  const [modelDraft, setModelDraft] = useState(() => emptyCustomModelFormDraft(catalog.defaultModel ?? ""));
+  const [promptCacheMode, setPromptCacheMode] = useState<"short" | "off">(protocol === "anthropic-messages" ? "short" : "off");
+  const [proxyEnabled, setProxyEnabled] = useState(false);
+  const [proxyUrl, setProxyUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
     setSaving(true); setError(null);
     try {
-      if (initial) {
-        if (!window.actspace.updateCustomConnection) throw new Error("当前版本不支持编辑连接。");
-        await window.actspace.updateCustomConnection({ providerId: initial.providerId, connectionId, displayName, apiKey: apiKey.trim() || undefined, baseUrl, catalogId: initial.catalogId, protocol, promptCacheMode, proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl.trim() : null } });
-      } else {
-        if (!window.actspace.createCustomConnection) throw new Error("当前版本不支持创建连接。");
-        const initialModel = customModelInputFromDraft(modelDraft);
-        await window.actspace.createCustomConnection({ providerId: catalog?.runtimeProviderId ?? "openrouter", connectionId: connectionId || undefined, displayName, apiKey: apiKey.trim(), baseUrl, defaultModel: initialModel.apiModel, initialModel, catalogId: catalog?.id, protocol, promptCacheMode, proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl.trim() : null } });
-      }
+      if (!window.actspace.createCustomConnection) throw new Error("当前版本不支持创建连接。");
+      const initialModel = customModelInputFromDraft(modelDraft);
+      await window.actspace.createCustomConnection({ providerId: catalog.runtimeProviderId ?? "openrouter", connectionId: connectionId || undefined, displayName, apiKey: apiKey.trim(), baseUrl, defaultModel: initialModel.apiModel, initialModel, catalogId: catalog.id, protocol, promptCacheMode, proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl.trim() : null } });
       await onSaved();
     } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "保存失败。"); }
     finally { setSaving(false); }
@@ -458,23 +436,23 @@ function CustomConnectionSetup({ initial, catalog, onBack, onSaved }: { initial?
     <div className="w-full" onKeyDown={(event) => { if (event.key === "Escape" && !saving) onBack(); }}>
       <div className="mb-7 flex items-center gap-3">
         <RouteBack onBack={onBack} label="返回添加连接" />
-        <ProviderLogo provider={catalog?.runtimeProviderId ?? initial?.providerId ?? "openrouter"} logoKey={catalog?.logoKey ?? resolveCatalogLogo(initial?.catalogId)} />
+        <ProviderLogo provider={catalog.runtimeProviderId ?? "openrouter"} logoKey={catalog.logoKey} />
         <div className="min-w-0">
-          <h3 className="text-act-lg font-semibold tracking-tight text-text-main">{initial ? `编辑 ${initial.displayName ?? "自定义兼容服务"}` : `连接 ${catalog?.label ?? "自定义兼容服务"}`}</h3>
+          <h3 className="text-act-lg font-semibold tracking-tight text-text-main">{`连接 ${catalog.label}`}</h3>
           <p className="mt-0.5 text-act-xs leading-relaxed text-text-faint">完成必要配置后，连接会出现在模型页上方。</p>
         </div>
       </div>
       <div className="grid gap-5">
-        <ApiKeyField name="API Key" configured={Boolean(initial)} value={apiKey} onChange={setApiKey} />
+        <ApiKeyField name="API Key" configured={false} value={apiKey} onChange={setApiKey} />
         <Field label="显示名称"><input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="例如 公司中转站" className={inputClass} /></Field>
-        <Field label="服务地址 · 必填"><span className="text-act-xxs font-normal leading-relaxed text-text-faint">{protocol === "anthropic-messages" ? "填写站点根地址，例如 https://cheaprouter.cc；系统会调用 /v1/messages。" : "填写协议基础地址，例如 https://example.com/v1。"}</span><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder={protocol === "anthropic-messages" ? "https://example.com" : "https://example.com/v1"} className={inputClass} />{protocol === "anthropic-messages" && /\/v1\/?$/.test(baseUrl) ? <div className="flex items-center gap-2"><span className="text-act-xxs text-on-danger">Anthropic 服务地址不要包含末尾 /v1。</span><button type="button" onClick={() => setBaseUrl(baseUrl.replace(/\/v1\/?$/, ""))} className="text-act-xxs font-semibold text-action hover:text-text-main">移除 /v1</button></div> : null}</Field>
-        {!initial ? <><div className="border-t border-line pt-5"><h4 className="text-act-sm font-semibold text-text-main">第一个模型</h4><p className="mt-1 mb-5 text-act-xxs text-text-faint">创建连接时至少添加一个模型；首个模型会自动启用并成为连接默认模型。</p><CustomModelFields draft={modelDraft} onChange={setModelDraft} autoFocusApiModel={false} showEnabled={false} /></div></> : null}
-        <details className="group"><summary className="flex cursor-pointer list-none items-center justify-between py-2 text-act-sm font-semibold text-text-main">高级连接设置<ChevronDown size={15} className="group-open:rotate-180" aria-hidden="true" /></summary><div className="grid gap-4 pt-3"><Field label="连接标识"><input value={connectionId} disabled={Boolean(initial)} onChange={(event) => setConnectionId(event.target.value)} placeholder="自动生成" className={inputClass} /></Field><div className="flex items-start justify-between gap-4 rounded-act-md border border-line p-3"><div><p className="text-act-xs font-medium text-text-main">仅为此连接启用代理</p><p className="mt-1 text-act-xxs text-text-faint">不会影响其他模型服务。</p></div><Toggle checked={proxyEnabled} onChange={setProxyEnabled} ariaLabel="启用连接代理" /></div>{proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7890" className={inputClass} /></Field> : null}{protocol === "anthropic-messages" ? <div className="flex items-start justify-between gap-4 rounded-act-md border border-line p-3"><div><p className="text-act-xs font-medium text-text-main">Anthropic Prompt Cache</p><p className="mt-1 text-act-xxs leading-relaxed text-text-faint">短缓存为稳定前缀添加 ephemeral 断点；可关闭以适配不支持缓存的中转站。</p></div><Toggle checked={promptCacheMode === "short"} onChange={(enabled) => setPromptCacheMode(enabled ? "short" : "off")} ariaLabel="启用 Anthropic Prompt Cache" /></div> : null}</div></details>
+        <Field label="服务地址 · 必填"><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://example.com/v1" className={inputClass} /></Field>
+        <div className="border-t border-line pt-5"><h4 className="text-act-sm font-semibold text-text-main">第一个模型</h4><p className="mt-1 mb-5 text-act-xxs text-text-faint">创建连接时至少添加一个模型；首个模型会自动启用并成为连接默认模型。</p><CustomModelFields draft={modelDraft} onChange={setModelDraft} autoFocusApiModel={false} showEnabled={false} /></div>
+        <details className="group"><summary className="flex cursor-pointer list-none items-center justify-between py-2 text-act-sm font-semibold text-text-main">高级连接设置<ChevronDown size={15} className="group-open:rotate-180" aria-hidden="true" /></summary><div className="grid gap-4 pt-3"><Field label="连接标识"><input value={connectionId} onChange={(event) => setConnectionId(event.target.value)} placeholder="自动生成" className={inputClass} /></Field><div className="flex items-start justify-between gap-4 rounded-act-md border border-line p-3"><div><p className="text-act-xs font-medium text-text-main">仅为此连接启用代理</p><p className="mt-1 text-act-xxs text-text-faint">不会影响其他模型服务。</p></div><Toggle checked={proxyEnabled} onChange={setProxyEnabled} ariaLabel="启用连接代理" /></div>{proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7890" className={inputClass} /></Field> : null}{protocol === "anthropic-messages" ? <div className="flex items-start justify-between gap-4 rounded-act-md border border-line p-3"><div><p className="text-act-xs font-medium text-text-main">Anthropic Prompt Cache</p><p className="mt-1 text-act-xxs leading-relaxed text-text-faint">短缓存为稳定前缀添加 ephemeral 断点；可关闭以适配不支持缓存的中转站。</p></div><Toggle checked={promptCacheMode === "short"} onChange={(enabled) => setPromptCacheMode(enabled ? "short" : "off")} ariaLabel="启用 Anthropic Prompt Cache" /></div> : null}</div></details>
         {error ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="ghost" size="md" disabled={saving} onClick={onBack}>取消</Button>
-        <Button variant="primary" size="md" disabled={saving || (!initial && !apiKey.trim()) || !baseUrl.trim() || (!initial && !modelDraft.apiModel.trim()) || (proxyEnabled && !proxyUrl.trim())} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</Button>
+        <Button variant="primary" size="md" disabled={saving || !apiKey.trim() || !baseUrl.trim() || !modelDraft.apiModel.trim() || (proxyEnabled && !proxyUrl.trim())} onClick={() => void save()}>{saving ? "保存中…" : "保存连接"}</Button>
       </div>
     </div>
   );
@@ -662,34 +640,22 @@ function RouteBack({ onBack, label }: { onBack: () => void; label: string }) {
 
 function RemoveProviderDialog({
   provider,
-  busy,
   onClose,
   onConfirm,
 }: {
   provider: (typeof PROVIDERS)[number];
-  busy: boolean;
   onClose: () => void;
   onConfirm: () => Promise<string | null>;
 }) {
-  const [error, setError] = useState<string | null>(null);
-  const { dialogRef, trapTabKey } = useDialogFocusTrap();
-  const confirm = async () => {
-    setError(null);
-    const nextError = await onConfirm();
-    if (nextError) setError(nextError);
-  };
   return (
-    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-(--act-z-modal) grid place-items-center bg-scrim px-5" role="alertdialog" aria-modal="true" aria-labelledby="remove-provider-dialog-title" aria-describedby="remove-provider-dialog-description" onKeyDown={(event) => { if (event.key === "Escape" && !busy) onClose(); else trapTabKey(event); }}>
-      <div className="w-full max-w-[460px] rounded-act-xl border border-line bg-surface p-5 shadow-act-float">
-        <h2 id="remove-provider-dialog-title" className="text-act-lg font-semibold text-text-main">移除 {provider.label}？</h2>
-        <p id="remove-provider-dialog-description" className="mt-2 text-act-xs leading-relaxed text-text-muted">将清除该服务商的所有 API Key、接入地址、代理和连接状态。已添加模型、历史会话与用量记录会保留，但相关模型将暂时不可用。</p>
-        {error ? <p role="alert" className="mt-3 text-act-xs text-on-danger">{error}</p> : null}
-        <div className="mt-6 flex justify-end gap-2">
-          <Button variant="secondary" size="md" autoFocus onClick={onClose} disabled={busy}>取消</Button>
-          <Button variant="danger-solid" size="md" onClick={() => void confirm()} disabled={busy}>{busy ? "移除中…" : "移除服务商"}</Button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog
+      title={`移除 ${provider.label}？`}
+      description="将清除该服务商的所有 API Key、接入地址、代理和连接状态。已添加模型、历史会话与用量记录会保留，但相关模型将暂时不可用。"
+      confirmLabel="移除服务商"
+      pendingLabel="移除中…"
+      onCancel={onClose}
+      onConfirm={onConfirm}
+    />
   );
 }
 
@@ -736,75 +702,67 @@ function ProviderConnectionsSkeleton() {
   );
 }
 
+const CATALOG_GROUPS: readonly { category: ProviderCategory; label: string }[] = [
+  { category: "direct", label: "官方直连" },
+  { category: "coding", label: "Coding Plan" },
+  { category: "compatible", label: "第三方兼容" },
+];
+
 function ProviderCatalogRoute({
   providers,
   query,
   onQueryChange,
-  category,
-  onCategoryChange,
   onBack,
   onSelect,
 }: {
   providers: CatalogEntry[];
   query: string;
   onQueryChange: (query: string) => void;
-  category: "all" | ProviderCategory;
-  onCategoryChange: (category: "all" | ProviderCategory) => void;
   onBack: () => void;
   onSelect: (provider: CatalogEntry) => void;
 }) {
   const normalized = query.trim().toLocaleLowerCase();
-  const filtered = providers.filter((provider) => (category === "all" || provider.category === category) && [provider.label, provider.description, provider.id]
-    .some((value) => value.toLocaleLowerCase().includes(normalized)));
+  const matches = (provider: CatalogEntry) => [provider.label, provider.description, provider.id].some((value) => value.toLocaleLowerCase().includes(normalized));
+  const groups = CATALOG_GROUPS
+    .map((group) => ({ ...group, rows: providers.filter((provider) => provider.category === group.category && matches(provider)) }))
+    .filter((group) => group.rows.length > 0);
+  // 「自定义服务」始终留在底部，搜不到服务商时就是出口。
+  const custom = providers.find((provider) => provider.category === "custom");
+  const row = (provider: CatalogEntry) => (
+    <SettingLinkRow
+      key={provider.id}
+      ariaLabel={`选择 ${provider.label}`}
+      leading={<ProviderLogo provider={provider.kind === "builtin" ? provider.id : provider.runtimeProviderId ?? "openrouter"} logoKey={provider.logoKey} />}
+      title={provider.label}
+      description={provider.description}
+      onClick={() => onSelect(provider)}
+    />
+  );
   return (
-    <div className="w-full">
-      <div className="mb-6 flex items-center gap-3">
+    <div className="flex w-full flex-col gap-6">
+      <div>
         <RouteBack onBack={onBack} label="返回模型连接" />
-        <div>
-          <h3 className="text-act-lg font-semibold tracking-tight text-text-main">添加连接</h3>
-          <p className="mt-0.5 text-act-xs leading-relaxed text-text-faint">选择一个服务商，然后配置 API Key 和连接参数。</p>
-        </div>
+        <h3 className="mt-2 text-act-lg font-semibold tracking-tight text-text-main">添加连接</h3>
       </div>
-      <div className="w-full">
-        <div className="flex items-center gap-3 max-[600px]:flex-col max-[600px]:items-stretch">
-        <label className="relative block w-[220px] max-[600px]:w-full">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" />
-          <input
-            autoFocus
-            aria-label="搜索模型服务"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="搜索服务商"
-            className="h-10 w-full rounded-act-md border border-line bg-surface-subtle pl-9 pr-3 text-act-sm text-text-main outline-none placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
-          />
+      <div className="flex flex-col gap-3">
+        <label className="relative block w-[260px] max-[600px]:w-full">
+          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" />
+          <SettingsInput autoFocus width="full" className="pl-8" aria-label="搜索模型服务" placeholder="搜索服务商" value={query} onChange={(event) => onQueryChange(event.target.value)} />
         </label>
-        <select aria-label="服务商类型" value={category} onChange={(event) => onCategoryChange(event.target.value as "all" | ProviderCategory)} className="ml-auto h-10 rounded-act-md border border-line bg-surface px-3 text-act-sm text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 max-[600px]:ml-0"><option value="all">全部</option><option value="direct">官方直连</option><option value="coding">Coding Plan</option><option value="compatible">第三方兼容</option><option value="custom">自定义</option></select>
-        </div>
-        {filtered.length === 0 ? (
-          <div className="mt-4 border-y border-dashed border-line px-4 py-8 text-center text-act-xs text-text-faint"><p>没有匹配的服务商。</p><button type="button" className="mt-2 rounded-act-md px-3 py-2 text-text-main hover:bg-hover-overlay" onClick={() => { onQueryChange(""); onCategoryChange("all"); }}>清除筛选</button></div>
+        {groups.length ? (
+          <SettingGroup>
+            {groups.map((group) => (
+              <div key={group.category} className="divide-y divide-line/60">
+                <SettingSubhead>{group.label}</SettingSubhead>
+                {group.rows.map(row)}
+              </div>
+            ))}
+          </SettingGroup>
         ) : (
-          <div className="mt-4 divide-y divide-line border-y border-line">
-            {filtered.map((provider) => {
-              return (
-                <button
-                  key={provider.id}
-                  type="button"
-                  aria-label={`选择 ${provider.label}`}
-                  onClick={() => onSelect(provider)}
-                  className="flex w-full items-center gap-3 px-2 py-3.5 text-left hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-55"
-                >
-                  <ProviderLogo provider={provider.kind === "builtin" ? provider.id : provider.runtimeProviderId ?? "openrouter"} logoKey={provider.logoKey} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-act-md font-semibold text-text-main">{provider.label}</span>
-                    <span className="mt-0.5 block text-act-xxs text-text-faint">{provider.description} · {categoryLabel(provider.category)}</span>
-                  </span>
-                  <ChevronRight className="shrink-0 text-text-faint" size={17} aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
+          <p className="px-0.5 text-act-xs text-text-muted">列表里没有匹配的服务商。</p>
         )}
       </div>
+      {custom ? <SettingGroup title="没有找到？">{row(custom)}</SettingGroup> : null}
     </div>
   );
 }
@@ -883,7 +841,7 @@ function ProviderConnectionForm({
           </details>
           {error ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}
         </div>
-        <div className="mt-5 flex justify-end gap-2"><Button variant="ghost" size="md" disabled={saving} onClick={onClose}>取消</Button><Button variant="primary" size="md" aria-label="保存" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim() && !current?.proxy?.enabled)} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</Button></div>
+        <div className="mt-5 flex justify-end gap-2"><Button variant="ghost" size="md" disabled={saving} onClick={onClose}>取消</Button><Button variant="primary" size="md" aria-label="保存" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim() && !current?.proxy?.enabled)} onClick={() => void save()}>{saving ? "保存中…" : "保存连接"}</Button></div>
       </div>
     </div>
   );
@@ -897,23 +855,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="grid gap-1.5"><span className="text-act-xs font-semibold text-text-muted">{label}</span>{children}</label>;
 }
 
-function compactAddress(value: string): string {
-  return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
-}
-
-function protocolLabel(protocol: SettingsV4ConnectionSettings["protocol"]): string {
-  if (protocol === "anthropic-messages") return "Anthropic Messages";
-  if (protocol === "openai-responses") return "OpenAI Responses";
-  return "OpenAI Chat Completions";
-}
-
-function customConnectionRequestUrl(connection: SettingsV4ConnectionSettings): string {
-  const baseUrl = connection.baseUrl.replace(/\/+$/, "");
-  if (connection.protocol === "anthropic-messages") return `${baseUrl}/v1/messages`;
-  if (connection.protocol === "openai-responses") return `${baseUrl}/responses`;
-  return `${baseUrl}/chat/completions`;
-}
-
 function ApiKeyField({ name, configured, value, onChange }: { name: string; configured: boolean; value: string; onChange: (value: string) => void }) {
   const [visible, setVisible] = useState(false);
   return (
@@ -924,6 +865,10 @@ function ApiKeyField({ name, configured, value, onChange }: { name: string; conf
       </span>
     </Field>
   );
+}
+
+function compactAddress(value: string): string {
+  return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
 function categoryLabel(category: ProviderCategory): string {

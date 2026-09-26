@@ -245,6 +245,7 @@ declare global {
       removeCustomConnection?: (input: { connectionId: string }) => Promise<import("@actspace/shared").SettingsV4Snapshot>;
       updateCustomConnection?: (input: import("@actspace/shared/runtime-v2").RuntimeV2UpdateCustomConnectionInput) => Promise<import("@actspace/shared").SettingsV4Snapshot>;
       testCustomConnection?: (input: import("@actspace/shared").CustomConnectionTestInput) => Promise<import("@actspace/shared").CustomConnectionTestResult>;
+      probeCustomConnection?: (input: import("@actspace/shared").CustomConnectionProbeInput) => Promise<import("@actspace/shared").CustomConnectionProbeResult>;
       onSettingsChangedV4?: (
         callback: (notification: import("@actspace/shared").SettingsV4ChangedNotification) => void
       ) => () => void;

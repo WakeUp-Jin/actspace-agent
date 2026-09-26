@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCustomModelDefinition, customConnectionModelKey, normalizeCustomModelPricing } from "../custom-model-input";
+import { buildCustomModelDefinition, customConnectionModelKey, customModelDraftFromCatalog, normalizeCustomModelPricing } from "../custom-model-input";
 
 describe("custom model input", () => {
   it("builds a connection-scoped Anthropic model with four manual rates", () => {
@@ -37,5 +37,29 @@ describe("custom model input", () => {
     expect(() => buildCustomModelDefinition({ ...base, apiModel: "" }, { providerId: "openrouter", protocol: "anthropic-messages", connectionId: "relay" })).toThrow("API 模型 ID");
     expect(() => buildCustomModelDefinition({ ...base, contextWindow: -1 }, { providerId: "openrouter", protocol: "openai-completions", connectionId: "relay" })).toThrow("上下文窗口");
     expect(() => buildCustomModelDefinition({ ...base, reasoningConfig: { mode: "manual", support: "supported", efforts: ["ultra"], defaultEffort: "ultra", allowOff: true } }, { providerId: "openrouter", protocol: "anthropic-messages", connectionId: "relay" })).toThrow("Anthropic 协议");
+  });
+
+  it("fills capabilities for a known model from the builtin catalog", () => {
+    expect(customModelDraftFromCatalog(" claude-sonnet-5 ")).toEqual({
+      apiModel: "claude-sonnet-5",
+      enabled: true,
+      contextWindow: 1_000_000,
+      maxTokens: 128_000,
+      input: ["text", "image"],
+      reasoningConfig: { mode: "auto" },
+      pricing: null,
+    });
+  });
+
+  it("leaves capabilities unknown for a model the catalog does not list", () => {
+    expect(customModelDraftFromCatalog("relay-private-model")).toEqual({
+      apiModel: "relay-private-model",
+      enabled: true,
+      contextWindow: null,
+      maxTokens: null,
+      input: ["text"],
+      reasoningConfig: { mode: "auto" },
+      pricing: null,
+    });
   });
 });
