@@ -8,6 +8,7 @@ export type ProviderModelOptionLike = {
   provider: LlmProviderId;
   label: string;
   apiModel: string;
+  connectionLabel?: string;
 };
 
 export type ProviderModelGroup<T extends ProviderModelOptionLike> = {
@@ -21,11 +22,15 @@ function normalizeModelLabel(label: string): string {
 }
 
 export function groupModelsByProvider<T extends ProviderModelOptionLike>(models: T[]): ProviderModelGroup<T>[] {
-  return PROVIDER_IDS.map((provider) => ({
-    provider,
-    label: PROVIDER_REGISTRY[provider].label,
-    models: models.filter((model) => model.provider === provider),
-  })).filter((group) => group.models.length > 0);
+  return PROVIDER_IDS.flatMap((provider) => {
+    const providerModels = models.filter((model) => model.provider === provider);
+    const labels = [...new Set(providerModels.map((model) => model.connectionLabel ?? PROVIDER_REGISTRY[provider].label))];
+    return labels.map((label) => ({
+      provider,
+      label,
+      models: providerModels.filter((model) => (model.connectionLabel ?? PROVIDER_REGISTRY[provider].label) === label),
+    }));
+  });
 }
 
 export function hasDuplicateModelLabel<T extends ProviderModelOptionLike>(model: T, models: T[]): boolean {

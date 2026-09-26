@@ -4,6 +4,7 @@ import type { ProviderId } from "./provider-config";
 import type { ModelCatalogEntry } from "./model-catalog";
 import { BUILTIN_MODEL_CATALOG } from "./generated/model-catalog.generated";
 import { billingReferenceProvider } from "./model-pricing";
+import { CNY_PER_USD } from "./usage-cost";
 
 export type CustomModelPricingInput = ModelPricing | null;
 
@@ -88,12 +89,13 @@ export function buildCustomModelDefinition(
 
 export function normalizeCustomModelPricing(pricing: ModelPricing): ModelPricing {
   if (pricing.currency !== "USD" && pricing.currency !== "CNY") throw new Error("价格币种无效。");
+  const factor = pricing.currency === "CNY" ? 1 / CNY_PER_USD : 1;
   return {
-    currency: pricing.currency,
-    inputCacheMissPerMillion: normalizeRate(pricing.inputCacheMissPerMillion, "标准输入"),
-    outputPerMillion: normalizeRate(pricing.outputPerMillion, "输出"),
-    inputCacheHitPerMillion: normalizeRate(pricing.inputCacheHitPerMillion, "缓存读取"),
-    inputCacheWritePerMillion: normalizeRate(pricing.inputCacheWritePerMillion, "缓存写入"),
+    currency: "USD",
+    inputCacheMissPerMillion: normalizeRate(pricing.inputCacheMissPerMillion, "标准输入") * factor,
+    outputPerMillion: normalizeRate(pricing.outputPerMillion, "输出") * factor,
+    inputCacheHitPerMillion: normalizeRate(pricing.inputCacheHitPerMillion, "缓存读取") * factor,
+    inputCacheWritePerMillion: normalizeRate(pricing.inputCacheWritePerMillion, "缓存写入") * factor,
   };
 }
 

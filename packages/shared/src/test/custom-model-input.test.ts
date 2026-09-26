@@ -27,7 +27,7 @@ describe("custom model input", () => {
   });
 
   it("requires every enabled manual price and accepts zero", () => {
-    expect(normalizeCustomModelPricing({ currency: "CNY", inputCacheMissPerMillion: 0, outputPerMillion: 0, inputCacheHitPerMillion: 0, inputCacheWritePerMillion: 0 })).toMatchObject({ inputCacheWritePerMillion: 0 });
+    expect(normalizeCustomModelPricing({ currency: "CNY", inputCacheMissPerMillion: 7.2, outputPerMillion: 14.4, inputCacheHitPerMillion: 0.72, inputCacheWritePerMillion: 3.6 })).toEqual({ currency: "USD", inputCacheMissPerMillion: 1, outputPerMillion: 2, inputCacheHitPerMillion: 0.1, inputCacheWritePerMillion: 0.5 });
     expect(() => normalizeCustomModelPricing({ currency: "USD", inputCacheMissPerMillion: 1, outputPerMillion: 2, inputCacheHitPerMillion: 0.1 })).toThrow("缓存写入");
     expect(() => normalizeCustomModelPricing({ currency: "USD", inputCacheMissPerMillion: -1, outputPerMillion: 2, inputCacheHitPerMillion: 0.1, inputCacheWritePerMillion: 1 })).toThrow("标准输入");
   });

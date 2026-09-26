@@ -606,7 +606,7 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 
 - 内置 / 精选模型价格来自受版本控制的模型定义。
 - provider-catalog 模型保存目录返回的 pricing 与 `catalogUpdatedAt`。
-- 自定义连接模型可以手动保存 USD / CNY 的标准输入、输出、缓存读取、缓存写入四类每百万 Token 单价；未配置价格时只统计 Token，费用保持未知。
+- 自定义连接模型可兼容输入 USD 或 CNY 价格；保存和请求快照统一转换为 USD，未配置价格时只统计 Token，费用保持未知。
 - 手动价格写入 `ModelDefinition.pricing`，请求开始时冻结为 `source: "configured"` 的 `ModelPricingSnapshot`，后续编辑价格不会重算历史请求。
 - 每次 `llm_usage` 仍保存当次价格快照与 provider-qualified ModelKey，历史成本不因目录刷新而变化。
 - 目录价格缺失时显示“价格未知”，不能按 0 计费。

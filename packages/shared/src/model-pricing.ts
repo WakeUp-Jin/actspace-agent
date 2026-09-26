@@ -1,4 +1,5 @@
 import { deepSeekPeakPricing, DEEPSEEK_FLASH_RELEASE_AT } from "./deepseek-model-facts";
+import { CNY_PER_USD } from "./usage-cost";
 import type { ModelApi, ModelPricing } from "./model-config";
 import type { CustomConnectionBillingMode } from "./settings";
 import type { ModelCatalogSnapshot, ModelPricingSnapshot } from "./model-catalog";
@@ -41,7 +42,9 @@ export function resolveModelPricing(catalog: ModelCatalogSnapshot, input: { prov
   if (peak) return { providerId: owner!, connectionId: input.connectionId ?? null, modelKey: input.modelKey, apiModel: input.apiModel, currency: "USD", rates: { input: peak.inputCacheMissPerMillion * multiplier, output: peak.outputPerMillion * multiplier, cacheRead: peak.inputCacheHitPerMillion * multiplier, cacheWrite: null }, multiplier, source: "deepseek-official", strategy: "fixed-peak", contentHash: `deepseek-peak-20260910:${JSON.stringify(peak)}`, fetchedAt: DEEPSEEK_FLASH_RELEASE_AT, capturedAt, unsupportedBilling: false };
   if (!configured && !entry) return null;
   const baseRates = configured ? { input: configured.inputCacheMissPerMillion, output: configured.outputPerMillion, cacheRead: configured.inputCacheHitPerMillion, cacheWrite: configured.inputCacheWritePerMillion ?? null } : entry!.rates;
+  const sourceCurrency = configured?.currency ?? entry!.currency;
+  const currencyFactor = sourceCurrency === "CNY" ? 1 / CNY_PER_USD : 1;
   const factor = configured && (input.configuredAlreadyMultiplied || configuredUnscaled) ? 1 : multiplier;
-  const rate = (value: number | null) => value === null ? null : value * factor;
-  return { providerId: entryProvider ?? input.providerId, connectionId: input.connectionId ?? null, modelKey: input.modelKey, apiModel: input.apiModel, currency: configured?.currency ?? entry!.currency, rates: { input: rate(baseRates.input), output: rate(baseRates.output), cacheRead: rate(baseRates.cacheRead), cacheWrite: rate(baseRates.cacheWrite) }, multiplier, source: configured ? "configured" : entry!.source, contentHash: configured ? JSON.stringify(configured) : catalog.contentHash, fetchedAt: configured ? input.now ?? new Date().toISOString() : entry!.fetchedAt ?? catalog.generatedAt, capturedAt: input.now ?? new Date().toISOString(), unsupportedBilling: configured ? configured.reasoningPerMillion !== undefined : entry!.unsupportedBilling };
+  const rate = (value: number | null) => value === null ? null : value * factor * currencyFactor;
+  return { providerId: entryProvider ?? input.providerId, connectionId: input.connectionId ?? null, modelKey: input.modelKey, apiModel: input.apiModel, currency: "USD", rates: { input: rate(baseRates.input), output: rate(baseRates.output), cacheRead: rate(baseRates.cacheRead), cacheWrite: rate(baseRates.cacheWrite) }, multiplier, source: configured ? "configured" : entry!.source, contentHash: configured ? JSON.stringify(configured) : catalog.contentHash, fetchedAt: configured ? input.now ?? new Date().toISOString() : entry!.fetchedAt ?? catalog.generatedAt, capturedAt: input.now ?? new Date().toISOString(), unsupportedBilling: configured ? configured.reasoningPerMillion !== undefined : entry!.unsupportedBilling };
 }

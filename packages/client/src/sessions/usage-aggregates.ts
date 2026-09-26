@@ -1,12 +1,12 @@
 import type { UsageActivityAggregate, UsageActivityRow, UsageCostSummary } from "@actspace/shared";
 
 export function summarizeActivityCosts(rows: readonly UsageActivityRow[]): UsageCostSummary {
-  const result: UsageCostSummary = { amountsByCurrency: {}, knownCostRequestCount: 0, unknownCostRequestCount: 0, unverifiedHistoricalRequestCount: 0 };
+  const result: UsageCostSummary = { costUsd: 0, knownCostRequestCount: 0, unknownCostRequestCount: 0, unverifiedHistoricalRequestCount: 0 };
   for (const row of rows) {
     if (row.kind !== "llm_request") continue;
-    if (row.costAmount == null || !row.costCurrency) { result.unknownCostRequestCount += 1; continue; }
+    if (row.costAmount == null || row.costCurrency !== "USD") { result.unknownCostRequestCount += 1; continue; }
     result.knownCostRequestCount += 1;
-    result.amountsByCurrency[row.costCurrency] = (result.amountsByCurrency[row.costCurrency] ?? 0) + row.costAmount;
+    result.costUsd += row.costAmount;
     if (row.historicalUnverified) result.unverifiedHistoricalRequestCount += 1;
   }
   return result;

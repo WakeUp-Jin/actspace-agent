@@ -914,6 +914,21 @@ describe("Composer follow-up bar", () => {
     expect(modelButton).toHaveTextContent("deepseek-flash · OpenRouter");
   });
 
+  it("groups models from custom connections under their connection name", async () => {
+    const user = userEvent.setup();
+    renderComposer({
+      models: [
+        { ...reasoningModels[1], key: "openrouter:openai/gpt-5" },
+        { ...reasoningModels[1], key: "openrouter:connection/relay/gpt-5", connectionId: "relay", connectionLabel: "Team Relay" },
+      ],
+      defaultModelId: "openrouter:openai/gpt-5",
+    });
+    await user.click(screen.getByRole("button", { name: /GPT-5 High/i }));
+    const menu = screen.getByRole("menu", { name: "模型" });
+    expect(within(menu).getByRole("group", { name: "OpenRouter" })).toBeInTheDocument();
+    expect(within(menu).getByRole("group", { name: "Team Relay" })).toBeInTheDocument();
+  });
+
   it("sends a supported OpenRouter reasoning effort and animates both popovers", async () => {
     const user = userEvent.setup();
     const { onSend, container } = renderComposer({

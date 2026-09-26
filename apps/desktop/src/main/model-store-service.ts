@@ -62,6 +62,7 @@ export class ModelStoreService {
     return {
       connections: Object.fromEntries(Object.values(connections).filter((connection) => connection.connectionId !== `${connection.providerId}:default`).map((connection) => [connection.connectionId, {
         providerId: connection.providerId,
+        displayName: connection.displayName,
         enabled: connection.enabled,
         hasApiKey: !("code" in this.settings.getProviderRuntimeConfigForCredential(connection.providerId, undefined, connection.connectionId)),
         lastConnection: connection.lastConnection,
@@ -99,11 +100,18 @@ export class ModelStoreService {
   }
 
   listUsableModels(purpose: ModelPurpose): UsableModelView[] {
-    return listUsableModels(this.getModelSnapshot(), purpose).map(({ key, definition }) => ({
+    const snapshot = this.getModelSnapshot();
+    return listUsableModels(snapshot, purpose).map(({ key, definition, installed }) => ({
       key,
       label: definition.label,
       provider: definition.provider,
       apiModel: definition.apiModel,
+      ...(installed.connectionId && installed.connectionId !== `${definition.provider}:default`
+        ? {
+            connectionId: installed.connectionId,
+            connectionLabel: snapshot.connections?.[installed.connectionId]?.displayName ?? installed.connectionId,
+          }
+        : {}),
       contextWindow: definition.contextWindow,
       thinkingDefault: definition.thinkingDefault,
       capabilities: clone(definition.capabilities),

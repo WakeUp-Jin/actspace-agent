@@ -7,7 +7,8 @@ export type ModelCatalogEntry = {
   sourceProviderId: string;
   apiModel: string;
   name: string;
-  currency: "USD" | "CNY";
+  /** Catalog ingestion normalizes external currencies before storing entries. */
+  currency: "USD";
   rates: CatalogRates;
   unsupportedBilling: boolean;
   contextWindow: number | null;
@@ -26,7 +27,8 @@ export type ModelPricingSnapshot = {
   connectionId: string | null;
   modelKey: string;
   apiModel: string;
-  currency: "USD" | "CNY";
+  /** Runtime snapshots are normalized at the boundary and always use USD. */
+  currency: "USD";
   rates: CatalogRates;
   multiplier: number;
   source: CatalogSource | "configured" | "deepseek-official";

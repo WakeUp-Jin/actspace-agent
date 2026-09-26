@@ -36,7 +36,7 @@ import { CustomModelFields, customModelInputFromDraft, emptyCustomModelFormDraft
 import { CustomConnectionDetail } from "./CustomConnectionDetail";
 import { CustomConnectionWizard } from "./CustomConnectionWizard";
 import { AnthropicKeySetup } from "./AnthropicKeySetup";
-import { ConnectionStatusDot, hostOf, isOfficialAnthropic, protocolLabel } from "./custom-connection-shared";
+import { ConnectionStatusDot, hostOf, isOfficialAnthropic, protocolLabel, protocolLogoKey } from "./custom-connection-shared";
 import { Toggle } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
@@ -179,7 +179,6 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
         key={customDetail.connection.connectionId}
         connection={customDetail.connection}
         autoTest={customDetail.autoTest}
-        logoKey={resolveCatalogLogo(customDetail.connection.catalogId)}
         onConnectionChange={(connection) => setCustomDetail((current) => current ? { ...current, connection } : current)}
         onChanged={async () => { await load(); await onChanged?.(); }}
         onBack={() => setCustomDetail(null)}
@@ -334,7 +333,7 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
             {customConnections.map((connection) => (
               <SettingLinkRow
                 key={connection.connectionId}
-                leading={<ProviderLogo provider={connection.providerId} logoKey={resolveCatalogLogo(connection.catalogId)} />}
+                leading={<ProviderLogo provider={connection.providerId} logoKey={protocolLogoKey(connection.protocol)} />}
                 title={<h4 className="text-act-sm font-medium">{connection.displayName ?? connection.connectionId}</h4>}
                 description={isOfficialAnthropic(connection) ? "Anthropic 官方 API" : `${protocolLabel(connection.protocol)} · ${hostOf(connection.baseUrl)}`}
                 trailing={<ConnectionStatusDot status={connection.lastConnection?.status} />}

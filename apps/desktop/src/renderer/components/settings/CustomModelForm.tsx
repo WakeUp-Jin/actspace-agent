@@ -183,7 +183,7 @@ function priceSummary(connection: SettingsV4ConnectionSettings, apiModel: string
   const entry = findReferenceCatalogModel(apiModel, connection.protocol ?? "openai-completions");
   if (!entry) return { title: "未匹配官方价，只统计 Token" };
   const multiplier = official ? 1 : connection.defaultPricingMultiplier ?? 1;
-  const symbol = entry.currency === "CNY" ? "¥" : "$";
+  const symbol = "$";
   const money = (value: number) => `${symbol}${(value * multiplier).toFixed(2)}`;
   return {
     title: `输入 ${money(entry.rates.input)} · 输出 ${money(entry.rates.output)} · 每百万 Token`,

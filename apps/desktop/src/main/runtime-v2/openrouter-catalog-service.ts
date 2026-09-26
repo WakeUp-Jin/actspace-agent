@@ -1,4 +1,4 @@
-import { deepSeekModelDefinition, MODEL_LIST } from "@actspace/shared";
+import { CNY_PER_USD, deepSeekModelDefinition, MODEL_LIST } from "@actspace/shared";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { CatalogCacheState, CatalogModelView, ModelPricing, ModelReasoningEffort, OpenRouterCatalogCache } from "@actspace/shared";
@@ -104,12 +104,12 @@ export class RuntimeV2OpenRouterCatalogService {
 
   private withPricing(model: CatalogModelView): CatalogModelView {
     if (this.#provider === "deepseek") return { ...deepSeekCatalogModel(model.apiModel, this.#now().toISOString()), added: model.added };
-    if (!this.#pricingCatalog) return model;
+    if (!this.#pricingCatalog) return normalizeCatalogModelPricing(model);
     const fact = this.#pricingCatalog().entries.find((row) => row.sourceProviderId === "openrouter" && row.apiModel === model.apiModel);
     const { pricing: _old, ...rest } = model;
     const rates = fact?.rates;
     if (!rates || rates.input === null || rates.output === null || rates.cacheRead === null || fact?.unsupportedBilling) return { ...rest, isFree: false };
-    return { ...rest, isFree: rates.input === 0 && rates.output === 0 && rates.cacheRead === 0 && (rates.cacheWrite === null || rates.cacheWrite === 0), pricing: { currency: fact.currency, inputCacheMissPerMillion: rates.input, outputPerMillion: rates.output, inputCacheHitPerMillion: rates.cacheRead, ...(rates.cacheWrite === null ? {} : { inputCacheWritePerMillion: rates.cacheWrite }) } };
+    return { ...rest, isFree: rates.input === 0 && rates.output === 0 && rates.cacheRead === 0 && (rates.cacheWrite === null || rates.cacheWrite === 0), pricing: normalizePricingToUsd({ currency: fact.currency, inputCacheMissPerMillion: rates.input, outputPerMillion: rates.output, inputCacheHitPerMillion: rates.cacheRead, ...(rates.cacheWrite === null ? {} : { inputCacheWritePerMillion: rates.cacheWrite }) }) };
   }
 
   async reload(runtime: ProviderNetworkRuntime): Promise<RuntimeV2CatalogResult> {
@@ -272,6 +272,24 @@ function isModelPricing(value: unknown): value is ModelPricing {
     && (value.inputCacheWritePerMillion === undefined || isNonNegativeNumber(value.inputCacheWritePerMillion))
     && isNonNegativeNumber(value.outputPerMillion)
     && (value.reasoningPerMillion === undefined || isNonNegativeNumber(value.reasoningPerMillion));
+}
+
+function normalizeCatalogModelPricing(model: CatalogModelView): CatalogModelView {
+  return model.pricing ? { ...model, pricing: normalizePricingToUsd(model.pricing) } : model;
+}
+
+function normalizePricingToUsd(pricing: ModelPricing): ModelPricing {
+  if (pricing.currency === "USD") return { ...pricing };
+  const convert = (value: number | undefined) => value === undefined ? undefined : value / CNY_PER_USD;
+  return {
+    ...pricing,
+    currency: "USD",
+    inputCacheHitPerMillion: pricing.inputCacheHitPerMillion / CNY_PER_USD,
+    inputCacheMissPerMillion: pricing.inputCacheMissPerMillion / CNY_PER_USD,
+    outputPerMillion: pricing.outputPerMillion / CNY_PER_USD,
+    ...(convert(pricing.inputCacheWritePerMillion) === undefined ? {} : { inputCacheWritePerMillion: convert(pricing.inputCacheWritePerMillion) }),
+    ...(convert(pricing.reasoningPerMillion) === undefined ? {} : { reasoningPerMillion: convert(pricing.reasoningPerMillion) }),
+  };
 }
 
 function isNonNegativeNumber(value: unknown): value is number {

@@ -27,17 +27,17 @@ describe("model config", () => {
     ]);
     expect(ALL_MODEL_LIST.map((model) => model.id)).toContain("kimi-k2.6");
     expect(MODEL_REGISTRY["kimi-k2.6"].visibility).toBe("public");
-    expect(MODEL_REGISTRY["kimi-k2.6"].pricing?.currency).toBe("CNY");
+    expect(MODEL_REGISTRY["kimi-k2.6"].pricing?.currency).toBe("USD");
     expect(MODEL_REGISTRY["kimi-k2.7-code"]).toMatchObject({
       visibility: "public",
       input: ["text", "image"],
       contextWindow: 1_000_000,
       maxTokens: 262_144,
       pricing: {
-        currency: "CNY",
-        inputCacheHitPerMillion: 1.3,
-        inputCacheMissPerMillion: 6.5,
-        outputPerMillion: 27,
+        currency: "USD",
+        inputCacheHitPerMillion: 0.1805555556,
+        inputCacheMissPerMillion: 0.9027777778,
+        outputPerMillion: 3.75,
       },
     });
   });

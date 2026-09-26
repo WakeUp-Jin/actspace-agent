@@ -14,7 +14,7 @@ describe("model catalog", () => {
     const input = { providerId: "deepseek", apiModel: "m", modelKey: "deepseek:m", baseUrl: "https://openrouter.ai/api/v1", multiplier: 2 };
     expect(resolveModelPricing(catalog, input)?.rates.input).toBe(10);
     expect(resolveModelPricing(catalog, { ...input, baseUrl: "https://proxy.test" })).toBeNull();
-    expect(resolveModelPricing(catalog, { ...input, configured: { currency: "CNY", inputCacheMissPerMillion: 4, inputCacheHitPerMillion: 1, outputPerMillion: 8 }, configuredAlreadyMultiplied: true })?.rates.input).toBe(4);
+    expect(resolveModelPricing(catalog, { ...input, configured: { currency: "CNY", inputCacheMissPerMillion: 4, inputCacheHitPerMillion: 1, outputPerMillion: 8 }, configuredAlreadyMultiplied: true })?.rates.input).toBeCloseTo(4 / 7.2);
   });
   it("marks tiered prices unsupported rather than guessing a rate", () => {
     expect(normalizeModelCatalog("models.dev", { deepseek: { models: { m: { id: "m", cost: { input: 1, output: 2, tiers: [{ input: 3 }] } } } } })[0]?.unsupportedBilling).toBe(true);

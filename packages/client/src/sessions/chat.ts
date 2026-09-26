@@ -10,6 +10,7 @@ import {
   type UsageActivityRow,
   type UsageActivityStatus,
   type UsageActivityTokens,
+  CNY_PER_USD,
 } from "@actspace/shared";
 import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot, RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
@@ -153,8 +154,10 @@ export function projectChatEvents(
       const cacheHitTokens = nonNegative(usage.cacheReadTokens);
       const cacheMissTokens = nonNegative(usage.cacheWriteTokens);
       const reasoningTokens = nonNegative(usage.reasoningTokens);
-      const currency = string(usage.costCurrency)?.toUpperCase() === "CNY" ? "CNY" as const : "USD" as const;
-      const totalCost = nonNegative(usage.cost);
+      const currency = "USD" as const;
+      const rawCurrency = string(usage.costCurrency)?.toUpperCase();
+      const rawCost = nonNegative(usage.cost);
+      const totalCost = rawCurrency === "CNY" ? rawCost / CNY_PER_USD : rawCost;
       projected.push({ ...base, id: eventId(event), llmCallId: requestId, type: "llm_usage", payload: { llmCallId: requestId, attempt: 1, durationMs: 0, provider: request?.provider ?? "default", model: request?.model ?? "default", promptTokens, completionTokens, totalTokens: promptTokens + completionTokens + cacheHitTokens + cacheMissTokens, reasoningTokens, cacheHitTokens, cacheMissTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: totalCost, currency } } });
       continue;
     }
@@ -491,7 +494,8 @@ function activityCost(usage: EventRecord): Pick<UsageActivityRow, "costUsd" | "c
   const unknown = { costUsd: null, costAmount: null, costCurrency: null, costBasis: "unavailable" as const, ...(provenance ? { costProvenance: provenance } : {}) };
   if (cost === null || (currency !== "USD" && currency !== "CNY") || provenance?.basis === "unknown") return unknown;
   if (!provenance && cost === 0) return unknown;
-  return { costUsd: currency === "USD" ? cost : null, costAmount: cost, costCurrency: currency, costBasis: provenance?.basis === "provider-reported" ? "priced" : "estimated", ...(provenance ? { costProvenance: provenance } : { historicalUnverified: true }) };
+  const usd = currency === "CNY" ? cost / CNY_PER_USD : cost;
+  return { costUsd: usd, costAmount: usd, costCurrency: "USD", costBasis: provenance?.basis === "provider-reported" ? "priced" : "estimated", ...(provenance ? { costProvenance: provenance } : { historicalUnverified: true }) };
 }
 
 function requestActivityStatus(reason: string | null): UsageActivityStatus {

@@ -68,7 +68,7 @@
 
 - 尾栏按 `turnId` 聚合该轮全部 `llm_usage`，包括工具调用前后的多次模型请求和失败重试产生的真实消耗。
 - 聚合结果只挂到该 turn 最后一条可见 Assistant 回复；不能只读取最终正文对应的单次调用，否则会漏掉 Agent 中间调用费用。
-- USD 与 CNY 的折算复用 shared 层统一函数，当前固定口径为 `7.2 CNY = 1 USD`，与 Usage Statistics 页面一致。
+- 外部接口返回 CNY 时，在 shared 边界按 `7.2 CNY = 1 USD` 转成 USD；消息区只读取已经归一化的 USD 费用。
 - 费用允许显示最多 6 位小数，避免低成本调用被四舍五入成 `$0.00`。
 - 旧 session 没有 `llm_usage` 时只展示时间和操作，不伪造 token 或费用。
 

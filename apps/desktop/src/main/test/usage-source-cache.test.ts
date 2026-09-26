@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, it, vi } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
@@ -35,5 +35,20 @@ it("uses the Journal-derived revision when the Global Index lags, and skips only
   expect(sources.map(source => [source.sessionId, source.throughJournalSeq])).toEqual([["lagging", 0]]);
   expect(warn).toHaveBeenCalledTimes(1);
   warn.mockRestore();
+  await rm(root, { recursive: true, force: true });
+});
+
+it("clears the existing usage index once when USD-only usage is introduced", async () => {
+  const root = await mkdtemp(join(tmpdir(), "usage-source-cache-"));
+  await writeFile(join(root, "global-usage-index.json"), JSON.stringify({ version: 1, sources: [{ sessionId: "s", title: "old", throughJournalSeq: -1, rows: [{ activityId: "old" }] }] }));
+  const reader = {
+    globalSessionSummaries: vi.fn(async () => [{ sessionId: "s", throughJournalSeq: -1, summaryVersion: 1, createdAt: "2026-09-22T00:00:00Z", updatedAt: "2026-09-22T00:00:00Z", workspaceRoot: null, profileId: "test", title: "s", pinned: false, archived: false, completedTurnCount: 0, usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null }, accessState: "read-write" as const, lineage: null }]),
+    inspectSession: vi.fn(async () => ({ sessionId: "s", throughJournalSeq: -1, metadata: { title: "s" }, messages: [], tools: [] } as unknown as RuntimeV2SessionSnapshot)),
+    inspectSessionEvents: vi.fn(async () => []),
+  };
+  const cache = new UsageSourceCache(reader, root, () => new Date("2026-09-26T00:00:00.000Z"));
+  expect((await cache.read())[0]?.rows).toEqual([]);
+  expect(JSON.parse(await readFile(join(root, "global-usage-reset.json"), "utf8"))).toEqual({ version: 1, resetAt: "2026-09-26T00:00:00.000Z" });
+  expect(reader.inspectSession).toHaveBeenCalledTimes(1);
   await rm(root, { recursive: true, force: true });
 });

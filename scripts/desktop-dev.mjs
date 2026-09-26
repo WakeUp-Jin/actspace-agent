@@ -110,12 +110,14 @@ async function closeLog() {
 async function main() {
   await initializeLogging();
   const phases = [
-    ["pnpm", ["--filter", "@actspace/desktop", "run", "build:deps"], repoRoot],
+    ["pnpm", ["--filter", "@actspace/desktop", "run", "build:deps:dev"], repoRoot],
     ["pnpm", [
       "exec",
       "concurrently",
       "-k",
-      "pnpm:dev:shared",
+      "pnpm:dev:deps",
+      "pnpm:dev:client-bundle",
+      "pnpm:dev:prompts",
       "pnpm:dev:renderer",
       "pnpm:dev:electron:build",
       "pnpm:dev:electron:run",

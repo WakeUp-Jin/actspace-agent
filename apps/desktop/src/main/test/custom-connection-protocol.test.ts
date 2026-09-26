@@ -200,7 +200,7 @@ it("manually adds, edits, defaults and deletes connection-scoped models with pri
   await reloaded.load();
   const persisted = new ModelStoreService({ settings: reloaded }).listInstalledModels().find((model) => model.definition.apiModel === "claude-backup")!;
   expect(persisted).toMatchObject({
-    definition: { label: "Backup Updated", contextWindow: 300_000, capabilities: { input: ["text", "image"] }, pricing: { currency: "CNY", inputCacheWritePerMillion: 4 } },
+    definition: { label: "Backup Updated", contextWindow: 300_000, capabilities: { input: ["text", "image"] }, pricing: { currency: "USD", inputCacheWritePerMillion: 4 / 7.2 } },
     settings: { enabled: false, connectionId: "priced-relay" },
   });
   expect(reloaded.getV4().settings.models.connections["priced-relay"]?.defaultModel).toBe("claude-backup");

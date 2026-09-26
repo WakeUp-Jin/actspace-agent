@@ -8,6 +8,7 @@ import {
   type CustomConnectionProbeResult,
   type CustomModelDraftInput,
   type ModelApi,
+  type ProviderLogoKey,
   type ProviderConnectionErrorKind,
   type SettingsV4ConnectionSettings,
 } from "@actspace/shared";
@@ -57,6 +58,10 @@ export const DEFAULT_RELAY_MULTIPLIER = 0.3;
 
 export function protocolLabel(protocol: ModelApi | undefined): string {
   return PROTOCOL_OPTIONS.find((option) => option.value === (protocol ?? "openai-completions"))!.label;
+}
+
+export function protocolLogoKey(protocol: ModelApi | undefined): ProviderLogoKey {
+  return protocol === "anthropic-messages" ? "anthropic" : "openai";
 }
 
 export function hostOf(url: string | null | undefined): string {

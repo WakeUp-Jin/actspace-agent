@@ -123,14 +123,13 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
     contextWindow: 256_000,
     maxTokens: 8192,
     visibility: "public",
-    // Kimi（Moonshot）按人民币计价；单价为 CNY/百万 token（由公开 USD 单价 $0.95/$4.00、
-    // 缓存命中约 $0.13 按 ≈7.2 一次性换算而来，仅作示意，接真实项目时改成 Moonshot 官网公布的
-    // CNY 价目即可）。
+    // Model pricing is stored in USD per million tokens. External CNY prices are
+    // converted at the boundary before they enter the runtime model registry.
     pricing: {
-      currency: "CNY",
-      inputCacheHitPerMillion: 0.936,
-      inputCacheMissPerMillion: 6.84,
-      outputPerMillion: 28.8,
+      currency: "USD",
+      inputCacheHitPerMillion: 0.13,
+      inputCacheMissPerMillion: 0.95,
+      outputPerMillion: 4,
     },
   },
   "kimi-k2.7-code": {
@@ -148,10 +147,10 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
     maxTokens: 262_144,
     visibility: "public",
     pricing: {
-      currency: "CNY",
-      inputCacheHitPerMillion: 1.3,
-      inputCacheMissPerMillion: 6.5,
-      outputPerMillion: 27,
+      currency: "USD",
+      inputCacheHitPerMillion: 0.1805555556,
+      inputCacheMissPerMillion: 0.9027777778,
+      outputPerMillion: 3.75,
     },
   },
 };

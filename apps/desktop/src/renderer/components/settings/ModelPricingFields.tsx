@@ -1,8 +1,8 @@
 import type { ModelPricing } from "@actspace/shared";
-import { SettingRow, SettingsInput, SettingsSelect } from "./SettingsPrimitives";
+import { SettingRow, SettingsInput } from "./SettingsPrimitives";
 
 export type ModelPricingDraft = {
-  currency: ModelPricing["currency"];
+  currency: "USD";
   input: string;
   output: string;
   cacheRead: string;
@@ -20,7 +20,7 @@ export const EMPTY_MODEL_PRICING: ModelPricingDraft = {
 export function pricingDraftFromModel(pricing?: ModelPricing): ModelPricingDraft {
   if (!pricing) return { ...EMPTY_MODEL_PRICING };
   return {
-    currency: pricing.currency,
+    currency: "USD",
     input: String(pricing.inputCacheMissPerMillion),
     output: String(pricing.outputPerMillion),
     cacheRead: String(pricing.inputCacheHitPerMillion),
@@ -34,7 +34,7 @@ export function modelPricingFromDraft(enabled: boolean, draft: ModelPricingDraft
   const outputPerMillion = parseRate(draft.output, "输出");
   const inputCacheHitPerMillion = parseRate(draft.cacheRead, "缓存读取");
   const inputCacheWritePerMillion = parseRate(draft.cacheWrite, "缓存写入");
-  return { currency: draft.currency, inputCacheMissPerMillion, outputPerMillion, inputCacheHitPerMillion, inputCacheWritePerMillion };
+  return { currency: "USD", inputCacheMissPerMillion, outputPerMillion, inputCacheHitPerMillion, inputCacheWritePerMillion };
 }
 
 const RATE_FIELDS = [
@@ -46,14 +46,14 @@ const RATE_FIELDS = [
 
 /** 币种 + 四项单价，每项一行；放在 SettingGroup 里使用。 */
 export function ModelPricingFields({ draft, onChange }: { draft: ModelPricingDraft; onChange: (draft: ModelPricingDraft) => void }) {
-  const unit = `${draft.currency === "CNY" ? "¥" : "$"} / 百万`;
+  const unit = "$ / 百万";
   return (
     <>
       <SettingRow
         indent
         tight
         title="币种"
-        control={<SettingsSelect size="sm" ariaLabel="币种" value={draft.currency} options={[{ value: "USD", label: "USD" }, { value: "CNY", label: "CNY" }]} onChange={(currency) => onChange({ ...draft, currency: currency as ModelPricing["currency"] })} />}
+        control={<span className="text-act-xs text-text-muted">USD</span>}
       />
       {RATE_FIELDS.map((field) => (
         <SettingRow

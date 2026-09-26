@@ -34,6 +34,7 @@ import {
   hostOf,
   isOfficialAnthropic,
   protocolLabel,
+  protocolLogoKey,
 } from "./custom-connection-shared";
 
 type EditorId = "name" | "url" | "key" | "proxy";
@@ -48,11 +49,10 @@ const BILLING_OPTIONS: { value: CustomConnectionBillingMode; label: string }[] =
  * 自定义连接详情：每一项单独编辑。地址、Key、认证方式、代理变化后自动重新测试，
  * 因为主进程会把这些变化视为「需要重测」并清掉旧结果。
  */
-export function CustomConnectionDetail({ connection, autoTest = false, logoKey, onConnectionChange, onChanged, onBack, onRemove }: {
+export function CustomConnectionDetail({ connection, autoTest = false, onConnectionChange, onChanged, onBack, onRemove }: {
   connection: SettingsV4ConnectionSettings;
   /** 刚创建、还没测通时进入详情页，自动测一次。 */
   autoTest?: boolean;
-  logoKey?: Parameters<typeof ProviderLogo>[0]["logoKey"];
   onConnectionChange: (connection: SettingsV4ConnectionSettings) => void;
   onChanged?: () => void | Promise<void>;
   onBack: () => void;
@@ -186,7 +186,7 @@ export function CustomConnectionDetail({ connection, autoTest = false, logoKey, 
       <SetupHeader
         backLabel="模型"
         onBack={onBack}
-        logo={<ProviderLogo provider={connection.providerId} logoKey={official ? "anthropic" : logoKey ?? "generic"} />}
+        logo={<ProviderLogo provider={connection.providerId} logoKey={protocolLogoKey(protocol)} />}
         title={name}
         subtitle={<>{official ? "Anthropic 官方" : `${protocolLabel(protocol)} · ${hostOf(connection.baseUrl)}`}<span aria-hidden="true">·</span><ConnectionStatusDot status={status} testing={testing} /></>}
       />

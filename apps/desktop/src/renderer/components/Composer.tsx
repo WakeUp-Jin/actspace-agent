@@ -344,6 +344,7 @@ type ComposerModelOption = {
   label: string;
   provider: LlmProviderId;
   apiModel: string;
+  connectionLabel?: string;
   thinkingDefault: boolean;
   supportsThinkingToggle: boolean;
   reasoningEfforts?: ModelReasoningEffort[] | null;
@@ -568,6 +569,7 @@ export function Composer({
         label: model.label,
         provider: model.provider,
         apiModel: model.apiModel,
+        connectionLabel: model.connectionLabel,
         thinkingDefault: model.thinkingDefault,
         supportsThinkingToggle: model.capabilities.thinkingToggle,
         reasoningEfforts: model.capabilities.reasoningEfforts,
@@ -1791,7 +1793,7 @@ export function Composer({
               {filteredModelGroups.map((group) => (
                 <div
                   className={MODEL_PROVIDER_GROUP_CLASS}
-                  key={group.provider}
+                  key={`${group.provider}:${group.label}`}
                   role="group"
                   aria-label={group.label}
                 >

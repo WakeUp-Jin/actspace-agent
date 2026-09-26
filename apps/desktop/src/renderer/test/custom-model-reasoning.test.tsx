@@ -27,6 +27,7 @@ it("edits an existing model through models:update without recreating its connect
   const updateModel = vi.fn(async () => ({ ok: true, model }));
   window.actspace = { listInstalledModels: async () => ({ models: [model] }), updateModel } as unknown as typeof window.actspace;
   render(<ModelSettings settings={{ providers: {} } as never} connectionFilter="relay" embedded />);
+  await userEvent.click(await screen.findByRole("button", { name: "选择启用模型" }));
   await userEvent.click(await screen.findByRole("button", { name: "配置推理能力：Relay model" }));
   await userEvent.selectOptions(screen.getByLabelText("能力来源"), "manual");
   await userEvent.selectOptions(screen.getByLabelText("推理支持"), "supported");

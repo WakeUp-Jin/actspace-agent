@@ -17,6 +17,7 @@ import {
   MoreSettings,
   MultiplierStepper,
   PROTOCOL_OPTIONS,
+  protocolLogoKey,
   ProbeResultNotice,
   SecretInput,
   SetupFooter,
@@ -144,7 +145,7 @@ export function CustomConnectionWizard({ onCancel, onSaved }: { onCancel: () => 
 
   return (
     <div className="flex w-full flex-col gap-6" onKeyDown={(event) => { if (event.key === "Escape" && !saving) onCancel(); }}>
-      <SetupHeader backLabel="添加连接" onBack={onCancel} logo={<ProviderLogo provider="openrouter" logoKey="generic" />} title="连接自定义服务">
+      <SetupHeader backLabel="添加连接" onBack={onCancel} logo={<ProviderLogo provider="openrouter" logoKey={protocolLogoKey(protocol)} />} title="连接自定义服务">
         <WizardSteps step={step} />
       </SetupHeader>
 

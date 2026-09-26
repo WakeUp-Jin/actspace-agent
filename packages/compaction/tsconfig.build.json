@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../context/tsconfig.build.json"
+    },
+    {
+      "path": "./../cordis-adapter/tsconfig.build.json"
+    },
+    {
+      "path": "./../llm/service/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/journal/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/persistence/tsconfig.build.json"
+    },
+    {
+      "path": "./../shared/tsconfig.build.json"
+    }
+  ]
+}

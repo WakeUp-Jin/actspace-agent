@@ -4,7 +4,7 @@ import { ProviderNetworkService, type ProviderNetworkRuntime } from "../runtime-
 const NOW = new Date("2026-08-23T06:00:00.000Z");
 
 describe("ProviderNetworkService", () => {
-  const KEY = "sk-secret-provider-key";
+  const KEY = "test-provider-key";
   const anthropicDraft = { protocol: "anthropic-messages" as const, apiKey: KEY, baseUrl: "https://relay.example", model: "", authMode: "auto" as const };
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   const headersOf = (init?: RequestInit) => new Headers(init?.headers);

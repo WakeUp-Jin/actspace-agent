@@ -336,7 +336,7 @@ describe("live subagent projection", () => {
   });
 });
 
-it("keeps unknown, free and original currencies separate across full-query pagination", () => {
+it("keeps unknown and free requests separate across full-query pagination", () => {
   const costs = [
     { cost: 0, costCurrency: "USD", source: "provider-reported" },
     { cost: 0, costCurrency: "USD", costProvenance: { version: 1, basis: "estimated", reason: null, pricingSnapshot: null } },
@@ -345,12 +345,12 @@ it("keeps unknown, free and original currencies separate across full-query pagin
   const journal = costs.flatMap((usage, index) => [event(index * 2, "request/header", { requestId: `r${index}`, turnId: "t", stepId: `s${index}`, model: `m${index}`, routeId: "deepseek" }), event(index * 2 + 1, "assistant/message", { requestId: `r${index}`, finishReason: "stop", usage: { ...usage, inputTokens: 10, outputTokens: 5 } } as unknown as RuntimeV2JsonValue)]);
   const snapshot = baseSnapshot({ throughJournalSeq: 6 });
   const result = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
-  expect(result.costSummary).toEqual({ amountsByCurrency: { USD: 0, CNY: 2 }, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 });
-  expect(result.summary.costUsd).toBe(0);
+  expect(result.costSummary).toEqual({ costUsd: 2 / 7.2, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 });
+  expect(result.summary.costUsd).toBe(2 / 7.2);
   expect(result.aggregates?.models).toHaveLength(3);
   const filtered = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 }, search: "m2", status: "success" })!;
   expect(filtered.rowsPage.totalRows).toBe(1);
-  expect(filtered.costSummary?.amountsByCurrency).toEqual({ CNY: 2 });
+  expect(filtered.costSummary?.costUsd).toBe(2 / 7.2);
 });
 
 it("reuses immutable journal projections for 10,000 requests and invalidates on revision", () => {

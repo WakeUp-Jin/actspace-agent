@@ -1,0 +1,94 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../boot/tsconfig.build.json"
+    },
+    {
+      "path": "./../bundle/tsconfig.build.json"
+    },
+    {
+      "path": "./../compaction/tsconfig.build.json"
+    },
+    {
+      "path": "./../composition/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/tsconfig.build.json"
+    },
+    {
+      "path": "./../cordis-adapter/tsconfig.build.json"
+    },
+    {
+      "path": "./../core/agent/tsconfig.build.json"
+    },
+    {
+      "path": "./../core/agent-loop/tsconfig.build.json"
+    },
+    {
+      "path": "./../core/scope/tsconfig.build.json"
+    },
+    {
+      "path": "./../desktop-app/tsconfig.build.json"
+    },
+    {
+      "path": "./../diagnostics/tsconfig.build.json"
+    },
+    {
+      "path": "./../english-learning/tsconfig.build.json"
+    },
+    {
+      "path": "./../headless/tsconfig.build.json"
+    },
+    {
+      "path": "./../llm/pi-ai/tsconfig.build.json"
+    },
+    {
+      "path": "./../llm/service/tsconfig.build.json"
+    },
+    {
+      "path": "./../prompt/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/checkpoint-policy/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/journal/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/jsonl/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/persistence/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/projection/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/projection-cache/tsconfig.build.json"
+    },
+    {
+      "path": "./../shared/tsconfig.build.json"
+    },
+    {
+      "path": "./../subagent/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/approval/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/browser-tools/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/core-tools/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/runtime/tsconfig.build.json"
+    }
+  ]
+}

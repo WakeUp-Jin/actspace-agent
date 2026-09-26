@@ -26,7 +26,7 @@ export interface ProviderCredentialAvailability {
 
 export interface ModelSnapshot {
   providers: Record<ProviderId, ProviderAvailability>;
-  connections?: Record<string, ProviderAvailability & { providerId: ProviderId }>;
+  connections?: Record<string, ProviderAvailability & { providerId: ProviderId; displayName?: string }>;
   definitions: Partial<Record<ModelKey, ModelDefinition>>;
   installedModels: Partial<Record<ModelKey, InstalledModelSettings>>;
 }

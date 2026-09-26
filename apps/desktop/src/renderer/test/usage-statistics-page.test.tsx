@@ -5,14 +5,14 @@ import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
 import { mockUsageActivity } from "./fixtures/usageStatisticsFixture";
 import type { SettingsV4Snapshot, UsageActivitySnapshot } from "@actspace/shared";
 
-const data: UsageActivitySnapshot = { ...mockUsageActivity, costSummary: { amountsByCurrency: { USD: 0.12, CNY: 0.3 }, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 }, rows: mockUsageActivity.rows.map((row) => row.costUsd === null ? row : { ...row, costAmount: row.costUsd, costCurrency: "USD", costBasis: "estimated" }) };
+const data: UsageActivitySnapshot = { ...mockUsageActivity, costSummary: { costUsd: 0.12, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 }, rows: mockUsageActivity.rows.map((row) => row.costUsd === null ? row : { ...row, costAmount: row.costUsd, costCurrency: "USD", costBasis: "estimated" }) };
 describe("使用统计", () => {
   it("uses settings title, shows known amounts separately and shows mixed compact logs and toggles the whole detail table", async () => {
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={data} />);
     expect(screen.getByRole("heading", { name: "使用统计" })).toBeInTheDocument();
     expect(screen.getByText("已知费用")).toBeInTheDocument();
     expect(screen.getByText(/另有 1 次请求缺少费用依据/)).toBeInTheDocument();
-    expect(screen.getByText(/\$0.12 \/ ¥0.30/)).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "使用概览" })).getByText("$0.12")).toBeInTheDocument();
     expect(screen.queryByText("活动分析")).not.toBeInTheDocument();
     const table = screen.getByRole("table", { name: "请求日志" });
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["时间", "类型", "对象", "会话", "Token", "费用", "耗时", "状态"]);

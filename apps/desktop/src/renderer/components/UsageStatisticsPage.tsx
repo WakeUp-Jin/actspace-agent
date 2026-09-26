@@ -31,7 +31,7 @@ const tableHead = "border-b border-line bg-surface-subtle text-left text-act-xs 
 const numberCell = `${cell} text-right tabular-nums whitespace-nowrap`;
 const labels: Record<string, string> = { success: "成功", error: "失败", aborted: "已中止", running: "进行中", unknown: "未知" };
 const number = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("zh-CN");
-const money = (summary?: UsageCostSummary) => !summary || summary.knownCostRequestCount === 0 ? "费用未知" : Object.entries(summary.amountsByCurrency).map(([currency, amount]) => formatUsageAmount(amount, currency)).join(" / ");
+const money = (summary?: UsageCostSummary) => !summary || summary.knownCostRequestCount === 0 ? "费用未知" : formatUsageAmount(summary.costUsd, "USD");
 
 export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, onRefresh, onRequestPageChange, settingsV4, onUpdateNamespace }: Props) {
   const saved = settingsV4?.settings.activity.usage;
@@ -71,7 +71,7 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
       {isLoading && !data ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-act-sm text-text-faint">正在读取使用记录…</div> : <section aria-label="使用概览" className="-mt-5 grid grid-cols-4 gap-2.5 max-[800px]:grid-cols-2 max-[400px]:grid-cols-1">
         <Metric label="请求数" value={number(summary?.requestCount)} detail="模型调用" />
         <Metric label="Token 用量" value={number(summary?.totalTokens)} detail={`输入 ${number(summary?.inputTokens)} · 输出 ${number(summary?.outputTokens)}`} />
-        <Metric label={cost?.knownCostRequestCount && cost.unknownCostRequestCount ? "已知费用" : "费用"} value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unknownCostRequestCount ? `${cost.knownCostRequestCount ? "另有 " : ""}${cost.unknownCostRequestCount} 次请求缺少费用依据` : cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : "按请求记录 · 各币种分别汇总"} warn={Boolean(cost?.unknownCostRequestCount || cost?.unverifiedHistoricalRequestCount)} />
+        <Metric label={cost?.knownCostRequestCount && cost.unknownCostRequestCount ? "已知费用" : "费用"} value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unknownCostRequestCount ? `${cost.knownCostRequestCount ? "另有 " : ""}${cost.unknownCostRequestCount} 次请求缺少费用依据` : cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : "按请求记录 · USD 汇总"} warn={Boolean(cost?.unknownCostRequestCount || cost?.unverifiedHistoricalRequestCount)} />
         <Metric label="缓存命中率" value={hitRate} detail={`${number(summary?.cacheReadTokens)} 缓存 Token`} />
       </section>}
       <section className="flex min-w-0 flex-col gap-3">
@@ -95,7 +95,7 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
                 <td className={cell}>{row.kind === "llm_request" ? <UsageHoverCard row={row} view="model"><span className="block truncate font-mono text-act-xs">{row.model?.replace(/^[^:]+:/, "") ?? "未知模型"}</span></UsageHoverCard> : <CellHint text={row.toolName ?? "未知工具"}><span className="block truncate">{row.toolName ?? "未知工具"}</span></CellHint>}</td>
                 <td className={cell}><CellHint text={row.sessionTitle ?? row.sessionId}><span className="block truncate text-text-muted">{row.sessionTitle ?? `未命名会话 · ${row.sessionId.slice(0, 8)}`}</span></CellHint></td>
                 <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : <UsageHoverCard row={row} view="tokens">{number(row.tokens.totalTokens)}</UsageHoverCard>}</td>
-                <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : row.costAmount == null ? <span className="text-text-subtle">未知</span> : formatUsageAmount(row.costAmount, row.costCurrency ?? "USD")}</td>
+                <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : row.costAmount == null || row.costCurrency !== "USD" ? <span className="text-text-subtle">未知</span> : formatUsageAmount(row.costAmount, "USD")}</td>
                 <td className={numberCell}>{row.durationMs == null ? "—" : row.durationMs < 1000 ? `${Math.round(row.durationMs)}ms` : `${(row.durationMs / 1000).toFixed(2)}s`}</td>
                 <td className={`${cell} whitespace-nowrap`}><StatusDot tone={row.status === "error" ? "error" : row.status === "running" ? "ok" : row.status === "aborted" || row.status === "unknown" ? "warn" : "neutral"}>{labels[row.status]}</StatusDot></td>
               </tr>)}</tbody>

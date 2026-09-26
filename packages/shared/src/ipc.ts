@@ -321,6 +321,8 @@ export type UsableModelView = {
   label: string;
   provider: ProviderId;
   apiModel: string;
+  connectionId?: string;
+  connectionLabel?: string;
   contextWindow: number | null;
   thinkingDefault: boolean;
   capabilities: ModelDefinition["capabilities"];
@@ -1125,7 +1127,7 @@ export type UsageActivityRow = {
   costUsd: number | null;
   costBasis: UsageActivityCostBasis;
   costAmount?: number | null;
-  costCurrency?: string | null;
+  costCurrency?: "USD" | null;
   costProvenance?: import("./model-catalog").UsageCostProvenance;
   historicalUnverified?: boolean;
   status: UsageActivityStatus;
@@ -1166,7 +1168,7 @@ export type UsageActivityRowsPage = {
 };
 
 export type UsageCostSummary = {
-  amountsByCurrency: Record<string, number>;
+  costUsd: number;
   knownCostRequestCount: number;
   unknownCostRequestCount: number;
   unverifiedHistoricalRequestCount: number;

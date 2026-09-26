@@ -14,6 +14,7 @@ import { ModelSettings } from "../components/settings/ModelSettings";
 import { TaskModelDefaultsSection } from "../components/settings/SettingsPage";
 import { OpenRouterModelCatalogDialog } from "../components/settings/OpenRouterModelCatalogDialog";
 import { ProviderLogo } from "../components/settings/ProviderLogo";
+import { protocolLogoKey } from "../components/settings/custom-connection-shared";
 
 type ActspaceBridge = NonNullable<typeof window.actspace>;
 const readyCredentialStorage = { status: "ready" as const };
@@ -535,6 +536,12 @@ describe("provider and model settings", () => {
     expect(document.querySelector('[data-provider-logo="deepseek"]')).toBeInTheDocument();
     expect(document.querySelector('[data-provider-logo="moonshot"]')).toBeInTheDocument();
     expect(document.querySelector('[data-provider-logo="openrouter"]')).toBeInTheDocument();
+  });
+
+  it("maps custom connection protocols to the matching provider mark", () => {
+    expect(protocolLogoKey("openai-completions")).toBe("openai");
+    expect(protocolLogoKey("openai-responses")).toBe("openai");
+    expect(protocolLogoKey("anthropic-messages")).toBe("anthropic");
   });
 
   it("renders a required key label and primary save action on setup", async () => {

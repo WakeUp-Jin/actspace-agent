@@ -35,6 +35,7 @@
     "check:site": "pnpm --filter @actspace/site check",
     "ci": "./scripts/ci.sh",
     "check:docs": "./scripts/check-docs.sh",
+    "check:desktop-build-graph": "node scripts/generate-desktop-build-graph.mjs --check",
     "check:current-docs": "node scripts/check-current-docs.mjs",
     "check:secrets": "./scripts/check-secrets.sh",
     "check:v2-legacy-removal": "node scripts/check-v2-legacy-removal.mjs",
