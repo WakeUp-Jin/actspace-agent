@@ -226,6 +226,67 @@ describe("App streaming user message", () => {
     }
   });
 
+  function setupSingleSessionArchive() {
+    const active = createEmptySessionRecord("archive-active");
+    active.meta.title = "Active session";
+    const target = createEmptySessionRecord("archive-target");
+    target.meta.title = "Archive target";
+    const records = new Map([[active.meta.id, active], [target.meta.id, target]]);
+    const sessions: SessionListItem[] = [active, target].map((record) => ({
+      id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0,
+    }));
+    let resolveArchive!: (result: { ok: boolean; error?: string }) => void;
+    const archiveSession = vi.fn(() => new Promise<{ ok: boolean; error?: string }>((resolve) => { resolveArchive = resolve; }));
+    const listSessions = vi.fn(async () => sessions);
+    window.actspace = {
+      ...settingsApiStub,
+      getBootstrapState: async () => bootstrapState,
+      listSessions,
+      getSession: async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null,
+      createSession: async () => active,
+      abortAgentRun: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      listPendingApprovals: async () => [],
+      archiveSession,
+      onAgentStream: () => () => {},
+      runAgent: vi.fn(),
+    } as unknown as Window['actspace'];
+    return { archiveSession, listSessions, resolveArchive: (result: { ok: boolean; error?: string }) => resolveArchive(result) };
+  }
+
+  it("hides a single session before a slow archive IPC finishes", async () => {
+    const { archiveSession, listSessions, resolveArchive } = setupSingleSessionArchive();
+    renderApp();
+    const row = (await screen.findByText("Archive target")).closest(".session-row") as HTMLElement;
+    const initialLists = listSessions.mock.calls.length;
+    fireEvent.click(within(row).getByRole("button", { name: "归档会话" }));
+    expect(archiveSession).toHaveBeenCalledWith({ sessionId: "archive-target", archived: true });
+    expect(document.querySelector('[data-session-id="archive-target"]')).toBeNull();
+    await act(async () => resolveArchive({ ok: true }));
+    expect(listSessions).toHaveBeenCalledTimes(initialLists);
+    expect(document.querySelector('[data-session-id="archive-target"]')).toBeNull();
+  });
+
+  it("restores a single session when archive IPC reports failure", async () => {
+    const { listSessions, resolveArchive } = setupSingleSessionArchive();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      renderApp();
+      const row = (await screen.findByText("Archive target")).closest(".session-row") as HTMLElement;
+      const initialLists = listSessions.mock.calls.length;
+      fireEvent.click(within(row).getByRole("button", { name: "归档会话" }));
+      expect(document.querySelector('[data-session-id="archive-target"]')).toBeNull();
+      await act(async () => resolveArchive({ ok: false, error: "disk failed" }));
+      expect(listSessions).toHaveBeenCalledTimes(initialLists + 1);
+      expect(document.querySelector('[data-session-id="archive-target"]')).not.toBeNull();
+      expect(errorLog).toHaveBeenCalledWith("Failed to archive session", expect.any(Error));
+    } finally {
+      errorLog.mockRestore();
+    }
+  });
+
   it("archives every workspace session including pinned sessions", async () => {
     const user = userEvent.setup();
     const now = new Date().toISOString();

@@ -152,6 +152,7 @@
 - Pin 与 Archive 只在行 hover 或各自获得 keyboard focus 时淡入；已置顶通过填充 Pin 表达，但不在非 hover 状态常显。
 - actions 固定预留 46px，避免 hover 时标题截断位置或时间戳横向跳动。
 - 非当前会话点击 Archive 会调用 `archiveSession({ sessionId, archived: true })`，写入 `SessionMeta.archived` 后从普通侧边栏列表隐藏。
+- 点击 Archive 后先从 renderer 侧栏移除目标行，不等待 Journal 持久化完成；IPC 返回失败或异常时重新读取会话列表恢复目标行。
 - 当前 active session 不允许归档，Archive 按钮保持占位但禁用，`aria-label` / `title` 为 `Current session cannot be archived`，避免当前工作区被操作清空或自动跳转。
 - 行尾不显示状态点，避免左右两边出现语义相同的圆点。
 

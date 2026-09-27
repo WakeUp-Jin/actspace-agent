@@ -2398,15 +2398,20 @@ export function App() {
         return;
       }
 
+      setSessions((current) => current.filter((session) => session.id !== sessionId));
       try {
-        await window.actspace.archiveSession({ sessionId, archived: true });
-        const refreshed = await readSidebarSessions();
-        setSessions(refreshed);
+        const result = await window.actspace.archiveSession({ sessionId, archived: true });
+        if (!result.ok) throw new Error(result.error ?? "Archive request failed");
       } catch (error) {
         console.error("Failed to archive session", error);
+        try {
+          setSessions(await readSidebarSessions());
+        } catch (refreshError) {
+          console.error("Failed to restore sessions after archive failure", refreshError);
+        }
       }
     },
-    [activeSessionId],
+    [activeSessionId, readSidebarSessions],
   );
 
   const handleOpenWorkspace = useCallback(async (workspaceId: string) => {
