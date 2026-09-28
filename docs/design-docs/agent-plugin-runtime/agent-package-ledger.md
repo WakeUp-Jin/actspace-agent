@@ -39,7 +39,14 @@
 | `@actspace/prompt` | `actspace.prompt` | `prompt.default` | required |
 | `@actspace/tools-runtime` | `actspace.tools.runtime` | `tools.runtime` | required |
 | `@actspace/tools-approval` | `actspace.tools.approval` | `tools.approval` | required |
-| `@actspace/tools-core-tools` | `actspace.tools.core` | `tools.core` | required |
+| `@actspace/tools-filesystem-read` | `actspace.filesystem-read` | `tools.filesystem-read` | required by default, startup disable supported |
+| `@actspace/tools-filesystem-search` | `actspace.filesystem-search` | `tools.filesystem-search` | required by default, startup disable supported |
+| `@actspace/tools-filesystem-write` | `actspace.filesystem-write` | `tools.filesystem-write` | required by default, startup disable supported |
+| `@actspace/tools-shell-tools` | `actspace.shell-tools` | `tools.shell-tools` | required by default, startup disable supported |
+| `@actspace/tools-web-tools` | `actspace.web-tools` | `tools.web-tools` | required by default, startup disable supported |
+| `@actspace/tools-image-generation` | `actspace.image-generation` | `tools.image-generation` | required by default, startup disable supported |
+| `@actspace/tools-image-inspection` | `actspace.image-inspection` | `tools.image-inspection` | required by default, startup disable supported |
+| `@actspace/tools-todo-tools` | `actspace.todo` | `tools.todo` | required by default, startup disable supported |
 | `@actspace/tools-browser-tools` | `actspace.tools.browser` | `tools.browser` | optional capability |
 | `@actspace/subagent` | `actspace.subagent` | `subagent.one-shot` | required |
 | `@actspace/compaction` | `actspace.compaction` | `compaction.surface` | required |

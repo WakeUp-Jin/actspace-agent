@@ -1,5 +1,5 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { mergeRuntimeV2TodoItems, type FileGrantSelector, type GrantAccess, type GrantAction, type GrantAudience, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
+import { type FileGrantSelector, type GrantAccess, type GrantAction, type GrantAudience, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
 import { SessionProjectionRegistry } from "./registry.js";
 
 export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;
@@ -42,30 +42,6 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
       if (event.type === "session/pinned-set" && typeof data.pinned === "boolean") return { ...state, pinned: data.pinned };
       if (event.type === "session/archived-set" && typeof data.archived === "boolean") return { ...state, archived: data.archived };
       return state;
-    },
-  });
-  registry.register<SessionFacts["todos"]>({
-    key: "todos", stateVersion: 1, init: () => [], view: state => state,
-    apply: (state, event) => {
-      if (!event.type.startsWith("todo/")) return state;
-      const data = record(event.data);
-      if (event.type === "todo/write" && Array.isArray(data.items)) {
-        const items = data.items.filter((value): value is Readonly<Record<string, unknown>> => value !== null && typeof value === "object" && !Array.isArray(value)) as readonly Readonly<Record<string, unknown>>[];
-        return mergeRuntimeV2TodoItems(state, items, redact, event.time);
-      }
-      const todoId = text(data.todoId); const revision = data.revision;
-      if (!todoId || typeof revision !== "number" || !Number.isSafeInteger(revision)) return state;
-      const previous = state.find(item => item.todoId === todoId);
-      const activeForm = typeof data.activeForm === "string" ? redact(data.activeForm, 500) : previous?.activeForm;
-      const createdAt = text(data.createdAt) ?? previous?.createdAt;
-      const updatedAt = text(data.updatedAt) ?? previous?.updatedAt;
-      const item: SessionFacts["todos"][number] = {
-        todoId: redact(todoId, 240), revision,
-        text: typeof data.text === "string" ? redact(data.text, 500) : previous?.text ?? "",
-        state: data.state === "pending" || data.state === "in_progress" || data.state === "completed" || data.state === "cancelled" ? data.state : previous?.state ?? "pending",
-        ...(activeForm === undefined ? {} : { activeForm }), ...(createdAt == null ? {} : { createdAt }), ...(updatedAt == null ? {} : { updatedAt }),
-      };
-      return [...state.filter(item => item.todoId !== todoId), item].sort((a, b) => a.todoId.localeCompare(b.todoId));
     },
   });
   registry.register<SessionFacts["delegations"]>({
@@ -118,7 +94,7 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
 
 export function sessionFacts(registry: SessionProjectionRegistry, sessionId: string): SessionFacts {
   const values = registry.snapshot(sessionId).values;
-  return { permissionMode: values.permissionMode as PermissionMode, sessionGrants: values.sessionGrants as SessionFacts["sessionGrants"], metadata: values.metadata as SessionFacts["metadata"], todos: values.todos as SessionFacts["todos"], delegations: values.delegations as SessionFacts["delegations"], activity: values.sessionStats as SessionFacts["activity"], usage: values.providerUsage as SessionFacts["usage"], pendingInbox: values.pendingInbox as SessionFacts["pendingInbox"] };
+  return { permissionMode: values.permissionMode as PermissionMode, sessionGrants: values.sessionGrants as SessionFacts["sessionGrants"], metadata: values.metadata as SessionFacts["metadata"], todos: (values.todos ?? []) as SessionFacts["todos"], delegations: values.delegations as SessionFacts["delegations"], activity: values.sessionStats as SessionFacts["activity"], usage: values.providerUsage as SessionFacts["usage"], pendingInbox: values.pendingInbox as SessionFacts["pendingInbox"] };
 }
 
 export function projectPermissionMode(events: readonly SessionEventEnvelopeV1[]): PermissionMode {

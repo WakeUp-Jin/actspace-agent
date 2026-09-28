@@ -12,6 +12,7 @@ import { applySessionRecovery, classifySessionRecoveryAccess, type SessionRecove
 import { SessionReadModel } from "../projection/durable-session.js";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import type { SessionProjectionService } from "@actspace/session-projection";
 
 export class RuntimeSessionController {
   readonly store: SessionStore;
@@ -29,7 +30,7 @@ export class RuntimeSessionController {
 
   private liveModel(session: SessionHandle): SessionReadModel {
     let model = this.#models.get(session.header.sessionId);
-    if (!model) { model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist).replay(session.journal.events); this.#models.set(session.header.sessionId, model); return model; }
+    if (!model) { model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(session.journal.events); this.#models.set(session.header.sessionId, model); return model; }
     const seq = model.projections.throughSeq(session.header.sessionId);
     for (const event of session.journal.events.slice(seq + 1)) {
       const values = model.apply(event)?.values ?? {};
@@ -43,7 +44,7 @@ export class RuntimeSessionController {
     const live = this.#open.get(sessionId);
     if (live) { const model = this.liveModel(live); return { model, snapshot: model.snapshot(live.journal.validation.accessState) }; }
     const read = await this.#cache.read(sessionId);
-    const model = new SessionReadModel(read.header, this.options.registry, this.options.rendererAllowlist);
+    const model = new SessionReadModel(read.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService);
     model.projections.restore(sessionId, read.checkpoint);
     const snapshot = model.snapshot(read.accessState);
     await this.repairGlobalIndex(snapshot, model.header.createdWith.profileId);
@@ -163,7 +164,7 @@ export class RuntimeSessionController {
     return { items, indexing: false, failed };
   }
   async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
-  constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void> }, store?: SessionStore) { this.store = store ?? new SessionStore({ dataRoot: options.dataRoot, runtimeId: options.runtimeId, registry: options.registry }); this.#cache = new SessionProjectionCache({ root: options.dataRoot, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist).projections }); this.#globalIndex = new GlobalSessionIndex(options.dataRoot); }
+  constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; projectionService?: SessionProjectionService; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void> }, store?: SessionStore) { this.store = store ?? new SessionStore({ dataRoot: options.dataRoot, runtimeId: options.runtimeId, registry: options.registry }); this.#cache = new SessionProjectionCache({ root: options.dataRoot, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService).projections }); this.#globalIndex = new GlobalSessionIndex(options.dataRoot); }
   private onEvent(sessionId: string): (event: SessionEventEnvelopeV1) => void | Promise<void> {
     return event => {
       const model = this.#models.get(sessionId);

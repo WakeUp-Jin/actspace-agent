@@ -6,6 +6,15 @@ import type { PluginManifest } from "@actspace/cordis-adapter";
 import { BASE_BUNDLE } from "./base.bundle.js";
 import { KERNEL_BUNDLE } from "./kernel.bundle.js";
 import { manifest as headlessManifest } from "@actspace/headless/manifest";
+import { manifest as todoManifest } from "@actspace/tools-todo-tools/manifest";
+
+import { manifest as filesystemreadManifest } from "@actspace/tools-filesystem-read/manifest";
+import { manifest as filesystemsearchManifest } from "@actspace/tools-filesystem-search/manifest";
+import { manifest as filesystemwriteManifest } from "@actspace/tools-filesystem-write/manifest";
+import { manifest as shelltoolsManifest } from "@actspace/tools-shell-tools/manifest";
+import { manifest as webtoolsManifest } from "@actspace/tools-web-tools/manifest";
+import { manifest as imagegenerationManifest } from "@actspace/tools-image-generation/manifest";
+import { manifest as imageinspectionManifest } from "@actspace/tools-image-inspection/manifest";
 
 export const RUNTIME_PROFILE_IDS = Object.freeze({
   headless: "actspace.headless",
@@ -19,10 +28,8 @@ const DEPENDENCIES: Readonly<Record<string, readonly string[]>> = Object.freeze(
   prompt: ["scope", "skills"],
   "agent.registry": ["scope", "session.persistence"],
   inbox: ["session.persistence"],
-  todo: ["session.persistence"],
   compaction: ["session.persistence", "prompt", "llm"],
-  "core-tools": ["tools"],
-  "agent.loop": ["session.persistence", "prompt", "tools", "llm", "agent.registry", "inbox", "todo"],
+  "agent.loop": ["session.persistence", "prompt", "tools", "llm", "agent.registry", "inbox"],
   "subagent.agent": ["agent.loop", "tools", "session.persistence", "scope"],
   "subagent.explore": ["agent.loop", "tools", "session.persistence", "scope"],
 });
@@ -46,7 +53,28 @@ function createBuiltinManifest(plugin: string, name: string, entries: readonly s
 const kernelManifest = createBuiltinManifest("actspace.kernel", "ActSpace Runtime Kernel", KERNEL_BUNDLE.entries);
 const coreManifest = createBuiltinManifest("actspace.core", "ActSpace Agent Core", BASE_BUNDLE.entries);
 const kernelBundle: Bundle = Object.freeze({ id: KERNEL_BUNDLE.id, version: KERNEL_BUNDLE.version, manifests: Object.freeze([kernelManifest]), provenance: "builtin:actspace.kernel" });
-const baseBundle: Bundle = Object.freeze({ id: BASE_BUNDLE.id, version: BASE_BUNDLE.version, manifests: Object.freeze([coreManifest]), provenance: "builtin:actspace.base" });
+export const TOOL_PLUGIN_TRANSPORT = Object.freeze([
+  { manifest: filesystemreadManifest, id: "filesystem-read", packageName: "@actspace/tools-filesystem-read" },
+  { manifest: filesystemsearchManifest, id: "filesystem-search", packageName: "@actspace/tools-filesystem-search" },
+  { manifest: filesystemwriteManifest, id: "filesystem-write", packageName: "@actspace/tools-filesystem-write" },
+  { manifest: shelltoolsManifest, id: "shell-tools", packageName: "@actspace/tools-shell-tools" },
+  { manifest: webtoolsManifest, id: "web-tools", packageName: "@actspace/tools-web-tools" },
+  { manifest: imagegenerationManifest, id: "image-generation", packageName: "@actspace/tools-image-generation" },
+  { manifest: imageinspectionManifest, id: "image-inspection", packageName: "@actspace/tools-image-inspection" },
+  { manifest: todoManifest, id: "todo-tools", packageName: "@actspace/tools-todo-tools" },
+]);
+export async function loadBuiltinToolCodec(specifier: string, manifest: PluginManifest) {
+  const transport = TOOL_PLUGIN_TRANSPORT.find(item => item.manifest.pluginId === manifest.pluginId);
+  if (!transport || !transport.manifest.codecs.some(codec => codec.module === specifier) || specifier !== "./codec.js") throw new Error(`No admitted builtin Codec for ${manifest.pluginId}/${specifier}.`);
+  return import(`${transport.packageName}/codec`) as Promise<{ readonly codecs: readonly import("@actspace/session-journal").EventCodec[] }>;
+}
+export function toolTransportPatches(composition: ResolvedComposition) {
+  return TOOL_PLUGIN_TRANSPORT.map(item => {
+    const entry = composition.entries.find(entry => entry.pluginId === item.manifest.pluginId && entry.entryId === item.manifest.behaviors[0]!.entryId);
+    return { id: item.id, disabled: !entry?.enabled || entry.state === "skipped" };
+  });
+}
+const baseBundle: Bundle = Object.freeze({ id: BASE_BUNDLE.id, version: BASE_BUNDLE.version, manifests: Object.freeze([coreManifest, todoManifest, filesystemreadManifest, filesystemsearchManifest, filesystemwriteManifest, shelltoolsManifest, webtoolsManifest, imagegenerationManifest, imageinspectionManifest]), provenance: "builtin:actspace.base" });
 const browserManifest: PluginManifest = Object.freeze({ schemaVersion: 1, pluginId: pluginId("actspace.browser-tools"), version: "2.0.0", name: "ActSpace Browser Tools", runtimeContract: "actspace.runtime.v2", source: { kind: "builtin" as const, reference: "builtin:actspace.browser-tools" }, codecs: [], behaviors: [{ entryId: entryId("browser-tools"), module: "builtin:browser-tools", required: false, enabled: true, config: {}, host: { required: ["browser" as const], optional: [] }, frontend: null, provides: [serviceId("browser-tools")], injects: [serviceId("tools")] }], contributions: { services: [], events: [], contributions: ["browser-tools"] } });
 const browserBundle: Bundle = Object.freeze({ id: "actspace.host.browser", version: "2.0.0", manifests: Object.freeze([browserManifest]), provenance: "builtin:actspace.host.browser" });
 const headlessBundle: Bundle = Object.freeze({ id: "actspace.headless", version: headlessManifest.version, manifests: Object.freeze([headlessManifest]), provenance: "@actspace/headless" });
@@ -78,7 +106,14 @@ export const TRUSTED_LOADER_ENTRIES = Object.freeze([
   Object.freeze({ id: "context-assembly", name: "@actspace/context/plugin", inject: ["session.journal"] }),
   Object.freeze({ id: "prompt-runtime", name: "@actspace/prompt/plugin", inject: ["actspace.host.prompt", "context.assembly"] }),
   Object.freeze({ id: "compaction-runtime", name: "@actspace/compaction/plugin", inject: ["llm.service"] }),
-  Object.freeze({ id: "core-tools", name: "@actspace/tools-core-tools/plugin", inject: ["tools.runtime", "llm.service", "actspace.host.tools.core"] }),
+  Object.freeze({ id: "filesystem-read", name: "@actspace/tools-filesystem-read/plugin", inject: ["tools.runtime", "actspace.host.tools.filesystem-read"] }),
+  Object.freeze({ id: "filesystem-search", name: "@actspace/tools-filesystem-search/plugin", inject: ["tools.runtime", "actspace.host.tools.filesystem-search"] }),
+  Object.freeze({ id: "filesystem-write", name: "@actspace/tools-filesystem-write/plugin", inject: ["tools.runtime", "actspace.host.tools.filesystem-write"] }),
+  Object.freeze({ id: "shell-tools", name: "@actspace/tools-shell-tools/plugin", inject: ["tools.runtime", "actspace.host.tools.shell-tools"] }),
+  Object.freeze({ id: "web-tools", name: "@actspace/tools-web-tools/plugin", inject: ["tools.runtime", "actspace.host.tools.web-tools"] }),
+  Object.freeze({ id: "image-generation", name: "@actspace/tools-image-generation/plugin", inject: ["tools.runtime", "actspace.host.tools.image-generation"] }),
+  Object.freeze({ id: "image-inspection", name: "@actspace/tools-image-inspection/plugin", inject: ["llm.service", "tools.runtime", "actspace.host.tools.image-inspection"] }),
+  Object.freeze({ id: "todo-tools", name: "@actspace/tools-todo-tools/plugin", inject: ["tools.runtime", "session.runtime", "session.projection"] }),
   Object.freeze({ id: "browser-tools", name: "@actspace/tools-browser-tools/plugin", inject: ["tools.runtime"] }),
   Object.freeze({ id: "core-agent", name: "@actspace/core-agent/plugin", inject: [] }),
   Object.freeze({ id: "agent-factory", name: "@actspace/runtime/agent-factory", inject: ["actspace.host.agent", "agent.registry", "session.runtime", "llm.service", "tools.runtime", "prompt.runtime", "compaction.runtime"] }),

@@ -12,7 +12,7 @@
 
 - [`../agent-plugin-runtime/agent-spec-tool-runtime-abi.md`](../agent-plugin-runtime/agent-spec-tool-runtime-abi.md)：definition、permission、approval、prepared execution、checkpoint、result 与 recovery 契约；
 - `packages/tools/runtime/`：Tool Registry、PermissionEngine、prepared execution、Lease、redaction 与 ordered commit；
-- `packages/tools/core-tools/`：文件、Bash、Web、图片等 concrete capability；
+- `packages/tools/filesystem-read/`、`packages/tools/filesystem-search/`、`packages/tools/filesystem-write/`、`packages/tools/shell-tools/`、`packages/tools/web-tools/`、`packages/tools/image-generation/`、`packages/tools/image-inspection/`：文件、Bash、Web、图片等 concrete capability；
 - `packages/tools/approval/`：Host-neutral ApprovalBroker 契约；
 - `apps/desktop/src/main/runtime-v2/approval-broker.ts`：Desktop 审批适配；
 - `apps/cli/src/runtime-v2/approval.ts`：CLI 交互式和非交互式审批适配。
@@ -60,7 +60,7 @@ checkpoint 之前失败可以安全报告 not-started；checkpoint 之后如果�
 
 ## Bash 当前边界
 
-`packages/tools/core-tools/src/bash/command-rules.ts` 在执行前拒绝：
+`packages/tools/shell-tools/src/command-rules.ts` 在执行前拒绝：
 
 - 控制字符和不支持的 Unicode whitespace；
 - 当前分类器无法安全解析的 pipe、redirection、shell expansion；

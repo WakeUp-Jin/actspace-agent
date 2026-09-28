@@ -11,7 +11,7 @@ export async function createCordisRoot(): Promise<CordisRootHandle> {
  * The caller owns settlement and disposal; this function only creates the
  * Include entry so hosts can run preparation hooks before config activation.
  */
-export async function mountCordisConfig(root: CordisRootHandle, absoluteConfigPath: string, entryId = "include"): Promise<string> {
+export async function mountCordisConfig(root: CordisRootHandle, absoluteConfigPath: string, entryId = "include", patches: readonly { readonly id: string; readonly disabled: boolean }[] = []): Promise<string> {
   if (!isAbsolute(absoluteConfigPath)) throw new Error(`Cordis config path must be absolute: ${absoluteConfigPath}`);
   const context = root.context as CordisLoaderContextLike;
   // Bare Loader entries are resolved from the loader Context base URL. The
@@ -23,7 +23,7 @@ export async function mountCordisConfig(root: CordisRootHandle, absoluteConfigPa
   return loader.create({
     id: entryId,
     name: "cordis:include",
-    config: { path: pathToFileURL(absoluteConfigPath).href },
+    config: { path: pathToFileURL(absoluteConfigPath).href, patches },
     inject: Object.freeze([]),
   });
 }

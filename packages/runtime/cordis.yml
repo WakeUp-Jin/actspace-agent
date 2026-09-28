@@ -34,9 +34,30 @@
 - id: compaction-runtime
   name: "@actspace/compaction/plugin"
   inject: [llm.service]
-- id: core-tools
-  name: "@actspace/tools-core-tools/plugin"
-  inject: [tools.runtime, llm.service, actspace.host.tools.core]
+- id: filesystem-read
+  name: "@actspace/tools-filesystem-read/plugin"
+  inject: [tools.runtime, actspace.host.tools.filesystem-read]
+- id: filesystem-search
+  name: "@actspace/tools-filesystem-search/plugin"
+  inject: [tools.runtime, actspace.host.tools.filesystem-search]
+- id: filesystem-write
+  name: "@actspace/tools-filesystem-write/plugin"
+  inject: [tools.runtime, actspace.host.tools.filesystem-write]
+- id: shell-tools
+  name: "@actspace/tools-shell-tools/plugin"
+  inject: [tools.runtime, actspace.host.tools.shell-tools]
+- id: web-tools
+  name: "@actspace/tools-web-tools/plugin"
+  inject: [tools.runtime, actspace.host.tools.web-tools]
+- id: image-generation
+  name: "@actspace/tools-image-generation/plugin"
+  inject: [tools.runtime, actspace.host.tools.image-generation]
+- id: image-inspection
+  name: "@actspace/tools-image-inspection/plugin"
+  inject: [llm.service, tools.runtime, actspace.host.tools.image-inspection]
+- id: todo-tools
+  name: "@actspace/tools-todo-tools/plugin"
+  inject: [tools.runtime, session.runtime, session.projection]
 - id: browser-tools
   name: "@actspace/tools-browser-tools/plugin"
   inject: [tools.runtime]

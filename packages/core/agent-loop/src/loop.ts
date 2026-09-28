@@ -317,7 +317,7 @@ export class AgentLoop {
       this.emitLive({ kind: "tool-prepared", ...ids, callId: call.callId, name: definition.name, arguments: args });
     }
     const base = this.options.toolEnvironment(this.options.session);
-    const environment: ToolPreparedEnvironment = { ...base, context: this.options.context, eventCarrier: this.#events.carrier,
+    const environment: ToolPreparedEnvironment = { ...base, allowedToolNames: visibleToolNames, context: this.options.context, eventCarrier: this.#events.carrier,
       onExecutionStarted: (call) => {
         this.emitLive({ kind: "tool-started", ...ids, callId: call.callId, name: call.name });
         try { base.onExecutionStarted?.(call); } catch { /* Isolate optional observers. */ }

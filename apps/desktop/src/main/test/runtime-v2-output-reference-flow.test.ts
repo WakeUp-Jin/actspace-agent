@@ -3,7 +3,9 @@ import { mkdtemp, mkdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { createNodeCoreToolPorts } from "@actspace/tools-core-tools";
+import { createNodeToolPorts as createReadPorts } from "@actspace/tools-filesystem-read";
+import { createNodeToolPorts as createSearchPorts } from "@actspace/tools-filesystem-search";
+import { createNodeBashToolPorts } from "@actspace/tools-shell-tools";
 import { runToolStreamFixture } from "@actspace/core-agent-loop/testing";
 import { DesktopArtifactStore } from "../runtime-v2/artifact-store";
 import type { ToolExecutionContext } from "@actspace/tools-runtime";
@@ -15,7 +17,7 @@ it("runs large Bash output through storage, the next request, and paginated read
   const store = new DesktopArtifactStore(join(root, "data"));
   const sessionId = "output-flow";
   const resolveArtifact = (session: string, id: string) => store.resolveForSession(session, id);
-  const ports = createNodeCoreToolPorts({ workspaceRoot, tmpRoot: join(root, "tmp"), sandboxBash: false, resolveArtifact });
+  const ports = { ...createReadPorts({ workspaceRoot, resolveArtifact }), ...createSearchPorts({ workspaceRoot, resolveArtifact }), ...createNodeBashToolPorts({ workspaceRoot, tmpRoot: join(root, "tmp"), sandbox: false }) };
   const context: ToolExecutionContext = {
     sessionId, workspaceRoot, callId: "read-1", agentRunId: "run", turnId: "turn", stepId: "step", name: "bash", pluginId: "core",
     signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("unused"); } },

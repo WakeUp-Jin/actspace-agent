@@ -1,5 +1,7 @@
 # 设计文档索引
 
+- [Tool 插件边界与 Todo 领域事件](agent-plugin-runtime/agent-tool-plugin-boundaries.md)：独立工具包、Host port、Projection Contributor、scope 和不兼容旧 Todo 的事件断点。
+
 - [主 Agent 的 Chat 形态](agent-runtime/agent-main-chat-form.md)：已实施；定义固定 Session preset、两个 Chat 工具、附件边界、Prompt cache 动态尾部与可调压缩阈值。
 
 - [Agent 工具权限模型](execution-safety/agent-tool-permission-model.md)：当前权限事实源；定义已实施的 `default/full-access`、结构化资源、once 与 Desktop 文件 Session Grant。

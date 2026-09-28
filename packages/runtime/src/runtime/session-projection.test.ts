@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { appendFile, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createCoreCodecRegistry, createSessionHeader, SessionJournal } from "@actspace/session-journal";
+import { createCoreCodecRegistry, createSessionHeader, defaultSessionProvenance, SessionJournal } from "@actspace/session-journal";
+import { createSessionProjectionService } from "@actspace/session-projection";
+import { todoProjectionContributor, TodoService } from "@actspace/tools-todo-tools";
+import { codecs as todoCodecs } from "@actspace/tools-todo-tools/codec";
 import { RuntimeSessionController, slimHistoryWindow } from "./session-controller.js";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 
@@ -48,6 +51,38 @@ describe("history window slimming", () => {
 });
 
 describe("production Session projections", () => {
+  it("restores Todo contributions from checkpoints and rebuilds them from the durable Journal", async () => {
+    const f = await fixture(0);
+    const registry = createCoreCodecRegistry(todoCodecs);
+    const controller = () => {
+      const projectionService = createSessionProjectionService();
+      projectionService.registerContributor(todoProjectionContributor);
+      return new RuntimeSessionController({ dataRoot: f.root, registry, runtimeId: "test", profileId: "test", manifestDigest: "test", plugins: [], projectionService });
+    };
+    const writer = controller();
+    const session = await writer.resume("s");
+    await new TodoService(session).create("Restore plugin projection", "todo-1");
+    await session.flush();
+    await writer.closeAll();
+    const cold = await controller().inspect("s");
+    expect(cold.todos).toEqual([expect.objectContaining({ todoId: "todo-1", text: "Restore plugin projection" })]);
+    expect(JSON.parse(await readFile(f.cache, "utf8")).checkpoint.rows.todos.stateVersion).toBe(1);
+    expect(await controller().inspect("s")).toEqual(cold);
+    await rm(f.cache);
+    expect(await controller().inspect("s")).toEqual(cold);
+  });
+
+  it("keeps old required Todo Journals browse-only with a diagnostic and rejects resume", async () => {
+    const f = await fixture(0);
+    const event = { recordKind: "event", seq: 0, type: "todo/write", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, provenance: defaultSessionProvenance(), criticality: "required", time: "2026-09-28T00:00:00Z", data: { items: [], revision: 1 }, surface: null };
+    await appendFile(f.path, JSON.stringify(event) + "\n");
+    const controller = new RuntimeSessionController({ dataRoot: f.root, registry: createCoreCodecRegistry(todoCodecs), runtimeId: "test", profileId: "test", manifestDigest: "test", plugins: [] });
+    expect(await controller.inspect("s")).toMatchObject({ accessState: "browse-only", todos: [] });
+    const inspection = await controller.store.inspect("s");
+    expect(inspection.validation?.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code: "UNKNOWN_REQUIRED_CODEC" })]));
+    await expect(controller.resume("s")).rejects.toThrow();
+  });
+
   it("pages the same raw history for every target while facts cover the full Session", async () => {
     const f = await fixture(); const controller = f.controller();
     const tail = await controller.readProjection({ sessionId: "s" });

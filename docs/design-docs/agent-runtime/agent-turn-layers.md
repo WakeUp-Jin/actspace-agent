@@ -132,7 +132,7 @@ definition
 → ordered commit
 ```
 
-具体能力位于 `packages/tools/core-tools` 和 `packages/tools/browser-tools`。filesystem、shell、network、artifact、browser 等副作用由 Host port 提供。
+具体能力位于 `packages/tools/filesystem-read` 和 `packages/tools/browser-tools`。filesystem、shell、network、artifact、browser 等副作用由 Host port 提供。
 
 ### Subagent
 

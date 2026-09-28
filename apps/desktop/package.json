@@ -39,7 +39,6 @@
     "@actspace/shared": "workspace:*",
     "@actspace/tools-approval": "workspace:*",
     "@actspace/tools-browser-tools": "workspace:*",
-    "@actspace/tools-core-tools": "workspace:*",
     "@actspace/tools-runtime": "workspace:*",
     "@radix-ui/react-hover-card": "^1.1.23",
     "@radix-ui/react-tooltip": "^1.2.8",
@@ -53,7 +52,14 @@
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "@actspace/tools-filesystem-read": "workspace:*",
+    "@actspace/tools-filesystem-search": "workspace:*",
+    "@actspace/tools-filesystem-write": "workspace:*",
+    "@actspace/tools-shell-tools": "workspace:*",
+    "@actspace/tools-web-tools": "workspace:*",
+    "@actspace/tools-image-generation": "workspace:*",
+    "@actspace/tools-image-inspection": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",

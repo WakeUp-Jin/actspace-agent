@@ -13,7 +13,6 @@ export const CORE_EVENT_TYPES = [
   "assistant/message",
   "tool/call",
   "tool/result",
-  "todo/write",
   "request/header",
   "request/context",
   "session/end-seed",
@@ -228,12 +227,6 @@ function validateCoreData(type: CoreSessionEventType, data: RuntimeV2JsonValue):
       requireId(data.callId ?? data.toolCallId, type, "callId");
       requireToolName(data.name, type);
       if (typeof data.status !== "string" || data.status.length === 0) throw invalid(type, "status must be a non-empty string");
-      break;
-    case "todo/write":
-      if (!Array.isArray(data.items)) throw invalid(type, "items must be an array");
-      if (data.revision !== undefined && (!Number.isSafeInteger(data.revision) || (data.revision as number) < 1)) {
-        throw invalid(type, "revision must be a positive integer");
-      }
       break;
     case "request/header":
     case "request/context":

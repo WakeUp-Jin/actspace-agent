@@ -11,11 +11,11 @@ function candidate(type: string, data: RuntimeV2JsonValue, extra: Partial<Sessio
 }
 
 describe("Session Journal", () => {
-  it("keeps the Agent Loop kernel at exactly the 13 DSH core events", () => {
-    expect(CORE_EVENT_TYPES).toHaveLength(13);
+  it("keeps Todo outside the Agent Loop core event set", () => {
+    expect(CORE_EVENT_TYPES).toHaveLength(12);
     expect(CORE_EVENT_TYPES).toEqual([
       "turn/start", "turn/end", "step/start", "step/end", "user/message", "assistant/chunk", "assistant/message",
-      "tool/call", "tool/result", "todo/write", "request/header", "request/context", "session/end-seed",
+      "tool/call", "tool/result", "request/header", "request/context", "session/end-seed",
     ]);
   });
 
@@ -89,7 +89,7 @@ describe("Session Journal", () => {
       grantId: "grant-1",
       sessionId: "session-1",
       agentId: "main:session-1",
-      audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 },
+      audience: { pluginId: "actspace.filesystem-read", permissionDomain: "filesystem-read", policyVersion: 1 },
       action: "file.read",
       access: "read",
       selector: { kind: "exact", canonicalPath: "/workspace/src/file.ts" },

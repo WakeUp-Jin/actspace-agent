@@ -200,7 +200,7 @@ ActSpace v2 采用 DSH 风格的领域包结构，但不复制 DSH 的 `vendor/`
 
 不建立通用 `plugins/` 目录。每个可装载、可替换或可独立验证的领域包都是真实 workspace package，并通过独立的 Static Manifest、Codec Entry（如需要）和 Behavior Entry 参与 Cordis Loader。Session、LLM、Prompt、Agent Loop 是默认 Profile 中的核心语义插件，不属于插件系统之外的特殊代码。
 
-具体工具按 `tools/core-tools`、`tools/browser-tools` 等领域包组织；Browser Bridge 作为独立 Host capability 放在顶层 `browser-bridge/`，不作为同进程 TypeScript 插件伪装接入。
+具体工具按 `tools/filesystem-read`、`tools/browser-tools` 等领域包组织；Browser Bridge 作为独立 Host capability 放在顶层 `browser-bridge/`，不作为同进程 TypeScript 插件伪装接入。
 
 详细目录、manifest、codec、behavior、依赖和迁移规则见 [包结构与真实插件包规范](./agent-spec-package-layout-and-plugin-packaging.md)。
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DESKTOP_APP_BUNDLE } from "@actspace/desktop-app";
-import { createProfileComposition, RUNTIME_PROFILE_IDS, TRUSTED_LOADER_ENTRIES } from "./composition.js";
+import { createProfileComposition, RUNTIME_PROFILE_IDS, TRUSTED_LOADER_ENTRIES, toolTransportPatches } from "./composition.js";
 
 const host = {
   hostKind: "desktop" as const,
@@ -25,4 +25,13 @@ describe("runtime profile composition", () => {
     expect(composition.loaderConfig).toEqual({ profileId: RUNTIME_PROFILE_IDS.desktop, entries: TRUSTED_LOADER_ENTRIES });
     expect(TRUSTED_LOADER_ENTRIES).toContainEqual({ id: "session-checkpoint-policy", name: "@actspace/session-checkpoint-policy/plugin", inject: ["session.runtime"] });
   });
+
+  it("changes digest and disables only the selected tool transport", () => {
+    const baseline = createProfileComposition(RUNTIME_PROFILE_IDS.headless, { ...host, hostKind: "cli-run" });
+    const changed = createProfileComposition(RUNTIME_PROFILE_IDS.headless, { ...host, hostKind: "cli-run" }, { invocationPatch: { id: "disable-shell", provenance: "test", operations: [{ id: "shell", kind: "disable", target: "tools.shell-tools" }] } });
+    expect(changed.digest).not.toBe(baseline.digest);
+    expect(toolTransportPatches(changed).filter(item => item.disabled)).toEqual([{ id: "shell-tools", disabled: true }]);
+    expect(changed.entries.find(entry => entry.entryId === "tools.filesystem-read")?.enabled).toBe(true);
+  });
+
 });

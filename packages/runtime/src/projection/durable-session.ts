@@ -1,16 +1,17 @@
 import { projectContextState } from "@actspace/shared";
 import { mainAgentFormFromPresetId, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
 import { SessionSurface, type SessionSurfaceView, type EventCodecRegistry, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
-import { registerSessionFacts, sessionFacts, SessionProjectionRegistry } from "@actspace/session-projection";
+import { registerSessionFacts, sessionFacts, SessionProjectionRegistry, type SessionProjectionService } from "@actspace/session-projection";
 import { createRunningToolView, completeToolView, projectRendererHint, type RendererAllowlist } from "./tool-dto.js";
 import { redactProjectionText } from "./redaction.js";
 
 type ContextInput = { surface: SessionSurfaceView; events: SessionEventEnvelopeV1[]; activeTurnId: string | null; throughJournalSeq: number; updatedAt: string };
 export class SessionReadModel {
   readonly projections: SessionProjectionRegistry;
-  constructor(readonly header: SessionHeaderV1, readonly codecs: EventCodecRegistry, readonly rendererAllowlist?: RendererAllowlist) {
-    this.projections = new SessionProjectionRegistry(event => codecs.resolve(event).kind === "known");
+  constructor(readonly header: SessionHeaderV1, readonly codecs: EventCodecRegistry, readonly rendererAllowlist?: RendererAllowlist, readonly projectionService?: SessionProjectionService) {
+    this.projections = projectionService?.createRegistry(event => codecs.resolve(event).kind === "known") ?? new SessionProjectionRegistry(event => codecs.resolve(event).kind === "known");
     registerSessionFacts(this.projections, redactProjectionText);
+    projectionService?.applyContributors(this.projections, redactProjectionText);
     this.projections.register<SessionSurfaceView>({
       key: "surface", stateVersion: 1, init: () => ({ entries: [], replaceGeneration: 0 }), view: state => state,
       apply: (state, event) => {

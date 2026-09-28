@@ -43,12 +43,30 @@ importers:
       '@actspace/tools-approval':
         specifier: workspace:*
         version: link:../../packages/tools/approval
-      '@actspace/tools-core-tools':
+      '@actspace/tools-filesystem-read':
         specifier: workspace:*
-        version: link:../../packages/tools/core-tools
+        version: link:../../packages/tools/filesystem-read
+      '@actspace/tools-filesystem-search':
+        specifier: workspace:*
+        version: link:../../packages/tools/filesystem-search
+      '@actspace/tools-filesystem-write':
+        specifier: workspace:*
+        version: link:../../packages/tools/filesystem-write
+      '@actspace/tools-image-generation':
+        specifier: workspace:*
+        version: link:../../packages/tools/image-generation
+      '@actspace/tools-image-inspection':
+        specifier: workspace:*
+        version: link:../../packages/tools/image-inspection
       '@actspace/tools-runtime':
         specifier: workspace:*
         version: link:../../packages/tools/runtime
+      '@actspace/tools-shell-tools':
+        specifier: workspace:*
+        version: link:../../packages/tools/shell-tools
+      '@actspace/tools-web-tools':
+        specifier: workspace:*
+        version: link:../../packages/tools/web-tools
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -95,12 +113,30 @@ importers:
       '@actspace/tools-browser-tools':
         specifier: workspace:*
         version: link:../../packages/tools/browser-tools
-      '@actspace/tools-core-tools':
+      '@actspace/tools-filesystem-read':
         specifier: workspace:*
-        version: link:../../packages/tools/core-tools
+        version: link:../../packages/tools/filesystem-read
+      '@actspace/tools-filesystem-search':
+        specifier: workspace:*
+        version: link:../../packages/tools/filesystem-search
+      '@actspace/tools-filesystem-write':
+        specifier: workspace:*
+        version: link:../../packages/tools/filesystem-write
+      '@actspace/tools-image-generation':
+        specifier: workspace:*
+        version: link:../../packages/tools/image-generation
+      '@actspace/tools-image-inspection':
+        specifier: workspace:*
+        version: link:../../packages/tools/image-inspection
       '@actspace/tools-runtime':
         specifier: workspace:*
         version: link:../../packages/tools/runtime
+      '@actspace/tools-shell-tools':
+        specifier: workspace:*
+        version: link:../../packages/tools/shell-tools
+      '@actspace/tools-web-tools':
+        specifier: workspace:*
+        version: link:../../packages/tools/web-tools
       '@radix-ui/react-hover-card':
         specifier: ^1.1.23
         version: 1.1.23(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -768,12 +804,33 @@ importers:
       '@actspace/tools-browser-tools':
         specifier: workspace:*
         version: link:../tools/browser-tools
-      '@actspace/tools-core-tools':
+      '@actspace/tools-filesystem-read':
         specifier: workspace:*
-        version: link:../tools/core-tools
+        version: link:../tools/filesystem-read
+      '@actspace/tools-filesystem-search':
+        specifier: workspace:*
+        version: link:../tools/filesystem-search
+      '@actspace/tools-filesystem-write':
+        specifier: workspace:*
+        version: link:../tools/filesystem-write
+      '@actspace/tools-image-generation':
+        specifier: workspace:*
+        version: link:../tools/image-generation
+      '@actspace/tools-image-inspection':
+        specifier: workspace:*
+        version: link:../tools/image-inspection
       '@actspace/tools-runtime':
         specifier: workspace:*
         version: link:../tools/runtime
+      '@actspace/tools-shell-tools':
+        specifier: workspace:*
+        version: link:../tools/shell-tools
+      '@actspace/tools-todo-tools':
+        specifier: workspace:*
+        version: link:../tools/todo-tools
+      '@actspace/tools-web-tools':
+        specifier: workspace:*
+        version: link:../tools/web-tools
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1026,7 +1083,95 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/tools/core-tools:
+  packages/tools/filesystem-read:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/tools/filesystem-search:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/tools/filesystem-write:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/tools/image-generation:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/tools/image-inspection:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
@@ -1040,16 +1185,10 @@ importers:
       '@actspace/tools-runtime':
         specifier: workspace:*
         version: link:../runtime
-      turndown:
-        specifier: 7.2.4
-        version: 7.2.4
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
-      '@types/turndown':
-        specifier: 5.0.6
-        version: 5.0.6
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
@@ -1072,6 +1211,87 @@ importers:
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/tools/shell-tools:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/tools/todo-tools:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/persistence
+      '@actspace/session-projection':
+        specifier: workspace:*
+        version: link:../../session/projection
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/tools/web-tools:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      turndown:
+        specifier: 7.2.4
+        version: 7.2.4
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      '@types/turndown':
+        specifier: 5.0.6
+        version: 5.0.6
       typescript:
         specifier: ^5.8.3
         version: 5.9.3

@@ -43,7 +43,7 @@ JSON 不写入当前时间、随机 id 或本机绝对路径。顶层使用 `sou
 | --- | --- | --- |
 | Plugin manifests / Entry metadata | plugin id、Entry id、provides、injects、events、capabilities、codec owner | 检查插件 admission 和依赖声明 |
 | Service Definitions / Providers / Consumers | Service ID、ABI、scope、required、owner、provider、consumer | 检查三层 Service contract |
-| Session Journal registry | 13 个核心事件、扩展事件、Codec、Surface、producer status | 检查 durable event 覆盖和恢复边界 |
+| Session Journal registry | 12 个核心事件、扩展事件、Codec、Surface、producer status | 检查 durable event 覆盖和恢复边界 |
 | Agent Loop surface | 9 个 Cordis 插入事件、5 个通知事件、顺序、scope、containment | 检查插件干预和通知 contract |
 | Profile / Bundle / Patch result | ordered entries、patch result、Host ceiling、digest | 检查组合输入和最终 admission |
 | package exports / dependency metadata | public exports、package owner、依赖方向 | 检查 Consumer 是否绕过 Definition |
@@ -83,7 +83,7 @@ interface AgentContractMatrixV1 {
 | `tests` | 稳定测试 id 列表，不放机器绝对路径 |
 | `sourceRefs` | 仓库相对路径 + symbol/anchor，供审阅回溯 |
 
-事件行必须区分“codec 已存在”和“当前没有 producer”。因此 `goal/*`、`schedule/*` 等未来事件可以显示 `producerStatus: not-implemented`，不能被误报为已支持。13 个 Session 核心事件、9 个 Loop 插入事件和 5 个通知事件必须各自拥有固定分类和 scope 字段。
+事件行必须区分“codec 已存在”和“当前没有 producer”。因此 `goal/*`、`schedule/*` 等未来事件可以显示 `producerStatus: not-implemented`，不能被误报为已支持。12 个 Session 核心事件、9 个 Loop 插入事件和 5 个通知事件必须各自拥有固定分类和 scope 字段。
 
 ## 5. 归一化和校验规则
 
@@ -132,7 +132,7 @@ flowchart LR
 ## 8. 验收标准
 
 1. 同一输入重复生成得到相同 `sourceDigest`、JSON 和 Markdown。
-2. 13 个 Session 核心事件、9 个 Loop 插入事件、5 个通知事件全部出现，并带正确分类、scope、producer/codec 状态。
+2. 12 个 Session 核心事件、9 个 Loop 插入事件、5 个通知事件全部出现，并带正确分类、scope、producer/codec 状态。
 3. `goal/*`、`schedule/*` 等未实现事件明确显示 `unimplemented/not-implemented`，不会伪装成 active。
 4. Service Definition/Provider/Consumer、Profile/Bundle/Patch、Host ceiling 和 package export 的漂移能被 fixture 触发并 fail closed。
 5. 生成文档包含每行的 owner、sourceRefs 和测试证据，且不泄露凭据或绝对路径。

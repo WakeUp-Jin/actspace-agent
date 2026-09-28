@@ -98,6 +98,20 @@ function success(summary = "ok"): ToolBodyResult {
 }
 
 describe("Tool Runtime execution contract", () => {
+  it("denies a registered tool outside the caller scope before dispatch", async () => {
+    const trace: string[] = [];
+    const permissionEvents: string[] = [];
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute: async () => { trace.push("body"); return success(); } } });
+    const [result] = await runtime.executeBatch([call("scope-denied")], {
+      ...environment(trace, { permissionEvents }), allowedToolNames: new Set(["other"]),
+    });
+    expect(result).toMatchObject({ status: "denied", failure: { code: "TOOL_SCOPE_DENIED" } });
+    expect(permissionEvents).toContain("permission/scope-denied");
+    expect(trace).not.toContain("body");
+    expect(trace).not.toContain("dispatch:scope-denied");
+  });
+
   it("materializes JSON Schema defaults before freezing arguments", () => {
     const value = materializeToolArguments({ type: "object", properties: { count: { type: "integer", minimum: 1, default: 5 }, nested: { type: "object", properties: { enabled: { type: "boolean", default: true } }, additionalProperties: false, default: {} } }, additionalProperties: false }, {});
     expect(value).toEqual({ count: 5, nested: { enabled: true } });
@@ -163,7 +177,7 @@ describe("Tool Runtime execution contract", () => {
       definition: definition(),
       executor: { concurrencySafe: true, async execute() { return success(); } },
       permission: {
-        grantAudience: { pluginId: "plugin.test", permissionDomain: "core-files", policyVersion: 1 },
+        grantAudience: { pluginId: "plugin.test", permissionDomain: "filesystem-read", policyVersion: 1 },
         extractResources: () => [{ kind: "file", access: "read", canonicalPath: "/outside/a.txt", targetKind: "file" }],
         evaluate: () => ({ kind: "allow" }),
         suggestGrants: () => [{ action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/outside/a.txt" }, label: "This file only" }],
@@ -176,7 +190,7 @@ describe("Tool Runtime execution contract", () => {
       expect(request.grantSuggestions).toHaveLength(1);
       return { requestId: request.requestId, kind: "session", suggestionId: request.grantSuggestions[0]!.suggestionId, decidedAt: new Date().toISOString() };
     } };
-    const trustedGrantAudiences = new Set(["plugin.test\u0000core-files\u00001"]);
+    const trustedGrantAudiences = new Set(["plugin.test\u0000filesystem-read\u00001"]);
     const env = environment([], { approvalBroker: broker, permissionRecords: records, sessionGrants: grants, sessionGrantCapability: true, trustedGrantAudiences });
     expect((await runtime.executeBatch([call("grant-first")], env))[0]).toMatchObject({ status: "completed" });
     expect(records.map((record) => record.type)).toEqual(["permission/asked", "permission/decided", "permission/grant-added"]);
@@ -185,13 +199,13 @@ describe("Tool Runtime execution contract", () => {
     expect((await runtime.executeBatch([call("grant-second")], secondEnv))[0]).toMatchObject({ status: "completed" });
   });
 
-  it("does not let an untrusted plugin issue or consume a forged core-files Grant", async () => {
+  it("does not let an untrusted plugin issue or consume a forged filesystem-read Grant", async () => {
     const runtime = new ToolRuntime();
     runtime.register({
       definition: definition({ pluginId: "plugin.third-party" }),
       executor: { concurrencySafe: true, async execute() { return success(); } },
       permission: {
-        grantAudience: { pluginId: "plugin.third-party", permissionDomain: "core-files", policyVersion: 1 },
+        grantAudience: { pluginId: "plugin.third-party", permissionDomain: "filesystem-read", policyVersion: 1 },
         extractResources: () => [{ kind: "file", access: "read", canonicalPath: "/outside/a.txt", targetKind: "file" }],
         evaluate: () => ({ kind: "allow" }),
         suggestGrants: () => [{ action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/outside/a.txt" }, label: "Forged" }],
@@ -199,7 +213,7 @@ describe("Tool Runtime execution contract", () => {
     });
     const forged: SessionGrant = {
       schemaVersion: 1, grantId: "forged", sessionId: "session-1", agentId: "main:session-1",
-      audience: { pluginId: "plugin.third-party", permissionDomain: "core-files", policyVersion: 1 },
+      audience: { pluginId: "plugin.third-party", permissionDomain: "filesystem-read", policyVersion: 1 },
       action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/outside/a.txt" },
       sourceRequestId: "request", sourceCallId: "call", sourceToolName: "read", issuedAt: new Date().toISOString(),
     };
@@ -212,7 +226,7 @@ describe("Tool Runtime execution contract", () => {
       approvalBroker: broker,
       sessionGrantCapability: true,
       sessionGrants: [forged],
-      trustedGrantAudiences: new Set(["actspace.core-tools\u0000core-files\u00001"]),
+      trustedGrantAudiences: new Set(["actspace.filesystem-read\u0000filesystem-read\u00001"]),
     }));
     expect(requestSuggestionCount).toBe(0);
     expect(result).toMatchObject({ status: "denied", failure: { code: "APPROVAL_DENIED" } });
