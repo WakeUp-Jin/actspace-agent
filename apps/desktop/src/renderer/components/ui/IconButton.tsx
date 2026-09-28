@@ -5,7 +5,7 @@ import { BUTTON_VARIANT_CLASS, cx } from "./Button";
 // 纯图标按钮。label 必填：同时生成 aria-label 和 Tooltip（front-icon-button-tooltip-guidelines.md），
 // 从类型上保证不会再出现没有名字的图标按钮。className 只放布局与显隐类，不要覆盖尺寸、圆角、颜色。
 
-export type IconButtonVariant = "ghost" | "soft" | "secondary" | "primary";
+export type IconButtonVariant = "ghost" | "soft" | "secondary" | "primary" | "accent";
 export type IconButtonSize = "xs" | "sm" | "md" | "lg";
 export type IconButtonShape = "square" | "round";
 
@@ -27,11 +27,13 @@ const ICON_BUTTON_SHAPE_CLASS: Record<IconButtonShape, string> = {
 
 // ghost 图标默认用更淡的 faint，hover 回到主文字；soft 是带浅底和描边的常驻入口（Composer「+」）；
 // secondary / primary 与 Button 共用。展开态用 aria-expanded 统一变深。
+// accent 只给 Composer 发送：跟随外观强调色，默认调色板下与 primary 完全一致（front-accent-palette.md）。
 const ICON_BUTTON_VARIANT_CLASS: Record<IconButtonVariant, string> = {
   ghost: "border-transparent bg-transparent text-text-faint enabled:hover:bg-hover-overlay enabled:hover:text-text-main aria-expanded:bg-selected aria-expanded:text-text-main",
   soft: "border-line bg-surface-subtle text-text-muted enabled:hover:border-line-strong enabled:hover:bg-hover-overlay enabled:hover:text-text-main aria-expanded:border-line-strong aria-expanded:bg-selected aria-expanded:text-text-main",
   secondary: BUTTON_VARIANT_CLASS.secondary,
   primary: BUTTON_VARIANT_CLASS.primary,
+  accent: "border-transparent bg-accent text-on-accent enabled:hover:bg-accent-hover",
 };
 
 export function iconButtonClass({

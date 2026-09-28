@@ -513,7 +513,7 @@ export function Toggle({
       onClick={() => onChange(!checked)}
       className={cx(
         "relative inline-flex h-[18px] w-8 shrink-0 items-center rounded-full transition-[background-color,transform] duration-(--motion-base) active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30 focus-visible:ring-offset-1",
-        checked ? "bg-operational" : "bg-toggle-off",
+        checked ? "bg-toggle-on" : "bg-toggle-off",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
       )}
     >

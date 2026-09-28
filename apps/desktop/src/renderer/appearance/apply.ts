@@ -10,8 +10,10 @@ export function applyAppearance(
   root: HTMLElement | null = typeof document !== "undefined" ? document.documentElement : null,
 ): void {
   // 主题：写 <html data-theme>，CSS 据此覆盖 --act-color-*；并同步原生 nativeTheme。
+  // 强调色：写 <html data-accent>，tokens.css 据此切换调色板源值；不同步原生 chrome。
   if (root) {
     root.setAttribute("data-theme", prefs.theme);
+    root.setAttribute("data-accent", prefs.accentPalette);
   }
   if (typeof window !== "undefined" && typeof window.actspace?.setNativeTheme === "function") {
     window.actspace.setNativeTheme(prefs.theme);

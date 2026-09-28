@@ -1,9 +1,15 @@
 import { Check, Copy } from "lucide-react";
-import { Children, isValidElement, useState, type AnchorHTMLAttributes, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { Children, createContext, isValidElement, useContext, useState, type AnchorHTMLAttributes, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { LANGUAGE_MODULES } from "../right-panel/highlight";
+import { loadAppearance } from "../../appearance/storage";
+import { MermaidDiagramBlock } from "./MermaidDiagramBlock";
+import { isFenceClosed, isMermaidLanguage } from "./mermaid-renderer";
+
+/** Raw markdown of the message, so fence handlers can tell whether a streaming fence has closed. */
+const MarkdownSourceContext = createContext("");
 
 function MarkdownLink({ href, children, onOpenWorkspaceFile, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { onOpenWorkspaceFile?: (path: string) => void }) {
   const isWorkspacePath = Boolean(href && onOpenWorkspaceFile && !/^(?:[a-z][a-z0-9+.-]*:|#)/i.test(href));
@@ -32,12 +38,36 @@ function codeText(children: ReactNode): string {
   }).join("");
 }
 
-function MarkdownPre({ children, ...rest }: ComponentPropsWithoutRef<"pre"> & { node?: unknown }) {
-  const [copied, setCopied] = useState(false);
-  const text = codeText(children);
+type PositionedNode = { position?: { start?: { offset?: number }; end?: { offset?: number } } };
+
+function fenceLanguage(children: ReactNode): string | undefined {
   const codeElement = Children.toArray(children).find(isValidElement);
   const className = isValidElement<{ className?: string }>(codeElement) ? codeElement.props.className : undefined;
-  const language = className?.match(/language-([\w-]+)/)?.[1];
+  return className?.match(/language-([\w-]+)/)?.[1];
+}
+
+function MermaidFence({ children }: { children: ReactNode }) {
+  const [themeId] = useState(() => loadAppearance().mermaidTheme);
+  return <MermaidDiagramBlock source={codeText(children).replace(/\n$/, "")} themeId={themeId} sourceView={children} />;
+}
+
+/** Closed ```mermaid fences become diagrams; everything else (including a still-streaming fence) stays a code block. */
+function MarkdownPre({ node, ...props }: ComponentPropsWithoutRef<"pre"> & { node?: PositionedNode }) {
+  const markdown = useContext(MarkdownSourceContext);
+  if (isMermaidLanguage(fenceLanguage(props.children))) {
+    const start = node?.position?.start?.offset;
+    const end = node?.position?.end?.offset;
+    if (start !== undefined && end !== undefined && isFenceClosed(markdown.slice(start, end))) {
+      return <MermaidFence>{props.children}</MermaidFence>;
+    }
+  }
+  return <MarkdownCodeBlock {...props} />;
+}
+
+function MarkdownCodeBlock({ children, ...rest }: ComponentPropsWithoutRef<"pre">) {
+  const [copied, setCopied] = useState(false);
+  const text = codeText(children);
+  const language = fenceLanguage(children);
   const copy = async () => {
     try {
       await navigator.clipboard?.writeText(text);
@@ -65,17 +95,19 @@ function MarkdownPre({ children, ...rest }: ComponentPropsWithoutRef<"pre"> & { 
 export function MarkdownProse({ content, onOpenWorkspaceFile }: { content: string; onOpenWorkspaceFile?: (path: string) => void }) {
   return (
     <div className="markdown-prose act-code-hl">
-      <Markdown
-        remarkPlugins={[remarkGfm]}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true, languages: LANGUAGE_MODULES }]] as any}
-        components={{
-          a: (props) => <MarkdownLink {...props} onOpenWorkspaceFile={onOpenWorkspaceFile} />,
-          pre: MarkdownPre,
-        }}
-      >
-        {content}
-      </Markdown>
+      <MarkdownSourceContext.Provider value={content}>
+        <Markdown
+          remarkPlugins={[remarkGfm]}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true, languages: LANGUAGE_MODULES }]] as any}
+          components={{
+            a: (props) => <MarkdownLink {...props} onOpenWorkspaceFile={onOpenWorkspaceFile} />,
+            pre: MarkdownPre,
+          }}
+        >
+          {content}
+        </Markdown>
+      </MarkdownSourceContext.Provider>
     </div>
   );
 }

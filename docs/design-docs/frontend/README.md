@@ -1,9 +1,12 @@
 # 前端设计文档
 
+- [聊天 Mermaid 图表渲染](front-chat-mermaid-diagrams.md)：已实施：闭合的 ` ```mermaid ` 渲染为固定 Codex 浅色图表，支持查看/复制源码、PNG 导出与缩放预览；Electron 验收边界见执行摘要。
+
 - [消息流排版与工具摘要规范](front-tool-stream-typography.md)：已实施：统一过程行、相邻间距与摘要层级；自动验证和真实桌面验收边界见执行摘要。
 
 - [日常桌面界面中文文案](front-desktop-chinese-ui.md)：日常操作中文化，保留模式、思考档位与工具执行名称；验收边界见执行摘要。
 
+- [外观强调色](front-accent-palette.md)：已实施，Electron 验收待做；强调色覆盖范围、调色板色值、对比度门槛与 `data-accent` 机制。
 - [设置内使用统计页面更新](front-usage-statistics-refresh.md)：已实施，实机门禁见执行摘要；借鉴 Maka 信息结构，统一 ActSpace 视觉和中文，连接可靠费用投影及本地价目。
 - [英语辅助学习插件设计](../agent-plugin-runtime/agent-english-learning.md)：已实施，实机门禁见执行摘要；扩展能力卡片控制选定会话，通用设置配置 MiniMax 语音。
 - [Agent 工具流式渲染修复设计](front-agent-tool-stream-rendering.md)：已实施，定义工具事件链与实时/历史预览对齐；体验调整见后续计划。

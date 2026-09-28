@@ -58,7 +58,7 @@ const ENTRY_TOKENS_CLASS = "shrink-0 text-act-xxs tabular-nums text-text-faint";
 const ENTRY_PREVIEW_FULL_CLASS = "whitespace-pre-wrap break-words text-act-xs leading-[1.6] text-text-muted";
 const ENTRY_PREVIEW_CLAMP_CLASS = "line-clamp-3 whitespace-pre-wrap break-words text-act-xs leading-[1.55] text-text-muted";
 const ENTRY_TOGGLE_CLASS =
-  "mt-1 inline-flex items-center border-0 bg-transparent p-0 text-act-xxs text-info hover:text-info-hover hover:underline [cursor:pointer]";
+  "mt-1 inline-flex items-center border-0 bg-transparent p-0 text-act-xxs text-link hover:underline [cursor:pointer]";
 const ENTRY_EMPTY_CLASS = "text-act-xs italic text-text-faint";
 const EMPTY_CLASS = "p-[18px] text-act-sm text-text-muted";
 const CAP_NOTE_CLASS = "px-1 pt-1 text-act-xxs text-text-faint";

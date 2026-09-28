@@ -7,6 +7,12 @@ import "../../styles/index.css";
 
 const query = new URLSearchParams(location.search);
 document.documentElement.dataset.theme = query.get("theme") ?? "light";
+// ?accent= 预选强调色：写入外观偏好，外观页读取后与 <html data-accent> 一致。
+const accent = query.get("accent");
+if (accent) {
+  document.documentElement.dataset.accent = accent;
+  localStorage.setItem("actspace.appearance.v1", JSON.stringify({ version: 1, theme: document.documentElement.dataset.theme, accentPalette: accent }));
+}
 
 const promptPath = "/Users/me/Library/Application Support/ActSpace/prompts/main-agent.md";
 const quickOpen = { enabled: true, accelerator: "CommandOrControl+Shift+Space", target: { kind: "automatic" } };

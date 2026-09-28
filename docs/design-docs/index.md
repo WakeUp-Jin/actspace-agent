@@ -14,8 +14,11 @@
 
 - [工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)：Bash 大输出回读、历史引用、Provider 图片转换和失败反馈。
 
+- [聊天 Mermaid 图表渲染](frontend/front-chat-mermaid-diagrams.md)：已实施；助手回复中闭合的 Mermaid 代码块渲染为固定 Codex 浅色图表，源码按不可信输入处理，Electron 验收边界见执行摘要。
+
 - [日常桌面界面中文文案](frontend/front-desktop-chinese-ui.md)：日常操作中文化，保留模式、思考档位与工具执行名称；验收边界见执行摘要。
 
+- [外观强调色](frontend/front-accent-palette.md)：已实施，Electron 验收待做；5 个调色板只驱动发送按钮、开关、焦点、链接与文字选中，默认零变化。
 - [使用统计页面更新](frontend/front-usage-statistics-refresh.md)与[本地模型目录及使用费用](model-context/agent-model-catalog-and-usage-cost.md)：已实施，实机门禁见执行摘要；统一设置视觉，修正费用来源，定义随包目录、缓存和按需刷新。
 - [英语辅助学习插件设计](agent-plugin-runtime/agent-english-learning.md)：已实施，实机门禁见执行摘要；选定会话注入中英对照提示词、仅英文朗读，以及扩展入口、MiniMax 配置和生命周期边界。
 - [Agent 工具流式渲染修复设计](frontend/front-agent-tool-stream-rendering.md)：已实施的跨 Core、Tools、Desktop 事件链修复设计。
