@@ -37,6 +37,13 @@ describe("appearance storage", () => {
     expect(prefs.codeFontSize).toBe(18);
   });
 
+  it("falls back to the codex Mermaid theme for older records and unknown ids", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, theme: "dark" }));
+    expect(loadAppearance()).toMatchObject({ theme: "dark", mermaidTheme: "codex" });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, mermaidTheme: "neon" }));
+    expect(loadAppearance().mermaidTheme).toBe("codex");
+  });
+
   it("round-trips saved preferences", () => {
     const prefs: AppearancePrefs = {
       version: 1,
@@ -45,6 +52,7 @@ describe("appearance storage", () => {
       codeFontId: "jetbrains",
       uiFontSize: 16,
       codeFontSize: 15,
+      mermaidTheme: "codex",
     };
     saveAppearance(prefs);
     expect(loadAppearance()).toEqual(prefs);
@@ -71,6 +79,7 @@ describe("applyAppearance", () => {
         codeFontId: "jetbrains",
         uiFontSize: 21,
         codeFontSize: 15,
+        mermaidTheme: "codex",
       },
       root,
     );

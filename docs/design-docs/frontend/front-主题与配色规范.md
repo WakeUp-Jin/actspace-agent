@@ -51,6 +51,8 @@ ActSpace 支持：
 
 Chart、Context bucket、热力图等使用独立数据色，不映射到 action 或 operational。
 
+例外：聊天 Mermaid 图表的画布与节点色是固定预设（当前只有 `codex`），定义在 `components/messages/mermaid-renderer.ts` 的 `MERMAID_THEMES`，以 JS 值传给 Mermaid 与内联 `style`，**有意不随**浅/深主题翻转，保证同一张图在任何应用主题下外观一致。图表外壳、顶栏、按钮和错误提示仍属于应用 chrome，必须使用语义 token；直接画在固定画布上的文字（如加载提示）只能取预设里的颜色，不能用会翻转的 `text-*` token。
+
 ## 已落地 token 拆分
 
 当前实现按以下职责落地，禁止重新合并成单一强调色：

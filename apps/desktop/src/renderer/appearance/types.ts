@@ -5,6 +5,8 @@
 export type UiFontId = "system" | "sans-modern" | "serif-reading" | "rounded";
 export type CodeFontId = "system-mono" | "jetbrains" | "fira" | "source";
 export type ThemeMode = "light" | "dark" | "system";
+/** Mermaid 图表色板。独立于应用主题：切换 light/dark 不会改变图表外观。 */
+export type MermaidThemeId = "codex";
 
 export interface AppearancePrefs {
   version: 1;
@@ -22,6 +24,8 @@ export interface AppearancePrefs {
   uiFontSize: number;
   /** 代码字号（px）。范围 11–18，步进 1；写入 --act-font-mono-size（已对界面缩放反向补偿）。 */
   codeFontSize: number;
+  /** 聊天回复里 Mermaid 图表的固定色板；目前只有 codex，暂无设置入口。 */
+  mermaidTheme: MermaidThemeId;
 }
 
 /** 界面字号基准：等于该值时整窗缩放为 1.0（即当前默认观感）。 */
@@ -35,6 +39,7 @@ export const CODE_FONT_SIZE_MAX = 18;
 export const CODE_FONT_SIZE_STEP = 1;
 
 export const THEME_MODES: ThemeMode[] = ["light", "dark", "system"];
+export const MERMAID_THEME_IDS: MermaidThemeId[] = ["codex"];
 
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
   version: 1,
@@ -43,4 +48,5 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
   codeFontId: "system-mono",
   uiFontSize: 14,
   codeFontSize: 13,
+  mermaidTheme: "codex",
 };

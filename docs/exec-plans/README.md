@@ -31,6 +31,8 @@
 
 ## 最近完成
 
+- [聊天 Mermaid 图表渲染](completed/20260928-chat-mermaid-diagrams.md)：闭合的 ` ```mermaid ` 渲染为固定 Codex 浅色图表，支持查看/复制源码、PNG 导出与缩放平移预览；源码按不可信输入处理（strict、剥离 init/click、DOMPurify）。自动化与浏览器 fixture 截图已通过，Electron 验收见执行摘要。
+
 - [Desktop 构建提速](completed/20260926-desktop-build-speed.md)：依赖闭包去重、TypeScript 项目图增量构建、Client 与提示词监听；正式 Desktop 构建通过，typecheck 保留现有 Usage Statistics fixture 阻塞。
 
 - [自定义服务与 Anthropic 连接流程重做](completed/20260926-custom-connection-setup-redesign.md)：目录合并为一条「自定义服务」，新增两步向导和只填 Key 的官方 Anthropic 页面；地址自动规范化，Anthropic 认证支持 x-api-key 和 Bearer 自动识别，计费支持按官方价折算；详情页逐项编辑，删除要确认。自动化与 fixture 截图已通过，Electron 验收和真实中转站测试见执行摘要。

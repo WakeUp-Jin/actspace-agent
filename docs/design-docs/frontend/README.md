@@ -1,5 +1,7 @@
 # 前端设计文档
 
+- [聊天 Mermaid 图表渲染](front-chat-mermaid-diagrams.md)：已实施：闭合的 ` ```mermaid ` 渲染为固定 Codex 浅色图表，支持查看/复制源码、PNG 导出与缩放预览；Electron 验收边界见执行摘要。
+
 - [消息流排版与工具摘要规范](front-tool-stream-typography.md)：已实施：统一过程行、相邻间距与摘要层级；自动验证和真实桌面验收边界见执行摘要。
 
 - [日常桌面界面中文文案](front-desktop-chinese-ui.md)：日常操作中文化，保留模式、思考档位与工具执行名称；验收边界见执行摘要。

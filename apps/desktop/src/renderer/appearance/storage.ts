@@ -7,11 +7,13 @@ import {
   CODE_FONT_SIZE_MAX,
   CODE_FONT_SIZE_MIN,
   DEFAULT_APPEARANCE,
+  MERMAID_THEME_IDS,
   THEME_MODES,
   UI_FONT_SIZE_MAX,
   UI_FONT_SIZE_MIN,
   type AppearancePrefs,
   type CodeFontId,
+  type MermaidThemeId,
   type ThemeMode,
   type UiFontId,
 } from "./types";
@@ -39,6 +41,12 @@ function asTheme(value: unknown): ThemeMode {
   return THEME_MODES.includes(value as ThemeMode)
     ? (value as ThemeMode)
     : DEFAULT_APPEARANCE.theme;
+}
+
+function asMermaidTheme(value: unknown): MermaidThemeId {
+  return MERMAID_THEME_IDS.includes(value as MermaidThemeId)
+    ? (value as MermaidThemeId)
+    : DEFAULT_APPEARANCE.mermaidTheme;
 }
 
 export function loadAppearance(): AppearancePrefs {
@@ -78,6 +86,7 @@ export function loadAppearance(): AppearancePrefs {
         CODE_FONT_SIZE_MAX,
       ),
     ),
+    mermaidTheme: asMermaidTheme(parsed.mermaidTheme),
   };
 }
 
