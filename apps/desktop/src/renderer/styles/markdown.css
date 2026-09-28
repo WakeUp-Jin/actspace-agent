@@ -150,13 +150,13 @@
 }
 
 .markdown-prose a {
-  color: var(--act-color-info);
+  color: var(--act-color-link);
   text-decoration: none;
   border-bottom: 1px solid var(--act-color-quote-border);
 }
 
 .markdown-prose a:hover {
-  border-bottom-color: var(--act-color-info);
+  border-bottom-color: var(--act-color-link);
 }
 
 .markdown-table-wrap {

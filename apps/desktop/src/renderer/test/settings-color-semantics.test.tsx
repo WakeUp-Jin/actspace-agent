@@ -18,7 +18,8 @@ describe("Settings color semantics", () => {
 
     expect(page).toContain('<Button variant="primary"');
     expect(button).toContain("primary: \"border-transparent bg-action text-on-action");
-    expect(primitives).toContain('checked ? "bg-operational" : "bg-toggle-off"');
+    // 开关开启态跟随强调色（默认调色板下回落 operational）；状态点仍是 operational。
+    expect(primitives).toContain('checked ? "bg-toggle-on" : "bg-toggle-off"');
     expect(primitives).toContain("bg-selected font-medium text-text-main");
     expect(primitives).toContain("focus-visible:ring-focus-ring/30");
     expect(primitives).toContain("ok: \"h-1.5 w-1.5 bg-operational\"");

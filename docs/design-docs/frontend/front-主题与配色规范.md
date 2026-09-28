@@ -40,6 +40,21 @@ ActSpace 支持：
 
 负责 running、connected、enabled、healthy 和显式 success。目标 accent 为翡翠绿；diff additions 仍使用独立 diff token。
 
+### Accent（外观强调色）
+
+用户在「设置 → 外观 → 强调色」选择的调色板（`<html data-accent>`），详见 `front-accent-palette.md`。只驱动少数交互点，统一经语义 token 消费：
+
+| 位置 | token / 类 | 默认调色板回落 |
+|---|---|---|
+| Composer 发送按钮 | `IconButton variant="accent"`（`bg-accent` / `text-on-accent` / `hover:bg-accent-hover`） | action 反色 |
+| 开关开启态 | `bg-toggle-on` | operational |
+| 键盘焦点、输入框 focus、分割线拖动 | `focus-ring` | 中性墨灰 |
+| 普通链接 | `link` | info |
+| 文字选中 | `--act-color-selection` | 中性 20% |
+
+- 其它位置不得消费 accent：普通主按钮、导航 / 列表选中、状态点、进度条、审批条、数据色、用户消息卡都不随强调色变化。
+- 新增调色板 = `appearance/accents.ts` 一行 + `tokens.css` 一个 `:root[data-accent]` 块 + 一个 `--act-preview-accent-*` 色样；`pnpm check:frontend-theme` 校验一一对应与 4.5:1 对比度。
+
 ### Semantic
 
 - Info：信息提示和有限蓝色编码。
@@ -166,7 +181,7 @@ text-[rgba(...)]
 ## Focus
 
 - 键盘 focus 必须清晰可见，不能只依赖背景轻微变化。
-- 普通控件优先使用高对比中性 focus ring。
+- 普通控件优先使用 `focus-ring`：默认调色板下是高对比中性色，选了强调色后跟随强调色。
 - operational 控件可以使用 operational ring，但不能把所有 focus 都染绿。
 - focus、selected、running 是三个不同状态，不共享同一个彩色 token。
 
@@ -188,7 +203,7 @@ text-[rgba(...)]
 
 ### Composer
 
-- send = action token。
+- send = `IconButton variant="accent"`：默认调色板下即 action 反色，其它调色板为强调色；停止态保持 `primary`。
 - running = operational 小型反馈。
 - Context usage = 默认中性，阈值切 warning / danger。
 - Context 容量条的未使用轨道必须消费低对比 `meter-track`，不能使用 `border-strong` 造成“灰色区域也像已使用”的误读。
@@ -202,7 +217,7 @@ text-[rgba(...)]
 ### Settings
 
 - nav selected = neutral。
-- Toggle on = operational，Toggle off = `--act-color-toggle-off`（浅 `#d3d3ce` / 深 `#4a4b45`；`border-strong` 作关闭色太重）。
+- Toggle on = `toggle-on`（默认调色板下即 operational，其它调色板为强调色；「已开启」靠滑块位置与 `aria-checked` 表达），Toggle off = `--act-color-toggle-off`（浅 `#d3d3ce` / 深 `#4a4b45`；`border-strong` 作关闭色太重）。
 - 分组容器 = `surface` + `border`；分组内小节标题行 = `surface-subtle`。
 - 行内提醒 = warning 文字 + 图标；状态点：成功 operational，错误 danger，未配置为空心 `border-strong` 圈。
 - 连接成功 = operational，连接错误 = danger。

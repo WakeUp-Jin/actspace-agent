@@ -5,11 +5,14 @@
 export type UiFontId = "system" | "sans-modern" | "serif-reading" | "rounded";
 export type CodeFontId = "system-mono" | "jetbrains" | "fira" | "source";
 export type ThemeMode = "light" | "dark" | "system";
+export type AccentPaletteId = "default" | "blue" | "purple" | "pink" | "orange";
 
 export interface AppearancePrefs {
   version: 1;
   /** 主题三态；驱动 <html data-theme> 与原生 nativeTheme.themeSource。 */
   theme: ThemeMode;
+  /** 强调色调色板；驱动 <html data-accent>（发送按钮、开关、焦点、链接、文字选中），与明暗独立。 */
+  accentPalette: AccentPaletteId;
   /** UI 字体预设；驱动 --act-font-ui（连带 AI 输出正文）。 */
   uiFontId: UiFontId;
   /** 代码字体预设；驱动 --act-font-mono。 */
@@ -39,6 +42,7 @@ export const THEME_MODES: ThemeMode[] = ["light", "dark", "system"];
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
   version: 1,
   theme: "system",
+  accentPalette: "default",
   uiFontId: "system",
   codeFontId: "system-mono",
   uiFontSize: 14,

@@ -2,6 +2,7 @@
  * 外观偏好的 localStorage 读写。读取永远返回一个合法对象（坏数据 / 缺字段回落默认，
  * 数值越界 clamp），保证 applyAppearance 不会拿到非法值。
  */
+import { ACCENT_PALETTES } from "./accents";
 import { CODE_FONT_PRESETS, UI_FONT_PRESETS } from "./fonts";
 import {
   CODE_FONT_SIZE_MAX,
@@ -10,6 +11,7 @@ import {
   THEME_MODES,
   UI_FONT_SIZE_MAX,
   UI_FONT_SIZE_MIN,
+  type AccentPaletteId,
   type AppearancePrefs,
   type CodeFontId,
   type ThemeMode,
@@ -41,6 +43,12 @@ function asTheme(value: unknown): ThemeMode {
     : DEFAULT_APPEARANCE.theme;
 }
 
+function asAccentPalette(value: unknown): AccentPaletteId {
+  return ACCENT_PALETTES.some((palette) => palette.id === value)
+    ? (value as AccentPaletteId)
+    : DEFAULT_APPEARANCE.accentPalette;
+}
+
 export function loadAppearance(): AppearancePrefs {
   if (typeof localStorage === "undefined") return { ...DEFAULT_APPEARANCE };
   let raw: string | null = null;
@@ -62,6 +70,7 @@ export function loadAppearance(): AppearancePrefs {
   return {
     version: 1,
     theme: asTheme(parsed.theme),
+    accentPalette: asAccentPalette(parsed.accentPalette),
     uiFontId: asUiFontId(parsed.uiFontId),
     codeFontId: asCodeFontId(parsed.codeFontId),
     uiFontSize: Math.round(

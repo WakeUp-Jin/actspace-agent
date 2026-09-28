@@ -6,6 +6,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const rendererRoot = path.join(repoRoot, "apps/desktop/src/renderer");
 const tokensPath = path.join(rendererRoot, "styles/tokens.css");
 const tailwindPath = path.join(rendererRoot, "styles/tailwind.css");
+const accentsPath = path.join(rendererRoot, "appearance/accents.ts");
 
 const REQUIRED_THEME_TOKENS = [
   "--act-color-bg",
@@ -46,6 +47,11 @@ const REQUIRED_THEME_TOKENS = [
   "--act-color-success",
   "--act-color-success-soft",
   "--act-color-on-success",
+  "--act-color-accent",
+  "--act-color-accent-hover",
+  "--act-color-on-accent",
+  "--act-color-toggle-on",
+  "--act-color-link",
   "--act-color-focus-ring",
   "--act-color-operational-focus-ring",
   "--act-color-selection",
@@ -140,6 +146,77 @@ for (const [label, block] of [
       fail(`${label} is missing ${token}`);
     }
   }
+}
+
+// 强调色调色板（front-accent-palette.md）：accents.ts 每个 ID 都要有色样 token；
+// 非默认 ID 要有带浅深源值的 data-accent 块，且源值满足对比度门槛；默认 ID 不得定义源值。
+const DEFAULT_ACCENT_PALETTE = "default";
+const ACCENT_MIN_CONTRAST = 4.5;
+const accentRegistry = read(accentsPath).match(/ACCENT_PALETTES[^=]*=\s*\[([\s\S]*?)\];/)?.[1] ?? "";
+const accentIds = [...accentRegistry.matchAll(/\bid:\s*"([a-z0-9-]+)"/g)].map((match) => match[1]);
+
+function hexToken(block, token) {
+  return block?.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})\\s*;`, "i"))?.[1] ?? null;
+}
+
+function contrast(a, b) {
+  const luminance = (hex) =>
+    [1, 3, 5]
+      .map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255)
+      .map((value) => (value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4))
+      .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (high + 0.05) / (low + 0.05);
+}
+
+const sharedAccentBlock = findBlock(tokensSource, ':root[data-accent]:not([data-accent="default"])');
+const accentBackdrops = {
+  light: {
+    "on-accent": hexToken(sharedAccentBlock, "--act-palette-light-on-accent"),
+    surface: hexToken(lightBlock, "--act-color-surface"),
+    bg: hexToken(lightBlock, "--act-color-bg"),
+    "surface-subtle": hexToken(lightBlock, "--act-color-surface-subtle"),
+  },
+  dark: {
+    "on-accent": hexToken(sharedAccentBlock, "--act-palette-dark-on-accent"),
+    surface: hexToken(darkBlock, "--act-color-surface"),
+    bg: hexToken(darkBlock, "--act-color-bg"),
+    "surface-raised": hexToken(darkBlock, "--act-color-surface-raised"),
+  },
+};
+
+if (!accentIds.includes(DEFAULT_ACCENT_PALETTE)) fail(`appearance/accents.ts is missing default palette ${DEFAULT_ACCENT_PALETTE}`);
+if (lightBlock && /--act-palette-[a-z-]+\s*:/.test(lightBlock)) fail("light block must not define --act-palette-* source values (default palette falls back)");
+for (const id of accentIds) {
+  const swatch = id === DEFAULT_ACCENT_PALETTE ? `--act-preview-accent-${id}-ink` : `--act-preview-accent-${id}`;
+  if (lightBlock && !lightBlock.includes(`${swatch}:`)) fail(`light is missing accent swatch ${swatch}`);
+  const block = findBlock(tokensSource, `:root[data-accent="${id}"]`);
+  if (id === DEFAULT_ACCENT_PALETTE) {
+    if (block) fail(`default accent palette must not have a :root[data-accent="${id}"] block`);
+    continue;
+  }
+  if (!block) {
+    fail(`tokens.css is missing :root[data-accent="${id}"] block`);
+    continue;
+  }
+  for (const tone of ["light", "dark"]) {
+    const accent = hexToken(block, `--act-palette-${tone}-accent`);
+    if (!accent) {
+      fail(`accent palette ${id} is missing a hex --act-palette-${tone}-accent`);
+      continue;
+    }
+    for (const [label, backdrop] of Object.entries(accentBackdrops[tone])) {
+      if (!backdrop) {
+        fail(`accent contrast check cannot resolve ${tone} ${label}`);
+        continue;
+      }
+      const ratio = contrast(accent, backdrop);
+      if (ratio < ACCENT_MIN_CONTRAST) fail(`accent palette ${id} ${tone} ${accent} vs ${label} ${backdrop} is ${ratio.toFixed(2)}:1 (< ${ACCENT_MIN_CONTRAST})`);
+    }
+  }
+}
+for (const match of tokensSource.matchAll(/:root\[data-accent="([a-z0-9-]+)"\]/g)) {
+  if (!accentIds.includes(match[1])) fail(`tokens.css defines unregistered accent palette ${match[1]}`);
 }
 
 const definedRootTokens = new Set([...lightBlock.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((match) => match[1]));
