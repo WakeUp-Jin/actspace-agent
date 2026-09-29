@@ -2045,10 +2045,10 @@ function AppearanceSection() {
         />
         <div aria-label="字体预览" className="px-4 py-4">
           <p className="leading-relaxed text-text-main" style={{ fontSize: prefs.uiFontSize }}>
-            已完成设置页重构：导航分组保持不变，所有页面使用同一套分组和控件。
+            让想法清晰呈现。The quick brown fox jumps over the lazy dog. 0123456789
           </p>
           <pre className="mt-2.5 overflow-x-auto rounded-act-sm bg-surface-subtle px-3 py-2.5 font-mono text-text-muted" style={{ fontSize: prefs.codeFontSize }}>
-            pnpm --filter @actspace/desktop test
+            {'const greeting = "你好，ActSpace";'}
           </pre>
         </div>
       </SettingGroup>

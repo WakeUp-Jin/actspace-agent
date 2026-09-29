@@ -1,0 +1,57 @@
+[
+  {
+    "recordKind": "event",
+    "seq": 5248,
+    "type": "request/header",
+    "eventVersion": 1,
+    "criticality": "required",
+    "time": "2026-09-29T11:04:47.787Z",
+    "source": {
+      "ownerPluginId": "@actspace/core"
+    },
+    "data": {
+      "requestId": "5123d571-539e-4d1c-81b2-eb258d6979eb",
+      "turnId": "20f2f40d-6929-47b6-acee-7dc4253ef51d",
+      "stepId": "6b89722b-b528-4322-9a46-e44f6d95b321",
+      "routeId": "default",
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "attempt": 1,
+      "agentMode": "chat",
+      "agentModeRevision": 5
+    },
+    "surface": null,
+    "provenance": {
+      "sourceEventSeqs": [],
+      "contributorIds": [],
+      "runtimeSelectionSeq": null
+    }
+  },
+  {
+    "recordKind": "event",
+    "seq": 5749,
+    "type": "turn/end",
+    "eventVersion": 1,
+    "criticality": "required",
+    "time": "2026-09-29T11:05:02.263Z",
+    "source": {
+      "ownerPluginId": "@actspace/core"
+    },
+    "data": {
+      "turnId": "20f2f40d-6929-47b6-acee-7dc4253ef51d",
+      "reason": "failed",
+      "failure": {
+        "kind": "unknown",
+        "message": "Tool read_file is not visible in this Agent scope.",
+        "retryable": false,
+        "attempt": 1
+      }
+    },
+    "surface": null,
+    "provenance": {
+      "sourceEventSeqs": [],
+      "contributorIds": [],
+      "runtimeSelectionSeq": null
+    }
+  }
+]

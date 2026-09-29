@@ -18,6 +18,7 @@ import type { SessionProjectionService } from "@actspace/session-projection";
 export class RuntimeSessionController {
   readonly store: SessionStore;
   readonly #open = new Map<string, SessionHandle>();
+  readonly #external = new Map<string, SessionHandle>();
   readonly #ephemeral = new Set<string>();
   readonly #models = new Map<string, SessionReadModel>();
   readonly #changes = new Map<string, Map<number, RuntimeV2ProjectionValues>>();
@@ -56,7 +57,7 @@ export class RuntimeSessionController {
   private async repairGlobalIndex(snapshot: RuntimeV2SessionSnapshot, profileId: string): Promise<void> {
     if (!this.#globalIndexLoadedFromDisk) return;
     const indexed = this.#globalIndex.get(snapshot.sessionId);
-    if (indexed === undefined || indexed.throughJournalSeq >= snapshot.throughJournalSeq) return;
+    if (indexed !== undefined && indexed.throughJournalSeq >= snapshot.throughJournalSeq) return;
     this.#globalIndex.replace(this.summary(snapshot, profileId));
     await this.#globalIndex.save();
   }
@@ -158,9 +159,16 @@ export class RuntimeSessionController {
 
   async browseSessions() {
     await this.ensureGlobalIndex();
+    const ids = await this.store.listSessionIds();
+    const indexed = new Set(this.#globalIndex.values().map(item => item.sessionId));
+    for (const id of ids) {
+      if (!indexed.has(id)) {
+        try { await this.readModel(id); } catch { /* Keep unreadable sessions in the failed count; retry on the next browse. */ }
+      }
+    }
     const items: RuntimeV2SessionListItem[] = this.#globalIndex.values().map(summary => ({ sessionId: summary.sessionId, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, profileId: summary.profileId, agentForm: summary.agentForm ?? "agent", agentFormId: summary.agentFormId, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, accessState: summary.accessState, metadata: { title: summary.title, pinned: summary.pinned, archived: summary.archived }, lineage: summary.lineage, completedTurnCount: summary.completedTurnCount }));
     const known = new Set(items.map(item => item.sessionId));
-    const failed = (await this.store.listSessionIds()).filter(sessionId => !known.has(sessionId)).length;
+    const failed = ids.filter(sessionId => !known.has(sessionId)).length;
     items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
     return { items, indexing: false, failed };
   }
@@ -198,7 +206,14 @@ export class RuntimeSessionController {
   async create(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, presetId: "actspace.main", agentFormId: "actspace.main", agentFormVersion: 1, agentCompositionDigest: mainAgentFormComposition(this.options.plugins).digest, agentMembers: mainAgentFormComposition(this.options.plugins).members, initialAgentMode: agentForm === "chat" ? "chat" : "agent", runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); const model = this.liveModel(session); if (this.#globalIndexLoadedFromDisk) { this.#globalIndex.replace(this.summary(model.snapshot(session.journal.validation.accessState), this.options.profileId)); void this.#globalIndex.save().catch(() => undefined); } await this.options.onCreated?.(sessionId); return session; }
   async createEphemeral(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, presetId: "actspace.main", agentFormId: "actspace.main", agentFormVersion: 1, agentCompositionDigest: mainAgentFormComposition(this.options.plugins).digest, agentMembers: mainAgentFormComposition(this.options.plugins).members, initialAgentMode: agentForm === "chat" ? "chat" : "agent", runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.liveModel(session); this.#ephemeral.add(sessionId); await this.options.onCreated?.(sessionId); return session; }
   async resume(sessionId: string): Promise<SessionHandle> { const existing = this.#open.get(sessionId); if (existing !== undefined) return existing; const session = await this.store.open(sessionId, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); try { this.liveModel(session); await this.options.beforeRecovery?.(session, this.store); await applySessionRecovery(session); this.#open.set(sessionId, session); this.liveModel(session); await this.options.onCreated?.(sessionId); return session; } catch (error) { await session.close().catch(() => undefined); throw error; } }
-  getOpen(sessionId: string): SessionHandle | undefined { return this.#open.get(sessionId); }
+  /** Provider-owned sessions participate in checkpoints without transferring close ownership. */
+  registerExternal(session: SessionHandle): () => void {
+    const id = session.header.sessionId;
+    if (this.getOpen(id) !== undefined) throw new Error(`Session ${id} is already live.`);
+    this.#external.set(id, session);
+    return () => { if (this.#external.get(id) === session) this.#external.delete(id); };
+  }
+  getOpen(sessionId: string): SessionHandle | undefined { return this.#open.get(sessionId) ?? this.#external.get(sessionId); }
   closeOpen(sessionId: string): void { this.#open.delete(sessionId); this.#ephemeral.delete(sessionId); this.#models.delete(sessionId); this.#changes.delete(sessionId); }
   snapshot(session: SessionHandle): RuntimeV2SessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }
   async inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot> { return (await this.readModel(sessionId)).snapshot; }

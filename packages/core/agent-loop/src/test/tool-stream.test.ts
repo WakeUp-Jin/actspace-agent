@@ -100,3 +100,46 @@ it("passes reasoning settings to every request in a tool turn", async () => {
   expect(observed).toHaveLength(2);
   expect(observed).toEqual([expect.objectContaining({ reasoning: true, reasoningEffort: "max" }), expect.objectContaining({ reasoning: true, reasoningEffort: "max" })]);
 });
+
+ it("settles hidden tool calls without execution and allows a following Chat turn", async () => {
+    let executed = 0;
+    const requests: (readonly import("@actspace/llm-service").LlmMessage[])[] = [];
+    const { journal, result } = await runToolStreamFixture({ mode: "chat", followup: true,
+      execute: async () => { executed++; throw new Error("must not execute"); },
+      onMessages: messages => requests.push(messages),
+    });
+    expect(executed).toBe(0);
+    expect(result.reason).toBe("completed");
+    expect(journal.filter(event => event.type === "tool/result")).toHaveLength(1);
+    expect(journal.find(event => event.type === "tool/result")?.data).toMatchObject({ status: "denied" });
+    expect(requests).toHaveLength(3);
+    expect(requests[2]?.filter(message => message.role === "tool" && message.callId === "read-1")).toHaveLength(1);
+  });
+
+  it("recovers an orphaned historical call without rewriting the Journal", async () => {
+    let request: readonly import("@actspace/llm-service").LlmMessage[] = [];
+    const { journal } = await runToolStreamFixture({ mode: "chat", terminalOnly: true,
+      seedSession: async session => {
+        await session.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" },
+          data: { messageId: "old", content: [{ type: "tool-call", callId: "orphan", name: "read_file", arguments: "{}" }] },
+          surface: { kind: "append", node: { kind: "assistant", messageId: "old", content: [{ type: "tool-call", callId: "orphan", name: "read_file", arguments: "{}" }] } } });
+      }, onMessages: messages => { request = messages; },
+    });
+    const feedback = request.findIndex(message => message.role === "tool" && message.callId === "orphan");
+    expect(feedback).toBeGreaterThan(0);
+    expect(request[feedback - 1]?.role).toBe("assistant");
+    expect(JSON.stringify(request[feedback])).toContain("No result was recorded");
+    expect(journal.some(event => event.type === "tool/result")).toBe(false);
+  });
+
+  it("rejects every call in a mixed batch when one tool is unknown", async () => {
+    let executions = 0;
+    const { journal } = await runToolStreamFixture({ extraToolCall: true, execute: async () => {
+      executions++; return { status: "completed", summary: "unexpected", modelOutput: [] };
+    } });
+    expect(executions).toBe(0);
+    expect(journal.filter(event => event.type === "tool/result").map(event => event.data)).toEqual([
+      expect.objectContaining({ callId: "read-1", status: "denied" }),
+      expect.objectContaining({ callId: "unknown-2", status: "denied" }),
+    ]);
+  });

@@ -112,6 +112,8 @@ async function main() {
   const phases = [
     ["pnpm", ["--filter", "@actspace/desktop", "run", "build:deps:dev"], repoRoot],
     ["node", ["scripts/package-browser-components.mjs"], repoRoot],
+    // Existing dist files are not proof that this invocation compiled successfully.
+    ["pnpm", ["--filter", "@actspace/desktop", "run", "build:electron"], repoRoot],
     ["pnpm", [
       "exec",
       "concurrently",

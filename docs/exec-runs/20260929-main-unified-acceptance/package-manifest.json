@@ -1,0 +1,17 @@
+{
+  "repository": "local",
+  "git_sha": "082287af4219eaff8637741dc2d78f04289f59d0",
+  "generated_at_utc": "2026-09-29T12:00:14Z",
+  "application": "ActSpace",
+  "version": "0.1.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "artifact": "actspace-desktop-darwin-arm64.tar.gz",
+  "artifact_size_bytes": 167540507,
+  "dmg_artifact": "actspace-desktop-darwin-arm64.dmg",
+  "dmg_artifact_size_bytes": 245870206,
+  "signed": false,
+  "notarized": false,
+  "signature": "ad-hoc",
+  "packaging": "portable-electron-archive-and-macos-dmg"
+}
