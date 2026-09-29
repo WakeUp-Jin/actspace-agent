@@ -1,5 +1,5 @@
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
-import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, ResponseAnnotationReference, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import type { PermissionMode } from "@actspace/shared/runtime-v2";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, FlaskConical, ShieldCheck } from "lucide-react";
@@ -246,6 +246,16 @@ export function WorkbenchLayout({
       return;
     }
     composerDraftsRef.current.set(key, text);
+  }, []);
+  // 回复批注草稿和文字草稿一样按会话隔离，只存在内存里。
+  const annotationDraftsRef = useRef(new Map<string, ResponseAnnotationReference[]>());
+  const readAnnotationDraft = useCallback((key: string) => annotationDraftsRef.current.get(key) ?? [], []);
+  const writeAnnotationDraft = useCallback((key: string, annotations: readonly ResponseAnnotationReference[]) => {
+    if (annotations.length === 0) {
+      annotationDraftsRef.current.delete(key);
+      return;
+    }
+    annotationDraftsRef.current.set(key, [...annotations]);
   }, []);
 
   useEffect(() => {
@@ -583,6 +593,8 @@ export function WorkbenchLayout({
         draftKey={draftKey}
         readDraft={readDraft}
         writeDraft={writeDraft}
+        readAnnotationDraft={readAnnotationDraft}
+        writeAnnotationDraft={writeAnnotationDraft}
         reviewSummary={agentForm === "chat" ? null : reviewSummary}
         onOpenReview={agentForm === "chat" ? undefined : openReviewTab}
         models={models}

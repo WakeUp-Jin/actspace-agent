@@ -14,6 +14,20 @@ describe("Compaction", () => {
     expect(summary.content).not.toContain("agentMode");
   });
 
+  it("keeps file references and quoted replies in deterministic summaries", async () => {
+    const summary = await new DeterministicCompactionSummarizer().summarize([{
+      node: { kind: "user", messageId: "message-1", content: [
+        { type: "text", text: "hello" },
+        { type: "file-reference", relativePath: "src/a.ts", displayName: "a.ts" },
+        { type: "response-excerpt", annotationId: "ann", assistantMessageId: "v2-3", selectedText: "quoted line", startOffset: 0, endOffset: 11, prefixContext: "", suffixContext: "", comment: "why" },
+      ] },
+      sourceSeq: 0,
+    } as never], { sessionId: "session-1" });
+    expect(summary.content).toContain("src/a.ts");
+    expect(summary.content).toContain("quoted line");
+    expect(summary.content).toContain("why");
+  });
+
   it("appends a transaction and never deletes the original Surface facts", async () => {
     const registry = createCoreCodecRegistry();
     const session = SessionHandle.createEphemeral({

@@ -47,6 +47,19 @@ describe("formatSessionTranscript", () => {
     );
   });
 
+  it("lists referenced file paths and only counts quoted replies", () => {
+    const transcript = formatSessionTranscript("Refs", [{
+      kind: "user",
+      id: "user-1",
+      content: "Compare these.",
+      createdAt: "2026-07-26T00:00:00.000Z",
+      fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }],
+      responseAnnotations: [{ annotationId: "ann", assistantMessageId: "v2-1", selectedText: "secret excerpt", startOffset: 0, endOffset: 14, prefixContext: "", suffixContext: "" }],
+    }]);
+    expect(transcript).toBe("# Refs\n\n## User\n\nCompare these.\n\nReferenced files:\n- src/a.ts\nQuoted replies: 1\n");
+    expect(transcript).not.toContain("secret excerpt");
+  });
+
   it("keeps an empty session transcript readable", () => {
     expect(formatSessionTranscript("  ", [])).toBe("# Untitled session\n");
   });

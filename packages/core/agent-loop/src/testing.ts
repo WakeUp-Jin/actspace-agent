@@ -29,6 +29,7 @@ export async function runToolStreamFixture(options: {
   context?: CordisContext;
   mode?: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode;
   terminalOnly?: boolean;
+  content?: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue;
 } = {}) {
   const registry = createCoreCodecRegistry();
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({
@@ -78,7 +79,7 @@ export async function runToolStreamFixture(options: {
     context: options.context,
   });
   try {
-    const result = await loop.runTurn({ content: "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test" });
+    const result = await loop.runTurn({ content: options.content ?? "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test" });
     return { result, events, journal: [...session.journal.events], header: session.header, registry };
   } finally { options.onJournal?.([...session.journal.events]); await session.close(); await handle.dispose(100); }
 }

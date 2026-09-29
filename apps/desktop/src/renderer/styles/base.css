@@ -202,3 +202,20 @@ svg {
     opacity: 1;
   }
 }
+
+/* 回复批注选中态：用 CSS Custom Highlight API 高亮原文，不改动 DOM。 */
+::highlight(act-annotation) {
+  background-color: var(--act-color-annotation-highlight);
+}
+
+@keyframes annotation-toolbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

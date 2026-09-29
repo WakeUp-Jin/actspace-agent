@@ -710,6 +710,21 @@ describe("session selectors", () => {
     expect(blocks[0]).toMatchObject({ kind: "user", content: "看看进度" });
   });
 
+  it("carries file references and quoted replies onto user blocks only when present", () => {
+    const excerpt = { annotationId: "ann", assistantMessageId: "v2-1", selectedText: "x", startOffset: 0, endOffset: 1, prefixContext: "", suffixContext: "" };
+    const blocks = createMessageBlocks([
+      { id: "evt-plain", sessionId: "session-1", agentRunId: "turn-1", type: "user_message", timestamp: "2026-07-03T12:00:00.000Z", schemaVersion: 2, payload: { content: "plain" } },
+      { id: "evt-refs", sessionId: "session-1", agentRunId: "turn-2", type: "user_message", timestamp: "2026-07-03T12:00:01.000Z", schemaVersion: 2, payload: {
+        content: "with refs",
+        fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }],
+        responseAnnotations: [excerpt],
+      } },
+    ]);
+    expect(blocks[0]).not.toHaveProperty("fileReferences");
+    expect(blocks[0]).not.toHaveProperty("responseAnnotations");
+    expect(blocks[1]).toMatchObject({ kind: "user", content: "with refs", fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }], responseAnnotations: [excerpt] });
+  });
+
   it("restores a running Agent tool block with recent transcript summaries", () => {
     const preview: AgentToolPreview = {
       kind: "agent",

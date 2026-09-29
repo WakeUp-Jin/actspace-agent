@@ -428,7 +428,9 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
             renderKey: nextRenderKey(event, "user"),
             content: payload.content,
             createdAt: getDisplayTime(event.timestamp),
-            attachments: payload.attachments
+            attachments: payload.attachments,
+            ...(payload.fileReferences?.length ? { fileReferences: payload.fileReferences } : {}),
+            ...(payload.responseAnnotations?.length ? { responseAnnotations: payload.responseAnnotations } : {})
           }
         ];
       }

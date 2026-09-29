@@ -1,5 +1,6 @@
 import type { ContextUsageBucketName } from "./context-buckets";
 import type { ModelApi } from "./model-config";
+import type { FileReference, ResponseAnnotationReference } from "./composer-content";
 
 export type SessionId = string;
 export type AgentRunId = string;
@@ -185,6 +186,8 @@ export type SessionEvent<TPayload = unknown> = {
 export type UserMessagePayload = {
   content: string;
   attachments?: ComposerAttachment[];
+  fileReferences?: FileReference[];
+  responseAnnotations?: ResponseAnnotationReference[];
   /** 非用户手动输入的注入消息来源（如 "task_notification"），前端据此换展示样式。 */
   source?: string;
 };
@@ -698,6 +701,8 @@ export type MessageBlock = {
       content: string;
       createdAt: string;
       attachments?: ComposerAttachment[];
+      fileReferences?: FileReference[];
+      responseAnnotations?: ResponseAnnotationReference[];
     }
   | {
       kind: "assistant";

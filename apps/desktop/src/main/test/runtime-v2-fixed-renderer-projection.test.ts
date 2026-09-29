@@ -82,6 +82,43 @@ describe("fixed renderer v2 projection", () => {
     ]);
   });
 
+  it("projects file references and quoted replies beside the user content without leaking them into the text", () => {
+    const excerpt = { annotationId: "ann_1", assistantMessageId: "v2-2", selectedText: "张飞是三国人物", startOffset: 0, endOffset: 7, prefixContext: "", suffixContext: "", comment: "展开讲讲" };
+    const content = [
+      { type: "text", text: "继续" },
+      { type: "file-reference", relativePath: "docs/三国.md", displayName: "三国.md" },
+      { type: "response-excerpt", ...excerpt },
+      { type: "artifact", artifact: { artifactId: "img-1", mediaType: "image/png" }, label: "map.png" },
+    ];
+    const journal = [
+      event(0, "agent/inbox/spliced", { operation: "enqueue", messageId: "user-1", target: "next-turn", content: "张飞是谁" }),
+      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "user-1", target: "next-turn" }, append("user", "user-1", "张飞是谁")),
+      event(2, "assistant/message", { messageId: "assistant-1", requestId: "request-1", content: "张飞是三国人物" }, append("assistant", "assistant-1", "张飞是三国人物")),
+      event(3, "agent/inbox/spliced", { operation: "enqueue", messageId: "user-2", target: "next-turn", content }),
+      event(4, "agent/inbox/spliced", { operation: "claim", messageId: "user-2", target: "next-turn" }, append("user", "user-2", content)),
+    ];
+    const snapshot = baseSnapshot({
+      throughJournalSeq: 4,
+      messages: [
+        { kind: "user", messageId: "user-1", content: "张飞是谁" },
+        { kind: "assistant", messageId: "assistant-1", content: "张飞是三国人物" },
+        { kind: "user", messageId: "user-2", content },
+      ],
+    });
+
+    const messages = projectChatEvents(snapshot, journal).filter((item) => item.type === "user_message" || item.type === "assistant_message");
+
+    // 批注里的 assistantMessageId 依赖这个 id 形态，main 端按 seq 回查。
+    expect(messages[1]).toMatchObject({ id: "v2-2", type: "assistant_message" });
+    expect(messages[0]!.payload).toEqual({ content: "张飞是谁", attachments: [] });
+    expect(messages[2]!.payload).toEqual({
+      content: "继续[map.png]",
+      attachments: [{ id: "img-1", path: "img-1", kind: "image", name: "map.png", mimeType: "image/png" }],
+      fileReferences: [{ relativePath: "docs/三国.md", displayName: "三国.md" }],
+      responseAnnotations: [excerpt],
+    });
+  });
+
   it("preserves task notification provenance so the user projection can hide it", () => {
     const notification = [
       event(0, "agent/inbox/spliced", { operation: "enqueue", messageId: "notify-1", target: "next-step", content: "<task_notification>done</task_notification>", source: "task_notification" }),

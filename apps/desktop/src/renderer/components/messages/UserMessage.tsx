@@ -1,6 +1,8 @@
-import { FileText } from "lucide-react";
+import { ChevronDown, FileText, MessageSquareQuote } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
+import type { ComposerAttachment, MessageBlock, ResponseAnnotationReference } from "@actspace/shared";
+import { Button } from "../ui/Button";
+import { useResponseAnnotations } from "./response-annotation-context";
 
 const USER_MESSAGE_CLASS = "message-row user-message flex justify-start animate-[rise-in_260ms_ease_both]";
 const USER_CARD_CLASS =
@@ -23,6 +25,46 @@ const USER_FILE_ATTACHMENT_CLASS =
   "inline-flex h-9 max-w-[240px] items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-act-md leading-5 font-medium text-text-main";
 const USER_FILE_NAME_CLASS = "truncate";
 const EMPTY_ATTACHMENTS: readonly ComposerAttachment[] = [];
+const ANNOTATION_SUMMARY_TOGGLE_CLASS =
+  "mt-3 inline-flex h-7 items-center gap-1.5 rounded-act-sm px-1.5 text-act-xs font-medium text-text-muted transition-colors duration-(--motion-fast) hover:bg-hover-overlay hover:text-text-main focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring";
+const ANNOTATION_SUMMARY_ITEM_CLASS = "rounded-act-sm border border-line bg-surface-subtle px-2.5 py-2 [&+&]:mt-1.5";
+
+/** 已发送的回复引用摘要：独立于正文折叠，点击展开；可定位时滚到原回复并选中 marker。 */
+function ResponseAnnotationSummary({ annotations }: { annotations: readonly ResponseAnnotationReference[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const context = useResponseAnnotations();
+  return (
+    <div>
+      <button type="button" className={ANNOTATION_SUMMARY_TOGGLE_CLASS} aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>
+        <MessageSquareQuote size={14} aria-hidden="true" />
+        {annotations.length} 条回复引用
+        <ChevronDown size={13} className={`transition-transform duration-(--motion-fast) motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      {expanded ? (
+        <ol className="mt-1.5" aria-label="回复引用">
+          {annotations.map((annotation) => {
+            const available = context?.isAnnotationAvailable(annotation) ?? false;
+            return (
+              <li className={`${ANNOTATION_SUMMARY_ITEM_CLASS} flex items-start gap-3`} key={annotation.annotationId}>
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-3 whitespace-pre-wrap break-words text-act-sm leading-5 text-text-main">{annotation.selectedText}</p>
+                  {annotation.comment ? (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-act-xs leading-4 text-text-muted">{annotation.comment}</p>
+                  ) : null}
+                </div>
+                {available ? (
+                  <Button className="shrink-0" variant="ghost" size="xs" onClick={() => context?.locateAnnotation(annotation)}>定位</Button>
+                ) : (
+                  <span className="shrink-0 py-0.5 text-act-xs leading-4 text-text-faint">原回复不可用</span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
+    </div>
+  );
+}
 
 function getAttachmentPreviewStyle(attachment: ComposerAttachment): CSSProperties | undefined {
   return attachment.previewUrl
@@ -159,6 +201,7 @@ export function UserMessage({
             })}
           </div>
         ) : null}
+        {message.responseAnnotations?.length ? <ResponseAnnotationSummary annotations={message.responseAnnotations} /> : null}
       </div>
     </article>
   );

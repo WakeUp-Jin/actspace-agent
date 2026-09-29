@@ -1162,3 +1162,84 @@ it.each([false, true])("sends the configured custom-model default or explicit Au
   expect(options.thinkingEnabled).toBe(true);
   expect(options.reasoningEffort).toBe(auto ? undefined : "high");
 });
+
+describe("Composer response annotation tray", () => {
+  const first = { annotationId: "ann_1", assistantMessageId: "v2-3", selectedText: "第一段被引用的原文", startOffset: 0, endOffset: 9, prefixContext: "", suffixContext: "" };
+  const second = { ...first, annotationId: "ann_2", selectedText: "第二段", startOffset: 20, endOffset: 23, comment: "这里要展开" };
+
+  it("hides the tray without annotations and shows a count with cards when present", () => {
+    const { rerender } = renderComposer({ responseAnnotations: [], onResponseAnnotationsChange: vi.fn() });
+    expect(screen.queryByRole("region", { name: "回复引用" })).toBeNull();
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <Composer contextSnapshot={mockContextSnapshot} onSend={vi.fn()} onAbort={vi.fn()} responseAnnotations={[first, second]} onResponseAnnotationsChange={vi.fn()} />
+      </TooltipProvider>,
+    );
+    const tray = screen.getByRole("region", { name: "回复引用" });
+    expect(within(tray).getByText("2 条引用")).toBeVisible();
+    // 数量从 0 变多会自动展开。
+    expect(within(tray).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(tray).getByText("这里要展开")).toBeVisible();
+  });
+
+  it("removes one card, clears all and toggles the list", async () => {
+    const user = userEvent.setup();
+    const onResponseAnnotationsChange = vi.fn();
+    renderComposer({ responseAnnotations: [first, second], onResponseAnnotationsChange });
+    await user.click(screen.getByRole("button", { name: "展开引用" }));
+    expect(screen.getByRole("button", { name: "收起引用" })).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByRole("button", { name: "移除引用 1" }));
+    expect(onResponseAnnotationsChange).toHaveBeenLastCalledWith([second]);
+    await user.click(screen.getByRole("button", { name: "清空全部" }));
+    expect(onResponseAnnotationsChange).toHaveBeenLastCalledWith([]);
+    await user.click(screen.getByRole("button", { name: "收起引用" }));
+    expect(screen.queryByRole("list")).toBeNull();
+  });
+
+  it("edits a comment with Enter, cancels with Escape and blocks over-long comments", async () => {
+    const user = userEvent.setup();
+    const onResponseAnnotationsChange = vi.fn();
+    renderComposer({ responseAnnotations: [first], onResponseAnnotationsChange });
+    await user.click(screen.getByRole("button", { name: "展开引用" }));
+    await user.click(screen.getByRole("button", { name: "编辑引用 1 的评论" }));
+    const editor = screen.getByRole("textbox", { name: "引用 1 的评论" });
+    expect(editor).toHaveFocus();
+    await user.type(editor, "  补充说明  {Enter}");
+    expect(onResponseAnnotationsChange).toHaveBeenLastCalledWith([{ ...first, comment: "补充说明" }]);
+
+    await user.click(screen.getByRole("button", { name: "编辑引用 1 的评论" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "引用 1 的评论" }), { key: "Escape" });
+    expect(screen.queryByRole("textbox", { name: "引用 1 的评论" })).toBeNull();
+    expect(onResponseAnnotationsChange).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "编辑引用 1 的评论" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "引用 1 的评论" }), { target: { value: "长".repeat(2001) } });
+    expect(screen.getByRole("alert")).toHaveTextContent("评论超过 2,000 个字符");
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  });
+
+  it("does not submit a comment while an IME composition is active", () => {
+    const onResponseAnnotationsChange = vi.fn();
+    renderComposer({ responseAnnotations: [first], onResponseAnnotationsChange, responseAnnotationEditRequest: { annotationId: "ann_1", nonce: 1 } });
+    const editor = screen.getByRole("textbox", { name: "引用 1 的评论" });
+    fireEvent.change(editor, { target: { value: "拼音" } });
+    fireEvent.keyDown(editor, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(editor, { key: "Enter", keyCode: 229 });
+    expect(onResponseAnnotationsChange).not.toHaveBeenCalled();
+  });
+
+  it("sends annotations without text, includes them in send options and clears the tray", async () => {
+    const onResponseAnnotationsChange = vi.fn();
+    const { onSend } = renderComposer({ responseAnnotations: [first], onResponseAnnotationsChange });
+    const send = screen.getByRole("button", { name: "发送消息" });
+    expect(send).toBeEnabled();
+    await userEvent.click(send);
+    expect(onSend).toHaveBeenCalledWith("", expect.objectContaining({ responseAnnotations: [first] }));
+    expect(onResponseAnnotationsChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it("shows the limit notice in the tray header", () => {
+    renderComposer({ responseAnnotations: [first], onResponseAnnotationsChange: vi.fn(), responseAnnotationNotice: "最多引用 20 段回复" });
+    expect(screen.getByRole("status")).toHaveTextContent("最多引用 20 段回复");
+  });
+});

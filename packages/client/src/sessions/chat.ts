@@ -7,6 +7,8 @@ import {
   type SessionEvent,
   type SessionRecord,
   normalizeModelKey,
+  readFileReferenceBlocks,
+  readResponseExcerptBlocks,
   type UsageActivityRow,
   type UsageActivityStatus,
   type UsageActivityTokens,
@@ -190,7 +192,15 @@ function projectSurfaceNode(
   source?: string,
 ): void {
   if (node.kind === "user") {
-    projected.push({ ...base, type: "user_message", payload: { content: contentText(node.content), attachments: attachmentViews(node.content), ...(source === undefined ? {} : { source }) } });
+    const fileReferences = readFileReferenceBlocks(node.content);
+    const responseAnnotations = readResponseExcerptBlocks(node.content);
+    projected.push({ ...base, type: "user_message", payload: {
+      content: contentText(node.content),
+      attachments: attachmentViews(node.content),
+      ...(fileReferences.length === 0 ? {} : { fileReferences }),
+      ...(responseAnnotations.length === 0 ? {} : { responseAnnotations }),
+      ...(source === undefined ? {} : { source }),
+    } });
     return;
   }
   if (node.kind !== "assistant") return;

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { RuntimeV2AgentMode, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
+import { readFileReferenceBlocks, readResponseExcerptBlocks, renderFileReferencesForModel, renderResponseExcerptForModel } from "@actspace/shared";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
 import type { LlmService } from "@actspace/llm-service";
 import type { LlmStreamEvent } from "@actspace/llm-service";
@@ -393,6 +394,9 @@ function toMessage(value: RuntimeV2JsonValue, paths: ReadonlyMap<string, string>
 function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<string, string>): string | readonly LlmContentBlock[] {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return JSON.stringify(value ?? null) ?? "null";
+  // 同一条消息里的文件引用合并成一段，出现在第一个 file-reference 块的位置。
+  const fileReferences = readFileReferenceBlocks(value);
+  let fileReferencesRendered = false;
   return value.flatMap((item): LlmContentBlock[] => {
     if (item === null || typeof item !== "object" || Array.isArray(item)) return [{ type: "text", text: JSON.stringify(item) ?? "null" }];
     const block = item as Readonly<Record<string, RuntimeV2JsonValue>>;
@@ -401,6 +405,15 @@ function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<
     if (block.type === "tool-call" && typeof block.callId === "string" && typeof block.name === "string") return [{ type: "tool-call", callId: block.callId, name: block.name, arguments: typeof block.arguments === "string" ? block.arguments : JSON.stringify(block.arguments ?? {}) }];
     if (block.type === "json") return [{ type: "text", text: JSON.stringify(block.value ?? null) }];
     if (block.type === "runtime-context" && isRecord(block.context)) return [{ type: "text", text: `<runtime_context>${JSON.stringify(block.context)}</runtime_context>` }];
+    if (block.type === "file-reference") {
+      if (fileReferencesRendered || fileReferences.length === 0) return [];
+      fileReferencesRendered = true;
+      return [{ type: "text", text: renderFileReferencesForModel(fileReferences) }];
+    }
+    if (block.type === "response-excerpt") {
+      const [excerpt] = readResponseExcerptBlocks([block]);
+      return excerpt ? [{ type: "text", text: renderResponseExcerptForModel(excerpt) }] : [];
+    }
     if (block.type === "artifact" && isRecord(block.artifact)) {
       const { artifactId, mediaType } = block.artifact;
       if (typeof artifactId === "string" && typeof mediaType === "string") {

@@ -138,6 +138,10 @@ export type RunAgentInput = {
   /** 首个普通 Agent Run 的执行目录准备；已有运行记录的 session 忽略该字段。 */
   executionContext?: TurnExecutionContextInput;
   attachments?: import("./session").ComposerAttachment[];
+  /** `@` 工作区文件引用；main 按 session workspace 重新解析校验。 */
+  fileReferences?: import("./composer-content").FileReference[];
+  /** 助手回复选区批注。 */
+  responseAnnotations?: import("./composer-content").ResponseAnnotationReference[];
   mode?: ComposerMode;
   selectedSkills?: string[];
   /** 旧 renderer 兼容；Plan 5 新 UI 改发 modelKey。 */

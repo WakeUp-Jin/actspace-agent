@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { UserMessage } from "../components/messages/UserMessage";
+import { ResponseAnnotationContext, type ResponseAnnotationContextValue } from "../components/messages/response-annotation-context";
+import { makeAnnotation } from "./fixtures/response-annotation-helpers";
 
 function makeUserBlock(content: string): Extract<MessageBlock, { kind: "user" }> {
   return {
@@ -179,5 +181,73 @@ describe("UserMessage", () => {
 
     await userEvent.click(previewButton);
     expect(onOpenAttachmentPreview).toHaveBeenCalledWith(expect.objectContaining({ previewUrl: "data:image/png;base64,persisted" }));
+  });
+});
+
+describe("UserMessage response annotation summary", () => {
+  function contextWith(overrides: Partial<ResponseAnnotationContextValue> = {}): ResponseAnnotationContextValue {
+    return {
+      sentByMessageId: new Map(),
+      canAnnotate: () => true,
+      onAddAnnotation: vi.fn(),
+      onCopyToDraft: vi.fn(),
+      activeAnnotationId: null,
+      setActiveAnnotationId: vi.fn(),
+      reportResolution: vi.fn(),
+      isAnnotationAvailable: () => true,
+      locateAnnotation: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  const annotated = {
+    ...makeUserBlock("请解释"),
+    responseAnnotations: [
+      makeAnnotation({ annotationId: "a", comment: "为什么这样" }),
+      makeAnnotation({ annotationId: "b", assistantMessageId: "v2-9", selectedText: "<b>不是标签</b>" }),
+    ],
+  };
+
+  it("collapses to a count and expands to the excerpts and comments as plain text", async () => {
+    render(
+      <ResponseAnnotationContext.Provider value={contextWith()}>
+        <UserMessage message={annotated} sessionId="session-1" />
+      </ResponseAnnotationContext.Provider>,
+    );
+    const toggle = screen.getByRole("button", { name: /2 条回复引用/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("list", { name: "回复引用" })).toBeNull();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const list = screen.getByRole("list", { name: "回复引用" });
+    expect(list.querySelectorAll("li")).toHaveLength(2);
+    expect(screen.getByText("为什么这样")).toBeVisible();
+    expect(screen.getByText("<b>不是标签</b>")).toBeVisible();
+    expect(list.querySelector("b")).toBeNull();
+  });
+
+  it("locates an available annotation and marks unavailable ones", async () => {
+    const locateAnnotation = vi.fn();
+    render(
+      <ResponseAnnotationContext.Provider value={contextWith({ locateAnnotation, isAnnotationAvailable: (annotation) => annotation.annotationId === "a" })}>
+        <UserMessage message={annotated} sessionId="session-1" />
+      </ResponseAnnotationContext.Provider>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /2 条回复引用/ }));
+    const locateButtons = screen.getAllByRole("button", { name: "定位" });
+    expect(locateButtons).toHaveLength(1);
+    expect(screen.getByText("原回复不可用")).toBeVisible();
+    await userEvent.click(locateButtons[0]!);
+    expect(locateAnnotation).toHaveBeenCalledWith(expect.objectContaining({ annotationId: "a" }));
+  });
+
+  it("treats every annotation as unavailable without a provider and renders nothing without annotations", async () => {
+    const { rerender } = render(<UserMessage message={annotated} sessionId="session-1" />);
+    await userEvent.click(screen.getByRole("button", { name: /2 条回复引用/ }));
+    expect(screen.getAllByText("原回复不可用")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "定位" })).toBeNull();
+    rerender(<UserMessage message={makeUserBlock("普通消息")} sessionId="session-1" />);
+    expect(screen.queryByRole("button", { name: /条回复引用/ })).toBeNull();
   });
 });

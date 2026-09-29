@@ -5,7 +5,14 @@ import { homedir } from "node:os";
 import { dialog, ipcMain, nativeImage, nativeTheme, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import {
   PROVIDER_IDS,
+  fileReferenceBlocks,
   normalizeModelKey,
+  responseExcerptBlocks,
+  validateFileReferences,
+  validateResponseAnnotations,
+  type ComposerReferenceIssue,
+  type FileReference,
+  type ResponseAnnotationReference,
   type AgentRunResult,
   type RunAgentPreparationFailure,
   type AppSettings,
@@ -42,6 +49,7 @@ import type { AppDataRoots } from "../app-paths";
 import type { PendingApprovalRegistry } from "../approval-registry";
 import { showArtifactContextMenu, showResolvedArtifactContextMenu } from "../artifact-context-menu-service";
 import { importComposerImage } from "../composer-attachment-service";
+import { resolveWorkspaceFileReference } from "../workspace-file-reference";
 import type { LocalUpdateService } from "../local-update-service";
 import type { ModelRuntimeService } from "../model-runtime-service";
 import type { ModelStoreService, ModelStoreResult } from "../model-store-service";
@@ -220,9 +228,18 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent, async (_event, input: RunAgentInput): Promise<RunAgentPreparationFailure | (Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection })> => {
+    const references = await validateRunReferences(options.registry, input);
+    if (references.ok === false) {
+      return { status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: references.issue };
+    }
     let prepared: Awaited<ReturnType<typeof toRunContent>>;
     try {
-      prepared = await toRunContent(options.registry, input.sessionId, input.userInput, input.attachments ?? []);
+      prepared = await toRunContent(options.registry, input.sessionId, {
+        userInput: input.userInput,
+        attachments: input.attachments ?? [],
+        fileReferences: references.fileReferences,
+        responseAnnotations: references.responseAnnotations,
+      });
     } catch (error) {
       if (!(error instanceof ChatAttachmentValidationError)) throw error;
       const attachments = (input.attachments ?? []).filter((attachment) => Boolean(attachment.path));
@@ -756,15 +773,68 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
   };
 }
 
+type RunReferenceValidation =
+  | { ok: true; fileReferences: FileReference[]; responseAnnotations: ResponseAnnotationReference[] }
+  | { ok: false; issue: ComposerReferenceIssue };
+
+/** 引用校验在导入附件之前完成：任一失败就整体拒绝，不导入附件、不写 journal。 */
+async function validateRunReferences(registry: DesktopRuntimeV2Registry, input: RunAgentInput): Promise<RunReferenceValidation> {
+  const files = validateFileReferences(input.fileReferences);
+  if (files.ok === false) return { ok: false, issue: files.issue };
+  const annotations = validateResponseAnnotations(input.responseAnnotations);
+  if (annotations.ok === false) return { ok: false, issue: annotations.issue };
+  if (files.value.length === 0 && annotations.value.length === 0) return { ok: true, fileReferences: [], responseAnnotations: [] };
+
+  const snapshot = await registry.inspectSession(input.sessionId);
+  if (files.value.length > 0) {
+    if (snapshot.agentForm === "chat") return { ok: false, issue: { code: "file_references_not_allowed", kind: "file" } };
+    if (!snapshot.workspaceRoot) return { ok: false, issue: { code: "file_not_found", kind: "file", index: 0, relativePath: files.value[0]!.relativePath } };
+    for (const [index, reference] of files.value.entries()) {
+      const resolved = await resolveWorkspaceFileReference(snapshot.workspaceRoot, reference.relativePath);
+      if (resolved.ok === false) return { ok: false, issue: { code: resolved.code, kind: "file", index, relativePath: reference.relativePath } };
+    }
+  }
+  for (const [index, annotation] of annotations.value.entries()) {
+    if (!(await isSessionAssistantMessage(registry, input.sessionId, snapshot.throughJournalSeq, annotation.assistantMessageId))) {
+      return { ok: false, issue: { code: "annotation_source_missing", kind: "annotation", index } };
+    }
+  }
+  return { ok: true, fileReferences: files.value, responseAnnotations: annotations.value };
+}
+
+/**
+ * 回复的 MessageBlock.id 是投影时的 `v2-<journal seq>`：落盘的 `assistant/message`，
+ * 或压缩后重新发布 surface 的 `surface/replaced`。只读取这一条事件核对，不加载整段历史。
+ */
+async function isSessionAssistantMessage(registry: DesktopRuntimeV2Registry, sessionId: string, throughJournalSeq: number, messageId: string): Promise<boolean> {
+  const match = /^v2-(\d+)$/.exec(messageId);
+  if (!match) return false;
+  const seq = Number(match[1]);
+  if (!Number.isSafeInteger(seq) || seq > throughJournalSeq) return false;
+  const projection = await registry.readSessionProjection({ sessionId, beforeSeq: seq + 1, maxWindowEvents: 1 });
+  const event = projection.window.events.find((candidate) => candidate.seq === seq);
+  if (!event || event.surface?.node.kind !== "assistant") return false;
+  return (event.type === "assistant/message" && event.surface.kind === "append")
+    || (event.type === "surface/replaced" && event.surface.kind === "replace");
+}
+
 async function toRunContent(
   registry: DesktopRuntimeV2Registry,
   sessionId: string,
-  userInput: string,
-  attachments: readonly ComposerAttachment[],
+  input: {
+    readonly userInput: string;
+    readonly attachments: readonly ComposerAttachment[];
+    readonly fileReferences: readonly FileReference[];
+    readonly responseAnnotations: readonly ResponseAnnotationReference[];
+  },
 ): Promise<{ readonly content: RuntimeV2JsonValue; readonly importedArtifactIds: readonly string[] }> {
-  if (attachments.length === 0) return { content: userInput, importedArtifactIds: [] };
+  const { userInput, attachments } = input;
+  const referenceBlocks: RuntimeV2JsonValue[] = [...fileReferenceBlocks(input.fileReferences), ...responseExcerptBlocks(input.responseAnnotations)];
+  if (attachments.length === 0 && referenceBlocks.length === 0) return { content: userInput, importedArtifactIds: [] };
+  // 块顺序：正文 → 文件引用 → 回复批注 → 附件。
+  const blocks: RuntimeV2JsonValue[] = userInput ? [{ type: "text", text: userInput }, ...referenceBlocks] : [...referenceBlocks];
+  if (attachments.length === 0) return { content: blocks, importedArtifactIds: [] };
   const snapshot = await registry.inspectSession(sessionId);
-  const blocks: RuntimeV2JsonValue[] = userInput ? [{ type: "text", text: userInput }] : [];
   const usableAttachments = attachments.filter((attachment) => Boolean(attachment.path));
   if (snapshot.agentForm === "chat") {
     const imported = await registry.importChatAttachments(sessionId, usableAttachments.map((attachment) => attachment.path!));

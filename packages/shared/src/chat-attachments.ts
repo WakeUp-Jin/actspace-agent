@@ -23,9 +23,18 @@ export function formatChatAttachmentIssue(issue: ChatAttachmentIssue): string {
 }
 
 /** No turn has been enqueued. The renderer must restore the entire draft. */
-export type RunAgentPreparationFailure = {
-  status: "rejected";
-  sessionId: string;
-  agentRunId: string;
-  error: ChatAttachmentIssue;
-};
+export type RunAgentPreparationFailure =
+  | {
+      status: "rejected";
+      sessionId: string;
+      agentRunId: string;
+      error: ChatAttachmentIssue;
+      referenceIssue?: undefined;
+    }
+  | {
+      status: "rejected";
+      sessionId: string;
+      agentRunId: string;
+      error?: undefined;
+      referenceIssue: import("./composer-content").ComposerReferenceIssue;
+    };

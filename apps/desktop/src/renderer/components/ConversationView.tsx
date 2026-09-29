@@ -3,7 +3,10 @@ import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, WheelEvent as ReactWheelEvent } from "react";
-import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
+import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, ResponseAnnotationReference, UsableModelView } from "@actspace/shared";
+import { ResponseAnnotationContext, isAnnotatableMessageId } from "./messages/response-annotation-context";
+import { ResponseSelectionToolbar } from "./messages/ResponseSelectionToolbar";
+import { useResponseAnnotationState } from "./messages/useResponseAnnotationState";
 import { Composer, type ComposerAgentFormSwitch, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
@@ -753,6 +756,8 @@ export function ConversationView({
   trajectory,
   agentForm = "agent",
   permissionControl,
+  readAnnotationDraft,
+  writeAnnotationDraft,
 }: {
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
@@ -792,6 +797,9 @@ export function ConversationView({
   trajectory?: RuntimeV2TrajectorySnapshot | null;
   agentForm?: MainAgentForm;
   permissionControl?: ReactNode;
+  /** 草稿回复批注按 draftKey 存在上层，切换会话、切到设置页再回来都不丢。 */
+  readAnnotationDraft?: (draftKey: string) => ResponseAnnotationReference[];
+  writeAnnotationDraft?: (draftKey: string, annotations: readonly ResponseAnnotationReference[]) => void;
 }) {
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
@@ -828,6 +836,7 @@ export function ConversationView({
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const messageStackRef = useRef<HTMLDivElement | null>(null);
   const turnElementsRef = useRef(new Map<string, HTMLElement>());
+  const annotations = useResponseAnnotationState({ messages, draftKey, draftRestore, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef });
   const updateConversationViewportRef = useRef<() => void>(() => {});
   // 是否「贴底自动跟随」：流式输出时保持视图贴底；用户向上滚动阅读历史则暂停，
   // 滚回接近底部时恢复（类似 Cursor 的聊天滚动）。
@@ -1045,7 +1054,13 @@ export function ConversationView({
     </p></main>;
   }
   return (
+    <ResponseAnnotationContext.Provider value={annotations.contextValue}>
     <main className={CONVERSATION_SHELL_CLASS}>
+      <ResponseSelectionToolbar
+        scrollContainerRef={scrollContainerRef}
+        canAnnotate={isAnnotatableMessageId}
+        onAddAnnotation={annotations.contextValue.onAddAnnotation}
+      />
       <div className={MESSAGE_VIEWPORT_CLASS}>
         <div
           className={activeView === "trajectory" ? "hidden" : "block h-full min-h-0"}
@@ -1090,6 +1105,10 @@ export function ConversationView({
                     draftKey={draftKey}
                     readDraft={readDraft}
                     writeDraft={writeDraft}
+                    responseAnnotations={annotations.drafts}
+                    onResponseAnnotationsChange={annotations.setDrafts}
+                    responseAnnotationNotice={annotations.notice}
+                    responseAnnotationEditRequest={annotations.editRequest}
                     inputHistory={inputHistory}
                     focusRequestId={composerFocusRequestId}
                     models={models}
@@ -1179,6 +1198,10 @@ export function ConversationView({
             draftKey={draftKey}
             readDraft={readDraft}
             writeDraft={writeDraft}
+            responseAnnotations={annotations.drafts}
+            onResponseAnnotationsChange={annotations.setDrafts}
+            responseAnnotationNotice={annotations.notice}
+            responseAnnotationEditRequest={annotations.editRequest}
             inputHistory={inputHistory}
             focusRequestId={composerFocusRequestId}
             reviewSummary={reviewSummary}
@@ -1191,5 +1214,6 @@ export function ConversationView({
         </div>
       ) : null}
     </main>
+    </ResponseAnnotationContext.Provider>
   );
 }

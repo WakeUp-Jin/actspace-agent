@@ -81,6 +81,8 @@
   --act-color-focus-ring: #4d4d48;
   --act-color-operational-focus-ring: #087a4b;
   --act-color-selection: rgba(77, 77, 72, 0.2);
+  /* 回复批注被选中时的原文高亮（CSS Custom Highlight API） */
+  --act-color-annotation-highlight: rgba(214, 158, 46, 0.24);
 
   /* 代码（行内 / 代码块）/ 引用 / 表头等内容呈现色 */
   --act-color-code-text: #343430;
@@ -312,6 +314,7 @@
   --act-color-focus-ring: #c8c8c0;
   --act-color-operational-focus-ring: #55d99a;
   --act-color-selection: rgba(200, 200, 192, 0.2);
+  --act-color-annotation-highlight: rgba(232, 184, 88, 0.22);
 
   --act-color-code-text: #c6d4e6;
   --act-color-code-bg-top: #1d2024;
@@ -429,6 +432,7 @@
     --act-color-focus-ring: #c8c8c0;
     --act-color-operational-focus-ring: #55d99a;
     --act-color-selection: rgba(200, 200, 192, 0.2);
+    --act-color-annotation-highlight: rgba(232, 184, 88, 0.22);
 
     --act-color-code-text: #c6d4e6;
     --act-color-code-bg-top: #1d2024;

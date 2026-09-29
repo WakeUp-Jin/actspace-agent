@@ -109,3 +109,29 @@ it("restores a rejected Chat draft without a phantom message, failed turn, or wo
   await user.click(screen.getByLabelText("移除 bad.txt"));
   expect(screen.queryByRole("alert")).toBeNull();
 });
+
+it("restores the draft with a readable message when references are rejected", async () => {
+  window.localStorage.clear();
+  const record = createEmptySessionRecord("reference-rejection");
+  record.meta.agentForm = "chat";
+  record.meta.workspaceRoot = "/tmp/workspace";
+  const runAgent = vi.fn(async (input: RunAgentInput) => ({ status: "rejected" as const, sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: { code: "annotation_source_missing" as const, kind: "annotation" as const, index: 0 } }));
+  window.actspace = {
+    ...settingsApiStub,
+    getBootstrapState: async () => bootstrapState,
+    listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt),
+    listSessions: async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", workspaceRoot: "/tmp/workspace" }],
+    getSession: async () => record, createSession: async () => record,
+    listPendingApprovals: async () => [], onAgentStream: () => () => {},
+    runAgent,
+  } as unknown as typeof window.actspace;
+  renderApp();
+  await screen.findByText("Chat");
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "引用那段话" } });
+  fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("引用的回复已不在当前会话中"));
+  expect(screen.getByRole("textbox")).toHaveValue("引用那段话");
+  expect(runAgent).toHaveBeenCalledTimes(1);
+  expect(runAgent.mock.calls[0]![0]).not.toHaveProperty("fileReferences");
+  expect(runAgent.mock.calls[0]![0]).not.toHaveProperty("responseAnnotations");
+});

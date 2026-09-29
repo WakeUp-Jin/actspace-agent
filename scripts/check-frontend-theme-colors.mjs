@@ -49,6 +49,7 @@ const REQUIRED_THEME_TOKENS = [
   "--act-color-focus-ring",
   "--act-color-operational-focus-ring",
   "--act-color-selection",
+  "--act-color-annotation-highlight",
   "--act-scrollbar-thumb-subtle",
   "--act-scrollbar-thumb-subtle-hover",
   "--act-chart-series-1",

@@ -41,12 +41,15 @@ import type {
   ChatAttachmentIssue,
   ComposerMode,
   ComposerAttachment,
+  ComposerReferenceIssue,
   ContextState,
   ContextUsageSnapshot,
+  FileReference,
   LlmProviderId,
   MainAgentForm,
   ModelReasoningEffort,
   ModelSelectionId,
+  ResponseAnnotationReference,
   SkillCatalogItem,
   SessionRunLocation,
   UsableModelView,
@@ -54,6 +57,7 @@ import type {
 } from "@actspace/shared";
 import { DEFAULT_MODEL_ID, MODEL_LIST, MODEL_REASONING_EFFORTS } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
+import { ResponseAnnotationTray, type ResponseAnnotationEditRequest } from "./composer/ResponseAnnotationTray";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import {
   formatSelectedModelLabel,
@@ -81,6 +85,8 @@ export type ComposerSendOptions = {
   thinkingEnabled: boolean;
   reasoningEffort?: ModelReasoningEffort;
   attachments?: ComposerAttachment[];
+  fileReferences?: FileReference[];
+  responseAnnotations?: ResponseAnnotationReference[];
 };
 
 export type ComposerWorkspaceOption = {
@@ -105,8 +111,11 @@ export type ComposerDraftRestore = {
   sessionId: string;
   text: string;
   attachments?: ComposerAttachment[];
+  fileReferences?: FileReference[];
+  responseAnnotations?: ResponseAnnotationReference[];
   error?: string;
   attachmentIssue?: ChatAttachmentIssue;
+  referenceIssue?: ComposerReferenceIssue;
 };
 
 export type ComposerDraftReader = (draftKey: string) => string;
@@ -141,6 +150,7 @@ const COMPOSER_PANEL_CLASS =
   "composer-panel relative grid overflow-visible rounded-act-lg border border-line bg-surface transition-colors duration-(--motion-fast) focus-within:border-line-strong";
 const COMPOSER_PANEL_INITIAL_CLASS =
   "composer-panel composer-panel-initial relative grid overflow-visible rounded-act-lg border border-line bg-surface transition-colors duration-(--motion-fast) focus-within:border-line-strong";
+const EMPTY_RESPONSE_ANNOTATIONS: readonly ResponseAnnotationReference[] = [];
 const COMPOSER_ATTACHMENTS_CLASS = "composer-attachments flex min-h-14 flex-wrap items-center gap-2.5 px-3 pb-1 pt-3";
 const IMAGE_ATTACHMENT_WRAPPER_CLASS = "group/image-attachment relative h-12 w-12 shrink-0";
 const IMAGE_ATTACHMENT_CLASS =
@@ -505,6 +515,10 @@ export function Composer({
   models,
   agentForm = "agent",
   permissionControl,
+  responseAnnotations = EMPTY_RESPONSE_ANNOTATIONS,
+  onResponseAnnotationsChange,
+  responseAnnotationNotice,
+  responseAnnotationEditRequest,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   contextState?: ContextState | null;
@@ -543,6 +557,11 @@ export function Composer({
   models?: UsableModelView[];
   agentForm?: MainAgentForm;
   permissionControl?: ReactNode;
+  /** 当前会话的草稿回复批注；由上层按会话持有，发送后通过 onResponseAnnotationsChange 清空。 */
+  responseAnnotations?: readonly ResponseAnnotationReference[];
+  onResponseAnnotationsChange?: (next: ResponseAnnotationReference[]) => void;
+  responseAnnotationNotice?: string | null;
+  responseAnnotationEditRequest?: ResponseAnnotationEditRequest | null;
 }) {
   const isChatForm = agentForm === "chat";
   // 形态在 Session 创建时绑定 preset；只有还没发过消息的空会话允许「换一个形态重新开始」。
@@ -628,7 +647,7 @@ export function Composer({
   const selectedModelAvailable = modelList.some((model) => model.id === selectedModelId);
   const selectedModelSpec = modelList.find((spec) => spec.id === selectedModelId);
   const canSendMessage = Boolean(
-    (message.trim() || attachments.length > 0) && selectedModelAvailable,
+    (message.trim() || attachments.length > 0 || responseAnnotations.length > 0) && selectedModelAvailable,
   );
   const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
   const editingModelOptions = currentModelRuntimeOptions(editingModelSpec, modelRuntimeOptions[editingModelId]);
@@ -685,7 +704,7 @@ export function Composer({
   // 单行内容用 inline 紧凑布局；内容折行、有附件或 initial surface 切 stacked（参考 Cursor）。
   const showInlineContextUsage = isChatForm && surface === "followup";
   const resolvedLayout: "inline" | "stacked" =
-    surface === "initial" || hasAttachments || isInputMultiline ? "stacked" : "inline";
+    surface === "initial" || hasAttachments || responseAnnotations.length > 0 || isInputMultiline ? "stacked" : "inline";
   const placeholder = isChatForm
     ? surface === "initial" ? "有什么想聊的？" : "继续对话…"
     : mode === "plan"
@@ -1064,6 +1083,9 @@ export function Composer({
     if (includeAttachments && attachments.length > 0) {
       options.attachments = attachments;
     }
+    if (includeAttachments && responseAnnotations.length > 0) {
+      options.responseAnnotations = [...responseAnnotations];
+    }
     return options;
   }
 
@@ -1133,6 +1155,7 @@ export function Composer({
     if (draftKey) writeDraft?.(draftKey, "");
     historyIndexRef.current = null;
     setAttachments([]);
+    if (responseAnnotations.length > 0) onResponseAnnotationsChange?.([]);
     setAttachmentError(null);
     closeFloatingPanels();
     setSendError(null);
@@ -2062,6 +2085,14 @@ export function Composer({
         }}
         onDrop={handleDropFiles}
       >
+        {onResponseAnnotationsChange ? (
+          <ResponseAnnotationTray
+            annotations={responseAnnotations}
+            onChange={onResponseAnnotationsChange}
+            notice={responseAnnotationNotice}
+            editRequest={responseAnnotationEditRequest}
+          />
+        ) : null}
         {renderAttachmentStrip()}
         {attachmentError ? (
           <div className="px-3 pb-1 text-act-xs leading-4 text-danger" role="alert">

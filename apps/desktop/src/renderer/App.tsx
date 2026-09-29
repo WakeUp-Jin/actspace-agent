@@ -8,6 +8,7 @@ import {
   formatSessionTranscript,
   getLatestContextSnapshot,
   formatChatAttachmentIssue,
+  formatComposerReferenceIssue,
 } from "@actspace/shared";
 import type {
   AbortAgentRunInput,
@@ -1636,7 +1637,7 @@ export function App() {
     text: string,
     options: ComposerSendOptions,
   ) => {
-    if (isStreaming || (!text.trim() && !options.attachments?.length)) return;
+    if (isStreaming || (!text.trim() && !options.attachments?.length && !options.fileReferences?.length && !options.responseAnnotations?.length)) return;
 
     const createdSession = activeSessionIdRef.current
       ? null
@@ -1720,6 +1721,8 @@ export function App() {
       run.userBlock = {
         kind: "user", id: `turn:${agentRunId}:user:0`, content: text,
         createdAt: new Date().toISOString(), attachments: options.attachments,
+        ...(options.fileReferences?.length ? { fileReferences: options.fileReferences } : {}),
+        ...(options.responseAnnotations?.length ? { responseAnnotations: options.responseAnnotations } : {}),
       };
       run.state.waitingForModel = true;
     }
@@ -1774,6 +1777,8 @@ export function App() {
           agentRunId,
           userInput: text,
           attachments: options.attachments?.map(attachmentForRuntime),
+          ...(options.fileReferences?.length ? { fileReferences: options.fileReferences } : {}),
+          ...(options.responseAnnotations?.length ? { responseAnnotations: options.responseAnnotations } : {}),
           mode: options.mode,
           selectedSkills: options.selectedSkills,
           ...modelSelectionPayload(options.model),
@@ -1793,7 +1798,10 @@ export function App() {
           if (!isCurrentRun()) return;
           const draft: ComposerDraftRestore = {
             id: Date.now(), sessionId, text, attachments: options.attachments,
-            error: formatChatAttachmentIssue(result.error), attachmentIssue: result.error,
+            fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations,
+            ...(result.referenceIssue
+              ? { error: formatComposerReferenceIssue(result.referenceIssue), referenceIssue: result.referenceIssue }
+              : { error: formatChatAttachmentIssue(result.error), attachmentIssue: result.error }),
           };
           draftsRef.current.set(sessionId, draft);
           if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
@@ -1829,6 +1837,8 @@ export function App() {
             sessionId,
             text,
             attachments: options.attachments,
+            fileReferences: options.fileReferences,
+            responseAnnotations: options.responseAnnotations,
             error: "消息未能发送，正文和附件已保留，请重试。",
           };
           draftsRef.current.set(sessionId, draft);
