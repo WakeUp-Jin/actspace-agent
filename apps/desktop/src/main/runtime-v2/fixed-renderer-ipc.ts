@@ -2,7 +2,8 @@ import { paginateSessionSummaries } from "./session-list-page";
 import { UsageSourceCache } from "./usage-source-cache";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
-import { dialog, ipcMain, nativeImage, nativeTheme, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
+import { dialog, ipcMain, nativeImage, nativeTheme, shell, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
+import { spawn } from "node:child_process";
 import {
   PROVIDER_IDS,
   normalizeModelKey,
@@ -683,6 +684,27 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval, (_event, input: import("@actspace/shared").ApprovalDecideInput) => options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined));
 
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getBrowserBridgeStatus, () => options.browserBridge.getStatus());
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.connectBrowserBridge, () => options.browserBridge.connect());
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.useBrowserSourceExtension, (_event, repoRoot: string | null) => options.browserBridge.useSourceExtension(repoRoot));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.prepareBrowserBridgeUpdate, () => options.browserBridge.prepareUpdate());
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.disconnectBrowserBridge, () => options.browserBridge.disconnect());
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectBrowserBridgeInstance, (_event, instanceId: string) => options.browserBridge.selectInstance(instanceId));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.openBrowserExtensions, async () => {
+    if (process.platform === "darwin") {
+      return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        const child = spawn("open", ["-a", "Google Chrome", "chrome://extensions"], { stdio: "ignore" });
+        child.once("error", (error) => resolve({ ok: false, error: error.message }));
+        child.once("exit", (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: "Chrome 扩展页未能打开。" }));
+      });
+    }
+    return { ok: false, error: "请在 Chrome 地址栏打开 chrome://extensions。" };
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.revealBrowserExtensionDirectory, async () => {
+    const status = await options.browserBridge.getStatus();
+    if (!status.extensionDir || !status.installed) return { ok: false, error: "请先准备扩展组件。" };
+    shell.showItemInFolder(status.extensionDir);
+    return { ok: true };
+  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.installBrowserBridgeFromRepo, (_event, input: { repoRoot: string }) => options.browserBridge.buildAndInstall(input.repoRoot));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.installBrowserBridgeNativeHost, () => options.browserBridge.installNativeHost());
 

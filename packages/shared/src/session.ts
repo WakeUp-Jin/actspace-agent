@@ -510,7 +510,7 @@ export type ToolUiPreview =
   | BashPreview
   | AgentToolPreview
   | TodoUiPreview
-  | { kind: "generic"; title: string; content: string };
+  | { kind: "generic"; title: string; content: string; artifacts?: ToolArtifact[] };
 
 export type BashStatus =
   | "pending"
@@ -897,6 +897,7 @@ export type MessageBlock = {
       toolName?: string;
       title: string;
       content: string;
+      artifacts?: ToolArtifact[];
       createdAt: string;
       isError?: boolean;
       status?: "pending" | "running" | "completed" | "failed" | "denied";

@@ -22,7 +22,7 @@ export function BrowserApprovalBlock({
         message={{
           ...message,
           status: denied ? "denied" : "running",
-          content: denied ? "本轮浏览器授权已拒绝" : "正在连接浏览器…",
+          content: denied ? "已拒绝这次浏览器操作" : "正在执行这次浏览器操作…",
           isError: denied,
           approvalRequestId: undefined,
         }}
@@ -30,18 +30,17 @@ export function BrowserApprovalBlock({
     );
   }
 
-  // 浏览器授权本身就是会话级：主按钮一次允许即覆盖本会话，拒绝只对这一轮有效。
   return (
     <ApprovalCard
       className={className}
       icon={<Globe2 size={14} strokeWidth={2} />}
-      verb="使用浏览器"
-      target={<span className="flex-none text-text-main">Chrome</span>}
-      meta={<ApprovalChip tone="info">整个会话</ApprovalChip>}
-      actions={<ApprovalActions state={decision} primaryLabel="本会话允许" size="card" />}
+      verb="确认浏览器操作"
+      target={<span className="min-w-0 truncate text-text-main" title={message.title}>{message.title}</span>}
+      meta={<ApprovalChip tone="warning">仅这次</ApprovalChip>}
+      actions={<ApprovalActions state={decision} primaryLabel="允许这次" size="card" />}
     >
       <p className="m-0 text-act-sm leading-[1.6] text-text-muted">
-        Agent 将可以查看并操作你的 Chrome 标签页：打开网页、点击、输入、截图、读取页面内容。
+        该动作可能更改 Chrome 标签页或网页内容。连接浏览器不会自动批准这类操作。
       </p>
     </ApprovalCard>
   );

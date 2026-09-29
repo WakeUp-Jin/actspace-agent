@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-本文档定义 actspace-agent 接入 Browser Use 能力的集成方案。Plan 5 已完整收敛：62 条 canonical command 全部由 Go handler 实现，Agent Core 稳定注册 11 个分类/辅助工具，但模型默认只看到 `browser_help`，成功调用后下一次 LLM 请求才披露完整工具包。Extension 只保留 session-scoped primitive backend，真实 Chrome profile 与 approval/isolation 验收均已完成。统一入口见 `docs/design-docs/browser/agent-browser-use-index.md`。
+本文档定义 actspace-agent 接入 Browser Use 能力的集成方案。Plan 5 已完整收敛：62 条 canonical command 全部由 Go handler 实现，Agent Core 稳定注册 11 个分类/辅助工具，但模型默认只看到 `browser_help`，成功调用后下一次 LLM 请求才披露完整工具包。Extension 只保留 session-scoped primitive backend。2026-09-28 的连接、启动、打包和使用验收单独记录在当前执行计划；历史 Chrome 与审批验收不能代替本轮验收。统一入口见 `docs/design-docs/browser/agent-browser-use-index.md`。
 
 ## 设计决策
 
@@ -40,19 +40,17 @@ BridgeClient                    waits / events / sessions  TS 构建 + go:embed 
 
 ```
 packages/tools/browser-tools/src/
-  ├── definition.ts        ← 9 个分类工具 + help + run
-  ├── executor.ts          ← 通用分类/help/run executor
+  ├── definitions.ts       ← 9 个分类工具 + help + run
+  ├── plugin.ts            ← 工具注册、permission 与 executor 入口
   ├── generated-actions.ts ← 从 Go registry 生成的 action metadata
-  ├── permissions.ts       ← action/batch preflight
-  ├── preview.ts           ← compact preview
-  └── bridge-client.ts     ← Unix socket 长连接客户端
+  └── node-capability.ts   ← Unix socket、Turn 生命周期、action/batch dispatch
 ```
 
 职责：
 - 注册浏览器工具到 tool registry，遵守现有 approval/permission 流程
 - 维护与 Go bridge 的 socket 长连接
 - 发送 JSON-RPC 请求，接收响应和事件通知
-- 管理连接生命周期（turn 开始时连接，turn 结束时可选断开）
+- 管理连接生命周期（第一次调用时连接，Turn 结束时关闭）
 - 提供 sessionId/turnId 上下文
 
 不做：
@@ -128,9 +126,9 @@ browser-bridge/apps/chrome-extension/
 
 ### Runtime ↔ Go bridge
 
-传输：Native Host 暴露的稳定 Unix socket（macOS 默认 `~/Library/Application Support/AgentBrowserBridge/agent-browser-bridge.sock`）。
+传输：每个 Chrome 扩展实例启动自己的 Native Host，Host 使用独立 Unix socket，并在当前用户私有目录发布带实例 ID 与版本的记录。Desktop 验证实例、socket 和只读 probe 后绑定一个目标。旧 CLI 默认 socket 只作为无新实例时的兼容入口；多个在线实例不能隐式选择。
 
-Runtime 不额外启动 `abb serve`。Chrome Extension 负责拉起 Native Host，Agent turn 内的 `BridgeClient` 直接复用该稳定 socket；测试可通过 `ABB_SOCKET` / `ABB_SUPPORT_DIR` 隔离路径。
+Runtime 不额外启动 `abb serve`。Chrome Extension 负责拉起 Native Host；同一 Session Turn 的 Browser transport 复用已验证的目标 socket。测试可通过 `ABB_SOCKET` / `ABB_SUPPORT_DIR` 隔离路径。
 
 帧格式：
 ```
@@ -288,9 +286,8 @@ Turn 开始
   │    └─ 复用同一连接
   │
   └─ Turn 结束
-       └─ BridgeClient.dispose()
-            └─ 发送 browser.session.end { session_id, turn_id }
-            └─ 关闭 socket
+       └─ Browser transport dispose()
+            └─ 关闭 socket，Host 按连接清理 ownership
 ```
 
 ### 惰性连接
@@ -299,7 +296,7 @@ Turn 开始
 
 ### 断线重连
 
-如果 socket 断开（Go bridge 重启等），下次工具调用时自动重连。CDP attach 状态需要重新建立。
+如果执行中的 socket 断开，当前 Turn 的调用返回结果未知或连接丢失，不自动重放写操作。Desktop 后台继续发现原绑定实例，并在 Runtime 安全空闲后重组；新 Turn 才使用重新验证的连接。
 
 ### 安装升级与状态探测
 
@@ -395,7 +392,7 @@ Chrome 标签栏：
 
 遵守 `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`：
 - Browser preview 只展示 category/action、目标 URL/selector/坐标、文件名或 tab 数量等最小动作摘要。
-- 截图的原生 image content、DOM、console、clipboard 和页面读取结果只进入当前 LLM 调用，不进入持久化 preview 正文。
+- 截图的原生 image content、DOM、console、clipboard 和页面读取结果只进入当前 LLM 调用，不进入持久化 preview 正文。截图同时可作为 Session-owned image artifact 持久化；preview 只保留 artifact ID、媒体类型和显示名，由会话产物面板按需读取图片，不写入 base64。
 - session 与运行日志中的 Browser 结果统一替换为脱敏占位符；输入文本、fill value、rich clipboard 和内部 approval token 先清洗再记录。
 - finalize 在预览中只显示保留/关闭数量与安全的 tab 标识，不展开页面正文。
 
@@ -403,17 +400,16 @@ Chrome 标签栏：
 
 ### 权限分层
 
-Browser 工具不再按 62 条 action 逐次弹窗，而是使用 Agent Core 内存中的 Session 授权租约：
+Browser 工具在 Tool Runtime 的 permission 阶段按 Go canonical registry 的 action 元数据判断风险：
 
 - `browser_help` 只读取命令说明，不触发浏览器授权。
-- 其余 10 个 Browser 工具第一次调用时统一请求一次“允许 ActSpace 在当前会话中使用浏览器？”。
-- 用户允许后，以 `sessionId` 为键记录内存授权；当前应用运行期间该 Session 的后续 Turn 和 Browser action 自动放行。
-- 用户拒绝或审批超时后，以 `sessionId + turnId` 为键拒绝当前 Turn；本轮后续 Browser 调用直接失败且不重复弹窗，下一次用户输入可以重新申请。
-- 授权不写入 Session Journal，应用重启后自动失效，也不会跨 Session 共享。
+- 已知只读 action 按当前模式允许；修改页面或浏览器状态的 action 在 default 模式下交给现有 ApprovalBroker 决策，full-access 遵守该模式语义。
+- 未知 action 拒绝；batch 按所有 action 的最高风险判断。Go preflight token 只绑定批次参数和 Turn，不代表用户批准。
+- 设置页的“开始连接”只授权本机组件准备，不给 Session 中的写操作通用授权。
 
-Go registry 的 `low / medium / high` risk 继续用于能力说明、批处理 preflight 和诊断，不再直接决定 UI 弹窗次数。
+Go registry 的 `low / medium / high` risk 同时用于能力说明、批处理 preflight 与 Tool Runtime 权限判断。
 
-高风险 capability 仍由 Settings hard deny 控制：文件上传、下载、剪贴板写入等能力被禁用时，即使 Session 已授权也不能执行；启用后则纳入同一次 Session 授权，不逐 action 打断 Agent。
+Go backend capability 仍可在命令执行前拒绝不可用动作；用户审批不能绕过该能力检查。
 
 审批卡片只提供“拒绝 / 允许”两个动作。状态必须依次展示为“等待浏览器授权 → 执行中 → 完成/失败”，不得在工具开始时提前显示 `Completed`。
 

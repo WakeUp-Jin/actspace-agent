@@ -48,6 +48,18 @@ afterEach(() => {
 });
 
 describe("image generation presentation", () => {
+  it("previews a Browser screenshot stored as a generic tool artifact", async () => {
+    const readSessionArtifact = vi.fn(async () => ({ name: "screenshot.jpeg", relativePath: "browser-shot", mimeType: "image/jpeg" as const, size: 68, dataUrl: "data:image/jpeg;base64,AAAA" }));
+    Object.defineProperty(window, "actspace", { configurable: true, value: { readSessionArtifact } });
+    const screenshot: MessageBlock = { kind: "tool", id: "browser-shot", createdAt: "now", toolName: "browser_cua", title: "Screenshot", content: "Captured", artifacts: [{ type: "image", name: "Chrome 截图", path: "browser-artifact-id", mimeType: "image/jpeg" }] };
+    render(<RightPanelProvider><TurnOutputArtifacts messages={[screenshot]} sessionId="session-1" /><ActiveTabProbe /></RightPanelProvider>);
+    expect(screen.getByText("1 image")).toBeInTheDocument();
+    expect(screen.getByText("Chrome 截图")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open Chrome 截图" }));
+    expect(readSessionArtifact).toHaveBeenCalledWith({ sessionId: "session-1", artifactPath: "browser-artifact-id" });
+    expect(screen.getByTestId("active-tab-src")).toHaveTextContent("data:image/jpeg;base64,AAAA");
+  });
+
   it("renders image generation as a single Read-style tool line", () => {
     render(<ToolLogLine message={imageMessage} />);
 

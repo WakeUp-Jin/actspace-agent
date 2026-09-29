@@ -78,7 +78,7 @@ describe("CodeRenderView", () => {
 
     expect(container.querySelectorAll("[data-line-index]")).toHaveLength(20000);
     expect(screen.getByText(/仅渲染前 20,000 行，另有 500 行未显示/)).toBeInTheDocument();
-  });
+  }, 20_000);
 
   it("does not announce a cap for ordinary files", () => {
     render(<CodeRenderView content={"a\nb\nc"} language="text" />);

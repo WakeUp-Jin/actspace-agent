@@ -7,6 +7,15 @@ const original = window.actspace;
 afterEach(() => { window.actspace = original; });
 const deferredToolDetail = { sessionId: "parent", callId: "call" };
 
+it("renders a persisted generic tool without toolName instead of crashing", () => {
+  const message: MessageBlock = {
+    kind: "tool", id: "generic-without-name", createdAt: "now",
+    title: "Browser action", content: "Stopped", status: "pending",
+  };
+  render(<>{renderMessage(message)}</>);
+  expect(screen.getByText("Browser action: Stopped")).toBeVisible();
+});
+
 it.each(["agent", "explore"] as const)("renders deferred %s as a directly usable child-session card", (agentKind) => {
   const load = vi.fn();
   const open = vi.fn();

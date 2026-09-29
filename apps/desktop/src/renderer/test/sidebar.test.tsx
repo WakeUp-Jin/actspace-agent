@@ -8,7 +8,7 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 
 function makeSession(partial: Partial<SessionListItem> & Pick<SessionListItem, "id" | "title">): SessionListItem {
   return {
-    updatedAt: new Date().toISOString(),
+    updatedAt: "2026-07-29T00:00:00.000Z",
     agentRunCount: 1,
     ...partial,
   };

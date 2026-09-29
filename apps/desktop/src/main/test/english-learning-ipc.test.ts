@@ -9,7 +9,7 @@ afterEach(() => { handlers.clear(); vi.clearAllMocks(); });
 it("guards the renderer frame and DTO, honors persistence conflicts, and releases handlers", async () => {
   const frame = {}; const sender = { mainFrame: frame, send: vi.fn() }; const event = { sender, senderFrame: frame };
   const off = vi.fn(); const service = { getState: vi.fn(() => ({ enabled: false })), subscribe: vi.fn(() => off), stop: vi.fn(), preview: vi.fn() };
-  const registry = { englishLearning: () => service, setEnglishLearningTarget: vi.fn(async (_input, persist) => { await persist(); return service.getState(); }) };
+  const registry = { englishLearning: () => service, subscribeEnglishLearning: vi.fn(() => off), setEnglishLearningTarget: vi.fn(async (_input, persist) => { await persist(); return service.getState(); }) };
   const settings = { getV4: () => ({ revision: "one" }), updateNamespaceV4: vi.fn().mockRejectedValue(new Error("设置已更新")) };
   const dispose = registerEnglishLearningIpc({ registry, settings, getMainWindow: () => ({ webContents: sender, isDestroyed: () => false }) } as any);
   await expect(handlers.get(channels.getState)!({ sender: {}, senderFrame: frame })).rejects.toThrow("来源");

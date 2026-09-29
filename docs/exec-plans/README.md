@@ -16,6 +16,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
 | [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |
 | [会话切换与后台运行](active/20260916-session-background-runs.md) | 按会话隔离 stream、后台工具状态与历史校准，补切换回归与桌面验收。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
