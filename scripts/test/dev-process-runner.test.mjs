@@ -18,6 +18,44 @@ test("signaling a process group that no longer exists is a no-op", { skip: proce
   assert.equal(signalProcessTree(2_000_000_000, "SIGTERM"), false);
 });
 
+for (const buildFails of [false, true]) {
+  test(`desktop dev ${buildFails ? "stops on failed initial Electron build" : "rebuilds stale Electron artifacts before launching watchers"}`, { skip: process.platform === "win32", timeout: 10_000 }, async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "actspace-dev-barrier-"));
+    try {
+      await writeFile(resolve(root, "artifact"), "stale");
+      await writeFile(resolve(root, "pnpm"), `#!${process.execPath}
+const fs = require("node:fs");
+const path = require("node:path");
+const root = process.env.ACTSPACE_TEST_ROOT;
+const args = process.argv.slice(2);
+if (args.includes("build:electron")) {
+  fs.appendFileSync(path.join(root, "events"), "build-start\\n");
+  setTimeout(() => {
+    if (process.env.ACTSPACE_TEST_BUILD_FAILS === "true") process.exit(23);
+    fs.writeFileSync(path.join(root, "artifact"), "fresh");
+    fs.appendFileSync(path.join(root, "events"), "build-done\\n");
+  }, 100);
+} else if (args.includes("concurrently")) {
+  fs.appendFileSync(path.join(root, "events"), "launch\\n");
+  process.exit(fs.readFileSync(path.join(root, "artifact"), "utf8") === "fresh" ? 0 : 91);
+}
+`);
+      // Stub only browser-component packaging; execute the real dev orchestrator below.
+      await writeFile(resolve(root, "node"), `#!${process.execPath}\nprocess.exit(0);\n`);
+      await Promise.all(["pnpm", "node"].map((name) => chmod(resolve(root, name), 0o755)));
+      const cli = spawn(process.execPath, [resolve(testRoot, "..", "desktop-dev.mjs")], {
+        env: { ...process.env, PATH: `${root}:${process.env.PATH ?? ""}`, ACTSPACE_TEST_ROOT: root, ACTSPACE_TEST_BUILD_FAILS: String(buildFails) },
+        stdio: "ignore",
+      });
+      const [code] = await new Promise((resolveExit) => cli.once("exit", (...result) => resolveExit(result)));
+      assert.equal(code, buildFails ? 23 : 0);
+      assert.equal(await readFile(resolve(root, "events"), "utf8"), buildFails ? "build-start\n" : "build-start\nbuild-done\nlaunch\n");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+}
+
 function isAlive(pid) {
   try {
     process.kill(pid, 0);

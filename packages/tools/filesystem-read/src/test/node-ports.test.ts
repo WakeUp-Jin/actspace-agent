@@ -33,6 +33,19 @@ describe("filesystem-read ports", () => {
     expect(JSON.stringify(result)).toContain("session");
     expect(JSON.stringify(result)).not.toContain("default");
   });
+  it("returns contents on each Session's first read while preserving local cache and force", async () => {
+    const root = await workspace();
+    await writeFile(join(root, "value.txt"), "session-isolated-content\n");
+    const ports = createNodeToolPorts({ workspaceRoot: root });
+    for (const sessionId of ["parent", "child"]) {
+      const first = await invoke(ports.read_file, { path: "value.txt" }, sessionId);
+      expect(JSON.stringify(first.modelOutput)).toContain("1|session-isolated-content");
+      const repeated = await invoke(ports.read_file, { path: "value.txt" }, sessionId);
+      expect(JSON.stringify(repeated.modelOutput)).toContain("File unchanged");
+      const forced = await invoke(ports.read_file, { path: "value.txt", force: true }, sessionId);
+      expect(JSON.stringify(forced.modelOutput)).toContain("1|session-isolated-content");
+    }
+  });
 });
 async function waitFor(predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;

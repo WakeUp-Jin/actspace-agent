@@ -1,0 +1,123 @@
+[
+  {
+    "session": "00b8df4e-58fe-4319-a2a2-1925bdb6ce49",
+    "toolSets": [
+      {
+        "mode": "agent",
+        "tools": [
+          "glob",
+          "grep",
+          "list_directory",
+          "read_file"
+        ]
+      }
+    ]
+  },
+  {
+    "session": "54d5deb2-bfeb-460a-9339-2679afe7c4e8",
+    "toolSets": [
+      {
+        "mode": "agent",
+        "tools": [
+          "agent",
+          "bash",
+          "bash_kill",
+          "bash_output",
+          "delete_file",
+          "edit_file",
+          "explore",
+          "generate_image",
+          "glob",
+          "grep",
+          "inspect_image",
+          "list_directory",
+          "read_file",
+          "todo_read",
+          "todo_write",
+          "web_fetch",
+          "web_search",
+          "write_file"
+        ]
+      },
+      {
+        "mode": "chat",
+        "tools": [
+          "generate_image",
+          "web"
+        ]
+      },
+      {
+        "mode": "plan",
+        "tools": [
+          "explore",
+          "glob",
+          "grep",
+          "inspect_image",
+          "list_directory",
+          "read_file",
+          "todo_read",
+          "todo_write",
+          "web_fetch",
+          "web_search"
+        ]
+      }
+    ]
+  },
+  {
+    "session": "db87674b-79a5-42fb-90c4-b4c0b9ec9fad",
+    "toolSets": [
+      {
+        "mode": "plan",
+        "tools": [
+          "explore",
+          "glob",
+          "grep",
+          "inspect_image",
+          "list_directory",
+          "read_file",
+          "todo_read",
+          "todo_write",
+          "web_fetch",
+          "web_search"
+        ]
+      },
+      {
+        "mode": "agent",
+        "tools": [
+          "agent",
+          "bash",
+          "bash_kill",
+          "bash_output",
+          "delete_file",
+          "edit_file",
+          "explore",
+          "generate_image",
+          "glob",
+          "grep",
+          "inspect_image",
+          "list_directory",
+          "read_file",
+          "todo_read",
+          "todo_write",
+          "web_fetch",
+          "web_search",
+          "write_file"
+        ]
+      }
+    ]
+  },
+  {
+    "session": "0f8991ba-d620-49ec-b78a-242bf556df32",
+    "toolSets": [
+      {
+        "mode": "agent",
+        "tools": [
+          "glob",
+          "grep",
+          "list_directory",
+          "read_file"
+        ]
+      }
+    ]
+  }
+]

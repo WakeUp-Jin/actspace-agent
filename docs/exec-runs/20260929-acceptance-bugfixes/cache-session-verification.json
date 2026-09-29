@@ -1,0 +1,92 @@
+[
+  {
+    "sessionId": "65fcdfe7-92fc-4c72-9586-91681eb6a96b",
+    "events": [
+      {
+        "seq": 59,
+        "type": "tool/call",
+        "data": {
+          "agentRunId": "agent-run-1790687543615-1",
+          "turnId": "887a5607-0aec-429a-a590-b185be26c33a",
+          "stepId": "065e74be-5da1-452b-b5e4-fab6d29fa9c6",
+          "requestId": "ca0a6f59-6da9-407f-8b03-88fd1abe7013",
+          "callId": "call_00_iC8gUpHWgG0igHP3hDFk0745",
+          "pluginId": "actspace.filesystem-read",
+          "name": "read_file",
+          "args": {
+            "path": "cache-session-proof.txt",
+            "offset": 1,
+            "limit": 200,
+            "force": false
+          }
+        }
+      },
+      {
+        "seq": 61,
+        "type": "tool/result",
+        "data": {
+          "callId": "call_00_iC8gUpHWgG0igHP3hDFk0745",
+          "pluginId": "actspace.filesystem-read",
+          "name": "read_file",
+          "status": "completed",
+          "summary": "Read cache-session-proof.txt",
+          "modelOutput": [
+            {
+              "type": "text",
+              "text": "     1|CACHE_SESSION_PROOF_62917\n     2|Each new session must receive this full text.\n     3|"
+            }
+          ],
+          "detail": [],
+          "artifacts": [],
+          "failure": null,
+          "renderer": null
+        }
+      }
+    ]
+  },
+  {
+    "sessionId": "8def8911-e0ce-42a1-baf3-b8057e399a47",
+    "events": [
+      {
+        "seq": 59,
+        "type": "tool/call",
+        "data": {
+          "agentRunId": "agent-run-1790688003113-2",
+          "turnId": "932d7a3c-98d1-4d87-b67b-c15408ac1c62",
+          "stepId": "18140137-16ce-47b5-8678-5f713941ac40",
+          "requestId": "65d1b619-f4e5-4a92-aa9a-c3d51c686b29",
+          "callId": "call_00_cBA71OCQJpmQgGbeIIAl8071",
+          "pluginId": "actspace.filesystem-read",
+          "name": "read_file",
+          "args": {
+            "path": "cache-session-proof.txt",
+            "offset": 1,
+            "limit": 200,
+            "force": false
+          }
+        }
+      },
+      {
+        "seq": 61,
+        "type": "tool/result",
+        "data": {
+          "callId": "call_00_cBA71OCQJpmQgGbeIIAl8071",
+          "pluginId": "actspace.filesystem-read",
+          "name": "read_file",
+          "status": "completed",
+          "summary": "Read cache-session-proof.txt",
+          "modelOutput": [
+            {
+              "type": "text",
+              "text": "     1|CACHE_SESSION_PROOF_62917\n     2|Each new session must receive this full text.\n     3|"
+            }
+          ],
+          "detail": [],
+          "artifacts": [],
+          "failure": null,
+          "renderer": null
+        }
+      }
+    ]
+  }
+]

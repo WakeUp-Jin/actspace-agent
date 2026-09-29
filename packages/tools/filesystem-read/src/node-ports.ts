@@ -43,7 +43,7 @@ async function readFileTool(
     }
     const offset = integerArg(args, "offset", 1);
     const limit = integerArg(args, "limit", READ_FILE_DEFAULT_LIMIT);
-    const cacheKey = `${filePath}\0${offset}\0${limit}`;
+    const cacheKey = `${context.sessionId}\0${filePath}\0${offset}\0${limit}`;
     const cached = cache.get(cacheKey);
     if (args.force !== true && cached?.size === fileStat.size && cached.mtimeMs === fileStat.mtimeMs) {
       const text = "File unchanged since the previous read of this exact path and range. Reuse the earlier numbered lines, or pass force=true.";

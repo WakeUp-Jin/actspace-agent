@@ -281,7 +281,27 @@ export class AgentLoop {
         }
       }
     }
-    return values.map((value) => toMessage(value, paths));
+    const messages = values.map((value) => toMessage(value, paths));
+    const repaired: LlmMessage[] = [];
+    for (let index = 0; index < messages.length; index++) {
+      const message = messages[index]!;
+      repaired.push(message);
+      if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
+      const results = new Set<string>();
+      let next = index + 1;
+      while (messages[next]?.role === "tool") {
+        const result = messages[next++]!;
+        repaired.push(result);
+        if (result.callId) results.add(result.callId);
+      }
+      index = next - 1;
+      for (const block of message.content) {
+        if (block.type === "tool-call" && !results.has(block.callId)) {
+          repaired.push({ role: "tool", callId: block.callId, content: "No result was recorded for this tool call. Its outcome is unknown; do not assume it executed or succeeded." });
+        }
+      }
+    }
+    return repaired;
   }
 
   private toolDefinitions(mode: RuntimeV2AgentMode): readonly LlmToolDefinition[] {
@@ -320,7 +340,26 @@ export class AgentLoop {
 
   private async runTools(calls: readonly CollectedToolCall[], ids: { agentRunId: string; turnId: string; stepId: string; requestId: string }, signal: AbortSignal, visibleToolNames: ReadonlySet<string>): Promise<readonly ToolExecutionResult[]> {
     const unavailable = calls.find((call) => !visibleToolNames.has(call.name));
-    if (unavailable !== undefined) throw new AgentRuntimeError("AGENT_SETUP_FAILED", `Tool ${unavailable.name} is not visible in this Agent scope.`);
+    if (unavailable !== undefined) {
+      // The assistant message already contains every call. Settle the whole
+      // rejected batch without executing it so the next request remains valid.
+      const results: ToolExecutionResult[] = [];
+      for (const call of calls) {
+        const summary = `Tool batch rejected: ${unavailable.name} is not visible in this Agent scope. No tools in this batch were executed.`;
+        const result: ToolExecutionResult = { callId: call.callId, pluginId: "@actspace/core", name: call.name,
+          registrationId: "scope-rejected", definitionVersion: 1, definitionDigest: "scope-rejected",
+          status: "denied", summary, modelOutput: [{ type: "text", text: summary }], detail: [], artifacts: [],
+          finalizerFailures: [], dispatched: false };
+        await this.options.session.append(core("tool/call", { ...ids, callId: call.callId, pluginId: result.pluginId, name: call.name, args: parseArgs(call.arguments) }));
+        const event = await this.options.session.append(core("tool/result", { callId: call.callId, pluginId: result.pluginId, name: call.name, status: result.status, summary, modelOutput: result.modelOutput, detail: [], artifacts: [], failure: null, renderer: null }, {
+          surface: { kind: "append", node: { kind: "tool-result", messageId: `tool-${call.callId}`, callId: call.callId, content: result.modelOutput as unknown as RuntimeV2JsonValue, isError: true } },
+        }));
+        this.emitLive({ kind: "tool-finished", ...ids, callId: call.callId, name: call.name, result, resultEventId: `v2-${event.seq}` });
+        await this.notify("tools/result", result);
+        results.push(result);
+      }
+      return results;
+    }
     const resolvedCalls = calls.map((call) => ({ call, definition: this.options.tools.registry.capture(call.name).definition }));
     for (const { call, definition } of resolvedCalls) {
       const args = parseArgs(call.arguments);

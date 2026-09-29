@@ -1,0 +1,22 @@
+[
+  {
+    "sessionId": "ea95c0c5-6fb2-4053-a103-cfe61844aedf",
+    "presetId": "actspace.explore",
+    "status": "completed",
+    "durationMs": 4285,
+    "calls": [
+      "read_file"
+    ],
+    "failure": null
+  },
+  {
+    "sessionId": "212f019d-3f21-4c56-b9d1-007dc47c0f28",
+    "presetId": "actspace.agent",
+    "status": "completed",
+    "durationMs": 3468,
+    "calls": [
+      "read_file"
+    ],
+    "failure": null
+  }
+]

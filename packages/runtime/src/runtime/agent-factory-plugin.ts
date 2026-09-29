@@ -67,6 +67,8 @@ export function apply(ctx: CordisContext): void {
     readonly signal?: AbortSignal;
     readonly agentId?: string;
   }): Promise<AgentLoop> => {
+    scope.disposer.add(sessions.registerExternal(session));
+    scope.disposer.add(() => { activeSessions.delete(session.header.sessionId); });
     const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot);
     const source = await prompt.resolveSource(workspaceRoot);
     const contributors = new ContributorRegistry();

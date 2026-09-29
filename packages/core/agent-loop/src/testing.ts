@@ -11,6 +11,9 @@ import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {
   subagent?: boolean;
+  seedSession?: (session: SessionHandle) => Promise<void>;
+  followup?: boolean;
+  extraToolCall?: boolean;
   onTools?: (tools: readonly import("@actspace/llm-service").LlmToolDefinition[]) => void;
   deltas?: boolean;
   resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver;
@@ -35,6 +38,7 @@ export async function runToolStreamFixture(options: {
     sessionId: options.sessionId ?? "tool-stream-test", createdAt: "2026-09-06T00:00:00.000Z", lineage: options.subagent ? { origin: "delegation", parentSessionId: "parent", parentCallId: "delegate", parentBoundarySeq: 0, seedDigest: "fixture", delegationDepth: 1 } : null,
     createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest },
   }) });
+  await options.seedSession?.(session);
   const tools = new ToolRuntime();
   tools.register({ definition: { abiVersion: 2, pluginId: "test.tools", name: "read_file", definitionVersion: 1,
     description: "Read fixture", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false },
@@ -59,7 +63,7 @@ export async function runToolStreamFixture(options: {
           yield { type: "tool-call-delta", callId: "read-1", name: "read_file", argumentsDelta: args.slice(0, 8) };
           yield { type: "tool-call-delta", callId: "read-1", name: "read_file", argumentsDelta: args.slice(8) };
         }
-        yield { type: "done", stopReason: "tool-use", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "Read now. " }, { type: "tool-call", callId: "read-1", name: "read_file", arguments: args }] };
+        yield { type: "done", stopReason: "tool-use", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "Read now. " }, { type: "tool-call", callId: "read-1", name: "read_file", arguments: args }, ...(options.extraToolCall ? [{ type: "tool-call" as const, callId: "unknown-2", name: "missing_tool", arguments: "{}" }] : [])] };
       } else {
         await options.beforeFinalText?.();
         yield { type: "text-delta", text: 'Done. {"valid":"body JSON"}' };
@@ -79,6 +83,7 @@ export async function runToolStreamFixture(options: {
   });
   try {
     const result = await loop.runTurn({ content: "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test" });
+    if (options.followup) await loop.runTurn({ content: "Continue without tools", mode: options.mode });
     return { result, events, journal: [...session.journal.events], header: session.header, registry };
   } finally { options.onJournal?.([...session.journal.events]); await session.close(); await handle.dispose(100); }
 }

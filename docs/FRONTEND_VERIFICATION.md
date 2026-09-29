@@ -94,6 +94,8 @@ http://127.0.0.1:5173/
 pnpm dev
 ```
 
+启动器先完成依赖与本轮 Electron main/preload 构建，成功后才启动并行 watch、renderer 和 Electron。即使磁盘已有旧的 `dist-electron`，本轮构建失败也会停止启动。`dev:electron:run` 是内部运行阶段，文件存在检查不能替代上述构建屏障；请从 `pnpm dev` / `pnpm dev:log` 启动。
+
 macOS 开发启动不会直接暴露依赖目录里的默认 `Electron.app`。启动器会在系统临时目录缓存一份当前 workspace 专属的开发 runtime，并为它设置唯一的应用名、bundle ID 与可执行文件名。启动日志中的 `[dev-runtime]` JSON 是本次运行的事实来源，例如：
 
 ```text
