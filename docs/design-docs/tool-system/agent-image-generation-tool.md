@@ -389,37 +389,17 @@ run log 可以记录：
 
 不得记录完整 prompt 的场景包括 prompt 可能包含用户隐私或未公开产品资料。V0 最多记录长度、哈希或截断后的脱敏 preview；session 中的 tool args 仍属于本地会话事实，外发日志或截图前需要脱敏。
 
-## 15. 实现位置建议
+## 15. 当前实现位置
 
-```text
-packages/shared/src/settings.ts
-  ImageGenerationSettingsView / ImageGenerationSecretId / SecretProviderId
+- `packages/tools/image-generation/src/plugin.ts`：工具定义、注册和生命周期。
+- `packages/tools/image-generation/src/node-ports.ts`：Provider 请求、响应解析、下载与 artifact 保存。
+- `packages/tools/image-inspection/src/`：独立的图片分析工具和 LLM adapter。
+- `apps/desktop/src/main/runtime-v2/tool-host-services.ts`：Host 分别提供生成与分析端口；生成凭据在每次调用时读取。
+- `apps/cli/src/runtime-v2/tool-host-services.ts`：CLI 的独立 Host 接线。
+- `apps/desktop/src/main/settings-service.ts`、`session-artifact-service.ts`：设置和会话产物边界。
+- `apps/desktop/src/renderer/components/messages/TurnOutputArtifacts.tsx`：产物展示。
 
-packages/shared/src/session.ts
-  image_generation preview / MessageBlock / ToolArtifact
-
-packages/llm/service/src/image-generation.ts
-  IMAGE_GENERATION_API_KEY / IMAGE_GENERATION_BASE_URL / IMAGE_GENERATION_MODEL
-
-packages/tools/core-tools/src/generate-image/
-  definition.ts
-  executor.ts
-  provider.ts
-
-packages/tools/core-tools/src/exposure.ts
-packages/tools/core-tools/src/index.ts
-packages/runtime/src/runtime/create-runtime-deps.ts
-packages/runtime/src/projection/bridge.ts
-packages/runtime/src/projection/streaming-preview-extractors.ts
-
-apps/desktop/src/main/settings-service.ts
-apps/desktop/src/main/session-artifact-service.ts
-apps/desktop/src/renderer/components/settings/SettingsPage.tsx
-apps/desktop/src/renderer/components/messages/ToolLogLine.tsx
-apps/desktop/src/renderer/components/messages/TurnOutputArtifacts.tsx
-```
-
-provider 请求构造和响应解析放在薄 adapter 中，definition、网络传输、artifact 写盘和 UI preview 不应揉成一个大 executor。
+生成插件不依赖分析插件，也不通过 Runtime 聚合导出具体执行器。当前 transport 与响应解析仍在生成包的 node-ports 中，进一步拆薄 adapter 属于后续内部重构。
 
 ## 16. 测试与验收
 

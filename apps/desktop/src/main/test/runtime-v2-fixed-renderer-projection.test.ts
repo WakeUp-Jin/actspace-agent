@@ -163,13 +163,13 @@ describe("fixed renderer v2 projection", () => {
 
   it("maps core file writes to the existing write diff preview", () => {
     const journal = [
-      event(0, "tool/call", { callId: "call-1", name: "write_file", pluginId: "actspace.core-tools", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1", args: { path: "src/a.ts", content: "next" } }),
-      event(1, "tool/result", { callId: "call-1", pluginId: "actspace.core-tools", name: "write_file", status: "completed", summary: "Updated src/a.ts", modelOutput: [{ type: "text", text: "--- a/src/a.ts\n+++ b/src/a.ts\n-old\n+next\n\nFile updated: src/a.ts" }], detail: [{ label: "result", value: { type: "update", path: "src/a.ts", additions: 1, deletions: 1 } }], artifacts: [], failure: null }, appendTool("tool-call-1", "call-1")),
+      event(0, "tool/call", { callId: "call-1", name: "write_file", pluginId: "actspace.filesystem-write", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1", args: { path: "src/a.ts", content: "next" } }),
+      event(1, "tool/result", { callId: "call-1", pluginId: "actspace.filesystem-write", name: "write_file", status: "completed", summary: "Updated src/a.ts", modelOutput: [{ type: "text", text: "--- a/src/a.ts\n+++ b/src/a.ts\n-old\n+next\n\nFile updated: src/a.ts" }], detail: [{ label: "result", value: { type: "update", path: "src/a.ts", additions: 1, deletions: 1 } }], artifacts: [], failure: null }, appendTool("tool-call-1", "call-1")),
     ];
     const snapshot = baseSnapshot({
       messages: [{ kind: "tool-result", messageId: "tool-call-1", callId: "call-1", content: [{ type: "text", text: "done" }] }],
       throughJournalSeq: 1,
-      tools: [{ kind: "tool", schemaVersion: 1, sessionId: "session-1", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1", pluginId: "actspace.core-tools", name: "write_file", callId: "call-1", state: "completed", phase: null, startedAt: TIME, finishedAt: TIME, durationMs: 0, argsSummary: { text: "{}", fields: [] }, modelOutput: [{ type: "text", text: "done" }], summary: "Updated src/a.ts", detail: [], artifacts: [], failure: null, renderer: null }],
+      tools: [{ kind: "tool", schemaVersion: 1, sessionId: "session-1", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1", pluginId: "actspace.filesystem-write", name: "write_file", callId: "call-1", state: "completed", phase: null, startedAt: TIME, finishedAt: TIME, durationMs: 0, argsSummary: { text: "{}", fields: [] }, modelOutput: [{ type: "text", text: "done" }], summary: "Updated src/a.ts", detail: [], artifacts: [], failure: null, renderer: null }],
     });
 
     const result = projectChatEvents(snapshot, journal).find((item) => item.type === "tool_result");

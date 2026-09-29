@@ -42,7 +42,7 @@ func TestCommandPrimitiveAndEventMethodsAreUnique(t *testing.T) {
 			seen[method] = struct{}{}
 		}
 	}
-	if len(CommandMethods) != 5 || len(BackendPrimitiveMethods) != 12 || len(EventMethods) != 4 {
+	if len(CommandMethods) != 6 || len(BackendPrimitiveMethods) != 12 || len(EventMethods) != 6 {
 		t.Fatalf("unexpected method counts: command=%d primitive=%d event=%d", len(CommandMethods), len(BackendPrimitiveMethods), len(EventMethods))
 	}
 }

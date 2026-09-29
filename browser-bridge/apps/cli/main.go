@@ -136,6 +136,8 @@ type bridgeConnectionState struct {
 	turnID       string
 	attachedTabs map[int]int
 	browser      *browserEventState
+	active       map[string]bool
+	closed       bool
 }
 
 var cliCommands = []command{
@@ -339,7 +341,12 @@ var cliCommands = []command{
 
 func main() {
 	if isNativeMessagingLaunch(os.Args[1:]) {
-		if err := runBrokerHost(os.Stdin, os.Stdout, os.Stderr, defaultSocketPath()); err != nil {
+		socketPath, err := newNativeHostSocketPath()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := runBrokerHost(os.Stdin, os.Stdout, os.Stderr, socketPath); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -1329,10 +1336,20 @@ func defaultSocketPath() string {
 	if value := os.Getenv("ABB_SOCKET"); value != "" {
 		return value
 	}
+	instances := activeNativeHostInstances()
+	if len(instances) == 1 {
+		return instances[0].SocketPath
+	}
+	if len(instances) > 1 {
+		return ""
+	}
 	return filepath.Join(defaultSupportDir(), "agent-browser-bridge.sock")
 }
 
 func defaultChromeManifestPath() string {
+	if value := os.Getenv("ABB_CHROME_MANIFEST_PATH"); value != "" {
+		return value
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return filepath.Join(os.TempDir(), nativeHostName+".json")
@@ -1482,7 +1499,23 @@ func installNativeHostManifest(manifestPath string, binaryPath string, allowedOr
 		return installReport{}, err
 	}
 	payload = append(payload, '\n')
-	if err := os.WriteFile(manifestPath, payload, 0644); err != nil {
+	temp, err := os.CreateTemp(filepath.Dir(manifestPath), ".actspace-native-host-*")
+	if err != nil {
+		return installReport{}, err
+	}
+	defer os.Remove(temp.Name())
+	if err := temp.Chmod(0600); err != nil {
+		temp.Close()
+		return installReport{}, err
+	}
+	if _, err := temp.Write(payload); err != nil {
+		temp.Close()
+		return installReport{}, err
+	}
+	if err := temp.Close(); err != nil {
+		return installReport{}, err
+	}
+	if err := os.Rename(temp.Name(), manifestPath); err != nil {
 		return installReport{}, err
 	}
 	return installReport{HostName: nativeHostName, ManifestPath: manifestPath, BinaryPath: binaryPath, AllowedOrigin: allowedOrigin, Installed: true}, nil
@@ -1508,6 +1541,9 @@ func probeSocket(path string) error {
 }
 
 func sendCLIRequest(socketPath string, method string, params any) (protocol.ResponseEnvelope, error) {
+	if socketPath == "" {
+		return protocol.ResponseEnvelope{}, fmt.Errorf("multiple Chrome extension instances are connected; choose one with --socket")
+	}
 	conn, err := net.DialTimeout("unix", socketPath, defaultTimeout)
 	if err != nil {
 		return protocol.ResponseEnvelope{}, fmt.Errorf("%s: bridge socket is unavailable at %s", protocol.ErrorSocketUnavailable, socketPath)
@@ -1549,6 +1585,8 @@ func runBrokerHost(stdin io.Reader, stdout io.Writer, stderr io.Writer, socketPa
 		events:    NewEventBus(),
 	}
 	errCh := make(chan error, 2)
+	defer os.Remove(nativeHostInstanceFile(socketPath))
+	defer os.Remove(socketPath)
 	go func() {
 		errCh <- host.serveSocket()
 	}()
@@ -1559,8 +1597,7 @@ func runBrokerHost(stdin io.Reader, stdout io.Writer, stderr io.Writer, socketPa
 }
 
 func (h *bridgeHost) serveSocket() error {
-	_ = os.Remove(h.socket)
-	if err := os.MkdirAll(filepath.Dir(h.socket), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(h.socket), 0700); err != nil {
 		return err
 	}
 	listener, err := net.Listen("unix", h.socket)
@@ -1569,6 +1606,9 @@ func (h *bridgeHost) serveSocket() error {
 	}
 	defer listener.Close()
 	defer os.Remove(h.socket)
+	if err := os.Chmod(h.socket, 0600); err != nil {
+		return err
+	}
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -1584,7 +1624,7 @@ func (h *bridgeHost) handleClient(conn net.Conn) {
 	commandEventID := connID + "_command_state"
 	commandEvents := h.events.Subscribe(commandEventID)
 	defer h.events.Unsubscribe(connID)
-	state := &bridgeConnectionState{host: h, sessionID: "cli", turnID: "cli", attachedTabs: map[int]int{}, browser: newBrowserEventState()}
+	state := &bridgeConnectionState{host: h, sessionID: "cli", turnID: "cli", attachedTabs: map[int]int{}, browser: newBrowserEventState(), active: map[string]bool{}}
 	commandEventsDone := make(chan struct{})
 	go func() {
 		defer close(commandEventsDone)
@@ -1597,11 +1637,33 @@ func (h *bridgeHost) handleClient(conn net.Conn) {
 		<-commandEventsDone
 		state.cleanup()
 	}()
-	handleClientRequestsWithEvents(conn, state.dispatch, events)
+	handleClientRequestsWithEvents(conn, state.dispatch, events, func() {
+		state.mu.Lock()
+		state.closed = true
+		for id := range state.active {
+			state.active[id] = true
+		}
+		state.mu.Unlock()
+	})
 }
 
 func (state *bridgeConnectionState) dispatch(request protocol.RequestEnvelope) protocol.ResponseEnvelope {
 	switch request.Method {
+	case protocol.MethodCommandCancel:
+		var params struct {
+			ID string `json:"id"`
+		}
+		if err := protocol.DecodeParams(request.Params, &params); err != nil {
+			return errorResponse(request.ID, protocol.ErrorInvalidParams, err.Error())
+		}
+		state.mu.Lock()
+		if params.ID == "" || len(params.ID) > 128 {
+			state.mu.Unlock()
+			return errorResponse(request.ID, protocol.ErrorInvalidParams, "invalid request ID")
+		}
+		state.active[params.ID] = true
+		state.mu.Unlock()
+		return okResponse(request.ID, map[string]bool{"cancelled": true})
 	case protocol.MethodSessionStart:
 		var params protocol.SessionStartParams
 		if err := protocol.DecodeParams(request.Params, &params); err != nil {
@@ -1612,20 +1674,59 @@ func (state *bridgeConnectionState) dispatch(request protocol.RequestEnvelope) p
 		state.turnID = params.TurnID
 		state.mu.Unlock()
 	case protocol.MethodSessionEnd:
-		state.cleanup()
+		state.mu.Lock()
+		state.closed = true
+		for id := range state.active {
+			state.active[id] = true
+		}
+		state.mu.Unlock()
+		return state.forward(request)
 	}
-	return dispatchBridgeRequestWithState(request, state.forward, state.browser)
+	if request.Method == protocol.MethodCommandRun || request.Method == protocol.MethodCommandExecute {
+		state.mu.Lock()
+		if _, exists := state.active[request.ID]; !exists {
+			state.active[request.ID] = false
+		}
+		state.mu.Unlock()
+		defer func() { state.mu.Lock(); delete(state.active, request.ID); state.mu.Unlock() }()
+	}
+	isCancelled := func() bool {
+		state.mu.Lock()
+		cancelled := state.closed || state.active[request.ID]
+		state.mu.Unlock()
+		return cancelled
+	}
+	return dispatchBridgeRequestWithCancellation(request, func(subrequest protocol.RequestEnvelope) protocol.ResponseEnvelope {
+		if isCancelled() {
+			return errorResponse(subrequest.ID, "outcome_unknown", "Browser action was stopped; an already started Chrome operation may have completed.")
+		}
+		return state.forwardWithCancellation(subrequest, isCancelled)
+	}, state.browser, isCancelled)
 }
 
 func (state *bridgeConnectionState) forward(request protocol.RequestEnvelope) protocol.ResponseEnvelope {
+	return state.forwardWithCancellation(request, nil)
+}
+
+func (state *bridgeConnectionState) forwardWithCancellation(request protocol.RequestEnvelope, cancelled func() bool) protocol.ResponseEnvelope {
 	state.mu.Lock()
 	sessionID := state.sessionID
 	turnID := state.turnID
 	state.mu.Unlock()
 	request = withBackendSession(request, sessionID, turnID)
-	response := state.host.forwardToExtension(request)
+	response := state.host.forwardToExtensionWithCancellation(request, cancelled)
 	if !response.OK {
 		return response
+	}
+	if request.Method == protocol.MethodInfo {
+		// Check the live Host as well as the extension; the discovery file is not an identity proof.
+		payload, err := json.Marshal(response.Result)
+		var info map[string]any
+		if err == nil && json.Unmarshal(payload, &info) == nil && info != nil {
+			info["hostId"] = filepath.Base(state.host.socket)
+			info["hostVersion"] = version
+			response.Result = info
+		}
 	}
 	var params protocol.TabTargetParams
 	switch request.Method {
@@ -1659,6 +1760,11 @@ func (state *bridgeConnectionState) cleanup() {
 			Params:          protocol.TabTargetParams{TabID: tabID},
 		})
 	}
+	state.forward(protocol.RequestEnvelope{
+		ProtocolVersion: protocol.ProtocolVersion,
+		ID:              fmt.Sprintf("cleanup_session_%d", time.Now().UnixNano()),
+		Method:          protocol.MethodSessionEnd,
+	})
 }
 
 func handleClientRequests(
@@ -1686,9 +1792,17 @@ func handleClientRequestsWithEvents(
 	conn net.Conn,
 	forward func(protocol.RequestEnvelope) protocol.ResponseEnvelope,
 	events <-chan protocol.RequestEnvelope,
+	onClose ...func(),
 ) {
 	defer conn.Close()
 	var writeMu sync.Mutex
+	var workers sync.WaitGroup
+	defer func() {
+		for _, callback := range onClose {
+			callback()
+		}
+		workers.Wait()
+	}()
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -1720,6 +1834,17 @@ func handleClientRequestsWithEvents(
 			writeMu.Unlock()
 			return
 		}
+		if request.Method == protocol.MethodCommandRun || request.Method == protocol.MethodCommandExecute {
+			workers.Add(1)
+			go func(request protocol.RequestEnvelope) {
+				defer workers.Done()
+				response := forward(request)
+				writeMu.Lock()
+				_ = protocol.WriteJSONFrame(conn, response)
+				writeMu.Unlock()
+			}(request)
+			continue
+		}
 		response := forward(request)
 		writeMu.Lock()
 		err = protocol.WriteJSONFrame(conn, response)
@@ -1731,15 +1856,18 @@ func handleClientRequestsWithEvents(
 }
 
 func (h *bridgeHost) forwardToExtension(request protocol.RequestEnvelope) protocol.ResponseEnvelope {
-	if request.ID == "" {
-		request.ID = fmt.Sprintf("host_%d", time.Now().UnixNano())
-	}
+	return h.forwardToExtensionWithCancellation(request, nil)
+}
+
+func (h *bridgeHost) forwardToExtensionWithCancellation(request protocol.RequestEnvelope, cancelled func() bool) protocol.ResponseEnvelope {
+	originalID := request.ID
+	request.ID = fmt.Sprintf("host_%d_%s", time.Now().UnixNano(), randomRequestSuffix())
 	request.ProtocolVersion = protocol.ProtocolVersion
 	ch := make(chan protocol.ResponseEnvelope, 1)
 	h.mu.Lock()
 	if h.extension == nil {
 		h.mu.Unlock()
-		return errorResponse(request.ID, protocol.ErrorExtensionUnavailable, "Chrome extension is not connected to the native host.")
+		return errorResponse(originalID, protocol.ErrorExtensionUnavailable, "Chrome extension is not connected to the native host.")
 	}
 	h.pending[request.ID] = ch
 	h.writeMu.Lock()
@@ -1747,18 +1875,32 @@ func (h *bridgeHost) forwardToExtension(request protocol.RequestEnvelope) protoc
 		h.writeMu.Unlock()
 		delete(h.pending, request.ID)
 		h.mu.Unlock()
-		return errorResponse(request.ID, protocol.ErrorExtensionUnavailable, err.Error())
+		return errorResponse(originalID, protocol.ErrorExtensionUnavailable, err.Error())
 	}
 	h.writeMu.Unlock()
 	h.mu.Unlock()
-	select {
-	case response := <-ch:
-		return response
-	case <-time.After(defaultTimeout):
-		h.mu.Lock()
-		delete(h.pending, request.ID)
-		h.mu.Unlock()
-		return errorResponse(request.ID, protocol.ErrorRequestTimeout, "Timed out waiting for the Chrome extension response.")
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.NewTimer(defaultTimeout)
+	defer timeout.Stop()
+	for {
+		select {
+		case response := <-ch:
+			response.ID = originalID
+			return response
+		case <-ticker.C:
+			if cancelled != nil && cancelled() {
+				h.mu.Lock()
+				delete(h.pending, request.ID)
+				h.mu.Unlock()
+				return errorResponse(originalID, "outcome_unknown", "Browser action stopped while Chrome was processing it; check the page before retrying.")
+			}
+		case <-timeout.C:
+			h.mu.Lock()
+			delete(h.pending, request.ID)
+			h.mu.Unlock()
+			return errorResponse(originalID, protocol.ErrorRequestTimeout, "Timed out waiting for the Chrome extension response.")
+		}
 	}
 }
 
@@ -1784,6 +1926,30 @@ func (h *bridgeHost) readExtensionLoop() error {
 			continue
 		}
 		if message.ID == "" && message.Method != "" {
+			if message.Method == protocol.MethodEventInstanceSelected {
+				var selected struct {
+					InstanceID string `json:"instanceId"`
+				}
+				encoded, _ := json.Marshal(message.Params)
+				if json.Unmarshal(encoded, &selected) == nil {
+					_ = publishInstanceSelection(h.socket, selected.InstanceID)
+				}
+				continue
+			}
+			if message.Method == protocol.MethodEventInstanceReady {
+				var ready struct {
+					InstanceID       string `json:"instanceId"`
+					ExtensionVersion string `json:"extensionVersion"`
+					ProtocolVersion  string `json:"protocolVersion"`
+				}
+				encoded, _ := json.Marshal(message.Params)
+				if json.Unmarshal(encoded, &ready) == nil {
+					if err := publishNativeHostInstance(h.socket, ready.InstanceID, ready.ExtensionVersion, ready.ProtocolVersion); err != nil {
+						fmt.Fprintln(h.stderr, "extension instance registration failed:", err)
+					}
+				}
+				continue
+			}
 			h.events.Publish(protocol.RequestEnvelope{
 				ProtocolVersion: protocol.ProtocolVersion,
 				Method:          message.Method,

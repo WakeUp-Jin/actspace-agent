@@ -6,6 +6,7 @@ import type { SessionHandle } from "@actspace/session-persistence";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type {
   MainAgentForm,
+  RuntimeV2AgentMode,
   RuntimeV2JsonValue,
   RuntimeV2RunTurnRequest,
   RuntimeV2RunTurnResponse,
@@ -50,12 +51,14 @@ type RunService = {
   attach(session: SessionHandle): Promise<RunAssembly>;
   run(sessionId: string, input: Omit<RuntimeV2RunTurnRequest, "sessionId">): Promise<RuntimeV2RunTurnResponse>;
   get(sessionId: string): RunAssembly | undefined;
+  isIdle?: () => boolean;
   rebuild(session: SessionHandle): Promise<RunAssembly>;
 };
 
-type AgentRuntimeService = { readonly runs: RunService };
+type AgentRuntimeService = { readonly runs: RunService; readonly subagents?: { readonly activeCount: number } };
 
 export type DesktopAppServiceContract = {
+  readonly isIdleForReconfigure: () => Promise<boolean>;
   readonly readSessionProjection: SessionService["readProjection"];
   readonly readSessionObservation: SessionService["readObservation"];
   readonly subscribeSessionProjection: SessionService["subscribeProjection"];
@@ -78,6 +81,7 @@ export type DesktopAppServiceContract = {
   readonly updateSessionMetadata: (sessionId: string, patch: { readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean }) => Promise<RuntimeV2SessionSnapshot>;
   readonly updateSessionWorkspace: (sessionId: string, workspaceRoot: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly updateSessionPermissionMode: (sessionId: string, mode: import("@actspace/shared/runtime-v2").PermissionMode) => Promise<RuntimeV2SessionSnapshot>;
+  readonly updateSessionAgentMode: (sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number) => Promise<RuntimeV2SessionSnapshot>;
   readonly revokeSessionGrant: (sessionId: string, grantId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly completeText: (input: { readonly messages: readonly LlmMessage[]; readonly model?: string; readonly purpose?: "chat" | "utility"; readonly sessionId?: string; readonly signal?: AbortSignal }) => Promise<{ readonly text: string; readonly model: string; readonly provider: string; readonly usage: LlmUsage; readonly stopReason: string | null }>;
   readonly dispose: () => Promise<void>;
@@ -86,21 +90,38 @@ export type DesktopAppServiceContract = {
 export class DesktopAppService implements DesktopAppServiceContract {
   readonly #sessions: SessionService;
   readonly #runs: RunService;
+  readonly #subagents: { readonly activeCount: number } | undefined;
   readonly #compaction: CompactionPlugin;
   readonly #llm: LlmService;
+  readonly #hasRunningBackgroundTask: (sessionId: string) => boolean;
   readonly #manifestDigest: string;
   readonly #titleJobs = new Map<string, { controller: AbortController; done: Promise<void> }>();
+  readonly #activeRuns = new Set<string>();
+  readonly #modeTransitions = new Set<string>();
+  readonly #blockedModeSessions = new Set<string>();
   #disposed = false;
 
   constructor(ctx: CordisContext) {
     this.#sessions = required(ctx, "session.runtime");
-    this.#runs = (required<AgentRuntimeService>(ctx, "agent.runtime")).runs;
+    const agentRuntime = required<AgentRuntimeService>(ctx, "agent.runtime");
+    this.#runs = agentRuntime.runs;
+    this.#subagents = agentRuntime.subagents;
     this.#compaction = required(ctx, "compaction.runtime");
     this.#llm = required(ctx, "llm.service");
+    this.#hasRunningBackgroundTask = (sessionId) => (ctx.get?.("tools.shell-tools") as { readonly hasRunningBackgroundTask?: (sessionId: string) => boolean } | undefined)?.hasRunningBackgroundTask?.(sessionId) ?? false;
     this.#manifestDigest = (ctx.get?.("actspace.host.session") as { readonly manifestDigest?: string } | undefined)?.manifestDigest ?? "desktop-app";
   }
 
   listSessions() { return this.#sessions.list(); }
+  async isIdleForReconfigure(): Promise<boolean> {
+    if (this.#titleJobs.size > 0 || this.#runs.isIdle?.() !== true) return false;
+    if (this.#subagents?.activeCount) return false;
+    for (const item of await this.#sessions.list()) {
+      const snapshot = await this.#sessions.inspect(item.sessionId);
+      if (snapshot.pendingInbox.length > 0) return false;
+    }
+    return this.#runs.isIdle?.() === true;
+  }
   readSessionProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.#sessions.readProjection(input); }
   readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.#sessions.readObservation(input); }
   subscribeSessionProjection(listener: (update: import("@actspace/shared/runtime-v2").RuntimeV2SessionUpdate) => void) { return this.#sessions.subscribeProjection(listener); }
@@ -144,8 +165,16 @@ export class DesktopAppService implements DesktopAppServiceContract {
   }
 
   async runTurn(input: RuntimeV2RunTurnRequest): Promise<RuntimeV2RunTurnResponse> {
+    if (this.#blockedModeSessions.has(input.sessionId)) throw new Error("AGENT_MODE_RECOVERY_REQUIRED");
+    if (this.#activeRuns.has(input.sessionId) || this.#modeTransitions.has(input.sessionId)) throw new Error("SESSION_BUSY");
+    this.#activeRuns.add(input.sessionId);
+    try {
     const session = await this.#sessions.resume(input.sessionId);
-    const snapshot = this.#sessions.snapshot(session);
+    let snapshot = this.#sessions.snapshot(session);
+    if (input.mode !== undefined && input.mode !== snapshot.agentMode) {
+      if ((snapshot.agentModeRevision ?? 0) !== 0 || snapshot.activity.turnCount !== 0) throw new Error("AGENT_MODE_CONFLICT");
+      snapshot = await this.#changeAgentMode(session, input.mode);
+    }
     if (!this.#disposed && snapshot.metadata.title === null && !this.#titleJobs.has(input.sessionId)) {
       const title = titleFromContent(input.content);
       if (title !== null) {
@@ -156,17 +185,46 @@ export class DesktopAppService implements DesktopAppServiceContract {
         this.#titleJobs.set(input.sessionId, { controller, done });
       }
     }
-    return this.#runs.run(input.sessionId, {
+    return await this.#runs.run(input.sessionId, {
       content: input.content,
       messageId: input.messageId,
       agentRunId: input.agentRunId,
       model: input.model,
-      mode: snapshot.agentForm === "chat" ? "agent" : input.mode,
+      mode: snapshot.agentMode ?? "agent",
       thinkingEnabled: input.thinkingEnabled,
       reasoningEffort: input.reasoningEffort,
       keepPendingOnAbort: input.keepPendingOnAbort,
-      selectedSkillIds: snapshot.agentForm === "chat" ? [] : input.selectedSkillIds,
+      selectedSkillIds: snapshot.agentMode === "chat" ? [] : input.selectedSkillIds,
     });
+    } finally { this.#activeRuns.delete(input.sessionId); }
+  }
+
+  async updateSessionAgentMode(sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number): Promise<RuntimeV2SessionSnapshot> {
+    if (this.#blockedModeSessions.has(sessionId)) throw new Error("AGENT_MODE_RECOVERY_REQUIRED");
+    if (this.#activeRuns.has(sessionId) || this.#modeTransitions.has(sessionId) || this.#runs.get(sessionId)?.loop.active || this.#hasRunningBackgroundTask(sessionId)) throw new Error("SESSION_BUSY");
+    this.#modeTransitions.add(sessionId);
+    try {
+      const session = await this.#sessions.resume(sessionId);
+      const snapshot = this.#sessions.snapshot(session);
+      if (expectedRevision !== undefined && expectedRevision !== (snapshot.agentModeRevision ?? 0)) throw new Error("AGENT_MODE_CONFLICT");
+      if (snapshot.pendingInbox.length > 0 || snapshot.activity.activeTurnId !== null || snapshot.delegations.some(item => item.state !== "completed")) throw new Error("SESSION_BUSY");
+      return await this.#changeAgentMode(session, mode);
+    } finally { this.#modeTransitions.delete(sessionId); }
+  }
+
+  async #changeAgentMode(session: SessionHandle, mode: RuntimeV2AgentMode): Promise<RuntimeV2SessionSnapshot> {
+    if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw new Error("INVALID_AGENT_MODE");
+    const snapshot = this.#sessions.snapshot(session);
+    if (snapshot.agentMode === mode) return snapshot;
+    if (mode !== "chat" && snapshot.workspaceRoot === null) throw new Error("WORKSPACE_REQUIRED");
+    try {
+      await session.append(core("agent/mode-set", { mode, revision: (snapshot.agentModeRevision ?? 0) + 1, changedAt: new Date().toISOString(), source: "desktop" }));
+      await session.flush();
+    } catch (error) {
+      this.#blockedModeSessions.add(session.header.sessionId);
+      throw error;
+    }
+    return this.#sessions.snapshot(session);
   }
 
   async enqueueMainMessage(sessionId: string, content: RuntimeV2JsonValue, target: "next-step" | "next-turn", messageId?: string) {

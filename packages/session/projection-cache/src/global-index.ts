@@ -20,6 +20,7 @@ export class GlobalSessionIndex {
       const value = JSON.parse(await readFile(this.path(), "utf8")) as StoredIndex;
       if (value.version !== 1 || !Number.isSafeInteger(value.generation) || !Array.isArray(value.summaries)) throw new Error("Invalid global session index.");
       this.#generation = value.generation;
+      if (value.summaries.some(item => !item || item.summaryVersion < 2 || item.agentMode === undefined)) throw new Error("Stale global session index.");
       this.#summaries = new Map(value.summaries.filter(item => item && typeof item.sessionId === "string").map(item => [item.sessionId, item]));
       this.#loaded = true;
       return true;

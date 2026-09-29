@@ -95,7 +95,7 @@ func (sess *Session) forwardToExtension(req protocol.RequestEnvelope) protocol.R
 }
 
 func withBackendSession(req protocol.RequestEnvelope, sessionID string, turnID string) protocol.RequestEnvelope {
-	if !strings.HasPrefix(req.Method, "agent_browser_bridge.backend.") {
+	if !strings.HasPrefix(req.Method, "agent_browser_bridge.backend.") && req.Method != protocol.MethodSessionEnd {
 		return req
 	}
 	params := map[string]any{}

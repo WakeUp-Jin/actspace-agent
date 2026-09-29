@@ -297,6 +297,7 @@ function messageBlockFromToolPreview(
         id: eventId,
         title: preview.title,
         content: preview.content,
+        artifacts: preview.artifacts,
         createdAt: getDisplayTime(timestamp),
         isError
       };

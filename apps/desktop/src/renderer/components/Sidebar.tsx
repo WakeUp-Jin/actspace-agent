@@ -893,7 +893,6 @@ export function Sidebar({
   onArchiveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
   onRemoveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
 }) {
-  const [newSessionMenuOpen, setNewSessionMenuOpen] = useState(false);
   const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
   const [workspacesCollapsed, setWorkspacesCollapsed] = useState(false);
   const busyIds = busySessionIds ?? new Set<string>();
@@ -948,37 +947,12 @@ export function Sidebar({
           <button
             className={`${SIDEBAR_PRIMARY_ACTION_CLASS} min-w-0 flex-1 ${view === "chat" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
             type="button"
-            onClick={() => handleNewAgent({ agentForm: "agent" })}
+            onClick={() => handleNewAgent()}
           >
             <SquarePen size={14} strokeWidth={1.9} />
             <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>新建会话</span>
             <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">⌘N</span>
           </button>
-          <button
-            className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-act-md text-text-faint hover:bg-hover-overlay hover:text-text-main"
-            type="button"
-            aria-label="选择新会话形态"
-            aria-haspopup="menu"
-            aria-expanded={newSessionMenuOpen}
-            onClick={() => setNewSessionMenuOpen((open) => !open)}
-          >
-            <ChevronDown size={13} strokeWidth={2} aria-hidden="true" />
-          </button>
-          {newSessionMenuOpen ? (
-            <div className="absolute left-2 right-2 top-[calc(100%_+_4px)] z-40 rounded-act-md border border-line bg-surface-raised p-1 shadow-act-popover" role="menu" aria-label="选择会话形态">
-              {(["agent", "chat"] as const).map((agentForm) => (
-                <button
-                  className="flex min-h-8 w-full items-center rounded-act-sm px-2 text-left text-act-md leading-5 text-text-main hover:bg-hover-overlay"
-                  key={agentForm}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => { setNewSessionMenuOpen(false); handleNewAgent({ agentForm }); }}
-                >
-                  {agentForm === "agent" ? "Agent" : "Chat"}
-                </button>
-              ))}
-            </div>
-          ) : null}
         </div>
         <button
           className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "extensions" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}

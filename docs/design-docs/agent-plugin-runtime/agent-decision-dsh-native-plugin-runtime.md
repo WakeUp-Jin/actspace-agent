@@ -262,7 +262,7 @@ DSH 还提供 `agent/created`、`agent/disposed`、`agent/inbox/inserted`、`age
 - Agent/Tool/LLM 领域只调用 Session 的 append/flush 公共 API，不直接写 JSONL；
 - 事件采集插件在 root Context 上订阅 `session/event`，将它作为完整 Session event stream 投影到 CLI JSONL、Desktop live projection 或 diagnostics sink。
 
-Session 轨道未来提供 DSH 对齐的 13 种 durable event（`turn/start`、`turn/end`、`step/start`、`step/end`、`user/message`、`assistant/chunk`、`assistant/message`、`tool/call`、`tool/result`、`todo/write`、`request/header`、`request/context`、`session/end-seed`）。在该轨道完成前，AgentLoop 计划不得自行发明第二套事件类型来替代它。
+2026-08-29 提案中的 Session 轨道提供 DSH 对齐的 13 种 durable event（`turn/start`、`turn/end`、`step/start`、`step/end`、`user/message`、`assistant/chunk`、`assistant/message`、`tool/call`、`tool/result`、`todo/write`、`request/header`、`request/context`、`session/end-seed`）。在该轨道完成前，AgentLoop 计划不得自行发明第二套事件类型来替代它。
 
 ## 10. 当前代码到目标代码的迁移映射
 
@@ -315,3 +315,5 @@ Session 轨道未来提供 DSH 对齐的 13 种 durable event（`turn/start`、`
 - DSH 机制研究：[`agent-research-dsh-architecture.md`](./agent-research-dsh-architecture.md)
 - Session 格式（本轮不改）：[`agent-spec-session-format-v1.md`](./agent-spec-session-format-v1.md)
 - 分阶段执行计划：[`../../exec-plans/completed/20260829-actspace-dsh-core-rebuild/README.md`](../../exec-plans/completed/20260829-actspace-dsh-core-rebuild/README.md)
+
+2026-09-28 更新：当前 Core Journal 保留 12 个核心事件，Todo 已由独立插件拥有；旧提案中的 `todo/write` 不再是当前契约。见 [工具边界](agent-tool-plugin-boundaries.md)。

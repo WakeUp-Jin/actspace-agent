@@ -37,7 +37,6 @@ const SESSION_SURFACES = Object.freeze({
   "assistant/message": "assistant",
   "tool/call": "internal",
   "tool/result": "tool-result",
-  "todo/write": "internal",
   "request/header": "internal",
   "request/context": "internal",
   "session/end-seed": "internal",
@@ -120,7 +119,7 @@ async function parseEvents() {
   const extensions = extractArray(journalSource, "export const PERSISTED_EXTENSION_EVENT_TYPES");
   const interventions = extractUnion(eventSource, "AgentLoopIntervention");
   const notifications = extractUnion(eventSource, "AgentNotification");
-  if (core.length !== 13) throw new Error(`Expected 13 Session core events, found ${core.length}.`);
+  if (core.length !== 12) throw new Error(`Expected 12 Session core events, found ${core.length}.`);
   if (interventions.length !== 10) throw new Error(`Expected 10 Agent Loop interventions, found ${interventions.length}.`);
   if (notifications.length !== 6) throw new Error(`Expected 6 notifications, found ${notifications.length}.`);
 
@@ -181,10 +180,14 @@ function parseConstantString(source, name) {
 
 function resolveArrayField(source, fragment, field) {
   const array = fragment.match(new RegExp(`${field}\\s*:\\s*\\[([^\\]]*)\\]`, "u"));
-  if (array) return quotedStrings(array[1]);
+  if (array) return quotedStrings(array[1]).concat(array[1].split(",").map(token => token.trim()).filter(token => /^[A-Z0-9_]+$/.test(token)).map(token => parseConstantString(source, token)).filter(Boolean));
   const direct = fragment.match(new RegExp(`${field}\\s*:\\s*([^,]+)`, "u"))?.[1]?.trim();
   if (!direct) return [];
   if (direct.startsWith("[")) return quotedStrings(direct);
+  if (/^[A-Z0-9_]+$/.test(direct)) {
+    const frozen = source.match(new RegExp(`${direct}\\s*=\\s*Object\\.freeze\\(\\[([^\\]]*)\\]`, "u"));
+    if (frozen) return quotedStrings(frozen[1]);
+  }
   const constant = direct.match(/([A-Z0-9_]+)\.([a-zA-Z0-9_]+)/u);
   if (constant) {
     const match = source.match(new RegExp(`${constant[1]}[\\s\\S]*?${constant[2]}\\s*:\\s*Object\\.freeze\\(\\[([^\\]]*)\\]`, "u"));
@@ -303,7 +306,7 @@ export function validateRows(matrix) {
   const core = matrix.events.filter((item) => item.category === "core");
   const interventions = matrix.events.filter((item) => item.category === "agent-loop");
   const notifications = matrix.events.filter((item) => item.category === "notification");
-  if (core.length !== 13 || interventions.length !== 10 || notifications.length !== 6) diagnostics.push({ severity: "error", code: "EVENT_COUNT_DRIFT", message: `Expected 13/10/6 event surfaces, got ${core.length}/${interventions.length}/${notifications.length}.` });
+  if (core.length !== 12 || interventions.length !== 10 || notifications.length !== 6) diagnostics.push({ severity: "error", code: "EVENT_COUNT_DRIFT", message: `Expected 12/10/6 event surfaces, got ${core.length}/${interventions.length}/${notifications.length}.` });
   for (const item of matrix.events.filter((event) => event.category === "notification")) if (item.mode === "waterfall") diagnostics.push({ severity: "error", code: "NOTIFICATION_VETO", message: `${item.eventType} cannot be a waterfall/veto event.` });
   if (requiredServices.size === 0) diagnostics.push({ severity: "warning", code: "NO_REQUIRED_SERVICES", message: "No required Service Definitions were found." });
   return diagnostics;

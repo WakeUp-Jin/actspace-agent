@@ -64,6 +64,11 @@
   --color-on-success: var(--act-color-on-success);
   --color-surface-raised: var(--act-color-surface-raised);
   --color-overlay: var(--act-color-overlay);
+  --color-accent: var(--act-color-accent);
+  --color-accent-hover: var(--act-color-accent-hover);
+  --color-on-accent: var(--act-color-on-accent);
+  --color-toggle-on: var(--act-color-toggle-on);
+  --color-link: var(--act-color-link);
   --color-focus-ring: var(--act-color-focus-ring);
   --color-operational-focus-ring: var(--act-color-operational-focus-ring);
 

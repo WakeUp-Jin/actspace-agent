@@ -40,6 +40,13 @@
   --act-preview-dark-sidebar: #1e1f1c;
   --act-preview-dark-line: #3a3b35;
   --act-preview-dark-ink: #f1f1ed;
+  /* 外观页强调色色样：同上，固定色，不随当前主题或当前调色板翻转。 */
+  --act-preview-accent-default-ink: #20201e;
+  --act-preview-accent-default-emerald: #087a4b;
+  --act-preview-accent-blue: #3a83f7;
+  --act-preview-accent-purple: #a67df2;
+  --act-preview-accent-pink: #f077af;
+  --act-preview-accent-orange: #ee7c37;
 
   --act-color-text: #20201e;
   --act-color-text-muted: #676762;
@@ -77,10 +84,21 @@
   /* 浮层（卡片/模态/popover 高一层背景）与模态遮罩 */
   --act-color-overlay: rgba(17, 24, 39, 0.32);
 
+  /*
+   * 强调色（外观 → 强调色，front-accent-palette.md）：只驱动发送按钮、开关开启态、焦点、普通链接与文字选中。
+   * 调色板源值 --act-palette-light-* 只由文件末尾的 :root[data-accent="…"] 定义；
+   * 默认调色板不定义，这里全部回落到原有 action / operational / info / 中性值。
+   */
+  --act-color-accent: var(--act-palette-light-accent, var(--act-color-action));
+  --act-color-accent-hover: var(--act-palette-light-accent-hover, var(--act-color-action-hover));
+  --act-color-on-accent: var(--act-palette-light-on-accent, var(--act-color-on-action));
+  --act-color-toggle-on: var(--act-palette-light-accent, var(--act-color-operational));
+  --act-color-link: var(--act-palette-light-accent, var(--act-color-info));
+
   /* 焦点环 / 选区 / chrome hover 叠加 */
-  --act-color-focus-ring: #4d4d48;
+  --act-color-focus-ring: var(--act-palette-light-accent, #4d4d48);
   --act-color-operational-focus-ring: #087a4b;
-  --act-color-selection: rgba(77, 77, 72, 0.2);
+  --act-color-selection: var(--act-palette-light-selection, rgba(77, 77, 72, 0.2));
   /* 回复批注被选中时的原文高亮（CSS Custom Highlight API） */
   --act-color-annotation-highlight: rgba(214, 158, 46, 0.24);
 
@@ -311,9 +329,15 @@
 
   --act-color-overlay: rgba(0, 0, 0, 0.55);
 
-  --act-color-focus-ring: #c8c8c0;
+  --act-color-accent: var(--act-palette-dark-accent, var(--act-color-action));
+
+  --act-color-accent-hover: var(--act-palette-dark-accent-hover, var(--act-color-action-hover));
+  --act-color-on-accent: var(--act-palette-dark-on-accent, var(--act-color-on-action));
+  --act-color-toggle-on: var(--act-palette-dark-accent, var(--act-color-operational));
+  --act-color-link: var(--act-palette-dark-accent, var(--act-color-info));
+  --act-color-focus-ring: var(--act-palette-dark-accent, #c8c8c0);
   --act-color-operational-focus-ring: #55d99a;
-  --act-color-selection: rgba(200, 200, 192, 0.2);
+  --act-color-selection: var(--act-palette-dark-selection, rgba(200, 200, 192, 0.2));
   --act-color-annotation-highlight: rgba(232, 184, 88, 0.22);
 
   --act-color-code-text: #c6d4e6;
@@ -429,9 +453,15 @@
 
     --act-color-overlay: rgba(0, 0, 0, 0.55);
 
-    --act-color-focus-ring: #c8c8c0;
+    --act-color-accent: var(--act-palette-dark-accent, var(--act-color-action));
+
+    --act-color-accent-hover: var(--act-palette-dark-accent-hover, var(--act-color-action-hover));
+    --act-color-on-accent: var(--act-palette-dark-on-accent, var(--act-color-on-action));
+    --act-color-toggle-on: var(--act-palette-dark-accent, var(--act-color-operational));
+    --act-color-link: var(--act-palette-dark-accent, var(--act-color-info));
+    --act-color-focus-ring: var(--act-palette-dark-accent, #c8c8c0);
     --act-color-operational-focus-ring: #55d99a;
-    --act-color-selection: rgba(200, 200, 192, 0.2);
+    --act-color-selection: var(--act-palette-dark-selection, rgba(200, 200, 192, 0.2));
     --act-color-annotation-highlight: rgba(232, 184, 88, 0.22);
 
     --act-color-code-text: #c6d4e6;
@@ -492,4 +522,42 @@
     --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
     --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
   }
+}
+
+/*
+ * 强调色调色板（外观 → 强调色，<html data-accent>，front-accent-palette.md）。
+ * 每块只写与明暗无关的源值：light / dark 各一个，同时作填充色与文字色；
+ * 由 :root 与两个深色块挑选。默认调色板（data-accent="default"）不定义任何源值。
+ * 对比度门槛：浅色 白字在强调色上、强调色在 surface / bg / surface-subtle 上 ≥ 4.5:1；
+ * 深色 #181916 在强调色上、强调色在 surface / bg / surface-raised 上 ≥ 4.5:1。
+ * 新增调色板 = appearance/accents.ts 加一行 + 这里加一块 + :root 加一个 --act-preview-accent-* 色样。
+ */
+:root[data-accent]:not([data-accent="default"]) {
+  --act-palette-light-on-accent: #ffffff;
+  --act-palette-dark-on-accent: #181916;
+  /* hover 与 action 同向：浅色压暗、深色提亮，反色图标对比度只升不降。 */
+  --act-palette-light-accent-hover: color-mix(in srgb, var(--act-palette-light-accent) 88%, #000000);
+  --act-palette-dark-accent-hover: color-mix(in srgb, var(--act-palette-dark-accent) 85%, #ffffff);
+  --act-palette-light-selection: color-mix(in srgb, var(--act-palette-light-accent) 25%, transparent);
+  --act-palette-dark-selection: color-mix(in srgb, var(--act-palette-dark-accent) 30%, transparent);
+}
+
+:root[data-accent="blue"] {
+  --act-palette-light-accent: #2c67c5;
+  --act-palette-dark-accent: #6aa3f8;
+}
+
+:root[data-accent="purple"] {
+  --act-palette-light-accent: #7849d1;
+  --act-palette-dark-accent: #b394f5;
+}
+
+:root[data-accent="pink"] {
+  --act-palette-light-accent: #ad4178;
+  --act-palette-dark-accent: #f28bbb;
+}
+
+:root[data-accent="orange"] {
+  --act-palette-light-accent: #b4501f;
+  --act-palette-dark-accent: #f2995f;
 }

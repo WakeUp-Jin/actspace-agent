@@ -54,14 +54,15 @@ type FileScope = "workspace" | "all";
 
 ## 4. 模块所有权
 
-不新增 workspace package，也不创建第二个权限 Runtime。
+权限引擎保持唯一；具体工具合同由各独立工具插件拥有。
 
 | 模块 | 所有权 |
 | --- | --- |
 | `packages/shared` | `PermissionMode`、Grant 与跨进程权限 DTO |
 | `packages/tools/approval` | `ApprovalBroker` 请求/响应端口，不保存状态 |
 | `packages/tools/runtime` | `PermissionEngine`、边界评估、决策合并、Grant 匹配、审批和重检 |
-| `packages/tools/core-tools` | 文件/Bash 资源提取、领域风险和 Grant 建议 |
+| `packages/tools/filesystem-read`、`filesystem-search`、`filesystem-write` | 各自的文件资源提取和独立 permission audience、Grant 建议 |
+| `packages/tools/shell-tools` | Bash 资源提取和命令风险评估；不复用文件 Grant audience |
 | `packages/session/journal` | 权限事件 strict codec |
 | `packages/session/projection` | 当前 mode 与有效 Session Grant 投影 |
 | `packages/runtime` | Session、Agent、Projection 与 Tool Environment 组装 |
@@ -70,7 +71,7 @@ type FileScope = "workspace" | "all";
 | CLI | `default/full-access` 与 `once/deny`；首版不启用 Session Grant |
 
 ```text
-Core Tool PermissionContract
+Tool Plugin PermissionContract
             |
             v
 Tool Runtime PermissionEngine <--- Session Permission Projection

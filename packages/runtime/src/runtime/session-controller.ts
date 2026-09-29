@@ -1,8 +1,9 @@
 import { GlobalSessionIndex, SessionProjectionCache, type ProjectionCacheRead } from "@actspace/session-projection-cache";
 import type { RuntimeV2DesktopSessionProjection, RuntimeV2SessionProjectionInput, RuntimeV2SessionUpdate, RuntimeV2ProjectionValues, RuntimeV2JsonValue, RuntimeV2SessionObservation, RuntimeV2ReadModelWatermarks, RuntimeV2WindowSupportFact } from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
+import { mainAgentFormComposition } from "@actspace/core-agent";
 import type { RuntimeV2SessionListItem, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-import { mainAgentPresetId, type MainAgentForm } from "@actspace/shared/runtime-v2";
+import type { MainAgentForm } from "@actspace/shared/runtime-v2";
 import type { EventCodecRegistry } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { SessionHandle as RuntimeSessionHandle } from "@actspace/session-persistence";
@@ -12,6 +13,7 @@ import { applySessionRecovery, classifySessionRecoveryAccess, type SessionRecove
 import { SessionReadModel } from "../projection/durable-session.js";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import type { SessionProjectionService } from "@actspace/session-projection";
 
 export class RuntimeSessionController {
   readonly store: SessionStore;
@@ -29,7 +31,7 @@ export class RuntimeSessionController {
 
   private liveModel(session: SessionHandle): SessionReadModel {
     let model = this.#models.get(session.header.sessionId);
-    if (!model) { model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist).replay(session.journal.events); this.#models.set(session.header.sessionId, model); return model; }
+    if (!model) { model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(session.journal.events); this.#models.set(session.header.sessionId, model); return model; }
     const seq = model.projections.throughSeq(session.header.sessionId);
     for (const event of session.journal.events.slice(seq + 1)) {
       const values = model.apply(event)?.values ?? {};
@@ -43,7 +45,7 @@ export class RuntimeSessionController {
     const live = this.#open.get(sessionId);
     if (live) { const model = this.liveModel(live); return { model, snapshot: model.snapshot(live.journal.validation.accessState) }; }
     const read = await this.#cache.read(sessionId);
-    const model = new SessionReadModel(read.header, this.options.registry, this.options.rendererAllowlist);
+    const model = new SessionReadModel(read.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService);
     model.projections.restore(sessionId, read.checkpoint);
     const snapshot = model.snapshot(read.accessState);
     await this.repairGlobalIndex(snapshot, model.header.createdWith.profileId);
@@ -60,7 +62,7 @@ export class RuntimeSessionController {
   }
 
   private summary(snapshot: RuntimeV2SessionSnapshot, profileId: string): import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary {
-    return { sessionId: snapshot.sessionId, throughJournalSeq: snapshot.throughJournalSeq, summaryVersion: 1, createdAt: snapshot.createdAt, updatedAt: snapshot.updatedAt, workspaceRoot: snapshot.workspaceRoot, profileId, agentForm: snapshot.agentForm, title: snapshot.metadata.title, pinned: snapshot.metadata.pinned, archived: snapshot.metadata.archived, completedTurnCount: snapshot.activity.completedTurnCount, usage: snapshot.usage, accessState: snapshot.accessState, lineage: snapshot.lineage };
+    return { sessionId: snapshot.sessionId, throughJournalSeq: snapshot.throughJournalSeq, summaryVersion: 2, createdAt: snapshot.createdAt, updatedAt: snapshot.updatedAt, workspaceRoot: snapshot.workspaceRoot, profileId, agentForm: snapshot.agentForm, agentFormId: snapshot.agentFormId, agentMode: snapshot.agentMode, agentModeRevision: snapshot.agentModeRevision, title: snapshot.metadata.title, pinned: snapshot.metadata.pinned, archived: snapshot.metadata.archived, completedTurnCount: snapshot.activity.completedTurnCount, usage: snapshot.usage, accessState: snapshot.accessState, lineage: snapshot.lineage };
   }
 
   private async ensureGlobalIndex(): Promise<void> {
@@ -156,14 +158,14 @@ export class RuntimeSessionController {
 
   async browseSessions() {
     await this.ensureGlobalIndex();
-    const items: RuntimeV2SessionListItem[] = this.#globalIndex.values().map(summary => ({ sessionId: summary.sessionId, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, profileId: summary.profileId, agentForm: summary.agentForm ?? "agent", accessState: summary.accessState, metadata: { title: summary.title, pinned: summary.pinned, archived: summary.archived }, lineage: summary.lineage, completedTurnCount: summary.completedTurnCount }));
+    const items: RuntimeV2SessionListItem[] = this.#globalIndex.values().map(summary => ({ sessionId: summary.sessionId, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, profileId: summary.profileId, agentForm: summary.agentForm ?? "agent", agentFormId: summary.agentFormId, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, accessState: summary.accessState, metadata: { title: summary.title, pinned: summary.pinned, archived: summary.archived }, lineage: summary.lineage, completedTurnCount: summary.completedTurnCount }));
     const known = new Set(items.map(item => item.sessionId));
     const failed = (await this.store.listSessionIds()).filter(sessionId => !known.has(sessionId)).length;
     items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
     return { items, indexing: false, failed };
   }
   async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
-  constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void> }, store?: SessionStore) { this.store = store ?? new SessionStore({ dataRoot: options.dataRoot, runtimeId: options.runtimeId, registry: options.registry }); this.#cache = new SessionProjectionCache({ root: options.dataRoot, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist).projections }); this.#globalIndex = new GlobalSessionIndex(options.dataRoot); }
+  constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; projectionService?: SessionProjectionService; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void> }, store?: SessionStore) { this.store = store ?? new SessionStore({ dataRoot: options.dataRoot, runtimeId: options.runtimeId, registry: options.registry }); this.#cache = new SessionProjectionCache({ root: options.dataRoot, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService).projections }); this.#globalIndex = new GlobalSessionIndex(options.dataRoot); }
   private onEvent(sessionId: string): (event: SessionEventEnvelopeV1) => void | Promise<void> {
     return event => {
       const model = this.#models.get(sessionId);
@@ -193,8 +195,8 @@ export class RuntimeSessionController {
       await this.#globalIndex.save();
     }
   }; }
-  async create(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, presetId: mainAgentPresetId(agentForm), runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); const model = this.liveModel(session); if (this.#globalIndexLoadedFromDisk) { this.#globalIndex.replace(this.summary(model.snapshot(session.journal.validation.accessState), this.options.profileId)); void this.#globalIndex.save().catch(() => undefined); } await this.options.onCreated?.(sessionId); return session; }
-  async createEphemeral(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, presetId: mainAgentPresetId(agentForm), runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.liveModel(session); this.#ephemeral.add(sessionId); await this.options.onCreated?.(sessionId); return session; }
+  async create(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, presetId: "actspace.main", agentFormId: "actspace.main", agentFormVersion: 1, agentCompositionDigest: mainAgentFormComposition(this.options.plugins).digest, agentMembers: mainAgentFormComposition(this.options.plugins).members, initialAgentMode: agentForm === "chat" ? "chat" : "agent", runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); const model = this.liveModel(session); if (this.#globalIndexLoadedFromDisk) { this.#globalIndex.replace(this.summary(model.snapshot(session.journal.validation.accessState), this.options.profileId)); void this.#globalIndex.save().catch(() => undefined); } await this.options.onCreated?.(sessionId); return session; }
+  async createEphemeral(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, presetId: "actspace.main", agentFormId: "actspace.main", agentFormVersion: 1, agentCompositionDigest: mainAgentFormComposition(this.options.plugins).digest, agentMembers: mainAgentFormComposition(this.options.plugins).members, initialAgentMode: agentForm === "chat" ? "chat" : "agent", runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.liveModel(session); this.#ephemeral.add(sessionId); await this.options.onCreated?.(sessionId); return session; }
   async resume(sessionId: string): Promise<SessionHandle> { const existing = this.#open.get(sessionId); if (existing !== undefined) return existing; const session = await this.store.open(sessionId, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); try { this.liveModel(session); await this.options.beforeRecovery?.(session, this.store); await applySessionRecovery(session); this.#open.set(sessionId, session); this.liveModel(session); await this.options.onCreated?.(sessionId); return session; } catch (error) { await session.close().catch(() => undefined); throw error; } }
   getOpen(sessionId: string): SessionHandle | undefined { return this.#open.get(sessionId); }
   closeOpen(sessionId: string): void { this.#open.delete(sessionId); this.#ephemeral.delete(sessionId); this.#models.delete(sessionId); this.#changes.delete(sessionId); }

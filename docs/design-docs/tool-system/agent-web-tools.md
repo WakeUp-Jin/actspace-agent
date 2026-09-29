@@ -4,8 +4,8 @@
 
 当前代码位置：
 
-- `packages/tools/core-tools/src/web/`：Node Host 侧 `web_fetch` / `web_search` 端口、provider 与 HTML 转换实现。
-- `packages/tools/core-tools/src/plugin.ts`：作为独立 workspace plugin package 注册工具贡献。
+- `packages/tools/web-tools/src/`：Node Host 侧 `web_fetch` / `web_search` 端口、provider 与 HTML 转换实现。
+- `packages/tools/web-tools/src/plugin.ts`：作为独立 workspace plugin package 注册工具贡献。
 - `packages/tools/runtime/`：统一 Tool ABI、prepared execution、policy 与生命周期边界。
 
 ## 背景：为什么放弃 Kimi-backed web_search

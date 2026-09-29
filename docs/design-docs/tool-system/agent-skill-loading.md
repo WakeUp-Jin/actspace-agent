@@ -171,7 +171,7 @@ Skill catalog 属于系统级上下文，稳定性低于核心 system prompt，�
 
 - `apps/desktop/src/main/runtime-v2/` 负责装配真实 turn 的 runtime context，应在这里把 Skill catalog 与 AGENTS.md rules 一起注入。
 - `packages/prompt/src/` 提供 v2 的 Prompt Contributor、Skill discovery 和上下文组装边界。
-- `packages/tools/core-tools/` 提供受 Host capability 约束的读类工具，Skill 正文和资源读取复用统一 Tool Runtime。
+- `packages/tools/filesystem-read/`、`packages/tools/filesystem-search/`、`packages/tools/filesystem-write/`、`packages/tools/shell-tools/`、`packages/tools/web-tools/`、`packages/tools/image-generation/`、`packages/tools/image-inspection/` 提供受 Host capability 约束的读类工具，Skill 正文和资源读取复用统一 Tool Runtime。
 - `packages/shared/src/runtime-v2/` 保存 v2 跨进程投影与公共契约，不新增旧版 context bucket。
 
 ## 第一版不做

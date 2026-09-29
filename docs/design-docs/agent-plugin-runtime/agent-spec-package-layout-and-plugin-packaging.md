@@ -15,7 +15,7 @@ ActSpace v2 采用 DSH 风格的领域包结构，但不复制 DSH 的 `vendor/`
 3. 不建立通用 `plugins/` 目录。插件是 Runtime ABI 中的身份、manifest、behavior entry、codec entry 和生命周期，不是文件夹名称。
 4. 采用 DSH 的领域分组：`core`、`session`、`llm`、`context`、`prompt`、`tools`、`subagent`、`compaction`、`desktop-app` 和 `client`。
 5. 每个可装载、可替换或可独立验证的领域包都必须拥有自己的 package boundary 和 Cordis Plugin Entry。Session、LLM、Prompt、Agent Loop 不是“插件之外的特殊代码”，而是默认 Profile 中的核心语义插件。
-6. 具体能力插件按领域放置，例如 `packages/tools/core-tools`、`packages/tools/browser-tools`，不放入一个含义模糊的 `packages/plugins`。
+6. 具体能力插件按领域放置，例如 `packages/tools/filesystem-read`、`packages/tools/browser-tools`，不放入一个含义模糊的 `packages/plugins`。
 7. Browser Bridge 是独立的 Go + Chrome Extension Host capability，顶层目录使用 `browser-bridge/`，不伪装成同进程 TypeScript 插件，也不放入通用 `plugins/`。
 8. Desktop 的页面、样式、布局和现有固定前端信息架构不改变。只允许调整 Host、IPC、投影和 Runtime 加载边界。
 9. 可运行、打包或部署的产品入口统一进入 `apps/desktop`、`apps/cli`、`apps/site`；`packages/` 只保留可复用库、领域包、Plugin ABI package 和共享契约，且不得反向依赖 `apps/`。
@@ -76,7 +76,14 @@ actspace-agent/
 │   ├── tools/                           # Tool Runtime 与具体工具插件组
 │   │   ├── runtime/                     # definition、prepared execution、调度
 │   │   ├── approval/                    # Host approval seam
-│   │   ├── core-tools/                  # 文件、搜索、Shell、图片等内置工具
+│   │   ├── filesystem-read/             # read_file、list_directory
+│   │   ├── filesystem-search/           # grep、glob
+│   │   ├── filesystem-write/            # edit、write、delete
+│   │   ├── shell-tools/                 # Bash 与后台进程
+│   │   ├── web-tools/                   # Web search / fetch
+│   │   ├── image-generation/            # 图片生成
+│   │   ├── image-inspection/            # 图片分析
+│   │   ├── todo-tools/                  # Todo 领域事件与 projection
 │   │   └── browser-tools/               # Browser Tool Adapter
 │   ├── subagent/                        # one-shot Subagent、Agent、Explore descriptor
 │   ├── compaction/                      # append-only Surface compaction
@@ -181,7 +188,7 @@ flowchart LR
 | `src/session/`、`src/projection/` | `packages/session/*` | Journal、raw JSONL、projection 成为独立 Session plugin packages |
 | `src/llm/` | `packages/llm/*` | Service、pi-ai 和 fallback transport 分离 |
 | `src/prompt/`、`src/scope/`、`src/skills/` | `packages/prompt/`、`packages/context/`、`packages/core/scope/` | Context 与 Prompt 所有权分开 |
-| `src/tools/`、`src/plugins/core-tools/` | `packages/tools/runtime/`、`packages/tools/core-tools/` | Tool Runtime 契约和具体 executor 分开 |
+| `src/tools/`、`src/plugins/core-tools/` | `packages/tools/runtime/`、`packages/tools/filesystem-read/`、`packages/tools/filesystem-search/`、`packages/tools/filesystem-write/`、`packages/tools/shell-tools/`、`packages/tools/web-tools/`、`packages/tools/image-generation/`、`packages/tools/image-inspection/` | Tool Runtime 契约和具体 executor 分开 |
 | `src/plugins/browser-tools/` | `packages/tools/browser-tools/` | Browser 具体工具成为领域插件，不使用通用 plugins 目录 |
 | `src/agent/` | `packages/core/agent/`、`packages/core/agent-loop/`、`packages/subagent/` | Registry、Loop、Subagent 按独立替换边界拆分 |
 | `src/runtime/`、`src/boot/` | `packages/runtime/`、`packages/boot/` | Runtime 提供生产 BootedRuntimeProfile，App Bundle 拥有产品操作；基础 BootedProfile 由 packages/boot 提供，二者字段和 shutdown 结果不同 |

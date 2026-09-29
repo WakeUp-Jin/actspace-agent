@@ -594,7 +594,7 @@ describe("App streaming user message", () => {
     await screen.findByRole("button", { name: "查看会话详情： New chat" });
     await userEvent.click(screen.getByRole("button", { name: "新建会话" }));
     await waitFor(() => expect(createSession).toHaveBeenCalled());
-    expect(createSession.mock.calls[0]).toEqual([{ agentForm: "agent" }]);
+    expect(createSession.mock.calls[0]).toEqual([{}]);
     record = { ...record, meta: { ...record.meta, title: "项目架构分析" } };
     act(() => notify?.({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } }));
     await screen.findByRole("button", { name: "查看会话详情： 项目架构分析" });
@@ -2992,8 +2992,8 @@ sessionId: input.sessionId,
     await userEvent.type(composer, "看看浏览器标签页");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByText("使用浏览器")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "本会话允许" }));
+    expect(await screen.findByText("确认浏览器操作")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "允许这次" }));
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-browser-1",
@@ -3545,7 +3545,7 @@ sessionId: input.sessionId,
       resolveApproval([]);
     });
     expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 等待审批')).toBeInTheDocument();
-    expect(screen.getByText('使用浏览器')).toBeInTheDocument();
+    expect(screen.getByText('确认浏览器操作')).toBeInTheDocument();
   });
 
   it('keeps a run pinned while more than three other histories are loaded', async () => {

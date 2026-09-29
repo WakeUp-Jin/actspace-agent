@@ -1,3 +1,4 @@
+import { createDesktopToolHostServices } from "./tool-host-services";
 import type { SpeechHostPort } from "@actspace/english-learning";
 import { join } from "node:path";
 import type { RuntimeV2HostCapability, RuntimeV2HostDescriptor, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
@@ -108,14 +109,10 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
           defaults: { reasoning: false },
         }]),
       }),
-      [options.module.CORE_TOOLS_HOST_PORT_ID]: Object.freeze({
-        createPorts: async (llm: unknown) => {
-          const { createDesktopCoreToolPorts } = await import("./core-tool-ports");
-          return createDesktopCoreToolPorts({ workspaceRoot: options.roots.workspaceRoot, tmpRoot: options.roots.tmpRoot, modelRuntime: options.models, llm, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) });
-        },
-      }),
+      ...createDesktopToolHostServices({ workspaceRoot: options.roots.workspaceRoot, tmpRoot: options.roots.tmpRoot, modelRuntime: options.models, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) }),
       [options.module.PROMPT_HOST_PORT_ID]: Object.freeze({
         workspaceRoot: options.roots.workspaceRoot,
+        resolveUserSource: () => options.module.prepareUserPromptSource(options.roots.dataRoot),
         resolveSource: (workspaceRoot: string) => options.module.prepareRuntimePromptSource({ dataRoot: options.roots.dataRoot, workspaceRoot }),
       }),
       [options.module.BROWSER_TOOLS_HOST_PORT_ID]: browser,
@@ -133,7 +130,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
         capabilitySet,
         approvalBroker,
         sessionGrantCapability: true,
-        trustedGrantAudiences: new Set(["actspace.core-tools\u0000core-files\u00001"]),
+        trustedGrantAudiences: new Set(["actspace.filesystem-read\u0000filesystem-read\u00001", "actspace.filesystem-search\u0000filesystem-search\u00001", "actspace.filesystem-write\u0000filesystem-write\u00001"]),
         reportProgress: options.onToolProgress,
         createArtifact: (input) => artifacts.create(input),
         resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId),

@@ -1,16 +1,34 @@
 import { projectContextState } from "@actspace/shared";
-import { mainAgentFormFromPresetId, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
+import { mainAgentFormFromPresetId, type RuntimeV2AgentMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
 import { SessionSurface, type SessionSurfaceView, type EventCodecRegistry, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
-import { registerSessionFacts, sessionFacts, SessionProjectionRegistry } from "@actspace/session-projection";
+import { registerSessionFacts, sessionFacts, SessionProjectionRegistry, type SessionProjectionService } from "@actspace/session-projection";
 import { createRunningToolView, completeToolView, projectRendererHint, type RendererAllowlist } from "./tool-dto.js";
 import { redactProjectionText } from "./redaction.js";
 
 type ContextInput = { surface: SessionSurfaceView; events: SessionEventEnvelopeV1[]; activeTurnId: string | null; throughJournalSeq: number; updatedAt: string };
 export class SessionReadModel {
   readonly projections: SessionProjectionRegistry;
-  constructor(readonly header: SessionHeaderV1, readonly codecs: EventCodecRegistry, readonly rendererAllowlist?: RendererAllowlist) {
-    this.projections = new SessionProjectionRegistry(event => codecs.resolve(event).kind === "known");
+  constructor(readonly header: SessionHeaderV1, readonly codecs: EventCodecRegistry, readonly rendererAllowlist?: RendererAllowlist, readonly projectionService?: SessionProjectionService) {
+    this.projections = projectionService?.createRegistry(event => codecs.resolve(event).kind === "known") ?? new SessionProjectionRegistry(event => codecs.resolve(event).kind === "known");
     registerSessionFacts(this.projections, redactProjectionText);
+    this.projections.register<{ readonly mode: RuntimeV2AgentMode; readonly revision: number }>({
+      key: "agentMode", stateVersion: 1,
+      init: () => ({ mode: header.createdWith.initialAgentMode ?? (header.createdWith.presetId === "actspace.chat" ? "chat" : "agent"), revision: 0 }),
+      view: state => state,
+      apply: (state, event) => {
+        if (event.type === "agent/mode-set" && isRecord(event.data)) {
+          const mode = event.data.mode;
+          const revision = event.data.revision;
+          if ((mode === "chat" || mode === "plan" || mode === "agent") && typeof revision === "number" && revision === state.revision + 1) return { mode, revision };
+        }
+        if (event.type === "turn/start" && state.revision === 0 && header.createdWith.initialAgentMode === undefined && header.createdWith.presetId !== "actspace.chat" && isRecord(event.data)) {
+          const mode = event.data.mode;
+          if (mode === "plan" || mode === "agent") return { mode, revision: 0 };
+        }
+        return state;
+      },
+    });
+    projectionService?.applyContributors(this.projections, redactProjectionText);
     this.projections.register<SessionSurfaceView>({
       key: "surface", stateVersion: 1, init: () => ({ entries: [], replaceGeneration: 0 }), view: state => state,
       apply: (state, event) => {
@@ -59,10 +77,11 @@ export class SessionReadModel {
     const projection = this.projections.snapshot(this.header.sessionId);
     const values = projection.values;
     const surface = values.surface as SessionSurfaceView;
+    const agentMode = values.agentMode as { readonly mode: RuntimeV2AgentMode; readonly revision: number };
     return {
       kind: "session-snapshot", schemaVersion: 1, sessionId: this.header.sessionId,
       createdAt: this.header.createdAt, updatedAt: values.updatedAt as string,
-      workspaceRoot: values.workspaceRoot as string | null, agentForm: mainAgentFormFromPresetId(this.header.createdWith.presetId), throughJournalSeq: projection.throughJournalSeq, accessState,
+      workspaceRoot: values.workspaceRoot as string | null, agentForm: mainAgentFormFromPresetId(this.header.createdWith.presetId), agentFormId: "actspace.main", agentMode: agentMode.mode, agentModeRevision: agentMode.revision, throughJournalSeq: projection.throughJournalSeq, accessState,
       ...sessionFacts(this.projections, this.header.sessionId),
       messages: surface.entries.map(entry => ({ kind: entry.node.kind, messageId: entry.node.messageId, content: entry.node.content, ...(entry.node.kind === "tool-result" ? { callId: entry.node.callId } : {}) })),
       tools: values.tools as readonly RuntimeV2ToolView[], lineage: this.header.lineage as RuntimeV2JsonValue | null,

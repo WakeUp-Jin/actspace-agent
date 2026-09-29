@@ -23,6 +23,7 @@ describe("appearance storage", () => {
       JSON.stringify({
         version: 1,
         theme: "bogus",
+        accentPalette: "bogus",
         uiFontId: "bogus",
         codeFontId: "bogus",
         uiFontSize: 99,
@@ -31,20 +32,48 @@ describe("appearance storage", () => {
     );
     const prefs = loadAppearance();
     expect(prefs.theme).toBe("system");
+    expect(prefs.accentPalette).toBe("default");
     expect(prefs.uiFontId).toBe("system");
     expect(prefs.codeFontId).toBe("system-mono");
     expect(prefs.uiFontSize).toBe(20);
     expect(prefs.codeFontSize).toBe(18);
   });
 
+  it("falls back to the codex Mermaid theme for older records and unknown ids", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, theme: "dark" }));
+    expect(loadAppearance()).toMatchObject({ theme: "dark", mermaidTheme: "codex" });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, mermaidTheme: "neon" }));
+    expect(loadAppearance().mermaidTheme).toBe("codex");
+  });
+
+  it("defaults the accent palette for preferences saved before it existed", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ version: 1, theme: "dark", uiFontId: "system", codeFontId: "fira", uiFontSize: 14, codeFontSize: 13 }),
+    );
+    const prefs = loadAppearance();
+    expect(prefs.accentPalette).toBe("default");
+    expect(prefs.theme).toBe("dark");
+    expect(prefs.codeFontId).toBe("fira");
+  });
+
+  it("falls back to the default palette for retired prototype ids", () => {
+    for (const legacy of ["actspace", "codex-blue", "maka-dusk"]) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, accentPalette: legacy }));
+      expect(loadAppearance().accentPalette).toBe("default");
+    }
+  });
+
   it("round-trips saved preferences", () => {
     const prefs: AppearancePrefs = {
       version: 1,
       theme: "dark",
+      accentPalette: "purple",
       uiFontId: "serif-reading",
       codeFontId: "jetbrains",
       uiFontSize: 16,
       codeFontSize: 15,
+      mermaidTheme: "codex",
     };
     saveAppearance(prefs);
     expect(loadAppearance()).toEqual(prefs);
@@ -67,15 +96,18 @@ describe("applyAppearance", () => {
       {
         version: 1,
         theme: "dark",
+        accentPalette: "blue",
         uiFontId: "serif-reading",
         codeFontId: "jetbrains",
         uiFontSize: 21,
         codeFontSize: 15,
+        mermaidTheme: "codex",
       },
       root,
     );
 
     expect(root.getAttribute("data-theme")).toBe("dark");
+    expect(root.getAttribute("data-accent")).toBe("blue");
     expect(setNativeTheme).toHaveBeenCalledWith("dark");
     expect(root.style.getPropertyValue("--act-font-ui")).toContain("Georgia");
     expect(root.style.getPropertyValue("--act-font-mono")).toContain("JetBrains");
@@ -87,6 +119,7 @@ describe("applyAppearance", () => {
     const root = document.createElement("div");
     expect(() => applyAppearance({ ...DEFAULT_APPEARANCE }, root)).not.toThrow();
     expect(root.getAttribute("data-theme")).toBe("system");
+    expect(root.getAttribute("data-accent")).toBe("default");
     expect(root.style.getPropertyValue("--act-font-mono-size")).toBe("13px");
   });
 });

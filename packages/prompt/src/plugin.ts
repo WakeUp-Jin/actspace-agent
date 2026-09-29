@@ -11,6 +11,7 @@ export const PROMPT_HOST_PORT_ID = "actspace.host.prompt" as const;
 export type PromptHostPort = {
   readonly workspaceRoot: string;
   readonly resolveSource?: (workspaceRoot: string) => RuntimePromptSource | Promise<RuntimePromptSource>;
+  readonly resolveUserSource?: () => RuntimePromptSource | Promise<RuntimePromptSource>;
 };
 
 export type PromptRuntimeService = {
@@ -44,7 +45,7 @@ export class SystemPromptService extends Service implements PromptRuntimeService
 export async function apply(ctx: CordisContext): Promise<void> {
   const host = ctx.get?.(PROMPT_HOST_PORT_ID) as PromptHostPort | undefined;
   if (host === undefined) throw new Error(`Prompt plugin requires ${PROMPT_HOST_PORT_ID}.`);
-  const source = await host.resolveSource?.(host.workspaceRoot) ?? emptyRuntimePromptSource();
+  const source = await host.resolveUserSource?.() ?? emptyRuntimePromptSource();
   const service = new SystemPromptService(ctx as never, source, host);
   ctx.provide?.("prompt.assembly", Object.freeze({ RequestAssembler, ContributorRegistry, service }));
 }

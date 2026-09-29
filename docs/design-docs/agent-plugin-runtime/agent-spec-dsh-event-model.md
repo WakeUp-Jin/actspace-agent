@@ -3,7 +3,7 @@
 > 2026-09-20 更新：[Session 事件持久化重构](agent-session-event-persistence-refactor.md)的核心行为已实施。Journal 接纳后先交给 persistence coordinator，再发布 observer 通知；`flush` 是独立 durability barrier。
 
 
-> 状态：13 个核心事件与默认 Loop 已实现；最终 CLI retry/error 验收仍待完成。2026-09-09 按 ActSpace 当前 codec / Session Format v1 校准 seq 描述。
+> 状态：12 个核心事件与默认 Loop 已实现；最终 CLI retry/error 验收仍待完成。2026-09-09 按 ActSpace 当前 codec / Session Format v1 校准 seq 描述。
 >
 > 日期：2026-08-29
 
@@ -30,9 +30,11 @@
 
 `[I]` 事件不能悄悄改变已提交事实；任何改变都必须在后续持久化事件中可见。`[N]` 事件丢失不影响 Session 恢复，通知消费者必须能从 `[S]` 重建状态。
 
-## 3. 13 种核心持久化事件
+## 3. 12 种核心持久化事件
 
-以下 13 种来自 DSH `SessionEventMap`，是 Agent Loop 的最小持久化核心，名称和语义固定：
+Todo 新事件为 `plugin/actspace.todo/todo-write`，owner 为 `actspace.todo`，required / version 1。旧 required `todo/write` 没有兼容 Codec，会产生 `UNKNOWN_REQUIRED_CODEC` 并进入 browse-only；详见 [工具边界](agent-tool-plugin-boundaries.md)。
+
+以下 12 种为当前 ActSpace Core Journal 的持久化核心。Todo 已移入插件领域事件：
 
 | 事件 | 写入时机 | 关键数据 | Surface |
 |---|---|---|---|
@@ -45,7 +47,6 @@
 | `assistant/message` | 一条 Assistant 消息收束 | `messageId`, `content`, `sourceEventSeqs`, `usage`, `finishReason` | assistant |
 | `tool/call` | 模型请求执行工具 | `toolCallId`, `name`, `arguments`, `stepId` | internal |
 | `tool/result` | 工具执行完成 | `toolCallId`, `status`, `output`, `artifacts`, `error?` | tool-result |
-| `todo/write` | Todo 状态写入 | `items`, `revision`, `source` | internal |
 | `request/header` | 请求头部快照 | `requestId`, `model`, `provider`, `headers`（已脱敏） | internal |
 | `request/context` | 发送给模型的上下文 | `requestId`, `messages`, `system`, `tools`, `sourceRefs` | internal |
 | `session/end-seed` | Session 关闭前的确定性收尾种子 | `sessionId`, `lastSeq`, `reason` | internal |

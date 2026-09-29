@@ -43,6 +43,11 @@ export class DesktopRuntimeV2Registry {
   readonly #listeners = new Set<(event: RuntimeV2DesktopLiveEnvelope) => void>();
   #profile: BootedRuntimeProfile | undefined;
   #bootPromise: Promise<void> | undefined;
+  #switchPromise: Promise<boolean> | undefined;
+  #reconfiguring = false;
+  #admittedWork = 0;
+  #browserReady = false;
+  #browserSocketPath: string | undefined;
   #bootError: string | null = null;
   #cursor = 0;
   readonly #eventBuffer: RuntimeV2DesktopLiveEnvelope[] = [];
@@ -56,8 +61,56 @@ export class DesktopRuntimeV2Registry {
   constructor(private readonly options: DesktopRuntimeV2RegistryOptions) {}
 
   async boot(): Promise<void> {
-    this.#bootPromise ??= this.#boot();
+    this.#bootPromise ??= this.#boot().catch((error: unknown) => {
+      this.#bootPromise = undefined;
+      throw error;
+    });
     return this.#bootPromise;
+  }
+
+  async refreshBrowser(): Promise<boolean> {
+    this.#switchPromise ??= this.#refreshBrowser().finally(() => { this.#switchPromise = undefined; });
+    return this.#switchPromise;
+  }
+
+  async #refreshBrowser(): Promise<boolean> {
+    if (this.#profile === undefined) return false;
+    const desired = (await this.options.browser.getStatus()).bridgeReady === true;
+    const desiredSocket = desired ? this.options.browser.socketPath : undefined;
+    if (desired === this.#browserReady && desiredSocket === this.#browserSocketPath) {
+      this.options.browser.setRuntimeReady?.(desired);
+      return true;
+    }
+    const app = this.requireApp();
+    if (this.#admittedWork !== 0 || !(await app.isIdleForReconfigure())) return false;
+    this.#reconfiguring = true;
+    try {
+      if (this.#admittedWork !== 0 || !(await app.isIdleForReconfigure())) return false;
+      await this.dispose(true);
+      this.#bootPromise = undefined;
+      await this.boot();
+      this.options.browser.setRuntimeReady?.(this.#browserReady);
+      return true;
+    } catch (error) {
+      this.options.browser.setRuntimeReady?.(false);
+      this.options.log?.("browser runtime reconfigure failed", { error: error instanceof Error ? error.message : String(error) });
+      if (this.#profile === undefined) {
+        try {
+          this.options.browser.setBootRecoveryMode?.(true);
+          this.#bootPromise = undefined;
+          await this.boot();
+        } catch (recoveryError) {
+          this.options.log?.("browser runtime recovery failed", { error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError) });
+        } finally { this.options.browser.setBootRecoveryMode?.(false); }
+      }
+      return false;
+    } finally {
+      this.#reconfiguring = false;
+    }
+  }
+
+  private assertAdmission(): void {
+    if (this.#reconfiguring) throw new Error("Runtime is reconnecting Chrome; retry shortly.");
   }
 
   status(): RuntimeV2DesktopStatus {
@@ -98,50 +151,74 @@ export class DesktopRuntimeV2Registry {
   async exportSession(sessionId: string) { return Object.freeze({ sessionId, jsonl: await this.requireApp().exportSession(sessionId) }); }
 
   async createSession(sessionId?: string, workspaceRoot?: string, agentForm?: import("@actspace/shared/runtime-v2").MainAgentForm) {
-    const app = this.requireApp();
-    const resolved = await resolveWorkspaceSelection(this.workspaceRegistryOptions(), {
-      workspaceRoot: workspaceRoot ?? this.options.roots.workspaceRoot,
-    });
-    if (resolved.ok === false) throw new Error(resolved.error);
-    const snapshot = agentForm === undefined
-      ? await app.createMainSession(sessionId, resolved.workspaceRoot)
-      : await app.createMainSession(sessionId, resolved.workspaceRoot, agentForm);
-    this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-created");
-    return snapshot;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const app = this.requireApp();
+      const resolved = await resolveWorkspaceSelection(this.workspaceRegistryOptions(), {
+        workspaceRoot: workspaceRoot ?? this.options.roots.workspaceRoot,
+      });
+      if (resolved.ok === false) throw new Error(resolved.error);
+      const snapshot = agentForm === undefined
+        ? await app.createMainSession(sessionId, resolved.workspaceRoot)
+        : await app.createMainSession(sessionId, resolved.workspaceRoot, agentForm);
+      this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-created");
+      return snapshot;
+    } finally { this.#admittedWork--; }
   }
 
   async resumeSession(sessionId: string) {
-    const snapshot = await this.requireApp().resumeMainSession(sessionId);
-    this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-resumed");
-    return snapshot;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const snapshot = await this.requireApp().resumeMainSession(sessionId);
+      this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-resumed");
+      return snapshot;
+    } finally { this.#admittedWork--; }
   }
 
   async forkSession(input: RuntimeV2ForkSessionInput) {
-    const snapshot = await this.requireApp().forkMainSession(input.parentSessionId, input.boundarySeq, input.newSessionId);
-    this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-forked");
-    return snapshot;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const snapshot = await this.requireApp().forkMainSession(input.parentSessionId, input.boundarySeq, input.newSessionId);
+      this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-forked");
+      return snapshot;
+    } finally { this.#admittedWork--; }
   }
 
   async runTurn(input: RuntimeV2RunTurnRequest) {
-    const result = await this.requireApp().runTurn(input);
-    this.#emitDurableChanged(result.sessionId, result.snapshot.throughJournalSeq, `turn-${result.reason}`);
-    return result;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const result = await this.requireApp().runTurn(input);
+      this.#emitDurableChanged(result.sessionId, result.snapshot.throughJournalSeq, `turn-${result.reason}`);
+      return result;
+    } finally { this.#admittedWork--; }
   }
 
   async enqueueMessage(input: RuntimeV2EnqueueMessageInput) {
-    const result = await this.requireApp().enqueueMainMessage(input.sessionId, input.content, input.target, input.messageId);
-    const snapshot = await this.requireApp().inspectSession(input.sessionId);
-    this.#emitDurableChanged(input.sessionId, snapshot.throughJournalSeq, "inbox-enqueued");
-    return result;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const result = await this.requireApp().enqueueMainMessage(input.sessionId, input.content, input.target, input.messageId);
+      const snapshot = await this.requireApp().inspectSession(input.sessionId);
+      this.#emitDurableChanged(input.sessionId, snapshot.throughJournalSeq, "inbox-enqueued");
+      return result;
+    } finally { this.#admittedWork--; }
   }
 
   async cancelMessage(sessionId: string, messageId: string) {
-    const cancelled = await this.requireApp().cancelPendingMessage(sessionId, messageId);
-    if (cancelled) {
-      const snapshot = await this.requireApp().inspectSession(sessionId);
-      this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "inbox-cancelled");
-    }
-    return cancelled;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const cancelled = await this.requireApp().cancelPendingMessage(sessionId, messageId);
+      if (cancelled) {
+        const snapshot = await this.requireApp().inspectSession(sessionId);
+        this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "inbox-cancelled");
+      }
+      return cancelled;
+    } finally { this.#admittedWork--; }
   }
 
   abortRun(sessionId: string, reason?: string): boolean {
@@ -149,9 +226,13 @@ export class DesktopRuntimeV2Registry {
   }
 
   async compactSession(sessionId: string) {
-    const result = await this.requireApp().compactSession(sessionId);
-    this.#emitDurableChanged(sessionId, result.snapshot.throughJournalSeq, result.compacted ? "context-compacted" : "context-compaction-skipped");
-    return result;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const result = await this.requireApp().compactSession(sessionId);
+      this.#emitDurableChanged(sessionId, result.snapshot.throughJournalSeq, result.compacted ? "context-compacted" : "context-compaction-skipped");
+      return result;
+    } finally { this.#admittedWork--; }
   }
 
   flushSession(sessionId: string): Promise<void> {
@@ -165,33 +246,55 @@ export class DesktopRuntimeV2Registry {
   }
 
   async updateSessionMetadata(input: RuntimeV2UpdateSessionMetadataInput) {
-    const snapshot = await this.requireApp().updateSessionMetadata(input.sessionId, input);
-    if (input.archived && this.#profile?.context.get?.("english-learning")) {
-      const learning = this.englishLearning();
-      if (learning.getState().targetSessionId === input.sessionId) await learning.disable();
-    }
-    this.#emitDurableChanged(input.sessionId, snapshot.throughJournalSeq, "session-metadata-updated");
-    return snapshot;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const snapshot = await this.requireApp().updateSessionMetadata(input.sessionId, input);
+      if (input.archived && this.#profile?.context.get?.("english-learning")) {
+        const learning = this.englishLearning();
+        if (learning.getState().targetSessionId === input.sessionId) await learning.disable();
+      }
+      this.#emitDurableChanged(input.sessionId, snapshot.throughJournalSeq, "session-metadata-updated");
+      return snapshot;
+    } finally { this.#admittedWork--; }
   }
 
   async updateSessionWorkspace(sessionId: string, workspaceRoot: string) {
-    const snapshot = await this.requireApp().updateSessionWorkspace(sessionId, workspaceRoot);
-    this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-workspace-updated");
-    return snapshot;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const snapshot = await this.requireApp().updateSessionWorkspace(sessionId, workspaceRoot);
+      this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-workspace-updated");
+      return snapshot;
+    } finally { this.#admittedWork--; }
   }
 
   async updateSessionPermissionMode(sessionId: string, mode: import("@actspace/shared/runtime-v2").PermissionMode) {
-    this.options.approvals.expireAll?.(sessionId);
-    const snapshot = await this.requireApp().updateSessionPermissionMode(sessionId, mode);
-    this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-permission-mode-updated");
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      this.options.approvals.expireAll?.(sessionId);
+      const snapshot = await this.requireApp().updateSessionPermissionMode(sessionId, mode);
+      this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-permission-mode-updated");
+      return snapshot;
+    } finally { this.#admittedWork--; }
+  }
+
+  async updateSessionAgentMode(sessionId: string, mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode, expectedRevision?: number) {
+    const snapshot = await this.requireApp().updateSessionAgentMode(sessionId, mode, expectedRevision);
+    this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-agent-mode-updated");
     return snapshot;
   }
 
   async revokeSessionGrant(sessionId: string, grantId: string) {
-    this.options.approvals.expireAll?.(sessionId);
-    const snapshot = await this.requireApp().revokeSessionGrant(sessionId, grantId);
-    this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-grant-revoked");
-    return snapshot;
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      this.options.approvals.expireAll?.(sessionId);
+      const snapshot = await this.requireApp().revokeSessionGrant(sessionId, grantId);
+      this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-grant-revoked");
+      return snapshot;
+    } finally { this.#admittedWork--; }
   }
 
   async readArtifact(sessionId: string, artifactId: string): Promise<RuntimeV2ReadArtifactResult> {
@@ -212,53 +315,65 @@ export class DesktopRuntimeV2Registry {
   }
 
   async importAttachment(sessionId: string, path: string): Promise<RuntimeV2AttachmentRef> {
-    await this.requireApp().inspectSession(sessionId);
-    if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
-    const metadata = await stat(path);
-    if (!metadata.isFile()) throw new Error("Attachment must be a regular file.");
-    if (metadata.size > 20 * 1024 * 1024) throw new Error("Attachment exceeds the 20 MiB limit.");
-    const mediaType = attachmentMediaType(path);
-    const created = await this.#artifacts.create({ bytes: await readFile(path), mediaType, owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" } });
-    return Object.freeze({ artifactId: created.artifactId, mimeType: created.mediaType, name: basename(path).slice(0, 240), sizeBytes: created.size });
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      await this.requireApp().inspectSession(sessionId);
+      if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
+      const metadata = await stat(path);
+      if (!metadata.isFile()) throw new Error("Attachment must be a regular file.");
+      if (metadata.size > 20 * 1024 * 1024) throw new Error("Attachment exceeds the 20 MiB limit.");
+      const mediaType = attachmentMediaType(path);
+      const created = await this.#artifacts.create({ bytes: await readFile(path), mediaType, owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" } });
+      return Object.freeze({ artifactId: created.artifactId, mimeType: created.mediaType, name: basename(path).slice(0, 240), sizeBytes: created.size });
+    } finally { this.#admittedWork--; }
   }
 
   async importChatAttachments(sessionId: string, paths: readonly string[]): Promise<readonly RuntimeV2AttachmentRef[]> {
-    const snapshot = await this.requireApp().inspectSession(sessionId);
-    if (snapshot.agentForm !== "chat") throw new Error("Chat attachment import is only available in Chat sessions.");
-    if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
-
-    const prepared = await prepareChatAttachments(paths);
-
-    const imported: RuntimeV2AttachmentRef[] = [];
+    this.assertAdmission();
+    this.#admittedWork++;
     try {
-      for (const attachment of prepared) {
-        const created = await this.#artifacts.create({
-          bytes: attachment.bytes,
-          mediaType: attachment.mediaType,
-          owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" },
-        });
-        imported.push(Object.freeze({
-          artifactId: created.artifactId,
-          mimeType: created.mediaType,
-          name: attachment.name,
-          sizeBytes: created.size,
-          ...(attachment.textContent === undefined ? {} : { textContent: attachment.textContent }),
-        }));
+      const snapshot = await this.requireApp().inspectSession(sessionId);
+      if (snapshot.agentMode !== "chat") throw new Error("Chat attachment import is only available in Chat sessions.");
+      if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
+
+      const prepared = await prepareChatAttachments(paths);
+
+      const imported: RuntimeV2AttachmentRef[] = [];
+      try {
+        for (const attachment of prepared) {
+          const created = await this.#artifacts.create({
+            bytes: attachment.bytes,
+            mediaType: attachment.mediaType,
+            owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" },
+          });
+          imported.push(Object.freeze({
+            artifactId: created.artifactId,
+            mimeType: created.mediaType,
+            name: attachment.name,
+            sizeBytes: created.size,
+            ...(attachment.textContent === undefined ? {} : { textContent: attachment.textContent }),
+          }));
+        }
+        return Object.freeze(imported);
+      } catch (error) {
+        await Promise.allSettled(imported.map((attachment) => this.#artifacts!.deleteForSession(sessionId, attachment.artifactId)));
+        throw error;
       }
-      return Object.freeze(imported);
-    } catch (error) {
-      await Promise.allSettled(imported.map((attachment) => this.#artifacts!.deleteForSession(sessionId, attachment.artifactId)));
-      throw error;
-    }
+    } finally { this.#admittedWork--; }
   }
 
   async rollbackImportedAttachments(sessionId: string, artifactIds: readonly string[]): Promise<void> {
-    if (this.#artifacts === undefined || artifactIds.length === 0) return;
-    const snapshot = await this.requireApp().inspectSession(sessionId);
-    const unreferenced = artifactIds.filter((artifactId) => (
-      snapshot.messages.every((message) => findArtifactRef(message.content, artifactId) === null)
-    ));
-    await Promise.allSettled(unreferenced.map((artifactId) => this.#artifacts!.deleteForSession(sessionId, artifactId)));
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      if (this.#artifacts === undefined || artifactIds.length === 0) return;
+      const snapshot = await this.requireApp().inspectSession(sessionId);
+      const unreferenced = artifactIds.filter((artifactId) => (
+        snapshot.messages.every((message) => findArtifactRef(message.content, artifactId) === null)
+      ));
+      await Promise.allSettled(unreferenced.map((artifactId) => this.#artifacts!.deleteForSession(sessionId, artifactId)));
+    } finally { this.#admittedWork--; }
   }
 
   subscribeRendererStream(listener: (event: import("@actspace/shared").RuntimeStreamEvent) => void): () => void { return this.#rendererStream.subscribe(listener); }
@@ -283,6 +398,9 @@ export class DesktopRuntimeV2Registry {
 
   private learningControl: Promise<unknown> = Promise.resolve();
   private learningOperation = 0;
+  readonly #learningListeners = new Set<(state: EnglishLearningState) => void>();
+  #stopLearningNotifications: (() => void) | undefined;
+  #learningTargetToRestore: EnglishLearningTargetInput | undefined;
 
   englishLearning(): EnglishLearningService {
     const service = this.requireProfile().context.get?.("english-learning") as EnglishLearningService | undefined;
@@ -290,7 +408,28 @@ export class DesktopRuntimeV2Registry {
     return service;
   }
 
+  subscribeEnglishLearning(listener: (state: EnglishLearningState) => void): () => void {
+    this.#learningListeners.add(listener);
+    this.#bindLearningNotifications();
+    return () => {
+      this.#learningListeners.delete(listener);
+      if (this.#learningListeners.size === 0) {
+        this.#stopLearningNotifications?.();
+        this.#stopLearningNotifications = undefined;
+      }
+    };
+  }
+
+  #bindLearningNotifications(): void {
+    if (this.#profile === undefined || this.#stopLearningNotifications || this.#learningListeners.size === 0) return;
+    this.#stopLearningNotifications = this.englishLearning().subscribe((state) => {
+      for (const listener of this.#learningListeners) listener(state);
+    });
+  }
+
   setEnglishLearningTarget(input: EnglishLearningTargetInput, persist: () => Promise<void>): Promise<EnglishLearningState> {
+    this.assertAdmission();
+    this.#admittedWork++;
     const operation = ++this.learningOperation;
     const execute = async () => {
       const service = this.englishLearning();
@@ -304,26 +443,35 @@ export class DesktopRuntimeV2Registry {
       if (operation !== this.learningOperation) return service.getState();
       return input.enabled && input.sessionId ? service.enableSession(input.sessionId) : service.disable();
     };
-    const result = this.learningControl.then(execute, execute);
+    const result = this.learningControl.then(execute, execute).finally(() => { this.#admittedWork--; });
     this.learningControl = result.catch(() => {});
     return result;
   }
 
   #stopSessionRevisions: (() => void) | undefined;
 
-  async dispose(): Promise<void> {
+  async dispose(forRestart = false): Promise<void> {
     this.#stopSessionRevisions?.();
     this.#stopSessionRevisions = undefined;
+    this.#stopLearningNotifications?.();
+    this.#stopLearningNotifications = undefined;
     const profile = this.#profile;
     if (profile === undefined) return;
     this.learningOperation++;
     const learning = profile.context.get?.("english-learning") as EnglishLearningService | undefined;
+    if (forRestart && learning) {
+      const state = learning.getState();
+      this.#learningTargetToRestore = { enabled: state.enabled, sessionId: state.targetSessionId };
+    }
     await learning?.dispose();
     await profile.shutdown();
-    this.#rendererStream.dispose();
+    if (forRestart) this.#rendererStream.clearTransient();
+    else this.#rendererStream.dispose();
     if (this.#profile === profile) {
       this.#profile = undefined;
       this.#artifacts = undefined;
+      this.#browserReady = false;
+      this.#browserSocketPath = undefined;
     }
   }
 
@@ -379,6 +527,9 @@ export class DesktopRuntimeV2Registry {
   }
 
   #emitRuntimeLive(update: import("@actspace/runtime").AgentLoopLiveEvent): void {
+    if (update.kind === "run-state" && ["completed", "failed", "aborted", "step-limit"].includes(update.message)) {
+      void this.options.browser.endTurn?.(update.sessionId, update.turnId).catch((error: unknown) => this.options.log?.("browser turn cleanup failed", { error: String(error) }));
+    }
     if (update.workspaceRoot) this.#streamWorkspaces.set(update.sessionId, update.workspaceRoot);
     this.#rendererStream.accept(update);
     if (update.kind === "run-state" && ["completed", "failed", "aborted", "step-limit"].includes(update.message)) this.#streamWorkspaces.delete(update.sessionId);
@@ -403,6 +554,18 @@ export class DesktopRuntimeV2Registry {
         onRuntimeLive: (update) => this.#emitRuntimeLive(update),
       });
       this.#profile = booted.profile;
+      const learningTarget = this.#learningTargetToRestore;
+      if (learningTarget?.enabled && learningTarget.sessionId) {
+        await this.requireApp().resumeMainSession(learningTarget.sessionId);
+        await this.englishLearning().enableSession(learningTarget.sessionId);
+      }
+      this.#learningTargetToRestore = undefined;
+      this.#bindLearningNotifications();
+      const browserSurface = booted.profile.context.get?.("tools.browser") as { available?: boolean; registrations?: readonly unknown[]; definitions?: readonly unknown[] } | undefined;
+      this.#browserReady = booted.browserReady && browserSurface?.available === true && (browserSurface.registrations?.length ?? 0) > 0
+        && browserSurface.registrations?.length === browserSurface.definitions?.length;
+      this.#browserSocketPath = booted.browserReady ? this.options.browser?.socketPath : undefined;
+      this.options.browser?.setRuntimeReady?.(this.#browserReady);
       // Restore admission from persisted session facts before the desktop starts serving them.
       await readWorkspaceRegistry({
         ...this.workspaceRegistryOptions(),
@@ -425,6 +588,9 @@ export class DesktopRuntimeV2Registry {
         sessionRoot: booted.sessionRoot,
       });
     } catch (error) {
+      if (this.#profile !== undefined) await this.dispose(true).catch((cleanupError: unknown) => {
+        this.options.log?.("runtime v2 boot cleanup failed", { error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError) });
+      });
       this.#bootError = error instanceof Error ? error.message : String(error);
       this.options.log?.("runtime v2 boot failed", { error: this.#bootError });
       throw error;

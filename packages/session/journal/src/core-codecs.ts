@@ -13,7 +13,6 @@ export const CORE_EVENT_TYPES = [
   "assistant/message",
   "tool/call",
   "tool/result",
-  "todo/write",
   "request/header",
   "request/context",
   "session/end-seed",
@@ -28,6 +27,7 @@ export type CoreSessionEventType = (typeof CORE_EVENT_TYPES)[number];
 export const PERSISTED_EXTENSION_EVENT_TYPES = [
   "agent/inbox/spliced",
   "agent-preset/selected",
+  "agent/mode-set",
   "permission/asked",
   "permission/decided",
   "permission/mode-set",
@@ -100,6 +100,12 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
     validate: (data: RuntimeV2JsonValue) => {
       if (data === null || typeof data !== "object" || Array.isArray(data)) {
         throw invalid(type, "data must be an object");
+      }
+      if (type === "agent/mode-set") {
+        const mode = (data as Readonly<Record<string, RuntimeV2JsonValue>>).mode;
+        const revision = (data as Readonly<Record<string, RuntimeV2JsonValue>>).revision;
+        if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw invalid(type, "mode must be chat, plan or agent");
+        if (!Number.isSafeInteger(revision) || (revision as number) < 1) throw invalid(type, "revision must be a positive integer");
       }
       if (type.startsWith("permission/")) validatePermissionData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
     },
@@ -228,12 +234,6 @@ function validateCoreData(type: CoreSessionEventType, data: RuntimeV2JsonValue):
       requireId(data.callId ?? data.toolCallId, type, "callId");
       requireToolName(data.name, type);
       if (typeof data.status !== "string" || data.status.length === 0) throw invalid(type, "status must be a non-empty string");
-      break;
-    case "todo/write":
-      if (!Array.isArray(data.items)) throw invalid(type, "items must be an array");
-      if (data.revision !== undefined && (!Number.isSafeInteger(data.revision) || (data.revision as number) < 1)) {
-        throw invalid(type, "revision must be a positive integer");
-      }
       break;
     case "request/header":
     case "request/context":

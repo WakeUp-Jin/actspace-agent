@@ -23,25 +23,25 @@ describe("BrowserApprovalBlock", () => {
     delete (window as unknown as { actspace?: unknown }).actspace;
   });
 
-  it("allows Browser Use for the session with a single simple action", async () => {
+  it("approves only the displayed browser action", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
     window.actspace = { submitApproval } as unknown as Window["actspace"];
     render(<BrowserApprovalBlock message={makeMessage()} />);
 
-    expect(screen.getByText("使用浏览器")).toBeInTheDocument();
-    expect(screen.getByText("整个会话")).toBeInTheDocument();
+    expect(screen.getByText("确认浏览器操作")).toBeInTheDocument();
+    expect(screen.getByText("仅这次")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "拒绝" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "本会话允许" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "允许这次" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "本会话允许" }));
+    await userEvent.click(screen.getByRole("button", { name: "允许这次" }));
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "browser-approval-1",
       decision: "once",
     });
-    expect(await screen.findByText(/正在连接浏览器/)).toBeInTheDocument();
+    expect(await screen.findByText(/正在执行这次浏览器操作/)).toBeInTheDocument();
   });
 
-  it("denies only the current turn", async () => {
+  it("denies the current action", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
     window.actspace = { submitApproval } as unknown as Window["actspace"];
     render(<BrowserApprovalBlock message={makeMessage()} />);
@@ -51,7 +51,7 @@ describe("BrowserApprovalBlock", () => {
       requestId: "browser-approval-1",
       decision: "deny",
     });
-    expect(await screen.findByText(/本轮浏览器授权已拒绝/)).toBeInTheDocument();
+    expect(await screen.findByText(/已拒绝这次浏览器操作/)).toBeInTheDocument();
   });
 
   it("keeps the card actionable when submitting fails", async () => {
@@ -60,7 +60,7 @@ describe("BrowserApprovalBlock", () => {
     } as unknown as Window["actspace"];
     render(<BrowserApprovalBlock message={makeMessage()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "本会话允许" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "本会话允许" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "允许这次" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "允许这次" })).toBeEnabled());
   });
 });

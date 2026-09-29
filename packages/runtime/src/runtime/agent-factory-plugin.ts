@@ -1,10 +1,10 @@
 import { AgentLoop } from "@actspace/core-agent-loop";
 import type { AgentLoopAssembly, AgentLoopServiceOptions } from "@actspace/core-agent-loop";
-import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset } from "@actspace/core-agent";
+import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset, activateMainAgentFormTools, mainAgentFormComposition, allowedAgentModeTools } from "@actspace/core-agent";
 import type { AgentSubject } from "@actspace/core-agent";
 import { AgentScope, scopeContext } from "@actspace/core-scope";
-import { ContributorRegistry, RequestAssembler } from "@actspace/prompt";
-import type { PromptRuntimeService } from "@actspace/prompt";
+import { ContributorRegistry, RequestAssembler, emptyRuntimePromptSource } from "@actspace/prompt";
+import type { PromptContributor, PromptRuntimeService } from "@actspace/prompt";
 import type { LlmService } from "@actspace/llm-service";
 import type { ToolRuntime } from "@actspace/tools-runtime";
 import type { CompactionPlugin } from "@actspace/compaction";
@@ -76,7 +76,9 @@ export function apply(ctx: CordisContext): void {
     const scopedToolEnvironment = descriptor.kind === "subagent"
       ? (activeSession: import("@actspace/session-persistence").SessionHandle) => ({ ...toolEnvironmentFor(activeSession), sessionGrantCapability: false, sessionGrants: [] })
       : toolEnvironmentFor;
-    const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), assembler, llm, tools, toolEnvironment: scopedToolEnvironment, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
+    const binding = tools.bindAgentScope(session.header.sessionId, subject.agentId, () => new Set(allowedToolNames ?? []));
+    scope.disposer.add(binding.dispose);
+    const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), assembler, llm, tools, toolEnvironment: scopedToolEnvironment, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
     if (signal !== undefined) {
       const abort = () => loop.abort(typeof signal.reason === "string" ? signal.reason : "parent-abort");
       if (signal.aborted) abort(); else signal.addEventListener("abort", abort, { once: true });
@@ -86,25 +88,40 @@ export function apply(ctx: CordisContext): void {
   };
 
   const createMainAgent = async (session: import("@actspace/session-persistence").SessionHandle): Promise<AgentLoopAssembly> => {
-    const preset = resolveMainAgentPreset(session.header.createdWith.presetId);
-    const descriptor = Object.freeze({ ...preset.descriptor, routeId: llm.routes.list()[0]?.routeId ?? MAIN_AGENT_DESCRIPTOR.routeId });
+    resolveMainAgentPreset(session.header.createdWith.presetId);
+    const descriptor = Object.freeze({ ...MAIN_AGENT_DESCRIPTOR, routeId: llm.routes.list()[0]?.routeId ?? MAIN_AGENT_DESCRIPTOR.routeId });
     const agentId = `main:${session.header.sessionId}`;
     const scope = new AgentScope(agentId, undefined, agentId);
     try {
+      const activatedForm = activateMainAgentFormTools(scope, tools);
+      const recordedMembers = session.header.createdWith.agentMembers;
+      if (recordedMembers !== undefined) {
+        const actualMembers = activatedForm.members.map(({ id, version }) => ({ id, version }));
+        const actualDigest = mainAgentFormComposition(actualMembers.map(({ id, version }) => ({ id, version: String(version) }))).digest;
+        if (JSON.stringify(recordedMembers) !== JSON.stringify(actualMembers) || session.header.createdWith.agentCompositionDigest !== actualDigest) {
+          throw new Error("Agent form composition is unavailable for this Session.");
+        }
+      }
+      const binding = tools.bindAgentScope(session.header.sessionId, agentId, () => {
+        const mode = sessions.snapshot(session).agentMode ?? "agent";
+        const names = scope.tools.entries().map(entry => entry.id);
+        return allowedAgentModeTools(mode, names);
+      });
+      scope.disposer.add(binding.dispose);
       const subject: AgentSubject = Object.freeze({ agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
       const inbox = new MainAgentInbox(session);
       const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot);
-      const source = await prompt.resolveSource(workspaceRoot);
       const contributors = new ContributorRegistry();
-      for (const contributor of prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills, profile: preset.promptProfile })) contributors.register(scope, contributor);
       const assembler = new RequestAssembler({ registry: contributors, prepare: async () => ({ route: descriptor.routeId, model: descriptor.model, registrationId: "cordis-agent", adapterVersion: "cordis-agent", defaults: {}, retryPolicy: {}, contextWindow: null }) });
-      const allowedToolNames = preset.allowedToolNames === "all-except-web"
-        ? tools.registry.listDefinitions().map((definition) => definition.name).filter((name) => name !== "web")
-        : preset.allowedToolNames;
-      const sessionCompaction = preset.id === "actspace.chat"
-        ? compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))
-        : compaction;
-      const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox, assembler, llm, tools, toolEnvironment: toolEnvironmentFor, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, allowedToolNames: new Set(allowedToolNames), compaction: sessionCompaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
+      const activateModeContributors = createModeContributorActivation(scope, contributors, async key => {
+        const source = key === "chat"
+          ? { ...emptyRuntimePromptSource(), instructions: prompt.source.instructions.filter(instruction => instruction.id === "host/user-instructions") }
+          : await prompt.resolveSource(workspaceRoot);
+        return prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills, profile: key === "chat" ? "chat" : "agent" });
+      });
+      const initialMode = session.header.createdWith.initialAgentMode ?? (session.header.createdWith.presetId === "actspace.chat" ? "chat" : "agent");
+      await activateModeContributors(initialMode);
+      const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox, assembler, modeRuntime: async mode => { await activateModeContributors(mode); return { assembler, compaction: mode === "chat" ? compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8)) : compaction }; }, llm, tools, toolEnvironment: toolEnvironmentFor, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
       activeSessions.set(session.header.sessionId, session);
       const unpublish = registry.publish({ agentId: `main:${session.header.sessionId}`, descriptor, scope, session, dispose: async () => { loop.quiesce(); activeSessions.delete(session.header.sessionId); await scope.dispose(); } });
       return Object.freeze({ descriptor, scope, subject, session, inbox, loop, dispose: async () => { unpublish(); loop.quiesce(); activeSessions.delete(session.header.sessionId); await scope.dispose(); } });
@@ -122,6 +139,30 @@ export function apply(ctx: CordisContext): void {
     createSubagentLoop: ({ session, scope, preset, allowedToolNames, signal, agentId }) => createLoop({ session, scope, signal, agentId, allowedToolNames, descriptor: Object.freeze({ id: preset.id, version: preset.version, kind: "subagent", description: `One-shot ${preset.id} child Agent`, presetId: preset.id, routeId: preset.routeId, model: preset.model, maxSteps: preset.maxSteps }) }),
   });
   ctx.provide?.("actspace.agent.factory", service);
+}
+
+export function createModeContributorActivation(
+  scope: AgentScope,
+  registry: ContributorRegistry,
+  resolve: (key: "chat" | "workspace") => Promise<readonly PromptContributor[]>,
+): (mode: "chat" | "plan" | "agent") => Promise<void> {
+  let active: { key: "chat" | "workspace"; remove: readonly (() => void)[]; values: readonly PromptContributor[] } | undefined;
+  return async mode => {
+    const key = mode === "chat" ? "chat" : "workspace";
+    if (active?.key === key) return;
+    const values = await resolve(key);
+    const previous = active;
+    for (const remove of previous?.remove ?? []) remove();
+    const remove: Array<() => void> = [];
+    try {
+      for (const contributor of values) remove.push(registry.register(scope, contributor));
+      active = { key, remove, values };
+    } catch (error) {
+      for (const undo of remove.reverse()) undo();
+      if (previous !== undefined) active = { ...previous, remove: previous.values.map(value => registry.register(scope, value)) };
+      throw error;
+    }
+  };
 }
 
 function requireService<T>(ctx: CordisContext, id: string): T {

@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue, RuntimeV2RunTurnResponse, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeV2AgentMode, RuntimeV2JsonValue, RuntimeV2RunTurnResponse, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { AgentLoopService } from "@actspace/core-agent-loop";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { emitContained, type CordisContext } from "@actspace/cordis-adapter";
@@ -20,6 +20,8 @@ export type HeadlessHostPort = {
   readonly sessionId?: string;
   readonly title?: string;
   readonly model?: string;
+  /** Optional API mode; CLI leaves this unset and resumes the saved mode. */
+  readonly mode?: RuntimeV2AgentMode;
   readonly signal?: AbortSignal;
   readonly onSessionCreated?: (sessionId: string, abort: () => boolean) => void;
   /** DSH-style bounded exit request; the launcher decides when to terminate. */
@@ -42,6 +44,14 @@ export class HeadlessRunner {
       await session.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: host.title }, surface: null } as never);
     }
     const agent = await agents.attach(session);
+    const currentMode = sessions.snapshot(session).agentMode ?? "agent";
+    const mode = host.mode ?? currentMode;
+    if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw new Error("INVALID_AGENT_MODE");
+    if (mode !== currentMode) {
+      if (mode !== "chat" && sessions.snapshot(session).workspaceRoot === null) throw new Error("WORKSPACE_REQUIRED");
+      await session.append({ type: "agent/mode-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { mode, revision: (sessions.snapshot(session).agentModeRevision ?? 0) + 1, changedAt: new Date().toISOString(), source: "headless" }, surface: null });
+      await session.flush();
+    }
     host.onSessionCreated?.(session.header.sessionId, () => agent.abort("host-abort"));
     if (host.signal?.aborted) agent.abort(typeof host.signal.reason === "string" ? host.signal.reason : "host-abort");
     const started = Date.now();
@@ -50,7 +60,7 @@ export class HeadlessRunner {
     else host.signal?.addEventListener("abort", abort, { once: true });
     try {
       await this.notify("headless/started", { sessionId: session.header.sessionId, agentId: agent.agentId });
-      const result = await agent.followup(host.content, { model: host.model });
+      const result = await agent.followup(host.content, { model: host.model, mode });
       await agent.waitForIdle();
       await session.flush();
       host.appExit?.(result.reason === "completed" ? 0 : result.reason === "aborted" ? 130 : 1);

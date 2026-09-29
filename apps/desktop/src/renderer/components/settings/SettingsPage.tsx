@@ -1,5 +1,5 @@
 import { SpeechSettingsSection } from "./SpeechSettingsSection";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { CheckCircle2, ChevronRight, CircleAlert, KeyRound, Loader2, ShieldCheck, X } from "lucide-react";
 import {
   DEFAULT_IMAGE_GENERATION_BASE_URL,
@@ -56,6 +56,7 @@ import {
   type SelectOption,
 } from "./SettingsPrimitives";
 import { ModelPurposeSelect } from "./ModelPurposeSelect";
+import { ACCENT_PALETTES } from "../../appearance/accents";
 import { CODE_FONT_PRESETS, UI_FONT_PRESETS } from "../../appearance/fonts";
 import { applyAppearance } from "../../appearance/apply";
 import { loadAppearance, saveAppearance } from "../../appearance/storage";
@@ -67,6 +68,7 @@ import {
   UI_FONT_SIZE_MAX,
   UI_FONT_SIZE_MIN,
   UI_FONT_SIZE_STEP,
+  type AccentPaletteId,
   type AppearancePrefs,
   type CodeFontId,
   type ThemeMode,
@@ -426,7 +428,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
     case "tools":
       return <PageShell title="工具" description="Agent 可以调用哪些工具，以及执行前是否需要你确认。联网搜索在「搜索」中管理。"><ToolsSection {...rest} /></PageShell>;
     case "appearance":
-      return <PageShell title="外观" description="主题、字体与字号。"><AppearanceSection /></PageShell>;
+      return <PageShell title="外观" description="主题、强调色、字体与字号。"><AppearanceSection /></PageShell>;
     case "archivedChats":
       return <PageShell title="归档会话"><ArchivedChatsSection onArchivedSessionsChange={rest.onArchivedSessionsChange} /></PageShell>;
     case "subagents":
@@ -1093,7 +1095,7 @@ export function TaskModelDefaultsSection({
       />
       <SettingRow
         title="自动压缩阈值"
-        description={fieldDescription(error ?? undefined, "仅 Chat 形态：上下文占用达到该比例时压缩历史。")}
+        description={fieldDescription(error ?? undefined, "仅 Chat 模式：上下文占用达到该比例时压缩历史。")}
         control={
           <Stepper
             ariaLabel="自动压缩阈值"
@@ -1890,6 +1892,69 @@ function ThemeTiles({ value, onChange }: { value: ThemeMode; onChange: (value: T
   );
 }
 
+/** 强调色色样：固定预览色（--act-preview-accent-*），不随当前主题或当前选择翻转。 */
+const ACCENT_SWATCH: Record<AccentPaletteId, string> = {
+  default:
+    "bg-[linear-gradient(135deg,var(--act-preview-accent-default-ink)_50%,var(--act-preview-accent-default-emerald)_50%)]",
+  blue: "bg-[var(--act-preview-accent-blue)]",
+  purple: "bg-[var(--act-preview-accent-purple)]",
+  pink: "bg-[var(--act-preview-accent-pink)]",
+  orange: "bg-[var(--act-preview-accent-orange)]",
+};
+
+const ACCENT_NAV_STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
+function AccentPicker({ value, onChange }: { value: AccentPaletteId; onChange: (value: AccentPaletteId) => void }) {
+  const optionRefs = useRef(new Map<AccentPaletteId, HTMLButtonElement>());
+
+  // 单选组键盘约定：方向键在全部选项间循环移动并立即选中，Home / End 跳到首尾。
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const index = ACCENT_PALETTES.findIndex((palette) => palette.id === value);
+    const count = ACCENT_PALETTES.length;
+    let nextIndex: number;
+    if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = count - 1;
+    else if (event.key in ACCENT_NAV_STEP) nextIndex = (index + ACCENT_NAV_STEP[event.key] + count) % count;
+    else return;
+    event.preventDefault();
+    const next = ACCENT_PALETTES[nextIndex].id;
+    onChange(next);
+    optionRefs.current.get(next)?.focus();
+  };
+
+  return (
+    <div role="radiogroup" aria-label="强调色" className="flex flex-wrap gap-2">
+      {ACCENT_PALETTES.map((palette) => {
+        const selected = value === palette.id;
+        return (
+          <button
+            key={palette.id}
+            ref={(node) => {
+              if (node) optionRefs.current.set(palette.id, node);
+              else optionRefs.current.delete(palette.id);
+            }}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={palette.label}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(palette.id)}
+            onKeyDown={handleKeyDown}
+            className={`inline-flex h-8 items-center gap-2 rounded-act-pill border py-1 pr-3 pl-1.5 text-act-xs transition-[border-color,color,box-shadow] duration-(--motion-base) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+              selected
+                ? "border-transparent font-medium text-text-main ring-2 ring-text-main"
+                : "border-line text-text-muted hover:border-line-strong hover:text-text-main"
+            }`}
+          >
+            <span aria-hidden="true" className={`size-5 shrink-0 rounded-full ring-1 ring-line ring-inset ${ACCENT_SWATCH[palette.id]}`} />
+            {palette.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 const UI_FONT_OPTIONS: SelectOption[] = UI_FONT_PRESETS.map((preset) => ({
   value: preset.id,
   label: preset.label,
@@ -1915,6 +1980,10 @@ function AppearanceSection() {
     <>
       <SectionShell title="主题" description="“跟随系统”会随 macOS 外观自动切换。">
         <ThemeTiles value={prefs.theme} onChange={(value) => update({ theme: value })} />
+      </SectionShell>
+
+      <SectionShell title="强调色" description="用于发送按钮、开关、焦点和链接；导航选中和状态颜色保持不变。">
+        <AccentPicker value={prefs.accentPalette} onChange={(value) => update({ accentPalette: value })} />
       </SectionShell>
 
       <SettingGroup title="字体与字号" headingLevel={3}>

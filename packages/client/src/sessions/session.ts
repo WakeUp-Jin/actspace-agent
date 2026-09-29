@@ -161,6 +161,8 @@ export class ClientSessionStore {
       activity: (values.sessionStats ?? snapshot.activity) as RuntimeV2SessionSnapshot["activity"],
       delegations: (values.delegations ?? snapshot.delegations) as RuntimeV2SessionSnapshot["delegations"],
       pendingInbox: (values.pendingInbox ?? snapshot.pendingInbox) as RuntimeV2SessionSnapshot["pendingInbox"],
+      agentMode: (values.agentMode as { mode?: RuntimeV2SessionSnapshot["agentMode"] } | undefined)?.mode ?? snapshot.agentMode,
+      agentModeRevision: (values.agentMode as { revision?: number } | undefined)?.revision ?? snapshot.agentModeRevision,
       permissionMode: (values.permissionMode ?? snapshot.permissionMode) as RuntimeV2SessionSnapshot["permissionMode"],
     };
     const revisions = { ...cell.projectionRevisions };

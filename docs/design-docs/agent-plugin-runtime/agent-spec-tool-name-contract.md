@@ -1,5 +1,7 @@
 # ActSpace Tool Name 与 Plugin Namespace 契约
 
+> 2026-09-28：当前 `read_file` owner 为 `actspace.filesystem-read`；下文旧聚合插件 id 仅用于解释早期名称契约错误，当前包见 [工具边界](agent-tool-plugin-boundaries.md)。
+
 > 状态：已实施（2026-08-29；真实 Provider smoke 待凭据）
 >
 > 日期：2026-08-29
@@ -15,7 +17,7 @@ ActSpace 不再把 `pluginId/tool-name` 拼接成模型可见工具名，也不�
   -> Provider function.name=read_file
   -> LLM tool-call name=read_file
   -> AgentLoop capture("read_file")
-  -> ToolRegistry { name: "read_file", pluginId: "actspace.core-tools" }
+  -> ToolRegistry { name: "read_file", pluginId: "actspace.filesystem-read" }
   -> ToolRuntime / existing executor
   -> Session tool/call + tool/result { name: "read_file", pluginId: ... }
   -> notification / projection { name: "read_file", pluginId: ... }
@@ -45,7 +47,7 @@ DSH 也把 `toolName` 作为某些错误对象的字段，但它仍然代表同�
 | 层 | 当前行为 | 结果 |
 |---|---|---|
 | `packages/tools/runtime/src/definition.ts` | `toolId` 必须以 `pluginId/` 开头 | 内部身份带 `/` |
-| `packages/tools/core-tools/src/plugin.ts`、`browser-tools/src/definitions.ts` | 生成 `actspace.core-tools/read_file` 等值 | 所有 Core/Browser 工具进入问题路径 |
+| 2026-08-29 旧 `core-tools` 与 Browser definitions | 曾生成 `actspace.core-tools/read_file` 等值 | 所有 Core/Browser 工具进入问题路径 |
 | `packages/core/agent-loop/src/loop.ts` | LLM definition 继续暴露 `definition.toolId` | 模型 schema 收到 namespaced 值 |
 | `packages/llm/pi-ai/src/legacy-proxy-wire-engine.ts` | `function.name`、Responses `name`、Anthropic `name` 均使用 `tool.toolId` | Provider 收到非法函数名 |
 | `packages/llm/pi-ai/src/pi-ai-wire-engine.ts` | pi-ai schema 使用 `tool.toolId` | pi-ai 路径同样受影响 |

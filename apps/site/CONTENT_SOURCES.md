@@ -18,8 +18,8 @@
 | [模型选择与思考设置](src/content/docs/model-selection.md) | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md`、`docs/design-docs/model-context/agent-model-catalog-and-usage-cost.md` |
 | [上下文与压缩](src/content/docs/context.md) | `docs/design-docs/model-context/agent-token-usage-and-context-state.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md`、`packages/compaction/README.md`、`packages/compaction/src/plugin.ts` |
 | [Token、缓存与费用](src/content/docs/usage.md) | `docs/design-docs/frontend/front-usage-statistics-refresh.md`、`docs/design-docs/model-context/agent-model-catalog-and-usage-cost.md` |
-| [文件读写与检索](src/content/docs/files-and-search.md) | `packages/tools/core-tools/src/plugin.ts`、`docs/design-docs/index.md`、`docs/exec-plans/completed/20260913-tool-artifact-provider-image-ux.md` |
-| [Bash 与后台任务](src/content/docs/bash.md) | `packages/tools/core-tools/src/bash/node-bash-ports.ts`、`docs/design-docs/execution-safety/README.md`、`docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md` |
+| [文件读写与检索](src/content/docs/files-and-search.md) | `packages/tools/filesystem-read/src/plugin.ts`、`docs/design-docs/index.md`、`docs/exec-plans/completed/20260913-tool-artifact-provider-image-ux.md` |
+| [Bash 与后台任务](src/content/docs/bash.md) | `packages/tools/shell-tools/src/node-ports.ts`、`docs/design-docs/execution-safety/README.md`、`docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md` |
 | [权限与审批](src/content/docs/tools-and-approvals.md) | `docs/design-docs/execution-safety/README.md`、`docs/design-docs/frontend/front-聊天输入框规范.md` |
 | [联网搜索与网页读取](src/content/docs/web-tools.md) | `docs/design-docs/tool-system/agent-web-tools.md`、`apps/desktop/src/renderer/components/settings/SettingsPage.tsx` |
 | [Browser Use](src/content/docs/browser.md) | `browser-bridge/README.md`、`browser-bridge/skill/SKILL.md`、`docs/design-docs/browser/agent-browser-use-index.md` |

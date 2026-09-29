@@ -45,6 +45,18 @@ export async function prepareRuntimePromptSource(options: PrepareRuntimePromptSo
   return Object.freeze({ instructions: Object.freeze(instructions), skills, warnings: Object.freeze(warnings) });
 }
 
+export async function prepareUserPromptSource(dataRoot: string): Promise<RuntimePromptSource> {
+  const source = { id: "host/user-instructions", title: "User instructions", path: join(dataRoot, "AGENTS.md") };
+  try {
+    const content = await readFile(source.path, "utf8");
+    if (content.trim().length === 0) return emptyRuntimePromptSource();
+    return Object.freeze({ instructions: Object.freeze([Object.freeze({ ...source, content, contentDigest: digest(content) })]), skills: new SkillCatalog(), warnings: Object.freeze([]) });
+  } catch (error) {
+    if (isNotFound(error)) return emptyRuntimePromptSource();
+    return Object.freeze({ instructions: Object.freeze([]), skills: new SkillCatalog(), warnings: Object.freeze([`host/user-instructions: ${error instanceof Error ? error.message : String(error)}`]) });
+  }
+}
+
 export function emptyRuntimePromptSource(): RuntimePromptSource {
   return Object.freeze({ instructions: Object.freeze([]), skills: new SkillCatalog(), warnings: Object.freeze([]) });
 }

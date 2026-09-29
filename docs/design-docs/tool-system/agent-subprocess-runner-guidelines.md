@@ -6,7 +6,7 @@ Agent 工具可以调用少量成熟 CLI 来完成本地任务，例如 `rg` 用
 
 ## 适用范围
 
-适用于 v2 Runtime Core Tools 对受控命令的调用，例如：
+适用于独立工具插件对受控命令的调用，例如：
 
 - `grep` 调用 `rg` 搜索文件内容。
 - `glob` 调用 `rg --files` 查找文件。
@@ -29,10 +29,10 @@ Agent 工具可以调用少量成熟 CLI 来完成本地任务，例如 `rg` 用
 - 命令特有退出码语义放在适配层，例如 `rg` exit code `1` 对 Grep/Glob 表示“无结果”，不是工具失败。
 - 权限、参数清洗、workspace guard 和业务渲染留在具体工具层，不下沉到 runner。
 
-## 推荐结构
+## 推荐结构（后续内部整理）
 
 ```txt
-packages/tools/core-tools/src/subprocess/
+packages/tools/filesystem-search/src/subprocess/
   run-process.ts       # 通用受控子进程生命周期 helper
   ripgrep-path.ts      # rg 可执行文件解析：显式配置、系统命令、内置二进制
   ripgrep.ts           # rg 专用参数与退出码适配
@@ -45,7 +45,7 @@ packages/tools/core-tools/src/subprocess/
 - `ripgrep.ts`：封装 `rg` 默认 timeout、退出码解释和常用参数片段。
 - `tools/*/executor.ts`：负责工具参数、workspace guard、结果格式和模型可读输出。
 
-首轮 Grep/Glob 应先落 `run-process.ts` 与 `ripgrep.ts`。Bash 工具可在后续计划中迁移到 `run-process.ts`，但不应在 Grep/Glob 任务里重构 Bash 权限策略。
+当前 Grep/Glob 的 Node Host 实现在 `packages/tools/filesystem-search/src/node-ports.ts`，Bash 在 `packages/tools/shell-tools/src/node-ports.ts`。以上目录是以后提取共用 helper 的建议，并非已存在的实现路径；提取时不改变各插件的权限策略。
 
 ## run-process 契约
 

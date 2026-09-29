@@ -150,13 +150,13 @@
 }
 
 .markdown-prose a {
-  color: var(--act-color-info);
+  color: var(--act-color-link);
   text-decoration: none;
   border-bottom: 1px solid var(--act-color-quote-border);
 }
 
 .markdown-prose a:hover {
-  border-bottom-color: var(--act-color-info);
+  border-bottom-color: var(--act-color-link);
 }
 
 .markdown-table-wrap {
@@ -336,4 +336,25 @@
 
 .act-code-hl .hljs-strong {
   font-weight: 700;
+}
+
+/* Mermaid diagrams: the canvas colour comes from the fixed diagram preset (inline style). */
+.mermaid-canvas {
+  justify-content: safe center;
+  overflow-x: auto;
+}
+
+.mermaid-canvas svg {
+  display: block;
+  flex: none;
+  max-width: 100%;
+  min-width: var(--mermaid-min-width, 0);
+  height: auto;
+}
+
+.mermaid-preview-content svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
 }

@@ -13,6 +13,8 @@ export type DshCordisBootOptions = {
   readonly requiredServices?: readonly string[];
   /** Resolved Composer facts used to verify the file-backed transport. */
   readonly composition?: ResolvedComposition;
+  /** Startup-only Include overrides; production changes require a new Runtime. */
+  readonly transportPatches?: readonly { readonly id: string; readonly disabled: boolean }[];
 };
 
 export type DshCordisBoot = {
@@ -47,7 +49,7 @@ export async function bootDshCordis(options: DshCordisBootOptions): Promise<DshC
   try {
     if (options.composition !== undefined) await assertLoaderTransport(options.configPath, options.composition.loaderConfig);
     await options.prepare?.(root.context);
-    await mountCordisConfig(root, options.configPath);
+    await mountCordisConfig(root, options.configPath, "include", options.transportPatches);
     const settlement = await root.awaitSettlement();
     if (!settlement.settled) throw new Error(`${binName}: Cordis settlement pending: ${settlement.pendingServices.join(", ")}`);
     const missing = (options.requiredServices ?? []).filter((serviceId) => root.getService(serviceId) === undefined);

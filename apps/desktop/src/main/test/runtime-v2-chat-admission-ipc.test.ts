@@ -14,7 +14,7 @@ it("returns a serializable rejection before starting a turn and identifies the s
   const importChatAttachments = vi.fn().mockRejectedValue(new ChatAttachmentValidationError({ code: "invalid_utf8", fileName: "bad.txt" }, 1));
   const registration = registerFixedRendererIpc({
     roots: { dataRoot: "/tmp/chat-admission", workspaceRoot: "/work" },
-    registry: { subscribe: () => () => {}, subscribeRendererStream: () => () => {}, inspectSession: async () => ({ agentForm: "chat" }), importChatAttachments, runTurn },
+    registry: { subscribe: () => () => {}, subscribeRendererStream: () => () => {}, inspectSession: async () => ({ agentMode: "chat" }), importChatAttachments, runTurn },
     settings: { subscribeV4Changes: () => () => {} },
     getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
   } as unknown as FixedRendererIpcOptions);

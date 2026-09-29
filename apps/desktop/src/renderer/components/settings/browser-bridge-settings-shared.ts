@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BrowserBridgeStatus } from "@actspace/shared";
 
-const STATUS_POLL_MS = 2000;
+const STATUS_POLL_MS = 1000;
 const STATUS_ERROR_POLL_MS = 5000;
 
 export function hasBrowserBridge(): boolean {
@@ -14,12 +14,15 @@ export function useBrowserBridgeStatus(bridgeReady: boolean): {
   refreshStatus: () => Promise<BrowserBridgeStatus | null>;
 } {
   const [status, setStatus] = useState<BrowserBridgeStatus | null>(null);
+  const alive = useRef(true);
+  const sequence = useRef(0);
 
   const refreshStatus = useCallback(async () => {
     if (!bridgeReady || !window.actspace.getBrowserBridgeStatus) return null;
     try {
+      const request = ++sequence.current;
       const next = await window.actspace.getBrowserBridgeStatus();
-      setStatus(next);
+      if (alive.current && request === sequence.current) setStatus(next);
       return next;
     } catch (error) {
       console.error("Failed to load browser-bridge status", error);
@@ -28,6 +31,7 @@ export function useBrowserBridgeStatus(bridgeReady: boolean): {
   }, [bridgeReady]);
 
   useEffect(() => {
+    alive.current = true;
     let canceled = false;
     let timer: number | undefined;
     const poll = async () => {
@@ -38,6 +42,7 @@ export function useBrowserBridgeStatus(bridgeReady: boolean): {
     void poll();
     return () => {
       canceled = true;
+      alive.current = false;
       if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [refreshStatus]);

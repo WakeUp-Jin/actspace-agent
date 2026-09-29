@@ -18,7 +18,7 @@ export async function bootCliV2(options: { readonly kind: "cli-run"; readonly wo
   // plugin admission remains an explicit future surface; the default run does
   // not silently read the retired runtime-v2/plugins.json file.
   const composition = runtime.createProfileComposition(runtime.RUNTIME_PROFILE_IDS.headless, host);
-  const coreModule = options.mock ? undefined : await import("./core-tool-ports.js");
+  const toolModule = await import("./tool-host-services.js");
   const artifacts = options.persistentArtifacts === false ? await CliV2ArtifactStore.ephemeral() : new CliV2ArtifactStore(options.dataRoot);
   const llmAdapter = new CliV2LlmAdapter({ mock: options.mock, model: options.model, provider, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId) });
   const credentials = { resolve: async () => ({ apiKey: provider.apiKey, baseUrl: provider.baseUrl, ...(provider.proxyUrl === undefined ? {} : { proxyUrl: provider.proxyUrl }) }) };
@@ -42,8 +42,8 @@ export async function bootCliV2(options: { readonly kind: "cli-run"; readonly wo
         "host.approval": approval,
         "host.artifacts": artifacts,
         [runtime.LLM_HOST_PORT_ID]: Object.freeze({ credentials, routes: Object.freeze([{ routeId: "default", providerId: provider.providerId, modelPattern: "*", adapter: llmAdapter, credentialRef: "cli-env", defaults: {} }]) }),
-        [runtime.CORE_TOOLS_HOST_PORT_ID]: Object.freeze({ createPorts: async (llm: unknown) => coreModule?.createCliV2CoreToolPorts({ workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, llm, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId: string, artifactId: string) => artifacts.resolveForSession(sessionId, artifactId) }) ?? {} }),
-        [runtime.PROMPT_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspace, resolveSource: async (workspaceRoot: string) => runtime.prepareRuntimePromptSource({ dataRoot: options.dataRoot, workspaceRoot }) }),
+        ...(options.mock ? toolModule.createUnavailableToolHostServices() : toolModule.createCliToolHostServices({ workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) })),
+        [runtime.PROMPT_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspace, resolveUserSource: async () => runtime.prepareUserPromptSource(options.dataRoot), resolveSource: async (workspaceRoot: string) => runtime.prepareRuntimePromptSource({ dataRoot: options.dataRoot, workspaceRoot }) }),
         [runtime.HEADLESS_HOST_PORT_ID]: options.headlessInput === undefined
           ? Object.freeze({ enabled: false })
           : Object.freeze({ enabled: true, content: options.headlessInput, persistent: options.persistentArtifacts !== false, workspaceRoot: options.workspace, sessionId: options.headlessSessionId, title: titleFromInput(options.headlessInput), model: options.model, onSessionCreated: options.onHeadlessSession, appExit: (_code: number) => undefined }),

@@ -44,7 +44,7 @@ import { SessionProjectionProvider } from "./session";
 import { ClientSessionStore, selectChatSession, projectChatWindow } from "@actspace/client/sessions";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
-import type { ComposerAgentFormSwitch, ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
+import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import { resolveQuickOpenTarget } from "./quick-open-routing";
 
@@ -236,6 +236,8 @@ function createLocalEmptySession(input: NewSessionInput = {}): SessionRecord {
       updatedAt: now,
       agentRunCount: 0,
       agentForm: input.agentForm ?? "agent",
+      agentMode: input.agentForm === "chat" ? "chat" : "agent",
+      agentModeRevision: 0,
       workspaceRoot: input.workspaceRoot,
     },
     events: [],
@@ -640,11 +642,12 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
     kind: "tool",
     id: blockId,
     toolName: tool.toolName,
+    artifacts: tool.preview?.kind === "generic" ? tool.preview.artifacts : undefined,
     title: tool.preview?.kind === "generic"
       ? tool.preview.title
       : tool.finished ? `${tool.toolName}` : `Running ${tool.toolName}...`,
-    content: tool.approvalPending && tool.approvalScope === "browser_session"
-      ? "等待浏览器授权"
+    content: tool.approvalPending && tool.toolName.startsWith("browser_")
+      ? "等待确认浏览器操作"
       : tool.preview?.kind === "generic"
         ? tool.preview.content
       : tool.finished
@@ -840,6 +843,7 @@ export function App() {
   const [reviewSummary, setReviewSummary] = useState<ComposerReviewSummary | null>(null);
   const sessionRunsRef = useRef(new Map<string, SessionRunState>());
   const [busySessionIds, setBusySessionIds] = useState<Set<string>>(() => new Set());
+  const modeChangePendingRef = useRef(new Set<string>());
   const pageVersionsRef = useRef(new Map<string, number>());
   const approvalVersionsRef = useRef(new Map<string, number>());
   const draftsRef = useRef(new Map<string, ComposerDraftRestore>());
@@ -1604,6 +1608,8 @@ export function App() {
           updatedAt: created.meta.updatedAt,
           agentRunCount: created.meta.agentRunCount,
           agentForm: created.meta.agentForm,
+          agentMode: created.meta.agentMode,
+          agentModeRevision: created.meta.agentModeRevision,
           workspaceRoot: created.meta.workspaceRoot,
         },
         ...current,
@@ -1641,7 +1647,7 @@ export function App() {
 
     const createdSession = activeSessionIdRef.current
       ? null
-      : await createSessionForInput(selectedWorkspaceRoot ? { workspaceRoot: selectedWorkspaceRoot } : {});
+      : await createSessionForInput({ ...(selectedWorkspaceRoot ? { workspaceRoot: selectedWorkspaceRoot } : {}), agentForm: options.mode === "chat" ? "chat" : "agent" });
     const sessionId = createdSession?.meta.id ?? activeSessionIdRef.current;
     if (!sessionId || sessionRunsRef.current.has(sessionId)) return;
     setComposerStateBySession((current) => ({
@@ -1904,39 +1910,10 @@ export function App() {
     if (created) {
       setComposerStateBySession((current) => ({
         ...current,
-        [created.meta.id]: DEFAULT_COMPOSER_STATE,
+        [created.meta.id]: { ...DEFAULT_COMPOSER_STATE, mode: created.meta.agentMode ?? "agent" },
       }));
     }
   }, [createSessionForInput]);
-
-  // 形态随 Session preset 固定，空会话切换形态 = 用目标形态新建会话、带上草稿，再归档原来的空会话。
-  const handleSwitchEmptySessionForm = useCallback(async ({ agentForm, mode, draft }: ComposerAgentFormSwitch) => {
-    const previousSessionId = activeSessionIdRef.current;
-    const workspaceRoot = sessionRecord?.meta.workspaceRoot ?? selectedWorkspaceRoot;
-    setAgentRunResult(null);
-    const created = await createSessionForInput({ agentForm, ...(workspaceRoot ? { workspaceRoot } : {}) });
-    if (!created) return;
-    setComposerStateBySession((current) => ({ ...current, [created.meta.id]: { ...DEFAULT_COMPOSER_STATE, mode } }));
-    if (draft.text || draft.attachments.length > 0) {
-      setComposerDraftRestore({ id: Date.now(), sessionId: created.meta.id, text: draft.text, attachments: draft.attachments });
-    }
-    if (!previousSessionId || previousSessionId === created.meta.id) return;
-    if (!hasActspaceBridge()) {
-      setSessions((current) => current.filter((session) => session.id !== previousSessionId));
-      setLocalSessionRecords((current) => {
-        const next = { ...current };
-        delete next[previousSessionId];
-        return next;
-      });
-      return;
-    }
-    try {
-      await window.actspace.archiveSession({ sessionId: previousSessionId, archived: true });
-      setSessions(await readSidebarSessions());
-    } catch (error) {
-      console.error("Failed to archive the replaced empty session", error);
-    }
-  }, [createSessionForInput, readSidebarSessions, selectedWorkspaceRoot, sessionRecord]);
 
   const handleAddWorkspace = useCallback(async () => {
     if (!hasActspaceBridge()) {
@@ -2143,15 +2120,62 @@ export function App() {
   }, [sessions, workspaceRegistry]);
   const activeSessionId = selectedSessionId;
   const composerStateKey = activeSessionId ?? "__draft__";
-  const activeComposerState = composerStateBySession[composerStateKey] ?? DEFAULT_COMPOSER_STATE;
-  const handleComposerModeChange = (mode: ComposerMode) => {
-    setComposerStateBySession((current) => ({
-      ...current,
-      [composerStateKey]: {
-        mode,
-        selectedSkills: current[composerStateKey]?.selectedSkills ?? [],
-      },
-    }));
+  const storedComposerState = composerStateBySession[composerStateKey] ?? DEFAULT_COMPOSER_STATE;
+  const projectedMode = activeSessionId
+    ? sessionRecord?.meta.id === activeSessionId ? sessionRecord.meta.agentMode : visibleSessions.find((session) => session.id === activeSessionId)?.agentMode
+    : undefined;
+  const activeComposerState = { ...storedComposerState, mode: projectedMode ?? storedComposerState.mode };
+  const handleComposerModeChange = async (mode: ComposerMode) => {
+    const sessionId = activeSessionIdRef.current;
+    if (sessionId && (busySessionIds.has(sessionId) || modeChangePendingRef.current.has(sessionId))) throw new Error("会话正在执行，请等待任务结束后切换模式");
+    if (sessionId) modeChangePendingRef.current.add(sessionId);
+    try {
+      if (sessionId && hasActspaceBridge()) {
+        if (!window.actspace.setSessionAgentMode) throw new Error("当前应用版本不支持模式切换");
+        const revision = sessionRecord?.meta.id === sessionId
+          ? sessionRecord.meta.agentModeRevision
+          : visibleSessions.find((session) => session.id === sessionId)?.agentModeRevision;
+        let result = await window.actspace.setSessionAgentMode({ sessionId, mode, expectedRevision: revision });
+        if (!result.ok && result.error === "WORKSPACE_REQUIRED") {
+          if (!window.actspace.selectWorkspaceDirectory || !window.actspace.setSessionWorkspace) throw new Error("请先为当前会话选择工作区，再切换到 Plan 或 Agent");
+          const selection = await window.actspace.selectWorkspaceDirectory({ registerWorkspace: true });
+          if (selection.canceled || !selection.workspaceRoot) return;
+          const workspace = await window.actspace.setSessionWorkspace({ sessionId, workspaceRoot: selection.workspaceRoot });
+          if (!workspace.ok) throw new Error(workspace.error ?? "设置工作区失败");
+          setSelectedWorkspaceRoot(normalizeWorkspaceRoot(selection.workspaceRoot));
+          result = await window.actspace.setSessionAgentMode({ sessionId, mode, expectedRevision: revision });
+        }
+        if (!result.ok) {
+          if (result.error === "AGENT_MODE_CONFLICT") await readSessionPage(sessionId);
+          const message = result.error === "SESSION_BUSY"
+            ? "当前会话仍有运行、审批或后台任务，请等待任务结束后再切换模式。"
+            : result.error === "AGENT_MODE_CONFLICT"
+              ? "会话模式已更新，请重新选择模式。"
+              : result.error === "AGENT_MODE_RECOVERY_REQUIRED"
+                ? "会话模式需要恢复，请重新打开会话后再试。"
+                : result.error ?? "模式切换失败";
+          throw new Error(message);
+        }
+        await readSessionPage(sessionId);
+        setSessions((current) => current.map((session) => session.id === sessionId
+          ? { ...session, agentMode: result.mode ?? mode, agentModeRevision: result.revision }
+          : session));
+      } else if (sessionId) {
+        setSessionRecord((current) => current?.meta.id === sessionId
+          ? { ...current, meta: { ...current.meta, agentMode: mode, agentModeRevision: (current.meta.agentModeRevision ?? 0) + 1 } }
+          : current);
+        setSessions((current) => current.map((session) => session.id === sessionId ? { ...session, agentMode: mode } : session));
+      }
+      setComposerStateBySession((current) => ({
+        ...current,
+        [composerStateKey]: {
+          mode,
+          selectedSkills: current[composerStateKey]?.selectedSkills ?? [],
+        },
+      }));
+    } finally {
+      if (sessionId) modeChangePendingRef.current.delete(sessionId);
+    }
   };
   const handleSelectedSkillsChange = (selectedSkills: string[]) => {
     setComposerStateBySession((current) => ({
@@ -2596,7 +2620,6 @@ export function App() {
         onSelectedModelChange={handleSelectedChatModelChange}
         composerMode={activeComposerState.mode}
         onComposerModeChange={handleComposerModeChange}
-        onAgentFormChange={handleSwitchEmptySessionForm}
         selectedSkills={activeComposerState.selectedSkills}
         onSelectedSkillsChange={handleSelectedSkillsChange}
         onSettingsChange={handleSettingsChange}
@@ -2611,7 +2634,6 @@ export function App() {
         reviewSummary={reviewSummary}
         onReviewChanged={handleReviewChanged}
         models={usableChatModels}
-        agentForm={sessionRecord?.meta.agentForm ?? visibleSessions.find((session) => session.id === activeSessionId)?.agentForm ?? "agent"}
         />
         <ShutdownOverlay />
       </RightPanelProvider>

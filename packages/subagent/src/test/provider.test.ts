@@ -122,7 +122,7 @@ describe("one-shot Subagent provider", () => {
     let childRuns = 0;
     const provider = new OneShotSubagentProvider({
       store,
-      presets: createBuiltInPresets(["actspace.core-tools/read_file"]),
+      presets: createBuiltInPresets(["actspace.filesystem-read/read_file"]),
       manifestDigest: "manifest",
       plugins: [{ id: "@actspace/core", version: "2" }],
       parentPort: {
@@ -143,7 +143,7 @@ describe("one-shot Subagent provider", () => {
       }) as never,
     });
 
-    await expect(provider.invoke({ parentSession: parent, parentScope, parentCallId: "call-crash", presetId: "actspace.agent", task: "inspect", parentVisibleToolIds: ["actspace.core-tools/read_file"], delegationDepth: 0 })).rejects.toThrow("simulated crash");
+    await expect(provider.invoke({ parentSession: parent, parentScope, parentCallId: "call-crash", presetId: "actspace.agent", task: "inspect", parentVisibleToolIds: ["actspace.filesystem-read/read_file"], delegationDepth: 0 })).rejects.toThrow("simulated crash");
     expect(provider.activeCount).toBe(0);
     expect(childRuns).toBe(1);
     expect(terminalAttempts).toBe(1);
@@ -179,7 +179,7 @@ describe("one-shot Subagent provider", () => {
     const { store, parent, parentScope } = await fixture();
     const provider = new OneShotSubagentProvider({
       store,
-      presets: createBuiltInPresets(["actspace.core-tools/read_file"]),
+      presets: createBuiltInPresets(["actspace.filesystem-read/read_file"]),
       manifestDigest: "manifest",
       plugins: [{ id: "@actspace/core", version: "2" }],
       createLoop: ({ signal }) => ({
@@ -190,7 +190,7 @@ describe("one-shot Subagent provider", () => {
         }),
       }) as never,
     });
-    const invocation = provider.invoke({ parentSession: parent, parentScope, parentCallId: "call-abort", presetId: "actspace.agent", task: "wait", parentVisibleToolIds: ["actspace.core-tools/read_file"], delegationDepth: 0 });
+    const invocation = provider.invoke({ parentSession: parent, parentScope, parentCallId: "call-abort", presetId: "actspace.agent", task: "wait", parentVisibleToolIds: ["actspace.filesystem-read/read_file"], delegationDepth: 0 });
     await waitFor(() => provider.activeCount === 1);
     await provider.dispose("runtime-shutdown");
     await expect(invocation).resolves.toMatchObject({ status: "aborted", failure: null });

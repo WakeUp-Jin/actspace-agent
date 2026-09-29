@@ -36,7 +36,7 @@ function request(): ApprovalRequest {
     sessionId: "session-1",
     agentRunId: "run-1",
     agentId: "main:session-1",
-    pluginId: "actspace.core-tools",
+    pluginId: "actspace.filesystem-read",
     toolName: "write_file",
     definitionDigest: "definition-digest",
     normalizedArgsDigest: "arguments-digest",
