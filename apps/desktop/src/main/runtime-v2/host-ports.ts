@@ -40,5 +40,11 @@ export interface DesktopRuntimeV2ApprovalPort {
 
 export interface DesktopRuntimeV2BrowserPort {
   readonly socketPath: string;
-  getStatus(): Promise<{ readonly runState: string }>;
+  getStatus(): Promise<{ readonly runState: string; readonly bridgeReady?: boolean }>;
+  setRuntimeReady?(ready: boolean): void;
+  isBrowserAllowed?(): boolean;
+  setTurnTerminator?(terminate: (sessionId: string, turnId: string) => Promise<void>): void;
+  setBrowserDisposer?(dispose: () => Promise<void>): void;
+  setBootRecoveryMode?(enabled: boolean): void;
+  endTurn?(sessionId: string, turnId: string): Promise<void>;
 }

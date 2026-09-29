@@ -23,6 +23,7 @@ export type BrowserBridgeTransport = {
 export type NodeBrowserCapabilityOptions = {
   readonly ready: boolean;
   readonly socketPath: string;
+  readonly isAllowed?: () => boolean;
   readonly timeoutMs?: number;
   readonly maxFrameBytes?: number;
   readonly transportFactory?: (identity: BrowserIdentity) => BrowserBridgeTransport;
@@ -36,19 +37,45 @@ export function createNodeBrowserCapability(options: NodeBrowserCapabilityOption
     timeoutMs: options.timeoutMs,
     maxFrameBytes: options.maxFrameBytes,
   }));
+  const turns = new Map<string, { transport: BrowserBridgeTransport; pending: number; ending: boolean }>();
+  const keyFor = (sessionId: string, turnId: string) => JSON.stringify([sessionId, turnId]);
+  const end = async (key: string) => {
+    const entry = turns.get(key);
+    if (!entry) return;
+    entry.ending = true;
+    if (entry.pending > 0) return;
+    turns.delete(key);
+    await entry.transport.dispose();
+  };
   return Object.freeze({
     ready: options.ready,
+    endTurn: (sessionId, turnId) => end(keyFor(sessionId, turnId)),
+    dispose: async () => {
+      const entries = [...turns.values()];
+      turns.clear();
+      for (const entry of entries) entry.ending = true;
+      await Promise.allSettled(entries.map((entry) => entry.transport.dispose()));
+    },
     async command(name, args, context) {
-      if (!options.ready) return failure("BROWSER_UNAVAILABLE", "Browser Bridge is unavailable.", true);
-      const transport = transportFactory({ sessionId: context.sessionId, turnId: context.turnId });
+      if (!options.ready || options.isAllowed?.() === false) return failure("BROWSER_UNAVAILABLE", "Chrome is disconnected in Settings.", true);
+      const key = keyFor(context.sessionId, context.turnId);
+      let entry = turns.get(key);
+      if (!entry) {
+        entry = { transport: transportFactory({ sessionId: context.sessionId, turnId: context.turnId }), pending: 0, ending: false };
+        turns.set(key, entry);
+      }
+      if (entry.ending) return failure("BROWSER_UNAVAILABLE", "Browser turn has ended.", false);
+      entry.pending++;
       try {
-        return await executeBrowserCommand(transport, name, args, context);
+        return await executeBrowserCommand(entry.transport, name, args, context);
       } catch (error) {
+        entry.ending = true;
         const aborted = context.signal.aborted;
-        const message = aborted ? "Browser command was aborted." : redactBrowserValue(error instanceof Error ? error.message : String(error));
-        return failure(aborted ? "TOOL_ABORTED" : "BROWSER_COMMAND_FAILED", message, aborted);
+        const message = aborted ? "Browser command stopped. An action already sent to Chrome may have taken effect; check the page before retrying." : redactBrowserValue(error instanceof Error ? error.message : String(error));
+        return failure(aborted ? "TOOL_ABORTED" : "BROWSER_OUTCOME_UNKNOWN", message, false);
       } finally {
-        await transport.dispose();
+        entry.pending--;
+        if (entry.ending) await end(key);
       }
     },
   });
@@ -71,6 +98,7 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
   #buffer = Buffer.alloc(0);
   #counter = 0;
   #disposed = false;
+  #connectionLost = false;
 
   constructor(private readonly options: SocketBrowserBridgeTransportOptions) {
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -79,28 +107,23 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
 
   async request(method: string, params: unknown, signal?: AbortSignal): Promise<unknown> {
     if (this.#disposed) throw new Error("Browser Bridge transport is disposed.");
+    if (signal?.aborted) throw abortError();
     await this.#connect();
+    if (this.#disposed) throw new Error("Browser Bridge transport is disposed.");
     return this.#sendConnected(method, params, signal);
   }
 
   async dispose(): Promise<void> {
     if (this.#disposed) return;
-    if (this.#socket !== undefined && !this.#socket.destroyed) {
-      try {
-        await this.#sendConnected("agent_browser_bridge.session.end", {
-          sessionId: this.options.sessionId,
-          turnId: this.options.turnId,
-        });
-      } catch {
-        // Session shutdown is best effort; disconnect still rejects every pending call.
-      }
-    }
     this.#disposed = true;
+    // Closing the connection is the host's cancellation and ownership cleanup signal.
+    // Waiting for session.end here could leave the Settings disconnect action blocked by an active Chrome call.
     this.#disconnect(new Error("Browser Bridge transport was disposed."));
   }
 
   async #connect(): Promise<void> {
-    if (this.#socket !== undefined && !this.#socket.destroyed) return;
+    if (this.#connectionLost) throw new Error("Browser session was lost. Open Settings to reconnect; this action was not replayed.");
+    if (this.#connectPromise === undefined && this.#socket !== undefined && !this.#socket.destroyed) return;
     if (this.#connectPromise === undefined) this.#connectPromise = this.#openAndStart();
     try {
       await this.#connectPromise;
@@ -112,18 +135,29 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
   async #openAndStart(): Promise<void> {
     const socket = await new Promise<net.Socket>((resolve, reject) => {
       const candidate = net.createConnection(this.options.socketPath);
-      const connected = () => {
+      this.#socket = candidate;
+      const timer = setTimeout(() => failed(new Error("connection timed out")), this.#timeoutMs);
+      const closed = () => failed(new Error("connection closed before startup"));
+      const cleanup = () => {
+        clearTimeout(timer);
         candidate.removeListener("error", failed);
+        candidate.removeListener("connect", connected);
+        candidate.removeListener("close", closed);
+      };
+      const connected = () => {
+        cleanup();
         resolve(candidate);
       };
       const failed = (error: Error) => {
-        candidate.removeListener("connect", connected);
+        cleanup();
         candidate.destroy();
         reject(new Error(`Browser Bridge connection failed: ${error.message}`));
       };
       candidate.once("connect", connected);
       candidate.once("error", failed);
+      candidate.once("close", closed);
     });
+    if (this.#disposed) { socket.destroy(); throw new Error("Browser Bridge transport is disposed."); }
     this.#socket = socket;
     socket.on("data", (chunk) => this.#handleData(chunk));
     socket.on("error", (error) => this.#disconnect(error));
@@ -153,11 +187,17 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
         this.#pending.delete(id);
         clearTimeout(pending.timer);
         signal?.removeEventListener("abort", abort);
+        if (method === "agent_browser_bridge.command.execute" || method === "agent_browser_bridge.command.run") {
+          void this.#sendConnected("agent_browser_bridge.command.cancel", { id }).catch(() => undefined);
+        }
         reject(abortError());
       };
       const timer = setTimeout(() => {
         this.#pending.delete(id);
         signal?.removeEventListener("abort", abort);
+        if (method === "agent_browser_bridge.command.execute" || method === "agent_browser_bridge.command.run") {
+          void this.#sendConnected("agent_browser_bridge.command.cancel", { id }).catch(() => undefined);
+        }
         reject(new Error(`Browser Bridge request timed out: ${method}`));
       }, this.#timeoutMs);
       timer.unref?.();
@@ -188,6 +228,10 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
         return;
       }
       if (typeof response.id !== "string") continue;
+      if (response.protocolVersion !== PROTOCOL_VERSION || typeof response.ok !== "boolean") {
+        this.#disconnect(new Error("Browser Bridge returned an incompatible response."));
+        return;
+      }
       const pending = this.#pending.get(response.id);
       if (pending === undefined) continue;
       this.#pending.delete(response.id);
@@ -199,6 +243,7 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
   }
 
   #disconnect(error: Error): void {
+    if (this.#socket !== undefined) this.#connectionLost = true;
     const socket = this.#socket;
     this.#socket = undefined;
     this.#buffer = Buffer.alloc(0);
@@ -221,6 +266,7 @@ type PendingRequest = {
 };
 
 type BridgeResponse = {
+  readonly protocolVersion?: string;
   readonly id?: string;
   readonly ok?: boolean;
   readonly result?: unknown;

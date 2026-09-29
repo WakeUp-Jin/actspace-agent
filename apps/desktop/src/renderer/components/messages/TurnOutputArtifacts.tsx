@@ -55,8 +55,9 @@ export function collectTurnOutputArtifacts(messages: MessageBlock[]): TurnOutput
   const outputs = new Map<string, TurnOutputArtifact>();
 
   for (const message of messages) {
-    if (message.kind === "image_generation" && (message.status === "completed" || message.status === "partial")) {
-      for (const image of message.images ?? []) {
+    if ((message.kind === "image_generation" && (message.status === "completed" || message.status === "partial")) || (message.kind === "tool" && message.artifacts?.length)) {
+      const images = message.kind === "image_generation" ? message.images : message.artifacts;
+      for (const image of images ?? []) {
         if (image.type !== "image" || !image.path) continue;
         const key = `image:${image.path}`;
         if (outputs.has(key)) continue;
@@ -64,7 +65,7 @@ export function collectTurnOutputArtifacts(messages: MessageBlock[]): TurnOutput
           id: key,
           kind: "image",
           name: image.name || fileName(image.path),
-          displayPath: displayArtifactPath(image.path),
+          displayPath: message.kind === "tool" ? image.name || displayArtifactPath(image.path) : displayArtifactPath(image.path),
           sourcePath: image.path,
         });
       }
@@ -229,13 +230,14 @@ export function TurnOutputArtifacts({
 
   const fileOutputs = outputs.filter((artifact) => artifact.kind === "file");
   const imageCount = outputs.length - fileOutputs.length;
+  const hasGeneratedImage = messages.some((message) => message.kind === "image_generation" && (message.status === "completed" || message.status === "partial"));
   const additions = fileOutputs.reduce((total, artifact) => total + (artifact.additions ?? 0), 0);
   const deletions = fileOutputs.reduce((total, artifact) => total + (artifact.deletions ?? 0), 0);
   const summaryLabel = fileOutputs.length > 0 && imageCount > 0
     ? `${fileOutputs.length} ${fileOutputs.length === 1 ? "file" : "files"} · ${imageCount} ${imageCount === 1 ? "image" : "images"}`
     : fileOutputs.length > 0
       ? `Edited ${fileOutputs.length} ${fileOutputs.length === 1 ? "file" : "files"}`
-      : `Generated ${imageCount} ${imageCount === 1 ? "image" : "images"}`;
+      : `${hasGeneratedImage ? "Generated " : ""}${imageCount} ${imageCount === 1 ? "image" : "images"}`;
 
   return (
     <section className={ARTIFACT_PANEL_CLASS} aria-label="Turn output artifacts">

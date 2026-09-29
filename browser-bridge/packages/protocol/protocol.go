@@ -66,6 +66,7 @@ const (
 	MethodCommandPreflight = "agent_browser_bridge.command.preflight"
 	MethodCommandExecute   = "agent_browser_bridge.command.execute"
 	MethodCommandRun       = "agent_browser_bridge.command.run"
+	MethodCommandCancel    = "agent_browser_bridge.command.cancel"
 
 	// Extension primitive backend
 	MethodBackendAttach          = "agent_browser_bridge.backend.attach"
@@ -86,6 +87,8 @@ const (
 	MethodEventDebuggerDetach = "agent_browser_bridge.event.debugger_detach"
 	MethodEventDownload       = "agent_browser_bridge.event.download"
 	MethodEventTabClosed      = "agent_browser_bridge.event.tab_closed"
+	MethodEventInstanceReady  = "agent_browser_bridge.event.instance_ready"
+	MethodEventInstanceSelected = "agent_browser_bridge.event.instance_selected"
 
 	// Errors
 	ErrorInvalidMessage        = "invalid_message"
@@ -149,6 +152,7 @@ var CommandMethods = []string{
 	MethodCommandPreflight,
 	MethodCommandExecute,
 	MethodCommandRun,
+	MethodCommandCancel,
 }
 
 var BackendPrimitiveMethods = []string{
@@ -171,6 +175,8 @@ var EventMethods = []string{
 	MethodEventDebuggerDetach,
 	MethodEventDownload,
 	MethodEventTabClosed,
+	MethodEventInstanceReady,
+	MethodEventInstanceSelected,
 }
 
 type TabInfo struct {
@@ -247,7 +253,7 @@ type FinalizeTabsResult struct {
 type CDPParams struct {
 	TabID         int            `json:"tabId"`
 	FrameID       string         `json:"frameId,omitempty"`
-	SessionID     string         `json:"sessionId,omitempty"`
+	CDPSessionID  string         `json:"cdpSessionId,omitempty"`
 	Method        string         `json:"method"`
 	CommandParams map[string]any `json:"commandParams,omitempty"`
 }

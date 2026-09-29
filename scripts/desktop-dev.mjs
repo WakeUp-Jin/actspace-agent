@@ -111,6 +111,7 @@ async function main() {
   await initializeLogging();
   const phases = [
     ["pnpm", ["--filter", "@actspace/desktop", "run", "build:deps:dev"], repoRoot],
+    ["node", ["scripts/package-browser-components.mjs"], repoRoot],
     ["pnpm", [
       "exec",
       "concurrently",

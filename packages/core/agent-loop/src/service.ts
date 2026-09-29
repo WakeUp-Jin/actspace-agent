@@ -93,6 +93,7 @@ export class AgentLoopService {
    * deliberately does not expose the concrete loop or Session writer. */
   getAssembly(agentId: string): AgentLoopAssembly | undefined { return this.#agents.get(agentId)?.assembly; }
   list(): readonly ManagedAgent[] { return Object.freeze([...this.#agents.values()].map((record) => record.agent).sort((a, b) => a.agentId.localeCompare(b.agentId))); }
+  get pendingFollowupCount(): number { return this.#followups.size; }
 
   async followup(agentId: string, content: RuntimeV2JsonValue, options: AgentFollowupOptions = {}): Promise<RunTurnResult> {
     const previous = this.#followups.get(agentId);
@@ -182,6 +183,7 @@ export class AgentLoopRuntimeService extends Service {
   get(agentId: string): ManagedAgent | undefined { return this.runtime.get(agentId); }
   getAssembly(agentId: string): AgentLoopAssembly | undefined { return this.runtime.getAssembly(agentId); }
   list(): readonly ManagedAgent[] { return this.runtime.list(); }
+  get pendingFollowupCount(): number { return this.runtime.pendingFollowupCount; }
   followup(agentId: string, content: RuntimeV2JsonValue, options?: AgentFollowupOptions): Promise<RunTurnResult> { return this.runtime.followup(agentId, content, options); }
   quiesce(): void { this.runtime.quiesce(); }
   dispose(): Promise<void> { return this.runtime.dispose(); }

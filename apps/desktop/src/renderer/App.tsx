@@ -639,11 +639,12 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
     kind: "tool",
     id: blockId,
     toolName: tool.toolName,
+    artifacts: tool.preview?.kind === "generic" ? tool.preview.artifacts : undefined,
     title: tool.preview?.kind === "generic"
       ? tool.preview.title
       : tool.finished ? `${tool.toolName}` : `Running ${tool.toolName}...`,
-    content: tool.approvalPending && tool.approvalScope === "browser_session"
-      ? "等待浏览器授权"
+    content: tool.approvalPending && tool.toolName.startsWith("browser_")
+      ? "等待确认浏览器操作"
       : tool.preview?.kind === "generic"
         ? tool.preview.content
       : tool.finished

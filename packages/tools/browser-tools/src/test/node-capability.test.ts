@@ -45,11 +45,42 @@ function fakeTransport(trace: Array<{ readonly method: string; readonly params: 
 }
 
 describe("v2 Browser Bridge capability", () => {
+  it("allows a known write in full-access without approval and still rejects unknown commands", async () => {
+    let calls = 0;
+    let approvals = 0;
+    const runtime = new ToolRuntime();
+    registerBrowserTools(runtime, { ready: true, async command() { calls++; return { status: "completed", summary: "done", modelOutput: [] }; } });
+    const environment: ToolPreparedEnvironment = {
+      workspaceRoot: "/workspace", permissionMode: "full-access", hostCapabilities: new Set(["browser"]), capabilitySet: new EmptyCapabilities(),
+      approvalBroker: { async requestApproval(request) { approvals++; return { requestId: request.requestId, kind: "deny", decidedAt: new Date().toISOString() }; } },
+      journal: { async recordDispatch() {}, async checkpointBeforeBody() {}, async commitResult() {} }, createArtifact: context().createArtifact,
+    };
+    const base = { callId: "write", sessionId: "session-1", agentRunId: "run", turnId: "turn", stepId: "step" };
+    const [allowed] = await runtime.executeBatch([{ ...base, name: "browser_navigation", arguments: { action: "goto", tab_id: 1, url: "https://example.com" } }], environment);
+    expect(allowed?.status).toBe("completed");
+    const [unknown] = await runtime.executeBatch([{ ...base, callId: "unknown", name: "browser_navigation", arguments: { action: "unknown" } }], environment);
+    expect(unknown?.status).toBe("failed");
+    expect(calls).toBe(1);
+    expect(approvals).toBe(0);
+  });
+  it("reuses one transport for calls in the same turn and closes it at the terminal event", async () => {
+    const trace: string[] = [];
+    const browser = createNodeBrowserCapability({ ready: true, socketPath: "/unused", transportFactory: () => ({
+      async request(method) { trace.push(method); return { category: "tabs", action: "list", status: "completed", result: { tabs: [] } }; },
+      async dispose() { trace.push("dispose"); },
+    }) });
+    await browser.command("browser_tabs", { action: "list" }, context());
+    await browser.command("browser_tabs", { action: "list" }, context());
+    expect(trace).toEqual(["agent_browser_bridge.command.execute", "agent_browser_bridge.command.execute"]);
+    await browser.endTurn?.("session-1", "turn-1");
+    expect(trace.at(-1)).toBe("dispose");
+  });
   it("binds preflight and run to exact actions, Session and Turn without exposing the token", async () => {
     const trace: Array<{ readonly method: string; readonly params: unknown }> = [];
     const browser = createNodeBrowserCapability({ ready: true, socketPath: "/unused", transportFactory: () => fakeTransport(trace) });
     const args = { actions: [{ category: "navigation", action: "goto", params: { url: "https://example.com" } }], stop_on_error: true } as unknown as Readonly<Record<string, RuntimeV2JsonValue>>;
     const result = await browser.command("browser_run", args, context());
+    await browser.endTurn?.("session-1", "turn-1");
     expect(result.status).toBe("completed");
     expect(trace).toEqual([
       { method: "agent_browser_bridge.command.preflight", params: { actions: args.actions, sessionId: "session-1", turnId: "turn-1" } },
@@ -60,7 +91,7 @@ describe("v2 Browser Bridge capability", () => {
     expect(JSON.stringify(trace)).not.toContain("agentRunId");
   });
 
-  it("keeps durability checkpoint and Bridge preflight without operation approval", async () => {
+  it("requires operation approval before dispatch and Bridge preflight", async () => {
     const order: string[] = [];
     const browser = createNodeBrowserCapability({
       ready: true,
@@ -99,7 +130,28 @@ describe("v2 Browser Bridge capability", () => {
       stepId: "step-1",
     }], environment);
     expect(result?.status).toBe("completed");
-    expect(order).toEqual(["dispatch", "checkpoint", "preflight", "run", "dispose", "commit"]);
+    expect(order).toEqual(["approval", "dispatch", "checkpoint", "preflight", "run", "commit"]);
+    await browser.endTurn?.("session-1", "turn-1");
+    expect(order.at(-1)).toBe("dispose");
+  });
+
+  it("does not dispatch or call the Bridge when a write action is denied", async () => {
+    let bridgeCalls = 0;
+    let dispatches = 0;
+    const runtime = new ToolRuntime();
+    registerBrowserTools(runtime, { ready: true, async command() { bridgeCalls++; return { status: "completed", summary: "unexpected", modelOutput: [] }; } });
+    const [result] = await runtime.executeBatch([{
+      callId: "denied-write", name: "browser_navigation", arguments: { action: "goto", tab_id: 1, url: "https://example.com" },
+      sessionId: "session-1", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1",
+    }], {
+      workspaceRoot: "/workspace", hostCapabilities: new Set(["browser"]), capabilitySet: new EmptyCapabilities(),
+      approvalBroker: { async requestApproval(request) { return { requestId: request.requestId, kind: "deny", decidedAt: new Date().toISOString() }; } },
+      journal: { async recordDispatch() { dispatches++; }, async checkpointBeforeBody() {}, async commitResult() {} },
+      createArtifact: context().createArtifact,
+    });
+    expect(result?.status).toBe("failed");
+    expect(dispatches).toBe(0);
+    expect(bridgeCalls).toBe(0);
   });
 
   it("executes canonical read-only actions without approval and rejects unknown actions before the Bridge", async () => {
@@ -140,6 +192,7 @@ describe("v2 Browser Bridge capability", () => {
       }),
     });
     const result = await browser.command("browser_tabs", { action: "list", active: true }, context());
+    await browser.endTurn?.("session-1", "turn-1");
     expect(result.status).toBe("completed");
     expect(trace[0]).toEqual({ method: "agent_browser_bridge.command.execute", params: { category: "tabs", action: "list", params: { active: true } } });
   });

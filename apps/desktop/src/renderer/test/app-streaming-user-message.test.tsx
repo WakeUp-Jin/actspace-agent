@@ -2992,8 +2992,8 @@ sessionId: input.sessionId,
     await userEvent.type(composer, "看看浏览器标签页");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByText("使用浏览器")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "本会话允许" }));
+    expect(await screen.findByText("确认浏览器操作")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "允许这次" }));
 
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-browser-1",
@@ -3545,7 +3545,7 @@ sessionId: input.sessionId,
       resolveApproval([]);
     });
     expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 等待审批')).toBeInTheDocument();
-    expect(screen.getByText('使用浏览器')).toBeInTheDocument();
+    expect(screen.getByText('确认浏览器操作')).toBeInTheDocument();
   });
 
   it('keeps a run pinned while more than three other histories are loaded', async () => {

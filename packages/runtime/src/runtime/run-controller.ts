@@ -50,6 +50,13 @@ export class RunController {
   }
   abort(sessionId: string, reason?: string): boolean { return this.agentService?.get(`main:${sessionId}`)?.abort(reason) ?? this.#agents.get(sessionId)?.loop.abort(reason) ?? false; }
   get(sessionId: string): MainAgentAssembly | undefined { return this.agentService?.getAssembly(`main:${sessionId}`) ?? this.#agents.get(sessionId); }
+  isIdle(): boolean {
+    if (this.agentService !== undefined) {
+      return this.agentService.list().every((agent) => this.agentService?.getAssembly(agent.agentId)?.loop.active !== true)
+        && this.agentService.pendingFollowupCount === 0;
+    }
+    return [...this.#agents.values()].every((agent) => !agent.loop.active);
+  }
   async rebuild(session: SessionHandle): Promise<MainAgentAssembly> {
     const sessionId = session.header.sessionId;
     const existing = this.#agents.get(sessionId) ?? (this.agentService === undefined ? undefined : this.agentService.getAssembly(`main:${sessionId}`));

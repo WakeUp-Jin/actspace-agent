@@ -1,15 +1,113 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from "vitest";
-import { chmod, mkdtemp, open, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { chmod, mkdir, mkdtemp, open, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:net";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BrowserBridgeService } from "../browser-bridge-service";
 
 describe("BrowserBridgeService", () => {
   const tempDirs: string[] = [];
+  const servers: Server[] = [];
 
   afterEach(async () => {
+    await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
+    vi.unstubAllEnvs();
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  });
+
+  it("binds the verified instance, persists disconnect and ignores another Chrome profile", async () => {
+    const root = await mkdtemp("/tmp/actspace-bc-");
+    tempDirs.push(root);
+    const support = join(root, "support");
+    vi.stubEnv("ABB_SUPPORT_DIR", support);
+    await mkdir(join(support, "instances"), { recursive: true });
+    const instanceId = "00000000-0000-4000-8000-000000000001";
+    const socketPath = join(support, "s-0000000000000001.sock");
+    const server = createServer((socket) => socket.end());
+    await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+    servers.push(server);
+    await chmod(socketPath, 0o600);
+    await writeFile(join(support, "instances", "s-0000000000000001.sock.json"), JSON.stringify({
+      hostId: "s-0000000000000001.sock", extensionInstanceId: instanceId, socketPath,
+      hostVersion: "0.1.0-dev", extensionVersion: "0.2.2", protocolVersion: "0.2.0",
+    }), { mode: 0o600 });
+    const source = join(root, "source-abb");
+    await writeFile(source, ["#!/bin/sh", "case \"$1\" in",
+      "help) echo 'Agent Browser Bridge fixture' ;;",
+      "doctor) echo '{\"checks\":[{\"name\":\"local_rpc_socket\",\"status\":\"offline\",\"detail\":\"ambiguous default socket\"}]}' ;;",
+      `info) echo '{"ok":true,"result":{"instanceId":"${instanceId}","version":"0.2.2","protocolVersion":"0.2.0","hostId":"s-0000000000000001.sock","hostVersion":"0.1.0-dev"}}' ;;`,
+      "tabs) echo '[]' ;;", "capabilities) echo '{}' ;;", "esac", ""].join("\n"));
+    await chmod(source, 0o755);
+    const service = new BrowserBridgeService({ dataRoot: join(root, "data") });
+    await service.installFromFile(source);
+    await writeFile(join(service.pluginRoot, "connection.json"), '{"schemaVersion":1,"enabled":true}');
+    const connected = await service.getStatus();
+    expect(connected).toMatchObject({ runState: "waiting_for_runtime", bridgeReady: true, selectedInstanceId: instanceId });
+    expect(connected.doctorChecks.find((check) => check.name === "local_rpc_socket")).toMatchObject({
+      status: "ok", detail: `Local bridge socket is accepting requests at ${socketPath}.`,
+    });
+    expect(service.socketPath).toBe(socketPath);
+    expect(service.isBrowserAllowed()).toBe(true);
+    service.setRuntimeReady(true);
+    expect((await service.getStatus()).runState).toBe("ready");
+    const dispose = vi.fn(async () => {});
+    service.setBrowserDisposer(dispose);
+    await writeFile(join(support, "instances", "s-0000000000000001.sock.json"), JSON.stringify({
+      hostId: "s-0000000000000001.sock", extensionInstanceId: instanceId, socketPath,
+      hostVersion: "unverified-host", extensionVersion: "0.2.2", protocolVersion: "0.2.0",
+    }), { mode: 0o600 });
+    expect((await service.getStatus()).bridgeReady).toBe(false);
+    expect(service.isBrowserAllowed()).toBe(false);
+    expect(dispose).toHaveBeenCalledOnce();
+    await service.disconnect();
+    const reopened = new BrowserBridgeService({ dataRoot: join(root, "data") });
+    expect(await reopened.getStatus()).toMatchObject({ enabled: false, runState: "disconnected", selectedInstanceId: instanceId });
+    expect(reopened.isBrowserAllowed()).toBe(false);
+  });
+
+  it("rejects a corrupted bundled binary before replacing installed files", async () => {
+    const root = await mkdtemp("/tmp/actspace-package-");
+    tempDirs.push(root);
+    const bundle = join(root, "bundle");
+    await mkdir(join(bundle, "bin"), { recursive: true });
+    const host = "#!/bin/sh\necho 'Agent Browser Bridge fixture'\n";
+    await writeFile(join(bundle, "bin", "abb"), host);
+    await writeFile(join(bundle, "manifest.json"), JSON.stringify({ schemaVersion: 1, platform: process.platform, arch: process.arch,
+      hostVersion: "0.1.0-dev", extensionVersion: "0.2.2", protocolVersion: "0.2.0",
+      files: { "bin/abb": createHash("sha256").update("different").digest("hex") } }));
+    const service = new BrowserBridgeService({ dataRoot: join(root, "data"), bundledRoot: bundle });
+    expect(await service.installBundled()).toMatchObject({ ok: false, error: "Chrome 连接组件校验失败：bin/abb" });
+    expect((await service.getStatus()).installed).toBe(false);
+  });
+
+  it("restores the previous host and extension when native host registration fails", async () => {
+    const root = await mkdtemp("/tmp/actspace-rollback-");
+    tempDirs.push(root);
+    vi.stubEnv("ABB_CHROME_MANIFEST_PATH", join(root, "chrome-host.json"));
+    const bundle = join(root, "bundle");
+    const dataRoot = join(root, "data");
+    await mkdir(join(bundle, "bin"), { recursive: true });
+    await mkdir(join(bundle, "extension", "src"), { recursive: true });
+    const previous = "#!/bin/sh\necho 'Agent Browser Bridge previous'\n";
+    const replacement = "#!/bin/sh\nif [ \"$1\" = install-native-host ]; then exit 1; fi\necho 'Agent Browser Bridge replacement'\n";
+    const extensionManifest = await readFile(join(process.cwd(), "../../browser-bridge/apps/chrome-extension/manifest.json"), "utf8");
+    const background = "// browser fixture\n";
+    await writeFile(join(bundle, "bin", "abb"), replacement);
+    await writeFile(join(bundle, "extension", "manifest.json"), extensionManifest);
+    await writeFile(join(bundle, "extension", "src", "background.js"), background);
+    await writeFile(join(bundle, "manifest.json"), JSON.stringify({ schemaVersion: 1, platform: process.platform, arch: process.arch,
+      files: Object.fromEntries(Object.entries({ "bin/abb": replacement, "extension/manifest.json": extensionManifest, "extension/src/background.js": background })
+        .map(([path, content]) => [path, createHash("sha256").update(content).digest("hex")])) }));
+    const service = new BrowserBridgeService({ dataRoot, bundledRoot: bundle });
+    await mkdir(join(service.pluginRoot, "bin"), { recursive: true });
+    await mkdir(service.extensionDir, { recursive: true });
+    await writeFile(service.binPath, previous, { mode: 0o755 });
+    await writeFile(join(service.extensionDir, "manifest.json"), '{"version":"0.2.1"}');
+    expect((await service.installBundled()).ok).toBe(false);
+    expect(await readFile(service.binPath, "utf8")).toBe(previous);
+    expect(await readFile(join(service.extensionDir, "manifest.json"), "utf8")).toBe('{"version":"0.2.1"}');
   });
 
   it("installs abb and materializes the Browser Bridge skill", async () => {
@@ -108,6 +206,7 @@ describe("BrowserBridgeService", () => {
     const service = new BrowserBridgeService({ dataRoot });
     expect((await service.installFromFile(sourceAbb)).ok).toBe(true);
     await writeFile(callsPath, "", "utf8");
+    await writeFile(join(service.pluginRoot, "connection.json"), '{"schemaVersion":1,"enabled":true}');
 
     const [first, second] = await Promise.all([
       service.getStatus("/repo"),
@@ -141,6 +240,7 @@ describe("BrowserBridgeService", () => {
 
     const service = new BrowserBridgeService({ dataRoot, statusErrorRetryMs: 60_000 });
     expect((await service.installFromFile(sourceAbb)).ok).toBe(true);
+    await writeFile(join(service.pluginRoot, "connection.json"), '{"schemaVersion":1,"enabled":true}');
 
     const first = await service.getStatus("/repo");
     const second = await service.getStatus("/repo");

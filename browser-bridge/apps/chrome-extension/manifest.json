@@ -22,6 +22,8 @@
     }
   },
   "permissions": [
+    "alarms",
+    "storage",
     "debugger",
     "downloads",
     "history",

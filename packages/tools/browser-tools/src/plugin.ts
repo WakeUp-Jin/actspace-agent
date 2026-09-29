@@ -18,10 +18,13 @@ export function registerBrowserTools(runtime: ToolRuntime, browser: BrowserCapab
 function browserPermission(name: string) {
   return Object.freeze({
     extractResources: () => [],
-    evaluate: (args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>) => {
+    evaluate: (args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>, _resources: readonly unknown[], context: { readonly mode: string }) => {
       if (name === "browser_help") return { kind: "allow" as const };
       const commands = name === "browser_run" ? batchCommands(args.actions) : [singleCommand(name, args.action)];
       if (commands.some((command) => command === undefined)) return { kind: "deny" as const, code: "BROWSER_COMMAND_UNKNOWN", reason: "Browser command is not present in the canonical registry." };
+      if (commands.some((command) => command?.readOnly !== true) && context.mode !== "full-access") {
+        return { kind: "ask" as const, reason: "Allow this Browser action to change Chrome content or state?", risk: commands.some((command) => command?.riskLevel === "high") ? "high" as const : "medium" as const };
+      }
       return { kind: "allow" as const };
     },
   });
@@ -58,6 +61,7 @@ export function apply(ctx: CordisContext): void {
   ctx.provide?.("tools.browser", Object.freeze({ available: browser?.ready === true, registrations, definitions: BROWSER_TOOL_DEFINITIONS }));
   ctx.effect?.(() => async () => {
     const results = await Promise.allSettled([...registrations].reverse().map((registration) => registration.dispose()));
+    await browser?.dispose?.();
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
     if (failures.length > 0) throw new AggregateError(failures.map((failure) => failure.reason), "Browser Tools cleanup failed.");
   }, "browser-tools");

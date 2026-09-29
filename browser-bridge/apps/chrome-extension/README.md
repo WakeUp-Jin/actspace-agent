@@ -12,7 +12,13 @@ This directory contains the Manifest V3 Chrome extension backend for ActSpace Br
 
 The visible CUA cursor is a versioned injected runtime. It starts at the viewport center on first use, remembers its last page position, animates to the next target, and resolves before the Go CUA engine dispatches the corresponding CDP input event.
 
-## Local Load
+## Connect from ActSpace
+
+In ActSpace open **扩展 → 能力 → Chrome 浏览器**, then select **开始连接**. ActSpace prepares the bundled Native Host and a managed extension directory without requiring Go or a source checkout. Use the on-screen buttons to open `chrome://extensions`, reveal the prepared directory, and copy its path. Chrome's **Load unpacked** and permission confirmation remain user actions. ActSpace checks the connection automatically; with multiple Chrome profiles, click the ActSpace Browser toolbar icon in the profile you want to connect.
+
+The extension stores a random instance ID in `chrome.storage.local` and reconnects its Native Messaging port after service worker restarts. One Native Host uses one private socket and publishes a record for Desktop verification. Clicking the toolbar icon responds to a short-lived selection challenge; it does not authorize page modifications.
+
+## Source checkout load (advanced)
 
 1. Open `chrome://extensions`.
 2. Enable Developer mode.
@@ -35,6 +41,8 @@ The Native Messaging host allowlist must contain that exact ID. `go test ./...` 
 The extension requests:
 
 - `nativeMessaging`: launch and communicate with `com.agent_browser_bridge.host`.
+- `storage`: persist the random ID of this extension installation in the current Chrome profile.
+- `alarms`: retry Native Messaging after a service worker restart.
 - `tabs`: list, create, update, and remove Chrome tabs.
 - `history`: read Chrome history for `abb history`.
 - `debugger`: run basic CDP commands for `abb cdp` and `abb screenshot`.

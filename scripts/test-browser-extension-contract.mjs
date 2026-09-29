@@ -44,6 +44,9 @@ const nativePort = {
   postMessage(message) { calls.nativeMessages.push(message); },
 };
 const chrome = {
+  action: { onClicked: event() },
+  alarms: { create() {}, onAlarm: event() },
+  storage: { local: { async get() { return {}; }, async set() {} } },
   runtime: {
     lastError: null,
     connectNative: () => nativePort,
@@ -100,6 +103,7 @@ const chrome = {
 
 const context = vm.createContext({
   chrome,
+  crypto: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
   console: { info() {}, warn() {}, error() {} },
   fetch: async () => ({ text: async () => "" }),
   URL,
@@ -129,7 +133,7 @@ nativePort.onMessage.emit({
 await new Promise((resolve) => setTimeout(resolve, 0));
 const connectedInfo = await request("agent_browser_bridge.info");
 assert.equal(connectedInfo.result.nativeMessaging.connected, true);
-assert.equal(calls.nativeMessages.at(-1).id, "native-ping");
+assert.ok(calls.nativeMessages.some((message) => message.id === "native-ping"));
 
 const beforeClaim = await request("agent_browser_bridge.backend.tabs.list");
 assert.equal(beforeClaim.ok, true, JSON.stringify(beforeClaim));
@@ -186,6 +190,18 @@ const cdp = await request("agent_browser_bridge.backend.execute_cdp", {
 });
 assert.equal(cdp.ok, true);
 assert.equal(calls.cdpCalls.at(-1).method, "Runtime.evaluate");
+
+const agentIdentity = { sessionId: "agent-session", turnId: "agent-turn" };
+assert.equal((await request("agent_browser_bridge.backend.user_tabs.claim", { ...agentIdentity, tabId: 8 })).ok, true);
+assert.equal((await request("agent_browser_bridge.backend.attach", { ...agentIdentity, tabId: 8 })).ok, true);
+const agentCdp = await request("agent_browser_bridge.backend.execute_cdp", {
+  ...agentIdentity,
+  tabId: 8,
+  method: "Runtime.evaluate",
+  commandParams: { expression: "document.title" },
+});
+assert.equal(agentCdp.ok, true);
+assert.equal(calls.cdpCalls.at(-1).target.sessionId, undefined, "Agent identity must not become a Chrome Debugger session ID");
 
 chrome.debugger.onEvent.emit(
   { tabId: 7 },
@@ -245,5 +261,16 @@ assert.deepEqual(Array.from(sessionAFinalized.result.closed), [sessionACreated.r
 const sessionBTabs = await request("agent_browser_bridge.backend.tabs.list", { sessionId: "session-b" });
 assert.deepEqual(Array.from(sessionBTabs.result, (tab) => tab.id), [sessionBCreated.result.id]);
 assert.equal(calls.close, 1);
+
+const identity = { sessionId: "session-b", turnId: "next-turn" };
+const nextTurn = await request("agent_browser_bridge.backend.user_tabs.claim", { ...identity, tabId: sessionBCreated.result.id });
+assert.equal(nextTurn.ok, false, "another Turn cannot steal existing ownership");
+await request("agent_browser_bridge.session.end", { sessionId: "session-b" });
+const released = await request("agent_browser_bridge.backend.user_tabs.claim", { ...identity, tabId: sessionBCreated.result.id });
+assert.equal(released.ok, true, "session.end releases ownership");
+await request("agent_browser_bridge.session.end", identity);
+const afterEnd = await request("agent_browser_bridge.backend.tabs.list", identity);
+assert.deepEqual(Array.from(afterEnd.result), []);
+assert.equal(calls.close, 1, "ending a Turn must preserve Chrome pages");
 
 process.stdout.write("browser extension primitive contract passed\n");

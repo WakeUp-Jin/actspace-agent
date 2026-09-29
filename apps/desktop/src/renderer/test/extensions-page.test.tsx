@@ -29,14 +29,12 @@ describe("ExtensionsPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows a collapsed capability, searches it, and navigates tabs with the keyboard", async () => {
+  it("shows Chrome connection without requiring a source path and navigates tabs with the keyboard", async () => {
     const user = userEvent.setup();
     render(<ExtensionsPage />);
-    const capability = await screen.findByRole("button", { name: /Browser Bridge/ });
-    expect(capability).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("button", { name: "检查连接" })).not.toBeInTheDocument();
-    await user.click(capability);
-    expect(screen.getByRole("button", { name: "检查连接" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Chrome 浏览器" })).toBeVisible();
+    expect(screen.getByText("已连接，可以在对话中使用 Chrome")).toBeVisible();
+    expect(screen.queryByText("源码路径")).not.toBeInTheDocument();
     await user.type(screen.getByRole("searchbox"), "missing");
     expect(screen.getByText("没有找到匹配的能力。")).toBeVisible();
     await user.click(screen.getByRole("tab", { name: "能力" }));
