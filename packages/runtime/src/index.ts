@@ -25,7 +25,7 @@ export { registerBrowserTools, createNodeBrowserCapability, SocketBrowserBridgeT
 export { BROWSER_TOOLS_HOST_PORT_ID } from "@actspace/tools-browser-tools";
 export { HEADLESS_HOST_PORT_ID } from "@actspace/headless";
 export type { HeadlessHostPort, HeadlessRunResult, HeadlessRunner } from "@actspace/headless";
-export { prepareRuntimePromptSource } from "@actspace/prompt";
+export { prepareRuntimePromptSource, prepareUserPromptSource } from "@actspace/prompt";
 export type { RuntimePromptSource, RuntimeInstructionSource } from "@actspace/prompt";
 export type { LlmAdapter, LlmAdapterDispatchInput, LlmContentBlock, LlmMessage, LlmStreamEvent, LlmStreamSource, LlmToolDefinition, CredentialResolver, LlmCredential } from "@actspace/llm-service";
 export { LLM_HOST_PORT_ID } from "@actspace/llm-service";

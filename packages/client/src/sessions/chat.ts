@@ -61,6 +61,8 @@ export function projectChatSession(
       updatedAt: snapshot.updatedAt,
       agentRunCount: snapshot.activity.completedTurnCount,
       agentForm: snapshot.agentForm,
+      agentMode: snapshot.agentMode,
+      agentModeRevision: snapshot.agentModeRevision,
       workspaceRoot: snapshot.workspaceRoot ?? fallbackWorkspaceRoot,
       pinned: snapshot.metadata.pinned,
       archived: snapshot.metadata.archived,

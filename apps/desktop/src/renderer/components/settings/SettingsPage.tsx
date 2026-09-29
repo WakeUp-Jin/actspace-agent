@@ -1093,7 +1093,7 @@ export function TaskModelDefaultsSection({
       />
       <SettingRow
         title="自动压缩阈值"
-        description={fieldDescription(error ?? undefined, "仅 Chat 形态：上下文占用达到该比例时压缩历史。")}
+        description={fieldDescription(error ?? undefined, "仅 Chat 模式：上下文占用达到该比例时压缩历史。")}
         control={
           <Stepper
             ariaLabel="自动压缩阈值"

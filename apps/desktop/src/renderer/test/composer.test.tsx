@@ -416,9 +416,9 @@ describe("Composer follow-up bar", () => {
 
     const menu = screen.getByRole("menu", { name: "添加上下文或工具" });
     expect(within(menu).getByRole("menuitem", { name: "Plan" })).toBeInTheDocument();
-    // 模式区是完整的模式选择器；Chat 只在空会话且可切换形态时出现。
+    // 同一个 Session 可以切换三种模式。
     expect(within(menu).getByRole("menuitem", { name: "Agent" })).toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: "Chat" })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Chat" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "图片" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Skills" })).toBeInTheDocument();
     expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|模型|Attach files/)).not.toBeInTheDocument();

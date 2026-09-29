@@ -111,13 +111,12 @@ export type ComposerDraftRestore = {
 
 export type ComposerDraftReader = (draftKey: string) => string;
 export type ComposerDraftWriter = (draftKey: string, text: string) => void;
-/** 空会话切换形态：由上层用目标形态新建会话替换当前空会话，并带上草稿。 */
+/** 旧组件调用方的过渡类型；模式切换不再替换 Session。 */
 export type ComposerAgentFormSwitch = {
   agentForm: MainAgentForm;
   mode: ComposerMode;
   draft: { text: string; attachments: ComposerAttachment[] };
 };
-
 export type ComposerReviewSummary = {
   status: "loading" | "changes" | "empty" | "notAvailable" | "noBaseline" | "partial" | "failed";
   additions?: number;
@@ -184,6 +183,7 @@ const CONTROL_GROUP_CLASS = "control-group relative";
 const MODE_BUTTON_BASE_CLASS =
   "mode-button inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border-0 px-2.5 text-act-md leading-5 font-medium transition-[filter,opacity] duration-(--motion-fast) ease-in-out hover:brightness-95";
 const MODE_BUTTON_CLASS: Record<ComposerMode, string> = {
+  chat: "bg-operational-soft text-operational",
   plan: "bg-warning-soft text-on-warning",
   agent: "bg-operational-soft text-operational",
 };
@@ -314,17 +314,17 @@ type ContextSelectorKind = "workspace" | "branch" | "runtime";
 
 type CommandMenuModeKey = "agent" | "plan" | "chat";
 
-// + 菜单的模式区是完整的模式选择器，当前模式打勾；Chat 形态绑定 Session，只在空会话里可选。
+// + 菜单的模式区是完整的模式选择器，当前模式打勾。
 // 语义色：Agent 蓝、Plan 黄、Chat 绿，与 Composer 中的模式标签一致。
 const COMMAND_MENU_MODES: Record<CommandMenuModeKey, { label: string; description: string; icon: LucideIcon; iconClass: string }> = {
   agent: { label: "Agent", description: "读写工作区、执行命令，完成开发任务", icon: Bot, iconClass: "text-info" },
   plan: { label: "Plan", description: "先规划和设计，再编写代码", icon: ListTodo, iconClass: "text-warning" },
   chat: { label: "Chat", description: "日常对话、联网查询与生图，不接触工作区", icon: MessageCircle, iconClass: "text-operational" },
 };
-const CHAT_MODE_PILL_CLASS = "bg-operational-soft text-operational";
 
 const MODE_META: Record<Exclude<ComposerMode, "agent">, Omit<ModeMenuItem, "mode">> = {
   plan: { label: "Plan", icon: ListTodo },
+  chat: { label: "Chat", icon: MessageCircle },
 };
 
 const SLASH_FUNCTION_ICONS: Record<ComposerSlashFunctionId, LucideIcon> = {
@@ -485,7 +485,6 @@ export function Composer({
   onSelectedModelChange,
   mode = "agent",
   onModeChange,
-  onAgentFormChange,
   selectedSkills = [],
   onSelectedSkillsChange,
   onOpenAttachmentPreview,
@@ -503,7 +502,6 @@ export function Composer({
   reviewSummary,
   onOpenReview,
   models,
-  agentForm = "agent",
   permissionControl,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
@@ -520,8 +518,7 @@ export function Composer({
   selectedModelId?: ModelSelectionId;
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   mode?: ComposerMode;
-  onModeChange?: (mode: ComposerMode) => void;
-  /** 仅 initial（空会话）生效：提供时 + 菜单与 Chat 标签可在 Chat / Agent 形态间切换。 */
+  onModeChange?: (mode: ComposerMode) => void | Promise<void>;
   onAgentFormChange?: (change: ComposerAgentFormSwitch) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;
@@ -544,9 +541,7 @@ export function Composer({
   agentForm?: MainAgentForm;
   permissionControl?: ReactNode;
 }) {
-  const isChatForm = agentForm === "chat";
-  // 形态在 Session 创建时绑定 preset；只有还没发过消息的空会话允许「换一个形态重新开始」。
-  const canSwitchAgentForm = surface === "initial" && Boolean(onAgentFormChange) && !isStreaming;
+  const isChatForm = mode === "chat";
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && sessionProjection.sessionId === (sessionId ?? sessionProjection.sessionId)
     ? sessionProjection.cell
@@ -1040,14 +1035,11 @@ export function Composer({
     );
   }
 
-  function switchAgentForm(nextForm: MainAgentForm, nextMode: ComposerMode) {
+  function selectMode(nextMode: ComposerMode) {
     setCommandOpen(false);
     setSkillsOpen(false);
-    onAgentFormChange?.({
-      agentForm: nextForm,
-      mode: nextMode,
-      // Agent 形态只接受图片附件；Chat 形态图片和文本文件都接受。
-      draft: { text: message, attachments: nextForm === "agent" ? attachments.filter((item) => item.kind === "image") : attachments },
+    void Promise.resolve(onModeChange?.(nextMode)).catch((error: unknown) => {
+      setSendError({ message: error instanceof Error ? error.message : String(error) });
     });
   }
 
@@ -1094,7 +1086,7 @@ export function Composer({
     switch (item.id) {
       case "plan":
       case "agent":
-        onModeChange?.(item.id);
+        selectMode(item.id);
         finishSlashSelection();
         return;
       case "compact":
@@ -1247,7 +1239,7 @@ export function Composer({
   function renderCommandModeRow(key: CommandMenuModeKey) {
     const item = COMMAND_MENU_MODES[key];
     const Icon = item.icon;
-    const selected = isChatForm ? key === "chat" : key === mode;
+    const selected = key === mode;
     return (
       <button
         className={COMMAND_MENU_ROW_CLASS}
@@ -1255,16 +1247,13 @@ export function Composer({
         role="menuitem"
         key={key}
         aria-label={item.label}
+        disabled={isStreaming}
         onClick={() => {
           if (selected) {
             setCommandOpen(false);
             return;
           }
-          if (key === "chat") return switchAgentForm("chat", "agent");
-          if (isChatForm) return switchAgentForm("agent", key);
-          onModeChange?.(key);
-          setCommandOpen(false);
-          setSkillsOpen(false);
+          selectMode(key);
         }}
       >
         <Icon className={`shrink-0 ${item.iconClass}`} size={16} strokeWidth={1.9} aria-hidden="true" />
@@ -1303,7 +1292,7 @@ export function Composer({
         onKeyDown={(event) => {
           if (!isChatForm && event.key === "Tab" && event.shiftKey) {
             event.preventDefault();
-            onModeChange?.("plan");
+            selectMode("plan");
             return;
           }
           if (slashOpen && event.key === "Escape") {
@@ -1605,26 +1594,6 @@ export function Composer({
   }
 
   function renderAddMenuButton() {
-    // 已开始的 Chat 会话没有可切换的模式，+ 菜单只剩附件一项：直接换成回形针，也暗示形态已锁定。
-    if (isChatForm && !canSwitchAgentForm) return (
-      <div className={`${CONTROL_GROUP_CLASS} [grid-area:plus]`}>
-        <IconButton
-          className="attach-button"
-          label="添加图片或文件"
-          tooltip="添加图片或文件（PNG、JPEG、WEBP、GIF、TXT、Markdown、JSON、CSV）"
-          size="lg"
-          shape="round"
-          onClick={() => {
-            setModelOpen(false);
-            setModelOptionsOpen(false);
-            setContextOpen(false);
-            void handleSelectChatFiles();
-          }}
-        >
-          <Paperclip size={18} strokeWidth={1.9} aria-hidden="true" />
-        </IconButton>
-      </div>
-    );
     return (
       <div className={`${CONTROL_GROUP_CLASS} [grid-area:plus]`}>
         <IconButton
@@ -1656,7 +1625,7 @@ export function Composer({
     if (!commandOpen) return null;
     if (!isChatForm && skillsOpen) return renderSkillsMenu();
 
-    const modeKeys: CommandMenuModeKey[] = canSwitchAgentForm ? ["agent", "plan", "chat"] : isChatForm ? [] : ["agent", "plan"];
+    const modeKeys: CommandMenuModeKey[] = ["agent", "plan", "chat"];
     const AttachmentIcon = isChatForm ? Paperclip : Image;
     return (
       <div className={COMMAND_MENU_CLASS} ref={commandMenuRef} role="menu" aria-label="添加上下文或工具">
@@ -1694,17 +1663,6 @@ export function Composer({
   }
 
   function renderModeSelector() {
-    if (isChatForm) return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className={`${MODE_BUTTON_BASE_CLASS} ${CHAT_MODE_PILL_CLASS} [grid-area:mode] hover:brightness-100`} tabIndex={0}>
-            <MessageCircle size={15} strokeWidth={2} aria-hidden="true" />
-            <span>Chat</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{canSwitchAgentForm ? "发送前可在 + 菜单中切换模式" : "对话已开始，需要开发能力请新建 Agent 会话"}</TooltipContent>
-      </Tooltip>
-    );
     if (mode === "agent") return null;
     const selectedMode = MODE_META[mode];
     const Icon = selectedMode.icon;
@@ -1716,7 +1674,7 @@ export function Composer({
         aria-label={`移除 ${selectedMode.label} 模式`}
         disabled={isStreaming}
         onClick={() => {
-          onModeChange?.("agent");
+          selectMode("agent");
           setCommandOpen(false);
           setSkillsOpen(false);
           setModelOpen(false);

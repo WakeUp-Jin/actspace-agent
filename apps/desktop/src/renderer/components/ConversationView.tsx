@@ -773,7 +773,7 @@ export function ConversationView({
   selectedModelId?: ModelSelectionId;
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   composerMode?: ComposerMode;
-  onComposerModeChange?: (mode: ComposerMode) => void;
+  onComposerModeChange?: (mode: ComposerMode) => void | Promise<void>;
   onAgentFormChange?: (change: ComposerAgentFormSwitch) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;

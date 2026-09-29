@@ -57,6 +57,18 @@ describe("ClientSessionStore", () => {
     expect(store.get("session-1").snapshot?.throughJournalSeq).toBe(4);
   });
 
+  it("projects a durable mode change into the live snapshot", () => {
+    const store = new ClientSessionStore();
+    store.applyEnvelope({ ...envelope("session-1", 0, null), snapshot: { ...snapshot("session-1", 0), agentMode: "chat", agentModeRevision: 1 } });
+    const applied = store.applyJournalUpdate({
+      sessionId: "session-1", throughJournalSeq: 1,
+      event: { recordKind: "event", seq: 1, type: "agent/mode-set", eventVersion: 1, criticality: "core", time: "2026-09-28T00:00:00.000Z", source: { kind: "runtime" }, data: { mode: "plan", revision: 2 }, surface: null, provenance: { emitter: "runtime" } },
+      values: { agentMode: { mode: "plan", revision: 2 } },
+    });
+    expect(applied).toBe(true);
+    expect(store.get("session-1").snapshot).toMatchObject({ agentMode: "plan", agentModeRevision: 2 });
+  });
+
   it("does not treat other Sessions' live sequence numbers as a gap", () => {
     const store = new ClientSessionStore();
     store.applySnapshot(snapshot("session-1", 0), { runtimeInstanceId: "runtime-1" });

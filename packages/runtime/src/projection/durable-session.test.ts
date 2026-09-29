@@ -24,3 +24,21 @@ describe("durable usage summary", () => {
     expect(snapshot().usage).toMatchObject({ totalTokens: 340, costUsd: 0 });
   });
 });
+
+describe("Agent mode recovery", () => {
+  it("keeps a legacy Chat Session in Chat despite an internal agent turn mode", () => {
+    const registry = createCoreCodecRegistry();
+    const header = createSessionHeader({ sessionId: "legacy-chat", createdAt: "2026-09-07T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", presetId: "actspace.chat", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: registry.digest } });
+    const journal = new SessionJournal({ registry });
+    journal.append({ type: "turn/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "legacy", mode: "agent" }, surface: null });
+    expect(new SessionReadModel(header, registry).replay(journal.events).snapshot()).toMatchObject({ agentFormId: "actspace.main", agentMode: "chat", agentModeRevision: 0 });
+  });
+
+  it("replays a mode event and keeps it in the cold snapshot", () => {
+    const registry = createCoreCodecRegistry();
+    const header = createSessionHeader({ sessionId: "mode", createdAt: "2026-09-07T00:00:00Z", cwd: "/workspace", lineage: null, createdWith: { profileId: "fixture", presetId: "actspace.main", initialAgentMode: "chat", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: registry.digest } });
+    const journal = new SessionJournal({ registry });
+    journal.append({ type: "agent/mode-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { mode: "plan", revision: 1 }, surface: null });
+    expect(new SessionReadModel(header, registry).replay(journal.events).snapshot()).toMatchObject({ agentMode: "plan", agentModeRevision: 1 });
+  });
+});

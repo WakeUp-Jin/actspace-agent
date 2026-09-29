@@ -56,6 +56,8 @@
 
 ## 推荐阅读路线
 
+- [Agent 形态与三种工作模式](agent-runtime/agent-forms-and-modes.md)：待审核目标；单一插件组合、Chat/Plan/Agent 模式、调用门禁及旧会话兼容，尚未实施。
+
 ### Agent Runtime
 
 1. `agent-index.md`

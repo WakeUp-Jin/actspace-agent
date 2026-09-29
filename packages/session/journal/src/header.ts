@@ -23,6 +23,11 @@ export type SessionLineageV1 = {
 export type SessionCreatedWithV1 = {
   readonly profileId: string;
   readonly presetId?: string;
+  readonly agentFormId?: "actspace.main";
+  readonly agentFormVersion?: number;
+  readonly agentCompositionDigest?: string;
+  readonly agentMembers?: readonly { readonly id: string; readonly version: number }[];
+  readonly initialAgentMode?: "chat" | "plan" | "agent";
   readonly runtimeContractVersion: string;
   readonly manifestDigest: string;
   readonly plugins: readonly SessionPluginProvenance[];
@@ -83,6 +88,21 @@ export function validateSessionHeader(value: unknown, expectedSessionId?: string
   if (!isRecord(value.createdWith)) throw invalidHeader("createdWith must be an object.");
   requireString(value.createdWith.profileId, "createdWith.profileId");
   if (value.createdWith.presetId !== undefined) requireString(value.createdWith.presetId, "createdWith.presetId");
+  if (value.createdWith.agentFormId !== undefined && value.createdWith.agentFormId !== "actspace.main") throw invalidHeader("Unsupported agent form.");
+  if (value.createdWith.agentFormVersion !== undefined && value.createdWith.agentFormVersion !== 1) throw invalidHeader("Unsupported agent form version.");
+  if (value.createdWith.agentCompositionDigest !== undefined) requireString(value.createdWith.agentCompositionDigest, "createdWith.agentCompositionDigest");
+  if (value.createdWith.agentMembers !== undefined) {
+    if (!Array.isArray(value.createdWith.agentMembers)) throw invalidHeader("createdWith.agentMembers must be an array.");
+    const memberIds = new Set<string>();
+    for (const member of value.createdWith.agentMembers) {
+      if (!isRecord(member)) throw invalidHeader("Agent member must be an object.");
+      requireString(member.id, "createdWith.agentMembers[].id");
+      if (!Number.isSafeInteger(member.version) || (member.version as number) < 1) throw invalidHeader("Agent member version must be positive.");
+      if (memberIds.has(member.id)) throw invalidHeader(`Duplicate Agent member ${member.id}.`);
+      memberIds.add(member.id);
+    }
+  }
+  if (value.createdWith.initialAgentMode !== undefined && !["chat", "plan", "agent"].includes(String(value.createdWith.initialAgentMode))) throw invalidHeader("Unsupported initial Agent mode.");
   requireString(value.createdWith.runtimeContractVersion, "createdWith.runtimeContractVersion");
   requireString(value.createdWith.manifestDigest, "createdWith.manifestDigest");
   requireString(value.createdWith.codecSetDigest, "createdWith.codecSetDigest");

@@ -301,6 +301,8 @@ export type SessionMeta = {
   createdAt: string;
   agentRunCount: number;
   agentForm?: import("./runtime-v2/runtime").MainAgentForm;
+  agentMode?: import("./runtime-v2/runtime").RuntimeV2AgentMode;
+  agentModeRevision?: number;
   /** 工作区注册表里的稳定 id；缺省时按 workspaceRoot 或默认 workspace 解析。 */
   workspaceId?: string;
   /** 创建会话时的工作区根目录，用于侧边栏按 Workspace 分组；缺省时视为 default。 */

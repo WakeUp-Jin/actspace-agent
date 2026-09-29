@@ -18,7 +18,7 @@ export function recordProjectionFixture(record: SessionRecord): RuntimeV2Desktop
   });
   const events: SessionEventEnvelopeV1[] = sourceEvents.map((event, seq) => legacyEventToJournal(event, seq));
   const value = projectionFixture(record.meta.id, events.length - 1, events);
-  return { ...value, activeMessageIds: events.flatMap(event => event.surface ? [event.surface.node.messageId] : []), snapshot: { ...value.snapshot, metadata: { title: record.meta.title, pinned: record.meta.pinned ?? false, archived: record.meta.archived ?? false }, workspaceRoot: record.meta.workspaceRoot, agentForm: record.meta.agentForm ?? "agent", messages: events.flatMap(event => event.surface ? [event.surface.node] : []), activity: { ...value.snapshot.activity, turnCount: record.meta.agentRunCount, completedTurnCount: record.meta.agentRunCount } } };
+  return { ...value, activeMessageIds: events.flatMap(event => event.surface ? [event.surface.node.messageId] : []), snapshot: { ...value.snapshot, metadata: { title: record.meta.title, pinned: record.meta.pinned ?? false, archived: record.meta.archived ?? false }, workspaceRoot: record.meta.workspaceRoot, agentForm: record.meta.agentForm ?? "agent", agentMode: record.meta.agentMode ?? (record.meta.agentForm === "chat" ? "chat" : "agent"), agentModeRevision: record.meta.agentModeRevision ?? 0, messages: events.flatMap(event => event.surface ? [event.surface.node] : []), activity: { ...value.snapshot.activity, turnCount: record.meta.agentRunCount, completedTurnCount: record.meta.agentRunCount } } };
 }
 
 function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnvelopeV1 {

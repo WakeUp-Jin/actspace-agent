@@ -170,6 +170,9 @@ declare global {
       setSessionPermissionMode?: (
         input: import("@actspace/shared").SessionPermissionModeInput
       ) => Promise<import("@actspace/shared").SessionPermissionModeResult>;
+      setSessionAgentMode?: (
+        input: import("@actspace/shared").SessionAgentModeInput
+      ) => Promise<import("@actspace/shared").SessionAgentModeResult>;
       revokeSessionGrant?: (
         input: import("@actspace/shared").SessionGrantRevokeInput
       ) => Promise<import("@actspace/shared").SessionGrantRevokeResult>;

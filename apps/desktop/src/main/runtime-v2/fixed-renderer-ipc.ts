@@ -192,6 +192,14 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionAgentMode, async (_event, input: import("@actspace/shared").SessionAgentModeInput) => {
+    try {
+      const snapshot = await options.registry.updateSessionAgentMode(input.sessionId, input.mode, input.expectedRevision);
+      return { ok: true, mode: snapshot.agentMode, revision: snapshot.agentModeRevision };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.revokeSessionGrant, async (_event, input: { sessionId: string; grantId: string }) => {
     if (!input.sessionId || !input.grantId) return { ok: false, error: "invalid_grant_revoke" };
     try {
@@ -750,6 +758,8 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
     isChildSession: item.lineage !== null,
     agentRunCount,
     agentForm: item.agentForm,
+    agentMode: item.agentMode,
+    agentModeRevision: item.agentModeRevision,
     workspaceRoot: item.workspaceRoot ?? undefined,
     pinned: item.metadata.pinned,
     archived: item.metadata.archived,
@@ -766,7 +776,7 @@ async function toRunContent(
   const snapshot = await registry.inspectSession(sessionId);
   const blocks: RuntimeV2JsonValue[] = userInput ? [{ type: "text", text: userInput }] : [];
   const usableAttachments = attachments.filter((attachment) => Boolean(attachment.path));
-  if (snapshot.agentForm === "chat") {
+  if (snapshot.agentMode === "chat") {
     const imported = await registry.importChatAttachments(sessionId, usableAttachments.map((attachment) => attachment.path!));
     for (const attachment of imported) {
       blocks.push({

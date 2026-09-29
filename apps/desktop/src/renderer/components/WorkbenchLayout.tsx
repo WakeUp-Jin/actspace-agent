@@ -139,7 +139,6 @@ export function WorkbenchLayout({
   reviewSummary,
   onReviewChanged,
   models,
-  agentForm = "agent",
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -172,7 +171,7 @@ export function WorkbenchLayout({
   selectedModelId?: ModelSelectionId;
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   composerMode?: ComposerMode;
-  onComposerModeChange?: (mode: ComposerMode) => void;
+  onComposerModeChange?: (mode: ComposerMode) => void | Promise<void>;
   onAgentFormChange?: (change: ComposerAgentFormSwitch) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;
@@ -520,7 +519,7 @@ export function WorkbenchLayout({
     });
   }, [view, settingsSection, loadUsageStatistics]);
 
-  const permissionControl = activeSessionId && agentForm !== "chat" ? (
+  const permissionControl = activeSessionId && composerMode !== "chat" ? (
     <PermissionModeControl
       sessionId={activeSessionId}
       mode={permissionMode}
@@ -583,10 +582,9 @@ export function WorkbenchLayout({
         draftKey={draftKey}
         readDraft={readDraft}
         writeDraft={writeDraft}
-        reviewSummary={agentForm === "chat" ? null : reviewSummary}
-        onOpenReview={agentForm === "chat" ? undefined : openReviewTab}
+        reviewSummary={composerMode === "chat" ? null : reviewSummary}
+        onOpenReview={composerMode === "chat" ? undefined : openReviewTab}
         models={models}
-        agentForm={agentForm}
         activeView={sessionMainView}
         trajectory={projectedTrajectory}
         permissionControl={permissionControl}
@@ -670,7 +668,7 @@ export function WorkbenchLayout({
   );
   const rightPanel = (
     <RightPanel
-      developmentEnabled={agentForm !== "chat"}
+      developmentEnabled={composerMode !== "chat"}
       contextState={effectiveContextState}
       contextSnapshot={effectiveContextSnapshot}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
@@ -709,14 +707,14 @@ export function WorkbenchLayout({
         sessionView={view === "chat" ? sessionMainView : undefined}
         onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
         centerTrailing={view === "chat" ? <>
-          {agentForm !== "chat" && selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
+          {composerMode !== "chat" && selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
         </> : undefined}
         rightLeading={
           view === "chat" ? (
             <>
               {isRightPanelOpen ? (
                 <RightPanelObjectMenu
-                  developmentEnabled={agentForm !== "chat"}
+                  developmentEnabled={composerMode !== "chat"}
                   sessionId={activeSessionId}
                   onOpenReview={openReviewTab}
                 />

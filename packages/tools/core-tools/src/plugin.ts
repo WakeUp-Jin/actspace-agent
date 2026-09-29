@@ -13,7 +13,10 @@ import type { LlmService } from "@actspace/llm-service";
 
 export type CoreToolName = (typeof CORE_TOOLS_MANIFEST.tools)[number];
 export type CoreToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
-export type CoreToolPorts = Partial<Readonly<Record<CoreToolName, CoreToolHandler>>> & { readonly dispose?: () => Promise<void> };
+export type CoreToolPorts = Partial<Readonly<Record<CoreToolName, CoreToolHandler>>> & {
+  readonly hasRunningBackgroundTask?: (sessionId: string) => boolean;
+  readonly dispose?: () => Promise<void>;
+};
 
 export type CoreToolRegistration = { readonly name: string; readonly localName: CoreToolName; readonly handle: ReturnType<ToolRuntime["register"]> };
 
@@ -31,7 +34,7 @@ export async function apply(ctx: CordisContext): Promise<void> {
   if (host === undefined) throw new Error(`Core Tools plugin requires ${CORE_TOOLS_HOST_PORT_ID}.`);
   const ports = await host.createPorts(llm);
   const registrations = registerCoreTools(runtime, ports);
-  ctx.provide?.("tools.core", Object.freeze({ registrations, definitions: CORE_TOOL_DEFINITIONS }));
+  ctx.provide?.("tools.core", Object.freeze({ registrations, definitions: CORE_TOOL_DEFINITIONS, hasRunningBackgroundTask: ports.hasRunningBackgroundTask ?? (() => false) }));
   ctx.effect?.(() => async () => {
     const disposers: Array<() => void | Promise<void>> = [...registrations].reverse().map((registration) => () => registration.handle.dispose());
     if (ports.dispose !== undefined) disposers.push(() => ports.dispose!());

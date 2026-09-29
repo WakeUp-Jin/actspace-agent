@@ -88,6 +88,8 @@ describe("native v2 Core Tool ports", () => {
     const background = await invoke(ports.bash, { command: "printf ready; sleep 30", intent: "verify background", blockMs: 0 });
     const taskId = JSON.stringify(background).match(/bash_[0-9a-f-]+/)?.[0]; expect(taskId).toBeTruthy();
     expect(background.detail).toEqual([{ label: "background-task", value: { taskId, status: "running" } }]);
+    expect(ports.hasRunningBackgroundTask?.("session")).toBe(true);
+    expect(ports.hasRunningBackgroundTask?.("other-session")).toBe(false);
     await new Promise((resolveWait) => setTimeout(resolveWait, 30));
     const output = await invoke(ports.bash_output, { taskId: taskId! }); expect(JSON.stringify(output)).toContain("ready");
     await expect(invoke(ports.bash_output, { taskId: taskId! }, "other-session")).resolves.toMatchObject({ status: "failed", failure: { code: "BASH_TASK_NOT_FOUND" } });

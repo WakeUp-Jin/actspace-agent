@@ -45,6 +45,12 @@ export interface ToolJournalPort {
 }
 
 export type ToolPreparedEnvironment = {
+  /** Bound by the owning Agent Loop; production Tool Runtime rejects missing scopes. */
+  readonly allowedToolNames?: ReadonlySet<string>;
+  /** Re-resolved before staging and execution, including approval resume. */
+  readonly isToolAllowedNow?: (name: string) => boolean;
+  /** Opaque binding issued by the production Tool Runtime for one Agent instance. */
+  readonly agentScopeToken?: object;
   readonly resolveArtifact?: import("./executor.js").SessionArtifactResolver;
   readonly workspaceRoot: string;
   readonly permissionMode?: PermissionMode | (() => PermissionMode);
@@ -127,6 +133,7 @@ export class PreparedToolExecution {
   async stage(): Promise<PreparedDispatch> {
     if (this.#stage !== undefined) return this.#stage;
     try {
+      this.#checkToolScope();
       this.#args = materializeToolArguments(this.registration.definition.inputSchema, this.input.arguments);
       if (this.environment.context !== undefined) {
         const transformed = await waterfallDispatch(this.environment.context, "tools/pre-execute", {
@@ -176,6 +183,7 @@ export class PreparedToolExecution {
       } catch (error) {
         return this.#rememberTerminal(this.#failureResult("failed", { code: "CHECKPOINT_FAILED", message: "Tool dispatch could not pass its durability checkpoint.", retryable: true, phase: "checkpoint" }));
       }
+      this.#checkToolScope();
       this.#stage = Object.freeze({ kind: "body" });
       return this.#stage;
     } catch (error) {
@@ -220,6 +228,7 @@ export class PreparedToolExecution {
     };
     try {
       const invoke = async () => {
+        this.#checkToolScope();
         try { this.environment.onExecutionStarted?.({ callId: this.callId, name: this.name }); } catch { /* Observers cannot affect tool execution. */ }
         return this.registration.executor.execute(this.#args ?? {}, context);
       };
@@ -362,6 +371,7 @@ export class PreparedToolExecution {
   }
 
   async #recheck(expectedMode: PermissionMode): Promise<void> {
+    this.#checkToolScope();
     enforceCoreToolGuards({ definition: this.registration.definition, args: this.#args ?? {}, hostCapabilities: this.environment.hostCapabilities, lease: this.#lease, signal: this.#controller.signal, executorConcurrencySafe: this.registration.executor.concurrencySafe === true });
     if (this.#permissionMode() !== expectedMode) throw new ToolRuntimeError({ code: "PERMISSION_STATE_CHANGED", message: "Permission mode changed while approval was pending.", retryable: true, phase: "guard" });
     const resources = Object.freeze(await this.registration.permission.extractResources(this.#args ?? {}, { workspaceRoot: this.environment.workspaceRoot, canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot) }));
@@ -373,6 +383,12 @@ export class PreparedToolExecution {
     if (this.#onceApproval !== undefined) {
       if (this.#onceApproval.consumedAt !== undefined || Date.now() > new Date(this.#onceApproval.expiresAt).getTime()) throw new ToolRuntimeError({ code: "APPROVAL_STALE", message: "One-time approval is no longer valid.", retryable: false, phase: "approval" });
       this.#onceApproval.consumedAt = new Date().toISOString();
+    }
+  }
+
+  #checkToolScope(): void {
+    if ((this.environment.allowedToolNames !== undefined && !this.environment.allowedToolNames.has(this.name)) || this.environment.isToolAllowedNow?.(this.name) === false) {
+      throw new ToolRuntimeError({ code: "AGENT_MODE_DENIED", message: `Tool ${this.name} is unavailable in this Agent mode.`, retryable: false, phase: "guard" });
     }
   }
 

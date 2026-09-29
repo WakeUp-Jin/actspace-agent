@@ -7,6 +7,6 @@ export const manifest = defineBuiltinPluginManifest({
   entry: { entryId: "desktop.app", behavior: "./plugin.js" },
   host: { required: [], optional: [] },
   frontend: null,
-  injects: ["session.runtime", "agent.runtime", "llm.service", "compaction.runtime"],
+  injects: ["session.runtime", "agent.runtime", "llm.service", "compaction.runtime", "tools.core"],
   contributions: { services: ["desktop.app"], tools: [], prompts: [], events: [] },
 });

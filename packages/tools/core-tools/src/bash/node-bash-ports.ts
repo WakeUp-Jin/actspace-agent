@@ -26,6 +26,7 @@ const NOTIFICATION_TAIL_CHARS = 2_000;
 let sandboxProbe: Promise<boolean> | undefined;
 
 export type NodeBashToolPorts = Pick<CoreToolPorts, "bash" | "bash_output" | "bash_kill"> & {
+  readonly hasRunningBackgroundTask: (sessionId: string) => boolean;
   readonly dispose: () => Promise<void>;
 };
 
@@ -35,6 +36,7 @@ export function createNodeBashToolPorts(options: { readonly workspaceRoot: strin
     bash: (args, context) => executeBash(args, context, options, registry),
     bash_output: (args, context) => registry.output(stringArg(args, "taskId"), context.sessionId, integerArg(args, "tailLines")),
     bash_kill: (args, context) => registry.kill(stringArg(args, "taskId"), context.sessionId),
+    hasRunningBackgroundTask: (sessionId) => registry.running(sessionId) > 0,
     dispose: () => registry.dispose(),
   });
 }

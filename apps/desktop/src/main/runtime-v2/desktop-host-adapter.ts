@@ -116,6 +116,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       }),
       [options.module.PROMPT_HOST_PORT_ID]: Object.freeze({
         workspaceRoot: options.roots.workspaceRoot,
+        resolveUserSource: () => options.module.prepareUserPromptSource(options.roots.dataRoot),
         resolveSource: (workspaceRoot: string) => options.module.prepareRuntimePromptSource({ dataRoot: options.roots.dataRoot, workspaceRoot }),
       }),
       [options.module.BROWSER_TOOLS_HOST_PORT_ID]: browser,

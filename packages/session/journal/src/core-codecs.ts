@@ -28,6 +28,7 @@ export type CoreSessionEventType = (typeof CORE_EVENT_TYPES)[number];
 export const PERSISTED_EXTENSION_EVENT_TYPES = [
   "agent/inbox/spliced",
   "agent-preset/selected",
+  "agent/mode-set",
   "permission/asked",
   "permission/decided",
   "permission/mode-set",
@@ -100,6 +101,12 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
     validate: (data: RuntimeV2JsonValue) => {
       if (data === null || typeof data !== "object" || Array.isArray(data)) {
         throw invalid(type, "data must be an object");
+      }
+      if (type === "agent/mode-set") {
+        const mode = (data as Readonly<Record<string, RuntimeV2JsonValue>>).mode;
+        const revision = (data as Readonly<Record<string, RuntimeV2JsonValue>>).revision;
+        if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw invalid(type, "mode must be chat, plan or agent");
+        if (!Number.isSafeInteger(revision) || (revision as number) < 1) throw invalid(type, "revision must be a positive integer");
       }
       if (type.startsWith("permission/")) validatePermissionData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
     },

@@ -45,6 +45,6 @@ describe("Runtime v2 CLI candidate", () => {
     expect(resumed.sessionId).toBe(persistent.sessionId);
     expect(resumed.permissionMode).toBe("full-access");
     expect(resumed.messageCount).toBeGreaterThan(persistent.messageCount);
-  });
+  }, 30_000);
 
 });

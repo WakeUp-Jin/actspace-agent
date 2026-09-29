@@ -386,3 +386,35 @@ describe("incremental tool completion", () => {
     expect(commits.map((result) => result.callId)).toEqual(["fast", "slow"]);
   });
 });
+
+describe("production Agent scope admission", () => {
+  it("rejects missing, mismatched, and disallowed tool calls before executor body", async () => {
+    const runtime = new ToolRuntime({ requireAgentScope: true });
+    let executions = 0;
+    runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { executions += 1; return success(); } } });
+    const binding = runtime.bindAgentScope("session-1", "agent-1", () => new Set<string>());
+    const input = { ...call("scope-call"), agentId: "agent-1" };
+    const env = environment([]);
+    expect(() => runtime.executeBatch([input], env)).toThrow(/Agent scope policy/);
+    expect(() => runtime.executeBatch([{ ...input, agentId: "other" }], { ...env, agentScopeToken: binding.token })).toThrow(/matching Agent/);
+    const [denied] = await runtime.executeBatch([input], { ...env, agentScopeToken: binding.token, allowedToolNames: new Set(["read"]) });
+    expect(denied).toMatchObject({ status: "denied", failure: { code: "AGENT_MODE_DENIED" } });
+    expect(executions).toBe(0);
+    binding.dispose();
+    expect(() => runtime.executeBatch([input], { ...env, agentScopeToken: binding.token })).toThrow(/matching Agent/);
+  });
+
+  it("rechecks the bound policy before the body after batch admission", async () => {
+    const runtime = new ToolRuntime({ requireAgentScope: true });
+    let executions = 0;
+    let allowed = true;
+    runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { executions += 1; return success(); } } });
+    const binding = runtime.bindAgentScope("session-1", "agent-1", () => new Set(allowed ? ["read"] : []));
+    const input = { ...call("changed-policy"), agentId: "agent-1" };
+    const env = environment([]);
+    const [result] = await runtime.executeBatch([input], { ...env, agentScopeToken: binding.token, journal: { ...env.journal, recordDispatch: async fact => { allowed = false; await env.journal.recordDispatch(fact); } } });
+    expect(result).toMatchObject({ status: "denied", failure: { code: "AGENT_MODE_DENIED" } });
+    expect(executions).toBe(0);
+    binding.dispose();
+  });
+});

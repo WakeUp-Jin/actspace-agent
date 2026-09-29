@@ -13,7 +13,7 @@ import type { SessionHandle } from "@actspace/session-persistence";
 import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tools-runtime";
 import type { ToolRuntime } from "@actspace/tools-runtime";
 import type { ToolExecutionResult } from "@actspace/tools-runtime";
-import { createAgentEventDispatcher, defaultAgentSubject, type AgentDescriptor, type AgentSubject, type AgentEventDispatcher } from "@actspace/core-agent";
+import { allowedAgentModeTools, createAgentEventDispatcher, defaultAgentSubject, type AgentDescriptor, type AgentSubject, type AgentEventDispatcher } from "@actspace/core-agent";
 import type { CompactionPlugin } from "@actspace/compaction";
 import { AgentRuntimeError } from "@actspace/core-agent";
 import type { MainAgentInbox } from "@actspace/core-agent";
@@ -49,6 +49,7 @@ export type AgentLoopOptions = {
   readonly session: SessionHandle;
   readonly inbox: MainAgentInbox;
   readonly assembler: RequestAssembler;
+  readonly modeRuntime?: (mode: RuntimeV2AgentMode) => Promise<{ readonly assembler: RequestAssembler; readonly compaction?: CompactionPlugin }>;
   readonly llm: LlmService;
   readonly tools: ToolRuntime;
   readonly toolEnvironment: (session: SessionHandle) => Omit<ToolPreparedEnvironment, "journal">;
@@ -56,6 +57,7 @@ export type AgentLoopOptions = {
   readonly hostCapabilityDigest: string;
   readonly host: RuntimeV2HostDescriptor;
   readonly allowedToolNames?: ReadonlySet<string>;
+  readonly toolScopeToken?: object;
   readonly compaction?: CompactionPlugin;
   readonly onLiveEvent?: (event: AgentLoopLiveEvent) => void;
   /** Real Cordis context used by the DSH-native assembly path. */
@@ -89,13 +91,17 @@ export class AgentLoop {
       this.emitLive({ kind: "run-state", agentRunId, turnId, message: "started" });
       const messageId = input.messageId ?? randomUUID();
       const mode = input.mode ?? "agent";
-      await this.options.session.append(core("turn/start", { turnId, agentRunId, mode }));
+      const modeRevision = currentAgentModeRevision(this.options.session.journal.events);
+      const modeRuntime = await this.options.modeRuntime?.(mode);
+      const assembler = modeRuntime?.assembler ?? this.options.assembler;
+      const compaction = modeRuntime?.compaction ?? this.options.compaction;
+      await this.options.session.append(core("turn/start", { turnId, agentRunId, mode, modeRevision }));
       const turnEnvironment = this.options.toolEnvironment(this.options.session);
       const configuredPermissionMode = typeof turnEnvironment.permissionMode === "function" ? turnEnvironment.permissionMode() : turnEnvironment.permissionMode ?? "default";
       if (turnEnvironment.permissionModeExplicit && currentPermissionMode(this.options.session.journal.events) !== configuredPermissionMode) {
         await this.options.session.append(core("permission/mode-set", { mode: configuredPermissionMode, changedAt: new Date().toISOString(), source: "host" }));
       }
-      const persistedContent = this.options.descriptor.presetId === "actspace.chat" ? input.content : appendRuntimeContext(input.content, mode);
+      const persistedContent = appendRuntimeContext(input.content, mode, modeRevision);
       if (!hasUserMessage(this.options.session, messageId)) await this.options.session.append(core("user/message", { messageId, agentRunId, turnId }, { surface: { kind: "append", node: { kind: "user", messageId, content: persistedContent } } }));
       while (stepCount < this.options.descriptor.maxSteps) {
         if (controller.signal.aborted) throw new AgentRuntimeError("TURN_ABORTED", "Turn was aborted.");
@@ -107,14 +113,14 @@ export class AgentLoop {
         const budgetSummary = this.options.descriptor.kind === "subagent" && stepCount === this.options.descriptor.maxSteps;
         const tools = budgetSummary ? [] : this.toolDefinitions(mode);
         const visibleToolNames = new Set(tools.map((tool) => tool.name));
-        let candidate = await this.options.assembler.assembleCandidate({
+        let candidate = await assembler.assembleCandidate({
           sessionId: this.options.session.header.sessionId,
           turnId,
           stepId,
           scope: this.options.scope,
           surface: this.options.session.journal.surface.entries.map((entry) => surfaceMessage(entry.node)),
           hostFacts: { agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
-          selectedSkillIds: Object.freeze([...(input.selectedSkillIds ?? [])]),
+          selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(input.selectedSkillIds ?? [])]),
         }, tools as unknown as RuntimeV2JsonValue[], { routeId: this.options.descriptor.routeId, model: input.model ?? this.options.descriptor.model });
         const assembled = await this.waterfall("system-prompt/assemble", candidate, controller.signal);
         if (isRecord(assembled)) candidate = assembled as typeof candidate;
@@ -142,9 +148,9 @@ export class AgentLoop {
         const retryPolicy = prepared.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY;
         const contextWindow = prepared.request.contextWindow ?? null;
         const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: prepared.registration.registrationId, adapterVersion: prepared.registration.adapter.adapterVersion, defaults: prepared.request.options as RuntimeV2JsonValue, retryPolicy: retryPolicySnapshot(retryPolicy) as unknown as RuntimeV2JsonValue, contextWindow };
-        const snapshot = this.options.assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+        const snapshot = assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
         try {
-          await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt: 1 }));
+          await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt: 1, agentMode: mode, agentModeRevision: modeRevision }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot }));
           await this.checkpoint("before-llm-dispatch");
         } catch (error) { prepared.release(); throw error; }
@@ -184,14 +190,14 @@ export class AgentLoop {
           await this.options.session.append(core("llm/retry-started", { requestId: failedRequestId, retryId, attempt: attempt + 1 }));
           await this.checkpoint("before-llm-dispatch");
           attempt += 1;
-          candidate = await this.options.assembler.assembleCandidate({
+          candidate = await assembler.assembleCandidate({
             sessionId: this.options.session.header.sessionId,
             turnId,
             stepId,
             scope: this.options.scope,
             surface: this.options.session.journal.surface.entries.map((entry) => surfaceMessage(entry.node)),
             hostFacts: { agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
-            selectedSkillIds: Object.freeze([...(input.selectedSkillIds ?? [])]),
+            selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(input.selectedSkillIds ?? [])]),
           }, tools as unknown as RuntimeV2JsonValue[], { routeId: this.options.descriptor.routeId, model: input.model ?? this.options.descriptor.model });
           const retryAssembled = await this.waterfall("system-prompt/assemble", candidate, controller.signal);
           if (isRecord(retryAssembled)) candidate = retryAssembled as typeof candidate;
@@ -206,8 +212,8 @@ export class AgentLoop {
             requestId,
             messages: requestMessageList,
           }, controller.signal, prepared.preparedAdapterCall);
-          const retrySnapshot = this.options.assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
-          await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow, attempt }));
+          const retrySnapshot = assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+          await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow, attempt, agentMode: mode, agentModeRevision: modeRevision }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot: retrySnapshot }));
           await this.checkpoint("before-llm-dispatch");
           output = undefined;
@@ -224,7 +230,7 @@ export class AgentLoop {
           await this.options.session.append(core("turn/end", { turnId, reason: "completed" }));
           await this.checkpoint("after-turn-settled");
           const usage = compactionUsage(output.usage);
-          if (usage !== null) await this.options.compaction?.maybeCompact(this.options.session, usage);
+          if (usage !== null) await compaction?.maybeCompact(this.options.session, usage);
           this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "completed" });
           await this.notify("agent/status", { agentRunId, turnId, status: "completed" });
           return Object.freeze({ agentRunId, turnId, reason: "completed", steps: stepCount, finalText });
@@ -279,9 +285,14 @@ export class AgentLoop {
   }
 
   private toolDefinitions(mode: RuntimeV2AgentMode): readonly LlmToolDefinition[] {
-    return this.options.tools.registry.listDefinitions()
-      .filter((definition) => this.options.allowedToolNames?.has(definition.name) ?? true)
-      .filter((definition) => mode === "agent" || isPlanTool(definition))
+    const available = this.options.tools.registry.listDefinitions();
+    const modeTools = this.options.descriptor.kind === "subagent"
+      ? new Set(available.map(definition => definition.name))
+      : allowedAgentModeTools(mode, available.map(definition => definition.name));
+    return available
+      .filter((definition) => modeTools.has(definition.name)
+        && (this.options.toolScopeToken === undefined || this.options.descriptor.kind === "subagent" || this.options.scope.tools.get(definition.name)?.value === definition.pluginId)
+        && (this.options.allowedToolNames?.has(definition.name) ?? true))
       .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeV2JsonValue }));
   }
   private emitLive(event: WithoutSession<AgentLoopLiveEvent>): void {
@@ -317,7 +328,7 @@ export class AgentLoop {
       this.emitLive({ kind: "tool-prepared", ...ids, callId: call.callId, name: definition.name, arguments: args });
     }
     const base = this.options.toolEnvironment(this.options.session);
-    const environment: ToolPreparedEnvironment = { ...base, context: this.options.context, eventCarrier: this.#events.carrier,
+    const environment: ToolPreparedEnvironment = { ...base, allowedToolNames: visibleToolNames, agentScopeToken: this.options.toolScopeToken, context: this.options.context, eventCarrier: this.#events.carrier,
       onExecutionStarted: (call) => {
         this.emitLive({ kind: "tool-started", ...ids, callId: call.callId, name: call.name });
         try { base.onExecutionStarted?.(call); } catch { /* Isolate optional observers. */ }
@@ -336,12 +347,6 @@ export class AgentLoop {
     const inputs: ToolCallInput[] = resolvedCalls.map(({ call, definition }) => ({ callId: call.callId, name: definition.name, arguments: parseArgs(call.arguments), sessionId: this.options.session.header.sessionId, agentId: this.subject.agentId, ...ids, signal }));
     return this.options.tools.executeBatch(inputs, environment);
   }
-}
-
-function isPlanTool(definition: import("@actspace/tools-runtime").ToolDefinition): boolean {
-  if (definition.name === "explore") return true;
-  return definition.concurrency === "read-only"
-    && definition.effects.every((effect) => effect.mode !== "write" && effect.mode !== "execute");
 }
 
 type CollectedToolCall = { readonly callId: string; readonly name: string; readonly arguments: string };
@@ -416,11 +421,18 @@ function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<
   });
 }
 function parseArgs(value: string): RuntimeV2JsonValue { try { const parsed = JSON.parse(value); return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}; } catch { return {}; } }
-function appendRuntimeContext(content: RuntimeV2JsonValue, mode: RuntimeV2AgentMode): RuntimeV2JsonValue {
-  const block = { type: "runtime-context", context: { agentMode: mode } } as const;
+function appendRuntimeContext(content: RuntimeV2JsonValue, mode: RuntimeV2AgentMode, revision: number): RuntimeV2JsonValue {
+  const block = { type: "runtime-context", context: { agentMode: mode, agentModeRevision: revision } } as const;
   if (Array.isArray(content)) return [...content, block];
   if (typeof content === "string") return [{ type: "text", text: content }, block];
   return [{ type: "json", value: content }, block];
+}
+function currentAgentModeRevision(events: readonly { readonly type: string; readonly data: RuntimeV2JsonValue }[]): number {
+  for (let index = events.length - 1; index >= 0; index--) {
+    const event = events[index]!;
+    if (event.type === "agent/mode-set" && isRecord(event.data) && typeof event.data.revision === "number") return event.data.revision;
+  }
+  return 0;
 }
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function compactionUsage(value: RuntimeV2JsonValue): { inputTokens: number; outputTokens: number } | null {

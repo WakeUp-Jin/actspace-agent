@@ -78,6 +78,7 @@ it("restores a rejected Chat draft without a phantom message, failed turn, or wo
   window.localStorage.clear();
   const record = createEmptySessionRecord("chat-rejection");
   record.meta.agentForm = "chat";
+  record.meta.agentMode = "chat";
   record.meta.workspaceRoot = "/tmp/workspace";
   const attachment = { id: "bad", kind: "file" as const, name: "bad.txt", path: "/fixture/bad.txt" };
   const runAgent = vi.fn(async (input: RunAgentInput) => ({ status: "rejected" as const, sessionId: input.sessionId, agentRunId: input.agentRunId, error: { code: "invalid_utf8" as const, fileName: "bad.txt", attachmentId: "bad" } }));
@@ -85,7 +86,7 @@ it("restores a rejected Chat draft without a phantom message, failed turn, or wo
     ...settingsApiStub,
     getBootstrapState: async () => bootstrapState,
     listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt),
-    listSessions: async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", workspaceRoot: "/tmp/workspace" }],
+    listSessions: async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", agentMode: "chat", workspaceRoot: "/tmp/workspace" }],
     getSession: async () => record, createSession: async () => record,
     listPendingApprovals: async () => [], onAgentStream: () => () => {},
     selectFiles: async () => ({ canceled: false, attachments: [attachment] }),

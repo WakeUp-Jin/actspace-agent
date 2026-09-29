@@ -187,6 +187,12 @@ export class DesktopRuntimeV2Registry {
     return snapshot;
   }
 
+  async updateSessionAgentMode(sessionId: string, mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode, expectedRevision?: number) {
+    const snapshot = await this.requireApp().updateSessionAgentMode(sessionId, mode, expectedRevision);
+    this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-agent-mode-updated");
+    return snapshot;
+  }
+
   async revokeSessionGrant(sessionId: string, grantId: string) {
     this.options.approvals.expireAll?.(sessionId);
     const snapshot = await this.requireApp().revokeSessionGrant(sessionId, grantId);
@@ -224,7 +230,7 @@ export class DesktopRuntimeV2Registry {
 
   async importChatAttachments(sessionId: string, paths: readonly string[]): Promise<readonly RuntimeV2AttachmentRef[]> {
     const snapshot = await this.requireApp().inspectSession(sessionId);
-    if (snapshot.agentForm !== "chat") throw new Error("Chat attachment import is only available in Chat sessions.");
+    if (snapshot.agentMode !== "chat") throw new Error("Chat attachment import is only available in Chat sessions.");
     if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
 
     const prepared = await prepareChatAttachments(paths);
