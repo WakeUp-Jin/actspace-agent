@@ -19,10 +19,13 @@ export class FixedRendererStreamAdapter {
     return () => { this.#listeners.delete(listener); };
   }
   dispose(): void {
+    this.clearTransient();
+    this.#listeners.clear();
+  }
+  clearTransient(): void {
     for (const entry of this.#calls.values()) this.#clearTimer(entry);
     this.#calls.clear();
     this.#closedRuns.clear();
-    this.#listeners.clear();
   }
   #emit(event: RuntimeStreamEvent): void {
     for (const listener of this.#listeners) {

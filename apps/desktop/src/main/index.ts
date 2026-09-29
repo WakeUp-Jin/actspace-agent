@@ -49,6 +49,7 @@ let openRouterCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
 let deepSeekCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
 let kimiCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
 let browserBridgeService: BrowserBridgeService | undefined;
+let browserConnectionTimer: NodeJS.Timeout | undefined;
 let localUpdateService: LocalUpdateService | undefined;
 let shuttingDown = false;
 
@@ -182,7 +183,13 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     fixedRendererIpc?.requestQuickOpen();
   }, quickOpenSettings.accelerator);
   await logMain("v2 quick open initialized", quickOpenShortcutController.activate(quickOpenSettings));
-  browserBridgeService = new BrowserBridgeService({ dataRoot: roots.dataRoot, log: (message, details) => void logMain(message, details) });
+  browserBridgeService = new BrowserBridgeService({
+    dataRoot: roots.dataRoot,
+    bundledRoot: app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID
+      ? join(process.resourcesPath, "app", "browser-components")
+      : join(roots.logRoot, "..", "dist", "browser-components"),
+    log: (message, details) => void logMain(message, details),
+  });
   localUpdateService = new LocalUpdateService({
     dataRoot: roots.dataRoot,
     appPath: app.getPath("exe"),
@@ -233,6 +240,32 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     terminalUnavailableReason: terminalNativeAvailable ? null : "node-pty is not installed in this build.",
   }).dispose;
   await runtimeV2Registry.boot();
+  const syncBrowser = async () => {
+    if (!browserBridgeService || !runtimeV2Registry || shuttingDown) return;
+    const status = await browserBridgeService.getStatus();
+    await runtimeV2Registry.refreshBrowser();
+    if (status.runState === "error") throw new Error(status.lastError ?? "Chrome connection status probe failed");
+  };
+  let browserFailures = 0;
+  const scheduleBrowserSync = (delay: number) => {
+    browserConnectionTimer = setTimeout(() => { void pollBrowser(); }, delay);
+    browserConnectionTimer.unref();
+  };
+  const pollBrowser = async () => {
+    if (shuttingDown) return;
+    try {
+      await syncBrowser();
+      browserFailures = 0;
+    } catch (error) {
+      browserFailures++;
+      if (browserFailures === 1) await logMain("Chrome connection refresh failed", { error: error instanceof Error ? error.message : String(error) });
+    }
+    if (!shuttingDown) {
+      const base = browserFailures ? [1_000, 2_000, 5_000, 10_000][Math.min(browserFailures - 1, 3)]! : 10_000;
+      scheduleBrowserSync(Math.round(base * (0.9 + Math.random() * 0.2)));
+    }
+  };
+  scheduleBrowserSync(1_000);
   disposeEnglishLearningIpc = registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow });
   fixedRendererIpc = registerFixedRendererIpc({
     registry: runtimeV2Registry,
@@ -277,6 +310,7 @@ app.on("window-all-closed", () => {
 app.on("before-quit", (event) => {
   if (shuttingDown) return;
   shuttingDown = true;
+  if (browserConnectionTimer) clearTimeout(browserConnectionTimer);
   event.preventDefault();
   const timeout = setTimeout(() => app.exit(1), 35_000);
   void (async () => {

@@ -25,7 +25,7 @@ export function registerEnglishLearningIpc(options: { registry: DesktopRuntimeV2
   });
   handle(channels.stop, () => registry.englishLearning().stop());
   handle(channels.preview, () => registry.englishLearning().preview());
-  const remove = registry.englishLearning().subscribe((state) => {
+  const remove = registry.subscribeEnglishLearning((state) => {
     const window = options.getMainWindow();
     if (window && !window.isDestroyed()) window.webContents.send(channels.stateChanged, state);
   });

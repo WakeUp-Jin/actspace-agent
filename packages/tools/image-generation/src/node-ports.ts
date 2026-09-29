@@ -1,0 +1,124 @@
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tools-runtime";
+const MAX_PROMPT_CHARS = 32_000;
+const MAX_QUESTION_CHARS = 4_000;
+const MAX_BATCH_BYTES = 100 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+const MAX_PROVIDER_RESPONSE_BYTES = 32 * 1024 * 1024;
+const MAX_REPORT_CHARS = 20_000;
+const IMAGE_REQUEST_TIMEOUT_MS = 120_000;
+const SUPPORTED_SIZES = new Set(["1024x1024", "1536x1024", "1024x1536"]);
+export type ImageGenerationCredential = { readonly apiKey: string; readonly baseUrl: string; readonly model: string };
+export type NodeToolPortsOptions = {
+  readonly generation?: ImageGenerationCredential;
+  readonly fetchImpl?: typeof fetch;
+  readonly resolveHostname?: (hostname: string) => Promise<readonly string[]>;
+};
+import type { ToolPorts } from "./plugin.js";
+export function createNodeToolPorts(options: NodeToolPortsOptions): ToolPorts { return Object.freeze({ generate_image: (args, context) => generateImage(args, context, options) }); }
+async function generateImage(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, options: NodeToolPortsOptions): Promise<ToolBodyResult> {
+  const prompt = stringArg(args, "prompt").trim();
+  const size = stringArg(args, "size") || "1024x1024";
+  const count = integerArg(args, "n", 1);
+  if (!prompt || prompt.length > MAX_PROMPT_CHARS) return failed("INVALID_ARGUMENTS", `prompt must contain 1-${MAX_PROMPT_CHARS} characters.`, false);
+  if (!SUPPORTED_SIZES.has(size) || count < 1 || count > 10) return failed("INVALID_ARGUMENTS", "size or n is outside the supported range.", false);
+  const credential = options.generation;
+  if (credential === undefined) return failed("IMAGE_GENERATION_NOT_CONFIGURED", "Image generation is not configured.", false);
+  let endpoint: URL;
+  try { endpoint = new URL("images/generations", `${credential.baseUrl.replace(/\/$/, "")}/`); }
+  catch { return failed("IMAGE_GENERATION_NOT_CONFIGURED", "Image generation base URL is invalid.", false); }
+  if (endpoint.protocol !== "https:" && endpoint.hostname !== "localhost") return failed("IMAGE_GENERATION_NOT_CONFIGURED", "Image generation endpoint must use HTTPS.", false);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  try {
+    const response = await fetchImpl(endpoint, { method: "POST", redirect: "error", signal: combinedSignal(context.signal, IMAGE_REQUEST_TIMEOUT_MS), headers: { Authorization: `Bearer ${credential.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: credential.model, prompt, size, n: count }) });
+    if (!response.ok) return failed(imageHttpCode(response.status), `Image generation provider returned HTTP ${response.status}.`, response.status === 429 || response.status >= 500);
+    const raw = await readBounded(response, MAX_PROVIDER_RESPONSE_BYTES);
+    let parsed: unknown;
+    try {
+      parsed = parseProviderResponse(raw, response.headers.get("content-type"));
+    } catch (error) {
+      return failed("IMAGE_GENERATION_INVALID_RESPONSE", safeMessage(error), false);
+    }
+    const payloads = parsePayloads(parsed).slice(0, count);
+    if (!payloads.length) return failed("IMAGE_GENERATION_INVALID_RESPONSE", "Image generation provider returned no usable images.", false);
+    const artifacts = []; let batchBytes = 0; const failures: ToolBodyResult[] = [];
+    for (const payload of payloads) {
+      let stage: "download" | "decode" | "storage" = payload.kind === "url" ? "download" : "decode";
+      try {
+        const bytes = payload.kind === "base64" ? decodeBase64(payload.value) : await downloadImage(payload.value, context.signal, fetchImpl, options.resolveHostname ?? resolveAddresses);
+        stage = "decode";
+        if (bytes.byteLength > MAX_IMAGE_BYTES || batchBytes + bytes.byteLength > MAX_BATCH_BYTES) throw new Error("Generated image exceeds the configured size limit.");
+        const mediaType = sniffImage(bytes); if (!mediaType) throw new Error("Generated image format is unsupported.");
+        stage = "storage";
+        const artifact = await context.createArtifact({ bytes, mediaType }); artifacts.push(artifact); batchBytes += bytes.byteLength;
+      } catch (error) {
+        if (context.signal.aborted) return failed("TOOL_ABORTED", "Image generation was aborted.", false);
+        failures.push(imageStageFailure(stage, error));
+      }
+    }
+    if (!artifacts.length) return failures[0] ?? failed("IMAGE_GENERATION_INVALID_RESPONSE", "Generated images could not be materialized.", false);
+    const summary = `Generated ${artifacts.length}/${count} image${count === 1 ? "" : "s"}.`;
+    return { status: "completed", summary, modelOutput: [{ type: "text", text: summary }, ...artifacts.map((artifact, index) => ({ type: "artifact" as const, artifact, label: `Generated image ${index + 1}` }))], artifacts, renderer: { id: "actspace.image-gallery", schemaVersion: 1, props: { artifactIds: artifacts.map((artifact) => artifact.artifactId) } } };
+  } catch (error) {
+    return context.signal.aborted ? failed("TOOL_ABORTED", "Image generation was aborted.", false) : imageStageFailure("request", error);
+  }
+}
+
+type ImagePayload = { readonly kind: "base64" | "url"; readonly value: string };
+function parsePayloads(value: unknown): readonly ImagePayload[] {
+  const record = object(value);
+  if (!Array.isArray(record?.data)) return [];
+  const payloads: ImagePayload[] = [];
+  for (const entry of record.data) {
+    const item = object(entry);
+    if (typeof item?.b64_json === "string") payloads.push({ kind: "base64", value: item.b64_json });
+    else if (typeof item?.url === "string") payloads.push({ kind: "url", value: item.url });
+  }
+  return payloads;
+}
+function decodeBase64(value: string): Buffer { const compact = value.replace(/\s+/g, ""); if (!compact || compact.length > Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 8 || !/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) throw new Error("Image Base64 payload is invalid or too large."); return Buffer.from(compact, "base64"); }
+async function downloadImage(raw: string, signal: AbortSignal, fetchImpl: typeof fetch, resolveHostname: (hostname: string) => Promise<readonly string[]>): Promise<Buffer> { const url = new URL(raw); if (url.protocol !== "https:" || url.username || url.password) throw new Error("Generated image URL is unsafe."); await assertPublic(url.hostname, resolveHostname); const response = await fetchImpl(url, { redirect: "error", signal: combinedSignal(signal, IMAGE_REQUEST_TIMEOUT_MS) }); if (!response.ok) throw new Error(`Generated image download returned HTTP ${response.status}.`); return readBounded(response, MAX_IMAGE_BYTES); }
+async function assertPublic(hostname: string, resolver: (hostname: string) => Promise<readonly string[]>): Promise<void> { const addresses = isIP(hostname) ? [hostname] : await resolver(hostname); if (!addresses.length || addresses.some(privateAddress)) throw new Error("Generated image URL resolves to a private network."); }
+async function resolveAddresses(hostname: string): Promise<readonly string[]> { return (await lookup(hostname, { all: true, verbatim: true })).map(({ address }) => address); }
+function privateAddress(address: string): boolean { const value = address.toLowerCase(); if (value === "::" || value === "::1" || value === "0.0.0.0" || value.startsWith("fc") || value.startsWith("fd") || /^fe[89ab]/.test(value)) return true; if (value.startsWith("::ffff:")) return privateAddress(value.slice(7)); const parts = value.split(".").map(Number); if (parts.length !== 4 || parts.some(Number.isNaN)) return false; const [a, b] = parts as [number, number, number, number]; return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127); }
+async function readBounded(response: Response, maxBytes: number): Promise<Buffer> { if (!response.body) return Buffer.alloc(0); const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let total = 0; while (true) { const next = await reader.read(); if (next.done) break; total += next.value.byteLength; if (total > maxBytes) { await reader.cancel(); throw new Error(`Response exceeds ${maxBytes} bytes.`); } chunks.push(next.value); } return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total); }
+function parseProviderResponse(raw: Uint8Array, contentType: string | null): unknown {
+  const text = Buffer.from(raw).toString("utf8").trim();
+  if (!text) throw new Error("Image generation provider returned an empty response.");
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    if (/html/i.test(contentType ?? "") || /^<!doctype\s+html|^<html[\s>]/i.test(text)) {
+      throw new Error("Image generation provider returned HTML instead of JSON.");
+    }
+    throw new Error("Image generation provider returned invalid JSON.");
+  }
+}
+function sniffImage(bytes: Uint8Array): string | undefined { const value = Buffer.from(bytes); if (value.length >= 8 && value.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png"; if (value.length >= 3 && value[0] === 0xff && value[1] === 0xd8 && value[2] === 0xff) return "image/jpeg"; if (value.length >= 12 && value.toString("ascii", 0, 4) === "RIFF" && value.toString("ascii", 8, 12) === "WEBP") return "image/webp"; return undefined; }
+function imageHttpCode(status: number): string { return status === 401 || status === 403 ? "IMAGE_GENERATION_AUTH" : status === 429 ? "IMAGE_GENERATION_RATE_LIMIT" : status >= 500 ? "IMAGE_GENERATION_PROVIDER" : "IMAGE_GENERATION_INVALID_REQUEST"; }
+function object(value: unknown): Record<string, unknown> | undefined { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined; }
+function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
+function integerArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string, fallback: number): number { return typeof args[key] === "number" && Number.isInteger(args[key]) ? args[key] : fallback; }
+function combinedSignal(signal: AbortSignal, timeoutMs: number): AbortSignal { return AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]); }
+// Only controlled messages and known system codes may leave the Host. Never serialize
+// upstream error messages, signed URLs, headers, local paths or arbitrary causes.
+function imageStageFailure(stage: "request" | "download" | "decode" | "storage", error: unknown): ToolBodyResult {
+  const codes = new Set(["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "ENETUNREACH", "EHOSTUNREACH", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT", "UND_ERR_SOCKET", "CERT_HAS_EXPIRED", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "DEPTH_ZERO_SELF_SIGNED_CERT", "ENOSPC", "EACCES", "EPERM", "ENOENT", "EIO"]);
+  let value: unknown = error;
+  let diagnostic = "unknown error";
+  for (let depth = 0; depth < 4 && value instanceof Error; depth += 1) {
+    const code = (value as Error & { code?: unknown }).code;
+    if (typeof code === "string" && codes.has(code)) { diagnostic = code; break; }
+    if (value.name === "TimeoutError" || value.name === "AbortError") diagnostic = value.name;
+    value = value.cause;
+  }
+  const message = error instanceof Error ? error.message : "";
+  if (/^Generated image (URL is unsafe\.|URL resolves to a private network\.|download returned HTTP \d{3}\.|format is unsupported\.|exceeds the configured size limit\.|Base64 payload is invalid or too large\.)$/.test(message) || /^Response exceeds \d+ bytes\.$/.test(message)) diagnostic = message;
+  const code = stage === "decode" ? "IMAGE_GENERATION_INVALID_RESPONSE" : `IMAGE_GENERATION_${stage.toUpperCase()}_FAILED`;
+  // Do not retry the whole paid generation when only materialization failed.
+  return failed(code, `Image generation ${stage} failed: ${diagnostic}`, stage === "request");
+}
+function failed(code: string, message: string, retryable: boolean): ToolBodyResult { return { status: "failed", summary: message, modelOutput: [{ type: "text", text: message }], failure: { code, message, retryable } }; }
+function safeMessage(error: unknown): string { return (error instanceof Error ? error.message : String(error)).replace(/((?:Bearer|api[_-]?key)\s+)[^\s,]+/gi, "$1[REDACTED]"); }

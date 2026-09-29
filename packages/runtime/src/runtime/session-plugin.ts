@@ -1,5 +1,6 @@
 import { emitContained, type CordisContext } from "@actspace/cordis-adapter";
 import type { EventCodecRegistry } from "@actspace/session-journal";
+import type { SessionProjectionService } from "@actspace/session-projection";
 import { SessionStoreService } from "@actspace/session-persistence";
 import type { SessionPersistence } from "@actspace/session-persistence";
 import { repairSubagentPublications } from "@actspace/subagent";
@@ -28,14 +29,17 @@ export function apply(ctx: CordisContext): void {
   const host = ctx.get?.(SESSION_RUNTIME_HOST_PORT_ID) as RuntimeSessionHostPort | undefined;
   const journal = ctx.get?.("session.journal") as SessionJournalService | undefined;
   const persistence = ctx.get?.("session.persistence") as SessionPersistence | undefined;
+  const projection = ctx.get?.("session.projection") as SessionProjectionService | undefined;
   if (host === undefined) throw new Error(`Session Runtime plugin requires ${SESSION_RUNTIME_HOST_PORT_ID}.`);
   if (journal === undefined) throw new Error("Session Runtime plugin requires session.journal.");
   if (persistence === undefined) throw new Error("Session Runtime plugin requires session.persistence.");
+  if (projection === undefined) throw new Error("Session Runtime plugin requires session.projection.");
 
   const sessionStore = new SessionStoreService(ctx as unknown as import("@actspace/cordis-adapter").CordisServiceContext);
   const service = new RuntimeSessionController({
     ...host,
     registry: journal.registry,
+    projectionService: projection,
     beforeRecovery: async (parent, store) => { await repairSubagentPublications({ store, parent }); },
     onEvent: async (sessionId, event) => { await emitContained(ctx, "session/event", event, { sessionId }); },
     onFlush: (sessionId, throughSeq) => emitContained(ctx, "session/flush", { sessionId, throughSeq }),

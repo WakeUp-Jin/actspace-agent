@@ -1,5 +1,7 @@
 # Agent Browser Bridge 设计
 
+> 2026-09-28 当前产品范围：只使用 Chrome Extension → Native Messaging Host → Browser Tools。下文有关 CDP 独立 backend、IAB、多 backend 的内容记录早期设计背景，不是本轮实施目标。当前实例路由为每个 Native Host 独立 socket，Desktop 只绑定一个已验证的扩展实例。执行与验收见 `docs/exec-plans/active/20260928-chrome-connect-experience.md`。
+
 ## 当前状态
 
 本文档定义真实 Chrome Browser Bridge 的宿主、安装、传输和 backend 边界。Browser Use 当前完整架构入口见 `docs/design-docs/browser/agent-browser-use-index.md`；本文后半部分保留的 CLI-first v0 方案是历史阶段，不再代表 Agent 正常调用路径。

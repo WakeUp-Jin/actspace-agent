@@ -713,7 +713,7 @@ describe("SettingsPage", () => {
     await assertHeadingContract("模型", "模型", ["模型连接"]);
     await assertHeadingContract("搜索", "搜索", ["搜索通道"]);
     await assertHeadingContract("工具", "工具", ["代码库", "终端", "浏览器", "多媒体", "显示"]);
-    await assertHeadingContract("外观", "外观", ["主题", "字体与字号"]);
+    await assertHeadingContract("外观", "外观", ["主题", "强调色", "字体与字号"]);
     expect(within(main).queryByRole("heading", { name: "工具总览" })).not.toBeInTheDocument();
     expect(within(main).queryByRole("heading", { name: "联网搜索" })).not.toBeInTheDocument();
   });
@@ -825,5 +825,37 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("radio", { name: "跟随系统" }));
     expect(document.documentElement.getAttribute("data-theme")).toBe("system");
     expect(setNativeTheme).toHaveBeenCalledWith("system");
+  });
+
+  it("外观分区切换强调色写 data-accent、持久化，并支持方向键", async () => {
+    renderSettingsPage();
+    await screen.findByRole("heading", { name: "通用", level: 2 });
+
+    await userEvent.click(screen.getByRole("button", { name: "外观" }));
+
+    const group = await screen.findByRole("radiogroup", { name: "强调色" });
+    const options = within(group).getAllByRole("radio");
+    expect(options.map((option) => option.getAttribute("aria-label"))).toEqual(["默认", "蓝", "紫", "粉", "橙"]);
+    expect(within(group).getByRole("radio", { name: "默认" })).toHaveAttribute("aria-checked", "true");
+    // 单选组只有当前项进入 Tab 序列。
+    expect(options.filter((option) => option.tabIndex === 0)).toHaveLength(1);
+
+    await userEvent.click(within(group).getByRole("radio", { name: "蓝" }));
+    expect(document.documentElement.getAttribute("data-accent")).toBe("blue");
+    expect(localStorage.getItem("actspace.appearance.v1")).toContain('"accentPalette":"blue"');
+    // 强调色与明暗独立，且不驱动原生 chrome：nativeTheme 只收到主题三态。
+    for (const [mode] of setNativeTheme.mock.calls) expect(["light", "dark", "system"]).toContain(mode);
+
+    await userEvent.keyboard("{ArrowRight}");
+    const purple = within(group).getByRole("radio", { name: "紫" });
+    expect(purple).toHaveAttribute("aria-checked", "true");
+    expect(purple).toHaveFocus();
+    expect(document.documentElement.getAttribute("data-accent")).toBe("purple");
+
+    await userEvent.keyboard("{End}");
+    expect(within(group).getByRole("radio", { name: "橙" })).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(within(group).getByRole("radio", { name: "默认" })).toHaveFocus();
+    expect(document.documentElement.getAttribute("data-accent")).toBe("default");
   });
 });

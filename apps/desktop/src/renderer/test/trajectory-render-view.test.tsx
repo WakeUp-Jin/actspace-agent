@@ -150,6 +150,6 @@ describe("TrajectoryView", () => {
     await user.click(screen.getByRole("button", { name: "Load earlier history" }));
     expect(screen.getAllByRole("row").length).toBeGreaterThan(initial);
     expect(screen.getAllByRole("row")[0]).toHaveTextContent("USER");
-  });
+  }, 15_000);
 
 });

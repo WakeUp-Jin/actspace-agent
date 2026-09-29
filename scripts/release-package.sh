@@ -78,6 +78,7 @@ if ! pnpm --filter @actspace/desktop --prod deploy --legacy --offline "${deploy_
 fi
 
 node "${repo_root}/scripts/check-provider-proxy-package.mjs" "${deploy_dir}"
+node "${repo_root}/scripts/package-browser-components.mjs" "${deploy_dir}/browser-components"
 
 find "${deploy_dir}" -type d -name test -prune -exec rm -rf {} +
 find "${deploy_dir}" \( -name "*.map" -o -name "*.d.ts" -o -name "*.d.mts" \) -type f -delete
@@ -148,6 +149,7 @@ case "${platform}" in
     else
       codesign --remove-signature "${packaged_app}" 2>/dev/null || true
     fi
+    node "${repo_root}/scripts/verify-browser-components.mjs" "${packaged_app}/Contents/Resources/app/browser-components"
     if is_truthy "${mac_notarize}"; then
       if [[ "${signed}" != "true" ]]; then
         echo "ACTSPACE_MAC_NOTARIZE=true requires ACTSPACE_MAC_CODESIGN_IDENTITY." >&2

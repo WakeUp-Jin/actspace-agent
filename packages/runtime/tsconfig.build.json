@@ -85,10 +85,31 @@
       "path": "./../tools/browser-tools/tsconfig.build.json"
     },
     {
-      "path": "./../tools/core-tools/tsconfig.build.json"
+      "path": "./../tools/filesystem-read/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/filesystem-search/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/filesystem-write/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/image-generation/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/image-inspection/tsconfig.build.json"
     },
     {
       "path": "./../tools/runtime/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/shell-tools/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/todo-tools/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/web-tools/tsconfig.build.json"
     }
   ]
 }

@@ -294,6 +294,13 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "models:remove": RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeModel,
   "task-models:update": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateTaskModels,
   "plugins:browser-bridge:get-status": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getBrowserBridgeStatus,
+  "plugins:browser-bridge:connect": RUNTIME_V2_FIXED_RENDERER_CHANNELS.connectBrowserBridge,
+  "plugins:browser-bridge:use-source": RUNTIME_V2_FIXED_RENDERER_CHANNELS.useBrowserSourceExtension,
+  "plugins:browser-bridge:prepare-update": RUNTIME_V2_FIXED_RENDERER_CHANNELS.prepareBrowserBridgeUpdate,
+  "plugins:browser-bridge:disconnect": RUNTIME_V2_FIXED_RENDERER_CHANNELS.disconnectBrowserBridge,
+  "plugins:browser-bridge:select-instance": RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectBrowserBridgeInstance,
+  "plugins:browser-bridge:open-extensions": RUNTIME_V2_FIXED_RENDERER_CHANNELS.openBrowserExtensions,
+  "plugins:browser-bridge:reveal-extension": RUNTIME_V2_FIXED_RENDERER_CHANNELS.revealBrowserExtensionDirectory,
   "plugins:browser-bridge:install-from-repo": RUNTIME_V2_FIXED_RENDERER_CHANNELS.installBrowserBridgeFromRepo,
   "plugins:browser-bridge:install-native-host": RUNTIME_V2_FIXED_RENDERER_CHANNELS.installBrowserBridgeNativeHost,
   "skills:list": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSkills,
@@ -550,6 +557,20 @@ contextBridge.exposeInMainWorld("actspace", {
   updateTaskModels: (input: TaskModelsUpdateInput) => invokeFixedRenderer("task-models:update", input) as Promise<TaskModelsUpdateResult>,
   getBrowserBridgeStatus: () =>
     invokeFixedRenderer("plugins:browser-bridge:get-status") as Promise<BrowserBridgeStatus>,
+  connectBrowserBridge: () =>
+    invokeFixedRenderer("plugins:browser-bridge:connect") as Promise<BrowserBridgeInstallResult>,
+  useBrowserSourceExtension: (repoRoot: string | null) =>
+    invokeFixedRenderer("plugins:browser-bridge:use-source", repoRoot) as Promise<BrowserBridgeActionResult>,
+  prepareBrowserBridgeUpdate: () =>
+    invokeFixedRenderer("plugins:browser-bridge:prepare-update") as Promise<BrowserBridgeInstallResult>,
+  disconnectBrowserBridge: () =>
+    invokeFixedRenderer("plugins:browser-bridge:disconnect") as Promise<BrowserBridgeActionResult>,
+  selectBrowserBridgeInstance: (instanceId: string) =>
+    invokeFixedRenderer("plugins:browser-bridge:select-instance", instanceId) as Promise<BrowserBridgeActionResult>,
+  openBrowserExtensions: () =>
+    invokeFixedRenderer("plugins:browser-bridge:open-extensions") as Promise<BrowserBridgeActionResult>,
+  revealBrowserExtensionDirectory: () =>
+    invokeFixedRenderer("plugins:browser-bridge:reveal-extension") as Promise<BrowserBridgeActionResult>,
   installBrowserBridgeFromRepo: (input: { repoRoot: string }) =>
     invokeFixedRenderer("plugins:browser-bridge:install-from-repo", input) as Promise<BrowserBridgeInstallResult>,
   installBrowserBridgeNativeHost: () =>

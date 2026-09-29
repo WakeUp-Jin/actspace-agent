@@ -10,6 +10,15 @@ const file = (canonicalPath: string, access: "read" | "write" | "delete" = "read
 });
 
 describe("permission engine", () => {
+  it("does not reuse a retired aggregate audience for any split file plugin", () => {
+    const old = grant({ audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 } });
+    for (const slug of ["filesystem-read", "filesystem-search", "filesystem-write"]) {
+      expect(sessionGrantsCoverResources([old], [file("/outside/a.txt")], {
+        sessionId: "s1", agentId: "main:s1", audience: { pluginId: `actspace.${slug}`, permissionDomain: slug, policyVersion: 1 },
+      })).toBe(false);
+    }
+  });
+
   it("orders decisions monotonically as deny over ask over allow", () => {
     expect(combinePermissionDecisions(
       { kind: "deny", code: "GLOBAL_DENY", reason: "blocked" },

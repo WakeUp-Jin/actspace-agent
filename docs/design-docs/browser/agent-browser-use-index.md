@@ -2,6 +2,8 @@
 
 本文档是 ActSpace Browser Use 设计的专题导航和架构口径入口。详细命令参数、实现草图和阶段计划仍分别维护在相邻文档中；当这些文档的历史阶段描述与本文冲突时，以本文和当前 active execution plan 为准。
 
+> 2026-09-28 连接体验正在按 `docs/exec-plans/active/20260928-chrome-connect-experience.md` 执行。当前产品路线只有 Chrome Extension → Native Messaging Host → Browser Tools；多 backend 与内嵌浏览器不在本轮范围。Host 采用每实例独立 socket，连接授权不等于浏览器写操作授权。下面 Plan 5 的验收陈述是历史阶段记录，不代表本轮首次连接、打包安装和真实 Chrome 验收已经完成。
+
 ## 当前结论
 
 Browser Use Plan 5 已完成：62/62 canonical commands 全部由 Go handler 实现，Agent Core 稳定注册 9 个分类工具、`browser_help` 和 `browser_run`，真实 Chrome profile、Agent approval/denial 和跨 session isolation 均已验收。模型默认只看到 `browser_help`；入口成功后，从下一次 LLM 调用开始在当前 `Agent.run()` 内披露完整 11 工具。完整 Plan 5 证据见 `docs/exec-plans/completed/20260710-browser-use/plan-5-go-command-engine-convergence.md`。

@@ -47,7 +47,7 @@ function response(): RuntimeV2RunTurnResponse {
       accessState: "read-write",
       metadata: { title: "Parity", pinned: false, archived: false },
       messages: [{ kind: "user", messageId: "message-1", content: "run" }, { kind: "assistant", messageId: "message-2", content: "done" }],
-      tools: [{ kind: "tool", schemaVersion: 1, sessionId: "session-1", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1", pluginId: "actspace.core-tools", name: "read_file", callId: "call-1", state: "completed", phase: null, startedAt: null, finishedAt: null, durationMs: null, argsSummary: { text: "{}", fields: [] }, modelOutput: [{ type: "text", text: "ok" }], summary: "Read", detail: [], artifacts: [], failure: null, renderer: null }],
+      tools: [{ kind: "tool", schemaVersion: 1, sessionId: "session-1", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1", pluginId: "actspace.filesystem-read", name: "read_file", callId: "call-1", state: "completed", phase: null, startedAt: null, finishedAt: null, durationMs: null, argsSummary: { text: "{}", fields: [] }, modelOutput: [{ type: "text", text: "ok" }], summary: "Read", detail: [], artifacts: [], failure: null, renderer: null }],
       pendingInbox: [],
       todos: [{ todoId: "todo-1", revision: 1, text: "Verify", state: "pending" }],
       delegations: [{ invocationId: "child-1", childSessionId: "session-child", agentKind: "explore", state: "completed", summary: "Mapped" }],

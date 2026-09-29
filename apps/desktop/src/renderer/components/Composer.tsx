@@ -190,8 +190,6 @@ const MODE_BUTTON_CLASS: Record<ComposerMode, string> = {
 const MODEL_BUTTON_CLASS =
   "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-act-md leading-5 font-medium text-text-muted transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main max-[600px]:max-w-[210px]";
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
-// 发送按钮对齐 Cursor：反色圆形按钮 + 上箭头。bg-text-main / text-surface 随主题翻转
-// （浅色 = 近黑底白箭头，深色 = 近白底深箭头），禁用态退为灰底。
 // 不含水平锚点（left/right）的基类，方便不同菜单各自选择向左/向右展开，避免 left-0 与 right-0 冲突。
 const DROPDOWN_MENU_BASE_CLASS =
   "dropdown-menu absolute bottom-[calc(100%_+_8px)] z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
@@ -276,7 +274,7 @@ const OPTION_TOGGLE_INPUT_CLASS = "absolute opacity-0 pointer-events-none";
 // 同优先级、按样式表顺序覆盖导致开启时不变主题色。
 const TOGGLE_TRACK_CLASS =
   "toggle-track relative inline-flex h-5 w-8 rounded-full transition-colors duration-(--motion-fast) ease-in-out";
-const TOGGLE_TRACK_ON_CLASS = "bg-operational";
+const TOGGLE_TRACK_ON_CLASS = "bg-toggle-on";
 const TOGGLE_TRACK_OFF_CLASS = "bg-line";
 const TOGGLE_THUMB_CLASS =
   "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-act-knob transition-transform duration-(--motion-fast) ease-in-out";
@@ -1959,7 +1957,7 @@ export function Composer({
         className={`send-button${isStreaming ? " is-stop" : ""}${isAborting ? " is-aborting" : ""}`}
         label={ariaLabel}
         tooltip={tooltipLabel}
-        variant="primary"
+        variant={isStreaming ? "primary" : "accent"}
         size="md"
         shape="round"
         aria-disabled={sendDisabled}

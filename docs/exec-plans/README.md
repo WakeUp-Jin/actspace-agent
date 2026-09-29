@@ -16,7 +16,8 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [单一 Agent 形态与三种模式](active/20260928-agent-forms-and-modes.md) | 待审核，未实施；下一步审核设计 D1–D5，明确授权后开始插件生命周期、模式门禁与会话迁移。 |
+| [单一 Agent 形态与三种模式](active/20260928-agent-forms-and-modes.md) | T1–T7 已实现；主要实机路线通过，T8 剩余验收见执行摘要。 |
+| [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
 | [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |
 | [会话切换与后台运行](active/20260916-session-background-runs.md) | 按会话隔离 stream、后台工具状态与历史校准，补切换回归与桌面验收。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
@@ -31,6 +32,12 @@
 2026-09-09 [逐项复核与设计合并清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)：初始 10 个 active 入口逐项复核；中文界面任务自行归档后，Context 补齐全仓回归也进入 completed，当前剩余 8 个入口。P2 按语义检查缺口保留 active。
 
 ## 最近完成
+
+- [Tool 插件边界拆分与 Todo 领域迁移](completed/20260928-tool-plugin-boundaries.md)：七个独立工具插件与 Todo 领域事件、Projection Contributor、调用时 scope gate 和启动禁用已实现；全量测试与外部门禁边界见[执行摘要](../exec-runs/20260928-tool-plugin-boundaries/execution-summary.md)。
+
+- [聊天 Mermaid 图表渲染](completed/20260928-chat-mermaid-diagrams.md)：闭合的 ` ```mermaid ` 渲染为固定 Codex 浅色图表，支持查看/复制源码、PNG 导出与缩放平移预览；源码按不可信输入处理（strict、剥离 init/click、DOMPurify）。自动化与浏览器 fixture 截图已通过，Electron 验收见执行摘要。
+
+- [外观强调色](completed/20260928-accent-palette.md)：外观页新增默认 / 蓝 / 紫 / 粉 / 橙 5 个强调色，驱动发送按钮、开关开启态、焦点、链接、文字选中与分割线拖动；默认零变化，对比度由 `pnpm check:frontend-theme` 守住。单测与 fixture 截图通过，Electron 验收见执行摘要。
 
 - [Desktop 构建提速](completed/20260926-desktop-build-speed.md)：依赖闭包去重、TypeScript 项目图增量构建、Client 与提示词监听；正式 Desktop 构建通过，typecheck 保留现有 Usage Statistics fixture 阻塞。
 

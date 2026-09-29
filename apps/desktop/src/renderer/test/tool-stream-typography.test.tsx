@@ -43,8 +43,8 @@ describe("tool stream presentation preserves behavior", () => {
       listPendingApprovals: async () => [{
         requestId: "approval-read-1", toolName: "read_file", summary: "Read", reason: "Outside workspace", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
         grantSuggestions: [
-          { suggestionId: "exact-read", lifetime: "session", action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/tmp/shared/a.md" }, audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 }, label: "This file only" },
-          { suggestionId: "tree-read", lifetime: "session", action: "file.read", access: "read", selector: { kind: "subtree", canonicalRoot: "/tmp/shared" }, audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 }, label: "This directory tree" },
+          { suggestionId: "exact-read", lifetime: "session", action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/tmp/shared/a.md" }, audience: { pluginId: "actspace.filesystem-read", permissionDomain: "filesystem-read", policyVersion: 1 }, label: "This file only" },
+          { suggestionId: "tree-read", lifetime: "session", action: "file.read", access: "read", selector: { kind: "subtree", canonicalRoot: "/tmp/shared" }, audience: { pluginId: "actspace.filesystem-read", permissionDomain: "filesystem-read", policyVersion: 1 }, label: "This directory tree" },
         ],
       }],
     } as unknown as Window["actspace"];

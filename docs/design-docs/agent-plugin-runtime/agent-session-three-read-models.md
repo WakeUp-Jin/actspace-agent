@@ -90,7 +90,7 @@ Usage 仅保留 `projectSessionUsageActivities → UsageSourceCache → projectI
 
 本轮实现修正了以下边界和语义：
 
-1. `todo/write.items[]` 按 `todoId + item revision` 增量合并，Host 与 TodoService 共用 canonical reducer。
+1. `plugin/actspace.todo/todo-write.items[]` 按 `todoId + item revision` 增量合并，Host 与 TodoService 共用 canonical reducer。
 2. shared contract 增加 Global summary、Session observation、Window support/deferred refs 和独立水位。
 3. Global Session Index 与 Global Usage Index 持久化摘要/活动行；缺失、损坏或水位变化时按 Session 重建。
 4. Window 受事件数与 JSON 字节数上限约束，工具 args/result/detail/artifacts 使用 deferred detail。
@@ -154,7 +154,7 @@ Host Registry 是完整 Session Projection 的唯一生产驱动器。领域只�
 | Key | 来源 | 用途 |
 | --- | --- | --- |
 | `metadata` | title、pinned、archived | Global、Client |
-| `todos` | `todo/write` | Client |
+| `todos` | `plugin/actspace.todo/todo-write` | Client |
 | `sessionStats` | turn、step、compaction | Client |
 | `providerUsage` | request/assistant/step usage | Global、Client |
 | `pendingInbox` | Inbox enqueue/claim/discard | Client |

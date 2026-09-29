@@ -40,7 +40,7 @@ Runtime 不再通过 `new SessionStore()`、`new LlmService()`、`new ToolRuntim
 - Session live log 与持久化后端分离；
 - Agent、Subagent、Tool execution 的作用域和资源归属；
 - Runtime Boot、Profile 生命周期与 Host capability 的收缩边界；
-- 13 个核心 Session 事件、9 个 Agent Loop 干预事件、5 个主要通知在新 Service 图中的位置；
+- 12 个核心 Session 事件、9 个 Agent Loop 干预事件、5 个主要通知在新 Service 图中的位置；
 - 保留 ActSpace 具体工具 executor 的参数、路径、安全和结果行为。
 
 ### 2.2 不包含
@@ -48,7 +48,7 @@ Runtime 不再通过 `new SessionStore()`、`new LlmService()`、`new ToolRuntim
 - 不重写 `read`、`list`、`grep`、`edit`、`write`、`bash` 或 Browser Bridge 的具体执行函数；
 - 不实现 CLI chat UX、Goal/Schedule producer、在线 HMR 或配置热替换；
 - 不引入不可信插件的签名、市场、远程下载或进程沙箱；
-- 不改变 13 个核心 Session 事件的名字、顺序和恢复语义；
+- 不改变 12 个核心 Session 事件的名字、顺序和恢复语义；
 - 不将同进程 Context、Session writer 或 Service 实例序列化到 IPC 或 renderer；
 - 不在本规范中承诺 SQLite、远程 Session 或其他未来 Provider 已经实现。
 
@@ -74,7 +74,7 @@ Runtime 不再通过 `new SessionStore()`、`new LlmService()`、`new ToolRuntim
 | Session durability | `SessionPersistence` | locate/create/append/flush/load/recovery | JSONL；未来 SQLite | SessionStore adapter、resume、CLI |
 | LLM | `LlmRuntime` | route、model、PreparedCall、stream、failure | pi-ai/provider adapters | AgentLoop、Compaction、title |
 | Prompt / Context | `SystemPrompt` / `ContextAssembler` | contributor、request snapshot、tool schema | prompt/context contributors | AgentLoop、CLI inspect |
-| Tools | `ToolRuntime` | definition、prepared execution、policy、result | core-tools、browser-tools、future providers | AgentLoop、Subagent |
+| Tools | `ToolRuntime` | definition、prepared execution、policy、result | filesystem-read、shell-tools、web-tools、browser-tools、future providers | AgentLoop、Subagent |
 | Agent | `AgentRegistry` | Agent、scope、inbox、lifecycle | main/subagent registrations | AgentLoop、App Service |
 | Loop | `AgentLoop` | turn/step/request contract、9 intervention events | default loop driver | AgentRuntime、Headless runner |
 | Compaction | `Compaction` | policy、region、summary、recovery | basic summarizer/provider | AgentLoop event consumer |
@@ -187,7 +187,7 @@ validate → append in-memory → update surface → emit session/event
                               session/flush
 ```
 
-现有的 13 个核心事件、扩展事件 codec、连续 seq、recovery 和 `session/end-seed` 保持不变。
+现有的 12 个核心事件、扩展事件 codec、连续 seq、recovery 和 `session/end-seed` 保持不变。
 
 ### 7.2 `SessionPersistence`
 
@@ -213,7 +213,7 @@ System prompt、tool schema、workspace facts、skills 和 context contributor �
 
 ```text
 ToolRuntime Definition
-  ├── core-tools Provider → read/list/edit/write/bash
+  ├── 独立 Tool Providers → read/list/edit/write/bash
   ├── browser-tools Provider → Browser Bridge
   └── future Provider → remote/sandbox executor
 ```

@@ -1,7 +1,6 @@
 import { Service } from "@actspace/cordis-adapter";
 import type { CordisContext, CordisServiceContext } from "@actspace/cordis-adapter";
 import type { AgentRegistry } from "@actspace/core-agent";
-import { registerTodoTools } from "@actspace/core-agent";
 import type { AgentLoopService } from "@actspace/core-agent-loop";
 import { createBuiltInPresets, OneShotSubagentProvider, registerSubagentTools } from "@actspace/subagent";
 import type { RuntimeSessionController } from "./session-controller.js";
@@ -58,7 +57,6 @@ export class AgentRuntimeService extends Service implements AgentRuntimeServiceS
       createLoop: factory.createSubagentLoop,
     });
     this.runs = new RunController(sessions, factory.create, loopService);
-    const todoTools = registerTodoTools(tools, (sessionId) => factory.activeSessions.get(sessionId));
     const subagentTools = registerSubagentTools(tools, this.subagents, (sessionId) => {
       const assembly = this.runs.get(sessionId);
       return assembly === undefined ? undefined : { session: assembly.session, scope: assembly.scope };
@@ -68,7 +66,6 @@ export class AgentRuntimeService extends Service implements AgentRuntimeServiceS
     this.activeSessions = factory.activeSessions;
     ctx.effect(() => async () => {
       await Promise.allSettled(subagentTools.map((registration) => registration.dispose()));
-      await Promise.allSettled(todoTools.map((registration) => registration.dispose()));
       await this.subagents.dispose();
       await this.runs.dispose();
     }, "agent.runtime");

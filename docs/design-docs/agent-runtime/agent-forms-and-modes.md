@@ -58,7 +58,7 @@ Journal → Projection → Desktop / Headless
 
 不复制每个 Agent 的 LLM 连接、全局工具注册表和存储服务。已有插件的 Host/Runtime 安装负责提供共享 executor 与服务；增加明确的 Agent 激活入口，负责为当前 Agent 绑定该插件的工具贡献、上下文贡献、事件订阅和状态。
 
-首版组合包括现有 Prompt/Skills、Core Tools、Todo、Subagent、Compaction 的 Agent 行为；Browser 在 Profile 已装载时作为可选成员，英语辅助插件保持现有显式启用规则。基础 Loop、Inbox、Session 仍复用现有领域服务。形态清单引用已有插件/entry 身份，不把字符串标签冒充独立插件。
+首版组合包括现有 Prompt/Skills、Filesystem Read/Search/Write、Shell、Web、Image Generation/Inspection、Todo、Subagent、Compaction 的 Agent 行为；Browser 在 Profile 已装载时作为可选成员，英语辅助插件保持现有显式启用规则。基础 Loop、Inbox、Session 仍复用现有领域服务。形态清单引用已有插件/entry 身份，不把字符串标签冒充独立插件。
 
 工具名称来自已选插件的贡献，再由模式白名单收紧。未选插件不得给当前 Agent 注册 prompt、监听器或工具贡献。新增插件默认不进入形态；新增工具默认不进入模式。
 

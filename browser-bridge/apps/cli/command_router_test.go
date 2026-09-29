@@ -10,12 +10,31 @@ import (
 	"go/token"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	commandregistry "agent-browser-bridge/apps/cli/internal/commands"
 	"agent-browser-bridge/packages/protocol"
 )
+
+func TestCancellationInterruptsLocalWait(t *testing.T) {
+	var cancelled atomic.Bool
+	time.AfterFunc(30*time.Millisecond, func() { cancelled.Store(true) })
+	started := time.Now()
+	response := dispatchBridgeRequestWithCancellation(protocol.RequestEnvelope{
+		ID: "wait", Method: protocol.MethodCommandExecute,
+		Params: protocol.CommandExecuteParams{Category: "wait", Action: "timeout", Params: map[string]any{"tab_id": 7, "timeout_ms": 5000}},
+	}, func(request protocol.RequestEnvelope) protocol.ResponseEnvelope {
+		return okResponse(request.ID, map[string]any{"capabilities": map[string]bool{"cdp": true}})
+	}, newBrowserEventState(), cancelled.Load)
+	if response.OK || response.Error.Code != "outcome_unknown" {
+		t.Fatalf("unexpected cancellation: %+v", response)
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("local wait did not stop promptly")
+	}
+}
 
 func TestEveryRegistryHandlerHasDispatcherCase(t *testing.T) {
 	file, err := parser.ParseFile(token.NewFileSet(), "command_router.go", nil, 0)
@@ -512,6 +531,33 @@ func TestCommandRunExecutesOnlyWithMatchingPreflightApproval(t *testing.T) {
 	})
 	if changed.OK || changed.Error == nil || changed.Error.Code != protocol.ErrorApprovalRequired || forwarded != 0 {
 		t.Fatalf("changed action batch was not rejected: response=%+v forwarded=%d", changed, forwarded)
+	}
+}
+
+func TestCommandRunCancellationStopsTheNextAction(t *testing.T) {
+	actions := []protocol.CommandAction{
+		{Category: "tabs", Action: "list", Params: map[string]any{}},
+		{Category: "tabs", Action: "list", Params: map[string]any{}},
+	}
+	preflight := dispatchBridgeRequest(protocol.RequestEnvelope{
+		ID: "preflight-cancel", Method: protocol.MethodCommandPreflight,
+		Params: protocol.CommandPreflightParams{Actions: actions, SessionID: "session-cancel", TurnID: "turn-cancel"},
+	}, nil)
+	if !preflight.OK {
+		t.Fatalf("preflight failed: %+v", preflight)
+	}
+	forwarded := 0
+	stopped := false
+	run := dispatchBridgeRequestWithCancellation(protocol.RequestEnvelope{
+		ID: "run-cancel", Method: protocol.MethodCommandRun,
+		Params: protocol.CommandRunParams{Actions: actions, Approval: preflight.Result.(preflightResult).Approval, SessionID: "session-cancel", TurnID: "turn-cancel"},
+	}, func(request protocol.RequestEnvelope) protocol.ResponseEnvelope {
+		forwarded++
+		stopped = true
+		return okResponse(request.ID, []protocol.TabInfo{})
+	}, newBrowserEventState(), func() bool { return stopped })
+	if run.OK || run.Error == nil || run.Error.Code != "outcome_unknown" || forwarded != 1 {
+		t.Fatalf("cancelled batch dispatched another action: response=%+v forwarded=%d", run, forwarded)
 	}
 }
 

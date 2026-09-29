@@ -7,6 +7,7 @@ import { DiagnosticsCollector } from "../projection/diagnostics.js";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import type { DiagnosticInput } from "../projection/diagnostics.js";
 import { SESSION_CODEC_HOST_PORT_ID } from "@actspace/session-journal";
+import { loadBuiltinToolCodec, toolTransportPatches } from "../profiles/composition.js";
 import type { EventCodec } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tools-runtime";
 import { LlmService } from "@actspace/llm-service";
@@ -84,7 +85,9 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
   if (composition === undefined) throw new Error("Runtime boot requires an explicit Profile composition.");
   const hostServices = options.hostServices ?? createRuntimeHostServices({ descriptor: options.host, dataRoot: options.dataRoot, workspaceRoot: options.toolEnvironment.workspaceRoot, toolEnvironment: options.toolEnvironment });
   const cordisAdmission = options.cordis?.admission ?? await inspectCordisAdmission();
-  const pluginCodecs: readonly EventCodec[] = await discoverPluginCodecs(composition.manifests, options.pluginCodecLoader ?? missingCodecLoader);
+  const enabledPluginIds = new Set(composition.entries.filter(entry => entry.enabled && entry.state !== "skipped").map(entry => entry.pluginId));
+  const pluginCodecs: readonly EventCodec[] = await discoverPluginCodecs(composition.manifests.filter(manifest => enabledPluginIds.has(manifest.pluginId)), (specifier, manifest) =>
+    manifest.source.kind === "builtin" ? loadBuiltinToolCodec(specifier, manifest) : (options.pluginCodecLoader ?? missingCodecLoader)(specifier, manifest));
   const pluginVersions = new Map(composition.entries.filter((entry) => entry.enabled && entry.state !== "skipped").map((entry) => [entry.pluginId, entry.pluginVersion]));
   const configRevision = createHash("sha256").update(JSON.stringify(composition.config)).digest("hex");
   const diagnostics = new DiagnosticsCollector({ runtimeInstanceId: state.runtimeInstanceId });
@@ -131,7 +134,8 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       configPath: options.cordis!.configPath!,
       composition,
       createRoot: options.cordis?.createRoot,
-      requiredServices: ["actspace.runtime", "session.journal", "session.runtime", "llm.service", "tools.runtime", "context.assembly", "prompt.runtime", "compaction.runtime", "tools.core", "core.agent", "agent.registry", "agent.loop", "agent.runtime"],
+      transportPatches: toolTransportPatches(composition),
+      requiredServices: ["actspace.runtime", "session.journal", "session.runtime", "llm.service", "tools.runtime", "context.assembly", "prompt.runtime", "compaction.runtime", "core.agent", "agent.registry", "agent.loop", "agent.runtime"],
       prepare: (prepared) => {
         prepared.provide?.("actspace.host", Object.freeze({
           hostKind: options.host.hostKind,

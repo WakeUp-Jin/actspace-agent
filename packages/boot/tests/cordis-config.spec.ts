@@ -40,6 +40,14 @@ describe("DSH-style cordis.yml boot", () => {
     expect(await readFile(join(root, "effect-disposed"), "utf8")).toBe("yes");
   });
 
+  it("applies startup-only disable overrides before Behavior activation", async () => {
+    const root = await fixtureRoot();
+    const boot = await bootDshCordis({ configPath: join(root, "cordis.yml"), transportPatches: [{ id: "fixture", disabled: true }] });
+    expect(boot.context.get?.("fixture.service")).toBeUndefined();
+    await expect(access(join(root, "behavior-disposed"))).rejects.toThrow();
+    await boot.dispose();
+  });
+
   it("fails closed for a pending required service and disposes the partial tree", async () => {
     const root = await fixtureRoot("- id: pending\n  name: ./plugin.mjs\n  inject: [missing.service]\n");
     await expect(bootDshCordis({ configPath: join(root, "cordis.yml"), binName: "boot-test" })).rejects.toThrow(/settlement pending/);

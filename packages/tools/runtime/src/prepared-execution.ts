@@ -133,6 +133,11 @@ export class PreparedToolExecution {
   async stage(): Promise<PreparedDispatch> {
     if (this.#stage !== undefined) return this.#stage;
     try {
+      if (this.environment.allowedToolNames !== undefined && !this.environment.allowedToolNames.has(this.name)) {
+        const reason = `Tool ${this.name} is outside this Agent scope.`;
+        await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: "TOOL_SCOPE_DENIED", reason });
+        return this.#rememberTerminal(this.#failureResult("denied", { code: "TOOL_SCOPE_DENIED", message: reason, retryable: false, phase: "policy" }));
+      }
       this.#checkToolScope();
       this.#args = materializeToolArguments(this.registration.definition.inputSchema, this.input.arguments);
       if (this.environment.context !== undefined) {

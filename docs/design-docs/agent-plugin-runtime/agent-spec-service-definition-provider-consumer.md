@@ -172,7 +172,7 @@ Tool Runtime 仍是一个 Service shell，工具实现是 Provider contribution�
 
 ```text
 tools.runtime Definition
-  ├─ core-tools Provider       → read/list/grep/edit/write/delete/bash/web
+  ├─ 独立 Tool Providers       → read/list/grep/edit/write/delete/bash/web
   ├─ browser-tools Provider    → Browser Bridge adapter
   └─ future Provider            → 其他受信任 capability
 ```

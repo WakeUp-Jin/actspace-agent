@@ -17,7 +17,7 @@ describe("main Agent form", () => {
     const formed = activateMainAgentFormTools(first, runtime(MAIN_AGENT_FORM.members.at(-1)!.toolNames));
     activateMainAgentFormTools(second, runtime());
     expect(formed.members.map(member => member.id)).not.toContain("actspace.browser-tools");
-    expect(first.tools.get("read_file")?.owner).toBe("actspace.core-tools");
+    expect(first.tools.get("read_file")?.owner).toBe("actspace.filesystem-read");
     expect(first.tools.get("browser_help")).toBeUndefined();
     expect(second.tools.get("browser_help")?.owner).toBe("actspace.browser-tools");
     await first.dispose();
@@ -44,8 +44,8 @@ describe("main Agent form", () => {
   it("records a stable member digest separate from Host plugin provenance", () => {
     const required = mainAgentFormComposition([]);
     const browser = mainAgentFormComposition([{ id: "actspace.browser-tools", version: "2.0.0" }]);
-    expect(required.members).toHaveLength(5);
-    expect(browser.members).toHaveLength(6);
+    expect(required.members).toHaveLength(11);
+    expect(browser.members).toHaveLength(12);
     expect(browser.digest).not.toBe(required.digest);
     expect(mainAgentFormComposition([{ id: "unrelated.host-plugin", version: "1.0.0" }]).digest).toBe(required.digest);
   });

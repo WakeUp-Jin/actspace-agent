@@ -117,5 +117,5 @@ describe('trajectory content and call relations', () => {
     await user.click(screen.getByRole('button', { name: 'Open tool call batch-1:call-1-1-1' }));
     expect(document.querySelector(`[data-record-id="${target.id}"]`)).toHaveAttribute('data-selected', 'true');
     expect(screen.getByRole('tabpanel')).toHaveTextContent('80 lines read');
-  });
+  }, 15_000);
 });

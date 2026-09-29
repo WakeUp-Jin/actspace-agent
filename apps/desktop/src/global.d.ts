@@ -289,6 +289,13 @@ declare global {
       removeModel?: (input: import("@actspace/shared").ModelsRemoveInput) => Promise<import("@actspace/shared").ModelMutationResult>;
       updateTaskModels?: (input: import("@actspace/shared").TaskModelsUpdateInput) => Promise<import("@actspace/shared").TaskModelsUpdateResult>;
       getBrowserBridgeStatus?: () => Promise<import("@actspace/shared").BrowserBridgeStatus>;
+      connectBrowserBridge?: () => Promise<import("@actspace/shared").BrowserBridgeInstallResult>;
+      useBrowserSourceExtension?: (repoRoot: string | null) => Promise<import("@actspace/shared").BrowserBridgeActionResult>;
+      prepareBrowserBridgeUpdate?: () => Promise<import("@actspace/shared").BrowserBridgeInstallResult>;
+      disconnectBrowserBridge?: () => Promise<import("@actspace/shared").BrowserBridgeActionResult>;
+      selectBrowserBridgeInstance?: (instanceId: string) => Promise<import("@actspace/shared").BrowserBridgeActionResult>;
+      openBrowserExtensions?: () => Promise<import("@actspace/shared").BrowserBridgeActionResult>;
+      revealBrowserExtensionDirectory?: () => Promise<import("@actspace/shared").BrowserBridgeActionResult>;
       installBrowserBridgeFromRepo?: (input: { repoRoot: string }) => Promise<import("@actspace/shared").BrowserBridgeInstallResult>;
       installBrowserBridgeNativeHost?: () => Promise<import("@actspace/shared").BrowserBridgeActionResult>;
       listSkills?: (

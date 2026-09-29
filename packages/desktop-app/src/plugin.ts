@@ -1,7 +1,7 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { DesktopAppService } from "./service.js";
 
-export const inject = Object.freeze(["session.runtime", "agent.runtime", "llm.service", "compaction.runtime", "tools.core"]);
+export const inject = Object.freeze(["session.runtime", "agent.runtime", "llm.service", "compaction.runtime"]);
 
 /**
  * Desktop is an application Bundle, not a second runtime. The loader may

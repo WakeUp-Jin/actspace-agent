@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from "vitest";
 import type { ToolExecutionContext } from "@actspace/tools-runtime";
-import { createDesktopCoreToolPorts } from "../runtime-v2/core-tool-ports";
+import { createDesktopToolHostServices } from "../runtime-v2/tool-host-services";
+import { IMAGE_GENERATION_HOST_PORT_ID } from "@actspace/tools-image-generation";
 import type { DesktopRuntimeV2ModelPort } from "../runtime-v2/model-port";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -14,7 +15,7 @@ it("uses current image configuration for each call, including removal and reconf
   } as DesktopRuntimeV2ModelPort;
   const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ data: [{ b64_json: Buffer.from([137,80,78,71,13,10,26,10,0]).toString("base64") }] }), { headers: { "content-type": "application/json" } }));
   vi.stubGlobal("fetch", fetchImpl);
-  const ports = createDesktopCoreToolPorts({ workspaceRoot: "/workspace", tmpRoot: "/tmp", modelRuntime, llm: {}, readArtifact: async () => { throw new Error("unused"); } });
+  const ports = await createDesktopToolHostServices({ workspaceRoot: "/workspace", tmpRoot: "/tmp", modelRuntime, readArtifact: async () => { throw new Error("unused"); } })[IMAGE_GENERATION_HOST_PORT_ID].createPorts();
   const ctx = { signal: new AbortController().signal, createArtifact: async () => ({ artifactId: "image", mediaType: "image/png", size: 9, sha256: "sha" }) } as unknown as ToolExecutionContext;
   const run = () => ports.generate_image!({ prompt: "circle" }, ctx);
   try {

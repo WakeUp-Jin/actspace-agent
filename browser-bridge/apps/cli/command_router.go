@@ -78,6 +78,32 @@ func dispatchBridgeRequest(req protocol.RequestEnvelope, forward requestForwarde
 }
 
 func dispatchBridgeRequestWithState(req protocol.RequestEnvelope, forward requestForwarder, events *browserEventState) protocol.ResponseEnvelope {
+	return dispatchBridgeRequestWithCancellation(req, forward, events, nil)
+}
+
+func dispatchBridgeRequestWithCancellation(req protocol.RequestEnvelope, forward requestForwarder, events *browserEventState, cancelled func() bool) protocol.ResponseEnvelope {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if cancelled != nil {
+		if cancelled() {
+			cancel()
+		}
+		go func() {
+			ticker := time.NewTicker(25 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if cancelled() {
+						cancel()
+						return
+					}
+				}
+			}
+		}()
+	}
 	switch req.Method {
 	case protocol.MethodCommandList:
 		return okResponse(req.ID, commandregistry.Report(""))
@@ -110,7 +136,7 @@ func dispatchBridgeRequestWithState(req protocol.RequestEnvelope, forward reques
 		if err := protocol.DecodeParams(req.Params, &params); err != nil {
 			return errorResp(req.ID, protocol.ErrorInvalidParams, err.Error())
 		}
-		return executeCanonicalCommand(req.ID, params, forward, events)
+		return executeCanonicalCommand(req.ID, params, forward, events, ctx)
 	case protocol.MethodCommandRun:
 		var params protocol.CommandRunParams
 		if err := protocol.DecodeParams(req.Params, &params); err != nil {
@@ -126,8 +152,11 @@ func dispatchBridgeRequestWithState(req protocol.RequestEnvelope, forward reques
 		runResult := commandRunResult{ActionHash: result.ActionHash, Results: make([]commandExecutionResult, 0, len(params.Actions))}
 		stopOnError := params.StopOnError || !result.ReadOnly
 		for index, action := range params.Actions {
+			if cancelled != nil && cancelled() {
+				return errorResp(req.ID, "outcome_unknown", "Browser batch stopped; an earlier Chrome action may have completed")
+			}
 			started := time.Now()
-			response := executeCanonicalCommand(fmt.Sprintf("%s_%d", req.ID, index), protocol.CommandExecuteParams{Category: action.Category, Action: action.Action, Params: action.Params}, forward, events)
+			response := executeCanonicalCommand(fmt.Sprintf("%s_%d", req.ID, index), protocol.CommandExecuteParams{Category: action.Category, Action: action.Action, Params: action.Params}, forward, events, ctx)
 			if !response.OK {
 				item, _ := commandregistry.Find(action.Category, action.Action)
 				runResult.Results = append(runResult.Results, commandExecutionResult{
@@ -399,7 +428,14 @@ func enrichPreflight(result *preflightResult, actions []protocol.CommandAction, 
 	}
 }
 
-func executeCanonicalCommand(id string, params protocol.CommandExecuteParams, forward requestForwarder, events *browserEventState) protocol.ResponseEnvelope {
+func executeCanonicalCommand(id string, params protocol.CommandExecuteParams, forward requestForwarder, events *browserEventState, contexts ...context.Context) protocol.ResponseEnvelope {
+	ctx := context.Background()
+	if len(contexts) > 0 {
+		ctx = contexts[0]
+	}
+	if ctx.Err() != nil {
+		return errorResp(id, "outcome_unknown", "Browser command stopped; an earlier action may have completed")
+	}
 	started := time.Now()
 	item, ok := commandregistry.Find(params.Category, params.Action)
 	if !ok {
@@ -415,8 +451,11 @@ func executeCanonicalCommand(id string, params protocol.CommandExecuteParams, fo
 		return errorResp(id, protocol.ErrorCapabilityUnavailable, err.Error())
 	}
 	if strings.HasPrefix(item.HandlerKey, "go.") {
-		result, code, err := executeGoHandler(item.HandlerKey, params.Params, forward, events)
+		result, code, err := executeGoHandler(item.HandlerKey, params.Params, forward, events, ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				return errorResp(id, "outcome_unknown", "Browser command stopped; an earlier action may have completed")
+			}
 			return errorResp(id, classifyBrowserError(code, err), err.Error())
 		}
 		return okResponse(id, commandExecutionResult{CommandID: item.ID, Category: item.Category, Action: item.Action, Status: "completed", Duration: time.Since(started).Milliseconds(), Result: result})
@@ -450,7 +489,7 @@ func executeCanonicalCommand(id string, params protocol.CommandExecuteParams, fo
 	})
 }
 
-func executeGoHandler(handler string, params map[string]any, forward requestForwarder, events *browserEventState) (any, string, error) {
+func executeGoHandler(handler string, params map[string]any, forward requestForwarder, events *browserEventState, contexts ...context.Context) (any, string, error) {
 	if forward == nil {
 		return nil, protocol.ErrorExtensionUnavailable, fmt.Errorf("extension forwarder is not available")
 	}
@@ -473,6 +512,9 @@ func executeGoHandler(handler string, params map[string]any, forward requestForw
 	locatorEngine := locator.Engine{Backend: browserBackend}
 	domEngine := domcua.Engine{Backend: browserBackend}
 	ctx := context.Background()
+	if len(contexts) > 0 {
+		ctx = contexts[0]
+	}
 	switch handler {
 	case "go.cua.screenshot":
 		var input struct {

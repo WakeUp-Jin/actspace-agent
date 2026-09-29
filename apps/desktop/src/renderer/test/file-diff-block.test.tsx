@@ -269,8 +269,8 @@ describe("FileDiffBlock approval state", () => {
       listPendingApprovals: async () => [{
         requestId: "approval-edit-1", toolName: "edit_file", summary: "Edit", reason: "Outside workspace", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
         grantSuggestions: [
-          { suggestionId: "exact-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "exact", canonicalPath: "/Users/me/.agents/vocab.md" }, audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 }, label: "This file only" },
-          { suggestionId: "tree-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "subtree", canonicalRoot: "/Users/me/.agents" }, audience: { pluginId: "actspace.core-tools", permissionDomain: "core-files", policyVersion: 1 }, label: "This directory tree" },
+          { suggestionId: "exact-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "exact", canonicalPath: "/Users/me/.agents/vocab.md" }, audience: { pluginId: "actspace.filesystem-write", permissionDomain: "filesystem-write", policyVersion: 1 }, label: "This file only" },
+          { suggestionId: "tree-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "subtree", canonicalRoot: "/Users/me/.agents" }, audience: { pluginId: "actspace.filesystem-write", permissionDomain: "filesystem-write", policyVersion: 1 }, label: "This directory tree" },
         ],
       }],
     } as unknown as Window["actspace"];

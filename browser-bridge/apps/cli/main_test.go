@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -55,6 +56,46 @@ func TestHandleClientRequestsKeepsConnectionOpen(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("server did not close after client disconnect")
+	}
+}
+
+func TestForwardToExtensionCancellationReportsUnknownWithoutWaitingForTimeout(t *testing.T) {
+	var extension bytes.Buffer
+	host := &bridgeHost{extension: &extension, pending: map[string]chan protocol.ResponseEnvelope{}}
+	var stopped atomic.Bool
+	result := make(chan protocol.ResponseEnvelope, 1)
+	go func() {
+		result <- host.forwardToExtensionWithCancellation(protocol.RequestEnvelope{ID: "original", Method: protocol.MethodTabs}, stopped.Load)
+	}()
+	deadline := time.After(time.Second)
+	for {
+		host.mu.Lock()
+		started := len(host.pending) > 0
+		host.mu.Unlock()
+		if started {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("request was not sent to the extension")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	stopped.Store(true)
+	select {
+	case response := <-result:
+		if response.OK || response.ID != "original" || response.Error == nil || response.Error.Code != "outcome_unknown" {
+			t.Fatalf("unexpected cancelled response: %+v", response)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cancellation waited for the full extension timeout")
+	}
+	host.mu.Lock()
+	remaining := len(host.pending)
+	host.mu.Unlock()
+	if remaining != 0 {
+		t.Fatalf("cancelled request left %d pending responses", remaining)
 	}
 }
 

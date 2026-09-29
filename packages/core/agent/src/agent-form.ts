@@ -16,10 +16,13 @@ export const MAIN_AGENT_FORM = Object.freeze({
   defaultMode: "agent" as const,
   members: Object.freeze([
     Object.freeze({ id: "actspace.prompt", version: 1, required: true, toolNames: Object.freeze([]) }),
-    Object.freeze({ id: "actspace.core-tools", version: 2, required: true, toolNames: Object.freeze([
-      "read_file", "list_directory", "grep", "glob", "edit_file", "write_file", "delete_file",
-      "bash", "bash_output", "bash_kill", "web", "web_search", "web_fetch", "generate_image", "inspect_image",
-    ]) }),
+    Object.freeze({ id: "actspace.filesystem-read", version: 2, required: true, toolNames: Object.freeze(["read_file", "list_directory"]) }),
+    Object.freeze({ id: "actspace.filesystem-search", version: 2, required: true, toolNames: Object.freeze(["grep", "glob"]) }),
+    Object.freeze({ id: "actspace.filesystem-write", version: 2, required: true, toolNames: Object.freeze(["edit_file", "write_file", "delete_file"]) }),
+    Object.freeze({ id: "actspace.shell-tools", version: 2, required: true, toolNames: Object.freeze(["bash", "bash_output", "bash_kill"]) }),
+    Object.freeze({ id: "actspace.web-tools", version: 2, required: true, toolNames: Object.freeze(["web", "web_search", "web_fetch"]) }),
+    Object.freeze({ id: "actspace.image-generation", version: 2, required: true, toolNames: Object.freeze(["generate_image"]) }),
+    Object.freeze({ id: "actspace.image-inspection", version: 2, required: true, toolNames: Object.freeze(["inspect_image"]) }),
     Object.freeze({ id: "actspace.todo", version: 1, required: true, toolNames: Object.freeze(["todo_read", "todo_write"]) }),
     Object.freeze({ id: "actspace.subagent", version: 1, required: true, toolNames: Object.freeze(["agent", "explore"]) }),
     Object.freeze({ id: "actspace.compaction", version: 1, required: true, toolNames: Object.freeze([]) }),

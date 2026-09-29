@@ -60,7 +60,7 @@ DSH 的可迁移机制是：Session 作为 live service，Persistence 作为独�
 
 | 层 | 负责 | 明确不负责 |
 | --- | --- | --- |
-| Journal | 13 个核心事件、扩展 Codec、连续 seq、关系不变量、Surface fold | 文件、锁、Cordis、Host |
+| Journal | 12 个核心事件、扩展 Codec、连续 seq、关系不变量、Surface fold | 文件、锁、Cordis、Host |
 | Session Core | 创建/恢复 live Session、append、projection 入口、accepted `session/event`、关闭 | JSONL 编码、`fsync`、跨进程锁 |
 | Persistence Definition | provider 方法、错误类别、revision、durability 语义 | 具体文件或数据库 |
 | JSONL Provider | locate、create、append、load、inspect、readFrom、list、flush、lease、torn-tail | Agent Loop、工具 policy、通知语义 |
@@ -180,7 +180,7 @@ Cordis Service 的 Effect 只归属拥有资源的一层：Provider 拥有 write
 
 1. `session-core` 的生产源码不导入 `@actspace/session-jsonl` 或 `JsonlSessionWriter`。
 2. JSONL Provider 可以被 fake/in-memory Provider 替换，Agent Loop 和 projection 测试不改代码。
-3. 13 个核心事件、扩展事件、Surface、replay、recovery、fork 和 `session/end-seed` golden 结果与 P0 基线一致。
+3. 12 个核心事件、扩展事件、Surface、replay、recovery、fork 和 `session/end-seed` golden 结果与 P0 基线一致。
 4. `session/event` 与 `session/flush` 的先后、失败和 observer containment 有独立 contract tests。
 5. provider append/flush 失败时，后续 LLM/tool 副作用不会继续执行。
 6. 两个并行 Session 的 writer lease、seq 和通知不串线。

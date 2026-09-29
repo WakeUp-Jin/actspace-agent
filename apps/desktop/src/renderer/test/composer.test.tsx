@@ -363,11 +363,12 @@ describe("Composer follow-up bar", () => {
     expect(body.dataset.layout).toBe("stacked");
   });
 
-  it("renders the send button as an inverse round arrow button", () => {
+  it("renders the send button as an accent round arrow button", () => {
     renderComposer();
 
+    // bg-accent 在默认调色板下回落为 action 反色，其它调色板取强调色（front-accent-palette.md）。
     const sendButton = screen.getByRole("button", { name: "输入消息后发送" });
-    expect(sendButton).toHaveClass("bg-action", "text-on-action", "rounded-act-pill");
+    expect(sendButton).toHaveClass("bg-accent", "text-on-accent", "rounded-act-pill");
     expect(sendButton.className).not.toContain("bg-operational");
   });
 
@@ -1000,15 +1001,15 @@ describe("Composer follow-up bar", () => {
     const toggle = screen.getByLabelText("deepseek-v4-flash Thinking") as HTMLInputElement;
     const track = toggle.parentElement?.querySelector(".toggle-track");
     expect(toggle.checked).toBe(true);
-    expect(track).toHaveClass("bg-operational");
+    expect(track).toHaveClass("bg-toggle-on");
 
     await user.click(toggle);
     expect(toggle.checked).toBe(false);
-    expect(track).not.toHaveClass("bg-operational");
+    expect(track).not.toHaveClass("bg-toggle-on");
 
     await user.click(toggle);
     expect(toggle.checked).toBe(true);
-    expect(track).toHaveClass("bg-operational");
+    expect(track).toHaveClass("bg-toggle-on");
   });
 
   it("sends follow-up text with the selected model", async () => {

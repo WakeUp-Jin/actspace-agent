@@ -51,12 +51,14 @@ type RunService = {
   attach(session: SessionHandle): Promise<RunAssembly>;
   run(sessionId: string, input: Omit<RuntimeV2RunTurnRequest, "sessionId">): Promise<RuntimeV2RunTurnResponse>;
   get(sessionId: string): RunAssembly | undefined;
+  isIdle?: () => boolean;
   rebuild(session: SessionHandle): Promise<RunAssembly>;
 };
 
-type AgentRuntimeService = { readonly runs: RunService };
+type AgentRuntimeService = { readonly runs: RunService; readonly subagents?: { readonly activeCount: number } };
 
 export type DesktopAppServiceContract = {
+  readonly isIdleForReconfigure: () => Promise<boolean>;
   readonly readSessionProjection: SessionService["readProjection"];
   readonly readSessionObservation: SessionService["readObservation"];
   readonly subscribeSessionProjection: SessionService["subscribeProjection"];
@@ -88,6 +90,7 @@ export type DesktopAppServiceContract = {
 export class DesktopAppService implements DesktopAppServiceContract {
   readonly #sessions: SessionService;
   readonly #runs: RunService;
+  readonly #subagents: { readonly activeCount: number } | undefined;
   readonly #compaction: CompactionPlugin;
   readonly #llm: LlmService;
   readonly #hasRunningBackgroundTask: (sessionId: string) => boolean;
@@ -100,14 +103,25 @@ export class DesktopAppService implements DesktopAppServiceContract {
 
   constructor(ctx: CordisContext) {
     this.#sessions = required(ctx, "session.runtime");
-    this.#runs = (required<AgentRuntimeService>(ctx, "agent.runtime")).runs;
+    const agentRuntime = required<AgentRuntimeService>(ctx, "agent.runtime");
+    this.#runs = agentRuntime.runs;
+    this.#subagents = agentRuntime.subagents;
     this.#compaction = required(ctx, "compaction.runtime");
     this.#llm = required(ctx, "llm.service");
-    this.#hasRunningBackgroundTask = (ctx.get?.("tools.core") as { readonly hasRunningBackgroundTask?: (sessionId: string) => boolean } | undefined)?.hasRunningBackgroundTask ?? (() => false);
+    this.#hasRunningBackgroundTask = (sessionId) => (ctx.get?.("tools.shell-tools") as { readonly hasRunningBackgroundTask?: (sessionId: string) => boolean } | undefined)?.hasRunningBackgroundTask?.(sessionId) ?? false;
     this.#manifestDigest = (ctx.get?.("actspace.host.session") as { readonly manifestDigest?: string } | undefined)?.manifestDigest ?? "desktop-app";
   }
 
   listSessions() { return this.#sessions.list(); }
+  async isIdleForReconfigure(): Promise<boolean> {
+    if (this.#titleJobs.size > 0 || this.#runs.isIdle?.() !== true) return false;
+    if (this.#subagents?.activeCount) return false;
+    for (const item of await this.#sessions.list()) {
+      const snapshot = await this.#sessions.inspect(item.sessionId);
+      if (snapshot.pendingInbox.length > 0) return false;
+    }
+    return this.#runs.isIdle?.() === true;
+  }
   readSessionProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.#sessions.readProjection(input); }
   readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.#sessions.readObservation(input); }
   subscribeSessionProjection(listener: (update: import("@actspace/shared/runtime-v2").RuntimeV2SessionUpdate) => void) { return this.#sessions.subscribeProjection(listener); }

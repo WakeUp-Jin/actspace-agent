@@ -24,7 +24,7 @@ it("owns a Chat fork before first send, publishes changes and releases its write
     },
   };
   let backgroundRunning = false;
-  const services = new Map<string, unknown>([["session.runtime", sessions], ["agent.runtime", { runs }], ["compaction.runtime", {}], ["llm.service", {}], ["tools.core", { hasRunningBackgroundTask: (sessionId: string) => sessionId === "parent" && backgroundRunning }]]);
+  const services = new Map<string, unknown>([["session.runtime", sessions], ["agent.runtime", { runs }], ["compaction.runtime", {}], ["llm.service", {}], ["tools.shell-tools", { hasRunningBackgroundTask: (sessionId: string) => sessionId === "parent" && backgroundRunning }]]);
   const app = new DesktopAppService({ get: (id: string) => services.get(id) } as CordisContext);
   try {
     const parent = await sessions.create("parent", "/workspace", "chat");

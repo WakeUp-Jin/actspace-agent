@@ -44,7 +44,14 @@
       "packages/subagent/src/manifest.ts",
       "packages/tools/approval/src/manifest.ts",
       "packages/tools/browser-tools/src/manifest.ts",
-      "packages/tools/core-tools/src/manifest.ts",
+      "packages/tools/filesystem-read/src/manifest.ts",
+      "packages/tools/filesystem-search/src/manifest.ts",
+      "packages/tools/filesystem-write/src/manifest.ts",
+      "packages/tools/shell-tools/src/manifest.ts",
+      "packages/tools/web-tools/src/manifest.ts",
+      "packages/tools/image-generation/src/manifest.ts",
+      "packages/tools/image-inspection/src/manifest.ts",
+      "packages/tools/todo-tools/src/manifest.ts",
       "packages/tools/runtime/src/manifest.ts"
     ],
     "composition": [
@@ -83,7 +90,14 @@
       "packages/test-support/package.json",
       "packages/tools/approval/package.json",
       "packages/tools/browser-tools/package.json",
-      "packages/tools/core-tools/package.json",
+      "packages/tools/filesystem-read/package.json",
+      "packages/tools/filesystem-search/package.json",
+      "packages/tools/filesystem-write/package.json",
+      "packages/tools/shell-tools/package.json",
+      "packages/tools/web-tools/package.json",
+      "packages/tools/image-generation/package.json",
+      "packages/tools/image-inspection/package.json",
+      "packages/tools/todo-tools/package.json",
       "packages/tools/runtime/package.json",
       "packages/util/package.json",
       "apps/cli/package.json",
@@ -427,7 +441,9 @@
         "session.runtime"
       ],
       "publicSurface": [
-        "project"
+        "createRegistry",
+        "registerContributor",
+        "applyContributors"
       ],
       "configSchema": {
         "type": "object"
@@ -496,11 +512,11 @@
     },
     {
       "kind": "service",
-      "id": "tools.core",
-      "owner": "@actspace/core-tools",
+      "id": "tools.filesystem-read",
+      "owner": "@actspace/tools-filesystem-read",
       "status": "active",
       "sourceRefs": [
-        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.coreTools"
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.filesystemRead"
       ],
       "tests": [
         "cordis-adapter/service-contract"
@@ -508,9 +524,121 @@
       "abiVersion": 1,
       "scope": "agent",
       "required": true,
-      "description": "ActSpace core tool contributions.",
-      "providerId": "tools.core:default",
-      "providerOwner": "@actspace/core-tools",
+      "description": "filesystem-read contributions.",
+      "providerId": "tools.filesystem-read:default",
+      "providerOwner": "@actspace/tools-filesystem-read",
+      "consumerIds": [
+        "tools.runtime"
+      ],
+      "publicSurface": [
+        "definitions",
+        "registrations"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.filesystem-search",
+      "owner": "@actspace/tools-filesystem-search",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.filesystemSearch"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "filesystem-search contributions.",
+      "providerId": "tools.filesystem-search:default",
+      "providerOwner": "@actspace/tools-filesystem-search",
+      "consumerIds": [
+        "tools.runtime"
+      ],
+      "publicSurface": [
+        "definitions",
+        "registrations"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.filesystem-write",
+      "owner": "@actspace/tools-filesystem-write",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.filesystemWrite"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "filesystem-write contributions.",
+      "providerId": "tools.filesystem-write:default",
+      "providerOwner": "@actspace/tools-filesystem-write",
+      "consumerIds": [
+        "tools.runtime"
+      ],
+      "publicSurface": [
+        "definitions",
+        "registrations"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.image-generation",
+      "owner": "@actspace/tools-image-generation",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.imageGeneration"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "image-generation contributions.",
+      "providerId": "tools.image-generation:default",
+      "providerOwner": "@actspace/tools-image-generation",
+      "consumerIds": [
+        "tools.runtime"
+      ],
+      "publicSurface": [
+        "definitions",
+        "registrations"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.image-inspection",
+      "owner": "@actspace/tools-image-inspection",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.imageInspection"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "image-inspection contributions.",
+      "providerId": "tools.image-inspection:default",
+      "providerOwner": "@actspace/tools-image-inspection",
       "consumerIds": [
         "tools.runtime"
       ],
@@ -547,6 +675,90 @@
         "prepare",
         "execute",
         "dispose"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.shell-tools",
+      "owner": "@actspace/tools-shell-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.shellTools"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "shell-tools contributions.",
+      "providerId": "tools.shell-tools:default",
+      "providerOwner": "@actspace/tools-shell-tools",
+      "consumerIds": [
+        "tools.runtime"
+      ],
+      "publicSurface": [
+        "definitions",
+        "registrations"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.todo",
+      "owner": "@actspace/tools-todo-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.todoTools"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "todo-tools contributions.",
+      "providerId": "tools.todo:default",
+      "providerOwner": "@actspace/tools-todo-tools",
+      "consumerIds": [
+        "tools.runtime"
+      ],
+      "publicSurface": [
+        "definitions",
+        "registrations"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.web-tools",
+      "owner": "@actspace/tools-web-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.webTools"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "web-tools contributions.",
+      "providerId": "tools.web-tools:default",
+      "providerOwner": "@actspace/tools-web-tools",
+      "consumerIds": [
+        "tools.runtime"
+      ],
+      "publicSurface": [
+        "definitions",
+        "registrations"
       ],
       "configSchema": {
         "type": "object"
@@ -1811,27 +2023,6 @@
     },
     {
       "kind": "event",
-      "id": "session:todo/write",
-      "owner": "@actspace/session-journal",
-      "status": "active",
-      "sourceRefs": [
-        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
-      ],
-      "tests": [
-        "session-journal/core-codec-contract",
-        "cordis-adapter/event-contract"
-      ],
-      "plane": "session",
-      "category": "core",
-      "eventType": "todo/write",
-      "scope": "session",
-      "surface": "internal",
-      "codecStatus": "present",
-      "producerStatus": "present",
-      "required": true
-    },
-    {
-      "kind": "event",
       "id": "session:tool-workflow/agent-end",
       "owner": "@actspace/session-journal",
       "status": "active",
@@ -2194,6 +2385,24 @@
     },
     {
       "kind": "capability",
+      "id": "filesystem.read",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [
+        "actspace.filesystem-read",
+        "actspace.filesystem-search"
+      ],
+      "optionalBy": [],
+      "required": true
+    },
+    {
+      "kind": "capability",
       "id": "filesystem.session",
       "owner": "@actspace/cordis-adapter",
       "status": "active",
@@ -2207,6 +2416,24 @@
         "actspace.session.journal",
         "actspace.session.jsonl",
         "actspace.session.persistence"
+      ],
+      "optionalBy": [],
+      "required": true
+    },
+    {
+      "kind": "capability",
+      "id": "filesystem.write",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [
+        "actspace.filesystem-write",
+        "actspace.image-generation"
       ],
       "optionalBy": [],
       "required": true
@@ -2230,6 +2457,25 @@
     },
     {
       "kind": "capability",
+      "id": "network",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [
+        "actspace.image-generation",
+        "actspace.image-inspection",
+        "actspace.web-tools"
+      ],
+      "optionalBy": [],
+      "required": true
+    },
+    {
+      "kind": "capability",
       "id": "network.provider",
       "owner": "@actspace/cordis-adapter",
       "status": "active",
@@ -2243,7 +2489,6 @@
         "actspace.llm.pi-ai"
       ],
       "optionalBy": [
-        "actspace.core-tools",
         "actspace.llm.service"
       ],
       "required": true
@@ -2252,18 +2497,18 @@
       "kind": "capability",
       "id": "process",
       "owner": "@actspace/cordis-adapter",
-      "status": "optional",
+      "status": "active",
       "sourceRefs": [
         "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
       ],
       "tests": [
         "composition/admission-contract"
       ],
-      "requiredBy": [],
-      "optionalBy": [
-        "actspace.core-tools"
+      "requiredBy": [
+        "actspace.shell-tools"
       ],
-      "required": false
+      "optionalBy": [],
+      "required": true
     },
     {
       "kind": "capability",
@@ -2400,57 +2645,6 @@
     },
     {
       "kind": "plugin",
-      "id": "actspace.core-tools",
-      "owner": "actspace.core-tools",
-      "status": "active",
-      "sourceRefs": [
-        "packages/tools/core-tools/src/manifest.ts#manifest"
-      ],
-      "tests": [
-        "cordis-adapter/event-contract",
-        "cordis-adapter/service-contract"
-      ],
-      "version": "2.0.0",
-      "name": "ActSpace Core Tools",
-      "entryId": "tools.core",
-      "behavior": "./plugin.js",
-      "codec": null,
-      "required": true,
-      "enabled": true,
-      "provides": [
-        "tools.core"
-      ],
-      "injects": [
-        "actspace.host.tools.core",
-        "llm.service",
-        "tools.runtime"
-      ],
-      "tools": [
-        "bash",
-        "bash_kill",
-        "bash_output",
-        "delete_file",
-        "edit_file",
-        "generate_image",
-        "glob",
-        "grep",
-        "inspect_image",
-        "list_directory",
-        "read_file",
-        "web_fetch",
-        "web_search",
-        "write_file"
-      ],
-      "prompts": [],
-      "events": [],
-      "requiredCapabilities": [],
-      "optionalCapabilities": [
-        "network.provider",
-        "process"
-      ]
-    },
-    {
-      "kind": "plugin",
       "id": "actspace.core.agent",
       "owner": "actspace.core.agent",
       "status": "active",
@@ -2578,6 +2772,118 @@
     },
     {
       "kind": "plugin",
+      "id": "actspace.filesystem-read",
+      "owner": "actspace.filesystem-read",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/filesystem-read/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "2.0.0",
+      "name": "ActSpace Filesystem Read",
+      "entryId": "tools.filesystem-read",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.filesystem-read"
+      ],
+      "injects": [
+        "actspace.host.tools.filesystem-read",
+        "tools.runtime"
+      ],
+      "tools": [
+        "list_directory",
+        "read_file"
+      ],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "filesystem.read"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.filesystem-search",
+      "owner": "actspace.filesystem-search",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/filesystem-search/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "2.0.0",
+      "name": "ActSpace Filesystem Search",
+      "entryId": "tools.filesystem-search",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.filesystem-search"
+      ],
+      "injects": [
+        "actspace.host.tools.filesystem-search",
+        "tools.runtime"
+      ],
+      "tools": [
+        "glob",
+        "grep"
+      ],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "filesystem.read"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.filesystem-write",
+      "owner": "actspace.filesystem-write",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/filesystem-write/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "2.0.0",
+      "name": "ActSpace Filesystem Write",
+      "entryId": "tools.filesystem-write",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.filesystem-write"
+      ],
+      "injects": [
+        "actspace.host.tools.filesystem-write",
+        "tools.runtime"
+      ],
+      "tools": [
+        "delete_file",
+        "edit_file",
+        "write_file"
+      ],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "filesystem.write"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
       "id": "actspace.headless",
       "owner": "actspace.headless",
       "status": "active",
@@ -2614,6 +2920,80 @@
       "optionalCapabilities": [
         "headless"
       ]
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.image-generation",
+      "owner": "actspace.image-generation",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/image-generation/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "2.0.0",
+      "name": "ActSpace Image Generation",
+      "entryId": "tools.image-generation",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.image-generation"
+      ],
+      "injects": [
+        "actspace.host.tools.image-generation",
+        "tools.runtime"
+      ],
+      "tools": [
+        "generate_image"
+      ],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "filesystem.write",
+        "network"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.image-inspection",
+      "owner": "actspace.image-inspection",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/image-inspection/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "2.0.0",
+      "name": "ActSpace Image Inspection",
+      "entryId": "tools.image-inspection",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.image-inspection"
+      ],
+      "injects": [
+        "actspace.host.tools.image-inspection",
+        "llm.service",
+        "tools.runtime"
+      ],
+      "tools": [
+        "inspect_image"
+      ],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "network"
+      ],
+      "optionalCapabilities": []
     },
     {
       "kind": "plugin",
@@ -2851,6 +3231,44 @@
     },
     {
       "kind": "plugin",
+      "id": "actspace.shell-tools",
+      "owner": "actspace.shell-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/shell-tools/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "2.0.0",
+      "name": "ActSpace Shell Tools",
+      "entryId": "tools.shell-tools",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.shell-tools"
+      ],
+      "injects": [
+        "actspace.host.tools.shell-tools",
+        "tools.runtime"
+      ],
+      "tools": [
+        "bash",
+        "bash_kill",
+        "bash_output"
+      ],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "process"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
       "id": "actspace.subagent",
       "owner": "actspace.subagent",
       "status": "active",
@@ -2884,6 +3302,44 @@
       "events": [
         "delegation/completed",
         "delegation/started"
+      ],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.todo",
+      "owner": "actspace.todo",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/todo-tools/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Todo Tools",
+      "entryId": "tools.todo",
+      "behavior": "./plugin.js",
+      "codec": "./codec.js",
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.todo"
+      ],
+      "injects": [
+        "session.projection",
+        "session.runtime",
+        "tools.runtime"
+      ],
+      "tools": [
+        "todo_read",
+        "todo_write"
+      ],
+      "prompts": [],
+      "events": [
+        "plugin/actspace.todo/todo-write"
       ],
       "requiredCapabilities": [],
       "optionalCapabilities": []
@@ -2949,6 +3405,44 @@
       "events": [],
       "requiredCapabilities": [],
       "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.web-tools",
+      "owner": "actspace.web-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/web-tools/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "2.0.0",
+      "name": "ActSpace Web Tools",
+      "entryId": "tools.web-tools",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.web-tools"
+      ],
+      "injects": [
+        "actspace.host.tools.web-tools",
+        "tools.runtime"
+      ],
+      "tools": [
+        "web",
+        "web_fetch",
+        "web_search"
+      ],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "network"
+      ],
+      "optionalCapabilities": []
     }
   ],
   "packages": [
@@ -2971,8 +3465,14 @@
         "@actspace/runtime",
         "@actspace/shared",
         "@actspace/tools-approval",
-        "@actspace/tools-core-tools",
-        "@actspace/tools-runtime"
+        "@actspace/tools-filesystem-read",
+        "@actspace/tools-filesystem-search",
+        "@actspace/tools-filesystem-write",
+        "@actspace/tools-image-generation",
+        "@actspace/tools-image-inspection",
+        "@actspace/tools-runtime",
+        "@actspace/tools-shell-tools",
+        "@actspace/tools-web-tools"
       ],
       "packageRole": "host"
     },
@@ -3252,8 +3752,14 @@
         "@actspace/shared",
         "@actspace/tools-approval",
         "@actspace/tools-browser-tools",
-        "@actspace/tools-core-tools",
+        "@actspace/tools-filesystem-read",
+        "@actspace/tools-filesystem-search",
+        "@actspace/tools-filesystem-write",
+        "@actspace/tools-image-generation",
+        "@actspace/tools-image-inspection",
         "@actspace/tools-runtime",
+        "@actspace/tools-shell-tools",
+        "@actspace/tools-web-tools",
         "@radix-ui/react-hover-card",
         "@radix-ui/react-tooltip",
         "@tanstack/react-virtual",
@@ -3365,6 +3871,7 @@
         "@actspace/cordis-adapter",
         "@actspace/llm-service",
         "@actspace/shared",
+        "@anthropic-ai/sdk",
         "@earendil-works/pi-ai",
         "openai"
       ],
@@ -3468,8 +3975,15 @@
         "@actspace/subagent",
         "@actspace/tools-approval",
         "@actspace/tools-browser-tools",
-        "@actspace/tools-core-tools",
-        "@actspace/tools-runtime"
+        "@actspace/tools-filesystem-read",
+        "@actspace/tools-filesystem-search",
+        "@actspace/tools-filesystem-write",
+        "@actspace/tools-image-generation",
+        "@actspace/tools-image-inspection",
+        "@actspace/tools-runtime",
+        "@actspace/tools-shell-tools",
+        "@actspace/tools-todo-tools",
+        "@actspace/tools-web-tools"
       ],
       "packageRole": "domain"
     },
@@ -3723,16 +4237,112 @@
     },
     {
       "kind": "package",
-      "id": "@actspace/tools-core-tools",
-      "owner": "@actspace/tools-core-tools",
+      "id": "@actspace/tools-filesystem-read",
+      "owner": "@actspace/tools-filesystem-read",
       "status": "active",
       "sourceRefs": [
-        "packages/tools/core-tools/package.json#package.json"
+        "packages/tools/filesystem-read/package.json#package.json"
       ],
       "tests": [
         "composition/admission-contract"
       ],
-      "path": "packages/tools/core-tools/package.json",
+      "path": "packages/tools/filesystem-read/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-filesystem-search",
+      "owner": "@actspace/tools-filesystem-search",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/filesystem-search/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/filesystem-search/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-filesystem-write",
+      "owner": "@actspace/tools-filesystem-write",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/filesystem-write/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/filesystem-write/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-image-generation",
+      "owner": "@actspace/tools-image-generation",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/image-generation/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/image-generation/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-image-inspection",
+      "owner": "@actspace/tools-image-inspection",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/image-inspection/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/image-inspection/package.json",
       "exports": [
         ".",
         "./manifest",
@@ -3742,8 +4352,7 @@
         "@actspace/cordis-adapter",
         "@actspace/llm-service",
         "@actspace/shared",
-        "@actspace/tools-runtime",
-        "turndown"
+        "@actspace/tools-runtime"
       ],
       "packageRole": "domain"
     },
@@ -3768,6 +4377,83 @@
         "@actspace/cordis-adapter",
         "@actspace/shared",
         "@actspace/tools-approval"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-shell-tools",
+      "owner": "@actspace/tools-shell-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/shell-tools/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/shell-tools/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-todo-tools",
+      "owner": "@actspace/tools-todo-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/todo-tools/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/todo-tools/package.json",
+      "exports": [
+        ".",
+        "./codec",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/session-journal",
+        "@actspace/session-persistence",
+        "@actspace/session-projection",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-web-tools",
+      "owner": "@actspace/tools-web-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/web-tools/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/web-tools/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared",
+        "@actspace/tools-runtime",
+        "turndown"
       ],
       "packageRole": "domain"
     },
@@ -3829,10 +4515,8 @@
           "agent.registry",
           "agent.loop",
           "inbox",
-          "todo",
           "skills",
           "compaction",
-          "core-tools",
           "subagent.agent",
           "subagent.explore"
         ],
@@ -3996,6 +4680,6 @@
       "required": true
     }
   ],
-  "sourceDigest": "d81adad125e94cab987b2e23c24fb2b6ef4c8bc76a904ea3b4e155b5f67600d9",
+  "sourceDigest": "2e9b9c38344dd9225e0becce5cdb73119b4fe9817d2f34fdb155e1057b0a9d58",
   "diagnostics": []
 }

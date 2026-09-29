@@ -29,6 +29,7 @@ const SUPPORTED_CDP_METHODS = new Set([
 
 const state = {
   version: chrome.runtime.getManifest?.().version ?? "0.2.2",
+  instanceId: null,
   nativePort: null,
   nativeConnected: false,
   nativeLastError: null,
@@ -39,7 +40,7 @@ const state = {
 };
 
 function getSessionState(params = {}) {
-  const sessionId = typeof params.sessionId === "string" && params.sessionId ? params.sessionId : "legacy";
+  const sessionId = sessionKey(params);
   let session = state.sessions.get(sessionId);
   if (!session) {
     session = {
@@ -53,6 +54,16 @@ function getSessionState(params = {}) {
     state.sessions.set(sessionId, session);
   }
   return session;
+}
+
+function sessionKey(params = {}) {
+  return JSON.stringify([params.sessionId || "legacy", params.turnId || "legacy"]);
+}
+
+function endSession(params = {}) {
+  // Release ownership without closing or ungrouping the user's pages.
+  state.sessions.delete(sessionKey(params));
+  return { status: "ended" };
 }
 
 function assertTabAvailableForSession(tabId, session) {
@@ -118,6 +129,7 @@ function getInfo() {
   return {
     name: "agent-browser-bridge-chrome-extension",
     version: state.version,
+    instanceId: state.instanceId,
     protocolVersion: PROTOCOL_VERSION,
     nativeMessaging: {
       hostName: HOST_NAME,
@@ -180,15 +192,31 @@ function connectNativeHost() {
     state.nativePort = port;
     state.nativeConnected = false;
     state.nativeLastError = null;
+    void getOrCreateInstanceId().then((instanceId) => {
+      if (state.nativePort === port) {
+        state.instanceId = instanceId;
+        postNativeEvent("agent_browser_bridge.event.instance_ready", {
+          instanceId,
+          extensionVersion: state.version,
+          protocolVersion: PROTOCOL_VERSION
+        });
+      }
+    }).catch((error) => {
+      state.nativeLastError = error instanceof Error ? error.message : String(error);
+      port.disconnect();
+    });
 
     port.onDisconnect.addListener(() => {
+      if (state.nativePort !== port) return;
       state.nativePort = null;
       state.nativeConnected = false;
       state.nativeLastError = lastErrorMessage("Native host disconnected.");
       console.warn("[agent-browser-bridge] native host disconnected", state.nativeLastError);
+      setTimeout(() => { if (!state.nativePort) connectNativeHost(); }, 2_000);
     });
 
     port.onMessage.addListener((message) => {
+      if (state.nativePort !== port) return;
       if (!state.nativeConnected) {
         state.nativeConnected = true;
         console.info("[agent-browser-bridge] native host connected", { hostName: HOST_NAME });
@@ -208,8 +236,19 @@ function connectNativeHost() {
     state.nativePort = null;
     state.nativeConnected = false;
     state.nativeLastError = error instanceof Error ? error.message : String(error);
+    setTimeout(() => { if (!state.nativePort) connectNativeHost(); }, 5_000);
     return null;
   }
+}
+
+async function getOrCreateInstanceId() {
+  const stored = await chrome.storage.local.get("actspaceInstanceId");
+  if (typeof stored.actspaceInstanceId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(stored.actspaceInstanceId)) {
+    return stored.actspaceInstanceId;
+  }
+  const instanceId = crypto.randomUUID();
+  await chrome.storage.local.set({ actspaceInstanceId: instanceId });
+  return instanceId;
 }
 
 function postNativeEvent(method, params) {
@@ -224,6 +263,15 @@ function postNativeEvent(method, params) {
     console.warn("[agent-browser-bridge] failed to post native event", method, error);
   }
 }
+
+chrome.action.onClicked.addListener(() => {
+  if (state.instanceId) postNativeEvent("agent_browser_bridge.event.instance_selected", { instanceId: state.instanceId });
+});
+
+chrome.alarms.create("actspace-native-reconnect", { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "actspace-native-reconnect" && !state.nativePort) connectNativeHost();
+});
 
 async function handleNativeRequest(message) {
   const id = message?.id ?? "";
@@ -294,7 +342,7 @@ async function handleNativeRequest(message) {
       case "agent_browser_bridge.session.start":
         return ok(id, { sessionId: (message.params ?? {}).sessionId });
       case "agent_browser_bridge.session.end":
-        return ok(id, { status: "ended" });
+        return ok(id, endSession(message.params ?? {}));
       default:
         return fail(id, "unsupported_method", `Unsupported method: ${message.method ?? "unknown"}`);
     }
@@ -489,7 +537,7 @@ async function executeCdpPrimitive(params) {
     error.code = "unsupported_method";
     throw error;
   }
-  const target = resolveDebuggerSession(tabId, params.frameId, params.sessionId);
+  const target = resolveDebuggerSession(tabId, params.frameId, params.cdpSessionId);
   try {
     return await sendDebuggerCommand(target, params.method, params.commandParams ?? {});
   } catch (error) {

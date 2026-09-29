@@ -2,7 +2,7 @@
 
 > 状态：P0 Scope contract、fused dispatcher 与 main/child 生产接线已实现；真实 Host/Electron/Provider 与全仓库回归仍属于外部验收。
 >
-> 本文只定义 Agent Scope 的身份、父子关系、注册可见性、事件准入、资源所有权和 Agent subject 绑定。它不重新定义 Agent Loop 的 9 个事件、Session 的 13 个核心事件，也不重新定义工具执行本体；这些契约分别由 Agent Loop、Session 和 Tool Runtime 专题拥有。
+> 本文只定义 Agent Scope 的身份、父子关系、注册可见性、事件准入、资源所有权和 Agent subject 绑定。它不重新定义 Agent Loop 的 9 个事件、Session 的 12 个核心事件，也不重新定义工具执行本体；这些契约分别由 Agent Loop、Session 和 Tool Runtime 专题拥有。
 >
 > 本文是对 [Agent 与一次性 Subagent 规范](./agent-spec-agent-and-subagent.md) 中 Scope 小节的细化。实现应先通过本文的契约评审，再进入 execution plan。
 
@@ -266,7 +266,7 @@ Scope P0 已完成以下代码接线：
 ### 本规范不包含
 
 - Agent Loop 9 个事件的字段或顺序；
-- Session 13 个核心事件和持久化后端；
+- Session 12 个核心事件和持久化后端；
 - Tool executor、read/list/grep/bash/browser 的具体实现；
 - Credential、sandbox、网络或跨进程安全隔离；
 - Dynamic plugin marketplace、VM sandbox 或 live reload；

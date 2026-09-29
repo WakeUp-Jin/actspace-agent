@@ -52,3 +52,9 @@
 
 旧 Session 保留原 Header/Journal，通过旧 preset 映射恢复；没有回填新组合字段。真实 Browser、打包 Electron 与签名不属于本次通过范围。当前形态只有一个静态内建组合；新形态和插件市场尚未设计。
 首次锁屏曾中断实机路线；本轮在用户保持屏幕常亮后恢复了实机验收。首次 Chat 搜索因同一 AgentScope 重复注册 `core/identity` 失败；修正模式贡献切换后，真实搜索、生图和 Plan 调用成功，并增加回归测试。
+
+## 2026-09-29 main 集成验证
+
+按用户授权创建 `codex/agent-forms-and-modes` 并提交功能，再集成 main 的工具拆包及 Chrome 连接改动。形态成员改为七个独立工具插件；后台任务查询迁入可选 Shell 服务；保留工具 scope 拒绝审计与动态模式门禁、Todo 投影贡献、附件准入计数和模式校验。旧 Core Tools 源码继续退役。
+
+合并版本通过 typecheck、build、package boundaries、current docs；Desktop 119 文件/868 测试、Runtime 35、Tool Runtime 29、Core Agent 18、Agent Loop 20、CLI 13、Shell 6 测试通过。原先尚未覆盖的实机门禁仍保留，集成版本未重新运行整套 Electron 实机路线。

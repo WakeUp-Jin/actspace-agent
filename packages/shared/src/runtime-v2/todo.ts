@@ -3,7 +3,7 @@ import type { RuntimeV2TodoItem } from "./projection";
 export type RuntimeV2TodoWriteItem = Readonly<Record<string, unknown>>;
 
 /**
- * Canonical Journal fold for todo/write. Writes are item deltas, even when a
+ * Canonical Journal fold for plugin/actspace.todo/todo-write. Writes are item deltas, even when a
  * single event contains many items. The item revision is the only ordering
  * signal; the event-level revision is intentionally ignored.
  */
