@@ -34,6 +34,8 @@
 
 ## 最近完成
 
+- [压缩耗时与辅助模型路由修复](completed/20260930-compaction-duration-utility-fix.md)：真实摘要耗时持久化、utility 路由优先与旧 journal 兼容；98 项定向测试及真实 Electron 复验通过，见[修复报告](../exec-runs/20260930-compaction-duration-utility-fix/execution-summary.md)。
+
 - [统一验收缺陷修复](completed/20260929-acceptance-bugfixes.md)：Chat工具拒绝结算、旧历史恢复、子会话检查点/读取/索引、字体预览、开发启动竞态与文件缓存隔离已修复，定向实机复验通过。
 
 - [Tool 插件边界拆分与 Todo 领域迁移](completed/20260928-tool-plugin-boundaries.md)：七个独立工具插件与 Todo 领域事件、Projection Contributor、调用时 scope gate 和启动禁用已实现；全量测试与外部门禁边界见[执行摘要](../exec-runs/20260928-tool-plugin-boundaries/execution-summary.md)。

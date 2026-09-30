@@ -266,6 +266,8 @@ export type ContextCompactionPayload = {
   reductionRatio?: number;
   removedCount?: number;
   reason?: string;
+  /** 压缩耗时；优先读取 compaction/end.durationMs，旧 journal 回退 start/end 时间差 */
+  durationMs?: number;
 };
 
 export type SessionWorktreeContext = {

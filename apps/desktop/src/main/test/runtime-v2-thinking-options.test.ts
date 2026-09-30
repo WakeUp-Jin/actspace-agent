@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, expect, it, vi } from "vitest";
 import type { ModelCapabilities } from "@actspace/shared";
-import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
+import type { LlmAdapterDispatchInput, LlmAdapterPrepareInput } from "@actspace/llm-service";
 import { DesktopLegacyLlmAdapter } from "../runtime-v2/legacy-llm-adapter";
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn(async () => (async function* () {})()) }));
 vi.mock("@actspace/llm-pi-ai", async (importOriginal) => ({ ...await importOriginal<typeof import("@actspace/llm-pi-ai")>(), PiAiAdapter: class { dispatch = dispatch; }, PiAiWireEngine: class {}, LegacyProxyWireEngine: class {}, DeepSeekFileUploader: class {} }));
@@ -41,5 +41,21 @@ it("routes title requests to a text-only utility model with its own connection",
     expect(resolveUtilityTaskModel).toHaveBeenCalledWith("chosen-main");
     expect(resolveMainModel).not.toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ request: expect.objectContaining({ model: "title-model" }), credential: expect.objectContaining({ apiKey: "fixture-utility-key", baseUrl: "https://utility.example/v1" }) }));
+  } finally { await adapter.dispose(); }
+});
+
+it("resolves a changed utility binding on the next prepared call", async () => {
+  let key = "first-utility";
+  const resolveUtilityTaskModel = vi.fn(() => ({ ok: true as const, model: { key, definition: { api: "openai-completions" as const, provider: "kimi", apiModel: key, contextWindow: 1000 }, providerRuntime: {} } }));
+  const resolveMainModel = vi.fn(() => { throw Error("compaction must use utility"); });
+  const adapter = new DesktopLegacyLlmAdapter({ resolveMainModel, resolveUtilityTaskModel, resolveImageInspectionModel: resolveUtilityTaskModel, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); }, "utility");
+  const input = { request: { model: "default", options: {} }, credential: {} } as unknown as LlmAdapterPrepareInput;
+  try {
+    expect(adapter.prepare(input).request.model).toBe("first-utility");
+    key = "second-utility";
+    expect(adapter.prepare(input).request.model).toBe("second-utility");
+    expect(resolveUtilityTaskModel).toHaveBeenNthCalledWith(1, undefined);
+    expect(resolveUtilityTaskModel).toHaveBeenNthCalledWith(2, undefined);
+    expect(resolveMainModel).not.toHaveBeenCalled();
   } finally { await adapter.dispose(); }
 });

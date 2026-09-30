@@ -2,7 +2,35 @@ import { describe, expect, it, vi } from "vitest";
 import { activate, apply, CompactionPlugin, CompactionService } from "../plugin.js";
 import { CordisContextClass } from "@actspace/cordis-adapter";
 
+import { compactionSession } from "./session-fixture.js";
+
 describe("compaction plugin lifecycle", () => {
+  it.each([
+    { routes: ["default", "utility"], override: undefined, expected: "utility" },
+    { routes: ["default", "utility"], override: "default", expected: "default" },
+    { routes: ["default", "utility"], override: "custom", expected: "custom" },
+    { routes: ["default"], override: undefined, expected: "default" },
+    { routes: ["fixture"], override: undefined, expected: "fixture" },
+  ])("uses $expected for routes $routes and override $override", async ({ routes, override, expected }) => {
+    const ctx = new CordisContextClass();
+    const session = await compactionSession();
+    const prepare = vi.fn((request) => ({
+      request,
+      registration: { registrationId: "fixture", adapter: { adapterVersion: "fixture" } },
+      dispatch: async () => (async function* () { yield { type: "done", content: [{ type: "text", text: "summary" }] }; })(),
+      release: vi.fn(),
+    }));
+    ctx.provide("llm.service", { routes: { list: () => routes.map(routeId => ({ routeId })) }, prepare });
+    try {
+      await ctx.plugin({ inject: ["llm.service"], apply: (inner) => apply(inner as never, { routeId: override }) });
+      expect(await (ctx.get("compaction.runtime") as CompactionService).compact(session)).toBe(true);
+      expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ routeId: expected, model: "default" }));
+    } finally {
+      await session.close();
+      await ctx.fiber.dispose();
+    }
+  });
+
   it("publishes the compaction behavior entry and disposes", async () => {
     const activation = activate();
     expect(activation.services?.["compaction.surface"]).toMatchObject({ CompactionPlugin: expect.any(Function) });

@@ -35,7 +35,8 @@ export class CompactionService extends Service {
     const llmValue = ctx.get("llm.service") as (LlmService & { readonly runtime?: LlmService }) | undefined;
     if (llmValue === undefined) throw new Error("Compaction Service requires llm.service.");
     const llm = llmValue.runtime ?? llmValue;
-    const routeId = config.routeId ?? llm.routes.list()[0]?.routeId;
+    const routes = llm.routes.list();
+    const routeId = config.routeId ?? routes.find(route => route.routeId === "utility")?.routeId ?? routes[0]?.routeId;
     if (routeId === undefined) throw new Error("Compaction Service requires an active LLM route.");
     this.runtime = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, new LlmCompactionSummarizer({ llm, routeId, model: config.model ?? "default" }));
     ctx.effect(() => () => undefined, "compaction.runtime");
@@ -76,6 +77,7 @@ export class CompactionPlugin {
   async compact(session: SessionHandle): Promise<boolean> {
     const region = chooseCompactionRegion(session.projection.surface, this.policy);
     if (region === null) return false;
+    const startedAt = Date.now();
     const entries = session.projection.surface.entries.slice(region.start, region.end);
     await session.flush();
     const summary = await this.summarizer.summarize(entries, { sessionId: session.header.sessionId });
@@ -88,6 +90,8 @@ export class CompactionPlugin {
       compactionId: randomUUID(),
       contributorIds: ["core/compaction"],
       summaryDigest: createHash("sha256").update(JSON.stringify(content)).digest("hex"),
+      // Journal timestamps measure transaction commit, not the preceding LLM call.
+      durationMs: Math.max(0, Date.now() - startedAt),
     });
     await session.appendMany(transaction);
     await session.flush();

@@ -178,7 +178,10 @@ export function projectChatEvents(
       const started = findCompactionStart(journal, string(data.compactionId));
       const start = nonNegative(started?.data.start);
       const end = nonNegative(started?.data.end);
-      projected.push({ ...base, id: eventId(event), type: "context_compaction", payload: { triggerTokens: snapshot.usage.totalTokens, thresholdTokens: snapshot.usage.totalTokens, beforeCount: end, afterCount: Math.max(1, start + 1), summaryChars: 0, historyRefPath: "journal.jsonl", trigger: "manual", status: "compacted", removedCount: Math.max(0, end - start - 1) } });
+      const durationMs = typeof data.durationMs === "number" && Number.isFinite(data.durationMs) && data.durationMs >= 0
+        ? data.durationMs
+        : started === undefined ? undefined : Date.parse(event.time) - Date.parse(started.time);
+      projected.push({ ...base, id: eventId(event), type: "context_compaction", payload: { triggerTokens: snapshot.usage.totalTokens, thresholdTokens: snapshot.usage.totalTokens, beforeCount: end, afterCount: Math.max(1, start + 1), summaryChars: 0, historyRefPath: "journal.jsonl", trigger: "manual", status: "compacted", removedCount: Math.max(0, end - start - 1), ...(durationMs !== undefined && Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}) } });
     }
   }
   return projected;
@@ -589,7 +592,7 @@ function contentText(value: RuntimeV2JsonValue, includeReasoning = true): string
 function attachmentViews(value: RuntimeV2JsonValue | undefined) { return contentBlocks(value ?? []).filter((entry) => entry.type === "artifact").map((entry, index) => { const artifactId = string(record(entry.artifact).artifactId) ?? `attachment-${index}`; return { id: artifactId, path: artifactId, kind: (string(record(entry.artifact).mediaType)?.startsWith("image/") ? "image" : "file") as "image" | "file", name: string(entry.label) ?? `Attachment ${index + 1}`, mimeType: string(record(entry.artifact).mediaType) ?? undefined }; }); }
 function modelOutputText(value: RuntimeV2JsonValue | undefined): string { if (!Array.isArray(value)) return ""; return value.map((entry) => { const block = record(entry); return typeof block.text === "string" ? block.text : block.value === undefined ? "" : JSON.stringify(block.value); }).filter(Boolean).join("\n"); }
 function toolModelOutputText(tool: RuntimeV2ToolView | undefined): string { return tool?.modelOutput?.map((block) => block.type === "text" ? block.text : `${block.alt} (${block.artifactId})`).join("\n") ?? ""; }
-function findCompactionStart(events: readonly SessionEventEnvelopeV1[], id: string | null) { if (!id) return undefined; const event = events.find((candidate) => candidate.type === "compaction/start" && string(record(candidate.data).compactionId) === id); return event === undefined ? undefined : { data: record(event.data) }; }
+function findCompactionStart(events: readonly SessionEventEnvelopeV1[], id: string | null) { if (!id) return undefined; const event = events.find((candidate) => candidate.type === "compaction/start" && string(record(candidate.data).compactionId) === id); return event === undefined ? undefined : { data: record(event.data), time: event.time }; }
 function isToolTerminal(type: string): boolean { return type === "tool/result" || type === "tool/recovery-outcome"; }
 function eventId(event: SessionEventEnvelopeV1): string { return `v2-${event.seq}`; }
 function record(value: RuntimeV2JsonValue | undefined): EventRecord { return isRecord(value) ? value : {}; }

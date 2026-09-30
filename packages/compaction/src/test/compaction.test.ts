@@ -1,9 +1,42 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
 import { SessionHandle } from "@actspace/session-persistence";
 import { CompactionPlugin, DEFAULT_COMPACTION_POLICY, DeterministicCompactionSummarizer } from "../index.js";
 
+import { compactionSession } from "./session-fixture.js";
+
 describe("Compaction", () => {
+  it("persists summary latency even when transaction timestamps are identical", async () => {
+    const session = await compactionSession();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-30T00:00:00.000Z"));
+    try {
+      const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, {
+        summarize: async () => {
+          expect(session.journal.events).toHaveLength(5);
+          vi.setSystemTime(new Date("2026-09-30T00:00:01.500Z"));
+          return { content: "summary" };
+        },
+      });
+      expect(await plugin.compact(session)).toBe(true);
+      expect(session.journal.events.at(-1)).toMatchObject({ type: "compaction/end", data: { durationMs: 1500 } });
+      expect(session.journal.events[5]?.time).toBe(session.journal.events[8]?.time);
+    } finally {
+      vi.useRealTimers();
+      await session.close();
+    }
+  });
+
+  it("does not commit any compaction facts when summarization fails", async () => {
+    const session = await compactionSession();
+    try {
+      const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, { summarize: async () => { throw Error("utility unavailable"); } });
+      await expect(plugin.compact(session)).rejects.toThrow("utility unavailable");
+      expect(session.journal.events).toHaveLength(5);
+      expect(session.journal.surface.entries).toHaveLength(5);
+    } finally { await session.close(); }
+  });
+
   it("omits runtime context blocks from deterministic summaries", async () => {
     const summary = await new DeterministicCompactionSummarizer().summarize([{
       node: { kind: "user", messageId: "message-1", content: [{ type: "text", text: "hello" }, { type: "runtime-context", context: { agentMode: "plan" } }] },

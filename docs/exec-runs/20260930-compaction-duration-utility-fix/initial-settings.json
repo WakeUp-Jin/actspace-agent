@@ -1,0 +1,22 @@
+{
+  "bindings": {
+    "defaultChat": "deepseek:deepseek-flash",
+    "utility": "deepseek:deepseek-flash",
+    "explore": "deepseek:deepseek-flash"
+  },
+  "ratio": 0.8,
+  "connections": {
+    "deepseek:default": {
+      "baseUrl": null
+    },
+    "kimi:default": {
+      "baseUrl": null
+    },
+    "openrouter:default": {
+      "baseUrl": null
+    },
+    "custom-60efa1a2-cb31-4438-98e5-f38f93124e5f": {
+      "baseUrl": "https://cheaprouter.cc"
+    }
+  }
+}

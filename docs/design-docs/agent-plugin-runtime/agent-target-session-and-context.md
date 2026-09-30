@@ -102,6 +102,8 @@ Surface 支持：
 
 replace 不删除原始事件。任何压缩、裁剪或摘要都只能通过追加 replacement 事实改变未来请求视图。UI、导出和审计仍可查看未被破坏的原始历史。
 
+压缩先完成摘要生成，再整体追加 start / summary / replacement / end 事务；摘要失败不提交压缩事实。`compaction/end.data.durationMs` 是可选的实际工作耗时（包含摘要阶段），不能用事务事件时间差代替新事件的工作耗时；旧事件仍允许按时间差回放。
+
 若实现暴露 `replaceGeneration`，它只表示成功提交 positional replacement 的单调计数，用于 Surface 派生缓存失效；普通 append 不增加该计数，Journal 的总体前进仍以连续 `seq` 表达。
 
 插件不能直接扩展 Surface node union。插件若要影响模型上下文，应追加一个经过核心 schema 验证的 user message，或通过 Prompt / Context contributor 在 request snapshot 中形成可重建贡献。

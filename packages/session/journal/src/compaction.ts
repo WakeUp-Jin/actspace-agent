@@ -33,6 +33,8 @@ export function createCompactionTransaction(options: {
   readonly compactionId: string;
   readonly contributorIds: readonly string[];
   readonly summaryDigest: string;
+  /** Elapsed compaction work, including summarization before the transaction commits. */
+  readonly durationMs?: number;
 }): readonly SessionEventCandidateV1[] {
   const makeControl = (type: "compaction/start" | "compaction/summary" | "compaction/end", data: SessionEventCandidateV1["data"]): SessionEventCandidateV1 => ({
     type,
@@ -46,6 +48,6 @@ export function createCompactionTransaction(options: {
     makeControl("compaction/start", { compactionId: options.compactionId, start: options.start, end: options.end }),
     makeControl("compaction/summary", { compactionId: options.compactionId, summaryDigest: options.summaryDigest }),
     createCompactionReplacement(options),
-    makeControl("compaction/end", { compactionId: options.compactionId, summaryDigest: options.summaryDigest }),
+    makeControl("compaction/end", { compactionId: options.compactionId, summaryDigest: options.summaryDigest, ...(options.durationMs === undefined ? {} : { durationMs: options.durationMs }) }),
   ]);
 }

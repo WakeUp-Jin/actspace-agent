@@ -58,6 +58,8 @@ ActSpace 借鉴的是这个隔离方式，不原样复制 DSH Adapter。DSH 当�
 
 公共契约不得暴露 OpenAI、Anthropic 或 pi-ai SDK class。Provider-specific metadata 只能进入版本化、可选的 Adapter-private replay state。
 
+上下文压缩的路由优先级为显式 `CompactionPluginConfig.routeId`、Host 提供的 `utility`、首个可用路由（兼容仅有 default 的 CLI）。Desktop 的 utility adapter 每次 prepare 读取当前轻量任务模型设置；单次 prepared call 固定自己的模型，设置修改只影响之后的调用。
+
 ## 5. one-shot PreparedCall
 
 每次调用先解析 route、exact model、defaults、retry policy 和 Adapter registration，再返回一次性 PreparedCall。PreparedCall 冻结的是这次调用使用的 registration 与 resolved call config，不会自动深拷贝 Adapter 实现内部的所有可变状态。

@@ -321,6 +321,7 @@ Context Compaction 展示上下文压缩生命周期。它可能由用户在 Com
 - pending：显示轻量 `/compact` 命令行，不生成普通用户消息。
 - running：显示为消息流中的独立系统执行段，不使用外围方框、图标或 spinner。上方是一段稳定文字，例如 `Compacting context · Summarizing older messages`；下方是一条细进度条。
 - completed：显示为独立 timeline divider，推荐文案 `Context compacted · 29 messages`。divider 左右细线铺开，居中文案，不使用图标、卡片或 pill。
+- completed 耗时优先读取 journal 的 `compaction/end.data.durationMs`，包含事务提交前的模型摘要等待；旧 journal 缺少该值时回退 start/end 时间差，历史回放遵循同样规则。
 - skipped：显示为独立 timeline divider，推荐文案 `Nothing to compact`。
 - failed：显示为独立系统结果行或 divider，展示失败原因；不贴进上一条 assistant 回复。
 

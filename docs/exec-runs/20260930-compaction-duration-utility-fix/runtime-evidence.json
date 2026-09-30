@@ -1,0 +1,126 @@
+{
+  "manual": [
+    {
+      "seq": 26901,
+      "type": "compaction/start",
+      "time": "2026-09-30T13:09:00.628Z",
+      "durationMs": null,
+      "metadata": null
+    },
+    {
+      "seq": 26902,
+      "type": "compaction/summary",
+      "time": "2026-09-30T13:09:00.729Z",
+      "durationMs": null,
+      "metadata": null
+    },
+    {
+      "seq": 26903,
+      "type": "surface/replaced",
+      "time": "2026-09-30T13:09:00.810Z",
+      "durationMs": null,
+      "metadata": {
+        "routeId": "utility",
+        "model": "deepseek-flash",
+        "registrationId": "4cf32f78-d9d8-47cf-9565-323a15c1f354",
+        "adapterVersion": "actspace.desktop-pi-ai.v2"
+      }
+    },
+    {
+      "seq": 26904,
+      "type": "compaction/end",
+      "time": "2026-09-30T13:09:00.889Z",
+      "durationMs": 831,
+      "metadata": null
+    }
+  ],
+  "utilityFailure": {
+    "recentCommittedCompactionEvents": 0,
+    "lastSeq": 3458,
+    "lastEventType": "turn/end",
+    "mainModelResponseSucceeded": true
+  },
+  "chatCompactions": [
+    {
+      "seq": 3459,
+      "type": "compaction/start",
+      "time": "2026-09-30T13:29:42.842Z",
+      "compactionId": "da91b09b-496f-46c6-a314-dc847d95a049",
+      "durationMs": null,
+      "metadata": null
+    },
+    {
+      "seq": 3461,
+      "type": "surface/replaced",
+      "time": "2026-09-30T13:29:42.894Z",
+      "compactionId": "da91b09b-496f-46c6-a314-dc847d95a049",
+      "durationMs": null,
+      "metadata": {
+        "routeId": "utility",
+        "model": "kimi-k2.6",
+        "registrationId": "4cf32f78-d9d8-47cf-9565-323a15c1f354",
+        "adapterVersion": "actspace.desktop-pi-ai.v2"
+      }
+    },
+    {
+      "seq": 3462,
+      "type": "compaction/end",
+      "time": "2026-09-30T13:29:42.910Z",
+      "compactionId": "da91b09b-496f-46c6-a314-dc847d95a049",
+      "durationMs": 34816,
+      "metadata": null
+    },
+    {
+      "seq": 3605,
+      "type": "compaction/start",
+      "time": "2026-09-30T13:39:43.367Z",
+      "compactionId": "f74e5aa3-8ad3-4ee1-b772-890bc47a2b17",
+      "durationMs": null,
+      "metadata": null
+    },
+    {
+      "seq": 3607,
+      "type": "surface/replaced",
+      "time": "2026-09-30T13:39:43.426Z",
+      "compactionId": "f74e5aa3-8ad3-4ee1-b772-890bc47a2b17",
+      "durationMs": null,
+      "metadata": {
+        "routeId": "utility",
+        "model": "deepseek-flash",
+        "registrationId": "4cf32f78-d9d8-47cf-9565-323a15c1f354",
+        "adapterVersion": "actspace.desktop-pi-ai.v2"
+      }
+    },
+    {
+      "seq": 3608,
+      "type": "compaction/end",
+      "time": "2026-09-30T13:39:43.445Z",
+      "compactionId": "f74e5aa3-8ad3-4ee1-b772-890bc47a2b17",
+      "durationMs": 1383,
+      "metadata": null
+    }
+  ],
+  "autoRequestUsage": [
+    {
+      "seq": 3603,
+      "time": "2026-09-30T13:39:41.863Z",
+      "inputTokens": 73580,
+      "outputTokens": 11,
+      "cacheReadTokens": 1152,
+      "reason": "completed"
+    },
+    {
+      "seq": 3644,
+      "time": "2026-09-30T13:41:38.091Z",
+      "inputTokens": 330,
+      "outputTokens": 29,
+      "cacheReadTokens": 512,
+      "reason": "completed"
+    }
+  ],
+  "restart": {
+    "beforePid": 23174,
+    "afterPid": 29705,
+    "normalQuitAndDevLogRestart": true
+  }
+}
