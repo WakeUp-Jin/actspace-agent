@@ -1,0 +1,237 @@
+[
+  {
+    "seq": 172,
+    "kind": "assistant-text",
+    "content": [
+      {
+        "type": "text",
+        "text": "## 批注样本 ALPHA\n苹果计划使用 **蓝色标签**，香蕉计划使用 [绿色链接](https://example.com)，行内代码是 `sample()`。中文与 emoji：你好 🌱 hello。\n\n第二段唯一口令是 ANNOTATION_DELTA_629，请保留它。\n\n- 列表第一项：春天播种\n- 列表第二项：秋天收获\n\n> 引用段落：每天记录一次进度。\n\n| 项目 | 状态 |\n| --- | --- |\n| 苹果 | 完成 |\n| 香蕉 | 等待 |\n\n```text\nCODE_BLOCK_EXCLUDED\n```"
+      }
+    ]
+  },
+  {
+    "seq": 176,
+    "kind": "user-surface",
+    "content": [
+      {
+        "type": "response-excerpt",
+        "annotationId": "ann_mumq8i51_73p98q",
+        "assistantMessageId": "v2-172",
+        "selectedText": "苹果计划使用 蓝色标签，香蕉计划使用 绿色链接，行内代码是 sample()。中文与 emoji：你好 🌱 hello",
+        "startOffset": 11,
+        "endOffset": 71,
+        "prefixContext": "批注样本 ALPHA\n",
+        "suffixContext": "。\n第二段唯一口令是 ANNOTATION_DELTA_629，请保留它。\n列表第一项：春天播种\n列表第二项：秋天收获\n引用段落",
+        "comment": "请指出引用中两种标签的颜色。\n再原样输出其中的 emoji。不要调用工具。"
+      }
+    ]
+  },
+  {
+    "seq": 180,
+    "kind": "model-user-input",
+    "content": [
+      {
+        "type": "text",
+        "text": "<quoted_assistant_excerpt>\n苹果计划使用 蓝色标签，香蕉计划使用 绿色链接，行内代码是 sample()。中文与 emoji：你好 🌱 hello\n</quoted_assistant_excerpt>\n<user_comment>请指出引用中两种标签的颜色。\n再原样输出其中的 emoji。不要调用工具。</user_comment>"
+      }
+    ]
+  },
+  {
+    "seq": 275,
+    "kind": "assistant-text",
+    "content": [
+      {
+        "type": "text",
+        "text": "- **蓝色标签**：颜色是蓝色（blue）。\n- **绿色链接**：颜色是绿色（green）。\n\n原样 emoji：🌱"
+      }
+    ]
+  },
+  {
+    "seq": 279,
+    "kind": "user-surface",
+    "content": [
+      {
+        "type": "text",
+        "text": "正文与批注组合验收，不要调用工具。"
+      },
+      {
+        "type": "response-excerpt",
+        "annotationId": "ann_mumqjcm1_hsqf4i",
+        "assistantMessageId": "v2-172",
+        "selectedText": "苹果计划使用 蓝色标签，香蕉计划使用 绿色链接，行内代码是 sample()。中文与 emoji：你好 🌱 hello",
+        "startOffset": 11,
+        "endOffset": 71,
+        "prefixContext": "批注样本 ALPHA\n",
+        "suffixContext": "。\n第二段唯一口令是 ANNOTATION_DELTA_629，请保留它。\n列表第一项：春天播种\n列表第二项：秋天收获\n引用段落",
+        "comment": "这次只回复 ANNOTATION_SECOND_OK。"
+      }
+    ]
+  },
+  {
+    "seq": 283,
+    "kind": "model-user-input",
+    "content": [
+      {
+        "type": "text",
+        "text": "正文与批注组合验收，不要调用工具。"
+      },
+      {
+        "type": "text",
+        "text": "<quoted_assistant_excerpt>\n苹果计划使用 蓝色标签，香蕉计划使用 绿色链接，行内代码是 sample()。中文与 emoji：你好 🌱 hello\n</quoted_assistant_excerpt>\n<user_comment>这次只回复 ANNOTATION_SECOND_OK。</user_comment>"
+      }
+    ]
+  },
+  {
+    "seq": 290,
+    "kind": "assistant-text",
+    "content": [
+      {
+        "type": "text",
+        "text": "ANNOTATION_SECOND_OK"
+      }
+    ]
+  },
+  {
+    "seq": 295,
+    "kind": "user-surface",
+    "content": [
+      {
+        "type": "text",
+        "text": "Plan 批注验收：不要调用工具，只回复 PLAN_ANNOTATION_OK。"
+      },
+      {
+        "type": "response-excerpt",
+        "annotationId": "ann_mumr1i0q_porhfp",
+        "assistantMessageId": "v2-290",
+        "selectedText": "ANNOTATION_SECOND_OK",
+        "startOffset": 0,
+        "endOffset": 20,
+        "prefixContext": "",
+        "suffixContext": ""
+      }
+    ]
+  },
+  {
+    "seq": 299,
+    "kind": "model-user-input",
+    "content": [
+      {
+        "type": "text",
+        "text": "Plan 批注验收：不要调用工具，只回复 PLAN_ANNOTATION_OK。"
+      },
+      {
+        "type": "text",
+        "text": "<quoted_assistant_excerpt>\nANNOTATION_SECOND_OK\n</quoted_assistant_excerpt>"
+      }
+    ]
+  },
+  {
+    "seq": 307,
+    "kind": "assistant-text",
+    "content": [
+      {
+        "type": "text",
+        "text": "PLAN_ANNOTATION_OK"
+      }
+    ]
+  },
+  {
+    "seq": 312,
+    "kind": "user-surface",
+    "content": [
+      {
+        "type": "text",
+        "text": "Chat 批注验收：不要调用工具，只回复 CHAT_ANNOTATION_OK。"
+      },
+      {
+        "type": "response-excerpt",
+        "annotationId": "ann_mumrcewl_psyty5",
+        "assistantMessageId": "v2-307",
+        "selectedText": "PLAN_ANNOTATION_OK",
+        "startOffset": 0,
+        "endOffset": 18,
+        "prefixContext": "",
+        "suffixContext": ""
+      }
+    ]
+  },
+  {
+    "seq": 316,
+    "kind": "model-user-input",
+    "content": [
+      {
+        "type": "text",
+        "text": "Chat 批注验收：不要调用工具，只回复 CHAT_ANNOTATION_OK。"
+      },
+      {
+        "type": "text",
+        "text": "<quoted_assistant_excerpt>\nPLAN_ANNOTATION_OK\n</quoted_assistant_excerpt>"
+      }
+    ]
+  },
+  {
+    "seq": 324,
+    "kind": "assistant-text",
+    "content": [
+      {
+        "type": "text",
+        "text": "CHAT_ANNOTATION_OK"
+      }
+    ]
+  },
+  {
+    "seq": 331,
+    "kind": "request-mode",
+    "mode": "chat"
+  },
+  {
+    "seq": 332,
+    "kind": "model-last-user",
+    "content": [
+      {
+        "type": "text",
+        "text": "<quoted_assistant_excerpt>\nPLAN_ANNOTATION_OK\n</quoted_assistant_excerpt>\n<user_comment>只回复 STABLE_CHAT_OK，不调用工具。</user_comment>"
+      }
+    ]
+  },
+  {
+    "seq": 346,
+    "kind": "request-mode",
+    "mode": "plan"
+  },
+  {
+    "seq": 347,
+    "kind": "model-last-user",
+    "content": [
+      {
+        "type": "text",
+        "text": "<quoted_assistant_excerpt>\nPLAN_ANNOTATION_OK\n</quoted_assistant_excerpt>\n<user_comment>只回复 STABLE_PLAN_OK，不调用工具。</user_comment>"
+      }
+    ]
+  },
+  {
+    "seq": 402,
+    "kind": "request-mode",
+    "mode": "plan"
+  },
+  {
+    "seq": 403,
+    "kind": "model-last-user",
+    "content": [
+      {
+        "type": "text",
+        "text": "附件组合验收：无需识别图片，不调用任何工具，只回复 ATTACHMENT_COMBO_OK。"
+      },
+      {
+        "type": "text",
+        "text": "<quoted_assistant_excerpt>\n引用段落：每天记录一次进度。\n</quoted_assistant_excerpt>"
+      },
+      {
+        "type": "image",
+        "artifactId": "174695d3-5528-498e-98d3-f4c8fffc775a",
+        "mimeType": "image/png",
+        "alt": "annotation-test.png"
+      }
+    ]
+  }
+]

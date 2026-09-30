@@ -27,6 +27,7 @@ export function ResponseAnnotationPopover({
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const dismissedRef = useRef(false);
 
   return (
     <HoverCard
@@ -34,6 +35,7 @@ export function ResponseAnnotationPopover({
       openDelay={150}
       closeDelay={120}
       onOpenChange={(next) => {
+        if (next && dismissedRef.current) return;
         // 焦点在卡片里时忽略 trigger 失焦带来的关闭；Escape 会先把焦点还给 marker。
         if (!next && contentRef.current?.contains(document.activeElement)) return;
         setOpen(next);
@@ -47,7 +49,14 @@ export function ResponseAnnotationPopover({
           style={style}
           aria-label={`回复批注 ${label}`}
           aria-pressed={active}
+          onFocus={(event) => {
+            // Returning focus after Escape must not reopen the preview.
+            if (dismissedRef.current) event.preventDefault();
+          }}
+          onBlur={() => { dismissedRef.current = false; }}
+          onPointerEnter={() => { dismissedRef.current = false; }}
           onClick={() => {
+            dismissedRef.current = false;
             onSelect();
             setOpen(true);
           }}
@@ -67,7 +76,11 @@ export function ResponseAnnotationPopover({
         role="dialog"
         aria-label={`回复批注 ${label}`}
         className="w-72"
-        onEscapeKeyDown={() => triggerRef.current?.focus()}
+        onEscapeKeyDown={() => {
+          dismissedRef.current = true;
+          triggerRef.current?.focus();
+          setOpen(false);
+        }}
         onBlur={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null) && event.relatedTarget !== triggerRef.current) setOpen(false);
         }}

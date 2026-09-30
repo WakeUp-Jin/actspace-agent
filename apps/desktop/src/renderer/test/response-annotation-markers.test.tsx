@@ -157,6 +157,29 @@ describe("ResponseAnnotationMarkers", () => {
     expect(within(card).getByRole("button", { name: "复制到草稿" })).toHaveFocus();
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     await waitFor(() => expect(marker).toHaveFocus());
+    // Wait beyond HoverCard's delayed focus-open, not just its immediate dismissal.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
+    expect(screen.queryByRole("dialog", { name: "回复批注 1" })).toBeNull();
+    await userEvent.click(marker);
+    expect(await screen.findByRole("dialog", { name: "回复批注 1" })).toBeVisible();
+  });
+
+  it.each(["focus", "pointer"])("allows a new %s interaction after Escape dismissal", async (interaction) => {
+    setup([makeAnnotation()]);
+    const marker = screen.getByRole("button", { name: "回复批注 1" });
+    await userEvent.click(marker);
+    expect(await screen.findByRole("dialog", { name: "回复批注 1" })).toBeVisible();
+    fireEvent.keyDown(marker, { key: "Tab" });
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
+    expect(screen.queryByRole("dialog", { name: "回复批注 1" })).toBeNull();
+    if (interaction === "focus") {
+      act(() => { screen.getByRole("button", { name: "回复外部" }).focus(); marker.focus(); });
+    } else {
+      fireEvent.pointerLeave(marker, { pointerType: "mouse" });
+      fireEvent.pointerEnter(marker, { pointerType: "mouse" });
+    }
+    expect(await screen.findByRole("dialog", { name: "回复批注 1" })).toBeVisible();
   });
 
   it("highlights the active annotation with the Custom Highlight API and clears it outside or on Escape", async () => {
