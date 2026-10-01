@@ -840,7 +840,7 @@ describe("App streaming user message", () => {
     });
   });
 
-  it("shows the shared running shimmer while waiting for model activity", async () => {
+  it.each(["", " \n\t"])("ignores blank thinking deltas (%j) while preserving waiting and visible reasoning", async (blankDelta) => {
     const sessionId = "session-model-wait";
     const record = createEmptySessionRecord(sessionId);
     const sessions: SessionListItem[] = [
@@ -918,6 +918,21 @@ describe("App streaming user message", () => {
         sessionId,
         agentRunId: activeAgentRunId,
         messageId: "evt-wait-thinking",
+        delta: blankDelta,
+      });
+    });
+
+    expect(screen.queryByRole("button", { name: "Thinking..." })).toBeNull();
+    expect(screen.getByText("Operating Space · Expanding")).toHaveClass("tool-log-text-running");
+
+    await act(async () => {
+      streamHandler?.({
+        type: "assistant_thinking_delta",
+        turnId: "turn-stream",
+        llmCallId: "llm-call-stream",
+        sessionId,
+        agentRunId: activeAgentRunId,
+        messageId: "evt-wait-thinking",
         delta: "Inspect the request before using a tool.",
       });
     });
@@ -982,6 +997,22 @@ sessionId,
 
     expect(await screen.findByText("Model response")).toBeInTheDocument();
     expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
+
+    await act(async () => {
+      streamHandler?.({
+        type: "assistant_thinking_delta",
+        turnId: "turn-stream",
+        llmCallId: "llm-call-stream",
+        sessionId,
+        agentRunId: activeAgentRunId,
+        messageId: "evt-empty-thinking-after-answer",
+        delta: blankDelta,
+      });
+    });
+
+    expect(screen.getAllByRole("button", { name: "Thinking..." })).toHaveLength(1);
+    expect(screen.getByText("Thinking...")).not.toHaveClass("tool-log-text-running");
+    expect(screen.getByText("Inspect the request before using a tool.").textContent).toBe(`${blankDelta}Inspect the request before using a tool.`);
 
     await act(async () => {
       resolveRunAgent?.({

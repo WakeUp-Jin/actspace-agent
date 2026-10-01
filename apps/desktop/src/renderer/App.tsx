@@ -695,6 +695,7 @@ function streamingStateToBlocks(state: StreamingState, agentRunId?: string): Mes
 
   for (const [segmentIndex, seg] of state.segments.entries()) {
     if (seg.type === "thinking") {
+      if (!seg.text.trim()) continue;
       const index = thinkingIdx++;
       blocks.push({
         kind: "thinking",
@@ -1454,8 +1455,9 @@ export function App() {
         break;
 
       case "assistant_thinking_delta":
+        if (!event.delta) break;
         state.retryNotice = undefined;
-        if (event.delta.length > 0) {
+        if (event.delta.trim().length > 0) {
           state.waitingForModel = false;
         }
         appendOrMergeSegment(state.segments, "thinking", event.delta);
