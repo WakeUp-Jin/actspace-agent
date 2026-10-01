@@ -52,3 +52,5 @@ export * from "./custom-model-input";
 export * from "./custom-connection-address";
 
 export * from "./context-projection";
+
+export * from "./performance";

@@ -13,6 +13,48 @@ function eventJournal(): SessionEventEnvelopeV1[] {
 }
 
 describe("SessionProjectionRegistry", () => {
+  it("folds restored tails without intermediate views and rejects gaps atomically", () => {
+    let views = 0;
+    const make = () => {
+      const registry = new SessionProjectionRegistry();
+      registry.register({ key: "count", stateVersion: 1, init: () => 0,
+        apply: state => state + 1, view: state => { views++; return state; } });
+      return registry;
+    };
+    const sequential = make();
+    const events = eventJournal();
+    sequential.apply("s", events[0]!);
+    const batch = make();
+    batch.restore("s", sequential.checkpoint("s"));
+    const before = views;
+    batch.replayTail("s", events.slice(1));
+    expect(views).toBe(before);
+    events.slice(1).forEach(event => sequential.apply("s", event));
+    expect(batch.checkpoint("s")).toEqual(sequential.checkpoint("s"));
+    expect(batch.snapshot("s")).toEqual(sequential.snapshot("s"));
+    const checkpoint = batch.checkpoint("s");
+    expect(() => batch.replayTail("s", [{ ...events[0]!, seq: 4 }])).toThrow("gap");
+    expect(batch.checkpoint("s")).toEqual(checkpoint);
+  });
+
+  it("keeps incomplete transactions pending across a checkpoint and commits their tail together", () => {
+    const make = () => {
+      const registry = new SessionProjectionRegistry();
+      registry.register({ key: "types", stateVersion: 1, init: () => [] as string[], apply: (state, event) => [...state, event.type], view: state => state });
+      return registry;
+    };
+    const base = eventJournal()[0]!;
+    const events = ["compaction/start", "compaction/summary", "compaction/end"].map((type, seq) => ({ ...base, type, seq, data: { compactionId: "c" } }));
+    const sequential = make();
+    events.slice(0, 2).forEach(event => sequential.apply("s", event));
+    const batch = make(); batch.restore("s", sequential.checkpoint("s"));
+    expect(batch.snapshot("s").values.types).toEqual([]);
+    batch.replayTail("s", events.slice(2));
+    sequential.apply("s", events[2]!);
+    expect(batch.checkpoint("s")).toEqual(sequential.checkpoint("s"));
+    expect(batch.snapshot("s").values.types).toEqual(events.map(event => event.type));
+  });
+
   it("checkpoints internal state and rejects asynchronous views", () => {
     const registry = new SessionProjectionRegistry();
     registry.register({ key: "count", stateVersion: 1, init: () => ({ count: 0, secretState: 4 }), apply: state => ({ ...state, count: state.count + 1 }), view: state => state.count });

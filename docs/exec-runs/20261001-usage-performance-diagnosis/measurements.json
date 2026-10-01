@@ -1,0 +1,57 @@
+{
+  "scope": "read-only diagnosis; production code unchanged",
+  "electron": "39.8.10",
+  "native_observation": {
+    "main_cpu_peak_percent": 110.9,
+    "renderer_cpu_peak_percent": 10.0,
+    "main_rss_peak_mib": 313.421875,
+    "high_load_window": "10:03:22–10:03:29 +08:00",
+    "main_cpu_seconds_increase": 6.79,
+    "warm_refresh_main_cpu_peak_percent": 5.4,
+    "warm_refresh_renderer_cpu_peak_percent": 0.8,
+    "warm_refresh_main_cpu_seconds_increase": 0.09
+  },
+  "journal": {
+    "sessions": 71,
+    "bytes": 146322117,
+    "events": 185459,
+    "readMs": 113.45183299999943,
+    "parseMs": 482.99141999999995,
+    "validateMs": 888.1976170000006
+  },
+  "isolated_comparison": {
+    "sessions": 7,
+    "events": 8209,
+    "per_event_apply_ms": 8381.329126999999,
+    "batch_sync_ms": 42.78170899999998,
+    "note": "Node probe on the same seven journals whose checkpoints changed during the native click; not a patched Electron before/after test."
+  },
+  "other_probes": {
+    "restore_ms": 98.02170699999911,
+    "snapshot_ms": 134.36950100000078,
+    "usage_extract_ms": 22.16183000000032,
+    "stored_usage_rows": 79,
+    "aggregation_ms": [
+      10.102666999999883,
+      0.12579200000004676,
+      0.08324999999990723,
+      0.07783299999982773,
+      0.08041700000012497,
+      0.07620900000006259,
+      0.07983300000000781,
+      0.0810830000000351,
+      0.15775000000007822,
+      0.086292000000185,
+      0.07449999999994361,
+      0.06958299999996598,
+      0.06954200000018318,
+      0.0684160000000702,
+      0.06837499999983265,
+      0.07208300000002055,
+      0.07162500000004002,
+      0.06900000000018736,
+      0.09720800000013696,
+      0.07695799999987685
+    ]
+  }
+}

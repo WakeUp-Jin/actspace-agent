@@ -1638,6 +1638,7 @@ function defaultSettingsV4Metadata(): SettingsV4Metadata {
       taskBindings: { defaultChat: null, utility: null, explore: null },
     },
     general: {
+      performanceMonitoring: false,
       englishLearning: { lastSessionId: null },
       personalization: { displayName: "", responseStyle: "" },
       agentInstructions: { systemPromptPath: "" },
@@ -1826,6 +1827,7 @@ function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string): {
   const settings: SettingsV4 = {
     version: 4,
     general: {
+      performanceMonitoring: general.performanceMonitoring === true,
       englishLearning: { lastSessionId: isRecord(general.englishLearning) && typeof general.englishLearning.lastSessionId === "string" ? general.englishLearning.lastSessionId.slice(0, 200) : null },
       personalization: {
         displayName: typeof personalization.displayName === "string" ? personalization.displayName.slice(0, 60) : "",

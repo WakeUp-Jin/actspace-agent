@@ -4,6 +4,25 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { SessionReadModel } from "./durable-session.js";
 
 describe("durable usage summary", () => {
+  it("keeps memoized context identical to replay across chunks and final surfaces", () => {
+    const codecs = createCoreCodecRegistry();
+    const header = createSessionHeader({ sessionId: "context", createdAt: "2026-09-07T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: codecs.digest } });
+    const journal = new SessionJournal({ registry: codecs });
+    const append = (type: string, data: RuntimeV2JsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
+    append("turn/start", { turnId: "t" });
+    append("step/start", { turnId: "t", stepId: "s" });
+    append("request/header", { requestId: "r", turnId: "t", stepId: "s" });
+    append("request/context", { requestId: "r", turnId: "t", stepId: "s", snapshot: { messages: [{ role: "user", content: "hello" }] } });
+    for (let i = 0; i < 10; i++) append("assistant/chunk", { requestId: "r", messageId: "a", chunkIndex: i, chunk: { type: "text-delta", text: "hello" } });
+    journal.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "a", requestId: "r", content: "final" }, surface: { kind: "append", node: { kind: "assistant", messageId: "a", content: "final" } } });
+    const live = new SessionReadModel(header, codecs);
+    for (const [index, event] of journal.events.entries()) {
+      live.apply(event);
+      const cold = new SessionReadModel(header, codecs).replay(journal.events.slice(0, index + 1));
+      expect(live.projections.value(header.sessionId, "requestContext")).toEqual(cold.projections.value(header.sessionId, "requestContext"));
+    }
+  });
+
   it("counts terminal copies once and distinguishes historical zero from a verified free request", () => {
     const registry = createCoreCodecRegistry();
     const header = createSessionHeader({ sessionId: "usage", createdAt: "2026-09-07T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: registry.digest } });

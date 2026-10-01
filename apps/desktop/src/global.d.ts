@@ -3,6 +3,8 @@ export {};
 declare global {
   interface Window {
     actspace: {
+      samplePerformance?: () => Promise<import("@actspace/shared").DesktopPerformanceSnapshot>;
+      setPerformanceActive?: (active: boolean) => Promise<void>;
       getBootstrapState: () => Promise<import("@actspace/shared").BootstrapState>;
       runAgent: (
         input: import("@actspace/shared").RunAgentInput

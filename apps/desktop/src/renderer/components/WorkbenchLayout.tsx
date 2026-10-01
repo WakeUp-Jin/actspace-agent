@@ -1,3 +1,4 @@
+import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
 import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, ResponseAnnotationReference, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import type { PermissionMode } from "@actspace/shared/runtime-v2";
@@ -522,12 +523,8 @@ export function WorkbenchLayout({
     }
   }, []);
 
-  useEffect(() => {
-    if (!(view === "settings" && settingsSection === "usage")) return;
-    loadUsageStatistics().catch((error: unknown) => {
-      console.error("Failed to bootstrap usage statistics", error);
-    });
-  }, [view, settingsSection, loadUsageStatistics]);
+  // UsageStatisticsPage requests its persisted range after mounting.
+
 
   const permissionControl = activeSessionId && composerMode !== "chat" ? (
     <PermissionModeControl
@@ -762,6 +759,7 @@ export function WorkbenchLayout({
         rightSeparatorLabel="调整预览面板宽度"
         rightWidth={rightWidth}
       />
+      {(isCompactLayout ? !compactSidebarOpen : isSidebarHidden) ? <PerformancePanel compact /> : null}
       {isCompactLayout && compactSidebarOpen ? (
         <div className="fixed inset-0 z-(--act-z-drawer)" data-testid="compact-sidebar-overlay">
           <button

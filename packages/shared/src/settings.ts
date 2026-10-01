@@ -225,6 +225,7 @@ export type SettingsV4Namespace =
   | "activity";
 
 export interface SettingsV4General {
+  performanceMonitoring?: boolean;
   /** Absent in older v4 snapshots. Runtime enablement is never persisted. */
   englishLearning?: { lastSessionId: string | null };
   personalization: {

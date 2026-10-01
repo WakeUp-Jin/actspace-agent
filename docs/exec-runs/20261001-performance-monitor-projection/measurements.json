@@ -1,0 +1,18 @@
+{
+  "baselineApplyMs": 8381.329126999999,
+  "batchFoldMs": 20.93720800000002,
+  "batchSnapshotMs": 8.457083999999995,
+  "eventCount": 8209,
+  "sessions": 7,
+  "limitations": "Offline core-codec model, excludes IO/parse/full plugin composition and page rendering. Idle samples are not controlled overhead estimates.",
+  "monitor-off": {
+    "samples": 20,
+    "meanCpuPercent": 1.2049999999999998,
+    "meanRssMiB": 408.090625
+  },
+  "monitor-on": {
+    "samples": 20,
+    "meanCpuPercent": 0.64,
+    "meanRssMiB": 400.85
+  }
+}

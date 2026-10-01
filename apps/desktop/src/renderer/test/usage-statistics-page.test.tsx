@@ -5,7 +5,7 @@ import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
 import { mockUsageActivity } from "./fixtures/usageStatisticsFixture";
 import type { SettingsV4Snapshot, UsageActivitySnapshot } from "@actspace/shared";
 
-const data: UsageActivitySnapshot = { ...mockUsageActivity, costSummary: { costUsd: 0.12, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 }, rows: mockUsageActivity.rows.map((row) => row.costUsd === null ? row : { ...row, costAmount: row.costUsd, costCurrency: "USD", costBasis: "estimated" }) };
+const data: UsageActivitySnapshot = { ...mockUsageActivity, costSummary: { costUsd: 0.123456, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 }, rows: mockUsageActivity.rows.map((row) => row.costUsd === null ? row : { ...row, costAmount: row.costUsd, costCurrency: "USD", costBasis: "estimated" }) };
 describe("使用统计", () => {
   it("uses settings title, shows known amounts separately and shows mixed compact logs and toggles the whole detail table", async () => {
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={data} />);

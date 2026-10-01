@@ -30,22 +30,23 @@ Live Host model 可以反映 accepted prefix。冷读缓存只能从磁盘 Journ
 
 ## Host Projection Registry
 
-`packages/session/projection/src/registry.ts` 提供 `register`、`sync`、`apply`、`snapshot`、`checkpoint`、`restore` 和变更订阅。每个 definition 有稳定 key、stateVersion、init、apply、view。
+`packages/session/projection/src/registry.ts` 提供 `register`、`sync`、`apply`、`replayTail`、`snapshot`、`checkpoint`、`restore` 和变更订阅。每个 definition 有稳定 key、stateVersion、init、apply、view。
 
 - apply 与 view 必须同步、纯、确定；不相关事件返回原 state reference。
 - 状态被冻结，禁止 reducer 原地修改既有状态；所有 definitions 成功后才提交新水位。
 - 输出与 checkpoint 使用 detached JSON，不传递 live handle、闭包或 Provider 对象。
 - 增量事件必须连续；事务使用 effectiveSessionEvents，未闭合事务保留在 pending，不提前形成有效派生事实。
+- `replayTail` 专用于历史恢复：先验证整个尾部连续性，再按 definition 折叠含 pending 的有效事件；所有 reducer 成功才提交，不生成中间 view、不发送实时通知。实时输入继续使用 `apply`。
 - restore 验证 definition 版本；checkpoint 保存内部 reducer state，不用展示 value 反推状态。
 - 未知事件遵守 codec 的 required/ignorable 策略，不把不完整恢复伪装成可写会话。
 
 `facts.ts` 注册通用 metadata、todos、sessionStats、providerUsage、pendingInbox 和 delegations。Runtime 的 `SessionReadModel` 注册 Surface、tool lifecycle、workspaceRoot、updatedAt、requestContext，并组合 `RuntimeV2SessionSnapshot`。Surface append/replace 继续使用 SessionSurface 语义；Chat 不能仅凭 user/assistant 事件类型重新推断有效历史。
 
-Provider usage 来自持久化请求结果；requestContext 来自请求快照与模型容量事实。累计 tokens 不等于当前上下文占用，不能拿累计值除以模型窗口。容量缺失时不虚构固定默认容量。
+Provider usage 来自持久化请求结果；requestContext 来自请求快照与模型容量事实。requestContext 的昂贵预览和 token 估算按 surface、请求事件及 activeTurnId 的语义输入引用复用；事件水位与请求时间仍按原契约返回，不跳过 Journal chunk。累计 tokens 不等于当前上下文占用，不能拿累计值除以模型窗口。容量缺失时不虚构固定默认容量。
 
 ## 缓存与冷读
 
-`packages/session/projection-cache/src/journal-cache.ts` 读取 Journal Header、文件身份和长度，校验 codec digest、definition stateVersions、checkpoint 水位与 anchor。命中时恢复 reducer state 并 replay 新增尾部，同时维护事件字节偏移、Turn 起点、Request 编号和 callId 索引。
+`packages/session/projection-cache/src/journal-cache.ts` 读取 Journal Header、文件身份和长度，校验 codec digest、definition stateVersions、checkpoint 水位与 anchor。命中时恢复 reducer state 并通过 `replayTail` 批量折叠新增尾部，同时维护事件字节偏移、Turn 起点、Request 编号和 callId 索引。
 
 缺失、格式损坏、版本变化、文件替换或截断等失效条件触发 Journal 重建。checkpoint 文件采用临时文件写入后 rename；写缓存失败不阻止 Journal 读取。缓存可删除，不能参与 Agent resume、canonical export 或修复事实。
 

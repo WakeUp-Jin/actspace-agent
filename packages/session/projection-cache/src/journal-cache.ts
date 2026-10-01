@@ -76,8 +76,8 @@ export class SessionProjectionCache {
         const resolution = this.options.codecs.resolve(event);
         if (resolution.kind.endsWith("required")) accessState = "browse-only";
         else if (resolution.kind !== "known" && accessState === "read-write") accessState = "degraded";
-        registry.apply(sessionId, event);
       }
+      registry.replayTail(sessionId, parsed.events);
       const offsets = [...(cached?.offsets ?? []), ...parsed.offsets];
       const starts = [...(cached?.starts ?? [])]; const requests = [...(cached?.requests ?? [])];
       let turnFloor = cached?.turnFloor ?? 0;

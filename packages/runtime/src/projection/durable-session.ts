@@ -50,6 +50,7 @@ export class SessionReadModel {
       key: "updatedAt", stateVersion: 1, init: () => header.createdAt, view: state => state,
       apply: (_, event) => event.time,
     });
+    let contextMemo: { input: ContextInput; value: ReturnType<typeof projectContextState>; fixedWatermark: boolean; fixedTime: boolean } | undefined;
     this.projections.register<ContextInput>({
       key: "requestContext", stateVersion: 1,
       init: () => ({ surface: { entries: [], replaceGeneration: 0 }, events: [], activeTurnId: null, throughJournalSeq: -1, updatedAt: header.createdAt }),
@@ -62,10 +63,24 @@ export class SessionReadModel {
         const activeTurnId = event.type === "turn/start" && isRecord(event.data) ? stringValue(event.data.turnId) : event.type === "turn/end" ? null : state.activeTurnId;
         return { surface, events, activeTurnId, throughJournalSeq: event.seq, updatedAt: event.time };
       },
-      view: state => JSON.parse(JSON.stringify(projectContextState({
-        sessionId: header.sessionId, throughJournalSeq: state.throughJournalSeq, updatedAt: state.updatedAt,
-        activity: { activeTurnId: state.activeTurnId }, messages: state.surface.entries.map(entry => entry.node),
-      }, state.events))),
+      view: state => {
+        const prior = contextMemo;
+        if (prior && prior.input.surface === state.surface && prior.input.events === state.events && prior.input.activeTurnId === state.activeTurnId) {
+          return { ...prior.value,
+            throughJournalSeq: prior.fixedWatermark ? prior.value.throughJournalSeq : state.throughJournalSeq,
+            updatedAt: prior.fixedTime ? prior.value.updatedAt : state.updatedAt,
+          } as unknown as RuntimeV2JsonValue;
+        }
+        const value = projectContextState({
+          sessionId: header.sessionId, throughJournalSeq: state.throughJournalSeq, updatedAt: state.updatedAt,
+          activity: { activeTurnId: state.activeTurnId }, messages: state.surface.entries.map(entry => entry.node),
+        }, state.events);
+        const latest = [...state.events].reverse().find(event => event.type === "request/context");
+        const cached = latest && isRecord(latest.data) ? latest.data.browseContextState : null;
+        const fixedWatermark = isRecord(cached) && cached.sessionId === header.sessionId;
+        contextMemo = { input: state, value: JSON.parse(JSON.stringify(value)), fixedWatermark, fixedTime: fixedWatermark || latest !== undefined };
+        return JSON.parse(JSON.stringify(value));
+      },
     });
     this.projections.ensureSession(header.sessionId);
   }

@@ -31,7 +31,8 @@ const tableHead = "border-b border-line bg-surface-subtle text-left text-act-xs 
 const numberCell = `${cell} text-right tabular-nums whitespace-nowrap`;
 const labels: Record<string, string> = { success: "成功", error: "失败", aborted: "已中止", running: "进行中", unknown: "未知" };
 const number = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("zh-CN");
-const money = (summary?: UsageCostSummary) => !summary || summary.knownCostRequestCount === 0 ? "费用未知" : formatUsageAmount(summary.costUsd, "USD");
+const summaryCostFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (summary?: UsageCostSummary) => !summary || summary.knownCostRequestCount === 0 ? "费用未知" : Number.isFinite(summary.costUsd) ? summaryCostFormatter.format(summary.costUsd) : "—";
 
 export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, onRefresh, onRequestPageChange, settingsV4, onUpdateNamespace }: Props) {
   const saved = settingsV4?.settings.activity.usage;

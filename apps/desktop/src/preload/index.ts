@@ -1,3 +1,4 @@
+import { PERFORMANCE_CHANNELS } from "@actspace/shared";
 import { ENGLISH_LEARNING_CHANNELS } from "@actspace/shared";
 import { projectChatWindow, projectChatEvents } from "@actspace/client/sessions";
 import { createMessageBlocks } from "@actspace/shared";
@@ -318,6 +319,8 @@ function invokeFixedRenderer(channel: string, ...args: unknown[]): Promise<unkno
 }
 
 contextBridge.exposeInMainWorld("actspace", {
+  samplePerformance: () => ipcRenderer.invoke(PERFORMANCE_CHANNELS.sample),
+  setPerformanceActive: (active: boolean) => ipcRenderer.invoke(PERFORMANCE_CHANNELS.active, active),
   getBootstrapState: () => invokeFixedRenderer("app:get-bootstrap-state") as Promise<BootstrapState>,
   runAgent: async (input: RunAgentInput): Promise<AgentRunResult | RunAgentPreparationFailure> => {
     const response = await invokeFixedRenderer("agent:run", input) as RunAgentPreparationFailure | (Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection });

@@ -1,3 +1,4 @@
+import { PerformancePanel } from "../PerformancePanel";
 import type { ComponentType } from "react";
 import { Archive, ArrowLeft, BarChart3, Cpu, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
 
@@ -102,6 +103,7 @@ export function SettingsNav({
           {group.sections.map((section) => renderSectionButton(section, active, onSelect))}
         </div>
       ))}
+      <PerformancePanel />
     </nav>
   );
 }

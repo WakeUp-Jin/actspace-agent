@@ -1,3 +1,4 @@
+import { PerformancePanel } from "./PerformancePanel";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
@@ -1060,6 +1061,7 @@ export function Sidebar({
         <Settings size={14} strokeWidth={1.9} />
         设置
       </button>
+      <PerformancePanel />
     </aside>
   );
 }

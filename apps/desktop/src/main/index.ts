@@ -1,3 +1,4 @@
+import { registerPerformanceIpc } from "./performance-ipc";
 import { ModelCatalogService } from "./model-catalog-service";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
@@ -34,6 +35,7 @@ const APP_DISPLAY_NAME = process.env.ACTSPACE_DEV_APP_NAME?.trim() || "ActSpace"
 let startupLogPath: string | undefined;
 let mainWindow: BrowserWindow | undefined;
 let runtimeV2Registry: DesktopRuntimeV2Registry | undefined;
+let disposePerformanceIpc: (() => void) | undefined;
 let disposeRuntimeV2Ipc: (() => void) | undefined;
 let disposeEnglishLearningIpc: (() => void) | undefined;
 let speechPlayback: DesktopSpeechPlayback | undefined;
@@ -266,6 +268,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     }
   };
   scheduleBrowserSync(1_000);
+  disposePerformanceIpc = registerPerformanceIpc(getMainWindow);
   disposeEnglishLearningIpc = registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow });
   fixedRendererIpc = registerFixedRendererIpc({
     registry: runtimeV2Registry,
@@ -325,6 +328,7 @@ app.on("before-quit", (event) => {
     } catch (error) {
       await logMain("v2 shutdown incomplete", { error: error instanceof Error ? error.message : String(error) });
     } finally {
+      disposePerformanceIpc?.();
       disposeEnglishLearningIpc?.();
       await speechPlayback?.dispose();
       clearTimeout(timeout);

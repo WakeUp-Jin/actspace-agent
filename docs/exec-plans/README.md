@@ -34,6 +34,8 @@
 
 ## 最近完成
 
+- [性能面板与会话投影优化](completed/20261001-performance-monitor-projection.md)：低频按需监控、历史批量折叠、上下文计算复用；自动化通过，人工验收和开销对比边界见[执行摘要](../exec-runs/20261001-performance-monitor-projection/execution-summary.md)。
+
 - [压缩耗时与辅助模型路由修复](completed/20260930-compaction-duration-utility-fix.md)：真实摘要耗时持久化、utility 路由优先与旧 journal 兼容；98 项定向测试及真实 Electron 复验通过，见[修复报告](../exec-runs/20260930-compaction-duration-utility-fix/execution-summary.md)。
 
 - [统一验收缺陷修复](completed/20260929-acceptance-bugfixes.md)：Chat工具拒绝结算、旧历史恢复、子会话检查点/读取/索引、字体预览、开发启动竞态与文件缓存隔离已修复，定向实机复验通过。

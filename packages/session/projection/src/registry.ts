@@ -140,6 +140,31 @@ export class SessionProjectionRegistry {
     return change;
   }
 
+  /** Restore a contiguous tail without constructing or publishing intermediate views. */
+  replayTail(sessionId: string, events: readonly SessionEventEnvelopeV1[]): void {
+    validateSessionId(sessionId);
+    const cell = this.#cells.get(sessionId) ?? this.#createCell();
+    for (let index = 0; index < events.length; index++) {
+      const expected = cell.lastSeq + index + 1;
+      if (events[index]!.seq !== expected) throw new Error(`Projection event gap for ${sessionId}: expected ${expected}, received ${events[index]!.seq}.`);
+    }
+    const candidate = [...cell.pending, ...events];
+    const effective = effectiveSessionEvents(candidate);
+    const accepted = effective.filter(this.accepts);
+    const states = new Map(cell.states);
+    for (const definition of this.#definitions.values()) {
+      let state = states.get(definition.key);
+      for (const event of accepted) state = immutableState(definition.apply(state, event));
+      states.set(definition.key, state);
+    }
+    // Commit only after every reducer succeeds, including transaction buffering.
+    cell.states = states;
+    cell.events = [...cell.events, ...events];
+    cell.pending = candidate.slice(effective.length);
+    cell.lastSeq = events.at(-1)?.seq ?? cell.lastSeq;
+    this.#cells.set(sessionId, cell);
+  }
+
   snapshot(sessionId: string): SessionProjectionSnapshot {
     validateSessionId(sessionId);
     const cell = this.#cells.get(sessionId) ?? this.#createCell();
