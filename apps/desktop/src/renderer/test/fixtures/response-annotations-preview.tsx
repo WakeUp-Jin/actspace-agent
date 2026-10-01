@@ -1,4 +1,4 @@
-/** Explicit visual fixture: no IPC, provider requests, or persisted sessions. `?theme=dark` 切深色，`?drafts=0` 不预置草稿引用。 */
+/** Explicit visual fixture: no IPC, provider requests, or persisted sessions. `?theme=dark` 切深色，`?drafts=0` 不预置草稿批注。 */
 import React from "react";
 import { createRoot } from "react-dom/client";
 import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared";
@@ -29,7 +29,7 @@ const REPLY = [
   "const resolution = resolveAnnotation(model, annotation);",
   "```",
   "",
-  "最后一段用来观察 marker 碰撞：同一行上的两个批注会被错开 20px，而不是叠在一起。",
+  "最后一段用来观察 marker 碰撞：同一行上的两个批注会被错开 16px，而不是叠在一起。",
 ].join("\n");
 
 /** 与 collectAnnotatableText 的拼接规则一致，只用来给 fixture 算偏移。 */
@@ -40,7 +40,7 @@ const VISIBLE = [
   "Mixed 中英文 like inline code 和 emoji 😀 都按 UTF-16 计数。",
   "定位失败时宁可显示「原回复不可用」，也不要猜位置。",
   "场景", "处理", "偏移仍然对得上", "直接使用", "回复被压缩改写", "按前后文找唯一位置",
-  "最后一段用来观察 marker 碰撞：同一行上的两个批注会被错开 20px，而不是叠在一起。",
+  "最后一段用来观察 marker 碰撞：同一行上的两个批注会被错开 16px，而不是叠在一起。",
 ].join("\n");
 
 function annotationFor(id: string, selectedText: string, comment?: string, occurrence = 0): ResponseAnnotationReference {

@@ -1,0 +1,686 @@
+<title>回复批注演示 v2</title>
+<style>
+/* ===== token 与 apps/desktop/src/renderer/styles/tokens.css 对应 ===== */
+:root {
+  color-scheme: light;
+  --act-font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", sans-serif;
+  --act-font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
+
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --subtle: #f1f1ef;
+  --raised: #ffffff;
+  --hover: #eaeae7;
+  --border: #deded9;
+  --border-strong: #8c8c85;
+  --text: #20201e;
+  --text-muted: #676762;
+  --text-faint: #72726b;
+  --action: #20201e;
+  --action-hover: #343430;
+  --on-action: #ffffff;
+  --focus-ring: #4d4d48;
+  --selection: rgba(77, 77, 72, 0.2);
+  /* 批注：蓝色系（对应 --act-color-info），接近截图里的选区蓝；圆点用实色 */
+  --annotation: rgba(57, 120, 184, 0.18);
+  --annotation-active: rgba(57, 120, 184, 0.32);
+  --mark: #3978b8;
+  --on-mark: #ffffff;
+  --shadow: rgba(20, 21, 18, 0.14);
+  --knob: rgba(20, 21, 18, 0.24);
+
+  --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+  --shadow-xs: 0 1px 2px var(--knob);
+  --shadow-popover: 0 16px 40px var(--shadow);
+  --fast: 120ms;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #181916; --surface: #242522; --subtle: #292a26; --raised: #30312d;
+    --hover: #2a2b27; --border: #353630; --border-strong: #787870;
+    --text: #f1f1ed; --text-muted: #b5b5ae; --text-faint: #96968f;
+    --action: #f1f1ed; --action-hover: #dbdbd5; --on-action: #181916;
+    --focus-ring: #c8c8c0; --selection: rgba(200, 200, 192, 0.2);
+    --annotation: rgba(108, 166, 218, 0.22); --annotation-active: rgba(108, 166, 218, 0.38);
+    --mark: #6ca6da; --on-mark: #181916;
+    --shadow: rgba(0, 0, 0, 0.55); --knob: rgba(0, 0, 0, 0.4);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #181916; --surface: #242522; --subtle: #292a26; --raised: #30312d;
+  --hover: #2a2b27; --border: #353630; --border-strong: #787870;
+  --text: #f1f1ed; --text-muted: #b5b5ae; --text-faint: #96968f;
+  --action: #f1f1ed; --action-hover: #dbdbd5; --on-action: #181916;
+  --focus-ring: #c8c8c0; --selection: rgba(200, 200, 192, 0.2);
+  --annotation: rgba(108, 166, 218, 0.22); --annotation-active: rgba(108, 166, 218, 0.38);
+  --mark: #6ca6da; --on-mark: #181916;
+  --shadow: rgba(0, 0, 0, 0.55); --knob: rgba(0, 0, 0, 0.4);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--act-font-ui); font-size: 14px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--selection); }
+/* 批注原文高亮：CSS Custom Highlight API，不改 DOM，与现有实现同一机制 */
+::highlight(act-annotation) { background-color: var(--annotation); }
+::highlight(act-annotation-active) { background-color: var(--annotation-active); }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.grow { flex: 1; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 16px; }
+
+/* ===== 顶部 ===== */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 0; margin-bottom: 24px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar h1 { margin: 0; font-size: 15px; font-weight: 600; }
+.topbar .hint { font-size: 12px; color: var(--text-faint); }
+.seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--subtle); border: 1px solid var(--border); border-radius: var(--r-md); }
+.seg button { border: 0; background: transparent; cursor: pointer; height: 24px; padding: 0 9px; border-radius: var(--r-sm); font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); box-shadow: var(--shadow-xs); }
+.mini-btn {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  height: 26px; padding: 0 9px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--raised); color: var(--text);
+  font-size: 12px; font-weight: 500;
+}
+.mini-btn:hover { border-color: var(--border-strong); }
+
+/* ===== 会话 ===== */
+.thread { display: flex; flex-direction: column; gap: 28px; padding-bottom: 24px; }
+.turn { display: flex; flex-direction: column; gap: 14px; }
+.turn-head { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-faint); }
+.turn-head .line { flex: 1; height: 1px; background: var(--border); margin-left: 6px; }
+
+.user-row { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.user-bubble {
+  max-width: 78%; padding: 8px 14px; border-radius: 16px;
+  background: var(--subtle); white-space: pre-wrap; overflow-wrap: break-word;
+}
+
+.assistant { display: flex; flex-direction: column; gap: 10px; }
+.assistant p { margin: 0; }
+.assistant ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.assistant code { font-family: var(--act-font-mono); font-size: 13px; background: var(--subtle); border: 1px solid var(--border); border-radius: var(--r-xs); padding: 1px 4px; }
+.assistant .time { font-size: 12px; color: var(--text-faint); }
+
+/* ===== ① 选区上下文菜单 ===== */
+.ctx-menu {
+  position: fixed; z-index: 80; display: none; min-width: 160px; padding: 4px;
+  background: var(--raised); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-popover);
+  animation: pop-in 110ms ease-out both;
+}
+.ctx-menu[data-open="true"] { display: block; }
+.ctx-item {
+  display: flex; width: 100%; align-items: center; gap: 8px; cursor: pointer;
+  height: 30px; padding: 0 10px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--text); font-size: 13px; white-space: nowrap; text-align: left;
+}
+.ctx-item:hover, .ctx-item:focus-visible { background: var(--hover); outline: none; }
+.ctx-item svg { color: var(--text-muted); }
+@keyframes pop-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ctx-menu, .comment-pop, .card { animation: none !important; } }
+
+/* ===== ② 选区旁的评论输入 ===== */
+.comment-pop {
+  position: absolute; z-index: 70; display: flex; align-items: center; gap: 6px;
+  width: 340px; max-width: calc(100vw - 24px); padding: 5px 5px 5px 12px;
+  background: var(--raised); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-popover);
+  animation: pop-in 120ms ease-out both;
+}
+.comment-pop[hidden] { display: none; }
+.comment-pop input {
+  flex: 1; min-width: 0; height: 28px; border: 0; outline: 0; background: transparent;
+  font-size: 13px; color: var(--text);
+}
+.comment-pop input::placeholder { color: var(--text-faint); }
+.check-btn {
+  display: grid; place-items: center; flex: none; width: 28px; height: 28px; cursor: pointer;
+  border: 0; border-radius: var(--r-pill); background: var(--action); color: var(--on-action);
+}
+.check-btn:hover { background: var(--action-hover); }
+
+/* ===== ③ 选区末尾的编号圆点 ===== */
+.mark {
+  position: absolute; z-index: 10; display: grid; place-items: center;
+  width: 14px; height: 14px; padding: 0; cursor: pointer;
+  border: 0; border-radius: var(--r-pill);
+  background: var(--mark); color: var(--on-mark);
+  font-size: 9px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--bg);
+  transition: transform var(--fast);
+}
+.mark:hover { transform: scale(1.12); }
+
+/* ===== ④ 批注胶囊 + 悬停卡片 ===== */
+.pill-wrap { position: relative; display: inline-flex; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; cursor: default;
+  height: 28px; padding: 0 11px; border-radius: var(--r-pill);
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+  transition: border-color var(--fast), color var(--fast);
+}
+.pill-wrap:hover .pill, .pill-wrap:focus-within .pill { border-color: var(--border-strong); color: var(--text); }
+.pill-x {
+  position: absolute; top: -6px; right: -6px; z-index: 2;
+  display: none; place-items: center; width: 18px; height: 18px; padding: 0; cursor: pointer;
+  border: 2px solid var(--surface); border-radius: var(--r-pill);
+  background: var(--text-muted); color: var(--surface);
+}
+.pill-x:hover { background: var(--text); }
+.pill-wrap:hover .pill-x, .pill-wrap:focus-within .pill-x { display: grid; }
+
+.card {
+  position: absolute; z-index: 60; bottom: calc(100% + 8px); left: 0;
+  display: none; width: 360px; max-width: calc(100vw - 32px); max-height: 380px; overflow: auto;
+  padding: 4px 12px; text-align: left;
+  background: var(--raised); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-popover);
+  animation: pop-in 120ms ease-out both;
+}
+.pill-wrap.down .card { top: calc(100% + 8px); bottom: auto; left: auto; right: 0; }
+.pill-wrap:hover .card, .pill-wrap:focus-within .card { display: block; }
+/* 胶囊与卡片之间的透明桥，鼠标移过去不断开 hover */
+.pill-wrap:hover::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 10px; }
+.pill-wrap.down:hover::before { top: 100%; bottom: auto; }
+
+.card-item { padding: 10px 0; }
+.card-item + .card-item { border-top: 1px solid var(--border); }
+.card-item.clickable { cursor: pointer; }
+.card-head { display: flex; align-items: center; gap: 6px; min-height: 24px; }
+.card-index { font-size: 12px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.label { font-size: 12px; color: var(--text-faint); }
+.card-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.icon-btn {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; cursor: pointer;
+  border: 0; background: transparent; border-radius: var(--r-sm); color: var(--text-faint);
+}
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.selected-text {
+  margin: 2px 0 0; font-size: 13px; line-height: 1.55; color: var(--text); overflow-wrap: break-word;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.comment-label { margin: 8px 0 0; }
+.comment-text { margin: 2px 0 0; font-size: 13px; line-height: 1.55; color: var(--text); white-space: pre-wrap; overflow-wrap: break-word; }
+
+/* ===== Composer ===== */
+.composer {
+  position: sticky; bottom: 12px; z-index: 20; margin-bottom: 12px;
+  border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+  padding: 10px 10px 8px 14px;
+}
+.composer-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.composer-head:empty { display: none; }
+.composer-head:not(:empty) + textarea { margin-top: 8px; }
+.composer textarea {
+  display: block; width: 100%; border: 0; outline: 0; resize: none;
+  min-height: 44px; padding: 2px 0; font: inherit; font-size: 14px;
+  background: transparent; color: var(--text);
+}
+.composer textarea::placeholder { color: var(--text-faint); }
+.composer-foot { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-faint); }
+.send-btn {
+  display: grid; place-items: center; width: 30px; height: 30px; flex: none; cursor: pointer;
+  border: 0; border-radius: var(--r-pill); background: var(--action); color: var(--on-action);
+}
+.send-btn:hover { background: var(--action-hover); }
+
+.toast {
+  position: fixed; left: 50%; top: 64px; transform: translateX(-50%);
+  z-index: 90; padding: 8px 14px; border-radius: var(--r-md);
+  background: var(--raised); border: 1px solid var(--border); box-shadow: var(--shadow-popover);
+  font-size: 13px; color: var(--text);
+}
+.toast[hidden] { display: none; }
+
+.legend { margin: 8px 0 140px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--subtle); }
+.legend h2 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.legend h2 + ul + h2 { margin-top: 14px; }
+.legend ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
+</style>
+
+<div class="wrap">
+  <header class="topbar">
+    <h1>回复批注</h1>
+    <span class="hint">选中回复正文 → 添加到对话</span>
+    <span class="grow"></span>
+    <div class="seg" role="group" aria-label="主题">
+      <button type="button" data-theme-btn="light" aria-pressed="false">浅色</button>
+      <button type="button" data-theme-btn="dark" aria-pressed="false">深色</button>
+    </div>
+    <button class="mini-btn" type="button" id="reset">重置</button>
+  </header>
+
+  <div class="thread" id="thread">
+    <div class="turn">
+      <div class="user-row"><div class="user-bubble">开始修复这个 bug 吧</div></div>
+      <div class="turn-head">
+        <span>Worked for 19m 35s</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <span class="line"></span>
+      </div>
+      <article class="assistant" data-annotatable>
+        <p>已修复，尚未提交 commit。</p>
+        <ul>
+          <li>根因：Escape 关闭批注卡片后，恢复焦点的回调和排队中的旧请求会把卡片重新打开。</li>
+          <li>验证：20 条相关测试、类型检查通过；新增断言在旧实现上失败、修复后通过。</li>
+          <li>Computer Use：深浅主题均确认关闭、焦点返回正常；重新打开和复制正常。</li>
+          <li>同类检查未发现其他相同路径。</li>
+        </ul>
+        <p>验收报告已更新，其他未覆盖项保持原状态。</p>
+        <div class="time">8:26 AM</div>
+      </article>
+    </div>
+
+    <div class="turn">
+      <div class="user-row"><div class="user-bubble">提交一个 commit 吧，只提交这个功能相关的文件</div></div>
+      <div class="turn-head">
+        <span>Worked for 2m 18s</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <span class="line"></span>
+      </div>
+      <article class="assistant" data-annotatable>
+        <p>已提交：<code>b590060</code></p>
+        <p>只包含回复批注相关的 7 个文件：修复、测试、验收记录和日志。20 条相关测试通过，其他并行改动保留，没有推送到远端。</p>
+        <div class="time">8:29 AM</div>
+      </article>
+    </div>
+  </div>
+
+  <div class="composer">
+    <div class="composer-head" id="draft-slot"></div>
+    <label class="sr-only" for="prompt">消息输入框</label>
+    <textarea id="prompt" rows="2" placeholder="Do anything"></textarea>
+    <div class="composer-foot">
+      <span class="grow"></span>
+      <button class="send-btn" type="button" id="send" aria-label="发送消息">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <h2>对应你给的截图</h2>
+    <ul>
+      <li>选中文字后弹出上下文菜单，只有「添加到对话」一项（去掉了 Ask in side chat）。</li>
+      <li>点了之后，原文保持蓝色高亮，末尾出现编号圆点；选区下方弹出「添加评论（可选）…」输入框和深色 ✓ 按钮。Enter 或 ✓ 保存，Esc 跳过，点外面也会保存已输入的内容。</li>
+      <li>Composer 里只剩一个「N 条批注」胶囊。悬停胶囊在上方出卡片：序号、选中文本、评论，右上角是编辑 / 删除。悬停胶囊右上角出 ×，一次清空全部。</li>
+      <li>编辑（铅笔，或者点原文里的圆点）会滚回原文，重新打开同一个评论输入框。</li>
+      <li>发送后，用户气泡上方右对齐一个同样的胶囊，悬停出卡片但没有编辑 / 删除。悬停卡片里某一条会高亮原文，点它滚动到原文。</li>
+    </ul>
+    <h2>需要你拍板的点</h2>
+    <ul>
+      <li>发送之后，回复里的高亮和圆点都去掉，只在悬停已发送卡片时临时高亮。否则回复会越标越花。</li>
+      <li>高亮和圆点用的是 info 蓝。外观里选了强调色时要不要改成跟强调色走？</li>
+      <li>文案用中文（「添加到对话」「N 条批注」「选中文本」「评论」），没照搬截图里的英文。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="ctx-menu" id="ctx-menu" data-open="false" role="menu" aria-label="选区操作">
+  <button class="ctx-item" type="button" id="ctx-add" role="menuitem">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7v6M9 10h6"/></svg>
+    添加到对话
+  </button>
+</div>
+
+<div class="comment-pop" id="comment-pop" hidden>
+  <label class="sr-only" for="comment-input">评论（可选）</label>
+  <input id="comment-input" type="text" maxlength="2000" placeholder="添加评论（可选）…" autocomplete="off">
+  <button class="check-btn" type="button" id="comment-ok" aria-label="保存评论">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+  </button>
+</div>
+
+<div id="mark-layer"></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+  var MAX_ANNOTATIONS = 20;
+  var HL = "act-annotation";
+  var HL_ACTIVE = "act-annotation-active";
+  var ICON_ANNOTATION = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 8h8M8 12h5"/></svg>';
+  var ICON_EDIT = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  var ICON_TRASH = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14H5V6"/><path d="M10 11v5M14 11v5"/></svg>';
+  var ICON_X = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+  var thread = document.getElementById("thread");
+  var ctxMenu = document.getElementById("ctx-menu");
+  var pop = document.getElementById("comment-pop");
+  var popInput = document.getElementById("comment-input");
+  var draftSlot = document.getElementById("draft-slot");
+  var markLayer = document.getElementById("mark-layer");
+  var prompt = document.getElementById("prompt");
+  var toast = document.getElementById("toast");
+
+  var drafts = [];       // { id, text, comment, range }
+  var sentGroups = [];   // { slot, items }
+  var editingId = null;  // 评论输入框正在编辑的批注
+  var activeId = null;   // 加重高亮的那条
+  var pointer = null;    // 最近一次在回复里松开鼠标的位置
+  var seq = 0;
+  var toastTimer = null;
+
+  function esc(value) {
+    return String(value).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function showToast(message) {
+    toast.textContent = message;
+    toast.hidden = false;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.hidden = true; }, 2200);
+  }
+  function allSent() {
+    return sentGroups.reduce(function (list, group) { return list.concat(group.items); }, []);
+  }
+  function findDraft(id) {
+    for (var i = 0; i < drafts.length; i += 1) if (drafts[i].id === id) return drafts[i];
+    return null;
+  }
+  function findAny(id) {
+    return findDraft(id) || allSent().filter(function (item) { return item.id === id; })[0] || null;
+  }
+
+  // ============ 高亮 + 圆点 ============
+  function applyHighlights() {
+    if (typeof Highlight === "undefined" || !window.CSS || !CSS.highlights) return;
+    var normal = drafts.filter(function (d) { return d.id !== activeId; }).map(function (d) { return d.range; });
+    var active = findAny(activeId);
+    if (normal.length) CSS.highlights.set(HL, new Highlight(...normal)); else CSS.highlights.delete(HL);
+    if (active) CSS.highlights.set(HL_ACTIVE, new Highlight(active.range)); else CSS.highlights.delete(HL_ACTIVE);
+  }
+
+  function lastRect(range) {
+    var rects = Array.prototype.filter.call(range.getClientRects(), function (r) { return r.width > 0; });
+    return rects[rects.length - 1] || range.getBoundingClientRect();
+  }
+
+  function renderMarks() {
+    markLayer.innerHTML = "";
+    drafts.forEach(function (draft, index) {
+      var rect = lastRect(draft.range);
+      var mark = document.createElement("button");
+      mark.type = "button";
+      mark.className = "mark";
+      mark.dataset.mark = draft.id;
+      mark.textContent = String(index + 1);
+      mark.setAttribute("aria-label", "第 " + (index + 1) + " 条批注，点击编辑评论");
+      // 像上标一样贴在选区最后一个字的右上角，不压住后面的正文
+      mark.style.left = (rect.right + window.scrollX - 2) + "px";
+      mark.style.top = (rect.top + window.scrollY - 10) + "px";
+      markLayer.appendChild(mark);
+    });
+  }
+
+  // ============ 胶囊 + 卡片 ============
+  function cardItem(item, index, editable) {
+    var tools = editable
+      ? '<span class="card-tools">' +
+        '<button class="icon-btn" type="button" data-act="edit" data-id="' + item.id + '" aria-label="编辑第 ' + index + ' 条批注">' + ICON_EDIT + "</button>" +
+        '<button class="icon-btn" type="button" data-act="delete" data-id="' + item.id + '" aria-label="删除第 ' + index + ' 条批注">' + ICON_TRASH + "</button>" +
+        "</span>"
+      : "";
+    var comment = item.comment
+      ? '<p class="label comment-label">评论：</p><p class="comment-text">' + esc(item.comment) + "</p>"
+      : "";
+    return '<div class="card-item' + (editable ? "" : " clickable") + '" data-item="' + item.id + '"' + (editable ? "" : ' tabindex="0"') + ">" +
+      '<div class="card-head"><span class="card-index">' + index + '.</span><span class="label">选中文本：</span>' + tools + "</div>" +
+      '<p class="selected-text">' + esc(item.text) + "</p>" + comment + "</div>";
+  }
+
+  function pillHtml(items, options) {
+    var html = '<span class="pill-wrap' + (options.down ? " down" : "") + '">' +
+      '<span class="pill" tabindex="0" aria-label="' + items.length + ' 条批注，悬停查看">' + ICON_ANNOTATION + items.length + " 条批注</span>";
+    if (options.editable) {
+      html += '<button class="pill-x" type="button" data-act="clear" aria-label="清空全部批注">' + ICON_X + "</button>";
+    }
+    html += '<div class="card" role="group" aria-label="批注列表">';
+    items.forEach(function (item, index) { html += cardItem(item, index + 1, options.editable); });
+    return html + "</div></span>";
+  }
+
+  function renderDrafts() {
+    draftSlot.innerHTML = drafts.length ? pillHtml(drafts, { editable: true }) : "";
+  }
+
+  function renderAll() {
+    renderDrafts();
+    renderMarks();
+    applyHighlights();
+  }
+
+  // ============ 评论输入框 ============
+  function openCommentPop(id) {
+    var draft = findDraft(id);
+    if (!draft) return;
+    editingId = id;
+    activeId = id;
+    popInput.value = draft.comment || "";
+    pop.hidden = false;
+    var rect = lastRect(draft.range);
+    var box = pop.getBoundingClientRect();
+    var left = Math.min(Math.max(12, rect.left - 4), window.innerWidth - box.width - 12);
+    pop.style.left = (left + window.scrollX) + "px";
+    pop.style.top = (rect.bottom + window.scrollY + 8) + "px";
+    applyHighlights();
+    popInput.focus();
+  }
+
+  function closeCommentPop(save) {
+    if (!editingId) return;
+    var draft = findDraft(editingId);
+    if (draft && save) {
+      var value = popInput.value.trim();
+      draft.comment = value || "";
+    }
+    editingId = null;
+    activeId = null;
+    pop.hidden = true;
+    renderAll();
+  }
+
+  // ============ 选区 + 上下文菜单 ============
+  function readSelection() {
+    var sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+    var range = sel.getRangeAt(0);
+    var start = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+    var end = range.endContainer.nodeType === 1 ? range.endContainer : range.endContainer.parentElement;
+    var article = start && start.closest("[data-annotatable]");
+    if (!article || !end || end.closest("[data-annotatable]") !== article) return null;
+    if (start.closest("code, pre")) return null;
+    var text = range.toString();
+    if (!text.trim() || Array.from(text).length > 8000) return null;
+    // 和已有草稿重叠就不再提供
+    var overlaps = drafts.some(function (d) {
+      return d.range.compareBoundaryPoints(Range.END_TO_START, range) < 0 && d.range.compareBoundaryPoints(Range.START_TO_END, range) > 0;
+    });
+    return overlaps ? null : { range: range, text: text };
+  }
+
+  function openMenu() {
+    var hit = readSelection();
+    if (!hit) { closeMenu(); return; }
+    ctxMenu.dataset.open = "true";
+    var box = ctxMenu.getBoundingClientRect();
+    var rect = lastRect(hit.range);
+    var x = pointer ? pointer.x : rect.right;
+    var y = pointer ? pointer.y + 10 : rect.bottom + 6;
+    if (y + box.height > window.innerHeight - 12) y = rect.top - box.height - 6;
+    ctxMenu.style.left = Math.max(12, Math.min(x, window.innerWidth - box.width - 12)) + "px";
+    ctxMenu.style.top = y + "px";
+  }
+  function closeMenu() { ctxMenu.dataset.open = "false"; }
+
+  function addDraft() {
+    var hit = readSelection();
+    if (!hit) return;
+    if (drafts.length >= MAX_ANNOTATIONS) { showToast("最多引用 20 段回复"); return; }
+    var draft = { id: "ann_" + (seq += 1), text: hit.text, comment: "", range: hit.range.cloneRange() };
+    drafts.push(draft);
+    document.getSelection().removeAllRanges();
+    closeMenu();
+    renderAll();
+    openCommentPop(draft.id);
+  }
+
+  function removeDraft(id) {
+    drafts = drafts.filter(function (d) { return d.id !== id; });
+    if (editingId === id) { editingId = null; pop.hidden = true; }
+    if (activeId === id) activeId = null;
+    renderAll();
+  }
+
+  // ============ 事件 ============
+  thread.addEventListener("mouseup", function (event) {
+    pointer = { x: event.clientX, y: event.clientY };
+    setTimeout(openMenu, 0);
+  });
+  document.addEventListener("keyup", function (event) {
+    if (event.shiftKey && /Arrow|Home|End/.test(event.key)) { pointer = null; openMenu(); }
+  });
+  document.addEventListener("selectionchange", function () {
+    var sel = document.getSelection();
+    if (!sel || sel.isCollapsed) closeMenu();
+  });
+  document.addEventListener("scroll", closeMenu, { passive: true, capture: true });
+  window.addEventListener("resize", function () {
+    closeMenu();
+    renderMarks();
+    if (editingId) openCommentPop(editingId);
+  });
+
+  var addButton = document.getElementById("ctx-add");
+  addButton.addEventListener("mousedown", function (event) { event.preventDefault(); });
+  addButton.addEventListener("click", addDraft);
+
+  popInput.addEventListener("keydown", function (event) {
+    if (event.isComposing) return;
+    if (event.key === "Enter") { event.preventDefault(); closeCommentPop(true); }
+    if (event.key === "Escape") { event.preventDefault(); closeCommentPop(false); }
+  });
+  document.getElementById("comment-ok").addEventListener("click", function () { closeCommentPop(true); });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closeMenu();
+    var item = event.target.closest && event.target.closest(".card-item.clickable");
+    if (item && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); locate(item.dataset.item); }
+  });
+
+  document.addEventListener("pointerdown", function (event) {
+    // 点评论框以外的地方：保留已输入的内容
+    if (editingId && !pop.contains(event.target) && !event.target.closest(".mark")) closeCommentPop(true);
+    if (!ctxMenu.contains(event.target) && ctxMenu.dataset.open === "true" && !thread.contains(event.target)) closeMenu();
+  });
+
+  function locate(id) {
+    var item = findAny(id);
+    if (!item) return;
+    var node = item.range.startContainer.nodeType === 1 ? item.range.startContainer : item.range.startContainer.parentElement;
+    node.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    activeId = id;
+    applyHighlights();
+    setTimeout(function () { if (activeId === id && !editingId) { activeId = null; applyHighlights(); } }, 1600);
+  }
+
+  document.addEventListener("click", function (event) {
+    var mark = event.target.closest(".mark");
+    if (mark) { openCommentPop(mark.dataset.mark); return; }
+
+    var actor = event.target.closest("[data-act]");
+    if (actor) {
+      var act = actor.dataset.act;
+      if (act === "clear") { drafts = []; editingId = null; pop.hidden = true; activeId = null; renderAll(); showToast("已清空批注"); return; }
+      if (act === "delete") { removeDraft(actor.dataset.id); return; }
+      if (act === "edit") {
+        var id = actor.dataset.id;
+        var draft = findDraft(id);
+        var node = draft.range.startContainer.parentElement;
+        node.scrollIntoView({ block: "center" });
+        document.activeElement.blur();
+        requestAnimationFrame(function () { renderMarks(); openCommentPop(id); });
+        return;
+      }
+    }
+
+    var sentItem = event.target.closest(".card-item.clickable");
+    if (sentItem) locate(sentItem.dataset.item);
+  });
+
+  // 悬停卡片里的某一条：加重它的原文高亮
+  document.addEventListener("mouseover", function (event) {
+    if (editingId) return;
+    var item = event.target.closest(".card-item");
+    var next = item ? item.dataset.item : null;
+    if (next === activeId) return;
+    activeId = next;
+    applyHighlights();
+  });
+
+  // ============ 发送 ============
+  document.getElementById("send").addEventListener("click", function () {
+    var text = prompt.value.trim();
+    if (drafts.length === 0 && !text) return;
+    if (editingId) closeCommentPop(true);
+
+    var turn = document.createElement("div");
+    turn.className = "turn";
+    var row = document.createElement("div");
+    row.className = "user-row";
+    if (drafts.length) {
+      var slot = document.createElement("div");
+      slot.innerHTML = pillHtml(drafts, { editable: false, down: true });
+      row.appendChild(slot);
+      sentGroups.push({ slot: slot, items: drafts.slice() });
+    }
+    var bubble = document.createElement("div");
+    bubble.className = "user-bubble";
+    bubble.textContent = text || "按这几处批注改一下";
+    row.appendChild(bubble);
+    turn.appendChild(row);
+    var head = document.createElement("div");
+    head.className = "turn-head";
+    head.innerHTML = '<span>Working…</span><span class="line"></span>';
+    turn.appendChild(head);
+    thread.appendChild(turn);
+
+    var count = drafts.length;
+    drafts = [];
+    activeId = null;
+    prompt.value = "";
+    renderAll();
+    turn.scrollIntoView({ block: "end", behavior: "smooth" });
+    if (count) showToast(count + " 条批注已随消息发送");
+  });
+
+  // ============ 主题 / 重置 ============
+  var themeButtons = Array.prototype.slice.call(document.querySelectorAll("[data-theme-btn]"));
+  themeButtons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      document.documentElement.setAttribute("data-theme", button.dataset.themeBtn);
+      themeButtons.forEach(function (other) { other.setAttribute("aria-pressed", String(other === button)); });
+    });
+  });
+  document.getElementById("reset").addEventListener("click", function () { location.reload(); });
+
+  renderAll();
+})();
+</script>

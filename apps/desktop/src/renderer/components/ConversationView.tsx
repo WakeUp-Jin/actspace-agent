@@ -5,7 +5,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ReactNode, WheelEvent as ReactWheelEvent } from "react";
 import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, ResponseAnnotationReference, UsableModelView } from "@actspace/shared";
 import { ResponseAnnotationContext, isAnnotatableMessageId } from "./messages/response-annotation-context";
-import { ResponseSelectionToolbar } from "./messages/ResponseSelectionToolbar";
+import { ResponseSelectionMenu } from "./messages/ResponseSelectionMenu";
+import { ResponseAnnotationCommentPopover } from "./messages/ResponseAnnotationCommentPopover";
+import { ResponseAnnotationHighlights } from "./messages/ResponseAnnotationHighlights";
+import { ResponseAnnotationPill } from "./composer/ResponseAnnotationPill";
 import { useResponseAnnotationState } from "./messages/useResponseAnnotationState";
 import type { MessageQueueControls } from "./composer/MessageQueueTray";
 import { Composer, type ComposerAgentFormSwitch, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
@@ -28,7 +31,7 @@ import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
 } from "./messages/toolLogStyles";
-import { UserMessage } from "./messages/UserMessage";
+import { USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "./messages/UserMessage";
 import type { SessionMainView } from "./SessionViewToggle";
 import { TrajectoryView } from "./TrajectoryView";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
@@ -448,6 +451,11 @@ function TurnPrompt({
 
   return (
     <div className={TURN_PROMPT_CLASS}>
+      {turn.user.responseAnnotations?.length ? (
+        <div className={USER_ANNOTATIONS_ROW_CLASS}>
+          <ResponseAnnotationPill annotations={turn.user.responseAnnotations} variant="sent" />
+        </div>
+      ) : null}
       <div className={TURN_PROMPT_CARD_CLASS}>
         <UserMessage
           message={turn.user}
@@ -849,7 +857,10 @@ export function ConversationView({
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const messageStackRef = useRef<HTMLDivElement | null>(null);
   const turnElementsRef = useRef(new Map<string, HTMLElement>());
-  const annotations = useResponseAnnotationState({ messages, draftKey, draftRestore, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef });
+  const annotations = useResponseAnnotationState({ draftKey, draftRestore, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef });
+  // 评论框保存 / 取消后把焦点还给 Composer：和上层的聚焦请求叠加成同一个递增 id。
+  const [annotationFocusRequest, setAnnotationFocusRequest] = useState(0);
+  const focusRequestId = composerFocusRequestId + annotationFocusRequest;
   const updateConversationViewportRef = useRef<() => void>(() => {});
   // 是否「贴底自动跟随」：流式输出时保持视图贴底；用户向上滚动阅读历史则暂停，
   // 滚回接近底部时恢复（类似 Cursor 的聊天滚动）。
@@ -1070,10 +1081,14 @@ export function ConversationView({
     <ResponseAnnotationContext.Provider value={annotations.contextValue}>
     <CompactionRetryContext.Provider value={onRetryCompaction}>
     <main className={CONVERSATION_SHELL_CLASS}>
-      <ResponseSelectionToolbar
+      <ResponseSelectionMenu
         scrollContainerRef={scrollContainerRef}
         canAnnotate={isAnnotatableMessageId}
-        onAddAnnotation={annotations.contextValue.onAddAnnotation}
+        onAddAnnotation={annotations.contextValue.addDraft}
+      />
+      <ResponseAnnotationCommentPopover
+        scrollContainerRef={scrollContainerRef}
+        onClose={() => setAnnotationFocusRequest((current) => current + 1)}
       />
       <div className={MESSAGE_VIEWPORT_CLASS}>
         <div
@@ -1124,9 +1139,8 @@ export function ConversationView({
                     responseAnnotations={annotations.drafts}
                     onResponseAnnotationsChange={annotations.setDrafts}
                     responseAnnotationNotice={annotations.notice}
-                    responseAnnotationEditRequest={annotations.editRequest}
                     inputHistory={inputHistory}
-                    focusRequestId={composerFocusRequestId}
+                    focusRequestId={focusRequestId}
                     models={models}
                     agentForm={agentForm}
                     sessionId={sessionId}
@@ -1186,6 +1200,8 @@ export function ConversationView({
           <div className="min-h-0 flex-1"><TrajectoryView snapshot={trajectory ?? null} /></div>
         </div> : null}
       </div>
+      {/* 放在消息区之后：React 按树序挂 ref 并跑 layout effect，放前面时首帧拿不到 scrollContainerRef。 */}
+      <ResponseAnnotationHighlights messages={messages} scrollContainerRef={scrollContainerRef} />
 
       {resolvedSessionReady && !isInitialComposer ? (
         <div className="composer-zone grid min-w-0 w-full gap-3 overflow-visible pb-5" style={activeView === "trajectory" ? { display: "none" } : undefined} aria-hidden={activeView === "trajectory"}>
@@ -1220,9 +1236,8 @@ export function ConversationView({
             responseAnnotations={annotations.drafts}
             onResponseAnnotationsChange={annotations.setDrafts}
             responseAnnotationNotice={annotations.notice}
-            responseAnnotationEditRequest={annotations.editRequest}
             inputHistory={inputHistory}
-            focusRequestId={composerFocusRequestId}
+            focusRequestId={focusRequestId}
             reviewSummary={reviewSummary}
             onOpenReview={onOpenReview}
             models={models}

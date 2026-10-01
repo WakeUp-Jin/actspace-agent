@@ -263,7 +263,49 @@ function accumulator(): Accumulator { return { text: [], reasoning: [], signatur
 function done(acc: Accumulator, pricing: ModelPricingSnapshot | null): Extract<LlmStreamEvent, { type: "done" }> { const content: LlmContentBlock[] = []; const reasoning = acc.reasoning.join(""); if (reasoning || acc.signatures.length) content.push({ type: "reasoning", text: reasoning, ...(acc.signatures.at(-1) ? { signature: acc.signatures.at(-1) } : {}) }); const text = acc.text.join(""); if (text) content.push({ type: "text", text }); for (const call of [...acc.calls].sort(([left], [right]) => left - right).map(([, value]) => value)) content.push({ type: "tool-call", callId: call.callId, name: call.name, arguments: call.arguments }); return { type: "done", stopReason: acc.calls.size ? "tool-calls" : acc.stopReason, usage: calculateUsageCost(acc.usage, pricing), content }; }
 function terminalFailure(error: unknown, signal: AbortSignal): Extract<LlmStreamEvent, { type: "error" | "aborted" }> { if (signal.aborted || (error instanceof Error && error.name === "AbortError")) return { type: "aborted", reason: "LLM request aborted." }; return { type: "error", failure: classifyFailure(error) }; }
 function malformedStream(route: PiAiWireRoute): Extract<LlmStreamEvent, { type: "error" }> { return { type: "error", failure: { kind: "malformed-stream", message: `Provider stream for route ${route} ended without a terminal event.`, retryable: true, attempt: 1 } }; }
-function classifyFailure(error: unknown): LlmFailure { const raw = error instanceof Error ? error.message : String(error); const message = redactLlmText(raw); const status = Number((error as { status?: unknown } | null)?.status ?? /\b(401|402|403|429|5\d\d)\b/.exec(message)?.[1]); const httpStatus = Number.isFinite(status) && status > 0 ? status : undefined; const kind: LlmFailureKind = error instanceof ProviderProxyError ? "proxy" : httpStatus === 401 ? "authentication" : httpStatus === 402 ? "quota" : httpStatus === 403 ? "permission" : httpStatus === 429 ? "rate-limit" : httpStatus !== undefined && httpStatus >= 500 ? "provider" : /context|token limit/i.test(message) ? "context-overflow" : /timeout/i.test(message) ? "timeout" : /network|fetch|socket|ECONN|DNS/i.test(message) ? "network" : /invalid|bad request/i.test(message) ? "invalid-request" : "unknown"; const retryAfterMs = retryAfterMsFromUnknown(error); const providerCode = providerCodeFromUnknown(error); return { kind, message, retryable: ["rate-limit", "provider", "network", "timeout", "proxy"].includes(kind), ...(httpStatus === undefined ? {} : { httpStatus }), ...(retryAfterMs === undefined ? {} : { retryAfterMs }), ...(providerCode === undefined ? {} : { providerCode }), attempt: 1 }; }
+function classifyFailure(error: unknown): LlmFailure {
+  const raw = error instanceof Error ? error.message : String(error);
+  const detail = providerErrorDetail(error);
+  const message = redactLlmText(detail.message ? `${raw}: ${detail.message}` : raw).slice(0, 2_000);
+  const status = Number((error as { status?: unknown } | null)?.status ?? /\b(400|401|402|403|404|422|429|5\d\d)\b/.exec(message)?.[1]);
+  const httpStatus = Number.isFinite(status) && status > 0 ? status : undefined;
+  const kind: LlmFailureKind = error instanceof ProviderProxyError ? "proxy"
+    : httpStatus === 401 ? "authentication"
+    : httpStatus === 402 ? "quota"
+    : httpStatus === 403 ? "permission"
+    : httpStatus === 429 ? "rate-limit"
+    : httpStatus !== undefined && httpStatus >= 500 ? "provider"
+    : /context|token limit/i.test(message) ? "context-overflow"
+    : httpStatus === 400 || httpStatus === 404 || httpStatus === 422 ? "invalid-request"
+    : /timeout/i.test(message) ? "timeout"
+    : /network|fetch|socket|ECONN|DNS/i.test(message) ? "network"
+    : /invalid|bad request/i.test(message) ? "invalid-request" : "unknown";
+  const retryAfterMs = retryAfterMsFromUnknown(error);
+  const code = providerCodeFromUnknown(error) ?? detail.code;
+  return {
+    kind, message, retryable: ["rate-limit", "provider", "network", "timeout", "proxy"].includes(kind), attempt: 1,
+    ...(httpStatus === undefined ? {} : { httpStatus }),
+    ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+    ...(code === undefined ? {} : { providerCode: redactLlmText(code).slice(0, 200) }),
+    ...(detail.message === undefined ? {} : { providerMessage: redactLlmText(detail.message).slice(0, 2_000) }),
+  };
+}
+
+/** Keep only upstream diagnostic fields, never the raw body, headers or routing metadata. */
+function providerErrorDetail(error: unknown): { message?: string; code?: string } {
+  const record = (value: unknown): Record<string, unknown> | undefined => typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+  let raw = record(record(record(error)?.error)?.metadata)?.raw;
+  if (typeof raw === "string") {
+    try { raw = JSON.parse(raw); } catch { return {}; }
+  }
+  const body = record(raw);
+  const detail = record(body?.error) ?? body;
+  const code = detail?.code ?? detail?.type;
+  return {
+    ...(typeof detail?.message === "string" ? { message: detail.message } : {}),
+    ...(typeof code === "string" ? { code } : {}),
+  };
+}
 function mapStopReason(value: string): string { if (["tool_calls", "tool_use", "requires_action"].includes(value)) return "tool-calls"; if (["length", "max_tokens", "max_output_tokens", "incomplete"].includes(value)) return "max-tokens"; return value === "end_turn" || value === "completed" ? "stop" : value; }
 function mapOpenAiUsage(usage: Record<string, unknown>): LlmUsage { const input = numberOrNull(usage.prompt_tokens); const output = numberOrNull(usage.completion_tokens); const inputDetails = usage.prompt_tokens_details as Record<string, unknown> | undefined; const outputDetails = usage.completion_tokens_details as Record<string, unknown> | undefined; const cacheRead = numberOrNull(usage.prompt_cache_hit_tokens ?? inputDetails?.cached_tokens ?? usage.cached_tokens); const cacheWrite = numberOrNull(usage.prompt_cache_write_tokens ?? inputDetails?.cache_write_tokens); return reportedUsage(input === null ? null : input - (cacheRead ?? 0) - (cacheWrite ?? 0), output, cacheRead, cacheWrite, numberOrNull(outputDetails?.reasoning_tokens)); }
 function mapResponsesUsage(usage: Record<string, unknown>): LlmUsage { const inputDetails = usage.input_tokens_details as Record<string, unknown> | undefined; const outputDetails = usage.output_tokens_details as Record<string, unknown> | undefined; const totalInput = numberOrNull(usage.input_tokens); return reportedUsage(totalInput === null ? null : totalInput - (numberOrNull(inputDetails?.cached_tokens) ?? 0) - (numberOrNull(inputDetails?.cache_write_tokens) ?? 0), numberOrNull(usage.output_tokens), numberOrNull(inputDetails?.cached_tokens), numberOrNull(inputDetails?.cache_write_tokens), numberOrNull(outputDetails?.reasoning_tokens)); }

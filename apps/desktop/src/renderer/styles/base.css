@@ -203,12 +203,16 @@ svg {
   }
 }
 
-/* 回复批注选中态：用 CSS Custom Highlight API 高亮原文，不改动 DOM。 */
+/* 回复批注原文高亮：用 CSS Custom Highlight API，不改动 DOM。草稿是常规档，悬停 / 定位中的那条是加深档。 */
 ::highlight(act-annotation) {
   background-color: var(--act-color-annotation-highlight);
 }
 
-@keyframes annotation-toolbar-in {
+::highlight(act-annotation-active) {
+  background-color: var(--act-color-annotation-highlight-active);
+}
+
+@keyframes annotation-pop-in {
   from {
     opacity: 0;
     transform: translateY(4px);

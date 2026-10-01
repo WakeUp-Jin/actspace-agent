@@ -1,17 +1,15 @@
-import { useState } from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useRef, useState } from "react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared";
 import { AssistantReply } from "../components/messages/AssistantReply";
-import {
-  ResponseAnnotationContext,
-  indexSentAnnotations,
-  isAnnotatableMessageId,
-  reuseUnchangedAnnotationLists,
-  type ResponseAnnotationContextValue,
-} from "../components/messages/response-annotation-context";
-import { makeAnnotation, stubRangeRects } from "./fixtures/response-annotation-helpers";
+import { ResponseAnnotationCommentPopover } from "../components/messages/ResponseAnnotationCommentPopover";
+import { ResponseAnnotationHighlights } from "../components/messages/ResponseAnnotationHighlights";
+import { ResponseAnnotationContext, isAnnotatableMessageId } from "../components/messages/response-annotation-context";
+import { resolveAnnotationRange } from "../components/messages/response-annotation-text";
+import { TooltipProvider } from "../components/ui/Tooltip";
+import { createAnnotationContextValue, makeAnnotation, stubRangeRects } from "./fixtures/response-annotation-helpers";
 
 const REPLY: Extract<MessageBlock, { kind: "assistant" }> = {
   kind: "assistant",
@@ -20,37 +18,60 @@ const REPLY: Extract<MessageBlock, { kind: "assistant" }> = {
   createdAt: "2026-09-28T00:00:00.000Z",
 };
 
-function userMessageWith(annotations: ResponseAnnotationReference[], id = "v2-2"): MessageBlock {
-  return { kind: "user", id, content: "", createdAt: "2026-09-28T00:00:01.000Z", responseAnnotations: annotations };
-}
+type HarnessState = {
+  drafts: ResponseAnnotationReference[];
+  editingAnnotationId?: string | null;
+  activeAnnotationId?: string | null;
+  messages?: MessageBlock[];
+  /** 回复晚于高亮组件出现（列表首帧后才渲染）。 */
+  deferReply?: boolean;
+};
 
-type Spies = Pick<ResponseAnnotationContextValue, "reportResolution" | "onCopyToDraft">;
+let current: {
+  drafts: readonly ResponseAnnotationReference[];
+  activeAnnotationId: string | null;
+  setActive: (id: string | null) => void;
+  setDrafts: (next: ResponseAnnotationReference[]) => void;
+  showReply: () => void;
+};
 
-function Harness({ annotations, spies }: { annotations: ResponseAnnotationReference[]; spies: Spies }) {
-  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-  const value: ResponseAnnotationContextValue = {
-    sentByMessageId: indexSentAnnotations([userMessageWith(annotations)]),
-    canAnnotate: isAnnotatableMessageId,
-    onAddAnnotation: vi.fn(),
-    onCopyToDraft: spies.onCopyToDraft,
+/** 用真实 state 驱动的批注 context：圆点、评论框和高亮都读同一份草稿。 */
+function Harness({ initial, onClose }: { initial: HarnessState; onClose?: () => void }) {
+  const [drafts, setDrafts] = useState<ResponseAnnotationReference[]>(initial.drafts);
+  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(initial.editingAnnotationId ?? null);
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(initial.activeAnnotationId ?? null);
+  const [replyVisible, setReplyVisible] = useState(!initial.deferReply);
+  current = { drafts, activeAnnotationId, setActive: setActiveAnnotationId, setDrafts, showReply: () => setReplyVisible(true) };
+  const messagesRef = useRef<HTMLElement | null>(null);
+  // 评论框不给消息区：jsdom 里容器没有尺寸，会被当成原文滚出视口而隐藏。
+  const popoverScrollRef = useRef<HTMLElement | null>(null);
+  const value = createAnnotationContextValue({
+    drafts,
+    editingAnnotationId,
+    setEditingAnnotationId,
     activeAnnotationId,
     setActiveAnnotationId,
-    reportResolution: spies.reportResolution,
-    isAnnotationAvailable: () => true,
-    locateAnnotation: vi.fn(),
-  };
+    updateComment: (id, comment) =>
+      setDrafts((list) =>
+        list.map((item) => {
+          if (item.annotationId !== id) return item;
+          const { comment: _previous, ...rest } = item;
+          return comment ? { ...rest, comment } : rest;
+        }),
+      ),
+    removeDraft: (id) => setDrafts((list) => list.filter((item) => item.annotationId !== id)),
+    resolveRange: (annotation) => resolveAnnotationRange(document.body, annotation),
+  });
   return (
-    <ResponseAnnotationContext.Provider value={value}>
-      <AssistantReply message={REPLY} />
-      <button type="button">回复外部</button>
-    </ResponseAnnotationContext.Provider>
+    <TooltipProvider delayDuration={0}>
+      <ResponseAnnotationContext.Provider value={value}>
+        <section ref={messagesRef}>{replyVisible ? <AssistantReply message={REPLY} /> : null}</section>
+        <ResponseAnnotationHighlights messages={initial.messages ?? []} scrollContainerRef={messagesRef} />
+        <ResponseAnnotationCommentPopover scrollContainerRef={popoverScrollRef} onClose={onClose} />
+        <button type="button">回复外部</button>
+      </ResponseAnnotationContext.Provider>
+    </TooltipProvider>
   );
-}
-
-function setup(annotations: ResponseAnnotationReference[]) {
-  const spies = { reportResolution: vi.fn(), onCopyToDraft: vi.fn() };
-  render(<Harness annotations={annotations} spies={spies} />);
-  return spies;
 }
 
 let restoreRects: () => void;
@@ -59,181 +80,184 @@ beforeEach(() => {
 });
 afterEach(() => {
   restoreRects();
-  Reflect.deleteProperty(globalThis, "Highlight");
-  Reflect.deleteProperty(CSS, "highlights");
 });
 
-describe("ResponseAnnotationMarkers", () => {
-  it("draws a numbered marker for a resolvable annotation and reports resolution", () => {
-    const spies = setup([makeAnnotation()]);
-    const marker = screen.getByRole("button", { name: "回复批注 1" });
-    expect(marker).toHaveTextContent("1");
-    expect(marker).toHaveAttribute("aria-pressed", "false");
-    expect(spies.reportResolution).toHaveBeenCalledWith("ann_fixture_1", true);
+describe("draft annotation marks", () => {
+  it("numbers resolved drafts and skips drafts whose text no longer matches", () => {
+    render(
+      <Harness
+        initial={{
+          drafts: [
+            makeAnnotation({ annotationId: "a" }),
+            makeAnnotation({ annotationId: "gone", selectedText: "不存在", prefixContext: "", suffixContext: "" }),
+            makeAnnotation({ annotationId: "c", selectedText: "正文", startOffset: 10, endOffset: 12, prefixContext: "第二段的", suffixContext: "" }),
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "批注 1，编辑评论" })).toHaveTextContent("1");
+    expect(screen.queryByRole("button", { name: "批注 2，编辑评论" })).toBeNull();
+    // 序号跟 Composer 卡片一致：跳过的那条仍占第 2 号。
+    expect(screen.getByRole("button", { name: "批注 3，编辑评论" })).toHaveTextContent("3");
   });
 
-  it("does not draw an annotation that no longer resolves and reports it as unresolved", () => {
-    const spies = setup([
-      makeAnnotation(),
-      makeAnnotation({ annotationId: "ann_gone", selectedText: "不存在的原文", startOffset: 0, endOffset: 6, prefixContext: "", suffixContext: "" }),
-    ]);
-    expect(screen.getAllByRole("button", { name: /^回复批注/ })).toHaveLength(1);
-    expect(spies.reportResolution).toHaveBeenCalledWith("ann_gone", false);
+  it("draws nothing for replies without drafts", () => {
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "x", assistantMessageId: "v2-9" })] }} />);
+    expect(document.querySelector("[data-annotation-mark]")).toBeNull();
   });
 
-  it("caps markers per reply at 20", () => {
-    const many = Array.from({ length: 22 }, (_, index) => makeAnnotation({ annotationId: `ann_${index}` }));
-    setup(many);
-    expect(screen.getAllByRole("button", { name: /^回复批注/ })).toHaveLength(20);
+  it("opens the comment popover when a mark is clicked", async () => {
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a", comment: "旧评论" })] }} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "批注 1，编辑评论" }));
+    const input = screen.getByRole("textbox", { name: "第 1 条批注的评论" });
+    expect(input).toHaveValue("旧评论");
+    expect(input).toHaveFocus();
+  });
+});
+
+describe("comment popover", () => {
+  it("saves the trimmed comment with Enter and hands focus back", async () => {
+    const onClose = vi.fn();
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={onClose} />);
+    const popover = screen.getByRole("dialog", { name: "第 1 条批注的评论" });
+    expect(popover).toHaveAttribute("data-anchored", "true");
+    await userEvent.type(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), "  说清楚一点  {Enter}");
+    expect(current.drafts[0]).toMatchObject({ comment: "说清楚一点" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("lines markers on the same line up side by side instead of covering the next line", () => {
-    setup([makeAnnotation(), makeAnnotation({ annotationId: "ann_same_line" })]);
-    const [a, b] = screen.getAllByRole("button", { name: /^回复批注/ });
-    expect(b!.style.top).toBe(a!.style.top);
-    expect(parseFloat(b!.style.left) - parseFloat(a!.style.left)).toBeGreaterThanOrEqual(20);
+  it("does not submit while an IME composition is active", () => {
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} />);
+    const input = screen.getByRole("textbox", { name: "第 1 条批注的评论" });
+    fireEvent.change(input, { target: { value: "拼音" } });
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(current.drafts[0]).not.toHaveProperty("comment");
   });
 
-  it("keeps markers inside the content box and stacks them down along the right edge", () => {
-    const layerWidth = 230;
-    const original = HTMLElement.prototype.getBoundingClientRect;
-    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-      return (this.hasAttribute("data-annotation-exclude") ? { top: 0, left: 0, width: layerWidth, height: 400, right: layerWidth, bottom: 400, x: 0, y: 0 } : original.call(this)) as DOMRect;
-    };
-    try {
-      setup([makeAnnotation(), makeAnnotation({ annotationId: "ann_same_line" })]);
-      const [a, b] = screen.getAllByRole("button", { name: /^回复批注/ });
-      // 选区右缘 220 + 2 已贴近 230 - 16 = 214：两个都夹到 214，第二个向下排开。
-      expect(a!.style.left).toBe("214px");
-      expect(b!.style.left).toBe("214px");
-      expect(parseFloat(b!.style.top) - parseFloat(a!.style.top)).toBe(20);
-    } finally {
-      HTMLElement.prototype.getBoundingClientRect = original;
-    }
+  it("cancels with Escape without changing the comment", () => {
+    const onClose = vi.fn();
+    const outerKeyDown = vi.fn();
+    document.addEventListener("keydown", outerKeyDown);
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a", comment: "原评论" })], editingAnnotationId: "a" }} onClose={onClose} />);
+    const input = screen.getByRole("textbox", { name: "第 1 条批注的评论" });
+    fireEvent.change(input, { target: { value: "改了一半" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(current.drafts[0]).toMatchObject({ comment: "原评论" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(outerKeyDown).not.toHaveBeenCalled();
+    document.removeEventListener("keydown", outerKeyDown);
   });
 
-  it("places the marker at the end of the selection's last line", () => {
-    const tail = { top: 200, left: 220, width: 80, height: 18 };
-    restoreRects();
-    const proto = Range.prototype as unknown as Record<string, unknown>;
-    const originalRects = proto.getClientRects;
-    const originalBounding = proto.getBoundingClientRect;
-    const toRect = (rect: typeof tail) => ({ ...rect, x: rect.left, y: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height }) as DOMRect;
-    // 选区本身在 100..220，同一行后面还有文字到 300；marker 应放在 300 之后。
-    proto.getClientRects = function (this: Range) {
-      return [this.toString() === "第二段" ? toRect({ ...tail, left: 100, width: 120 }) : toRect(tail)];
-    };
-    proto.getBoundingClientRect = () => toRect({ top: 0, left: 0, width: 0, height: 0 });
-    restoreRects = () => { proto.getClientRects = originalRects; proto.getBoundingClientRect = originalBounding; };
-    setup([makeAnnotation()]);
-    expect(screen.getByRole("button", { name: "回复批注 1" }).style.left).toBe("302px");
-  });
-
-  it("previews selected text and comment as plain text and copies to the draft", async () => {
-    const spies = setup([makeAnnotation({ comment: "<img src=x onerror=alert(1)>" })]);
-    const marker = screen.getByRole("button", { name: "回复批注 1" });
-    await userEvent.click(marker);
-    const card = await screen.findByRole("dialog", { name: "回复批注 1" });
-    expect(within(card).getByText("第二段")).toBeVisible();
-    expect(within(card).getByText("<img src=x onerror=alert(1)>")).toBeVisible();
-    expect(card.querySelector("img")).toBeNull();
-    await userEvent.click(within(card).getByRole("button", { name: "复制到草稿" }));
-    expect(spies.onCopyToDraft).toHaveBeenCalledWith(expect.objectContaining({ annotationId: "ann_fixture_1" }));
-  });
-
-  it("omits the comment section when there is no comment", async () => {
-    setup([makeAnnotation()]);
-    await userEvent.click(screen.getByRole("button", { name: "回复批注 1" }));
-    const card = await screen.findByRole("dialog", { name: "回复批注 1" });
-    expect(within(card).queryByText("用户评论")).toBeNull();
-  });
-
-  it("moves keyboard focus into the card with Tab and returns it with Escape", async () => {
-    setup([makeAnnotation()]);
-    const marker = screen.getByRole("button", { name: "回复批注 1" });
-    await userEvent.click(marker);
-    const card = await screen.findByRole("dialog", { name: "回复批注 1" });
-    fireEvent.keyDown(marker, { key: "Tab" });
-    expect(within(card).getByRole("button", { name: "复制到草稿" })).toHaveFocus();
-    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
-    await waitFor(() => expect(marker).toHaveFocus());
-    // Wait beyond HoverCard's delayed focus-open, not just its immediate dismissal.
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
-    expect(screen.queryByRole("dialog", { name: "回复批注 1" })).toBeNull();
-    await userEvent.click(marker);
-    expect(await screen.findByRole("dialog", { name: "回复批注 1" })).toBeVisible();
-  });
-
-  it.each(["focus", "pointer"])("allows a new %s interaction after Escape dismissal", async (interaction) => {
-    setup([makeAnnotation()]);
-    const marker = screen.getByRole("button", { name: "回复批注 1" });
-    await userEvent.click(marker);
-    expect(await screen.findByRole("dialog", { name: "回复批注 1" })).toBeVisible();
-    fireEvent.keyDown(marker, { key: "Tab" });
-    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
-    expect(screen.queryByRole("dialog", { name: "回复批注 1" })).toBeNull();
-    if (interaction === "focus") {
-      act(() => { screen.getByRole("button", { name: "回复外部" }).focus(); marker.focus(); });
-    } else {
-      fireEvent.pointerLeave(marker, { pointerType: "mouse" });
-      fireEvent.pointerEnter(marker, { pointerType: "mouse" });
-    }
-    expect(await screen.findByRole("dialog", { name: "回复批注 1" })).toBeVisible();
-  });
-
-  it("highlights the active annotation with the Custom Highlight API and clears it outside or on Escape", async () => {
-    const registry = new Map<string, unknown>();
-    class HighlightStub { ranges: Range[]; constructor(...ranges: Range[]) { this.ranges = ranges; } }
-    Object.defineProperty(globalThis, "Highlight", { configurable: true, value: HighlightStub });
-    Object.defineProperty(CSS, "highlights", { configurable: true, value: registry });
-    setup([makeAnnotation()]);
-    const marker = screen.getByRole("button", { name: "回复批注 1" });
-
-    await userEvent.click(marker);
-    expect(marker).toHaveAttribute("aria-pressed", "true");
-    const highlight = registry.get("act-annotation") as HighlightStub;
-    expect(highlight.ranges[0]!.toString()).toBe("第二段");
-
+  it("saves typed text on an outside click without stealing focus", () => {
+    const onClose = vi.fn();
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={onClose} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), { target: { value: "外部保存" } });
     fireEvent.pointerDown(screen.getByRole("button", { name: "回复外部" }));
-    expect(marker).toHaveAttribute("aria-pressed", "false");
-    expect(registry.has("act-annotation")).toBe(false);
-
-    await userEvent.click(marker);
-    act(() => { fireEvent.keyDown(document, { key: "Escape" }); });
-    expect(marker).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(current.drafts[0]).toMatchObject({ comment: "外部保存" });
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("does not throw when the Custom Highlight API is unavailable", async () => {
-    setup([makeAnnotation()]);
-    const marker = screen.getByRole("button", { name: "回复批注 1" });
-    await userEvent.click(marker);
-    expect(marker).toHaveAttribute("aria-pressed", "true");
+  it("blocks over-long comments and keeps the original on an outside click", () => {
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a", comment: "原评论" })], editingAnnotationId: "a" }} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), { target: { value: "长".repeat(2001) } });
+    expect(screen.getByRole("alert")).toHaveTextContent("评论超过 2,000 个字符");
+    expect(screen.getByRole("button", { name: "保存评论" })).toBeDisabled();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "回复外部" }));
+    expect(current.drafts[0]).toMatchObject({ comment: "原评论" });
+  });
+
+  it("closes when its draft is removed", () => {
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} />);
+    act(() => current.setDrafts([]));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 
-describe("sent annotation index", () => {
-  it("numbers annotations per reply in user-message order", () => {
-    const index = indexSentAnnotations([
-      userMessageWith([makeAnnotation({ annotationId: "a" }), makeAnnotation({ annotationId: "b", assistantMessageId: "v2-9" })], "v2-2"),
-      userMessageWith([makeAnnotation({ annotationId: "c" })], "v2-5"),
-    ]);
-    expect(index.get("v2-1")!.map((item) => [item.annotation.annotationId, item.label, item.sourceUserMessageId])).toEqual([["a", 1, "v2-2"], ["c", 2, "v2-5"]]);
-    expect(index.get("v2-9")!.map((item) => item.label)).toEqual([1]);
+describe("annotation highlights", () => {
+  let registry: Map<string, { ranges: Range[] }>;
+  beforeEach(() => {
+    registry = new Map();
+    vi.stubGlobal("CSS", { highlights: registry });
+    vi.stubGlobal(
+      "Highlight",
+      class {
+        ranges: Range[];
+        constructor(...ranges: Range[]) {
+          this.ranges = ranges;
+        }
+      },
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it("keeps list identity for replies whose annotations did not change", () => {
-    const messages = [userMessageWith([makeAnnotation({ annotationId: "a" })])];
-    const before = reuseUnchangedAnnotationLists(new Map(), indexSentAnnotations(messages));
-    const rebuilt = reuseUnchangedAnnotationLists(before, indexSentAnnotations(structuredClone(messages)));
-    expect(rebuilt.get("v2-1")).toBe(before.get("v2-1"));
-    const changed = reuseUnchangedAnnotationLists(before, indexSentAnnotations([...messages, userMessageWith([makeAnnotation({ annotationId: "b" })], "v2-4")]));
-    expect(changed.get("v2-1")).not.toBe(before.get("v2-1"));
+  it("registers drafts normally, moves the active one to the active highlight and cleans up", () => {
+    const sent = makeAnnotation({ annotationId: "sent", selectedText: "正文", startOffset: 10, endOffset: 12, prefixContext: "第二段的", suffixContext: "" });
+    const { unmount } = render(
+      <Harness
+        initial={{
+          drafts: [makeAnnotation({ annotationId: "a" }), makeAnnotation({ annotationId: "b", selectedText: "第一段", startOffset: 0, endOffset: 3, prefixContext: "", suffixContext: "内容\n" })],
+          messages: [{ kind: "user", id: "v2-2", content: "", createdAt: "2026-09-28T00:00:01.000Z", responseAnnotations: [sent] }],
+        }}
+      />,
+    );
+    expect(registry.get("act-annotation")?.ranges.map(String)).toEqual(["第二段", "第一段"]);
+    expect(registry.has("act-annotation-active")).toBe(false);
+
+    act(() => current.setActive("a"));
+    expect(registry.get("act-annotation")?.ranges.map(String)).toEqual(["第一段"]);
+    expect(registry.get("act-annotation-active")?.ranges.map(String)).toEqual(["第二段"]);
+
+    // 已发送批注也能加深（悬停用户消息上的卡片条目或定位时）。
+    act(() => current.setActive("sent"));
+    expect(registry.get("act-annotation")?.ranges).toHaveLength(2);
+    expect(registry.get("act-annotation-active")?.ranges.map(String)).toEqual(["正文"]);
+
+    act(() => {
+      current.setActive(null);
+      current.setDrafts([]);
+    });
+    expect(registry.has("act-annotation")).toBe(false);
+    expect(registry.has("act-annotation-active")).toBe(false);
+
+    act(() => current.setDrafts([makeAnnotation({ annotationId: "a" })]));
+    expect(registry.has("act-annotation")).toBe(true);
+    unmount();
+    expect(registry.size).toBe(0);
+  });
+});
+
+describe("annotation highlights for late replies", () => {
+  let registry: Map<string, { ranges: Range[] }>;
+  beforeEach(() => {
+    registry = new Map();
+    vi.stubGlobal("CSS", { highlights: registry });
+    vi.stubGlobal("Highlight", class { ranges: Range[]; constructor(...ranges: Range[]) { this.ranges = ranges; } });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it("only accepts persisted reply ids", () => {
+  it("registers drafts once their reply is rendered after the highlight layer", async () => {
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], deferReply: true }} />);
+    expect(registry.has("act-annotation")).toBe(false);
+    act(() => current.showReply());
+    await act(() => new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve())));
+    expect(registry.get("act-annotation")?.ranges.map(String)).toEqual(["第二段"]);
+  });
+});
+
+describe("isAnnotatableMessageId", () => {
+  it("accepts only persisted v2 reply ids", () => {
     expect(isAnnotatableMessageId("v2-12")).toBe(true);
-    expect(isAnnotatableMessageId("turn:run-1:assistant:0")).toBe(false);
+    expect(isAnnotatableMessageId("turn:abc:assistant")).toBe(false);
     expect(isAnnotatableMessageId("v2-")).toBe(false);
   });
 });

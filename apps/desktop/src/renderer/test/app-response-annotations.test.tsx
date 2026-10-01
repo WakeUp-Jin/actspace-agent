@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AppSettings, BootstrapState, RunAgentInput, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { App } from "../App";
@@ -81,8 +81,30 @@ async function annotateReply(sessionId: string, needle = "第二段") {
     if (!element?.textContent?.includes(sessionId)) throw new Error(`reply of ${sessionId} not rendered`);
     return element;
   });
+  // 切会话后 Composer 会在下一帧抢焦点；先等它落定，再像真实拖选那样让输入框失焦
+  // （jsdom 里输入框拿着焦点会把脚本加的选区收起）。
+  await act(() => new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))));
+  (document.activeElement as HTMLElement | null)?.blur();
   selectText(reply, needle);
-  await userEvent.click(await screen.findByRole("button", { name: "添加到对话" }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: "添加到对话" }));
+  // 添加后评论框打开：不写评论直接 Enter 保存。jsdom 里消息区没有尺寸，评论框按“原文滚出视口”处理成
+  // visibility:hidden，可访问名称为空，只能按 aria-label 选择器找。
+  const input = await waitFor(() => {
+    const element = document.querySelector<HTMLTextAreaElement>('textarea[aria-label$="条批注的评论"]');
+    if (!element) throw new Error("comment popover not open");
+    return element;
+  });
+  expect(input).toHaveFocus();
+  fireEvent.keyDown(input, { key: "Enter" });
+  await waitFor(() => expect(document.querySelector('textarea[aria-label$="条批注的评论"]')).toBeNull());
+  // 保存后焦点回到 Composer。
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "消息输入框" })).toHaveFocus());
+}
+
+/** Composer 里的草稿批注胶囊（已发送的那份在用户消息上方，不算）。 */
+function annotationPill(count: number) {
+  const row = document.querySelector<HTMLElement>(".composer-annotations");
+  return row ? within(row).queryByRole("button", { name: `${count} 条批注` }) : null;
 }
 
 let restoreRects: () => void;
@@ -97,23 +119,24 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-it("sends an annotation-only message and clears the tray once the run is submitted", async () => {
+it("sends an annotation-only message and clears the pill once the run is submitted", async () => {
   const runAgent = installBridge(() => new Promise(() => {}));
   renderApp();
   await selectSession("annotated-a");
   await annotateReply("annotated-a");
-  const tray = screen.getByRole("region", { name: "回复引用" });
-  expect(within(tray).getByText("1 条引用")).toBeVisible();
+  expect(annotationPill(1)).toBeVisible();
 
   await userEvent.click(screen.getByRole("button", { name: "发送消息" }));
   await waitFor(() => expect(runAgent).toHaveBeenCalledTimes(1));
   expect(runAgent.mock.calls[0]![0].responseAnnotations).toEqual([
     expect.objectContaining({ assistantMessageId: "v2-1", selectedText: "第二段", prefixContext: "annotated-a 第一段内容\n", suffixContext: "的正文" }),
   ]);
-  expect(screen.queryByRole("region", { name: "回复引用" })).toBeNull();
+  expect(document.querySelector(".composer-annotations")).toBeNull();
+  // 发出去的批注改由用户消息上方的只读胶囊展示。
+  expect(screen.getByRole("button", { name: "1 条批注" })).toBeVisible();
 });
 
-it("restores the tray when main rejects the annotation", async () => {
+it("restores the drafts when main rejects the annotation", async () => {
   installBridge(async (input) => ({ status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: { code: "annotation_source_missing", kind: "annotation", index: 0 } }));
   renderApp();
   await selectSession("annotated-a");
@@ -123,12 +146,12 @@ it("restores the tray when main rejects the annotation", async () => {
 
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("引用的回复已不在当前会话中"));
   expect(screen.getByRole("textbox", { name: "消息输入框" })).toHaveValue("解释一下");
-  const tray = screen.getByRole("region", { name: "回复引用" });
-  expect(within(tray).getByText("1 条引用")).toBeVisible();
-  expect(within(tray).getByText("第二段")).toBeVisible();
+  await userEvent.click(annotationPill(1)!);
+  const card = await screen.findByRole("dialog", { name: "草稿批注" });
+  expect(within(card).getByText("第二段")).toBeVisible();
 });
 
-it("restores the tray when sending throws", async () => {
+it("restores the drafts when sending throws", async () => {
   const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
   installBridge(async () => { throw new Error("ipc failed"); });
   renderApp();
@@ -136,7 +159,7 @@ it("restores the tray when sending throws", async () => {
   await annotateReply("annotated-a");
   await userEvent.click(screen.getByRole("button", { name: "发送消息" }));
   await waitFor(() => expect(screen.getByRole("alert")).toBeVisible());
-  expect(within(screen.getByRole("region", { name: "回复引用" })).getByText("1 条引用")).toBeVisible();
+  expect(annotationPill(1)).toBeVisible();
   errorLog.mockRestore();
 });
 
@@ -145,17 +168,16 @@ it("keeps annotation drafts per session", async () => {
   renderApp();
   await selectSession("annotated-a");
   await annotateReply("annotated-a");
-  expect(within(screen.getByRole("region", { name: "回复引用" })).getByText("1 条引用")).toBeVisible();
+  expect(annotationPill(1)).toBeVisible();
 
   await selectSession("annotated-b");
   await waitFor(() => expect(document.querySelector('[data-assistant-message-id="v2-1"]')).toHaveTextContent("annotated-b"));
-  expect(screen.queryByRole("region", { name: "回复引用" })).toBeNull();
+  expect(annotationPill(1)).toBeNull();
   await annotateReply("annotated-b", "第一段");
   await annotateReply("annotated-b", "正文");
-  expect(within(screen.getByRole("region", { name: "回复引用" })).getByText("2 条引用")).toBeVisible();
+  expect(annotationPill(2)).toBeVisible();
 
   await selectSession("annotated-a");
   await waitFor(() => expect(document.querySelector('[data-assistant-message-id="v2-1"]')).toHaveTextContent("annotated-a"));
-  const tray = screen.getByRole("region", { name: "回复引用" });
-  expect(within(tray).getByText("1 条引用")).toBeVisible();
+  expect(annotationPill(1)).toBeVisible();
 });

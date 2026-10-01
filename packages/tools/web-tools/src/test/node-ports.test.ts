@@ -15,6 +15,12 @@ async function invoke(handler: ((args: Readonly<Record<string, RuntimeV2JsonValu
 
 import { createNodeWebToolPorts as createNodeToolPorts } from "../node-ports.js";
 describe("web-tools ports", () => {
+  it.each([{ action: "search" }, { action: "search", query: "  " }, { action: "open" }])("rejects missing action-specific arguments before network access: %j", async (args) => {
+    let requests = 0;
+    const ports = createNodeToolPorts({ credentials: { tavily: "fixture" }, fetchImpl: (async () => { requests++; throw new Error("must not reach network"); }) as typeof fetch });
+    await expect(invoke(ports.web, args)).resolves.toMatchObject({ status: "failed", failure: { code: "INVALID_ARGUMENTS", retryable: false } });
+    expect(requests).toBe(0);
+  });
   it("searches through Host-injected credentials without exposing the key", async () => {
     const root = await workspace(); const calls: Array<{ url: string; authorization: string | null }> = [];
     const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {

@@ -57,7 +57,7 @@ import type {
 } from "@actspace/shared";
 import { DEFAULT_MODEL_ID, MODEL_LIST, MODEL_REASONING_EFFORTS } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
-import { ResponseAnnotationTray, type ResponseAnnotationEditRequest } from "./composer/ResponseAnnotationTray";
+import { ResponseAnnotationPill } from "./composer/ResponseAnnotationPill";
 import { MessageQueueTray, type MessageQueueControls } from "./composer/MessageQueueTray";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import {
@@ -518,7 +518,6 @@ export function Composer({
   responseAnnotations = EMPTY_RESPONSE_ANNOTATIONS,
   onResponseAnnotationsChange,
   responseAnnotationNotice,
-  responseAnnotationEditRequest,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   contextState?: ContextState | null;
@@ -566,7 +565,6 @@ export function Composer({
   responseAnnotations?: readonly ResponseAnnotationReference[];
   onResponseAnnotationsChange?: (next: ResponseAnnotationReference[]) => void;
   responseAnnotationNotice?: string | null;
-  responseAnnotationEditRequest?: ResponseAnnotationEditRequest | null;
 }) {
   const isChatForm = mode === "chat";
   const sessionProjection = useOptionalSessionProjection();
@@ -2076,13 +2074,17 @@ export function Composer({
             inputEmpty={!message.trim() && attachments.length === 0 && responseAnnotations.length === 0}
           />
         ) : null}
-        {onResponseAnnotationsChange ? (
-          <ResponseAnnotationTray
-            annotations={responseAnnotations}
-            onChange={onResponseAnnotationsChange}
-            notice={responseAnnotationNotice}
-            editRequest={responseAnnotationEditRequest}
-          />
+        {onResponseAnnotationsChange && (responseAnnotations.length > 0 || responseAnnotationNotice) ? (
+          <div className="composer-annotations flex min-w-0 items-center gap-2 px-3 pt-3">
+            <ResponseAnnotationPill
+              annotations={responseAnnotations}
+              variant="draft"
+              onClear={() => onResponseAnnotationsChange([])}
+            />
+            {responseAnnotationNotice ? (
+              <span className="truncate text-act-xs leading-4 text-text-muted" role="status">{responseAnnotationNotice}</span>
+            ) : null}
+          </div>
         ) : null}
         {renderAttachmentStrip()}
         {statusNotice ? (

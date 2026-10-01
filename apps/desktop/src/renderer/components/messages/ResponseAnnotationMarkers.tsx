@@ -1,66 +1,36 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { MAX_MARKERS_PER_REPLY, useResponseAnnotations, type SentResponseAnnotation } from "./response-annotation-context";
-import { ResponseAnnotationPopover } from "./ResponseAnnotationPopover";
-import { collectAnnotatableText, offsetsToRange, resolveAnnotation, type AnnotatableText } from "./response-annotation-text";
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import type { ResponseAnnotationReference } from "@actspace/shared";
+import { useResponseAnnotations } from "./response-annotation-context";
+import { collectAnnotatableText, offsetsToRange, resolveAnnotation } from "./response-annotation-text";
 
-const MARKER_SIZE_PX = 16;
-const MARKER_GAP_PX = 2;
-const MARKER_MIN_SPACING_PX = 20;
-const HIGHLIGHT_NAME = "act-annotation";
+const MARK_SIZE_PX = 16;
+/** 圆点压进最后一行顶部的深度：像上标一样贴在最后一个字右上角，不盖住后面的正文。 */
+const MARK_RAISE_PX = 11;
+const MARK_INSET_PX = 3;
+const MARK_MIN_SPACING_PX = 16;
+const MARK_CLASS =
+  "pointer-events-auto absolute grid size-4 place-items-center rounded-act-pill bg-annotation-mark p-0 text-act-xxs font-semibold leading-none text-on-annotation-mark tabular-nums ring-2 ring-surface transition-transform duration-(--motion-fast) hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring motion-reduce:transition-none";
 
-type MarkerPosition = { annotationId: string; top: number; left: number };
+/** 一条草稿批注和它在 Composer 卡片里的序号（从 1 开始，跨回复连续编号）。 */
+export type DraftAnnotationMark = { annotation: ResponseAnnotationReference; label: number };
 
-type HighlightRegistry = { set: (name: string, highlight: unknown) => void; delete: (name: string) => boolean };
-
-function highlightRegistry(): { registry: HighlightRegistry; Highlight: new (...ranges: Range[]) => unknown } | null {
-  const registry = (globalThis.CSS as unknown as { highlights?: HighlightRegistry } | undefined)?.highlights;
-  const Highlight = (globalThis as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight;
-  return registry && Highlight ? { registry, Highlight } : null;
-}
+type MarkPosition = { annotationId: string; label: number; top: number; left: number };
 
 /**
- * 选区最后一行的行尾 x：选区停在行中间时，marker 放在选区右侧会压住后面的正文，
- * 所以取「选区终点到所在块末尾」这段文字里与最后一行同一行的最右边。
- */
-function lineEndRight(range: Range, last: DOMRect): number {
-  const block = (range.endContainer.nodeType === Node.ELEMENT_NODE ? range.endContainer as Element : range.endContainer.parentElement)
-    ?.closest("p, h1, h2, h3, h4, h5, h6, li, blockquote, td, th");
-  if (!block) return last.right;
-  const tail = range.cloneRange();
-  tail.setEndAfter(block.lastChild ?? block);
-  tail.setStart(range.endContainer, range.endOffset);
-  const middle = last.top + last.height / 2;
-  let right = last.right;
-  for (const rect of Array.from(tail.getClientRects())) {
-    if (rect.width > 0 && rect.top <= middle && rect.bottom >= middle) right = Math.max(right, rect.right);
-  }
-  return right;
-}
-
-function resolvedRange(model: AnnotatableText, item: SentResponseAnnotation): Range | null {
-  const resolution = resolveAnnotation(model, item.annotation);
-  return resolution.status === "resolved" ? offsetsToRange(model, resolution.start, resolution.end) : null;
-}
-
-/**
- * 回复内容容器里的绝对定位 marker 层。坐标以铺满内容容器的 layer 为基准：marker 放在选区最后一行的行尾，
- * 同一行有多个时向右排开（向下顺延会压到下一行正文）。定位不上的批注不画，只把结果报给 context。
+ * 草稿批注在回复里的编号圆点层。坐标以铺满内容容器的 layer 为基准，
+ * 圆点放在原文最后一行的右上角；定位不上的草稿不画。点圆点重新打开该条的评论框。
  * 测量用 layer 自己的 ref：React 按后序挂 ref，layout effect 运行时外层容器的 ref 还没挂上。
  */
 export function ResponseAnnotationMarkers({
   rootRef,
-  annotations,
+  marks,
 }: {
   rootRef: RefObject<HTMLElement | null>;
-  annotations: readonly SentResponseAnnotation[];
+  marks: readonly DraftAnnotationMark[];
 }) {
   const context = useResponseAnnotations();
-  const contextRef = useRef(context);
-  contextRef.current = context;
   const layerRef = useRef<HTMLDivElement | null>(null);
-  const [positions, setPositions] = useState<readonly MarkerPosition[]>([]);
-  const activeId = context?.activeAnnotationId ?? null;
-  const activeItem = annotations.find((item) => item.annotation.annotationId === activeId);
+  const [positions, setPositions] = useState<readonly MarkPosition[]>([]);
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -72,37 +42,32 @@ export function ResponseAnnotationMarkers({
       frame = null;
       const model = collectAnnotatableText(root);
       const layerRect = layer.getBoundingClientRect();
-      const placed: MarkerPosition[] = [];
-      for (const [index, item] of annotations.entries()) {
-        const range = resolvedRange(model, item);
-        contextRef.current?.reportResolution(item.annotation.annotationId, range !== null);
-        if (!range || index >= MAX_MARKERS_PER_REPLY || typeof range.getClientRects !== "function") continue;
-        const rects = range.getClientRects();
+      const placed: MarkPosition[] = [];
+      for (const { annotation, label } of marks) {
+        const resolution = resolveAnnotation(model, annotation);
+        const range = resolution.status === "resolved" ? offsetsToRange(model, resolution.start, resolution.end) : null;
+        if (!range || typeof range.getClientRects !== "function") continue;
+        const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 0);
         const last = rects[rects.length - 1];
         if (!last) continue;
         placed.push({
-          annotationId: item.annotation.annotationId,
-          top: last.top - layerRect.top + (last.height - MARKER_SIZE_PX) / 2,
-          left: lineEndRight(range, last) - layerRect.left + MARKER_GAP_PX,
+          annotationId: annotation.annotationId,
+          label,
+          top: last.top - layerRect.top - MARK_RAISE_PX,
+          left: last.right - layerRect.left - MARK_INSET_PX,
         });
       }
       placed.sort((a, b) => a.top - b.top || a.left - b.left);
       // 量不到宽度（未布局）时不做右缘限制。
-      const maxLeft = layerRect.width > MARKER_SIZE_PX ? layerRect.width - MARKER_SIZE_PX : Number.POSITIVE_INFINITY;
+      const maxLeft = layerRect.width > MARK_SIZE_PX ? layerRect.width - MARK_SIZE_PX : Number.POSITIVE_INFINITY;
       for (const [index, current] of placed.entries()) {
         const previous = placed[index - 1];
-        // 行距小于 marker 间距，视为同一行：对齐到同一行，并排在上一个右边。
-        if (previous && current.top - previous.top < MARKER_MIN_SPACING_PX) {
+        // 两段原文在同一行附近结束：向右错开，不叠在一起。
+        if (previous && Math.abs(current.top - previous.top) < MARK_SIZE_PX && current.left - previous.left < MARK_MIN_SPACING_PX) {
           current.top = previous.top;
-          current.left = Math.max(current.left, previous.left + MARKER_MIN_SPACING_PX);
+          current.left = previous.left + MARK_MIN_SPACING_PX;
         }
-        // 窄窗里行尾已贴近容器右缘：不越界，贴着右缘向下排。
-        if (current.left > maxLeft) {
-          if (previous && Math.abs(current.top - previous.top) < MARKER_MIN_SPACING_PX && maxLeft - previous.left < MARKER_MIN_SPACING_PX) {
-            current.top = previous.top + MARKER_MIN_SPACING_PX;
-          }
-          current.left = maxLeft;
-        }
+        current.left = Math.min(current.left, maxLeft);
       }
       setPositions(placed);
     };
@@ -118,52 +83,24 @@ export function ResponseAnnotationMarkers({
       observer.disconnect();
       window.removeEventListener("resize", schedule);
     };
-  }, [annotations, rootRef]);
-
-  // 选中态：用 Custom Highlight API 高亮原文，不改 DOM；点击回复外部或 Escape 清除。
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!activeItem || !root) return;
-    const highlights = highlightRegistry();
-    const range = resolvedRange(collectAnnotatableText(root), activeItem);
-    if (highlights && range) highlights.registry.set(HIGHLIGHT_NAME, new highlights.Highlight(range));
-    const clear = () => contextRef.current?.setActiveAnnotationId(null);
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && layerRef.current?.parentElement?.contains(target)) return;
-      if (target instanceof Element && target.closest("[role='dialog']")) return;
-      clear();
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") clear();
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      if (highlights && range) highlights.registry.delete(HIGHLIGHT_NAME);
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [activeItem, rootRef]);
+  }, [marks, rootRef]);
 
   if (!context) return null;
-  const byId = new Map(annotations.map((item) => [item.annotation.annotationId, item]));
   return (
     <div ref={layerRef} className="pointer-events-none absolute inset-0" data-annotation-exclude>
-      {positions.map((position) => {
-        const item = byId.get(position.annotationId);
-        if (!item) return null;
-        return (
-          <ResponseAnnotationPopover
-            key={position.annotationId}
-            item={item}
-            active={position.annotationId === activeId}
-            style={{ top: position.top, left: position.left }}
-            onSelect={() => context.setActiveAnnotationId(position.annotationId)}
-            onCopyToDraft={context.onCopyToDraft}
-          />
-        );
-      })}
+      {positions.map((position) => (
+        <button
+          key={position.annotationId}
+          type="button"
+          className={MARK_CLASS}
+          style={{ top: position.top, left: position.left }}
+          aria-label={`批注 ${position.label}，编辑评论`}
+          data-annotation-mark={position.annotationId}
+          onClick={() => context.setEditingAnnotationId(position.annotationId)}
+        >
+          {position.label}
+        </button>
+      ))}
     </div>
   );
 }

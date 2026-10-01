@@ -99,8 +99,11 @@
   --act-color-focus-ring: var(--act-palette-light-accent, #4d4d48);
   --act-color-operational-focus-ring: #087a4b;
   --act-color-selection: var(--act-palette-light-selection, rgba(77, 77, 72, 0.2));
-  /* 回复批注被选中时的原文高亮（CSS Custom Highlight API） */
-  --act-color-annotation-highlight: rgba(214, 158, 46, 0.24);
+  /* 回复批注：原文高亮（CSS Custom Highlight API，常规档 / 当前条加深档）与选区末尾的编号圆点；固定 info 蓝，不跟强调色 */
+  --act-color-annotation-highlight: rgba(57, 120, 184, 0.18);
+  --act-color-annotation-highlight-active: rgba(57, 120, 184, 0.32);
+  --act-color-annotation-mark: var(--act-color-info);
+  --act-color-on-annotation-mark: #ffffff;
 
   /* 代码（行内 / 代码块）/ 引用 / 表头等内容呈现色 */
   --act-color-code-text: #343430;
@@ -338,7 +341,10 @@
   --act-color-focus-ring: var(--act-palette-dark-accent, #c8c8c0);
   --act-color-operational-focus-ring: #55d99a;
   --act-color-selection: var(--act-palette-dark-selection, rgba(200, 200, 192, 0.2));
-  --act-color-annotation-highlight: rgba(232, 184, 88, 0.22);
+  --act-color-annotation-highlight: rgba(108, 166, 218, 0.22);
+  --act-color-annotation-highlight-active: rgba(108, 166, 218, 0.38);
+  --act-color-annotation-mark: var(--act-color-info);
+  --act-color-on-annotation-mark: #181916;
 
   --act-color-code-text: #c6d4e6;
   --act-color-code-bg-top: #1d2024;
@@ -462,7 +468,10 @@
     --act-color-focus-ring: var(--act-palette-dark-accent, #c8c8c0);
     --act-color-operational-focus-ring: #55d99a;
     --act-color-selection: var(--act-palette-dark-selection, rgba(200, 200, 192, 0.2));
-    --act-color-annotation-highlight: rgba(232, 184, 88, 0.22);
+    --act-color-annotation-highlight: rgba(108, 166, 218, 0.22);
+    --act-color-annotation-highlight-active: rgba(108, 166, 218, 0.38);
+    --act-color-annotation-mark: var(--act-color-info);
+    --act-color-on-annotation-mark: #181916;
 
     --act-color-code-text: #c6d4e6;
     --act-color-code-bg-top: #1d2024;

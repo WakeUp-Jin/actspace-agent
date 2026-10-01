@@ -8,6 +8,31 @@ import type { PiAiWireRoute } from "../pi-ai-wire-engine.js";
 const routes: readonly PiAiWireRoute[] = ["openai-completions", "openai-responses", "anthropic-messages"];
 
 describe("LegacyProxyWireEngine", () => {
+  it.each(["json", "object", "malformed"])("preserves safe OpenRouter provider details through the SDK (%s)", async (format) => {
+    const providerMessage = "tools.1.custom.input_schema: unsupported allOf; sk-fixture12345678 http://user:password@proxy.invalid";
+    const detail = { error: { type: "invalid_request_error", message: providerMessage }, request_id: "private-request-id", headers: { authorization: "private-header" } };
+    const raw = format === "json" ? JSON.stringify(detail) : format === "object" ? detail : "unparseable private-provider-body";
+    const pool = new ProviderProxyPool(async () => ({
+      ProxyAgent: class { async close(): Promise<void> {} },
+      fetch: async () => new Response(JSON.stringify({ error: { code: 400, message: "Provider returned error", metadata: { raw } } }), { status: 400, headers: { "content-type": "application/json" } }),
+    }));
+    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "openrouter", baseUrl: "https://openrouter.ai/api/v1", proxies: pool });
+    try {
+      const events: LlmStreamEvent[] = [];
+      for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
+      expect(events.at(-1)).toMatchObject({ type: "error", failure: { kind: "invalid-request", httpStatus: 400, retryable: false } });
+      const output = JSON.stringify(events);
+      if (format !== "malformed") {
+        expect(events.at(-1)).toMatchObject({ failure: { providerCode: "invalid_request_error", providerMessage: "tools.1.custom.input_schema: unsupported allOf; [REDACTED] http://[REDACTED]@proxy.invalid", message: expect.stringContaining("unsupported allOf") } });
+        expect(output).not.toContain("sk-fixture12345678");
+        expect(output).not.toContain("user:password");
+      } else expect(events.at(-1)).toMatchObject({ failure: { message: "400 Provider returned error" } });
+      expect(output).not.toContain("private-request-id");
+      expect(output).not.toContain("private-header");
+      expect(output).not.toContain("private-provider-body");
+    } finally { await pool.dispose(); }
+  });
+
   it.each(["short", "none"] as const)("applies Anthropic cache markers through the proxy (%s)", async (cacheRetention) => {
     const observed: { params?: unknown; options?: unknown } = {};
     const pool = proxyPool();

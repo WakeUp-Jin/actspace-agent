@@ -1,25 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { COMPOSER_REFERENCE_LIMITS, responseAnnotationKey, type MessageBlock, type ResponseAnnotationReference } from "@actspace/shared";
+import { COMPOSER_REFERENCE_LIMITS, responseAnnotationKey, type ResponseAnnotationReference } from "@actspace/shared";
 import type { ComposerDraftRestore } from "../Composer";
-import type { ResponseAnnotationEditRequest } from "../composer/ResponseAnnotationTray";
-import { indexSentAnnotations, isAnnotatableMessageId, reuseUnchangedAnnotationLists, type ResponseAnnotationContextValue, type SentResponseAnnotation } from "./response-annotation-context";
-import { createAnnotationId } from "./response-annotation-text";
+import { isAnnotatableMessageId, type ResponseAnnotationContextValue } from "./response-annotation-context";
+import { resolveAnnotationRange } from "./response-annotation-text";
 
 const EMPTY: ResponseAnnotationReference[] = [];
+const LOCATE_HIGHLIGHT_MS = 1600;
+
+function scrollRangeIntoView(range: Range, behavior: ScrollBehavior) {
+  const node = range.startContainer;
+  const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement;
+  element?.scrollIntoView?.({ block: "center", behavior });
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 /**
- * 会话级回复批注状态：草稿批注（受控传给 Composer 托盘）、已发送批注索引、选中态和定位结果。
+ * 会话级回复批注状态：草稿批注（受控传给 Composer 胶囊）、评论框编辑中的那条、加深高亮的那条。
  * 草稿按 draftKey 读写上层存储，切会话天然隔离；发送失败时 draftRestore 把批注放回。
  */
 export function useResponseAnnotationState({
-  messages,
   draftKey,
   draftRestore,
   readAnnotationDraft,
   writeAnnotationDraft,
   scrollContainerRef,
 }: {
-  messages: readonly MessageBlock[];
   draftKey?: string;
   draftRestore?: ComposerDraftRestore | null;
   readAnnotationDraft?: (draftKey: string) => ResponseAnnotationReference[];
@@ -30,9 +38,9 @@ export function useResponseAnnotationState({
   const [drafts, setDraftState] = useState<ResponseAnnotationReference[]>(readDraft);
   const draftsRef = useRef(drafts);
   const [notice, setNotice] = useState<string | null>(null);
-  const [editRequest, setEditRequest] = useState<ResponseAnnotationEditRequest | null>(null);
+  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-  const [unresolvedIds, setUnresolvedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const locateTimerRef = useRef<number | null>(null);
 
   const replaceDrafts = useCallback((next: ResponseAnnotationReference[]) => {
     draftsRef.current = next;
@@ -47,7 +55,7 @@ export function useResponseAnnotationState({
 
   useEffect(() => {
     replaceDrafts(readDraft());
-    setEditRequest(null);
+    setEditingAnnotationId(null);
     setActiveAnnotationId(null);
   }, [readDraft, replaceDrafts]);
 
@@ -56,68 +64,81 @@ export function useResponseAnnotationState({
     setDrafts(draftRestore.responseAnnotations ?? EMPTY);
   }, [draftKey, draftRestore, setDrafts]);
 
-  /** 同一条回复的同一段范围只保留一条；超过上限时提示而不是静默丢弃。返回最终在草稿里的那一条。 */
-  const addDraft = useCallback((annotation: ResponseAnnotationReference): ResponseAnnotationReference | null => {
+  useEffect(() => () => {
+    if (locateTimerRef.current !== null) window.clearTimeout(locateTimerRef.current);
+  }, []);
+
+  /** 同一条回复的同一段范围只保留一条（重复添加时打开已有那条的评论框）；超过上限时提示而不是静默丢弃。 */
+  const addDraft = useCallback((annotation: ResponseAnnotationReference) => {
     const current = draftsRef.current;
     const key = responseAnnotationKey(annotation);
     const existing = current.find((item) => responseAnnotationKey(item) === key);
-    if (existing) return existing;
+    if (existing) {
+      setEditingAnnotationId(existing.annotationId);
+      return;
+    }
     if (current.length >= COMPOSER_REFERENCE_LIMITS.maxResponseAnnotations) {
       setNotice(`最多引用 ${COMPOSER_REFERENCE_LIMITS.maxResponseAnnotations} 段回复`);
-      return null;
+      return;
     }
     setDrafts([...current, annotation]);
-    return annotation;
+    setEditingAnnotationId(annotation.annotationId);
   }, [setDrafts]);
 
-  const onAddAnnotation = useCallback((annotation: ResponseAnnotationReference) => {
-    addDraft(annotation);
-  }, [addDraft]);
+  const updateComment = useCallback((annotationId: string, comment: string) => {
+    setDrafts(draftsRef.current.map((annotation) => {
+      if (annotation.annotationId !== annotationId) return annotation;
+      const { comment: _previous, ...rest } = annotation;
+      return comment ? { ...rest, comment } : rest;
+    }));
+  }, [setDrafts]);
 
-  const onCopyToDraft = useCallback((annotation: ResponseAnnotationReference) => {
-    const added = addDraft({ ...annotation, annotationId: createAnnotationId() });
-    if (added) setEditRequest({ annotationId: added.annotationId, nonce: Date.now() });
-  }, [addDraft]);
+  const removeDraft = useCallback((annotationId: string) => {
+    setDrafts(draftsRef.current.filter((annotation) => annotation.annotationId !== annotationId));
+    setEditingAnnotationId((current) => (current === annotationId ? null : current));
+    setActiveAnnotationId((current) => (current === annotationId ? null : current));
+  }, [setDrafts]);
 
-  const reportResolution = useCallback((annotationId: string, resolved: boolean) => {
-    setUnresolvedIds((current) => {
-      if (current.has(annotationId) !== resolved) return current;
-      const next = new Set(current);
-      if (resolved) next.delete(annotationId);
-      else next.add(annotationId);
-      return next;
-    });
-  }, []);
-
-  const sentIndexRef = useRef<ReadonlyMap<string, readonly SentResponseAnnotation[]>>(new Map());
-  const sentByMessageId = useMemo(() => {
-    sentIndexRef.current = reuseUnchangedAnnotationLists(sentIndexRef.current, indexSentAnnotations(messages));
-    return sentIndexRef.current;
-  }, [messages]);
-  const loadedReplyIds = useMemo(
-    () => new Set(messages.flatMap((message) => (message.kind === "assistant" ? [message.id] : []))),
-    [messages],
-  );
-
-  const locateAnnotation = useCallback((annotation: ResponseAnnotationReference) => {
-    const replies = scrollContainerRef.current?.querySelectorAll<HTMLElement>("[data-assistant-message-id]") ?? [];
-    const reply = Array.from(replies).find((element) => element.dataset.assistantMessageId === annotation.assistantMessageId);
-    if (!reply) return;
-    reply.scrollIntoView({ block: "center", behavior: "smooth" });
-    setActiveAnnotationId(annotation.annotationId);
+  const resolveRange = useCallback((annotation: ResponseAnnotationReference) => {
+    const container = scrollContainerRef.current;
+    return container ? resolveAnnotationRange(container, annotation) : null;
   }, [scrollContainerRef]);
 
+  const locateAnnotation = useCallback((annotation: ResponseAnnotationReference) => {
+    const range = resolveRange(annotation);
+    if (!range) return;
+    scrollRangeIntoView(range, prefersReducedMotion() ? "auto" : "smooth");
+    setActiveAnnotationId(annotation.annotationId);
+    if (locateTimerRef.current !== null) window.clearTimeout(locateTimerRef.current);
+    locateTimerRef.current = window.setTimeout(() => {
+      locateTimerRef.current = null;
+      setActiveAnnotationId((current) => (current === annotation.annotationId ? null : current));
+    }, LOCATE_HIGHLIGHT_MS);
+  }, [resolveRange]);
+
+  const editAnnotation = useCallback((annotationId: string) => {
+    const annotation = draftsRef.current.find((item) => item.annotationId === annotationId);
+    const range = annotation ? resolveRange(annotation) : null;
+    if (!range) return;
+    // 瞬时滚动：评论框按原文当前位置定位，平滑滚动途中打开会落在旧位置。
+    scrollRangeIntoView(range, "auto");
+    window.requestAnimationFrame(() => setEditingAnnotationId(annotationId));
+  }, [resolveRange]);
+
   const contextValue = useMemo<ResponseAnnotationContextValue>(() => ({
-    sentByMessageId,
+    drafts,
     canAnnotate: isAnnotatableMessageId,
-    onAddAnnotation,
-    onCopyToDraft,
+    addDraft,
+    updateComment,
+    removeDraft,
+    editingAnnotationId,
+    setEditingAnnotationId,
     activeAnnotationId,
     setActiveAnnotationId,
-    reportResolution,
-    isAnnotationAvailable: (annotation) => loadedReplyIds.has(annotation.assistantMessageId) && !unresolvedIds.has(annotation.annotationId),
+    resolveRange,
     locateAnnotation,
-  }), [activeAnnotationId, loadedReplyIds, locateAnnotation, onAddAnnotation, onCopyToDraft, reportResolution, sentByMessageId, unresolvedIds]);
+    editAnnotation,
+  }), [activeAnnotationId, addDraft, drafts, editAnnotation, editingAnnotationId, locateAnnotation, removeDraft, resolveRange, updateComment]);
 
-  return { contextValue, drafts, setDrafts, notice, editRequest };
+  return { contextValue, drafts, setDrafts, notice };
 }

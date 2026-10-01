@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComposerAttachment, SkillCatalogItem, UsableModelView } from "@actspace/shared";
+import type { ComposerAttachment, ResponseAnnotationReference, SkillCatalogItem, UsableModelView } from "@actspace/shared";
 import { mockContextSnapshot, mockContextState } from "./fixtures/workbenchFixture";
 import { Composer } from "../components/Composer";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { ResponseAnnotationContext } from "../components/messages/response-annotation-context";
+import { createAnnotationContextValue } from "./fixtures/response-annotation-helpers";
 
 type PartialActspaceBridge = Partial<NonNullable<typeof window.actspace>>;
 
@@ -1164,74 +1166,69 @@ it.each([false, true])("sends the configured custom-model default or explicit Au
   expect(options.reasoningEffort).toBe(auto ? undefined : "high");
 });
 
-describe("Composer response annotation tray", () => {
+describe("Composer response annotation pill", () => {
   const first = { annotationId: "ann_1", assistantMessageId: "v2-3", selectedText: "第一段被引用的原文", startOffset: 0, endOffset: 9, prefixContext: "", suffixContext: "" };
   const second = { ...first, annotationId: "ann_2", selectedText: "第二段", startOffset: 20, endOffset: 23, comment: "这里要展开" };
 
-  it("hides the tray without annotations and shows a count with cards when present", () => {
-    const { rerender } = renderComposer({ responseAnnotations: [], onResponseAnnotationsChange: vi.fn() });
-    expect(screen.queryByRole("region", { name: "回复引用" })).toBeNull();
-    rerender(
+  function renderWithAnnotations(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
+    const context = createAnnotationContextValue({ drafts: (overrides.responseAnnotations ?? []) as ResponseAnnotationReference[] });
+    const onSend = vi.fn();
+    const result = render(
       <TooltipProvider delayDuration={0}>
-        <Composer contextSnapshot={mockContextSnapshot} onSend={vi.fn()} onAbort={vi.fn()} responseAnnotations={[first, second]} onResponseAnnotationsChange={vi.fn()} />
+        <ResponseAnnotationContext.Provider value={context}>
+          <Composer contextSnapshot={mockContextSnapshot} onSend={onSend} onAbort={vi.fn()} {...overrides} />
+        </ResponseAnnotationContext.Provider>
       </TooltipProvider>,
     );
-    const tray = screen.getByRole("region", { name: "回复引用" });
-    expect(within(tray).getByText("2 条引用")).toBeVisible();
-    // 数量从 0 变多会自动展开。
-    expect(within(tray).getAllByRole("listitem")).toHaveLength(2);
-    expect(within(tray).getByText("这里要展开")).toBeVisible();
+    return { context, onSend, ...result };
+  }
+
+  it("hides the pill without annotations and shows the count when present", () => {
+    renderWithAnnotations({ responseAnnotations: [], onResponseAnnotationsChange: vi.fn() });
+    expect(screen.queryByRole("button", { name: /条批注/ })).toBeNull();
+    cleanup();
+    renderWithAnnotations({ responseAnnotations: [first, second], onResponseAnnotationsChange: vi.fn() });
+    expect(screen.getByRole("button", { name: "2 条批注" })).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("removes one card, clears all and toggles the list", async () => {
+  it("opens a card listing selected text and comments, with edit and delete per item", async () => {
+    const user = userEvent.setup();
+    const { context } = renderWithAnnotations({ responseAnnotations: [first, second], onResponseAnnotationsChange: vi.fn() });
+    await user.click(screen.getByRole("button", { name: "2 条批注" }));
+    const card = await screen.findByRole("dialog", { name: "草稿批注" });
+    expect(within(card).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(card).getByText("第一段被引用的原文")).toBeVisible();
+    expect(within(card).getByText("这里要展开")).toBeVisible();
+
+    await user.click(within(card).getByRole("button", { name: "删除第 1 条批注" }));
+    expect(context.removeDraft).toHaveBeenCalledWith("ann_1");
+    await user.click(within(card).getByRole("button", { name: "编辑第 2 条批注" }));
+    expect(context.editAnnotation).toHaveBeenCalledWith("ann_2");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "草稿批注" })).toBeNull());
+  });
+
+  it("marks the hovered item active and clears it when the pointer leaves the card", async () => {
+    const user = userEvent.setup();
+    const { context } = renderWithAnnotations({ responseAnnotations: [first, second], onResponseAnnotationsChange: vi.fn() });
+    await user.click(screen.getByRole("button", { name: "2 条批注" }));
+    const card = await screen.findByRole("dialog", { name: "草稿批注" });
+    fireEvent.pointerEnter(within(card).getAllByRole("listitem")[1]!);
+    expect(context.setActiveAnnotationId).toHaveBeenLastCalledWith("ann_2");
+    fireEvent.pointerLeave(card);
+    expect(context.setActiveAnnotationId).toHaveBeenLastCalledWith(null);
+  });
+
+  it("clears all annotations with the corner button", async () => {
     const user = userEvent.setup();
     const onResponseAnnotationsChange = vi.fn();
-    renderComposer({ responseAnnotations: [first, second], onResponseAnnotationsChange });
-    await user.click(screen.getByRole("button", { name: "展开引用" }));
-    expect(screen.getByRole("button", { name: "收起引用" })).toHaveAttribute("aria-expanded", "true");
-    await user.click(screen.getByRole("button", { name: "移除引用 1" }));
-    expect(onResponseAnnotationsChange).toHaveBeenLastCalledWith([second]);
-    await user.click(screen.getByRole("button", { name: "清空全部" }));
+    renderWithAnnotations({ responseAnnotations: [first, second], onResponseAnnotationsChange });
+    await user.click(screen.getByRole("button", { name: "清空全部批注" }));
     expect(onResponseAnnotationsChange).toHaveBeenLastCalledWith([]);
-    await user.click(screen.getByRole("button", { name: "收起引用" }));
-    expect(screen.queryByRole("list")).toBeNull();
   });
 
-  it("edits a comment with Enter, cancels with Escape and blocks over-long comments", async () => {
-    const user = userEvent.setup();
+  it("sends annotations without text, includes them in send options and clears them", async () => {
     const onResponseAnnotationsChange = vi.fn();
-    renderComposer({ responseAnnotations: [first], onResponseAnnotationsChange });
-    await user.click(screen.getByRole("button", { name: "展开引用" }));
-    await user.click(screen.getByRole("button", { name: "编辑引用 1 的评论" }));
-    const editor = screen.getByRole("textbox", { name: "引用 1 的评论" });
-    expect(editor).toHaveFocus();
-    await user.type(editor, "  补充说明  {Enter}");
-    expect(onResponseAnnotationsChange).toHaveBeenLastCalledWith([{ ...first, comment: "补充说明" }]);
-
-    await user.click(screen.getByRole("button", { name: "编辑引用 1 的评论" }));
-    fireEvent.keyDown(screen.getByRole("textbox", { name: "引用 1 的评论" }), { key: "Escape" });
-    expect(screen.queryByRole("textbox", { name: "引用 1 的评论" })).toBeNull();
-    expect(onResponseAnnotationsChange).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByRole("button", { name: "编辑引用 1 的评论" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "引用 1 的评论" }), { target: { value: "长".repeat(2001) } });
-    expect(screen.getByRole("alert")).toHaveTextContent("评论超过 2,000 个字符");
-    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
-  });
-
-  it("does not submit a comment while an IME composition is active", () => {
-    const onResponseAnnotationsChange = vi.fn();
-    renderComposer({ responseAnnotations: [first], onResponseAnnotationsChange, responseAnnotationEditRequest: { annotationId: "ann_1", nonce: 1 } });
-    const editor = screen.getByRole("textbox", { name: "引用 1 的评论" });
-    fireEvent.change(editor, { target: { value: "拼音" } });
-    fireEvent.keyDown(editor, { key: "Enter", isComposing: true });
-    fireEvent.keyDown(editor, { key: "Enter", keyCode: 229 });
-    expect(onResponseAnnotationsChange).not.toHaveBeenCalled();
-  });
-
-  it("sends annotations without text, includes them in send options and clears the tray", async () => {
-    const onResponseAnnotationsChange = vi.fn();
-    const { onSend } = renderComposer({ responseAnnotations: [first], onResponseAnnotationsChange });
+    const { onSend } = renderWithAnnotations({ responseAnnotations: [first], onResponseAnnotationsChange });
     const send = screen.getByRole("button", { name: "发送消息" });
     expect(send).toBeEnabled();
     await userEvent.click(send);
@@ -1239,8 +1236,8 @@ describe("Composer response annotation tray", () => {
     expect(onResponseAnnotationsChange).toHaveBeenLastCalledWith([]);
   });
 
-  it("shows the limit notice in the tray header", () => {
-    renderComposer({ responseAnnotations: [first], onResponseAnnotationsChange: vi.fn(), responseAnnotationNotice: "最多引用 20 段回复" });
+  it("shows the limit notice next to the pill", () => {
+    renderWithAnnotations({ responseAnnotations: [first], onResponseAnnotationsChange: vi.fn(), responseAnnotationNotice: "最多引用 20 段回复" });
     expect(screen.getByRole("status")).toHaveTextContent("最多引用 20 段回复");
   });
 });

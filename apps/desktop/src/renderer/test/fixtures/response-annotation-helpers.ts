@@ -1,4 +1,6 @@
+import { vi } from "vitest";
 import type { ResponseAnnotationReference } from "@actspace/shared";
+import { isAnnotatableMessageId, type ResponseAnnotationContextValue } from "../../components/messages/response-annotation-context";
 
 /** 在 root 内找到包含 needle 的文本节点，返回 needle 起点（或终点）对应的 DOM 位置。 */
 export function textPoint(root: Node, needle: string, edge: "start" | "end" = "start"): [Text, number] {
@@ -50,6 +52,25 @@ export function makeAnnotation(overrides: Partial<ResponseAnnotationReference> =
     endOffset: 9,
     prefixContext: "第一段内容\n",
     suffixContext: "的正文",
+    ...overrides,
+  };
+}
+
+/** 全部动作都是 vi.fn 的批注 context，给只关心调用的组件测试用。 */
+export function createAnnotationContextValue(overrides: Partial<ResponseAnnotationContextValue> = {}): ResponseAnnotationContextValue {
+  return {
+    drafts: [],
+    canAnnotate: isAnnotatableMessageId,
+    addDraft: vi.fn(),
+    updateComment: vi.fn(),
+    removeDraft: vi.fn(),
+    editingAnnotationId: null,
+    setEditingAnnotationId: vi.fn(),
+    activeAnnotationId: null,
+    setActiveAnnotationId: vi.fn(),
+    resolveRange: vi.fn(() => null),
+    locateAnnotation: vi.fn(),
+    editAnnotation: vi.fn(),
     ...overrides,
   };
 }

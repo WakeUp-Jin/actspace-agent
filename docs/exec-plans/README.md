@@ -17,7 +17,7 @@
 | 计划 | 当前状态与下一步 |
 |---|---|
 | [Composer 消息队列与运行中插入](active/20260930-composer-message-queue.md) | T1–T9 已完成（未提交）；剩 Electron 实机验收。 |
-| [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | 计划已拆为 P0 内容块契约 / PA 回复批注 / PB 编辑器与 `@` 文件引用；P0、PA 已实施（PA.8 Electron 验收待确认）；下一步 PB。 |
+| [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | 计划已拆为 P0 内容块契约 / PA 回复批注 / PB 编辑器与 `@` 文件引用；P0、PA 已实施；PA2 回复批注交互重做执行中；之后 PB。 |
 | [单一 Agent 形态与三种模式](active/20260928-agent-forms-and-modes.md) | T1–T7 已实现；主要实机路线通过，T8 剩余验收见执行摘要。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
 | [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |

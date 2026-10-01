@@ -100,6 +100,17 @@ export function resolveAnnotation(model: AnnotatableText, annotation: Pick<Respo
   return { status: "resolved", start, end: start + selectedText.length };
 }
 
+/** 在容器里找到批注所属回复的可批注根节点并定位原文；回复没渲染或定位失败返回 null。 */
+export function resolveAnnotationRange(container: ParentNode, annotation: ResponseAnnotationReference): Range | null {
+  const replies = container.querySelectorAll<HTMLElement>("[data-assistant-message-id]");
+  const reply = Array.from(replies).find((element) => element.dataset.assistantMessageId === annotation.assistantMessageId);
+  const root = reply?.querySelector<HTMLElement>("[data-annotation-root]");
+  if (!root) return null;
+  const model = collectAnnotatableText(root);
+  const resolution = resolveAnnotation(model, annotation);
+  return resolution.status === "resolved" ? offsetsToRange(model, resolution.start, resolution.end) : null;
+}
+
 function boundaryToIndex(model: AnnotatableText, container: Node, offset: number, edge: "start" | "end"): number | null {
   if (container.nodeType === Node.TEXT_NODE) {
     const segment = model.segments.find((candidate) => candidate.node === container);

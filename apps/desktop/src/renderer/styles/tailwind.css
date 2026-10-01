@@ -50,6 +50,8 @@
   --color-info-hover: var(--act-color-info-hover);
   --color-info-soft: var(--act-color-info-soft);
   --color-on-info: var(--act-color-on-info);
+  --color-annotation-mark: var(--act-color-annotation-mark);
+  --color-on-annotation-mark: var(--act-color-on-annotation-mark);
   --color-warning: var(--act-color-warning);
   --color-warning-soft: var(--act-color-warning-soft);
   --color-on-warning: var(--act-color-on-warning);
