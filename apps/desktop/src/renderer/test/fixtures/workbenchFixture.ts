@@ -333,17 +333,16 @@ export const mockMessages: MessageBlock[] = [
     kind: "context_compaction",
     id: "mock-compact-completed",
     status: "completed",
-    trigger: "manual",
-    summaryText: "Context compacted · 18 messages",
+    removedCount: 18,
+    durationMs: 12_000,
+    summary: "## 当前目标\n- 修复会话恢复后压缩分隔线的显示\n\n## 已完成\n- 投影保留被压缩的旧消息\n- 摘要挂到分隔线上",
     createdAt: now
   },
   {
     kind: "context_compaction",
     id: "mock-compact-running",
     status: "running",
-    trigger: "manual",
-    stage: "summarizing",
-    summaryText: "Compacting context",
+    startedAt: now,
     createdAt: now
   },
   {

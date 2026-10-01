@@ -1,0 +1,21 @@
+{
+  "recordedAt": "2026-09-30T19:36:51.198285+08:00",
+  "head": "b5900608a93b8cbbde6cb7c2f06e6ac6f8f38a32",
+  "sourceFileCount": 38,
+  "changedBaselineFiles": [],
+  "settings": {
+    "taskBindings": {
+      "defaultChat": "deepseek:deepseek-flash",
+      "utility": "deepseek:deepseek-flash",
+      "explore": "deepseek:deepseek-flash"
+    },
+    "chatCompactionTriggerRatio": 0.8,
+    "testedProviderBaseUrls": {
+      "deepseek:default": null,
+      "kimi:default": null
+    }
+  },
+  "themeVisuallyVerified": "light",
+  "appIdentity": "com.actspace.desktop.dev.w2067fa05",
+  "restartCompleted": true
+}

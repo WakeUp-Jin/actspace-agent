@@ -2,6 +2,8 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   bootstrapState: "runtime-v2:fixed-renderer:bootstrap-state",
   runAgent: "runtime-v2:fixed-renderer:run-agent",
   abortAgentRun: "runtime-v2:fixed-renderer:abort-agent-run",
+  steerAgentRun: "runtime-v2:fixed-renderer:steer-agent-run",
+  cancelSteer: "runtime-v2:fixed-renderer:cancel-steer",
   agentStream: "runtime-v2:fixed-renderer:agent-stream",
   sessionLiveEvent: "runtime-v2:fixed-renderer:session-live-event",
   compactContext: "runtime-v2:fixed-renderer:compact-context",

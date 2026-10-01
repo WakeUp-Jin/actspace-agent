@@ -63,42 +63,11 @@ export type RuntimeStreamEvent =
       agentRunId: AgentRunId;
       payload: WorkspacePreparationPayload;
     }
-  | {
-      type: "context_compaction_started";
-      sessionId: SessionId;
-      agentRunId: AgentRunId;
-      trigger: "manual" | "auto";
-      stage: "queued" | "preparing" | "summarizing" | "writing" | "completed";
-      progress?: number;
-    }
-  | {
-      type: "context_compaction_progress";
-      sessionId: SessionId;
-      agentRunId: AgentRunId;
-      trigger: "manual" | "auto";
-      stage: "queued" | "preparing" | "summarizing" | "writing" | "completed";
-      progress?: number;
-      summary?: string;
-    }
-  | {
-      type: "context_compaction_finished";
-      sessionId: SessionId;
-      agentRunId: AgentRunId;
-      trigger: "manual" | "auto";
-      stage: "completed";
-      status: "compacted" | "skipped";
-      progress?: number;
-      summary?: string;
-      payload: ContextCompactionPayload;
-    }
-  | {
-      type: "context_compaction_failed";
-      sessionId: SessionId;
-      agentRunId: AgentRunId;
-      trigger: "manual" | "auto";
-      stage: "failed";
-      error: SessionError;
-    }
+  | { type: "context_compaction_started"; sessionId: SessionId; agentRunId: AgentRunId; startedAt: string }
+  | { type: "context_compaction_finished"; sessionId: SessionId; agentRunId: AgentRunId; payload: ContextCompactionPayload }
+  | { type: "context_compaction_failed"; sessionId: SessionId; agentRunId: AgentRunId; error: SessionError }
+  /** 运行中插入的消息已被 Agent 读到（下一步开始前）。 */
+  | { type: "user_message_steered"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; messageId: string }
   | { type: "assistant_text_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string }
   | { type: "assistant_thinking_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string }
   | {
@@ -268,6 +237,8 @@ export type ContextCompactionPayload = {
   reason?: string;
   /** 压缩耗时；优先读取 compaction/end.durationMs，旧 journal 回退 start/end 时间差 */
   durationMs?: number;
+  /** 模型之后看到的摘要正文 */
+  summary?: string;
 };
 
 export type SessionWorktreeContext = {
@@ -917,12 +888,17 @@ export type MessageBlock = {
   | {
       kind: "context_compaction";
       id: EventId;
-      status: "pending" | "running" | "completed" | "skipped" | "failed";
-      trigger: "manual" | "auto";
-      stage?: string;
-      summaryText: string;
-      reductionLabel?: string;
-      progress?: number;
+      status: "running" | "completed" | "failed";
+      /** running：计时起点（ISO 时间） */
+      startedAt?: string;
+      /** completed：被摘要替换的消息条数 */
+      removedCount?: number;
+      /** completed：压缩耗时，来自 journal 时间差 */
+      durationMs?: number;
+      /** completed：模型之后看到的摘要正文，分隔线展开后显示 */
+      summary?: string;
+      /** failed：失败原因 */
+      errorMessage?: string;
       createdAt: string;
     }
   | {

@@ -31,8 +31,7 @@ const messagesWithCompaction: MessageBlock[] = [
     kind: "context_compaction",
     id: "compact-1",
     status: "completed",
-    trigger: "manual",
-    summaryText: "Context compacted · 8 messages",
+    removedCount: 8,
     createdAt: "2026-06-02T00:00:02.000Z",
   },
 ];
@@ -189,7 +188,7 @@ describe("ConversationView tooltips", () => {
     renderConversation(messagesWithCompaction);
 
     const actionsButton = screen.getByRole("button", { name: "更多消息操作" });
-    const divider = screen.getByRole("separator", { name: "Context compacted · 8 messages" });
+    const divider = screen.getByRole("separator", { name: "上下文已压缩 · 8 条消息" });
 
     expect(actionsButton.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

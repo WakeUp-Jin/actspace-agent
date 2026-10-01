@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>消息队列 Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* Layout: 左侧是可播放、也可以直接操作的对话流模拟；右侧是托盘各状态的静态对照与规则；窄屏上下堆叠。
+   颜色沿用 ActSpace「Ink & Emerald」token（apps/desktop/src/renderer/styles/tokens.css），与 context-compaction-demo.html 同一套。 */
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-subtle: #f1f1ef;
+  --text: #20201e;
+  --muted: #676762;
+  --faint: #72726b;
+  --line: #deded9;
+  --op: #087a4b;
+  --op-soft: #e5f2ea;
+  --danger: #c74747;
+  --action: #20201e;
+  --on-action: #ffffff;
+  --popover-shadow: 0 12px 32px rgba(20, 21, 18, 0.14);
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
+  --inset: 17px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+    --line: #353630; --op: #36c783; --op-soft: #193a2b; --danger: #e06b6b; --action: #f1f1ed; --on-action: #181916;
+    --popover-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+  --line: #353630; --op: #36c783; --op-soft: #193a2b; --danger: #e06b6b; --action: #f1f1ed; --on-action: #181916;
+  --popover-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font: 14px/1.55 var(--font); padding-inline: 16px; padding-block: 24px 48px; margin: 0; }
+button { font: inherit; color: inherit; }
+button:focus-visible, .input:focus-visible { outline: 2px solid var(--op); outline-offset: 2px; border-radius: 4px; }
+
+.page { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.head h1 { margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600; text-wrap: balance; }
+.head p { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--surface); flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--surface-subtle); color: var(--text); font-weight: 600; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+.btn:hover { border-color: var(--faint); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+@media (max-width: 980px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* 模拟应用窗口 */
+.app { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); height: 720px; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.app-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.app-bar strong { color: var(--text); font-weight: 600; }
+.scenario-note { font-size: 12px; color: var(--faint); }
+.flow { flex: 1; overflow-y: auto; padding-block: 20px 12px; }
+.column { max-width: 700px; margin: 0 auto; padding-inline: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* 消息流元素（与压缩 demo 一致） */
+.user-card { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 12px 16px; animation: rise 240ms ease both; overflow-wrap: anywhere; }
+.assistant { padding-inline: var(--inset); line-height: 1.65; animation: rise 240ms ease both; }
+.assistant code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-subtle); padding: 1px 4px; border-radius: 4px; }
+.tools { padding-inline: var(--inset); display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--faint); }
+.tools div { animation: rise 200ms ease both; overflow-wrap: anywhere; }
+.tools b { font-weight: 500; color: var(--muted); }
+.tools .add { color: var(--op); } .tools .del { color: var(--danger); }
+.thinking { padding-inline: var(--inset); color: var(--faint); font-size: 13px; }
+.stopped { padding-inline: var(--inset); color: var(--faint); font-size: 12px; }
+
+.compact-running { padding: 8px var(--inset); animation: rise 220ms ease both; }
+.cr-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.cr-title { font-weight: 600; }
+.cr-meta { color: var(--faint); font-variant-numeric: tabular-nums; }
+.track { margin-top: 8px; height: 3px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.track i { display: block; height: 100%; width: 45%; border-radius: 99px; background: var(--op); animation: indet 1.2s ease-in-out infinite; }
+.cr-caption { margin-top: 6px; font-size: 12px; color: var(--faint); }
+.divider { display: flex; align-items: center; gap: 12px; padding-block: 10px; padding-inline: var(--inset); font-size: 12px; font-weight: 500; color: var(--faint); animation: rise 220ms ease both; font-variant-numeric: tabular-nums; }
+.divider .ln { flex: 1; min-width: 24px; height: 1px; background: var(--line); }
+
+/* Composer：托盘在输入框内部顶部，与回复引用托盘同一位置体系 */
+.composer-wrap { padding: 0 16px 16px; }
+.composer { max-width: 668px; margin: 0 auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); display: flex; flex-direction: column; }
+.composer-row { display: flex; align-items: flex-end; gap: 10px; padding: 10px 10px 10px 14px; }
+.input { flex: 1; min-width: 0; min-height: 22px; max-height: 120px; overflow-y: auto; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; outline: none; }
+.input:empty::before { content: attr(data-placeholder); color: var(--faint); pointer-events: none; }
+.send { flex: none; height: 28px; min-width: 28px; border-radius: 99px; border: 0; padding: 0; background: var(--action); color: var(--on-action); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
+.send svg { display: block; flex: none; }
+.send[aria-disabled="true"] { opacity: .35; cursor: not-allowed; }
+
+.q-tray { margin: 10px 10px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); animation: rise 180ms ease both; min-width: 0; }
+.q-head { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 4px 0 10px; font-size: 12px; color: var(--muted); }
+.q-title { flex: none; font-weight: 600; color: var(--text); }
+.q-hint { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); }
+.q-hint.paused { color: var(--text); }
+.q-list { list-style: none; margin: 0; padding: 0 4px 2px; max-height: 156px; overflow-y: auto; border-top: 1px solid var(--line); }
+.q-row { display: flex; align-items: center; gap: 4px; min-height: 36px; padding: 3px 0 3px 6px; font-size: 13px; animation: rise 180ms ease both; }
+.q-row + .q-row { border-top: 1px solid var(--line); }
+.q-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.q-text.cmd { font-family: var(--mono); font-size: 12.5px; }
+.q-meta { flex: none; font-size: 12px; color: var(--faint); padding-inline: 4px; white-space: nowrap; }
+.q-act { flex: none; border: 0; background: none; border-radius: 6px; height: 26px; padding: 0 8px; font-size: 12px; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; transition: background-color 120ms ease, color 120ms ease; }
+.q-act:hover:not([aria-disabled="true"]), .q-act[aria-expanded="true"] { background: var(--surface); color: var(--text); }
+.q-act[aria-disabled="true"] { color: var(--faint); opacity: .55; cursor: not-allowed; }
+.q-act.strong { color: var(--text); font-weight: 600; }
+.q-icon { width: 26px; padding: 0; justify-content: center; }
+.q-row.pending .q-text { color: var(--muted); }
+.q-state { flex: none; display: inline-flex; align-items: center; gap: 6px; padding-inline: 4px; font-size: 12px; color: var(--op); white-space: nowrap; }
+.q-state i { width: 6px; height: 6px; border-radius: 99px; background: var(--op); animation: pulse 1.2s ease-in-out infinite; }
+.pressed { box-shadow: 0 0 0 2px var(--op); }
+@media (max-width: 560px) { .q-meta { display: none; } .q-hint { display: none; } }
+
+/* 浮层：提示与 ··· 菜单用 fixed 定位，不被托盘滚动区裁掉 */
+.tip { position: fixed; z-index: 30; max-width: 260px; background: var(--action); color: var(--on-action); font-size: 12px; line-height: 1.4; padding: 5px 9px; border-radius: 6px; pointer-events: none; }
+.menu { position: fixed; z-index: 25; min-width: 168px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--popover-shadow); padding: 4px; display: flex; flex-direction: column; }
+.menu.static { position: static; box-shadow: none; margin: 6px 10px 8px auto; width: max-content; }
+.menu button { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: none; text-align: left; padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.menu button:hover:not([aria-disabled="true"]) { background: var(--surface-subtle); }
+.menu button[aria-disabled="true"] { color: var(--faint); cursor: not-allowed; }
+.menu small { margin-left: auto; color: var(--faint); font-size: 11px; }
+
+/* 右侧 */
+aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 16px; min-width: 0; }
+.card h2 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.states { display: flex; flex-direction: column; gap: 14px; }
+.state { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.state-name { font-size: 12px; color: var(--faint); letter-spacing: .02em; }
+.state-box { background: var(--bg); border-radius: 8px; padding: 0 0 10px; min-width: 0; }
+.state-box .q-tray { animation: none; }
+.state-box .q-row { animation: none; }
+.buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 10px 12px 0; }
+.buttons figure { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 12px; color: var(--muted); }
+.rules { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 13px; }
+.rules b { color: var(--text); font-weight: 600; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(230%); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .track i { width: 100%; opacity: .45; }
+}
+@media (max-width: 520px) { .app { height: 640px; } }
+</style>
+
+<div class="page">
+  <header class="head">
+    <div>
+      <h1>消息队列与运行中插入</h1>
+      <p>Agent 运行时继续输入：Enter 进入输入框上方的队列，运行结束后依次发出；「↳ 插入」把一条送进正在运行的回合。点场景自动播放，播放中和「自己试试」里都可以直接操作托盘。</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="场景">
+        <button type="button" data-scene="queue" aria-pressed="true">运行中排队</button>
+        <button type="button" data-scene="steerTool" aria-pressed="false">工具执行中插入</button>
+        <button type="button" data-scene="steerFinal" aria-pressed="false">写回复时插入</button>
+        <button type="button" data-scene="stop" aria-pressed="false">停止后暂停</button>
+        <button type="button" data-scene="compact" aria-pressed="false">压缩中排队</button>
+        <button type="button" data-scene="play" aria-pressed="false">自己试试</button>
+      </div>
+      <button type="button" class="btn" id="replay">重播</button>
+      <button type="button" class="btn" id="theme">主题：跟随系统</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="app" aria-label="对话流模拟">
+      <div class="app-bar"><strong>会话列表改游标分页</strong><span class="scenario-note" id="note"></span></div>
+      <div class="flow" id="flow"><div class="column" id="column"></div></div>
+      <div class="composer-wrap">
+        <div class="composer">
+          <div id="trayHost"></div>
+          <div class="composer-row">
+            <div class="input" id="input" contenteditable="true" role="textbox" aria-label="消息输入框" data-placeholder="继续对话…"></div>
+            <button type="button" class="send" id="send"></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="card">
+        <h2>状态一览</h2>
+        <div class="states" id="states"></div>
+      </div>
+      <div class="card">
+        <h2>规则</h2>
+        <ul class="rules">
+          <li><b>发送按钮只有两种样子</b>：输入框有内容时是 ↑ 发送（运行中点它或按 Enter 就是加入队列），运行中且输入框为空时是 ■ 停止。压缩中也能排队，只是停止按钮置灰。</li>
+          <li><b>一条排队消息就是一个新回合</b>，不合并。当前运行正常结束后发出队首一条，结束后再发下一条。</li>
+          <li><b>「↳ 插入」</b>把消息送进正在运行的回合，Agent 开始下一步时读到。它在对话里就是一条普通用户消息，出现在被读到的位置。</li>
+          <li>Agent 正在写最后的回复时插入，<b>回合不结束，多跑一步</b>处理这条消息。</li>
+          <li><b>读到之前可以撤回</b>，撤回后回到队列。停止时还没读到的插入回到队列顶部，不丢。</li>
+          <li><b>停止或失败后队列暂停</b>，不自动发出。点「继续发送」或直接发一条新消息后恢复。</li>
+          <li><b>/compact</b> 可以排队，不能插入。压缩进行中或等待审批时，「插入」不可用。</li>
+          <li>「···」里是编辑（输入框为空时把这条拿回输入框）和上移。删除直接生效，不二次确认。</li>
+          <li>队列只在本次打开应用期间保留，和草稿一样；每个会话一份，切到别的会话后照常在后台发出。</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const column = $("column"), flow = $("flow"), input = $("input"), send = $("send"), note = $("note"), trayHost = $("trayHost");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const ICON = {
+    arrow: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg>',
+    stop: '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" rx="2" fill="currentColor"/></svg>',
+    trash: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11M6.5 4.5V3h3v1.5M4 4.5l.7 8.5h6.6l.7-8.5M6.8 7v4M9.2 7v4"/></svg>',
+    more: '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" fill="currentColor"/><circle cx="8" cy="8" r="1.25" fill="currentColor"/><circle cx="12.5" cy="8" r="1.25" fill="currentColor"/></svg>',
+  };
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const html = (s) => { const t = document.createElement("template"); t.innerHTML = s.trim(); return t.content.firstElementChild; };
+  const fmt = (s) => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+  const short = (s, n = 18) => s.length > n ? `${s.slice(0, n)}…` : s;
+
+  // ---------- 播放控制 ----------
+  let epoch = 0, timers = new Set();
+  const track = (t) => { timers.add(t); return t; };
+  const sleep = (ms) => new Promise((r) => track(setTimeout(r, reduce ? Math.min(ms, 400) : ms)));
+  const until = async (cond, alive) => { while (alive() && !cond()) await sleep(80); };
+
+  // ---------- 队列状态（每个会话一份；demo 只有一个会话） ----------
+  let seq = 0;
+  const S = { running: false, compacting: false, run: null, queue: [], pending: [], paused: false, phase: "", menuFor: null };
+  const makeItem = (text, extra = {}) => ({ id: ++seq, text, kind: text.trim() === "/compact" ? "compact" : "message", ...extra });
+
+  // ---------- 托盘 ----------
+  function metaText(it) {
+    if (it.kind === "compact") return `<span class="q-meta">命令</span>`;
+    const parts = [];
+    if (it.files) parts.push(`${it.files} 个文件`);
+    if (it.refs) parts.push(`${it.refs} 条引用`);
+    return parts.length ? `<span class="q-meta">${parts.join(" · ")}</span>` : "";
+  }
+
+  /** 纯渲染：同一个函数给左侧实时托盘和右侧静态状态用。 */
+  function trayEl(m) {
+    if (!m.queue.length && !m.pending.length) return null;
+    const counts = [];
+    if (m.queue.length) counts.push(`${m.queue.length} 条排队`);
+    if (m.pending.length) counts.push(`${m.pending.length} 条已插入`);
+    const hint = m.paused ? "已暂停" : !m.queue.length ? "" : m.compacting ? "压缩完成后依次发送" : m.running ? "当前运行结束后依次发送" : "即将发送";
+    const steerTip = m.compacting ? "压缩中不能插入，完成后会自动发送" : m.awaitingApproval ? "等待审批时不能插入" : "让 Agent 在下一步看到这条消息";
+    const steerDisabled = m.compacting || m.awaitingApproval;
+    const pendingRows = m.pending.map((it) => `
+      <li class="q-row pending" data-id="${it.id}">
+        <span class="q-text" title="${esc(it.text)}">${esc(it.text)}</span>
+        <span class="q-state" data-tip="Agent 开始下一步时会读到这条消息"><i aria-hidden="true"></i>下一步读取</span>
+        <button type="button" class="q-act" data-act="unsteer" data-tip="读到之前可以撤回，撤回后回到队列">撤回</button>
+      </li>`);
+    const queueRows = m.queue.map((it) => {
+      const cmd = it.kind === "compact";
+      // 没有运行中的回合时不显示「插入」；压缩中 / 等待审批时显示但不可用。
+      const steer = cmd || !m.running ? "" :
+        `<button type="button" class="q-act" data-act="steer" data-tip="${steerTip}"${steerDisabled ? ' aria-disabled="true"' : ""}>↳ 插入</button>`;
+      return `
+      <li class="q-row" data-id="${it.id}">
+        <span class="q-text${cmd ? " cmd" : ""}" title="${esc(it.text)}">${esc(it.text)}</span>
+        ${metaText(it)}${steer}
+        <button type="button" class="q-act q-icon" data-act="remove" aria-label="删除" data-tip="删除">${ICON.trash}</button>
+        <button type="button" class="q-act q-icon" data-act="more" aria-label="更多操作" aria-haspopup="menu" aria-expanded="${m.menuFor === it.id}">${ICON.more}</button>
+      </li>`;
+    });
+    return html(`
+      <section class="q-tray" aria-label="消息队列">
+        <div class="q-head">
+          <span class="q-title">${counts.join(" · ")}</span>
+          <span class="q-hint${m.paused ? " paused" : ""}">${hint}</span>
+          ${m.paused ? '<button type="button" class="q-act strong" data-act="resume">继续发送</button>' : ""}
+        </div>
+        <ul class="q-list">${pendingRows.join("")}${queueRows.join("")}</ul>
+      </section>`);
+  }
+
+  function renderAll() {
+    const tray = trayEl(S);
+    trayHost.replaceChildren(...(tray ? [tray] : []));
+    renderSend();
+  }
+
+  const inputText = () => input.innerText.replace(/\n$/, "").trim();
+  function sendMode() {
+    const hasText = inputText().length > 0;
+    if (!S.running) return "send";
+    if (hasText) return "queue";
+    return S.compacting ? "stop-disabled" : "stop";
+  }
+  function renderSend() {
+    const mode = sendMode();
+    send.className = "send";
+    send.removeAttribute("aria-disabled");
+    if (mode === "send") { send.innerHTML = ICON.arrow; send.setAttribute("aria-label", "发送"); send.dataset.tip = "发送 · Enter"; }
+    if (mode === "queue") { send.innerHTML = ICON.arrow; send.setAttribute("aria-label", "加入队列"); send.dataset.tip = "加入队列，当前运行结束后发送 · Enter"; }
+    if (mode === "stop") { send.innerHTML = ICON.stop; send.setAttribute("aria-label", "停止"); send.dataset.tip = "停止"; }
+    if (mode === "stop-disabled") { send.innerHTML = ICON.stop; send.setAttribute("aria-label", "正在压缩上下文，压缩完成后可继续"); send.setAttribute("aria-disabled", "true"); send.dataset.tip = "压缩完成后可继续"; }
+    input.dataset.placeholder = S.running ? "输入下一条，Enter 加入队列" : "继续对话…";
+  }
+
+  // ---------- 托盘操作 ----------
+  const findIn = (list, id) => list.findIndex((it) => it.id === id);
+  const actions = {
+    steer(id) {
+      if (!S.running || S.compacting) return;
+      const i = findIn(S.queue, id); if (i < 0) return;
+      S.pending.push(...S.queue.splice(i, 1));
+    },
+    unsteer(id) {
+      const i = findIn(S.pending, id); if (i < 0) return;
+      S.queue.unshift(...S.pending.splice(i, 1));
+    },
+    remove(id) { const i = findIn(S.queue, id); if (i >= 0) S.queue.splice(i, 1); },
+    up(id) { const i = findIn(S.queue, id); if (i > 0) [S.queue[i - 1], S.queue[i]] = [S.queue[i], S.queue[i - 1]]; },
+    edit(id) {
+      if (inputText()) return;
+      const i = findIn(S.queue, id); if (i < 0) return;
+      const [it] = S.queue.splice(i, 1);
+      input.textContent = it.text; input.focus();
+      placeCaretAtEnd();
+    },
+    resume() {
+      S.paused = false;
+      if (!S.running && S.queue.length) startRun(S.queue.shift());
+    },
+  };
+  trayHost.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-act]"); if (!btn || btn.getAttribute("aria-disabled") === "true") return;
+    const id = Number(btn.closest("[data-id]")?.dataset.id);
+    if (btn.dataset.act === "more") { openMenu(btn, id); return; }
+    closeMenu();
+    actions[btn.dataset.act](id);
+    renderAll();
+  });
+
+  // ··· 菜单
+  let menu = null;
+  function menuEl(id, { isStatic = false } = {}) {
+    const i = findIn(S.queue, id);
+    const canEdit = !inputText();
+    return html(`
+      <div class="menu${isStatic ? " static" : ""}" role="menu">
+        <button type="button" role="menuitem" data-menu="edit"${canEdit ? "" : ' aria-disabled="true"'}>编辑${canEdit ? "" : "<small>先清空输入框</small>"}</button>
+        <button type="button" role="menuitem" data-menu="up"${i > 0 || isStatic ? "" : ' aria-disabled="true"'}>上移</button>
+      </div>`);
+  }
+  function openMenu(anchor, id) {
+    if (S.menuFor === id) { closeMenu(); renderAll(); return; }
+    closeMenu();
+    S.menuFor = id; renderAll();
+    menu = menuEl(id);
+    document.body.appendChild(menu);
+    const a = trayHost.querySelector(`[data-id="${id}"] [data-act="more"]`).getBoundingClientRect();
+    const h = menu.offsetHeight, w = menu.offsetWidth;
+    const top = a.bottom + 4 + h > window.innerHeight ? a.top - 4 - h : a.bottom + 4;
+    menu.style.top = `${Math.max(8, top)}px`;
+    menu.style.left = `${Math.max(8, Math.min(a.right - w, window.innerWidth - w - 8))}px`;
+    menu.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-menu]"); if (!b || b.getAttribute("aria-disabled") === "true") return;
+      actions[b.dataset.menu](id); closeMenu(); renderAll();
+    });
+    menu.querySelector('[data-menu]:not([aria-disabled="true"])')?.focus();
+  }
+  function closeMenu() { menu?.remove(); menu = null; S.menuFor = null; }
+  document.addEventListener("click", (e) => {
+    if (!menu || menu.contains(e.target) || e.target.closest('[data-act="more"]')) return;
+    closeMenu(); renderAll();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menu) { closeMenu(); renderAll(); } });
+  window.addEventListener("resize", () => { if (menu) { closeMenu(); renderAll(); } });
+
+  // 提示：fixed 浮层，托盘滚动区不会裁掉
+  let tip = null;
+  function showTip(el) {
+    hideTip();
+    tip = html(`<div class="tip" role="tooltip">${esc(el.dataset.tip)}</div>`);
+    document.body.appendChild(tip);
+    const r = el.getBoundingClientRect();
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = `${Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8))}px`;
+    tip.style.top = `${r.top - h - 6 < 8 ? r.bottom + 6 : r.top - h - 6}px`;
+  }
+  function hideTip() { tip?.remove(); tip = null; }
+  document.addEventListener("mouseover", (e) => { const el = e.target.closest("[data-tip]"); if (el) showTip(el); else hideTip(); });
+  document.addEventListener("focusin", (e) => { const el = e.target.closest("[data-tip]"); if (el && el.matches(":focus-visible")) showTip(el); });
+  document.addEventListener("focusout", hideTip);
+  document.addEventListener("click", hideTip, true);
+
+  // ---------- Composer ----------
+  function placeCaretAtEnd() {
+    const r = document.createRange(); r.selectNodeContents(input); r.collapse(false);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  }
+  function submit(extra = {}) {
+    const text = inputText(); if (!text) return;
+    input.textContent = "";
+    if (S.running) S.queue.push(makeItem(text, extra));
+    else { S.paused = false; startRun(makeItem(text, extra)); }
+    renderAll();
+  }
+  function stopRun() {
+    if (!S.run || S.compacting) return;
+    S.run.aborted = true;
+    finish(S.run);
+  }
+  input.addEventListener("input", renderSend);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
+  });
+  input.addEventListener("paste", (e) => {
+    e.preventDefault();
+    document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+  });
+  send.addEventListener("click", () => {
+    const mode = sendMode();
+    if (mode === "stop") stopRun();
+    else if (mode === "send" || mode === "queue") submit();
+  });
+
+  // ---------- 模拟 Agent ----------
+  const add = (node) => { column.appendChild(node); flow.scrollTop = flow.scrollHeight; return node; };
+  const userCard = (text) => html(`<div class="user-card">${esc(text)}</div>`);
+  const plain = (s) => s.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+
+  async function streamInto(node, htmlText, alive, chunkMs = 45) {
+    const parts = plain(htmlText).match(/.{1,3}/gs) || [];
+    for (const p of parts) { if (!alive()) return; node.textContent += p; flow.scrollTop = flow.scrollHeight; await sleep(chunkMs); }
+    node.innerHTML = htmlText;
+  }
+  async function execStep(step, alive) {
+    S.phase = "thinking";
+    const think = add(html(`<div class="thinking">思考中…</div>`));
+    await sleep(step.think ?? 500);
+    think.remove();
+    if (!alive()) return;
+    if (step.tools) {
+      S.phase = "tools";
+      const box = add(html(`<div class="tools"></div>`));
+      for (const line of step.tools) {
+        box.appendChild(html(`<div>${line}</div>`)); flow.scrollTop = flow.scrollHeight;
+        await sleep(step.delay ?? 900); if (!alive()) return;
+      }
+    }
+    if (step.say || step.reply) {
+      S.phase = step.reply ? "reply" : "say";
+      await streamInto(add(html(`<div class="assistant"></div>`)), step.say || step.reply, alive, step.reply ? 60 : 40);
+    }
+  }
+  const defaultPlan = (text) => [
+    { tools: ["<b>搜索</b> 相关代码于 apps/desktop/src/", "<b>编辑</b> apps/desktop/src/renderer/App.tsx <span class=\"add\">+12</span> <span class=\"del\">−3</span>"] },
+    { reply: `已处理「${esc(short(text, 24))}」，改动在 <code>App.tsx</code>。` },
+  ];
+  const defaultSteerPlan = (it) => [{ say: `好，按「${esc(short(it.text, 24))}」调整。` }];
+
+  async function startRun(it) {
+    if (it.kind === "compact") return compactRun(it);
+    const e = epoch;
+    add(userCard(it.text));
+    const run = { aborted: false };
+    S.run = run; S.running = true; renderAll();
+    const alive = () => e === epoch && !run.aborted;
+    let steps = [...(it.plan || defaultPlan(it.text))];
+    // 每一步开始前读取插入（next-step inbox）；最后一步写完时还有未读插入，就再跑一步。
+    while (alive()) {
+      if (S.pending.length) {
+        const claimed = S.pending.splice(0);
+        renderAll();
+        claimed.forEach((c) => add(userCard(c.text)));
+        steps = [...claimed.flatMap((c) => c.steerPlan || defaultSteerPlan(c)), ...steps];
+        await sleep(450); if (!alive()) break;
+      }
+      const step = steps.shift();
+      if (!step) break;
+      await execStep(step, alive);
+    }
+    S.phase = "";
+    if (e === epoch && !run.aborted) finish(run);
+  }
+
+  async function compactRun() {
+    const e = epoch, alive = () => e === epoch;
+    const run = { aborted: false };
+    S.run = run; S.running = true; S.compacting = true; renderAll();
+    let secs = 0;
+    const el = add(html(`
+      <div class="compact-running">
+        <div class="cr-row" role="status"><span class="cr-title">正在压缩上下文</span><span class="cr-meta" aria-hidden="true">·</span><span class="cr-meta" data-t>0s</span></div>
+        <div class="track" role="progressbar" aria-label="上下文压缩进度"><i></i></div>
+        <div class="cr-caption">正在总结较早的消息。</div>
+      </div>`));
+    const timer = track(setInterval(() => { secs += 1; el.querySelector("[data-t]").textContent = fmt(secs); }, 1000));
+    await sleep(5200);
+    clearInterval(timer);
+    if (!alive()) return;
+    el.replaceWith(html(`<div class="divider"><span class="ln"></span><span>上下文已压缩 · 29 条消息 · ${fmt(Math.max(secs, 5))}</span><span class="ln"></span></div>`));
+    S.compacting = false;
+    finish(run);
+  }
+
+  async function finish(run) {
+    if (S.run !== run) return;
+    const e = epoch;
+    S.run = null; S.running = false; S.compacting = false;
+    if (run.aborted) {
+      add(html(`<div class="stopped">已停止</div>`));
+      // 停止时还没被读到的插入回到队列顶部；队列暂停。
+      S.queue.unshift(...S.pending.splice(0));
+      S.paused = S.queue.length > 0;
+      renderAll();
+      return;
+    }
+    renderAll();
+    await sleep(800);
+    if (e !== epoch || S.running || S.paused || !S.queue.length) return;
+    startRun(S.queue.shift());
+    renderAll();
+  }
+
+  // ---------- 脚本辅助 ----------
+  async function type(text, alive) {
+    input.textContent = ""; renderSend();
+    for (const ch of text) { if (!alive()) return; input.textContent += ch; renderSend(); await sleep(38); }
+    await sleep(320);
+  }
+  async function press(get, alive) {
+    const el = get(); if (!el || !alive()) return;
+    el.classList.add("pressed");
+    await sleep(450); if (!alive()) return;
+    const now = get(); now?.classList.remove("pressed"); now?.click();
+  }
+  const queueBtn = (act, index = 0) => () => trayHost.querySelectorAll(".q-row:not(.pending)")[index]?.querySelector(`[data-act="${act}"]`);
+  const headBtn = (act) => () => trayHost.querySelector(`.q-head [data-act="${act}"]`);
+
+  function history() {
+    add(userCard("把会话列表的分页从 offset 改成游标分页，接口和前端都要改。"));
+    add(html(`<div class="tools"><div><b>编辑</b> packages/client/src/sessions/session.ts <span class="add">+42</span> <span class="del">−17</span></div><div><b>编辑</b> apps/desktop/src/renderer/components/Sidebar.tsx <span class="add">+23</span> <span class="del">−9</span></div></div>`));
+    add(html(`<div class="assistant">已经把 <code>listSessions</code> 改成游标分页：返回值新增 <code>nextCursor</code>，Sidebar 滚到底部时用它拉下一页。</div>`));
+  }
+
+  const FIRST = "把会话列表的分页从 offset 改成游标分页，接口和前端都要改。";
+  const SCENES = {
+    async queue(alive) {
+      note.textContent = "运行中回车 → 进入队列；运行结束后按顺序自动发出，每条一个回合";
+      startRun(makeItem(FIRST, { plan: [
+        { tools: ["<b>读取</b> packages/client/src/sessions/session.ts", "<b>搜索</b> listSessions 于 packages/"], delay: 1100 },
+        { tools: ["<b>编辑</b> packages/client/src/sessions/session.ts <span class=\"add\">+42</span> <span class=\"del\">−17</span>", "<b>编辑</b> apps/desktop/src/renderer/components/Sidebar.tsx <span class=\"add\">+23</span> <span class=\"del\">−9</span>"], delay: 1100 },
+        { reply: "已经把 <code>listSessions</code> 改成游标分页：返回值新增 <code>nextCursor</code>，Sidebar 滚到底部时用它拉下一页。" },
+      ] }));
+      await sleep(1100); if (!alive()) return;
+      await type("顺便把 Sidebar 的加载态也补上。", alive); if (!alive()) return;
+      submit({ plan: [
+        { tools: ["<b>编辑</b> apps/desktop/src/renderer/components/Sidebar.tsx <span class=\"add\">+14</span>"] },
+        { reply: "Sidebar 拉下一页时底部显示加载行，失败时显示「重试」。" },
+      ] });
+      await sleep(700); if (!alive()) return;
+      await type("/compact", alive); if (!alive()) return;
+      submit();
+    },
+
+    async steerTool(alive) {
+      note.textContent = "工具执行中插入 → Agent 下一步读到，消息出现在回合中间";
+      startRun(makeItem(FIRST, { plan: [
+        { tools: ["<b>读取</b> packages/client/src/sessions/session.ts", "<b>搜索</b> listSessions 于 packages/", "<b>读取</b> apps/desktop/src/renderer/components/Sidebar.tsx"], delay: 1300 },
+        { tools: ["<b>编辑</b> packages/client/src/sessions/session.ts <span class=\"add\">+38</span>", "<b>编辑</b> apps/desktop/src/renderer/components/Sidebar.tsx <span class=\"add\">+23</span> <span class=\"del\">−9</span>"] },
+        { reply: "改好了：新增 <code>cursor</code> 参数和 <code>nextCursor</code> 返回值，<code>offset</code> 保留并标了 <code>@deprecated</code>。" },
+      ] }));
+      await sleep(800); if (!alive()) return;
+      await type("别删 offset 参数，保留一个版本做兼容。", alive); if (!alive()) return;
+      submit({ steerPlan: [{ say: "好，<code>offset</code> 保留，只新增 <code>cursor</code>。" }] });
+      await sleep(400); if (!alive()) return;
+      await press(queueBtn("steer"), alive);
+    },
+
+    async steerFinal(alive) {
+      note.textContent = "Agent 写最后回复时插入 → 回合不结束，多跑一步处理";
+      startRun(makeItem("给游标分页补边界测试。", { plan: [
+        { tools: ["<b>编辑</b> packages/client/src/sessions/session-store.test.ts <span class=\"add\">+64</span>", "<b>运行</b> pnpm --filter @actspace/client test"], delay: 1400 },
+        { reply: "测试已补上：空列表返回 <code>nextCursor</code> 为 null，最后一页不再多请求一次，同一 <code>updatedAt</code> 的会话按 <code>id</code> 排序不漏数据，12 个用例全部通过。" },
+      ] }));
+      await sleep(700); if (!alive()) return;
+      await type("测试文件放到 packages/client/src/test/ 下。", alive); if (!alive()) return;
+      submit({ steerPlan: [
+        { tools: ["<b>移动</b> session-store.test.ts → packages/client/src/test/", "<b>运行</b> pnpm --filter @actspace/client test"] },
+        { reply: "已移到 <code>packages/client/src/test/</code>，12 个用例仍然全部通过。" },
+      ] });
+      await until(() => S.phase === "reply", alive); if (!alive()) return;
+      await sleep(500); if (!alive()) return;
+      await press(queueBtn("steer"), alive);
+    },
+
+    async stop(alive) {
+      note.textContent = "插入后立刻停止 → 未读的插入回到队首，队列暂停";
+      startRun(makeItem(FIRST, { plan: [
+        { tools: ["<b>读取</b> packages/client/src/sessions/session.ts", "<b>搜索</b> listSessions 于 packages/", "<b>读取</b> apps/desktop/src/renderer/components/Sidebar.tsx"], delay: 1900 },
+        { tools: ["<b>编辑</b> packages/client/src/sessions/session.ts <span class=\"add\">+42</span>"] },
+        { reply: "已改成游标分页。" },
+      ] }));
+      await sleep(600); if (!alive()) return;
+      await type("接口里统一叫 keyset 分页。", alive); if (!alive()) return;
+      submit({ plan: [
+        { tools: ["<b>编辑</b> packages/client/src/sessions/session.ts <span class=\"add\">+6</span> <span class=\"del\">−6</span>"] },
+        { reply: "已把命名统一为 keyset 分页。" },
+      ] });
+      await sleep(250); if (!alive()) return;
+      await type("最后在 README 补一段说明。", alive); if (!alive()) return;
+      submit({ plan: [
+        { tools: ["<b>编辑</b> packages/client/README.md <span class=\"add\">+18</span>"] },
+        { reply: "README 已补上 keyset 分页的用法和兼容说明。" },
+      ] });
+      await sleep(250); if (!alive()) return;
+      await press(queueBtn("steer"), alive); if (!alive()) return;
+      await sleep(350); if (!alive()) return;
+      await press(() => send, alive); if (!alive()) return;
+      await sleep(2200); if (!alive()) return;
+      await press(headBtn("resume"), alive);
+    },
+
+    async compact(alive) {
+      note.textContent = "压缩中也能排队；插入不可用，压缩完成后自动发出";
+      history();
+      await sleep(600); if (!alive()) return;
+      await type("/compact", alive); if (!alive()) return;
+      submit();
+      await sleep(900); if (!alive()) return;
+      await type("接着把 offset 兼容删掉。", alive); if (!alive()) return;
+      await sleep(400); if (!alive()) return;
+      submit({ plan: [
+        { tools: ["<b>编辑</b> packages/client/src/sessions/session.ts <span class=\"del\">−21</span>", "<b>搜索</b> offset 于 apps/desktop/src/"] },
+        { reply: "<code>offset</code> 参数和兼容分支都删掉了，调用方已经全部改用 <code>cursor</code>。" },
+      ] });
+    },
+
+    async play() {
+      note.textContent = "发一条消息开始运行，运行中再输入 → Enter 进入队列";
+      history();
+      input.focus();
+    },
+  };
+
+  function reset() {
+    epoch += 1;
+    timers.forEach((t) => { clearTimeout(t); clearInterval(t); });
+    timers = new Set();
+    closeMenu(); hideTip();
+    Object.assign(S, { running: false, compacting: false, run: null, queue: [], pending: [], paused: false, phase: "", menuFor: null });
+    column.innerHTML = ""; input.textContent = "";
+    renderAll();
+  }
+  let current = "queue";
+  function play(name) {
+    current = name;
+    document.querySelectorAll("[data-scene]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.scene === name)));
+    reset();
+    const e = epoch;
+    SCENES[name](() => e === epoch);
+  }
+  document.querySelectorAll("[data-scene]").forEach((b) => b.addEventListener("click", () => play(b.dataset.scene)));
+  $("replay").addEventListener("click", () => play(current));
+
+  // 主题三态：跟随系统 → 浅色 → 深色
+  const themes = [["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]];
+  let ti = 0;
+  $("theme").addEventListener("click", () => {
+    ti = (ti + 1) % themes.length;
+    const [key, label] = themes[ti];
+    if (key === "system") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", key);
+    $("theme").textContent = `主题：${label}`;
+  });
+
+  // ---------- 静态状态一览 ----------
+  const states = $("states");
+  const base = { queue: [], pending: [], running: true, compacting: false, paused: false, menuFor: null };
+  const it = (text, extra) => makeItem(text, extra);
+  const addState = (name, ...nodes) => {
+    const box = html(`<div class="state"><div class="state-name">${name}</div><div class="state-box"></div></div>`);
+    nodes.filter(Boolean).forEach((n) => box.lastElementChild.appendChild(n));
+    states.appendChild(box);
+  };
+  addState("1 条排队（运行中）", trayEl({ ...base, queue: [it("顺便把 Sidebar 的加载态也补上。")] }));
+  addState("多条：带附件 / 引用，含 /compact", trayEl({ ...base, queue: [
+    it("对照评审意见逐条修改", { files: 2 }),
+    it("把 offset 兼容删掉，并更新所有调用方", { refs: 1 }),
+    it("/compact"),
+  ] }));
+  addState("已插入，等 Agent 下一步读取", trayEl({ ...base, pending: [it("别删 offset 参数，保留一个版本做兼容。")], queue: [it("最后在 README 补一段说明。")] }));
+  const menuState = it("把 offset 兼容删掉，并更新所有调用方");
+  addState("··· 菜单", trayEl({ ...base, queue: [it("对照评审意见逐条修改"), menuState], menuFor: menuState.id }), menuEl(menuState.id, { isStatic: true }));
+  addState("停止或失败后：已暂停", trayEl({ ...base, running: false, paused: true, queue: [it("接口里统一叫 keyset 分页。"), it("最后在 README 补一段说明。")] }));
+  addState("压缩中：可排队，插入不可用", trayEl({ ...base, compacting: true, queue: [it("接着把 offset 兼容删掉。")] }));
+
+  const btnFigure = (label, inner, cls = "", disabled = false) =>
+    `<figure><span class="send${cls}"${disabled ? ' aria-disabled="true"' : ""}>${inner}</span>${label}</figure>`;
+  addState("发送按钮", html(`<div class="buttons">
+    ${btnFigure("发送：有输入时。运行中点它 = 加入队列", ICON.arrow)}
+    ${btnFigure("停止：运行中且输入为空（压缩中置灰）", ICON.stop)}
+  </div>`));
+
+  play("queue");
+})();
+</script>

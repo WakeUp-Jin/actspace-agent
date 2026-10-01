@@ -136,11 +136,11 @@ describe("fixed renderer v2 projection", () => {
     expect(projected.messageBlocks).toEqual([]);
   });
 
-  it("projects only the effective Surface and places a compaction summary at the shadowed range", () => {
+  it("keeps compacted messages visible and attaches the summary to the compaction divider", () => {
     const journal = [
       event(0, "user/message", { messageId: "user-1", agentRunId: "run-1", turnId: "turn-1" }, append("user", "user-1", "old question")),
       event(1, "assistant/message", { messageId: "assistant-1", requestId: "request-1" }, append("assistant", "assistant-1", "old answer")),
-      event(2, "compaction/start", { compactionId: "compact-1", start: 0, end: 2 }),
+      eventAt(2, "compaction/start", { compactionId: "compact-1", start: 0, end: 2 }, "2026-08-23T00:00:00.000Z"),
       event(3, "compaction/summary", { compactionId: "compact-1", summaryDigest: "digest" }),
       event(4, "surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 1] }, {
         kind: "replace",
@@ -149,16 +149,16 @@ describe("fixed renderer v2 projection", () => {
         node: { kind: "user", messageId: "summary-1", content: "summary" },
         sourceEventSeqs: [0, 1],
       }),
-      event(5, "compaction/end", { compactionId: "compact-1", summaryDigest: "digest" }),
+      eventAt(5, "compaction/end", { compactionId: "compact-1", summaryDigest: "digest" }, "2026-08-23T00:00:12.000Z"),
     ];
     const snapshot = baseSnapshot({ messages: [{ kind: "user", messageId: "summary-1", content: "summary" }], throughJournalSeq: 5, activity: { ...baseSnapshot().activity, compactionCount: 1, lastCompactionSummary: "summary" } });
 
     const projected = projectChatEvents(snapshot, journal);
 
-    expect(projected.filter((item) => item.type === "user_message" || item.type === "assistant_message")).toEqual([
-      expect.objectContaining({ id: "v2-4", type: "user_message", payload: expect.objectContaining({ content: "summary" }) }),
-    ]);
-    expect(projected.some((item) => item.type === "context_compaction")).toBe(true);
+    expect(projected.map((item) => item.type)).toEqual(["user_message", "assistant_message", "context_compaction"]);
+    expect(projected[0]?.payload).toMatchObject({ content: "old question" });
+    expect(projected[2]?.payload).toMatchObject({ status: "compacted", removedCount: 2, durationMs: 12_000, summary: "summary" });
+    expect(projected[2]?.payload).not.toHaveProperty("trigger");
   });
 
   it("maps core file writes to the existing write diff preview", () => {

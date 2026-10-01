@@ -58,6 +58,7 @@ import type {
 import { DEFAULT_MODEL_ID, MODEL_LIST, MODEL_REASONING_EFFORTS } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
 import { ResponseAnnotationTray, type ResponseAnnotationEditRequest } from "./composer/ResponseAnnotationTray";
+import { MessageQueueTray, type MessageQueueControls } from "./composer/MessageQueueTray";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import {
   formatSelectedModelLabel,
@@ -485,6 +486,9 @@ export function Composer({
   sessionId,
   isStreaming = false,
   isAborting = false,
+  isCompacting = false,
+  messageQueue,
+  statusNotice = null,
   onSend,
   onAbort,
   surface = "followup",
@@ -521,6 +525,12 @@ export function Composer({
   sessionId?: string | null;
   isStreaming?: boolean;
   isAborting?: boolean;
+  /** 上下文压缩进行中：压缩不可中止，停止按钮置灰。 */
+  isCompacting?: boolean;
+  /** 提供时运行中仍可输入：发送进入队列，托盘显示在输入框上方。 */
+  messageQueue?: MessageQueueControls;
+  /** 输入框上方的一次性状态提示（由上层负责定时清除）。 */
+  statusNotice?: string | null;
   onSend?: (text: string, options: ComposerSendOptions) => void | Promise<void>;
   onAbort?: () => void;
   surface?: ComposerSurface;
@@ -655,9 +665,14 @@ export function Composer({
         model.id.toLocaleLowerCase().includes(normalizedModelSearchQuery))
     : modelList;
   const filteredModelGroups = groupModelsByProvider(filteredModelList);
-  const slashQuery = isStreaming ? null : parseComposerSlashQuery(message);
+  // 有队列时运行中也能输入；没有队列的调用方保持运行中锁定输入框。
+  const inputLocked = isStreaming && !messageQueue;
+  const slashQuery = inputLocked ? null : parseComposerSlashQuery(message);
   const slashOpen = slashQuery !== null && !slashDismissed;
-  const filteredSlashFunctions = slashQuery === null ? [] : filterComposerSlashFunctions(slashQuery).filter((item) => !isChatForm || ["compact", "status"].includes(item.id));
+  const filteredSlashFunctions = slashQuery === null ? [] : filterComposerSlashFunctions(slashQuery)
+    .filter((item) => !isChatForm || ["compact", "status"].includes(item.id))
+    // 运行中不切换模式；/compact 会进入队列。
+    .filter((item) => !isStreaming || (item.id !== "plan" && item.id !== "agent"));
   const filteredSlashSkills = slashQuery === null || isChatForm ? [] : filterComposerSlashSkills(skillItems, slashQuery);
   const slashResults: ComposerSlashResult[] = [
     ...filteredSlashFunctions.map((item): ComposerSlashResult => ({ kind: "function", item })),
@@ -698,7 +713,9 @@ export function Composer({
   const showInlineContextUsage = isChatForm && surface === "followup";
   const resolvedLayout: "inline" | "stacked" =
     surface === "initial" || hasAttachments || responseAnnotations.length > 0 || isInputMultiline ? "stacked" : "inline";
-  const placeholder = isChatForm
+  const placeholder = isStreaming && messageQueue
+    ? "输入下一条，Enter 加入队列"
+    : isChatForm
     ? surface === "initial" ? "有什么想聊的？" : "继续对话…"
     : mode === "plan"
       ? surface === "initial" ? "先规划和设计，再编写代码…" : "继续完善方案…"
@@ -1110,7 +1127,7 @@ export function Composer({
         finishSlashSelection();
         return;
       case "compact":
-        if (!onSend || isStreaming || !selectedModelAvailable) return;
+        if (!onSend || inputLocked || !selectedModelAvailable) return;
         onSend("/compact", createSendOptions(false));
         finishSlashSelection();
         return;
@@ -1135,7 +1152,7 @@ export function Composer({
   }
 
   function sendCurrentMessage() {
-    if (!canSendMessage || !onSend || isStreaming) return;
+    if (!canSendMessage || !onSend || inputLocked) return;
     const sentAttachments = [...attachments];
     const sendResult = onSend(message.trim(), createSendOptions(true));
     void Promise.resolve(sendResult).finally(() => {
@@ -1194,7 +1211,7 @@ export function Composer({
     event.preventDefault();
     event.stopPropagation();
     setIsDragActive(false);
-    if (isStreaming) return;
+    if (inputLocked) return;
 
     const files = Array.from(event.dataTransfer.files);
     if (isChatForm) {
@@ -1299,7 +1316,7 @@ export function Composer({
         rows={1}
         ref={inputRef}
         value={message}
-        disabled={isStreaming}
+        disabled={inputLocked}
         onChange={(event) => {
           cancelSlashFocusFrame();
           setMessage(event.target.value);
@@ -1957,43 +1974,55 @@ export function Composer({
   }
 
   function renderSendButton() {
-    const sendDisabled = isAborting || (!isStreaming && !canSendMessage);
+    // 只有两种样子：输入框有内容是 ↑ 发送（运行中即加入队列），运行中且输入框为空是 ■ 停止。
+    const showStop = isStreaming && !(messageQueue && canSendMessage);
+    const queueing = isStreaming && !showStop;
+    const stopBlockedByCompaction = showStop && isCompacting;
+    const sendDisabled = showStop ? isAborting || stopBlockedByCompaction : !canSendMessage;
     const modelUnavailable = !selectedModelAvailable;
-    const tooltipLabel = isStreaming
-      ? "停止 Agent"
-      : modelUnavailable
-          ? "请先在设置中连接模型服务"
-          : canSendMessage
-            ? "发送消息"
-            : "输入消息后发送";
-    const ariaLabel = isStreaming
-      ? "停止 Agent"
-      : modelUnavailable
-          ? "暂无可用模型，请在设置中连接服务商"
-          : canSendMessage
-            ? "发送消息"
-            : "输入消息后发送";
+    const tooltipLabel = stopBlockedByCompaction
+      ? "压缩完成后可继续"
+      : showStop
+        ? "停止 Agent"
+        : queueing
+          ? "加入队列，当前运行结束后发送"
+          : modelUnavailable
+            ? "请先在设置中连接模型服务"
+            : canSendMessage
+              ? "发送消息"
+              : "输入消息后发送";
+    const ariaLabel = stopBlockedByCompaction
+      ? "正在压缩上下文，压缩完成后可继续"
+      : showStop
+        ? "停止 Agent"
+        : queueing
+          ? "加入队列"
+          : modelUnavailable
+            ? "暂无可用模型，请在设置中连接服务商"
+            : canSendMessage
+              ? "发送消息"
+              : "输入消息后发送";
 
     return (
       <div className="[grid-area:send] grid">
       <IconButton
-        className={`send-button${isStreaming ? " is-stop" : ""}${isAborting ? " is-aborting" : ""}`}
+        className={`send-button${showStop ? " is-stop" : ""}${showStop && isAborting ? " is-aborting" : ""}`}
         label={ariaLabel}
         tooltip={tooltipLabel}
-        variant={isStreaming ? "primary" : "accent"}
+        variant={showStop ? "primary" : "accent"}
         size="md"
         shape="round"
         aria-disabled={sendDisabled}
         onClick={() => {
           if (sendDisabled) return;
-          if (isStreaming) {
+          if (showStop) {
             onAbort?.();
             return;
           }
           sendCurrentMessage();
         }}
       >
-        {isStreaming ? (
+        {showStop ? (
           <Square size={12} strokeWidth={2.6} fill="currentColor" aria-hidden="true" />
         ) : (
           <ArrowUp size={16} strokeWidth={2.4} aria-hidden="true" />
@@ -2030,7 +2059,7 @@ export function Composer({
         onDragOver={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (!isStreaming && event.dataTransfer.types.includes("Files")) {
+          if (!inputLocked && event.dataTransfer.types.includes("Files")) {
             setIsDragActive(true);
           }
         }}
@@ -2041,6 +2070,12 @@ export function Composer({
         }}
         onDrop={handleDropFiles}
       >
+        {messageQueue ? (
+          <MessageQueueTray
+            controls={messageQueue}
+            inputEmpty={!message.trim() && attachments.length === 0 && responseAnnotations.length === 0}
+          />
+        ) : null}
         {onResponseAnnotationsChange ? (
           <ResponseAnnotationTray
             annotations={responseAnnotations}
@@ -2050,6 +2085,11 @@ export function Composer({
           />
         ) : null}
         {renderAttachmentStrip()}
+        {statusNotice ? (
+          <div className="composer-status-notice px-3 pt-2 pb-1 text-act-xs leading-4 text-text-faint" role="status">
+            {statusNotice}
+          </div>
+        ) : null}
         {attachmentError ? (
           <div className="px-3 pb-1 text-act-xs leading-4 text-danger" role="alert">
             {attachmentError}

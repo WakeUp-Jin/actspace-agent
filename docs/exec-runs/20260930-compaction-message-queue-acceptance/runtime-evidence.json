@@ -1,0 +1,741 @@
+{
+  "evidenceType": "RT",
+  "note": "仅提取本轮专用会话的事件标识、时间、模型路由、唯一标记和用量；不包含凭据、请求上下文或完整 Journal。时间为 UTC。 visibleMarkers 是正文中出现的标记，不是发送次数；后续引用确认可再次提及旧 ACK（如 CU_STOP_UNREAD_02_ACK），须结合 turnId、stepId、Inbox claim 和 CU 判断重复发送。",
+  "sessions": {
+    "9409db58-3ed4-4f17-8daa-5671afa76aff": [
+      {
+        "seq": 2678,
+        "time": "2026-09-30T06:21:06.925Z",
+        "type": "turn/end",
+        "turnId": "dd96f1c4-fd0b-4b36-91fb-1bdc93f373ef",
+        "reason": "completed"
+      },
+      {
+        "seq": 11870,
+        "time": "2026-09-30T06:40:28.797Z",
+        "type": "agent/inbox/spliced",
+        "operation": "enqueue",
+        "messageId": "queued-3f4c34fb-adac-49bd-88d2-3ac5b6997117",
+        "target": "next-step",
+        "source": "steer",
+        "activeTurnId": "b5993548-ece3-4d86-98a8-c48f6a3286f2"
+      },
+      {
+        "seq": 12695,
+        "time": "2026-09-30T06:42:38.590Z",
+        "type": "agent/inbox/spliced",
+        "operation": "claim",
+        "messageId": "queued-3f4c34fb-adac-49bd-88d2-3ac5b6997117",
+        "target": "next-step",
+        "source": "steer",
+        "activeTurnId": "b5993548-ece3-4d86-98a8-c48f6a3286f2"
+      },
+      {
+        "seq": 12707,
+        "time": "2026-09-30T06:42:41.007Z",
+        "type": "assistant/message",
+        "turnId": "b5993548-ece3-4d86-98a8-c48f6a3286f2",
+        "stepId": "8677c9fa-1983-4f46-ac5e-da7e817248b3",
+        "visibleMarkers": [
+          "CU_QUEUE_01_ACK"
+        ]
+      },
+      {
+        "seq": 12709,
+        "time": "2026-09-30T06:42:41.386Z",
+        "type": "turn/end",
+        "turnId": "b5993548-ece3-4d86-98a8-c48f6a3286f2",
+        "reason": "completed"
+      },
+      {
+        "seq": 12724,
+        "time": "2026-09-30T06:42:44.437Z",
+        "type": "assistant/message",
+        "turnId": "088a9a34-4360-4257-a7a1-57ea743263f6",
+        "stepId": "5c7ad282-fb83-42b5-a93d-af18e6f619a8",
+        "visibleMarkers": [
+          "CU_QUEUE_02_ACK"
+        ]
+      },
+      {
+        "seq": 12726,
+        "time": "2026-09-30T06:42:44.642Z",
+        "type": "turn/end",
+        "turnId": "088a9a34-4360-4257-a7a1-57ea743263f6",
+        "reason": "completed"
+      },
+      {
+        "seq": 12727,
+        "time": "2026-09-30T06:45:58.662Z",
+        "type": "compaction/start",
+        "compactionId": "4a894f62-7d44-4d6e-bec1-75af01a8c013",
+        "start": 0,
+        "end": 7
+      },
+      {
+        "seq": 12728,
+        "time": "2026-09-30T06:45:58.724Z",
+        "type": "compaction/summary",
+        "compactionId": "4a894f62-7d44-4d6e-bec1-75af01a8c013",
+        "summaryDigest": "1d81728280450152f4f3a807d48a82eebdff17fd12c142392d1ca629922b5f6d"
+      },
+      {
+        "seq": 12729,
+        "time": "2026-09-30T06:45:58.776Z",
+        "type": "surface/replaced",
+        "compactionId": "4a894f62-7d44-4d6e-bec1-75af01a8c013",
+        "summaryMetadata": [
+          {
+            "routeId": "default",
+            "model": "deepseek-flash",
+            "adapterVersion": "actspace.desktop-pi-ai.v2"
+          }
+        ]
+      },
+      {
+        "seq": 12730,
+        "time": "2026-09-30T06:45:58.827Z",
+        "type": "compaction/end",
+        "compactionId": "4a894f62-7d44-4d6e-bec1-75af01a8c013",
+        "summaryDigest": "1d81728280450152f4f3a807d48a82eebdff17fd12c142392d1ca629922b5f6d"
+      },
+      {
+        "seq": 12747,
+        "time": "2026-09-30T06:46:00.517Z",
+        "type": "assistant/message",
+        "turnId": "1e9a81f6-6aea-4f9a-9dcb-ad97a597882b",
+        "stepId": "a8cfea03-4fec-4eef-8b20-5859b5a2e9d5",
+        "visibleMarkers": [
+          "CU_AFTER_COMPACT_01_ACK"
+        ]
+      },
+      {
+        "seq": 12749,
+        "time": "2026-09-30T06:46:00.648Z",
+        "type": "turn/end",
+        "turnId": "1e9a81f6-6aea-4f9a-9dcb-ad97a597882b",
+        "reason": "completed"
+      },
+      {
+        "seq": 12766,
+        "time": "2026-09-30T06:46:02.259Z",
+        "type": "assistant/message",
+        "turnId": "6f249e09-44cc-44d0-911d-ce15d3e81f5e",
+        "stepId": "da92b760-1ccc-4d07-8945-128eb85b3257",
+        "visibleMarkers": [
+          "CU_AFTER_COMPACT_02_ACK"
+        ]
+      },
+      {
+        "seq": 12768,
+        "time": "2026-09-30T06:46:02.391Z",
+        "type": "turn/end",
+        "turnId": "6f249e09-44cc-44d0-911d-ce15d3e81f5e",
+        "reason": "completed"
+      },
+      {
+        "seq": 12777,
+        "time": "2026-09-30T07:00:09.636Z",
+        "type": "turn/end",
+        "turnId": "c23c7ccd-1a1b-4da9-9925-c78259614239",
+        "reason": "failed",
+        "failure": {
+          "kind": "unknown",
+          "message": "Connection error.",
+          "retryable": false,
+          "attempt": 1
+        }
+      },
+      {
+        "seq": 12786,
+        "time": "2026-09-30T07:01:43.316Z",
+        "type": "turn/end",
+        "turnId": "2909b1cf-f209-42e9-a334-ef6d0bf11f82",
+        "reason": "failed",
+        "failure": {
+          "kind": "unknown",
+          "message": "Connection error.",
+          "retryable": false,
+          "attempt": 1
+        }
+      },
+      {
+        "seq": 12787,
+        "time": "2026-09-30T07:08:23.720Z",
+        "type": "compaction/start",
+        "compactionId": "12f32cf5-ab2b-41f5-a97b-8008a376739d",
+        "start": 0,
+        "end": 7
+      },
+      {
+        "seq": 12788,
+        "time": "2026-09-30T07:08:23.786Z",
+        "type": "compaction/summary",
+        "compactionId": "12f32cf5-ab2b-41f5-a97b-8008a376739d",
+        "summaryDigest": "ba06f29af0d362a1527ba359292741db24c17ce40bb3c57d92af3921feb5fd00"
+      },
+      {
+        "seq": 12789,
+        "time": "2026-09-30T07:08:23.836Z",
+        "type": "surface/replaced",
+        "compactionId": "12f32cf5-ab2b-41f5-a97b-8008a376739d",
+        "summaryMetadata": [
+          {
+            "routeId": "default",
+            "model": "deepseek-flash",
+            "adapterVersion": "actspace.desktop-pi-ai.v2"
+          }
+        ]
+      },
+      {
+        "seq": 12790,
+        "time": "2026-09-30T07:08:23.886Z",
+        "type": "compaction/end",
+        "compactionId": "12f32cf5-ab2b-41f5-a97b-8008a376739d",
+        "summaryDigest": "ba06f29af0d362a1527ba359292741db24c17ce40bb3c57d92af3921feb5fd00"
+      },
+      {
+        "seq": 12943,
+        "time": "2026-09-30T07:08:33.661Z",
+        "type": "turn/end",
+        "turnId": "81cead53-41b6-4461-a3f5-564e04705284",
+        "reason": "completed"
+      },
+      {
+        "seq": 12963,
+        "time": "2026-09-30T07:08:35.821Z",
+        "type": "turn/end",
+        "turnId": "220aaff3-6f9e-4461-9e4c-5db4da06d418",
+        "reason": "completed"
+      },
+      {
+        "seq": 13095,
+        "time": "2026-09-30T07:15:19.842Z",
+        "type": "agent/inbox/spliced",
+        "operation": "enqueue",
+        "messageId": "queued-b5e11e83-2fa0-434f-8d46-39f1ec476181",
+        "target": "next-step",
+        "source": "steer",
+        "activeTurnId": "6a46f7e0-7b9c-45bd-acc6-5b920684a403"
+      },
+      {
+        "seq": 13098,
+        "time": "2026-09-30T07:15:45.108Z",
+        "type": "agent/inbox/spliced",
+        "operation": "claim",
+        "messageId": "queued-b5e11e83-2fa0-434f-8d46-39f1ec476181",
+        "target": "next-step",
+        "source": "steer",
+        "activeTurnId": "6a46f7e0-7b9c-45bd-acc6-5b920684a403"
+      },
+      {
+        "seq": 13110,
+        "time": "2026-09-30T07:15:47.193Z",
+        "type": "assistant/message",
+        "turnId": "6a46f7e0-7b9c-45bd-acc6-5b920684a403",
+        "stepId": "7de117de-b8e6-4ca9-bb77-5a17676d3337",
+        "visibleMarkers": [
+          "CU_TOOL_STEER_ACK"
+        ]
+      },
+      {
+        "seq": 13112,
+        "time": "2026-09-30T07:15:47.323Z",
+        "type": "turn/end",
+        "turnId": "6a46f7e0-7b9c-45bd-acc6-5b920684a403",
+        "reason": "completed"
+      },
+      {
+        "seq": 13113,
+        "time": "2026-09-30T07:15:52.602Z",
+        "type": "compaction/start",
+        "compactionId": "ad1151be-66c5-45b2-a925-3e6d6f07ad9a",
+        "start": 0,
+        "end": 10
+      },
+      {
+        "seq": 13114,
+        "time": "2026-09-30T07:15:52.681Z",
+        "type": "compaction/summary",
+        "compactionId": "ad1151be-66c5-45b2-a925-3e6d6f07ad9a",
+        "summaryDigest": "103f4a2de9e68bb9800b3ea43493df8a8c4b6542d15dd1a6657dc838b5ea426e"
+      },
+      {
+        "seq": 13115,
+        "time": "2026-09-30T07:15:52.736Z",
+        "type": "surface/replaced",
+        "compactionId": "ad1151be-66c5-45b2-a925-3e6d6f07ad9a",
+        "summaryMetadata": [
+          {
+            "routeId": "default",
+            "model": "deepseek-flash",
+            "adapterVersion": "actspace.desktop-pi-ai.v2"
+          }
+        ]
+      },
+      {
+        "seq": 13116,
+        "time": "2026-09-30T07:15:52.791Z",
+        "type": "compaction/end",
+        "compactionId": "ad1151be-66c5-45b2-a925-3e6d6f07ad9a",
+        "summaryDigest": "103f4a2de9e68bb9800b3ea43493df8a8c4b6542d15dd1a6657dc838b5ea426e"
+      },
+      {
+        "seq": 13137,
+        "time": "2026-09-30T07:15:55.057Z",
+        "type": "turn/end",
+        "turnId": "9e0534a4-c11c-40ff-a0a1-1e82b3775ec4",
+        "reason": "completed"
+      },
+      {
+        "seq": 13144,
+        "time": "2026-09-30T07:18:14.458Z",
+        "type": "agent/inbox/spliced",
+        "operation": "enqueue",
+        "messageId": "queued-504e510a-842e-4ddd-9204-977331bcd4cf",
+        "target": "next-step",
+        "source": "steer",
+        "activeTurnId": "ba6c3cd5-2f5b-4a41-bb39-42c751e63e66"
+      },
+      {
+        "seq": 16074,
+        "time": "2026-09-30T07:24:29.100Z",
+        "type": "agent/inbox/spliced",
+        "operation": "discard",
+        "messageId": "queued-504e510a-842e-4ddd-9204-977331bcd4cf",
+        "target": "next-step",
+        "reason": "steer-cancelled",
+        "activeTurnId": "ba6c3cd5-2f5b-4a41-bb39-42c751e63e66"
+      },
+      {
+        "seq": 16381,
+        "time": "2026-09-30T07:25:25.531Z",
+        "type": "turn/end",
+        "turnId": "ba6c3cd5-2f5b-4a41-bb39-42c751e63e66",
+        "reason": "completed"
+      },
+      {
+        "seq": 16395,
+        "time": "2026-09-30T07:25:29.924Z",
+        "type": "assistant/message",
+        "turnId": "2f63ead2-78f7-4600-abdc-027948228b71",
+        "stepId": "005922d1-e58a-4521-b0f6-a48c64649666",
+        "visibleMarkers": [
+          "CU_UNREAD_01_ACK"
+        ]
+      },
+      {
+        "seq": 16397,
+        "time": "2026-09-30T07:25:30.463Z",
+        "type": "turn/end",
+        "turnId": "2f63ead2-78f7-4600-abdc-027948228b71",
+        "reason": "completed"
+      },
+      {
+        "seq": 16422,
+        "time": "2026-09-30T07:27:04.150Z",
+        "type": "agent/inbox/spliced",
+        "operation": "enqueue",
+        "messageId": "queued-1180c8d3-1d35-40aa-9c47-85437fe87684",
+        "target": "next-step",
+        "source": "steer",
+        "activeTurnId": "ae58c88d-df0e-46c5-8406-aea093169144"
+      },
+      {
+        "seq": 16435,
+        "time": "2026-09-30T07:27:05.614Z",
+        "type": "agent/inbox/spliced",
+        "operation": "enqueue",
+        "messageId": "queued-621f7f6c-ad33-4839-93cf-08c6b4143d67",
+        "target": "next-step",
+        "source": "steer",
+        "activeTurnId": "ae58c88d-df0e-46c5-8406-aea093169144"
+      },
+      {
+        "seq": 16453,
+        "time": "2026-09-30T07:27:07.506Z",
+        "type": "agent/inbox/spliced",
+        "operation": "discard",
+        "messageId": "queued-1180c8d3-1d35-40aa-9c47-85437fe87684",
+        "target": "next-step",
+        "reason": "turn-aborted",
+        "activeTurnId": "ae58c88d-df0e-46c5-8406-aea093169144"
+      },
+      {
+        "seq": 16454,
+        "time": "2026-09-30T07:27:07.614Z",
+        "type": "agent/inbox/spliced",
+        "operation": "discard",
+        "messageId": "queued-621f7f6c-ad33-4839-93cf-08c6b4143d67",
+        "target": "next-step",
+        "reason": "turn-aborted",
+        "activeTurnId": "ae58c88d-df0e-46c5-8406-aea093169144"
+      },
+      {
+        "seq": 16455,
+        "time": "2026-09-30T07:27:07.719Z",
+        "type": "turn/end",
+        "turnId": "ae58c88d-df0e-46c5-8406-aea093169144",
+        "reason": "aborted"
+      },
+      {
+        "seq": 16661,
+        "time": "2026-09-30T07:33:05.011Z",
+        "type": "assistant/message",
+        "turnId": "eea39bb2-dec2-428c-91c3-da696e0ea4ff",
+        "stepId": "fcc98dc0-abc2-4ee9-b402-02dcb6884c5a",
+        "visibleMarkers": [
+          "CU_STOP_UNREAD_01_ACK"
+        ]
+      },
+      {
+        "seq": 16663,
+        "time": "2026-09-30T07:33:05.262Z",
+        "type": "turn/end",
+        "turnId": "eea39bb2-dec2-428c-91c3-da696e0ea4ff",
+        "reason": "completed"
+      },
+      {
+        "seq": 16679,
+        "time": "2026-09-30T07:33:07.301Z",
+        "type": "assistant/message",
+        "turnId": "53f82232-4120-4e9b-90e6-08a802e83729",
+        "stepId": "9ee6d03a-ebf0-4540-9c57-945a65745abc",
+        "visibleMarkers": [
+          "CU_STOP_UNREAD_02_ACK"
+        ]
+      },
+      {
+        "seq": 16681,
+        "time": "2026-09-30T07:33:07.459Z",
+        "type": "turn/end",
+        "turnId": "53f82232-4120-4e9b-90e6-08a802e83729",
+        "reason": "completed"
+      },
+      {
+        "seq": 18330,
+        "time": "2026-09-30T08:06:28.148Z",
+        "type": "turn/end",
+        "turnId": "0b52c2c9-68fb-493f-8c86-72b5baa5dc3d",
+        "reason": "aborted"
+      },
+      {
+        "seq": 18589,
+        "time": "2026-09-30T08:10:40.031Z",
+        "type": "turn/end",
+        "turnId": "b2a66017-7799-4c32-97da-a2f6f13247e9",
+        "reason": "completed"
+      },
+      {
+        "seq": 26305,
+        "time": "2026-09-30T08:38:31.125Z",
+        "type": "turn/end",
+        "turnId": "18d7c665-0bb4-4cbb-b66a-a545274746c0",
+        "reason": "failed",
+        "failure": {
+          "kind": "unknown",
+          "message": "terminated",
+          "retryable": false,
+          "attempt": 1
+        }
+      },
+      {
+        "seq": 26648,
+        "time": "2026-09-30T10:52:29.578Z",
+        "type": "turn/end",
+        "turnId": "e17cf88e-157b-4d33-b473-5321181f847a",
+        "reason": "aborted"
+      },
+      {
+        "seq": 26663,
+        "time": "2026-09-30T10:55:33.185Z",
+        "type": "assistant/message",
+        "turnId": "eca97cf2-a401-43b5-8058-eeab7e656b9d",
+        "stepId": "7c5eb79f-f2bf-49af-9bd9-154e8418d8b1",
+        "visibleMarkers": [
+          "CU_NARROW_02_ACK"
+        ]
+      },
+      {
+        "seq": 26665,
+        "time": "2026-09-30T10:55:33.470Z",
+        "type": "turn/end",
+        "turnId": "eca97cf2-a401-43b5-8058-eeab7e656b9d",
+        "reason": "completed"
+      },
+      {
+        "seq": 26680,
+        "time": "2026-09-30T10:55:36.440Z",
+        "type": "assistant/message",
+        "turnId": "1fa70c08-fc31-4375-ab9f-812f6f80d981",
+        "stepId": "fb157c8f-204f-4ee7-a5ce-969729c3155d",
+        "visibleMarkers": [
+          "CU_NARROW_03_ACK"
+        ]
+      },
+      {
+        "seq": 26682,
+        "time": "2026-09-30T10:55:36.758Z",
+        "type": "turn/end",
+        "turnId": "1fa70c08-fc31-4375-ab9f-812f6f80d981",
+        "reason": "completed"
+      },
+      {
+        "seq": 26697,
+        "time": "2026-09-30T10:55:39.799Z",
+        "type": "assistant/message",
+        "turnId": "763c5630-cf91-4b85-9904-0026146f5fa3",
+        "stepId": "729fa33b-2bba-4abe-8e0c-4f00c3f744a7",
+        "visibleMarkers": [
+          "CU_NARROW_04_ACK"
+        ]
+      },
+      {
+        "seq": 26699,
+        "time": "2026-09-30T10:55:40.093Z",
+        "type": "turn/end",
+        "turnId": "763c5630-cf91-4b85-9904-0026146f5fa3",
+        "reason": "completed"
+      },
+      {
+        "seq": 26888,
+        "time": "2026-09-30T10:56:10.036Z",
+        "type": "assistant/message",
+        "turnId": "fd47f8c8-9455-4c69-95ce-f8a67a50f5cd",
+        "stepId": "50647b09-10d1-47b9-9330-ba1ebf3309cb",
+        "visibleMarkers": [
+          "CU_STOP_UNREAD_02_ACK",
+          "CU_QUOTE_QUEUE_ACK"
+        ]
+      },
+      {
+        "seq": 26890,
+        "time": "2026-09-30T10:56:10.718Z",
+        "type": "turn/end",
+        "turnId": "fd47f8c8-9455-4c69-95ce-f8a67a50f5cd",
+        "reason": "completed"
+      },
+      {
+        "seq": 26899,
+        "time": "2026-09-30T10:58:53.446Z",
+        "type": "turn/end",
+        "turnId": "3ac88eb9-daaf-45b9-b3f7-e311b10a0850",
+        "reason": "aborted"
+      }
+    ],
+    "f8c99d15-3fcd-4bec-8b9f-52c6a6ecaed4": [
+      {
+        "seq": 48,
+        "time": "2026-09-30T07:35:29.707Z",
+        "type": "turn/end",
+        "turnId": "c0a037db-c917-4a2c-925b-d00e753bb29d",
+        "reason": "completed"
+      },
+      {
+        "seq": 66,
+        "time": "2026-09-30T07:36:46.273Z",
+        "type": "turn/end",
+        "turnId": "2e232670-f90e-44ec-8c10-2ec0e1c8e65c",
+        "reason": "completed"
+      },
+      {
+        "seq": 181,
+        "time": "2026-09-30T07:38:38.679Z",
+        "type": "assistant/message",
+        "turnId": "75788001-4068-4bf5-a97d-7d3142e0de54",
+        "stepId": "ee3bd3bb-dbaa-4a50-a666-3299ffc0fe11",
+        "visibleMarkers": [
+          "CU_AUTO_LARGE_ACK"
+        ]
+      },
+      {
+        "seq": 182,
+        "time": "2026-09-30T07:38:38.683Z",
+        "type": "step/end",
+        "usage": {
+          "inputTokens": 73663,
+          "outputTokens": 109,
+          "cacheReadTokens": 768,
+          "cacheWriteTokens": 0
+        }
+      },
+      {
+        "seq": 183,
+        "time": "2026-09-30T07:38:38.859Z",
+        "type": "turn/end",
+        "turnId": "75788001-4068-4bf5-a97d-7d3142e0de54",
+        "reason": "completed"
+      },
+      {
+        "seq": 184,
+        "time": "2026-09-30T07:38:47.746Z",
+        "type": "compaction/start",
+        "compactionId": "5bd8e614-a290-4c12-b6d1-0ec022177130",
+        "start": 0,
+        "end": 5
+      },
+      {
+        "seq": 185,
+        "time": "2026-09-30T07:38:47.752Z",
+        "type": "compaction/summary",
+        "compactionId": "5bd8e614-a290-4c12-b6d1-0ec022177130",
+        "summaryDigest": "4a7147ac49c0592726e0d02cb697e015f69c05be8cd2a893cfecd80114e06414"
+      },
+      {
+        "seq": 186,
+        "time": "2026-09-30T07:38:47.757Z",
+        "type": "surface/replaced",
+        "compactionId": "5bd8e614-a290-4c12-b6d1-0ec022177130",
+        "summaryMetadata": [
+          {
+            "routeId": "default",
+            "model": "deepseek-flash",
+            "adapterVersion": "actspace.desktop-pi-ai.v2"
+          }
+        ]
+      },
+      {
+        "seq": 187,
+        "time": "2026-09-30T07:38:47.762Z",
+        "type": "compaction/end",
+        "compactionId": "5bd8e614-a290-4c12-b6d1-0ec022177130",
+        "summaryDigest": "4a7147ac49c0592726e0d02cb697e015f69c05be8cd2a893cfecd80114e06414"
+      },
+      {
+        "seq": 203,
+        "time": "2026-09-30T07:38:48.742Z",
+        "type": "assistant/message",
+        "turnId": "3d336799-f97c-4920-9ad2-95da42437750",
+        "stepId": "5fdc5ea3-1e17-4501-925b-a23a7eb3403d",
+        "visibleMarkers": [
+          "CU_AUTO_QUEUED_ACK"
+        ]
+      },
+      {
+        "seq": 205,
+        "time": "2026-09-30T07:38:48.759Z",
+        "type": "turn/end",
+        "turnId": "3d336799-f97c-4920-9ad2-95da42437750",
+        "reason": "completed"
+      },
+      {
+        "seq": 3158,
+        "time": "2026-09-30T07:44:11.455Z",
+        "type": "turn/end",
+        "turnId": "99a579f7-5b2b-4751-b483-7b73bf43f5ed",
+        "reason": "completed"
+      },
+      {
+        "seq": 3159,
+        "time": "2026-09-30T07:44:22.157Z",
+        "type": "compaction/start",
+        "compactionId": "09818b30-924e-4289-bf7d-150fb59eb0ec",
+        "start": 0,
+        "end": 5
+      },
+      {
+        "seq": 3160,
+        "time": "2026-09-30T07:44:22.189Z",
+        "type": "compaction/summary",
+        "compactionId": "09818b30-924e-4289-bf7d-150fb59eb0ec",
+        "summaryDigest": "7ddf8fb290c54468751bf428238fbc5a7ef45a897796a776eeb5f51ef375881c"
+      },
+      {
+        "seq": 3161,
+        "time": "2026-09-30T07:44:22.212Z",
+        "type": "surface/replaced",
+        "compactionId": "09818b30-924e-4289-bf7d-150fb59eb0ec",
+        "summaryMetadata": [
+          {
+            "routeId": "default",
+            "model": "deepseek-flash",
+            "adapterVersion": "actspace.desktop-pi-ai.v2"
+          }
+        ]
+      },
+      {
+        "seq": 3162,
+        "time": "2026-09-30T07:44:22.242Z",
+        "type": "compaction/end",
+        "compactionId": "09818b30-924e-4289-bf7d-150fb59eb0ec",
+        "summaryDigest": "7ddf8fb290c54468751bf428238fbc5a7ef45a897796a776eeb5f51ef375881c"
+      },
+      {
+        "seq": 3180,
+        "time": "2026-09-30T07:44:23.143Z",
+        "type": "turn/end",
+        "turnId": "c6b618f1-4cac-4873-9905-0eef6171a17b",
+        "reason": "completed"
+      },
+      {
+        "seq": 3197,
+        "time": "2026-09-30T07:53:35.117Z",
+        "type": "assistant/message",
+        "turnId": "947a4281-9ffd-45c4-8e31-e8093824f0e0",
+        "stepId": "371acb80-2fc4-435a-94d8-4367bf37815f",
+        "visibleMarkers": [
+          "CU_AUTO_ISOLATED_FAIL_ACK"
+        ]
+      },
+      {
+        "seq": 3199,
+        "time": "2026-09-30T07:53:35.200Z",
+        "type": "turn/end",
+        "turnId": "947a4281-9ffd-45c4-8e31-e8093824f0e0",
+        "reason": "completed"
+      },
+      {
+        "seq": 3200,
+        "time": "2026-09-30T07:53:36.818Z",
+        "type": "compaction/start",
+        "compactionId": "20a3d25a-d338-4869-97cd-39c0a4442737",
+        "start": 0,
+        "end": 5
+      },
+      {
+        "seq": 3201,
+        "time": "2026-09-30T07:53:36.852Z",
+        "type": "compaction/summary",
+        "compactionId": "20a3d25a-d338-4869-97cd-39c0a4442737",
+        "summaryDigest": "d3f3a60ccd618ae4c798bfd2d2d6f4c9b83b3797d7994fa99759a3e3cef5ea0e"
+      },
+      {
+        "seq": 3202,
+        "time": "2026-09-30T07:53:36.872Z",
+        "type": "surface/replaced",
+        "compactionId": "20a3d25a-d338-4869-97cd-39c0a4442737",
+        "summaryMetadata": [
+          {
+            "routeId": "default",
+            "model": "deepseek-flash",
+            "adapterVersion": "actspace.desktop-pi-ai.v2"
+          }
+        ]
+      },
+      {
+        "seq": 3203,
+        "time": "2026-09-30T07:53:36.891Z",
+        "type": "compaction/end",
+        "compactionId": "20a3d25a-d338-4869-97cd-39c0a4442737",
+        "summaryDigest": "d3f3a60ccd618ae4c798bfd2d2d6f4c9b83b3797d7994fa99759a3e3cef5ea0e"
+      },
+      {
+        "seq": 3243,
+        "time": "2026-09-30T07:53:38.586Z",
+        "type": "assistant/message",
+        "turnId": "7cd37dfd-6dfa-4fc0-8eba-0f31cf2741d9",
+        "stepId": "26bb8edd-de02-473d-85ca-05d654774491",
+        "visibleMarkers": [
+          "CU_AUTO_ISOLATED_QUEUE_ACK"
+        ]
+      },
+      {
+        "seq": 3245,
+        "time": "2026-09-30T07:53:38.638Z",
+        "type": "turn/end",
+        "turnId": "7cd37dfd-6dfa-4fc0-8eba-0f31cf2741d9",
+        "reason": "completed"
+      }
+    ]
+  }
+}

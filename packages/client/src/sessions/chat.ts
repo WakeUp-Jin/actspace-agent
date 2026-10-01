@@ -94,35 +94,28 @@ export function projectChatEvents(
       timestamp: event.time,
       schemaVersion: 2 as const,
     };
-    for (const replacement of activeSurface.replacementsAt.get(event.seq) ?? []) {
-      projectSurfaceNode(projected, replacement.surface!.node, {
-        ...base,
-        id: eventId(replacement),
-        timestamp: replacement.time,
-      }, index);
-    }
     if (event.type === "user/message" || (event.type === "agent/inbox/spliced" && string(data.operation) === "claim")) {
       const node = appendNode(event);
-      if (node === null || !activeSurface.messageIds.has(node.messageId)) continue;
+      if (node === null || !activeSurface.showsMessage(node.messageId, event.seq)) continue;
       projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined);
       continue;
     }
     if (event.type === "assistant/message") {
       const node = appendNode(event);
-      if (node === null || !activeSurface.messageIds.has(node.messageId)) continue;
+      if (node === null || !activeSurface.showsMessage(node.messageId, event.seq)) continue;
       projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index);
       continue;
     }
     if (event.type === "tool/call") {
       const callId = string(data.callId) ?? `call-${event.seq}`;
       const tool = index.toolByCall.get(callId);
-      if (tool?.state !== "running" && !activeSurface.toolCallIds.has(callId)) continue;
+      if (tool?.state !== "running" && !activeSurface.showsToolCall(callId)) continue;
       projected.push({ ...base, id: eventId(event), type: "tool_call", payload: { id: callId, name: string(data.name) ?? "tool", arguments: record(data.args) } });
       continue;
     }
     if (isToolTerminal(event.type)) {
       const callId = string(data.callId) ?? `call-${event.seq}`;
-      if (!activeSurface.toolCallIds.has(callId)) continue;
+      if (!activeSurface.showsToolCall(callId)) continue;
       const tool = index.toolByCall.get(callId);
       const toolName = tool?.name ?? string(index.callData.get(callId)?.name) ?? "tool";
       const ok = event.type === "tool/result" && string(data.status) === "completed";
@@ -175,13 +168,20 @@ export function projectChatEvents(
       continue;
     }
     if (event.type === "compaction/end") {
-      const started = findCompactionStart(journal, string(data.compactionId));
+      const compactionId = string(data.compactionId);
+      const started = findCompactionStart(journal, compactionId);
       const start = nonNegative(started?.data.start);
       const end = nonNegative(started?.data.end);
       const durationMs = typeof data.durationMs === "number" && Number.isFinite(data.durationMs) && data.durationMs >= 0
         ? data.durationMs
         : started === undefined ? undefined : Date.parse(event.time) - Date.parse(started.time);
-      projected.push({ ...base, id: eventId(event), type: "context_compaction", payload: { triggerTokens: snapshot.usage.totalTokens, thresholdTokens: snapshot.usage.totalTokens, beforeCount: end, afterCount: Math.max(1, start + 1), summaryChars: 0, historyRefPath: "journal.jsonl", trigger: "manual", status: "compacted", removedCount: Math.max(0, end - start - 1), ...(durationMs !== undefined && Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}) } });
+      const summary = compactionSummaryText(journal, compactionId);
+      projected.push({ ...base, id: eventId(event), type: "context_compaction", payload: {
+        triggerTokens: snapshot.usage.totalTokens, thresholdTokens: snapshot.usage.totalTokens, beforeCount: end, afterCount: Math.max(1, start + 1),
+        summaryChars: summary?.length ?? 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: Math.max(0, end - start),
+        ...(durationMs !== undefined && Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}),
+        ...(summary ? { summary } : {}),
+      } });
     }
   }
   return projected;
@@ -218,18 +218,28 @@ function projectSurfaceNode(
   projected.push({ ...base, type: "assistant_message", payload: { content: contentText(node.content, false), stopReason: "stop", model: request?.model ?? "default", provider: request?.provider ?? "default" } });
 }
 
+/**
+ * The model only sees the effective Surface, but the chat keeps showing messages a compaction replaced:
+ * they stay readable above the compaction divider, and the summary is shown inside that divider instead.
+ */
 function indexActiveSurface(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]) {
   const messageIds = new Set(snapshot.messages.map((message) => message.messageId));
   const toolCallIds = new Set(snapshot.messages.flatMap((message) => message.kind === "tool-result" && message.callId ? [message.callId] : []));
-  const replacementsAt = new Map<number, SessionEventEnvelopeV1[]>();
-  for (const event of journal) {
-    const surface = event.surface;
-    if (surface?.kind !== "replace" || !messageIds.has(surface.node.messageId)) continue;
-    const origin = surface.sourceEventSeqs[0] ?? event.seq;
-    const insertionSeq = journal.some(item => item.seq === origin) ? origin : event.seq;
-    replacementsAt.set(insertionSeq, [...(replacementsAt.get(insertionSeq) ?? []), event]);
-  }
-  return { messageIds, toolCallIds, replacementsAt };
+  const compactedSeqs = new Set(journal.flatMap((event) => event.surface?.kind === "replace" ? event.surface.sourceEventSeqs : []));
+  const compactedCallIds = new Set(journal.flatMap((event) => compactedSeqs.has(event.seq) && isToolTerminal(event.type) ? [string(record(event.data).callId) ?? ""] : []).filter(Boolean));
+  return {
+    showsMessage: (messageId: string, seq: number) => messageIds.has(messageId) || compactedSeqs.has(seq),
+    showsToolCall: (callId: string) => toolCallIds.has(callId) || compactedCallIds.has(callId),
+  };
+}
+
+function compactionSummaryText(events: readonly SessionEventEnvelopeV1[], compactionId: string | null): string | undefined {
+  if (!compactionId) return undefined;
+  const replacement = events.find((event) => event.surface?.kind === "replace" && string(record(event.data).compactionId) === compactionId);
+  if (replacement?.surface?.kind !== "replace") return undefined;
+  const content = replacement.surface.node.content;
+  const text = isRecord(content) && typeof content.text === "string" ? content.text : contentText(content, false);
+  return text.trim() || undefined;
 }
 
 export function projectContextSnapshot(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[] = []): ContextUsageSnapshot {

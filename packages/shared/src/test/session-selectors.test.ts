@@ -530,7 +530,7 @@ describe("session selectors", () => {
     ]);
   });
 
-  it("maps legacy context_compaction payloads as auto completed blocks", () => {
+  it("maps legacy context_compaction payloads as completed blocks", () => {
     const blocks = createMessageBlocks([
       contextCompactionEvent({
         triggerTokens: 1200,
@@ -543,16 +543,35 @@ describe("session selectors", () => {
     ]);
 
     expect(blocks).toEqual([
-      expect.objectContaining({
-        kind: "context_compaction",
-        status: "completed",
-        trigger: "auto",
-        summaryText: "Context compacted · 6 messages",
-      }),
+      expect.objectContaining({ kind: "context_compaction", status: "completed", removedCount: 6 }),
     ]);
   });
 
-  it("maps manual skipped payloads as Nothing to compact", () => {
+  it("carries duration and summary into completed compaction blocks", () => {
+    const [block] = createMessageBlocks([
+      contextCompactionEvent({
+        triggerTokens: 0,
+        thresholdTokens: 0,
+        beforeCount: 30,
+        afterCount: 1,
+        summaryChars: 0,
+        historyRefPath: "journal.jsonl",
+        removedCount: 29,
+        durationMs: 12_400,
+        summary: "目标：改游标分页",
+      }),
+    ]);
+
+    expect(block).toEqual(expect.objectContaining({
+      kind: "context_compaction",
+      status: "completed",
+      removedCount: 29,
+      durationMs: 12_400,
+      summary: "目标：改游标分页",
+    }));
+  });
+
+  it("drops skipped compaction payloads from the message flow", () => {
     const blocks = createMessageBlocks([
       contextCompactionEvent({
         triggerTokens: 120,
@@ -561,18 +580,12 @@ describe("session selectors", () => {
         afterCount: 1,
         summaryChars: 0,
         historyRefPath: "/sessions/s1/session.jsonl",
-        trigger: "manual",
         status: "skipped",
         removedCount: 0,
       }),
     ]);
 
-    expect(blocks[0]).toEqual(expect.objectContaining({
-      kind: "context_compaction",
-      status: "skipped",
-      trigger: "manual",
-      summaryText: "Nothing to compact",
-    }));
+    expect(blocks).toEqual([]);
   });
 
   it("restores a completed Agent tool block from tool_result uiPreview", () => {

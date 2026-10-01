@@ -20,4 +20,5 @@
 - A second watch smoke touched Shared and Runtime; both changes triggered incremental recompilation with zero errors.
 - Renderer profile transformed 2474 modules and built in 2.09s. No bundling change was justified by the profile.
 - Clean Desktop build passed in 11.76s. Process tests and graph drift checks passed.
-- Desktop typecheck is blocked by existing Usage Statistics fixture edits missing `costUsd`; this was not introduced by the build changes.
+- A later verification reran Desktop typecheck successfully after the parallel Usage Statistics edits landed.
+- A later verification reran documentation checks successfully after the active site plan status was clarified.

@@ -41,6 +41,10 @@ export type AgentLoopLiveEvent = LiveIdentity & (
   | { readonly kind: "tool-prepared"; readonly requestId: string; readonly callId: string; readonly name: string; readonly arguments: RuntimeV2JsonValue }
   | { readonly kind: "tool-started"; readonly requestId: string; readonly callId: string; readonly name: string }
   | { readonly kind: "tool-finished"; readonly requestId: string; readonly callId: string; readonly name: string; readonly result: ToolExecutionResult; readonly resultEventId: string }
+  | { readonly kind: "compaction-started" }
+  | { readonly kind: "compaction-finished"; readonly removedCount: number; readonly durationMs: number }
+  | { readonly kind: "compaction-failed"; readonly message: string }
+  | { readonly kind: "inbox-claimed"; readonly messageId: string; readonly source?: import("@actspace/core-agent").InboxSource }
 );
 type WithoutSession<T> = T extends unknown ? Omit<T, "sessionId"> : never;
 
@@ -104,9 +108,11 @@ export class AgentLoop {
       }
       const persistedContent = appendRuntimeContext(input.content, mode, modeRevision);
       if (!hasUserMessage(this.options.session, messageId)) await this.options.session.append(core("user/message", { messageId, agentRunId, turnId }, { surface: { kind: "append", node: { kind: "user", messageId, content: persistedContent } } }));
+      // 上一回合结束后才到的插入不能排到本回合用户消息之后；Host 看到 discarded 会把它放回队列。
+      for (const item of this.options.inbox.pending()) if (item.source === "steer") await this.options.inbox.discard(item.messageId, "stale-steer");
       while (stepCount < this.options.descriptor.maxSteps) {
         if (controller.signal.aborted) throw new AgentRuntimeError("TURN_ABORTED", "Turn was aborted.");
-        await this.options.inbox.claim("next-step");
+        for (const item of await this.options.inbox.claim("next-step")) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId: item.messageId, ...(item.source === undefined ? {} : { source: item.source }) });
         const stepId = randomUUID(); stepCount += 1;
         const preStep = await this.waterfall("agent/pre-step", { agentRunId, turnId, stepId, stepIndex: stepCount, mode }, controller.signal);
         this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "step-started" });
@@ -226,12 +232,14 @@ export class AgentLoop {
         if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");
-        if (output.toolCalls.length === 0 && !budgetSummary) {
+        // 模型写最后回复时用户插入了消息：回合不结束，下一步开头读到它（仍受 maxSteps 约束）。
+        const steerPending = this.options.inbox.pending().some((item) => item.target === "next-step" && item.source === "steer");
+        if (output.toolCalls.length === 0 && !budgetSummary && !steerPending) {
           await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "completed", stepCount }, controller.signal);
           await this.options.session.append(core("turn/end", { turnId, reason: "completed" }));
           await this.checkpoint("after-turn-settled");
           const usage = compactionUsage(output.usage);
-          if (usage !== null) await compaction?.maybeCompact(this.options.session, usage);
+          if (usage !== null && compaction !== undefined) await this.autoCompact(compaction, usage, { agentRunId, turnId });
           this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "completed" });
           await this.notify("agent/status", { agentRunId, turnId, status: "completed" });
           return Object.freeze({ agentRunId, turnId, reason: "completed", steps: stepCount, finalText });
@@ -315,6 +323,23 @@ export class AgentLoop {
         && (this.options.toolScopeToken === undefined || this.options.descriptor.kind === "subagent" || this.options.scope.tools.get(definition.name)?.value === definition.pluginId)
         && (this.options.allowedToolNames?.has(definition.name) ?? true))
       .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeV2JsonValue }));
+  }
+  /** The turn is already settled; a failed compaction is reported live and must not fail the turn. */
+  private async autoCompact(compaction: CompactionPlugin, usage: { inputTokens: number; outputTokens: number }, ids: { agentRunId: string; turnId: string }): Promise<void> {
+    let startedAt: number | null = null;
+    let removedCount = 0;
+    try {
+      const compacted = await compaction.maybeCompact(this.options.session, usage, {
+        onStarted: ({ entryCount }) => {
+          startedAt = Date.now();
+          removedCount = entryCount;
+          this.emitLive({ kind: "compaction-started", ...ids });
+        },
+      });
+      if (compacted && startedAt !== null) this.emitLive({ kind: "compaction-finished", ...ids, removedCount, durationMs: Date.now() - startedAt });
+    } catch (error) {
+      this.emitLive({ kind: "compaction-failed", ...ids, message: redactLlmText(error instanceof Error ? error.message : String(error)).slice(0, 500) });
+    }
   }
   private emitLive(event: WithoutSession<AgentLoopLiveEvent>): void {
     const lineage = this.options.session.header.lineage;

@@ -72,8 +72,12 @@ describe("Compaction", () => {
       await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${index}` }, surface: { kind: "append", node: { kind: "user", messageId: `m-${index}`, content: `message-${index}` } } });
     }
     const plugin = new CompactionPlugin({ ...DEFAULT_COMPACTION_POLICY, contextLimitTokens: 10, reserveTokens: 0, triggerRatio: 0.5 }, new DeterministicCompactionSummarizer());
-    expect(await plugin.maybeCompact(session, { inputTokens: 10, outputTokens: 0 })).toBe(true);
-    await expect(plugin.compact(session)).resolves.toBe(false);
+    const started: number[] = [];
+    const observer = { onStarted: ({ entryCount }: { entryCount: number }) => { started.push(entryCount); } };
+    expect(await plugin.maybeCompact(session, { inputTokens: 10, outputTokens: 0 }, observer)).toBe(true);
+    await expect(plugin.compact(session, observer)).resolves.toBe(false);
+    // Only the compaction that chose a region notifies; the skipped one stays silent.
+    expect(started).toEqual([4]);
     expect(session.journal.events).toHaveLength(9);
     expect(session.journal.events[7]?.type).toBe("surface/replaced");
     expect(session.journal.surface.entries).toHaveLength(2);

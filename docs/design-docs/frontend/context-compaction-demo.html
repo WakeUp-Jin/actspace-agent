@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>上下文压缩 Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* Layout: 左侧是按真实比例模拟的对话流（场景可播放），右侧是状态一览与规则；窄屏上下堆叠。
+   颜色沿用 ActSpace「Ink & Emerald」token（apps/desktop/src/renderer/styles/tokens.css）。 */
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-subtle: #f1f1ef;
+  --text: #20201e;
+  --muted: #676762;
+  --faint: #72726b;
+  --line: #deded9;
+  --op: #087a4b;
+  --op-soft: #e5f2ea;
+  --danger: #c74747;
+  --danger-soft: #f8e9e9;
+  --action: #20201e;
+  --on-action: #ffffff;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
+  --inset: 17px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+    --line: #353630; --op: #36c783; --op-soft: #193a2b; --danger: #e06b6b; --danger-soft: #452525; --action: #f1f1ed; --on-action: #181916;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+  --line: #353630; --op: #36c783; --op-soft: #193a2b; --danger: #e06b6b; --danger-soft: #452525; --action: #f1f1ed; --on-action: #181916;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font: 14px/1.55 var(--font); padding-inline: 16px; padding-block: 24px 48px; }
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 2px solid var(--op); outline-offset: 2px; border-radius: 4px; }
+
+.page { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.head h1 { margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600; text-wrap: balance; }
+.head p { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--surface); flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--surface-subtle); color: var(--text); font-weight: 600; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+.btn:hover { border-color: var(--faint); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* 模拟应用窗口 */
+.app { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); height: 680px; display: flex; flex-direction: column; overflow: hidden; position: relative; min-width: 0; }
+.app-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.app-bar strong { color: var(--text); font-weight: 600; }
+.scenario-note { font-size: 12px; color: var(--faint); }
+.flow { flex: 1; overflow-y: auto; padding-block: 20px 12px; scroll-behavior: smooth; }
+.column { max-width: 700px; margin: 0 auto; padding-inline: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* 消息流元素 */
+.user-card { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 12px 16px; animation: rise 240ms ease both; }
+.assistant { padding-inline: var(--inset); line-height: 1.65; animation: rise 240ms ease both; }
+.assistant code, .summary code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-subtle); padding: 1px 4px; border-radius: 4px; }
+.tools { padding-inline: var(--inset); display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--faint); }
+.tools b { font-weight: 500; color: var(--muted); }
+.tools .add { color: var(--op); } .tools .del { color: var(--danger); }
+.thinking { padding-inline: var(--inset); color: var(--faint); font-size: 14px; }
+.pending-cmd { padding-inline: var(--inset); color: var(--faint); font-weight: 500; font-family: var(--mono); font-size: 13px; }
+
+/* 压缩中 */
+.compact-running { padding: 8px var(--inset); animation: rise 220ms ease both; }
+.cr-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.cr-title { font-weight: 600; }
+.cr-meta { color: var(--faint); font-variant-numeric: tabular-nums; }
+.track { margin-top: 8px; height: 3px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.track i { display: block; height: 100%; width: 45%; border-radius: 99px; background: var(--op); animation: indet 1.2s ease-in-out infinite; }
+.cr-caption { margin-top: 6px; font-size: 12px; color: var(--faint); }
+
+/* 分隔线 */
+.divider { display: flex; align-items: center; gap: 12px; padding-block: 10px; padding-inline: var(--inset); font-size: 12px; color: var(--faint); animation: rise 220ms ease both; }
+.divider .ln { flex: 1; min-width: 24px; height: 1px; background: var(--line); }
+.divider .label { display: inline-flex; align-items: center; gap: 4px; min-width: 0; border: 0; background: none; padding: 2px 4px; color: inherit; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+button.label { cursor: pointer; border-radius: 4px; }
+button.label:hover { color: var(--text); }
+.label svg { flex: none; transition: transform 160ms ease; }
+button.label[aria-expanded="true"] svg { transform: rotate(90deg); }
+.divider.failed { color: var(--danger); }
+.divider.failed .ln { background: var(--danger-soft); }
+.retry { border: 0; background: none; padding: 0 0 0 4px; color: var(--text); font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+
+.summary { margin: -6px var(--inset) 0; background: var(--surface-subtle); border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.7; color: var(--muted); animation: rise 180ms ease both; }
+.summary-head { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--faint); margin-bottom: 6px; }
+.summary-head button { border: 0; background: none; padding: 0; color: var(--muted); font-size: 12px; cursor: pointer; }
+.summary-body { max-height: 240px; overflow-y: auto; }
+.summary-body h4 { margin: 8px 0 2px; font-size: 13px; color: var(--text); font-weight: 600; }
+.summary-body h4:first-child { margin-top: 0; }
+.summary-body ul { margin: 0; padding-left: 18px; }
+.summary-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); }
+
+/* Composer */
+.composer-wrap { padding: 0 16px 16px; position: relative; }
+.composer { max-width: 668px; margin: 0 auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 10px 10px 10px 14px; display: flex; align-items: flex-end; gap: 10px; }
+.composer .input { flex: 1; min-width: 0; min-height: 22px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.composer .input:empty::before { content: attr(data-placeholder); color: var(--faint); }
+.send { flex: none; width: 28px; height: 28px; border-radius: 99px; border: 0; background: var(--action); color: var(--on-action); display: grid; place-items: center; }
+.send svg { display: block; }
+.toast { position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(-50%); background: var(--action); color: var(--on-action); font-size: 12px; padding: 6px 12px; border-radius: 8px; white-space: nowrap; animation: rise 200ms ease both; }
+
+/* 右侧 */
+aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 16px; min-width: 0; }
+.card h2 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.states { display: flex; flex-direction: column; gap: 14px; }
+.state { display: flex; flex-direction: column; gap: 4px; }
+.state-name { font-size: 12px; color: var(--faint); letter-spacing: .02em; }
+.state-box { background: var(--bg); border-radius: 8px; padding-block: 4px; }
+.state-box .compact-running, .state-box .divider { padding-inline: 12px; animation: none; }
+.state-box .user-card { margin: 0 12px 8px; padding: 8px 12px; font-size: 13px; }
+.rules { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 13px; }
+.rules b { color: var(--text); font-weight: 600; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(230%); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .track i { width: 100%; opacity: .45; }
+}
+@media (max-width: 520px) { .app { height: 600px; } }
+</style>
+
+<div class="page">
+  <header class="head">
+    <div>
+      <h1>上下文压缩 · 对话流方案</h1>
+      <p>压缩中和压缩后都放在对话流里。点上方场景切换并自动播放，右侧是所有状态的静态对照。</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="场景">
+        <button type="button" data-scene="auto" aria-pressed="true">自动触发</button>
+        <button type="button" data-scene="manual" aria-pressed="false">手动 /compact</button>
+        <button type="button" data-scene="failed" aria-pressed="false">失败与重试</button>
+        <button type="button" data-scene="skipped" aria-pressed="false">无需压缩</button>
+      </div>
+      <button type="button" class="btn" id="replay">重播</button>
+      <button type="button" class="btn" id="theme">主题：跟随系统</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="app" aria-label="对话流模拟">
+      <div class="app-bar"><strong>会话列表改游标分页</strong><span class="scenario-note" id="note"></span></div>
+      <div class="flow" id="flow"><div class="column" id="column"></div></div>
+      <div class="composer-wrap" id="composerWrap">
+        <div class="composer">
+          <div class="input" id="input" data-placeholder="继续对话…"></div>
+          <span class="send" id="send" aria-hidden="true"></span>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="card">
+        <h2>状态一览</h2>
+        <div class="states" id="states"></div>
+      </div>
+      <div class="card">
+        <h2>规则</h2>
+        <ul class="rules">
+          <li><b>手动和自动触发完全一样</b>：同一个组件、同一套文案，都是对话流里独立的一行，不贴进上一条回复。</li>
+          <li><b>进行中只显示已用时间</b>，后端没有真实进度就用不确定进度条，不编造百分比。</li>
+          <li><b>压缩中不能发送、不能停止</b>，停止按钮置灰，提示「压缩完成后可继续」。压缩期间排队发送由独立的消息队列功能负责。</li>
+          <li><b>完成后留一条分隔线</b>，点开能看到模型拿到的摘要。上面的旧消息不置灰，照常可读。</li>
+          <li><b>失败</b>时显示红色分隔线，附原因和「重试」。<b>无需压缩</b>只弹一次提示，不在对话里留记录。</li>
+          <li>不加图标、卡片和 pill，状态靠文案、位置和进度条表达。</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const column = $("column"), flow = $("flow"), input = $("input"), send = $("send"), note = $("note"), composerWrap = $("composerWrap");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const ICON = {
+    chevron: '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>',
+    arrow: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg>',
+    stop: '<svg width="10" height="10" viewBox="0 0 10 10"><rect width="10" height="10" rx="2" fill="currentColor"/></svg>',
+  };
+
+  const SUMMARY = `
+    <h4>目标</h4>
+    <ul><li>把会话列表分页从 offset 改为游标分页，接口和前端一起改。</li></ul>
+    <h4>已完成</h4>
+    <ul>
+      <li><code>listSessions</code> 返回 <code>{ items, nextCursor }</code>，游标由 <code>updatedAt</code> + <code>id</code> 组成。</li>
+      <li>Sidebar 滚到底部时用 <code>nextCursor</code> 拉下一页，按 <code>id</code> 去重。</li>
+      <li><code>offset</code> 参数保留一个版本做兼容，已标 <code>@deprecated</code>。</li>
+    </ul>
+    <h4>关键决定</h4>
+    <ul>
+      <li>游标对前端不透明，前端只透传不解析。</li>
+      <li>同一 <code>updatedAt</code> 的会话用 <code>id</code> 作第二排序键，避免翻页漏数据。</li>
+    </ul>
+    <h4>待办</h4>
+    <ul>
+      <li>补游标边界测试：空列表、最后一页。</li>
+      <li>下个版本删除 <code>offset</code> 兼容。</li>
+    </ul>`;
+
+  const fmt = (s) => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+  const html = (s) => { const t = document.createElement("template"); t.innerHTML = s.trim(); return t.content.firstElementChild; };
+
+  // ---------- 组件 ----------
+  function userCard(text) { return html(`<div class="user-card">${text}</div>`); }
+  function assistant(text) { return html(`<div class="assistant">${text}</div>`); }
+  function tools(lines) { return html(`<div class="tools">${lines.map(l => `<div>${l}</div>`).join("")}</div>`); }
+
+  function running({ elapsed = 0, live = true } = {}) {
+    const el = html(`
+      <div class="compact-running">
+        <div class="cr-row" role="status" aria-live="polite">
+          <span class="cr-title">正在压缩上下文</span>
+          <span class="cr-meta" aria-hidden="true">·</span>
+          <span class="cr-meta" data-t>${fmt(elapsed)}</span>
+        </div>
+        <div class="track" role="progressbar" aria-label="上下文压缩进度"><i></i></div>
+        <div class="cr-caption">正在总结较早的消息。</div>
+      </div>`);
+    let s = elapsed, timer = null;
+    if (live) timer = track(setInterval(() => { s += 1; el.querySelector("[data-t]").textContent = fmt(s); }, 1000));
+    return { el, stop() { clearInterval(timer); return s; } };
+  }
+
+  function divider({ text, summary = false, failed = false, onRetry, open = false }) {
+    const el = document.createElement("div");
+    const line = `<span class="ln" aria-hidden="true"></span>`;
+    if (failed) {
+      el.innerHTML = `<div class="divider failed" role="separator" aria-label="${text}">${line}<span class="label">${text}${onRetry ? `<button type="button" class="retry">重试</button>` : ""}</span>${line}</div>`;
+      if (onRetry) el.querySelector(".retry").addEventListener("click", onRetry);
+      return el;
+    }
+    if (!summary) {
+      el.innerHTML = `<div class="divider" role="separator" aria-label="${text}">${line}<span class="label">${text}</span>${line}</div>`;
+      return el;
+    }
+    el.innerHTML = `<div class="divider">${line}<button type="button" class="label" aria-expanded="false">${text}${ICON.chevron}</button>${line}</div>`;
+    const btn = el.querySelector("button.label");
+    let panel = null;
+    const toggle = () => {
+      const next = btn.getAttribute("aria-expanded") !== "true";
+      btn.setAttribute("aria-expanded", String(next));
+      if (next) {
+        panel = html(`
+          <div class="summary">
+            <div class="summary-head"><span>压缩摘要 · 412 字</span><button type="button">复制</button></div>
+            <div class="summary-body">${SUMMARY}</div>
+            <div class="summary-foot">分隔线以上的消息仍然显示，但模型之后只通过这段摘要了解它们。</div>
+          </div>`);
+        const copyBtn = panel.querySelector(".summary-head button");
+        copyBtn.addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(panel.querySelector(".summary-body").innerText); copyBtn.textContent = "已复制"; }
+          catch { copyBtn.textContent = "复制失败"; }
+          setTimeout(() => { copyBtn.textContent = "复制"; }, 1600);
+        });
+        el.appendChild(panel);
+      } else if (panel) { panel.remove(); panel = null; }
+    };
+    btn.addEventListener("click", toggle);
+    if (open) toggle();
+    return el;
+  }
+
+  // ---------- 播放控制 ----------
+  let runId = 0, timers = new Set();
+  function track(t) { timers.add(t); return t; }
+  const sleep = (ms) => new Promise(r => track(setTimeout(r, reduce ? Math.min(ms, 400) : ms)));
+  function reset() {
+    runId += 1;
+    timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+    timers = new Set();
+    column.innerHTML = ""; input.textContent = ""; setBusy(false);
+    composerWrap.querySelectorAll(".toast").forEach(t => t.remove());
+  }
+  function add(node) { column.appendChild(node); flow.scrollTop = flow.scrollHeight; return node; }
+  function setBusy(b) { send.innerHTML = b ? ICON.stop : ICON.arrow; send.title = b ? "停止" : "发送"; }
+  async function type(text, alive) {
+    input.textContent = "";
+    for (const ch of text) { if (!alive()) return; input.textContent += ch; await sleep(45); }
+    await sleep(350);
+  }
+  async function stream(node, text, alive) {
+    node.textContent = "";
+    const parts = text.match(/.{1,4}/gs) || [];
+    for (const p of parts) { if (!alive()) return; node.textContent += p; flow.scrollTop = flow.scrollHeight; await sleep(28); }
+  }
+  function toast(text, ms = 2600) {
+    const t = html(`<div class="toast" role="status">${text}</div>`);
+    composerWrap.appendChild(t);
+    track(setTimeout(() => t.remove(), ms));
+  }
+
+  function history(short = false) {
+    add(userCard("把会话列表的分页从 offset 改成游标分页，接口和前端都要改。"));
+    if (short) {
+      add(assistant("可以。先确认一下：游标用 <code>updatedAt</code> + <code>id</code> 组合可以吗？这样同一时间更新的会话也不会在翻页时漏掉。"));
+      return;
+    }
+    add(tools([
+      "<b>读取</b> packages/client/src/sessions/session.ts",
+      "<b>搜索</b> listSessions 于 packages/",
+      "<b>编辑</b> packages/client/src/sessions/session.ts <span class=\"add\">+42</span> <span class=\"del\">−17</span>",
+      "<b>编辑</b> apps/desktop/src/renderer/components/Sidebar.tsx <span class=\"add\">+23</span> <span class=\"del\">−9</span>",
+    ]));
+    add(assistant("已经把 <code>listSessions</code> 改成游标分页：返回值新增 <code>nextCursor</code>，Sidebar 滚到底部时用它拉下一页。旧的 <code>offset</code> 参数保留一个版本做兼容。"));
+    add(userCard("好，再把游标边界的测试补上。"));
+    add(tools([
+      "<b>编辑</b> packages/client/src/test/session-store.test.ts <span class=\"add\">+64</span>",
+      "<b>运行</b> pnpm --filter @actspace/client test",
+    ]));
+  }
+
+  const SCENES = {
+    async auto(alive) {
+      note.textContent = "回复结束后达到阈值，自动压缩";
+      history();
+      const reply = add(assistant(""));
+      await stream(reply, "测试已补上：空列表返回 nextCursor 为 null，最后一页不再多请求一次，12 个用例全部通过。", alive);
+      if (!alive()) return;
+      await sleep(500); if (!alive()) return;
+      setBusy(true);
+      const run = running();
+      add(run.el);
+      await sleep(5800); if (!alive()) return;
+      const secs = run.stop();
+      run.el.replaceWith(divider({ text: `上下文已压缩 · 31 条消息 · ${fmt(secs)}`, summary: true }));
+      setBusy(false);
+    },
+    async manual(alive) {
+      note.textContent = "用户在 Composer 输入 /compact";
+      history();
+      add(assistant("测试已补上：空列表返回 nextCursor 为 null，最后一页不再多请求一次，12 个用例全部通过。"));
+      await sleep(700); if (!alive()) return;
+      await type("/compact", alive); if (!alive()) return;
+      input.textContent = ""; setBusy(true);
+      const run = running();
+      add(run.el);
+      await sleep(5000); if (!alive()) return;
+      const secs = run.stop();
+      run.el.replaceWith(divider({ text: `上下文已压缩 · 29 条消息 · ${fmt(secs)}`, summary: true }));
+      setBusy(false);
+    },
+    async failed(alive) {
+      note.textContent = "压缩请求失败，点「重试」再次压缩";
+      history();
+      add(assistant("测试已补上：空列表返回 nextCursor 为 null，最后一页不再多请求一次，12 个用例全部通过。"));
+      await sleep(700); if (!alive()) return;
+      await type("/compact", alive); if (!alive()) return;
+      input.textContent = ""; setBusy(true);
+      const attempt = async (slot) => {
+        const run = running();
+        slot ? slot.replaceWith(run.el) : add(run.el);
+        return run;
+      };
+      let run = await attempt(null);
+      await sleep(3200); if (!alive()) return;
+      run.stop(); setBusy(false);
+      const fail = divider({
+        text: "上下文压缩失败 · 模型请求超时（60s）", failed: true,
+        onRetry: async () => {
+          if (!alive()) return;
+          setBusy(true);
+          run = await attempt(fail);
+          await sleep(3500); if (!alive()) return;
+          const secs = run.stop();
+          run.el.replaceWith(divider({ text: `上下文已压缩 · 29 条消息 · ${fmt(secs)}`, summary: true }));
+          setBusy(false);
+        },
+      });
+      run.el.replaceWith(fail);
+    },
+    async skipped(alive) {
+      note.textContent = "对话太短，不产生分隔线，只提示一次";
+      history(true);
+      await sleep(700); if (!alive()) return;
+      await type("/compact", alive); if (!alive()) return;
+      input.textContent = "";
+      toast("对话还很短，暂时不需要压缩");
+    },
+  };
+
+  let current = "auto";
+  function play(name) {
+    current = name;
+    document.querySelectorAll("[data-scene]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.scene === name)));
+    reset();
+    const id = runId;
+    SCENES[name](() => id === runId);
+  }
+  document.querySelectorAll("[data-scene]").forEach(b => b.addEventListener("click", () => play(b.dataset.scene)));
+  $("replay").addEventListener("click", () => play(current));
+
+  // 主题三态：跟随系统 → 浅色 → 深色
+  const themes = [["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]];
+  let ti = 0;
+  $("theme").addEventListener("click", () => {
+    ti = (ti + 1) % themes.length;
+    const [key, label] = themes[ti];
+    if (key === "system") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", key);
+    $("theme").textContent = `主题：${label}`;
+  });
+
+  // ---------- 静态状态一览 ----------
+  const states = $("states");
+  const addState = (name, ...nodes) => {
+    const box = html(`<div class="state"><div class="state-name">${name}</div><div class="state-box"></div></div>`);
+    nodes.forEach(n => box.lastElementChild.appendChild(n));
+    states.appendChild(box);
+  };
+  addState("进行中", running({ elapsed: 8, live: false }).el);
+  addState("已完成（可展开摘要）", divider({ text: "上下文已压缩 · 29 条消息 · 12s", summary: true }));
+  addState("刚完成、摘要尚未载入", divider({ text: "上下文已压缩 · 29 条消息 · 12s" }));
+  addState("失败", divider({ text: "上下文压缩失败 · 模型请求超时（60s）", failed: true, onRetry: () => {} }));
+  addState("无需压缩（不进对话流，Composer 上方提示）", html(`<div style="padding:8px 12px;font-size:12px;"><span style="background:var(--action);color:var(--on-action);padding:5px 10px;border-radius:8px;display:inline-block">对话还很短，暂时不需要压缩</span></div>`));
+
+  play("auto");
+})();
+</script>

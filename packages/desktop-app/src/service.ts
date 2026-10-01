@@ -44,7 +44,11 @@ type SessionService = {
 type RunAssembly = {
   readonly session: SessionHandle;
   readonly loop: { readonly active?: boolean; readonly abort: (reason?: string) => boolean };
-  readonly inbox: { readonly enqueue: (content: RuntimeV2JsonValue, target: "next-step" | "next-turn", messageId?: string) => Promise<{ readonly messageId: string; readonly target: "next-step" | "next-turn"; readonly enqueuedSeq: number }>; readonly discard: (messageId: string) => Promise<boolean> };
+  readonly inbox: {
+    readonly enqueue: (content: RuntimeV2JsonValue, target: "next-step" | "next-turn", messageId?: string, source?: "task_notification" | "steer") => Promise<{ readonly messageId: string; readonly target: "next-step" | "next-turn"; readonly enqueuedSeq: number }>;
+    readonly discard: (messageId: string, reason?: string) => Promise<boolean>;
+    readonly status: (messageId: string) => "pending" | "claimed" | "discarded" | null;
+  };
 };
 
 type RunService = {
@@ -75,7 +79,10 @@ export type DesktopAppServiceContract = {
   readonly runTurn: (input: RuntimeV2RunTurnRequest) => Promise<RuntimeV2RunTurnResponse>;
   readonly enqueueMainMessage: (sessionId: string, content: RuntimeV2JsonValue, target: "next-step" | "next-turn", messageId?: string) => Promise<{ readonly messageId: string; readonly target: "next-step" | "next-turn"; readonly enqueuedSeq: number }>;
   readonly cancelPendingMessage: (sessionId: string, messageId: string) => Promise<boolean>;
+  readonly steerRun: (sessionId: string, content: RuntimeV2JsonValue, messageId: string) => Promise<{ readonly messageId: string; readonly enqueuedSeq: number }>;
+  readonly cancelSteer: (sessionId: string, messageId: string) => Promise<"cancelled" | "claimed" | "discarded" | "missing">;
   readonly abortRun: (sessionId: string, reason?: string) => boolean;
+  readonly isRunActive: (sessionId: string) => boolean;
   readonly compactSession: (sessionId: string) => Promise<{ readonly compacted: boolean; readonly snapshot: RuntimeV2SessionSnapshot }>;
   readonly flushSession: (sessionId: string) => Promise<void>;
   readonly updateSessionMetadata: (sessionId: string, patch: { readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean }) => Promise<RuntimeV2SessionSnapshot>;
@@ -238,7 +245,24 @@ export class DesktopAppService implements DesktopAppServiceContract {
     return (await this.#runs.attach(session)).inbox.discard(messageId);
   }
 
+  /** 运行中插入：只写 next-step inbox，由正在运行的 loop 在下一步开头读取。 */
+  async steerRun(sessionId: string, content: RuntimeV2JsonValue, messageId: string) {
+    const assembly = this.#runs.get(sessionId);
+    if (!assembly?.loop.active) throw new Error("STEER_UNAVAILABLE");
+    const item = await assembly.inbox.enqueue(content, "next-step", messageId, "steer");
+    return { messageId: item.messageId, enqueuedSeq: item.enqueuedSeq };
+  }
+
+  async cancelSteer(sessionId: string, messageId: string) {
+    const session = await this.#sessions.resume(sessionId);
+    const inbox = (await this.#runs.attach(session)).inbox;
+    const status = inbox.status(messageId);
+    if (status === "pending") return await inbox.discard(messageId, "steer-cancelled") ? "cancelled" as const : inbox.status(messageId) === "claimed" ? "claimed" as const : "discarded" as const;
+    return status ?? "missing";
+  }
+
   abortRun(sessionId: string, reason?: string) { return this.#runs.get(sessionId)?.loop.abort(reason) ?? false; }
+  isRunActive(sessionId: string) { return this.#runs.get(sessionId)?.loop.active ?? false; }
 
   async compactSession(sessionId: string) {
     const assembly = this.#runs.get(sessionId);

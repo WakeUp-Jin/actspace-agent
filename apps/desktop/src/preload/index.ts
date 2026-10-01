@@ -172,6 +172,10 @@ import type {
   TerminalResizeInput,
   TerminalSessionResult,
   TerminalWriteInput,
+  SteerAgentRunInput,
+  SteerAgentRunResult,
+  CancelSteerInput,
+  CancelSteerResult,
 } from "@actspace/shared";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 
@@ -180,6 +184,8 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "agent:run": RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent,
   "context:compact": RUNTIME_V2_FIXED_RENDERER_CHANNELS.compactContext,
   "agent:abort-run": RUNTIME_V2_FIXED_RENDERER_CHANNELS.abortAgentRun,
+  "agent:steer": RUNTIME_V2_FIXED_RENDERER_CHANNELS.steerAgentRun,
+  "agent:cancel-steer": RUNTIME_V2_FIXED_RENDERER_CHANNELS.cancelSteer,
   "dialog:select-files": RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectFiles,
   "dialog:select-images": RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectImages,
   "composer:import-image": RUNTIME_V2_FIXED_RENDERER_CHANNELS.importComposerImage,
@@ -332,6 +338,8 @@ contextBridge.exposeInMainWorld("actspace", {
   compactContext: (input: CompactContextInput) =>
     invokeFixedRenderer("context:compact", input) as Promise<CompactContextResult>,
   abortAgentRun: (input: AbortAgentRunInput) => invokeFixedRenderer("agent:abort-run", input) as Promise<boolean>,
+  steerAgentRun: (input: SteerAgentRunInput) => invokeFixedRenderer("agent:steer", input) as Promise<SteerAgentRunResult>,
+  cancelSteer: (input: CancelSteerInput) => invokeFixedRenderer("agent:cancel-steer", input) as Promise<CancelSteerResult>,
   selectFiles: () => invokeFixedRenderer("dialog:select-files") as Promise<SelectFilesResult>,
   selectImages: () => invokeFixedRenderer("dialog:select-images") as Promise<SelectImagesResult>,
   importComposerImage: (input: ImportComposerImageInput) =>

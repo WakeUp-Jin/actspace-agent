@@ -316,24 +316,26 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
     return [];
   }
 
-  const trigger = payload.trigger ?? "auto";
   const status = payload.status ?? "compacted";
-  const removedCount = payload.removedCount ?? Math.max(payload.beforeCount - payload.afterCount, 0);
-  const summaryText = status === "skipped"
-    ? "Nothing to compact"
-    : status === "failed"
-      ? "Context compaction failed"
-      : removedCount > 0
-        ? `Context compacted · ${removedCount} ${removedCount === 1 ? "message" : "messages"}`
-        : "Context compacted";
+  if (status === "skipped") return [];
+  if (status === "failed") {
+    return [{
+      kind: "context_compaction",
+      id: event.id,
+      status: "failed",
+      ...(payload.reason ? { errorMessage: payload.reason } : {}),
+      createdAt: getDisplayTime(event.timestamp),
+    }];
+  }
 
   return [
     {
       kind: "context_compaction",
       id: event.id,
-      status: status === "compacted" ? "completed" : status,
-      trigger,
-      summaryText,
+      status: "completed",
+      removedCount: payload.removedCount ?? Math.max(payload.beforeCount - payload.afterCount, 0),
+      ...(typeof payload.durationMs === "number" ? { durationMs: payload.durationMs } : {}),
+      ...(payload.summary ? { summary: payload.summary } : {}),
       createdAt: getDisplayTime(event.timestamp),
     }
   ];

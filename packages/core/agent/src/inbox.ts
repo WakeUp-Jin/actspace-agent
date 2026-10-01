@@ -3,7 +3,9 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
 
 export type InboxTarget = "next-step" | "next-turn";
-export type InboxSource = "task_notification";
+/** `task_notification` 是后台任务回报；`steer` 是用户在运行中插入的消息。 */
+export type InboxSource = "task_notification" | "steer";
+export type InboxItemStatus = "pending" | "claimed" | "discarded";
 export type InboxItem = { readonly messageId: string; readonly target: InboxTarget; readonly content: RuntimeV2JsonValue; readonly enqueuedSeq: number; readonly source?: InboxSource };
 export type InboxClaimOptions = { readonly materializeSurface?: boolean; readonly messageId?: string };
 
@@ -19,7 +21,7 @@ export class MainAgentInbox {
       const data = record(event.data); const messageId = text(data.messageId); const target = data.target;
       if (messageId === null || (target !== "next-step" && target !== "next-turn")) continue;
       if (event.type === "agent/inbox/spliced" && data.operation === "enqueue") {
-        const source = data.source === "task_notification" ? "task_notification" as const : undefined;
+        const source = inboxSource(data.source);
         pending.set(messageId, { messageId, target, content: data.content ?? null, enqueuedSeq: event.seq, ...(source === undefined ? {} : { source }) });
       }
       if (event.type === "agent/inbox/spliced" && (data.operation === "claim" || data.operation === "discard")) pending.delete(messageId);
@@ -39,8 +41,21 @@ export class MainAgentInbox {
     await this.session.append(core("agent/inbox/spliced", { operation: "discard", messageId, target: item.target, reason })); return true;
   }
   async discardAll(reason: string): Promise<void> { for (const item of this.pending()) await this.discard(item.messageId, reason); }
+  /** 最后一次 inbox 操作决定状态；从未入队返回 null。 */
+  status(messageId: string): InboxItemStatus | null {
+    let status: InboxItemStatus | null = null;
+    for (const event of this.session.journal.events) {
+      if (event.type !== "agent/inbox/spliced") continue;
+      const data = record(event.data); if (data.messageId !== messageId) continue;
+      if (data.operation === "enqueue") status = "pending";
+      if (data.operation === "claim") status = "claimed";
+      if (data.operation === "discard") status = "discarded";
+    }
+    return status;
+  }
 }
 
 function core(type: string, data: RuntimeV2JsonValue, extra: Record<string, unknown> = {}) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null, ...extra } as never; }
 function record(value: RuntimeV2JsonValue): Readonly<Record<string, RuntimeV2JsonValue>> { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }
 function text(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" ? value : null; }
+function inboxSource(value: RuntimeV2JsonValue | undefined): InboxSource | undefined { return value === "task_notification" || value === "steer" ? value : undefined; }

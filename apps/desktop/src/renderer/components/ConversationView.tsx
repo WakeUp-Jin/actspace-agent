@@ -7,6 +7,7 @@ import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapsh
 import { ResponseAnnotationContext, isAnnotatableMessageId } from "./messages/response-annotation-context";
 import { ResponseSelectionToolbar } from "./messages/ResponseSelectionToolbar";
 import { useResponseAnnotationState } from "./messages/useResponseAnnotationState";
+import type { MessageQueueControls } from "./composer/MessageQueueTray";
 import { Composer, type ComposerAgentFormSwitch, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
@@ -15,7 +16,7 @@ import { AssistantReply } from "./messages/AssistantReply";
 import { AgentRunBlock } from "./messages/AgentRunBlock";
 import { BashRunBlock } from "./messages/BashRunBlock";
 import { BrowserApprovalBlock } from "./messages/BrowserApprovalBlock";
-import { CompactCommandBlock } from "./messages/CompactCommandBlock";
+import { CompactCommandBlock, CompactionRetryContext } from "./messages/CompactCommandBlock";
 import { DeleteFileBlock } from "./messages/DeleteFileBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
 import { TurnOutputArtifacts } from "./messages/TurnOutputArtifacts";
@@ -728,6 +729,10 @@ export function ConversationView({
   sessionId = null,
   isStreaming = false,
   isAborting = false,
+  isCompacting = false,
+  messageQueue,
+  composerNotice = null,
+  onRetryCompaction,
   sendScrollRequestId = 0,
   composerFocusRequestId = 0,
   onSend,
@@ -769,6 +774,14 @@ export function ConversationView({
   sessionId?: string | null;
   isStreaming?: boolean;
   isAborting?: boolean;
+  /** 上下文压缩进行中：停止按钮置灰（压缩不可中止）。 */
+  isCompacting?: boolean;
+  /** 运行中发送的消息队列；只在后续对话的 Composer 上显示。 */
+  messageQueue?: MessageQueueControls;
+  /** Composer 上方的一次性提示，例如「对话还很短，暂时不需要压缩」。 */
+  composerNotice?: string | null;
+  /** 失败分隔线上的「重试」。 */
+  onRetryCompaction?: () => void;
   sendScrollRequestId?: number;
   composerFocusRequestId?: number;
   onSend?: (text: string, options: ComposerSendOptions) => void;
@@ -1055,6 +1068,7 @@ export function ConversationView({
   }
   return (
     <ResponseAnnotationContext.Provider value={annotations.contextValue}>
+    <CompactionRetryContext.Provider value={onRetryCompaction}>
     <main className={CONVERSATION_SHELL_CLASS}>
       <ResponseSelectionToolbar
         scrollContainerRef={scrollContainerRef}
@@ -1084,6 +1098,8 @@ export function ConversationView({
                     contextState={contextState}
                     isStreaming={isStreaming}
                     isAborting={isAborting}
+                    isCompacting={isCompacting}
+                    statusNotice={composerNotice}
                     onSend={onSend}
                     onAbort={onAbort}
                     surface="initial"
@@ -1178,6 +1194,9 @@ export function ConversationView({
             contextState={contextState}
             isStreaming={isStreaming}
             isAborting={isAborting}
+            isCompacting={isCompacting}
+            messageQueue={messageQueue}
+            statusNotice={composerNotice}
             onSend={onSend}
             onAbort={onAbort}
             surface="followup"
@@ -1214,6 +1233,7 @@ export function ConversationView({
         </div>
       ) : null}
     </main>
+    </CompactionRetryContext.Provider>
     </ResponseAnnotationContext.Provider>
   );
 }

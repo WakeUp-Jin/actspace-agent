@@ -87,6 +87,23 @@ export class FixedRendererStreamAdapter {
       }
       return;
     }
+    if (event.kind === "compaction-started") {
+      this.#emit({ type: "context_compaction_started", sessionId: event.sessionId, agentRunId: event.agentRunId, startedAt: new Date().toISOString() });
+      return;
+    }
+    if (event.kind === "compaction-finished") {
+      this.#emit({ type: "context_compaction_finished", sessionId: event.sessionId, agentRunId: event.agentRunId, payload: { triggerTokens: 0, thresholdTokens: 0, beforeCount: event.removedCount, afterCount: 1, summaryChars: 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: event.removedCount, durationMs: event.durationMs } });
+      return;
+    }
+    if (event.kind === "compaction-failed") {
+      this.#emit({ type: "context_compaction_failed", sessionId: event.sessionId, agentRunId: event.agentRunId, error: { code: "CONTEXT_COMPACTION_FAILED", message: event.message, recoverable: true } });
+      return;
+    }
+    if (event.kind === "inbox-claimed") {
+      // 任务通知只给模型看；用户插入的消息要立刻出现在当前回合里。
+      if (event.source === "steer") this.#emit({ type: "user_message_steered", ...ids, messageId: event.messageId });
+      return;
+    }
     const key = this.#key(event.sessionId, event.agentRunId, event.callId);
     let entry = this.#calls.get(key);
     if (entry?.phase === "finished") return;

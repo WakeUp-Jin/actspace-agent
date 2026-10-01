@@ -39,4 +39,4 @@ Interactive. The user approved all four stages in this conversation.
 
 The dependency build path now builds the Runtime closure once and Client once. Development uses a generated TypeScript project graph with persistent watch, plus separate Client bundle and English prompt watchers. The renderer profile did not show a build-time change worth adding; the renderer remains a 2.09s production build with a large-chunk warning.
 
-Validation: graph generation/check, development process tests, clean Desktop build, renderer build, Electron build, and project-graph warm build passed. Desktop `typecheck` remains blocked by pre-existing Usage Statistics fixture edits that omit the current `costUsd` field.
+Validation: graph generation/check, development process tests, clean Desktop build, renderer build, Electron build, Desktop typecheck, Desktop tests, and project-graph warm build passed. The active site plan retains its separate T10 manual screenshot gate.

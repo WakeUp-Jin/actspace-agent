@@ -16,6 +16,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [Composer 消息队列与运行中插入](active/20260930-composer-message-queue.md) | T1–T9 已完成（未提交）；剩 Electron 实机验收。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | 计划已拆为 P0 内容块契约 / PA 回复批注 / PB 编辑器与 `@` 文件引用；P0、PA 已实施（PA.8 Electron 验收待确认）；下一步 PB。 |
 | [单一 Agent 形态与三种模式](active/20260928-agent-forms-and-modes.md) | T1–T7 已实现；主要实机路线通过，T8 剩余验收见执行摘要。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
@@ -37,6 +38,8 @@
 - [性能面板与会话投影优化](completed/20261001-performance-monitor-projection.md)：低频按需监控、历史批量折叠、上下文计算复用；自动化通过，人工验收和开销对比边界见[执行摘要](../exec-runs/20261001-performance-monitor-projection/execution-summary.md)。
 
 - [压缩耗时与辅助模型路由修复](completed/20260930-compaction-duration-utility-fix.md)：真实摘要耗时持久化、utility 路由优先与旧 journal 兼容；98 项定向测试及真实 Electron 复验通过，见[修复报告](../exec-runs/20260930-compaction-duration-utility-fix/execution-summary.md)。
+
+- [对话流里的上下文压缩](completed/20260929-context-compaction-timeline.md)：手动 `/compact` 与自动压缩共用一套中文 UI——进行中计时 + 不确定进度条、完成分隔线可展开摘要、失败红色分隔线可重试、无需压缩只在 Composer 提示；被压缩的旧消息继续显示，压缩中停止按钮置灰。自动化与 fixture 截图通过，Electron 验收见[执行摘要](../exec-runs/20260929-context-compaction-timeline/execution-summary.md)。
 
 - [统一验收缺陷修复](completed/20260929-acceptance-bugfixes.md)：Chat工具拒绝结算、旧历史恢复、子会话检查点/读取/索引、字体预览、开发启动竞态与文件缓存隔离已修复，定向实机复验通过。
 

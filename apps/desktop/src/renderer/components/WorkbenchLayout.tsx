@@ -1,5 +1,6 @@
 import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
+import type { MessageQueueControls } from "./composer/MessageQueueTray";
 import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, ResponseAnnotationReference, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import type { PermissionMode } from "@actspace/shared/runtime-v2";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -101,6 +102,10 @@ export function WorkbenchLayout({
   contextState,
   isStreaming = false,
   isAborting = false,
+  isCompacting = false,
+  messageQueue,
+  composerNotice = null,
+  onRetryCompaction,
   sendScrollRequestId = 0,
   composerFocusRequestId = 0,
   busySessionIds,
@@ -149,6 +154,10 @@ export function WorkbenchLayout({
   contextState?: ContextState | null;
   isStreaming?: boolean;
   isAborting?: boolean;
+  isCompacting?: boolean;
+  messageQueue?: MessageQueueControls;
+  composerNotice?: string | null;
+  onRetryCompaction?: () => void;
   sendScrollRequestId?: number;
   composerFocusRequestId?: number;
   busySessionIds?: Set<string>;
@@ -568,6 +577,10 @@ export function WorkbenchLayout({
         sessionId={activeSessionId}
         isStreaming={isStreaming}
         isAborting={isAborting}
+        isCompacting={isCompacting}
+        messageQueue={messageQueue}
+        composerNotice={composerNotice}
+        onRetryCompaction={onRetryCompaction}
         sendScrollRequestId={sendScrollRequestId}
         composerFocusRequestId={composerFocusRequestId}
         onSend={onSend}

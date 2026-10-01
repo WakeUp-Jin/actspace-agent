@@ -358,3 +358,24 @@
   height: 100% !important;
   max-width: none !important;
 }
+
+/* 压缩摘要面板：同一套 Markdown 管线，但字号收敛到正文档位，避免摘要标题比对话正文还大。 */
+.compact-command-summary .markdown-prose {
+  gap: 6px;
+}
+
+.compact-command-summary .markdown-prose h1,
+.compact-command-summary .markdown-prose h2,
+.compact-command-summary .markdown-prose h3,
+.compact-command-summary .markdown-prose h4 {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  line-height: inherit;
+  margin-top: 4px;
+}
+
+.compact-command-summary .markdown-prose ul,
+.compact-command-summary .markdown-prose ol {
+  gap: 2px;
+}

@@ -51,6 +51,35 @@ describe("real AgentLoop to fixed renderer stream", () => {
     } finally { adapter.dispose(); }
   });
 
+  it("maps auto compaction live events to context compaction stream events", () => {
+    const adapter = new FixedRendererStreamAdapter();
+    const events: RuntimeStreamEvent[] = [];
+    adapter.subscribe((event) => events.push(event));
+    const run = { sessionId: "session", agentRunId: "run", turnId: "turn" };
+    try {
+      adapter.accept({ ...run, kind: "compaction-started" });
+      adapter.accept({ ...run, kind: "compaction-finished", removedCount: 29, durationMs: 12_000 });
+      adapter.accept({ ...run, kind: "compaction-failed", message: "summary request timed out" });
+      expect(events).toEqual([
+        { type: "context_compaction_started", sessionId: "session", agentRunId: "run", startedAt: expect.any(String) },
+        expect.objectContaining({ type: "context_compaction_finished", payload: expect.objectContaining({ removedCount: 29, durationMs: 12_000 }) }),
+        expect.objectContaining({ type: "context_compaction_failed", error: expect.objectContaining({ message: "summary request timed out" }) }),
+      ]);
+    } finally { adapter.dispose(); }
+  });
+
+  it("maps claimed steer messages to user_message_steered and hides task notifications", () => {
+    const adapter = new FixedRendererStreamAdapter();
+    const events: RuntimeStreamEvent[] = [];
+    adapter.subscribe((event) => events.push(event));
+    const run = { sessionId: "session", agentRunId: "run", turnId: "turn" };
+    try {
+      adapter.accept({ ...run, kind: "inbox-claimed", messageId: "task-1", source: "task_notification" });
+      adapter.accept({ ...run, kind: "inbox-claimed", messageId: "steer-1", source: "steer" });
+      expect(events).toEqual([{ type: "user_message_steered", sessionId: "session", agentRunId: "run", turnId: "turn", messageId: "steer-1" }]);
+    } finally { adapter.dispose(); }
+  });
+
   it("keeps invalid arguments visible as failed without a started event", async () => {
     const adapter = new FixedRendererStreamAdapter();
     const events: RuntimeStreamEvent[] = [];

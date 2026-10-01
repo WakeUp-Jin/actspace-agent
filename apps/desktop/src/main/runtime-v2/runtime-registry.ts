@@ -18,6 +18,7 @@ import type {
   RuntimeV2ReadArtifactResult,
   RuntimeV2RunTurnRequest,
   RuntimeV2AttachmentRef,
+  RuntimeV2JsonValue,
 } from "@actspace/shared/runtime-v2";
 import type { BootedRuntimeProfile } from "@actspace/runtime";
 import type { DesktopAppServiceContract } from "@actspace/desktop-app";
@@ -221,8 +222,35 @@ export class DesktopRuntimeV2Registry {
     } finally { this.#admittedWork--; }
   }
 
+  async steerRun(sessionId: string, content: RuntimeV2JsonValue, messageId: string) {
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const result = await this.requireApp().steerRun(sessionId, content, messageId);
+      this.#emitDurableChanged(sessionId, result.enqueuedSeq, "inbox-enqueued");
+      return result;
+    } finally { this.#admittedWork--; }
+  }
+
+  async cancelSteer(sessionId: string, messageId: string) {
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const status = await this.requireApp().cancelSteer(sessionId, messageId);
+      if (status === "cancelled") {
+        const snapshot = await this.requireApp().inspectSession(sessionId);
+        this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "inbox-cancelled");
+      }
+      return status;
+    } finally { this.#admittedWork--; }
+  }
+
   abortRun(sessionId: string, reason?: string): boolean {
     return this.requireApp().abortRun(sessionId, reason);
+  }
+
+  isRunActive(sessionId: string): boolean {
+    return this.requireApp().isRunActive(sessionId);
   }
 
   async compactSession(sessionId: string) {

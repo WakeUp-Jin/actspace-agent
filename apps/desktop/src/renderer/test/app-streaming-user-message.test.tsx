@@ -1368,62 +1368,10 @@ sessionId,
     ]);
   });
 
-  it("routes /compact to compactContext without creating a normal run turn", async () => {
-    const sessionId = "session-compact";
+  function installCompactBridge(sessionId: string, compactContext: NonNullable<typeof window.actspace>["compactContext"], runAgent = vi.fn()) {
     const record = createEmptySessionRecord(sessionId);
-    const sessions: SessionListItem[] = [
-      {
-        id: sessionId,
-        title: "New chat",
-        updatedAt: record.meta.updatedAt,
-        agentRunCount: 0,
-      },
-    ];
+    const sessions: SessionListItem[] = [{ id: sessionId, title: "New chat", updatedAt: record.meta.updatedAt, agentRunCount: 0 }];
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    const runAgent = vi.fn();
-    let resolveCompactContext: (() => void) | null = null;
-    const compactContext = vi.fn((input: CompactContextInput) => new Promise<Awaited<ReturnType<NonNullable<typeof window.actspace>["compactContext"]>>>((resolve) => {
-      streamHandler?.({
-        type: "context_compaction_started",
-        sessionId: input.sessionId,
-        agentRunId: input.agentRunId,
-        trigger: "manual",
-        stage: "preparing",
-      });
-      streamHandler?.({
-        type: "context_compaction_finished",
-        sessionId: input.sessionId,
-        agentRunId: input.agentRunId,
-        trigger: "manual",
-        stage: "completed",
-        status: "compacted",
-        payload: {
-          triggerTokens: 20,
-          thresholdTokens: 1000,
-          beforeCount: 6,
-          afterCount: 1,
-          summaryChars: 240,
-          historyRefPath: "/tmp/session.jsonl",
-          trigger: "manual",
-          status: "compacted",
-          removedCount: 5,
-        },
-      });
-      resolveCompactContext = () => resolve({
-        sessionId: input.sessionId,
-        agentRunId: input.agentRunId,
-        status: "compacted" as const,
-        events: [],
-        contextSnapshot: {
-          totalTokens: 20,
-          maxTokens: 200_000,
-          percentUsed: 0,
-          buckets: [],
-        },
-        contextState: null,
-      });
-    }));
-
     window.actspace = {
       getBootstrapState: async () => bootstrapState,
       listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
@@ -1462,6 +1410,25 @@ sessionId,
       runAgent,
     };
 
+    return runAgent;
+  }
+
+  const compactedResult = (input: CompactContextInput, status: "compacted" | "skipped") => ({
+    sessionId: input.sessionId,
+    agentRunId: input.agentRunId,
+    status,
+    events: [],
+    contextSnapshot: { totalTokens: 20, maxTokens: 200_000, percentUsed: 0, buckets: [] },
+    contextState: null,
+  });
+
+  it("routes /compact to compactContext, shows the running block and blocks stop until it settles", async () => {
+    let resolveCompactContext: (() => void) | null = null;
+    const compactContext = vi.fn((input: CompactContextInput) => new Promise<Awaited<ReturnType<NonNullable<typeof window.actspace>["compactContext"]>>>((resolve) => {
+      resolveCompactContext = () => resolve(compactedResult(input, "skipped"));
+    }));
+    const runAgent = installCompactBridge("session-compact", compactContext);
+
     renderApp();
 
     const composer = await screen.findByLabelText("消息输入框");
@@ -1471,11 +1438,40 @@ sessionId,
     await waitFor(() => {
       expect(compactContext).toHaveBeenCalledTimes(1);
     });
-    expect(await screen.findByRole("separator", { name: "Context compacted · 5 messages" })).toBeInTheDocument();
+    expect(await screen.findByText("正在压缩上下文")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "上下文压缩进度" })).toBeInTheDocument();
+    expect(screen.getByLabelText("正在压缩上下文，压缩完成后可继续")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByText("/compact")).not.toBeInTheDocument();
     expect(runAgent).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveCompactContext?.();
+    });
+    expect(await screen.findByText("对话还很短，暂时不需要压缩")).toBeInTheDocument();
+    expect(screen.queryByText("正在压缩上下文")).not.toBeInTheDocument();
+  });
+
+  it("keeps a failed manual compaction in the stream and retries through the same command", async () => {
+    const compactContext = vi.fn()
+      .mockRejectedValueOnce(new Error("Error invoking remote method 'runtime-v2:context:compact': Error: 模型请求超时"))
+      .mockImplementationOnce(async (input: CompactContextInput) => compactedResult(input, "skipped"));
+    installCompactBridge("session-compact-failed", compactContext);
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("消息输入框");
+    await userEvent.type(composer, "/compact");
+    await userEvent.click(screen.getByLabelText("发送消息"));
+
+    expect(await screen.findByText("上下文压缩失败 · 模型请求超时")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "重试" }));
+
+    await waitFor(() => {
+      expect(compactContext).toHaveBeenCalledTimes(2);
+    });
+    expect(compactContext.mock.calls[1]?.[0]).toMatchObject({ sessionId: "session-compact-failed" });
+    await waitFor(() => {
+      expect(screen.queryByText("上下文压缩失败 · 模型请求超时")).not.toBeInTheDocument();
     });
   });
 

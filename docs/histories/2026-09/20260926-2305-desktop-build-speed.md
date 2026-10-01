@@ -32,4 +32,4 @@ The old development path built the Runtime closure and then rebuilt several of t
 
 ### ✅ Validation
 
-Existing `build:deps` measured 13.85–14.92s; the deduplicated path measured 8.44s. Warm project graph build measured 0.33s. Clean Desktop build passed in 11.76s; renderer profile passed in 2.09s; process tests passed 5/5 runnable tests. Desktop typecheck remains blocked by unrelated Usage Statistics fixture edits requiring `costUsd`.
+Existing `build:deps` measured 13.85–14.92s; the deduplicated path measured 8.44s. Warm project graph build measured 0.33s. Clean Desktop build passed in 11.56s; renderer profile passed in 2.09s; Desktop typecheck passed; Desktop tests passed 116 files and 835 tests; process tests passed all 6 tests.

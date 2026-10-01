@@ -24,6 +24,10 @@ import {
   type ProviderOperationResult,
   type ProviderTestResult,
   type RunAgentInput,
+  type SteerAgentRunInput,
+  type SteerAgentRunResult,
+  type CancelSteerInput,
+  type CancelSteerResult,
   type SessionListItem,
   type SessionRecord,
   type SelectWorkspaceDirectoryResult,
@@ -297,6 +301,36 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       ...(result.reason === "failed" ? { error: { code: "AGENT_RUN_FAILED", message: "The v2 Agent run failed." } } : {}),
     };
   });
+  // 插入与发送走同一套引用校验和附件准备；失败时同样不写 journal，renderer 把这条放回队列。
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.steerAgentRun, async (_event, input: SteerAgentRunInput): Promise<SteerAgentRunResult> => {
+    const ids = { sessionId: input.sessionId, agentRunId: input.agentRunId, messageId: input.messageId };
+    if (!options.registry.isRunActive(input.sessionId)) return { status: "unavailable", ...ids };
+    const references = await validateRunReferences(options.registry, input);
+    if (references.ok === false) return { status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: references.issue };
+    let prepared: Awaited<ReturnType<typeof toRunContent>>;
+    try {
+      prepared = await toRunContent(options.registry, input.sessionId, {
+        userInput: input.userInput,
+        attachments: input.attachments ?? [],
+        fileReferences: references.fileReferences,
+        responseAnnotations: references.responseAnnotations,
+      });
+    } catch (error) {
+      if (!(error instanceof ChatAttachmentValidationError)) throw error;
+      return { status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId, error: error.issue };
+    }
+    try {
+      await options.registry.steerRun(input.sessionId, prepared.content, input.messageId);
+    } catch (error) {
+      await options.registry.rollbackImportedAttachments(input.sessionId, prepared.importedArtifactIds);
+      if (safeErrorMessage(error).includes("STEER_UNAVAILABLE")) return { status: "unavailable", ...ids };
+      throw error;
+    }
+    return { status: "accepted", ...ids };
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.cancelSteer, async (_event, input: CancelSteerInput): Promise<CancelSteerResult> => (
+    { status: await options.registry.cancelSteer(input.sessionId, input.messageId) }
+  ));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.abortAgentRun, (_event, input: { sessionId: string; agentRunId: string }) => {
     options.approvals.abortAgentRun(input.sessionId, input.agentRunId);
     return options.registry.abortRun(input.sessionId, "user");
@@ -810,7 +844,7 @@ type RunReferenceValidation =
   | { ok: false; issue: ComposerReferenceIssue };
 
 /** 引用校验在导入附件之前完成：任一失败就整体拒绝，不导入附件、不写 journal。 */
-async function validateRunReferences(registry: DesktopRuntimeV2Registry, input: RunAgentInput): Promise<RunReferenceValidation> {
+async function validateRunReferences(registry: DesktopRuntimeV2Registry, input: Pick<RunAgentInput, "sessionId" | "fileReferences" | "responseAnnotations">): Promise<RunReferenceValidation> {
   const files = validateFileReferences(input.fileReferences);
   if (files.ok === false) return { ok: false, issue: files.issue };
   const annotations = validateResponseAnnotations(input.responseAnnotations);

@@ -436,6 +436,35 @@ export type AbortAgentRunInput = {
   agentRunId: string;
 };
 
+/** 运行中插入：把一条 Composer 消息送进正在运行的回合，Agent 开始下一步时读到。 */
+export type SteerAgentRunInput = {
+  sessionId: string;
+  agentRunId: string;
+  /** renderer 生成；读到时 `user_message_steered` 与 durable 投影都用它对应。 */
+  messageId: string;
+  userInput: string;
+  attachments?: import("./session").ComposerAttachment[];
+  fileReferences?: import("./composer-content").FileReference[];
+  responseAnnotations?: import("./composer-content").ResponseAnnotationReference[];
+};
+
+/** `unavailable`：会话已没有运行中的回合，renderer 把这条放回队列。 */
+export type SteerAgentRunResult =
+  | { status: "accepted"; sessionId: string; agentRunId: string; messageId: string }
+  | { status: "unavailable"; sessionId: string; agentRunId: string; messageId: string }
+  | import("./chat-attachments").RunAgentPreparationFailure;
+
+export type CancelSteerInput = {
+  sessionId: string;
+  messageId: string;
+};
+
+/**
+ * `cancelled`：撤回成功；`claimed`：Agent 已经读到，留在对话里；
+ * `discarded` / `missing`：运行结束时被丢弃或从未写入，renderer 放回队列。
+ */
+export type CancelSteerResult = { status: "cancelled" | "claimed" | "discarded" | "missing" };
+
 export type ApprovalDecideInput =
   | { requestId: string; decision: "once" | "deny" }
   | { requestId: string; decision: "session"; suggestionId: string };

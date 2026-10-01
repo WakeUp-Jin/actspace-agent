@@ -67,7 +67,7 @@ describe("compaction plugin lifecycle", () => {
       expect(compact).not.toHaveBeenCalled();
       ratio = 0.5;
       expect(await chat.maybeCompact(session, usage)).toBe(true);
-      expect(compact).toHaveBeenCalledExactlyOnceWith(session);
+      expect(compact).toHaveBeenCalledExactlyOnceWith(session, undefined);
       expect(await service.maybeCompact(session, usage)).toBe(false);
       expect(baseCompact).not.toHaveBeenCalled();
       const fixed = service.withTriggerRatio(0.5);

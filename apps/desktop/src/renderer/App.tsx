@@ -1,5 +1,19 @@
 import { createEmptyStreamingState, type ToolEntry, type StreamingState, type StreamingSegment, type SessionRunState } from "./session/session-run-state";
 import { SessionBrowseContext } from "./session/SessionBrowseContext";
+import {
+  EMPTY_MESSAGE_QUEUE,
+  createQueuedMessage,
+  enqueueMessage,
+  isQueueEmpty,
+  markSteering,
+  moveQueuedMessageUp,
+  removeQueuedMessage,
+  returnToFront,
+  takeSteering,
+  type QueuedComposerMessage,
+  type SessionMessageQueue,
+} from "./session/message-queue";
+import type { MessageQueueControls } from "./components/composer/MessageQueueTray";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_QUICK_OPEN_ACCELERATOR,
@@ -52,6 +66,13 @@ const DEFAULT_WORKSPACE_LABEL = "默认工作区";
 const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } = {
   mode: "agent",
   selectedSkills: [],
+};
+/** `not_started`：会话已有运行，没有发出。`rejected`：发送前校验失败，正文已放回输入框。 */
+type SessionRunOutcome = AgentRunResult["status"] | "rejected" | "not_started";
+type SessionRunEnv = {
+  record: SessionRecord | null;
+  historyBefore: number | null;
+  executionContext?: RunAgentInput["executionContext"];
 };
 type SessionPageCache = { record: SessionRecord; history: { before: number | null; throughJournalSeq: number } };
 
@@ -705,6 +726,8 @@ function streamingStateToBlocks(state: StreamingState, agentRunId?: string): Mes
     } else if (seg.type === "workspace_preparation") {
       const block = state.activeWorkspacePreparations.get(seg.agentRunId);
       if (block) blocks.push(block);
+    } else if (seg.type === "user_message") {
+      blocks.push(seg.block);
     }
   }
 
@@ -733,29 +756,34 @@ function streamingStateToBlocks(state: StreamingState, agentRunId?: string): Mes
   return blocks;
 }
 
+type CompactionBlock = Extract<MessageBlock, { kind: "context_compaction" }>;
+
+// 手动 /compact 与自动压缩共用同一个块；完成后的可展开摘要以 durable 投影为准，这里只负责本次运行期间的状态。
 function createCompactionBlock(input: {
   agentRunId: string;
-  status: Extract<MessageBlock, { kind: "context_compaction" }>["status"];
-  trigger?: "manual" | "auto";
-  stage?: string;
-  progress?: number;
-  summaryText?: string;
-}): Extract<MessageBlock, { kind: "context_compaction" }> {
+  status: CompactionBlock["status"];
+  startedAt?: string;
+  removedCount?: number;
+  durationMs?: number;
+  errorMessage?: string;
+}): CompactionBlock {
   return {
     kind: "context_compaction",
     id: `turn:${input.agentRunId}:context-compaction:0`,
     status: input.status,
-    trigger: input.trigger ?? "manual",
-    stage: input.stage,
-    progress: input.progress,
-    summaryText: input.summaryText ?? (input.status === "pending" ? "/compact" : "Compacting context"),
+    ...(input.startedAt ? { startedAt: input.startedAt } : {}),
+    ...(input.removedCount !== undefined ? { removedCount: input.removedCount } : {}),
+    ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
+    ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
     createdAt: new Date().toISOString(),
   };
 }
 
-function formatContextCompactionSummary(removedCount: number): string {
-  if (removedCount <= 0) return "Context compacted";
-  return `Context compacted · ${removedCount} ${removedCount === 1 ? "message" : "messages"}`;
+function formatCompactionError(error: unknown): string {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  // Electron 把主进程异常包成 "Error invoking remote method '…': Error: …"，只保留最后的原因。
+  const reason = message.replace(/^Error invoking remote method '[^']*':\s*/, "").replace(/^(?:\w*Error:\s*)+/, "").trim();
+  return reason.slice(0, 120) || "未知错误";
 }
 
 function upsertCompactionSegment(state: StreamingState, agentRunId: string): void {
@@ -847,6 +875,19 @@ export function App() {
   const pageVersionsRef = useRef(new Map<string, number>());
   const approvalVersionsRef = useRef(new Map<string, number>());
   const draftsRef = useRef(new Map<string, ComposerDraftRestore>());
+  // 压缩失败没有 durable 事件；运行结束后按会话保留失败分隔线，直到该会话下一次发送。
+  const compactionFailuresRef = useRef(new Map<string, CompactionBlock>());
+  const [compactionFailure, setCompactionFailure] = useState<CompactionBlock | null>(null);
+  const [composerNotice, setComposerNotice] = useState<{ sessionId: string; text: string } | null>(null);
+  const lastSendOptionsRef = useRef(new Map<string, ComposerSendOptions>());
+  // 运行中发送的消息按会话排队；只在内存中。drainingSessionsRef 覆盖「上一个运行结束、下一条还没发出」的间隙。
+  const messageQueuesRef = useRef(new Map<string, SessionMessageQueue>());
+  const [messageQueue, setMessageQueue] = useState<SessionMessageQueue>(EMPTY_MESSAGE_QUEUE);
+  const drainingSessionsRef = useRef(new Set<string>());
+  const steerRequestsRef = useRef(new Map<string, Set<Promise<void>>>());
+  // 插入的正文：loop 读到后用它在当前回合里显示用户消息。
+  const steerContentRef = useRef(new Map<string, QueuedComposerMessage>());
+  const continueQueueRef = useRef<(sessionId: string, outcome: SessionRunOutcome) => Promise<void>>(async () => {});
   const bashUpdatesRef = useRef(new Map<string, Record<string, { status: BashBackgroundStatus; exitCode?: number | null }>>());
   const activeSessionIdRef = useRef<string | null>(null);
   useEffect(() => sessionStore.subscribe(cell => {
@@ -877,6 +918,8 @@ export function App() {
     setHistoryBefore(null);
     setBashTaskUpdates(sessionId ? bashUpdatesRef.current.get(sessionId) ?? {} : {});
     setComposerDraftRestore(sessionId ? draftsRef.current.get(sessionId) ?? null : null);
+    setCompactionFailure(sessionId ? compactionFailuresRef.current.get(sessionId) ?? null : null);
+    setMessageQueue(sessionId ? messageQueuesRef.current.get(sessionId) ?? EMPTY_MESSAGE_QUEUE : EMPTY_MESSAGE_QUEUE);
     refreshStreamingBlocks(sessionId);
   }, [refreshStreamingBlocks]);
   const reviewRefreshRequestIdRef = useRef(0);
@@ -905,6 +948,28 @@ export function App() {
     if (!sessionId) return;
     setFailedSessionIds((current) => updateStringSet(current, sessionId, failed));
   }, []);
+
+  const updateMessageQueue = useCallback((sessionId: string, update: (queue: SessionMessageQueue) => SessionMessageQueue) => {
+    const current = messageQueuesRef.current.get(sessionId) ?? EMPTY_MESSAGE_QUEUE;
+    const updated = update(current);
+    if (updated === current) return;
+    const next = isQueueEmpty(updated) ? EMPTY_MESSAGE_QUEUE : updated;
+    if (next === EMPTY_MESSAGE_QUEUE) messageQueuesRef.current.delete(sessionId);
+    else messageQueuesRef.current.set(sessionId, next);
+    if (activeSessionIdRef.current === sessionId) setMessageQueue(next);
+  }, []);
+
+  const setCompactionFailureForSession = useCallback((sessionId: string, block: CompactionBlock | null) => {
+    if (block) compactionFailuresRef.current.set(sessionId, block);
+    else compactionFailuresRef.current.delete(sessionId);
+    if (activeSessionIdRef.current === sessionId) setCompactionFailure(block);
+  }, []);
+
+  useEffect(() => {
+    if (!composerNotice) return;
+    const timer = window.setTimeout(() => setComposerNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [composerNotice]);
 
   const refreshReviewSummary = useCallback(async (workspaceRoot?: string | null) => {
     if (!hasActspaceBridge()) return;
@@ -1301,6 +1366,24 @@ export function App() {
         state.waitingForModel = true;
         break;
 
+      case "user_message_steered": {
+        const item = steerContentRef.current.get(event.messageId);
+        steerContentRef.current.delete(event.messageId);
+        updateMessageQueue(event.sessionId, (queue) => takeSteering(queue, event.messageId).queue);
+        if (!item) break;
+        state.segments.push({
+          type: "user_message",
+          block: {
+            kind: "user", id: `turn:${event.agentRunId}:steer:${event.messageId}`, content: item.text,
+            createdAt: new Date().toISOString(), attachments: item.options.attachments,
+            ...(item.options.fileReferences?.length ? { fileReferences: item.options.fileReferences } : {}),
+            ...(item.options.responseAnnotations?.length ? { responseAnnotations: item.options.responseAnnotations } : {}),
+          },
+        });
+        state.waitingForModel = true;
+        break;
+      }
+
       case "workspace_preparation_started":
         state.waitingForModel = false;
         upsertWorkspacePreparationSegment(state, event.agentRunId);
@@ -1338,46 +1421,25 @@ export function App() {
         state.activeCompactions.set(event.agentRunId, createCompactionBlock({
           agentRunId: event.agentRunId,
           status: "running",
-          trigger: event.trigger,
-          stage: event.stage,
-          progress: event.progress,
-          summaryText: "Compacting context",
+          startedAt: event.startedAt,
         }));
         break;
-
-      case "context_compaction_progress": {
-        state.waitingForModel = false;
-        upsertCompactionSegment(state, event.agentRunId);
-        const existing = state.activeCompactions.get(event.agentRunId);
-        state.activeCompactions.set(event.agentRunId, {
-          ...(existing ?? createCompactionBlock({
-            agentRunId: event.agentRunId,
-            status: "running",
-            trigger: event.trigger,
-            summaryText: "Compacting context",
-          })),
-          status: "running",
-          stage: event.stage,
-          progress: event.progress,
-          summaryText: event.summary ?? existing?.summaryText ?? "Compacting context",
-        });
-        break;
-      }
 
       case "context_compaction_finished": {
+        state.waitingForModel = false;
+        if (event.payload.status === "skipped") {
+          state.activeCompactions.delete(event.agentRunId);
+          state.segments = state.segments.filter((segment) => !(segment.type === "compaction" && segment.agentRunId === event.agentRunId));
+          break;
+        }
         upsertCompactionSegment(state, event.agentRunId);
-        const removedCount = event.payload.removedCount ?? Math.max(event.payload.beforeCount - event.payload.afterCount, 0);
         state.activeCompactions.set(event.agentRunId, createCompactionBlock({
           agentRunId: event.agentRunId,
-          status: event.status === "compacted" ? "completed" : "skipped",
-          trigger: event.trigger,
-          stage: event.stage,
-          progress: event.progress,
-          summaryText: event.status === "skipped"
-            ? (event.summary ?? "Nothing to compact")
-            : formatContextCompactionSummary(removedCount),
+          status: event.payload.status === "failed" ? "failed" : "completed",
+          removedCount: event.payload.removedCount ?? Math.max(event.payload.beforeCount - event.payload.afterCount, 0),
+          durationMs: event.payload.durationMs,
+          errorMessage: event.payload.reason,
         }));
-        state.waitingForModel = event.trigger === "auto";
         break;
       }
 
@@ -1387,9 +1449,7 @@ export function App() {
         state.activeCompactions.set(event.agentRunId, createCompactionBlock({
           agentRunId: event.agentRunId,
           status: "failed",
-          trigger: event.trigger,
-          stage: event.stage,
-          summaryText: event.error.message,
+          errorMessage: event.error.message,
         }));
         break;
 
@@ -1544,7 +1604,7 @@ export function App() {
     }
 
     refreshStreamingBlocks(event.sessionId);
-  }, [refreshStreamingBlocks]);
+  }, [refreshStreamingBlocks, updateMessageQueue]);
 
   useEffect(() => {
     if (!hasActspaceBridge()) return;
@@ -1589,6 +1649,7 @@ export function App() {
           sessionRunsRef.current.delete(event.sessionId);
           setBusySessionIds(current => updateStringSet(current, event.sessionId, false));
           refreshStreamingBlocks(event.sessionId);
+          void continueQueueRef.current(event.sessionId, event.type === "agent_run_finished" ? "completed" : event.type === "agent_run_aborted" ? "aborted" : "failed");
         });
       }
     });
@@ -1639,11 +1700,347 @@ export function App() {
     }
   }, [bootstrapState?.workspaceRoot, refreshWorkspaces]);
 
+  /** 为某个会话启动一次运行；可见会话发送和队列自动发出共用。返回结果供队列决定继续还是暂停。 */
+  const startSessionRun = useCallback(async (
+    sessionId: string,
+    text: string,
+    options: ComposerSendOptions,
+    env: SessionRunEnv,
+  ): Promise<SessionRunOutcome> => {
+    if (sessionRunsRef.current.has(sessionId)) return "not_started";
+    const agentRunId = nextAgentRunId();
+    const isCompactCommand = text.trim() === "/compact";
+    let outcome: SessionRunOutcome = "failed";
+    const run: SessionRunState = {
+      sessionId, agentRunId, state: createEmptyStreamingState(), userBlock: null, aborting: false,
+      record: env.record, historyBefore: env.historyBefore,
+    };
+    sessionRunsRef.current.set(sessionId, run);
+    setBusySessionIds(current => updateStringSet(current, sessionId, true));
+    draftsRef.current.delete(sessionId);
+    if (activeSessionIdRef.current === sessionId) setComposerDraftRestore(null);
+    setApprovalPendingForSession(sessionId, false);
+    setFailedForSession(sessionId, false);
+    setCompactionFailureForSession(sessionId, null);
+    lastSendOptionsRef.current.set(sessionId, options);
+
+    if (isCompactCommand) {
+      upsertCompactionSegment(run.state, agentRunId);
+      run.state.activeCompactions.set(agentRunId, createCompactionBlock({ agentRunId, status: "running", startedAt: new Date().toISOString() }));
+    } else {
+      run.userBlock = {
+        kind: "user", id: `turn:${agentRunId}:user:0`, content: text,
+        createdAt: new Date().toISOString(), attachments: options.attachments,
+        ...(options.fileReferences?.length ? { fileReferences: options.fileReferences } : {}),
+        ...(options.responseAnnotations?.length ? { responseAnnotations: options.responseAnnotations } : {}),
+      };
+      run.state.waitingForModel = true;
+    }
+    refreshStreamingBlocks(sessionId);
+    if (activeSessionIdRef.current === sessionId) setSendScrollRequestId(value => value + 1);
+
+    const isCurrentRun = () => sessionRunsRef.current.get(sessionId) === run;
+    const isCurrentVisibleTurn = () => isCurrentRun() && activeSessionIdRef.current === sessionId;
+    const finishRun = () => {
+      if (!isCurrentRun()) return;
+      const compaction = run.state.activeCompactions.get(agentRunId);
+      if (compaction?.status === "failed") setCompactionFailureForSession(sessionId, compaction);
+      sessionRunsRef.current.delete(sessionId);
+      setBusySessionIds(current => updateStringSet(current, sessionId, false));
+      refreshStreamingBlocks(sessionId);
+      if (activeSessionIdRef.current === sessionId && hasActspaceBridge()) void refreshReviewSummary();
+    };
+    const settleResult = async (result: AgentRunResult | Awaited<ReturnType<typeof window.actspace.compactContext>>) => {
+      setApprovalPendingForSession(sessionId, false);
+      setFailedForSession(sessionId, result.status === "failed");
+      const restored = await readSessionPage(sessionId);
+      if (!isCurrentRun()) return;
+      // The result is durable. Invalidate in-flight reads started before settlement.
+      pageVersionsRef.current.set(sessionId, (pageVersionsRef.current.get(sessionId) ?? 0) + 1);
+      if (!restored) {
+        const fallback: SessionRecord = {
+          meta: run.record?.meta ?? { schemaVersion: 2, id: sessionId, title: "New chat", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), agentRunCount: 1 },
+          events: result.events, contextSnapshot: result.contextSnapshot,
+        };
+        cacheSessionPage(sessionId, { record: fallback, history: { before: null, throughJournalSeq: -1 } });
+        if (isCurrentVisibleTurn()) { setSessionRecord(fallback); setHistoryBefore(null); }
+      }
+      if (isCurrentVisibleTurn()) { setAgentRunResult(null); setMessageLoading(false); }
+      finishRun();
+    };
+
+    try {
+      if (hasActspaceBridge()) {
+        if (isCompactCommand) {
+          const input: CompactContextInput = {
+            sessionId,
+            agentRunId,
+            ...modelSelectionPayload(options.model),
+          };
+          const startedAt = Date.parse(run.state.activeCompactions.get(agentRunId)?.startedAt ?? "") || Date.now();
+          let result: Awaited<ReturnType<typeof window.actspace.compactContext>>;
+          try {
+            result = await window.actspace.compactContext(input);
+          } catch (compactError) {
+            console.error("Failed to compact context", compactError);
+            if (isCurrentRun()) {
+              run.state.activeCompactions.set(agentRunId, createCompactionBlock({
+                agentRunId,
+                status: "failed",
+                durationMs: Date.now() - startedAt,
+                errorMessage: formatCompactionError(compactError),
+              }));
+            }
+            return outcome;
+          }
+          outcome = result.status === "failed" ? "failed" : "completed";
+          if (result.status === "skipped" && isCurrentRun()) {
+            run.state.activeCompactions.delete(agentRunId);
+            setComposerNotice({ sessionId, text: "对话还很短，暂时不需要压缩" });
+          }
+          await settleResult(result);
+          const refreshed = await readSidebarSessions();
+          setSessions(refreshed);
+          return outcome;
+        }
+
+        const input: RunAgentInput = {
+          sessionId,
+          agentRunId,
+          userInput: text,
+          attachments: options.attachments?.map(attachmentForRuntime),
+          ...(options.fileReferences?.length ? { fileReferences: options.fileReferences } : {}),
+          ...(options.responseAnnotations?.length ? { responseAnnotations: options.responseAnnotations } : {}),
+          mode: options.mode,
+          selectedSkills: options.selectedSkills,
+          ...modelSelectionPayload(options.model),
+          thinkingEnabled: options.thinkingEnabled,
+          ...(options.reasoningEffort && { reasoningEffort: options.reasoningEffort }),
+          ...(env.executionContext ? { executionContext: env.executionContext } : {}),
+        };
+        const result = await window.actspace.runAgent(input);
+        if (result.status === "rejected") {
+          outcome = "rejected";
+          if (!isCurrentRun()) return outcome;
+          const draft: ComposerDraftRestore = {
+            id: Date.now(), sessionId, text, attachments: options.attachments,
+            fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations,
+            ...(result.referenceIssue
+              ? { error: formatComposerReferenceIssue(result.referenceIssue), referenceIssue: result.referenceIssue }
+              : { error: formatChatAttachmentIssue(result.error), attachmentIssue: result.error }),
+          };
+          draftsRef.current.set(sessionId, draft);
+          if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
+          setApprovalPendingForSession(sessionId, false);
+          setFailedForSession(sessionId, false);
+          return outcome;
+        }
+
+        outcome = result.status;
+        await settleResult(result);
+        const refreshed = await readSidebarSessions();
+        setSessions(refreshed);
+      } else {
+        outcome = "completed";
+      }
+    } catch (error) {
+      outcome = "failed";
+      console.error("Failed to run Agent", error);
+      if (isCurrentRun()) {
+        let restored: SessionRecord | null = null;
+        if (hasActspaceBridge() && !isCompactCommand) {
+          try {
+            restored = await readSessionPage(sessionId);
+          } catch (restoreError) {
+            console.error("Failed to inspect session after turn error", restoreError);
+          }
+        }
+        if (!isCurrentRun()) return outcome;
+        const inputPersisted = restored?.events.some(
+          (event) => event.agentRunId === agentRunId && event.type === "user_message",
+        ) ?? false;
+        if (inputPersisted && restored) {
+          if (isCurrentVisibleTurn()) setSessionRecord(restored);
+        } else if (!isCompactCommand) {
+          const draft: ComposerDraftRestore = {
+            id: Date.now(),
+            sessionId,
+            text,
+            attachments: options.attachments,
+            fileReferences: options.fileReferences,
+            responseAnnotations: options.responseAnnotations,
+            error: "消息未能发送，正文和附件已保留，请重试。",
+          };
+          draftsRef.current.set(sessionId, draft);
+          if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
+        }
+        setApprovalPendingForSession(sessionId, false);
+        setFailedForSession(sessionId, true);
+      }
+    } finally {
+      finishRun();
+    }
+    return outcome;
+  }, [
+    readSessionPage,
+    cacheSessionPage,
+    refreshStreamingBlocks,
+    refreshReviewSummary,
+    setApprovalPendingForSession,
+    setFailedForSession,
+    setCompactionFailureForSession,
+    readSidebarSessions,
+  ]);
+
+  /** 运行结束后核对还没被读到的插入：只有 loop 已读到的留在对话里，其余回到队首。 */
+  const settleSteers = useCallback(async (sessionId: string) => {
+    await Promise.allSettled([...(steerRequestsRef.current.get(sessionId) ?? [])]);
+    const pending = messageQueuesRef.current.get(sessionId)?.steering ?? [];
+    if (pending.length === 0) return;
+    const statuses = await Promise.all(pending.map(async (item) => {
+      try {
+        return (await window.actspace.cancelSteer?.({ sessionId, messageId: item.id }))?.status ?? "missing";
+      } catch (error) {
+        console.error("Failed to settle steer", error);
+        return "missing";
+      }
+    }));
+    const returned = pending.filter((_, index) => statuses[index] !== "claimed");
+    for (const item of returned) steerContentRef.current.delete(item.id);
+    updateMessageQueue(sessionId, (queue) => returnToFront(
+      { ...queue, steering: queue.steering.filter((item) => !pending.includes(item)) },
+      returned,
+    ));
+  }, [updateMessageQueue]);
+
+  /** 按上一次运行的结果决定：正常结束就发出队首一条，停止 / 失败 / 被拒则暂停。 */
+  const continueQueue = useCallback(async (sessionId: string, firstOutcome: SessionRunOutcome) => {
+    if (firstOutcome === "not_started") return;
+    drainingSessionsRef.current.add(sessionId);
+    try {
+      let outcome: SessionRunOutcome = firstOutcome;
+      while (outcome !== "not_started") {
+        await settleSteers(sessionId);
+        const queue = messageQueuesRef.current.get(sessionId) ?? EMPTY_MESSAGE_QUEUE;
+        if (outcome !== "completed") {
+          if (queue.items.length > 0) updateMessageQueue(sessionId, (current) => ({ ...current, paused: true }));
+          return;
+        }
+        const next = queue.paused ? undefined : queue.items[0];
+        if (!next) return;
+        updateMessageQueue(sessionId, (current) => removeQueuedMessage(current, next.id));
+        const cached = pageCacheRef.current.get(sessionId);
+        outcome = await startSessionRun(sessionId, next.text, next.options, {
+          record: cached?.record ?? null,
+          historyBefore: cached?.history.before ?? null,
+        });
+        // 另一个运行抢先开始：放回队首，由那个运行结束后继续发出。
+        if (outcome === "not_started") updateMessageQueue(sessionId, (current) => returnToFront(current, [next]));
+      }
+    } finally {
+      drainingSessionsRef.current.delete(sessionId);
+    }
+  }, [settleSteers, startSessionRun, updateMessageQueue]);
+  continueQueueRef.current = continueQueue;
+
+  const handleSteerQueued = useCallback((id: string) => {
+    const sessionId = activeSessionIdRef.current;
+    const run = sessionId ? sessionRunsRef.current.get(sessionId) : undefined;
+    const steer = hasActspaceBridge() ? window.actspace.steerAgentRun : undefined;
+    const item = sessionId ? messageQueuesRef.current.get(sessionId)?.items.find((candidate) => candidate.id === id) : undefined;
+    if (!sessionId || !run || !steer || !item || item.kind !== "message") return;
+    steerContentRef.current.set(item.id, item);
+    updateMessageQueue(sessionId, (queue) => markSteering(queue, item.id));
+    const request = (async () => {
+      let notice: string | null = null;
+      try {
+        const result = await steer({
+          sessionId,
+          agentRunId: run.agentRunId,
+          messageId: item.id,
+          userInput: item.text,
+          attachments: item.options.attachments?.map(attachmentForRuntime),
+          ...(item.options.fileReferences?.length ? { fileReferences: item.options.fileReferences } : {}),
+          ...(item.options.responseAnnotations?.length ? { responseAnnotations: item.options.responseAnnotations } : {}),
+        });
+        if (result.status === "accepted") return;
+        if (result.status === "rejected") {
+          notice = result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : formatChatAttachmentIssue(result.error);
+        }
+      } catch (error) {
+        console.error("Failed to steer Agent run", error);
+        notice = "插入失败，消息已放回队列。";
+      }
+      // 没能插入（回合已结束、校验失败）：还在「已插入」里才放回队首，避免与运行结束时的核对重复。
+      let returned = false;
+      updateMessageQueue(sessionId, (queue) => {
+        const taken = takeSteering(queue, item.id);
+        returned = Boolean(taken.item);
+        return taken.item ? returnToFront(taken.queue, [taken.item]) : queue;
+      });
+      if (returned) steerContentRef.current.delete(item.id);
+      if (notice) setComposerNotice({ sessionId, text: notice });
+    })();
+    const requests = steerRequestsRef.current.get(sessionId) ?? new Set<Promise<void>>();
+    requests.add(request);
+    steerRequestsRef.current.set(sessionId, requests);
+    void request.finally(() => requests.delete(request));
+  }, [updateMessageQueue]);
+
+  const handleUnsteerQueued = useCallback(async (id: string) => {
+    const sessionId = activeSessionIdRef.current;
+    const cancel = hasActspaceBridge() ? window.actspace.cancelSteer : undefined;
+    if (!sessionId || !cancel) return;
+    // 插入请求还在路上时先等它落定，否则撤回会报 missing，随后插入又生效。
+    await Promise.allSettled([...(steerRequestsRef.current.get(sessionId) ?? [])]);
+    if (!messageQueuesRef.current.get(sessionId)?.steering.some((item) => item.id === id)) return;
+    let status: Awaited<ReturnType<typeof cancel>>["status"];
+    try {
+      status = (await cancel({ sessionId, messageId: id })).status;
+    } catch (error) {
+      console.error("Failed to cancel steer", error);
+      return;
+    }
+    // 已被读到：保持原样，user_message_steered 会把它显示到对话里。
+    if (status === "claimed") return;
+    steerContentRef.current.delete(id);
+    updateMessageQueue(sessionId, (queue) => {
+      const taken = takeSteering(queue, id);
+      return taken.item ? returnToFront(taken.queue, [taken.item]) : queue;
+    });
+  }, [updateMessageQueue]);
+
+  const handleResumeQueue = useCallback(() => {
+    const sessionId = activeSessionIdRef.current;
+    if (!sessionId) return;
+    updateMessageQueue(sessionId, (queue) => ({ ...queue, paused: false }));
+    if (sessionRunsRef.current.has(sessionId) || drainingSessionsRef.current.has(sessionId)) return;
+    void continueQueue(sessionId, "completed");
+  }, [continueQueue, updateMessageQueue]);
+
+  const handleEditQueued = useCallback((id: string) => {
+    const sessionId = activeSessionIdRef.current;
+    const item = sessionId ? messageQueuesRef.current.get(sessionId)?.items.find((candidate) => candidate.id === id) : undefined;
+    if (!sessionId || !item) return;
+    updateMessageQueue(sessionId, (queue) => removeQueuedMessage(queue, id));
+    setComposerDraftRestore({
+      id: Date.now(), sessionId, text: item.text, attachments: item.options.attachments,
+      fileReferences: item.options.fileReferences, responseAnnotations: item.options.responseAnnotations,
+    });
+  }, [updateMessageQueue]);
+
   const handleSend = useCallback(async (
     text: string,
     options: ComposerSendOptions,
   ) => {
-    if (isStreaming || (!text.trim() && !options.attachments?.length && !options.fileReferences?.length && !options.responseAnnotations?.length)) return;
+    if (!text.trim() && !options.attachments?.length && !options.fileReferences?.length && !options.responseAnnotations?.length) return;
+    const visibleSessionId = activeSessionIdRef.current;
+    if (visibleSessionId && (sessionRunsRef.current.has(visibleSessionId) || drainingSessionsRef.current.has(visibleSessionId))) {
+      updateMessageQueue(visibleSessionId, (queue) => enqueueMessage(queue, createQueuedMessage(text, options)));
+      draftsRef.current.delete(visibleSessionId);
+      setComposerDraftRestore(null);
+      return;
+    }
 
     const createdSession = activeSessionIdRef.current
       ? null
@@ -1655,9 +2052,6 @@ export function App() {
       [sessionId]: { mode: options.mode, selectedSkills: options.selectedSkills },
     }));
 
-    const agentRunId = nextAgentRunId();
-    const trimmedText = text.trim();
-    const isCompactCommand = trimmedText === "/compact";
     const nextWorkspaceRoot = selectedWorkspaceRoot;
     let nextWorkspace = findWorkspaceOption(nextWorkspaceRoot);
     const currentWorkspaceRoot = normalizeWorkspaceRoot(
@@ -1707,175 +2101,50 @@ export function App() {
       }
     }
 
-    if (sessionRunsRef.current.has(sessionId)) return;
-    const run: SessionRunState = {
-      sessionId, agentRunId, state: createEmptyStreamingState(), userBlock: null, aborting: false,
-      record: createdSession ?? sessionRecord, historyBefore,
-    };
-    sessionRunsRef.current.set(sessionId, run);
-    setBusySessionIds(current => updateStringSet(current, sessionId, true));
-    draftsRef.current.delete(sessionId);
-    if (activeSessionIdRef.current === sessionId) setComposerDraftRestore(null);
-    setApprovalPendingForSession(sessionId, false);
-    setFailedForSession(sessionId, false);
-
-    if (isCompactCommand) {
-      const pendingBlock = createCompactionBlock({ agentRunId, status: "pending", summaryText: "/compact" });
-      upsertCompactionSegment(run.state, agentRunId);
-      run.state.activeCompactions.set(agentRunId, pendingBlock);
-    } else {
-      run.userBlock = {
-        kind: "user", id: `turn:${agentRunId}:user:0`, content: text,
-        createdAt: new Date().toISOString(), attachments: options.attachments,
-        ...(options.fileReferences?.length ? { fileReferences: options.fileReferences } : {}),
-        ...(options.responseAnnotations?.length ? { responseAnnotations: options.responseAnnotations } : {}),
-      };
-      run.state.waitingForModel = true;
-    }
-    refreshStreamingBlocks(sessionId);
-    if (activeSessionIdRef.current === sessionId) setSendScrollRequestId(value => value + 1);
-
-    const isCurrentRun = () => sessionRunsRef.current.get(sessionId) === run;
-    const isCurrentVisibleTurn = () => isCurrentRun() && activeSessionIdRef.current === sessionId;
-    const finishRun = () => {
-      if (!isCurrentRun()) return;
-      sessionRunsRef.current.delete(sessionId);
-      setBusySessionIds(current => updateStringSet(current, sessionId, false));
-      refreshStreamingBlocks(sessionId);
-      if (activeSessionIdRef.current === sessionId && hasActspaceBridge()) void refreshReviewSummary();
-    };
-    const settleResult = async (result: AgentRunResult | Awaited<ReturnType<typeof window.actspace.compactContext>>) => {
-      setApprovalPendingForSession(sessionId, false);
-      setFailedForSession(sessionId, result.status === "failed");
-      const restored = await readSessionPage(sessionId);
-      if (!isCurrentRun()) return;
-      // The result is durable. Invalidate in-flight reads started before settlement.
-      pageVersionsRef.current.set(sessionId, (pageVersionsRef.current.get(sessionId) ?? 0) + 1);
-      if (!restored) {
-        const fallback: SessionRecord = {
-          meta: run.record?.meta ?? { schemaVersion: 2, id: sessionId, title: "New chat", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), agentRunCount: 1 },
-          events: result.events, contextSnapshot: result.contextSnapshot,
-        };
-        cacheSessionPage(sessionId, { record: fallback, history: { before: null, throughJournalSeq: -1 } });
-        if (isCurrentVisibleTurn()) { setSessionRecord(fallback); setHistoryBefore(null); }
-      }
-      if (isCurrentVisibleTurn()) { setAgentRunResult(null); setMessageLoading(false); }
-      finishRun();
-    };
-
-    try {
-      if (hasActspaceBridge()) {
-        if (isCompactCommand) {
-          const input: CompactContextInput = {
-            sessionId,
-            agentRunId,
-            ...modelSelectionPayload(options.model),
-          };
-          const result = await window.actspace.compactContext(input);
-          await settleResult(result);
-          const refreshed = await readSidebarSessions();
-          setSessions(refreshed);
-          return;
-        }
-
-        const input: RunAgentInput = {
-          sessionId,
-          agentRunId,
-          userInput: text,
-          attachments: options.attachments?.map(attachmentForRuntime),
-          ...(options.fileReferences?.length ? { fileReferences: options.fileReferences } : {}),
-          ...(options.responseAnnotations?.length ? { responseAnnotations: options.responseAnnotations } : {}),
-          mode: options.mode,
-          selectedSkills: options.selectedSkills,
-          ...modelSelectionPayload(options.model),
-          thinkingEnabled: options.thinkingEnabled,
-          ...(options.reasoningEffort && { reasoningEffort: options.reasoningEffort }),
-          ...(isFirstAgentRun && nextWorkspaceRoot ? {
-            executionContext: {
-              runLocation,
-              ...(nextWorkspace?.id ? { workspaceId: nextWorkspace.id } : {}),
-              sourceWorkspaceRoot: nextWorkspaceRoot,
-              ...(selectedBranch ? { branch: selectedBranch } : {}),
-            },
-          } : {}),
-        };
-        const result = await window.actspace.runAgent(input);
-        if (result.status === "rejected") {
-          if (!isCurrentRun()) return;
-          const draft: ComposerDraftRestore = {
-            id: Date.now(), sessionId, text, attachments: options.attachments,
-            fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations,
-            ...(result.referenceIssue
-              ? { error: formatComposerReferenceIssue(result.referenceIssue), referenceIssue: result.referenceIssue }
-              : { error: formatChatAttachmentIssue(result.error), attachmentIssue: result.error }),
-          };
-          draftsRef.current.set(sessionId, draft);
-          if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
-          setApprovalPendingForSession(sessionId, false);
-          setFailedForSession(sessionId, false);
-          return;
-        }
-
-        await settleResult(result);
-        const refreshed = await readSidebarSessions();
-        setSessions(refreshed);
-      }
-    } catch (error) {
-      console.error("Failed to run Agent", error);
-      if (isCurrentRun()) {
-        let restored: SessionRecord | null = null;
-        if (hasActspaceBridge() && !isCompactCommand) {
-          try {
-            restored = await readSessionPage(sessionId);
-          } catch (restoreError) {
-            console.error("Failed to inspect session after turn error", restoreError);
-          }
-        }
-        if (!isCurrentRun()) return;
-        const inputPersisted = restored?.events.some(
-          (event) => event.agentRunId === agentRunId && event.type === "user_message",
-        ) ?? false;
-        if (inputPersisted && restored) {
-          if (isCurrentVisibleTurn()) setSessionRecord(restored);
-        } else if (!isCompactCommand) {
-          const draft: ComposerDraftRestore = {
-            id: Date.now(),
-            sessionId,
-            text,
-            attachments: options.attachments,
-            fileReferences: options.fileReferences,
-            responseAnnotations: options.responseAnnotations,
-            error: "消息未能发送，正文和附件已保留，请重试。",
-          };
-          draftsRef.current.set(sessionId, draft);
-          if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
-        }
-        setApprovalPendingForSession(sessionId, false);
-        setFailedForSession(sessionId, true);
-      }
-    } finally {
-      finishRun();
-    }
+    // 手动发送视为继续：这一条之后，暂停的队列照常发出。
+    updateMessageQueue(sessionId, (queue) => queue.paused ? { ...queue, paused: false } : queue);
+    const outcome = await startSessionRun(sessionId, text, options, {
+      record: createdSession ?? sessionRecord,
+      historyBefore,
+      ...(isFirstAgentRun && nextWorkspaceRoot ? {
+        executionContext: {
+          runLocation,
+          ...(nextWorkspace?.id ? { workspaceId: nextWorkspace.id } : {}),
+          sourceWorkspaceRoot: nextWorkspaceRoot,
+          ...(selectedBranch ? { branch: selectedBranch } : {}),
+        },
+      } : {}),
+    });
+    await continueQueue(sessionId, outcome);
   }, [
-    isStreaming,
     sessionRecord,
     historyBefore,
-    readSessionPage,
-    cacheSessionPage,
-    refreshStreamingBlocks,
+    startSessionRun,
+    continueQueue,
+    updateMessageQueue,
     selectedWorkspaceRoot,
     findWorkspaceOption,
     refreshWorkspaces,
     sessionRecord?.meta.workspaceRoot,
     bootstrapState?.workspaceRoot,
-    refreshReviewSummary,
-    refreshPendingApprovalStatuses,
-    setApprovalPendingForSession,
     setFailedForSession,
     createSessionForInput,
     runLocation,
     selectedBranch,
   ]);
+
+  const handleRetryCompaction = useCallback(() => {
+    const sessionId = activeSessionIdRef.current;
+    if (!sessionId) return;
+    const composerState = composerStateBySession[sessionId];
+    const options = lastSendOptionsRef.current.get(sessionId) ?? {
+      model: selectedChatModelId,
+      mode: composerState?.mode ?? "agent",
+      selectedSkills: composerState?.selectedSkills ?? [],
+      thinkingEnabled: false,
+    };
+    void handleSend("/compact", { ...options, attachments: undefined, fileReferences: undefined, responseAnnotations: undefined });
+  }, [composerStateBySession, handleSend, selectedChatModelId]);
 
   const handleAbort = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
@@ -2085,7 +2354,8 @@ export function App() {
   }, [activeAgentRunId, persistedEvents, sessionRecord?.messageBlocks, streamingBlocks, isRecoveredRun]);
 
   const messages = useMemo<MessageBlock[]>(() => {
-    const merged = streamingBlocks.length === 0 ? persistedMessages : [...persistedMessages, ...streamingBlocks];
+    const withStreaming = streamingBlocks.length === 0 ? persistedMessages : [...persistedMessages, ...streamingBlocks];
+    const merged = compactionFailure && !isStreaming ? [...withStreaming, compactionFailure] : withStreaming;
     // 后台 bash 任务状态覆写：bash_task_update 事件在 turn 结束后仍会到达，
     // 持久化块里的 backgrounded 状态以内存最新事件为准
     if (Object.keys(bashTaskUpdates).length === 0) return merged;
@@ -2095,7 +2365,8 @@ export function App() {
       if (!update) return block;
       return { ...block, backgroundStatus: update.status, exitCode: update.exitCode ?? block.exitCode };
     });
-  }, [persistedMessages, streamingBlocks, bashTaskUpdates]);
+  }, [persistedMessages, streamingBlocks, bashTaskUpdates, compactionFailure, isStreaming]);
+  const isCompacting = streamingBlocks.some((block) => block.kind === "context_compaction" && block.status === "running");
 
   const contextSnapshot: ContextUsageSnapshot | null =
     sessionRecord?.contextSnapshot ??
@@ -2119,6 +2390,19 @@ export function App() {
     );
   }, [sessions, workspaceRegistry]);
   const activeSessionId = selectedSessionId;
+  const messageQueueControls: MessageQueueControls = {
+    queue: messageQueue,
+    running: isStreaming,
+    steerBlockedReason: isCompacting
+      ? "压缩中不能插入，完成后会自动发送"
+      : activeSessionId && approvalPendingSessionIds.has(activeSessionId) ? "等待审批时不能插入" : null,
+    onSteer: handleSteerQueued,
+    onUnsteer: (id) => void handleUnsteerQueued(id),
+    onRemove: (id) => { if (activeSessionId) updateMessageQueue(activeSessionId, (queue) => removeQueuedMessage(queue, id)); },
+    onMoveUp: (id) => { if (activeSessionId) updateMessageQueue(activeSessionId, (queue) => moveQueuedMessageUp(queue, id)); },
+    onEdit: handleEditQueued,
+    onResume: handleResumeQueue,
+  };
   const composerStateKey = activeSessionId ?? "__draft__";
   const storedComposerState = composerStateBySession[composerStateKey] ?? DEFAULT_COMPOSER_STATE;
   const projectedMode = activeSessionId
@@ -2596,6 +2880,10 @@ export function App() {
         contextState={contextState}
         isStreaming={isStreaming}
         isAborting={isAborting}
+        isCompacting={isCompacting}
+        messageQueue={messageQueueControls}
+        composerNotice={composerNotice && composerNotice.sessionId === activeSessionId ? composerNotice.text : null}
+        onRetryCompaction={handleRetryCompaction}
         sendScrollRequestId={sendScrollRequestId}
         composerFocusRequestId={composerFocusRequestId}
         busySessionIds={busySessionIds}

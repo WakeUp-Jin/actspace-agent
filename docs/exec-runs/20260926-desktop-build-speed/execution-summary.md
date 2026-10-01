@@ -19,6 +19,4 @@
 
 ## Remaining gate
 
-`pnpm --filter @actspace/desktop typecheck` currently reports errors in existing Usage Statistics fixtures because the worktree's `UsageCostSummary` edits require `costUsd`. Re-run after those unrelated edits are completed. Electron UI, packaged app, and signing gates remain manual release checks.
-
-`pnpm check:docs` also remains blocked by the pre-existing `docs/exec-plans/active/20260926-site-homepage-redesign.md`, whose completed plan is still under `active/`.
+Automated build, typecheck, test, graph, and documentation checks now pass. Electron UI, packaged app, and signing gates remain manual release checks; the active site plan separately retains its T10 real screenshot gate.

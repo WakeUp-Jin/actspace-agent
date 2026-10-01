@@ -15,6 +15,12 @@ declare global {
       abortAgentRun: (
         input: import("@actspace/shared").AbortAgentRunInput
       ) => Promise<boolean>;
+      steerAgentRun?: (
+        input: import("@actspace/shared").SteerAgentRunInput
+      ) => Promise<import("@actspace/shared").SteerAgentRunResult>;
+      cancelSteer?: (
+        input: import("@actspace/shared").CancelSteerInput
+      ) => Promise<import("@actspace/shared").CancelSteerResult>;
       selectFiles?: () => Promise<import("@actspace/shared").SelectFilesResult>;
       selectImages?: () => Promise<import("@actspace/shared").SelectImagesResult>;
       importComposerImage?: (

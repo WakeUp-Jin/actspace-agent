@@ -50,7 +50,7 @@
 - Bash 审核态可以使用轻量边框块，因为它承载用户操作，不属于普通执行日志。
 - Agent 是聚合执行对象：主消息流显示可点击的紧凑两行入口，展示状态点、任务名、Agent/Explore 类型、状态和最新一行活动；不展示额外 logo、机器人图标或全大写状态噪音。完整 transcript 通过 Composer 上方的会话内 panel 展示，不使用全局遮罩弹窗，也不在主消息流原地展开。
 - Edit / Write File 与 Read 等保持同样的纯文本工具行节奏，仅在用户主动展开时显示 diff 详情容器。
-- Context Compaction 是系统执行事件，不属于工具调用，也不渲染为 Tool Preview；手动 `/compact` 和未来自动压缩共享同一消息块语法。
+- Context Compaction 是系统执行事件，不属于工具调用，也不渲染为 Tool Preview；手动 `/compact` 和自动压缩共享同一消息块与同一套 UI。
 - Final reply 作为收束结果，保持最清晰的阅读层级。
 
 ## Assistant 回复尾栏
@@ -314,33 +314,51 @@ Edit File 和 Write File 是文件修改类工具消息。后端工具名为 `ed
 
 ## Context Compaction 组件
 
-Context Compaction 展示上下文压缩生命周期。它可能由用户在 Composer 直接输入 `/compact` 手动触发，也可能由后端自动压缩触发；二者都落到消息流中的 `context_compaction` 消息块。
+Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接输入 `/compact` 手动触发，或回合结束后由后端自动触发；两者使用同一套 UI，不区分、不标注触发方式，都落到消息流中的 `context_compaction` 消息块。设计稿：`docs/design-docs/frontend/context-compaction-demo.html`。
 
 ### 结构
 
-- pending：显示轻量 `/compact` 命令行，不生成普通用户消息。
-- running：显示为消息流中的独立系统执行段，不使用外围方框、图标或 spinner。上方是一段稳定文字，例如 `Compacting context · Summarizing older messages`；下方是一条细进度条。
-- completed：显示为独立 timeline divider，推荐文案 `Context compacted · 29 messages`。divider 左右细线铺开，居中文案，不使用图标、卡片或 pill。
-- completed 耗时优先读取 journal 的 `compaction/end.data.durationMs`，包含事务提交前的模型摘要等待；旧 journal 缺少该值时回退 start/end 时间差，历史回放遵循同样规则。
-- skipped：显示为独立 timeline divider，推荐文案 `Nothing to compact`。
-- failed：显示为独立系统结果行或 divider，展示失败原因；不贴进上一条 assistant 回复。
+- running：独立系统执行段。第一行 `正在压缩上下文 · 8s`（已用时间每秒刷新，来自 `startedAt`），下方一条 3px 不确定进度条，再下方一行说明 `正在总结较早的消息。`。手动 `/compact` 发出即进入 running，不再显示淡色 `/compact` 命令行。
+- completed：独立 timeline divider，左右细线，居中文案 `上下文已压缩 · 29 条消息 · 12s`。条数来自压缩区间大小，耗时优先来自 journal 的 `compaction/end.data.durationMs`，包含事务提交前的模型摘要等待；旧 journal 缺少该值时回退 `compaction/start` 与 `compaction/end` 的时间差，历史回放同样显示。有摘要时文案是按钮，右侧带一个 chevron，点击展开摘要面板；运行中刚完成、摘要尚未投影时显示为纯分隔线。
+- 摘要面板：分隔线下方的浅底面板（`bg-surface-subtle`），头部 `压缩摘要 · N 字` + `复制`；正文用 Markdown 渲染，字号收敛到正文档位，最高 240px 内滚动；底部说明 `分隔线以上的消息仍然显示，但模型之后只通过这段摘要了解它们。`
+- failed：红色分隔线（`text-on-danger` + `bg-danger-soft` 细线），文案 `上下文压缩失败 · 原因`，右侧带下划线文字按钮 `重试`，重试走同一 `/compact` 路径。失败没有 durable 事件，只在本次会话窗口内保留到该会话下一次发送。
+- skipped（对话太短）：不进入消息流，只在 Composer 输入框顶部显示一行 `对话还很短，暂时不需要压缩`，约 3 秒后消失。
 
 ### 交互
 
-- 本轮不提供展开详情。
+- 被压缩的旧消息、工具调用继续在分隔线上方照常显示，不置灰；摘要不再投影成一张用户消息卡片，只在分隔线展开后出现。
 - `/compact` exact command 由 renderer 在发送前分流到 `context:compact` IPC，不进入 `RunAgentInput.userInput`，也不写入 LLM conversation。
-- running 进度条只表达阶段进度；后端没有真实百分比时使用 indeterminate 样式，不伪造精确百分比。
-- running 文本不做 opacity pulse、扫光或省略号动画；动态只交给进度条，避免在阅读流里产生重复闪动。
+- 压缩进行中不能中止：输入框为空时 Composer 停止按钮置灰（`aria-disabled`），提示 `压缩完成后可继续`。压缩期间输入的消息进入消息队列（见下一节），压缩完成后依次发出。
+- 自动压缩在 `turn/end` 之后、回合 `completed` 之前运行；自动压缩失败不会让已完成的回合变成失败，只显示失败分隔线。
+- running 文本不做 opacity pulse、扫光或省略号动画；动态只交给进度条和计时数字。
 
 ### 视觉原则
 
-- pending / completed / skipped / failed 都保持轻量系统消息，不打断对话阅读节奏。
-- Context Compaction 是工作流的一部分，但不是工具日志，也不是 assistant 正文；它必须作为独立 timeline item 占据消息流位置，不能贴到上一条模型回复里。
-- running 的进度条宽度与中间内容列 / Composer 输入框宽度对齐，允许铺满；高度保持克制，建议 2-3px。
-- completed divider 使用普通主题色文字 + 细线，视觉重量低于用户消息卡片，高于普通工具日志行，确保用户能感知这里发生了上下文边界事件。
-- 所有状态都不使用图标。当前方向明确去掉 `CheckCircle`、`Loader`、`CircleDashed` 等图标语言，让状态由文案、位置和进度条表达。
-- 颜色只消费语义 token / 语义 Tailwind 类。
-- `prefers-reduced-motion` 下仍能通过文案和状态理解执行过程，不依赖动画。
+- 所有状态保持轻量系统消息，不打断对话阅读节奏；它必须作为独立 timeline item 占据消息流位置，不能贴到上一条模型回复里。
+- 进度条宽度与中间内容列对齐，高度 3px；后端没有真实百分比，只用不确定样式，不伪造百分比。
+- 除展开 chevron 外不使用图标；状态由文案、位置、颜色和进度条表达。
+- 颜色只消费语义 token / 语义 Tailwind 类；同一属性的颜色类按状态二选一，不叠加。
+- `prefers-reduced-motion` 下进度条停止动画，状态仍能通过文案理解。
+
+## 消息队列与运行中插入
+
+回合运行中（包括上下文压缩中），用户仍可在 Composer 输入并发送。消息进入输入框上方的队列托盘，当前运行结束后按顺序自动发出，每条是一个新回合，不合并。设计稿：`docs/design-docs/frontend/message-queue-demo.html`。
+
+### 结构
+
+- 托盘位置与回复引用托盘同一体系（Composer 面板顶部，`bg-surface-subtle` + 细边框），排在引用托盘之上。头部 `N 条排队 · N 条已插入` + 状态提示（`当前运行结束后依次发送` / `即将发送` / `已暂停`）；暂停时右侧 `继续发送`。列表最高 156px 内滚动。
+- 排队行：单行文本摘要，右侧依次是附件 / 引用数量（`1 个文件 · 2 条引用`）、`↳ 插入`、删除图标、`···`。`···` 菜单只有 `编辑`（输入框为空时可用，把这条放回输入框并移出队列）和 `上移`；删除不二次确认。
+- `/compact` 行用等宽字体，标 `命令`，没有插入。
+- 已插入行：排在最上方，文本降为 muted，右侧绿色圆点 `下一步读取` + `撤回`。
+
+### 交互
+
+- 发送按钮只有两种样子：输入框有内容时是 ↑（运行中点击或 Enter 即加入队列，aria-label / 提示为 `加入队列`）；运行中且输入框为空时是 ■ 停止（压缩中置灰）。运行中占位文案 `输入下一条，Enter 加入队列`。
+- `↳ 插入` 把这条通过 durable inbox `next-step` 送进正在运行的回合，模型下一步开始时读到；如果模型当时正在写最后的回复，回合多跑一步。读到时（`user_message_steered`）这条以普通用户消息出现在当前回合的对应位置，不加标记，并从托盘移除。
+- 没有运行中的回合时不显示 `插入`；压缩中、等待审批时显示但不可用，悬停说明原因。
+- `撤回` 或回合结束时还没被读到的插入，回到队首。插入被拒（附件 / 引用失效）时回到队首并在 Composer 顶部提示原因。
+- 回合停止、失败或发送被拒后队列暂停，不自动发出；点 `继续发送` 或手动发送一条后恢复。
+- 队列按会话保存，只在渲染进程内存中（与草稿一致，重启丢失）；后台会话的队列在它的运行结束后照常自动发出。
 
 ## 顺序原则
 

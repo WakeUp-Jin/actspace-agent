@@ -33,6 +33,9 @@ export async function runToolStreamFixture(options: {
   mode?: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode;
   terminalOnly?: boolean;
   content?: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue;
+  compaction?: import("@actspace/compaction").CompactionPlugin;
+  usage?: import("@actspace/llm-service").LlmUsage;
+  onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void;
 } = {}) {
   const registry = createCoreCodecRegistry();
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({
@@ -57,7 +60,7 @@ export async function runToolStreamFixture(options: {
       if (options.terminalOnly) {
         requests += 1;
         yield { type: "text-delta", text: "Done." };
-        yield { type: "done", stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "Done." }] };
+        yield { type: "done", stopReason: "stop", usage: options.usage ?? EMPTY_LLM_USAGE, content: [{ type: "text", text: "Done." }] };
       } else if (requests++ === 0) {
         yield { type: "text-delta", text: "Read now. " };
         if (options.deltas !== false) {
@@ -73,7 +76,8 @@ export async function runToolStreamFixture(options: {
     })(),
   } });
   const events: AgentLoopLiveEvent[] = [];
-  const loop = new AgentLoop({ session, tools, inbox: new MainAgentInbox(session),
+  const inbox = new MainAgentInbox(session);
+  const loop = new AgentLoop({ session, tools, inbox,
     descriptor: { ...MAIN_AGENT_DESCRIPTOR, ...(options.subagent ? { kind: "subagent" as const, maxSteps: 2 } : {}), routeId: "test", model: "test" }, scope: new AgentScope("main:test", undefined, "main:test"),
     assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
     llm: new LlmService(routes, { resolve: async () => ({ apiKey: "fixture" }) }),
@@ -81,7 +85,9 @@ export async function runToolStreamFixture(options: {
     toolEnvironment: () => ({ resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: async () => { throw new Error("not used"); } }),
     onLiveEvent: (event) => { events.push(event); options.onLiveEvent?.(event); },
     context: options.context,
+    compaction: options.compaction,
   });
+  options.onLoop?.(loop, inbox);
   try {
     const result = await loop.runTurn({ content: options.content ?? "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test" });
     if (options.followup) await loop.runTurn({ content: "Continue without tools", mode: options.mode });

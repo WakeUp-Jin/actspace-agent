@@ -13,6 +13,8 @@ import { DEFAULT_COMPACTION_POLICY } from "./policy.js";
 import { LlmCompactionSummarizer } from "./summarizer.js";
 
 export type CompactionPluginConfig = { readonly routeId?: string; readonly model?: string };
+/** Notified once a region is chosen and summarizing is about to start; skipped compactions never notify. */
+export type CompactionObserver = { readonly onStarted?: (info: { readonly entryCount: number }) => void };
 
 /** Cordis owner for compaction policy and summarizer resources. */
 export class CompactionService extends Service {
@@ -43,8 +45,8 @@ export class CompactionService extends Service {
   }
 
   withTriggerRatio(triggerRatio: number | (() => number)): CompactionPlugin { return this.runtime.withTriggerRatio(triggerRatio); }
-  maybeCompact(session: SessionHandle, usage: TokenUsage): Promise<boolean> { return this.runtime.maybeCompact(session, usage); }
-  compact(session: SessionHandle): Promise<boolean> { return this.runtime.compact(session); }
+  maybeCompact(session: SessionHandle, usage: TokenUsage, observer?: CompactionObserver): Promise<boolean> { return this.runtime.maybeCompact(session, usage, observer); }
+  compact(session: SessionHandle, observer?: CompactionObserver): Promise<boolean> { return this.runtime.compact(session, observer); }
 }
 
 export function apply(ctx: CordisContext, config: CompactionPluginConfig = {}): void {
@@ -64,20 +66,21 @@ export class CompactionPlugin {
     return new CompactionPlugin(this.policy, this.summarizer, resolver);
   }
 
-  async maybeCompact(session: SessionHandle, usage: TokenUsage): Promise<boolean> {
+  async maybeCompact(session: SessionHandle, usage: TokenUsage, observer?: CompactionObserver): Promise<boolean> {
     let resolved: number | undefined;
     try { resolved = this.triggerRatioResolver?.(); } catch { resolved = undefined; }
     const triggerRatio = typeof resolved === "number" && Number.isFinite(resolved) && resolved > 0 && resolved <= 1
       ? resolved
       : this.policy.triggerRatio;
     if (!shouldCompact(usage, { ...this.policy, triggerRatio })) return false;
-    return this.compact(session);
+    return this.compact(session, observer);
   }
 
-  async compact(session: SessionHandle): Promise<boolean> {
+  async compact(session: SessionHandle, observer?: CompactionObserver): Promise<boolean> {
     const region = chooseCompactionRegion(session.projection.surface, this.policy);
     if (region === null) return false;
     const startedAt = Date.now();
+    try { observer?.onStarted?.({ entryCount: region.end - region.start }); } catch { /* Observers cannot change compaction. */ }
     const entries = session.projection.surface.entries.slice(region.start, region.end);
     await session.flush();
     const summary = await this.summarizer.summarize(entries, { sessionId: session.header.sessionId });
