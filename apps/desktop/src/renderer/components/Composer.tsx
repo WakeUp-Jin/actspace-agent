@@ -711,6 +711,12 @@ export function Composer({
   const showInlineContextUsage = isChatForm && surface === "followup";
   const resolvedLayout: "inline" | "stacked" =
     surface === "initial" || hasAttachments || responseAnnotations.length > 0 || isInputMultiline ? "stacked" : "inline";
+  const inlineBodyClass = showInlineContextUsage
+    ? COMPOSER_BODY_CHAT_INLINE_CLASS
+    : mode === "agent" && !isChatForm ? COMPOSER_BODY_AGENT_INLINE_CLASS : COMPOSER_BODY_INLINE_CLASS;
+  const stackedBodyClass = showInlineContextUsage
+    ? COMPOSER_BODY_CHAT_STACKED_CLASS
+    : mode === "agent" && !isChatForm ? COMPOSER_BODY_AGENT_STACKED_CLASS : COMPOSER_BODY_STACKED_CLASS;
   const placeholder = isStreaming && messageQueue
     ? "输入下一条，Enter 加入队列"
     : isChatForm
@@ -846,7 +852,7 @@ export function Composer({
 
   // 原生 textarea 不会随内容自动长高（粘贴大段文本时只会内部滚动）。
   // 多行判定必须始终按 inline 布局的可用宽度测量：如果在 stacked 的全宽输入框中测量，
-  // 长文本可能被误判为单行，切回更窄的 inline 后又发生折行，但 effect 不再触发，最终裁切内容。
+  // 长文本可能被误判为单行，切回更窄的 inline 后又发生折行，反复更新直到 React 卸载页面。
   // 判定完成后再按当前布局宽度设置实际高度；布局切换和容器宽度变化都会安全重测。
   useLayoutEffect(() => {
     const input = inputRef.current;
@@ -854,28 +860,40 @@ export function Composer({
     if (!input || !body) return;
 
     function measureInput() {
-      const bodyStyle = window.getComputedStyle(body);
-      const paddingLeft = Number.parseFloat(bodyStyle.paddingLeft) || 0;
-      const paddingRight = Number.parseFloat(bodyStyle.paddingRight) || 0;
-      const paddingWidth = paddingLeft + paddingRight;
-      const columnGap = Number.parseFloat(bodyStyle.columnGap) || 0;
-      const commandWidth = commandButtonRef.current?.offsetWidth ?? 0;
-      const modeWidth = modeButtonRef.current?.offsetWidth ?? 0;
-      const modelWidth = modelButtonRef.current?.offsetWidth ?? 0;
-      const sendWidth = body.querySelector<HTMLElement>(".send-button")?.offsetWidth ?? 0;
-      const inlineInputWidth = Math.max(
-        1,
-        body.clientWidth - paddingWidth - commandWidth - modeWidth - modelWidth - sendWidth - columnGap * 4,
-      );
-      const previousWidth = input.style.width;
+      // 测量必须使用独立 DOM：改变正在编辑的 textarea 的网格宽度或把高度
+      // 暂时归零，会改变其 scrollTop，IME 提交后浏览器不一定重新展示光标。
+      // 复制完整网格以复用控件宽度、gap 和响应式断点，避免布局判定反馈循环。
+      const measurement = body.cloneNode(true) as HTMLDivElement;
+      measurement.setAttribute("aria-hidden", "true");
+      measurement.setAttribute("inert", "");
+      measurement.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+      Object.assign(measurement.style, {
+        position: "fixed",
+        visibility: "hidden",
+        pointerEvents: "none",
+        left: "0",
+        top: "0",
+        width: `${body.clientWidth}px`,
+        boxSizing: "border-box",
+      });
+      const measuredInput = measurement.querySelector("textarea")!;
+      measuredInput.value = input.value;
+      measuredInput.style.height = "auto";
+      measuredInput.style.maxHeight = "none";
+      body.parentElement!.appendChild(measurement);
+      let inlineContentHeight: number;
+      let contentHeight: number;
+      try {
+        measurement.className = inlineBodyClass;
+        inlineContentHeight = measuredInput.scrollHeight;
+        measurement.className = body.className;
+        contentHeight = measuredInput.scrollHeight;
+      } finally {
+        measurement.remove();
+      }
 
-      input.style.width = `${inlineInputWidth}px`;
-      input.style.height = "auto";
-      const inlineContentHeight = input.scrollHeight;
-
-      input.style.width = previousWidth;
-      input.style.height = "auto";
-      input.style.height = `${input.scrollHeight}px`;
+      const height = `${contentHeight}px`;
+      if (input.style.height !== height) input.style.height = height;
       setIsInputMultiline(inlineContentHeight > COMPOSER_SINGLE_LINE_MAX_PX);
     }
 
@@ -890,7 +908,7 @@ export function Composer({
     });
     resizeObserver.observe(body);
     return () => resizeObserver.disconnect();
-  }, [message, mode, resolvedLayout, selectedModelId, surface]);
+  }, [message, inlineBodyClass, resolvedLayout, selectedModelId, surface]);
 
   function closeFloatingPanels() {
     setCommandOpen(false);
@@ -2045,11 +2063,7 @@ export function Composer({
   }
 
   function renderPanel() {
-    const composerBodyClass = showInlineContextUsage
-      ? resolvedLayout === "inline" ? COMPOSER_BODY_CHAT_INLINE_CLASS : COMPOSER_BODY_CHAT_STACKED_CLASS
-      : mode === "agent" && !isChatForm
-        ? resolvedLayout === "inline" ? COMPOSER_BODY_AGENT_INLINE_CLASS : COMPOSER_BODY_AGENT_STACKED_CLASS
-        : resolvedLayout === "inline" ? COMPOSER_BODY_INLINE_CLASS : COMPOSER_BODY_STACKED_CLASS;
+    const composerBodyClass = resolvedLayout === "inline" ? inlineBodyClass : stackedBodyClass;
     return (
       <div
         className={`${getComposerPanelClass(surface)}${isDragActive ? ` ${COMPOSER_DROP_ACTIVE_CLASS}` : ""}`}

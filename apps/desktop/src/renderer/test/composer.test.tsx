@@ -15,6 +15,7 @@ function setPartialActspaceBridge(bridge: PartialActspaceBridge) {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   delete (window as unknown as { actspace?: unknown }).actspace;
 });
 
@@ -295,10 +296,7 @@ describe("Composer follow-up bar", () => {
 
     // jsdom 不做真实布局，scrollHeight 恒为 0；用 getter 模拟内容高度。
     let mockScrollHeight = 34;
-    Object.defineProperty(input, "scrollHeight", {
-      configurable: true,
-      get: () => mockScrollHeight,
-    });
+    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(() => mockScrollHeight);
 
     expect(body.dataset.layout).toBe("inline");
 
@@ -316,21 +314,19 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByLabelText("消息输入框")).toBe(input);
   });
 
-  it("keeps wrapped content stacked when the wider stacked layout would fit on one line", async () => {
+  it.each(["agent", "plan", "chat"] as const)("keeps wrapped content stacked when the wider stacked layout would fit on one line (%s)", async (mode) => {
     const user = userEvent.setup();
-    renderComposer();
+    renderComposer({ mode });
 
     const panel = screen.getByLabelText("消息输入面板");
     const body = panel.querySelector(".composer-body") as HTMLElement;
     const input = screen.getByLabelText("消息输入框") as HTMLTextAreaElement;
 
-    Object.defineProperty(input, "scrollHeight", {
-      configurable: true,
-      get: () => {
-        // 测量判定时组件会临时写入 inline 宽度；真实 stacked 展示宽度没有 inline style。
-        if (input.style.width) return 74;
-        return body.dataset.layout === "stacked" ? 34 : 74;
-      },
+    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(function () {
+      // 同一个固定 inline 网格决定折行，不能随真实布局的判定结果变化。
+      const measuredBody = this.parentElement!;
+      if (this.style.width) return body.dataset.layout === "stacked" ? 34 : 74;
+      return /\[grid-template-areas:'plus_(?:mode_)?input_model(?:_context)?_send'\]/.test(measuredBody.className) ? 74 : 34;
     });
 
     await user.click(input);
@@ -342,6 +338,29 @@ describe("Composer follow-up bar", () => {
     // 模拟中文输入法按 Enter 确认候选后 message 再次变化：仍应按 inline 宽度判定，不能缩回 inline。
     await user.type(input, "啦");
     expect(body.dataset.layout).toBe("stacked");
+  });
+
+  it("does not resize the editing textarea temporarily during IME commit", async () => {
+    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockReturnValue(314);
+    renderComposer({ surface: "initial" });
+    const input = screen.getByLabelText("消息输入框") as HTMLTextAreaElement;
+    const body = input.parentElement!;
+    const changes: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => changes.push(...records));
+    observer.observe(body, { attributes: true, attributeOldValue: true, subtree: true });
+    input.focus();
+    input.scrollTop = 134.5;
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "长文本末尾的候选词" } });
+    fireEvent.compositionEnd(input, { data: "候选词" });
+    await Promise.resolve();
+    observer.disconnect();
+    expect(document.activeElement).toBe(input);
+    expect(input.selectionStart).toBe(input.value.length);
+    expect(input.scrollTop).toBe(134.5);
+    expect(changes.filter((record) => record.target === body && record.attributeName === "class")).toEqual([]);
+    expect(changes.filter((record) => record.target === input && record.attributeName === "style")).toEqual([]);
+    expect(screen.getAllByLabelText("消息输入框")).toEqual([input]);
   });
 
   it("forces stacked layout when attachments exist", async () => {
@@ -399,10 +418,7 @@ describe("Composer follow-up bar", () => {
     const input = screen.getByLabelText("消息输入框") as HTMLTextAreaElement;
     // jsdom 不做真实布局，scrollHeight 恒为 0；用 getter 模拟粘贴大段文本后内容撑高。
     let mockScrollHeight = 20;
-    Object.defineProperty(input, "scrollHeight", {
-      configurable: true,
-      get: () => mockScrollHeight,
-    });
+    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(() => mockScrollHeight);
 
     mockScrollHeight = 96;
     await user.click(input);
