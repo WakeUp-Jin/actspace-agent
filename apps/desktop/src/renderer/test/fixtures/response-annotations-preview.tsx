@@ -1,4 +1,4 @@
-/** Explicit visual fixture: no IPC, provider requests, or persisted sessions. `?theme=dark` 切深色，`?drafts=0` 不预置草稿批注。 */
+/** Explicit visual fixture: no IPC, provider requests, or persisted sessions. `?theme=dark` 切深色，`?drafts=0` 不预置草稿批注，`?mode=chat` 验证 Chat 输入框。 */
 import React from "react";
 import { createRoot } from "react-dom/client";
 import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared";
@@ -77,7 +77,7 @@ function Preview() {
   return <TooltipProvider><RightPanelProvider>
     <div className="flex h-screen flex-col bg-app-bg text-text-main">
       <ConversationView messages={messages} contextSnapshot={null} sessionId="visual-fixture" draftKey="visual-fixture"
-        isStreaming={false} composerPhase="active"
+        isStreaming={false} composerPhase="active" composerMode={params.get("mode") === "chat" ? "chat" : "agent"}
         readAnnotationDraft={() => drafts} writeAnnotationDraft={() => {}}
         executionContext={{ locked: true, runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
     </div>

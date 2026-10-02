@@ -149,7 +149,7 @@ export class AgentLoop {
           model: requestModel,
           messages: requestMessageList,
           tools: budgetSummary ? [] : Array.isArray(requestRecord.tools) ? requestRecord.tools as unknown as readonly LlmToolDefinition[] : tools,
-          options: { ...(input.thinkingEnabled === undefined ? {} : { reasoning: input.thinkingEnabled }), ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }) },
+          options: { cacheRetention: mode === "chat" ? "long" : "short", ...(input.thinkingEnabled === undefined ? {} : { reasoning: input.thinkingEnabled }), ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }) },
           signal: controller.signal,
         });
         const retryPolicy = prepared.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY;

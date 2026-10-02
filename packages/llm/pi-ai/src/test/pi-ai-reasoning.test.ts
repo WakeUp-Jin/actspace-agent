@@ -22,7 +22,7 @@ it.each([true, false])("carries thinking and effort through direct transport (en
   else expect(streamOptions.reasoning).toBeUndefined();
 });
 
-it.each(["short", "none"] as const)("passes Anthropic cache retention and session identity to pi-ai (%s)", async (cacheRetention) => {
+it.each(["short", "long", "none"] as const)("passes Anthropic cache retention and session identity to pi-ai (%s)", async (cacheRetention) => {
   let streamOptions: Record<string, unknown> = {};
   const engine = new PiAiAdapter({ wire: { route: "anthropic-messages", providerId: "custom", baseUrl: "https://relay.example", cacheRetention, load: async () => ({
     core: { createProvider: () => ({ id: "custom" }), createModels: () => ({ setProvider: () => {}, getModel: () => ({ id: "claude", provider: "custom" }), streamSimple: (_model, _context, options) => { streamOptions = options as Record<string, unknown>; return (async function* () { yield { type: "done", message: { content: [], stopReason: "stop" } }; })(); } }) },

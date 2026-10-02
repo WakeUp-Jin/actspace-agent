@@ -13,7 +13,7 @@ import { redactLlmText } from "@actspace/llm-service";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
 import { DeepSeekFileUploader } from "./deepseek-files.js";
-import { applyAnthropicPromptCache } from "./anthropic-cache.js";
+import { anthropicCacheControl, applyAnthropicPromptCache } from "./anthropic-cache.js";
 
 type SdkClient = Record<string, unknown>;
 type SdkConstructor = new (options: Record<string, unknown>) => SdkClient;
@@ -30,7 +30,7 @@ export type LegacyProxyWireEngineOptions = {
   readonly deepSeekFiles?: DeepSeekFileUploader;
   readonly proxies?: ProviderProxyPool;
   readonly loadSdk?: LegacyProxySdkLoader;
-  readonly cacheRetention?: "short" | "none";
+  readonly cacheRetention?: "short" | "long" | "none";
 };
 
 type Accumulator = {
@@ -83,8 +83,12 @@ async function* completionsStream(client: SdkClient, input: LlmAdapterDispatchIn
       const artifact = await readArtifact(sessionId, artifactId);
       return { ...artifact, mimeType: validateDeepSeekImage(artifact.data) };
     } : readArtifact;
+    const model = options.modelId ?? input.request.model;
+    const cacheControl = catalogProviderForEndpoint(input.credential.baseUrl ?? options.baseUrl ?? "") === "openrouter" && model.startsWith("anthropic/")
+      ? anthropicCacheControl(options.cacheRetention) : undefined;
     const body = {
-      model: options.modelId ?? input.request.model,
+      model,
+      ...(cacheControl ? { cache_control: cacheControl } : {}),
       messages: await toOpenAiMessages(input.request.messages, input.request.sessionId, checkedReader, deepseek, deepseek && options.deepSeekFiles ? async (sessionId, artifactId, artifact) => options.deepSeekFiles!.resolve({ apiKey: input.credential.apiKey ?? "", baseUrl: input.credential.baseUrl ?? options.baseUrl ?? "", sessionId, artifactId, bytes: artifact.data, mimeType: artifact.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp", signal: input.signal, fetchImpl: fetch }) : undefined),
       stream: true,
       ...reasoningPayload(options.route, options.providerId, input.request.options),

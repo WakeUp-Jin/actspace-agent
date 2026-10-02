@@ -2,7 +2,7 @@
 
 ## 文档状态
 
-- 状态：已确认方向，执行计划已拆分（见配套执行文档）；待实施。
+- 状态：P0、PA、PA2 已实施，PB 待实施；PA2 真实 Electron 主要流程通过，边界项见[验收记录](../../exec-runs/20260928-composer-mentions-annotations/pa2-computer-use/acceptance.md)。
 - 日期：2026-09-28。
 - 适用产品：ActSpace Desktop（Electron + React + TypeScript）。
 - 参考对象：Codex App 的富输入框、`@` 文件引用、`/` 命令菜单、回复选区批注和悬浮批注卡片。
@@ -24,6 +24,7 @@
 | 文件搜索 | 未定 | main 用 `git ls-files -co --exclude-standard`，非 git 仓库退回有上限的 Node 遍历；按 workspace 缓存 30 秒；不依赖 PATH 上的 `rg`。 |
 | workspace 外文件（§17-2） | 建议 V1 只含当前 workspace | 确认只含当前 session workspace。 |
 | 已发送批注（§9.5、§17-3） | `删除` 为本地 overlay | 已发送批注只读：只有查看和「复制到草稿」，没有删除。 |
+| 回复批注交互（§8.2–§8.5、§9.3–§9.5，2026-10-01 PA2） | 选区上方工具条、Composer 引用托盘、回复内中性编号 marker + 悬浮预览、已发送摘要 + 复制到草稿 | 按用户确认的 demo 重做，见 [PA2](../../exec-plans/active/20260928-composer-mentions-annotations/pa2-annotation-interaction-redesign.md)：选区末尾「添加到对话」菜单；添加后在选区旁弹评论框（Enter 保存、Esc 取消）；草稿在回复里是原文淡蓝高亮 + 右上角蓝色编号圆点，点圆点重开评论框；Composer 只有一个「N 条批注」胶囊，悬停出卡片（编辑、删除、× 清空）；已发送批注是用户消息上方的只读胶囊，卡片条目可定位原文，定位不上显示「原回复不可用」；发送后回复上不留高亮和圆点，「复制到草稿」取消。数据契约不变。 |
 | 代码块批注（§17-4） | 建议不允许 | 确认不允许。 |
 | 模型可见内容（§10.3） | 引用说明含 source message id | 只给选中原文和用户评论，不含内部 id、编号或 UI 文案。 |
 | Chat 形态 | `@` 关闭 | `@` 关闭且 main 拒绝文件引用；回复批注在 Chat 中可用。 |

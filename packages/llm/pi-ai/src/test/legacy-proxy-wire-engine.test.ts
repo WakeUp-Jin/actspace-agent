@@ -33,19 +33,38 @@ describe("LegacyProxyWireEngine", () => {
     } finally { await pool.dispose(); }
   });
 
-  it.each(["short", "none"] as const)("applies Anthropic cache markers through the proxy (%s)", async (cacheRetention) => {
+  it.each(["short", "long", "none"] as const)("applies Anthropic cache markers through the proxy (%s)", async (cacheRetention) => {
     const observed: { params?: unknown; options?: unknown } = {};
     const pool = proxyPool();
     const engine = new LegacyProxyWireEngine({ route: "anthropic-messages", providerId: "custom", baseUrl: "https://relay.example", proxies: pool, cacheRetention, loadSdk: loaderFor("anthropic-messages", observed) });
     for await (const _event of await engine.stream(input("anthropic-messages"))) { /* drain */ }
     const serialized = JSON.stringify(observed.params);
-    if (cacheRetention === "short") {
+    if (cacheRetention !== "none") {
       expect((serialized.match(/cache_control/g) ?? [])).toHaveLength(3);
       expect(serialized).toContain('"type":"ephemeral"');
+      expect(serialized).toContain(`"ttl":"${cacheRetention === "long" ? "1h" : "5m"}"`);
     } else {
       expect(serialized).not.toContain("cache_control");
     }
     await pool.dispose();
+  });
+
+  it.each(["short", "long", "none"] as const)("enables OpenRouter Claude caching on direct and proxy requests (%s)", async (cacheRetention) => {
+    for (const proxy of [false, true]) {
+      for (const modelId of ["anthropic/claude-opus-5.5", "openai/gpt-fixture"]) {
+        const observed: { params?: unknown } = {};
+        const pool = proxyPool();
+        try {
+          const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "openrouter", modelId, baseUrl: "https://openrouter.ai/api/v1", proxies: pool, cacheRetention, loadSdk: loaderFor("openai-completions", observed) });
+          const original = input("openai-completions");
+          for await (const _event of await engine.stream({ ...original, credential: proxy ? original.credential : { apiKey: "fixture" } })) { /* drain */ }
+          expect(observed.params).toMatchObject({ model: modelId, stream: true });
+          if (modelId.startsWith("anthropic/") && cacheRetention !== "none") {
+            expect(observed.params).toMatchObject({ cache_control: { type: "ephemeral", ttl: cacheRetention === "long" ? "1h" : "5m" } });
+          } else expect(observed.params).not.toHaveProperty("cache_control");
+        } finally { await pool.dispose(); }
+      }
+    }
   });
 
   it.each([0, 0.123])("preserves raw OpenRouter billed cost %s on direct requests", async (cost) => {

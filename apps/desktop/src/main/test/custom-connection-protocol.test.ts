@@ -407,3 +407,17 @@ it("dispatches Bearer connections with an Authorization header and no apiKey", a
     expect(sent).not.toHaveProperty("apiKey");
   } finally { await adapter.dispose(); }
 });
+
+
+it.each(["openai-completions", "anthropic-messages"] as const)("binds mode cache retention and honors connection opt-out (%s)", async (api) => {
+  for (const promptCacheMode of [undefined, "off"] as const) {
+    const resolution = { ok: true as const, model: { key: "fixture", definition: { api, provider: "openrouter", apiModel: "anthropic/claude-fixture", contextWindow: 1_000_000 }, providerRuntime: { baseUrl: "https://openrouter.ai/api/v1", promptCacheMode } } };
+    const adapter = new DesktopLegacyLlmAdapter({ resolveMainModel: () => resolution, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); });
+    try {
+      for (const cacheRetention of ["long", "short", "none"] as const) {
+        await adapter.dispatch({ request: { model: "fixture", options: { cacheRetention } }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
+        expect(wire).toHaveBeenLastCalledWith(expect.objectContaining({ cacheRetention: promptCacheMode === "off" ? "none" : cacheRetention }));
+      }
+    } finally { await adapter.dispose(); }
+  }
+});

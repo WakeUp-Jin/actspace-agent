@@ -24,7 +24,7 @@ export type PiAiConnectionOptions = {
   readonly readArtifact?: PiAiArtifactReader;
   readonly deepSeekFiles?: DeepSeekFileUploader;
   readonly load?: PiAiPublicLoader;
-  readonly cacheRetention?: "short" | "none";
+  readonly cacheRetention?: "short" | "long" | "none";
 };
 
 type PiAiPublicLoader = (route: PiAiWireRoute) => Promise<{ readonly core: PiAiCoreModule; readonly api: PiAiApiModule }>;

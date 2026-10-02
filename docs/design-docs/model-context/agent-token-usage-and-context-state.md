@@ -250,3 +250,8 @@ Compaction 不删除 Journal 历史，而是为有效 Session Surface 追加 rep
 - 删除派生 UI 状态不会影响 Session 恢复；
 - secret-like 字段无法进入 request snapshot；
 - Compaction 后旧 Journal 行仍保留，后续请求只消费新的有效 Surface。
+
+
+### 小于 1% 的显示边界
+
+Context 的 `percentUsed` 保留浮点占用率。已知容量且有内容时，`percentUsed < 1` 显示 `<1%`；不能只判断 `<= 0` 再向下取整，否则 0.42% 会错误显示为 0%。Composer 与 ContextPopup 使用相同条件。空上下文或未知容量仍显示 0%，不猜测模型容量。此百分比不是缓存命中率。

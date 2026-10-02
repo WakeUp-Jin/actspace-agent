@@ -1,0 +1,6 @@
+The following is a diff from the previous accessibility tree for Window: "actspace" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~						477 文本输入区 (settable) Description: 第 1 条批注的评论, Placeholder: 添加评论（可选）…, Value: [1999 个验字]😀😀
+~						478 按钮 (disabled) 保存评论
++						479 container
++							480 text 评论超过  2,000  个字符，请缩短后再提交。
+The focused UI element is 477 文本输入区 (settable) Description: 第 1 条批注的评论, Placeholder: 添加评论（可选）…, Value: [1999 个验字]😀😀

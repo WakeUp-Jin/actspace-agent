@@ -704,7 +704,7 @@ export function Composer({
         ? "var(--act-color-warning)"
         : "var(--act-color-text-faint)";
   // 有内容但占比不足 1% 时显示「<1」，避免「明明有数据却是 0%」的误解。
-  const contextPercentLabel = effectiveContextSnapshot && effectiveContextSnapshot.maxTokens > 0 && effectiveContextSnapshot.totalTokens > 0 && contextUsagePercent <= 0
+  const contextPercentLabel = effectiveContextSnapshot && effectiveContextSnapshot.maxTokens > 0 && effectiveContextSnapshot.totalTokens > 0 && contextUsagePercent < 1
       ? "<1"
       : `${Math.floor(contextUsagePercent)}`;
   // 单行内容用 inline 紧凑布局；内容折行、有附件或 initial surface 切 stacked（参考 Cursor）。

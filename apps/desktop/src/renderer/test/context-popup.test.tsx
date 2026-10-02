@@ -65,7 +65,7 @@ describe("ContextPopup", () => {
     const snapshot: ContextUsageSnapshot = {
       totalTokens: 2_190,
       maxTokens: 1_000_000,
-      percentUsed: 0,
+      percentUsed: 0.219,
       compressionCount: 0,
       cumulativeTokens: 2_190,
       buckets: [

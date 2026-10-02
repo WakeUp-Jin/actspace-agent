@@ -31,6 +31,8 @@ export type LlmToolDefinition = {
 };
 
 export type LlmRequestOptions = {
+  /** Requested prompt-cache lifetime; adapters apply provider support and connection opt-out. */
+  readonly cacheRetention?: "none" | "short" | "long";
   readonly temperature?: number;
   readonly maxTokens?: number;
   readonly reasoning?: boolean;

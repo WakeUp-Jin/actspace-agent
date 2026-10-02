@@ -401,3 +401,17 @@ owner lease 在成功、不可重试失败、重试耗尽、backoff abort、snap
 初版采用保守兼容规则：上述身份与支持的 schema version 全部一致才保留 opaque state；跨 provider/protocol/model 或未知版本剥离 opaque 部分，保留普通内容。应用重启和同配置 generation replacement 不因此丢失兼容 signature。若某协议不接受剥离后的 reasoning block，由该协议转换器省略该 reasoning block，不能破坏文本或工具调用关系。
 
 验证包含同模型重启恢复、旧 signature-only 记录、跨 provider/model 切换、未知 schema、工具调用回放和无秘密序列化。真实 Provider 是否接受恢复的 signature 单独验收。
+
+
+## 15. 按模式选择 Claude 提示缓存
+
+Agent Loop 在每次准备请求时设置 `LlmRequestOptions.cacheRetention`：Chat 使用 `long`（1 小时），Plan、Agent 等其他模式使用 `short`（5 分钟）。模式切换从下一次请求生效；同一次请求的重试复用已准备的选项。缺少模式策略的辅助请求默认短缓存。
+
+Desktop 在 prepare 阶段应用连接级关闭开关，`promptCacheMode: off` 优先于模式策略，并把实际选择写回 prepared options。持久设置的 `short` 保留兼容性，表示启用缓存，实际时长由请求模式决定。
+
+- Anthropic Messages 直连：把 `short / long / none` 传给 pi-ai；SDK 将 long 转成 `cache_control.ttl: 1h`，short 使用默认 5 分钟。
+- Anthropic Messages 代理：稳定前缀断点显式携带同一时长的 `cache_control`。
+- OpenRouter 官方 endpoint 的 `anthropic/*` Chat Completions：兼容 backend 在请求顶层发送 `cache_control: { type: ephemeral, ttl: 1h | 5m }`，让服务端自动推进多轮缓存边界；关闭时省略。继续保留 provider-reported cost。
+- 其他模型不注入 Claude 缓存参数。本轮不改变 Responses backend 或切换 SDK。
+
+请求参数正确不代表每次都能命中；缓存最小长度、前缀一致性、有效期和上游路由仍由服务商决定。官方依据：[OpenRouter prompt caching](https://openrouter.ai/docs/guides/best-practices/prompt-caching)。本地回归覆盖模式策略、关闭优先、直接/代理请求体、真实 pi-ai 序列化，以及账单和 usage 不回退；真实服务商命中另行验收。

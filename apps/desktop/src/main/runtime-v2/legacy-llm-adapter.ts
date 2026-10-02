@@ -58,13 +58,16 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     if (capabilities?.reasoning === false) { delete requestOptions.reasoning; delete requestOptions.reasoningEffort; }
     const requestModel = reasoningEffort ? model.definition.requestModelByReasoningEffort?.[reasoningEffort] ?? model.definition.apiModel : model.definition.apiModel;
     const route = toWireRoute(model.definition.api);
-    const cacheRetention: "short" | "none" = runtime.promptCacheMode === "off" ? "none" : "short";
+    const cacheRetention = runtime.promptCacheMode === "off" ? "none" : requestedOptions.cacheRetention ?? "short";
     const pricingModel = model;
     const pricing = this.models.resolvePricing ? this.models.resolvePricing(pricingModel, requestModel) : resolveModelPricing(BUILTIN_MODEL_CATALOG, customConnectionPricingInput(pricingModel, requestModel));
     const endpointOwner = catalogProviderForEndpoint(runtime.baseUrl ?? "");
     const wireProvider = !customConnection ? model.definition.provider
       : endpointOwner === "openrouter" || endpointOwner === "deepseek" ? endpointOwner
       : endpointOwner === "moonshotai" || endpointOwner === "moonshotai-cn" ? "kimi" : "custom";
+    const supportsPromptCache = route === "anthropic-messages"
+      || (endpointOwner === "openrouter" && route === "openai-completions" && requestModel.startsWith("anthropic/"));
+    if (supportsPromptCache) requestOptions.cacheRetention = cacheRetention;
     const deepSeekFiles = wireProvider === "deepseek" && route === "openai-completions" && capabilities?.input?.includes("image")
       ? (this.#deepSeekFiles ??= new DeepSeekFileUploader())
       : undefined;
@@ -75,7 +78,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
       providerId: wireProvider,
       modelId: requestModel,
       baseUrl: runtime.baseUrl,
-      ...(route === "anthropic-messages" ? { cacheRetention } : {}),
+      ...(supportsPromptCache ? { cacheRetention } : {}),
       readArtifact: async (sessionId: string, artifactId: string) => {
         const artifact = await this.readArtifact(sessionId, artifactId);
         return { data: artifact.bytes, mimeType: artifact.mediaType };

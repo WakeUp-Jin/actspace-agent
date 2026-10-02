@@ -93,6 +93,28 @@
   - `pnpm --filter @actspace/desktop build` 通过。
 - **待用户确认（PA.8）**：Electron 真实验收需要用户手动操作，步骤见 `pa-response-annotations.md` 的 PA.8。
 
+### 步骤 7：PA2 回复批注交互重做
+
+起因：PA 完成后，用户拿 Codex 的截图对照，认为选区工具条、Composer 托盘和回复里的编号 marker 太重太散，要求照截图改（不做 Ask in side chat）。先做 demo（`assets/pa2-annotation-demo.html`），用户确认后写计划 [`pa2-annotation-interaction-redesign.md`](../../exec-plans/active/20260928-composer-mentions-annotations/pa2-annotation-interaction-redesign.md) 再改。只动 renderer，数据契约不变。已合入本地 main `6a1fd8b`（未 push）。
+
+- **选区菜单**：`ResponseSelectionToolbar` 改名 `ResponseSelectionMenu`，`role="menu"`，挂在选区最后一行右下方，放不下翻到上方；拖选期间（pointerdown 到 pointerup）不出现，松手后才评估。
+- **评论框**：新增 `ResponseAnnotationCommentPopover`，添加批注后在选区旁自动打开；Enter 保存并把焦点还给 Composer，Esc 取消，点外部保存已输入内容，超过 2000 字提示并禁用保存；原文滚出消息区时隐藏不关闭。
+- **草稿圆点与高亮**：`ResponseAnnotationMarkers` 只画草稿的 16px 蓝色编号圆点，点击重开评论框；新增 `ResponseAnnotationHighlights` 用 CSS Custom Highlight API 注册 `act-annotation`（草稿）和 `act-annotation-active`（悬停条目或定位中，草稿和已发送都可以）。
+- **Composer 胶囊**：`ResponseAnnotationTray`、`ResponseAnnotationCommentEditor`、`ResponseAnnotationPopover` 删除，换成 `ResponseAnnotationPill`（草稿 / 已发送两种）：HoverCard 卡片里逐条显示选中文本和评论，草稿条目有编辑、删除，右上角 × 清空；已发送条目是定位按钮。
+- **已发送批注**：`UserMessage` 的摘要去掉，胶囊放在用户消息上方；执行态的用户消息在 sticky 卡片里，所以胶囊由 `TurnPrompt` 渲染在卡片外。
+- **状态**：`useResponseAnnotationState` 不再接收 `messages`，改为 `resolveRange` 直接从 DOM 解析；新增 `editingAnnotationId`、`activeAnnotationId`、`locateAnnotation`、`editAnnotation`。
+- **颜色**：新增 `--act-color-annotation-mark`、`on-annotation-mark`、`annotation-highlight(-active)`，固定信息蓝，不跟随强调色，浅色、深色、跟随系统深色三处都有定义。
+- **与计划不同的地方**：
+  1. 草稿高亮第一次截图里完全没出现。原因：`ResponseAnnotationHighlights` 放在消息区之前，layout effect 运行时 `scrollContainerRef` 还是空的。改为挂在消息区之后，并在有草稿时用 MutationObserver 监听消息区，回复晚于组件出现、分页加载或重渲染后下一帧重新解析；补了回归测试（回复延后渲染）。
+  2. 评论框的保存按钮保留了 Tooltip（`IconButton` 规则要求 label）。
+  3. jsdom 里消息区没有尺寸，评论框被当作「原文滚出视口」设成 `visibility:hidden`，可访问名称为空，App 级测试改用 aria-label 选择器查找。
+- **验证**：
+  - `pnpm --filter "./packages/**" build` 通过。
+  - desktop 全量 967 通过，1 失败，1 跳过；失败的仍是 `workspace-git-context-service` 的 non-repository 用例（环境问题，main 上同样失败）。
+  - `pnpm typecheck`、`pnpm check:frontend-tokens`、`pnpm check:frontend-theme`、`pnpm check:docs`、`pnpm --filter @actspace/desktop build` 通过。
+  - fixture 截图 13 张，存 `pa2-screenshots/`：宽窗 / 窄窗(600px) × 浅色 / 深色、选区菜单、评论框、草稿卡片、已发送卡片。截图脚本在 `/tmp/pa2-shots/`，没有进仓库。
+- **2026-10-01 真实 Electron 验收**：用户授权 Computer Use 使用 `pnpm dev:log` 原生应用。完成 Agent/Chat 批注添加、评论保存/取消、重排/清空/20 条上限、发送与 Journal、会话隔离/重启、浅深主题及真实窗口缩窄主要路线；窄窗白屏未复现。相关 6 文件 104 测试通过。IME、降级定位、提交失败恢复等边界尚未实测，未完整签收；验收点、操作分组、截图和剩余路线见[逐项记录](pa2-computer-use/acceptance.md)。
+
 ## 遇到的问题
 
 - **问题**：worktree 隔离下，带变量的 shell 循环会被拒绝执行。
@@ -103,5 +125,6 @@
 ## 跳过或推迟的事项
 
 - PoC 中 IME `compositionend` 后 Enter 的验证：推迟到 PB.1。
-- PA.8 Electron 真实验收：agent 无法操作桌面应用，等用户确认。
-- 工具条翻到下方的截图：真实布局里拍不出来，由单元测试覆盖。
+- PA.8 真实交互现按 PA2 修订进行主要流程验收；原未实测边界继续保留，见[逐项记录](pa2-computer-use/acceptance.md)。
+- 工具条翻到下方的截图：真实布局里拍不出来，由单元测试覆盖（PA2 后菜单改名，逻辑不变）。
+- PA2 Electron 边界补验：IME、不可用/回退/歧义定位、提交前失败恢复、键盘定位与时长、部分视觉状态；主要流程已通过，不等同于完整签收。

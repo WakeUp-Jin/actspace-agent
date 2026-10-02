@@ -1,6 +1,6 @@
 # PA2：回复批注交互重做
 
-状态：执行中（2026-10-01，分支 `feat/response-annotation-redesign`，从 `main@d758122` 切出）。上级：[总览](README.md)。
+状态：已实施（2026-10-01，已合入本地 main `6a1fd8b`，未 push）；真实 Electron 主要流程已验收，边界项待补验，见[逐项记录](../../../exec-runs/20260928-composer-mentions-annotations/pa2-computer-use/acceptance.md)。上级：[总览](README.md)。
 
 ## 为什么重做
 
@@ -171,6 +171,7 @@ PA 按原设计实现后，用户对照 Codex 的截图认为交互和样式不�
 - 状态：选区菜单、评论框、两条草稿圆点 + 高亮、胶囊卡片、已发送胶囊卡片。
 - 截图放 `docs/exec-runs/20260928-composer-mentions-annotations/pa2-screenshots/`。
 - Electron 真实验收沿用 PA.8 的步骤（第 3 步改为：胶囊、悬停卡片、点击定位），由用户确认。
+- 2026-10-01：用户授权 Computer Use 操作真实 `pnpm dev:log` 桌面，主要流程通过；IME、降级定位、提交失败恢复等边界仍未实测。覆盖、截图与定向测试见[实机验收记录](../../../exec-runs/20260928-composer-mentions-annotations/pa2-computer-use/acceptance.md)，未完整签收。
 
 ## 验证命令
 

@@ -221,6 +221,13 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByText("~49K / 1M Token")).toBeVisible();
   });
 
+  it("shows a fractional context estimate as <1% in the footer and popup", async () => {
+    const user = userEvent.setup();
+    renderComposer({ contextState: { ...mockContextState, totalEstimatedTokens: 4_200, maxTokens: 1_000_000, percentUsed: 0.42 } });
+    await user.click(screen.getByRole("button", { name: "上下文用量 <1%" }));
+    expect(screen.getByText("<1% 已用")).toBeVisible();
+  });
+
   it("rounds the context usage status to an integer", () => {
     renderComposer({
       contextSnapshot: { ...mockContextSnapshot, percentUsed: 7.6092 },

@@ -6,6 +6,9 @@ describe("AgentLoop tool live events", () => {
   it.each(["chat", "plan", "agent"] as const)("persists %s mode at the end of the user message", async (mode) => {
     const requests: string[] = [];
     const { journal } = await runToolStreamFixture({ mode, terminalOnly: true, onMessages: (messages) => requests.push(JSON.stringify(messages)) });
+    expect(journal.find((event) => event.type === "request/context")?.data).toMatchObject({
+      snapshot: { prepared: { defaults: { cacheRetention: mode === "chat" ? "long" : "short" } } },
+    });
     const user = journal.find((event) => event.type === "user/message")?.surface?.node;
     expect(user?.content).toEqual([
       { type: "text", text: "Read fixture" },

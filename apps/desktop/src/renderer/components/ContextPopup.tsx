@@ -64,7 +64,7 @@ export function ContextPopup({
   };
 
   // 有内容但占比不足 1% 时显示「<1」，避免「明明有数据却是 0%」的误解。
-  const percentLabel = safeSnapshot.maxTokens > 0 && safeSnapshot.totalTokens > 0 && safeSnapshot.percentUsed <= 0
+  const percentLabel = safeSnapshot.maxTokens > 0 && safeSnapshot.totalTokens > 0 && safeSnapshot.percentUsed < 1
       ? "<1"
       : `${Math.floor(safeSnapshot.percentUsed)}`;
 
