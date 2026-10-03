@@ -21,7 +21,7 @@
     "dev:site": "pnpm --filter @actspace/site dev",
     "build": "pnpm --filter @actspace/agent-cli build && pnpm --filter @actspace/desktop build",
     "build:site": "pnpm --filter @actspace/site build",
-  "test": "pnpm run test:dev-runner && pnpm run test:repo-stats && pnpm run test:refactor-stats && pnpm run test:package-boundaries && pnpm run test:current-docs && pnpm run test:contract-matrix && pnpm -r --if-present test",
+    "test": "pnpm run test:dev-runner && pnpm run test:repo-stats && pnpm run test:refactor-stats && pnpm run test:package-boundaries && pnpm run test:current-docs && pnpm run test:contract-matrix && pnpm check:harness-events && pnpm test:harness-events && pnpm test:harness-recovery && pnpm -r --if-present test",
     "test:dev-runner": "node --test scripts/test/dev-process-runner.test.mjs",
     "test:repo-stats": "node --test scripts/test/repo-stats.test.mjs",
     "test:refactor-stats": "node --test scripts/test/refactor-stats.test.mjs",
@@ -57,7 +57,10 @@
     "hooks:install": "./scripts/install-git-hooks.sh",
     "package:desktop": "./scripts/release-package.sh",
     "package:desktop:dmg": "./scripts/release-package.sh",
-    "release-package": "./scripts/release-package.sh"
+    "release-package": "./scripts/release-package.sh",
+    "check:harness-events": "node scripts/check-harness-event-contracts.mjs",
+    "test:harness-events": "node --test scripts/test/harness-event-contracts.test.mjs",
+    "test:harness-recovery": "node --test scripts/test/harness-recovery-process.test.mjs"
   },
   "dependencies": {
     "@actspace/english-learning": "workspace:*",

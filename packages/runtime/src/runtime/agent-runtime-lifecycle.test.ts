@@ -41,7 +41,7 @@ describe("agent runtime service lifecycle", () => {
     ctx.provide("session.runtime", { store: {} });
     const runtime = new AgentRuntimeService(ctx as never);
     expect(runtime.registry).toBe(registry);
-    expect(runtime.harnesses.inspect()).toEqual([]);
+    expect(runtime.harnesses).toBeUndefined();
     expect(runtime.runs.isIdle()).toBe(true);
     await runtime.dispose();
     await runtime.dispose();

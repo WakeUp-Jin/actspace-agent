@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { emitContained, type CordisContext } from "@actspace/cordis-adapter";
-import { HarnessGenerations } from "@actspace/boot";
+import { HarnessControl } from "@actspace/harness-control";
 import type { AgentRegistry } from "@actspace/core-agent";
 import { createBuiltInPresets, OneShotSubagentProvider } from "@actspace/subagent";
 import type { RuntimeSessionController } from "./session-controller.js";
@@ -17,20 +17,19 @@ export const inject = Object.freeze([...new Set([...DEFAULT_HARNESS_SHARED_SERVI
 export class AgentRuntimeService {
   readonly runs: ManagedRuns;
   readonly subagents: OneShotSubagentProvider;
-  readonly harnesses: HarnessGenerations;
+  harnesses!: HarnessControl;
   readonly registry: AgentRegistry;
   constructor(ctx: CordisContext) {
     const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
     const sessions = get<RuntimeSessionController>(ctx, "session.runtime");
     this.registry = get(ctx, "agent.registry");
-    this.harnesses = new HarnessGenerations(ctx);
-    this.runs = new ManagedRuns(sessions, this.harnesses, snapshot => { void emitContained(ctx, "agent/tasks-updated", snapshot); });
+    this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal) }, snapshot => { void emitContained(ctx, "agent/tasks-updated", snapshot); });
     this.subagents = new OneShotSubagentProvider({
       store: sessions.store, presets: createBuiltInPresets(["read_file", "list_directory", "grep", "glob"]),
       manifestDigest: host.compositionDigest, plugins: host.plugins,
       createLoop: () => { throw new Error("A child Run requires a Harness lease"); },
-      acquireRun: preset => {
-        const lease = this.harnesses.acquire("main");
+      acquireRun: async (preset, signal) => {
+        const lease = await this.harnesses.acquire("main", signal);
         const factory = lease.getService<AgentFactoryService>("actspace.agent.factory");
         if (!factory) { void lease.release(); throw new Error("Harness has no child factory"); }
         let ledger: TaskLedger | undefined;
@@ -40,7 +39,7 @@ export class AgentRuntimeService {
           start: async (session, content, id) => {
             ledger = await TaskLedger.open(session);
             const receipt = await ledger.submit(id, content);
-            await ledger.start(receipt.task.taskId, id, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, JSON.parse(JSON.stringify({ presetId: preset.id, model: preset.model, routeId: preset.routeId, maxSteps: preset.maxSteps, durationMs: preset.maxDurationMs })));
+            await ledger.start(receipt.task.taskId, id, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, JSON.parse(JSON.stringify({ harnessExecutionDigest: lease.executionDigest, presetId: preset.id, model: preset.model, routeId: preset.routeId, maxSteps: preset.maxSteps, durationMs: preset.maxDurationMs })));
             runId = id;
             return { messageId: receipt.task.taskId };
           },
@@ -53,13 +52,23 @@ export class AgentRuntimeService {
     const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
     const sessionHost = get<RuntimeSessionHostPort>(ctx, "actspace.host.session");
     const request = await prepareDefaultHarnessArtifact({ artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), hostCapabilities: host.host.capabilityCeiling, disabledEntries: host.disabledHarnessEntries ?? [] });
-    this.harnesses.activate(await this.harnesses.prepare("main", 0, request));
+    this.harnesses = new HarnessControl({ context: ctx, dataRoot: sessionHost.dataRoot,
+      artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), runtimeId: sessionHost.runtimeId,
+      builtin: async () => request, sharedServices: DEFAULT_HARNESS_SHARED_SERVICES,
+      compatibility: { capabilities: host.host.capabilityCeiling, requiredServices: [{ id: "agent.run-factory", version: 1 }, { id: "actspace.agent.factory", version: 1 }], services: DEFAULT_HARNESS_SHARED_SERVICES.map(id => ({ id, version: 1 })), events: [{ id: "session/checkpoint", version: 1, mode: "emit" }],
+        sharedModules: [...request.artifacts.values()].flatMap(a => a.manifest.sharedModules), codecArtifacts: [] },
+      authorize: host.authorizeHarness,
+      onSelection: record => { void emitContained(ctx, "harness/selection-updated", record); },
+      onDiagnostic: error => { host.onHarnessDiagnostic?.(error); },
+    });
+    await this.harnesses.initialize();
+    ctx.provide?.("harness.control", this.harnesses);
   }
   async dispose(): Promise<void> {
     this.runs.quiesce();
     await this.subagents.dispose();
     await this.runs.dispose();
-    await this.harnesses.close();
+    await this.harnesses?.close();
   }
 }
 

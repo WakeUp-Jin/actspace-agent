@@ -17,6 +17,7 @@ export interface HarnessLease {
   readonly harnessId: string;
   readonly generationId: string;
   readonly revision: number;
+  readonly executionDigest: string;
   readonly scope: AgentScope;
   readonly context: CordisContext;
   getService<T>(name: string): T | undefined;
@@ -77,6 +78,15 @@ export class HarnessGenerations {
     return Object.freeze({ revision, generationId: candidate.generationId });
   }
 
+  /** Restore durable selection before admitting any leases. */
+  restore(candidate: HarnessCandidate, revision: number): void {
+    this.#assertOpen(candidate.harnessId);
+    const record = this.#owned(candidate);
+    if (this.#current.has(candidate.harnessId) || record.state !== "ready" || !Number.isSafeInteger(revision) || revision < 1) throw new HarnessError("INVALID_CANDIDATE", candidate.harnessId, "Invalid restored selection");
+    record.state = "current";
+    this.#current.set(candidate.harnessId, { record, revision });
+  }
+
   acquire(harnessId: string): HarnessLease {
     this.#assertOpen(harnessId);
     const selection = this.#current.get(harnessId);
@@ -86,7 +96,7 @@ export class HarnessGenerations {
     const context = scopeContext(record.mount.context, scope.scopeKey, scope.disposer);
     record.users++;
     let releasing: Promise<void> | undefined;
-    return Object.freeze({ harnessId, generationId: record.candidate.generationId, revision, scope, context,
+    return Object.freeze({ harnessId, generationId: record.candidate.generationId, executionDigest: record.candidate.executionDigest, revision, scope, context,
       getService: <T>(name: string): T | undefined => { scope.assertActive(); return record.mount.getService<T>(name); },
       release: () => releasing ??= (async () => {
         const errors: unknown[] = [];

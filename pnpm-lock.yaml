@@ -685,6 +685,34 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/harness-control:
+    dependencies:
+      '@actspace/boot':
+        specifier: workspace:*
+        version: link:../boot
+      '@actspace/bundle':
+        specifier: workspace:*
+        version: link:../bundle
+      '@actspace/composition':
+        specifier: workspace:*
+        version: link:../composition
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../session/persistence
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/headless:
     dependencies:
       '@actspace/cordis-adapter':
@@ -832,6 +860,9 @@ importers:
       '@actspace/english-learning':
         specifier: workspace:*
         version: link:../english-learning
+      '@actspace/harness-control':
+        specifier: workspace:*
+        version: link:../harness-control
       '@actspace/headless':
         specifier: workspace:*
         version: link:../headless

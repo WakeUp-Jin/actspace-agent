@@ -1,6 +1,6 @@
 # Task、Run 与 Harness 的生产接线
 
-2026-10-03 P2 实现说明。验收结论以[执行记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)为准。P3 的 Patch 启用和 P4 的独立进程/远端传输尚未实现。
+2026-10-03 P2 实现说明。验收结论以[执行记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)为准。P3 已接入 Harness 控制服务，阶段验证见 [P3 执行记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-3-summary.md)；P4 的独立进程/远端传输尚未实现。
 
 ## 所有权
 
@@ -38,4 +38,12 @@ Host 重启不恢复旧 Loop 内存，也不自动重放工具。已领取记录
 
 执行预算从真正执行开始计时，审批等待区间只暂停一次；绝对 deadline 不暂停。开始前已过 deadline 的输入取消，不获取执行租约。主 Run 取消传到子 Run；当前内置子智能体只读且不允许审批，沿用 preset 的执行时限。
 
-执行器在进入 execute 后以 outcome 表达正常取消；抛出的异常即使发生于 AbortSignal 已触发之后，也不能被调度器改写为取消成功。ManagedRuns 的调用取消必须关联原 task/run；调用响应延迟时不得取会话当前 Run 作为取消目标。CLI ephemeral 仅保证不保存会话历史/任务 Journal，固定 Harness 代码可缓存于 Host 的 harness-artifacts。
+执行器在进入 execute 后以 outcome 表达正常取消；抛出的异常即使发生于 AbortSignal 已触发之后，也不能被调度器改写为取消成功。ManagedRuns 的调用取消必须关联原 task/run；调用响应延迟时不得取会话当前 Run 作为取消目标。CLI ephemeral 仅保证不保存会话历史/任务 Journal，Host 独立保存 harness-artifacts 固定代码及 harness-state 选择记录；这两类数据不属于临时会话历史。
+
+## P3 的选择边界
+
+Runtime 组装 `HarnessControl` 的可信 Host 端口；控制服务复用 composition 和 boot，不承担任务调度。首次启动保存内置选择，后续启动恢复最后成功记录。主 Run、子 Run、手动压缩和能力查询都经异步租约入口；准备和授权等待不阻塞运行，仅最终持久提交窗口串行化新租约。排队期间不冻结模型配置，实际拿到租约后重新读取配置；绝对截止时间在获取前后均检查。
+
+Run 已有 harnessId/generationId/revision 保持不变，跨重启稳定摘要放入 `run.configuration.harnessExecutionDigest`。P2 task codec 对 harness 对象字段严格校验，因此不向该对象追加字段，不升级 codec、不重写历史。configuration 原本是可扩展 JSON，旧读取器继续接受新增摘要。
+
+替换只改变后续获取的组合。旧 Run 持有旧租约，父 Run 和子 Run 可使用不同 revision；同会话下一 Run 可更换 Loop。恢复缺产物、共享契约变化或选择日志损坏时执行 blocked，Host 控制服务仍存在；恢复内置组合需独立授权，成功产生新 revision。生产默认没有授权端口或面向用户的启用入口。普通任务失败不会触发 Harness 回退。

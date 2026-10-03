@@ -8,14 +8,15 @@ import { SessionRunManager, type RunFactory } from "../run-manager.js";
 import { ExecutionBudget, RunBudget } from "../execution-budget.js";
 
 function gate() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
-async function fixture(factory: RunFactory, release: () => Promise<void> = async () => {}) {
+async function fixture(factory: RunFactory, release: () => Promise<void> = async () => {}, beforeAcquire: () => Promise<void> = async () => {}) {
   const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "runs", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   const ledger = await TaskLedger.open(session);
   let model = "first"; let mode: "plan" | "agent" = "plan"; let acquired = 0;
-  const manager = new SessionRunManager({ ledger, harnessId: "main", readConfiguration: () => ({ model, mode }), acquire: () => {
+  const manager = new SessionRunManager({ ledger, harnessId: "main", readConfiguration: () => ({ model, mode }), acquire: async () => {
+    await beforeAcquire();
     acquired++;
-    return { scope: new AgentScope("test-run"), context: {}, harnessId: "main", generationId: `g${acquired}`, revision: acquired, getService: <T>() => factory as T, release };
+    return { scope: new AgentScope("test-run"), context: {}, executionDigest: "stable-content", harnessId: "main", generationId: `g${acquired}`, revision: acquired, getService: <T>() => factory as T, release };
   } });
   return { manager, ledger, session, setConfig: (next: string) => { model = next; mode = "agent"; }, acquired: () => acquired };
 }
@@ -168,5 +169,31 @@ it("does not turn an execution settlement error into a successful cancellation",
   await manager.stop(manager.activeRunId!); await manager.waitForIdle();
   expect(ledger.snapshot().runs[0]?.state).toBe("failed");
   expect(manager.failure).toBeInstanceOf(AggregateError);
+  await manager.dispose(); await session.close();
+});
+
+it("reads updated model configuration only after the asynchronous Harness lease arrives", async () => {
+  const entered = gate(); const permit = gate(); const seen: unknown[] = [];
+  const { manager, ledger, session, setConfig } = await fixture({ create: async input => {
+    seen.push(input.configuration); return { execute: async () => ({ outcome: "completed", value: null }), dispose: async () => {} };
+  } }, async () => {}, async () => { entered.resolve(); await permit.promise; });
+  await manager.submit("waiting-lease", "content"); await entered.promise;
+  setConfig("changed-while-waiting"); permit.resolve(); await manager.waitForIdle();
+  expect(seen).toEqual([{ model: "changed-while-waiting", mode: "agent" }]);
+  expect(ledger.snapshot().runs[0]?.configuration).toMatchObject({ harnessExecutionDigest: "stable-content" });
+  expect(Object.keys(ledger.snapshot().runs[0]!.harness).sort()).toEqual(["generationId", "harnessId", "revision"]);
+  await manager.dispose(); await session.close();
+});
+
+it("retains unclaimed content on Harness recovery blocking and resumes after Host repair", async () => {
+  let blocked = true;
+  const { manager, ledger, session } = await fixture({ create: async () => ({ execute: async () => ({ outcome: "completed", value: "after repair" }), dispose: async () => {} }) }, async () => {}, async () => {
+    if (blocked) throw Object.assign(new Error("repair required"), { code: "RECOVERY_BLOCKED" });
+  });
+  await manager.submit("recoverable", "keep my input"); await manager.waitForIdle();
+  expect(ledger.snapshot()).toMatchObject({ paused: true, tasks: [{ state: "pending" }], runs: [] });
+  expect(manager.blocked).toBe(false);
+  blocked = false; await manager.resume(ledger.snapshot().revision); await manager.waitForIdle();
+  expect(ledger.snapshot()).toMatchObject({ tasks: [{ state: "completed" }], runs: [{ result: "after repair" }] });
   await manager.dispose(); await session.close();
 });

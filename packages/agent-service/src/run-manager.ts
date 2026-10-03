@@ -30,6 +30,7 @@ export interface RunFactory {
   }): Promise<RunInstance>;
 }
 export interface RunLease extends HarnessIdentity {
+  readonly executionDigest?: string;
   readonly scope: import("@actspace/core-scope").AgentScope;
   readonly context: import("@actspace/cordis-adapter").CordisContext;
   getService<T>(name: string): T | undefined;
@@ -38,9 +39,9 @@ export interface RunLease extends HarnessIdentity {
 export type RunManagerOptions = {
   readonly ledger: TaskLedger;
   readonly harnessId: string;
-  readonly operationForTask?: (task: TaskRecord) => (() => Promise<void>) | undefined;
+  readonly operationForTask?: (task: TaskRecord) => ((signal: AbortSignal) => Promise<void>) | undefined;
   readonly runIdForTask?: (task: TaskRecord) => string | undefined;
-  readonly acquire: (harnessId: string) => RunLease;
+  readonly acquire: (harnessId: string, signal?: AbortSignal) => RunLease | Promise<RunLease>;
   readonly readConfiguration: () => ExecutionConfiguration | Promise<ExecutionConfiguration>;
   /** @mode emit — observational only, never a durability barrier. */
   readonly onSettled?: (runId: string, result: RunExecutionResult) => void;
@@ -133,12 +134,12 @@ export class SessionRunManager {
     this.#active = { runId, taskId: task.taskId, controller, done };
   }
 
-  async #executeOperation(task: TaskRecord, operation: () => Promise<void>, signal: AbortSignal): Promise<void> {
+  async #executeOperation(task: TaskRecord, operation: (signal: AbortSignal) => Promise<void>, signal: AbortSignal): Promise<void> {
     let started = false;
     try {
       signal.throwIfAborted();
       await this.ledger.startOperation(task.taskId); started = true;
-      await operation();
+      await operation(signal);
       await this.ledger.finishOperation(task.taskId, signal.aborted ? "cancelled" : "completed");
     } catch (error) {
       if (started && !this.ledger.blocked) await this.ledger.finishOperation(task.taskId, signal.aborted ? "cancelled" : "failed");
@@ -159,7 +160,19 @@ export class SessionRunManager {
     let disposed = true;
     let lostClaim = false;
     let executing = false;
+    let acquiring = false;
     try {
+      const beforeAcquire = await this.options.readConfiguration();
+      signal.throwIfAborted();
+      if (beforeAcquire.deadline !== undefined && beforeAcquire.deadline <= Date.now()) {
+        await this.ledger.startOperation(task.taskId);
+        await this.ledger.finishOperation(task.taskId, "cancelled");
+        return;
+      }
+      acquiring = true;
+      lease = await this.options.acquire(this.options.harnessId, signal);
+      acquiring = false;
+      signal.throwIfAborted();
       const configuration = snapshotSessionJson(await this.options.readConfiguration());
       signal.throwIfAborted();
       if (configuration.deadline !== undefined && configuration.deadline <= Date.now()) {
@@ -167,10 +180,9 @@ export class SessionRunManager {
         await this.ledger.finishOperation(task.taskId, "cancelled");
         return;
       }
-      lease = this.options.acquire(this.options.harnessId);
       const factory = lease.getService<RunFactory>(RUN_FACTORY_SERVICE);
       if (!factory) throw new Error(`Harness ${lease.harnessId} does not provide ${RUN_FACTORY_SERVICE}`);
-      const initial = await this.ledger.start(task.taskId, runId, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, configuration as RuntimeV2JsonValue);
+      const initial = await this.ledger.start(task.taskId, runId, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, { ...configuration, ...(lease.executionDigest ? { harnessExecutionDigest: lease.executionDigest } : {}) } as RuntimeV2JsonValue);
       started = true;
       signal.throwIfAborted();
       if (configuration.durationMs !== undefined || configuration.deadline !== undefined) budget = new RunBudget(configuration.durationMs ?? Number.MAX_SAFE_INTEGER, configuration.deadline ?? null, () => controller.abort("execution-budget"));
@@ -193,6 +205,12 @@ export class SessionRunManager {
       // Once execution begins, normal cancellation is a returned outcome.
       // An exception still signals failure, even if cancellation happened concurrently.
       if (signal.aborted && !executing) result = { outcome: "cancelled", value: null };
+      else if (acquiring && ["RECOVERY_BLOCKED", "DURABILITY_BLOCKED", "STORE_LOCKED"].includes((error as { code?: string })?.code ?? "")) {
+        // No task was claimed: retain content and permit explicit resume after Host repair.
+        await this.ledger.pause(); lostClaim = true;
+        for (const listener of this.#failureListeners) { try { listener(error); } catch { /* observer */ } }
+        try { this.options.onFailure?.(error); } catch { /* observer */ }
+      }
       // A concurrent queue edit or pause won before the initial claim: leave it queued.
       else if (!started && error instanceof TaskError && ["QUEUE_PAUSED", "QUEUE_ORDER", "TASK_NOT_PENDING"].includes(error.code)) lostClaim = true;
       else { errors.push(error); result = { outcome: "failed", value: null }; }

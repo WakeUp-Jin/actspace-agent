@@ -18,10 +18,10 @@ import { TaskLedger } from "./task-ledger.js";
 
 export interface AgentServicePorts {
   openSession(sessionId: string): Promise<SessionHandle>;
-  operationForTask?(session: SessionHandle, task: TaskRecord): (() => Promise<void>) | undefined;
+  operationForTask?(session: SessionHandle, task: TaskRecord): ((signal: AbortSignal) => Promise<void>) | undefined;
   runIdForTask?(sessionId: string, task: TaskRecord): string | undefined;
   harnessId(session: SessionHandle): string;
-  acquire(harnessId: string): RunLease;
+  acquire(harnessId: string, signal?: AbortSignal): RunLease | Promise<RunLease>;
   readConfiguration(session: SessionHandle): ExecutionConfiguration | Promise<ExecutionConfiguration>;
   onSnapshot?(sessionId: string, snapshot: TaskSnapshot): void;
   onFailure?(sessionId: string, error: unknown): void;
@@ -97,7 +97,7 @@ export class AgentService {
       if (session.header.sessionId !== sessionId) throw new Error("Session owner mismatch");
       const ledger = await TaskLedger.open(session);
       ledger.subscribe(snapshot => this.ports.onSnapshot?.(sessionId, snapshot));
-      return new SessionRunManager({ ledger, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: this.ports.harnessId(session), acquire: id => this.ports.acquire(id), readConfiguration: () => this.ports.readConfiguration(session), onFailure: error => this.ports.onFailure?.(sessionId, error) });
+      return new SessionRunManager({ ledger, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), onFailure: error => this.ports.onFailure?.(sessionId, error) });
     })();
     // Keep a failed opening cached: never bypass a recovery/durability failure by retrying in memory.
     this.#sessions.set(sessionId, opening);

@@ -16,7 +16,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [Agent Harness 插件化与 Host 分离](active/20261003-agent-harness-host-refactor/README.md) | P1 固定产物、隔离组合树及引用生命周期已实现，A1–A12 自动化验收通过；P2 接入草案已建立，先审阅 Host 队列迁移和默认固定组合接线范围。 |
+| [Agent Harness 插件化与 Host 分离](active/20261003-agent-harness-host-refactor/README.md) | P1/P2 验收通过；[P3 详细计划](active/20261003-agent-harness-host-refactor/phase-3.md) 已实施并验收，范围为 Harness 可替换基础、持久启用与恢复，不实现自进化工作流。 |
 | [Composer 消息队列与运行中插入](active/20260930-composer-message-queue.md) | T1–T9 已完成（未提交）；剩 Electron 实机验收。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [单一 Agent 形态与三种模式](active/20260928-agent-forms-and-modes.md) | T1–T7 已实现；主要实机路线通过，T8 剩余验收见执行摘要。 |

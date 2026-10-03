@@ -7,7 +7,7 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
 
 afterEach(() => { delete (window as { actspace?: unknown }).actspace; window.localStorage.clear(); });
-function fixture() {
+function fixture(ordinary = false) {
   window.localStorage.clear();
   const now = new Date().toISOString();
   const record: SessionRecord = { meta: { schemaVersion: 2, id: "reloaded", title: "Recover approvals", createdAt: now, updatedAt: now, agentRunCount: 1, workspaceRoot: "/tmp/workspace" }, events: [
@@ -15,7 +15,9 @@ function fixture() {
   ] };
   let pending: PendingApprovalInfo[] = [{ requestId: "live-approval", toolName: "read_file", reason: "outside workspace", summary: "Read fixture", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
     recovery: { agentRunId: "live-run", toolCallId: "live-call", preview: { kind: "read", filePath: "/tmp/fixture.txt", displayText: "Read fixture" } } }];
+  if (ordinary) pending = [];
   let listener: (event: RuntimeStreamEvent) => void = () => {};
+  let liveListener: (event: unknown) => void = () => {};
   const abort = vi.fn(async () => true);
   const decide = vi.fn(async () => ({ ok: true }));
   window.actspace = {
@@ -24,7 +26,9 @@ function fixture() {
     listSessions: async () => [{ id: "reloaded", title: record.meta.title, updatedAt: now, agentRunCount: 1, workspaceRoot: "/tmp/workspace" }],
     getSessionPage: async () => recordProjectionFixture(record),
     listPendingApprovals: async () => pending,
+    ...(ordinary ? { taskCommand: async () => ({ snapshot: { sessionId: "reloaded", revision: 1, paused: false, tasks: [], queue: [], runs: [{ runId: "live-run", state: "running" }] } }) } : {}),
     onAgentStream: (callback: typeof listener) => { listener = callback; return () => {}; },
+    onSessionLiveEvent: (callback: typeof liveListener) => { liveListener = callback; return () => {}; },
     getReviewSnapshot: async () => ({ ok: false, code: "not_available", message: "No changes" }),
     listVisualizations: async () => ({ items: [] }),
     abortAgentRun: abort, submitApproval: decide,
@@ -32,7 +36,7 @@ function fixture() {
   } as unknown as Window["actspace"];
   const emit = (event: { type: RuntimeStreamEvent["type"]; [key: string]: unknown }) => act(() => listener({ sessionId: "reloaded", agentRunId: "live-run", ...event } as RuntimeStreamEvent));
   const view = render(<TooltipProvider><App /></TooltipProvider>);
-  return { abort, decide, emit, view, clear: () => { pending = []; }, record };
+  return { abort, decide, emit, view, refresh: () => act(() => liveListener({ event: { sessionId: "reloaded", message: "task-queue-updated" } })), clear: () => { pending = []; }, record };
 }
 
 it("reattaches a pending approval on mount, keeps history, rejects it and settles without a local send promise", async () => {
@@ -71,4 +75,28 @@ it("stops the original recovered run and clears the card after abort", async () 
   f.clear(); f.emit({ type: "agent_run_aborted" });
   await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
   expect(screen.queryByRole("button", { name: "拒绝" })).not.toBeInTheDocument();
+});
+
+it("recovers a running model request without approvals after reload and stops the original Run", async () => {
+  const f = fixture(true);
+  await screen.findByLabelText("停止 Agent");
+  expect(screen.queryByRole("button", { name: "拒绝" })).not.toBeInTheDocument();
+  expect(screen.getAllByText("read the fixture")).toHaveLength(1);
+  await userEvent.click(screen.getByLabelText("停止 Agent"));
+  expect(f.abort).toHaveBeenCalledWith({ sessionId: "reloaded", agentRunId: "live-run" });
+  f.emit({ type: "agent_run_aborted" });
+  await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
+});
+
+it("does not resurrect a Run from a snapshot overtaken by its terminal stream event", async () => {
+  const f = fixture(true);
+  await screen.findByLabelText("停止 Agent");
+  const stale = await window.actspace.taskCommand({ sessionId: "reloaded", op: "snapshot" });
+  let release!: (value: typeof stale) => void;
+  window.actspace.taskCommand = vi.fn(() => new Promise<typeof stale>(resolve => { release = resolve; }));
+  f.refresh();
+  f.emit({ type: "agent_run_finished" });
+  await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
+  await act(async () => release(stale));
+  expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument();
 });

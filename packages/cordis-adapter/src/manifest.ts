@@ -1,10 +1,11 @@
+import { validateHarnessContracts, type HarnessBehaviorContracts } from "./harness-contracts.js";
 import { entryId, eventTypeId, pluginId, serviceId, type EntryId, type EventTypeId, type PluginId, type ServiceId } from "./identity.js";
 import type { JsonValue } from "./plugin-contract.js";
 export type PluginSource = { readonly kind: "builtin" | "local-path" | "managed-package"; readonly reference: string; readonly integrity?: string };
 export type PluginCodecDescriptor = { readonly module: string; readonly eventTypes: readonly EventTypeId[] };
 export type PluginFrontendRequirement = { readonly required: boolean; readonly rendererKeys: readonly string[] } | null;
 export type PluginHostRequirement = { readonly required: readonly string[]; readonly optional: readonly string[] };
-export type PluginBehaviorDescriptor = { readonly entryId: EntryId; readonly module: string; readonly required: boolean; readonly enabled: boolean; readonly config: JsonValue; readonly host: PluginHostRequirement; readonly frontend: PluginFrontendRequirement; readonly provides?: readonly ServiceId[]; readonly injects?: readonly ServiceId[] };
+export type PluginBehaviorDescriptor = { readonly contracts?: HarnessBehaviorContracts; readonly entryId: EntryId; readonly module: string; readonly required: boolean; readonly enabled: boolean; readonly config: JsonValue; readonly host: PluginHostRequirement; readonly frontend: PluginFrontendRequirement; readonly provides?: readonly ServiceId[]; readonly injects?: readonly ServiceId[] };
 export type PluginContributionSummary = { readonly services: readonly string[]; readonly events: readonly EventTypeId[]; readonly contributions: readonly string[] };
 export type PluginManifest = { readonly schemaVersion: 1; readonly pluginId: PluginId; readonly version: string; readonly name: string; readonly runtimeContract: "actspace.runtime.v2"; readonly source: PluginSource; readonly codecs: readonly PluginCodecDescriptor[]; readonly behaviors: readonly PluginBehaviorDescriptor[]; readonly contributions: PluginContributionSummary };
 export type BuiltinPluginManifestInput = { readonly pluginId: string; readonly version: string; readonly name: string; readonly entry: { readonly entryId: string; readonly behavior: string; readonly codec?: string; readonly required?: boolean; readonly enabled?: boolean }; readonly config?: JsonValue; readonly host: { readonly required: readonly string[]; readonly optional: readonly string[] }; readonly frontend: PluginFrontendRequirement; readonly injects?: readonly string[]; readonly contributions: { readonly services: readonly string[]; readonly tools: readonly string[]; readonly prompts: readonly string[]; readonly events: readonly string[] } };
@@ -18,7 +19,7 @@ export function validatePluginManifest(value: PluginManifest): PluginManifest {
   pluginId(value.pluginId); if (value.schemaVersion !== 1 || value.runtimeContract !== "actspace.runtime.v2" || !value.version || !value.name) throw new Error(`Invalid manifest for ${value.pluginId}.`);
   if (!value.source.reference || /^https?:/i.test(value.source.reference)) throw new Error(`Plugin ${value.pluginId} has an untrusted source.`);
   if (!isJsonValue(value)) throw new Error(`Plugin ${value.pluginId} manifest is not JSON-safe.`);
-  const entries = new Set<string>(); for (const behavior of value.behaviors) { entryId(behavior.entryId); if (entries.has(behavior.entryId)) throw new Error(`Duplicate Entry id ${behavior.entryId}.`); entries.add(behavior.entryId); rejectSecretConfig(behavior.config); for (const service of [...behavior.provides ?? [], ...behavior.injects ?? []]) serviceId(service); }
+  const entries = new Set<string>(); for (const behavior of value.behaviors) { entryId(behavior.entryId); if (entries.has(behavior.entryId)) throw new Error(`Duplicate Entry id ${behavior.entryId}.`); entries.add(behavior.entryId); rejectSecretConfig(behavior.config); if (behavior.contracts) validateHarnessContracts(behavior.contracts); for (const service of [...behavior.provides ?? [], ...behavior.injects ?? []]) serviceId(service); }
   for (const codec of value.codecs) for (const type of codec.eventTypes) eventTypeId(type);
   return Object.freeze(value);
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AgentService, type ExecutionConfiguration, type TaskSnapshot } from "@actspace/agent-service";
-import type { HarnessGenerations } from "@actspace/boot";
+import type { HarnessLease } from "@actspace/boot";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { RuntimeV2JsonValue, RuntimeV2RunTurnRequest, RuntimeV2RunTurnResponse } from "@actspace/shared/runtime-v2";
 import type { RunTurnResult } from "@actspace/core-agent";
@@ -14,7 +14,7 @@ export class ManagedRuns {
   readonly #states = new Map<string, TaskSnapshot>();
   readonly #sessions = new Map<string, SessionHandle>();
   #closed = false;
-  constructor(private readonly sessions: RuntimeSessionController, private readonly harnesses: HarnessGenerations, onSnapshot?: (snapshot: TaskSnapshot) => void) {
+  constructor(private readonly sessions: RuntimeSessionController, private readonly harnesses: { acquire(id: string, signal?: AbortSignal): Promise<HarnessLease> | HarnessLease }, onSnapshot?: (snapshot: TaskSnapshot) => void) {
     this.service = new AgentService({
       openSession: async id => { const session = sessions.getOpen(id) ?? await sessions.resume(id); this.#sessions.set(id, session); return session; },
       runIdForTask: (sessionId, task) => { const key = `${sessionId}/${task.submissionId}`; const id = this.#requestedRunIds.get(key); this.#requestedRunIds.delete(key); return id; },
@@ -22,27 +22,28 @@ export class ManagedRuns {
         const value = task.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
         const original = value?.kind === "composer-task" ? value.original as { userInput?: string } : null;
         if (original?.userInput?.trim() !== "/compact") return undefined;
-        return async () => {
-          const lease = harnesses.acquire("main");
+        return async signal => {
+          const lease = await harnesses.acquire("main", signal);
           try {
+            signal.throwIfAborted();
             const compaction = lease.getService<import("@actspace/compaction").CompactionPlugin>("compaction.runtime");
             if (!compaction) throw new Error("Harness does not provide compaction");
             await compaction.compact(session);
           } finally { await lease.release(); }
         };
       },
-      harnessId: () => "main", acquire: id => harnesses.acquire(id),
+      harnessId: () => "main", acquire: (id, signal) => harnesses.acquire(id, signal),
       readConfiguration: session => ({ ...this.#settings.get(session.header.sessionId), mode: sessions.snapshot(session).agentMode ?? "agent" }),
       onSnapshot: (id, snapshot) => { this.#states.set(id, snapshot); onSnapshot?.(snapshot); },
     });
   }
-  inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R): R {
-    const lease = this.harnesses.acquire("main");
-    try { return inspect(lease.getService<T>(name)); } finally { void lease.release(); }
+  async inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R): Promise<R> {
+    const lease = await this.harnesses.acquire("main");
+    try { return inspect(lease.getService<T>(name)); } finally { await lease.release(); }
   }
   async compact(sessionId: string): Promise<boolean> {
     return this.service.exclusive(sessionId, async () => {
-      const lease = this.harnesses.acquire("main");
+      const lease = await this.harnesses.acquire("main");
       try {
         const compaction = lease.getService<import("@actspace/compaction").CompactionPlugin>("compaction.runtime");
         if (!compaction) throw new Error("Missing compaction service");

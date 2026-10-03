@@ -44,22 +44,39 @@ export interface DomainEvents {}
 /** Declaration surface consumed by Cordis' typed Context methods. */
 declare module "@deepseek-ai/cordis" {
   interface Events extends DomainEvents {
+    /** @mode waterfall */
     "system-prompt/assemble": AgentWaterfallEventHandler;
+    /** @mode waterfall */
     "agent/pre-step": AgentWaterfallEventHandler;
+    /** @mode waterfall */
     "agent/request": AgentWaterfallEventHandler;
+    /** @mode waterfall */
     "llm/stream": AgentWaterfallEventHandler;
+    /** @mode waterfall */
     "agent/request-error": AgentWaterfallEventHandler;
+    /** @mode waterfall */
     "tools/pre-execute": AgentWaterfallEventHandler;
+    /** @mode waterfall */
     "tools/execute": AgentWaterfallEventHandler;
+    /** @mode waterfall */
     "tools/post-execute": AgentWaterfallEventHandler;
+    /** @mode serial */
     "agent/turn-stopping": (this: object, payload: AgentSubjectPayload) => unknown;
+    /** @mode emit */
     "agent/session-start": (this: object, payload: AgentSubjectPayload) => unknown;
+    /** @mode emit */
     "agent/status": (this: object, payload: AgentSubjectPayload) => unknown;
+    /** @mode emit */
     "agent/error": (this: object, payload: AgentSubjectPayload) => unknown;
+    /** @mode emit */
     "tools/result": (this: object, payload: AgentSubjectPayload) => unknown;
+    /** @mode emit */
     "llm/chunk": (this: object, payload: AgentSubjectPayload) => unknown;
+    /** @mode emit */
     "session/checkpoint": (this: object, payload: AgentSubjectPayload) => unknown;
+    /** @mode emit */
     "session/event": (payload: unknown) => unknown;
+    /** @mode emit */
     "session/flush": (payload: unknown) => unknown;
   }
 }

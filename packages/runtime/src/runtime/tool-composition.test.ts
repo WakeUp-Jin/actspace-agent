@@ -25,15 +25,16 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
   ]));
   let profile: Awaited<ReturnType<typeof bootProfileRuntime>> | undefined;
   try {
-    profile = await bootProfileRuntime({ host, dataRoot: root, toolEnvironment: env, composition,
+    const options: Parameters<typeof bootProfileRuntime>[0] = { host, dataRoot: root, toolEnvironment: env, composition,
       hostServices: createRuntimeHostServices({ descriptor: host, dataRoot: root, workspaceRoot: root, toolEnvironment: env, services: {
         ...ports, "actspace.host.llm": { credentials: { resolve: async () => ({}) }, routes: [{ routeId: "test", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async () => { throw new Error("No model calls in this test."); } } }] },
       } }),
       cordis: { configPath: runtimeCordisConfigPath(), admission: await inspectCordisAdmission() },
-    });
+    };
+    profile = await bootProfileRuntime(options);
     expect(profile.context.get!("tools.runtime")).toBeUndefined();
     const runtime = profile.context.get!("agent.runtime") as import("./agent-runtime-plugin.js").AgentRuntimeService;
-    const lease = runtime.harnesses.acquire("main");
+    const lease = await runtime.harnesses.acquire("main");
     const tools = lease.getService<ToolRuntime>("tools.runtime")!;
     const names = tools.registry.listDefinitions().map(item => item.name);
     expect(names).toContain("read_file");
@@ -50,6 +51,16 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
     await profile.shutdown();
     profile = undefined;
     expect(() => tools.registry.capture("read_file")).toThrow(/not active/);
+    // A changed Host permission ceiling must not silently restore the former execution environment.
+    profile = await bootProfileRuntime({ ...options, host: { ...host, capabilityCeiling: ["filesystem.read"] },
+      authorizeHarness: async request => ({ ...request, actor: "maintenance-test", decisionId: "repair", expiresAt: Date.now() + 10000 }),
+    });
+    const restored = profile.context.get!("harness.control") as import("@actspace/harness-control").HarnessControl;
+    expect(restored).toBeDefined();
+    await expect(restored.acquire("main")).rejects.toMatchObject({ code: "RECOVERY_BLOCKED" });
+    expect(profile.getDiagnostics().diagnostics.some(d => d.code === "HARNESS_RECOVERY_BLOCKED")).toBe(true);
+    expect((await restored.recoverBuiltin("repair-permissions", 1)).revision).toBe(2);
+    const repaired = await restored.acquire("main"); expect(repaired.revision).toBe(2); await repaired.release();
   } finally {
     await profile?.shutdown();
     await rm(root, { recursive: true, force: true });

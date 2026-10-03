@@ -27,8 +27,8 @@ describe("Runtime v2 CLI candidate", () => {
     });
     expect(ephemeral.totalUsage).toEqual(ephemeral.snapshot?.usage);
     expect(ephemeral.messageCount).toBe(ephemeral.snapshot?.messages.length);
-    // Fixed Harness code is cached; ephemeral conversation data is never persisted.
-    expect(await readdir(dataDir)).toEqual(["harness-artifacts"]);
+    // Host Harness code and selection persist independently of ephemeral conversation data.
+    expect(await readdir(dataDir)).toEqual(["harness-artifacts", "harness-state"]);
     const persistent = await runV2Command({ input: "first", workspace, dataDir, permissionMode: "full-access", permissionModeExplicit: true, outputFormat: "json", mock: true, persist: true });
     expect(persistent.persistent).toBe(true);
     expect(persistent.permissionMode).toBe("full-access");

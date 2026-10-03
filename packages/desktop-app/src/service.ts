@@ -53,7 +53,7 @@ type RunAssembly = {
 type RunService = {
   readonly service: import("@actspace/agent-service").AgentService;
   compact(sessionId: string): Promise<boolean>;
-  inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R): R;
+  inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R): R | Promise<R>;
   configure(sessionId: string, configuration: import("@actspace/shared/runtime-v2").TaskConfiguration): void;
   attach(session: SessionHandle): Promise<RunAssembly>;
   run(sessionId: string, input: Omit<RuntimeV2RunTurnRequest, "sessionId">): Promise<RuntimeV2RunTurnResponse>;
@@ -64,7 +64,7 @@ type RunService = {
 type AgentRuntimeService = { readonly runs: RunService; readonly subagents?: { readonly activeCount: number } };
 
 export type DesktopAppServiceContract = {
-  readonly browserAvailable: () => boolean;
+  readonly browserAvailable: () => Promise<boolean>;
   readonly taskCommand: (input: import("@actspace/shared/runtime-v2").TaskCommand) => Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>;
   readonly submitTask: (sessionId: string, submissionId: string, content: RuntimeV2JsonValue) => Promise<import("@actspace/shared/runtime-v2").TaskReceipt>;
   readonly isIdleForReconfigure: () => Promise<boolean>;
@@ -104,7 +104,7 @@ export class DesktopAppService implements DesktopAppServiceContract {
   readonly #runs: RunService;
   readonly #subagents: { readonly activeCount: number } | undefined;
   readonly #llm: LlmService;
-  readonly #hasRunningBackgroundTask: (sessionId: string) => boolean;
+  readonly #hasRunningBackgroundTask: (sessionId: string) => boolean | Promise<boolean>;
   readonly #manifestDigest: string;
   readonly #titleJobs = new Map<string, { controller: AbortController; done: Promise<void> }>();
   readonly #blockedModeSessions = new Set<string>();
@@ -120,7 +120,7 @@ export class DesktopAppService implements DesktopAppServiceContract {
     this.#manifestDigest = (ctx.get?.("actspace.host.session") as { readonly manifestDigest?: string } | undefined)?.manifestDigest ?? "desktop-app";
   }
 
-  browserAvailable(): boolean {
+  async browserAvailable(): Promise<boolean> {
     return this.#runs.inspectCapability<{ available?: boolean; registrations?: readonly unknown[]; definitions?: readonly unknown[] }, boolean>("tools.browser", browser => browser?.available === true && (browser.registrations?.length ?? 0) > 0 && browser.registrations?.length === browser.definitions?.length);
   }
   submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) { if (this.#blockedModeSessions.has(sessionId)) throw new Error("AGENT_MODE_RECOVERY_REQUIRED"); return this.#runs.service.submit(sessionId, submissionId, content); }
@@ -228,7 +228,7 @@ export class DesktopAppService implements DesktopAppServiceContract {
   async updateSessionAgentMode(sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number): Promise<RuntimeV2SessionSnapshot> {
     if (this.#blockedModeSessions.has(sessionId)) throw new Error("AGENT_MODE_RECOVERY_REQUIRED");
     return this.#runs.service.exclusive(sessionId, async () => {
-      if (this.#hasRunningBackgroundTask(sessionId)) throw new Error("SESSION_BUSY");
+      if (await this.#hasRunningBackgroundTask(sessionId)) throw new Error("SESSION_BUSY");
       const session = await this.#sessions.resume(sessionId);
       const snapshot = this.#sessions.snapshot(session);
       if (expectedRevision !== undefined && expectedRevision !== (snapshot.agentModeRevision ?? 0)) throw new Error("AGENT_MODE_CONFLICT");

@@ -113,3 +113,11 @@ it("retains the current selection after an import error or missing Host capabili
   const holder = manager.acquire("main"); expect(await holder.getService<Reader>("reader")!.read()).toBe("old:old");
   await holder.release(); await manager.close();
 });
+
+it("derives execution identity from actual configuration rather than a caller-supplied composition digest", async () => {
+  const { manager } = await setup(); const value = await fixture("identity");
+  const first = await manager.prepare("main", 0, value.request);
+  const changed = await manager.prepare("main", 0, { ...value.request, composition: { ...value.request.composition, entries: value.request.composition.entries.map(e => ({ ...e, config: { setting: "changed" } })) } });
+  expect(first.executionDigest).not.toBe(changed.executionDigest);
+  await manager.close();
+});

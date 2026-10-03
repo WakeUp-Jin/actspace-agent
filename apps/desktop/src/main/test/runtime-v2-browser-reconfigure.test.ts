@@ -21,15 +21,15 @@ describe("Browser Runtime restart admission", () => {
     vi.clearAllMocks();
   });
 
-  async function setup() {
+  async function setup(blockedHarness = false) {
     const dataRoot = await mkdtemp("/tmp/actspace-reconfigure-");
     rootsToRemove.push(dataRoot);
-    let bridgeReady = false;
+    let bridgeReady = blockedHarness;
     const browser = { socketPath: "/tmp/test-browser.sock", getStatus: vi.fn(async () => ({ runState: "ready", bridgeReady })), setRuntimeReady: vi.fn() };
     const app = {
       taskCommand: vi.fn(async (_input: unknown) => ({ snapshot: {} })),
       submitTask: vi.fn(async () => ({ task: {} })),
-      browserAvailable: () => bridgeReady,
+      browserAvailable: () => { if (blockedHarness) throw Object.assign(new Error("Harness recovery blocked"), { code: "RECOVERY_BLOCKED" }); return bridgeReady; },
       listSessions: vi.fn(async () => []),
       subscribeSessionProjection: vi.fn(() => vi.fn()),
       isIdleForReconfigure: vi.fn(async () => true),
@@ -48,6 +48,14 @@ describe("Browser Runtime restart admission", () => {
     await registry.boot();
     return { registry, app, browser, learning, shutdown, connect: () => { bridgeReady = true; } };
   }
+
+  it("keeps the Host application available when Harness recovery blocks execution", async () => {
+    const fixture = await setup(true);
+    expect(fixture.shutdown).not.toHaveBeenCalled();
+    expect(fixture.browser.setRuntimeReady).toHaveBeenLastCalledWith(false);
+    await fixture.registry.taskCommand({ op: "snapshot", sessionId: "session" });
+    expect(fixture.app.taskCommand).toHaveBeenCalled();
+  });
 
   it("waits for background activity and accepted Inbox writes before disposing", async () => {
     const fixture = await setup();

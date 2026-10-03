@@ -866,6 +866,7 @@ export function App() {
   const [composerDraftRestore, setComposerDraftRestore] = useState<ComposerDraftRestore | null>(null);
   const [reviewSummary, setReviewSummary] = useState<ComposerReviewSummary | null>(null);
   const sessionRunsRef = useRef(new Map<string, SessionRunState>());
+  const terminalRunIdsRef = useRef(new Set<string>());
   const [busySessionIds, setBusySessionIds] = useState<Set<string>>(() => new Set());
   const modeChangePendingRef = useRef(new Set<string>());
   const pageVersionsRef = useRef(new Map<string, number>());
@@ -960,7 +961,19 @@ export function App() {
     const queue = projectTaskQueue(snapshot);
     messageQueuesRef.current.set(snapshot.sessionId, queue);
     if (activeSessionIdRef.current === snapshot.sessionId) setMessageQueue(queue);
-  }, []);
+    const running = snapshot.runs.find(run => run.state === "running" && !terminalRunIdsRef.current.has(run.runId));
+    if (running && !sessionRunsRef.current.has(snapshot.sessionId)) {
+      const state = createEmptyStreamingState();
+      state.waitingForModel = true;
+      sessionRunsRef.current.set(snapshot.sessionId, {
+        sessionId: snapshot.sessionId, agentRunId: running.runId, recovered: true,
+        state, userBlock: null, aborting: false,
+        record: pageCacheRef.current.get(snapshot.sessionId)?.record ?? null, historyBefore: null,
+      });
+      setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, true));
+      refreshStreamingBlocks(snapshot.sessionId);
+    }
+  }, [refreshStreamingBlocks]);
   const refreshTaskQueue = useCallback(async (sessionId: string) => {
     if (!hasActspaceBridge() || !window.actspace.taskCommand) return;
     const result = await window.actspace.taskCommand({ sessionId, op: "snapshot" });
@@ -1139,7 +1152,8 @@ export function App() {
     refreshPendingApprovalStatuses(sessions.map((session) => session.id)).catch((error: unknown) => {
       console.error("Failed to refresh pending approval statuses", error);
     });
-  }, [refreshPendingApprovalStatuses, sessions]);
+    for (const session of sessions) void refreshTaskQueue(session.id).catch(console.error);
+  }, [refreshPendingApprovalStatuses, refreshTaskQueue, sessions]);
 
   useEffect(() => {
     if (!hasActspaceBridge()) return;
@@ -1633,6 +1647,9 @@ export function App() {
     if (!hasActspaceBridge()) return;
 
     return window.actspace.onAgentStream((event) => {
+      if (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed") {
+        terminalRunIdsRef.current.add(event.agentRunId);
+      }
       let run = sessionRunsRef.current.get(event.sessionId);
       if (event.type === "agent_run_started" && (!run || run.agentRunId !== event.agentRunId)) {
         run = { sessionId: event.sessionId, agentRunId: event.agentRunId, recovered: true, state: createEmptyStreamingState(), userBlock: null, aborting: false, record: pageCacheRef.current.get(event.sessionId)?.record ?? null, historyBefore: null };

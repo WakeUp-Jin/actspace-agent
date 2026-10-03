@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.harness-control", version: "1", name: "Harness control", entry: { entryId: "harness.control", behavior: "@actspace/harness-control/plugin" }, host: { required: [], optional: [] }, frontend: null, injects: ["actspace.host.harness-control"], contributions: { services: ["harness.control"], events: [], tools: [], prompts: [] } });

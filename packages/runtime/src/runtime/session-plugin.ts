@@ -52,3 +52,12 @@ export function apply(ctx: CordisContext): void {
     await service.closeAll();
   }, "session-runtime");
 }
+
+/** Session lifecycle facts are observational; persistence uses explicit awaited ports. */
+interface SessionLifecycleEvents {
+  /** @mode emit */
+  "session/created": (payload: { sessionId: string }) => void;
+  /** @mode emit */
+  "session/disposed": (payload: { sessionId: string; outcome: unknown }) => void;
+}
+declare module "@actspace/cordis-adapter" { interface DomainEvents extends SessionLifecycleEvents {} }

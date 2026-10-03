@@ -4,6 +4,7 @@ import { discoverPluginCodecs, importArtifactModule, mountIsolatedCordisTree, ve
 import type { ResolvedComposition } from "@actspace/composition";
 
 export interface HarnessMountRequest {
+  readonly hostContractDigest?: string;
   readonly composition: ResolvedComposition;
   readonly artifacts: ReadonlyMap<string, PluginArtifact>;
   readonly sharedServices: readonly string[];
@@ -36,8 +37,10 @@ export async function mountHarness(parent: CordisContext, request: HarnessMountR
     artifacts.set(id, verified);
   }
   for (const entry of entries) {
-    const manifest = artifacts.get(entry.pluginId)!.manifest.plugin;
-    const descriptor = manifest.behaviors.find(item => item.entryId === entry.entryId);
+    const selectedArtifact = artifacts.get(entry.pluginId)!;
+    if (entry.artifactId && entry.artifactId !== selectedArtifact.artifactId) throw new Error(`Harness artifact differs from entry: ${entry.entryId}`);
+    const manifest = selectedArtifact.manifest.plugin;
+    const descriptor = manifest.behaviors.find(item => item.entryId === (entry.manifestEntryId ?? entry.entryId));
     if (!descriptor || descriptor.module !== entry.module || manifest.version !== entry.pluginVersion || stable(descriptor.provides ?? []) !== stable(entry.provides) || stable(descriptor.injects ?? []) !== stable(entry.injects)) throw new Error(`Harness entry differs from manifest: ${entry.entryId}`);
     for (const capability of new Set([...descriptor.host.required, ...entry.requiredCapabilities])) {
       if (!composition.hostCapabilities.includes(capability)) throw new Error(`Missing Harness Host capability: ${entry.entryId}/${capability}`);
@@ -61,7 +64,7 @@ export async function mountHarness(parent: CordisContext, request: HarnessMountR
     const tree = await mountIsolatedCordisTree({ parent, entries: rows, sharedServices, decorate: ctx => scopeContext(ctx, scope.scopeKey, scope.disposer) });
     let disposal: Promise<void> | undefined;
     return Object.freeze({
-      executionDigest: createHash("sha256").update(stable({ composition: composition.digest, artifacts: [...artifacts].map(([id, artifact]) => [id, artifact.artifactId]).sort(), sharedServices: [...sharedServices].sort() })).digest("hex"),
+      executionDigest: createHash("sha256").update(stable({ hostContractDigest: request.hostContractDigest, composition: { profileId: composition.profileId, entries: composition.entries, hostCapabilities: composition.hostCapabilities }, artifacts: [...artifacts].map(([id, artifact]) => [id, artifact.artifactId]).sort(), sharedServices: [...sharedServices].sort() })).digest("hex"),
       compositionDigest: composition.digest, scope, context: tree.context, codecs, getService: tree.getService,
       dispose: () => disposal ??= (async () => {
         const results = await Promise.allSettled([scope.dispose(), tree.dispose()]);

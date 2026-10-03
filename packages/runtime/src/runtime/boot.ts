@@ -29,6 +29,8 @@ import { settleWithinDeadline } from "./shutdown.js";
 let runtimeClaimed = false;
 
 export type BootRuntimeOptions = {
+  /** Trusted Host-only hook; absent in production defaults. Never supplied by renderer input. */
+  readonly authorizeHarness?: import("@actspace/harness-control").HarnessAuthorizer;
   readonly host: RuntimeV2HostDescriptor;
   readonly dataRoot: string;
   readonly toolEnvironment: Omit<ToolPreparedEnvironment, "journal">;
@@ -121,6 +123,8 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     [HEADLESS_HOST_PORT_ID]: hostServices.services[HEADLESS_HOST_PORT_ID] ?? Object.freeze({ enabled: false }),
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
       disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...(options.host.capabilityCeiling.includes("browser") ? [] : ["browser-tools"])],
+      authorizeHarness: options.authorizeHarness,
+      onHarnessDiagnostic: (error: unknown) => diagnostics.record({ severity: "error", source: "boot", code: "HARNESS_RECOVERY_BLOCKED", message: error instanceof Error ? error.message : String(error) }),
       host: options.host,
       toolEnvironment: options.toolEnvironment,
       workspaceRoot: options.toolEnvironment.workspaceRoot,

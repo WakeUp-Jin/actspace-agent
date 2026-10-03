@@ -46,6 +46,9 @@
       "path": "./../english-learning/tsconfig.build.json"
     },
     {
+      "path": "./../harness-control/tsconfig.build.json"
+    },
+    {
       "path": "./../headless/tsconfig.build.json"
     },
     {

@@ -96,7 +96,8 @@
     "@actspace/tools-web-tools": "workspace:*",
     "@actspace/tools-image-generation": "workspace:*",
     "@actspace/tools-image-inspection": "workspace:*",
-    "@actspace/agent-service": "workspace:*"
+    "@actspace/agent-service": "workspace:*",
+    "@actspace/harness-control": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

@@ -26,7 +26,7 @@ export class OneShotSubagentProvider {
   readonly #inflight = new Set<Promise<SubagentTerminalResult>>();
   readonly #linked = new Set<string>();
   #accepting = true;
-  constructor(private readonly options: { readonly store: SessionStore; readonly presets: StaticPresetRegistry; readonly parentPort?: ParentDelegationPort; readonly createLoop: ChildLoopFactory; readonly acquireRun?: (preset: StaticAgentPreset) => ChildRunLease; readonly manifestDigest: string; readonly plugins: readonly { id: string; version: string }[] }) {}
+  constructor(private readonly options: { readonly store: SessionStore; readonly presets: StaticPresetRegistry; readonly parentPort?: ParentDelegationPort; readonly createLoop: ChildLoopFactory; readonly acquireRun?: (preset: StaticAgentPreset, signal?: AbortSignal) => ChildRunLease | Promise<ChildRunLease>; readonly manifestDigest: string; readonly plugins: readonly { id: string; version: string }[] }) {}
 
   invoke(input: SubagentInvocation): Promise<SubagentTerminalResult> {
     const task = this.#invoke(input);
@@ -58,7 +58,8 @@ export class OneShotSubagentProvider {
       const workspaceRoot = resolveSessionWorkspaceRoot(input.parentSession.header, input.parentSession.journal.events);
       child = await createChildSession({ store: this.options.store, parentSessionId: input.parentSession.header.sessionId, parentBoundarySeq: input.parentSession.lastSeq, parentCallId: input.parentCallId, childSessionId, createdAt: new Date().toISOString(), ...(workspaceRoot ? { cwd: workspaceRoot } : {}), delegationDepth: input.delegationDepth + 1, task: input.task, preset, manifestDigest: this.options.manifestDigest, plugins: this.options.plugins });
       controller.signal.throwIfAborted();
-      lease = this.options.acquireRun?.(preset);
+      lease = await this.options.acquireRun?.(preset, controller.signal);
+      controller.signal.throwIfAborted();
       const content = `${input.task}\n\nSubagent execution boundary: only read_file, list_directory, grep and glob are available. Do not request Bash, edits, approvals or nested delegation. Work only in the inherited workspace. If target files are absent or outside its boundary, stop and report the blocker and partial findings to the parent instead of repeatedly searching unrelated directories.`;
       const accepted = await lease?.start?.(child, content, invocationId);
       admitted = accepted !== undefined;

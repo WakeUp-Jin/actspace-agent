@@ -29,3 +29,4 @@ export const CORDIS_PACKAGE_VERSIONS = Object.freeze({
 } as const);
 export * from "./plugin-artifact.js";
 export * from "./cordis-tree.js";
+export * from "./harness-contracts.js";

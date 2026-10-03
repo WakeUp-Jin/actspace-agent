@@ -603,7 +603,14 @@ export class DesktopRuntimeV2Registry {
       }
       this.#learningTargetToRestore = undefined;
       this.#bindLearningNotifications();
-      this.#browserReady = booted.browserReady && this.requireApp().browserAvailable();
+      try {
+        this.#browserReady = booted.browserReady && await this.requireApp().browserAvailable();
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (code !== "RECOVERY_BLOCKED" && code !== "DURABILITY_BLOCKED" && code !== "STORE_LOCKED") throw error;
+        this.#browserReady = false;
+        this.options.log?.("Harness blocked; Host maintenance remains available", { code });
+      }
       this.#browserSocketPath = booted.browserReady ? this.options.browser?.socketPath : undefined;
       this.options.browser?.setRuntimeReady?.(this.#browserReady);
       // Restore admission from persisted session facts before the desktop starts serving them.

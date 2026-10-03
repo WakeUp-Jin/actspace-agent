@@ -2,9 +2,19 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { join } from "node:path";
-import { artifactHash, publishPluginArtifact, entryId, pluginId, serviceId, type PluginBehaviorDescriptor, type PluginManifest, type SharedArtifactModule } from "@actspace/cordis-adapter";
+import { artifactHash, publishPluginArtifact, entryId, pluginId, serviceId, type PluginBehaviorDescriptor, type PluginManifest, type SharedArtifactModule, type HarnessContract } from "@actspace/cordis-adapter";
 import type { HarnessMountRequest } from "@actspace/boot";
 import type { ResolvedComposition } from "@actspace/composition";
+
+const loopEvents: readonly HarnessContract[] = [
+  ...["system-prompt/assemble", "agent/pre-step", "agent/request", "llm/stream", "agent/request-error"].map(id => ({ id, version: 1, mode: "waterfall" as const })),
+  { id: "agent/turn-stopping", version: 1, mode: "serial" },
+  ...["agent/session-start", "agent/status", "agent/error", "llm/chunk"].map(id => ({ id, version: 1, mode: "emit" as const })),
+];
+const toolEvents: readonly HarnessContract[] = [
+  ...["tools/pre-execute", "tools/execute", "tools/post-execute"].map(id => ({ id, version: 1, mode: "waterfall" as const })),
+  { id: "tools/result", version: 1, mode: "emit" },
+];
 
 const rows = [
   ["llm-service", ["llm.service", "llm.routes", "llm.service.types"], ["actspace.host.llm"]],
@@ -46,7 +56,7 @@ export async function prepareDefaultHarnessArtifact(options: {
   const manifest: PluginManifest = {
     schemaVersion: 1, pluginId: id, version: "1", name: "Default built-in Harness", runtimeContract: "actspace.runtime.v2",
     source: { kind: "builtin", reference: "builtin:actspace.default-harness" }, codecs: [],
-    behaviors: rows.map(([name, provides, injects]): PluginBehaviorDescriptor => ({ entryId: entryId(name as string), module: `./${name}.js`, required: true, enabled: !options.disabledEntries?.includes(name as string), config: name === "browser-tools" ? { disposeHost: false } : {}, host: { required: [], optional: [] }, frontend: null, provides: [...provides].map(serviceId), injects: [...injects].map(serviceId) })),
+    behaviors: rows.map(([name, provides, injects]): PluginBehaviorDescriptor => ({ entryId: entryId(name as string), module: `./${name}.js`, required: true, enabled: !options.disabledEntries?.includes(name as string), config: name === "browser-tools" ? { disposeHost: false } : {}, host: { required: [], optional: [] }, frontend: null, provides: [...provides].map(serviceId), injects: [...injects].map(serviceId), contracts: { services: { provides: [...provides].map(id => ({ id, version: 1 })), requires: [...injects].map(id => ({ id, version: 1 })) }, events: { provides: name === "agent-factory" ? loopEvents : name === "tools-runtime" ? toolEvents : [], requires: name === "agent-factory" ? [{ id: "session/checkpoint", version: 1, mode: "emit" }] : [] } } })),
     contributions: { services: rows.flatMap(([, provides]) => [...provides]), events: [], contributions: [] },
   };
   const artifact = await publishPluginArtifact({ sourceRoot, artifactRoot: options.artifactRoot, plugin: manifest, files: files as string[], sharedModules });
