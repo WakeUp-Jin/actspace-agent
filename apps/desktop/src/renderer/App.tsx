@@ -1,14 +1,9 @@
+import { projectTaskQueue } from "./session/message-queue";
 import { createEmptyStreamingState, type ToolEntry, type StreamingState, type StreamingSegment, type SessionRunState } from "./session/session-run-state";
 import { SessionBrowseContext } from "./session/SessionBrowseContext";
 import {
   EMPTY_MESSAGE_QUEUE,
-  createQueuedMessage,
-  enqueueMessage,
   isQueueEmpty,
-  markSteering,
-  moveQueuedMessageUp,
-  removeQueuedMessage,
-  returnToFront,
   takeSteering,
   type QueuedComposerMessage,
   type SessionMessageQueue,
@@ -881,11 +876,9 @@ export function App() {
   const [compactionFailure, setCompactionFailure] = useState<CompactionBlock | null>(null);
   const [composerNotice, setComposerNotice] = useState<{ sessionId: string; text: string } | null>(null);
   const lastSendOptionsRef = useRef(new Map<string, ComposerSendOptions>());
-  // 运行中发送的消息按会话排队；只在内存中。drainingSessionsRef 覆盖「上一个运行结束、下一条还没发出」的间隙。
+  // Host 队列快照缓存；刷新窗口后从持久任务事实重建。
   const messageQueuesRef = useRef(new Map<string, SessionMessageQueue>());
   const [messageQueue, setMessageQueue] = useState<SessionMessageQueue>(EMPTY_MESSAGE_QUEUE);
-  const drainingSessionsRef = useRef(new Set<string>());
-  const steerRequestsRef = useRef(new Map<string, Set<Promise<void>>>());
   // 插入的正文：loop 读到后用它在当前回合里显示用户消息。
   const steerContentRef = useRef(new Map<string, QueuedComposerMessage>());
   const continueQueueRef = useRef<(sessionId: string, outcome: SessionRunOutcome) => Promise<void>>(async () => {});
@@ -959,6 +952,34 @@ export function App() {
     else messageQueuesRef.current.set(sessionId, next);
     if (activeSessionIdRef.current === sessionId) setMessageQueue(next);
   }, []);
+
+  const taskSnapshotsRef = useRef(new Map<string, import("@actspace/shared/runtime-v2").TaskSnapshot>());
+  const applyTaskSnapshot = useCallback((snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot) => {
+    if ((taskSnapshotsRef.current.get(snapshot.sessionId)?.revision ?? -2) > snapshot.revision) return;
+    taskSnapshotsRef.current.set(snapshot.sessionId, snapshot);
+    const queue = projectTaskQueue(snapshot);
+    messageQueuesRef.current.set(snapshot.sessionId, queue);
+    if (activeSessionIdRef.current === snapshot.sessionId) setMessageQueue(queue);
+  }, []);
+  const refreshTaskQueue = useCallback(async (sessionId: string) => {
+    if (!hasActspaceBridge() || !window.actspace.taskCommand) return;
+    const result = await window.actspace.taskCommand({ sessionId, op: "snapshot" });
+    applyTaskSnapshot(result.snapshot);
+  }, [applyTaskSnapshot]);
+  const taskCommand = useCallback(async (command: import("@actspace/shared/runtime-v2").TaskCommand) => {
+    if (!hasActspaceBridge() || !window.actspace.taskCommand) throw new Error("Host task service unavailable");
+    const result = await window.actspace.taskCommand(command);
+    applyTaskSnapshot(result.snapshot);
+    if (result.error) { setComposerNotice({ sessionId: command.sessionId, text: "队列状态已变化，请根据最新状态重试。" }); return false; }
+    return true;
+  }, [applyTaskSnapshot]);
+  useEffect(() => {
+    if (selectedSessionId) void refreshTaskQueue(selectedSessionId).catch(console.error);
+    if (!hasActspaceBridge() || !window.actspace.onSessionLiveEvent) return;
+    return window.actspace.onSessionLiveEvent(({ event }) => {
+      if (event.sessionId && event.message === "task-queue-updated") void refreshTaskQueue(event.sessionId).catch(console.error);
+    });
+  }, [selectedSessionId, refreshTaskQueue]);
 
   const setCompactionFailureForSession = useCallback((sessionId: string, block: CompactionBlock | null) => {
     if (block) compactionFailuresRef.current.set(sessionId, block);
@@ -1612,7 +1633,13 @@ export function App() {
     if (!hasActspaceBridge()) return;
 
     return window.actspace.onAgentStream((event) => {
-      const run = sessionRunsRef.current.get(event.sessionId);
+      let run = sessionRunsRef.current.get(event.sessionId);
+      if (event.type === "agent_run_started" && (!run || run.agentRunId !== event.agentRunId)) {
+        run = { sessionId: event.sessionId, agentRunId: event.agentRunId, recovered: true, state: createEmptyStreamingState(), userBlock: null, aborting: false, record: pageCacheRef.current.get(event.sessionId)?.record ?? null, historyBefore: null };
+        sessionRunsRef.current.set(event.sessionId, run);
+        setBusySessionIds(current => updateStringSet(current, event.sessionId, true));
+        void readSessionPage(event.sessionId);
+      }
       if (event.type !== "bash_task_update" && run && run.agentRunId !== event.agentRunId) return;
       if ((event.type === "tool_approval_required" || event.type === "tool_approval_resolved") &&
         run?.agentRunId === event.agentRunId && run.state.activeTools.get(event.toolCallId)?.terminalStatus) return;
@@ -1702,7 +1729,7 @@ export function App() {
     }
   }, [bootstrapState?.workspaceRoot, refreshWorkspaces]);
 
-  /** 为某个会话启动一次运行；可见会话发送和队列自动发出共用。返回结果供队列决定继续还是暂停。 */
+  /** 首次发送保留结果兼容接口；执行与后续队列均由 Host 调度。 */
   const startSessionRun = useCallback(async (
     sessionId: string,
     text: string,
@@ -1710,8 +1737,13 @@ export function App() {
     env: SessionRunEnv,
   ): Promise<SessionRunOutcome> => {
     if (sessionRunsRef.current.has(sessionId)) return "not_started";
-    const agentRunId = nextAgentRunId();
     const isCompactCommand = text.trim() === "/compact";
+    const pendingKey = `actspace:pending-run:${sessionId}`;
+    const contentIdentity = JSON.stringify({ text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations });
+    let pending: { content: string; id: string } | null = null;
+    try { pending = JSON.parse(sessionStorage.getItem(pendingKey) ?? "null"); } catch { /* obsolete draft */ }
+    const agentRunId = !isCompactCommand && pending?.content === contentIdentity ? pending.id : nextAgentRunId();
+    if (!isCompactCommand) sessionStorage.setItem(pendingKey, JSON.stringify({ content: contentIdentity, id: agentRunId }));
     let outcome: SessionRunOutcome = "failed";
     const run: SessionRunState = {
       sessionId, agentRunId, state: createEmptyStreamingState(), userBlock: null, aborting: false,
@@ -1821,6 +1853,7 @@ export function App() {
           ...(env.executionContext ? { executionContext: env.executionContext } : {}),
         };
         const result = await window.actspace.runAgent(input);
+        sessionStorage.removeItem(pendingKey);
         if (result.status === "rejected") {
           outcome = "rejected";
           if (!isCurrentRun()) return outcome;
@@ -1871,7 +1904,7 @@ export function App() {
             attachments: options.attachments,
             fileReferences: options.fileReferences,
             responseAnnotations: options.responseAnnotations,
-            error: "消息未能发送，正文和附件已保留，请重试。",
+            error: "提交结果尚未确认，正文和附件已保留；重试将核对同一次提交。",
           };
           draftsRef.current.set(sessionId, draft);
           if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
@@ -1894,142 +1927,35 @@ export function App() {
     readSidebarSessions,
   ]);
 
-  /** 运行结束后核对还没被读到的插入：只有 loop 已读到的留在对话里，其余回到队首。 */
-  const settleSteers = useCallback(async (sessionId: string) => {
-    await Promise.allSettled([...(steerRequestsRef.current.get(sessionId) ?? [])]);
-    const pending = messageQueuesRef.current.get(sessionId)?.steering ?? [];
-    if (pending.length === 0) return;
-    const statuses = await Promise.all(pending.map(async (item) => {
-      try {
-        return (await window.actspace.cancelSteer?.({ sessionId, messageId: item.id }))?.status ?? "missing";
-      } catch (error) {
-        console.error("Failed to settle steer", error);
-        return "missing";
-      }
-    }));
-    const returned = pending.filter((_, index) => statuses[index] !== "claimed");
-    for (const item of returned) steerContentRef.current.delete(item.id);
-    updateMessageQueue(sessionId, (queue) => returnToFront(
-      { ...queue, steering: queue.steering.filter((item) => !pending.includes(item)) },
-      returned,
-    ));
-  }, [updateMessageQueue]);
-
-  /** 按上一次运行的结果决定：正常结束就发出队首一条，停止 / 失败 / 被拒则暂停。 */
-  const continueQueue = useCallback(async (sessionId: string, firstOutcome: SessionRunOutcome) => {
-    if (firstOutcome === "not_started") return;
-    drainingSessionsRef.current.add(sessionId);
-    try {
-      let outcome: SessionRunOutcome = firstOutcome;
-      while (outcome !== "not_started") {
-        await settleSteers(sessionId);
-        const queue = messageQueuesRef.current.get(sessionId) ?? EMPTY_MESSAGE_QUEUE;
-        if (outcome !== "completed") {
-          if (queue.items.length > 0) updateMessageQueue(sessionId, (current) => ({ ...current, paused: true }));
-          return;
-        }
-        const next = queue.paused ? undefined : queue.items[0];
-        if (!next) return;
-        updateMessageQueue(sessionId, (current) => removeQueuedMessage(current, next.id));
-        const cached = pageCacheRef.current.get(sessionId);
-        outcome = await startSessionRun(sessionId, next.text, next.options, {
-          record: cached?.record ?? null,
-          historyBefore: cached?.history.before ?? null,
-        });
-        // 另一个运行抢先开始：放回队首，由那个运行结束后继续发出。
-        if (outcome === "not_started") updateMessageQueue(sessionId, (current) => returnToFront(current, [next]));
-      }
-    } finally {
-      drainingSessionsRef.current.delete(sessionId);
-    }
-  }, [settleSteers, startSessionRun, updateMessageQueue]);
+  const continueQueue = useCallback(async (sessionId: string, _outcome: SessionRunOutcome) => { await refreshTaskQueue(sessionId); }, [refreshTaskQueue]);
   continueQueueRef.current = continueQueue;
-
   const handleSteerQueued = useCallback((id: string) => {
     const sessionId = activeSessionIdRef.current;
-    const run = sessionId ? sessionRunsRef.current.get(sessionId) : undefined;
-    const steer = hasActspaceBridge() ? window.actspace.steerAgentRun : undefined;
-    const item = sessionId ? messageQueuesRef.current.get(sessionId)?.items.find((candidate) => candidate.id === id) : undefined;
-    if (!sessionId || !run || !steer || !item || item.kind !== "message") return;
-    steerContentRef.current.set(item.id, item);
-    updateMessageQueue(sessionId, (queue) => markSteering(queue, item.id));
-    const request = (async () => {
-      let notice: string | null = null;
-      try {
-        const result = await steer({
-          sessionId,
-          agentRunId: run.agentRunId,
-          messageId: item.id,
-          userInput: item.text,
-          attachments: item.options.attachments?.map(attachmentForRuntime),
-          ...(item.options.fileReferences?.length ? { fileReferences: item.options.fileReferences } : {}),
-          ...(item.options.responseAnnotations?.length ? { responseAnnotations: item.options.responseAnnotations } : {}),
-        });
-        if (result.status === "accepted") return;
-        if (result.status === "rejected") {
-          notice = result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : formatChatAttachmentIssue(result.error);
-        }
-      } catch (error) {
-        console.error("Failed to steer Agent run", error);
-        notice = "插入失败，消息已放回队列。";
-      }
-      // 没能插入（回合已结束、校验失败）：还在「已插入」里才放回队首，避免与运行结束时的核对重复。
-      let returned = false;
-      updateMessageQueue(sessionId, (queue) => {
-        const taken = takeSteering(queue, item.id);
-        returned = Boolean(taken.item);
-        return taken.item ? returnToFront(taken.queue, [taken.item]) : queue;
-      });
-      if (returned) steerContentRef.current.delete(item.id);
-      if (notice) setComposerNotice({ sessionId, text: notice });
-    })();
-    const requests = steerRequestsRef.current.get(sessionId) ?? new Set<Promise<void>>();
-    requests.add(request);
-    steerRequestsRef.current.set(sessionId, requests);
-    void request.finally(() => requests.delete(request));
-  }, [updateMessageQueue]);
-
+    const snapshot = sessionId ? taskSnapshotsRef.current.get(sessionId) : undefined;
+    const runId = snapshot?.runs.find(run => run.state === "running")?.runId;
+    if (!sessionId || !snapshot || !runId) return;
+    const item = messageQueuesRef.current.get(sessionId)?.items.find(item => item.id === id);
+    if (item) steerContentRef.current.set(id, item);
+    void taskCommand({ op: "designate", sessionId, taskId: id, runId, revision: snapshot.revision }).catch(console.error);
+  }, [taskCommand]);
   const handleUnsteerQueued = useCallback(async (id: string) => {
     const sessionId = activeSessionIdRef.current;
-    const cancel = hasActspaceBridge() ? window.actspace.cancelSteer : undefined;
-    if (!sessionId || !cancel) return;
-    // 插入请求还在路上时先等它落定，否则撤回会报 missing，随后插入又生效。
-    await Promise.allSettled([...(steerRequestsRef.current.get(sessionId) ?? [])]);
-    if (!messageQueuesRef.current.get(sessionId)?.steering.some((item) => item.id === id)) return;
-    let status: Awaited<ReturnType<typeof cancel>>["status"];
-    try {
-      status = (await cancel({ sessionId, messageId: id })).status;
-    } catch (error) {
-      console.error("Failed to cancel steer", error);
-      return;
-    }
-    // 已被读到：保持原样，user_message_steered 会把它显示到对话里。
-    if (status === "claimed") return;
-    steerContentRef.current.delete(id);
-    updateMessageQueue(sessionId, (queue) => {
-      const taken = takeSteering(queue, id);
-      return taken.item ? returnToFront(taken.queue, [taken.item]) : queue;
-    });
-  }, [updateMessageQueue]);
-
+    const snapshot = sessionId ? taskSnapshotsRef.current.get(sessionId) : undefined;
+    if (sessionId && snapshot) await taskCommand({ op: "designate", sessionId, taskId: id, runId: null, revision: snapshot.revision });
+  }, [taskCommand]);
   const handleResumeQueue = useCallback(() => {
     const sessionId = activeSessionIdRef.current;
-    if (!sessionId) return;
-    updateMessageQueue(sessionId, (queue) => ({ ...queue, paused: false }));
-    if (sessionRunsRef.current.has(sessionId) || drainingSessionsRef.current.has(sessionId)) return;
-    void continueQueue(sessionId, "completed");
-  }, [continueQueue, updateMessageQueue]);
-
-  const handleEditQueued = useCallback((id: string) => {
+    const snapshot = sessionId ? taskSnapshotsRef.current.get(sessionId) : undefined;
+    if (sessionId && snapshot) void taskCommand({ op: "resume", sessionId, revision: snapshot.revision }).catch(console.error);
+  }, [taskCommand]);
+  const handleEditQueued = useCallback(async (id: string) => {
     const sessionId = activeSessionIdRef.current;
-    const item = sessionId ? messageQueuesRef.current.get(sessionId)?.items.find((candidate) => candidate.id === id) : undefined;
-    if (!sessionId || !item) return;
-    updateMessageQueue(sessionId, (queue) => removeQueuedMessage(queue, id));
-    setComposerDraftRestore({
-      id: Date.now(), sessionId, text: item.text, attachments: item.options.attachments,
-      fileReferences: item.options.fileReferences, responseAnnotations: item.options.responseAnnotations,
-    });
-  }, [updateMessageQueue]);
+    const snapshot = sessionId ? taskSnapshotsRef.current.get(sessionId) : undefined;
+    const item = sessionId ? messageQueuesRef.current.get(sessionId)?.items.find(item => item.id === id) : undefined;
+    if (!sessionId || !snapshot || !item) return;
+    if (!await taskCommand({ op: "cancel", sessionId, taskId: id, revision: snapshot.revision })) return;
+    setComposerDraftRestore({ id: Date.now(), sessionId, text: item.text, ...item.options });
+  }, [taskCommand]);
 
   const handleSend = useCallback(async (
     text: string,
@@ -2037,10 +1963,34 @@ export function App() {
   ) => {
     if (!text.trim() && !options.attachments?.length && !options.fileReferences?.length && !options.responseAnnotations?.length) return;
     const visibleSessionId = activeSessionIdRef.current;
-    if (visibleSessionId && (sessionRunsRef.current.has(visibleSessionId) || drainingSessionsRef.current.has(visibleSessionId))) {
-      updateMessageQueue(visibleSessionId, (queue) => enqueueMessage(queue, createQueuedMessage(text, options)));
-      draftsRef.current.delete(visibleSessionId);
-      setComposerDraftRestore(null);
+    if (visibleSessionId && (sessionRunsRef.current.has(visibleSessionId) || taskSnapshotsRef.current.get(visibleSessionId)?.paused)) {
+      if (!window.actspace.submitTask) throw new Error("Host task service unavailable");
+      const submitted = { sessionId: visibleSessionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
+      const pendingKey = `actspace:pending-submission:${visibleSessionId}`;
+      const previous = sessionStorage.getItem(pendingKey);
+      let saved: { content: string; id: string } | null = null;
+      try { saved = previous ? JSON.parse(previous) : null; } catch { /* obsolete draft */ }
+      const serialized = JSON.stringify(submitted);
+      const submissionId = saved?.content === serialized ? saved.id : crypto.randomUUID();
+      sessionStorage.setItem(pendingKey, JSON.stringify({ content: serialized, id: submissionId }));
+      await taskCommand({ sessionId: visibleSessionId, op: "configure", configuration: { model: options.model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills } });
+      try {
+        await window.actspace.submitTask({ sessionId: visibleSessionId, submissionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations });
+        await refreshTaskQueue(visibleSessionId);
+        sessionStorage.removeItem(pendingKey);
+        draftsRef.current.delete(visibleSessionId); setComposerDraftRestore(null);
+      } catch (error) {
+        setComposerNotice({ sessionId: visibleSessionId, text: "提交结果尚未确认，正在用同一标识核对。" });
+        // The same submission identity is retained across an uncertain acknowledgement.
+        try {
+          await window.actspace.submitTask({ ...submitted, submissionId });
+          sessionStorage.removeItem(pendingKey);
+          await refreshTaskQueue(visibleSessionId);
+        } catch {
+          const draft = { id: Date.now(), sessionId: visibleSessionId, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error: "提交尚未确认，再次发送将核对同一次提交。" };
+          draftsRef.current.set(visibleSessionId, draft); setComposerDraftRestore(draft);
+        }
+      }
       return;
     }
 
@@ -2103,8 +2053,6 @@ export function App() {
       }
     }
 
-    // 手动发送视为继续：这一条之后，暂停的队列照常发出。
-    updateMessageQueue(sessionId, (queue) => queue.paused ? { ...queue, paused: false } : queue);
     const outcome = await startSessionRun(sessionId, text, options, {
       record: createdSession ?? sessionRecord,
       historyBefore,
@@ -2400,8 +2348,8 @@ export function App() {
       : activeSessionId && approvalPendingSessionIds.has(activeSessionId) ? "等待审批时不能插入" : null,
     onSteer: handleSteerQueued,
     onUnsteer: (id) => void handleUnsteerQueued(id),
-    onRemove: (id) => { if (activeSessionId) updateMessageQueue(activeSessionId, (queue) => removeQueuedMessage(queue, id)); },
-    onMoveUp: (id) => { if (activeSessionId) updateMessageQueue(activeSessionId, (queue) => moveQueuedMessageUp(queue, id)); },
+    onRemove: (id) => { const snapshot = activeSessionId ? taskSnapshotsRef.current.get(activeSessionId) : undefined; if (activeSessionId && snapshot) void taskCommand({ op: "cancel", sessionId: activeSessionId, taskId: id, revision: snapshot.revision }).catch(console.error); },
+    onMoveUp: (id) => { const snapshot = activeSessionId ? taskSnapshotsRef.current.get(activeSessionId) : undefined; const index = messageQueue.items.findIndex(item => item.id === id); if (activeSessionId && snapshot && index > 0) void taskCommand({ op: "move", sessionId: activeSessionId, taskId: id, beforeTaskId: messageQueue.items[index - 1].id, revision: snapshot.revision }).catch(console.error); },
     onEdit: handleEditQueued,
     onResume: handleResumeQueue,
   };

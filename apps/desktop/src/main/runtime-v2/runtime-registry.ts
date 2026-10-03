@@ -198,6 +198,18 @@ export class DesktopRuntimeV2Registry {
     } finally { this.#admittedWork--; }
   }
 
+  async taskCommand(input: import("@actspace/shared/runtime-v2").TaskCommand) {
+    this.assertAdmission();
+    this.#admittedWork++;
+    try { return await this.requireApp().taskCommand(input); }
+    finally { this.#admittedWork--; }
+  }
+  async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) {
+    this.assertAdmission();
+    this.#admittedWork++;
+    try { return await this.requireApp().submitTask(sessionId, submissionId, content); }
+    finally { this.#admittedWork--; }
+  }
   async enqueueMessage(input: RuntimeV2EnqueueMessageInput) {
     this.assertAdmission();
     this.#admittedWork++;
@@ -476,9 +488,11 @@ export class DesktopRuntimeV2Registry {
     return result;
   }
 
+  #stopTaskRevisions: (() => void) | undefined;
   #stopSessionRevisions: (() => void) | undefined;
 
   async dispose(forRestart = false): Promise<void> {
+    this.#stopTaskRevisions?.(); this.#stopTaskRevisions = undefined;
     this.#stopSessionRevisions?.();
     this.#stopSessionRevisions = undefined;
     this.#stopLearningNotifications?.();
@@ -589,9 +603,7 @@ export class DesktopRuntimeV2Registry {
       }
       this.#learningTargetToRestore = undefined;
       this.#bindLearningNotifications();
-      const browserSurface = booted.profile.context.get?.("tools.browser") as { available?: boolean; registrations?: readonly unknown[]; definitions?: readonly unknown[] } | undefined;
-      this.#browserReady = booted.browserReady && browserSurface?.available === true && (browserSurface.registrations?.length ?? 0) > 0
-        && browserSurface.registrations?.length === browserSurface.definitions?.length;
+      this.#browserReady = booted.browserReady && this.requireApp().browserAvailable();
       this.#browserSocketPath = booted.browserReady ? this.options.browser?.socketPath : undefined;
       this.options.browser?.setRuntimeReady?.(this.#browserReady);
       // Restore admission from persisted session facts before the desktop starts serving them.
@@ -608,6 +620,9 @@ export class DesktopRuntimeV2Registry {
       this.#stopSessionRevisions = this.requireApp().subscribeSessionProjection(update => {
         this.#emit({ kind: "journal-update", sessionId: update.sessionId, throughJournalSeq: update.throughJournalSeq, update, ...(update.event.type === "session/title-set" ? { message: "session-title-updated" } : {}) });
       });
+      this.#stopTaskRevisions = booted.profile.context.on?.("agent/tasks-updated", (snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot) => {
+        this.#emitDurableChanged(snapshot.sessionId, snapshot.revision, "task-queue-updated");
+      }) as (() => void) | undefined;
       this.#artifacts = booted.artifacts;
       this.#bootError = null;
       this.options.log?.("runtime v2 ready", {

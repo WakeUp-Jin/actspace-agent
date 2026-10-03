@@ -29,7 +29,7 @@ describe("one-shot Subagent provider", () => {
     const provider = new OneShotSubagentProvider({ store, presets, manifestDigest: "manifest", plugins: [{ id: "@actspace/core", version: "2" }], parentPort: {
       recordRequested: async ({ invocationId, parentCallId, presetId }) => { await parent.append({ type: "delegation/requested", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { invocationId, parentCallId, presetId }, surface: null }); },
       recordTerminal: async (result) => { links.push(result.childSessionId); await parent.append({ type: "delegation/completed", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { invocationId: result.invocationId, childSessionId: result.childSessionId, status: result.status }, surface: null }); },
-    }, createLoop: ({ preset, allowedToolNames, agentId }) => { childAgentIds.push(agentId); return { runTurn: async () => ({ agentRunId: "run", turnId: "turn", reason: "completed", steps: 1, finalText: `${preset.id}:${allowedToolNames.join(",")}` }) } as never; } });
+    }, createLoop: ({ preset, allowedToolNames, agentId }) => { childAgentIds.push(agentId); return { ...idleLifecycle(), runTurn: async () => ({ agentRunId: "run", turnId: "turn", reason: "completed", steps: 1, finalText: `${preset.id}:${allowedToolNames.join(",")}` }) } as never; } });
     const agent = await provider.invoke({ parentSession: parent, parentScope, parentCallId: "call-agent", presetId: "actspace.agent", task: "write", parentVisibleToolIds: ["read_file", "write_file"], delegationDepth: 0 });
     const explore = await provider.invoke({ parentSession: parent, parentScope, parentCallId: "call-explore", presetId: "actspace.explore", task: "read", parentVisibleToolIds: ["read_file", "write_file", "grep"], delegationDepth: 0 });
     expect(agent.text).toBe("actspace.agent:read_file");
@@ -54,7 +54,7 @@ describe("one-shot Subagent provider", () => {
   it("persists the step-limit reason and partial findings", async () => {
     const { store, parent, parentScope } = await fixture();
     const provider = new OneShotSubagentProvider({ store, presets: createBuiltInPresets([]), manifestDigest: "manifest", plugins: [],
-      createLoop: () => ({ runTurn: async () => ({ reason: "step-limit", steps: 300, finalText: "Target files were not found." }) }) as never });
+      createLoop: () => ({ ...idleLifecycle(), runTurn: async () => ({ reason: "step-limit", steps: 300, finalText: "Target files were not found." }) }) as never });
     const result = await provider.invoke({ parentSession: parent, parentScope, parentCallId: "limit", presetId: "actspace.agent", task: "inspect", parentVisibleToolIds: [], delegationDepth: 0 });
     expect(result).toMatchObject({ status: "failed", text: "Target files were not found.", failure: { code: "SUBAGENT_STEP_LIMIT", retryable: false } });
     expect(result.failure?.message).toContain("300");
@@ -68,7 +68,7 @@ describe("one-shot Subagent provider", () => {
     const presets = new StaticPresetRegistry();
     presets.register({ ...createBuiltInPresets([]).get("actspace.agent"), maxDurationMs: 5 });
     const provider = new OneShotSubagentProvider({ store, presets, manifestDigest: "manifest", plugins: [],
-      createLoop: ({ signal }) => ({ abort: () => undefined, runTurn: async () => {
+      createLoop: ({ signal }) => ({ ...idleLifecycle(), abort: () => undefined, runTurn: async () => {
         if (!signal.aborted) await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
         return { reason: "aborted", steps: 1, finalText: "Partial result" };
       } }) as never });
@@ -105,7 +105,7 @@ describe("one-shot Subagent provider", () => {
       plugins: [],
       createLoop: ({ scope }) => {
         inheritedParent = scope.parent;
-        return { runTurn: async () => ({ agentRunId: "run", turnId: "turn", reason: "completed" as const, steps: 1, finalText: "ok" }) } as never;
+        return { ...idleLifecycle(), runTurn: async () => ({ agentRunId: "run", turnId: "turn", reason: "completed" as const, steps: 1, finalText: "ok" }) } as never;
       },
     });
     await provider.invoke({ parentSession: parent, parentScope, parentCallId: "default", presetId: "actspace.agent", task: "default", parentVisibleToolIds: ["read_file"], delegationDepth: 0 });
@@ -136,6 +136,7 @@ describe("one-shot Subagent provider", () => {
         },
       },
       createLoop: () => ({
+        ...idleLifecycle(),
         runTurn: async () => {
           childRuns += 1;
           return { agentRunId: "run", turnId: "turn", reason: "completed", steps: 1, finalText: "durable child answer" };
@@ -177,21 +178,24 @@ describe("one-shot Subagent provider", () => {
 
   it("cascades provider disposal into an active child and waits for terminal publication", async () => {
     const { store, parent, parentScope } = await fixture();
+    let running = false;
     const provider = new OneShotSubagentProvider({
       store,
       presets: createBuiltInPresets(["actspace.filesystem-read/read_file"]),
       manifestDigest: "manifest",
       plugins: [{ id: "@actspace/core", version: "2" }],
       createLoop: ({ signal }) => ({
+        ...idleLifecycle(),
         abort: () => undefined,
         runTurn: () => new Promise((resolve) => {
+          running = true;
           const finish = () => resolve({ agentRunId: "run", turnId: "turn", reason: "aborted", steps: 0, finalText: "" });
           if (signal.aborted) finish(); else signal.addEventListener("abort", finish, { once: true });
         }),
       }) as never,
     });
     const invocation = provider.invoke({ parentSession: parent, parentScope, parentCallId: "call-abort", presetId: "actspace.agent", task: "wait", parentVisibleToolIds: ["actspace.filesystem-read/read_file"], delegationDepth: 0 });
-    await waitFor(() => provider.activeCount === 1);
+    await waitFor(() => running);
     await provider.dispose("runtime-shutdown");
     await expect(invocation).resolves.toMatchObject({ status: "aborted", failure: null });
     expect(provider.activeCount).toBe(0);
@@ -225,3 +229,24 @@ async function waitFor(predicate: () => boolean): Promise<void> {
   }
   throw new Error("condition did not become true");
 }
+
+function idleLifecycle() { return { abort: () => undefined, quiesce: () => undefined, waitForIdle: async () => undefined }; }
+
+it("selects each child's generation independently and releases it after stop-and-join", async () => {
+  const { store, parent, parentScope } = await fixture();
+  const scopes = [new AgentScope("generation-one"), new AgentScope("generation-two")];
+  const order: string[] = []; let current = 0;
+  const provider = new OneShotSubagentProvider({ store, presets: createBuiltInPresets([]), manifestDigest: "test", plugins: [], createLoop: () => { throw new Error("legacy factory used"); }, acquireRun: () => {
+    const selection = current;
+    return { scope: scopes[selection], createLoop: ({ scope, allowedToolNames }) => {
+      expect(scope.parent).toBe(scopes[selection]); expect(allowedToolNames).toEqual([]);
+      return { abort: () => false, runTurn: async () => ({ agentRunId: `run-${selection}`, turnId: "turn", reason: "completed", steps: 1, finalText: String(selection) }), quiesce: () => { order.push(`stop-${selection}`); }, waitForIdle: async () => { order.push(`join-${selection}`); } } as never;
+    }, release: async () => { order.push(`release-${selection}`); } };
+  } });
+  // Provider creates one task scope directly under the acquired lease scope.
+  const invoke = () => provider.invoke({ parentSession: parent, parentScope, parentCallId: `call-${current}`, presetId: "actspace.agent", task: "inspect", parentVisibleToolIds: [], delegationDepth: 0 });
+  const first = await invoke(); current = 1; const second = await invoke();
+  expect([first.text, second.text]).toEqual(["0", "1"]);
+  expect(order).toEqual(["stop-0", "join-0", "release-0", "stop-1", "join-1", "release-1"]);
+  await provider.dispose(); await parent.close(); await parentScope.dispose(); await Promise.all(scopes.map(scope => scope.dispose()));
+});

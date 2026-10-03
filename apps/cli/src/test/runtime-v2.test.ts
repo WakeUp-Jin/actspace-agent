@@ -27,7 +27,8 @@ describe("Runtime v2 CLI candidate", () => {
     });
     expect(ephemeral.totalUsage).toEqual(ephemeral.snapshot?.usage);
     expect(ephemeral.messageCount).toBe(ephemeral.snapshot?.messages.length);
-    expect(await readdir(dataDir)).toEqual([]);
+    // Fixed Harness code is cached; ephemeral conversation data is never persisted.
+    expect(await readdir(dataDir)).toEqual(["harness-artifacts"]);
     const persistent = await runV2Command({ input: "first", workspace, dataDir, permissionMode: "full-access", permissionModeExplicit: true, outputFormat: "json", mock: true, persist: true });
     expect(persistent.persistent).toBe(true);
     expect(persistent.permissionMode).toBe("full-access");
@@ -39,8 +40,11 @@ describe("Runtime v2 CLI candidate", () => {
     expect(journal).toContain('"type":"assistant/chunk"');
     expect(journal).toContain('"type":"session/end-seed"');
     const eventTypes = journal.trim().split("\n").map((line) => JSON.parse(line) as { recordKind?: string; type?: string }).filter((row) => row.recordKind === "event").map((row) => row.type);
-    expect(eventTypes.indexOf("agent/inbox/spliced")).toBeGreaterThanOrEqual(0);
-    expect(eventTypes.indexOf("agent/inbox/spliced")).toBeLessThan(eventTypes.indexOf("turn/start"));
+    expect(eventTypes).not.toContain("agent/inbox/spliced");
+    expect(eventTypes.indexOf("plugin/actspace.agent-service/task")).toBeGreaterThanOrEqual(0);
+    expect(eventTypes).toContain("user/message");
+    expect(eventTypes.indexOf("user/message")).toBeLessThan(eventTypes.indexOf("turn/start"));
+    expect(eventTypes).toContain("plugin/actspace.agent-service/run");
     const resumed = await runV2Command({ input: "second", workspace, dataDir, permissionMode: "default", outputFormat: "json", mock: true, resume: persistent.sessionId });
     expect(resumed.sessionId).toBe(persistent.sessionId);
     expect(resumed.permissionMode).toBe("full-access");

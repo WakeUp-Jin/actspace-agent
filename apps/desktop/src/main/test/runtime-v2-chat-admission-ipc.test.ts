@@ -14,7 +14,8 @@ it("returns a serializable rejection before starting a turn and identifies the s
   const importChatAttachments = vi.fn().mockRejectedValue(new ChatAttachmentValidationError({ code: "invalid_utf8", fileName: "bad.txt" }, 1));
   const registration = registerFixedRendererIpc({
     roots: { dataRoot: "/tmp/chat-admission", workspaceRoot: "/work" },
-    registry: { subscribe: () => () => {}, subscribeRendererStream: () => () => {}, inspectSession: async () => ({ agentMode: "chat" }), importChatAttachments, runTurn },
+    registry: {
+      taskCommand: async () => ({ snapshot: { tasks: [] } }), subscribe: () => () => {}, subscribeRendererStream: () => () => {}, inspectSession: async () => ({ agentMode: "chat" }), importChatAttachments, runTurn },
     settings: { subscribeV4Changes: () => () => {} },
     getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
   } as unknown as FixedRendererIpcOptions);
@@ -43,7 +44,8 @@ it("recovers the accepted call preview and excludes approvals resolved while rea
   const browseToolDetail = vi.fn(async () => detail);
   const registration = registerFixedRendererIpc({
     roots: { dataRoot: "/tmp/approval-recovery", workspaceRoot: "/work" }, approvals,
-    registry: { subscribe: () => () => {}, subscribeRendererStream: () => () => {}, browseToolDetail },
+    registry: {
+      taskCommand: async () => ({ snapshot: { tasks: [] } }), subscribe: () => () => {}, subscribeRendererStream: () => () => {}, browseToolDetail },
     settings: { subscribeV4Changes: () => () => {} },
     getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
   } as unknown as FixedRendererIpcOptions);

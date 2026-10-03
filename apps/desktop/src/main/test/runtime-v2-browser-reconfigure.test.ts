@@ -27,6 +27,9 @@ describe("Browser Runtime restart admission", () => {
     let bridgeReady = false;
     const browser = { socketPath: "/tmp/test-browser.sock", getStatus: vi.fn(async () => ({ runState: "ready", bridgeReady })), setRuntimeReady: vi.fn() };
     const app = {
+      taskCommand: vi.fn(async (_input: unknown) => ({ snapshot: {} })),
+      submitTask: vi.fn(async () => ({ task: {} })),
+      browserAvailable: () => bridgeReady,
       listSessions: vi.fn(async () => []),
       subscribeSessionProjection: vi.fn(() => vi.fn()),
       isIdleForReconfigure: vi.fn(async () => true),
@@ -62,6 +65,22 @@ describe("Browser Runtime restart admission", () => {
     await pending;
     expect(await fixture.registry.refreshBrowser()).toBe(true);
     expect(fixture.shutdown).toHaveBeenCalledOnce();
+  });
+
+  it.each(["submit", "command"])("waits for accepted task %s operations before reconfiguration", async (operation) => {
+    const fixture = await setup();
+    fixture.connect();
+    const gate = deferred<any>();
+    if (operation === "submit") fixture.app.submitTask.mockReturnValueOnce(gate.promise);
+    else fixture.app.taskCommand.mockReturnValueOnce(gate.promise);
+    const pending = operation === "submit"
+      ? fixture.registry.submitTask("session", "submission", "hello")
+      : fixture.registry.taskCommand({ op: "snapshot", sessionId: "session" });
+    expect(await fixture.registry.refreshBrowser()).toBe(false);
+    expect(fixture.shutdown).not.toHaveBeenCalled();
+    gate.resolve(operation === "submit" ? { task: {} } : { snapshot: {} });
+    await pending;
+    expect(await fixture.registry.refreshBrowser()).toBe(true);
   });
 
   it("closes admission during shutdown and restores subscriptions and learning target after boot", async () => {

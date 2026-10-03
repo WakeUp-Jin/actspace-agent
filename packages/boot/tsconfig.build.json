@@ -16,13 +16,13 @@
       "path": "./../cordis-adapter/tsconfig.build.json"
     },
     {
+      "path": "./../core/scope/tsconfig.build.json"
+    },
+    {
       "path": "./../diagnostics/tsconfig.build.json"
     },
     {
       "path": "./../shared/tsconfig.build.json"
-    },
-    {
-      "path": "../core/scope/tsconfig.build.json"
     }
   ]
 }

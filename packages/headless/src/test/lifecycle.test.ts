@@ -12,11 +12,11 @@ describe("headless plugin", () => {
   it("drives followup through the durable session service", async () => {
     const events: string[] = [];
     const session = { header: { sessionId: "session-1" }, journal: { events: [] }, append: async () => { events.push("append"); }, flush: async () => { events.push("flush"); } } as never;
-    const agent = { followup: async () => { events.push("followup"); return { agentRunId: "run-1", turnId: "turn-1", reason: "completed", steps: 1, finalText: "ok" }; }, waitForIdle: async () => { events.push("idle"); } } as never;
+    const agent = { followup: async () => { events.push("followup"); return { agentRunId: "run-1", turnId: "turn-1", reason: "completed", steps: 1, finalText: "ok" }; }, waitForIdle: async () => { events.push("idle"); } };
     const runner = new HeadlessRunner({
       host: { enabled: true, content: "hello", persistent: false, appExit: (code) => { events.push(`exit:${code}`); } },
       sessions: { create: async () => session, createEphemeral: async () => session, resume: async () => session, snapshot: () => ({ sessionId: "session-1" }) as never },
-      agents: { attach: async () => agent } as never,
+      agents: { attach: async () => undefined, run: async () => { const result = await agent.followup(); await agent.waitForIdle(); return { ...result, sessionId: "session-1" }; }, service: {} } as never,
       context: { parallel: async (type: unknown) => { events.push(String(type)); } },
     });
     const result = await runner.run();

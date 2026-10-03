@@ -8,3 +8,12 @@ describe("browser tools plugin", () => {
     await activation.dispose();
   });
 });
+
+it("allows Harness retirement to leave the Host-owned browser alive", async () => {
+  const { apply } = await import("../plugin.js");
+  const { ToolRuntime } = await import("@actspace/tools-runtime");
+  let closed = 0; const cleanup: Array<() => unknown> = [];
+  apply({ get: name => name === "tools.runtime" ? new ToolRuntime() : { ready: false, dispose: async () => { closed++; } }, provide: () => undefined, effect: factory => { cleanup.push(factory() as () => unknown); return () => undefined; } }, { disposeHost: false });
+  for (const dispose of cleanup) await dispose();
+  expect(closed).toBe(0);
+});

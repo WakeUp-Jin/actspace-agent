@@ -6,6 +6,8 @@ declare global {
       samplePerformance?: () => Promise<import("@actspace/shared").DesktopPerformanceSnapshot>;
       setPerformanceActive?: (active: boolean) => Promise<void>;
       getBootstrapState: () => Promise<import("@actspace/shared").BootstrapState>;
+      taskCommand?: (input: import("@actspace/shared/runtime-v2").TaskCommand) => Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>;
+      submitTask?: (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => Promise<import("@actspace/shared/runtime-v2").TaskReceipt>;
       runAgent: (
         input: import("@actspace/shared").RunAgentInput
       ) => Promise<import("@actspace/shared").AgentRunResult | import("@actspace/shared").RunAgentPreparationFailure>;

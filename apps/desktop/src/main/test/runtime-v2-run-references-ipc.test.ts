@@ -26,7 +26,11 @@ const annotation = {
 };
 
 function setup(overrides: { agentForm?: "agent" | "chat"; journal?: Record<number, unknown> } = {}) {
-  const runTurn = vi.fn(async () => ({ snapshot: { sessionId: "s" }, reason: "completed", finalText: "" }));
+  const tasks: { submissionId: string; content: unknown }[] = [];
+  const runTurn = vi.fn(async (input: { messageId: string; content: unknown }) => {
+    if (!tasks.some(task => task.submissionId === input.messageId)) tasks.push({ submissionId: input.messageId, content: input.content });
+    return { snapshot: { sessionId: "s" }, reason: "completed", finalText: "" };
+  });
   const importAttachment = vi.fn(async () => ({ artifactId: "art-1", mimeType: "image/png", name: "shot.png" }));
   const journal = overrides.journal ?? { 5: { seq: 5, type: "assistant/message", surface: { kind: "append", node: { kind: "assistant", messageId: "m", content: "关键句。" } } } };
   const readSessionProjection = vi.fn(async ({ beforeSeq }: { beforeSeq: number }) => ({
@@ -38,6 +42,7 @@ function setup(overrides: { agentForm?: "agent" | "chat"; journal?: Record<numbe
       subscribe: () => () => {}, subscribeRendererStream: () => () => {},
       inspectSession: async () => ({ agentForm: overrides.agentForm ?? "agent", workspaceRoot: workspace, throughJournalSeq: 9 }),
       importAttachment, runTurn, readSessionProjection, rollbackImportedAttachments: vi.fn(),
+      taskCommand: async () => ({ snapshot: { tasks } }),
     },
     settings: { subscribeV4Changes: () => () => {} },
     getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
@@ -55,12 +60,12 @@ it("writes text, file references, excerpts and attachments as ordered content bl
       attachments: [{ id: "img", kind: "image", name: "shot.png", path: "/fixture/shot.png" }],
     });
     expect(readSessionProjection).toHaveBeenCalledWith({ sessionId: "s", beforeSeq: 6, maxWindowEvents: 1 });
-    expect(runTurn).toHaveBeenCalledWith(expect.objectContaining({ content: [
+    expect(runTurn).toHaveBeenCalledWith(expect.objectContaining({ content: expect.objectContaining({ prepared: [
       { type: "text", text: "看这里" },
       { type: "file-reference", relativePath: "src/a.ts", displayName: "a.ts" },
       { type: "response-excerpt", ...annotation },
       { type: "artifact", artifact: { artifactId: "art-1", mediaType: "image/png" }, label: "shot.png" },
-    ] }));
+    ] }) }));
   } finally { registration.dispose(); }
 });
 
@@ -68,7 +73,7 @@ it("keeps plain string content when there are no references or attachments", asy
   const { registration, runTurn, readSessionProjection, run } = setup();
   try {
     await run({ fileReferences: [], responseAnnotations: [] });
-    expect(runTurn).toHaveBeenCalledWith(expect.objectContaining({ content: "看这里" }));
+    expect(runTurn).toHaveBeenCalledWith(expect.objectContaining({ content: expect.objectContaining({ prepared: "看这里" }) }));
     expect(readSessionProjection).not.toHaveBeenCalledWith(expect.objectContaining({ maxWindowEvents: 1 }));
   } finally { registration.dispose(); }
 });
@@ -77,7 +82,7 @@ it("sends an excerpt without any typed text", async () => {
   const { registration, runTurn, run } = setup();
   try {
     await run({ userInput: "", responseAnnotations: [annotation] });
-    expect(runTurn).toHaveBeenCalledWith(expect.objectContaining({ content: [{ type: "response-excerpt", ...annotation }] }));
+    expect(runTurn).toHaveBeenCalledWith(expect.objectContaining({ content: expect.objectContaining({ prepared: [{ type: "response-excerpt", ...annotation }] }) }));
   } finally { registration.dispose(); }
 });
 
@@ -126,5 +131,16 @@ it("rejects file references in Chat sessions but still accepts excerpts there", 
     expect(runTurn).not.toHaveBeenCalled();
     await run({ responseAnnotations: [annotation] });
     expect(runTurn).toHaveBeenCalledTimes(1);
+  } finally { registration.dispose(); }
+});
+
+it("reuses accepted attachment content across an uncertain result retry and rejects ID reuse with different content", async () => {
+  const { registration, run, importAttachment, runTurn } = setup();
+  try {
+    const input = { attachments: [{ id: "img", kind: "image", name: "shot.png", path: "/fixture/shot.png" }] };
+    await run(input); await run(input);
+    expect(importAttachment).toHaveBeenCalledTimes(1);
+    expect(runTurn.mock.calls[1][0].content).toEqual(runTurn.mock.calls[0][0].content);
+    await expect(run({ ...input, userInput: "different" })).rejects.toThrow("SUBMISSION_CONFLICT");
   } finally { registration.dispose(); }
 });

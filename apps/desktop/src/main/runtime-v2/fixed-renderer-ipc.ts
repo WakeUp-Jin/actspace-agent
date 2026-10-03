@@ -1,5 +1,6 @@
 import { paginateSessionSummaries } from "./session-list-page";
 import { UsageSourceCache } from "./usage-source-cache";
+import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { dialog, ipcMain, nativeImage, nativeTheme, shell, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
@@ -240,14 +241,46 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return { ok: failedSessionIds.length === 0, archivedSessionIds, failedSessionIds };
   });
 
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.taskCommand, async (_event, input: import("@actspace/shared/runtime-v2").TaskCommand) => options.registry.taskCommand(input));
+  // Serialize duplicate preparation too: importing the same attachment twice must not change content identity.
+  const submissions = new Map<string, Promise<unknown>>();
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask, async (_event, input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => {
+    const key = `${input.sessionId}/${input.submissionId}`;
+    const previous = submissions.get(key) ?? Promise.resolve();
+    const attempt = previous.catch(() => undefined).then(async () => {
+      const original = { userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [] };
+      const { snapshot } = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
+      const existing = snapshot.tasks.find(task => task.submissionId === input.submissionId);
+      if (existing) {
+        const content = existing.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
+        if (content?.kind !== "composer-task" || !isDeepStrictEqual(content.original, JSON.parse(JSON.stringify(original)))) throw new Error("SUBMISSION_CONFLICT");
+        return options.registry.submitTask(input.sessionId, input.submissionId, existing.content);
+      }
+      const references = await validateRunReferences(options.registry, input);
+      if (references.ok === false) throw new Error(JSON.stringify(references.issue));
+      const prepared = await toRunContent(options.registry, input.sessionId, { userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: references.fileReferences, responseAnnotations: references.responseAnnotations });
+      // Once admission is attempted a missing reply is uncertain; never delete imported content needed by a durable Task.
+      return options.registry.submitTask(input.sessionId, input.submissionId, { kind: "composer-task", original: JSON.parse(JSON.stringify(original)), prepared: prepared.content });
+    });
+    submissions.set(key, attempt);
+    try { return await attempt; } finally { if (submissions.get(key) === attempt) submissions.delete(key); }
+  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent, async (_event, input: RunAgentInput): Promise<RunAgentPreparationFailure | (Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection })> => {
-    const references = await validateRunReferences(options.registry, input);
+    const submissionId = `user-${input.agentRunId}`;
+    const key = `${input.sessionId}/${submissionId}`;
+    const attempt = (submissions.get(key) ?? Promise.resolve()).catch(() => undefined).then(async () => {
+    const original = JSON.parse(JSON.stringify({ userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [] }));
+    const taskState = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
+    const existing = taskState.snapshot.tasks.find(task => task.submissionId === submissionId);
+    const saved = existing?.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope | undefined;
+    if (saved && (saved.kind !== "composer-task" || !isDeepStrictEqual(saved.original, original))) throw new Error("SUBMISSION_CONFLICT");
+    const references = saved ? { ok: true as const, fileReferences: [], responseAnnotations: [] } : await validateRunReferences(options.registry, input);
     if (references.ok === false) {
-      return { status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: references.issue };
+      return { status: "rejected" as const, sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: references.issue };
     }
     let prepared: Awaited<ReturnType<typeof toRunContent>>;
     try {
-      prepared = await toRunContent(options.registry, input.sessionId, {
+      prepared = saved ? { content: saved.prepared, importedArtifactIds: [] } : await toRunContent(options.registry, input.sessionId, {
         userInput: input.userInput,
         attachments: input.attachments ?? [],
         fileReferences: references.fileReferences,
@@ -257,7 +290,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       if (!(error instanceof ChatAttachmentValidationError)) throw error;
       const attachments = (input.attachments ?? []).filter((attachment) => Boolean(attachment.path));
       return {
-        status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId,
+        status: "rejected" as const, sessionId: input.sessionId, agentRunId: input.agentRunId,
         error: {
           ...error.issue,
           ...(error.attachmentIndex === undefined ? {} : { attachmentId: attachments[error.attachmentIndex]?.id }),
@@ -272,8 +305,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       result = await options.registry.runTurn({
         sessionId: input.sessionId,
         agentRunId: input.agentRunId,
-        messageId: `user-${input.agentRunId}`,
-        content: prepared.content,
+        messageId: submissionId,
+        content: saved ?? { kind: "composer-task", original, prepared: prepared.content },
         selectedSkillIds: input.selectedSkills,
         model: input.modelKey ?? input.model,
         mode: input.mode,
@@ -281,7 +314,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
         reasoningEffort: input.reasoningEffort,
       });
     } catch (error) {
-      await options.registry.rollbackImportedAttachments(input.sessionId, prepared.importedArtifactIds);
+      // Admission may have committed before the reply failed. Retain artifacts for recovery.
       throw error;
     }
     const snapshot = result.snapshot;
@@ -292,14 +325,17 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       projection: record,
       finalReply: result.finalText ? {
         content: result.finalText,
-        stopReason: result.reason === "aborted" ? "aborted" : result.reason === "failed" ? "error" : "stop",
+        stopReason: result.reason === "aborted" ? "aborted" as const : result.reason === "failed" ? "error" as const : "stop" as const,
         model: input.modelKey ?? input.model ?? "default",
         provider: "runtime-v2",
       } : undefined,
 
-      status: result.reason === "aborted" ? "aborted" : result.reason === "failed" ? "failed" : "completed",
+      status: result.reason === "aborted" ? "aborted" as const : result.reason === "failed" ? "failed" as const : "completed" as const,
       ...(result.reason === "failed" ? { error: { code: "AGENT_RUN_FAILED", message: "The v2 Agent run failed." } } : {}),
     };
+    });
+    submissions.set(key, attempt);
+    try { return await attempt; } finally { if (submissions.get(key) === attempt) submissions.delete(key); }
   });
   // 插入与发送走同一套引用校验和附件准备；失败时同样不写 journal，renderer 把这条放回队列。
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.steerAgentRun, async (_event, input: SteerAgentRunInput): Promise<SteerAgentRunResult> => {
@@ -331,9 +367,12 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.cancelSteer, async (_event, input: CancelSteerInput): Promise<CancelSteerResult> => (
     { status: await options.registry.cancelSteer(input.sessionId, input.messageId) }
   ));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.abortAgentRun, (_event, input: { sessionId: string; agentRunId: string }) => {
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.abortAgentRun, async (_event, input: { sessionId: string; agentRunId: string }) => {
     options.approvals.abortAgentRun(input.sessionId, input.agentRunId);
-    return options.registry.abortRun(input.sessionId, "user");
+    const state = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
+    if (!state.snapshot.runs.some(run => run.runId === input.agentRunId && run.state === "running")) return false;
+    await options.registry.taskCommand({ op: "stop", sessionId: input.sessionId, runId: input.agentRunId });
+    return true;
   });
 
   const unsubscribeLive = options.registry.subscribe((envelope) => {

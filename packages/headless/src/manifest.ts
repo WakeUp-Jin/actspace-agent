@@ -7,6 +7,6 @@ export const manifest = defineBuiltinPluginManifest({
   entry: { entryId: "headless.runner", behavior: "./plugin.js" },
   host: { required: [], optional: ["headless"] },
   frontend: null,
-  injects: ["actspace.host.headless", "session.runtime", "agent.loop"],
+  injects: ["actspace.host.headless", "session.runtime", "agent.runtime"],
   contributions: { services: ["headless.runner"], tools: [], prompts: [], events: ["headless/started", "headless/completed", "headless/failed"] },
 });

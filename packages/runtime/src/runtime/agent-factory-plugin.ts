@@ -1,6 +1,7 @@
+import type { RunFactory } from "@actspace/agent-service";
 import { AgentLoop } from "@actspace/core-agent-loop";
-import type { AgentLoopAssembly, AgentLoopServiceOptions } from "@actspace/core-agent-loop";
-import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset, activateMainAgentFormTools, mainAgentFormComposition, allowedAgentModeTools } from "@actspace/core-agent";
+import type { AgentLoopAssembly } from "@actspace/core-agent-loop";
+import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset, activateMainAgentFormTools, allowedAgentModeTools } from "@actspace/core-agent";
 import type { AgentSubject } from "@actspace/core-agent";
 import { AgentScope, scopeContext } from "@actspace/core-scope";
 import { ContributorRegistry, RequestAssembler, emptyRuntimePromptSource } from "@actspace/prompt";
@@ -14,7 +15,8 @@ import { resolveSessionWorkspaceRoot } from "@actspace/session-jsonl";
 import { projectPermissionMode, projectSessionGrants } from "@actspace/session-projection";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
 
-export type AgentFactoryService = AgentLoopServiceOptions & {
+export type AgentFactoryService = {
+  readonly runFactory: RunFactory;
   readonly activeSessions: ReadonlyMap<string, import("@actspace/session-persistence").SessionHandle>;
   readonly createSubagentLoop: (input: {
     readonly session: import("@actspace/session-persistence").SessionHandle;
@@ -36,7 +38,7 @@ export const inject = Object.freeze([
   "compaction.runtime",
 ]);
 
-export function apply(ctx: CordisContext): void {
+export function apply(ctx: CordisContext): AgentFactoryService {
   const host = requireService<AgentRuntimeHostPort>(ctx, AGENT_RUNTIME_HOST_PORT_ID);
   const registry = requireService<import("@actspace/core-agent").AgentRegistry>(ctx, "agent.registry");
   const sessions = requireService<RuntimeSessionController>(ctx, "session.runtime");
@@ -89,23 +91,20 @@ export function apply(ctx: CordisContext): void {
     return loop;
   };
 
-  const createMainAgent = async (session: import("@actspace/session-persistence").SessionHandle): Promise<AgentLoopAssembly> => {
+  const createMainAgent = async (session: import("@actspace/session-persistence").SessionHandle, run: {
+    readonly scope: AgentScope;
+    readonly budget?: Parameters<RunFactory["create"]>[0]["budget"];
+    readonly inputSource: import("@actspace/core-agent-loop").LoopInputSource;
+    readonly mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode;
+  }): Promise<AgentLoopAssembly> => {
     resolveMainAgentPreset(session.header.createdWith.presetId);
     const descriptor = Object.freeze({ ...MAIN_AGENT_DESCRIPTOR, routeId: llm.routes.list()[0]?.routeId ?? MAIN_AGENT_DESCRIPTOR.routeId });
     const agentId = `main:${session.header.sessionId}`;
-    const scope = new AgentScope(agentId, undefined, agentId);
+    const scope = run.scope.child(agentId);
     try {
       const activatedForm = activateMainAgentFormTools(scope, tools);
-      const recordedMembers = session.header.createdWith.agentMembers;
-      if (recordedMembers !== undefined) {
-        const actualMembers = activatedForm.members.map(({ id, version }) => ({ id, version }));
-        const actualDigest = mainAgentFormComposition(actualMembers.map(({ id, version }) => ({ id, version: String(version) }))).digest;
-        if (JSON.stringify(recordedMembers) !== JSON.stringify(actualMembers) || session.header.createdWith.agentCompositionDigest !== actualDigest) {
-          throw new Error("Agent form composition is unavailable for this Session.");
-        }
-      }
       const binding = tools.bindAgentScope(session.header.sessionId, agentId, () => {
-        const mode = sessions.snapshot(session).agentMode ?? "agent";
+        const mode = run.mode;
         const names = scope.tools.entries().map(entry => entry.id);
         return allowedAgentModeTools(mode, names);
       });
@@ -121,9 +120,19 @@ export function apply(ctx: CordisContext): void {
           : await prompt.resolveSource(workspaceRoot);
         return prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills, profile: key === "chat" ? "chat" : "agent" });
       });
-      const initialMode = session.header.createdWith.initialAgentMode ?? (session.header.createdWith.presetId === "actspace.chat" ? "chat" : "agent");
+      const initialMode = run.mode;
       await activateModeContributors(initialMode);
-      const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox, assembler, modeRuntime: async mode => { await activateModeContributors(mode); return { assembler, compaction: mode === "chat" ? compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8)) : compaction }; }, llm, tools, toolEnvironment: toolEnvironmentFor, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
+      const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, assembler, modeRuntime: async mode => { await activateModeContributors(mode); return { assembler, compaction: mode === "chat" ? compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8)) : compaction }; }, llm, tools, toolEnvironment: activeSession => {
+        const environment = toolEnvironmentFor(activeSession);
+        const broker = environment.approvalBroker;
+        return !broker || !run.budget ? environment : { ...environment, approvalBroker: {
+          requestApproval: async (request, signal) => {
+            run.budget!.waitForApproval(request.requestId);
+            try { return await broker.requestApproval(request, signal); }
+            finally { run.budget!.settleApproval(request.requestId); }
+          },
+        } };
+      }, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
       activeSessions.set(session.header.sessionId, session);
       const unpublish = registry.publish({ agentId: `main:${session.header.sessionId}`, descriptor, scope, session, dispose: async () => { loop.quiesce(); activeSessions.delete(session.header.sessionId); await scope.dispose(); } });
       return Object.freeze({ descriptor, scope, subject, session, inbox, loop, dispose: async () => { unpublish(); loop.quiesce(); activeSessions.delete(session.header.sessionId); await scope.dispose(); } });
@@ -134,13 +143,40 @@ export function apply(ctx: CordisContext): void {
     }
   };
 
+  const runFactory: RunFactory = {
+    create: async input => {
+      const assembly = await createMainAgent(input.session, { scope: input.scope, mode: input.configuration.mode, budget: input.budget, inputSource: {
+        hasPending: () => input.hasPendingSupplements(),
+        claim: async () => {
+          const consumed = await input.claimSupplements();
+          return { messageIds: consumed.tasks.map(task => task.taskId), configuration: consumed.configuration };
+        },
+      } });
+      const abort = () => assembly.loop.abort(typeof input.signal.reason === "string" ? input.signal.reason : "host-abort");
+      input.signal.addEventListener("abort", abort);
+      return {
+        execute: async () => {
+          input.signal.throwIfAborted();
+          const result = await assembly.loop.runTurn({ ...input.configuration, content: taskContent(input.initial.content), messageId: input.initial.taskId, agentRunId: input.runId });
+          return { outcome: result.reason === "aborted" ? "cancelled" : result.reason === "completed" ? "completed" : "failed", value: result };
+        },
+        dispose: async () => {
+          input.signal.removeEventListener("abort", abort);
+          assembly.loop.quiesce();
+          await assembly.loop.waitForIdle();
+          await assembly.dispose();
+        },
+      };
+    },
+  };
+
   const service: AgentFactoryService = Object.freeze({
-    create: createMainAgent,
-    context: ctx,
+    runFactory,
     activeSessions,
     createSubagentLoop: ({ session, scope, preset, allowedToolNames, signal, agentId }) => createLoop({ session, scope, signal, agentId, allowedToolNames, descriptor: Object.freeze({ id: preset.id, version: preset.version, kind: "subagent", description: `One-shot ${preset.id} child Agent`, presetId: preset.id, routeId: preset.routeId, model: preset.model, maxSteps: preset.maxSteps }) }),
   });
   ctx.provide?.("actspace.agent.factory", service);
+  return service;
 }
 
 export function createModeContributorActivation(
@@ -171,4 +207,14 @@ function requireService<T>(ctx: CordisContext, id: string): T {
   const value = ctx.get?.(id) as T | undefined;
   if (value === undefined) throw new Error(`Agent factory plugin requires ${id}.`);
   return value;
+}
+
+/** Harness entry: publish the structural one-Run factory from this isolated service tree. */
+export function applyRunFactory(ctx: CordisContext): void {
+  const factory = apply(ctx);
+  ctx.provide?.("agent.run-factory", factory.runFactory);
+}
+
+function taskContent(content: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue) {
+  return content && typeof content === "object" && !Array.isArray(content) && "kind" in content && content.kind === "composer-task" ? content.prepared : content;
 }

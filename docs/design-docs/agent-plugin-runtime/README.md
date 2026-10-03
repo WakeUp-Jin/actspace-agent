@@ -1,5 +1,8 @@
 # Agent Plugin Runtime 文档导航
 
+P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle.md)；[阶段验证记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)。
+
+
 - [Tool 插件边界与 Todo 领域事件](agent-tool-plugin-boundaries.md)：独立工具包、Host port、Projection Contributor、scope 和不兼容旧 Todo 的事件断点。
 
 > 当前入口：v2 Profile-first、多包 Cordis Plugin Runtime。本文按用途导航；每份文档的实现状态与未完成门禁分别维护。v2 决策保留原位置，v1 资料集中到 [archive/v1](../../archive/v1/README.md)。

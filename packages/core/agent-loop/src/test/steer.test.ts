@@ -59,6 +59,31 @@ describe("AgentLoop steer messages", () => {
     expect(inbox!.status("task-1")).toBe("pending");
   });
 
+  it("returns a cancelled result after settlement and does not report an execution error", async () => {
+    let loop: AgentLoop | undefined;
+    const notifications: string[] = [];
+    const { result, journal } = await runToolStreamFixture({
+      onLoop: value => { loop = value; },
+      beforeFinalText: async () => { loop!.abort("user"); },
+      context: { parallel: async type => { notifications.push(String(type)); } },
+    });
+    expect(result).toMatchObject({ agentRunId: "run-test", reason: "aborted", steps: 2 });
+    expect(journal.at(-1)).toMatchObject({ type: "turn/end", data: { reason: "aborted" } });
+    expect(notifications).not.toContain("agent/error");
+    expect(loop!.active).toBe(false);
+  });
+
+  it("does not hide a settlement failure behind normal cancellation", async () => {
+    let loop: AgentLoop | undefined;
+    await expect(runToolStreamFixture({
+      onLoop: value => { loop = value; },
+      beforeFinalText: async () => { loop!.abort("user"); },
+      context: { parallel: async (type, payload) => {
+        if (type === "session/checkpoint" && (payload as { reason: string }).reason === "after-turn-settled") throw new Error("checkpoint failed");
+      } },
+    })).rejects.toThrow("settlement checkpoint also failed");
+  });
+
   it("discards an unread steer when the turn is aborted", async () => {
     let inbox: MainAgentInbox | undefined;
     let loop: AgentLoop | undefined;
@@ -69,7 +94,7 @@ describe("AgentLoop steer messages", () => {
         loop!.abort("user");
         return { status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture content" }] };
       },
-    })).rejects.toThrow();
+    })).resolves.toMatchObject({ result: { reason: "aborted" } });
 
     expect(inbox!.status("steer-abort")).toBe("discarded");
   });
@@ -89,5 +114,32 @@ describe("AgentLoop steer messages", () => {
 
     expect(requests.map(mentionsSteer)).toEqual([false]);
     expect(inbox!.status("steer-stale")).toBe("discarded");
+  });
+});
+
+
+describe("Host-owned input source", () => {
+  it("consumes at step boundaries and applies the new model without changing the Run mode", async () => {
+    let pending = false;
+    let session: import("@actspace/session-persistence").SessionHandle;
+    const { result, journal } = await runToolStreamFixture({
+      mode: "plan",
+      seedSession: async value => { session = value; },
+      execute: async () => { pending = true; return { status: "completed", summary: "ok", modelOutput: [] }; },
+      inputSource: {
+        hasPending: () => pending,
+        claim: async () => {
+          if (!pending) return { messageIds: [], configuration: {} };
+          pending = false;
+          await session!.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "owned-input" }, surface: { kind: "append", node: { kind: "user", messageId: "owned-input", content: "Continue" } } });
+          await session!.flush();
+          return { messageIds: ["owned-input"], configuration: { model: "new-model", thinkingEnabled: true } };
+        },
+      },
+    });
+    expect(result.steps).toBe(2);
+    const headers = journal.filter(event => event.type === "request/header").map(event => event.data);
+    expect(headers).toEqual([expect.objectContaining({ model: "test", agentMode: "plan" }), expect.objectContaining({ model: "new-model", agentMode: "plan" })]);
+    expect(journal.filter(event => event.type === "user/message")).toHaveLength(2);
   });
 });

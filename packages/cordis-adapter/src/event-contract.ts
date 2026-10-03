@@ -10,7 +10,7 @@ export type AgentLoopIntervention =
   | "agent/turn-stopping"
   | "session/checkpoint";
 
-export type AgentNotification = "agent/session-start" | "agent/status" | "agent/error" | "tools/result" | "session/event" | "llm/chunk";
+export type AgentNotification = "agent/tasks-updated" | "agent/session-start" | "agent/status" | "agent/error" | "tools/result" | "session/event" | "llm/chunk";
 
 export type RuntimeLifecycleEvent =
   | "runtime/booting"
@@ -38,9 +38,12 @@ export type CordisEventPayload = Record<string, unknown> & AgentEventMeta;
 export type AgentSubjectPayload = CordisEventPayload & { readonly agent: AgentSubject };
 export type AgentWaterfallEventHandler<T = AgentSubjectPayload, R = T> = (this: object, payload: T, next: () => R | Promise<R>) => R | Promise<R>;
 
+/** Domain packages extend this interface without introducing adapter dependencies. */
+export interface DomainEvents {}
+
 /** Declaration surface consumed by Cordis' typed Context methods. */
 declare module "@deepseek-ai/cordis" {
-  interface Events {
+  interface Events extends DomainEvents {
     "system-prompt/assemble": AgentWaterfallEventHandler;
     "agent/pre-step": AgentWaterfallEventHandler;
     "agent/request": AgentWaterfallEventHandler;

@@ -653,6 +653,11 @@ export function Composer({
   const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
   const editingModelOptions = currentModelRuntimeOptions(editingModelSpec, modelRuntimeOptions[editingModelId]);
   const selectedModelOptions = currentModelRuntimeOptions(selectedModelSpec, modelRuntimeOptions[selectedModelId]);
+  const configurationKey = JSON.stringify({ model: selectedModelId, thinkingEnabled: selectedModelOptions.thinkingEnabled, reasoningEffort: selectedModelOptions.reasoningEffort, selectedSkillIds: selectedSkills });
+  useEffect(() => {
+    if (!sessionId || !window.actspace?.taskCommand) return;
+    void window.actspace.taskCommand({ sessionId, op: "configure", configuration: JSON.parse(configurationKey) }).catch(error => console.error("Failed to update execution configuration", error));
+  }, [sessionId, configurationKey]);
   const editingReasoningEfforts = modelReasoningEfforts(editingModelSpec);
   const normalizedModelSearchQuery = modelSearchQuery.trim().toLocaleLowerCase();
   const filteredModelList = normalizedModelSearchQuery

@@ -1,5 +1,10 @@
 import type { RuntimeV2AgentMode, RuntimeV2JsonValue, RuntimeV2RunTurnResponse, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-import type { AgentLoopService } from "@actspace/core-agent-loop";
+type HeadlessRunService = {
+  attach(session: SessionHandle): Promise<unknown>;
+  run(sessionId: string, input: { content: RuntimeV2JsonValue; model?: string }, signal?: AbortSignal): Promise<RuntimeV2RunTurnResponse>;
+  abort(sessionId: string): boolean;
+  service: { exclusive<T>(sessionId: string, operation: () => Promise<T>): Promise<T> };
+};
 import type { SessionHandle } from "@actspace/session-persistence";
 import { emitContained, type CordisContext } from "@actspace/cordis-adapter";
 
@@ -33,7 +38,7 @@ export type DisabledHeadlessHostPort = { readonly enabled: false };
 export type HeadlessRunResult = RuntimeV2RunTurnResponse & { readonly session: SessionHandle };
 
 export class HeadlessRunner {
-  constructor(private readonly options: { readonly host: HeadlessHostPort; readonly sessions: HeadlessSessionService; readonly agents: AgentLoopService; readonly context?: CordisContext }) {}
+  constructor(private readonly options: { readonly host: HeadlessHostPort; readonly sessions: HeadlessSessionService; readonly agents: HeadlessRunService; readonly context?: CordisContext }) {}
 
   async run(): Promise<HeadlessRunResult> {
     const { host, sessions, agents } = this.options;
@@ -43,31 +48,33 @@ export class HeadlessRunner {
     if (host.title !== undefined && session.journal.events.every((event) => event.type !== "session/title-set")) {
       await session.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: host.title }, surface: null } as never);
     }
-    const agent = await agents.attach(session);
+    await agents.attach(session);
+    const sessionId = session.header.sessionId;
+    const controller = new AbortController();
+    const abort = () => { controller.abort(host.signal?.reason ?? "host-abort"); return agents.abort(sessionId); };
     const currentMode = sessions.snapshot(session).agentMode ?? "agent";
     const mode = host.mode ?? currentMode;
     if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw new Error("INVALID_AGENT_MODE");
     if (mode !== currentMode) {
       if (mode !== "chat" && sessions.snapshot(session).workspaceRoot === null) throw new Error("WORKSPACE_REQUIRED");
+      await agents.service.exclusive(sessionId, async () => {
       await session.append({ type: "agent/mode-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { mode, revision: (sessions.snapshot(session).agentModeRevision ?? 0) + 1, changedAt: new Date().toISOString(), source: "headless" }, surface: null });
       await session.flush();
+      });
     }
-    host.onSessionCreated?.(session.header.sessionId, () => agent.abort("host-abort"));
-    if (host.signal?.aborted) agent.abort(typeof host.signal.reason === "string" ? host.signal.reason : "host-abort");
+    host.onSessionCreated?.(sessionId, abort);
     const started = Date.now();
-    const abort = () => agent.abort(typeof host.signal?.reason === "string" ? host.signal.reason : "host-abort");
     if (host.signal?.aborted) abort();
     else host.signal?.addEventListener("abort", abort, { once: true });
     try {
-      await this.notify("headless/started", { sessionId: session.header.sessionId, agentId: agent.agentId });
-      const result = await agent.followup(host.content, { model: host.model, mode });
-      await agent.waitForIdle();
+      await this.notify("headless/started", { sessionId: session.header.sessionId, agentId: `main:${sessionId}` });
+      const result = await agents.run(sessionId, { content: host.content, model: host.model }, controller.signal);
       await session.flush();
       host.appExit?.(result.reason === "completed" ? 0 : result.reason === "aborted" ? 130 : 1);
-      await this.notify("headless/completed", { sessionId: session.header.sessionId, agentId: agent.agentId, reason: result.reason });
-      return Object.freeze({ session, sessionId: session.header.sessionId, ...result, snapshot: sessions.snapshot(session), durationMs: Date.now() - started });
+      await this.notify("headless/completed", { sessionId: session.header.sessionId, agentId: `main:${sessionId}`, reason: result.reason });
+      return Object.freeze({ session, ...result, snapshot: sessions.snapshot(session), durationMs: Date.now() - started });
     } catch (error) {
-      await this.notify("headless/failed", { sessionId: session.header.sessionId, agentId: agent.agentId, error: error instanceof Error ? error.message : String(error) });
+      await this.notify("headless/failed", { sessionId: session.header.sessionId, agentId: `main:${sessionId}`, error: error instanceof Error ? error.message : String(error) });
       host.appExit?.(host.signal?.aborted ? 130 : 1);
       throw error;
     } finally {

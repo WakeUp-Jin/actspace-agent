@@ -47,11 +47,16 @@
       "types": "./loader.d.cts",
       "require": "./loader.cjs",
       "default": "./loader.cjs"
+    },
+    "./todo-projection": {
+      "types": "./dist/runtime/todo-projection-plugin.d.ts",
+      "import": "./dist/runtime/todo-projection-plugin.js",
+      "default": "./dist/runtime/todo-projection-plugin.js"
     }
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/build-default-harness.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --globals --passWithNoTests"
   },
@@ -90,11 +95,13 @@
     "@actspace/tools-shell-tools": "workspace:*",
     "@actspace/tools-web-tools": "workspace:*",
     "@actspace/tools-image-generation": "workspace:*",
-    "@actspace/tools-image-inspection": "workspace:*"
+    "@actspace/tools-image-inspection": "workspace:*",
+    "@actspace/agent-service": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "esbuild": "0.21.5"
   }
 }

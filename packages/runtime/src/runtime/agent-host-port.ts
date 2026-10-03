@@ -5,6 +5,7 @@ import type { ToolPreparedEnvironment } from "@actspace/tools-runtime";
 export const AGENT_RUNTIME_HOST_PORT_ID = "actspace.host.agent" as const;
 
 export type AgentRuntimeHostPort = {
+  readonly disabledHarnessEntries?: readonly string[];
   readonly host: RuntimeV2HostDescriptor;
   readonly toolEnvironment: Omit<ToolPreparedEnvironment, "journal">;
   readonly workspaceRoot: string;

@@ -20,66 +20,20 @@
 - id: llm-service
   name: "@actspace/llm-service/plugin"
   inject: [actspace.host.llm]
-- id: tools-runtime
-  name: "@actspace/tools-runtime/plugin"
-  inject: [tools.approval]
-- id: tools-approval
-  name: "@actspace/tools-approval/plugin"
-- id: context-assembly
-  name: "@actspace/context/plugin"
-  inject: [session.journal]
-- id: prompt-runtime
-  name: "@actspace/prompt/plugin"
-  inject: [actspace.host.prompt, context.assembly]
-- id: compaction-runtime
-  name: "@actspace/compaction/plugin"
-  inject: [llm.service]
-- id: filesystem-read
-  name: "@actspace/tools-filesystem-read/plugin"
-  inject: [tools.runtime, actspace.host.tools.filesystem-read]
-- id: filesystem-search
-  name: "@actspace/tools-filesystem-search/plugin"
-  inject: [tools.runtime, actspace.host.tools.filesystem-search]
-- id: filesystem-write
-  name: "@actspace/tools-filesystem-write/plugin"
-  inject: [tools.runtime, actspace.host.tools.filesystem-write]
-- id: shell-tools
-  name: "@actspace/tools-shell-tools/plugin"
-  inject: [tools.runtime, actspace.host.tools.shell-tools]
-- id: web-tools
-  name: "@actspace/tools-web-tools/plugin"
-  inject: [tools.runtime, actspace.host.tools.web-tools]
-- id: image-generation
-  name: "@actspace/tools-image-generation/plugin"
-  inject: [tools.runtime, actspace.host.tools.image-generation]
-- id: image-inspection
-  name: "@actspace/tools-image-inspection/plugin"
-  inject: [llm.service, tools.runtime, actspace.host.tools.image-inspection]
-- id: todo-tools
-  name: "@actspace/tools-todo-tools/plugin"
-  inject: [tools.runtime, session.runtime, session.projection]
-- id: browser-tools
-  name: "@actspace/tools-browser-tools/plugin"
-  inject: [tools.runtime]
+- id: todo-projection
+  name: "@actspace/runtime/todo-projection"
+  inject: [session.projection]
 - id: core-agent
   name: "@actspace/core-agent/plugin"
-- id: agent-factory
-  name: "@actspace/runtime/agent-factory"
-  inject: [actspace.host.agent, agent.registry, session.runtime, llm.service, tools.runtime, prompt.runtime, compaction.runtime]
-- id: core-agent-loop
-  name: "@actspace/core-agent-loop/plugin"
-  inject: [core.agent, actspace.agent.factory]
-- id: subagent-surface
-  name: "@actspace/subagent/plugin"
 - id: agent-runtime
   name: "@actspace/runtime/agent-runtime"
-  inject: [actspace.host.agent, agent.registry, agent.loop, actspace.agent.factory, session.runtime, tools.runtime, subagent.one-shot]
+  inject: [actspace.host.llm, actspace.host.prompt, actspace.host.agent, actspace.host.subagents, agent.registry, session.runtime, session.journal, session.projection, actspace.host.tools.filesystem-read, actspace.host.tools.filesystem-search, actspace.host.tools.filesystem-write, actspace.host.tools.shell-tools, actspace.host.tools.web-tools, actspace.host.tools.image-generation, actspace.host.tools.image-inspection, actspace.host.session]
 - id: headless-runner
   name: "@actspace/headless/plugin"
-  inject: [actspace.host.headless, session.runtime, agent.loop]
+  inject: [actspace.host.headless, session.runtime, agent.runtime]
 - id: desktop-app
   name: "@actspace/desktop-app/plugin"
-  inject: [session.runtime, agent.runtime, llm.service, compaction.runtime]
+  inject: [session.runtime, agent.runtime, llm.service]
 - id: english-learning
   name: "@actspace/english-learning/plugin"
   inject: [agent.registry, session.runtime]

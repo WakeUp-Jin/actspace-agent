@@ -1,12 +1,12 @@
 import type { ComposerSendOptions } from "../components/Composer";
 
-/** 运行中发送的消息；只在渲染进程内存中，与草稿一样不跨重启。 */
+/** Host 持久队列的内容投影；执行配置在消费时独立读取。 */
 export type QueuedComposerMessage = {
   /** 同时用作插入时的 inbox messageId。 */
   id: string;
   kind: "message" | "compact";
   text: string;
-  options: ComposerSendOptions;
+  options: Pick<ComposerSendOptions, "attachments" | "fileReferences" | "responseAnnotations">;
 };
 
 export type SessionMessageQueue = {
@@ -24,7 +24,7 @@ export function createQueuedMessage(text: string, options: ComposerSendOptions):
     id: `queued-${crypto.randomUUID()}`,
     kind: text.trim() === "/compact" ? "compact" : "message",
     text,
-    options,
+    options: { attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations },
   };
 }
 
@@ -66,4 +66,18 @@ export function returnToFront(queue: SessionMessageQueue, returned: readonly Que
   if (returned.length === 0) return queue;
   const ids = new Set(returned.map((item) => item.id));
   return { ...queue, items: [...returned, ...queue.items.filter((item) => !ids.has(item.id))] };
+}
+
+export function projectTaskQueue(snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot): SessionMessageQueue {
+  const items: QueuedComposerMessage[] = []; const steering: QueuedComposerMessage[] = [];
+  for (const id of snapshot.queue) {
+    const task = snapshot.tasks.find(task => task.taskId === id);
+    if (!task || task.state !== "pending") continue;
+    const envelope = task.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
+    const original = envelope?.kind === "composer-task" ? envelope.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
+    const text = original?.userInput ?? (typeof task.content === "string" ? task.content : "待执行消息");
+    const item: QueuedComposerMessage = { id, text, kind: text.trim() === "/compact" ? "compact" : "message", options: { attachments: original?.attachments, fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations } };
+    (task.targetRunId ? steering : items).push(item);
+  }
+  return { items, steering, paused: snapshot.paused };
 }

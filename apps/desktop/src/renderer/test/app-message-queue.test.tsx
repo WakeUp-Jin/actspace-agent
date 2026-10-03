@@ -1,3 +1,4 @@
+import type { TaskSnapshot, TaskCommand, SubmitTaskInput, TaskContentEnvelope } from "@actspace/shared/runtime-v2";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -50,9 +51,45 @@ function setupQueueFixture() {
   ]);
   let emit!: (event: RuntimeStreamEvent) => void;
   let seq = 0;
+  const states = new Map<string, TaskSnapshot>();
+  const live = new Set<(event: any) => void>();
+  const state = (id: string) => { if (!states.has(id)) states.set(id, { sessionId: id, revision: 0, paused: false, tasks: [], queue: [], runs: [] }); return states.get(id)!; };
+  const publish = (id: string, next: TaskSnapshot) => { states.set(id, { ...next, revision: state(id).revision + 1 }); for (const fn of live) fn({ event: { kind: "journal-update", message: "task-queue-updated", sessionId: id } }); };
+  const schedule = (id: string) => {
+    const current = state(id);
+    if (pending.has(id) || current.paused || !current.queue.length) return;
+    const task = current.tasks.find(task => task.taskId === current.queue[0])!;
+    const original = (task.content as TaskContentEnvelope).original as { userInput: string };
+    if (original.userInput === "/compact") { void compactContext({ sessionId: id, agentRunId: "compact" }); publish(id, { ...current, queue: current.queue.slice(1), tasks: current.tasks.map(item => item === task ? { ...item, state: "completed" } : item) }); return; }
+    const agentRunId = `host-${task.taskId}`;
+    publish(id, { ...current, queue: current.queue.slice(1), tasks: current.tasks.map(item => item === task ? { ...item, state: "claimed", runId: agentRunId } : item) });
+    void runAgent({ sessionId: id, agentRunId, userInput: original.userInput });
+  };
+  const submitTask = vi.fn(async (input: SubmitTaskInput) => {
+    const current = state(input.sessionId); const taskId = input.submissionId;
+    const task = { taskId, submissionId: taskId, content: { kind: "composer-task", original: { userInput: input.userInput }, prepared: input.userInput }, acceptedSeq: ++seq, state: "pending" as const, targetRunId: null, runId: null, continuationOf: null };
+    publish(input.sessionId, { ...current, tasks: [...current.tasks, task], queue: [...current.queue, taskId] });
+    return { task, revision: state(input.sessionId).revision, durableSeq: seq };
+  });
+  const taskCommand = vi.fn(async (input: TaskCommand) => {
+    const current = state(input.sessionId);
+    if (input.op === "designate") {
+      const task = current.tasks.find(task => task.taskId === input.taskId)!;
+      if (input.runId) {
+        const result = await steerAgentRun({ sessionId: input.sessionId, agentRunId: input.runId, messageId: input.taskId, userInput: ((task.content as TaskContentEnvelope).original as { userInput: string }).userInput });
+        if (result.status !== "accepted") return { snapshot: current, error: "RUN_NOT_ACTIVE" };
+      } else await cancelSteer({ sessionId: input.sessionId, messageId: input.taskId });
+      publish(input.sessionId, { ...current, tasks: current.tasks.map(item => item.taskId === input.taskId ? { ...item, targetRunId: input.runId } : item) });
+    }
+    if (input.op === "cancel") publish(input.sessionId, { ...current, queue: current.queue.filter(id => id !== input.taskId), tasks: current.tasks.map(item => item.taskId === input.taskId ? { ...item, state: "cancelled" } : item) });
+    if (input.op === "resume") { publish(input.sessionId, { ...current, paused: false }); schedule(input.sessionId); }
+    return { snapshot: state(input.sessionId) };
+  });
   const pending = new Map<string, PendingRun>();
   const runAgent = vi.fn((input: RunAgentInput) => new Promise<AgentRunResult>((resolve) => {
     pending.set(input.sessionId, { input, resolve });
+    const current = state(input.sessionId);
+    publish(input.sessionId, { ...current, runs: [...current.runs, { runId: input.agentRunId, taskId: "initial", configuration: {}, harness: { harnessId: "main", generationId: "fixture", revision: 1 }, state: "running", result: null }] });
     emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
   }));
   const compactContext = vi.fn(async (input: CompactContextInput) => ({
@@ -66,6 +103,8 @@ function setupQueueFixture() {
   const abort = vi.fn(async () => true);
 
   window.actspace = {
+    taskCommand, submitTask,
+    onSessionLiveEvent: (callback: any) => { live.add(callback); return () => live.delete(callback); },
     getBootstrapState: async () => bootstrapState,
     getSettings: async () => ({ version: 1, defaultModelId: null, providers: {}, searchProviders: {}, agent: {}, skills: { disabled: [] } }),
     listSessions: async () => [...records.values()].map((record) => ({
@@ -90,6 +129,9 @@ function setupQueueFixture() {
   } as unknown as Window["actspace"];
 
   const event = (sessionId: string, value: Record<string, unknown>) => {
+    if (value.type === "user_message_steered") {
+      const current = state(sessionId); publish(sessionId, { ...current, queue: current.queue.filter(id => id !== value.messageId), tasks: current.tasks.map(task => task.taskId === value.messageId ? { ...task, state: "claimed", targetRunId: null, runId: pending.get(sessionId)!.input.agentRunId } : task) });
+    }
     emit({ sessionId, agentRunId: pending.get(sessionId)!.input.agentRunId, ...value } as RuntimeStreamEvent);
   };
   const finish = (sessionId: string, status: AgentRunResult["status"], extra: SessionEvent[] = []) => {
@@ -105,7 +147,9 @@ function setupQueueFixture() {
     records.set(sessionId, { ...record, meta: { ...record.meta, agentRunCount: record.meta.agentRunCount + 1 }, events, messageBlocks: createMessageBlocks(events) });
     event(sessionId, { type: status === "completed" ? "agent_run_finished" : status === "aborted" ? "agent_run_aborted" : "agent_run_failed" });
     pending.delete(sessionId);
+    const current = state(sessionId); publish(sessionId, { ...current, paused: status !== "completed", runs: current.runs.map(run => run.runId === input.agentRunId ? { ...run, state: status === "aborted" ? "cancelled" : status } : run), tasks: current.tasks.map(task => ({ ...task, targetRunId: null, state: task.runId === input.agentRunId ? status === "aborted" ? "cancelled" : status : task.state })) });
     resolve({ sessionId, agentRunId: input.agentRunId, status, events, contextSnapshot: emptySnapshot });
+    schedule(sessionId);
   };
   const sentTexts = () => runAgent.mock.calls.map(([input]) => input.userInput);
   return { records, pending, runAgent, compactContext, steerAgentRun, cancelSteer, abort, event, finish, sentTexts, nextSeq: () => ++seq };
@@ -228,7 +272,7 @@ describe("App message queue", () => {
     await userEvent.click(screen.getByLabelText("停止 Agent"));
     await act(async () => fixture.finish("queue-a", "aborted"));
 
-    await waitFor(() => expect(fixture.cancelSteer).toHaveBeenCalledWith({ sessionId: "queue-a", messageId: fixture.steerAgentRun.mock.calls[0]![0].messageId }));
+    expect(fixture.cancelSteer).not.toHaveBeenCalled(); // Host clears unread designation at terminal commit.
     await waitFor(() => expect(within(tray()!).getByText("已暂停")).toBeInTheDocument());
     const rows = within(tray()!).getAllByRole("listitem");
     expect(rows.map((row) => row.textContent)).toEqual([expect.stringContaining("steer me"), expect.stringContaining("later")]);

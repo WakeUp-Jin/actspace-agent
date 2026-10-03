@@ -305,6 +305,43 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@24.12.4)(jsdom@26.1.0)(vite@8.1.5(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))
 
+  packages/agent-service:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/core-scope':
+        specifier: workspace:*
+        version: link:../core/scope
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session/journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../session/persistence
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@actspace/boot':
+        specifier: workspace:*
+        version: link:../boot
+      '@actspace/bundle':
+        specifier: workspace:*
+        version: link:../bundle
+      '@actspace/composition':
+        specifier: workspace:*
+        version: link:../composition
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/boot:
     dependencies:
       '@actspace/bundle':
@@ -563,6 +600,9 @@ importers:
 
   packages/desktop-app:
     dependencies:
+      '@actspace/agent-service':
+        specifier: workspace:*
+        version: link:../agent-service
       '@actspace/bundle':
         specifier: workspace:*
         version: link:../bundle
@@ -753,6 +793,9 @@ importers:
 
   packages/runtime:
     dependencies:
+      '@actspace/agent-service':
+        specifier: workspace:*
+        version: link:../agent-service
       '@actspace/boot':
         specifier: workspace:*
         version: link:../boot
@@ -862,6 +905,9 @@ importers:
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
+      esbuild:
+        specifier: 0.21.5
+        version: 0.21.5
       typescript:
         specifier: ^5.8.3
         version: 5.9.3

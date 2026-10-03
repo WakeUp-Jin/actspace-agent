@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import type { RuntimeV2HostDescriptor, RuntimeV2BootManifest, RuntimeV2RuntimeState, RuntimeV2DiagnosticsSnapshot, RuntimeV2ShutdownResult } from "@actspace/shared/runtime-v2";
 import type { AgentLoopLiveEvent } from "@actspace/core-agent-loop";
-import { CompactionPlugin } from "@actspace/compaction";
 import { emptyRuntimePromptSource, type RuntimePromptSource } from "@actspace/prompt";
 import { DiagnosticsCollector } from "../projection/diagnostics.js";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
@@ -76,8 +75,8 @@ async function bootClaimedRuntime(options: BootRuntimeOptions): Promise<BootedRu
 
 /**
  * Final DSH-native boot path. Bootstrap only prepares Host ports and mounts
- * the checked-in tree; Agent, Loop, Subagent and RunController are Context
- * services published by Behaviors.
+ * the checked-in Host tree; scheduling is a Context service and execution
+ * services are published by isolated Harness Behaviors.
  */
 async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<BootedRuntimeProfile> {
   const state = new RuntimeStateController();
@@ -107,14 +106,21 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     workspaceRoot: options.toolEnvironment.workspaceRoot,
     resolveSource: async (workspaceRoot: string) => typeof options.promptSource === "function" ? options.promptSource(workspaceRoot) : options.promptSource ?? emptyRuntimePromptSource(),
   });
+  let runtimeContext: CordisContext | undefined;
   const providedHostServices = Object.freeze({
     ...hostServices.services,
+    "actspace.host.subagents": Object.freeze({ invoke: (input: import("@actspace/subagent").SubagentInvocation) => {
+      const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
+      if (!runtime) throw new Error("Agent runtime is not ready");
+      return runtime.subagents.invoke(input);
+    } }),
     "actspace.host.prompt": promptPort,
     [RUNTIME_HOST_SERVICES_ID]: hostServices,
     [SESSION_CODEC_HOST_PORT_ID]: pluginCodecs,
     [SESSION_RUNTIME_HOST_PORT_ID]: runtimeHost,
     [HEADLESS_HOST_PORT_ID]: hostServices.services[HEADLESS_HOST_PORT_ID] ?? Object.freeze({ enabled: false }),
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
+      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...(options.host.capabilityCeiling.includes("browser") ? [] : ["browser-tools"])],
       host: options.host,
       toolEnvironment: options.toolEnvironment,
       workspaceRoot: options.toolEnvironment.workspaceRoot,
@@ -134,9 +140,10 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       configPath: options.cordis!.configPath!,
       composition,
       createRoot: options.cordis?.createRoot,
-      transportPatches: toolTransportPatches(composition),
-      requiredServices: ["actspace.runtime", "session.journal", "session.runtime", "llm.service", "tools.runtime", "context.assembly", "prompt.runtime", "compaction.runtime", "core.agent", "agent.registry", "agent.loop", "agent.runtime"],
+
+      requiredServices: ["actspace.runtime", "session.journal", "session.runtime", "llm.service", "core.agent", "agent.registry", "agent.service", "agent.runtime"],
       prepare: (prepared) => {
+        runtimeContext = prepared;
         prepared.provide?.("actspace.host", Object.freeze({
           hostKind: options.host.hostKind,
           descriptor: hostServices.descriptor,
@@ -148,13 +155,11 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     context = boot.context;
     const sessions = requireService(context.get?.("session.runtime") as RuntimeSessionController | undefined, "session.runtime");
     const llm = requireService(context.get?.("llm.service") as LlmService | undefined, "llm.service");
-    const compaction = requireService(context.get?.("compaction.runtime") as CompactionPlugin | undefined, "compaction.runtime");
     const agentRuntime = requireService(context.get?.("agent.runtime") as AgentRuntimeService | undefined, "agent.runtime");
     const candidate = await createDshBootCandidate({ host: options.host, composition, cordisAdmission, root, discoveredCodecs: pluginCodecs });
     for (const item of candidate.diagnostics) diagnostics.record({ severity: item.severity, source: "boot", code: item.code, message: item.message, ...(item.provenance.pluginId === undefined ? {} : { pluginId: item.provenance.pluginId }), details: isRecord(item.details) ? item.details : { value: item.details } });
     context.provide?.(RUNTIME_CONTEXT_SERVICE_IDS.sessions, sessions);
     context.provide?.(RUNTIME_CONTEXT_SERVICE_IDS.runs, agentRuntime.runs);
-    context.provide?.(RUNTIME_CONTEXT_SERVICE_IDS.compaction, compaction);
     context.provide?.(RUNTIME_CONTEXT_SERVICE_IDS.llm, llm);
     state.ready();
     return createBootedProfile({ state, manifest: candidate.manifest, diagnostics, context, root, agentRuntime, candidate, options });

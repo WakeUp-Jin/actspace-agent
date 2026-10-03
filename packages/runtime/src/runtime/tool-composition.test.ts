@@ -31,7 +31,10 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
       } }),
       cordis: { configPath: runtimeCordisConfigPath(), admission: await inspectCordisAdmission() },
     });
-    const tools = profile.context.get!("tools.runtime") as ToolRuntime;
+    expect(profile.context.get!("tools.runtime")).toBeUndefined();
+    const runtime = profile.context.get!("agent.runtime") as import("./agent-runtime-plugin.js").AgentRuntimeService;
+    const lease = runtime.harnesses.acquire("main");
+    const tools = lease.getService<ToolRuntime>("tools.runtime")!;
     const names = tools.registry.listDefinitions().map(item => item.name);
     expect(names).toContain("read_file");
     expect(names).not.toContain("bash");
@@ -43,6 +46,7 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
     profile.requestRestart("Tool composition changed", "profile", "next-digest");
     expect(profile.getState().restart).toMatchObject({ required: true, candidateDigest: "next-digest" });
     expect(tools.registry.listDefinitions().map(item => item.name)).toEqual(names);
+    await lease.release();
     await profile.shutdown();
     profile = undefined;
     expect(() => tools.registry.capture("read_file")).toThrow(/not active/);

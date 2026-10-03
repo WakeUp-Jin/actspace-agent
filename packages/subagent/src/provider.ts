@@ -12,14 +12,21 @@ import type { SubagentTerminalResult } from "./terminal-result.js";
 
 export type SubagentInvocation = { readonly parentSession: SessionHandle; readonly parentScope: AgentScope; readonly parentCallId: string; readonly presetId: string; readonly task: string; readonly parentVisibleToolIds: readonly string[]; readonly delegationDepth: number; readonly signal?: AbortSignal; readonly isolatedScope?: boolean };
 export interface ParentDelegationPort { recordRequested(input: { invocationId: string; presetId: string; parentCallId: string; childSessionId: string }): Promise<void>; recordTerminal(result: SubagentTerminalResult): Promise<void>; }
-export type ChildLoopFactory = (input: { session: SessionHandle; scope: AgentScope; preset: StaticAgentPreset; allowedToolNames: readonly string[]; signal: AbortSignal; agentId: string }) => AgentLoop | Promise<AgentLoop>;
+export type ChildLoop = Pick<AgentLoop, "runTurn" | "abort" | "waitForIdle" | "quiesce">;
+export type ChildLoopFactory = (input: { session: SessionHandle; scope: AgentScope; preset: StaticAgentPreset; allowedToolNames: readonly string[]; signal: AbortSignal; agentId: string }) => ChildLoop | Promise<ChildLoop>;
+export type ChildRunLease = {
+  readonly scope: AgentScope; readonly createLoop: ChildLoopFactory;
+  start?(session: SessionHandle, content: string, runId: string): Promise<{ messageId: string }>;
+  finish?(outcome: "completed" | "cancelled" | "failed", result: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue): Promise<void>;
+  release(): Promise<void>;
+};
 
 export class OneShotSubagentProvider {
   readonly #active = new Map<string, AbortController>();
   readonly #inflight = new Set<Promise<SubagentTerminalResult>>();
   readonly #linked = new Set<string>();
   #accepting = true;
-  constructor(private readonly options: { readonly store: SessionStore; readonly presets: StaticPresetRegistry; readonly parentPort?: ParentDelegationPort; readonly createLoop: ChildLoopFactory; readonly manifestDigest: string; readonly plugins: readonly { id: string; version: string }[] }) {}
+  constructor(private readonly options: { readonly store: SessionStore; readonly presets: StaticPresetRegistry; readonly parentPort?: ParentDelegationPort; readonly createLoop: ChildLoopFactory; readonly acquireRun?: (preset: StaticAgentPreset) => ChildRunLease; readonly manifestDigest: string; readonly plugins: readonly { id: string; version: string }[] }) {}
 
   invoke(input: SubagentInvocation): Promise<SubagentTerminalResult> {
     const task = this.#invoke(input);
@@ -38,19 +45,29 @@ export class OneShotSubagentProvider {
     const parentPort = this.options.parentPort ?? sessionParentPort(input.parentSession);
     await parentPort.recordRequested({ invocationId, presetId: preset.id, parentCallId: input.parentCallId, childSessionId });
     const controller = new AbortController(); this.#active.set(invocationId, controller);
-    const timeout = setTimeout(() => controller.abort("subagent-timeout"), preset.maxDurationMs); timeout.unref?.();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     const parentAbort = () => controller.abort(input.signal?.reason);
     if (input.signal?.aborted) parentAbort(); else input.signal?.addEventListener("abort", parentAbort, { once: true });
     let child: SessionHandle | undefined;
     let scope: AgentScope | undefined;
+    let lease: ChildRunLease | undefined;
+    let loop: ChildLoop | undefined;
+    let admitted = false;
     let result: SubagentTerminalResult;
     try {
       const workspaceRoot = resolveSessionWorkspaceRoot(input.parentSession.header, input.parentSession.journal.events);
       child = await createChildSession({ store: this.options.store, parentSessionId: input.parentSession.header.sessionId, parentBoundarySeq: input.parentSession.lastSeq, parentCallId: input.parentCallId, childSessionId, createdAt: new Date().toISOString(), ...(workspaceRoot ? { cwd: workspaceRoot } : {}), delegationDepth: input.delegationDepth + 1, task: input.task, preset, manifestDigest: this.options.manifestDigest, plugins: this.options.plugins });
-      scope = input.isolatedScope === true ? input.parentScope.isolatedChild(childAgentId) : input.parentScope.child(childAgentId);
-      const loop = await this.options.createLoop({ session: child, scope, preset, allowedToolNames, signal: controller.signal, agentId: childAgentId });
-      if (controller.signal.aborted) loop.abort("parent-abort");
-      const turn = await loop.runTurn({ content: `${input.task}\n\nSubagent execution boundary: only read_file, list_directory, grep and glob are available. Do not request Bash, edits, approvals or nested delegation. Work only in the inherited workspace. If target files are absent or outside its boundary, stop and report the blocker and partial findings to the parent instead of repeatedly searching unrelated directories.` });
+      controller.signal.throwIfAborted();
+      lease = this.options.acquireRun?.(preset);
+      const content = `${input.task}\n\nSubagent execution boundary: only read_file, list_directory, grep and glob are available. Do not request Bash, edits, approvals or nested delegation. Work only in the inherited workspace. If target files are absent or outside its boundary, stop and report the blocker and partial findings to the parent instead of repeatedly searching unrelated directories.`;
+      const accepted = await lease?.start?.(child, content, invocationId);
+      admitted = accepted !== undefined;
+      scope = lease ? lease.scope.child(childAgentId) : input.isolatedScope === true ? input.parentScope.isolatedChild(childAgentId) : input.parentScope.child(childAgentId);
+      loop = await (lease?.createLoop ?? this.options.createLoop)({ session: child, scope, preset, allowedToolNames, signal: controller.signal, agentId: childAgentId });
+      controller.signal.throwIfAborted();
+      timeout = setTimeout(() => controller.abort("subagent-timeout"), preset.maxDurationMs);
+      timeout.unref?.();
+      const turn = await loop.runTurn({ content, agentRunId: invocationId, ...(accepted ? { messageId: accepted.messageId } : {}) });
       await child.flush();
       const status = controller.signal.aborted || turn.reason === "aborted" ? "aborted" : turn.reason === "completed" ? "completed" : "failed";
       const failure = controller.signal.reason === "subagent-timeout"
@@ -60,9 +77,23 @@ export class OneShotSubagentProvider {
           : null;
       result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status, text: turn.finalText, durationMs: Date.now() - started, failure });
     } catch (error) {
-      result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status: controller.signal.aborted ? "aborted" : "failed", text: "", durationMs: Date.now() - started, failure: { code: controller.signal.reason === "subagent-timeout" ? "SUBAGENT_TIMEOUT" : controller.signal.aborted ? "SUBAGENT_ABORTED" : child === undefined ? "SUBAGENT_SETUP_FAILED" : "SUBAGENT_FAILED", message: controller.signal.reason === "subagent-timeout" ? "子智能体达到 30 分钟执行时限。" : error instanceof Error ? error.message : String(error), retryable: false } });
+      result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status: controller.signal.aborted ? "aborted" : "failed", text: "", durationMs: Date.now() - started, failure: { code: controller.signal.reason === "subagent-timeout" ? "SUBAGENT_TIMEOUT" : controller.signal.aborted ? "SUBAGENT_ABORTED" : child === undefined ? "SUBAGENT_SETUP_FAILED" : "SUBAGENT_FAILED", message: controller.signal.reason === "subagent-timeout" ? "子智能体达到执行时限。" : error instanceof Error ? error.message : String(error), retryable: false } });
+    }
+    clearTimeout(timeout);
+    // A factory must not leave work using a retired generation during cleanup.
+    let lifecycleFailure: unknown;
+    if (loop) {
+      try { loop.quiesce(); await loop.waitForIdle(); }
+      catch (error) {
+        lifecycleFailure = error;
+        result = terminal({ ...result, status: "failed", failure: { code: "SUBAGENT_CLEANUP_FAILED", message: error instanceof Error ? error.message : String(error), retryable: false } });
+      }
     }
     let publicationFailure: unknown;
+    if (admitted) {
+      try { await lease!.finish!(result.status === "completed" ? "completed" : result.status === "aborted" ? "cancelled" : "failed", { status: result.status, text: result.text }); }
+      catch (error) { publicationFailure = error; result = terminal({ ...result, status: "failed", failure: { code: "SUBAGENT_PUBLICATION_FAILED", message: String(error), retryable: false } }); }
+    }
     if (child !== undefined) {
       try {
         await publishSubagentTerminal(child, result);
@@ -71,16 +102,18 @@ export class OneShotSubagentProvider {
         result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status: "failed", text: "", durationMs: Date.now() - started, failure: { code: "SUBAGENT_PUBLICATION_FAILED", message: error instanceof Error ? error.message : String(error), retryable: false } });
       }
     }
-    const cleanup = await Promise.allSettled([
+    const cleanup: PromiseSettledResult<void>[] = lifecycleFailure === undefined ? await Promise.allSettled([
       child?.close() ?? Promise.resolve(),
       scope?.dispose() ?? Promise.resolve(),
-    ]);
+    ]) : [];
+    // Retain the generation if its consumers could not be proven stopped/disposed.
+    if (lease && lifecycleFailure === undefined && !cleanup.some(entry => entry.status === "rejected")) cleanup.push(...await Promise.allSettled([lease.release()]));
     clearTimeout(timeout);
     input.signal?.removeEventListener("abort", parentAbort);
     this.#active.delete(invocationId);
     const cleanupFailure = cleanup.find((entry): entry is PromiseRejectedResult => entry.status === "rejected")?.reason;
-    if (publicationFailure !== undefined || cleanupFailure !== undefined) {
-      const failure = publicationFailure ?? cleanupFailure;
+    if (lifecycleFailure !== undefined || publicationFailure !== undefined || cleanupFailure !== undefined) {
+      const failure = lifecycleFailure ?? publicationFailure ?? cleanupFailure;
       if (!this.#linked.has(childSessionId)) {
         await parentPort.recordTerminal(result);
         this.#linked.add(childSessionId);

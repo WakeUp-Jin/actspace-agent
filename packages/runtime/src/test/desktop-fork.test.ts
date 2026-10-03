@@ -13,6 +13,8 @@ it("owns a Chat fork before first send, publishes changes and releases its write
   const sessions = new RuntimeSessionController({ dataRoot: root, runtimeId: "fork-test", registry: createCoreCodecRegistry(), profileId: "test", manifestDigest: "test", plugins: [] });
   const attached = new Map<string, SessionHandle>();
   const runs = {
+    inspectCapability: (_name: string, inspect: (service: { hasRunningBackgroundTask: (sessionId: string) => boolean }) => unknown) => inspect({ hasRunningBackgroundTask: sessionId => sessionId === "parent" && backgroundRunning }),
+    service: { exclusive: async (_id: string, operation: () => Promise<unknown>) => operation() },
     get: () => undefined,
     attach: async (session: SessionHandle) => { attached.set(session.header.sessionId, session); },
     run: async (sessionId: string) => {

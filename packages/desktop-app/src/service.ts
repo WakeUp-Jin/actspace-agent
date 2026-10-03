@@ -1,5 +1,4 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
-import type { CompactionPlugin } from "@actspace/compaction";
 import type { LlmMessage, LlmService, LlmUsage } from "@actspace/llm-service";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
@@ -52,16 +51,22 @@ type RunAssembly = {
 };
 
 type RunService = {
+  readonly service: import("@actspace/agent-service").AgentService;
+  compact(sessionId: string): Promise<boolean>;
+  inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R): R;
+  configure(sessionId: string, configuration: import("@actspace/shared/runtime-v2").TaskConfiguration): void;
   attach(session: SessionHandle): Promise<RunAssembly>;
   run(sessionId: string, input: Omit<RuntimeV2RunTurnRequest, "sessionId">): Promise<RuntimeV2RunTurnResponse>;
   get(sessionId: string): RunAssembly | undefined;
   isIdle?: () => boolean;
-  rebuild(session: SessionHandle): Promise<RunAssembly>;
 };
 
 type AgentRuntimeService = { readonly runs: RunService; readonly subagents?: { readonly activeCount: number } };
 
 export type DesktopAppServiceContract = {
+  readonly browserAvailable: () => boolean;
+  readonly taskCommand: (input: import("@actspace/shared/runtime-v2").TaskCommand) => Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>;
+  readonly submitTask: (sessionId: string, submissionId: string, content: RuntimeV2JsonValue) => Promise<import("@actspace/shared/runtime-v2").TaskReceipt>;
   readonly isIdleForReconfigure: () => Promise<boolean>;
   readonly readSessionProjection: SessionService["readProjection"];
   readonly readSessionObservation: SessionService["readObservation"];
@@ -98,13 +103,10 @@ export class DesktopAppService implements DesktopAppServiceContract {
   readonly #sessions: SessionService;
   readonly #runs: RunService;
   readonly #subagents: { readonly activeCount: number } | undefined;
-  readonly #compaction: CompactionPlugin;
   readonly #llm: LlmService;
   readonly #hasRunningBackgroundTask: (sessionId: string) => boolean;
   readonly #manifestDigest: string;
   readonly #titleJobs = new Map<string, { controller: AbortController; done: Promise<void> }>();
-  readonly #activeRuns = new Set<string>();
-  readonly #modeTransitions = new Set<string>();
   readonly #blockedModeSessions = new Set<string>();
   #disposed = false;
 
@@ -113,12 +115,33 @@ export class DesktopAppService implements DesktopAppServiceContract {
     const agentRuntime = required<AgentRuntimeService>(ctx, "agent.runtime");
     this.#runs = agentRuntime.runs;
     this.#subagents = agentRuntime.subagents;
-    this.#compaction = required(ctx, "compaction.runtime");
     this.#llm = required(ctx, "llm.service");
-    this.#hasRunningBackgroundTask = (sessionId) => (ctx.get?.("tools.shell-tools") as { readonly hasRunningBackgroundTask?: (sessionId: string) => boolean } | undefined)?.hasRunningBackgroundTask?.(sessionId) ?? false;
+    this.#hasRunningBackgroundTask = (sessionId) => this.#runs.inspectCapability<{ readonly hasRunningBackgroundTask?: (sessionId: string) => boolean }, boolean>("tools.shell-tools", service => service?.hasRunningBackgroundTask?.(sessionId) ?? false);
     this.#manifestDigest = (ctx.get?.("actspace.host.session") as { readonly manifestDigest?: string } | undefined)?.manifestDigest ?? "desktop-app";
   }
 
+  browserAvailable(): boolean {
+    return this.#runs.inspectCapability<{ available?: boolean; registrations?: readonly unknown[]; definitions?: readonly unknown[] }, boolean>("tools.browser", browser => browser?.available === true && (browser.registrations?.length ?? 0) > 0 && browser.registrations?.length === browser.definitions?.length);
+  }
+  submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) { if (this.#blockedModeSessions.has(sessionId)) throw new Error("AGENT_MODE_RECOVERY_REQUIRED"); return this.#runs.service.submit(sessionId, submissionId, content); }
+  async taskCommand(input: import("@actspace/shared/runtime-v2").TaskCommand): Promise<import("@actspace/shared/runtime-v2").TaskCommandResult> {
+    const service = this.#runs.service;
+    try {
+      switch (input.op) {
+        case "snapshot": break;
+        case "configure": this.#runs.configure(input.sessionId, input.configuration); break;
+        case "designate": await service.designate(input.sessionId, input.taskId, input.runId, input.revision); break;
+        case "cancel": await service.cancel(input.sessionId, input.taskId, input.revision); break;
+        case "move": await service.move(input.sessionId, input.taskId, input.beforeTaskId, input.revision); break;
+        case "resume": await service.resume(input.sessionId, input.revision); break;
+        case "stop": await service.stop(input.sessionId, input.runId); break;
+      }
+      return { snapshot: await service.snapshot(input.sessionId) };
+    } catch (error) {
+      if (error && typeof error === "object" && "snapshot" in error && error.snapshot) return { snapshot: error.snapshot as import("@actspace/shared/runtime-v2").TaskSnapshot, error: error instanceof Error ? error.message : String(error) };
+      throw error;
+    }
+  }
   listSessions() { return this.#sessions.list(); }
   async isIdleForReconfigure(): Promise<boolean> {
     if (this.#titleJobs.size > 0 || this.#runs.isIdle?.() !== true) return false;
@@ -173,14 +196,11 @@ export class DesktopAppService implements DesktopAppServiceContract {
 
   async runTurn(input: RuntimeV2RunTurnRequest): Promise<RuntimeV2RunTurnResponse> {
     if (this.#blockedModeSessions.has(input.sessionId)) throw new Error("AGENT_MODE_RECOVERY_REQUIRED");
-    if (this.#activeRuns.has(input.sessionId) || this.#modeTransitions.has(input.sessionId)) throw new Error("SESSION_BUSY");
-    this.#activeRuns.add(input.sessionId);
-    try {
     const session = await this.#sessions.resume(input.sessionId);
     let snapshot = this.#sessions.snapshot(session);
     if (input.mode !== undefined && input.mode !== snapshot.agentMode) {
       if ((snapshot.agentModeRevision ?? 0) !== 0 || snapshot.activity.turnCount !== 0) throw new Error("AGENT_MODE_CONFLICT");
-      snapshot = await this.#changeAgentMode(session, input.mode);
+      snapshot = await this.#runs.service.exclusive(input.sessionId, () => this.#changeAgentMode(session, input.mode!));
     }
     if (!this.#disposed && snapshot.metadata.title === null && !this.#titleJobs.has(input.sessionId)) {
       const title = titleFromContent(input.content);
@@ -203,20 +223,18 @@ export class DesktopAppService implements DesktopAppServiceContract {
       keepPendingOnAbort: input.keepPendingOnAbort,
       selectedSkillIds: snapshot.agentMode === "chat" ? [] : input.selectedSkillIds,
     });
-    } finally { this.#activeRuns.delete(input.sessionId); }
   }
 
   async updateSessionAgentMode(sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number): Promise<RuntimeV2SessionSnapshot> {
     if (this.#blockedModeSessions.has(sessionId)) throw new Error("AGENT_MODE_RECOVERY_REQUIRED");
-    if (this.#activeRuns.has(sessionId) || this.#modeTransitions.has(sessionId) || this.#runs.get(sessionId)?.loop.active || this.#hasRunningBackgroundTask(sessionId)) throw new Error("SESSION_BUSY");
-    this.#modeTransitions.add(sessionId);
-    try {
+    return this.#runs.service.exclusive(sessionId, async () => {
+      if (this.#hasRunningBackgroundTask(sessionId)) throw new Error("SESSION_BUSY");
       const session = await this.#sessions.resume(sessionId);
       const snapshot = this.#sessions.snapshot(session);
       if (expectedRevision !== undefined && expectedRevision !== (snapshot.agentModeRevision ?? 0)) throw new Error("AGENT_MODE_CONFLICT");
-      if (snapshot.pendingInbox.length > 0 || snapshot.activity.activeTurnId !== null || snapshot.delegations.some(item => item.state !== "completed")) throw new Error("SESSION_BUSY");
-      return await this.#changeAgentMode(session, mode);
-    } finally { this.#modeTransitions.delete(sessionId); }
+      if (snapshot.activity.activeTurnId !== null || snapshot.delegations.some(item => item.state !== "completed")) throw new Error("SESSION_BUSY");
+      return this.#changeAgentMode(session, mode);
+    });
   }
 
   async #changeAgentMode(session: SessionHandle, mode: RuntimeV2AgentMode): Promise<RuntimeV2SessionSnapshot> {
@@ -268,7 +286,7 @@ export class DesktopAppService implements DesktopAppServiceContract {
     const assembly = this.#runs.get(sessionId);
     if (assembly?.loop.active) throw new Error("Cannot compact a Session while its Agent turn is active.");
     const session = await this.#sessions.resume(sessionId);
-    const compacted = await this.#compaction.compact(session);
+    const compacted = await this.#runs.compact(sessionId);
     return Object.freeze({ compacted, snapshot: this.#sessions.snapshot(session) });
   }
 
@@ -292,13 +310,12 @@ export class DesktopAppService implements DesktopAppServiceContract {
   async updateSessionWorkspace(sessionId: string, workspaceRoot: string) {
     const next = workspaceRoot.trim();
     if (!next) throw new Error("workspaceRoot must not be empty.");
-    const existing = this.#runs.get(sessionId);
-    if (existing?.loop.active) throw new Error("Cannot change workspace while an Agent turn is active.");
-    const session = await this.#sessions.resume(sessionId);
-    await session.append(core("session/workspace-set", { workspaceRoot: next }));
-    await session.flush();
-    await this.#runs.rebuild(session);
-    return this.#sessions.snapshot(session);
+    return this.#runs.service.exclusive(sessionId, async () => {
+      const session = await this.#sessions.resume(sessionId);
+      await session.append(core("session/workspace-set", { workspaceRoot: next }));
+      await session.flush();
+      return this.#sessions.snapshot(session);
+    });
   }
 
   async updateSessionPermissionMode(sessionId: string, mode: import("@actspace/shared/runtime-v2").PermissionMode) {
@@ -405,6 +422,7 @@ function titleFromContent(value: RuntimeV2JsonValue): string | null {
 }
 
 function textFromContent(value: RuntimeV2JsonValue): string {
+  if (value && typeof value === "object" && !Array.isArray(value) && "kind" in value && value.kind === "composer-task") return textFromContent((value as { prepared: RuntimeV2JsonValue }).prepared);
   return typeof value === "string" ? value : Array.isArray(value) ? value.flatMap((item) => item !== null && typeof item === "object" && !Array.isArray(item) && item.type === "text" && typeof item.text === "string" ? [item.text] : []).join(" ") : "";
 }
 

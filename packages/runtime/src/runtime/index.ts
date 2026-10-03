@@ -1,7 +1,6 @@
 export * from "./boot.js";
 export * from "./errors.js";
 export * from "./restart-controller.js";
-export * from "./run-controller.js";
 export * from "./runtime-state.js";
 export * from "./session-controller.js";
 export * from "./session-plugin.js";

@@ -578,7 +578,8 @@ describe("App streaming user message", () => {
 
   it("keeps New chat as a placeholder and refreshes a background generated title", async () => {
     let record = createEmptySessionRecord("title-session");
-    let notify: ((envelope: { event: { kind: string; sessionId: string; message: string } }) => void) | undefined;
+    type LiveListener = (envelope: { event: { kind: string; sessionId: string; message: string } }) => void;
+    const listeners = new Set<LiveListener>();
     const createSession = vi.fn(async () => record);
     window.actspace = {
       ...settingsApiStub,
@@ -588,7 +589,7 @@ describe("App streaming user message", () => {
       createSession,
       listPendingApprovals: async () => [],
       onAgentStream: () => () => {},
-      onSessionLiveEvent: (listener: NonNullable<typeof notify>) => { notify = listener; return () => {}; },
+      onSessionLiveEvent: (listener: LiveListener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     } as unknown as NonNullable<typeof window.actspace>;
     renderApp();
     await screen.findByRole("button", { name: "查看会话详情： New chat" });
@@ -596,7 +597,7 @@ describe("App streaming user message", () => {
     await waitFor(() => expect(createSession).toHaveBeenCalled());
     expect(createSession.mock.calls[0]).toEqual([{}]);
     record = { ...record, meta: { ...record.meta, title: "项目架构分析" } };
-    act(() => notify?.({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } }));
+    act(() => listeners.forEach(listener => listener({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } })));
     await screen.findByRole("button", { name: "查看会话详情： 项目架构分析" });
     expect(document.querySelector('[data-session-id="title-session"]')).toHaveTextContent("项目架构分析");
   });
@@ -836,7 +837,7 @@ describe("App streaming user message", () => {
 
     await waitFor(() => {
       expect(composer).toHaveValue("keep this input");
-      expect(screen.getByRole("alert")).toHaveTextContent("消息未能发送，正文和附件已保留，请重试。");
+      expect(screen.getByRole("alert")).toHaveTextContent("提交结果尚未确认，正文和附件已保留；重试将核对同一次提交。");
     });
   });
 
@@ -3513,7 +3514,7 @@ sessionId: input.sessionId,
     expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 失败')).toBeInTheDocument();
     await fixture.select('background-a');
     expect(screen.getByLabelText('消息输入框')).toHaveValue('A failed input');
-    expect(screen.getByRole('alert')).toHaveTextContent('消息未能发送，正文和附件已保留，请重试。');
+    expect(screen.getByRole('alert')).toHaveTextContent('提交结果尚未确认，正文和附件已保留；重试将核对同一次提交。');
     errorLog.mockRestore();
   });
 

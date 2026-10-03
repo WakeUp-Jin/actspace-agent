@@ -11,6 +11,7 @@ import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {
   subagent?: boolean;
+  inputSource?: import("./loop.js").LoopInputSource;
   seedSession?: (session: SessionHandle) => Promise<void>;
   followup?: boolean;
   extraToolCall?: boolean;
@@ -77,7 +78,7 @@ export async function runToolStreamFixture(options: {
   } });
   const events: AgentLoopLiveEvent[] = [];
   const inbox = new MainAgentInbox(session);
-  const loop = new AgentLoop({ session, tools, inbox,
+  const loop = new AgentLoop({ session, tools, inbox, inputSource: options.inputSource,
     descriptor: { ...MAIN_AGENT_DESCRIPTOR, ...(options.subagent ? { kind: "subagent" as const, maxSteps: 2 } : {}), routeId: "test", model: "test" }, scope: new AgentScope("main:test", undefined, "main:test"),
     assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
     llm: new LlmService(routes, { resolve: async () => ({ apiKey: "fixture" }) }),

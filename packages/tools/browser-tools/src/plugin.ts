@@ -53,7 +53,7 @@ function commandExecutor(name: string, browser: BrowserCapability): BrowserToolH
   };
 }
 
-export function apply(ctx: CordisContext): void {
+export function apply(ctx: CordisContext, config: { readonly disposeHost?: boolean } = {}): void {
   const runtime = ctx.get?.("tools.runtime") as ToolRuntime | undefined;
   const browser = ctx.get?.(BROWSER_TOOLS_HOST_PORT_ID) as BrowserCapability | undefined;
   if (runtime === undefined) throw new Error("Browser Tools plugin requires tools.runtime.");
@@ -61,7 +61,7 @@ export function apply(ctx: CordisContext): void {
   ctx.provide?.("tools.browser", Object.freeze({ available: browser?.ready === true, registrations, definitions: BROWSER_TOOL_DEFINITIONS }));
   ctx.effect?.(() => async () => {
     const results = await Promise.allSettled([...registrations].reverse().map((registration) => registration.dispose()));
-    await browser?.dispose?.();
+    if (config.disposeHost !== false) await browser?.dispose?.();
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
     if (failures.length > 0) throw new AggregateError(failures.map((failure) => failure.reason), "Browser Tools cleanup failed.");
   }, "browser-tools");

@@ -181,6 +181,8 @@ import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2"
 
 const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.freeze({
   "app:get-bootstrap-state": RUNTIME_V2_FIXED_RENDERER_CHANNELS.bootstrapState,
+  "agent:task-command": RUNTIME_V2_FIXED_RENDERER_CHANNELS.taskCommand,
+  "agent:submit-task": RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask,
   "agent:run": RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent,
   "context:compact": RUNTIME_V2_FIXED_RENDERER_CHANNELS.compactContext,
   "agent:abort-run": RUNTIME_V2_FIXED_RENDERER_CHANNELS.abortAgentRun,
@@ -328,6 +330,8 @@ contextBridge.exposeInMainWorld("actspace", {
   samplePerformance: () => ipcRenderer.invoke(PERFORMANCE_CHANNELS.sample),
   setPerformanceActive: (active: boolean) => ipcRenderer.invoke(PERFORMANCE_CHANNELS.active, active),
   getBootstrapState: () => invokeFixedRenderer("app:get-bootstrap-state") as Promise<BootstrapState>,
+  taskCommand: (input: import("@actspace/shared/runtime-v2").TaskCommand) => invokeFixedRenderer("agent:task-command", input) as Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>,
+  submitTask: (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => invokeFixedRenderer("agent:submit-task", input) as Promise<import("@actspace/shared/runtime-v2").TaskReceipt>,
   runAgent: async (input: RunAgentInput): Promise<AgentRunResult | RunAgentPreparationFailure> => {
     const response = await invokeFixedRenderer("agent:run", input) as RunAgentPreparationFailure | (Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection });
     if (response.status === "rejected") return response;
