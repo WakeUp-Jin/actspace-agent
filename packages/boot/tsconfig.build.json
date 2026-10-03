@@ -20,6 +20,9 @@
     },
     {
       "path": "./../shared/tsconfig.build.json"
+    },
+    {
+      "path": "../core/scope/tsconfig.build.json"
     }
   ]
 }

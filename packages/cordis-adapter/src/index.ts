@@ -27,3 +27,5 @@ export const CORDIS_PACKAGE_VERSIONS = Object.freeze({
   "@deepseek-ai/cordis-plugin-group": "1.0.1",
   "@deepseek-ai/cordis-plugin-timer": "1.1.3",
 } as const);
+export * from "./plugin-artifact.js";
+export * from "./cordis-tree.js";

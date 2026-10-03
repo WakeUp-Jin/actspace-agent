@@ -47,6 +47,8 @@ Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧�
 
 以下材料用于理解取舍，不替代上面的当前实现入口：
 
+- [Harness 插件化与 Agent Host 分离讨论](agent-harness-host-refactor-decisions.md)：2026-10-03 已确认目标与分阶段路线；P1 固定产物和组合生命周期已实现并自动化验证，下一步细化 P2 真实 Run 迁移。
+
 - [P0 核心 Service 设计](agent-spec-core-cordis-services.md)：保留领域职责与 Service 化背景；当前三层 ABI 由上面的 Service 契约维护。
 - [Profile-first 决策](agent-decision-profile-first-headless-desktop.md)：两种 Profile 与应用操作所有权，保留当时迁移步骤。
 - [v2 foundation 决策](agent-decisions-v2-foundation.md)、[Cordis 采用](agent-decision-cordis-adoption.md)：方向、适用范围和证据边界。
