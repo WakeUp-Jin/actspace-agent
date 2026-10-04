@@ -1,7 +1,7 @@
 # @actspace/agent-host
 
 P4 standalone Host transport and Node adapters. Work in progress; see the approved
-[execution plan](../../docs/exec-plans/active/20261003-agent-harness-host-refactor/phase-4.md).
+[execution plan](../../docs/exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md).
 
 The Cordis application plugin publishes `host.application` only with the remote
 Host marker. It delegates domain operations to `@actspace/agent-service` and does

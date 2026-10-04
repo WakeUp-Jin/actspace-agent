@@ -1,6 +1,6 @@
 # 独立 Agent Host（P4 首版）
 
-Host 在服务器持有 Session、任务、审批及 Provider 凭据。Desktop Main 通过 WSS 或系统 SSH 隧道连接；网络断开不取消任务。手机前端尚未实现。完整交付门禁见 [P4 计划](../exec-plans/active/20261003-agent-harness-host-refactor/phase-4.md)及[过程记录](../exec-runs/20261003-agent-harness-host-refactor/phase-4-process.md)，P4 首版 T1–T7 已验收，证据见 [第十轮复验](../exec-runs/20261003-agent-harness-host-refactor/phase-4-cu-round10.md)。本地夹具不代表用户云部署或外部 Provider 已验证。
+Host 在服务器持有 Session、任务、审批及 Provider 凭据。Desktop Main 通过 WSS 或系统 SSH 隧道连接；网络断开不取消任务。手机前端尚未实现。完整交付门禁见 [P4 计划](../exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)及[过程记录](../exec-runs/20261003-agent-harness-host-refactor/phase-4-process.md)，P4 首版 T1–T7 已验收，证据见 [第十轮复验](../exec-runs/20261003-agent-harness-host-refactor/phase-4-cu-round10.md)。本地夹具不代表用户云部署或外部 Provider 已验证。
 
 ## 启动
 
@@ -70,3 +70,11 @@ pnpm test:agent-host:protocol
 ```
 
 协议测试使用独立测试证书和隔离 sshd，不修改系统 SSH 信任。真实 SSH 测试要求 `/usr/sbin/sshd` 可用，日常 Desktop 单测默认跳过，需要专用命令显式启用。
+
+## 内部装配与退出（P5）
+
+CLI `runtime-v2/host.ts` 保留 managed Runtime 加载、Profile 和模型/工具端口组装；`agent-host/src/bootstrap.ts` 拥有认证、网关、订阅、上传维护与启动失败回收；`lifecycle.ts` 协调状态、诊断、drain 和强停。模块通过 `HostRuntime` 端口连接，不引入 agent-host 到 Runtime 的反向依赖。
+
+正常停止等待任务、子 Run 和后台 shell；强停保留截止退出。上传维护停止调度后等待当前 pass 完成，再释放相关资源。重试 stop 不重复释放。用户命令、WSS/SSH、配置与数据路径不变。
+
+P5 的 Computer Use 由用户切换模型后继续；[本轮摘要](../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)区分自动化结果与待验收项。

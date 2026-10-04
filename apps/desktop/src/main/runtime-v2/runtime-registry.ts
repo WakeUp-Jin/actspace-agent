@@ -628,7 +628,8 @@ export class DesktopRuntimeV2Registry {
         this.#emit({ kind: "journal-update", sessionId: update.sessionId, throughJournalSeq: update.throughJournalSeq, update, ...(update.event.type === "session/title-set" ? { message: "session-title-updated" } : {}) });
       });
       this.#stopTaskRevisions = booted.profile.context.on?.("agent/tasks-updated", (snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot) => {
-        this.#emitDurableChanged(snapshot.sessionId, snapshot.revision, "task-queue-updated");
+        try { this.#emitDurableChanged(snapshot.sessionId, snapshot.revision, "task-queue-updated"); }
+        catch (error) { this.options.log?.("Task notification observer failed", { error: String(error) }); }
       }) as (() => void) | undefined;
       this.#artifacts = booted.artifacts;
       this.#bootError = null;

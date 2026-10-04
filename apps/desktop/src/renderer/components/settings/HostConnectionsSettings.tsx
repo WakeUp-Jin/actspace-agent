@@ -5,6 +5,7 @@ const stateNames = { connected: "已连接", connecting: "连接中", offline: "
 const inputClass = "w-full rounded-act-sm border border-line bg-surface px-3 py-2 text-text-main focus:outline-none focus:ring-2 focus:ring-focus-ring/30";
 function connectionError(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error);
+  if (/System credential encryption|safeStorage\.(?:encryptString|decryptString)|errKCAuthFailed/i.test(text)) return "本机凭据存储不可用，无法安全保存或读取服务器授权。请检查系统钥匙串或密钥环的解锁状态与访问权限后重试；若配对码已被使用，请重新生成。";
   if (/Invalid URL|WSS URL|Invalid Host endpoint/.test(text)) return "请输入有效的服务器地址，例如 wss://agent.example.com/rpc。";
   if (/Pairing code.*invalid|expired/i.test(text)) return "配对码无效或已过期，请在服务器生成新的配对码后重试。";
   if (/already connected/.test(text)) return "这台服务器已经添加，请使用已有连接。";

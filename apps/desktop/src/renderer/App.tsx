@@ -58,6 +58,13 @@ import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSumm
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import { resolveQuickOpenTarget } from "./quick-open-routing";
 
+function sessionReadError(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : "";
+  if (/HostDisconnectedError|Host is offline|Host connection lost/i.test(message)) return "远端连接已断开，暂时无法加载会话。连接恢复后将自动刷新，也可点击重试。";
+  if (/Error invoking remote method/.test(message)) return `${fallback}，请稍后重试。`;
+  return message || fallback;
+}
+
 const DEFAULT_WORKSPACE_LABEL = "默认工作区";
 const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } = {
   mode: "agent",
@@ -1327,7 +1334,7 @@ export function App() {
       }
       return page.record;
     } catch (error) {
-      if (version === pageVersionsRef.current.get(sessionId) && visible() && request === messageRequestRef.current) setMessageError(error instanceof Error ? error.message : '消息加载失败');
+      if (version === pageVersionsRef.current.get(sessionId) && visible() && request === messageRequestRef.current) setMessageError(sessionReadError(error, '消息加载失败'));
       return null;
     } finally {
       if (version === pageVersionsRef.current.get(sessionId) && visible() && request === messageRequestRef.current) setMessageLoading(false);
@@ -1352,7 +1359,7 @@ export function App() {
         return { ...current, events, messageBlocks: createMessageBlocks(events).map(b => deferred.has(b.id) ? { ...b, deferredToolDetail: deferred.get(b.id) } : b) };
       });
       setHistoryBefore(page.history.before);
-    } catch (error) { if (request === messageRequestRef.current) setEarlierError(error instanceof Error ? error.message : '历史消息加载失败'); }
+    } catch (error) { if (request === messageRequestRef.current) setEarlierError(sessionReadError(error, '历史消息加载失败')); }
     finally { if (historyPendingRef.current === request) { historyPendingRef.current = null; setEarlierLoading(false); } }
   }, [historyBefore]);
 
@@ -1424,7 +1431,7 @@ export function App() {
 
     function handleBootstrapError(error: unknown) {
       if (disposed) return;
-      setListLoading(false); setListError(error instanceof Error ? error.message : '会话列表加载失败');
+      setListLoading(false); setListError(sessionReadError(error, '会话列表加载失败'));
       setSessionBootstrapComplete(true);
     }
     void bootstrapSession().catch(handleBootstrapError);

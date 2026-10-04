@@ -84,17 +84,3 @@ export type ToolExecutor = {
   readonly concurrencySafe?: boolean;
   execute(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext): Promise<ToolBodyResult>;
 };
-
-export type ToolMiddlewareContext = {
-  readonly definition: NormalizedToolDefinition;
-  readonly callId: string;
-  readonly args: Readonly<Record<string, RuntimeV2JsonValue>>;
-};
-
-export type ToolMiddleware = {
-  readonly id: string;
-  readonly layer: number;
-  readonly order: number;
-  readonly before?: (context: ToolMiddlewareContext) => void | Promise<void>;
-  readonly after?: (context: ToolMiddlewareContext, result: ToolBodyResult) => ToolBodyResult | Promise<ToolBodyResult>;
-};

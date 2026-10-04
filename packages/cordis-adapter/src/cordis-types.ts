@@ -20,6 +20,7 @@ export type CordisEventService = {
   readonly dispatch?: (mode: string, args: unknown[]) => readonly ((...args: unknown[]) => unknown)[];
 };
 export type CordisContext = {
+  readonly logger?: { readonly error: (...args: unknown[]) => void };
   readonly root?: CordisContext;
   readonly baseUrl?: string;
   readonly get?: (name: string) => unknown;

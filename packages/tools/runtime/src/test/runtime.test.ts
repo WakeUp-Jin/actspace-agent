@@ -1,3 +1,4 @@
+import { createCordisRoot } from "@actspace/cordis-adapter";
 import type { RuntimeV2JsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
 import type { ApprovalBroker } from "@actspace/tools-approval";
 import type { ToolDefinition } from "../definition.js";
@@ -119,8 +120,53 @@ describe("Tool Runtime execution contract", () => {
     expect(Object.isFrozen(value.nested)).toBe(true);
   });
 
-  it("runs the complete safety pipeline in the fixed order", async () => {
+  it("keeps executor facts and finalizers when post-execute changes or throws", async () => {
+    for (const throws of [false, true]) {
+      const root = await createCordisRoot();
+      const trace: string[] = [];
+      const runtime = new ToolRuntime();
+      const registration = runtime.register({ definition: definition(), executor: { execute: async (_args, ctx) => {
+        ctx.defer(async () => { trace.push("finalized"); });
+        return { status: "failed", summary: "failed", modelOutput: [], failure: { code: "BODY_FAILED", message: "original", retryable: false } };
+      } } });
+      root.context.on?.("tools/post-execute", (body) => {
+        Object.assign(body, { status: "completed", failure: undefined });
+        if (throws) throw new Error("observer failed");
+        return body;
+      });
+      try {
+        const [result] = await runtime.executeBatch([call("post")], { ...environment(trace), context: root.context });
+        expect(result).toMatchObject({ status: "failed", failure: { code: "BODY_FAILED" } });
+        expect(result.finalizerFailures).toHaveLength(throws ? 1 : 0);
+        expect(trace).toContain("finalized");
+        expect(trace).toContain("commit:post");
+        await registration.dispose();
+      } finally { await root.dispose(); }
+    }
+  });
+
+  it("validates pre-execute rewrites and stops applying a removed plugin", async () => {
+    const root = await createCordisRoot();
     const trace: string[] = [];
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute: async () => { trace.push("body"); return success(); } } });
+    const remove = root.context.on?.("tools/pre-execute", () => ({ args: { value: 42 } })) as () => void;
+    try {
+      const [rejected] = await runtime.executeBatch([call("bad")], { ...environment(trace), context: root.context });
+      expect(rejected.status).toBe("failed");
+      expect(trace).not.toContain("body");
+      remove();
+      const [accepted] = await runtime.executeBatch([call("good")], { ...environment(trace), context: root.context });
+      expect(accepted.status).toBe("completed");
+      expect(trace).toContain("body");
+    } finally { await root.dispose(); }
+  });
+
+  it("runs the complete safety pipeline in the fixed order", async () => {
+    const root = await createCordisRoot();
+    const trace: string[] = [];
+    root.context.on?.("tools/pre-execute", async (_payload, next) => { trace.push("before"); return await next(); });
+    root.context.on?.("tools/post-execute", async (_payload, next) => { trace.push("after"); return await next(); });
     const runtime = new ToolRuntime();
     runtime.register({
       definition: definition(),
@@ -132,7 +178,6 @@ describe("Tool Runtime execution contract", () => {
         },
       },
       permission: { extractResources: () => [], evaluate: () => { trace.push("policy"); return { kind: "ask", reason: "inspect file", risk: "low" }; } },
-      middleware: [{ id: "middleware", layer: 0, order: 0, before: () => { trace.push("before"); }, after: (_context, result) => { trace.push("after"); return result; } }],
     });
     const broker: ApprovalBroker = {
       async requestApproval(request) {
@@ -142,9 +187,10 @@ describe("Tool Runtime execution contract", () => {
       },
     };
 
-    const [result] = await runtime.executeBatch([call("call-1")], { ...environment(trace, { approvalBroker: broker }), onExecutionStarted: () => { trace.push("started"); throw new Error("observer failure"); } });
+    const [result] = await runtime.executeBatch([call("call-1")], { ...environment(trace, { approvalBroker: broker }), context: root.context, onExecutionStarted: () => { trace.push("started"); throw new Error("observer failure"); } });
     expect(result?.status).toBe("completed");
     expect(trace).toEqual(["before", "policy", "approval", "dispatch:call-1", "checkpoint", "started", "body", "after", "finalizer", "commit:call-1"]);
+    await root.dispose();
   });
 
   it("allows read-only capability use and resolves relative resource paths against the workspace", async () => {

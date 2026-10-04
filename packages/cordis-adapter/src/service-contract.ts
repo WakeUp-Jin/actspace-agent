@@ -28,6 +28,7 @@ export const ACTSPACE_SERVICE_IDS = Object.freeze({
   /** Canonical live-log owner; session.runtime remains the host controller facade. */
   sessionStore: serviceId("session.store"),
   sessionRuntime: serviceId("session.runtime"),
+  sessionCheckpoint: serviceId("session.checkpoint"),
   llmRuntime: serviceId("llm.service"),
   toolsRuntime: serviceId("tools.runtime"),
   toolsApproval: serviceId("tools.approval"),
@@ -224,6 +225,7 @@ export function validateManifestServiceConsistency(manifest: PluginManifest): vo
 
 /** Definitions for the long-lived capabilities being migrated to Cordis ownership. */
 export const ACTSPACE_SERVICE_DEFINITIONS: Readonly<Record<string, ServiceDefinition>> = Object.freeze({
+  sessionCheckpoint: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.sessionCheckpoint, owner: "@actspace/session-checkpoint-policy", scope: "root", description: "Required live Session durability barrier.", publicSurface: ["flush"] }),
   sessionJournal: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.sessionJournal, owner: "@actspace/session-journal", description: "Session event codecs, envelope validation and Journal replay owner.", publicSurface: ["registry", "append", "replay"] }),
   sessionStore: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.sessionStore, owner: "@actspace/session-persistence", scope: "session", description: "Session live log, surface and replay owner.", publicSurface: ["create", "open", "append", "flush", "close"] }),
   sessionPersistence: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.sessionPersistence, owner: "@actspace/session-persistence", scope: "session", description: "Durability provider for session checkpoints and recovery.", publicSurface: ["create", "inspect", "open", "fork"] }),
@@ -257,6 +259,7 @@ export type ServiceRoleMetadata = Readonly<{
 
 /** Static role inventory consumed by composition checks and the P2 matrix. */
 export const ACTSPACE_SERVICE_ROLE_METADATA: readonly ServiceRoleMetadata[] = Object.freeze([
+  serviceRole("sessionCheckpoint", "@actspace/session-checkpoint-policy", "session.checkpoint:default", ["agent.loop"]),
   serviceRole("sessionJournal", "@actspace/session-journal", "session.journal:default", []),
   serviceRole("sessionStore", "@actspace/session-persistence", "session.store:default", ["agent.runtime", "agent.loop", "session.runtime"]),
   serviceRole("sessionPersistence", "@actspace/session-persistence", "session.persistence:jsonl", ["session.store", "session.runtime"]),

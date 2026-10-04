@@ -27,6 +27,7 @@
       "idsSymbol": "ACTSPACE_SERVICE_IDS"
     },
     "manifests": [
+      "packages/session/checkpoint-policy/src/manifest.ts",
       "packages/compaction/src/manifest.ts",
       "packages/context/src/manifest.ts",
       "packages/core/agent-loop/src/manifest.ts",
@@ -356,6 +357,33 @@
       "publicSurface": [
         "register",
         "assemble"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "session.checkpoint",
+      "owner": "@actspace/session-checkpoint-policy",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.sessionCheckpoint"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "root",
+      "required": true,
+      "description": "Required live Session durability barrier.",
+      "providerId": "session.checkpoint:default",
+      "providerOwner": "@actspace/session-checkpoint-policy",
+      "consumerIds": [
+        "agent.loop"
+      ],
+      "publicSurface": [
+        "flush"
       ],
       "configSchema": {
         "type": "object"
@@ -878,28 +906,6 @@
     },
     {
       "kind": "event",
-      "id": "intervention:session/checkpoint",
-      "owner": "@actspace/cordis-adapter",
-      "status": "active",
-      "sourceRefs": [
-        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
-      ],
-      "tests": [
-        "session-journal/core-codec-contract",
-        "cordis-adapter/event-contract"
-      ],
-      "plane": "intervention",
-      "category": "agent-loop",
-      "eventType": "session/checkpoint",
-      "scope": "agent",
-      "mode": "required",
-      "containment": "fail-closed",
-      "codecStatus": "n/a",
-      "producerStatus": "present",
-      "required": true
-    },
-    {
-      "kind": "event",
       "id": "intervention:system-prompt/assemble",
       "owner": "@actspace/cordis-adapter",
       "status": "active",
@@ -959,7 +965,7 @@
       "eventType": "tools/post-execute",
       "scope": "agent",
       "mode": "waterfall",
-      "containment": "result-fail-or-redact",
+      "containment": "result-redact-finalizer-diagnostics",
       "codecStatus": "n/a",
       "producerStatus": "present",
       "required": true
@@ -1054,6 +1060,28 @@
     },
     {
       "kind": "event",
+      "id": "notification:agent/tasks-updated",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentNotification"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "notification",
+      "category": "notification",
+      "eventType": "agent/tasks-updated",
+      "scope": "session",
+      "containment": "observer-isolated",
+      "mode": "emit",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
       "id": "notification:llm/chunk",
       "owner": "@actspace/cordis-adapter",
       "status": "active",
@@ -1090,7 +1118,7 @@
       "category": "notification",
       "eventType": "session/event",
       "scope": "session",
-      "containment": "post-commit-observer-isolated",
+      "containment": "post-admission-observer-isolated",
       "mode": "emit",
       "codecStatus": "n/a",
       "producerStatus": "present",
@@ -1154,6 +1182,27 @@
       "plane": "session",
       "category": "extension",
       "eventType": "agent/inbox/spliced",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:agent/mode-set",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "agent/mode-set",
       "scope": "session",
       "surface": "internal",
       "codecStatus": "present",
@@ -2695,12 +2744,9 @@
       "required": true,
       "enabled": true,
       "provides": [
-        "agent.loop",
         "core.agent-loop"
       ],
-      "injects": [
-        "actspace.agent.factory"
-      ],
+      "injects": [],
       "tools": [],
       "prompts": [],
       "events": [],
@@ -2760,7 +2806,6 @@
       ],
       "injects": [
         "agent.runtime",
-        "compaction.runtime",
         "llm.service",
         "session.runtime"
       ],
@@ -2906,7 +2951,7 @@
       ],
       "injects": [
         "actspace.host.headless",
-        "agent.loop",
+        "agent.runtime",
         "session.runtime"
       ],
       "tools": [],
@@ -3094,6 +3139,37 @@
       "prompts": [
         "prompt.default"
       ],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.session.checkpoint-policy",
+      "owner": "actspace.session.checkpoint-policy",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/checkpoint-policy/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Session Checkpoint Policy",
+      "entryId": "session.checkpoint-policy",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "session.checkpoint"
+      ],
+      "injects": [
+        "session.runtime"
+      ],
+      "tools": [],
+      "prompts": [],
       "events": [],
       "requiredCapabilities": [],
       "optionalCapabilities": []
@@ -3460,6 +3536,8 @@
       "path": "apps/cli/package.json",
       "exports": [],
       "dependencies": [
+        "@actspace/agent-host",
+        "@actspace/agent-service",
         "@actspace/llm-pi-ai",
         "@actspace/llm-service",
         "@actspace/runtime",
@@ -3495,6 +3573,7 @@
         "@actspace/bundle",
         "@actspace/composition",
         "@actspace/cordis-adapter",
+        "@actspace/core-scope",
         "@actspace/diagnostics",
         "@actspace/shared"
       ],
@@ -3534,6 +3613,7 @@
       "path": "packages/client/package.json",
       "exports": [
         ".",
+        "./host",
         "./sessions"
       ],
       "dependencies": [
@@ -3642,7 +3722,8 @@
         "@deepseek-ai/cordis-plugin-group",
         "@deepseek-ai/cordis-plugin-include",
         "@deepseek-ai/cordis-plugin-loader",
-        "@deepseek-ai/cordis-plugin-timer"
+        "@deepseek-ai/cordis-plugin-timer",
+        "typescript"
       ],
       "packageRole": "domain"
     },
@@ -3741,6 +3822,7 @@
       "path": "apps/desktop/package.json",
       "exports": [],
       "dependencies": [
+        "@actspace/agent-host",
         "@actspace/client",
         "@actspace/desktop-app",
         "@actspace/english-learning",
@@ -3765,14 +3847,23 @@
         "@tanstack/react-virtual",
         "@xterm/addon-fit",
         "@xterm/xterm",
+        "dompurify",
         "highlight.js",
         "lucide-react",
+        "mermaid",
         "node-pty",
+        "prosemirror-commands",
+        "prosemirror-history",
+        "prosemirror-keymap",
+        "prosemirror-model",
+        "prosemirror-state",
+        "prosemirror-view",
         "react",
         "react-dom",
         "react-markdown",
         "rehype-highlight",
-        "remark-gfm"
+        "remark-gfm",
+        "ws"
       ],
       "packageRole": "host"
     },
@@ -3794,6 +3885,7 @@
         "./plugin"
       ],
       "dependencies": [
+        "@actspace/agent-service",
         "@actspace/bundle",
         "@actspace/compaction",
         "@actspace/cordis-adapter",
@@ -3843,6 +3935,7 @@
         "./plugin"
       ],
       "dependencies": [
+        "@actspace/agent-service",
         "@actspace/cordis-adapter",
         "@actspace/core-agent-loop",
         "@actspace/session-persistence",
@@ -3946,9 +4039,12 @@
         "./cordis",
         "./headless",
         "./loader",
-        "./session"
+        "./session",
+        "./todo-projection"
       ],
       "dependencies": [
+        "@actspace/agent-host",
+        "@actspace/agent-service",
         "@actspace/boot",
         "@actspace/bundle",
         "@actspace/compaction",
@@ -3961,6 +4057,7 @@
         "@actspace/desktop-app",
         "@actspace/diagnostics",
         "@actspace/english-learning",
+        "@actspace/harness-control",
         "@actspace/headless",
         "@actspace/llm-pi-ai",
         "@actspace/llm-service",
@@ -4099,11 +4196,14 @@
       "path": "packages/shared/package.json",
       "exports": [
         ".",
+        "./composer-reference-validation",
+        "./host-protocol",
         "./model-catalog-data",
         "./runtime-v2",
         "./runtime-v2/desktop-ipc",
         "./runtime-v2/projection",
         "./runtime-v2/runtime",
+        "./session-list-page",
         "./session-selectors"
       ],
       "dependencies": [],
@@ -4680,6 +4780,6 @@
       "required": true
     }
   ],
-  "sourceDigest": "2e9b9c38344dd9225e0becce5cdb73119b4fe9817d2f34fdb155e1057b0a9d58",
+  "sourceDigest": "b0548b4945b6da8d0e0eb806a05e19675a79d12214790784e0051dcc580299e7",
   "diagnostics": []
 }

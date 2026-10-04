@@ -1,6 +1,6 @@
 # Agent Harness 插件化与 Host 分离
 
-状态：分阶段推进中。P1–P3 验收通过；P3 提交为 `c7b3aea`。P4 产品边界已确认，见设计决策第 36–39 节；[详细执行计划](phase-4.md)的 T1–T7 已实施并验收，缺陷复验见第十轮；P4 尚未提交，P5 尚未细化。
+状态：已完成，2026-10-04。P1–P5 已实施并通过计划范围验收；P5 的 B1/B2 修复由 gpt-6.1-sol 定向复验通过，B3 夹具误报已撤回并完成不同配置实机校准。详见 [P5 摘要](../../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)。未提交或推送。
 
 ## 目标与依据
 
@@ -18,7 +18,7 @@
 | P2 共同应用操作和运行管理 | Desktop、Headless 共用任务管理；Session 与 Loop 生命周期分开 | 任务持久接纳、去重、排队；同会话下一 Run 和子 Run 选最新组合；不同 Loop 并存；现有功能回归 | desktop-app/service.ts、headless/runner.ts、runtime/runtime/run-controller.ts、core/agent-loop/service.ts；领域规则迁回所属插件 |
 | P3 Harness 可替换基础 | 已构建产物的 Patch、兼容检查、Host 授权、持久启用、恢复与回退 | 基线冲突拒绝；新旧 Run 隔离；失败可诊断；重启选择一致；不实现自进化工具与工作流 | 复用 composition、adapter 与 boot，新增独立控制模块；见 [P3 详细计划](phase-3.md) |
 | P4 Host 与客户端分离 | 独立 Host、Desktop WSS/SSH 隧道及供后续 Web 使用的服务接口 | 断线继续、重连状态衔接、设备撤销、多端审批竞态、重启后手动继续 | Electron Main 持连接；renderer 走 IPC；共同应用契约供 JSON-RPC 适配器消费；SSH 只承载同一协议 |
-| P5 文档和目录整理 | 当前设计与代码一致；删除已无消费者的旧路径 | 链接、构建、包边界、进程启动及功能验收通过；比较前后统计 | 按消费者检索结果列删除清单，保留历史和用户数据 |
+| P5 架构、测试和文档收敛 | Cordis 事件与生命周期、模块职责、测试迁移、文档和目录精简 | 行为回归、包边界、进程及应用验收；比较前后统计 | 见 [P5 计划](phase-5.md)；设置保护，必要运行历史清理不涉及工作区产物 |
 
 每阶段结束时主应用必须可启动、现有使用方式可用。P1 不切换产品默认路径；P2 先用当前组合完成迁移；P3 再开放在线启用；P4 完成独立 Host 交付。不能用“预留接口”代替 Host 分离主线。后续阶段在进入前写独立详细计划，不把本路线表当成可直接执行全部代码的任务清单。
 
@@ -50,6 +50,8 @@ P1 若发现当前 Cordis 无法提供所需隔离，提交具体失败证据和
 
 不自动提交、推送、部署或清理其他工作区。记录每阶段修改范围，按阶段回退自己的改动，不使用清空工作区的操作。
 
+P5 数据边界按最新用户决定更新：必须保护设置、凭据、连接配置及工作区文件/产物，运行历史必要时可按明确白名单清理；不为旧会话增加长期兼容层。本次文件级计划没有必须清理真实历史的步骤。前文 P1–P4 的数据保留约束是当时实施边界。
+
 ## 执行记录与状态
 
 实施开始后使用 `docs/exec-runs/20261003-agent-harness-host-refactor/` 的 execution-process.md 和 execution-summary.md。原重构统计与参考验证仍保留在 `docs/exec-runs/architecture-refactor/`，不得覆盖原 before 数据。
@@ -64,11 +66,11 @@ P1 若发现当前 Cordis 无法提供所需隔离，提交具体失败证据和
 - [x] P3 产品边界已逐项确认，详细计划已落盘。
 - [x] P3 详细计划审阅、实现与验收。
 - [x] P4 [详细计划](phase-4.md)实现与验收，第十轮修复后复验通过。
-- [ ] P5 清理与总体验收。
+- [x] P5 清理与总体验收。
 
-## 当前下一步
+## 完成与后续边界
 
-P4 首版 T1–T7 已完成，详见 [第十轮验收](../../../exec-runs/20261003-agent-harness-host-refactor/phase-4-cu-round10.md)。下一阶段是 P5：梳理现有消费者与文档对应关系，审阅具体合并、迁移、删除清单，再实施清理与总体验收；保持模块独立，以解耦为前提精简。
+P1–P5 计划范围已完成，归档于 completed。P5 定向复验见 [第三轮报告](../../../exec-runs/20261003-agent-harness-host-refactor/phase-5-cu-round3.md)。手机 Web、自进化具体工作流、真实云端部署与真实外部 Provider 验收属于后续独立范围；未实施跨组合共享实例优化。设置、凭据及用户数据保留。
 
 P2 已签收，见 [P2 计划](phase-2.md) 和 [验证记录](../../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)。[P3 执行计划](phase-3.md) 已完成实现与验收，见 [P3 记录](../../../exec-runs/20261003-agent-harness-host-refactor/phase-3-summary.md)。
 

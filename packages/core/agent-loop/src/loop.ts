@@ -99,8 +99,8 @@ export class AgentLoop {
     const controller = new AbortController(); this.#active = controller; this.#idle = new Promise<void>((resolve) => { this.#resolveIdle = resolve; });
     const agentRunId = input.agentRunId ?? randomUUID(); const turnId = randomUUID(); let stepCount = 0; let finalText = "";
     try {
-      await this.notify("agent/session-start", { agentRunId, turnId, sessionId: this.options.session.header.sessionId });
-      await this.notify("agent/status", { agentRunId, turnId, status: "started" });
+      this.notify("agent/session-start", { agentRunId, turnId, sessionId: this.options.session.header.sessionId });
+      this.notify("agent/status", { agentRunId, turnId, status: "started" });
       this.emitLive({ kind: "run-state", agentRunId, turnId, message: "started" });
       const messageId = input.messageId ?? randomUUID();
       const mode = input.mode ?? "agent";
@@ -185,7 +185,7 @@ export class AgentLoop {
             output = await collectStream(stream as AsyncIterable<LlmStreamEvent>, controller.signal, async (event) => {
               this.emitLive({ ...event.live, agentRunId, turnId, stepId, requestId, messageId: event.messageId });
               await this.options.session.append(core("assistant/chunk", { messageId: event.messageId, chunkIndex: event.chunkIndex, requestId, turnId, stepId, kind: event.live.kind, content: event.live.kind === "tool-call-delta" ? event.live.argumentsDelta : event.live.message, ...(event.live.kind === "tool-call-delta" ? { callId: event.live.callId, name: event.live.name } : {}) }));
-              await this.#events.emit("llm/chunk", this.recordPayload(event.live));
+              this.#events.emit("llm/chunk", this.recordPayload(event.live));
             });
           } catch (error) {
             output = failedStreamOutput(normalizeLlmFailure(error, attempt));
@@ -255,14 +255,14 @@ export class AgentLoop {
           const usage = compactionUsage(output.usage);
           if (usage !== null && compaction !== undefined) await this.autoCompact(compaction, usage, { agentRunId, turnId });
           this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "completed" });
-          await this.notify("agent/status", { agentRunId, turnId, status: "completed" });
+          this.notify("agent/status", { agentRunId, turnId, status: "completed" });
           return Object.freeze({ agentRunId, turnId, reason: "completed", steps: stepCount, finalText });
         }
       }
       await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "step-limit", stepCount }, controller.signal);
       await this.options.session.append(core("turn/end", { turnId, reason: "step-limit" }));
       await this.checkpoint("after-turn-settled");
-      await this.notify("agent/status", { agentRunId, turnId, status: "step-limit" });
+      this.notify("agent/status", { agentRunId, turnId, status: "step-limit" });
       this.emitLive({ kind: "run-state", agentRunId, turnId, message: "step-limit" });
       return Object.freeze({ agentRunId, turnId, reason: "step-limit", steps: stepCount, finalText });
     } catch (error) {
@@ -278,8 +278,8 @@ export class AgentLoop {
           await this.checkpoint("after-turn-settled");
         } catch (caught) { settlementFailure = caught; }
       }
-      if (!controller.signal.aborted) await this.notify("agent/error", { agentRunId, turnId, error: failure.message });
-      await this.notify("agent/status", { agentRunId, turnId, status: controller.signal.aborted ? "aborted" : "failed" });
+      if (!controller.signal.aborted) this.notify("agent/error", { agentRunId, turnId, error: failure.message });
+      this.notify("agent/status", { agentRunId, turnId, status: controller.signal.aborted ? "aborted" : "failed" });
       this.emitLive({ kind: "run-state", agentRunId, turnId, message: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) });
       if (settlementFailure !== undefined) throw new AggregateError([error, settlementFailure], "Agent turn failed and its settlement checkpoint also failed.", { cause: error });
       if (controller.signal.aborted && this.options.session.durabilityState !== "blocked") {
@@ -363,8 +363,8 @@ export class AgentLoop {
     try { this.options.onLiveEvent?.(Object.freeze({ ...event, sessionId: this.options.session.header.sessionId, ...(lineage?.origin === "delegation" ? { parentSessionId: lineage.parentSessionId, parentCallId: lineage.parentCallId } : {}), workspaceRoot: this.options.toolEnvironment(this.options.session).workspaceRoot })); }
     catch { /* Observers must not change execution or journal outcomes. */ }
   }
-  private async notify(type: AgentNotification, payload: unknown): Promise<void> {
-    await this.#events.emit(type, this.recordPayload(payload));
+  private notify(type: AgentNotification, payload: unknown): void {
+    this.#events.emit(type, this.recordPayload(payload));
   }
   private async waterfall<T, R = T>(type: AgentLoopIntervention, payload: T, signal: AbortSignal, next: () => R | Promise<R> = () => this.recordPayload(payload) as unknown as R): Promise<T | R> {
     return await this.#events.waterfall(type, this.recordPayload(payload), () => next()) as T | R;
@@ -377,7 +377,9 @@ export class AgentLoop {
       await this.options.session.flush(this.options.session.lastSeq);
       return;
     }
-    await this.#events.required("session/checkpoint", { sessionId: this.options.session.header.sessionId, throughSeq: this.options.session.lastSeq, reason });
+    const checkpoint = this.options.context.get?.("session.checkpoint") as { flush(input: { sessionId: string; throughSeq: number; reason: string }): Promise<void> } | undefined;
+    if (!checkpoint) throw new Error("Required service session.checkpoint is missing.");
+    await checkpoint.flush({ sessionId: this.options.session.header.sessionId, throughSeq: this.options.session.lastSeq, reason });
   }
   private recordPayload<T>(payload: T): Readonly<Record<string, unknown>> { return isRecord(payload) ? payload : {}; }
 
@@ -398,7 +400,7 @@ export class AgentLoop {
           surface: { kind: "append", node: { kind: "tool-result", messageId: `tool-${call.callId}`, callId: call.callId, content: result.modelOutput as unknown as RuntimeV2JsonValue, isError: true } },
         }));
         this.emitLive({ kind: "tool-finished", ...ids, callId: call.callId, name: call.name, result, resultEventId: `v2-${event.seq}` });
-        await this.notify("tools/result", result);
+        this.notify("tools/result", result);
         results.push(result);
       }
       return results;
@@ -423,7 +425,7 @@ export class AgentLoop {
         const surface = { surface: { kind: "append", node: { kind: "tool-result", messageId: `tool-${result.callId}`, callId: result.callId, content: result.modelOutput as unknown as RuntimeV2JsonValue, isError: result.status !== "completed" } } };
         const event = await this.options.session.append(core("tool/result", data, surface));
         this.emitLive({ kind: "tool-finished", ...ids, callId: result.callId, name: result.name, result, resultEventId: `v2-${event.seq}` });
-        await this.notify("tools/result", data);
+        this.notify("tools/result", data);
       },
     } };
     const inputs: ToolCallInput[] = resolvedCalls.map(({ call, definition }) => ({ callId: call.callId, name: definition.name, arguments: parseArgs(call.arguments), sessionId: this.options.session.header.sessionId, agentId: this.subject.agentId, ...ids, signal }));

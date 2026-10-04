@@ -2,15 +2,15 @@ import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/prom
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { CliV2ArtifactStore } from "../runtime-v2/artifact-store";
+import { NodeArtifactStore } from "../node-ports/artifact-store.js";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 
-describe("CliV2ArtifactStore", () => {
+describe("NodeArtifactStore", () => {
   it("persists owner metadata, enforces Session ownership and detects metadata tampering", async () => {
     const root = await mkdtemp(join(tmpdir(), "actspace-cli-artifact-")); roots.push(root);
-    const store = new CliV2ArtifactStore(root);
+    const store = new NodeArtifactStore(root);
     const ref = await store.create({ bytes: Buffer.from("original"), mediaType: "text/plain", owner: { sessionId: "session-a", callId: "call", pluginId: "plugin", name: "tool" } });
     await expect(store.readForSession("session-a", ref.artifactId)).resolves.toMatchObject({ mediaType: "text/plain" });
     await expect(store.readForSession("session-b", ref.artifactId)).rejects.toThrow("does not belong");
@@ -24,7 +24,7 @@ describe("CliV2ArtifactStore", () => {
 
   it("exports referenced ephemeral artifacts and removes the temporary store", async () => {
     const out = await mkdtemp(join(tmpdir(), "actspace-cli-artifact-out-")); roots.push(out);
-    const store = await CliV2ArtifactStore.ephemeral(); const storeRoot = store.root;
+    const store = await NodeArtifactStore.ephemeral(); const storeRoot = store.root;
     const ref = await store.create({ bytes: Buffer.from([137, 80, 78, 71]), mediaType: "image/png", owner: { sessionId: "session-a", callId: "call", pluginId: "plugin", name: "tool" } });
 
     await store.exportForSession("session-a", [ref], out);

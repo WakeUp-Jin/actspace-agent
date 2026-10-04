@@ -10,3 +10,6 @@ export { HostError } from "@actspace/shared/host-protocol";
 export * from "./live-output.js";
 
 export { HostArtifacts } from "./artifacts.js";
+
+export * from "./bootstrap.js";
+export * from "./lifecycle.js";

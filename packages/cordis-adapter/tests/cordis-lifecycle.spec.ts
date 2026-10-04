@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCordisRoot, createCordisRootWithLoader, emitContained, inspectCordisAdmission, serialDispatch, toCordisBehavior, waterfallDispatch } from "../src/index.js";
+import { containNotification, createCordisRoot, createCordisRootWithLoader, emitNotification, inspectCordisAdmission, serialDispatch, toCordisBehavior, waterfallDispatch } from "../src/index.js";
 
 describe("Cordis package boundary", () => {
   it("admits the exact published family without HMR", async () => { const report = await inspectCordisAdmission(); expect(report.packages).toHaveLength(5); expect(report.hmrAbsent).toBe(true); expect(report.failures).toEqual([]); });
@@ -72,14 +72,41 @@ describe("Cordis package boundary", () => {
     const root = await createCordisRoot();
     const calls: string[] = [];
     try {
-      root.context.on?.("agent/status", () => { calls.push("first"); throw new Error("observer failed"); });
+      root.context.on?.("agent/status", containNotification(root.context, () => { calls.push("first"); throw new Error("observer failed"); }));
       root.context.on?.("agent/status", () => { calls.push("second"); });
-      await emitContained(root.context, "agent/status", { status: "started" });
+      await emitNotification(root.context, "agent/status", { status: "started" });
       expect(calls).toEqual(["first", "second"]);
     } finally {
       await root.dispose();
     }
   });
+  it("reports asynchronous rejection and disposes plugin-owned pending observers", async () => {
+    const root = await createCordisRoot();
+    const errors: unknown[] = [];
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    let called = 0;
+    let cleaned = false;
+    const error = new Error("async observer failed");
+    await root.mount("observer", ({ context }) => {
+      context!.on?.("agent/status", containNotification({ logger: { error: (...args) => { errors.push(args[1]); } } }, async () => { throw error; }));
+      context!.on?.("agent/status", containNotification(context!, () => { called++; return pending; }));
+      return async () => { await pending; cleaned = true; };
+    });
+    expect(emitNotification(root.context, "agent/status", {})).toBeUndefined();
+    await Promise.resolve();
+    expect(errors).toEqual([error]);
+    expect(called).toBe(1);
+    const disposing = root.dispose();
+    await Promise.resolve();
+    expect(cleaned).toBe(false);
+    release();
+    await disposing;
+    emitNotification(root.context, "agent/status", {});
+    expect(called).toBe(1);
+    expect(cleaned).toBe(true);
+  });
+
 });
 
 describe.skipIf(process.env.ACTSPACE_REAL_CORDIS !== "1")("real Cordis Loader family", () => {

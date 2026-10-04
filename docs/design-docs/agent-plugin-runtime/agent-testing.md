@@ -152,3 +152,11 @@ pnpm check:browser
 - Host integration 没有绕过 Profile Bootstrap 或 App Bundle Service；
 - 文档与 package exports / manifest 一致；
 - 未验证的真实外部边界被明确列出。
+
+## P5 测试迁移与运行顺序
+
+旧测试按保护行为迁移，不因旧内部 API 删除就删掉行为保护。checkpoint 服务、原生通知、工具 Cordis 插入点、Host 装配与退出的接替见 [P5 测试映射](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-test-map.md)。存储行为迁入 agent-host，CLI 保留接入与真实进程回归；组合/Run 租约原测试保留。
+
+先构建依赖闭包，再跑消费 dist 的测试；`pnpm typecheck` 自带构建步骤，不与这类测试并发运行。事件目录从源声明生成，校验具体成员，不硬编码过时的总数。
+
+真实 Computer Use 默认委派 `gpt-6.1-sol`，逐项区分通过、失败与未覆盖；不能用静态/进程测试替代界面验收。P5 按用户要求在启动 CU 前暂停交接。

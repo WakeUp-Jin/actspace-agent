@@ -13,4 +13,4 @@ Host 内唯一的 Session 任务调度所有者。依赖结构化 `RunFactory` �
 
 状态变化观察通知为 `emit`，不能代替服务调用的持久化屏障。`/compact` 通过同一执行槽运行管理操作，不创建 Loop Run。窗口重载只读取 Host 投影；Host 重启将已领取任务标记中断，暂停未领取队列，等待明确继续。
 
-验证：`pnpm --filter @actspace/agent-service test`。生产接线和验收范围见 [P2 计划](../../docs/exec-plans/active/20261003-agent-harness-host-refactor/phase-2.md)。
+验证：`pnpm --filter @actspace/agent-service test`。生产接线和验收范围见 [P2 计划](../../docs/exec-plans/completed/20261003-agent-harness-host-refactor/phase-2.md)。

@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { RuntimeV2LiveEvent } from "@actspace/shared/runtime-v2";
 import type { TerminalLineInput } from "../terminal-input";
 import { CliV2ApprovalBroker } from "./approval";
-import { CliV2ArtifactStore } from "./artifact-store";
-import { CliV2LlmAdapter, type CliPiAiProvider } from "./llm-adapter";
+import { NodeArtifactStore, NodeLlmAdapter, type NodePiAiProvider } from "@actspace/agent-host/node-ports";
 import { loadRuntimeV2 } from "./loader";
 import type { BootRuntimeOptions } from "@actspace/runtime";
 import type { RuntimeV2PermissionMode } from "./types";
@@ -18,9 +17,9 @@ export async function bootCliV2(options: { readonly kind: "cli-run"; readonly wo
   // plugin admission remains an explicit future surface; the default run does
   // not silently read the retired runtime-v2/plugins.json file.
   const composition = runtime.createProfileComposition(runtime.RUNTIME_PROFILE_IDS.headless, host);
-  const toolModule = await import("./tool-host-services.js");
-  const artifacts = options.persistentArtifacts === false ? await CliV2ArtifactStore.ephemeral() : new CliV2ArtifactStore(options.dataRoot);
-  const llmAdapter = new CliV2LlmAdapter({ mock: options.mock, model: options.model, provider, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId) });
+  const toolModule = await import("@actspace/agent-host/node-ports");
+  const artifacts = options.persistentArtifacts === false ? await NodeArtifactStore.ephemeral() : new NodeArtifactStore(options.dataRoot);
+  const llmAdapter = new NodeLlmAdapter({ mock: options.mock, model: options.model, provider, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId) });
   const credentials = { resolve: async () => ({ apiKey: provider.apiKey, baseUrl: provider.baseUrl, ...(provider.proxyUrl === undefined ? {} : { proxyUrl: provider.proxyUrl }) }) };
   const disposeResources = onceAsync(async () => { await artifacts.dispose(); });
   try {
@@ -42,7 +41,7 @@ export async function bootCliV2(options: { readonly kind: "cli-run"; readonly wo
         "host.approval": approval,
         "host.artifacts": artifacts,
         [runtime.LLM_HOST_PORT_ID]: Object.freeze({ credentials, routes: Object.freeze([{ routeId: "default", providerId: provider.providerId, modelPattern: "*", adapter: llmAdapter, credentialRef: "cli-env", defaults: {} }]) }),
-        ...(options.mock ? toolModule.createUnavailableToolHostServices() : toolModule.createCliToolHostServices({ workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) })),
+        ...(options.mock ? toolModule.createUnavailableToolHostServices() : toolModule.createNodeToolHostServices({ workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) })),
         [runtime.PROMPT_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspace, resolveUserSource: async () => runtime.prepareUserPromptSource(options.dataRoot), resolveSource: async (workspaceRoot: string) => runtime.prepareRuntimePromptSource({ dataRoot: options.dataRoot, workspaceRoot }) }),
         [runtime.HEADLESS_HOST_PORT_ID]: options.headlessInput === undefined
           ? Object.freeze({ enabled: false })
@@ -72,7 +71,7 @@ function titleFromInput(value: string): string {
   return normalized.length <= 48 ? normalized : `${normalized.slice(0, 47)}...`;
 }
 
-function resolveCliProvider(env: NodeJS.ProcessEnv): CliPiAiProvider {
+function resolveCliProvider(env: NodeJS.ProcessEnv): NodePiAiProvider {
   const providerId = (env.LLM_PROVIDER ?? "deepseek").toLowerCase();
   const route = env.LLM_API === "openai-responses" || env.LLM_API === "anthropic-messages" ? env.LLM_API : "openai-completions";
   const prefix = providerId.toUpperCase();

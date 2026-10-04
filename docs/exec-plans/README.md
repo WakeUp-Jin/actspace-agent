@@ -16,7 +16,6 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [Agent Harness 插件化与 Host 分离](active/20261003-agent-harness-host-refactor/README.md) | P1/P2 验收通过；[P3 详细计划](active/20261003-agent-harness-host-refactor/phase-3.md) 已实施并验收，范围为 Harness 可替换基础、持久启用与恢复，不实现自进化工作流；[P4 计划](active/20261003-agent-harness-host-refactor/phase-4.md) T1–T7 已实施并验收；手机前端与自进化工作流另行开发，P5 待讨论。 |
 | [Composer 消息队列与运行中插入](active/20260930-composer-message-queue.md) | T1–T9 已完成（未提交）；剩 Electron 实机验收。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [单一 Agent 形态与三种模式](active/20260928-agent-forms-and-modes.md) | T1–T7 已实现；主要实机路线通过，T8 剩余验收见执行摘要。 |
@@ -35,6 +34,8 @@
 2026-09-09 [逐项复核与设计合并清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)：初始 10 个 active 入口逐项复核；中文界面任务自行归档后，Context 补齐全仓回归也进入 completed，当前剩余 8 个入口。P2 按语义检查缺口保留 active。
 
 ## 最近完成
+
+- [Agent Harness 插件化与 Host 分离](completed/20261003-agent-harness-host-refactor/README.md)：P1–P5 实施与计划范围验收通过，P5 错误反馈修复经 Sol 实机复验；手机 Web、自进化具体工作流与真实云部署留待独立计划。见 [P5 摘要](../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)。
 
 - [性能面板与会话投影优化](completed/20261001-performance-monitor-projection.md)：低频按需监控、历史批量折叠、上下文计算复用；自动化通过，人工验收和开销对比边界见[执行摘要](../exec-runs/20261001-performance-monitor-projection/execution-summary.md)。
 

@@ -1,4 +1,4 @@
-import { emitContained, type CordisContext } from "@actspace/cordis-adapter";
+import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 import type { EventCodecRegistry } from "@actspace/session-journal";
 import type { SessionProjectionService } from "@actspace/session-projection";
 import { SessionStoreService } from "@actspace/session-persistence";
@@ -41,10 +41,10 @@ export function apply(ctx: CordisContext): void {
     registry: journal.registry,
     projectionService: projection,
     beforeRecovery: async (parent, store) => { await repairSubagentPublications({ store, parent }); },
-    onEvent: async (sessionId, event) => { await emitContained(ctx, "session/event", event, { sessionId }); },
-    onFlush: (sessionId, throughSeq) => emitContained(ctx, "session/flush", { sessionId, throughSeq }),
-    onCreated: (sessionId) => emitContained(ctx, "session/created", { sessionId }),
-    onDisposed: (sessionId, outcome) => emitContained(ctx, "session/disposed", { sessionId, outcome }),
+    onEvent: (sessionId, event) => emitNotification(ctx, "session/event", event, { sessionId }),
+    onFlush: (sessionId, throughSeq) => emitNotification(ctx, "session/flush", { sessionId, throughSeq }),
+    onCreated: (sessionId) => emitNotification(ctx, "session/created", { sessionId }),
+    onDisposed: (sessionId, outcome) => emitNotification(ctx, "session/disposed", { sessionId, outcome }),
   }, sessionStore.store);
   ctx.provide?.("session.runtime", service);
   ctx.effect?.(() => async () => {

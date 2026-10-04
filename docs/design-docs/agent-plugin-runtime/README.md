@@ -1,5 +1,7 @@
 # Agent Plugin Runtime 文档导航
 
+当前分层以 [Host/Harness/Run 总览](agent-target-overall-architecture.md)为入口；[P5 摘要](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)跟踪自动化及尚未开始的 Computer Use。
+
 P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle.md)；[阶段验证记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)。
 
 
@@ -50,7 +52,7 @@ Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧�
 
 以下材料用于理解取舍，不替代上面的当前实现入口：
 
-- [Harness 插件化与 Agent Host 分离讨论](agent-harness-host-refactor-decisions.md)：2026-10-03 已确认目标与分阶段路线；P1/P2 已验收；P3 可替换基础的范围已确认，[执行计划](../../exec-plans/active/20261003-agent-harness-host-refactor/phase-3.md) 已实施并验收，自进化功能后续独立开发。
+- [Harness 插件化与 Agent Host 分离讨论](agent-harness-host-refactor-decisions.md)：2026-10-03 已确认目标与分阶段路线；P1/P2 已验收；P3 可替换基础的范围已确认，[执行计划](../../exec-plans/completed/20261003-agent-harness-host-refactor/phase-3.md) 已实施并验收，自进化功能后续独立开发。
 
 - [P0 核心 Service 设计](agent-spec-core-cordis-services.md)：保留领域职责与 Service 化背景；当前三层 ABI 由上面的 Service 契约维护。
 - [Profile-first 决策](agent-decision-profile-first-headless-desktop.md)：两种 Profile 与应用操作所有权，保留当时迁移步骤。

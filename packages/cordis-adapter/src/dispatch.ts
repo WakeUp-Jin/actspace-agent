@@ -3,33 +3,26 @@ import type { AgentLoopIntervention, AgentNotification } from "./event-contract.
 
 export type DispatchCarrier = object;
 
-/** Run a required event and fail when no handler or a handler fails. */
-export async function requiredDispatch(context: CordisContext | undefined, type: string, payload: unknown, carrier?: DispatchCarrier): Promise<void> {
-  if (context === undefined) throw new Error(`Required event "${type}" has no dispatch context.`);
-  if (context.events?.dispatch === undefined) {
-    if (context.parallel === undefined) throw new Error(`Required event "${type}" has no dispatch context.`);
-    await context.parallel(type, payload);
-    return;
-  }
+/** Publish through native Cordis emit. Observers own their asynchronous work. */
+export function emitNotification(context: CordisContext | undefined, type: AgentNotification | string, payload: unknown, carrier?: DispatchCarrier): void {
   const args: unknown[] = carrier === undefined ? [type, payload] : [carrier, type, payload];
-  const callbacks = context.events.dispatch("emit", args);
-  if (callbacks.length === 0) throw new Error(`Required event "${type}" has no handler.`);
-  const results = await Promise.allSettled(callbacks.map((callback) => Promise.resolve().then(() => callback(...args))));
-  const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
-  if (failure !== undefined) throw failure.reason;
+  context?.emit?.(...args);
 }
 
-/** Notify every matching listener while isolating observer failures. */
-export async function emitContained(context: CordisContext | undefined, type: AgentNotification | string, payload: unknown, carrier?: DispatchCarrier): Promise<void> {
-  if (context === undefined) return;
-  const args: unknown[] = carrier === undefined ? [type, payload] : [carrier, type, payload];
-  const callbacks = context.events?.dispatch?.("emit", args);
-  if (callbacks !== undefined) {
-    await Promise.allSettled(callbacks.map((callback) => Promise.resolve().then(() => callback(...args))));
-    return;
-  }
-  try { await Promise.resolve(context.parallel?.(type, payload)); }
-  catch { /* notifications never block the durable path */ }
+/** Isolate notification observers at registration, preserving Cordis' carrier. */
+export function containNotification<T, A extends unknown[]>(context: CordisContext, listener: (this: T, ...args: A) => unknown): (this: T, ...args: A) => void {
+  const report = (error: unknown): void => {
+    try { context.logger?.error("Notification observer failed: %s", error); }
+    catch { /* A diagnostic exporter must not turn an observation into a failure. */ }
+  };
+  return function (this: T, ...args: A): void {
+    try {
+      const result = listener.apply(this, args);
+      if (result !== undefined && result !== null && typeof (result as PromiseLike<unknown>).then === "function") {
+        void Promise.resolve(result).catch(report);
+      }
+    } catch (error) { report(error); }
+  };
 }
 
 /** Run an intervention with Cordis' true continuation-based waterfall semantics. */

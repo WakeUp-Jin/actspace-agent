@@ -1,5 +1,7 @@
 # 设计文档索引
 
+[Host/Harness/Run 总览](agent-plugin-runtime/agent-target-overall-architecture.md)：Host 稳定基底、Harness 独立组合与 Run 固定租约；P5 实机验收单独跟踪。
+
 - [Tool 插件边界与 Todo 领域事件](agent-plugin-runtime/agent-tool-plugin-boundaries.md)：独立工具包、Host port、Projection Contributor、scope 和不兼容旧 Todo 的事件断点。
 
 - [主 Agent 的 Chat 形态](agent-runtime/agent-main-chat-form.md)：已实施；定义固定 Session preset、两个 Chat 工具、附件边界、Prompt cache 动态尾部与可调压缩阈值。

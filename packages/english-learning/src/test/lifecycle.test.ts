@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createCordisRoot, emitContained } from "@actspace/cordis-adapter";
+import { createCordisRoot, emitNotification } from "@actspace/cordis-adapter";
 import { AgentScope } from "@actspace/core-scope";
 import { MAIN_AGENT_DESCRIPTOR, createAgentEventDispatcher, type AgentHandle } from "@actspace/core-agent";
 import { RequestAssembler, type LogicalRequestCandidate } from "@actspace/prompt";
@@ -66,7 +66,7 @@ describe("English learning lifecycle and scoped prompt", () => {
       expect(service.getState().enabled).toBe(false);
       expect((await assemble(a, "a")).renderedSystemPrompt).not.toContain(PROMPT_ID);
       await service.dispose(); await service.dispose();
-      await emitContained(root.context, "session/event", {}, { sessionId: "a" });
+      await emitNotification(root.context, "session/event", {}, { sessionId: "a" });
     } finally { await service.dispose(); await a.dispose(); await b.dispose(); await root.dispose(); }
   });
 });

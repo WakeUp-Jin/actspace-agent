@@ -7,7 +7,7 @@ type HeadlessRunService = {
   service: { exclusive<T>(sessionId: string, operation: () => Promise<T>): Promise<T> };
 };
 import type { SessionHandle } from "@actspace/session-persistence";
-import { emitContained, type CordisContext } from "@actspace/cordis-adapter";
+import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 
 export const HEADLESS_HOST_PORT_ID = "actspace.host.headless" as const;
 
@@ -60,14 +60,14 @@ export class HeadlessRunner {
     if (host.signal?.aborted) abort();
     else host.signal?.addEventListener("abort", abort, { once: true });
     try {
-      await this.notify("headless/started", { sessionId: session.header.sessionId, agentId: `main:${sessionId}` });
+      this.notify("headless/started", { sessionId: session.header.sessionId, agentId: `main:${sessionId}` });
       const result = await agents.run(sessionId, { content: host.content, model: host.model }, controller.signal);
       await session.flush();
       host.appExit?.(result.reason === "completed" ? 0 : result.reason === "aborted" ? 130 : 1);
-      await this.notify("headless/completed", { sessionId: session.header.sessionId, agentId: `main:${sessionId}`, reason: result.reason });
+      this.notify("headless/completed", { sessionId: session.header.sessionId, agentId: `main:${sessionId}`, reason: result.reason });
       return Object.freeze({ session, ...result, snapshot: sessions.snapshot(session), durationMs: Date.now() - started });
     } catch (error) {
-      await this.notify("headless/failed", { sessionId: session.header.sessionId, agentId: `main:${sessionId}`, error: error instanceof Error ? error.message : String(error) });
+      this.notify("headless/failed", { sessionId: session.header.sessionId, agentId: `main:${sessionId}`, error: error instanceof Error ? error.message : String(error) });
       host.appExit?.(host.signal?.aborted ? 130 : 1);
       throw error;
     } finally {
@@ -75,7 +75,7 @@ export class HeadlessRunner {
     }
   }
 
-  private async notify(type: string, payload: unknown): Promise<void> {
-    await emitContained(this.options.context, type, payload);
+  private notify(type: string, payload: unknown): void {
+    emitNotification(this.options.context, type, payload);
   }
 }

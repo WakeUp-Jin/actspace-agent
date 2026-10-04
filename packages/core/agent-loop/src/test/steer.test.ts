@@ -65,7 +65,7 @@ describe("AgentLoop steer messages", () => {
     const { result, journal } = await runToolStreamFixture({
       onLoop: value => { loop = value; },
       beforeFinalText: async () => { loop!.abort("user"); },
-      context: { parallel: async type => { notifications.push(String(type)); } },
+      context: { get: () => ({ flush: async () => {} }), emit: type => { notifications.push(String(type)); } },
     });
     expect(result).toMatchObject({ agentRunId: "run-test", reason: "aborted", steps: 2 });
     expect(journal.at(-1)).toMatchObject({ type: "turn/end", data: { reason: "aborted" } });
@@ -78,9 +78,9 @@ describe("AgentLoop steer messages", () => {
     await expect(runToolStreamFixture({
       onLoop: value => { loop = value; },
       beforeFinalText: async () => { loop!.abort("user"); },
-      context: { parallel: async (type, payload) => {
-        if (type === "session/checkpoint" && (payload as { reason: string }).reason === "after-turn-settled") throw new Error("checkpoint failed");
-      } },
+      context: { get: () => ({ flush: async (payload: { reason: string }) => {
+        if (payload.reason === "after-turn-settled") throw new Error("checkpoint failed");
+      } }) },
     })).rejects.toThrow("settlement checkpoint also failed");
   });
 

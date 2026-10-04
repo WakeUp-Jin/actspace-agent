@@ -1,8 +1,6 @@
 # Profile / Bundle / Patch 分层规范
 
-> 状态：目标设计已确认；P1-C schema、digest 与 loader transport parity 已实施，restart/one-shot 收口仍待 G1。
->
-> 本规范把 DSH 的组合思想落到 ActSpace v2：Profile 选择能力配方，Bundle 提供可分发 Entry，Patch 做稳定 id 覆盖，最终生成唯一的 immutable `ResolvedComposition / BootManifest`。它不支持在线热替换，也不改变 Agent、Session 或 Tool 的领域语义。
+> 状态：P5 当前分层，2026-10-04。Host/Profile 与可选择的 Harness 组合有不同生命周期；不得把运行中切换选择误写成重启整个 Host。
 
 ## 1. 决策摘要
 
@@ -125,7 +123,7 @@ flowchart TD
 - Loader 再读取一份未经过 composer 的生产插件列表；
 - Host 根据自己的数组顺序补装 core plugin；
 - Patch 绕过 required capability 或 frontend ceiling；
-- 运行中替换 Entry、Provider、Codec 或 Service；
+- 修改已被 Run 固定的组合实例；Host/codec 变更仍需兼容检查与重启；
 - 为 CLI、Desktop、测试各维护不同的默认 Profile 事实。
 
 ## 6. `cordis.yml` 的定位
@@ -183,17 +181,19 @@ Host 消费 Profile Context
 
 组合事实保持不可变；启动结果只持有 Context、root、manifest、state/diagnostics、restart 通知与 shutdown，不持有通用 Session/run API。Context 可由受信任的同进程调用方使用，不跨 IPC/renderer。基础 BootedProfile 与生产 BootedRuntimeProfile 的精确差异见 [Runtime 文档](agent-target-runtime-architecture.md)。
 
-## 10. Restart-only
+## 10. 简单 Patch 与组合切换
 
-Profile、Bundle、Patch、插件代码或 Service Provider 变化都通过完整 restart 生效：
+Patch 是定义变换：旧定义应用差异后产出完整新定义，再独立验证、装配和启用。不是对旧 live tree 做实例交换。
 
-1. 当前 Runtime 停止接受新任务。
-2. Abort/drain active turn、tool lease 和 approval。
-3. Flush Session。
-4. Dispose Cordis root。
-5. 用新输入重新 compose、validate、boot。
+1. Host/Profile 基底保持运行，提供稳定服务和能力上界。
+2. 候选引用固定产物，验证服务、事件、codec 与 Host 能力契约，完整装配新的 Harness。
+3. 准备或启用失败保留原选择；成功后新 Run 取得最新组合。
+4. 旧 Run 的 Loop、工具和插件实例保持原样，至最后一个 Run 释放后回收旧组合。
+5. 同一 Session 的下一次运行不必新建会话；子 Run 在启动时独立选择最新组合。
 
-不实现在线 reconcile、HMR、旧 Entry 与新 Entry 的零中断切换，也不承诺外部副作用可回滚。
+不实现跨组合插件实例共享、插件级引用计数、自动影响图或增量树交换。固定文件可复用不代表实例复用。机制实验留在 cordis-adapter 测试，不能作为生产能力承诺。
+
+Host Profile、codec 读取规则或基底服务变化走受控重启和兼容检查；不可在线改变历史解码。未来自进化先作用于 Harness，当前不提供源码自改工具或自进化控制流程。
 
 ## 11. 验收标准
 
@@ -202,7 +202,7 @@ Profile、Bundle、Patch、插件代码或 Service Provider 变化都通过完�
 3. required/optional capability、frontend、Service conflict、Codec discovery 和 Patch target 行为有测试。
 4. 生产默认路径不使用 `serviceValues`、手工 core activation 或第二份插件列表。
 5. `cordis.yml` 的 authoring/transport 角色在文件和 diagnostics 中可识别。
-6. restart-only、失败清理、旧 Runtime 不被破坏和 生产 Profile 进程内单实例有 contract tests。
+6. Host 重启边界、失败候选保留原选择、新旧 Run 隔离与最后释放有 contract tests。
 7. CLI 单次无头 `run` 的 boot → followup → flush → dispose 回归通过。
 
 ## 12. 回退和非目标

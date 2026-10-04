@@ -17,7 +17,7 @@ ActSpace v2 保留已经验证的具体工具 executor 和协议实现，替换 
 新的 Tool Runtime 遵循五条总原则：
 
 1. Tool definition 与 executor 分离；模型、Prompt 和固定前端只能看到数据合同，不持有执行函数。
-2. `prepare()` 一次性捕获 exact registration、definition、policy chain、middleware chain、executor 和 activation lease。
+2. `prepare()` 一次性捕获 exact registration、definition、permission contract、executor 和 activation lease。
 3. 单次调用从参数校验到终态提交都不能切换到另一份同名工具实现。
 4. Core admission、Host approval、单调安全检查、durability checkpoint 和 Journal invariant 不可由插件 hook 绕过。
 5. body 可以按明确声明有界并行，终态 Journal 和 Surface 提交必须保持模型 tool-call 顺序。
@@ -153,14 +153,16 @@ Executor 只能获得 admission 后缩窄过的 capability handles。凭据由�
 
 ## 5. 注册合同
 
-一个 Tool contribution 必须原子提交 definition、executor 和随 registration 固定的 policy / middleware contributions。禁止先发布 definition、稍后再补 executor，也禁止 executor 在静态全局变量中自行注册。
+扩展只用 Cordis 的 `tools/pre-execute`、`tools/execute`、`tools/post-execute`；不再有 registration.middleware、ToolMiddleware 或单独排序链。参数干预后再次校验，安全检查仍属于 Tool Runtime。
+
+一个 Tool contribution 必须原子提交 definition、executor 和随 registration 固定的 permission contract。禁止先发布 definition、稍后再补 executor，也禁止 executor 在静态全局变量中自行注册。
 
 Registry 必须满足：
 
 - 注册由 Cordis activation Effect 拥有，并返回可等待 disposer；
 - 重复 `name` 注册失败，不能用“最后一个覆盖前一个”解决冲突；
 - 发布前验证 ABI 版本、definition schema、稳定身份、capability 声明和 policy 引用；
-- 发布后 definition 和 chain 均不可变；definition、executor 或 chain 更新通过完整 Runtime restart 生效；
+- 发布后 definition 和 permission contract 均不可变；definition、executor 或 permission 更新通过独立的新 Harness 组合生效；
 - unload / Runtime shutdown 先停止 registration 接受新 preparation，再等待旧 lease drain；
 - Registry lookup 只能返回 active registration，不返回 importing、failed、pending 或 disposed Fiber 的贡献。
 
@@ -174,7 +176,7 @@ Tool Runtime 收到一个已进入当前 Step 的 tool call 后，必须在第�
 
 1. 检查 Runtime 与 Tool preparation admission gate；
 2. 按 `name` 解析唯一 active registration；
-3. 捕获冻结的 definition、definition digest、executor、policy chain、pre/post middleware chain 和 concurrency classification；
+3. 捕获冻结的 definition、definition digest、executor、permission contract 和 concurrency classification；
 4. 为该 registration 获取 activation lease；
 5. 为当前模型 tool-call 顺序预留 result commit slot；
 6. 返回 one-shot `PreparedToolCall`。
@@ -212,7 +214,7 @@ prepare
   -> lease release
 ```
 
-插件进入 draining 后不得接受新 `prepare()`，但已经持有 lease 的调用继续使用旧 executor 和旧 chain。审批等待期间也持有 lease，因此不会发生“旧定义请求审批、新 executor 执行”的切换。
+插件进入 draining 后不得接受新 `prepare()`，但已经持有 lease 的调用继续使用旧 executor 与该 Harness 的 Cordis 插入点。审批等待期间也持有 lease，因此不会发生“旧定义请求审批、新 executor 执行”的切换。
 
 ## 7. 唯一合法的执行顺序
 
@@ -328,12 +330,12 @@ Executor 正常返回 `completed` 或 `failed` body result。Throw、rejection �
 
 Body settle 后按以下顺序处理：
 
-1. post hooks 按 registration 时固定的顺序运行；
+1. 通过该 Harness 的 Cordis `tools/post-execute` waterfall 修饰输出；
 2. executor 通过 `defer()` 注册的 finalizers 按 LIFO 运行；
 3. Core 校验 result schema、artifact ownership、状态转换，并对 model output、summary 和 detail 执行有界裁剪或 artifact 化；
 4. Core 合并插件声明与平台强制 redaction，形成唯一 terminal candidate。
 
-Post hook 可以增加摘要、detail、artifact metadata 或把成功降级为失败，不能：
+Post hook 可以修饰摘要、detail 与输出，不能改写 executor 的 status/failure，也不能：
 
 - 把 body failure、abort 或 deny 提升为 completed；
 - 替换 `callId`、`pluginId`、`name` 或 definition provenance；
@@ -343,7 +345,7 @@ Post hook 可以增加摘要、detail、artifact metadata 或把成功降级为�
 
 裁剪不得只删除中间内容后伪装成完整输出：被裁剪的 model output 必须明确标记，并在需要保留完整结果时写入 Session-owned artifact。禁止用 renderer 可见的临时绝对路径代替 artifact ref。
 
-Finalizer 是正确性相关清理；任一 finalizer 失败会使尚未失败的 candidate 变为 `failed / FINALIZER_FAILED`。纯观测、metrics 和日志使用 best-effort observability listener，不能伪装成 finalizer 以影响业务结果。
+Post hook 和 finalizer 的异常记录在 `finalizerFailures`，后续 LIFO 清理和有序提交仍执行；不得以清理失败伪造 body 的执行成败。纯观测使用注册时隔离的 Cordis emit 监听。
 
 ### 7.8 Ordered Journal commit
 

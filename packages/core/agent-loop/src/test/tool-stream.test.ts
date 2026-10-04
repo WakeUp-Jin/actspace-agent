@@ -69,12 +69,10 @@ describe("AgentLoop tool live events", () => {
     expect(events.filter((e) => e.kind === "tool-finished")).toHaveLength(1);
   });
 
-  it("emits required durability checkpoints at each real side-effect boundary", async () => {
+  it("awaits durability checkpoint services at each real side-effect boundary", async () => {
     const reasons: string[] = [];
     const context = {
-      parallel: async (type: string, payload: unknown) => {
-        if (type === "session/checkpoint") reasons.push(String((payload as { reason?: string }).reason));
-      },
+      get: (name: string) => name === "session.checkpoint" ? { flush: async (payload: { reason: string }) => { reasons.push(payload.reason); } } : undefined,
     };
     await runToolStreamFixture({ context });
     expect(reasons).toEqual([
@@ -87,7 +85,21 @@ describe("AgentLoop tool live events", () => {
     ]);
   });
 
-  it("does not dispatch the model when the required checkpoint handler is missing", async () => {
+  it("does not cross the model boundary before a pending checkpoint settles", async () => {
+    let enter!: () => void, release!: () => void;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let requests = 0;
+    const running = runToolStreamFixture({ context: { get: () => ({ flush: async () => { enter(); await gate; } }) }, onRequest: () => { requests++; } });
+    try {
+      await entered;
+      expect(requests).toBe(0);
+    } finally { release(); }
+    await running;
+    expect(requests).toBeGreaterThan(0);
+  });
+
+  it("does not dispatch the model when the required checkpoint service is missing", async () => {
     const root = await createCordisRoot();
     let requests = 0;
     try {

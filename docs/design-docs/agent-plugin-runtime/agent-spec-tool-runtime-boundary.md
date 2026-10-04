@@ -161,3 +161,9 @@ parity 只比较工具实现的可观察结果和副作用，不要求旧事件�
 - executor 不污染 CLI stdout，CLI `run` 仍能输出稳定 JSONL；
 - plugin unload、approval 拒绝、取消、超时和进程崩溃恢复都有 contract test；
 - 工具实现无需知道 Cordis、Journal 或 Host UI 的存在。
+
+## P5 扩展与资源所有权
+
+工具干预统一使用 Cordis `tools/pre-execute`、`tools/execute`、`tools/post-execute`，不再提供 registration.middleware。工具 Service 仍拥有参数复检、权限与审批、checkpoint、结果事实和 lease；post hook 出错不跳过 finalizer，不能改写 body 的成败。新 Harness 独立装配工具树，旧 Run 的工具租约随其组合保留至释放。
+
+对应机制与测试只维护在 [Tool Runtime ABI](agent-spec-tool-runtime-abi.md)和 `packages/tools/runtime/src/test/runtime.test.ts`。

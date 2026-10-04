@@ -1,5 +1,5 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
-import { emitContained, requiredDispatch, serialDispatch, waterfallDispatch, type DispatchCarrier } from "@actspace/cordis-adapter";
+import { emitNotification, serialDispatch, waterfallDispatch, type DispatchCarrier } from "@actspace/cordis-adapter";
 import { carrierKeyOf, isScopeCarrier, scopeActiveOf, scopeTarget, type AgentScope, type ScopeKey } from "@actspace/core-scope";
 
 /** Live Agent subject carried by Agent-subject events. */
@@ -14,8 +14,7 @@ export interface AgentEventDispatcher {
   readonly subject: AgentSubject;
   readonly scopeKey: ScopeKey;
   readonly carrier: DispatchCarrier;
-  emit(type: string, payload?: AgentEventPayload): Promise<void>;
-  required(type: string, payload?: AgentEventPayload): Promise<void>;
+  emit(type: string, payload?: AgentEventPayload): void;
   serial(type: string, payload?: AgentEventPayload): Promise<unknown>;
   waterfall<T extends unknown = AgentEventPayload>(type: string, payload?: AgentEventPayload, next?: () => T | Promise<T>): Promise<unknown>;
 }
@@ -47,15 +46,9 @@ export function createAgentEventDispatcher(
     subject,
     scopeKey,
     carrier,
-    emit: async (type: string, payload: AgentEventPayload = {}) => {
+    emit: (type: string, payload: AgentEventPayload = {}) => {
       assertDispatchable();
-      const release = scope.disposer.acquire();
-      try { await emitContained(context, type, payloadFor(payload), carrier); } finally { release(); }
-    },
-    required: async (type: string, payload: AgentEventPayload = {}) => {
-      assertDispatchable();
-      const release = scope.disposer.acquire();
-      try { await requiredDispatch(context, type, payloadFor(payload), carrier); } finally { release(); }
+      emitNotification(context, type, payloadFor(payload), carrier);
     },
     serial: async (type: string, payload: AgentEventPayload = {}) => {
       assertDispatchable();

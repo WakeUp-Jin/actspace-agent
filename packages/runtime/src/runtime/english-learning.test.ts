@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createCordisRoot, emitContained } from "@actspace/cordis-adapter";
+import { createCordisRoot, emitNotification } from "@actspace/cordis-adapter";
 import { AgentScope } from "@actspace/core-scope";
 import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, type AgentHandle } from "@actspace/core-agent";
 import { AgentLoop } from "@actspace/core-agent-loop";
@@ -40,7 +40,7 @@ describe("English learning real AgentLoop integration", () => {
     const play = vi.fn(async () => {});
     const learning = new EnglishLearningService(root.context, { supported: true, settings: () => ({ ...DEFAULT_SPEECH_SETTINGS }), resolveCredential: () => "speech-canary", play, stop: async () => {}, subscribeSettings: () => () => {} });
     const create = (id: string) => {
-      const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: id, createdAt: "2026-09-06T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: registry.digest } }), onEvent: (event) => emitContained(root.context, "session/event", event, { sessionId: id }) });
+      const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: id, createdAt: "2026-09-06T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: registry.digest } }), onEvent: (event) => emitNotification(root.context, "session/event", event, { sessionId: id }) });
       const scope = new AgentScope(`main:${id}`); scopes.push(scope); sessions.push(session); liveSessions.set(id, session);
       const descriptor = { ...MAIN_AGENT_DESCRIPTOR, routeId: "fixture", model: "fixture" };
       const agent: AgentHandle = { agentId: scope.agentId, scope, descriptor, session, dispose: () => scope.dispose() };
@@ -60,7 +60,7 @@ describe("English learning real AgentLoop integration", () => {
       expect(JSON.stringify(snapshot)).toContain("english-learning/v1");
       expect(JSON.stringify(a.session.journal.events)).not.toContain("speech-canary");
       // Replayed terminal events and closing the mode cannot speak old content.
-      for (const event of a.session.journal.events.filter((event) => event.type === "turn/end")) await emitContained(root.context, "session/event", event, { sessionId: "a" });
+      for (const event of a.session.journal.events.filter((event) => event.type === "turn/end")) await emitNotification(root.context, "session/event", event, { sessionId: "a" });
       await learning.disable();
       await a.loop.runTurn({ content: "继续" }); await a.session.flush();
       expect(observed.get("a")?.filter((message) => message.role === "system").some((message) => JSON.stringify(message).includes("english-learning/v1"))).toBe(false);

@@ -21,6 +21,7 @@ export const SERVICE_SOURCE = Object.freeze({
 });
 
 export const MANIFEST_PATHS = Object.freeze([
+  "packages/session/checkpoint-policy/src/manifest.ts",
   "packages/compaction/src/manifest.ts",
   "packages/context/src/manifest.ts",
   "packages/core/agent-loop/src/manifest.ts",

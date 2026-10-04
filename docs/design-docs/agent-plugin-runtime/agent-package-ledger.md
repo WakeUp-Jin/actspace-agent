@@ -30,7 +30,7 @@
 | `@actspace/core-agent-loop` | `actspace.core.agent-loop` | `core.agent-loop` | required |
 | `@actspace/session-journal` | `actspace.session.journal` | `session.journal` | required |
 | `@actspace/session-persistence` | `actspace.session.persistence` | `session.persistence` | required |
-| `@actspace/session-checkpoint-policy` | `actspace.session.checkpoint-policy` | `session/checkpoint` required handler | required |
+| `@actspace/session-checkpoint-policy` | `actspace.session.checkpoint-policy` | `session.checkpoint-policy`；提供 `session.checkpoint` Service | required |
 | `@actspace/session-jsonl` | `actspace.session.jsonl` | `session.jsonl` | required |
 | `@actspace/session-projection` | `actspace.session.projection` | `session.projection` | required |
 | `@actspace/llm-service` | `actspace.llm.service` | `llm.service` | required |
@@ -56,6 +56,7 @@
 | Package | Plugin id | Entry id | 类型 |
 | --- | --- | --- | --- |
 | `@actspace/desktop-app` | `actspace.desktop-app` | `desktop.app` | Desktop App Bundle / Service |
+| `@actspace/agent-host` | `actspace.agent-host` | `host.application` | 独立 Host bootstrap/lifecycle/传输；不依赖 Runtime |
 | `@actspace/headless` | `actspace.headless` | `headless.runner` | Headless App Bundle / Runner |
 | `@actspace/client` | — | — | fixed renderer DTO / IPC |
 | `@actspace/test-support` | — | — | test-only library |

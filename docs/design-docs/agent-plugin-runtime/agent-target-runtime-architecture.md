@@ -1,13 +1,14 @@
 # ActSpace v2 Runtime 与 Composition
 
-> 状态：当前启动与生命周期说明，2026-09-08 按源码校准。整体职责见[总体架构](agent-target-overall-architecture.md)，演进取舍见 [Profile-first 决策](agent-decision-profile-first-headless-desktop.md)。
+> 状态：当前启动与生命周期说明，2026-10-04 按源码校准。整体职责见[总体架构](agent-target-overall-architecture.md)，演进取舍见 [Profile-first 决策](agent-decision-profile-first-headless-desktop.md)。
 
-## 1. 两种 Profile 与应用所有权
+## 1. 三种 Profile 与应用所有权
 
-生产 Profile identity 为 `actspace.headless` 与 `actspace.desktop`。CLI 的业务命令为 `run`，通过 headless Profile 完成一次请求；Desktop 通过自己的 App Bundle 承担会话应用操作。每个 Host 进程持有自己的 root，不能把架构图理解成跨进程单例。
+生产 Profile identity 为 `actspace.headless`、`actspace.desktop` 与 `actspace.host`。CLI 的业务命令为 `run`，通过 headless Profile 完成一次请求；Desktop 通过自己的 App Bundle 承担会话应用操作。每个 Host 进程持有自己的 root，不能把架构图理解成跨进程单例。
 
 - `packages/headless` 提供 `headless.runner`；CLI 调用 `run()` 并负责输出与退出。
 - `packages/desktop-app` 提供 `desktop.app`；`DesktopAppService` 包含会话创建/恢复/分支、run、Inbox、abort、flush、metadata 和辅助文本调用。
+- `packages/agent-host` 提供远端 `host.application`；bootstrap 通过 CLI 注入的 Runtime 端口启动，负责网关、订阅、维护与资源回收。
 - Runtime Boot 返回启动结果与生命周期操作，不重新聚合出另一套通用业务 facade。
 - Host 适配器通过包的公开 exports 和本进程 Context 接入应用 Service。Context、Fiber 与 Service 实例不序列化到 IPC、renderer 或 Journal。
 
@@ -30,7 +31,7 @@
 
 Static Manifest 保留 identity、codec、依赖与准入信息；Behavior 由 Cordis Include/Loader 执行 `apply(ctx, config)`，领域对象在 plugin tree 中创建。恢复需要的 codec 先于行为激活发现，不以启动旧行为作为解码历史事件的前提。
 
-Profile/Patch schema、digest 和 transport parity 已有实现；restart-only、one-shot 与全域 Service metadata 的剩余收口见 [P1-C](../../exec-plans/active/20260829-actspace-p1-profile-bundle-patch/README.md)及 [P1/P2](../../exec-plans/active/20260829-actspace-p1-p2-contract-and-composition/README.md)，不能因组合类型已存在就宣称所有目标完成。
+Profile/Patch schema、digest 和 transport parity 已有实现。Host Profile 保持稳定；Harness 的完整候选装配和选择由 harness-control/boot 负责，详见 [组合分层](agent-spec-profile-bundle-patch-layering.md)。
 
 ## 4. 生产 Boot 顺序
 
@@ -45,13 +46,15 @@ Profile/Patch schema、digest 和 transport parity 已有实现；restart-only�
 
 ## 5. Shutdown 与 restart
 
-生产生命周期为 `booting → ready → quiescing → disposed`。`requestRestart()` 报告需要重启，不在线重写已激活插件树；配置更新仍要求受控 shutdown 后重新 Boot。
+Runtime Profile 生命周期为 `booting → ready → quiescing → disposed`。`requestRestart()` 报告需要重启，不在线重写已激活插件树；Host 基底/codec 配置更新要求受控 shutdown 后重新 Boot；新 Harness 选择不修改已被 Run 固定的树。
 
 `shutdown()` 先将 state 与 Run controller 置为 quiescing，再等待 candidate/root、领域资源及 Host 扩展的 disposer。Session flush、取消与 Effect 清理由各自生命周期实现负责，Bootstrap 不通过另一个通用业务句柄逐条调度。
 
 当前 graceful 等待默认为 30 秒，超时后再次请求停止接纳，并追加 5 秒最终等待。失败或超时记录 `SHUTDOWN_INCOMPLETE` 并抛出 `RuntimeShutdownFailure`；只有完成清理才进入 disposed 并释放启动占用。Host 必须处理失败结果，不能把退出进程当作持久化成功证明。
 
 CLI 在单次命令 finally 中等待 Profile shutdown；Desktop 退出还需协调 Terminal、Host 扩展与 Electron 资源。真实 reload/quit/flush、Provider 和发行制品验收继续保留在各任务摘要。
+
+独立 Host 的 `HostLifecycle` 管理 ready/draining/blocked，正常停止等待任务、子 Run 和后台 shell，强停设置截止。bootstrap 停止上传维护并等待在途清理，随后 shutdown Runtime，注销订阅并关闭网关/admin。启动失败逆序回收已取得资源，保留原始错误与清理错误。源码位于 `packages/agent-host/src/{bootstrap,lifecycle}.ts`，Runtime 不通过反向依赖泄漏进该包。
 
 ## 6. 固定边界与验证
 

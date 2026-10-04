@@ -4,7 +4,6 @@ export * from "./activation-lease.js";
 export type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/tools-approval";
 export * from "./argument-validator.js";
 export * from "./core-guards.js";
-export * from "./contributions.js";
 export * from "./definition.js";
 export * from "./errors.js";
 export * from "./executor.js";

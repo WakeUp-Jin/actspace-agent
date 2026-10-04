@@ -4,11 +4,10 @@ import type { ToolActivationLease } from "./activation-lease.js";
 import { materializeToolArguments } from "./argument-validator.js";
 import type { ApprovalBroker, ApprovalRequest } from "@actspace/tools-approval";
 import { canonicalJson } from "./definition.js";
-import type { ToolArtifactOwner, ToolArtifactRef, ToolBodyResult, ToolCapabilitySet, ToolExecutionContext, ToolMiddlewareContext, ToolProgressUpdate } from "./executor.js";
+import type { ToolArtifactOwner, ToolArtifactRef, ToolBodyResult, ToolCapabilitySet, ToolExecutionContext, ToolProgressUpdate } from "./executor.js";
 import { enforceCoreToolGuards } from "./core-guards.js";
 import { ToolRuntimeError, type ToolFailure } from "./errors.js";
 import type { OrderedCommitSlot } from "./ordered-commit.js";
-import { sortToolContributions } from "./contributions.js";
 import { redactToolText, redactToolValue } from "./redaction.js";
 import type { CapturedToolRegistration } from "./registry.js";
 import type { ToolExecutionResult } from "./result.js";
@@ -149,8 +148,6 @@ export class PreparedToolExecution {
         }, () => ({ callId: this.callId, name: this.name, args: this.#args, definitionDigest: this.definitionDigest }), this.environment.eventCarrier);
         if (isArgsPatch(transformed)) this.#args = materializeToolArguments(this.registration.definition.inputSchema, transformed.args);
       }
-      const middlewareContext = this.#middlewareContext();
-      for (const middleware of sortToolContributions(this.registration.middleware)) await middleware.before?.(middlewareContext);
       enforceCoreToolGuards({
         definition: this.registration.definition,
         args: this.#args,
@@ -257,22 +254,19 @@ export class PreparedToolExecution {
     const stage = await this.stage();
     if (stage.kind === "terminal") return stage.result;
     let body = await this.runBody();
+    const outcome = { status: body.status, failure: body.failure === undefined ? undefined : { ...body.failure } };
     const finalizerFailures: ToolFailure[] = [];
-    for (const middleware of [...sortToolContributions(this.registration.middleware)].reverse()) {
-      try {
-        if (middleware.after !== undefined) body = await middleware.after(this.#middlewareContext(), body);
-      } catch (error) {
-        finalizerFailures.push(toFailure(error, "finalize"));
-      }
-    }
     if (this.environment.context !== undefined) {
-      const transformed = await waterfallDispatch(this.environment.context, "tools/post-execute", body, () => body, this.environment.eventCarrier);
-      if (isToolBodyResult(transformed)) body = transformed;
+      try {
+        const transformed = await waterfallDispatch(this.environment.context, "tools/post-execute", body, () => body, this.environment.eventCarrier);
+        // Presentation can change; completed/failed execution facts cannot.
+        if (isToolBodyResult(transformed)) body = { ...transformed, ...outcome };
+      } catch (error) { finalizerFailures.push(toFailure(error, "finalize")); }
     }
     for (const finalizer of [...this.#finalizers].reverse()) {
       try { await finalizer(); } catch (error) { finalizerFailures.push(toFailure(error, "finalize")); }
     }
-    return this.#normalizeBody(body, finalizerFailures);
+    return this.#normalizeBody({ ...body, ...outcome }, finalizerFailures);
   }
 
   async execute(): Promise<ToolExecutionResult> {
@@ -483,10 +477,6 @@ export class PreparedToolExecution {
   #rememberTerminal(result: ToolExecutionResult): PreparedDispatch {
     this.#stage = Object.freeze({ kind: "terminal", result });
     return this.#stage;
-  }
-
-  #middlewareContext(): ToolMiddlewareContext {
-    return { definition: this.registration.definition, callId: this.callId, args: this.#args ?? {} };
   }
 
   async #releaseAfterUse(): Promise<void> {

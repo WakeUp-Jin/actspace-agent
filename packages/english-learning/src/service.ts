@@ -1,6 +1,6 @@
 import type { AgentHandle } from "@actspace/core-agent";
 import { scopeContext } from "@actspace/core-scope";
-import type { CordisContext } from "@actspace/cordis-adapter";
+import { containNotification, type CordisContext } from "@actspace/cordis-adapter";
 import type { LogicalRequestCandidate } from "@actspace/prompt";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { EnglishLearningState } from "@actspace/shared";
@@ -26,9 +26,9 @@ export class EnglishLearningService {
     this.queue = new SpeechQueue(host, (patch) => this.update(patch));
     this.update({ speechStatus: this.queue.available() });
     const service = this;
-    const remove = ctx.on?.("session/event", function (this: { sessionId?: string } | undefined, event: SessionEventEnvelopeV1) {
+    const remove = ctx.on?.("session/event", containNotification(ctx, function (this: { sessionId?: string } | undefined, event: SessionEventEnvelopeV1) {
       service.observe(this?.sessionId, event);
-    });
+    }));
     this.removeEvents = typeof remove === "function" ? remove as () => void : () => {};
     this.removeSettings = host.subscribeSettings(() => { void this.queue.stop(); });
   }

@@ -8,5 +8,5 @@ export const manifest = defineBuiltinPluginManifest({
   host: { required: [], optional: [] },
   frontend: null,
   injects: ["session.runtime"],
-  contributions: { services: [], tools: [], prompts: [], events: ["session/checkpoint"] },
+  contributions: { services: ["session.checkpoint"], tools: [], prompts: [], events: [] },
 });

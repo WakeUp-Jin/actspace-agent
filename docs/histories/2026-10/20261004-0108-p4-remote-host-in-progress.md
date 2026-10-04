@@ -11,7 +11,7 @@ P4 获批首版范围已经实施并验收。以下保留过程状态，最新�
 
 ## 依据与验证
 
-详见 [P4 计划](../../exec-plans/active/20261003-agent-harness-host-refactor/phase-4.md)、[过程记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-4-process.md)、[Host 指南](../../agent-host/README.md)。工程构建、Host 28 项、Desktop 993 项、真实 TLS/隔离 SSH、独立进程断线继续、P3 强杀恢复已通过。Computer Use 由 gpt-6.1-sol 进行，结论单列；Linux ARM64 容器内解压产物的 6 项真实进程测试已通过；真实云部署/真实 Provider 未验证。
+详见 [P4 计划](../../exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)、[过程记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-4-process.md)、[Host 指南](../../agent-host/README.md)。工程构建、Host 28 项、Desktop 993 项、真实 TLS/隔离 SSH、独立进程断线继续、P3 强杀恢复已通过。Computer Use 由 gpt-6.1-sol 进行，结论单列；Linux ARM64 容器内解压产物的 6 项真实进程测试已通过；真实云部署/真实 Provider 未验证。
 
 待完成项保留在过程记录，不以单测代替界面验收。不改写现有 Session Journal，不清理用户并行设计文件。
 

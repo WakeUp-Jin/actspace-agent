@@ -47,12 +47,12 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       yield { type: "done", stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "fixed loop result" }] }; })() } }] },
   };
   await root.mount("host", ctx => { for (const [name, value] of Object.entries(ports)) ctx.provide(name, value); }, { provides: Object.keys(ports) });
+  root.context.provide?.("session.checkpoint", { flush: async (value: { sessionId: string; throughSeq: number }) => { await sessions.getOpen(value.sessionId)!.flush(value.throughSeq); } });
   const runtime = new AgentRuntimeService(root.context);
   await root.mount("subagent-host", ctx => { ctx.provide("actspace.host.subagents", runtime.subagents); }, { provides: ["actspace.host.subagents"] });
   await runtime.initialize(root.context);
   const harnesses = runtime.harnesses;
   // Existing core checkpoint policy stays a Host durability service.
-  root.context.on?.("session/checkpoint", async (payload: unknown) => { const value = payload as { sessionId: string; throughSeq: number }; await sessions.getOpen(value.sessionId)!.flush(value.throughSeq); });
   const failures: unknown[] = [];
   const app = new AgentService({ onFailure: (_id, error) => failures.push(error), openSession: id => sessions.resume(id), harnessId: () => "main", acquire: id => harnesses.acquire(id), readConfiguration: () => ({ mode: "chat", model: "test" }) });
   try {

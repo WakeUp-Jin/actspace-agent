@@ -18,7 +18,7 @@ describe("Agent event dispatcher", () => {
   it("rejects a payload carrying a different Agent subject", async () => {
     const scope = new AgentScope("agent-a", undefined, "scope-a");
     const dispatcher = createAgentEventDispatcher(undefined, scope);
-    await expect(dispatcher.emit("agent/status", { agent: { agentId: "agent-b" }, status: "started" })).rejects.toThrow("does not match");
+    expect(() => dispatcher.emit("agent/status", { agent: { agentId: "agent-b" }, status: "started" })).toThrow("does not match");
     await scope.dispose();
   });
 
@@ -68,23 +68,21 @@ describe("Agent event dispatcher", () => {
     await Promise.all([first.dispose(), second.dispose()]);
   });
 
-  it("waits for an in-flight Agent notification before scope disposal settles", async () => {
+  it("does not hold a Run scope for a pending notification observer", async () => {
     const root = await createCordisRoot();
     const scope = new AgentScope("agent-a");
     let release!: () => void;
     const listenerDone = new Promise<void>((resolve) => { release = resolve; });
-    scopeContext(root.context, scope.scopeKey).on?.("agent/status", async () => { await listenerDone; });
-    const dispatch = createAgentEventDispatcher(root.context, scope);
-    const notification = dispatch.emit("agent/status", { status: "started" });
-    const disposal = scope.dispose();
-    let disposed = false;
-    void disposal.then(() => { disposed = true; });
-    await Promise.resolve();
-    expect(disposed).toBe(false);
-    release();
-    await Promise.all([notification, disposal]);
-    expect(disposed).toBe(true);
-    await root.dispose();
+    scopeContext(root.context, scope.scopeKey).on?.("agent/status", () => listenerDone);
+    try {
+      const dispatch = createAgentEventDispatcher(root.context, scope);
+      expect(dispatch.emit("agent/status", { status: "started" })).toBeUndefined();
+      await scope.dispose();
+      expect(() => dispatch.emit("agent/status")).toThrow("disposed");
+    } finally {
+      release();
+      await root.dispose();
+    }
   });
 
   it("preserves continuation-based waterfall semantics on a scoped carrier", async () => {
@@ -108,21 +106,4 @@ describe("Agent event dispatcher", () => {
     await root.dispose();
   });
 
-  it("requires a checkpoint handler and propagates its failure", async () => {
-    const root = await createCordisRoot();
-    const scope = new AgentScope("agent-checkpoint");
-    const dispatcher = createAgentEventDispatcher(root.context, scope);
-    await expect(dispatcher.required("session/checkpoint", { sessionId: "session-1", throughSeq: 3, reason: "before-tool-body" })).rejects.toThrow("has no handler");
-    const context = scopeContext(root.context, scope.scopeKey);
-    const seen: unknown[] = [];
-    context.on?.("session/checkpoint", async (payload) => {
-      seen.push(payload);
-      if ((payload as { throughSeq?: number }).throughSeq === 5) throw new Error("checkpoint failed");
-    });
-    await dispatcher.required("session/checkpoint", { sessionId: "session-1", throughSeq: 4, reason: "before-tool-body" });
-    expect(seen).toHaveLength(1);
-    await expect(dispatcher.required("session/checkpoint", { sessionId: "session-1", throughSeq: 5, reason: "before-tool-body" })).rejects.toThrow("checkpoint failed");
-    await scope.dispose();
-    await root.dispose();
-  });
 });

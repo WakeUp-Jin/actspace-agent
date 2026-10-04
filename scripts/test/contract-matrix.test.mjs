@@ -2,13 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildMatrix, renderJson, renderMarkdown, validateRows } from "../contract-matrix/generate.mjs";
 
-test("contract matrix is deterministic and preserves the 12/10/6 event surfaces", async () => {
+test("contract matrix is deterministic and preserves declared event surfaces", async () => {
   const first = await buildMatrix();
   const second = await buildMatrix();
   assert.deepEqual(first, second);
   assert.equal(first.events.filter((item) => item.category === "core").length, 12);
-  assert.equal(first.events.filter((item) => item.category === "agent-loop").length, 10);
-  assert.equal(first.events.filter((item) => item.category === "notification").length, 6);
+  assert.equal(first.services.find(item => item.id === "session.checkpoint")?.providerId, "session.checkpoint:default");
+  assert.equal(first.events.some(item => item.eventType === "session/checkpoint"), false);
+  assert.equal(first.events.find(item => item.eventType === "agent/tasks-updated")?.mode, "emit");
+  assert.deepEqual(validateRows(first).filter(item => item.severity === "error"), []);
   assert.equal(first.events.find((item) => item.eventType === "goal/change")?.producerStatus, "not-implemented");
   assert.equal(first.events.find((item) => item.eventType === "schedule/change")?.producerStatus, "not-implemented");
   assert.doesNotMatch(renderJson(first), /\/Users\//u);

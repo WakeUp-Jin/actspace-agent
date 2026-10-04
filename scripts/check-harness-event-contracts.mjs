@@ -5,9 +5,9 @@ import { pathToFileURL } from 'node:url';
 export function inspectHarnessEvents(declarations, sources) {
   const modes = new Map([...declarations.matchAll(/\/\*\*\s*@mode\s+(emit|waterfall|parallel|serial|bail)\s*\*\/\s*"([^"]+)"/g)].map(m => [m[2], m[1]]));
   const errors = [];
-  const wrappers = { emitContained: 'emit', requiredDispatch: 'emit', waterfallDispatch: 'waterfall', serialDispatch: 'serial' };
+  const wrappers = { emitNotification: 'emit', waterfallDispatch: 'waterfall', serialDispatch: 'serial' };
   for (const [path, source] of sources) {
-    const calls = [...source.matchAll(/\.(emit|required|serial|waterfall|parallel|bail)\(\s*"([^"]+)"/g)].map(m => [m[1] === 'required' ? 'emit' : m[1], m[2]]);
+    const calls = [...source.matchAll(/\.(emit|serial|waterfall|parallel|bail)(?:\?\.)?\(\s*"([^"]+)"/g)].map(m => [m[1], m[2]]);
     for (const [wrapper, mode] of Object.entries(wrappers)) for (const m of source.matchAll(new RegExp(`\\b${wrapper}\\([^,]+,\\s*"([^"]+)"`, 'g'))) calls.push([mode, m[1]]);
     for (const [mode, event] of calls) {
       if (!modes.has(event)) errors.push(`${path}: missing @mode for ${event}`);

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { emitContained, type CordisContext } from "@actspace/cordis-adapter";
+import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 import { HarnessControl } from "@actspace/harness-control";
 import type { AgentRegistry } from "@actspace/core-agent";
 import { createBuiltInPresets, OneShotSubagentProvider } from "@actspace/subagent";
@@ -23,7 +23,7 @@ export class AgentRuntimeService {
     const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
     const sessions = get<RuntimeSessionController>(ctx, "session.runtime");
     this.registry = get(ctx, "agent.registry");
-    this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal) }, snapshot => { void emitContained(ctx, "agent/tasks-updated", snapshot); });
+    this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal) }, snapshot => { emitNotification(ctx, "agent/tasks-updated", snapshot); });
     this.subagents = new OneShotSubagentProvider({
       store: sessions.store, presets: createBuiltInPresets(["read_file", "list_directory", "grep", "glob"]),
       manifestDigest: host.compositionDigest, plugins: host.plugins,
@@ -55,10 +55,10 @@ export class AgentRuntimeService {
     this.harnesses = new HarnessControl({ context: ctx, dataRoot: sessionHost.dataRoot,
       artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), runtimeId: sessionHost.runtimeId,
       builtin: () => prepareDefaultHarnessArtifact({ artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), hostCapabilities: host.host.capabilityCeiling, disabledEntries: host.disabledHarnessEntries ?? [] }), sharedServices: DEFAULT_HARNESS_SHARED_SERVICES,
-      compatibility: { capabilities: host.host.capabilityCeiling, requiredServices: [{ id: "agent.run-factory", version: 1 }, { id: "actspace.agent.factory", version: 1 }], services: DEFAULT_HARNESS_SHARED_SERVICES.map(id => ({ id, version: 1 })), events: [{ id: "session/checkpoint", version: 1, mode: "emit" }],
+      compatibility: { capabilities: host.host.capabilityCeiling, requiredServices: [{ id: "agent.run-factory", version: 1 }, { id: "actspace.agent.factory", version: 1 }], services: DEFAULT_HARNESS_SHARED_SERVICES.map(id => ({ id, version: 1 })), events: [],
         sharedModules, codecArtifacts: [] },
       authorize: host.authorizeHarness,
-      onSelection: record => { void emitContained(ctx, "harness/selection-updated", record); },
+      onSelection: record => { emitNotification(ctx, "harness/selection-updated", record); },
       onDiagnostic: error => { host.onHarnessDiagnostic?.(error); },
     });
     await this.harnesses.initialize();

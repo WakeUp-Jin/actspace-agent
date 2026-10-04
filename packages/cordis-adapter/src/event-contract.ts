@@ -7,8 +7,7 @@ export type AgentLoopIntervention =
   | "tools/pre-execute"
   | "tools/execute"
   | "tools/post-execute"
-  | "agent/turn-stopping"
-  | "session/checkpoint";
+  | "agent/turn-stopping";
 
 export type AgentNotification = "agent/tasks-updated" | "agent/session-start" | "agent/status" | "agent/error" | "tools/result" | "session/event" | "llm/chunk";
 
@@ -72,8 +71,6 @@ declare module "@deepseek-ai/cordis" {
     "tools/result": (this: object, payload: AgentSubjectPayload) => unknown;
     /** @mode emit */
     "llm/chunk": (this: object, payload: AgentSubjectPayload) => unknown;
-    /** @mode emit */
-    "session/checkpoint": (this: object, payload: AgentSubjectPayload) => unknown;
     /** @mode emit */
     "session/event": (payload: unknown) => unknown;
     /** @mode emit */

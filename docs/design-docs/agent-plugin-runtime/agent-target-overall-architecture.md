@@ -1,76 +1,61 @@
 # ActSpace v2 总体架构
 
-> 状态：当前实现概览，2026-09-08 按源码校准。文件名保留以稳定引用；本文已更新为 Profile-first 架构。实现存在不代表真实 Provider、Electron、Chrome 或发行制品门禁已全部通过。
+状态：2026-10-04 按 P1–P5 源码校准。P4 本机夹具验收已完成；P5 自动化与 Computer Use 分别见 [执行摘要](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)，不代表真实云部署或 Provider 验收。
 
-## 1. 整体关系
+## Host、Harness 与 Run
 
-ActSpace 使用独立领域包构成 Cordis 插件树。CLI 与 Desktop 各自在自己的进程内启动 Profile，应用操作由对应 Service 承担，Agent、Session、LLM 与工具共享领域实现。
+Host 是稳定承载基底，拥有进程、存储、凭据、连接和生命周期；Harness 是其上独立装配、可以替换的插件组合；Run 是持有固定 Harness 组合的一次执行。三者不是同一个“可自进化对象”。
+
+未来先让 Harness 演进，Host 基底不轻易变更。Loop 也属于可替换组合，但不在任务执行中切换。新 Run 选最新成功启用的组合，旧 Run 保留旧树至结束；同一 Session 可以跨 Run 更新组合，子 Run 独立选择。当前只准备这种环境，不实现自进化工具。
 
 ```mermaid
 flowchart TD
-  CLI[CLI run] --> HEADLESS[actspace.headless Profile]
-  DESKTOP[Electron main] --> DP[actspace.desktop Profile]
-  HEADLESS --> COMPOSE[Profile / Bundle / Patch / Host ceiling]
-  DP --> COMPOSE
-  COMPOSE --> BOOT[Composition + cordis.yml → Cordis Boot]
-  BOOT --> SERVICES[领域 Service 与应用 Service]
-  SERVICES --> RUNNER[headless.runner / desktop.app]
-  RUNNER --> AGENT[Agent Registry / Inbox / Agent Loop]
-  AGENT --> CAP[Prompt / Context / LLM / Tools / Subagent]
-  AGENT --> JOURNAL[Session Journal]
-  CAP --> JOURNAL
-  JOURNAL --> PROJECTION[Session Projection]
-  PROJECTION --> OUTPUT[CLI 结果 / Desktop IPC 与 renderer]
+  D[Desktop 客户端] --> LOCAL[本机 Desktop Host]
+  D --> REMOTE[独立 Node Host / WSS 或 SSH 隧道]
+  C[CLI run] --> HEADLESS[Headless Host]
+  REMOTE --> APP[AgentApplication / AgentService]
+  LOCAL --> APP
+  HEADLESS --> APP
+  APP --> RUN[ManagedRuns / 固定组合租约]
+  RUN --> H[Harness: Loop / Prompt / LLM / Tools / Subagent]
+  H --> S[Host Session 服务 / Journal / Projection]
+  S --> CLIENT[客户端 DTO / IPC / WSS]
 ```
 
-图中的共享节点表达实现复用，不代表 CLI 和 Desktop 共享同一个 live Context。当前业务命令是 `run`；CLI 的 help/version 是辅助入口。
+图中的共享节点表示实现复用，不是跨进程共享 live Context。Cordis 是插件化基底；模块化优先，不按包数量判断精简。Patch 产出完整新定义后独立装配，不共享旧插件实例，详见 [Profile/Bundle/Patch](agent-spec-profile-bundle-patch-layering.md)。
 
-## 2. 所有权
+## 职责与源码入口
 
-| 层 | 当前职责 | 源码入口 |
-|---|---|---|
-| CLI Host | argv/stdin、工作目录、凭据和工具端口、结果输出与退出 | `apps/cli/src/cli.ts`、`runtime-v2/host-adapter.ts` |
-| Desktop Host | Electron 生命周期、Main-only 凭据、IPC、窗口与本机能力 | `apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts` |
-| Profile / Composition | 选择应用 Bundle、解析 Patch、Host ceiling 与只读组合事实 | `packages/runtime/src/profiles/composition.ts`、`packages/composition/` |
-| Boot / Runtime | Cordis root、Host ports、codec discovery、settlement、启动验证、诊断和 shutdown | `packages/boot/src/dsh-boot.ts`、`packages/runtime/src/runtime/boot.ts` |
-| 应用 Service | CLI 单次任务或 Desktop 会话操作 | `packages/headless/`、`packages/desktop-app/` |
-| 领域 Service | Agent、Loop、Session、LLM、Tools、Prompt、Context、Compaction、Subagent | `packages/core/`、`packages/session/` 等独立包 |
-| 固定 renderer | 展示 DTO、提交用户意图，不执行后端插件代码 | `apps/desktop/src/renderer/`、`packages/shared/` |
-| Browser Bridge | Go/Chrome 外部能力，经 Host port 与工具包接入 | `browser-bridge/`、`packages/tools/browser-tools/` |
+| 模块 | 职责与边界 | 源码 |
+| --- | --- | --- |
+| CLI 适配器 | 参数、输出/退出、managed Runtime 加载与 Host ports | `apps/cli/src/runtime-v2/{host,host-adapter,host-command}.ts` |
+| 独立 Host | 认证、网关、文件、订阅、维护；drain/强停/诊断 | `packages/agent-host/src/{bootstrap,lifecycle}.ts` |
+| Desktop Host | Electron、Main-only 凭据、IPC、本机能力与远端连接 | `apps/desktop/src/main/runtime-v2/` |
+| Runtime / Boot | Profile composition、可信 codec 发现、Cordis 装配和 shutdown | `packages/runtime/`、`packages/boot/` |
+| Harness 控制 | 固定产物、候选验证、授权启用、恢复与选择 | `packages/harness-control/` |
+| 应用和调度 | AgentApplication 应用操作、AgentService 任务调度、ManagedRuns 持有运行实例 | `packages/agent-service/`、`packages/runtime/src/runtime/managed-runs.ts` |
+| 客户端策略 | Desktop 标题/辅助文本；Headless 单次任务/信号/退出 | `packages/desktop-app/`、`packages/headless/` |
+| Harness 领域 | Loop、Prompt、Context、LLM、Tools、Compaction、Subagent | 对应独立 package |
+| Session | 接纳、持久化、checkpoint、投影 | `packages/session/` 及 Runtime Session controller |
+| 固定 renderer | 展示 DTO，提交意图，不执行插件代码 | `apps/desktop/src/renderer/` |
+| Browser Bridge | 外部 Go/Chrome Host capability | `browser-bridge/` |
 
-`packages/runtime` 当前还包含 Session/Run controller、Host port 组装与投影适配，并非已经完全清空的 Boot 包。领域持久化与 Service 全域收敛的剩余工作见 [P1/P2 计划](../../exec-plans/active/20260829-actspace-p1-p2-contract-and-composition/README.md)。
+依赖方向为 `Runtime → agent-host`；Host bootstrap 通过注入 `bootRuntime` 获取窄端口，不能反向 import Runtime。Node 端口直接从 `@actspace/agent-host/node-ports` 消费，CLI 不保留空转发层。
 
-## 3. 启动到应用操作
+## 输入、事件与持久化
 
-1. Host 选择 headless 或 desktop Profile，提供工作目录、存储根、凭据 resolver、审批和外部 capability；Desktop 额外提供自己的 App Bundle。
-2. Composition 解析 Bundle、Patch 和 Host ceiling。生产 Host 指定受控的 `packages/runtime/cordis.yml`，其 Loader transport 与组合事实进行一致性检查。
-3. Runtime 先发现可信 codec，再创建 Cordis root、注入 Host services、由 Include/Loader 挂载行为。required Service、Fiber 状态和启动验证通过后才返回结果。
-4. 生产 Host 得到 `BootedRuntimeProfile`，从本进程 Context 取得 `headless.runner` 或 `desktop.app`；应用 Service 持有具体领域操作。
-5. 退出时 Host 等待 Profile shutdown；运行停止接纳新工作，领域资源完成取消、flush 和可等待 dispose。具体实现与失败边界见 [Runtime 与 Composition](agent-target-runtime-architecture.md)。
+输入队列保存内容，消息交付时读取当前模型等配置。运行中不切 Chat/Plan/Agent 模式；同会话下一条独立任务可以改变模式。应用操作、调度与执行有真实职责，不为减少层数而合并。
 
-Boot 只建立可运行的服务环境。创建 Agent、恢复 Session 和发起任务属于应用/领域 Service 的职责，不等同于装载插件。
+Cordis 原生事件是唯一插件事件机制：通知 `emit` 不等待观察者，注册处隔离异常；干预用 waterfall/serial；必须完成的动作如 `session.checkpoint.flush()` 用 Service。资源回收对应监听、timer、任务和租约的所有者，不承诺撤销文件或网络已发生的副作用。
 
-## 4. 一次任务与持久事实
+Journal 是恢复事实源，Projection、live progress 和 diagnostics 各自分离。`session/event` 的内存接纳通知不等于 fsync；真正持久化由显式 checkpoint 保证。Session Format v1 仍是当前格式，名称中的 v1 不意味着过期。
 
-CLI 的 `runV2Command()` 调用 `headless.runner.run()`；Desktop 通过 `DesktopAppService` 创建或恢复 main Session、运行任务和投递后续输入。Run controller、Agent factory 与 Agent Loop 连接 Session、Inbox、Prompt、LLM 和 Tools。
+## 阅读路线与非目标
 
-输入通过 Agent 的 followup/Inbox 语义进入 Loop，request snapshot、模型响应、工具调用和结果进入 Session Journal。一次性 Subagent 创建独立 child Session，向父任务返回有界结果；它不是持久 Member、Room 或 Team。
+- [Runtime 与 Composition](agent-target-runtime-architecture.md)：Profile 启动与生命周期。
+- [Cordis ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md)、[Loop surface](agent-spec-agent-loop-cordis-surface.md)：事件与屏障。
+- [Host 指南](../../agent-host/README.md)：连接、附件与维护。
+- [测试策略](agent-testing.md)：包、进程和真实 UI 的证据边界。
+- [设计决策](agent-harness-host-refactor-decisions.md)：讨论历史；最新简化结论覆盖共享实例探索。
 
-当前持久目录是 `sessions-v2/<sessionId>/journal.jsonl`。Session Format 的版本仍为 1，不能按文件名中的 v1 将其归档。可恢复状态来自 Journal，live progress 与 diagnostics 不替代持久事实。
-
-Desktop 的聊天、Trajectory、Context、Usage 等消费投影；Host Registry、checkpoint 与 Client raw window 已按 [Session 投影切换计划](../../exec-plans/completed/20260921-session-projection-cutover.md)接通。已退役的分析观测页面不再是当前入口。
-
-## 5. 当前、未来与历史
-
-- 当前：headless/desktop Profile、Cordis 原生事件与插件组装、Journal、一次性 Subagent、固定前端、模型/工具及英语学习能力。
-- 部分实施：P1/P2 全域契约收口、完整 Session 投影收敛及相应回归门禁；以 active 计划列出的差距为准。
-- 未来：Member、Room、Team 产品意图保留在 collaboration 专题，实施前需重新制定 v2 方案。
-- v1：旧 Runtime、Kairos、Lab、fs-watch、旧设置与旧 Usage 设计在 [v1 归档](../../archive/v1/README.md)。
-
-## 6. 阅读路线
-
-- 启动与生命周期：[Runtime 与 Composition](agent-target-runtime-architecture.md)。
-- 行为分层：[Agent Run / Turn](../agent-runtime/agent-turn-layers.md)。
-- 当前事件：[DSH 事件模型](agent-spec-dsh-event-model.md)、[Cordis ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md)。
-- 领域与剩余任务：[专题索引](README.md)、[测试策略](agent-testing.md)。
-- 演进背景：[Profile-first 决策](agent-decision-profile-first-headless-desktop.md)。历史决策中的旧接口不能覆盖本页和当前源码。
+手机 Web 前端、自进化源码工具、Member/Room/Team、远端终端/Git 后续单独设计。P5 保留设置、凭据、prompts 与远端连接，未执行用户历史重置；不批量删除 tmp、包或用户工作目录。旧 v1 设计保留在 [历史归档](../../archive/v1/README.md)。

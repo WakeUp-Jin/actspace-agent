@@ -17,7 +17,7 @@ describe("headless plugin", () => {
       host: { enabled: true, content: "hello", persistent: false, appExit: (code) => { events.push(`exit:${code}`); } },
       sessions: { create: async () => session, createEphemeral: async () => session, resume: async () => session, snapshot: () => ({ sessionId: "session-1" }) as never },
       agents: { attach: async () => undefined, run: async () => { const result = await agent.followup(); await agent.waitForIdle(); return { ...result, sessionId: "session-1" }; }, service: {} } as never,
-      context: { parallel: async (type: unknown) => { events.push(String(type)); } },
+      context: { emit: async (type: unknown) => { events.push(String(type)); } },
     });
     const result = await runner.run();
     expect(result.finalText).toBe("ok");

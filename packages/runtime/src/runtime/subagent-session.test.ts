@@ -15,7 +15,7 @@ it("checkpoints a provider-owned child session until its scope releases it", asy
     lineage: { origin: "delegation", parentSessionId: "parent", parentCallId: "delegate", parentBoundarySeq: 0, seedDigest: "test", delegationDepth: 1 },
     createdWith: { profileId: "base", presetId: "actspace.explore", runtimeContractVersion: "2", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } });
   let checkpoint!: (payload: unknown) => Promise<void>;
-  checkpointPolicy({ get: () => sessions, on: (_type, listener) => { checkpoint = listener as typeof checkpoint; } });
+  checkpointPolicy({ get: () => sessions, provide: (_type, service) => { checkpoint = (service as { flush: typeof checkpoint }).flush; } });
   try {
     await expect(checkpoint({ sessionId: "child", throughSeq: child.lastSeq })).rejects.toThrow("not live");
     const release = sessions.registerExternal(child);

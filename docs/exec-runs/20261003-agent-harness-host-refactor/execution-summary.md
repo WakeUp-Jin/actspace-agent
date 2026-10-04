@@ -1,6 +1,6 @@
 # P1 执行摘要：固定产物与组合生命周期
 
-2026-10-03，交互模式。P1 T1–T5 完成，整个 Host 分离重构仍在进行中。[计划](../../exec-plans/active/20261003-agent-harness-host-refactor/phase-1.md) · [过程](execution-process.md)。
+2026-10-03，交互模式。P1 T1–T5 完成，整个 Host 分离重构仍在进行中。[计划](../../exec-plans/completed/20261003-agent-harness-host-refactor/phase-1.md) · [过程](execution-process.md)。
 
 ## 交付
 

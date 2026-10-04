@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { ToolRegistrationLeaseOwner } from "./activation-lease.js";
 import { normalizeToolDefinition, type NormalizedToolDefinition, type ToolDefinition } from "./definition.js";
-import type { ToolExecutor, ToolMiddleware } from "./executor.js";
+import type { ToolExecutor } from "./executor.js";
 import { ToolRuntimeError } from "./errors.js";
 import type { ToolPermissionContract } from "./permission/types.js";
 
@@ -10,7 +10,6 @@ export type ToolExecutorRegistration = {
   readonly definition: ToolDefinition;
   readonly executor: ToolExecutor;
   readonly permission?: ToolPermissionContract;
-  readonly middleware?: readonly ToolMiddleware[];
 };
 
 export type CapturedToolRegistration = {
@@ -18,7 +17,6 @@ export type CapturedToolRegistration = {
   readonly definition: NormalizedToolDefinition;
   readonly executor: ToolExecutor;
   readonly permission: ToolPermissionContract;
-  readonly middleware: readonly ToolMiddleware[];
   readonly leaseOwner: ToolRegistrationLeaseOwner;
 };
 
@@ -57,7 +55,6 @@ export class ToolRegistry {
       definition,
       executor: input.executor,
       permission: input.permission ?? ALLOW_ALL_PERMISSION,
-      middleware: Object.freeze([...(input.middleware ?? [])]),
       leaseOwner: new ToolRegistrationLeaseOwner(registrationId),
     });
     this.#byName.set(definition.name, registration);
