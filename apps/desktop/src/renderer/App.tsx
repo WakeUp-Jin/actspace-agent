@@ -1,3 +1,4 @@
+import { useRemoteTarget } from "./hooks/useRemoteTarget";
 import { projectTaskQueue } from "./session/message-queue";
 import { createEmptyStreamingState, type ToolEntry, type StreamingState, type StreamingSegment, type SessionRunState } from "./session/session-run-state";
 import { SessionBrowseContext } from "./session/SessionBrowseContext";
@@ -817,6 +818,8 @@ export function App() {
   const [historyBefore, setHistoryBefore] = useState<number | null>(null);
   const [earlierLoading, setEarlierLoading] = useState(false);
   const [earlierError, setEarlierError] = useState<string | null>(null);
+  const sidebarSessionsRef = useRef(sessions);
+  sidebarSessionsRef.current = sessions;
   const loadedListPages = useRef(new Map<string, number>());
   const readSidebarSessions = useCallback(async () => {
     if (!window.actspace.listSessionPage) return window.actspace.listSessions();
@@ -824,14 +827,26 @@ export function App() {
     const items = [...first.items];
     const groups = [...first.groups];
     for (const group of first.groups) {
-      const key = JSON.stringify([group.workspaceRoot, group.pinned]);
+      const key = JSON.stringify([group.hostId ?? "local", group.workspaceRoot, group.pinned]);
       let hasMore = group.hasMore;
       for (let page = 1; page < (loadedListPages.current.get(key) ?? 1) && hasMore; page++) {
-        const after = items.filter(s => (s.workspaceRoot ?? '') === group.workspaceRoot && !!s.pinned === group.pinned).at(-1)?.id;
-        const next = await window.actspace.listSessionPage({ workspaceRoot: group.workspaceRoot, pinned: group.pinned, after });
+        const after = items.filter(s => s.hostId === group.hostId && (s.workspaceRoot ?? '') === group.workspaceRoot && !!s.pinned === group.pinned).at(-1)?.id;
+        const next = await window.actspace.listSessionPage({ hostId: group.hostId, workspaceRoot: group.workspaceRoot, pinned: group.pinned, after });
         items.push(...next.items); hasMore = next.groups[0]?.hasMore ?? false;
       }
       group.hasMore = hasMore;
+    }
+    // Removing a connection must not remove already displayed history. Its
+    // Session remains bound to the absent Host and can never become local.
+    if (window.actspaceHosts) {
+      const known = new Set((await window.actspaceHosts.list()).map(host => host.hostId));
+      for (const item of sidebarSessionsRef.current) {
+        if (!item.hostId || known.has(item.hostId) || items.some(next => next.id === item.id)) continue;
+        items.push({ ...item, connectionState: "offline" });
+        if (!groups.some(group => group.hostId === item.hostId && group.workspaceRoot === (item.workspaceRoot ?? "") && group.pinned === !!item.pinned)) {
+          groups.push({ hostId: item.hostId, workspaceRoot: item.workspaceRoot ?? "", pinned: !!item.pinned, hasMore: false });
+        }
+      }
     }
     setBrowseGroups(groups);
     return [...new Map(items.map(s => [s.id, s])).values()];
@@ -891,6 +906,7 @@ export function App() {
     if (record) { setSessionRecord(record); setHistoryBefore(cell.window?.beforeSeq ?? null); }
   }), [sessionStore, bootstrapState?.workspaceRoot]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const remoteTarget = useRemoteTarget(selectedSessionId, sessionRecord?.meta.workspaceRoot);
   const refreshStreamingBlocks = useCallback((sessionId: string | null) => {
     if (activeSessionIdRef.current !== sessionId) return;
     const run = sessionId ? sessionRunsRef.current.get(sessionId) : undefined;
@@ -912,6 +928,12 @@ export function App() {
     setSessionRecord(null);
     setHistoryBefore(null);
     setBashTaskUpdates(sessionId ? bashUpdatesRef.current.get(sessionId) ?? {} : {});
+    if (sessionId?.startsWith("host:") && !draftsRef.current.has(sessionId)) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(`actspace:pending-submission:${sessionId}`) ?? "null");
+        if (saved?.draft?.sessionId === sessionId && typeof saved.draft.text === "string") draftsRef.current.set(sessionId, { ...saved.draft, id: Date.now(), error: "上次提交尚未确认，再次发送将核对同一次提交。" });
+      } catch { /* An invalid local draft must not block opening durable history. */ }
+    }
     setComposerDraftRestore(sessionId ? draftsRef.current.get(sessionId) ?? null : null);
     setCompactionFailure(sessionId ? compactionFailuresRef.current.get(sessionId) ?? null : null);
     setMessageQueue(sessionId ? messageQueuesRef.current.get(sessionId) ?? EMPTY_MESSAGE_QUEUE : EMPTY_MESSAGE_QUEUE);
@@ -962,6 +984,12 @@ export function App() {
     messageQueuesRef.current.set(snapshot.sessionId, queue);
     if (activeSessionIdRef.current === snapshot.sessionId) setMessageQueue(queue);
     const running = snapshot.runs.find(run => run.state === "running" && !terminalRunIdsRef.current.has(run.runId));
+    const existing = sessionRunsRef.current.get(snapshot.sessionId);
+    if (!running && existing?.recovered && snapshot.runs.some(run => run.runId === existing.agentRunId && run.state !== "running")) {
+      sessionRunsRef.current.delete(snapshot.sessionId);
+      setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, false));
+      refreshStreamingBlocks(snapshot.sessionId);
+    }
     if (running && !sessionRunsRef.current.has(snapshot.sessionId)) {
       const state = createEmptyStreamingState();
       state.waitingForModel = true;
@@ -1119,7 +1147,7 @@ export function App() {
       return;
     }
     const workspaceRoot = selectedWorkspaceRoot ?? bootstrapState?.workspaceRoot;
-    if (!hasActspaceBridge() || !workspaceRoot || !window.actspace.getWorkspaceGitContext) {
+    if (remoteTarget.hostId || !hasActspaceBridge() || !workspaceRoot || !window.actspace.getWorkspaceGitContext) {
       setWorkspaceGitContext(null);
       setSelectedBranch(undefined);
       setRunLocation("this_mac");
@@ -1145,7 +1173,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.agentRunCount, sessionRecord?.meta.worktree]);
+  }, [remoteTarget.hostId, bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.agentRunCount, sessionRecord?.meta.worktree]);
 
   useEffect(() => {
     if (!hasActspaceBridge()) return;
@@ -1225,19 +1253,33 @@ export function App() {
   useEffect(() => {
     if (!hasActspaceBridge() || !window.actspace.onSessionLiveEvent) return;
     let disposed = false;
+    // Serialize notifications: an older response must not overwrite a newer Host state.
+    let refreshing = false;
+    let pending = false;
+    const refresh = async () => {
+      pending = true;
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        do {
+          pending = false;
+          const items = await readSidebarSessions();
+          if (disposed) return;
+          setSessions(items);
+          setSessionRecord(current => {
+            const item = items.find(item => item.id === current?.meta.id);
+            return current && item ? { ...current, meta: { ...current.meta, title: item.title } } : current;
+          });
+        } while (pending && !disposed);
+      } catch (error) { console.error("Failed to refresh session list", error); }
+      finally { refreshing = false; }
+    };
     const unsubscribe = window.actspace.onSessionLiveEvent(({ event }) => {
-      if (event.message !== "session-title-updated" || !event.sessionId) return;
-      const sessionId = event.sessionId;
-      void window.actspace.listSessions().then(items => {
-        const item = items.find(s => s.id === sessionId);
-        const record = item ? { meta: { title: item.title } } : null;
-        if (disposed || !record) return;
-        setSessions(current => current.map(item => item.id === sessionId ? { ...item, title: record.meta.title } : item));
-        setSessionRecord(current => current?.meta.id === sessionId ? { ...current, meta: { ...current.meta, title: record.meta.title } } : current);
-      }).catch(error => console.error("Failed to refresh session title", error));
+      if (event.message === "session-title-updated") void refresh();
     });
-    return () => { disposed = true; unsubscribe(); };
-  }, []);
+    const unhosts = window.actspaceHosts?.onChanged(() => { void refresh(); });
+    return () => { disposed = true; unsubscribe(); unhosts?.(); };
+  }, [readSidebarSessions]);
 
   const cacheSessionPage = useCallback((sessionId: string, page: SessionPageCache) => {
     pageCacheRef.current.delete(sessionId);
@@ -1317,10 +1359,10 @@ export function App() {
   const loadMoreSessions = useCallback(async (input: import("@actspace/shared").SessionListPageInput) => {
     if (!window.actspace?.listSessionPage) return;
     const page = await window.actspace.listSessionPage(input);
-    const key = JSON.stringify([input.workspaceRoot ?? "", input.pinned === true]);
+    const key = JSON.stringify([input.hostId ?? "local", input.workspaceRoot ?? "", input.pinned === true]);
     loadedListPages.current.set(key, (loadedListPages.current.get(key) ?? 1) + 1);
     setSessions(current => { const byId = new Map(current.map(s => [s.id, s])); for (const s of page.items) byId.set(s.id, s); return [...byId.values()]; });
-    setBrowseGroups(current => [...current.filter(g => !page.groups.some(n => n.workspaceRoot === g.workspaceRoot && n.pinned === g.pinned)), ...page.groups]);
+    setBrowseGroups(current => [...current.filter(g => !page.groups.some(n => n.hostId === g.hostId && n.workspaceRoot === g.workspaceRoot && n.pinned === g.pinned)), ...page.groups]);
   }, []);
 
   useEffect(() => {
@@ -1651,7 +1693,7 @@ export function App() {
         terminalRunIdsRef.current.add(event.agentRunId);
       }
       let run = sessionRunsRef.current.get(event.sessionId);
-      if (event.type === "agent_run_started" && (!run || run.agentRunId !== event.agentRunId)) {
+      if (event.type === "agent_run_started" && (event.recoveredReset || !run || run.agentRunId !== event.agentRunId)) {
         run = { sessionId: event.sessionId, agentRunId: event.agentRunId, recovered: true, state: createEmptyStreamingState(), userBlock: null, aborting: false, record: pageCacheRef.current.get(event.sessionId)?.record ?? null, historyBefore: null };
         sessionRunsRef.current.set(event.sessionId, run);
         setBusySessionIds(current => updateStringSet(current, event.sessionId, true));
@@ -1662,7 +1704,7 @@ export function App() {
         run?.agentRunId === event.agentRunId && run.state.activeTools.get(event.toolCallId)?.terminalStatus) return;
       if (event.type === "tool_approval_required") {
         setApprovalPendingForSession(event.sessionId, true);
-        if (!run) void refreshPendingApprovalStatuses([event.sessionId]);
+        if (!run || (run.recovered && !run.state.activeTools.has(event.toolCallId))) void refreshPendingApprovalStatuses([event.sessionId]);
       } else if (
         event.type === "tool_approval_resolved" ||
         event.type === "agent_run_aborted" ||
@@ -1727,6 +1769,7 @@ export function App() {
     const selectionRequest = messageRequestRef.current;
     try {
       const created = await window.actspace.createSession({
+        ...(input.hostId ? { hostId: input.hostId } : {}),
         ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
         ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
         ...(input.agentForm ? { agentForm: input.agentForm } : {}),
@@ -1979,35 +2022,59 @@ export function App() {
     options: ComposerSendOptions,
   ) => {
     if (!text.trim() && !options.attachments?.length && !options.fileReferences?.length && !options.responseAnnotations?.length) return;
-    const visibleSessionId = activeSessionIdRef.current;
-    if (visibleSessionId && (sessionRunsRef.current.has(visibleSessionId) || taskSnapshotsRef.current.get(visibleSessionId)?.paused)) {
+    let visibleSessionId = activeSessionIdRef.current;
+    if (remoteTarget.hostId) {
+      if (!remoteTarget.canSend) throw new Error("Host is not ready; your draft has been preserved");
+      if (!visibleSessionId) {
+        const created = await createSessionForInput({ hostId: remoteTarget.hostId, workspaceId: remoteTarget.workspaceId, agentForm: options.mode === "chat" ? "chat" : "agent" });
+        if (!created) throw new Error("Unable to create remote Session");
+        visibleSessionId = created.meta.id;
+        if (options.mode === "plan") await window.actspace.setSessionAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
+      }
+    }
+    if (visibleSessionId && (visibleSessionId.startsWith("host:") || sessionRunsRef.current.has(visibleSessionId) || taskSnapshotsRef.current.get(visibleSessionId)?.paused)) {
       if (!window.actspace.submitTask) throw new Error("Host task service unavailable");
       const submitted = { sessionId: visibleSessionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
       const pendingKey = `actspace:pending-submission:${visibleSessionId}`;
-      const previous = sessionStorage.getItem(pendingKey);
+      const pendingStorage = visibleSessionId.startsWith("host:") ? localStorage : sessionStorage;
+      const previous = pendingStorage.getItem(pendingKey);
       let saved: { content: string; id: string } | null = null;
       try { saved = previous ? JSON.parse(previous) : null; } catch { /* obsolete draft */ }
       const serialized = JSON.stringify(submitted);
       const submissionId = saved?.content === serialized ? saved.id : crypto.randomUUID();
-      sessionStorage.setItem(pendingKey, JSON.stringify({ content: serialized, id: submissionId }));
-      await taskCommand({ sessionId: visibleSessionId, op: "configure", configuration: { model: options.model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills } });
+      pendingStorage.setItem(pendingKey, JSON.stringify({ content: serialized, id: submissionId, draft: { sessionId: visibleSessionId, text, attachments: options.attachments?.map(({ previewUrl: _preview, ...attachment }) => attachment), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } }));
+      const restore = (error: string) => {
+        const draft = { id: Date.now(), sessionId: visibleSessionId!, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error };
+        draftsRef.current.set(visibleSessionId!, draft);
+        if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(draft);
+      };
       try {
-        await window.actspace.submitTask({ sessionId: visibleSessionId, submissionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations });
-        await refreshTaskQueue(visibleSessionId);
-        sessionStorage.removeItem(pendingKey);
-        draftsRef.current.delete(visibleSessionId); setComposerDraftRestore(null);
+        const configured = await taskCommand({ sessionId: visibleSessionId, op: "configure", configuration: { model: visibleSessionId.startsWith("host:") ? remoteTarget.model : options.model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills } });
+        if (!configured) throw new Error("无法更新任务配置，草稿已保留。");
       } catch (error) {
-        setComposerNotice({ sessionId: visibleSessionId, text: "提交结果尚未确认，正在用同一标识核对。" });
-        // The same submission identity is retained across an uncertain acknowledgement.
-        try {
-          await window.actspace.submitTask({ ...submitted, submissionId });
-          sessionStorage.removeItem(pendingKey);
-          await refreshTaskQueue(visibleSessionId);
-        } catch {
-          const draft = { id: Date.now(), sessionId: visibleSessionId, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error: "提交尚未确认，再次发送将核对同一次提交。" };
-          draftsRef.current.set(visibleSessionId, draft); setComposerDraftRestore(draft);
-        }
+        pendingStorage.removeItem(pendingKey);
+        const message = error instanceof Error ? error.message : "无法更新任务配置，草稿已保留。";
+        restore(message); throw new Error(message);
       }
+      const attempt = async () => {
+        try { return await window.actspace.submitTask!({ ...submitted, submissionId }); }
+        catch { return { status: "submission-failed" as const, acknowledgement: "unknown" as const, message: "提交尚未确认，再次发送将核对同一次提交。" }; }
+      };
+      let result = await attempt();
+      if ("status" in result && result.status === "submission-failed" && result.acknowledgement === "unknown") {
+        setComposerNotice({ sessionId: visibleSessionId, text: "提交结果尚未确认，正在用同一标识核对。" });
+        result = await attempt();
+      }
+      if ("status" in result && result.status === "submission-failed") {
+        if (result.acknowledgement === "rejected") pendingStorage.removeItem(pendingKey);
+        const message = result.acknowledgement === "unknown" ? "提交尚未确认，再次发送将核对同一次提交。" : result.message;
+        restore(message); throw new Error(message);
+      }
+      pendingStorage.removeItem(pendingKey);
+      draftsRef.current.delete(visibleSessionId);
+      if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(null);
+      // Receipt already proves acceptance; a failed refresh must not restore a sent draft.
+      await refreshTaskQueue(visibleSessionId).catch(console.error);
       return;
     }
 
@@ -2084,6 +2151,7 @@ export function App() {
     });
     await continueQueue(sessionId, outcome);
   }, [
+    remoteTarget,
     sessionRecord,
     historyBefore,
     startSessionRun,
@@ -2099,6 +2167,16 @@ export function App() {
     runLocation,
     selectedBranch,
   ]);
+
+  useEffect(() => {
+    if (!window.actspaceHosts) return;
+    return window.actspaceHosts.onChanged(hosts => {
+      const id = activeSessionIdRef.current;
+      if (id?.startsWith("host:") && hosts.some(host => host.hostId === remoteTarget.hostId && host.state === "connected")) {
+        void readSessionPage(id); void refreshTaskQueue(id); void refreshPendingApprovalStatuses([id]);
+      }
+    });
+  }, [remoteTarget.hostId, readSessionPage, refreshTaskQueue, refreshPendingApprovalStatuses]);
 
   const handleRetryCompaction = useCallback(() => {
     const sessionId = activeSessionIdRef.current;
@@ -2139,17 +2217,18 @@ export function App() {
   }, [refreshStreamingBlocks]);
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
-    setAgentRunResult(null);
-    setComposerStateBySession((current) => ({ ...current, __draft__: DEFAULT_COMPOSER_STATE }));
-
-    const created = await createSessionForInput(input);
-    if (created) {
-      setComposerStateBySession((current) => ({
-        ...current,
-        [created.meta.id]: { ...DEFAULT_COMPOSER_STATE, mode: created.meta.agentMode ?? "agent" },
-      }));
+    if (!remoteTarget.hosts.length && !input.hostId) {
+      setAgentRunResult(null); setComposerStateBySession(current => ({ ...current, __draft__: DEFAULT_COMPOSER_STATE }));
+      const created = await createSessionForInput(input);
+      if (created) setComposerStateBySession(current => ({ ...current, [created.meta.id]: { ...DEFAULT_COMPOSER_STATE, mode: created.meta.agentMode ?? "agent" } }));
+      return;
     }
-  }, [createSessionForInput]);
+    setAgentRunResult(null); setActiveSessionId(null); setSessionRecord(null); setHistoryBefore(null);
+    setComposerStateBySession(current => ({ ...current, __draft__: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" } }));
+    remoteTarget.selectHost(input.hostId ?? null);
+    if (input.workspaceId) remoteTarget.selectWorkspace(input.workspaceId);
+    if (input.workspaceRoot) setSelectedWorkspaceRoot(input.workspaceRoot);
+  }, [remoteTarget.hosts.length, remoteTarget.selectHost, remoteTarget.selectWorkspace, setActiveSessionId, createSessionForInput]);
 
   const handleAddWorkspace = useCallback(async () => {
     if (!hasActspaceBridge()) {
@@ -2460,7 +2539,9 @@ export function App() {
     [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessions, workspaceRegistry],
   );
   const executionContext = useMemo<ComposerExecutionContext>(() => ({
-    gitContext: workspaceGitContext,
+    gitContext: remoteTarget.hostId ? null : workspaceGitContext,
+    remote: remoteTarget,
+    targetLocked: !!sessionRecord,
     selectedBranch,
     runLocation,
     locked: (sessionRecord?.meta.agentRunCount ?? 0) > 0,
@@ -2469,6 +2550,8 @@ export function App() {
     onUseExistingWorkspace: handleUseExistingWorkspace,
     onCreateWorkspaceFolder: handleCreateWorkspaceFolder,
   }), [
+    remoteTarget,
+    sessionRecord,
     handleCreateWorkspaceFolder,
     handleUseExistingWorkspace,
     runLocation,

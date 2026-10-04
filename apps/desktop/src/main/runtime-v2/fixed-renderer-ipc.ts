@@ -1,3 +1,6 @@
+import { validateRunReferences as validateSharedRunReferences } from "@actspace/shared/composer-reference-validation";
+import { parseRemoteSessionKey } from "../remote-hosts/session-router";
+import type { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
 import { paginateSessionSummaries } from "./session-list-page";
 import { UsageSourceCache } from "./usage-source-cache";
 import { isDeepStrictEqual } from "node:util";
@@ -10,8 +13,6 @@ import {
   fileReferenceBlocks,
   normalizeModelKey,
   responseExcerptBlocks,
-  validateFileReferences,
-  validateResponseAnnotations,
   type ComposerReferenceIssue,
   type FileReference,
   type ResponseAnnotationReference,
@@ -87,6 +88,7 @@ import { listVisualizationsV2, visualizeReplyV2 } from "./fixed-renderer-visuali
 
 export type FixedRendererIpcOptions = {
   readonly registry: DesktopRuntimeV2Registry;
+  readonly remote?: RemoteDesktopAdapter;
   readonly roots: AppDataRoots;
   readonly settings: SettingsService;
   readonly models: ModelStoreService;
@@ -117,9 +119,17 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     channel: string,
     listener: (event: IpcMainInvokeEvent, ...args: T) => R | Promise<R>,
   ): void => {
-    ipcMain.handle(channel, (event, ...args) => {
+    ipcMain.handle(channel, async (event, ...args) => {
       assertTrustedSender(event, options.getMainWindow());
-      return listener(event, ...(args as T));
+      const input = args[0] && typeof args[0] === "object" ? args[0] as Record<string, unknown> : {};
+      if (options.remote) {
+        if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession && input.hostId) return options.remote.create(input);
+        if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval && typeof input.requestId === "string" && input.requestId.startsWith("remote-approval:")) return options.remote.decide(input);
+        const ref = typeof input.sessionId === "string" ? parseRemoteSessionKey(input.sessionId) : null;
+        if (ref) return options.remote.handle(channel, input, ref);
+      }
+      const result = await listener(event, ...(args as T));
+      return options.remote ? options.remote.mergeList(channel, input, result) : result;
     });
     channels.push(channel);
   };
@@ -134,6 +144,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   }));
 
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessionPage, async (_event, input: import("@actspace/shared").SessionListPageInput = {}) => {
+    if (input.hostId) return { items: [], groups: [], indexing: false, failed: 0 };
     const result = await options.registry.browseSessions();
     return paginateSessionSummaries(result, input);
   });
@@ -632,10 +643,10 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
 
 function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, handle: Handle): void {
   const registryOptions = workspaceRegistryOptions(options.roots);
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectFiles, async () => {
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectFiles, async (_event, input: { remote?: boolean } = {}) => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), {
       properties: ["openFile", "multiSelections"],
-      filters: [{ name: "Chat attachments", extensions: ["png", "jpg", "jpeg", "webp", "gif", "txt", "md", "markdown", "json", "csv"] }],
+      filters: input.remote === true ? [{ name: "Files", extensions: ["*"] }] : [{ name: "Chat attachments", extensions: ["png", "jpg", "jpeg", "webp", "gif", "txt", "md", "markdown", "json", "csv"] }],
     });
     const attachments = await Promise.all(result.filePaths.map(async (path) => {
       const image = /\.(png|jpe?g|webp|gif)$/i.test(path);
@@ -878,49 +889,13 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
   };
 }
 
-type RunReferenceValidation =
-  | { ok: true; fileReferences: FileReference[]; responseAnnotations: ResponseAnnotationReference[] }
-  | { ok: false; issue: ComposerReferenceIssue };
-
-/** 引用校验在导入附件之前完成：任一失败就整体拒绝，不导入附件、不写 journal。 */
-async function validateRunReferences(registry: DesktopRuntimeV2Registry, input: Pick<RunAgentInput, "sessionId" | "fileReferences" | "responseAnnotations">): Promise<RunReferenceValidation> {
-  const files = validateFileReferences(input.fileReferences);
-  if (files.ok === false) return { ok: false, issue: files.issue };
-  const annotations = validateResponseAnnotations(input.responseAnnotations);
-  if (annotations.ok === false) return { ok: false, issue: annotations.issue };
-  if (files.value.length === 0 && annotations.value.length === 0) return { ok: true, fileReferences: [], responseAnnotations: [] };
-
-  const snapshot = await registry.inspectSession(input.sessionId);
-  if (files.value.length > 0) {
-    if (snapshot.agentForm === "chat") return { ok: false, issue: { code: "file_references_not_allowed", kind: "file" } };
-    if (!snapshot.workspaceRoot) return { ok: false, issue: { code: "file_not_found", kind: "file", index: 0, relativePath: files.value[0]!.relativePath } };
-    for (const [index, reference] of files.value.entries()) {
-      const resolved = await resolveWorkspaceFileReference(snapshot.workspaceRoot, reference.relativePath);
-      if (resolved.ok === false) return { ok: false, issue: { code: resolved.code, kind: "file", index, relativePath: reference.relativePath } };
-    }
-  }
-  for (const [index, annotation] of annotations.value.entries()) {
-    if (!(await isSessionAssistantMessage(registry, input.sessionId, snapshot.throughJournalSeq, annotation.assistantMessageId))) {
-      return { ok: false, issue: { code: "annotation_source_missing", kind: "annotation", index } };
-    }
-  }
-  return { ok: true, fileReferences: files.value, responseAnnotations: annotations.value };
-}
-
-/**
- * 回复的 MessageBlock.id 是投影时的 `v2-<journal seq>`：落盘的 `assistant/message`，
- * 或压缩后重新发布 surface 的 `surface/replaced`。只读取这一条事件核对，不加载整段历史。
- */
-async function isSessionAssistantMessage(registry: DesktopRuntimeV2Registry, sessionId: string, throughJournalSeq: number, messageId: string): Promise<boolean> {
-  const match = /^v2-(\d+)$/.exec(messageId);
-  if (!match) return false;
-  const seq = Number(match[1]);
-  if (!Number.isSafeInteger(seq) || seq > throughJournalSeq) return false;
-  const projection = await registry.readSessionProjection({ sessionId, beforeSeq: seq + 1, maxWindowEvents: 1 });
-  const event = projection.window.events.find((candidate) => candidate.seq === seq);
-  if (!event || event.surface?.node.kind !== "assistant") return false;
-  return (event.type === "assistant/message" && event.surface.kind === "append")
-    || (event.type === "surface/replaced" && event.surface.kind === "replace");
+/** Shared ownership validation; filesystem resolution remains a Node Host port. */
+async function validateRunReferences(registry: DesktopRuntimeV2Registry, input: Pick<RunAgentInput, "sessionId" | "fileReferences" | "responseAnnotations">) {
+  return validateSharedRunReferences({
+    inspectSession: id => registry.inspectSession(id),
+    readSessionProjection: input => registry.readSessionProjection(input),
+    resolveFile: resolveWorkspaceFileReference,
+  }, input);
 }
 
 async function toRunContent(

@@ -5,7 +5,7 @@ export type RuntimeV2JsonValue =
   | readonly RuntimeV2JsonValue[]
   | { readonly [key: string]: RuntimeV2JsonValue };
 
-export type RuntimeV2HostKind = "desktop" | "cli-run";
+export type RuntimeV2HostKind = "desktop" | "cli-run" | "host";
 
 export type RuntimeV2HostCapability =
   | "filesystem.read"

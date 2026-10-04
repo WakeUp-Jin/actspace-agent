@@ -190,6 +190,35 @@ describe("Composer follow-up bar", () => {
     await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("draft for B"));
   });
 
+  it("does not leak an asynchronous send failure into the newly selected session", async () => {
+    let rejectSend!: (error: Error) => void;
+    const onSend = vi.fn(() => new Promise<void>((_resolve, reject) => { rejectSend = reject; }));
+    const readDraft = (key: string) => key === "session-a" ? "message for A" : "";
+    const writeDraft = vi.fn();
+    const view = (draftKey: string) => <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} draftKey={draftKey} readDraft={readDraft} writeDraft={writeDraft} onSend={onSend} /></TooltipProvider>;
+    const { rerender } = render(view("session-a"));
+    await userEvent.click(screen.getByRole("button", { name: "发送消息" }));
+    expect(onSend).toHaveBeenCalledOnce();
+    rerender(view("session-b"));
+    rejectSend(new Error("A upload failed"));
+    await waitFor(() => expect(writeDraft).toHaveBeenCalledWith("session-a", "message for A"));
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+    expect(screen.queryByText("A upload failed")).not.toBeInTheDocument();
+  });
+
+  it("allows removing a rejected attachment and retrying the retained text", async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockRejectedValueOnce(new Error("单个文件不能超过 20 MiB。"));
+    renderComposer({ draftKey: "remote", onSend, draftRestore: { id: 1, sessionId: "remote", text: "keep this", attachments: [{ id: "large", kind: "file", name: "too-large.txt", path: "/tmp/too-large.txt" }] } });
+    await user.click(screen.getByRole("button", { name: "发送消息" }));
+    await screen.findByText("单个文件不能超过 20 MiB。");
+    await user.click(screen.getByRole("button", { name: "移除 too-large.txt" }));
+    expect(screen.queryByLabelText("已附加的文件 too-large.txt")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "发送消息" }));
+    expect(onSend.mock.calls[1]?.[0]).toBe("keep this");
+    expect(onSend.mock.calls[1]?.[1].attachments).toBeUndefined();
+  });
+
   it("renders the follow-up shell with review preview and status row", () => {
     renderComposer({
       reviewSummary: {
@@ -1263,4 +1292,15 @@ describe("Composer response annotation pill", () => {
     renderWithAnnotations({ responseAnnotations: [first], onResponseAnnotationsChange: vi.fn(), responseAnnotationNotice: "最多引用 20 段回复" });
     expect(screen.getByRole("status")).toHaveTextContent("最多引用 20 段回复");
   });
+});
+
+it("keeps a removed remote Host as the selected locked target", () => {
+  renderComposer({ surface: "followup", executionContext: { gitContext: null, runLocation: "this_mac", targetLocked: true, remote: {
+    hostId: "removed", hosts: [], host: undefined, description: undefined, workspaceId: "workspace", canSend: false,
+    selectHost: vi.fn(), selectWorkspace: vi.fn(), model: "fixture", selectModel: vi.fn(),
+  } } });
+  const location = screen.getByLabelText("会话运行位置") as HTMLSelectElement;
+  expect(location).toHaveValue("removed");
+  expect(location.selectedOptions[0].textContent).toContain("远端");
+  expect(location).toBeDisabled();
 });

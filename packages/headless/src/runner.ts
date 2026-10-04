@@ -1,3 +1,4 @@
+import { SessionModeWriter, setInitialSessionTitle } from "@actspace/agent-service";
 import type { RuntimeV2AgentMode, RuntimeV2JsonValue, RuntimeV2RunTurnResponse, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 type HeadlessRunService = {
   attach(session: SessionHandle): Promise<unknown>;
@@ -38,6 +39,7 @@ export type DisabledHeadlessHostPort = { readonly enabled: false };
 export type HeadlessRunResult = RuntimeV2RunTurnResponse & { readonly session: SessionHandle };
 
 export class HeadlessRunner {
+  readonly #modeWriter = new SessionModeWriter();
   constructor(private readonly options: { readonly host: HeadlessHostPort; readonly sessions: HeadlessSessionService; readonly agents: HeadlessRunService; readonly context?: CordisContext }) {}
 
   async run(): Promise<HeadlessRunResult> {
@@ -45,22 +47,13 @@ export class HeadlessRunner {
     const session = host.sessionId === undefined
       ? host.persistent ? await sessions.create(undefined, host.workspaceRoot) : await sessions.createEphemeral(undefined, host.workspaceRoot)
       : await sessions.resume(host.sessionId);
-    if (host.title !== undefined && session.journal.events.every((event) => event.type !== "session/title-set")) {
-      await session.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: host.title }, surface: null } as never);
-    }
+    await setInitialSessionTitle(session, host.title);
     await agents.attach(session);
     const sessionId = session.header.sessionId;
     const controller = new AbortController();
     const abort = () => { controller.abort(host.signal?.reason ?? "host-abort"); return agents.abort(sessionId); };
-    const currentMode = sessions.snapshot(session).agentMode ?? "agent";
-    const mode = host.mode ?? currentMode;
-    if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw new Error("INVALID_AGENT_MODE");
-    if (mode !== currentMode) {
-      if (mode !== "chat" && sessions.snapshot(session).workspaceRoot === null) throw new Error("WORKSPACE_REQUIRED");
-      await agents.service.exclusive(sessionId, async () => {
-      await session.append({ type: "agent/mode-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { mode, revision: (sessions.snapshot(session).agentModeRevision ?? 0) + 1, changedAt: new Date().toISOString(), source: "headless" }, surface: null });
-      await session.flush();
-      });
+    if (host.mode !== undefined) {
+      await agents.service.exclusive(sessionId, () => this.#modeWriter.change(session, host.mode!, value => sessions.snapshot(value), "headless"));
     }
     host.onSessionCreated?.(sessionId, abort);
     const started = Date.now();

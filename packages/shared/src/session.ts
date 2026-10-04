@@ -26,7 +26,7 @@ export type LlmUsageCost = {
 };
 
 export type RuntimeStreamEvent =
-  | { type: "agent_run_started"; sessionId: SessionId; agentRunId: AgentRunId }
+  | { type: "agent_run_started"; sessionId: SessionId; agentRunId: AgentRunId; recoveredReset?: boolean }
   | { type: "agent_turn_started"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; turnIndex: number }
   | { type: "agent_turn_finished"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; turnIndex: number }
   | {

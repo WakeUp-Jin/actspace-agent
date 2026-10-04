@@ -185,3 +185,27 @@ describe("production Session projections", () => {
     expect(JSON.stringify(observation.window).length).toBeGreaterThan(0);
   });
 });
+
+it("keeps bounded history pages on turn boundaries without losing older events", async () => {
+  const f = await fixture(5); const controller = f.controller();
+  let beforeSeq: number | undefined; const pages: number[][] = [];
+  do {
+    const page = await controller.readProjection({ sessionId: "s", beforeSeq, maxWindowEvents: 4 });
+    expect(page.window.events.length).toBeLessThanOrEqual(4);
+    expect(page.window.events[0]?.type).toBe("turn/start");
+    pages.unshift(page.window.events.map(event => event.seq));
+    beforeSeq = page.window.beforeSeq ?? undefined;
+  } while (beforeSeq !== undefined);
+  expect(pages.flat()).toEqual(f.journal.events.map(event => event.seq));
+});
+
+it("makes bounded progress through an oversized turn and keeps delta cursors exact", async () => {
+  const f = await fixture(1); const controller = f.controller();
+  const page = await controller.readProjection({ sessionId: "s", maxWindowEvents: 1 });
+  expect(page.window.events.map(event => event.seq)).toEqual([2]);
+  expect(page.window.beforeSeq).toBe(2);
+  const older = await controller.readProjection({ sessionId: "s", beforeSeq: 2, maxWindowEvents: 1 });
+  expect(older.window.events.map(event => event.seq)).toEqual([1]);
+  const delta = await controller.readProjection({ sessionId: "s", afterSeq: 0 });
+  expect(delta.window.events.map(event => event.seq)).toEqual([1, 2]);
+});

@@ -152,7 +152,7 @@ function setupQueueFixture() {
     schedule(sessionId);
   };
   const sentTexts = () => runAgent.mock.calls.map(([input]) => input.userInput);
-  return { records, pending, runAgent, compactContext, steerAgentRun, cancelSteer, abort, event, finish, sentTexts, nextSeq: () => ++seq };
+  return { records, pending, runAgent, submitTask, compactContext, steerAgentRun, cancelSteer, abort, event, finish, sentTexts, nextSeq: () => ++seq };
 }
 
 function renderApp() {
@@ -235,6 +235,18 @@ describe("App message queue", () => {
     await userEvent.click(within(tray()!).getByRole("button", { name: "继续发送" }));
     await waitFor(() => expect(fixture.sentTexts()).toEqual(["first question", "after stop"]));
     expect(tray()).toBeNull();
+  });
+
+  it("preserves a definitively rejected draft without retrying or retaining a pending submission", async () => {
+    const fixture = setupQueueFixture();
+    renderApp(); await startFirstRun(fixture);
+    fixture.submitTask.mockResolvedValueOnce({ status: "submission-failed", acknowledgement: "rejected", message: "单个文件不能超过 20 MiB。" } as never);
+    await queueText("oversized draft");
+    await screen.findByText("单个文件不能超过 20 MiB。");
+    expect(fixture.submitTask).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("oversized draft");
+    expect(sessionStorage.getItem("actspace:pending-submission:queue-a")).toBeNull();
+    expect(screen.queryByText("提交结果尚未确认，正在用同一标识核对。")).not.toBeInTheDocument();
   });
 
   it("steers a queued message into the running turn and shows it where it was read", async () => {

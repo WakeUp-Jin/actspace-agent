@@ -9,7 +9,12 @@
     "dist"
   ],
   "exports": {
-    "./model-catalog-data": { "types": "./dist/generated/model-catalog.generated.d.ts", "import": "./dist/generated/model-catalog.generated.js", "require": "./dist/generated/model-catalog.generated.js", "default": "./dist/generated/model-catalog.generated.js" },
+    "./model-catalog-data": {
+      "types": "./dist/generated/model-catalog.generated.d.ts",
+      "import": "./dist/generated/model-catalog.generated.js",
+      "require": "./dist/generated/model-catalog.generated.js",
+      "default": "./dist/generated/model-catalog.generated.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
@@ -45,6 +50,24 @@
       "import": "./dist/runtime-v2/desktop-ipc.js",
       "require": "./dist/runtime-v2/desktop-ipc.js",
       "default": "./dist/runtime-v2/desktop-ipc.js"
+    },
+    "./host-protocol": {
+      "types": "./dist/host-protocol/index.d.ts",
+      "import": "./dist/host-protocol/index.js",
+      "require": "./dist/host-protocol/index.js",
+      "default": "./dist/host-protocol/index.js"
+    },
+    "./composer-reference-validation": {
+      "types": "./dist/composer-reference-validation.d.ts",
+      "import": "./dist/composer-reference-validation.js",
+      "require": "./dist/composer-reference-validation.js",
+      "default": "./dist/composer-reference-validation.js"
+    },
+    "./session-list-page": {
+      "types": "./dist/session-list-page.d.ts",
+      "import": "./dist/session-list-page.js",
+      "require": "./dist/session-list-page.js",
+      "default": "./dist/session-list-page.js"
     }
   },
   "scripts": {

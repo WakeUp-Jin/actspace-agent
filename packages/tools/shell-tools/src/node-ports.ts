@@ -65,7 +65,7 @@ async function executeBash(
   const outputPath = join(outputRoot, `${randomUUID()}.log`);
   await writeFile(outputPath, "", { encoding: "utf8", mode: 0o600 });
   const wantsSandbox = options.sandbox !== false && !arrayStrings(args.requiredPermissions).includes("no_sandbox");
-  const spawnSpec = wantsSandbox ? await sandboxSpawn(command, workspaceRoot, outputRoot) : { command: "/bin/zsh", args: ["-lc", command], env: process.env, sandboxed: false };
+  const spawnSpec = wantsSandbox ? await sandboxSpawn(command, workspaceRoot, outputRoot) : { command: process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", args: ["-lc", command], env: process.env, sandboxed: false };
   const sandboxed = spawnSpec.sandboxed;
   const monitor = new OutputMonitor(subscription);
   const processHandle = new ProcessHandle(spawnSpec.command, spawnSpec.args, realCwd, spawnSpec.env, outputPath, monitor.handleChunk);
@@ -287,7 +287,7 @@ function backgrounded(task: BashTask, reason: "explicit" | "block_timeout" | "al
 }
 
 async function sandboxSpawn(command: string, workspaceRoot: string, outputRoot: string): Promise<{ readonly command: string; readonly args: readonly string[]; readonly env: NodeJS.ProcessEnv; readonly sandboxed: boolean }> {
-  if (!await probeSandbox()) return { command: "/bin/zsh", args: ["-lc", command], env: process.env, sandboxed: false };
+  if (!await probeSandbox()) return { command: process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", args: ["-lc", command], env: process.env, sandboxed: false };
   const [workspace, temp, home] = await Promise.all([realpath(workspaceRoot), realpath(tmpdir()), realpath(homedir())]);
   const profilePath = join(outputRoot, "sandbox.sb");
   const profile = [

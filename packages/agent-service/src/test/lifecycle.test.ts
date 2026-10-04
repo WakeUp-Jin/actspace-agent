@@ -21,3 +21,14 @@ describe("agent service plugin", () => {
     await session.close();
   });
 });
+
+it("drains without reopening a Session whose ownership acquisition failed", async () => {
+  let opens = 0;
+  const plugin = activate({ openSession: async () => { opens++; throw new Error("SESSION_WRITER_LOCKED"); }, harnessId: () => "main", readConfiguration: () => ({ mode: "plan" }), acquire: () => { throw new Error("must not acquire"); } });
+  const service = plugin.services["agent.service"];
+  await expect(service.snapshot("foreign")).rejects.toThrow("SESSION_WRITER_LOCKED");
+  service.beginDrain();
+  await expect(service.waitForOwnedRuns()).resolves.toBeUndefined();
+  expect(opens).toBe(1);
+  await plugin.dispose();
+});

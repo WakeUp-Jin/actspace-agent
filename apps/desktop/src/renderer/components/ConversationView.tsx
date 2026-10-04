@@ -1,3 +1,5 @@
+import { openRemoteFile } from "../hooks/remoteArtifact";
+import { remoteSessionRef } from "../hooks/useRemoteTarget";
 import { messageFlowKind } from "./messages/messageFlowStyles";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
@@ -421,9 +423,10 @@ function renderProcessContent(
   replyCompleted = false,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
   onOpenWorkspaceFile?: (path: string) => void,
+  completeTurn = true,
 ): ReactNode[] {
   return [
-    <ToolActivityGroup key="work" running={isActive} durationMs={workDurationMs(processItems, finalReply)}>
+    <ToolActivityGroup key="work" running={isActive} durationMs={completeTurn ? workDurationMs(processItems, finalReply) : undefined}>
       {renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
     </ToolActivityGroup>,
   ];
@@ -493,7 +496,7 @@ function renderTurnBody(
   const processContent = processItems.length === 0
     ? null
     : hasToolLikeItem(processItems)
-      ? renderProcessContent(processItems, isActive, finalReply, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)
+      ? renderProcessContent(processItems, isActive, finalReply, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, Boolean(turn.user))
       : renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile);
 
   if (!hasToolLikeItem(processItems) && !latestTodo) {
@@ -525,9 +528,11 @@ function deriveVisualizeTitle(content: string): string {
 function TurnActions({
   assistantMessages,
   sessionId,
+  completeTurn,
 }: {
   assistantMessages: AssistantMessageBlock[];
   sessionId: string | null;
+  completeTurn: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [visualizeState, setVisualizeState] = useState<VisualizeState>("idle");
@@ -571,7 +576,7 @@ function TurnActions({
     return null;
   }
 
-  const usageLabel = latestAssistantMessage.usage
+  const usageLabel = completeTurn && latestAssistantMessage.usage
     ? `${latestAssistantMessage.usage.totalTokens.toLocaleString("zh-CN")} Token · ${formatUsdCost(latestAssistantMessage.usage.costUsd)}`
     : null;
 
@@ -887,6 +892,12 @@ export function ConversationView({
   const openReadFile = useCallback(async (message: ReadMessageBlock) => {
     const workspaceRoot = selectedWorkspaceRoot?.trim();
     const relativePath = message.filePath.trim();
+    const ref = remoteSessionRef(sessionId ?? null);
+    if (ref && window.actspaceHosts) {
+      try { await openRemoteFile(sessionId!, relativePath, openTab); }
+      catch { openTab({ id: `remote-error:${sessionId}:${relativePath}`, kind: "text", title: relativePath.split("/").at(-1) || "远端文件", content: "远端文件读取失败，请确认连接后重试。" }); }
+      return;
+    }
     const api = typeof window !== "undefined" ? window.actspace?.readWorkspaceFile : undefined;
     if (!workspaceRoot || !api || !isSafeWorkspaceRelativePath(relativePath)) return;
     try {
@@ -895,7 +906,7 @@ export function ConversationView({
       const title = relativePath.split(/[\\/]/).pop() || relativePath;
       openTab(readFailureTab(relativePath, title));
     }
-  }, [openTab, selectedWorkspaceRoot]);
+  }, [sessionId, openTab, selectedWorkspaceRoot]);
   const openWorkspaceFile = useCallback((path: string) => {
     const normalizedPath = path.replace(/^file:\/\//i, "").replace(/\\/g, "/");
     const root = selectedWorkspaceRoot?.replace(/\\/g, "/").replace(/\/+$/, "");
@@ -1114,6 +1125,7 @@ export function ConversationView({
                     isStreaming={isStreaming}
                     isAborting={isAborting}
                     isCompacting={isCompacting}
+                    messageQueue={messageQueue}
                     statusNotice={composerNotice}
                     onSend={onSend}
                     onAbort={onAbort}
@@ -1171,6 +1183,7 @@ export function ConversationView({
                           />
                         ) : null}
                         <TurnActions
+                          completeTurn={Boolean(turn.user)}
                           sessionId={sessionId}
                           assistantMessages={
                             splitTurnMessages(turn.messages).finalReply.filter(

@@ -7,7 +7,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@actspace/shared/model-catalog-data": resolve(__dirname, "../../packages/shared/src/generated/model-catalog.generated.ts"),
+      "@actspace/shared/host-protocol": resolve(__dirname, "../../packages/shared/src/host-protocol/index.ts"),
       "@actspace/shared/runtime-v2": resolve(__dirname, "../../packages/shared/src/runtime-v2/index.ts"),
+      "@actspace/shared/composer-reference-validation": resolve(__dirname, "../../packages/shared/src/composer-reference-validation.ts"),
+      "@actspace/shared/session-list-page": resolve(__dirname, "../../packages/shared/src/session-list-page.ts"),
       "@actspace/shared": resolve(__dirname, "../../packages/shared/src/index.ts"),
       "@actspace/shared/session-selectors": resolve(__dirname, "../../packages/shared/src/session-selectors.ts"),
     },

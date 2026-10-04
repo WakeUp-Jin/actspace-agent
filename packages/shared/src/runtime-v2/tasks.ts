@@ -55,3 +55,7 @@ export type TaskCommand = { readonly sessionId: string } & (
 export type TaskCommandResult = { readonly snapshot: TaskSnapshot; readonly error?: string };
 export type SubmitTaskInput = Pick<import("../ipc").RunAgentInput, "sessionId" | "userInput" | "attachments" | "fileReferences" | "responseAnnotations"> & { readonly submissionId: string };
 export type TaskContentEnvelope = { readonly kind: "composer-task"; readonly original: RuntimeV2JsonValue; readonly prepared: RuntimeV2JsonValue };
+
+/** A rejected preparation is distinct from an unacknowledged network submission. */
+export type TaskSubmissionFailure = { readonly status: "submission-failed"; readonly acknowledgement: "rejected" | "unknown"; readonly message: string };
+export type TaskSubmissionResult = TaskReceipt | TaskSubmissionFailure;

@@ -348,3 +348,27 @@ it("hides the trajectory composer without losing the draft and keeps Stop availa
   expect(screen.getByRole("button", { name: "移除 notes.txt" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "deepseek-flash" })).toBe(model);
 });
+
+it("shows and resumes accepted tasks even before the first conversation turn exists", async () => {
+  const resume = vi.fn();
+  render(<TooltipProvider><RightPanelProvider><ConversationView messages={[]} contextSnapshot={null} sessionId="recovered" isSessionReady
+    messageQueue={{ queue: { paused: true, steering: [], items: [{ id: "pending", kind: "message", text: "Accepted before startup failure", options: {} }] }, running: false, steerBlockedReason: null,
+      onSteer: vi.fn(), onUnsteer: vi.fn(), onRemove: vi.fn(), onMoveUp: vi.fn(), onEdit: vi.fn(), onResume: resume }}
+  /></RightPanelProvider></TooltipProvider>);
+  expect(screen.getByText("Accepted before startup failure")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "继续发送" }));
+  expect(resume).toHaveBeenCalledOnce();
+});
+
+it("does not present a fragment's usage as a complete turn total", () => {
+  const thinking: MessageBlock = { kind: "thinking", id: "partial-work", title: "Thinking...", content: "Visible fragment", createdAt: messages[0].createdAt, collapsedByDefault: true, status: "completed" };
+  const view = renderConversation([thinking, messages[1]]);
+  expect(screen.getByRole("button", { name: "Worked" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: /Worked for/ })).not.toBeInTheDocument();
+  expect(screen.queryByText(/33,361 Token/)).not.toBeInTheDocument();
+  expect(screen.getByText(messages[1].kind === "assistant" ? messages[1].content : "")).toBeVisible();
+  view.unmount();
+  renderConversation([messages[0], thinking, messages[1]]);
+  expect(screen.getByRole("button", { name: /Worked for 1s/ })).toBeVisible();
+  expect(screen.getByText(/33,361 Token/)).toBeVisible();
+});

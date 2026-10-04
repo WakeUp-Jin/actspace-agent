@@ -37,6 +37,8 @@ export interface RunLease extends HarnessIdentity {
   release(): Promise<void>;
 }
 export type RunManagerOptions = {
+  /** Host admission gate, checked before reserving a Run. */
+  readonly canStart?: () => boolean;
   readonly ledger: TaskLedger;
   readonly harnessId: string;
   readonly operationForTask?: (task: TaskRecord) => ((signal: AbortSignal) => Promise<void>) | undefined;
@@ -117,7 +119,7 @@ export class SessionRunManager {
 
   /** Called after queue edits or initial acceptance; never blocks an acceptance receipt. */
   kick(): void {
-    if (this.#closed || this.#maintenance || this.#active || this.#failed || this.ledger.blocked) return;
+    if (this.#closed || this.#maintenance || this.#active || this.#failed || this.ledger.blocked || this.options.canStart?.() === false) return;
     const snapshot = this.ledger.snapshot();
     if (snapshot.paused || snapshot.runs.some(run => run.state === "running")) return;
     const task = snapshot.queue.map(id => snapshot.tasks.find(item => item.taskId === id)!).find(item => item.targetRunId === null);

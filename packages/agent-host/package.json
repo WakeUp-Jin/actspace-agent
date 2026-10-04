@@ -1,0 +1,71 @@
+{
+  "name": "@actspace/agent-host",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./node-ports": {
+      "types": "./dist/node-ports/index.d.ts",
+      "import": "./dist/node-ports/index.js",
+      "require": "./dist/node-ports.cjs",
+      "default": "./dist/node-ports/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js",
+      "default": "./dist/plugin.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest.d.ts",
+      "import": "./dist/manifest.js",
+      "default": "./dist/manifest.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && esbuild src/node-ports/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/node-ports.cjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@actspace/shared": "workspace:*",
+    "@actspace/cordis-adapter": "workspace:*",
+    "@actspace/session-persistence": "workspace:*",
+    "ws": "8.21.0",
+    "@actspace/llm-service": "workspace:*",
+    "@actspace/llm-pi-ai": "workspace:*",
+    "@actspace/tools-approval": "workspace:*",
+    "@actspace/tools-runtime": "workspace:*",
+    "@actspace/tools-filesystem-read": "workspace:*",
+    "@actspace/tools-filesystem-search": "workspace:*",
+    "@actspace/tools-filesystem-write": "workspace:*",
+    "@actspace/tools-shell-tools": "workspace:*",
+    "@actspace/tools-web-tools": "workspace:*",
+    "@actspace/tools-image-generation": "workspace:*",
+    "@actspace/tools-image-inspection": "workspace:*",
+    "@actspace/agent-service": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "typesVersions": {
+    "*": {
+      "node-ports": [
+        "dist/node-ports/index.d.ts"
+      ]
+    }
+  }
+}

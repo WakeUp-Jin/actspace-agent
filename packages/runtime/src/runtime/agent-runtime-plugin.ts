@@ -7,7 +7,7 @@ import type { RuntimeSessionController } from "./session-controller.js";
 import type { AgentFactoryService } from "./agent-factory-plugin.js";
 import type { AgentRuntimeHostPort } from "./agent-host-port.js";
 import type { RuntimeSessionHostPort } from "./session-plugin.js";
-import { prepareDefaultHarnessArtifact, DEFAULT_HARNESS_SHARED_SERVICES } from "./default-harness.js";
+import { prepareDefaultHarnessArtifact, defaultHarnessSharedModules, DEFAULT_HARNESS_SHARED_SERVICES } from "./default-harness.js";
 import { TaskLedger } from "@actspace/agent-service";
 import { ManagedRuns } from "./managed-runs.js";
 
@@ -51,12 +51,12 @@ export class AgentRuntimeService {
   async initialize(ctx: CordisContext): Promise<void> {
     const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
     const sessionHost = get<RuntimeSessionHostPort>(ctx, "actspace.host.session");
-    const request = await prepareDefaultHarnessArtifact({ artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), hostCapabilities: host.host.capabilityCeiling, disabledEntries: host.disabledHarnessEntries ?? [] });
+    const sharedModules = await defaultHarnessSharedModules();
     this.harnesses = new HarnessControl({ context: ctx, dataRoot: sessionHost.dataRoot,
       artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), runtimeId: sessionHost.runtimeId,
-      builtin: async () => request, sharedServices: DEFAULT_HARNESS_SHARED_SERVICES,
+      builtin: () => prepareDefaultHarnessArtifact({ artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), hostCapabilities: host.host.capabilityCeiling, disabledEntries: host.disabledHarnessEntries ?? [] }), sharedServices: DEFAULT_HARNESS_SHARED_SERVICES,
       compatibility: { capabilities: host.host.capabilityCeiling, requiredServices: [{ id: "agent.run-factory", version: 1 }, { id: "actspace.agent.factory", version: 1 }], services: DEFAULT_HARNESS_SHARED_SERVICES.map(id => ({ id, version: 1 })), events: [{ id: "session/checkpoint", version: 1, mode: "emit" }],
-        sharedModules: [...request.artifacts.values()].flatMap(a => a.manifest.sharedModules), codecArtifacts: [] },
+        sharedModules, codecArtifacts: [] },
       authorize: host.authorizeHarness,
       onSelection: record => { void emitContained(ctx, "harness/selection-updated", record); },
       onDiagnostic: error => { host.onHarnessDiagnostic?.(error); },

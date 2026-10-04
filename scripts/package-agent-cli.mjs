@@ -6,16 +6,16 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const target = `${process.platform}-${process.arch}`;
-const artifactRoot = resolve(readOption("--out-dir") ?? join(repoRoot, "artifacts", "agent-cli-managed", target));
+const requestedArtifactRoot = resolve(readOption("--out-dir") ?? join(repoRoot, "artifacts", "agent-cli-managed", target));
+await mkdir(requestedArtifactRoot, { recursive: true });
+const artifactRoot = await realpath(requestedArtifactRoot);
 const packageRoot = join(artifactRoot, "actspace-agent");
 const archive = join(artifactRoot, "actspace-agent.tar.gz");
 
 await rm(packageRoot, { recursive: true, force: true });
 await rm(archive, { force: true });
 await mkdir(artifactRoot, { recursive: true });
-run("pnpm", ["--filter", "@actspace/shared", "build"]);
-run("pnpm", ["--filter", "@actspace/runtime", "build"]);
-run("pnpm", ["--filter", "@actspace/agent-cli", "build"]);
+run("pnpm", ["--filter", "@actspace/agent-cli...", "build"]);
 try {
   run("pnpm", ["--filter", "@actspace/agent-cli", "deploy", "--legacy", "--prod", "--offline", packageRoot]);
 } catch {

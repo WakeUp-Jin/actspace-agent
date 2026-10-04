@@ -100,10 +100,21 @@ export type ApprovalDecisionState = {
 };
 
 export function useApprovalDecision(requestId: string | undefined): ApprovalDecisionState {
+  const [remoteConnected, setRemoteConnected] = useState(false);
+  const remoteHost = requestId?.startsWith("remote-approval:") ? requestId.slice("remote-approval:".length).split(":")[0] : null;
+  useEffect(() => {
+    if (!remoteHost || !window.actspaceHosts) return;
+    let active = true;
+    const update = (hosts: import("@actspace/shared/host-protocol").HostConnection[]) => { if (active) setRemoteConnected(hosts.some(host => host.hostId === remoteHost && host.state === "connected")); };
+    void window.actspaceHosts.list().then(update).catch(() => { if (active) setRemoteConnected(false); });
+    const cleanup = window.actspaceHosts.onChanged(update);
+    return () => { active = false; cleanup(); };
+  }, [remoteHost]);
+  const unavailable = Boolean(remoteHost && !remoteConnected);
   const [submitting, setSubmitting] = useState<ApprovalChoice | null>(null);
   const [resolved, setResolved] = useState<ApprovalChoice | null>(null);
   const decide = async (choice: ApprovalChoice, suggestionId?: string) => {
-    if (!requestId || submitting !== null) return;
+    if (!requestId || submitting !== null || unavailable) return;
     if (choice === "session" && !suggestionId) return;
     setSubmitting(choice);
     const input: RuntimeV2ApprovalDecisionInput = choice === "session" && suggestionId
@@ -112,7 +123,7 @@ export function useApprovalDecision(requestId: string | undefined): ApprovalDeci
     if (await submitApprovalDecision(input)) setResolved(choice);
     else setSubmitting(null);
   };
-  return { submitting, resolved, disabled: !requestId || submitting !== null, decide };
+  return { submitting, resolved, disabled: !requestId || submitting !== null || unavailable, decide };
 }
 
 /** 只取精确路径的会话授权建议；目录树授权由权限服务自行判断，不在审批条上暴露。 */

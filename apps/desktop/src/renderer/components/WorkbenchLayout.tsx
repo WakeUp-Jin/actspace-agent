@@ -475,6 +475,7 @@ export function WorkbenchLayout({
   }
 
   const openReviewTab = useCallback(() => {
+    if (executionContext?.remote?.hostId) return;
     const refreshKey = ++reviewTabRefreshCounterRef.current;
     openTab({
       id: "review",
@@ -485,7 +486,7 @@ export function WorkbenchLayout({
       refreshKey,
     });
     onReviewChanged?.();
-  }, [onReviewChanged, openTab, selectedWorkspaceRoot]);
+  }, [executionContext?.remote?.hostId, onReviewChanged, openTab, selectedWorkspaceRoot]);
 
   const handleSelectView = useCallback((next: SidebarView) => {
     setView(next);
@@ -604,8 +605,8 @@ export function WorkbenchLayout({
         writeDraft={writeDraft}
         readAnnotationDraft={readAnnotationDraft}
         writeAnnotationDraft={writeAnnotationDraft}
-        reviewSummary={composerMode === "chat" ? null : reviewSummary}
-        onOpenReview={composerMode === "chat" ? undefined : openReviewTab}
+        reviewSummary={composerMode === "chat" || executionContext?.remote?.hostId ? null : reviewSummary}
+        onOpenReview={composerMode === "chat" || executionContext?.remote?.hostId ? undefined : openReviewTab}
         models={models}
         activeView={sessionMainView}
         trajectory={projectedTrajectory}
@@ -690,7 +691,7 @@ export function WorkbenchLayout({
   );
   const rightPanel = (
     <RightPanel
-      developmentEnabled={composerMode !== "chat"}
+      developmentEnabled={composerMode !== "chat" && !executionContext?.remote?.hostId}
       contextState={effectiveContextState}
       contextSnapshot={effectiveContextSnapshot}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
@@ -729,14 +730,14 @@ export function WorkbenchLayout({
         sessionView={view === "chat" ? sessionMainView : undefined}
         onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
         centerTrailing={view === "chat" ? <>
-          {composerMode !== "chat" && selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
+          {!executionContext?.remote?.hostId && composerMode !== "chat" && selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
         </> : undefined}
         rightLeading={
           view === "chat" ? (
             <>
               {isRightPanelOpen ? (
                 <RightPanelObjectMenu
-                  developmentEnabled={composerMode !== "chat"}
+                  developmentEnabled={composerMode !== "chat" && !executionContext?.remote?.hostId}
                   sessionId={activeSessionId}
                   onOpenReview={openReviewTab}
                 />

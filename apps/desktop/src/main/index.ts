@@ -1,3 +1,6 @@
+import { RemoteDesktopAdapter } from "./remote-hosts/desktop-adapter";
+import { RemoteHostRegistry } from "./remote-hosts/registry";
+import { registerRemoteHostIpc } from "./remote-hosts/ipc";
 import { registerPerformanceIpc } from "./performance-ipc";
 import { ModelCatalogService } from "./model-catalog-service";
 import { DesktopSpeechPlayback } from "./speech-playback";
@@ -40,6 +43,9 @@ let disposeRuntimeV2Ipc: (() => void) | undefined;
 let disposeEnglishLearningIpc: (() => void) | undefined;
 let speechPlayback: DesktopSpeechPlayback | undefined;
 let disposeRuntimeV2DesktopShell: (() => void) | undefined;
+let remoteDesktop: RemoteDesktopAdapter | undefined;
+let remoteHosts: RemoteHostRegistry | undefined;
+let disposeRemoteHostIpc: (() => void) | undefined;
 let fixedRendererIpc: FixedRendererIpcRegistration | undefined;
 let terminalSessionService: TerminalSessionService | undefined;
 let settingsService: SettingsService | undefined;
@@ -270,7 +276,12 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   scheduleBrowserSync(1_000);
   disposePerformanceIpc = registerPerformanceIpc(getMainWindow);
   disposeEnglishLearningIpc = registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow });
+  remoteHosts = new RemoteHostRegistry(roots.dataRoot);
+  await remoteHosts.open();
+  disposeRemoteHostIpc = registerRemoteHostIpc(remoteHosts, getMainWindow, async sessionId => { await remoteDesktop?.activate(sessionId); });
+  remoteDesktop = new RemoteDesktopAdapter(remoteHosts, getMainWindow, roots.dataRoot);
   fixedRendererIpc = registerFixedRendererIpc({
+    remote: remoteDesktop,
     registry: runtimeV2Registry,
     roots,
     settings: settingsService,
@@ -320,6 +331,9 @@ app.on("before-quit", (event) => {
     try {
       const window = getMainWindow();
       if (window) window.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" });
+      remoteDesktop?.dispose();
+      await remoteHosts?.dispose();
+      disposeRemoteHostIpc?.();
       await runtimeV2Registry?.dispose();
       pricingCatalog?.dispose();
       await providerNetworkService?.dispose();

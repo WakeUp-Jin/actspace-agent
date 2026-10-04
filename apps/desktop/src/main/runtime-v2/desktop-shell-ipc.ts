@@ -54,7 +54,13 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   const terminalAvailable = options.terminalAvailable === true && options.terminal !== undefined;
   const handlers: string[] = [];
   const handle = <T extends unknown[]>(channel: string, listener: (...args: T) => unknown): void => {
-    ipcMain.handle(channel, listener as never);
+    ipcMain.handle(channel, (event, ...args) => {
+      const window = options.getMainWindow?.();
+      if (window && (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame)) throw new Error("Untrusted shell sender");
+      const input = args[0];
+      if (input && typeof input === "object" && (("sessionId" in input && typeof input.sessionId === "string" && input.sessionId.startsWith("host:")) || ("hostId" in input && input.hostId))) throw new Error("Local shell capabilities are unavailable for remote Sessions");
+      return listener(...([event, ...args] as unknown as T));
+    });
     handlers.push(channel);
   };
 

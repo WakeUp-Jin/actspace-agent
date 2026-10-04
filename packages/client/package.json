@@ -6,10 +6,50 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" }, "./sessions": { "types": "./dist/sessions/index.d.ts", "import": "./dist/sessions/index.js", "require": "./dist/sessions.cjs", "default": "./dist/sessions/index.js" } },
-  "typesVersions": { "*": { "sessions": ["dist/sessions/index.d.ts"] } },
-  "scripts": { "build": "tsc -p tsconfig.json && esbuild src/sessions/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/sessions.cjs", "typecheck": "tsc --noEmit -p tsconfig.json", "test": "vitest run --globals --passWithNoTests" },
-  "dependencies": { "@actspace/shared": "workspace:*", "pathe": "2.0.3" },
-  "devDependencies": { "@types/node": "^24.0.3", "typescript": "^5.8.3", "vitest": "^3.2.4" }
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./sessions": {
+      "types": "./dist/sessions/index.d.ts",
+      "import": "./dist/sessions/index.js",
+      "require": "./dist/sessions.cjs",
+      "default": "./dist/sessions/index.js"
+    },
+    "./host": {
+      "types": "./dist/host/index.d.ts",
+      "import": "./dist/host/index.js",
+      "require": "./dist/host.cjs",
+      "default": "./dist/host/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "sessions": [
+        "dist/sessions/index.d.ts"
+      ],
+      "host": [
+        "dist/host/index.d.ts"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && esbuild src/sessions/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/sessions.cjs && esbuild src/host/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/host.cjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --globals --passWithNoTests"
+  },
+  "dependencies": {
+    "@actspace/shared": "workspace:*",
+    "pathe": "2.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
 }

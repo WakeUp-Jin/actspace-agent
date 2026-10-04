@@ -5,6 +5,7 @@ import { entryId, pluginId, serviceId } from "@actspace/cordis-adapter";
 import type { PluginManifest } from "@actspace/cordis-adapter";
 import { BASE_BUNDLE } from "./base.bundle.js";
 import { KERNEL_BUNDLE } from "./kernel.bundle.js";
+import { manifest as hostManifest } from "@actspace/agent-host/manifest";
 import { manifest as headlessManifest } from "@actspace/headless/manifest";
 import { manifest as agentServiceManifest } from "@actspace/agent-service/manifest";
 import { manifest as todoManifest } from "@actspace/tools-todo-tools/manifest";
@@ -20,6 +21,7 @@ import { manifest as imageinspectionManifest } from "@actspace/tools-image-inspe
 export const RUNTIME_PROFILE_IDS = Object.freeze({
   headless: "actspace.headless",
   desktop: "actspace.desktop",
+  host: "actspace.host",
 } as const);
 
 export type RuntimeProfileId = (typeof RUNTIME_PROFILE_IDS)[keyof typeof RUNTIME_PROFILE_IDS];
@@ -81,7 +83,10 @@ const browserManifest: PluginManifest = Object.freeze({ schemaVersion: 1, plugin
 const browserBundle: Bundle = Object.freeze({ id: "actspace.host.browser", version: "2.0.0", manifests: Object.freeze([browserManifest]), provenance: "builtin:actspace.host.browser" });
 const headlessBundle: Bundle = Object.freeze({ id: "actspace.headless", version: headlessManifest.version, manifests: Object.freeze([headlessManifest]), provenance: "@actspace/headless" });
 
+const hostBundle: Bundle = Object.freeze({ id: "actspace.host", version: hostManifest.version, manifests: Object.freeze([hostManifest]), provenance: "@actspace/agent-host" });
+
 const profileDefinitions: Readonly<Record<RuntimeProfileId, Profile>> = Object.freeze({
+  [RUNTIME_PROFILE_IDS.host]: Object.freeze({ id: RUNTIME_PROFILE_IDS.host, runtimeContract: "actspace.runtime.v2", orderedBundleIds: Object.freeze([kernelBundle.id, baseBundle.id, hostBundle.id]) }),
   [RUNTIME_PROFILE_IDS.headless]: Object.freeze({ id: RUNTIME_PROFILE_IDS.headless, runtimeContract: "actspace.runtime.v2", orderedBundleIds: Object.freeze([kernelBundle.id, baseBundle.id, headlessBundle.id]) }),
   // Desktop's application Bundle is supplied by @actspace/desktop-app in the
   // Desktop migration phase. Keeping the Profile identity here prevents the
@@ -107,6 +112,7 @@ export const TRUSTED_LOADER_ENTRIES = Object.freeze([
   Object.freeze({ id: "core-agent", name: "@actspace/core-agent/plugin", inject: [] }),
   Object.freeze({ id: "agent-runtime", name: "@actspace/runtime/agent-runtime", inject: ["actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "agent.registry", "session.runtime", "session.journal", "session.projection", "actspace.host.tools.filesystem-read", "actspace.host.tools.filesystem-search", "actspace.host.tools.filesystem-write", "actspace.host.tools.shell-tools", "actspace.host.tools.web-tools", "actspace.host.tools.image-generation", "actspace.host.tools.image-inspection", "actspace.host.session"] }),
   Object.freeze({ id: "headless-runner", name: "@actspace/headless/plugin", inject: ["actspace.host.headless", "session.runtime", "agent.runtime"] }),
+  Object.freeze({ id: "agent-host", name: "@actspace/agent-host/plugin", inject: ["session.runtime", "agent.runtime"] }),
   Object.freeze({ id: "desktop-app", name: "@actspace/desktop-app/plugin", inject: ["session.runtime", "agent.runtime", "llm.service"] }),
   Object.freeze({ id: "english-learning", name: "@actspace/english-learning/plugin", inject: ["agent.registry", "session.runtime"] }),
 ]);
@@ -138,7 +144,7 @@ export function createProfileComposition(profileId: RuntimeProfileId, host: Runt
     ...pluginBundles.map((bundle) => bundle.id),
   ];
   const runtimeProfile: Profile = Object.freeze({ ...profile, orderedBundleIds: Object.freeze(orderedBundleIds) });
-  const bundles = [kernelBundle, baseBundle, ...(profileId === RUNTIME_PROFILE_IDS.headless ? [headlessBundle] : []), ...(appBundle === undefined ? [] : [appBundle]), ...pluginBundles];
+  const bundles = [kernelBundle, baseBundle, ...(profileId === RUNTIME_PROFILE_IDS.headless ? [headlessBundle] : []), ...(profileId === RUNTIME_PROFILE_IDS.host ? [hostBundle] : []), ...(appBundle === undefined ? [] : [appBundle]), ...pluginBundles];
   return composeRuntime({ profile: runtimeProfile, bundles, hostBundle: browserBundle, homePatch: options.homePatch, invocationPatch: options.invocationPatch, hostCapabilities: host.capabilityCeiling, loaderConfig: { profileId: runtimeProfile.id, entries: TRUSTED_LOADER_ENTRIES } });
 }
 
@@ -149,6 +155,6 @@ export function createDefaultComposition(host: RuntimeV2HostDescriptor, options:
 } = {}): ResolvedComposition {
   // Compatibility shim for callers that have not migrated to an explicit
   // Profile yet. New production launchers must choose a profile directly.
-  const profileId = host.hostKind === "desktop" ? RUNTIME_PROFILE_IDS.desktop : RUNTIME_PROFILE_IDS.headless;
+  const profileId = host.hostKind === "desktop" ? RUNTIME_PROFILE_IDS.desktop : host.hostKind === "host" ? RUNTIME_PROFILE_IDS.host : RUNTIME_PROFILE_IDS.headless;
   return createProfileComposition(profileId, host, options);
 }

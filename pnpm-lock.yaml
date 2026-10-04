@@ -28,6 +28,12 @@ importers:
 
   apps/cli:
     dependencies:
+      '@actspace/agent-host':
+        specifier: workspace:*
+        version: link:../../packages/agent-host
+      '@actspace/agent-service':
+        specifier: workspace:*
+        version: link:../../packages/agent-service
       '@actspace/llm-pi-ai':
         specifier: workspace:*
         version: link:../../packages/llm/pi-ai
@@ -80,6 +86,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@actspace/agent-host':
+        specifier: workspace:*
+        version: link:../../packages/agent-host
       '@actspace/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -200,6 +209,9 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      ws:
+        specifier: 8.21.0
+        version: 8.21.0
     devDependencies:
       '@actspace/core-agent-loop':
         specifier: workspace:*
@@ -225,6 +237,9 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.7
         version: 18.3.7(@types/react@18.3.29)
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.2
       '@vitejs/plugin-react':
         specifier: ^4.5.2
         version: 4.7.0(vite@5.4.21(@types/node@22.19.19)(lightningcss@1.32.0))
@@ -304,6 +319,70 @@ importers:
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@24.12.4)(jsdom@26.1.0)(vite@8.1.5(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))
+
+  packages/agent-host:
+    dependencies:
+      '@actspace/agent-service':
+        specifier: workspace:*
+        version: link:../agent-service
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/llm-pi-ai':
+        specifier: workspace:*
+        version: link:../llm/pi-ai
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../llm/service
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../session/persistence
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@actspace/tools-approval':
+        specifier: workspace:*
+        version: link:../tools/approval
+      '@actspace/tools-filesystem-read':
+        specifier: workspace:*
+        version: link:../tools/filesystem-read
+      '@actspace/tools-filesystem-search':
+        specifier: workspace:*
+        version: link:../tools/filesystem-search
+      '@actspace/tools-filesystem-write':
+        specifier: workspace:*
+        version: link:../tools/filesystem-write
+      '@actspace/tools-image-generation':
+        specifier: workspace:*
+        version: link:../tools/image-generation
+      '@actspace/tools-image-inspection':
+        specifier: workspace:*
+        version: link:../tools/image-inspection
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../tools/runtime
+      '@actspace/tools-shell-tools':
+        specifier: workspace:*
+        version: link:../tools/shell-tools
+      '@actspace/tools-web-tools':
+        specifier: workspace:*
+        version: link:../tools/web-tools
+      ws:
+        specifier: 8.21.0
+        version: 8.21.0
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.2
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
   packages/agent-service:
     dependencies:
@@ -715,6 +794,9 @@ importers:
 
   packages/headless:
     dependencies:
+      '@actspace/agent-service':
+        specifier: workspace:*
+        version: link:../agent-service
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
@@ -821,6 +903,9 @@ importers:
 
   packages/runtime:
     dependencies:
+      '@actspace/agent-host':
+        specifier: workspace:*
+        version: link:../agent-host
       '@actspace/agent-service':
         specifier: workspace:*
         version: link:../agent-service
@@ -3348,6 +3433,9 @@ packages:
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
+
+  '@types/ws@8.18.2':
+    resolution: {integrity: sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==}
 
   '@types/yauzl@2.10.3':
     resolution: {integrity: sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q==}
@@ -7707,6 +7795,10 @@ snapshots:
   '@types/unist@2.0.11': {}
 
   '@types/unist@3.0.3': {}
+
+  '@types/ws@8.18.2':
+    dependencies:
+      '@types/node': 24.12.4
 
   '@types/yauzl@2.10.3':
     dependencies:

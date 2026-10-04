@@ -120,6 +120,7 @@ async function main() {
       "-k",
       "pnpm:dev:deps",
       "pnpm:dev:client-bundle",
+      "pnpm:dev:host-bundles",
       "pnpm:dev:prompts",
       "pnpm:dev:renderer",
       "pnpm:dev:electron:build",

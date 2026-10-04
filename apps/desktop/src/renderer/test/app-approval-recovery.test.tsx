@@ -100,3 +100,13 @@ it("does not resurrect a Run from a snapshot overtaken by its terminal stream ev
   await act(async () => release(stale));
   expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument();
 });
+
+it("restores the approval card after a remote observation resets an existing running overlay", async () => {
+  const f = fixture();
+  await screen.findByRole("button", { name: "拒绝" });
+  f.emit({ type: "agent_run_started", recoveredReset: true });
+  f.emit({ type: "tool_approval_required", toolCallId: "live-call", requestId: "live-approval", toolName: "read_file", summary: "Read fixture", reason: "outside workspace" });
+  const reject = await screen.findByRole("button", { name: "拒绝" });
+  await userEvent.click(reject);
+  expect(f.decide).toHaveBeenCalledWith({ requestId: "live-approval", decision: "deny" });
+});

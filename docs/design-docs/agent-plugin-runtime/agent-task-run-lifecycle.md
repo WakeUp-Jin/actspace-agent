@@ -4,7 +4,7 @@
 
 ## 所有权
 
-DesktopAppService、HeadlessRunner → Runtime 的 ManagedRuns 适配 → AgentService → SessionRunManager → 租约中的 RunFactory。
+DesktopAppService / 远端 AgentApplication、HeadlessRunner → Runtime 的 ManagedRuns 适配 → AgentService → SessionRunManager → 租约中的 RunFactory。
 
 AgentService 管理每会话唯一调度器；TaskLedger 拥有持久任务状态；默认 AgentLoop 仅执行一次 Run。ManagedRuns 将既有桌面/CLI 请求转换成共同操作，不缓存 Loop assembly。旧 RunController 和 AgentLoopService 已移除，旧 Inbox 仍供默认 Loop 的内部通知及低层测试使用，不拥有生产排队任务。
 
@@ -47,3 +47,10 @@ Runtime 组装 `HarnessControl` 的可信 Host 端口；控制服务复用 compo
 Run 已有 harnessId/generationId/revision 保持不变，跨重启稳定摘要放入 `run.configuration.harnessExecutionDigest`。P2 task codec 对 harness 对象字段严格校验，因此不向该对象追加字段，不升级 codec、不重写历史。configuration 原本是可扩展 JSON，旧读取器继续接受新增摘要。
 
 替换只改变后续获取的组合。旧 Run 持有旧租约，父 Run 和子 Run 可使用不同 revision；同会话下一 Run 可更换 Loop。恢复缺产物、共享契约变化或选择日志损坏时执行 blocked，Host 控制服务仍存在；恢复内置组合需独立授权，成功产生新 revision。生产默认没有授权端口或面向用户的启用入口。普通任务失败不会触发 Harness 回退。
+
+
+## P4 远端接入（实施中）
+
+独立 Node Host 和 Desktop 共用会话应用操作与任务调度。连接只拥有观察订阅；断开连接、释放当前会话观察或撤销设备不会把网络取消传播成 Run 取消。正常维护先停止接纳/领取，等待运行和后台资源结束，再关闭 Runtime；force 才请求取消。真实进程测试已验证正常 drain、重启暂停与 force 时限，完整验收见 P4 过程记录。
+
+远端待确认提交保留正文、submissionId 和上传标识；重试先匹配已接纳内容，再返回原任务，不能因文件后来变化重新生成另一条任务。当前会话快照包含任务/审批和当前输出页引用；完整输出落 Journal 后释放临时流缓存。

@@ -74,6 +74,8 @@ export function registerRuntimeV2Ipc(options: {
   const handle = <T extends unknown[], R>(channel: string, listener: (event: IpcMainInvokeEvent, ...args: T) => R | Promise<R>) => {
     ipcMain.handle(channel, (event, ...args) => {
       assertTrustedSender(event, options.getMainWindow());
+      const input = args[0];
+      if ((typeof input === "string" && input.startsWith("host:")) || (input && typeof input === "object" && "sessionId" in input && typeof input.sessionId === "string" && input.sessionId.startsWith("host:"))) throw new Error("Remote Sessions must use the Host adapter");
       return listener(event, ...(args as T));
     });
   };

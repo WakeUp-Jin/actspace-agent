@@ -61,6 +61,7 @@
     "test": "vitest run --globals --passWithNoTests"
   },
   "dependencies": {
+    "@actspace/agent-host": "workspace:*",
     "@actspace/english-learning": "workspace:*",
     "@actspace/boot": "workspace:*",
     "@actspace/bundle": "workspace:*",

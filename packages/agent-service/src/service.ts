@@ -31,11 +31,14 @@ export interface AgentServicePorts {
 export class AgentService {
   readonly #sessions = new Map<string, Promise<SessionRunManager>>();
   #closed = false;
+  #draining = false;
   #closing: Promise<void> | undefined;
   constructor(private readonly ports: AgentServicePorts) {}
 
   async submit(sessionId: string, submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
-    return (await this.#manager(sessionId)).submit(submissionId, content, continuationOf);
+    const manager = await this.#manager(sessionId);
+    if (this.#draining) throw new Error("HOST_DRAINING");
+    return manager.submit(submissionId, content, continuationOf);
   }
   async snapshot(sessionId: string): Promise<TaskSnapshot> { return (await this.#manager(sessionId)).ledger.snapshot(); }
   async designate(sessionId: string, taskId: string, runId: string | null, revision: number): Promise<TaskSnapshot> {
@@ -53,7 +56,21 @@ export class AgentService {
     const snapshot = await manager.ledger.move(taskId, beforeTaskId, revision);
     manager.kick(); return snapshot;
   }
-  async resume(sessionId: string, revision: number): Promise<void> { await (await this.#manager(sessionId)).resume(revision); }
+  async resume(sessionId: string, revision: number): Promise<void> {
+    const manager = await this.#manager(sessionId);
+    if (this.#draining) throw new Error("HOST_DRAINING");
+    await manager.resume(revision);
+  }
+  /** Stop queue claims without aborting owned Runs or their approval waits. */
+  beginDrain(): void { this.#draining = true; }
+  get draining(): boolean { return this.#draining; }
+  async waitForOwnedRuns(): Promise<void> {
+    if (!this.#draining) throw new Error("Begin draining before waiting for Host idle");
+    const managers = await Promise.allSettled(this.#sessions.values());
+    // Failed opens own no Run. Keep their recovery failure cached, but drain every
+    // successfully opened manager and propagate failures from its running work.
+    await Promise.all(managers.flatMap(result => result.status === "fulfilled" ? [result.value.waitForIdle()] : []));
+  }
   async stop(sessionId: string, runId: string): Promise<boolean> { return (await this.#manager(sessionId)).stop(runId); }
   async exclusive<T>(sessionId: string, operation: () => Promise<T>): Promise<T> { return (await this.#manager(sessionId)).exclusive(operation); }
   async activeRunId(sessionId: string): Promise<string | null> { return (await this.#manager(sessionId)).activeRunId; }
@@ -97,7 +114,7 @@ export class AgentService {
       if (session.header.sessionId !== sessionId) throw new Error("Session owner mismatch");
       const ledger = await TaskLedger.open(session);
       ledger.subscribe(snapshot => this.ports.onSnapshot?.(sessionId, snapshot));
-      return new SessionRunManager({ ledger, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), onFailure: error => this.ports.onFailure?.(sessionId, error) });
+      return new SessionRunManager({ ledger, canStart: () => !this.#draining, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), onFailure: error => this.ports.onFailure?.(sessionId, error) });
     })();
     // Keep a failed opening cached: never bypass a recovery/durability failure by retrying in memory.
     this.#sessions.set(sessionId, opening);

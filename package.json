@@ -13,6 +13,7 @@
     }
   },
   "scripts": {
+    "test:agent-host:process": "node --test scripts/test/host-process.test.mjs scripts/test/host-lifecycle-process.test.mjs scripts/test/host-tools-process.test.mjs scripts/test/host-receipt-process.test.mjs scripts/test/host-blocked-process.test.mjs scripts/test/host-subagent-drain-process.test.mjs",
     "models:generate": "node scripts/generate-model-catalog.mjs",
     "clean": "pnpm --filter @actspace/shared clean && pnpm --filter @actspace/runtime clean && pnpm --filter @actspace/agent-cli clean && pnpm --filter @actspace/desktop clean",
     "dev": "node scripts/desktop-dev.mjs",
@@ -21,7 +22,7 @@
     "dev:site": "pnpm --filter @actspace/site dev",
     "build": "pnpm --filter @actspace/agent-cli build && pnpm --filter @actspace/desktop build",
     "build:site": "pnpm --filter @actspace/site build",
-    "test": "pnpm run test:dev-runner && pnpm run test:repo-stats && pnpm run test:refactor-stats && pnpm run test:package-boundaries && pnpm run test:current-docs && pnpm run test:contract-matrix && pnpm check:harness-events && pnpm test:harness-events && pnpm test:harness-recovery && pnpm -r --if-present test",
+    "test": "pnpm run test:dev-runner && pnpm run test:repo-stats && pnpm run test:refactor-stats && pnpm run test:package-boundaries && pnpm run test:current-docs && pnpm run test:contract-matrix && pnpm check:harness-events && pnpm test:harness-events && pnpm test:harness-recovery && pnpm test:agent-host:process && pnpm -r --if-present test",
     "test:dev-runner": "node --test scripts/test/dev-process-runner.test.mjs",
     "test:repo-stats": "node --test scripts/test/repo-stats.test.mjs",
     "test:refactor-stats": "node --test scripts/test/refactor-stats.test.mjs",
@@ -60,7 +61,8 @@
     "release-package": "./scripts/release-package.sh",
     "check:harness-events": "node scripts/check-harness-event-contracts.mjs",
     "test:harness-events": "node --test scripts/test/harness-event-contracts.test.mjs",
-    "test:harness-recovery": "node --test scripts/test/harness-recovery-process.test.mjs"
+    "test:harness-recovery": "node --test scripts/test/harness-recovery-process.test.mjs",
+    "test:agent-host:protocol": "pnpm --filter @actspace/agent-host test && ACTSPACE_TEST_SSH=1 pnpm --filter @actspace/desktop exec vitest run src/main/test/remote-host-ssh.test.ts"
   },
   "dependencies": {
     "@actspace/english-learning": "workspace:*",

@@ -1,8 +1,9 @@
 import { PerformancePanel } from "../PerformancePanel";
 import type { ComponentType } from "react";
-import { Archive, ArrowLeft, BarChart3, Cpu, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
+import { Server, Archive, ArrowLeft, BarChart3, Cpu, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
 
 export type SettingsSectionId =
+  | "hosts"
   | "general"
   | "model"
   | "search"
@@ -26,6 +27,7 @@ export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId
   {
     label: "能力",
     sections: [
+      { id: "hosts", label: "远端 Host", icon: Server },
       { id: "model", label: "模型", icon: Cpu },
       { id: "search", label: "搜索", icon: Search },
       { id: "tools", label: "工具", icon: Wrench },

@@ -20,14 +20,16 @@
     "dev:electron:run": "node ./scripts/dev-electron-run.mjs",
     "clean": "rm -rf dist dist-electron",
     "build:deps": "pnpm --filter @actspace/runtime... build && pnpm --filter @actspace/client build",
-    "build:deps:dev": "node ../../scripts/generate-desktop-build-graph.mjs && tsc -b ../../tsconfig.desktop-deps.json && pnpm --filter @actspace/client exec esbuild src/sessions/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/sessions.cjs && pnpm --filter @actspace/english-learning exec node scripts/copy-prompts.mjs && pnpm --filter @actspace/runtime exec node scripts/build-default-harness.mjs",
+    "build:deps:dev": "node ../../scripts/generate-desktop-build-graph.mjs && tsc -b ../../tsconfig.desktop-deps.json && pnpm --filter @actspace/client exec esbuild src/sessions/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/sessions.cjs && pnpm --filter @actspace/client exec esbuild src/host/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/host.cjs && pnpm --filter @actspace/agent-host exec esbuild src/node-ports/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/node-ports.cjs && pnpm --filter @actspace/english-learning exec node scripts/copy-prompts.mjs && pnpm --filter @actspace/runtime exec node scripts/build-default-harness.mjs",
     "build": "pnpm run clean && pnpm run build:deps && pnpm build:renderer && pnpm build:electron",
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json && esbuild src/preload/index.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/preload/index.bundle.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:host-bundles": "concurrently -k \"pnpm --filter @actspace/client exec esbuild src/host/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/host.cjs --watch=forever\" \"pnpm --filter @actspace/agent-host exec esbuild src/node-ports/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/node-ports.cjs --watch=forever\""
   },
   "dependencies": {
+    "ws": "8.21.0",
     "@actspace/client": "workspace:*",
     "@actspace/desktop-app": "workspace:*",
     "@actspace/english-learning": "workspace:*",
@@ -67,9 +69,11 @@
     "@actspace/tools-shell-tools": "workspace:*",
     "@actspace/tools-web-tools": "workspace:*",
     "@actspace/tools-image-generation": "workspace:*",
-    "@actspace/tools-image-inspection": "workspace:*"
+    "@actspace/tools-image-inspection": "workspace:*",
+    "@actspace/agent-host": "workspace:*"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "@actspace/core-agent-loop": "workspace:*",
     "@tailwindcss/vite": "^4.3.0",
     "@testing-library/jest-dom": "^6.6.3",

@@ -1,3 +1,4 @@
+import { openRemoteFile } from "../../hooks/remoteArtifact";
 import { FileText, Image as ImageIcon, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { MessageBlock, WorkspaceReadFileResult } from "@actspace/shared";
@@ -184,6 +185,7 @@ export function TurnOutputArtifacts({
         return;
       }
 
+      if (sessionId && await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab)) return;
       if (!workspaceRoot || !artifact.workspaceRelativePath || !window.actspace?.readWorkspaceFile) {
         setError("该文件不在当前工作区内，暂时不能预览。");
         return;
@@ -207,6 +209,11 @@ export function TurnOutputArtifacts({
   async function showContextMenu(artifact: TurnOutputArtifact) {
     if (!window.actspace?.showArtifactContextMenu) return;
     setError(null);
+    if (artifact.kind === "file" && sessionId?.startsWith("host:")) {
+      try { await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab, true); }
+      catch { setError("远端文件下载失败，请确认连接后重试。"); }
+      return;
+    }
     const input = artifact.kind === "image"
       ? sessionId
         ? { kind: "session_image" as const, sessionId, artifactPath: artifact.sourcePath }

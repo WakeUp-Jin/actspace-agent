@@ -38,6 +38,14 @@ export const DEFAULT_HARNESS_SHARED_SERVICES = Object.freeze([
   ...["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => `actspace.host.tools.${id}`),
 ]);
 
+/** Resolve trusted Host contracts without touching persisted executable artifacts. */
+export async function defaultHarnessSharedModules(): Promise<SharedArtifactModule[]> {
+  return (await Promise.all(hostModules.map(async specifier => {
+    const url = pathToFileURL(createRequire(import.meta.url).resolve(specifier)).href;
+    return { specifier, url, integrity: artifactHash(await readFile(fileURLToPath(url))) };
+  }))).sort((a, b) => a.specifier.localeCompare(b.specifier));
+}
+
 /** Publish the build-produced closure; only supported default builtin implementation is admitted. */
 export async function prepareDefaultHarnessArtifact(options: {
   readonly artifactRoot: string;
@@ -48,10 +56,7 @@ export async function prepareDefaultHarnessArtifact(options: {
   const sourceRoot = options.sourceRoot ?? fileURLToPath(new URL("../default-harness/", import.meta.url));
   const files: unknown = JSON.parse(await readFile(join(sourceRoot, "files.json"), "utf8"));
   if (!Array.isArray(files) || files.some(file => typeof file !== "string" || !file.endsWith(".js"))) throw new Error("Invalid default Harness build inventory");
-  const sharedModules: SharedArtifactModule[] = await Promise.all(hostModules.map(async specifier => {
-    const url = pathToFileURL(createRequire(import.meta.url).resolve(specifier)).href;
-    return { specifier, url, integrity: artifactHash(await readFile(fileURLToPath(url))) };
-  }));
+  const sharedModules = await defaultHarnessSharedModules();
   const id = pluginId("actspace.default-harness");
   const manifest: PluginManifest = {
     schemaVersion: 1, pluginId: id, version: "1", name: "Default built-in Harness", runtimeContract: "actspace.runtime.v2",

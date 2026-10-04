@@ -110,6 +110,14 @@ export class RuntimeSessionController {
       bytes -= sizes[trimmed]! + 1;
       trimmed += 1;
     }
+    if (trimmed > 0 && input.afterSeq === undefined) {
+      // Start a history page at the next whole turn when one fits the budget.
+      // The cursor retains the omitted fragment for the preceding page. A single
+      // oversized turn still makes bounded progress instead of returning empty.
+      const nextStart = starts.find(seq => seq >= journal[trimmed]!.seq && seq < until);
+      const aligned = nextStart === undefined ? -1 : journal.findIndex(event => event.seq >= nextStart);
+      if (aligned >= trimmed) trimmed = aligned;
+    }
     if (trimmed > 0) journal = journal.slice(trimmed);
     const windowFrom = journal[0]?.seq ?? until;
     const messageIds = new Set(journal.flatMap(event => event.surface ? [event.surface.node.messageId] : []));

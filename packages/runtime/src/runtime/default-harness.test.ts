@@ -7,6 +7,7 @@ vi.mock("./default-harness.js", async importOriginal => {
   const original = await importOriginal<typeof import("./default-harness.js")>();
   return { ...original, prepareDefaultHarnessArtifact: (options: Parameters<typeof original.prepareDefaultHarnessArtifact>[0]) => original.prepareDefaultHarnessArtifact({ ...options, sourceRoot: fileURLToPath(new URL("../../dist/default-harness/", import.meta.url)) }) };
 });
+import { defaultHarnessSharedModules } from "./default-harness.js";
 import { createCordisRoot, publishPluginArtifact, pluginId } from "@actspace/cordis-adapter";
 import { AgentRuntimeService } from "./agent-runtime-plugin.js";
 import { AgentRegistry } from "@actspace/core-agent";
@@ -130,3 +131,8 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     await app.dispose(); await runtime.dispose(); await sessions.closeAll(); await root.dispose(); await rm(directory, { recursive: true, force: true });
   }
 }, 20_000);
+
+it("keeps Host compatibility modules in the persisted artifact canonical order", async () => {
+  const modules = await defaultHarnessSharedModules();
+  expect(modules.map(module => module.specifier)).toEqual(modules.map(module => module.specifier).sort((a, b) => a.localeCompare(b)));
+});

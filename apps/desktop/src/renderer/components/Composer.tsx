@@ -97,6 +97,8 @@ export type ComposerWorkspaceOption = {
 };
 
 export type ComposerExecutionContext = {
+  remote?: ReturnType<typeof import("../hooks/useRemoteTarget").useRemoteTarget>;
+  targetLocked?: boolean;
   gitContext: WorkspaceGitContext | null;
   selectedBranch?: string;
   runLocation: SessionRunLocation;
@@ -625,6 +627,10 @@ export function Composer({
   const [contextOpen, setContextOpen] = useState(false);
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const attachmentsRef = useRef<ComposerAttachment[]>([]);
+  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  const [uploadProgress, setUploadProgress] = useState<import("@actspace/shared/host-protocol").HostUploadProgress | null>(null);
+  useEffect(() => window.actspaceHosts?.onUploadProgress(value => { if (value.sessionId === sessionId) setUploadProgress(value.state === "finished" ? null : value); }), [sessionId]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<{ message: string; issue?: ChatAttachmentIssue } | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -645,19 +651,19 @@ export function Composer({
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const modelOptionsRef = useRef<HTMLDivElement | null>(null);
   const hasAttachments = attachments.length > 0 || (!isChatForm && selectedSkills.length > 0);
-  const selectedModelAvailable = modelList.some((model) => model.id === selectedModelId);
+  const selectedModelAvailable = executionContext?.remote?.hostId ? executionContext.remote.canSend : modelList.some((model) => model.id === selectedModelId);
   const selectedModelSpec = modelList.find((spec) => spec.id === selectedModelId);
   const canSendMessage = Boolean(
-    (message.trim() || attachments.length > 0 || responseAnnotations.length > 0) && selectedModelAvailable,
+    (message.trim() || attachments.length > 0 || responseAnnotations.length > 0) && selectedModelAvailable && !sending,
   );
   const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
   const editingModelOptions = currentModelRuntimeOptions(editingModelSpec, modelRuntimeOptions[editingModelId]);
   const selectedModelOptions = currentModelRuntimeOptions(selectedModelSpec, modelRuntimeOptions[selectedModelId]);
-  const configurationKey = JSON.stringify({ model: selectedModelId, thinkingEnabled: selectedModelOptions.thinkingEnabled, reasoningEffort: selectedModelOptions.reasoningEffort, selectedSkillIds: selectedSkills });
+  const configurationKey = JSON.stringify({ model: executionContext?.remote?.hostId ? executionContext.remote.model : selectedModelId, thinkingEnabled: selectedModelOptions.thinkingEnabled, reasoningEffort: selectedModelOptions.reasoningEffort, selectedSkillIds: selectedSkills });
   useEffect(() => {
-    if (!sessionId || !window.actspace?.taskCommand) return;
+    if (!sessionId || !window.actspace?.taskCommand || (executionContext?.remote?.hostId && !executionContext.remote.canSend)) return;
     void window.actspace.taskCommand({ sessionId, op: "configure", configuration: JSON.parse(configurationKey) }).catch(error => console.error("Failed to update execution configuration", error));
-  }, [sessionId, configurationKey]);
+  }, [sessionId, configurationKey, executionContext?.remote?.hostId, executionContext?.remote?.canSend]);
   const editingReasoningEfforts = modelReasoningEfforts(editingModelSpec);
   const normalizedModelSearchQuery = modelSearchQuery.trim().toLocaleLowerCase();
   const filteredModelList = normalizedModelSearchQuery
@@ -995,7 +1001,7 @@ export function Composer({
 
     if (window.actspace?.selectFiles) {
       try {
-        const result = await window.actspace.selectFiles();
+        const result = await window.actspace.selectFiles(executionContext?.remote?.hostId ? { remote: true } : undefined);
         if (!result.canceled) appendAttachments(result.attachments);
       } catch (error) {
         console.error("Failed to select Chat attachments", error);
@@ -1172,12 +1178,24 @@ export function Composer({
     finishSlashSelection();
   }
 
+  const activeDraftKeyRef = useRef(draftKey);
+  activeDraftKeyRef.current = draftKey;
+
   function sendCurrentMessage() {
-    if (!canSendMessage || !onSend || inputLocked) return;
+    if (!canSendMessage || !onSend || inputLocked || sendingRef.current) return;
     const sentAttachments = [...attachments];
-    const sendResult = onSend(message.trim(), createSendOptions(true));
-    void Promise.resolve(sendResult).finally(() => {
-      sentAttachments.forEach(revokeAttachmentPreview);
+    const remoteSend = Boolean(executionContext?.remote?.hostId);
+    if (remoteSend) { sendingRef.current = true; setSending(true); }
+    const options = createSendOptions(true);
+    let sendResult: void | Promise<void>;
+    try { sendResult = onSend(message.trim(), options); } catch (error) { sendResult = Promise.reject(error); }
+    void Promise.resolve(sendResult).then(() => { sentAttachments.forEach(revokeAttachmentPreview); }).catch((error: unknown) => {
+      if (draftKey) writeDraft?.(draftKey, message);
+      if (activeDraftKeyRef.current !== draftKey) return;
+      setMessage(current => current || message); setAttachments(current => current.length ? current : sentAttachments);
+      setSendError({ message: error instanceof Error ? error.message : "发送失败，草稿已保留" });
+    }).finally(() => {
+      sendingRef.current = false; setSending(false); setUploadProgress(null);
     });
     setMessage("");
     if (draftKey) writeDraft?.(draftKey, "");
@@ -1685,7 +1703,8 @@ export function Composer({
     if (!isChatForm && skillsOpen) return renderSkillsMenu();
 
     const modeKeys: CommandMenuModeKey[] = ["agent", "plan", "chat"];
-    const AttachmentIcon = isChatForm ? Paperclip : Image;
+    const acceptsFiles = isChatForm || Boolean(executionContext?.remote?.hostId);
+    const AttachmentIcon = acceptsFiles ? Paperclip : Image;
     return (
       <div className={COMMAND_MENU_CLASS} ref={commandMenuRef} role="menu" aria-label="添加上下文或工具">
         {modeKeys.map(renderCommandModeRow)}
@@ -1694,11 +1713,11 @@ export function Composer({
           className={COMMAND_MENU_ROW_CLASS}
           type="button"
           role="menuitem"
-          aria-label={isChatForm ? "图片与文件" : "图片"}
-          onClick={() => void (isChatForm ? handleSelectChatFiles() : handleSelectImages())}
+          aria-label={acceptsFiles ? "图片与文件" : "图片"}
+          onClick={() => void (acceptsFiles ? handleSelectChatFiles() : handleSelectImages())}
         >
           <AttachmentIcon className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={1.9} aria-hidden="true" />
-          <span className={COMMAND_MENU_ROW_LABEL_CLASS}>{isChatForm ? "图片与文件" : "图片"}</span>
+          <span className={COMMAND_MENU_ROW_LABEL_CLASS}>{acceptsFiles ? "图片与文件" : "图片"}</span>
           {isChatForm ? <span className={COMMAND_MENU_ROW_DESCRIPTION_CLASS}>PNG、JPEG、WEBP、GIF、TXT、Markdown、JSON、CSV</span> : null}
         </button>
         {!isChatForm ? (
@@ -1750,6 +1769,11 @@ export function Composer({
   }
 
   function renderModelSelector() {
+    const remote = executionContext?.remote;
+    if (remote?.hostId) return <select aria-label="远端模型" className="max-w-[220px] rounded-act-sm bg-surface-base px-2 py-1 text-act-sm text-text-main" value={remote.model} disabled={remote.host?.state !== "connected"} onChange={event => remote.selectModel(event.target.value)}>
+      {!remote.description ? <option value="">等待 Host 模型</option> : remote.description.models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
+    </select>;
+
     // inline 时模型按钮靠右，菜单向左锚定；stacked 时从左侧向右展开。
     const modelMenuClusterClass = `${MODEL_MENU_CLUSTER_CLASS} ${resolvedLayout === "inline" ? "right-0" : "left-0"}`;
     const modelMenuMotionClass = modelMenuEntered
@@ -1999,7 +2023,7 @@ export function Composer({
     const showStop = isStreaming && !(messageQueue && canSendMessage);
     const queueing = isStreaming && !showStop;
     const stopBlockedByCompaction = showStop && isCompacting;
-    const sendDisabled = showStop ? isAborting || stopBlockedByCompaction : !canSendMessage;
+    const sendDisabled = showStop ? isAborting || stopBlockedByCompaction || Boolean(executionContext?.remote?.hostId && executionContext.remote.host?.state !== "connected") : !canSendMessage;
     const modelUnavailable = !selectedModelAvailable;
     const tooltipLabel = stopBlockedByCompaction
       ? "压缩完成后可继续"
@@ -2111,6 +2135,7 @@ export function Composer({
             {statusNotice}
           </div>
         ) : null}
+        {sending ? <div role="status" className="px-3 py-1 text-act-xs text-text-muted">{uploadProgress?.state === "uploading" ? `正在上传附件 ${Math.round(uploadProgress.bytes / Math.max(1, uploadProgress.total) * 100)}%` : "正在确认提交…"}</div> : null}
         {attachmentError ? (
           <div className="px-3 pb-1 text-act-xs leading-4 text-danger" role="alert">
             {attachmentError}
@@ -2131,6 +2156,7 @@ export function Composer({
   }
 
   function renderReviewActionsStrip() {
+    if (executionContext?.remote?.hostId) return null;
     if (isChatForm) return null;
     if (surface !== "followup" && surface !== "initial") return null;
     if (!reviewSummary || reviewSummary.status === "empty") return null;
@@ -2212,7 +2238,7 @@ export function Composer({
           ) : null}
           <span className={STATUS_ITEM_CLASS}>
             <Laptop className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
-            <span>{runLocation === "worktree" ? "工作树" : "本机"}</span>
+            <span>{executionContext?.remote?.hostId ? `${executionContext.remote.host?.name ?? "远端"}${executionContext.remote.canSend ? "" : " · 未就绪"}` : runLocation === "worktree" ? "工作树" : "本机"}</span>
           </span>
           {permissionControl ? <span className={STATUS_ITEM_CLASS}>{permissionControl}</span> : null}
         </div>
@@ -2394,7 +2420,19 @@ export function Composer({
   }
 
   function renderInitialContextRow() {
-    if (surface !== "initial" || isChatForm) return null;
+    if (surface !== "initial" && !executionContext?.remote?.hostId) return null;
+    const remote = executionContext?.remote;
+    if (remote) return <div className={INITIAL_CONTEXT_ROW_CLASS}>
+      <select aria-label="会话运行位置" className="max-w-[200px] rounded-act-sm bg-surface-base text-act-sm text-text-muted" value={remote.hostId ?? ""} disabled={executionContext?.targetLocked} onChange={event => remote.selectHost(event.target.value || null)}>
+        <option value="">本机 Mac</option>
+        {remote.hostId && !remote.hosts.some(host => host.hostId === remote.hostId) ? <option value={remote.hostId}>远端 · 未连接</option> : null}
+        {remote.hosts.map(host => <option key={host.hostId} value={host.hostId}>{host.name}{host.state === "connected" ? "" : " · 离线"}</option>)}
+      </select>
+      {remote.hostId ? <><select aria-label="远端工作区" className="max-w-[260px] rounded-act-sm bg-surface-base text-act-sm text-text-muted" value={remote.workspaceId} disabled={executionContext?.targetLocked} onChange={event => remote.selectWorkspace(event.target.value)}>
+        {!remote.description ? <option value="">等待 Host 工作区</option> : remote.description.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name} · {workspace.path}</option>)}
+      </select>{!remote.canSend ? <span className="text-act-xxs text-text-faint">Host 未就绪，草稿仍可编辑</span> : null}</> : <>{renderContextSelector("workspace", selectedWorkspaceLabel)}{gitHasBranch && branchLabel ? renderContextSelector("branch", branchLabel, "branch") : null}{renderContextSelector("runtime", runLocation === "worktree" ? "新建工作树" : "本机", "runtime")}</>}
+    </div>;
+    if (isChatForm) return null;
 
     return (
       <div className={INITIAL_CONTEXT_ROW_CLASS} aria-label="初始工作区与运行位置选择">

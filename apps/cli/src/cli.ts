@@ -22,6 +22,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   };
 
   try {
+    if (argv[0] === "host") return await (await import("./runtime-v2/host-command")).runHostCommand(argv.slice(1));
     const parsed = parseCliArgs(argv);
     if (parsed.command === "help") {
       process.stdout.write(`${usage()}\n`);

@@ -7,3 +7,5 @@ export * from "./execution-budget.js";
 export * from "./service.js";
 export { manifest } from "./manifest.js";
 export { apply, activate } from "./plugin.js";
+export * from "./application.js";
+export * from "./session-commands.js";

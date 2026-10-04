@@ -31,6 +31,7 @@ import { IconButton } from "./ui/IconButton";
 export type SidebarMode = "expanded" | "hidden";
 export type SidebarView = "chat" | "lab" | "settings" | "extensions";
 export type NewSessionInput = {
+  hostId?: string;
   workspaceId?: string;
   workspaceRoot?: string;
   agentForm?: MainAgentForm;
@@ -96,6 +97,7 @@ function clampContextMenuPosition(position: { x: number; y: number }): { x: numb
 }
 
 type WorkspaceGroup = {
+  hostId?: string;
   key: string;
   label: string;
   workspaceId?: string;
@@ -104,6 +106,7 @@ type WorkspaceGroup = {
 };
 
 function sessionWorkspaceRoot(session: SessionListItem, workspaces: WorkspaceEntry[]): string | undefined {
+  if (session.hostId) return session.workspaceRoot;
   return workspaces.find((workspace) => workspace.id === session.workspaceId)?.path ??
     workspaces.find((workspace) => session.workspaceRoot && workspace.path === session.workspaceRoot)?.path ??
     session.workspaceRoot ??
@@ -124,15 +127,16 @@ function groupSessionsByWorkspace(sessions: SessionListItem[], workspaces: Works
 
   const defaultWorkspace = workspaces.find((workspace) => workspace.kind === "default");
   for (const session of sessions) {
-    const matchedWorkspace =
+    const matchedWorkspace = session.hostId ? undefined :
       workspaces.find((workspace) => workspace.id === session.workspaceId) ??
       workspaces.find((workspace) => session.workspaceRoot && workspace.path === session.workspaceRoot) ??
       (session.workspaceRoot ? undefined : defaultWorkspace);
-    const key = matchedWorkspace?.id ?? session.workspaceId ?? workspaceKey(session.workspaceRoot);
+    const key = session.hostId ? JSON.stringify([session.hostId, session.workspaceRoot]) : matchedWorkspace?.id ?? session.workspaceId ?? workspaceKey(session.workspaceRoot);
     if (!groups.has(key)) {
       groups.set(key, {
         key,
-        label: matchedWorkspace?.label ?? workspaceLabelFromRoot(session.workspaceRoot),
+        hostId: session.hostId,
+        label: session.hostId ? `${session.hostName} · ${workspaceLabelFromRoot(session.workspaceRoot)}` : matchedWorkspace?.label ?? workspaceLabelFromRoot(session.workspaceRoot),
         workspaceId: matchedWorkspace?.id ?? session.workspaceId,
         workspaceRoot: matchedWorkspace?.path ?? session.workspaceRoot,
         sessions: [],
@@ -543,6 +547,7 @@ function SessionRow({
               aria-current={isActive ? "page" : undefined}
             >
               <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{displayTitle}</span>
+              {session.hostName ? <span className="shrink-0 text-act-xxs text-text-faint" title={session.connectionState}>{session.hostName}{session.connectionState !== "connected" ? " · 离线" : ""}</span> : null}
             </button>
           )}
           <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
@@ -798,7 +803,7 @@ function CollapsibleSessionList({
   const [limit, setLimit] = useState(SESSION_VISIBLE_LIMIT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const remoteGroups = browse?.groups.filter(g => groupKey === 'pinned' ? g.pinned : !g.pinned && g.workspaceRoot === (sessions[0]?.workspaceRoot ?? '')) ?? [];
+  const remoteGroups = browse?.groups.filter(g => groupKey === 'pinned' ? g.pinned : !g.pinned && g.hostId === sessions[0]?.hostId && g.workspaceRoot === (sessions[0]?.workspaceRoot ?? '')) ?? [];
   const remoteMore = remoteGroups.some(g => g.hasMore);
   const hasOverflow = browse ? remoteMore : sessions.length > limit;
   const visibleSessions = browse ? sessions : sessions.slice(0, limit);
@@ -808,8 +813,8 @@ function CollapsibleSessionList({
     setLoading(true); setError(null);
     try {
       for (const group of remoteGroups.filter(g => g.hasMore)) {
-        const last = [...sessions].filter(s => (s.workspaceRoot ?? '') === group.workspaceRoot).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)).at(-1);
-        await browse.loadMore({ workspaceRoot: group.workspaceRoot, pinned: group.pinned, after: last?.id });
+        const last = [...sessions].filter(s => s.hostId === group.hostId && (s.workspaceRoot ?? '') === group.workspaceRoot).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)).at(-1);
+        await browse.loadMore({ hostId: group.hostId, workspaceRoot: group.workspaceRoot, pinned: group.pinned, after: last?.id });
       }
     } catch (e) { setError(e instanceof Error ? e.message : '会话加载失败'); }
     finally { setLoading(false); }
@@ -915,11 +920,11 @@ export function Sidebar({
   const workspaceGroupSessions = useMemo(() => {
     const groups = new Map<string, SessionListItem[]>();
     for (const session of sessions) {
-      const matchedWorkspace =
+      const matchedWorkspace = session.hostId ? undefined :
         workspaces.find((workspace) => workspace.id === session.workspaceId) ??
         workspaces.find((workspace) => session.workspaceRoot && workspace.path === session.workspaceRoot) ??
         (!session.workspaceRoot ? workspaces.find((workspace) => workspace.kind === "default") : undefined);
-      const key = matchedWorkspace?.id ?? session.workspaceId ?? workspaceKey(session.workspaceRoot);
+      const key = session.hostId ? JSON.stringify([session.hostId, session.workspaceRoot]) : matchedWorkspace?.id ?? session.workspaceId ?? workspaceKey(session.workspaceRoot);
       const current = groups.get(key) ?? [];
       current.push(session);
       groups.set(key, current);
@@ -1218,7 +1223,7 @@ function WorkspaceSection({
             tooltip="在此工作区中新建会话"
             onClick={(event) => {
               event.stopPropagation();
-              onNewSession?.({ workspaceId: group.workspaceId, workspaceRoot: group.workspaceRoot, agentForm: "agent" });
+              onNewSession?.({ hostId: group.hostId, workspaceId: group.workspaceId, workspaceRoot: group.workspaceRoot, agentForm: "agent" });
             }}
           >
             <Plus size={13} strokeWidth={2} aria-hidden="true" />

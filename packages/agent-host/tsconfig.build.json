@@ -1,0 +1,55 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../agent-service/tsconfig.build.json"
+    },
+    {
+      "path": "./../cordis-adapter/tsconfig.build.json"
+    },
+    {
+      "path": "./../llm/pi-ai/tsconfig.build.json"
+    },
+    {
+      "path": "./../llm/service/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/persistence/tsconfig.build.json"
+    },
+    {
+      "path": "./../shared/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/approval/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/filesystem-read/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/filesystem-search/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/filesystem-write/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/image-generation/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/image-inspection/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/runtime/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/shell-tools/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/web-tools/tsconfig.build.json"
+    }
+  ]
+}

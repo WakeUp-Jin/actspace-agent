@@ -499,6 +499,9 @@ export type PendingApprovalInfo = {
 };
 
 export type SessionListItem = {
+  hostId?: string;
+  hostName?: string;
+  connectionState?: import("./host-protocol").HostConnectionState;
   /** Runtime session admission facts used by optional session capabilities. */
   accessState?: "read-write" | "degraded" | "browse-only" | "corrupt";
   isChildSession?: boolean;
@@ -521,8 +524,8 @@ export type SessionListItem = {
   archived?: boolean;
 };
 
-export type SessionListPageInput = { workspaceRoot?: string; pinned?: boolean; after?: string };
-export type SessionListPage = { items: SessionListItem[]; groups: { workspaceRoot: string; pinned: boolean; hasMore: boolean }[]; indexing: boolean; failed: number };
+export type SessionListPageInput = { hostId?: string; workspaceRoot?: string; pinned?: boolean; after?: string };
+export type SessionListPage = { items: SessionListItem[]; groups: { hostId?: string; workspaceRoot: string; pinned: boolean; hasMore: boolean }[]; indexing: boolean; failed: number };
 
 export type SessionListInput = {
   /** 缺省为 false：普通会话列表只返回未归档会话。 */
@@ -898,6 +901,8 @@ export type WorkspaceVisibilityResult = {
 };
 
 export type SessionCreateInput = {
+  /** Remote ownership is fixed when the Session is created. */
+  hostId?: string;
   title?: string;
   agentForm?: import("./runtime-v2/runtime").MainAgentForm;
   agentMode?: ComposerMode;

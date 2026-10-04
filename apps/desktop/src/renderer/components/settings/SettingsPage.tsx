@@ -1,3 +1,4 @@
+import { HostConnectionsSettings } from "./HostConnectionsSettings";
 import { SpeechSettingsSection } from "./SpeechSettingsSection";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { CheckCircle2, ChevronRight, CircleAlert, KeyRound, Loader2, ShieldCheck, X } from "lucide-react";
@@ -407,6 +408,7 @@ function PerformanceSettingsSection({ settingsV4, onUpdateNamespace }: SectionPr
 
 function SettingsContent({ section, ...rest }: SectionProps & { section: SettingsSectionId }) {
   switch (section) {
+    case "hosts": return <HostConnectionsSettings />;
     case "general":
       return (
         <PageShell title="通用" description="ActSpace 与 Agent 的默认行为。">

@@ -1,3 +1,4 @@
+import { HOST_IPC } from "@actspace/shared/host-protocol";
 import { PERFORMANCE_CHANNELS } from "@actspace/shared";
 import { ENGLISH_LEARNING_CHANNELS } from "@actspace/shared";
 import { projectChatWindow, projectChatEvents } from "@actspace/client/sessions";
@@ -331,7 +332,7 @@ contextBridge.exposeInMainWorld("actspace", {
   setPerformanceActive: (active: boolean) => ipcRenderer.invoke(PERFORMANCE_CHANNELS.active, active),
   getBootstrapState: () => invokeFixedRenderer("app:get-bootstrap-state") as Promise<BootstrapState>,
   taskCommand: (input: import("@actspace/shared/runtime-v2").TaskCommand) => invokeFixedRenderer("agent:task-command", input) as Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>,
-  submitTask: (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => invokeFixedRenderer("agent:submit-task", input) as Promise<import("@actspace/shared/runtime-v2").TaskReceipt>,
+  submitTask: (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => invokeFixedRenderer("agent:submit-task", input) as Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult>,
   runAgent: async (input: RunAgentInput): Promise<AgentRunResult | RunAgentPreparationFailure> => {
     const response = await invokeFixedRenderer("agent:run", input) as RunAgentPreparationFailure | (Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection });
     if (response.status === "rejected") return response;
@@ -344,7 +345,7 @@ contextBridge.exposeInMainWorld("actspace", {
   abortAgentRun: (input: AbortAgentRunInput) => invokeFixedRenderer("agent:abort-run", input) as Promise<boolean>,
   steerAgentRun: (input: SteerAgentRunInput) => invokeFixedRenderer("agent:steer", input) as Promise<SteerAgentRunResult>,
   cancelSteer: (input: CancelSteerInput) => invokeFixedRenderer("agent:cancel-steer", input) as Promise<CancelSteerResult>,
-  selectFiles: () => invokeFixedRenderer("dialog:select-files") as Promise<SelectFilesResult>,
+  selectFiles: (input?: { remote?: boolean }) => invokeFixedRenderer("dialog:select-files", input) as Promise<SelectFilesResult>,
   selectImages: () => invokeFixedRenderer("dialog:select-images") as Promise<SelectImagesResult>,
   importComposerImage: (input: ImportComposerImageInput) =>
     invokeFixedRenderer("composer:import-image", input) as Promise<ImportComposerImageResult>,
@@ -628,4 +629,18 @@ contextBridge.exposeInMainWorld("actspace", {
       ipcRenderer.removeListener(RUNTIME_V2_FIXED_RENDERER_CHANNELS.appShuttingDown, handler);
     };
   },
+});
+
+contextBridge.exposeInMainWorld("actspaceHosts", {
+  activate: (sessionId: string | null) => ipcRenderer.invoke(HOST_IPC.activate, sessionId),
+  preview: (input: unknown) => ipcRenderer.invoke(HOST_IPC.preview, input),
+  onUploadProgress: (listener: (value: unknown) => void) => { const callback = (_event: unknown, value: unknown) => listener(value); ipcRenderer.on(HOST_IPC.uploadProgress, callback); return () => ipcRenderer.removeListener(HOST_IPC.uploadProgress, callback); },
+  download: (input: unknown) => ipcRenderer.invoke(HOST_IPC.download, input),
+  list: () => ipcRenderer.invoke(HOST_IPC.list),
+  add: (input: import("@actspace/shared/host-protocol").AddHostInput) => ipcRenderer.invoke(HOST_IPC.add, input),
+  remove: (id: string) => ipcRenderer.invoke(HOST_IPC.remove, id),
+  reconnect: (id: string) => ipcRenderer.invoke(HOST_IPC.reconnect, id),
+  call: (hostId: string, method: string, params: unknown) => ipcRenderer.invoke(HOST_IPC.call, { hostId, method, params }),
+  onChanged: (listener: (value: unknown) => void) => { const callback = (_event: unknown, value: unknown) => listener(value); ipcRenderer.on(HOST_IPC.changed, callback); return () => ipcRenderer.removeListener(HOST_IPC.changed, callback); },
+  onEvent: (listener: (value: unknown) => void) => { const callback = (_event: unknown, value: unknown) => listener(value); ipcRenderer.on(HOST_IPC.event, callback); return () => ipcRenderer.removeListener(HOST_IPC.event, callback); },
 });

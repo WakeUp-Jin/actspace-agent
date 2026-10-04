@@ -31,6 +31,9 @@
 - id: headless-runner
   name: "@actspace/headless/plugin"
   inject: [actspace.host.headless, session.runtime, agent.runtime]
+- id: agent-host
+  name: "@actspace/agent-host/plugin"
+  inject: [session.runtime, agent.runtime]
 - id: desktop-app
   name: "@actspace/desktop-app/plugin"
   inject: [session.runtime, agent.runtime, llm.service]

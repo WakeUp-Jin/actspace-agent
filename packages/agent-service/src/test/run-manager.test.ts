@@ -8,12 +8,12 @@ import { SessionRunManager, type RunFactory } from "../run-manager.js";
 import { ExecutionBudget, RunBudget } from "../execution-budget.js";
 
 function gate() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
-async function fixture(factory: RunFactory, release: () => Promise<void> = async () => {}, beforeAcquire: () => Promise<void> = async () => {}) {
+async function fixture(factory: RunFactory, release: () => Promise<void> = async () => {}, beforeAcquire: () => Promise<void> = async () => {}, canStart: () => boolean = () => true) {
   const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "runs", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   const ledger = await TaskLedger.open(session);
   let model = "first"; let mode: "plan" | "agent" = "plan"; let acquired = 0;
-  const manager = new SessionRunManager({ ledger, harnessId: "main", readConfiguration: () => ({ model, mode }), acquire: async () => {
+  const manager = new SessionRunManager({ ledger, canStart, harnessId: "main", readConfiguration: () => ({ model, mode }), acquire: async () => {
     await beforeAcquire();
     acquired++;
     return { scope: new AgentScope("test-run"), context: {}, executionDigest: "stable-content", harnessId: "main", generationId: `g${acquired}`, revision: acquired, getService: <T>() => factory as T, release };
@@ -195,5 +195,20 @@ it("retains unclaimed content on Harness recovery blocking and resumes after Hos
   expect(manager.blocked).toBe(false);
   blocked = false; await manager.resume(ledger.snapshot().revision); await manager.waitForIdle();
   expect(ledger.snapshot()).toMatchObject({ tasks: [{ state: "completed" }], runs: [{ result: "after repair" }] });
+  await manager.dispose(); await session.close();
+});
+
+
+it("drains an active Run without abort and leaves the next task pending", async () => {
+  const entered = gate(), finish = gate(); let accepting = true, executions = 0;
+  const { manager, ledger, session } = await fixture({ create: async input => ({
+    execute: async () => { executions++; entered.resolve(); await finish.promise; expect(input.signal.aborted).toBe(false); return { outcome: "completed", value: null }; },
+    dispose: async () => {},
+  }) }, async () => {}, async () => {}, () => accepting);
+  await manager.submit("first", "first"); await entered.promise;
+  await manager.submit("queued", "queued");
+  accepting = false; finish.resolve(); await manager.waitForIdle();
+  expect(executions).toBe(1);
+  expect(ledger.snapshot().tasks.map(task => task.state)).toEqual(["completed", "pending"]);
   await manager.dispose(); await session.close();
 });

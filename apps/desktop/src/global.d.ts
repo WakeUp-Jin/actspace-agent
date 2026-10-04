@@ -7,7 +7,7 @@ declare global {
       setPerformanceActive?: (active: boolean) => Promise<void>;
       getBootstrapState: () => Promise<import("@actspace/shared").BootstrapState>;
       taskCommand?: (input: import("@actspace/shared/runtime-v2").TaskCommand) => Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>;
-      submitTask?: (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => Promise<import("@actspace/shared/runtime-v2").TaskReceipt>;
+      submitTask?: (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult>;
       runAgent: (
         input: import("@actspace/shared").RunAgentInput
       ) => Promise<import("@actspace/shared").AgentRunResult | import("@actspace/shared").RunAgentPreparationFailure>;
@@ -23,7 +23,7 @@ declare global {
       cancelSteer?: (
         input: import("@actspace/shared").CancelSteerInput
       ) => Promise<import("@actspace/shared").CancelSteerResult>;
-      selectFiles?: () => Promise<import("@actspace/shared").SelectFilesResult>;
+      selectFiles?: (input?: { remote?: boolean }) => Promise<import("@actspace/shared").SelectFilesResult>;
       selectImages?: () => Promise<import("@actspace/shared").SelectImagesResult>;
       importComposerImage?: (
         input: import("@actspace/shared").ImportComposerImageInput

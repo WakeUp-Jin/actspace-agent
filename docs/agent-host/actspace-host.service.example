@@ -1,0 +1,20 @@
+# Example only: adjust paths/user and validate on the target Linux machine.
+[Unit]
+Description=ActSpace Agent Host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=actspace
+WorkingDirectory=/opt/actspace
+EnvironmentFile=/etc/actspace/host.env
+ExecStart=/usr/bin/node /opt/actspace/apps/cli/dist/cli.js host serve --config /etc/actspace/host.json
+KillSignal=SIGTERM
+TimeoutStopSec=infinity
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
