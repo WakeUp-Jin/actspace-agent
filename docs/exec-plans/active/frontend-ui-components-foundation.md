@@ -114,6 +114,7 @@ Radix primitives / 原生 HTML
 - [x] 公共 `components/ui/Tooltip.tsx` 已存在；另有 HoverCard、Sheet。这里只确认文件落地，不代替本计划的统一迁移验收。
 - [x] 新增 `components/ui/Button.tsx`、`IconButton.tsx`。2026-09-26 由 `completed/20260926-frontend-design-token-convergence.md` 的 T12 完成，并迁移了设置中心、审批卡、Composer、Sidebar、右侧面板工具条和各对话框按钮。仍未迁移的按钮形态（菜单项、下拉触发器、分段控件）见 `front-基础组件封装规范.md`「已落地：Button 与 IconButton」，随下面的 `DropdownMenu`、`Tabs` 一起迁移。
 - [ ] 新增 `components/ui/DropdownMenu.tsx`、`Switch.tsx`。
+  - 2026-10-06：DropdownMenu 由 [Desktop 前端重构 16](20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md) 接手，实现为 `ui/Menu.tsx`（另含 Popover、Dialog、Select、ContextMenu），16 完成时勾选；`Switch.tsx` 仍归本计划。
 - [ ] 新增 `components/ui/Textarea.tsx`、`Tabs.tsx`。
 - [ ] 迁移消息操作菜单和右侧 tabs。
 - [ ] 迁移 Composer mode/model 菜单和 Thinking toggle。

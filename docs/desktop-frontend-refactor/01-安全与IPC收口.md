@@ -264,4 +264,4 @@ export function createIpcRegistry(getWindow: () => BrowserWindow | undefined) {
 2. 设置迁移版本：S8（拆分 `settings-service`）只搬代码不改逻辑，历代迁移代码原样保留，不涉及此问题。
 3. IPC 入参校验：**手写 guard**，不引入 zod。
 
-范围调整：S6 并入 [13 执行计划](13-Preload与MockBridge执行计划.md)；S7（`applyToEnv` 退役）本轮不做，以后单独设计（本轮只核实子进程是否继承这些 Key）；S8 单独成 [17 执行计划](17-settings-service拆分执行计划.md)；S9 并入 [15 执行计划](15-运行目标执行计划.md)。
+范围调整：S6 并入 [13 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/13-Preload与MockBridge执行计划.md)；S7（`applyToEnv` 退役）本轮不做，以后单独设计（本轮只核实子进程是否继承这些 Key）；S8 单独成 [17 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md)；S9 并入 [15 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/15-运行目标执行计划.md)。
