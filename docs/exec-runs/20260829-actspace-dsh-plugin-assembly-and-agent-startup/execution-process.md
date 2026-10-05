@@ -44,13 +44,13 @@
 ### 步骤 6：Phase 4 Cordis event bridge 与 CLI 默认入口
 
 - **操作**：新增真实 Cordis Context 到现有 EventHub-shaped kernel API 的桥接；Agent Loop 可由 `context` 使用 Cordis dispatch；CLI 默认不再读取 `runtime-v2/plugins.json`，改为加载仓库内 `apps/cli/cordis.yml`，并保留 test-only fake Cordis seam。
-- **影响文件**：`packages/cordis-adapter/src/events.ts`、`packages/core/agent-loop/src/loop.ts`、`packages/runtime/src/runtime/boot.ts`、`apps/cli/src/runtime-v2/host-adapter.ts`、`apps/cli/cordis.yml`。
+- **影响文件**：`packages/cordis-adapter/src/events.ts`、`packages/core/agent-loop/src/loop.ts`、`packages/runtime/src/startup/boot.ts`、`apps/cli/src/runtime-v2/host-adapter.ts`、`apps/cli/cordis.yml`。
 - **验证**：`pnpm -r typecheck` 通过；CLI 全套当前测试通过（14 tests）；关闭 fake seam 的真实构建 CLI mock persistent run 通过。
 
 ### 步骤 7：AgentLoop Service 进入 Cordis Behavior
 
 - **操作**：`core-agent-loop/plugin` 增加 `actspace.agent.factory` 注入声明，在 `apply(ctx)` 中创建并提供 `agent.loop` Service，并通过 `ctx.effect()` 绑定幂等 dispose。Runtime 只提供 factory/host seam；DSH Config 负责激活该 Behavior。
-- **影响文件**：`packages/core/agent-loop/src/plugin.ts`、`packages/runtime/src/runtime/boot.ts`、`apps/cli/cordis.yml`。
+- **影响文件**：`packages/core/agent-loop/src/plugin.ts`、`packages/runtime/src/startup/boot.ts`、`apps/cli/cordis.yml`。
 - **验证**：真实构建 CLI persistent mock run 通过；Journal 保持 `agent/inbox/spliced` enqueue/claim 先于 `turn/start`。
 
 ### 当前偏差

@@ -48,7 +48,7 @@
 ### 步骤 6：P1-C Profile / Bundle / Patch 与 Loader transport parity
 
 - **操作**：为 Composition 增加 service/codec admission、诊断、loaderConfig、startupRequirements 和 BootManifest；默认 Profile 提供不可变 trusted loader entries；Boot 在挂载前校验 `cordis.yml` 与 resolved loader metadata 的一致性。
-- **影响文件**：`packages/composition/src/types.ts`、`compose.ts`、`config-dump.ts`、测试；`packages/runtime/src/profiles/composition.ts`；`packages/boot/src/dsh-boot.ts`、`packages/runtime/src/runtime/boot.ts` 及 Boot 测试。
+- **影响文件**：`packages/composition/src/types.ts`、`compose.ts`、`config-dump.ts`、测试；`packages/runtime/src/profiles/composition.ts`；`packages/boot/src/dsh-boot.ts`、`packages/runtime/src/startup/boot.ts` 及 Boot 测试。
 - **决定**：Profile/Bundle/Patch 的结果成为 Boot 的唯一 composition facts；当前 transport 采用 checked-in immutable metadata + parity check，不让静态 `cordis.yml` 静默偏离 Composer。外部插件动态 admission 与 CLI restart acceptance 留到 G1。
 - **验证**：Composition 6、Boot 8、Runtime 4 个测试通过；runtime build、transport parity 脚本和全仓 typecheck 通过。
 

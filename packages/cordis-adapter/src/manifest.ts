@@ -20,8 +20,24 @@ export function validatePluginManifest(value: PluginManifest): PluginManifest {
   if (!value.source.reference || /^https?:/i.test(value.source.reference)) throw new Error(`Plugin ${value.pluginId} has an untrusted source.`);
   if (!isJsonValue(value)) throw new Error(`Plugin ${value.pluginId} manifest is not JSON-safe.`);
   const entries = new Set<string>(); for (const behavior of value.behaviors) { entryId(behavior.entryId); if (entries.has(behavior.entryId)) throw new Error(`Duplicate Entry id ${behavior.entryId}.`); entries.add(behavior.entryId); rejectSecretConfig(behavior.config); if (behavior.contracts) validateHarnessContracts(behavior.contracts); for (const service of [...behavior.provides ?? [], ...behavior.injects ?? []]) serviceId(service); }
+  validateServiceDeclarations(value);
   for (const codec of value.codecs) for (const type of codec.eventTypes) eventTypeId(type);
   return Object.freeze(value);
 }
 function rejectSecretConfig(value: JsonValue, path = "config"): void { if (value === null || typeof value !== "object") return; if (Array.isArray(value)) { value.forEach((child, index) => rejectSecretConfig(child, `${path}[${index}]`)); return; } for (const [key, child] of Object.entries(value)) { if (/^(authorization|api[_-]?key|password|secret|token|cookie)$/i.test(key)) throw new Error(`Secret field ${path}.${key} is forbidden; use credentialRef.`); rejectSecretConfig(child, `${path}.${key}`); } }
 function isJsonValue(value: unknown): boolean { if (value === null || typeof value === "string" || typeof value === "boolean") return true; if (typeof value === "number") return Number.isFinite(value); if (Array.isArray(value)) return value.every(isJsonValue); if (typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) return false; return Object.values(value as Record<string, unknown>).every(isJsonValue); }
+
+function validateServiceDeclarations(manifest: PluginManifest): void {
+  const declared = new Set(manifest.contributions.services);
+  const provided = new Set<string>();
+  for (const behavior of manifest.behaviors) {
+    for (const id of behavior.provides ?? []) {
+      if (!declared.has(id)) throw new Error(`Manifest ${manifest.pluginId} provides undeclared service ${id}.`);
+      provided.add(id);
+    }
+    for (const [kind, ids] of [["provide", behavior.provides ?? []], ["inject", behavior.injects ?? []]] as const) {
+      if (new Set(ids).size !== ids.length) throw new Error(`Manifest ${manifest.pluginId} repeats ${kind} service in ${behavior.entryId}.`);
+    }
+  }
+  for (const id of declared) if (!provided.has(id)) throw new Error(`Manifest ${manifest.pluginId} declares service ${id} without a behavior provider.`);
+}

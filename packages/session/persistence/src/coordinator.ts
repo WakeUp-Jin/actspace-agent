@@ -21,6 +21,7 @@ export class SessionPersistenceCoordinator {
     this.#writes = new SessionWriteBehind({
       write: async (events) => {
         await this.driver.append(events);
+        await this.driver.flush();
         const last = events[events.length - 1];
         if (last !== undefined) this.#durableSeq = last.seq;
       },
@@ -54,6 +55,7 @@ export class SessionPersistenceCoordinator {
     let failure: unknown;
     try { await this.flush(throughSeq); } catch (error) { failure = error; }
     this.#closed = true;
+    try { await this.#writes.close(); } catch (error) { failure ??= error; }
     try { await this.driver.close(); } catch (error) { failure ??= error; }
     if (failure !== undefined) throw failure;
   }

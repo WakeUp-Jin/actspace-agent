@@ -1,0 +1,15 @@
+The following is a diff from the previous accessibility tree for Window: "actspace" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 51, 61, 71, 84, 95, 105, 116, 126
++										168 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										169 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										170 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										171 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										172 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										173 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										174 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										175 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++								176 container
++									177 文本 上下文压缩失败 · Compaction LLM failed: 400: {"message":"Storage CU injected summary failure","type":"invalid_request_error","code":"fixture_summary_failure"}
++									178 按钮 重试
+~								147 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续补充…
+The focused UI element is 147 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续补充…

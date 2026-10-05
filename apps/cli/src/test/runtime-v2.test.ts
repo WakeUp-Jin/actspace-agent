@@ -14,8 +14,8 @@ describe("Runtime v2 CLI candidate", () => {
     const ephemeral = await runV2Command({ input: "hello", workspace, dataDir, permissionMode: "default", outputFormat: "json", mock: true });
     expect(ephemeral).toMatchObject({ ok: true, persistent: false, finalText: "Mock ActSpace Agent response." });
     expect(ephemeral).toMatchObject({
-      reason: "completed",
-      steps: 1,
+      outcome: "completed",
+      value: expect.objectContaining({ finalText: "Mock ActSpace Agent response." }),
       snapshot: {
         sessionId: ephemeral.sessionId,
         messages: [{ kind: "user" }, { kind: "assistant" }],

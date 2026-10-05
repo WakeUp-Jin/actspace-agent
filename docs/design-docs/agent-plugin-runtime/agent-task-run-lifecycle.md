@@ -54,3 +54,11 @@ Run 已有 harnessId/generationId/revision 保持不变，跨重启稳定摘要�
 独立 Node Host 和 Desktop 共用会话应用操作与任务调度。连接只拥有观察订阅；断开连接、释放当前会话观察或撤销设备不会把网络取消传播成 Run 取消。正常维护先停止接纳/领取，等待运行和后台资源结束，再关闭 Runtime；force 才请求取消。真实进程测试已验证正常 drain、重启暂停与 force 时限，完整验收见 P4 过程记录。
 
 远端待确认提交保留正文、submissionId 和上传标识；重试先匹配已接纳内容，再返回原任务，不能因文件后来变化重新生成另一条任务。当前会话快照包含任务/审批和当前输出页引用；完整输出落 Journal 后释放临时流缓存。
+
+## 应用接纳与操作结果
+
+Desktop 本地首发、忙碌补充和远端都通过 submitTask 返回持久 receipt；Host 快照/通知决定 UI 运行状态。相同 submissionId 重试不会新建第二次任务，明确拒绝保留草稿；执行失败发生在已接纳之后，不把该内容自动恢复为未发送草稿。
+
+Headless 的 submit-and-wait 返回通用 outcome/value，等待 Run settlement 和资源释放后才返回。默认 Loop 的 reason/steps 不属于应用出口前置条件；CLI 可选读取 value.finalText。
+
+`/compact` 是持久 Task operation：占同一调度槽，pending 可取消，执行时不创建 Loop Run，不能作为普通提示发给模型。operation-finish 保存 compacted 或错误结果以支持观察；UI 首次加载历史不重复弹出旧操作通知。会话运行中不切换模式，下一条空闲输入可选择新模式。

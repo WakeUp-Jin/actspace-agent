@@ -224,7 +224,7 @@ main Agent 的 scope identity 必须基于 live Agent instance，诊断 id 使�
 - child Scope key；
 - child Agent identity；
 - child Session；
-- Inbox、Prompt/Tool effective view 和取消链。
+- 后台通知 Inbox、Prompt/Tool effective view 和取消链；主用户队列归 TaskLedger，详见 Task/Run 规范。
 
 child 看到父 Scope 允许继承的能力，但不获得父 Agent 的可变 conversation、writer、credential object 或 Agent identity。child 的 listener 只观察 child 及其后代；parent listener 可以按事件契约观察 child。
 

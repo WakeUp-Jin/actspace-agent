@@ -24,24 +24,19 @@
       "default": "./dist/cordis.js"
     },
     "./session": {
-      "types": "./dist/runtime/session-plugin.d.ts",
-      "import": "./dist/runtime/session-plugin.js",
-      "default": "./dist/runtime/session-plugin.js"
+      "types": "./dist/session/session-plugin.d.ts",
+      "import": "./dist/session/session-plugin.js",
+      "default": "./dist/session/session-plugin.js"
     },
     "./agent-factory": {
-      "types": "./dist/runtime/agent-factory-plugin.d.ts",
-      "import": "./dist/runtime/agent-factory-plugin.js",
-      "default": "./dist/runtime/agent-factory-plugin.js"
+      "types": "./dist/harness/agent-factory-plugin.d.ts",
+      "import": "./dist/harness/agent-factory-plugin.js",
+      "default": "./dist/harness/agent-factory-plugin.js"
     },
     "./agent-runtime": {
-      "types": "./dist/runtime/agent-runtime-plugin.d.ts",
-      "import": "./dist/runtime/agent-runtime-plugin.js",
-      "default": "./dist/runtime/agent-runtime-plugin.js"
-    },
-    "./headless": {
-      "types": "./dist/runtime/headless-plugin.d.ts",
-      "import": "./dist/runtime/headless-plugin.js",
-      "default": "./dist/runtime/headless-plugin.js"
+      "types": "./dist/harness/agent-runtime-plugin.d.ts",
+      "import": "./dist/harness/agent-runtime-plugin.js",
+      "default": "./dist/harness/agent-runtime-plugin.js"
     },
     "./loader": {
       "types": "./loader.d.cts",
@@ -49,9 +44,9 @@
       "default": "./loader.cjs"
     },
     "./todo-projection": {
-      "types": "./dist/runtime/todo-projection-plugin.d.ts",
-      "import": "./dist/runtime/todo-projection-plugin.js",
-      "default": "./dist/runtime/todo-projection-plugin.js"
+      "types": "./dist/session/todo-projection-plugin.d.ts",
+      "import": "./dist/session/todo-projection-plugin.js",
+      "default": "./dist/session/todo-projection-plugin.js"
     }
   },
   "scripts": {
@@ -104,6 +99,7 @@
     "@types/node": "^24.0.3",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4",
-    "esbuild": "0.21.5"
+    "esbuild": "0.21.5",
+    "@actspace/session-storage": "workspace:*"
   }
 }

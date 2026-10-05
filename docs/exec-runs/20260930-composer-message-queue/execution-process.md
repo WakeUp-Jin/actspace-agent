@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260930-composer-message-queue.md`
+- **关联计划**：`docs/design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md`
 - **执行模式**：交互
 - **开始时间**：2026-09-30 00:10
 - **结束时间**：2026-09-30 14:00（Electron 实机验收待人工）

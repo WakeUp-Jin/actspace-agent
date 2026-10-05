@@ -17,7 +17,6 @@ import {
   type FileReference,
   type ResponseAnnotationReference,
   type AgentRunResult,
-  type RunAgentPreparationFailure,
   type AppSettings,
   type ArtifactContextMenuInput,
   type BootstrapState,
@@ -25,11 +24,6 @@ import {
   type PendingApprovalInfo,
   type ProviderOperationResult,
   type ProviderTestResult,
-  type RunAgentInput,
-  type SteerAgentRunInput,
-  type SteerAgentRunResult,
-  type CancelSteerInput,
-  type CancelSteerResult,
   type SessionListItem,
   type SessionRecord,
   type SelectWorkspaceDirectoryResult,
@@ -268,116 +262,26 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
         return options.registry.submitTask(input.sessionId, input.submissionId, existing.content);
       }
       const references = await validateRunReferences(options.registry, input);
-      if (references.ok === false) throw new Error(JSON.stringify(references.issue));
-      const prepared = await toRunContent(options.registry, input.sessionId, { userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: references.fileReferences, responseAnnotations: references.responseAnnotations });
+      if (references.ok === false) return { status: "submission-failed", acknowledgement: "rejected", message: "消息引用已失效，请检查后重试。", referenceIssue: references.issue };
+      let prepared: Awaited<ReturnType<typeof toRunContent>>;
+      try {
+        prepared = await toRunContent(options.registry, input.sessionId, { userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: references.fileReferences, responseAnnotations: references.responseAnnotations });
+      } catch (error) {
+        if (!(error instanceof ChatAttachmentValidationError)) throw error;
+        const attachments = (input.attachments ?? []).filter(attachment => Boolean(attachment.path));
+        return { status: "submission-failed", acknowledgement: "rejected", message: "附件校验失败，请检查后重试。", attachmentIssue: {
+          ...error.issue,
+          ...(error.attachmentIndex === undefined ? {} : { attachmentId: attachments[error.attachmentIndex]?.id }),
+          ...(error.textCharacterCounts === undefined ? {} : { textCharacterCounts: Object.fromEntries(attachments.map((attachment, index) => [attachment.id, error.textCharacterCounts![index] ?? 0])) }),
+        } };
+      }
       // Once admission is attempted a missing reply is uncertain; never delete imported content needed by a durable Task.
       return options.registry.submitTask(input.sessionId, input.submissionId, { kind: "composer-task", original: JSON.parse(JSON.stringify(original)), prepared: prepared.content });
     });
     submissions.set(key, attempt);
     try { return await attempt; } finally { if (submissions.get(key) === attempt) submissions.delete(key); }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent, async (_event, input: RunAgentInput): Promise<RunAgentPreparationFailure | (Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection })> => {
-    const submissionId = `user-${input.agentRunId}`;
-    const key = `${input.sessionId}/${submissionId}`;
-    const attempt = (submissions.get(key) ?? Promise.resolve()).catch(() => undefined).then(async () => {
-    const original = JSON.parse(JSON.stringify({ userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [] }));
-    const taskState = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
-    const existing = taskState.snapshot.tasks.find(task => task.submissionId === submissionId);
-    const saved = existing?.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope | undefined;
-    if (saved && (saved.kind !== "composer-task" || !isDeepStrictEqual(saved.original, original))) throw new Error("SUBMISSION_CONFLICT");
-    const references = saved ? { ok: true as const, fileReferences: [], responseAnnotations: [] } : await validateRunReferences(options.registry, input);
-    if (references.ok === false) {
-      return { status: "rejected" as const, sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: references.issue };
-    }
-    let prepared: Awaited<ReturnType<typeof toRunContent>>;
-    try {
-      prepared = saved ? { content: saved.prepared, importedArtifactIds: [] } : await toRunContent(options.registry, input.sessionId, {
-        userInput: input.userInput,
-        attachments: input.attachments ?? [],
-        fileReferences: references.fileReferences,
-        responseAnnotations: references.responseAnnotations,
-      });
-    } catch (error) {
-      if (!(error instanceof ChatAttachmentValidationError)) throw error;
-      const attachments = (input.attachments ?? []).filter((attachment) => Boolean(attachment.path));
-      return {
-        status: "rejected" as const, sessionId: input.sessionId, agentRunId: input.agentRunId,
-        error: {
-          ...error.issue,
-          ...(error.attachmentIndex === undefined ? {} : { attachmentId: attachments[error.attachmentIndex]?.id }),
-          ...(error.textCharacterCounts === undefined ? {} : {
-            textCharacterCounts: Object.fromEntries(attachments.map((attachment, index) => [attachment.id, error.textCharacterCounts![index] ?? 0])),
-          }),
-        },
-      };
-    }
-    let result: Awaited<ReturnType<DesktopRuntimeV2Registry["runTurn"]>>;
-    try {
-      result = await options.registry.runTurn({
-        sessionId: input.sessionId,
-        agentRunId: input.agentRunId,
-        messageId: submissionId,
-        content: saved ?? { kind: "composer-task", original, prepared: prepared.content },
-        selectedSkillIds: input.selectedSkills,
-        model: input.modelKey ?? input.model,
-        mode: input.mode,
-        thinkingEnabled: input.thinkingEnabled,
-        reasoningEffort: input.reasoningEffort,
-      });
-    } catch (error) {
-      // Admission may have committed before the reply failed. Retain artifacts for recovery.
-      throw error;
-    }
-    const snapshot = result.snapshot;
-    const record = await options.registry.readSessionProjection({ sessionId: snapshot.sessionId });
-    return {
-      sessionId: input.sessionId,
-      agentRunId: input.agentRunId,
-      projection: record,
-      finalReply: result.finalText ? {
-        content: result.finalText,
-        stopReason: result.reason === "aborted" ? "aborted" as const : result.reason === "failed" ? "error" as const : "stop" as const,
-        model: input.modelKey ?? input.model ?? "default",
-        provider: "runtime-v2",
-      } : undefined,
 
-      status: result.reason === "aborted" ? "aborted" as const : result.reason === "failed" ? "failed" as const : "completed" as const,
-      ...(result.reason === "failed" ? { error: { code: "AGENT_RUN_FAILED", message: "The v2 Agent run failed." } } : {}),
-    };
-    });
-    submissions.set(key, attempt);
-    try { return await attempt; } finally { if (submissions.get(key) === attempt) submissions.delete(key); }
-  });
-  // 插入与发送走同一套引用校验和附件准备；失败时同样不写 journal，renderer 把这条放回队列。
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.steerAgentRun, async (_event, input: SteerAgentRunInput): Promise<SteerAgentRunResult> => {
-    const ids = { sessionId: input.sessionId, agentRunId: input.agentRunId, messageId: input.messageId };
-    if (!options.registry.isRunActive(input.sessionId)) return { status: "unavailable", ...ids };
-    const references = await validateRunReferences(options.registry, input);
-    if (references.ok === false) return { status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: references.issue };
-    let prepared: Awaited<ReturnType<typeof toRunContent>>;
-    try {
-      prepared = await toRunContent(options.registry, input.sessionId, {
-        userInput: input.userInput,
-        attachments: input.attachments ?? [],
-        fileReferences: references.fileReferences,
-        responseAnnotations: references.responseAnnotations,
-      });
-    } catch (error) {
-      if (!(error instanceof ChatAttachmentValidationError)) throw error;
-      return { status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId, error: error.issue };
-    }
-    try {
-      await options.registry.steerRun(input.sessionId, prepared.content, input.messageId);
-    } catch (error) {
-      await options.registry.rollbackImportedAttachments(input.sessionId, prepared.importedArtifactIds);
-      if (safeErrorMessage(error).includes("STEER_UNAVAILABLE")) return { status: "unavailable", ...ids };
-      throw error;
-    }
-    return { status: "accepted", ...ids };
-  });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.cancelSteer, async (_event, input: CancelSteerInput): Promise<CancelSteerResult> => (
-    { status: await options.registry.cancelSteer(input.sessionId, input.messageId) }
-  ));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.abortAgentRun, async (_event, input: { sessionId: string; agentRunId: string }) => {
     options.approvals.abortAgentRun(input.sessionId, input.agentRunId);
     const state = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
@@ -857,16 +761,6 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return projectSubagentTranscript(snapshot, journal);
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.compactContext, async (_event, input: { sessionId: string; agentRunId: string }) => {
-    const result = await options.registry.compactSession(input.sessionId);
-    return {
-      sessionId: input.sessionId,
-      agentRunId: input.agentRunId,
-      status: result.compacted ? "compacted" : "skipped",
-      events: projectChatEvents(result.snapshot, await options.registry.inspectSessionEvents(input.sessionId)),
-      contextSnapshot: projectContextSnapshot(result.snapshot, await options.registry.inspectSessionEvents(input.sessionId)),
-    };
-  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.visualizeReply, (_event, input: Parameters<typeof visualizeReplyV2>[0]) => visualizeReplyV2(input, options.roots, options.registry));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listVisualizations, (_event, input: { sessionId: string }) => listVisualizationsV2(input.sessionId, options.roots, options.registry));
 }
@@ -890,7 +784,7 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
 }
 
 /** Shared ownership validation; filesystem resolution remains a Node Host port. */
-async function validateRunReferences(registry: DesktopRuntimeV2Registry, input: Pick<RunAgentInput, "sessionId" | "fileReferences" | "responseAnnotations">) {
+async function validateRunReferences(registry: DesktopRuntimeV2Registry, input: Pick<import("@actspace/shared/runtime-v2").SubmitTaskInput, "sessionId" | "fileReferences" | "responseAnnotations">) {
   return validateSharedRunReferences({
     inspectSession: id => registry.inspectSession(id),
     readSessionProjection: input => registry.readSessionProjection(input),

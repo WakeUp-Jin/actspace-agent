@@ -35,7 +35,6 @@ export type DesktopRuntimeV2BootOptions = {
   readonly onRuntimeLive?: (update: import("@actspace/runtime").AgentLoopLiveEvent) => void;
   readonly disposeCordis?: () => Promise<void>;
   /** Optional forensic/legacy plugin config; default boot never reads plugins.json. */
-  readonly legacyPluginsConfigPath?: string;
 };
 
 export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions) {
@@ -58,11 +57,10 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
     workspaceRef: options.roots.workspaceRoot,
   });
   const artifacts = new DesktopArtifactStore(options.roots.dataRoot);
-  const plugins = options.legacyPluginsConfigPath === undefined ? undefined : await options.module.loadConfiguredPlugins(options.legacyPluginsConfigPath);
   const desktopApp = await import("@actspace/desktop-app");
   const composition = options.module.createProfileComposition(options.module.RUNTIME_PROFILE_IDS.desktop, host, {
     appBundle: desktopApp.DESKTOP_APP_BUNDLE,
-    ...(plugins === undefined ? {} : { plugins: plugins.manifests }),
+
   });
   const credentialResolver = new DesktopCredentialResolver(options.models);
   const capabilityMap = new Map<string, unknown>([
@@ -118,8 +116,6 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       [options.module.BROWSER_TOOLS_HOST_PORT_ID]: browser,
     }),
   });
-  const disposeResources = onceAsync(async () => undefined);
-  try {
     const profile = await options.module.bootProfileRuntime({
       host,
       dataRoot: options.roots.dataRoot,
@@ -136,7 +132,6 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
         resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId),
       },
       composition,
-      ...(plugins === undefined ? {} : { pluginCodecLoader: plugins.codecLoader }),
       cordis: { configPath: options.module.runtimeCordisConfigPath(), admission: await options.module.inspectCordisAdmission() },
       disposeCordis: options.disposeCordis,
       onLiveEvent: options.onRuntimeLive,
@@ -144,10 +139,6 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
     });
     if (!browser.ready) profile.recordDiagnostic({ severity: "warning", source: "host", code: "BROWSER_BRIDGE_UNAVAILABLE", message: "Browser Bridge is not ready; browser tools were not activated." });
     return Object.freeze({ profile, host, artifacts, browserReady: browser.ready, sessionRoot: join(options.roots.dataRoot, "sessions-v2") });
-  } catch (error) {
-    await disposeResources().catch(() => undefined);
-    throw error;
-  }
 }
 
 const DESKTOP_RENDERER_ALLOWLIST = new Map([
@@ -159,17 +150,3 @@ function isImageGalleryProps(value: RuntimeV2JsonValue): boolean {
   const artifactIds = (value as Readonly<Record<string, RuntimeV2JsonValue>>).artifactIds;
   return Array.isArray(artifactIds) && artifactIds.length > 0 && artifactIds.length <= 10 && artifactIds.every((id) => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id));
 }
-
-function onceAsync(dispose: () => Promise<void>): () => Promise<void> {
-  let promise: Promise<void> | undefined;
-  return () => {
-    if (promise !== undefined) return promise;
-    const attempt = dispose().catch((error: unknown) => {
-      if (promise === attempt) promise = undefined;
-      throw error;
-    });
-    promise = attempt;
-    return attempt;
-  };
-}
-async function settleAll(disposers: readonly (() => void | Promise<void>)[]): Promise<void> { const results = await Promise.allSettled(disposers.map((dispose) => dispose())); const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected"); if (failures.length > 0) throw new AggregateError(failures.map((failure) => failure.reason), "Desktop v2 resource cleanup failed."); }

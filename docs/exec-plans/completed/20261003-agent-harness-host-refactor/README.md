@@ -70,7 +70,7 @@ P5 数据边界按最新用户决定更新：必须保护设置、凭据、连�
 
 ## 完成与后续边界
 
-P1–P5 计划范围已完成，归档于 completed。P5 定向复验见 [第三轮报告](../../../exec-runs/20261003-agent-harness-host-refactor/phase-5-cu-round3.md)。手机 Web、自进化具体工作流、真实云端部署与真实外部 Provider 验收属于后续独立范围；未实施跨组合共享实例优化。设置、凭据及用户数据保留。
+P1–P5 计划范围已完成，归档于 completed。P5 定向复验见 [第三轮报告](../../../exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)。手机 Web、自进化具体工作流、真实云端部署与真实外部 Provider 验收属于后续独立范围；未实施跨组合共享实例优化。设置、凭据及用户数据保留。
 
 P2 已签收，见 [P2 计划](phase-2.md) 和 [验证记录](../../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)。[P3 执行计划](phase-3.md) 已完成实现与验收，见 [P3 记录](../../../exec-runs/20261003-agent-harness-host-refactor/phase-3-summary.md)。
 

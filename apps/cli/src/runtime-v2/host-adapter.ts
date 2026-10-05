@@ -91,4 +91,3 @@ function onceAsync(dispose: () => Promise<void>): () => Promise<void> {
     return attempt;
   };
 }
-async function settleAll(disposers: readonly (() => void | Promise<void>)[]): Promise<void> { const results = await Promise.allSettled(disposers.map((dispose) => dispose())); const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected"); if (failures.length > 0) throw new AggregateError(failures.map((failure) => failure.reason), "CLI v2 resource cleanup failed."); }

@@ -190,7 +190,7 @@ M2 可独立合并。完成后用户可以创建、运行、恢复一个只含�
 - `packages/shared/src/ipc.ts`
 - `packages/shared/src/session.ts`
 - `packages/session/journal/src/header.ts` 相邻测试（格式不升级，仅使用已有 optional preset 字段）
-- `packages/runtime/src/runtime/session-controller.ts`
+- `packages/runtime/src/session/session-controller.ts`
 - `packages/desktop-app/src/service.ts`
 - 对应 Session/Projection/Client 测试。
 
@@ -210,7 +210,7 @@ M2 可独立合并。完成后用户可以创建、运行、恢复一个只含�
 - `packages/core/agent/src/descriptor.ts`
 - 新增 `packages/core/agent/src/main-preset.ts`
 - `packages/core/agent/src/index.ts`
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
 - `packages/runtime/src/runtime/run-controller.ts`
 - `packages/core/agent-loop/src/loop.ts`
 - 相关 runtime/agent lifecycle 测试。
@@ -353,9 +353,9 @@ M4 可独立合并。Chat 在没有新设置时继续使用 80% 默认值；M4 �
 - `apps/desktop/src/main/runtime-v2/runtime-registry.ts`
 - `apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts`
 - `apps/desktop/src/main/index.ts`
-- `packages/runtime/src/runtime/boot.ts`
-- `packages/runtime/src/runtime/agent-host-port.ts`
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
+- `packages/runtime/src/startup/boot.ts`
+- `packages/runtime/src/harness/agent-host-port.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
 - `packages/compaction/src/policy.ts`
 - `packages/compaction/src/plugin.ts`
 - `apps/desktop/src/renderer/components/settings/SettingsPage.tsx`

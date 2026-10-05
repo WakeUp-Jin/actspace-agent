@@ -44,7 +44,7 @@
 ### 步骤 6：P04 Runtime Collector + CLI run
 
 - **操作**：Session post-commit 事件转发到 `session/event`；Runtime 关闭前追加 `session/end-seed`；CLI `run` artifact trace 收集真实 durable Journal 事件。
-- **影响文件**：`packages/runtime/src/runtime/session-controller.ts`、`boot.ts`、`apps/cli/src/runtime-v2/run.ts`。
+- **影响文件**：`packages/runtime/src/session/session-controller.ts`、`boot.ts`、`apps/cli/src/runtime-v2/run.ts`。
 - **验证**：CLI 测试通过（14 tests）；`cli run --mock --json` 进程 smoke 通过，persistent Journal 含 `session/end-seed`。
 
 ## 遇到的问题

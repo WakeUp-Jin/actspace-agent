@@ -1,3 +1,4 @@
+import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +16,7 @@ afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root,
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "actspace-subagent-")); roots.push(root);
-  const registry = createCoreCodecRegistry(); const store = new SessionStore({ dataRoot: root, runtimeId: "runtime", registry });
+  const registry = createCoreCodecRegistry(); const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot: root, runtimeId: "runtime", registry }));
   const parent = await store.create({ sessionId: "parent", createdAt: "2026-08-22T12:00:00.000Z", lineage: null, createdWith: { profileId: "base", runtimeContractVersion: "2", manifestDigest: "manifest", plugins: [{ id: "@actspace/core", version: "2" }], codecSetDigest: registry.digest } });
   const parentScope = new AgentScope("main", undefined, "root");
   return { root, registry, store, parent, parentScope };

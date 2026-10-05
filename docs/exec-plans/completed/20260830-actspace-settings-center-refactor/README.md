@@ -289,7 +289,7 @@ v3 → v4 必须使用以下唯一映射：
 - `packages/prompt/src/contributor.ts`
 - `packages/prompt/src/test/assembler.test.ts`
 - `packages/prompt/src/test/host-context.test.ts`
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
 - `apps/desktop/src/renderer/test/settings-page.test.tsx`
 - `apps/desktop/src/main/test/runtime-v2-settings-migration.test.ts`
 

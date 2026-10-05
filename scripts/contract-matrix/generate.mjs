@@ -1,9 +1,11 @@
+import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   COMPOSITION_SOURCES,
+  DOMAIN_EVENT_PATHS,
   EVENT_SOURCES,
   GENERATOR_VERSION,
   MANIFEST_PATHS,
@@ -132,6 +134,13 @@ async function parseEvents() {
   }
   for (const id of interventions) rows.push(row("event", `intervention:${id}`, "@actspace/cordis-adapter", "active", [sourceRef(EVENT_SOURCES.loopInterventions.path, EVENT_SOURCES.loopInterventions.symbol)], { plane: "intervention", category: "agent-loop", eventType: id, scope: LOOP_META[id]?.scope ?? "agent", mode: LOOP_META[id]?.mode ?? "waterfall", containment: LOOP_META[id]?.containment ?? "defined", codecStatus: "n/a", producerStatus: "present", required: true }));
   for (const id of notifications) rows.push(row("event", `notification:${id}`, "@actspace/cordis-adapter", "active", [sourceRef(EVENT_SOURCES.notifications.path, EVENT_SOURCES.notifications.symbol)], { plane: "notification", category: "notification", eventType: id, scope: NOTIFICATION_META[id]?.scope ?? "runtime", containment: NOTIFICATION_META[id]?.containment ?? "observer-isolated", mode: "emit", codecStatus: "n/a", producerStatus: "present", required: true }));
+  for (const path of DOMAIN_EVENT_PATHS) {
+    const source = await readRelative(path);
+    for (const match of source.matchAll(/\/\*\*\s*@mode\s+(emit|waterfall|parallel|serial|bail)\s*\*\/\s*"([^"]+)"/g)) {
+      if (rows.some(item => item.eventType === match[2])) continue;
+      rows.push(row("event", `domain:${match[2]}`, path.split("/").slice(0, 2).join("/"), "declared", [path], { plane: "domain", category: "domain", eventType: match[2], mode: match[1], producerStatus: "not-inferred", codecStatus: "n/a" }));
+    }
+  }
   return stableSort(rows);
 }
 
@@ -300,8 +309,13 @@ export function validateRows(matrix) {
       seen.add(item.id);
       if (!item.owner || item.sourceRefs.length === 0) diagnostics.push({ severity: "error", code: "INCOMPLETE_ROW", message: `${kind}:${item.id} must have owner and sourceRefs` });
       if (item.sourceRefs.some((ref) => ref.startsWith("/") || ref.includes("\\"))) diagnostics.push({ severity: "error", code: "ABSOLUTE_SOURCE_REF", message: `${kind}:${item.id} has an unsafe sourceRef` });
+      for (const ref of item.sourceRefs) {
+        const path = ref.split("#")[0];
+        if (path.split("/").includes("..") || !existsSync(resolve(repoRoot, path))) diagnostics.push({ severity: "error", code: "INVALID_SOURCE_REF", message: `${kind}:${item.id} references missing or unsafe ${path}` });
+      }
     }
   }
+  if (!/^[a-f0-9]{64}$/.test(matrix.sourceDigest)) diagnostics.push({ severity: "error", code: "INVALID_DIGEST", message: "sourceDigest must be SHA-256" });
   const requiredServices = new Set(matrix.services.filter((item) => item.required).map((item) => item.id));
   for (const service of matrix.services) if (!service.providerId) diagnostics.push({ severity: "error", code: "MISSING_PROVIDER", message: `Service ${service.id} has no Provider.` });
   const core = matrix.events.filter((item) => item.category === "core");
@@ -359,7 +373,7 @@ function formatCell(value) {
 }
 
 async function collectSourceSnapshot() {
-  const paths = [...Object.values(EVENT_SOURCES).map((item) => item.path), SERVICE_SOURCE.path, ...MANIFEST_PATHS, ...COMPOSITION_SOURCES, ...PACKAGE_PATHS, ...VERIFICATION_SOURCES.map((item) => item.path)];
+  const paths = [...Object.values(EVENT_SOURCES).map((item) => item.path), SERVICE_SOURCE.path, ...DOMAIN_EVENT_PATHS, ...MANIFEST_PATHS, ...COMPOSITION_SOURCES, ...PACKAGE_PATHS, ...VERIFICATION_SOURCES.map((item) => item.path)];
   const unique = [...new Set(paths)].sort();
   const snapshot = [];
   for (const path of unique) {
@@ -374,17 +388,22 @@ export async function buildMatrix() {
   const sourceSnapshot = await collectSourceSnapshot();
   const events = await parseEvents();
   const { manifests, rows: plugins } = await parseManifests();
-  const services = await parseServices();
+  const services = [...await parseServices()];
+  for (const manifest of manifests) for (const id of manifest.services) {
+    if (!services.some(item => item.id === id)) services.push(row("service", id, manifest.pluginId, "declared", [manifest.path], { providerId: manifest.entryId, required: manifest.required, consumerIds: manifests.filter(item => item.injects.includes(id)).map(item => item.entryId).sort() }));
+  }
+  services.sort((a, b) => a.id.localeCompare(b.id));
   const capabilities = await parseCapabilities(manifests);
   const packages = await parsePackages();
   const composition = await parseComposition();
   const verification = await parseVerification();
   const sessions = [
     row("session", "session.journal", "@actspace/session-journal", "active", ["packages/session/journal/src/index.ts#SessionJournal"], { scope: "session", required: true, responsibility: "codec registry, envelope validation, replay" }),
-    row("session", "session.persistence", "@actspace/session-persistence", "active", ["packages/session/persistence/src/session-persistence.ts#SessionPersistence", "packages/session/persistence/src/session-driver.ts#SessionPersistenceDriver"], { scope: "session", required: true, responsibility: "Core/Provider binding and durability lifecycle" }),
-    row("session", "session.projection", "@actspace/session-projection", "optional", ["packages/session/projection/src/index.ts#SessionProjection"], { scope: "session", required: false, responsibility: "read-only projection" }),
+    row("session", "session.storage", "@actspace/session-storage", "active", ["packages/session/storage/src/index.ts#SessionStorage", "packages/session/jsonl/src/storage.ts#JsonlSessionStorage"], { scope: "root", required: true, responsibility: "Backend-neutral inspect/list/create/open/flush ownership" }),
+    row("session", "session.store", "@actspace/session-persistence", "active", ["packages/session/persistence/src/session-store.ts#SessionStore"], { scope: "session", required: true, responsibility: "Session admission, recovery, fork and durability lifecycle" }),
+    row("session", "session.projection", "@actspace/session-projection", "optional", ["packages/session/projection/src/index.ts#SessionProjectionRegistry"], { scope: "session", required: false, responsibility: "read-only projection" }),
   ];
-  const matrixWithoutDigest = { schemaVersion: 1, generatorVersion: GENERATOR_VERSION, sourceRefs: Object.freeze({ events: EVENT_SOURCES, services: SERVICE_SOURCE, manifests: MANIFEST_PATHS, composition: COMPOSITION_SOURCES, packages: PACKAGE_PATHS, verification: VERIFICATION_SOURCES }), services, events, sessions, capabilities, plugins, packages, composition, verification };
+  const matrixWithoutDigest = { schemaVersion: 1, generatorVersion: GENERATOR_VERSION, sourceRefs: Object.freeze({ events: EVENT_SOURCES, domainEvents: DOMAIN_EVENT_PATHS, services: SERVICE_SOURCE, manifests: MANIFEST_PATHS, composition: COMPOSITION_SOURCES, packages: PACKAGE_PATHS, verification: VERIFICATION_SOURCES }), services, events, sessions, capabilities, plugins, packages, composition, verification };
   const sourceDigest = createHash("sha256").update(canonical(sourceSnapshot)).digest("hex");
   const matrix = { ...matrixWithoutDigest, sourceDigest, diagnostics: [] };
   matrix.diagnostics = validateRows(matrix);

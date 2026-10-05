@@ -33,7 +33,7 @@ describe("SessionRunManager", () => {
     expect(fixtureState.acquired()).toBe(0);
     await manager.submit("first", "first"); await ready.promise;
     const second = await manager.submit("second", "second");
-    await ledger.designate(second.task.taskId, manager.activeRunId, ledger.snapshot().revision);
+    await ledger.designate(second.task.taskId, ledger.snapshot().runs.find(run => run.state === "running")!.runId, ledger.snapshot().revision);
     await manager.submit("third", "third");
     fixtureState.setConfig("latest"); proceed.resolve();
     await manager.waitForIdle();
@@ -52,7 +52,7 @@ describe("SessionRunManager", () => {
     await manager.submit("one", "one"); await entered.promise;
     await manager.submit("two", "two");
     expect(await manager.stop("old-run")).toBe(false);
-    expect(await manager.stop(manager.activeRunId!)).toBe(true);
+    expect(await manager.stop(ledger.snapshot().runs.find(run => run.state === "running")!.runId!)).toBe(true);
     await stopped.promise; await manager.waitForIdle();
     expect(order).toEqual(["dispose", "release"]);
     expect(ledger.snapshot()).toMatchObject({ paused: true, tasks: [{ state: "cancelled" }, { state: "pending" }] });
@@ -123,9 +123,10 @@ it("runs a queued maintenance task without constructing a Loop", async () => {
   const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "operations", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   const ledger = await TaskLedger.open(session); let compacted = 0;
-  const manager = new SessionRunManager({ ledger, harnessId: "main", acquire: () => { throw new Error("No Run lease for scheduling operation"); }, readConfiguration: () => ({ mode: "agent" }), operationForTask: () => async () => { compacted++; } });
+  const manager = new SessionRunManager({ ledger, harnessId: "main", acquire: () => { throw new Error("No Run lease for scheduling operation"); }, readConfiguration: () => ({ mode: "agent" }), operationForTask: () => async () => { compacted++; return { compacted: false }; } });
   await manager.submit("compact", "/compact"); await manager.waitForIdle();
   expect(compacted).toBe(1); expect(ledger.snapshot().runs).toEqual([]); expect(ledger.snapshot().tasks[0].state).toBe("completed");
+  expect((await TaskLedger.open(session)).snapshot().tasks[0].result).toEqual({ compacted: false });
   await manager.dispose(); await session.close();
 });
 
@@ -166,7 +167,7 @@ it("does not turn an execution settlement error into a successful cancellation",
     dispose: async () => {},
   }) });
   await manager.submit("one", "one"); await entered.promise;
-  await manager.stop(manager.activeRunId!); await manager.waitForIdle();
+  await manager.stop(ledger.snapshot().runs.find(run => run.state === "running")!.runId!); await manager.waitForIdle();
   expect(ledger.snapshot().runs[0]?.state).toBe("failed");
   expect(manager.failure).toBeInstanceOf(AggregateError);
   await manager.dispose(); await session.close();

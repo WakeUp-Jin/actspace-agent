@@ -9,7 +9,6 @@ import type {
   RuntimeV2DesktopStatus,
   RuntimeV2DesktopLiveEnvelope,
   RuntimeV2DesktopSnapshot,
-  RuntimeV2EnqueueMessageInput,
   RuntimeV2ForkSessionInput,
   RuntimeV2LiveEvent,
   RuntimeV2LiveReplay,
@@ -188,16 +187,6 @@ export class DesktopRuntimeV2Registry {
     } finally { this.#admittedWork--; }
   }
 
-  async runTurn(input: RuntimeV2RunTurnRequest) {
-    this.assertAdmission();
-    this.#admittedWork++;
-    try {
-      const result = await this.requireApp().runTurn(input);
-      this.#emitDurableChanged(result.sessionId, result.snapshot.throughJournalSeq, `turn-${result.reason}`);
-      return result;
-    } finally { this.#admittedWork--; }
-  }
-
   async taskCommand(input: import("@actspace/shared/runtime-v2").TaskCommand) {
     this.assertAdmission();
     this.#admittedWork++;
@@ -210,69 +199,12 @@ export class DesktopRuntimeV2Registry {
     try { return await this.requireApp().submitTask(sessionId, submissionId, content); }
     finally { this.#admittedWork--; }
   }
-  async enqueueMessage(input: RuntimeV2EnqueueMessageInput) {
-    this.assertAdmission();
-    this.#admittedWork++;
-    try {
-      const result = await this.requireApp().enqueueMainMessage(input.sessionId, input.content, input.target, input.messageId);
-      const snapshot = await this.requireApp().inspectSession(input.sessionId);
-      this.#emitDurableChanged(input.sessionId, snapshot.throughJournalSeq, "inbox-enqueued");
-      return result;
-    } finally { this.#admittedWork--; }
-  }
-
-  async cancelMessage(sessionId: string, messageId: string) {
-    this.assertAdmission();
-    this.#admittedWork++;
-    try {
-      const cancelled = await this.requireApp().cancelPendingMessage(sessionId, messageId);
-      if (cancelled) {
-        const snapshot = await this.requireApp().inspectSession(sessionId);
-        this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "inbox-cancelled");
-      }
-      return cancelled;
-    } finally { this.#admittedWork--; }
-  }
-
-  async steerRun(sessionId: string, content: RuntimeV2JsonValue, messageId: string) {
-    this.assertAdmission();
-    this.#admittedWork++;
-    try {
-      const result = await this.requireApp().steerRun(sessionId, content, messageId);
-      this.#emitDurableChanged(sessionId, result.enqueuedSeq, "inbox-enqueued");
-      return result;
-    } finally { this.#admittedWork--; }
-  }
-
-  async cancelSteer(sessionId: string, messageId: string) {
-    this.assertAdmission();
-    this.#admittedWork++;
-    try {
-      const status = await this.requireApp().cancelSteer(sessionId, messageId);
-      if (status === "cancelled") {
-        const snapshot = await this.requireApp().inspectSession(sessionId);
-        this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "inbox-cancelled");
-      }
-      return status;
-    } finally { this.#admittedWork--; }
-  }
-
   abortRun(sessionId: string, reason?: string): boolean {
     return this.requireApp().abortRun(sessionId, reason);
   }
 
   isRunActive(sessionId: string): boolean {
     return this.requireApp().isRunActive(sessionId);
-  }
-
-  async compactSession(sessionId: string) {
-    this.assertAdmission();
-    this.#admittedWork++;
-    try {
-      const result = await this.requireApp().compactSession(sessionId);
-      this.#emitDurableChanged(sessionId, result.snapshot.throughJournalSeq, result.compacted ? "context-compacted" : "context-compaction-skipped");
-      return result;
-    } finally { this.#admittedWork--; }
   }
 
   flushSession(sessionId: string): Promise<void> {

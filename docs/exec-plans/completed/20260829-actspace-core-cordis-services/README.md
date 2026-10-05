@@ -2,7 +2,7 @@
 
 状态：已完成（Phase 1–5 已落地；另有仓库已有 active plan 的文档登记门禁待处理）。本文记录已批准的执行范围与阶段门禁。
 
-设计真源：[核心 Cordis Service 化与能力 seam 规范](../../../design-docs/agent-plugin-runtime/agent-spec-core-cordis-services.md)。本计划承接已落地的 DSH-native Boot、Session 13 事件、Agent Loop 9 个干预点、5 个通知和 CLI 单次 run，不重新设计这些公共语义。
+设计真源：[核心 Cordis Service 化与能力 seam 规范](../../../design-docs/agent-plugin-runtime/agent-spec-service-definition-provider-consumer.md)。本计划承接已落地的 DSH-native Boot、Session 13 事件、Agent Loop 9 个干预点、5 个通知和 CLI 单次 run，不重新设计这些公共语义。
 
 ## 1. 目标
 
@@ -42,8 +42,8 @@
 - `docs/PLANS_GUIDE.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/agent-plugin-runtime/agent-spec-core-cordis-services.md`
-- `docs/design-docs/agent-plugin-runtime/agent-spec-dsh-runtime-as-plugin-composition.md`
+- `docs/design-docs/agent-plugin-runtime/agent-spec-service-definition-provider-consumer.md`
+- `docs/design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md`
 - `docs/design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md`
 - `docs/design-docs/agent-plugin-runtime/agent-spec-dsh-event-model.md`
 - `docs/design-docs/agent-plugin-runtime/agent-spec-agent-loop-cordis-surface.md`
@@ -61,11 +61,11 @@
 
 ### 主要 Service/Behavior 入口
 
-- `packages/runtime/src/runtime/boot.ts`
-- `packages/runtime/src/runtime/cordis-entry.ts`
-- `packages/runtime/src/runtime/session-plugin.ts`
-- `packages/runtime/src/runtime/agent-runtime-plugin.ts`
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
+- `packages/runtime/src/startup/boot.ts`
+- `packages/runtime/src/startup/cordis-entry.ts`
+- `packages/runtime/src/session/session-plugin.ts`
+- `packages/runtime/src/harness/agent-runtime-plugin.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
 - `packages/session/journal/src/plugin.ts`
 - `packages/session/persistence/src/plugin.ts`
 - `packages/session/persistence/src/session.ts`
@@ -176,8 +176,8 @@ pnpm --filter @actspace/test-support typecheck
 - `packages/session/persistence/src/plugin.ts`
 - `packages/session/jsonl/src/plugin.ts`
 - `packages/session/projection/src/plugin.ts`
-- `packages/runtime/src/runtime/session-plugin.ts`
-- `packages/runtime/src/runtime/session-controller.ts`
+- `packages/runtime/src/session/session-plugin.ts`
+- `packages/runtime/src/session/session-controller.ts`
 - `packages/session/**/src/test/`
 
 **动作**：
@@ -262,8 +262,8 @@ pnpm --filter @actspace/tools-browser-tools test
 - `packages/core/agent-loop/src/plugin.ts`
 - `packages/compaction/src/plugin.ts`
 - `packages/compaction/src/summarizer.ts`
-- `packages/runtime/src/runtime/agent-runtime-plugin.ts`
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
+- `packages/runtime/src/harness/agent-runtime-plugin.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
 - `packages/runtime/src/runtime/run-controller.ts`
 - `packages/core/agent/**/src/test/`
 - `packages/core/agent-loop/**/src/test/`
@@ -296,10 +296,10 @@ pnpm --filter @actspace/runtime test
 
 **文件范围**：
 
-- `packages/runtime/src/runtime/boot.ts`
-- `packages/runtime/src/runtime/cordis-entry.ts`
+- `packages/runtime/src/startup/boot.ts`
+- `packages/runtime/src/startup/cordis-entry.ts`
 - `packages/runtime/src/runtime/runtime-handle.ts`
-- `packages/runtime/src/runtime/shutdown.ts`
+- `packages/runtime/src/startup/shutdown.ts`
 - `packages/runtime/cordis.yml`
 - `apps/cli/src/runtime-v2/host-adapter.ts`
 - `apps/cli/src/runtime-v2/run.ts`

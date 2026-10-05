@@ -1,3 +1,4 @@
+import { taskOperation } from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
 import { snapshotSessionJson, type SessionEventCandidateV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
@@ -50,9 +51,7 @@ export class TaskLedger {
       this.#revision(expectedRevision); this.#pending(taskId);
       if (runId !== null) {
         this.#active(runId);
-        const content = this.#task(taskId).content;
-        const original = content && typeof content === "object" && "kind" in content && content.kind === "composer-task" ? content.original : null;
-        if (original && typeof original === "object" && "userInput" in original && typeof original.userInput === "string" && original.userInput.trim() === "/compact") this.#error("QUEUE_ORDER");
+        if (taskOperation(this.#task(taskId).content)) this.#error("QUEUE_ORDER");
       }
       await this.#commit([eventCandidate(TASK_EVENT, { op: "designate", sessionId: this.session.header.sessionId, taskId, runId })]);
       return this.#snapshot;
@@ -118,8 +117,8 @@ export class TaskLedger {
       await this.#commit([eventCandidate(TASK_EVENT, { op: "operation-start", sessionId: this.session.header.sessionId, taskId })]);
     });
   }
-  finishOperation(taskId: string, outcome: RunOutcome): Promise<void> {
-    return this.#serialize(() => this.#commit([eventCandidate(TASK_EVENT, { op: "operation-finish", sessionId: this.session.header.sessionId, taskId, outcome })]));
+  finishOperation(taskId: string, outcome: RunOutcome, result: RuntimeV2JsonValue = null): Promise<void> {
+    return this.#serialize(() => this.#commit([eventCandidate(TASK_EVENT, { op: "operation-finish", sessionId: this.session.header.sessionId, taskId, outcome, result })]));
   }
   finish(runId: string, outcome: RunOutcome, result: RuntimeV2JsonValue = null): Promise<TaskSnapshot> {
     return this.#serialize(async () => {

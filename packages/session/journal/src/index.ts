@@ -12,3 +12,5 @@ export * from "./header.js";
 export * from "./invariant-validator.js";
 export * from "./journal.js";
 export * from "./surface.js";
+
+export * from "./workspace.js";

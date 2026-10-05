@@ -1,0 +1,14 @@
+The following is a diff from the previous accessibility tree for Window: "actspace" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 62
++					102 弹出式按钮 Description: 新建右侧面板对象, Help: 新建对象
+~					11 切换按钮 Description: 关闭面板, Help: 关闭右侧面板, Value: 1
+~								32 文本 4m
+~								42 文本 15m
++									103 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++					104 分离器 Description: 调整预览面板宽度, Value: 390
++					105 container
++						106 标签组 右侧面板
++							107 标签 (selected) result.txt, Value: 1
++							108 按钮 关闭 result.txt
++						109 text P5 remote result verified.
+The focused UI element is 3 HTML 内容 actspace, URL: 127.0.0.1:5173/

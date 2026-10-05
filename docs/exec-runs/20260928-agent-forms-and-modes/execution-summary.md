@@ -11,7 +11,7 @@
 
 | 变更 | 主要位置 | 结果 |
 |---|---|---|
-| 唯一 Agent 形态 | `packages/core/agent/src/agent-form.ts`、`packages/runtime/src/runtime/agent-factory-plugin.ts` | 每个 AgentScope 激活成员贡献，释放时清理；Header 保存实际成员与组合摘要 |
+| 唯一 Agent 形态 | `packages/core/agent/src/agent-form.ts`、`packages/runtime/src/harness/agent-factory-plugin.ts` | 每个 AgentScope 激活成员贡献，释放时清理；Header 保存实际成员与组合摘要 |
 | 三模式工具边界 | `packages/core/agent/src/agent-mode-policy.ts`、`packages/tools/runtime/src/` | Chat 仅 `web`、`generate_image`；Plan/Agent 显式集合；生产 Runtime 从可信绑定校验 |
 | 持久模式 | `packages/session/journal/`、`packages/runtime/src/projection/`、`packages/desktop-app/src/service.ts` | 模式事件、revision、fork、重建索引与 Run 接纳贯通 |
 | Desktop/Headless/UI | `apps/desktop/src/`、`packages/headless/src/runner.ts`、`packages/client/src/sessions/session.ts` | 同会话三模式菜单与 IPC；按模式决定 Prompt、Skills、工具及压缩；实时缓存同步模式修订号 |

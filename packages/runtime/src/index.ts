@@ -11,11 +11,22 @@ export type {
   RuntimeV2JsonPrimitive,
   RuntimeV2JsonValue,
 } from "@actspace/shared/runtime-v2";
-export * from "./runtime/index.js";
+export * from "./startup/boot.js";
+export * from "./startup/errors.js";
+export * from "./startup/runtime-state.js";
+export * from "./session/session-controller.js";
+export * from "./session/session-plugin.js";
+export * from "./startup/shutdown.js";
+export * from "./startup/host-services.js";
+export * from "./harness/agent-host-port.js";
+export { apply as applyAgentFactory } from "./harness/agent-factory-plugin.js";
+export { apply as applyAgentRuntime } from "./harness/agent-runtime-plugin.js";
+export type { AgentFactoryService } from "./harness/agent-factory-plugin.js";
+export { AgentRuntimeService } from "./harness/agent-runtime-plugin.js";
 export * from "./config-path.js";
 export { SessionReadModel } from "./projection/durable-session.js";
-export { apply as applyCordisRuntimeEntry } from "./runtime/cordis-entry.js";
-export type { RuntimeCordisHost } from "./runtime/cordis-entry.js";
+export { apply as applyCordisRuntimeEntry } from "./startup/cordis-entry.js";
+export type { RuntimeCordisHost } from "./startup/cordis-entry.js";
 export * from "./profiles/index.js";
 export { LlmRouteRegistry, LlmService, ProviderProxyPool } from "@actspace/llm-service";
 export { PiAiAdapter } from "@actspace/llm-pi-ai";
@@ -43,7 +54,5 @@ export type { ExplicitPluginConfig, LoadedPluginSet, PluginManifest, PluginBehav
 export type { Bundle, Profile, Patch, PatchOperation, PatchOperationResult } from "@actspace/bundle";
 export type { ResolvedComposition } from "@actspace/composition";
 export type { BootDiagnostic } from "@actspace/diagnostics";
-export { bootProfile } from "@actspace/boot";
-export type { BootedProfile } from "@actspace/boot";
 
 export type { AgentLoopLiveEvent } from "@actspace/core-agent-loop";

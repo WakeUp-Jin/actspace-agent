@@ -18,7 +18,7 @@
 | quiescent disposer | `packages/core/scope/src/disposer.ts` | active/quiescing/disposed 状态，逆序清理，并发 dispose 共享同一 Promise。 |
 | P00 contract tests | `packages/core/scope/src/test/scope.test.ts`、`packages/core/scope/src/test/disposer.test.ts` | 覆盖 identity、rebind、cycle、shadow、cleanup 和 race。 |
 | fused Agent dispatcher | `packages/core/agent/src/dispatch.ts`、`packages/core/agent/src/test/dispatch.test.ts` | subject 与 carrier 成对绑定；parent/child admission，sibling isolation，disposed fail-closed。 |
-| 生产身份接线 | `packages/runtime/src/runtime/boot.ts`、`packages/runtime/src/runtime/agent-factory-plugin.ts`、`packages/core/agent-loop/src/service.ts` | main 与 one-shot child 的 AgentLoop 和生命周期通知复用唯一 live scope。 |
+| 生产身份接线 | `packages/runtime/src/startup/boot.ts`、`packages/runtime/src/harness/agent-factory-plugin.ts`、`packages/core/agent-loop/src/service.ts` | main 与 one-shot child 的 AgentLoop 和生命周期通知复用唯一 live scope。 |
 | child Scope 模式 | `packages/core/scope/src/scope.ts`、`packages/subagent/src/provider.ts` | 默认 parent inheritance；显式 `isolatedChild()` 用于 flat registration isolation。 |
 
 ## 人工验证指引

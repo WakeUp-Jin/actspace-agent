@@ -36,7 +36,7 @@
 
 当前生产代码仍通过 `RuntimeHandle` 连接 Host 与 Runtime，关键路径包括：
 
-- [`packages/runtime/src/runtime/boot.ts`](../../../../packages/runtime/src/runtime/boot.ts)
+- [`packages/runtime/src/startup/boot.ts`](../../../../packages/runtime/src/startup/boot.ts)
 - `packages/runtime/src/runtime/runtime-handle.ts`（迁移前源码，已删除）
 - `packages/runtime/src/runtime/runtime-facade.ts`（迁移前源码，已删除）
 - [`apps/cli/src/runtime-v2/host-adapter.ts`](../../../../apps/cli/src/runtime-v2/host-adapter.ts)
@@ -55,7 +55,7 @@
 
 相关目标边界：
 
-- [`agent-spec-dsh-runtime-as-plugin-composition.md`](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-runtime-as-plugin-composition.md)
+- [`agent-spec-dsh-runtime-as-plugin-composition.md`](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md)
 - [`agent-spec-dsh-plugin-assembly-and-agent-startup.md`](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md)
 - [`agent-spec-profile-bundle-patch-layering.md`](../../../design-docs/agent-plugin-runtime/agent-spec-profile-bundle-patch-layering.md)
 
@@ -78,7 +78,7 @@
 - `packages/runtime/src/profiles/`
 - `packages/runtime/cordis.yml`
 - `apps/cli/cordis.yml`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `apps/cli/src/args.ts`
 - `apps/cli/src/cli.ts`
 - `apps/cli/src/runtime-v2/chat.ts`

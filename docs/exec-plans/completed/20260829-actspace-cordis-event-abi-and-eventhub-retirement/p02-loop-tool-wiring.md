@@ -8,7 +8,7 @@
 
 - `packages/core/agent-loop/src/loop.ts`
 - `packages/core/agent-loop/src/service.ts`
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
 - `packages/tools/runtime/src/prepared-execution.ts`
 - `packages/tools/runtime/src/runtime.ts`
 - `packages/llm/service/src/service.ts`

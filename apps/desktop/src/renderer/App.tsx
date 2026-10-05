@@ -1,3 +1,4 @@
+import { taskOperation } from "@actspace/shared/runtime-v2";
 import { useRemoteTarget } from "./hooks/useRemoteTarget";
 import { projectTaskQueue } from "./session/message-queue";
 import { createEmptyStreamingState, type ToolEntry, type StreamingState, type StreamingSegment, type SessionRunState } from "./session/session-run-state";
@@ -27,7 +28,6 @@ import type {
   BashBackgroundStatus,
   BashStatus,
   BootstrapState,
-  CompactContextInput,
   ComposerAttachment,
   ComposerMode,
   ContextState,
@@ -38,7 +38,6 @@ import type {
   ModelKey,
   UsableModelView,
   ReviewGetSnapshotResult,
-  RunAgentInput,
   RuntimeStreamEvent,
   SessionRunLocation,
   SessionListItem,
@@ -72,11 +71,6 @@ const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } =
 };
 /** `not_started`：会话已有运行，没有发出。`rejected`：发送前校验失败，正文已放回输入框。 */
 type SessionRunOutcome = AgentRunResult["status"] | "rejected" | "not_started";
-type SessionRunEnv = {
-  record: SessionRecord | null;
-  historyBefore: number | null;
-  executionContext?: RunAgentInput["executionContext"];
-};
 type SessionPageCache = { record: SessionRecord; history: { before: number | null; throughJournalSeq: number } };
 
 function hasActspaceBridge(): boolean {
@@ -783,13 +777,6 @@ function createCompactionBlock(input: {
   };
 }
 
-function formatCompactionError(error: unknown): string {
-  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
-  // Electron 把主进程异常包成 "Error invoking remote method '…': Error: …"，只保留最后的原因。
-  const reason = message.replace(/^Error invoking remote method '[^']*':\s*/, "").replace(/^(?:\w*Error:\s*)+/, "").trim();
-  return reason.slice(0, 120) || "未知错误";
-}
-
 function upsertCompactionSegment(state: StreamingState, agentRunId: string): void {
   if (!state.segments.some((segment) => segment.type === "compaction" && segment.agentRunId === agentRunId)) {
     state.segments.push({ type: "compaction", agentRunId });
@@ -800,15 +787,6 @@ function upsertWorkspacePreparationSegment(state: StreamingState, agentRunId: st
   if (!state.segments.some((segment) => segment.type === "workspace_preparation" && segment.agentRunId === agentRunId)) {
     state.segments.push({ type: "workspace_preparation", agentRunId });
   }
-}
-
-let agentRunCounter = 0;
-function nextAgentRunId(): string {
-  return `agent-run-${Date.now()}-${++agentRunCounter}`;
-}
-
-function modelSelectionPayload(model: ModelSelectionId): { model?: ModelId; modelKey?: ModelKey } {
-  return model.includes(":") ? { modelKey: model as ModelKey } : { model: model as ModelId };
 }
 
 export function App() {
@@ -983,16 +961,49 @@ export function App() {
     if (activeSessionIdRef.current === sessionId) setMessageQueue(next);
   }, []);
 
+  const refreshSessionRef = useRef<(id: string) => Promise<unknown>>(async () => {});
   const taskSnapshotsRef = useRef(new Map<string, import("@actspace/shared/runtime-v2").TaskSnapshot>());
+  const submittedOptionsRef = useRef(new Map<string, ComposerSendOptions>());
   const applyTaskSnapshot = useCallback((snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot) => {
     if ((taskSnapshotsRef.current.get(snapshot.sessionId)?.revision ?? -2) > snapshot.revision) return;
+    const previous = taskSnapshotsRef.current.get(snapshot.sessionId);
     taskSnapshotsRef.current.set(snapshot.sessionId, snapshot);
+    for (const run of snapshot.runs) if (run.state !== "running") terminalRunIdsRef.current.add(run.runId);
+    const settled = snapshot.tasks.filter(task => !["pending", "claimed"].includes(task.state) && previous?.tasks.find(item => item.taskId === task.taskId)?.state !== task.state);
+    for (const task of settled) submittedOptionsRef.current.delete(task.submissionId);
+    if (settled.length) void refreshSessionRef.current(snapshot.sessionId).catch(console.error);
     const queue = projectTaskQueue(snapshot);
     messageQueuesRef.current.set(snapshot.sessionId, queue);
     if (activeSessionIdRef.current === snapshot.sessionId) setMessageQueue(queue);
     const running = snapshot.runs.find(run => run.state === "running" && !terminalRunIdsRef.current.has(run.runId));
     const existing = sessionRunsRef.current.get(snapshot.sessionId);
-    if (!running && existing?.recovered && snapshot.runs.some(run => run.runId === existing.agentRunId && run.state !== "running")) {
+    const operation = snapshot.tasks.find(task => task.state === "claimed" && task.runId === null && taskOperation(task.content));
+    // Initial hydration must not replay notices from historical operations.
+    for (const task of settled.filter(task => previous && taskOperation(task.content))) {
+      const result = task.result && typeof task.result === "object" && !Array.isArray(task.result) ? task.result as Record<string, unknown> : {};
+      if (task.state === "failed") {
+        const block = createCompactionBlock({ agentRunId: task.taskId, status: "failed", errorMessage: typeof result.error === "string" ? result.error : "压缩失败，可以重试。" });
+        compactionFailuresRef.current.set(snapshot.sessionId, block);
+        if (activeSessionIdRef.current === snapshot.sessionId) setCompactionFailure(block);
+      } else if (task.state === "completed" && result.compacted === false) {
+        setComposerNotice({ sessionId: snapshot.sessionId, text: "对话还很短，暂时不需要压缩" });
+      }
+    }
+    if (existing?.operationTaskId && !operation) {
+      sessionRunsRef.current.delete(snapshot.sessionId);
+      setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, false));
+      refreshStreamingBlocks(snapshot.sessionId);
+    }
+    if (operation && !sessionRunsRef.current.has(snapshot.sessionId)) {
+      const state = createEmptyStreamingState();
+      upsertCompactionSegment(state, operation.taskId);
+      state.activeCompactions.set(operation.taskId, createCompactionBlock({ agentRunId: operation.taskId, status: "running", startedAt: new Date().toISOString() }));
+      sessionRunsRef.current.set(snapshot.sessionId, { sessionId: snapshot.sessionId, agentRunId: operation.taskId, operationTaskId: operation.taskId, recovered: true,
+        state, userBlock: null, aborting: false, record: pageCacheRef.current.get(snapshot.sessionId)?.record ?? null, historyBefore: null });
+      setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, true));
+      refreshStreamingBlocks(snapshot.sessionId);
+    }
+    if (!running && existing?.recovered && !existing.operationTaskId && snapshot.runs.some(run => run.runId === existing.agentRunId && run.state !== "running")) {
       sessionRunsRef.current.delete(snapshot.sessionId);
       setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, false));
       refreshStreamingBlocks(snapshot.sessionId);
@@ -1008,6 +1019,17 @@ export function App() {
       setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, true));
       refreshStreamingBlocks(snapshot.sessionId);
     }
+    const currentRun = sessionRunsRef.current.get(snapshot.sessionId);
+    const initial = running && snapshot.tasks.find(task => task.taskId === running.taskId);
+    if (currentRun && initial && !currentRun.userBlock) {
+      const content = initial.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
+      const original = content?.kind === "composer-task" ? content.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
+      const submittedOptions = submittedOptionsRef.current.get(initial.submissionId);
+      currentRun.userBlock = { kind: "user", id: `turn:${currentRun.agentRunId}:user:0`, content: original?.userInput ?? (typeof initial.content === "string" ? initial.content : ""), createdAt: new Date().toISOString(),
+        attachments: submittedOptions?.attachments ?? original?.attachments, fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations };
+      refreshStreamingBlocks(snapshot.sessionId);
+    }
+
   }, [refreshStreamingBlocks]);
   const refreshTaskQueue = useCallback(async (sessionId: string) => {
     if (!hasActspaceBridge() || !window.actspace.taskCommand) return;
@@ -1340,6 +1362,8 @@ export function App() {
       if (version === pageVersionsRef.current.get(sessionId) && visible() && request === messageRequestRef.current) setMessageLoading(false);
     }
   }, [cacheSessionPage, sessionStore]);
+
+  refreshSessionRef.current = readSessionPage;
 
   const loadEarlierMessages = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
@@ -1696,15 +1720,20 @@ export function App() {
     if (!hasActspaceBridge()) return;
 
     return window.actspace.onAgentStream((event) => {
+      if (event.type === "agent_run_started" && terminalRunIdsRef.current.has(event.agentRunId)) return;
       if (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed") {
         terminalRunIdsRef.current.add(event.agentRunId);
       }
       let run = sessionRunsRef.current.get(event.sessionId);
       if (event.type === "agent_run_started" && (event.recoveredReset || !run || run.agentRunId !== event.agentRunId)) {
-        run = { sessionId: event.sessionId, agentRunId: event.agentRunId, recovered: true, state: createEmptyStreamingState(), userBlock: null, aborting: false, record: pageCacheRef.current.get(event.sessionId)?.record ?? null, historyBefore: null };
+        run = { sessionId: event.sessionId, agentRunId: event.agentRunId, recovered: event.recoveredReset === true, state: createEmptyStreamingState(), userBlock: null, aborting: false, record: pageCacheRef.current.get(event.sessionId)?.record ?? null, historyBefore: null };
         sessionRunsRef.current.set(event.sessionId, run);
         setBusySessionIds(current => updateStringSet(current, event.sessionId, true));
         void readSessionPage(event.sessionId);
+      }
+      if (event.type === "agent_run_started" && run && !event.recoveredReset) {
+        run.recovered = false;
+        void refreshTaskQueue(event.sessionId);
       }
       if (event.type !== "bash_task_update" && run && run.agentRunId !== event.agentRunId) return;
       if ((event.type === "tool_approval_required" || event.type === "tool_approval_resolved") &&
@@ -1737,18 +1766,20 @@ export function App() {
       }
 
       handleStreamEvent(event);
-      if (run?.recovered && (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed")) {
-        // Recovered runs have no renderer-owned runAgent promise to settle them.
+      if (run && (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed")) {
+        // Host events settle every run; no renderer-owned execution promise.
+        void readSidebarSessions().then(setSessions).catch(console.error);
         void readSessionPage(event.sessionId).finally(() => {
           if (sessionRunsRef.current.get(event.sessionId) !== run) return;
           sessionRunsRef.current.delete(event.sessionId);
           setBusySessionIds(current => updateStringSet(current, event.sessionId, false));
           refreshStreamingBlocks(event.sessionId);
+          if (activeSessionIdRef.current === event.sessionId) void refreshReviewSummary();
           void continueQueueRef.current(event.sessionId, event.type === "agent_run_finished" ? "completed" : event.type === "agent_run_aborted" ? "aborted" : "failed");
         });
       }
     });
-  }, [handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshStreamingBlocks]);
+  }, [handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshStreamingBlocks, refreshReviewSummary]);
 
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
     if (!hasActspaceBridge()) {
@@ -1797,203 +1828,6 @@ export function App() {
   }, [bootstrapState?.workspaceRoot, refreshWorkspaces]);
 
   /** 首次发送保留结果兼容接口；执行与后续队列均由 Host 调度。 */
-  const startSessionRun = useCallback(async (
-    sessionId: string,
-    text: string,
-    options: ComposerSendOptions,
-    env: SessionRunEnv,
-  ): Promise<SessionRunOutcome> => {
-    if (sessionRunsRef.current.has(sessionId)) return "not_started";
-    const isCompactCommand = text.trim() === "/compact";
-    const pendingKey = `actspace:pending-run:${sessionId}`;
-    const contentIdentity = JSON.stringify({ text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations });
-    let pending: { content: string; id: string } | null = null;
-    try { pending = JSON.parse(sessionStorage.getItem(pendingKey) ?? "null"); } catch { /* obsolete draft */ }
-    const agentRunId = !isCompactCommand && pending?.content === contentIdentity ? pending.id : nextAgentRunId();
-    if (!isCompactCommand) sessionStorage.setItem(pendingKey, JSON.stringify({ content: contentIdentity, id: agentRunId }));
-    let outcome: SessionRunOutcome = "failed";
-    const run: SessionRunState = {
-      sessionId, agentRunId, state: createEmptyStreamingState(), userBlock: null, aborting: false,
-      record: env.record, historyBefore: env.historyBefore,
-    };
-    sessionRunsRef.current.set(sessionId, run);
-    setBusySessionIds(current => updateStringSet(current, sessionId, true));
-    draftsRef.current.delete(sessionId);
-    if (activeSessionIdRef.current === sessionId) setComposerDraftRestore(null);
-    setApprovalPendingForSession(sessionId, false);
-    setFailedForSession(sessionId, false);
-    setCompactionFailureForSession(sessionId, null);
-    lastSendOptionsRef.current.set(sessionId, options);
-
-    if (isCompactCommand) {
-      upsertCompactionSegment(run.state, agentRunId);
-      run.state.activeCompactions.set(agentRunId, createCompactionBlock({ agentRunId, status: "running", startedAt: new Date().toISOString() }));
-    } else {
-      run.userBlock = {
-        kind: "user", id: `turn:${agentRunId}:user:0`, content: text,
-        createdAt: new Date().toISOString(), attachments: options.attachments,
-        ...(options.fileReferences?.length ? { fileReferences: options.fileReferences } : {}),
-        ...(options.responseAnnotations?.length ? { responseAnnotations: options.responseAnnotations } : {}),
-      };
-      run.state.waitingForModel = true;
-    }
-    refreshStreamingBlocks(sessionId);
-    if (activeSessionIdRef.current === sessionId) setSendScrollRequestId(value => value + 1);
-
-    const isCurrentRun = () => sessionRunsRef.current.get(sessionId) === run;
-    const isCurrentVisibleTurn = () => isCurrentRun() && activeSessionIdRef.current === sessionId;
-    const finishRun = () => {
-      if (!isCurrentRun()) return;
-      const compaction = run.state.activeCompactions.get(agentRunId);
-      if (compaction?.status === "failed") setCompactionFailureForSession(sessionId, compaction);
-      sessionRunsRef.current.delete(sessionId);
-      setBusySessionIds(current => updateStringSet(current, sessionId, false));
-      refreshStreamingBlocks(sessionId);
-      if (activeSessionIdRef.current === sessionId && hasActspaceBridge()) void refreshReviewSummary();
-    };
-    const settleResult = async (result: AgentRunResult | Awaited<ReturnType<typeof window.actspace.compactContext>>) => {
-      setApprovalPendingForSession(sessionId, false);
-      setFailedForSession(sessionId, result.status === "failed");
-      const restored = await readSessionPage(sessionId);
-      if (!isCurrentRun()) return;
-      // The result is durable. Invalidate in-flight reads started before settlement.
-      pageVersionsRef.current.set(sessionId, (pageVersionsRef.current.get(sessionId) ?? 0) + 1);
-      if (!restored) {
-        const fallback: SessionRecord = {
-          meta: run.record?.meta ?? { schemaVersion: 2, id: sessionId, title: "New chat", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), agentRunCount: 1 },
-          events: result.events, contextSnapshot: result.contextSnapshot,
-        };
-        cacheSessionPage(sessionId, { record: fallback, history: { before: null, throughJournalSeq: -1 } });
-        if (isCurrentVisibleTurn()) { setSessionRecord(fallback); setHistoryBefore(null); }
-      }
-      if (isCurrentVisibleTurn()) { setAgentRunResult(null); setMessageLoading(false); }
-      finishRun();
-    };
-
-    try {
-      if (hasActspaceBridge()) {
-        if (isCompactCommand) {
-          const input: CompactContextInput = {
-            sessionId,
-            agentRunId,
-            ...modelSelectionPayload(options.model),
-          };
-          const startedAt = Date.parse(run.state.activeCompactions.get(agentRunId)?.startedAt ?? "") || Date.now();
-          let result: Awaited<ReturnType<typeof window.actspace.compactContext>>;
-          try {
-            result = await window.actspace.compactContext(input);
-          } catch (compactError) {
-            console.error("Failed to compact context", compactError);
-            if (isCurrentRun()) {
-              run.state.activeCompactions.set(agentRunId, createCompactionBlock({
-                agentRunId,
-                status: "failed",
-                durationMs: Date.now() - startedAt,
-                errorMessage: formatCompactionError(compactError),
-              }));
-            }
-            return outcome;
-          }
-          outcome = result.status === "failed" ? "failed" : "completed";
-          if (result.status === "skipped" && isCurrentRun()) {
-            run.state.activeCompactions.delete(agentRunId);
-            setComposerNotice({ sessionId, text: "对话还很短，暂时不需要压缩" });
-          }
-          await settleResult(result);
-          const refreshed = await readSidebarSessions();
-          setSessions(refreshed);
-          return outcome;
-        }
-
-        const input: RunAgentInput = {
-          sessionId,
-          agentRunId,
-          userInput: text,
-          attachments: options.attachments?.map(attachmentForRuntime),
-          ...(options.fileReferences?.length ? { fileReferences: options.fileReferences } : {}),
-          ...(options.responseAnnotations?.length ? { responseAnnotations: options.responseAnnotations } : {}),
-          mode: options.mode,
-          selectedSkills: options.selectedSkills,
-          ...modelSelectionPayload(options.model),
-          thinkingEnabled: options.thinkingEnabled,
-          ...(options.reasoningEffort && { reasoningEffort: options.reasoningEffort }),
-          ...(env.executionContext ? { executionContext: env.executionContext } : {}),
-        };
-        const result = await window.actspace.runAgent(input);
-        sessionStorage.removeItem(pendingKey);
-        if (result.status === "rejected") {
-          outcome = "rejected";
-          if (!isCurrentRun()) return outcome;
-          const draft: ComposerDraftRestore = {
-            id: Date.now(), sessionId, text, attachments: options.attachments,
-            fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations,
-            ...(result.referenceIssue
-              ? { error: formatComposerReferenceIssue(result.referenceIssue), referenceIssue: result.referenceIssue }
-              : { error: formatChatAttachmentIssue(result.error), attachmentIssue: result.error }),
-          };
-          draftsRef.current.set(sessionId, draft);
-          if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
-          setApprovalPendingForSession(sessionId, false);
-          setFailedForSession(sessionId, false);
-          return outcome;
-        }
-
-        outcome = result.status;
-        await settleResult(result);
-        const refreshed = await readSidebarSessions();
-        setSessions(refreshed);
-      } else {
-        outcome = "completed";
-      }
-    } catch (error) {
-      outcome = "failed";
-      console.error("Failed to run Agent", error);
-      if (isCurrentRun()) {
-        let restored: SessionRecord | null = null;
-        if (hasActspaceBridge() && !isCompactCommand) {
-          try {
-            restored = await readSessionPage(sessionId);
-          } catch (restoreError) {
-            console.error("Failed to inspect session after turn error", restoreError);
-          }
-        }
-        if (!isCurrentRun()) return outcome;
-        const inputPersisted = restored?.events.some(
-          (event) => event.agentRunId === agentRunId && event.type === "user_message",
-        ) ?? false;
-        if (inputPersisted && restored) {
-          if (isCurrentVisibleTurn()) setSessionRecord(restored);
-        } else if (!isCompactCommand) {
-          const draft: ComposerDraftRestore = {
-            id: Date.now(),
-            sessionId,
-            text,
-            attachments: options.attachments,
-            fileReferences: options.fileReferences,
-            responseAnnotations: options.responseAnnotations,
-            error: "提交结果尚未确认，正文和附件已保留；重试将核对同一次提交。",
-          };
-          draftsRef.current.set(sessionId, draft);
-          if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
-        }
-        setApprovalPendingForSession(sessionId, false);
-        setFailedForSession(sessionId, true);
-      }
-    } finally {
-      finishRun();
-    }
-    return outcome;
-  }, [
-    readSessionPage,
-    cacheSessionPage,
-    refreshStreamingBlocks,
-    refreshReviewSummary,
-    setApprovalPendingForSession,
-    setFailedForSession,
-    setCompactionFailureForSession,
-    readSidebarSessions,
-  ]);
-
   const continueQueue = useCallback(async (sessionId: string, _outcome: SessionRunOutcome) => { await refreshTaskQueue(sessionId); }, [refreshTaskQueue]);
   continueQueueRef.current = continueQueue;
   const handleSteerQueued = useCallback((id: string) => {
@@ -2027,6 +1861,7 @@ export function App() {
   const handleSend = useCallback(async (
     text: string,
     options: ComposerSendOptions,
+    resumeAfterAcceptance = false,
   ) => {
     if (!text.trim() && !options.attachments?.length && !options.fileReferences?.length && !options.responseAnnotations?.length) return;
     let visibleSessionId = activeSessionIdRef.current;
@@ -2039,7 +1874,25 @@ export function App() {
         if (options.mode === "plan") await window.actspace.setSessionAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
       }
     }
-    if (visibleSessionId && (visibleSessionId.startsWith("host:") || sessionRunsRef.current.has(visibleSessionId) || taskSnapshotsRef.current.get(visibleSessionId)?.paused)) {
+    if (!visibleSessionId) {
+      const created = await createSessionForInput({ ...(selectedWorkspaceRoot ? { workspaceRoot: selectedWorkspaceRoot } : {}), agentForm: options.mode === "chat" ? "chat" : "agent" });
+      if (!created) throw new Error("Unable to create Session");
+      visibleSessionId = created.meta.id;
+      if (hasActspaceBridge() && options.mode === "plan") await window.actspace.setSessionAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
+    }
+    if (!hasActspaceBridge()) return;
+    const sessionId = visibleSessionId;
+    setComposerStateBySession(current => ({ ...current, [sessionId]: { mode: options.mode, selectedSkills: options.selectedSkills } }));
+    // Keep workspace changes on the idle Session boundary before task admission.
+    if (!sessionId.startsWith("host:") && !sessionRunsRef.current.has(sessionId) && !sessionRecord?.meta.worktree && selectedWorkspaceRoot &&
+        selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot) && window.actspace.setSessionWorkspace) {
+      const result = await window.actspace.setSessionWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
+      if (!result.ok) throw new Error(result.error ?? "无法更新会话工作区");
+    }
+    lastSendOptionsRef.current.set(sessionId, options);
+    setFailedForSession(sessionId, false);
+    setCompactionFailureForSession(sessionId, null);
+    {
       if (!window.actspace.submitTask) throw new Error("Host task service unavailable");
       const submitted = { sessionId: visibleSessionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
       const pendingKey = `actspace:pending-submission:${visibleSessionId}`;
@@ -2049,9 +1902,10 @@ export function App() {
       try { saved = previous ? JSON.parse(previous) : null; } catch { /* obsolete draft */ }
       const serialized = JSON.stringify(submitted);
       const submissionId = saved?.content === serialized ? saved.id : crypto.randomUUID();
+      submittedOptionsRef.current.set(submissionId, options);
       pendingStorage.setItem(pendingKey, JSON.stringify({ content: serialized, id: submissionId, draft: { sessionId: visibleSessionId, text, attachments: options.attachments?.map(({ previewUrl: _preview, ...attachment }) => attachment), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } }));
-      const restore = (error: string) => {
-        const draft = { id: Date.now(), sessionId: visibleSessionId!, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error };
+      const restore = (error: string, issues?: { attachmentIssue?: import("@actspace/shared").ChatAttachmentIssue; referenceIssue?: import("@actspace/shared").ComposerReferenceIssue }) => {
+        const draft = { id: Date.now(), sessionId: visibleSessionId!, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error, ...issues };
         draftsRef.current.set(visibleSessionId!, draft);
         if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(draft);
       };
@@ -2060,10 +1914,11 @@ export function App() {
         if (!configured) throw new Error("无法更新任务配置，草稿已保留。");
       } catch (error) {
         pendingStorage.removeItem(pendingKey);
+        submittedOptionsRef.current.delete(submissionId);
         const message = error instanceof Error ? error.message : "无法更新任务配置，草稿已保留。";
         restore(message); throw new Error(message);
       }
-      const attempt = async () => {
+      const attempt = async (): Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult> => {
         try { return await window.actspace.submitTask!({ ...submitted, submissionId }); }
         catch { return { status: "submission-failed" as const, acknowledgement: "unknown" as const, message: "提交尚未确认，再次发送将核对同一次提交。" }; }
       };
@@ -2073,107 +1928,28 @@ export function App() {
         result = await attempt();
       }
       if ("status" in result && result.status === "submission-failed") {
-        if (result.acknowledgement === "rejected") pendingStorage.removeItem(pendingKey);
+        if (result.acknowledgement === "rejected") {
+          pendingStorage.removeItem(pendingKey);
+          submittedOptionsRef.current.delete(submissionId);
+        }
         const message = result.acknowledgement === "unknown" ? "提交尚未确认，再次发送将核对同一次提交。" : result.message;
-        restore(message); throw new Error(message);
+        restore(result.attachmentIssue ? formatChatAttachmentIssue(result.attachmentIssue) : result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : message, result); throw new Error(message);
       }
       pendingStorage.removeItem(pendingKey);
       draftsRef.current.delete(visibleSessionId);
       if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(null);
+      if (activeSessionIdRef.current === visibleSessionId) setSendScrollRequestId(value => value + 1);
       // Receipt already proves acceptance; a failed refresh must not restore a sent draft.
       await refreshTaskQueue(visibleSessionId).catch(console.error);
+      const snapshot = taskSnapshotsRef.current.get(visibleSessionId);
+      const acceptedTaskId = "task" in result ? result.task.taskId : null;
+      if (resumeAfterAcceptance && snapshot?.paused && snapshot.tasks.some(task => task.taskId === acceptedTaskId && task.state === "pending")) {
+        await taskCommand({ op: "resume", sessionId: visibleSessionId, revision: snapshot.revision });
+      }
       return;
     }
 
-    const createdSession = activeSessionIdRef.current
-      ? null
-      : await createSessionForInput({ ...(selectedWorkspaceRoot ? { workspaceRoot: selectedWorkspaceRoot } : {}), agentForm: options.mode === "chat" ? "chat" : "agent" });
-    const sessionId = createdSession?.meta.id ?? activeSessionIdRef.current;
-    if (!sessionId || sessionRunsRef.current.has(sessionId)) return;
-    setComposerStateBySession((current) => ({
-      ...current,
-      [sessionId]: { mode: options.mode, selectedSkills: options.selectedSkills },
-    }));
-
-    const nextWorkspaceRoot = selectedWorkspaceRoot;
-    let nextWorkspace = findWorkspaceOption(nextWorkspaceRoot);
-    const currentWorkspaceRoot = normalizeWorkspaceRoot(
-      (createdSession ?? sessionRecord)?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
-    );
-    const currentWorktree = (createdSession ?? sessionRecord)?.meta.worktree;
-    const isFirstAgentRun = ((createdSession ?? sessionRecord)?.meta.agentRunCount ?? 0) === 0;
-
-    if (
-      hasActspaceBridge() &&
-      !isFirstAgentRun &&
-      !currentWorktree &&
-      nextWorkspaceRoot &&
-      nextWorkspaceRoot !== currentWorkspaceRoot &&
-      window.actspace.setSessionWorkspace
-    ) {
-      try {
-        if (!nextWorkspace?.id) {
-          const latestRegistry = await refreshWorkspaces();
-          const normalizedNextRoot = normalizeWorkspaceRoot(nextWorkspaceRoot);
-          nextWorkspace = latestRegistry?.items.find((workspace) => workspace.path === normalizedNextRoot) ?? nextWorkspace;
-        }
-        const result = await window.actspace.setSessionWorkspace({
-          sessionId,
-          ...(nextWorkspace?.id ? { workspaceId: nextWorkspace.id } : {}),
-          workspaceRoot: nextWorkspaceRoot,
-        });
-        if (!result.ok) {
-          console.error("Failed to set session workspace", result.error);
-          setFailedForSession(sessionId, true);
-          return;
-        }
-        setSessionRecord((current) => current?.meta.id === sessionId
-          ? {
-              ...current,
-              meta: {
-                ...current.meta,
-                ...(nextWorkspace?.id ? { workspaceId: nextWorkspace.id } : {}),
-                workspaceRoot: nextWorkspaceRoot,
-              },
-            }
-          : current);
-      } catch (error) {
-        console.error("Failed to set session workspace", error);
-        setFailedForSession(sessionId, true);
-        return;
-      }
-    }
-
-    const outcome = await startSessionRun(sessionId, text, options, {
-      record: createdSession ?? sessionRecord,
-      historyBefore,
-      ...(isFirstAgentRun && nextWorkspaceRoot ? {
-        executionContext: {
-          runLocation,
-          ...(nextWorkspace?.id ? { workspaceId: nextWorkspace.id } : {}),
-          sourceWorkspaceRoot: nextWorkspaceRoot,
-          ...(selectedBranch ? { branch: selectedBranch } : {}),
-        },
-      } : {}),
-    });
-    await continueQueue(sessionId, outcome);
-  }, [
-    remoteTarget,
-    sessionRecord,
-    historyBefore,
-    startSessionRun,
-    continueQueue,
-    updateMessageQueue,
-    selectedWorkspaceRoot,
-    findWorkspaceOption,
-    refreshWorkspaces,
-    sessionRecord?.meta.workspaceRoot,
-    bootstrapState?.workspaceRoot,
-    setFailedForSession,
-    createSessionForInput,
-    runLocation,
-    selectedBranch,
-  ]);
+  }, [remoteTarget, sessionRecord, selectedWorkspaceRoot, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, createSessionForInput, taskCommand, refreshTaskQueue]);
 
   useEffect(() => {
     if (!window.actspaceHosts) return;
@@ -2195,7 +1971,9 @@ export function App() {
       selectedSkills: composerState?.selectedSkills ?? [],
       thinkingEnabled: false,
     };
-    void handleSend("/compact", { ...options, attachments: undefined, fileReferences: undefined, responseAnnotations: undefined });
+    void handleSend("/compact", { ...options, attachments: undefined, fileReferences: undefined, responseAnnotations: undefined }, true).catch(error => {
+      setComposerNotice({ sessionId, text: error instanceof Error ? error.message : "重试未完成，请检查队列状态。" });
+    });
   }, [composerStateBySession, handleSend, selectedChatModelId]);
 
   const handleAbort = useCallback(async () => {
@@ -2407,7 +2185,11 @@ export function App() {
   }, [activeAgentRunId, persistedEvents, sessionRecord?.messageBlocks, streamingBlocks, isRecoveredRun]);
 
   const messages = useMemo<MessageBlock[]>(() => {
-    const withStreaming = streamingBlocks.length === 0 ? persistedMessages : [...persistedMessages, ...streamingBlocks];
+    // Recovery can supply both a durable user message and a Task-derived placeholder.
+    // Keep the durable block (including its metadata), matching identity rather than text.
+    const durableUserKeys = new Set(persistedMessages.filter(block => block.kind === "user").map(block => block.renderKey ?? block.id));
+    const visibleStreaming = streamingBlocks.filter(block => block.kind !== "user" || !durableUserKeys.has(block.renderKey ?? block.id));
+    const withStreaming = visibleStreaming.length === 0 ? persistedMessages : [...persistedMessages, ...visibleStreaming];
     const merged = compactionFailure && !isStreaming ? [...withStreaming, compactionFailure] : withStreaming;
     // 后台 bash 任务状态覆写：bash_task_update 事件在 turn 结束后仍会到达，
     // 持久化块里的 backgrounded 状态以内存最新事件为准

@@ -6,14 +6,15 @@
   inject: [actspace.host.session.codecs]
 - id: session-persistence
   name: "@actspace/session-persistence/plugin"
-  inject: [actspace.host.session, session.journal]
+  inject: [session.journal, session.storage]
 - id: session-jsonl
   name: "@actspace/session-jsonl/plugin"
+  inject: [actspace.host.session, session.journal]
 - id: session-projection
   name: "@actspace/session-projection/plugin"
 - id: session-runtime
   name: "@actspace/runtime/session"
-  inject: [actspace.host.session, session.journal, session.persistence, session.jsonl, session.projection]
+  inject: [actspace.host.session, session.journal, session.store, session.projection]
 - id: session-checkpoint-policy
   name: "@actspace/session-checkpoint-policy/plugin"
   inject: [session.runtime]

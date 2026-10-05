@@ -1,5 +1,8 @@
 # DeepSeek Harness 架构研究
 
+> 历史研究快照：用于理解当时取舍；其中路径、包名和迁移建议不代表当前实现。当前入口见[总览](agent-target-overall-architecture.md)和[启动追踪](agent-spec-dsh-plugin-assembly-and-agent-startup.md)。
+
+
 > **状态**：研究基线，已完成当前快照的源码审计；不是 ActSpace v2 目标架构，也不是实施计划。
 >
 > **研究快照**：`tmp/deepseek-harness`，Git commit `47f943859bef60e4160492346772ded9b24f765a`（短哈希 `47f943859bef`）。

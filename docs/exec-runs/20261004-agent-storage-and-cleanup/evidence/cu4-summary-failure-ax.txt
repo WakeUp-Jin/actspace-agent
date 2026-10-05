@@ -1,0 +1,19 @@
+The following is a diff from the previous accessibility tree for Window: "actspace" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 140-143, 146, 149
+~								27 按钮 会话状态： 空闲
+~								31 文本 2m
++										156 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										157 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										158 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										159 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										160 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++									161 container
++										162 文本 P5 正在输出… P5 夹具任务完成。模型：p5-test。工具结果：0。
++										163 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
+~									150 container 本轮消耗：150 Token · $0.00
+~										151 text 23:25 150 Token · $0.00
++								164 container
++									165 文本 上下文压缩失败 · Compaction LLM failed: 400: {"message":"Storage CU injected summary failure","type":"invalid_request_error","code":"fixture_summary_failure"}
++									166 按钮 重试
+~									106 按钮 (disabled) 输入消息后发送
+The focused UI element is 101 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续补充…

@@ -1,3 +1,4 @@
+import type { FixtureRunInput, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
 import type { TaskSnapshot, TaskCommand, SubmitTaskInput, TaskContentEnvelope } from "@actspace/shared/runtime-v2";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import { render } from "@testing-library/react";
@@ -5,15 +6,9 @@ import userEvent from "@testing-library/user-event";
 import type {
   AgentRunResult,
   BootstrapState,
-  CancelSteerInput,
-  CancelSteerResult,
-  CompactContextInput,
-  RunAgentInput,
   RuntimeStreamEvent,
   SessionEvent,
   SessionRecord,
-  SteerAgentRunInput,
-  SteerAgentRunResult,
 } from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
@@ -42,7 +37,7 @@ function createRecord(id: string, title: string): SessionRecord {
   };
 }
 
-type PendingRun = { input: RunAgentInput; resolve: (result: AgentRunResult) => void };
+type PendingRun = { input: FixtureRunInput; resolve: (result: AgentRunResult) => void };
 
 function setupQueueFixture() {
   const records = new Map([
@@ -60,15 +55,16 @@ function setupQueueFixture() {
     if (pending.has(id) || current.paused || !current.queue.length) return;
     const task = current.tasks.find(task => task.taskId === current.queue[0])!;
     const original = (task.content as TaskContentEnvelope).original as { userInput: string };
-    if (original.userInput === "/compact") { void compactContext({ sessionId: id, agentRunId: "compact" }); publish(id, { ...current, queue: current.queue.slice(1), tasks: current.tasks.map(item => item === task ? { ...item, state: "completed" } : item) }); return; }
+    if (original.userInput === "/compact") { void executeCompaction({ sessionId: id, agentRunId: "compact" }); publish(id, { ...current, queue: current.queue.slice(1), tasks: current.tasks.map(item => item === task ? { ...item, state: "completed" } : item) }); return; }
     const agentRunId = `host-${task.taskId}`;
     publish(id, { ...current, queue: current.queue.slice(1), tasks: current.tasks.map(item => item === task ? { ...item, state: "claimed", runId: agentRunId } : item) });
-    void runAgent({ sessionId: id, agentRunId, userInput: original.userInput });
+    void startExecution({ sessionId: id, agentRunId, userInput: original.userInput });
   };
   const submitTask = vi.fn(async (input: SubmitTaskInput) => {
     const current = state(input.sessionId); const taskId = input.submissionId;
     const task = { taskId, submissionId: taskId, content: { kind: "composer-task", original: { userInput: input.userInput }, prepared: input.userInput }, acceptedSeq: ++seq, state: "pending" as const, targetRunId: null, runId: null, continuationOf: null };
     publish(input.sessionId, { ...current, tasks: [...current.tasks, task], queue: [...current.queue, taskId] });
+    schedule(input.sessionId);
     return { task, revision: state(input.sessionId).revision, durableSeq: seq };
   });
   const taskCommand = vi.fn(async (input: TaskCommand) => {
@@ -76,9 +72,9 @@ function setupQueueFixture() {
     if (input.op === "designate") {
       const task = current.tasks.find(task => task.taskId === input.taskId)!;
       if (input.runId) {
-        const result = await steerAgentRun({ sessionId: input.sessionId, agentRunId: input.runId, messageId: input.taskId, userInput: ((task.content as TaskContentEnvelope).original as { userInput: string }).userInput });
-        if (result.status !== "accepted") return { snapshot: current, error: "RUN_NOT_ACTIVE" };
-      } else await cancelSteer({ sessionId: input.sessionId, messageId: input.taskId });
+        const result = await designateSupplement(input);
+        if (!result) return { snapshot: current, error: "RUN_NOT_ACTIVE" };
+      } else await clearDesignation(input);
       publish(input.sessionId, { ...current, tasks: current.tasks.map(item => item.taskId === input.taskId ? { ...item, targetRunId: input.runId } : item) });
     }
     if (input.op === "cancel") publish(input.sessionId, { ...current, queue: current.queue.filter(id => id !== input.taskId), tasks: current.tasks.map(item => item.taskId === input.taskId ? { ...item, state: "cancelled" } : item) });
@@ -86,20 +82,18 @@ function setupQueueFixture() {
     return { snapshot: state(input.sessionId) };
   });
   const pending = new Map<string, PendingRun>();
-  const runAgent = vi.fn((input: RunAgentInput) => new Promise<AgentRunResult>((resolve) => {
+  const startExecution = vi.fn((input: FixtureRunInput) => new Promise<AgentRunResult>((resolve) => {
     pending.set(input.sessionId, { input, resolve });
     const current = state(input.sessionId);
     publish(input.sessionId, { ...current, runs: [...current.runs, { runId: input.agentRunId, taskId: "initial", configuration: {}, harness: { harnessId: "main", generationId: "fixture", revision: 1 }, state: "running", result: null }] });
     emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
   }));
-  const compactContext = vi.fn(async (input: CompactContextInput) => ({
+  const executeCompaction = vi.fn(async (input: FixtureCompactionInput) => ({
     sessionId: input.sessionId, agentRunId: input.agentRunId, status: "skipped" as const,
     events: [], contextSnapshot: emptySnapshot, contextState: null,
   }));
-  const steerAgentRun = vi.fn(async (input: SteerAgentRunInput): Promise<SteerAgentRunResult> => ({
-    status: "accepted", sessionId: input.sessionId, agentRunId: input.agentRunId, messageId: input.messageId,
-  }));
-  const cancelSteer = vi.fn(async (_input: CancelSteerInput): Promise<CancelSteerResult> => ({ status: "cancelled" }));
+  const designateSupplement = vi.fn(async (_input: Extract<TaskCommand, { op: "designate" }>) => true);
+  const clearDesignation = vi.fn(async (_input: Extract<TaskCommand, { op: "designate" }>) => {});
   const abort = vi.fn(async () => true);
 
   window.actspace = {
@@ -122,10 +116,6 @@ function setupQueueFixture() {
     setNativeTheme: () => {},
     onShuttingDown: () => () => {},
     onAgentStream: (callback: typeof emit) => { emit = callback; return () => {}; },
-    runAgent,
-    compactContext,
-    steerAgentRun,
-    cancelSteer,
   } as unknown as Window["actspace"];
 
   const event = (sessionId: string, value: Record<string, unknown>) => {
@@ -151,8 +141,8 @@ function setupQueueFixture() {
     resolve({ sessionId, agentRunId: input.agentRunId, status, events, contextSnapshot: emptySnapshot });
     schedule(sessionId);
   };
-  const sentTexts = () => runAgent.mock.calls.map(([input]) => input.userInput);
-  return { records, pending, runAgent, submitTask, compactContext, steerAgentRun, cancelSteer, abort, event, finish, sentTexts, nextSeq: () => ++seq };
+  const sentTexts = () => startExecution.mock.calls.map(([input]) => input.userInput);
+  return { records, pending, startExecution, submitTask, executeCompaction, designateSupplement, clearDesignation, abort, event, finish, sentTexts, nextSeq: () => ++seq };
 }
 
 function renderApp() {
@@ -192,6 +182,26 @@ describe("App message queue", () => {
     delete (window as unknown as { actspace?: unknown }).actspace;
   });
 
+  it("hydrates an active task without duplicating its persisted user message", async () => {
+    const fixture = setupQueueFixture();
+    const record = fixture.records.get("queue-a")!;
+    const text = "reload active task input";
+    record.events = [{ id: "durable-user", sessionId: "queue-a", agentRunId: "recovered-run", type: "user_message", timestamp: new Date().toISOString(), schemaVersion: 2, payload: { content: text } }];
+    record.messageBlocks = createMessageBlocks(record.events);
+    const snapshot: TaskSnapshot = {
+      sessionId: "queue-a", revision: 4, paused: false, queue: [],
+      tasks: [{ taskId: "accepted-task", submissionId: "accepted-task", acceptedSeq: 1, state: "claimed", targetRunId: null, runId: "recovered-run", continuationOf: null,
+        content: { kind: "composer-task", original: { userInput: text }, prepared: text } }],
+      runs: [{ runId: "recovered-run", taskId: "accepted-task", state: "running", result: null, configuration: {}, harness: { harnessId: "main", generationId: "fixture", revision: 1 } }],
+    };
+    window.actspace.taskCommand = vi.fn(async () => ({ snapshot }));
+    renderApp();
+    await selectSession("queue-a", "Queue A");
+    await screen.findByLabelText("停止 Agent");
+    await waitFor(() => expect(screen.getAllByText(text)).toHaveLength(1));
+    expect(fixture.submitTask).not.toHaveBeenCalled();
+  });
+
   it("queues messages while running and sends them one turn at a time after completion", async () => {
     const fixture = setupQueueFixture();
     renderApp();
@@ -209,7 +219,7 @@ describe("App message queue", () => {
     expect(within(tray()!).getByText("2 条排队")).toBeInTheDocument();
     expect(within(tray()!).getByText("second")).toBeInTheDocument();
     expect(input.value).toBe("");
-    expect(fixture.runAgent).toHaveBeenCalledTimes(1);
+    expect(fixture.startExecution).toHaveBeenCalledTimes(1);
 
     await act(async () => fixture.finish("queue-a", "completed"));
     await waitFor(() => expect(fixture.sentTexts()).toEqual(["first question", "second"]));
@@ -230,7 +240,7 @@ describe("App message queue", () => {
     await act(async () => fixture.finish("queue-a", "aborted"));
 
     await waitFor(() => expect(within(tray()!).getByText("已暂停")).toBeInTheDocument());
-    expect(fixture.runAgent).toHaveBeenCalledTimes(1);
+    expect(fixture.startExecution).toHaveBeenCalledTimes(1);
 
     await userEvent.click(within(tray()!).getByRole("button", { name: "继续发送" }));
     await waitFor(() => expect(fixture.sentTexts()).toEqual(["first question", "after stop"]));
@@ -243,7 +253,7 @@ describe("App message queue", () => {
     fixture.submitTask.mockResolvedValueOnce({ status: "submission-failed", acknowledgement: "rejected", message: "单个文件不能超过 20 MiB。" } as never);
     await queueText("oversized draft");
     await screen.findByText("单个文件不能超过 20 MiB。");
-    expect(fixture.submitTask).toHaveBeenCalledTimes(1);
+    expect(fixture.submitTask).toHaveBeenCalledTimes(2);
     expect(screen.getByLabelText("消息输入框")).toHaveValue("oversized draft");
     expect(sessionStorage.getItem("actspace:pending-submission:queue-a")).toBeNull();
     expect(screen.queryByText("提交结果尚未确认，正在用同一标识核对。")).not.toBeInTheDocument();
@@ -257,19 +267,19 @@ describe("App message queue", () => {
     await queueText("also check tests");
 
     await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 插入" }));
-    const steerInput = fixture.steerAgentRun.mock.calls[0]![0];
-    expect(steerInput).toMatchObject({ sessionId: "queue-a", userInput: "also check tests", agentRunId: fixture.pending.get("queue-a")!.input.agentRunId });
+    const steerInput = fixture.designateSupplement.mock.calls[0]![0];
+    expect(steerInput).toMatchObject({ sessionId: "queue-a", op: "designate", runId: fixture.pending.get("queue-a")!.input.agentRunId });
     expect(await within(tray()!).findByText("下一步读取")).toBeInTheDocument();
     expect(within(tray()!).getByText("1 条已插入")).toBeInTheDocument();
 
-    await act(async () => fixture.event("queue-a", { type: "user_message_steered", turnId: "turn-1", messageId: steerInput.messageId }));
+    await act(async () => fixture.event("queue-a", { type: "user_message_steered", turnId: "turn-1", messageId: steerInput.taskId }));
     expect(tray()).toBeNull();
     const log = screen.getByText("working on it").closest("[role='log'], main") ?? document.body;
     expect(within(log as HTMLElement).getByText("also check tests")).toBeInTheDocument();
 
     await act(async () => fixture.finish("queue-a", "completed"));
-    await waitFor(() => expect(fixture.cancelSteer).not.toHaveBeenCalled());
-    expect(fixture.runAgent).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(fixture.clearDesignation).not.toHaveBeenCalled());
+    expect(fixture.startExecution).toHaveBeenCalledTimes(1);
   });
 
   it("returns an unread steer to the top of the queue when the run is stopped", async () => {
@@ -284,18 +294,16 @@ describe("App message queue", () => {
     await userEvent.click(screen.getByLabelText("停止 Agent"));
     await act(async () => fixture.finish("queue-a", "aborted"));
 
-    expect(fixture.cancelSteer).not.toHaveBeenCalled(); // Host clears unread designation at terminal commit.
+    expect(fixture.clearDesignation).not.toHaveBeenCalled(); // Host clears unread designation at terminal commit.
     await waitFor(() => expect(within(tray()!).getByText("已暂停")).toBeInTheDocument());
     const rows = within(tray()!).getAllByRole("listitem");
     expect(rows.map((row) => row.textContent)).toEqual([expect.stringContaining("steer me"), expect.stringContaining("later")]);
-    expect(fixture.runAgent).toHaveBeenCalledTimes(1);
+    expect(fixture.startExecution).toHaveBeenCalledTimes(1);
   });
 
   it("puts a steer back into the queue when the run already ended or input is rejected", async () => {
     const fixture = setupQueueFixture();
-    fixture.steerAgentRun.mockImplementationOnce(async (input) => ({
-      status: "unavailable", sessionId: input.sessionId, agentRunId: input.agentRunId, messageId: input.messageId,
-    }));
+    fixture.designateSupplement.mockResolvedValueOnce(false);
     renderApp();
     await startFirstRun(fixture);
     await queueText("too late");
@@ -314,7 +322,7 @@ describe("App message queue", () => {
     await userEvent.click(await within(tray()!).findByRole("button", { name: "撤回" }));
 
     await waitFor(() => expect(within(tray()!).getByText("1 条排队")).toBeInTheDocument());
-    expect(fixture.cancelSteer).toHaveBeenCalledTimes(1);
+    expect(fixture.clearDesignation).toHaveBeenCalledTimes(1);
   });
 
   it("disables steering while a tool approval is pending", async () => {
@@ -339,7 +347,7 @@ describe("App message queue", () => {
 
     await act(async () => fixture.finish("queue-a", "completed"));
     await waitFor(() => expect(fixture.sentTexts()).toEqual(["first question", "background follow-up"]));
-    expect(fixture.runAgent.mock.calls[1]![0].sessionId).toBe("queue-a");
+    expect(fixture.startExecution.mock.calls[1]![0].sessionId).toBe("queue-a");
   });
 
   it("queues /compact as a command without steering", async () => {
@@ -353,7 +361,7 @@ describe("App message queue", () => {
     expect(within(tray()!).queryByRole("button", { name: "↳ 插入" })).not.toBeInTheDocument();
 
     await act(async () => fixture.finish("queue-a", "completed"));
-    await waitFor(() => expect(fixture.compactContext).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "queue-a" })));
+    await waitFor(() => expect(fixture.executeCompaction).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "queue-a" })));
   });
 
   it("edits a queued message back into the empty input", async () => {

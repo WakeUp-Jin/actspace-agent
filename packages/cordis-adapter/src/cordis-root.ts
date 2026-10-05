@@ -52,7 +52,7 @@ export async function createCordisRootFromConfig(absoluteConfigPath: string): Pr
 export async function createCordisRootWithLoader(load: () => Promise<CordisModuleLike>): Promise<CordisRootHandle> {
   const cordis = await load();
   if (typeof cordis.Context !== "function") throw new Error("Cordis public Context export is unavailable.");
-  const context = new cordis.Context(); let disposed = false; const fibers = new Map<string, CordisFiberLike>(); const failures = new Map<string, string>(); const provided = new Map<string, readonly string[]>();
+  const context = new cordis.Context(); let disposed = false; let disposing: Promise<void> | undefined; const fibers = new Map<string, CordisFiberLike>(); const failures = new Map<string, string>(); const provided = new Map<string, readonly string[]>();
   return Object.freeze({
     context,
     mount: async (entryId: string, activate: (scope: CordisActivationScope) => void | (() => void | Promise<void>) | Promise<void | (() => void | Promise<void>)>, options: CordisMountOptions = {}) => {
@@ -85,7 +85,7 @@ export async function createCordisRootWithLoader(load: () => Promise<CordisModul
     getService: <T = unknown>(serviceId: string): T | undefined => context.get?.(serviceId) as T | undefined,
     facts: () => Object.freeze([...fibers].map(([entryId, fiber]): CordisEntryFact => Object.freeze({ entryId, hasFiber: true, state: stateName(fiber.state), unresolvedServices: Object.freeze(Object.keys(fiber.inject ?? {}).filter((service) => context.get?.(service) === undefined)), providedServices: provided.get(entryId) ?? Object.freeze([]), ...(failures.has(entryId) ? { error: failures.get(entryId) } : {}) }))),
     awaitSettlement: async () => { const loader = context.get?.("loader") as { await?(): Promise<void> } | undefined; await loader?.await?.(); return probe(context, disposed); },
-    dispose: async () => { if (!disposed) { disposed = true; await context.dispose?.(); } return probe(context, disposed); },
+    dispose: async () => { if (!disposed) await (disposing ??= Promise.resolve().then(() => context.dispose?.()).then(() => { disposed = true; }).finally(() => { disposing = undefined; })); return probe(context, disposed); },
   });
 }
 type CordisFiberLike = PromiseLike<unknown> & { state?: number; inject?: Record<string, unknown> };
@@ -104,7 +104,7 @@ export async function createCordisLoaderRootWithLoader(load: () => Promise<Cordi
   if (loader === undefined) { await disposeContext(context); throw new Error("Cordis Loader service was not published."); }
   loader.builtins.include = modules.include.default;
   loader.builtins.group = modules.group.default;
-  const mounted: string[] = []; const provided = new Map<string, readonly string[]>(); const failures = new Map<string, string>(); let disposed = false;
+  const mounted: string[] = []; const provided = new Map<string, readonly string[]>(); const failures = new Map<string, string>(); let disposed = false; let disposing: Promise<void> | undefined;
   return Object.freeze({
     context,
     mount: async (entryId: string, activate: (scope: CordisActivationScope) => void | (() => void | Promise<void>) | Promise<void | (() => void | Promise<void>)>, options: CordisMountOptions = {}) => {
@@ -138,7 +138,7 @@ export async function createCordisLoaderRootWithLoader(load: () => Promise<Cordi
       return Object.freeze({ entryId, hasFiber: fiber !== undefined, state: failures.has(entryId) ? "FAILED" : stateName(fiber?.state), unresolvedServices: Object.freeze(Object.keys(fiber?.inject ?? {}).filter((service) => fiber?.ctx?.get?.(service) === undefined)), providedServices: provided.get(entryId) ?? Object.freeze([]), ...(failures.has(entryId) ? { error: failures.get(entryId) } : {}) });
     })),
     awaitSettlement: async () => { await loader.await(); return probeLoader(loader, disposed); },
-    dispose: async () => { if (!disposed) { disposed = true; await disposeContext(context); } return probeLoader(loader, disposed); },
+    dispose: async () => { if (!disposed) await (disposing ??= Promise.resolve().then(() => disposeContext(context)).then(() => { disposed = true; }).finally(() => { disposing = undefined; })); return probeLoader(loader, disposed); },
   });
 }
 

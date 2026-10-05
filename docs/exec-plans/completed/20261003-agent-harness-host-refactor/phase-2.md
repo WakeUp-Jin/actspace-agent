@@ -2,7 +2,7 @@
 
 状态：2026-10-03 P2 阶段验收通过，T1–T6 已签收。工程回归与 GPT-6.1 Sol 真实 Electron 验收范围见摘要；FileReference 无现有 UI 入口，后端契约已验证，不将其称为界面通过。可开始讨论 P3，尚未授权 P3 实施。
 
-依据：[总计划](README.md)、[已确认决策](../../../design-docs/agent-plugin-runtime/agent-harness-host-refactor-decisions.md)、[P1 执行摘要](../../../exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)。当前源码基线为 P1 commit `99d1847`。实现与验证证据见 [P2 摘要](../../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)，暂停交接见 [待办记录](../../../exec-runs/20261003-agent-harness-host-refactor/phase-2-pause-handoff.md)。
+依据：[总计划](README.md)、[已确认决策](../../../design-docs/agent-plugin-runtime/agent-harness-host-refactor-decisions.md)、[P1 执行摘要](../../../exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)。当前源码基线为 P1 commit `99d1847`。实现与验证证据见 [P2 摘要](../../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)，暂停交接见 [待办记录](../../../exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)。
 
 ## 1. P2 的完成结果
 
@@ -20,7 +20,7 @@ P3 仍负责面向用户/Agent 的 Patch 准备、审批、启用与回退；P4 
 | `packages/headless/src/runner.ts` | 直接写标题/模式 Journal、attach/followup、flush，并返回 SessionHandle | 收敛为共同服务的单次工作流；等待特定任务、导出结果；不持有 Loop/Session writer |
 | `packages/runtime/src/runtime/run-controller.ts` | 按 sessionId 缓存 assembly；存在直调 Loop 和 AgentLoopService 两条路径 | 迁移为单一任务调度与 Run 持有逻辑；核对所有消费者后删除重复路径 |
 | `packages/core/agent-loop/src/service.ts` | attach 创建长期 assembly；followup 先串联 Promise，获得执行机会才入 Inbox | 跨 Run 的队列/注册移出；Loop 插件只提供单次运行工厂与控制契约 |
-| `packages/runtime/src/runtime/agent-factory-plugin.ts` | 直接 new AgentLoop，捕获根级 llm/tools/prompt/compaction，按 Session 发布 scope | 从租约选中的组合解析运行工厂和服务，创建 Run scope；不能只给旧全局 factory 套租约 |
+| `packages/runtime/src/harness/agent-factory-plugin.ts` | 直接 new AgentLoop，捕获根级 llm/tools/prompt/compaction，按 Session 发布 scope | 从租约选中的组合解析运行工厂和服务，创建 Run scope；不能只给旧全局 factory 套租约 |
 | `packages/subagent/src/provider.ts` | 从父 scope 派生子 scope，调用固定 createLoop；墙钟定时器控制时长 | 任务归属/权限/取消仍关联父 Run；策略 scope 属于子 Harness 租约，不能继承父 Harness 策略 |
 | `apps/desktop/src/renderer/session/message-queue.ts`、`App.tsx` | 队列只在 renderer 内存；结束后由 continueQueue 推进；含上移、编辑、steer、停止暂停、/compact | 调度状态迁到 Host，保留交互；renderer 保留未提交草稿和展示状态 |
 | `packages/core/agent/src/inbox.ts` | enqueue/claim 写 Journal，但 enqueue 本身不 flush，也不核对重复 messageId 的内容 | Inbox 继续表示输入消费，不充当完整的持久任务管理器 |

@@ -10,29 +10,29 @@ import { registerFixedRendererIpc, type FixedRendererIpcOptions } from "../runti
 import { PendingApprovalRegistry } from "../approval-registry";
 afterEach(() => handlers.clear());
 it("returns a serializable rejection before starting a turn and identifies the selected attachment", async () => {
-  const runTurn = vi.fn();
+  const submitTask = vi.fn();
   const importChatAttachments = vi.fn().mockRejectedValue(new ChatAttachmentValidationError({ code: "invalid_utf8", fileName: "bad.txt" }, 1));
   const registration = registerFixedRendererIpc({
     roots: { dataRoot: "/tmp/chat-admission", workspaceRoot: "/work" },
     registry: {
-      taskCommand: async () => ({ snapshot: { tasks: [] } }), subscribe: () => () => {}, subscribeRendererStream: () => () => {}, inspectSession: async () => ({ agentMode: "chat" }), importChatAttachments, runTurn },
+      taskCommand: async () => ({ snapshot: { tasks: [] } }), subscribe: () => () => {}, subscribeRendererStream: () => () => {}, inspectSession: async () => ({ agentMode: "chat" }), importChatAttachments, submitTask },
     settings: { subscribeV4Changes: () => () => {} },
     getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
   } as unknown as FixedRendererIpcOptions);
-  const input = { sessionId: "chat", agentRunId: "run", userInput: "keep", attachments: [
+  const input = { sessionId: "chat", submissionId: "run", userInput: "keep", attachments: [
     { id: "good", name: "good.txt", path: "/fixture/good.txt", kind: "file" },
     { id: "bad", name: "bad.txt", path: "/fixture/bad.txt", kind: "file" },
   ] };
   try {
-    const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent)!;
+    const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask)!;
     const result = await handler({ sender: { id: 7 } }, input);
-    expect(JSON.parse(JSON.stringify(result))).toEqual({ status: "rejected", sessionId: "chat", agentRunId: "run", error: { code: "invalid_utf8", fileName: "bad.txt", attachmentId: "bad" } });
-    expect(runTurn).not.toHaveBeenCalled();
+    expect(JSON.parse(JSON.stringify(result))).toEqual({ status: "submission-failed", acknowledgement: "rejected", message: "附件校验失败，请检查后重试。", attachmentIssue: { code: "invalid_utf8", fileName: "bad.txt", attachmentId: "bad" } });
+    expect(submitTask).not.toHaveBeenCalled();
     importChatAttachments.mockRejectedValueOnce(new ChatAttachmentValidationError({ code: "total_text_too_large", limit: 256000 }, undefined, [130000, 130000]));
-    expect(await handler({ sender: { id: 7 } }, input)).toMatchObject({ error: { textCharacterCounts: { good: 130000, bad: 130000 } } });
+    expect(await handler({ sender: { id: 7 } }, input)).toMatchObject({ attachmentIssue: { textCharacterCounts: { good: 130000, bad: 130000 } } });
     importChatAttachments.mockRejectedValueOnce(new Error("store unavailable"));
     await expect(handler({ sender: { id: 7 } }, input)).rejects.toThrow("store unavailable");
-    expect(runTurn).not.toHaveBeenCalled();
+    expect(submitTask).not.toHaveBeenCalled();
   } finally { registration.dispose(); }
 });
 

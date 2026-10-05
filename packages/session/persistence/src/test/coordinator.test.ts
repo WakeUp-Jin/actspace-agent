@@ -11,6 +11,7 @@ describe("SessionPersistenceCoordinator", () => {
     const order: string[] = [];
     const driver = {
       append: async (events: readonly SessionEventEnvelopeV1[]) => { order.push(`write:${events[0]?.seq}`); },
+      flush: async () => undefined,
       assertOwned: async () => undefined,
       close: async () => undefined,
     };
@@ -26,6 +27,7 @@ describe("SessionPersistenceCoordinator", () => {
     const cause = new Error("fsync failed");
     const driver = {
       append: async () => { throw cause; },
+      flush: async () => undefined,
       assertOwned: async () => undefined,
       close: async () => undefined,
     };
@@ -36,4 +38,14 @@ describe("SessionPersistenceCoordinator", () => {
     expect(coordinator.durableSeq).toBe(-1);
     await expect(coordinator.flush(0)).rejects.toThrow();
   });
+});
+
+it("does not advance durable sequence when append succeeds but flush fails, and still closes", async () => {
+  let closed = false;
+  const coordinator = new SessionPersistenceCoordinator({ append: async () => undefined, flush: async () => { throw new Error("flush failed"); }, assertOwned: async () => undefined, close: async () => { closed = true; } }, []);
+  coordinator.accept(event(0));
+  await expect(coordinator.flush(0)).rejects.toThrow("flush failed");
+  expect(coordinator.durableSeq).toBe(-1);
+  expect(coordinator.blocked).toBe(true);
+  await expect(coordinator.close(0)).rejects.toThrow(); expect(closed).toBe(true);
 });

@@ -3,21 +3,9 @@ import userEvent from "@testing-library/user-event";
 import type { ComposerSendOptions } from "../components/Composer";
 import { MessageQueueTray, type MessageQueueControls } from "../components/composer/MessageQueueTray";
 import { TooltipProvider } from "../components/ui/Tooltip";
-import {
-  EMPTY_MESSAGE_QUEUE,
-  createQueuedMessage,
-  enqueueMessage,
-  markSteering,
-  moveQueuedMessageUp,
-  returnToFront,
-  takeSteering,
-  type SessionMessageQueue,
-} from "../session/message-queue";
-
-const options: ComposerSendOptions = { model: "deepseek:deepseek-chat" as ComposerSendOptions["model"], mode: "agent", selectedSkills: [], thinkingEnabled: false };
-
+import { EMPTY_MESSAGE_QUEUE, projectTaskQueue, takeSteering, type SessionMessageQueue } from "../session/message-queue";
 function queueOf(...texts: string[]): SessionMessageQueue {
-  return texts.reduce((queue, text) => enqueueMessage(queue, createQueuedMessage(text, options)), EMPTY_MESSAGE_QUEUE);
+  return projectTaskQueue({ sessionId: "s", revision: 1, paused: false, runs: [], queue: texts.map((_, i) => String(i)), tasks: texts.map((text, i) => ({ taskId: String(i), submissionId: String(i), content: text, acceptedSeq: i, state: "pending", runId: null, targetRunId: null, continuationOf: null })) });
 }
 
 function renderTray(queue: SessionMessageQueue, overrides: Partial<MessageQueueControls> = {}, inputEmpty = true) {
@@ -30,28 +18,11 @@ function renderTray(queue: SessionMessageQueue, overrides: Partial<MessageQueueC
   return controls;
 }
 
-describe("message queue model", () => {
-  it("marks /compact as a command that cannot be steered", () => {
-    const queue = queueOf("/compact");
-    expect(queue.items[0]!.kind).toBe("compact");
-    expect(markSteering(queue, queue.items[0]!.id)).toBe(queue);
-  });
-
-  it("returns unread steers to the front in their original order", () => {
-    let queue = queueOf("a", "b", "c");
-    const [a, b] = queue.items;
-    queue = markSteering(markSteering(queue, a!.id), b!.id);
-    expect(queue.items.map((item) => item.text)).toEqual(["c"]);
-    const { queue: withoutA, item } = takeSteering(queue, a!.id);
-    expect(item?.text).toBe("a");
-    expect(returnToFront({ ...withoutA, steering: [] }, [a!, b!]).items.map((entry) => entry.text)).toEqual(["a", "b", "c"]);
-  });
-
-  it("moves an item up and leaves the first item in place", () => {
-    const queue = queueOf("a", "b");
-    expect(moveQueuedMessageUp(queue, queue.items[1]!.id).items.map((item) => item.text)).toEqual(["b", "a"]);
-    expect(moveQueuedMessageUp(queue, queue.items[0]!.id)).toBe(queue);
-  });
+it("projects Host order and keeps consumed supplements out of the pending tray", () => {
+  const queue = queueOf("a", "/compact");
+  expect(queue.items.map(item => item.kind)).toEqual(["message", "compact"]);
+  const steered = { ...queue, items: queue.items.slice(1), steering: queue.items.slice(0, 1) };
+  expect(takeSteering(steered, "0").queue.steering).toEqual([]);
 });
 
 describe("MessageQueueTray", () => {
@@ -75,7 +46,7 @@ describe("MessageQueueTray", () => {
 
   it("shows steering rows first with withdraw, and the paused header with resume", async () => {
     let queue = queueOf("steered", "waiting");
-    queue = { ...markSteering(queue, queue.items[0]!.id), paused: true };
+    queue = { items: queue.items.slice(1), steering: queue.items.slice(0, 1), paused: true };
     const controls = renderTray(queue);
     const tray = screen.getByRole("region", { name: "消息队列" });
     expect(within(tray).getByText("1 条排队 · 1 条已插入")).toBeInTheDocument();

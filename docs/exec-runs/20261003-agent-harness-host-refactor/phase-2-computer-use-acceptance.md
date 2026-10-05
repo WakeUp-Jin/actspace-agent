@@ -100,7 +100,7 @@ Journal 支持是持久化事实，不等于UI证据：主Session seq45/46编辑
 
 待后续补验：U1.3暂停改模式；U3.3实际消费；U3.4未读归队即时刷新；U4.2后台输入/运行恢复；U4.3轨迹草稿；U5.1有效审批等待/一次允许/恢复；U6.3附件/引用；真实Provider独立门禁。自动化通过项不能填入这些UI空缺。
 
-收尾保持dev和fixture进程，不重启、不修复。主Session已停止，待发补充甲已取消；审批尝试Session的Journal已完成（UI最终结果未观察）。`/tmp/actspace-p2-release`不存在。构建TS2345和Desktop全量未解决项由[暂停交接](phase-2-pause-handoff.md)记录，不属于本UI报告的产品Bug结论。
+收尾保持dev和fixture进程，不重启、不修复。主Session已停止，待发补充甲已取消；审批尝试Session的Journal已完成（UI最终结果未观察）。`/tmp/actspace-p2-release`不存在。构建TS2345和Desktop全量未解决项由[暂停交接](execution-summary.md)记录，不属于本UI报告的产品Bug结论。
 
 ## 解锁后补验（2026-10-03）
 

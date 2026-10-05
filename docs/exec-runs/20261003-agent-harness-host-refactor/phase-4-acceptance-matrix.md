@@ -2,7 +2,7 @@
 
 最新状态：第十轮由 gpt-6.1-sol 完成修复后的真实 Electron 定向复验，B1–B5 全部通过，双向审批、完全退出与恢复、同 SessionId 双 Host 隔离回归通过；B6 正常停止专项真实进程 2/2 重跑通过。详见 [第十轮报告](phase-4-cu-round10.md)与 [修复记录](phase-4-bug-fixes.md)。T1–T7 已完成，未提交或推送。
 
-本表按验收点汇总证据，不用自动化测试代替界面验收。基线 P3 `c7b3aea`。第一至第九轮报告保留历史发现，修复前 B1–B6 见 [Bug 交接](phase-4-bug-handoff.md)。工程基线为 Desktop 1000、Runtime 43、AgentService 28、Host 真进程 7 项通过；本轮只重跑 B6 专项，未重新宣称全量测试。
+本表按验收点汇总证据，不用自动化测试代替界面验收。基线 P3 `c7b3aea`。第一至第九轮报告保留历史发现，修复前 B1–B6 见 [Bug 交接](execution-summary.md)。工程基线为 Desktop 1000、Runtime 43、AgentService 28、Host 真进程 7 项通过；本轮只重跑 B6 专项，未重新宣称全量测试。
 
 ## 工程与进程
 

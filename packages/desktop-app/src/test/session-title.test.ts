@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-import type { CordisContext } from "@actspace/cordis-adapter";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { CordisContextClass, type CordisContext } from "@actspace/cordis-adapter";
 import { DesktopAppService } from "../service.js";
+import * as textUtility from "../complete-text.js";
+import { apply as mountTitles } from "../session-title.js";
 
 function fixture(initialTitle: string | null = null) {
   let title = initialTitle;
@@ -11,37 +13,44 @@ function fixture(initialTitle: string | null = null) {
   const run = vi.fn(async () => ({ sessionId: "session", snapshot: snapshot() }));
   const services = new Map<string, unknown>([
     ["session.runtime", { resume: async () => session, snapshot }],
-    ["agent.runtime", { runs: { run } }], ["compaction.runtime", {}], ["llm.service", {}],
+    ["agent.runtime", { runs: { service: { submit: run }, configuration: () => ({ model: "main-model" }) } }], ["compaction.runtime", {}], ["llm.service", {}],
   ]);
-  const app = new DesktopAppService({ get: (id: string) => services.get(id) } as CordisContext);
+  const ctx = new CordisContextClass();
+  for (const [id, value] of services) ctx.provide(id, value);
+  mountTitles(ctx as CordisContext);
+  const app = new DesktopAppService(ctx as CordisContext);
   let resolve!: (result: { text: string }) => void;
   let reject!: (error: Error) => void;
   const completion = new Promise<{ text: string }>((yes, no) => { resolve = yes; reject = no; });
-  const complete = vi.spyOn(app, "completeText").mockImplementation(() => completion as ReturnType<typeof app.completeText>);
-  return { app, run, complete, resolve, reject, snapshot, session, events };
+  const complete = vi.fn((_input: Parameters<typeof app.completeText>[0]) => completion as ReturnType<typeof app.completeText>);
+  vi.spyOn(textUtility, "completeText").mockImplementation((_llm, input) => complete(input));
+  let sequence = 0;
+  const submit = (input: { sessionId: string; content: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue }) => app.submitTask(input.sessionId, `submission-${sequence++}`, input.content);
+  return { submit, app, run, complete, resolve, reject, snapshot, session, events };
 }
+afterEach(() => vi.restoreAllMocks());
 const input = { sessionId: "session", content: "请帮我分析项目架构", model: "main-model" };
 
 describe("first message session title", () => {
   it("generates once in the background and persists without awaiting the main reply", async () => {
     const f = fixture();
-    await f.app.runTurn(input);
+    await f.submit(input);
     expect(f.run).toHaveBeenCalledOnce();
     await vi.waitFor(() => expect(f.complete).toHaveBeenCalledOnce());
     expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ purpose: "utility", model: "main-model" }));
-    await f.app.runTurn({ ...input, content: "第二条" });
+    await f.submit({ ...input, content: "第二条" });
     expect(f.complete).toHaveBeenCalledOnce();
     f.resolve({ text: '"项目架构分析"' });
     await vi.waitFor(() => expect(f.snapshot().metadata.title).toBe("项目架构分析"));
     expect(f.session.flush).toHaveBeenCalled();
-    await f.app.runTurn(input);
+    await f.submit(input);
     expect(f.complete).toHaveBeenCalledOnce();
     await f.app.dispose();
   });
 
   it.each(["手动标题", "New chat"])("preserves an explicitly assigned title: %s", async title => {
     const f = fixture(title);
-    await f.app.runTurn(input);
+    await f.submit(input);
     expect(f.complete).not.toHaveBeenCalled();
     expect(f.snapshot().metadata.title).toBe(title);
     await f.app.dispose();
@@ -49,7 +58,7 @@ describe("first message session title", () => {
 
   it("does not overwrite a manual rename while generation is pending", async () => {
     const f = fixture();
-    await f.app.runTurn(input);
+    await f.submit(input);
     await vi.waitFor(() => expect(f.complete).toHaveBeenCalledOnce());
     await f.app.updateSessionMetadata("session", { title: "我的标题" });
     f.resolve({ text: "模型标题" });
@@ -60,7 +69,7 @@ describe("first message session title", () => {
 
   it("does not replace a manual rename when the provider fails", async () => {
     const f = fixture();
-    await f.app.runTurn(input);
+    await f.submit(input);
     await f.app.updateSessionMetadata("session", { title: "保留手动标题" });
     f.reject(new Error("provider unavailable"));
     await f.app.dispose();
@@ -69,7 +78,7 @@ describe("first message session title", () => {
 
   it("extracts text from multimodal input without sending images to the title task", async () => {
     const f = fixture();
-    await f.app.runTurn({ ...input, content: [{ type: "text", text: "解释架构图" }, { type: "image", artifactId: "private-image" }] });
+    await f.submit({ ...input, content: [{ type: "text", text: "解释架构图" }, { type: "image", artifactId: "private-image" }] });
     expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ messages: expect.arrayContaining([{ role: "user", content: "解释架构图" }]) }));
     expect(JSON.stringify(f.complete.mock.calls)).not.toContain("private-image");
     f.resolve({ text: "架构图说明" });
@@ -79,7 +88,7 @@ describe("first message session title", () => {
 
   it("aborts outstanding generation on disposal without writing a late title", async () => {
     const f = fixture();
-    await f.app.runTurn(input);
+    await f.submit(input);
     const signal = f.complete.mock.calls[0]![0].signal!;
     const disposal = f.app.dispose();
     expect(signal.aborted).toBe(true);
@@ -95,7 +104,7 @@ describe("first message session title", () => {
       signal!.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
     }));
     try {
-      await f.app.runTurn(input);
+      await f.submit(input);
       await vi.advanceTimersByTimeAsync(30_000);
       expect(f.snapshot().metadata.title).toBe(input.content);
       await f.app.dispose();
@@ -104,7 +113,7 @@ describe("first message session title", () => {
 
   it.each(["failure", "empty"])("falls back to the first message on %s", async kind => {
     const f = fixture();
-    await f.app.runTurn(input);
+    await f.submit(input);
     await vi.waitFor(() => expect(f.complete).toHaveBeenCalledOnce());
     if (kind === "failure") f.reject(new Error("provider unavailable"));
     else f.resolve({ text: "   " });

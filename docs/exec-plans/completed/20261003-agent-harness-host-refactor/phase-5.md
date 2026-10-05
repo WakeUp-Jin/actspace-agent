@@ -1,6 +1,6 @@
 # P5：职责、Cordis、测试与文档收敛
 
-状态：已完成，2026-10-04。开发与自动化验证通过，U1–U9 验收路线已覆盖，B1/B2 修复经 Sol 定向复验通过；B3 误报已撤回且不同配置实机校准通过。见 [第三轮报告](../../../exec-runs/20261003-agent-harness-host-refactor/phase-5-cu-round3.md)。保留无关工作区改动，未提交。
+状态：已完成，2026-10-04。开发与自动化验证通过，U1–U9 验收路线已覆盖，B1/B2 修复经 Sol 定向复验通过；B3 误报已撤回且不同配置实机校准通过。见 [第三轮报告](../../../exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)。保留无关工作区改动，未提交。
 
 ## 1. 目标与边界
 
@@ -259,6 +259,6 @@ git diff --check
 - [x] T7 客户端职责核对
 - [x] T8 文档精简与同步
 - [x] T9 删除、产物及自动化总回归
-- [x] T9 Computer Use U1–U9 路线覆盖：见 [第二轮报告](../../../exec-runs/20261003-agent-harness-host-refactor/phase-5-cu-round2.md)及其证据边界
+- [x] T9 Computer Use U1–U9 路线覆盖：见 [第二轮报告](../../../exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)及其证据边界
 - [x] B1/B2 修复后定向 CU 复验与最终签收；见 [修复记录](../../../exec-runs/20261003-agent-harness-host-refactor/phase-5-feedback-fixes.md)
 - [x] 全阶段签收后归档计划、同步索引与链接

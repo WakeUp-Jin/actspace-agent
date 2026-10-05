@@ -41,6 +41,7 @@
 ## 根层入口
 
 - `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
+- [ActSpace 产品概念思路（初稿）](ActSpace产品概念思路初稿.md)：产品形象：定位、信念“唯变所适，每一个问题都有它的空间”、故事线、Agent / 场景 / Actor / Actor 名册 / 空间、意象与气质；视觉方向待定。
 - `core-storage-and-observability.md`：本地存储、workspace root 和可观测性边界。
 - `core-review-change-sources.md`：Git-first Review Workbench 单一事实源，覆盖六种 scope、upstream Branch、结构化 diff、Review Options、Git actions 与验收边界。
 - `core-review-large-diff-loading.md`：Review Standard/capped 双模式、批量 patch、完整文件正文、虚拟渲染和性能验收规范。

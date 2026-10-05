@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rm, lstat } from "node:fs/promises";
 import { join } from "node:path";
-import { SessionWriterLease } from "@actspace/session-persistence";
+import { SessionWriterLease } from "@actspace/session-jsonl";
 import { isRecord } from "@actspace/shared/host-protocol";
 import { writeDurableJson } from "./storage.js";
 export type AdminCommand = "status" | "pair" | "devices" | "revoke" | "stop";

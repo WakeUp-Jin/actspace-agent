@@ -35,7 +35,7 @@ Durable Session Projection 是从已接纳的 Session Journal 前缀派生的可
 - Session 列表和历史浏览；
 - 对话时间线和工具终态；
 - Desktop reload、CLI resume 和冷启动；
-- main Agent Inbox 的 pending / claimed / discarded 状态与 target；
+- 后台通知 Inbox 的 pending / claimed / discarded 状态；用户任务队列读取 TaskSnapshot；
 - canonical export、审计和测试；
 - live stream 断线后的重新同步。
 
@@ -640,7 +640,7 @@ Runtime 重启后不恢复旧 live progress。Session repair 根据 Journal：
 - terminal state 在 ordered Journal commit 前不可见；
 - unknown required / ignorable event 分别执行正确降级；
 - cold repair 不修改既有 event，只追加保守终态。
-- Inbox projection 按 enqueue seq 稳定重建，claimed / discarded message 不再显示为 pending。
+- 后台通知 Inbox projection 按 enqueue seq 稳定重建，claimed / discarded message 不再显示为 pending。
 
 ### 13.2 Live Progress
 

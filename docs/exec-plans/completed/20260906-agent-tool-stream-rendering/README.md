@@ -37,7 +37,7 @@
 - `packages/core/agent-loop/src/loop.ts`：AgentLoopLiveEvent 联合类型、collectStream 分类、assistant/chunk 身份、runTools prepared/finished、真实 requestId 贯穿。
 - `packages/tools/runtime/src/prepared-execution.ts`：ToolPreparedEnvironment 可选 onExecutionStarted；在 checkpoint 成功后、body 前调用；隔离观察者异常。
 - `apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts`：复用公开 AgentLoopLiveEvent 类型，去除手写 kind 副本。
-- `packages/runtime/src/runtime/boot.ts`、`packages/runtime/src/runtime/agent-host-port.ts`：核对现有类型转发；仅在签名确需同步时修改。
+- `packages/runtime/src/startup/boot.ts`、`packages/runtime/src/harness/agent-host-port.ts`：核对现有类型转发；仅在签名确需同步时修改。
 
 校验：T1 转绿；无工具可见性、参数校验、审批、checkpoint 或提交顺序变化。工具拒绝/校验失败没有 started，但有 finished；正常工具每次只有一个 started 和一个 finished。
 

@@ -58,7 +58,7 @@
 
 ### P2：Host Observation
 
-修改：`packages/runtime/src/runtime/session-controller.ts`、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`、`apps/desktop/src/preload/index.ts`、`apps/desktop/src/renderer/session/desktop-session-bridge.ts`、`packages/client/src/sessions/session.ts`。
+修改：`packages/runtime/src/session/session-controller.ts`、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`、`apps/desktop/src/preload/index.ts`、`apps/desktop/src/renderer/session/desktop-session-bridge.ts`、`packages/client/src/sessions/session.ts`。
 
 动作：
 
@@ -72,7 +72,7 @@
 
 ### P3：Global Index
 
-修改：`packages/runtime/src/runtime/session-controller.ts`、`packages/session/projection-cache/src/journal-cache.ts` 或同 package 的 Global Index 模块、`apps/desktop/src/main/runtime-v2/usage-source-cache.ts`、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts` 及 Global list/usage tests。
+修改：`packages/runtime/src/session/session-controller.ts`、`packages/session/projection-cache/src/journal-cache.ts` 或同 package 的 Global Index 模块、`apps/desktop/src/main/runtime-v2/usage-source-cache.ts`、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts` 及 Global list/usage tests。
 
 动作：
 
@@ -87,7 +87,7 @@
 
 ### P4：Window Reader 与资源边界
 
-修改：`packages/runtime/src/runtime/session-controller.ts`、`packages/session/projection-cache/src/journal-cache.ts`、`packages/shared/src/runtime-v2/projection.ts` 和 Window/large-tool tests。
+修改：`packages/runtime/src/session/session-controller.ts`、`packages/session/projection-cache/src/journal-cache.ts`、`packages/shared/src/runtime-v2/projection.ts` 和 Window/large-tool tests。
 
 动作：
 

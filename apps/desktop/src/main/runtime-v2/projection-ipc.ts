@@ -2,9 +2,7 @@ import { dialog, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from "el
 import {
   RUNTIME_V2_DESKTOP_CHANNELS,
   type RuntimeV2AbortRunInput,
-  type RuntimeV2CancelMessageInput,
   type RuntimeV2CreateSessionInput,
-  type RuntimeV2EnqueueMessageInput,
   type RuntimeV2ForkSessionInput,
   type RuntimeV2InspectSessionInput,
   type RuntimeV2RequestRestartInput,
@@ -87,9 +85,6 @@ export function registerRuntimeV2Ipc(options: {
   handle(RUNTIME_V2_DESKTOP_CHANNELS.createSession, (_event, input: RuntimeV2CreateSessionInput = {}) => options.registry.createSession(input.sessionId, input.workspaceRoot, input.agentForm));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.resumeSession, (_event, input: RuntimeV2InspectSessionInput) => options.registry.resumeSession(input.sessionId));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.forkSession, (_event, input: RuntimeV2ForkSessionInput) => options.registry.forkSession(input));
-  handle(RUNTIME_V2_DESKTOP_CHANNELS.runTurn, (_event, input: RuntimeV2RunTurnRequest) => options.registry.runTurn(input));
-  handle(RUNTIME_V2_DESKTOP_CHANNELS.enqueueMessage, (_event, input: RuntimeV2EnqueueMessageInput) => options.registry.enqueueMessage(input));
-  handle(RUNTIME_V2_DESKTOP_CHANNELS.cancelMessage, (_event, input: RuntimeV2CancelMessageInput) => options.registry.cancelMessage(input.sessionId, input.messageId));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.abortRun, (_event, input: RuntimeV2AbortRunInput) => options.registry.abortRun(input.sessionId, input.reason));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.flushSession, (_event, input: RuntimeV2InspectSessionInput) => options.registry.flushSession(input.sessionId));
   handle(RUNTIME_V2_DESKTOP_CHANNELS.requestRestart, (_event, input: RuntimeV2RequestRestartInput) => options.registry.requestRestart(input));

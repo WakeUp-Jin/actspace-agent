@@ -21,20 +21,3 @@ export function formatChatAttachmentIssue(issue: ChatAttachmentIssue): string {
     case "total_text_too_large": return `本次文本附件合计超过 ${(issue.limit ?? 256_000).toLocaleString("en-US")} 个字符，请减少附件或拆分发送。`;
   }
 }
-
-/** No turn has been enqueued. The renderer must restore the entire draft. */
-export type RunAgentPreparationFailure =
-  | {
-      status: "rejected";
-      sessionId: string;
-      agentRunId: string;
-      error: ChatAttachmentIssue;
-      referenceIssue?: undefined;
-    }
-  | {
-      status: "rejected";
-      sessionId: string;
-      agentRunId: string;
-      error?: undefined;
-      referenceIssue: import("./composer-content").ComposerReferenceIssue;
-    };

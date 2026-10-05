@@ -35,8 +35,6 @@ export interface ApprovalRegistryConfig {
 export class PendingApprovalRegistry implements DesktopRuntimeV2ApprovalPort {
   private pending = new Map<string, PendingEntry>();
   private timeoutMs: number;
-  private sessionId = "";
-  private agentRunId = "";
   private externalOnApprovalRequired?: (request: DesktopRuntimeV2ApprovalRequest, sessionId: string, agentRunId: string) => void;
   private externalOnApprovalResolved?: (
     request: DesktopRuntimeV2ApprovalRequest,
@@ -51,16 +49,11 @@ export class PendingApprovalRegistry implements DesktopRuntimeV2ApprovalPort {
     this.externalOnApprovalResolved = config?.onApprovalResolved;
   }
 
-  setCurrentAgentRun(sessionId: string, agentRunId: string): void {
-    this.sessionId = sessionId;
-    this.agentRunId = agentRunId;
-  }
-
   // Runtime v2 Desktop approval port
 
   waitForDecision(request: DesktopRuntimeV2ApprovalRequest): Promise<DesktopRuntimeV2ApprovalDecision> {
-    const sessionId = request.sessionId ?? this.sessionId;
-    const agentRunId = request.agentRunId ?? this.agentRunId;
+    const sessionId = request.sessionId;
+    const agentRunId = request.agentRunId;
 
     return new Promise<DesktopRuntimeV2ApprovalDecision>((resolve) => {
       const expiresAt = Date.now() + this.timeoutMs;

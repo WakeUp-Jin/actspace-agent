@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply, activate } from "./plugin.js";
+export { apply } from "./plugin.js";
 export * from "./recovery.js";
 export * from "./session-store.js";
 export * from "./session-persistence.js";
@@ -7,4 +7,3 @@ export * from "./session-driver.js";
 export * from "./coordinator.js";
 export * from "./session.js";
 export * from "./write-behind.js";
-export * from "./writer-lease.js";

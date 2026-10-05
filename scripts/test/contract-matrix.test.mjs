@@ -32,3 +32,32 @@ test("contract matrix validator fails closed for duplicate ids and notification 
   const vetoDiagnostics = validateRows(veto);
   assert.equal(vetoDiagnostics.some((item) => item.code === "NOTIFICATION_VETO"), true);
 });
+
+test("matrix covers workspace packages and plugin manifests without stale sources", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const { PACKAGE_PATHS, MANIFEST_PATHS } = await import("../contract-matrix/source-registry.mjs");
+  async function files(root, depth) {
+    const result = [];
+    for (const entry of await readdir(root, { withFileTypes: true })) {
+      if (["node_modules", "dist", ".git"].includes(entry.name)) continue;
+      const path = join(root, entry.name);
+      if (entry.isDirectory() && depth > 0) result.push(...await files(path, depth - 1));
+      else if (entry.isFile()) result.push(path);
+    }
+    return result;
+  }
+  const source = [...await files("packages", 4), ...await files("apps", 1)];
+  const packages = source.filter(path => /^(packages\/[^/]+(?:\/[^/]+)?|apps\/[^/]+)\/package\.json$/.test(path));
+  assert.deepEqual([...PACKAGE_PATHS].sort(), packages.sort());
+  const manifests = source.filter(path => /^packages\/.*\/src\/manifest\.ts$/.test(path) && !path.includes("cordis-adapter/"));
+  assert.deepEqual([...MANIFEST_PATHS].sort(), manifests.sort());
+  const matrix = await buildMatrix();
+  for (const id of ["agent.service", "harness.control", "host.application", "session.storage"]) assert.ok(matrix.services.some(row => row.id === id), id);
+  for (const event of ["harness/selection-updated", "application/run-preparing", "session/disposed"]) assert.ok(matrix.events.some(row => row.eventType === event), event);
+  const invalid = structuredClone(matrix);
+  invalid.services[0].sourceRefs = ["missing/source.ts#value"];
+  invalid.sourceDigest = "forged";
+  assert.ok(validateRows(invalid).some(row => row.code === "INVALID_SOURCE_REF"));
+  assert.ok(validateRows(invalid).some(row => row.code === "INVALID_DIGEST"));
+});

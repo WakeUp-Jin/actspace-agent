@@ -22,9 +22,6 @@ export const RUNTIME_V2_DESKTOP_CHANNELS = Object.freeze({
   createSession: "runtime-v2:create-session",
   resumeSession: "runtime-v2:resume-session",
   forkSession: "runtime-v2:fork-session",
-  runTurn: "runtime-v2:run-turn",
-  enqueueMessage: "runtime-v2:enqueue-message",
-  cancelMessage: "runtime-v2:cancel-message",
   abortRun: "runtime-v2:abort-run",
   flushSession: "runtime-v2:flush-session",
   requestRestart: "runtime-v2:request-restart",
@@ -83,8 +80,6 @@ export type RuntimeV2InspectSessionInput = { readonly sessionId: string };
 export type RuntimeV2CreateSessionInput = { readonly sessionId?: string; readonly workspaceRoot?: string; readonly agentForm?: MainAgentForm };
 export type RuntimeV2ForkSessionInput = { readonly parentSessionId: string; readonly boundarySeq: number; readonly newSessionId: string };
 export type RuntimeV2ExportSessionResult = { readonly sessionId: string; readonly jsonl: string };
-export type RuntimeV2EnqueueMessageInput = { readonly sessionId: string; readonly content: RuntimeV2JsonValue; readonly target: "next-step" | "next-turn"; readonly messageId?: string };
-export type RuntimeV2CancelMessageInput = { readonly sessionId: string; readonly messageId: string };
 export type RuntimeV2AbortRunInput = { readonly sessionId: string; readonly reason?: string };
 export type RuntimeV2RequestRestartInput = { readonly reason: string; readonly source: string; readonly candidateDigest?: string };
 export type RuntimeV2UpdateSessionMetadataInput = { readonly sessionId: string; readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean };
@@ -199,9 +194,6 @@ export type RuntimeV2DesktopBridge = {
   createSession(input?: RuntimeV2CreateSessionInput): Promise<RuntimeV2SessionSnapshot>;
   resumeSession(input: RuntimeV2InspectSessionInput): Promise<RuntimeV2SessionSnapshot>;
   forkSession(input: RuntimeV2ForkSessionInput): Promise<RuntimeV2SessionSnapshot>;
-  runTurn(input: RuntimeV2RunTurnRequest): Promise<RuntimeV2RunTurnResponse>;
-  enqueueMessage(input: RuntimeV2EnqueueMessageInput): Promise<{ readonly messageId: string; readonly target: "next-step" | "next-turn"; readonly enqueuedSeq: number }>;
-  cancelMessage(input: RuntimeV2CancelMessageInput): Promise<boolean>;
   abortRun(input: RuntimeV2AbortRunInput): Promise<boolean>;
   flushSession(input: RuntimeV2InspectSessionInput): Promise<void>;
   requestRestart(input: RuntimeV2RequestRestartInput): Promise<RuntimeV2RuntimeState>;

@@ -1,2 +1,2 @@
-export { apply } from "./runtime/cordis-entry.js";
-export type { RuntimeCordisHost } from "./runtime/cordis-entry.js";
+export { apply } from "./startup/cordis-entry.js";
+export type { RuntimeCordisHost } from "./startup/cordis-entry.js";

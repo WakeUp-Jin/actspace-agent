@@ -66,7 +66,7 @@ ctx.on("session/event", containNotification(ctx, function (event) {
 ## 声明与验证入口
 
 - `packages/cordis-adapter/src/event-contract.ts`：Loop 名称与基础 typed events。
-- `packages/agent-service/src/service.ts`、`packages/harness-control/src/contracts.ts`、`packages/runtime/src/runtime/session-plugin.ts`：领域声明。
+- `packages/agent-service/src/service.ts`、`packages/harness-control/src/contracts.ts`、`packages/runtime/src/session/session-plugin.ts`：领域声明。
 - `pnpm check:harness-events`：交叉检查显式发布调用与 `@mode`。
 - `pnpm test:harness-events`：负向 fixture，不能接受错模式或未声明名称。
 - `pnpm gen:contract-matrix`：从源声明生成目录；禁止手改生成物。

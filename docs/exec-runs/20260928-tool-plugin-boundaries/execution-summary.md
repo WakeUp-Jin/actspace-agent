@@ -23,9 +23,9 @@
 | --- | --- | --- |
 | 七个插件包与 Todo 的 manifest、exports、lifecycle、独立注册与 dispose | 通过 | package boundary 检查、各包测试、Runtime 跨包测试 |
 | 参数错误、缺失能力、scope deny、权限 audience 与 executor 故障 | 通过 | `packages/runtime/src/test/tool-contracts.test.ts`、Tool Runtime 权限测试 |
-| 新 Todo 写入、Journal、projection、读回及持久化 checkpoint 恢复 | 通过 | `packages/tools/todo-tools/src/test/lifecycle.test.ts`、`packages/runtime/src/runtime/session-projection.test.ts` |
+| 新 Todo 写入、Journal、projection、读回及持久化 checkpoint 恢复 | 通过 | `packages/tools/todo-tools/src/test/lifecycle.test.ts`、`packages/runtime/src/session/session-projection.test.ts` |
 | 旧 Todo Journal 明确降级、拒绝 resume，无兼容 Codec | 通过 | 持久 JSONL fixture 与 Codec 测试 |
-| 禁用 Shell/Todo 后实际 Cordis 不挂载、Codec 不装载；变更要求重启 | 通过 | `packages/runtime/src/runtime/tool-composition.test.ts` |
+| 禁用 Shell/Todo 后实际 Cordis 不挂载、Codec 不装载；变更要求重启 | 通过 | `packages/runtime/src/harness/tool-composition.test.ts` |
 | CLI 真实进程启动/退出 | 通过 | `pnpm test:agent-cli:process`：2/2 |
 | 全仓 build、typecheck、test | 分层复核完成；默认全量测试未通过 | `pnpm build`、`pnpm typecheck` 通过。默认 `pnpm test` 的 Desktop 部分有 14 项 5 秒超时、822 项通过；修复旧测试 import 后，4 worker / 15 秒的完整 Desktop 复跑为 834 通过、3 项 UI 超时。受影响的 Desktop Host/Projection/图片配置定向测试通过；3 项超时所在文件以单 worker / 30 秒复核，27/27 通过 |
 | package cutover、current docs、Desktop build graph、仓库卫生 | 通过 | 对应检查命令退出 0；cutover 输出仍有两项站点历史 `/eval` 发现 |

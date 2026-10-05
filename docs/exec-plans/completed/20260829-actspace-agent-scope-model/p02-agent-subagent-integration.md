@@ -26,7 +26,7 @@
 ## 具体任务
 
 1. 在 `packages/core/agent` 固定 live Agent identity contract：公开 `agentId` 用于诊断，内部 subject/key 用于 dispatch；`MAIN_AGENT_DESCRIPTOR.id` 和 preset id 不再作为 scope key。
-2. 修改 `packages/runtime/src/runtime/agent-factory-plugin.ts`，使每次 main Agent assembly 在 unpublished Scope 中创建自己的 Agent subject、Prompt/Tool registry view、cancel chain 和 dispatcher，完成 setup 后才 publish。
+2. 修改 `packages/runtime/src/harness/agent-factory-plugin.ts`，使每次 main Agent assembly 在 unpublished Scope 中创建自己的 Agent subject、Prompt/Tool registry view、cancel chain 和 dispatcher，完成 setup 后才 publish。
 3. 修改 `packages/subagent/src/provider.ts`，默认以 parent Scope 创建 child Scope；child Agent 使用独立 child identity、Session、Inbox 和 dispatcher；child terminal 后先等待 loop/stream/tool settlement，再 dispose child Scope。为需要注册隔离的调用提供显式 flat child Scope 选项，不得把 flat 模式作为默认行为。
 4. 修改 `packages/core/agent-loop/src/**` 中仅涉及 identity/carrier 的调用点，让通知、干预和 tool event 复用 Agent dispatcher；不修改事件名、事件顺序和工具执行函数。
 5. 覆盖失败路径：setup failure 不 publish、publication failure 逆序回滚、parent abort 级联 child、child failure 不终止 parent、shutdown 不留下 orphan child。
@@ -36,8 +36,8 @@
 
 - `packages/core/agent/src/**`
 - `packages/core/agent-loop/src/**` 中 identity/carrier 相关文件和测试
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
-- `packages/runtime/src/runtime/agent-runtime-plugin.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
+- `packages/runtime/src/harness/agent-runtime-plugin.ts`
 - `packages/subagent/src/provider.ts`
 - `packages/subagent/src/test/**`
 - `packages/runtime/src/runtime/test/**` 或现有对应 integration test 文件

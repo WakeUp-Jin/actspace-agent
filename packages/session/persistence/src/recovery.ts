@@ -1,23 +1,16 @@
-import { createHash, randomUUID } from "node:crypto";
-import { copyFile, mkdir, open, rename, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { EventCodecRegistry } from "@actspace/session-journal";
+import type { SessionInspection } from "./session-store.js";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { SessionError } from "@actspace/session-journal";
-import type { SessionInspection } from "@actspace/session-jsonl";
-import { encodeRows } from "@actspace/session-jsonl";
-import { SessionJournal } from "@actspace/session-journal";
 import type { SessionHandle } from "./session.js";
-import { SessionWriterLease } from "./writer-lease.js";
 
 export type SessionRecoveryOutcome = "not-started" | "outcome-unknown";
 export type SessionRecoveryAccess = "read-write" | "read-only" | "forensic-required";
 
-/** Maps low-level JSONL inspection to the product recovery posture. */
+/** Maps storage inspection to the product recovery posture. */
 export function classifySessionRecoveryAccess(inspection: SessionInspection): SessionRecoveryAccess {
   if (inspection.accessState === "corrupt" || inspection.header === null || inspection.validation === null) return "forensic-required";
-  if (inspection.tornTail !== null || inspection.accessState === "degraded" || inspection.accessState === "browse-only") return "read-only";
+  if (inspection.integrity !== "complete" || inspection.accessState === "degraded" || inspection.accessState === "browse-only") return "read-only";
   return "read-write";
 }
 
@@ -129,43 +122,6 @@ export async function applySessionRecovery(session: SessionHandle): Promise<Sess
   return plan;
 }
 
-export async function repairTornJsonlSession(options: {
-  readonly inspection: SessionInspection;
-  readonly registry: EventCodecRegistry;
-  readonly runtimeId: string;
-}): Promise<{ readonly repairId: string | null; readonly forensicPath: string }> {
-  const { inspection } = options;
-  if (inspection.header === null || inspection.tornTail === null || inspection.validation === null) {
-    throw new SessionError("SESSION_CORRUPT", "Only a validated prefix with a torn final line can use torn-tail repair.");
-  }
-  const sessionDir = dirname(inspection.journalPath);
-  const recoveryDir = join(sessionDir, "recovery");
-  await mkdir(recoveryDir, { recursive: true });
-  const lease = await SessionWriterLease.acquire({ sessionDir, sessionId: inspection.header.sessionId, runtimeId: options.runtimeId });
-  const digest = createHash("sha256").update(inspection.rawBytes).digest("hex");
-  const forensicPath = join(recoveryDir, `${digest}.journal.jsonl`);
-  const temporaryPath = join(sessionDir, `.repair-${randomUUID()}.tmp`);
-  try {
-    await copyFile(inspection.journalPath, forensicPath);
-    await syncFile(forensicPath);
-    const journal = new SessionJournal({ registry: options.registry, seed: inspection.events, now: () => new Date().toISOString() });
-    const plan = planSessionRecovery(journal.events);
-    if (plan !== null) journal.appendMany(plan.candidates);
-    const temporary = await open(temporaryPath, "wx", 0o600);
-    try {
-      await temporary.writeFile(encodeRows([inspection.header, ...journal.events]));
-      await temporary.sync();
-    } finally {
-      await temporary.close();
-    }
-    await rename(temporaryPath, inspection.journalPath);
-    await syncDirectory(sessionDir);
-    return Object.freeze({ repairId: plan?.repairId ?? null, forensicPath });
-  } finally {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
-    await lease.dispose();
-  }
-}
 
 function coreCandidate(
   type: string,
@@ -194,14 +150,4 @@ function record(value: RuntimeV2JsonValue): Readonly<Record<string, RuntimeV2Jso
 
 function string(value: RuntimeV2JsonValue | undefined): string {
   return typeof value === "string" ? value : "";
-}
-
-async function syncFile(path: string): Promise<void> {
-  const handle = await open(path, "r");
-  try { await handle.sync(); } finally { await handle.close(); }
-}
-
-async function syncDirectory(path: string): Promise<void> {
-  const handle = await open(path, "r");
-  try { await handle.sync(); } finally { await handle.close(); }
 }

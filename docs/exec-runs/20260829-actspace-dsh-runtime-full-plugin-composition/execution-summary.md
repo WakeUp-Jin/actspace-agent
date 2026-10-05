@@ -15,7 +15,7 @@
 
 | 变更 | 影响文件 | 说明 |
 |------|----------|------|
-| Host service contract | `packages/runtime/src/runtime/host-services.ts`、CLI/Desktop Host Adapter | 在 Include 前注入一致且不可变的 Host facts，不混入领域 Runtime 实例 |
+| Host service contract | `packages/runtime/src/startup/host-services.ts`、CLI/Desktop Host Adapter | 在 Include 前注入一致且不可变的 Host facts，不混入领域 Runtime 实例 |
 | Context-backed Runtime facade | `packages/runtime/src/runtime/runtime-facade.ts`、`runtime-handle.ts` | RuntimeHandle 通过 facade 查找服务，为后续插件 ownership 迁移建立稳定 Host API |
 | Loader required service validation | `packages/boot/src/dsh-boot.ts` | settlement 后、发布前验证 required services，失败时释放 partial tree |
 | Phase 1 lifecycle tests | Boot/Runtime tests | 覆盖 Host preparation、Context lookup、fallback、required service、失败清理和幂等 dispose 基础 |
@@ -33,11 +33,11 @@
    - 预期结果：JSON 中 `ok` 为 `true`、`status` 为 `completed`，并包含 Session snapshot。
 
 2. **确认阶段边界**
-   - 验证方式：检查 `packages/runtime/src/runtime/boot.ts`。
+   - 验证方式：检查 `packages/runtime/src/startup/boot.ts`。
    - 预期结果：Session、LLM、Tools、Agent、Subagent、Headless 均由 DSH plugin tree 提供。
 
 3. **确认 Runtime-owned config tree**
-   - 验证方式：检查 `packages/runtime/cordis.yml` 和 `packages/runtime/src/runtime/boot.ts`。
+   - 验证方式：检查 `packages/runtime/cordis.yml` 和 `packages/runtime/src/startup/boot.ts`。
    - 预期结果：默认 DSH 路径使用 `runtimeCordisConfigPath()`，CLI run 通过 headless runner service 驱动。
 
 ### 建议验证

@@ -49,6 +49,7 @@
     "vitest": "^3.2.4",
     "@actspace/boot": "workspace:*",
     "@actspace/bundle": "workspace:*",
-    "@actspace/composition": "workspace:*"
+    "@actspace/composition": "workspace:*",
+    "@actspace/session-jsonl": "workspace:*"
   }
 }

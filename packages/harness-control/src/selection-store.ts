@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { SessionWriterLease } from "@actspace/session-persistence";
+import { SessionWriterLease } from "@actspace/session-jsonl";
 import { canonical } from "@actspace/composition";
 import { HarnessControlError, type SelectionRecord } from "./contracts.js";
 export const selectionHash = (value: unknown): string => createHash("sha256").update(canonical(value)).digest("hex");

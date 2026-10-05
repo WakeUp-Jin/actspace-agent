@@ -6,47 +6,17 @@ import {
   CordisContextClass,
   CordisService,
   type CordisServiceContext,
-  defineServiceConsumer,
-  defineServiceProvider,
   defineServiceDefinition,
-  validateServiceDefinition,
-  validateServiceGraph,
   defineBuiltinPluginManifest,
-  validateManifestServiceConsistency,
-  requireService,
+  validatePluginManifest,
 } from "../src/index.js";
 import { createServiceLifecycleFixtures, SERVICE_FIXTURE_IDS } from "../../test-support/src/service-fixtures.js";
 
 describe("Cordis Service ABI", () => {
-  it("keeps stable ids and separates Definition, Provider and Consumer roles", () => {
-    const definition = defineServiceDefinition<{ value: number }, { enabled: boolean }>({ id: "fixture.definition", description: "fixture" });
-    const provider = defineServiceProvider({ definition, create: async () => ({ value: 1 }) });
-    const consumer = defineServiceConsumer({ definition, requires: ["fixture.definition"], consume: () => undefined });
-
+  it("describes real Cordis services without a second provider registry", () => {
     expect(ACTSPACE_SERVICE_IDS.sessionStore).toBe("session.store");
     expect(ACTSPACE_SERVICE_DEFINITIONS.agentLoop.id).toBe("agent.loop");
-    expect(ACTSPACE_SERVICE_ROLE_METADATA.length).toBeGreaterThanOrEqual(14);
-    expect(ACTSPACE_SERVICE_ROLE_METADATA.find((role) => role.definitionId === "session.persistence")?.providerId).toBe("session.persistence:jsonl");
-    expect(provider.kind).toBe("actspace.service-provider");
-    expect(provider.providerId).toBe("fixture.definition:default");
-    expect(consumer.kind).toBe("actspace.service-consumer");
-    expect(definition.abiVersion).toBe(1);
-    expect(definition.owner).toBe("@actspace/core");
-    expect(consumer.requires).toEqual(["fixture.definition"]);
-    expect(() => requireService(new CordisContextClass(), "fixture.missing")).toThrow(/fixture\.missing/);
-  });
-
-  it("validates provider ownership and required graph entries fail closed", async () => {
-    const definition = defineServiceDefinition<{ value: number }, Record<string, never>>({ id: "fixture.graph", description: "graph", required: true, owner: "@actspace/test" });
-    const provider = defineServiceProvider({ definition, create: async () => ({ value: 1 }) });
-    validateServiceGraph({ definitions: [definition], providers: [provider] });
-    const handle = await provider.apply(new CordisContextClass(), {});
-    expect(handle.service).toEqual({ value: 1 });
-    await handle.dispose();
-
-    expect(() => validateServiceGraph({ definitions: [definition], providers: [] })).toThrow(/no provider/);
-    expect(() => validateServiceGraph({ definitions: [definition], providers: [provider, provider] })).toThrow(/Multiple active providers/);
-    expect(() => validateServiceDefinition({ ...definition, owner: "" })).toThrow(/owner/);
+    expect(ACTSPACE_SERVICE_ROLE_METADATA.find(role => role.definitionId === "session.storage")?.providerId).toBe("session.storage:jsonl");
   });
 
   it("rejects manifest service declarations that drift from behavior metadata", () => {
@@ -59,9 +29,12 @@ describe("Cordis Service ABI", () => {
       frontend: null,
       contributions: { services: ["fixture.service"], tools: [], prompts: [], events: [] },
     });
-    expect(() => validateManifestServiceConsistency(manifest)).not.toThrow();
+    expect(() => validatePluginManifest(manifest)).not.toThrow();
     const drifted = Object.freeze({ ...manifest, contributions: Object.freeze({ ...manifest.contributions, services: ["fixture.other"] }) });
-    expect(() => validateManifestServiceConsistency(drifted)).toThrow(/undeclared service/);
+    expect(() => validatePluginManifest(drifted)).toThrow(/undeclared service/);
+    const second = defineBuiltinPluginManifest({ pluginId: "fixture.second", version: "1", name: "second", entry: { entryId: "fixture.second", behavior: "./second.js", enabled: false }, host: { required: [], optional: [] }, frontend: null, contributions: { services: ["fixture.second"], tools: [], prompts: [], events: [] } });
+    expect(() => validatePluginManifest({ ...manifest, behaviors: [...manifest.behaviors, ...second.behaviors], contributions: { ...manifest.contributions, services: ["fixture.service", "fixture.second"] } })).not.toThrow();
+    expect(() => validatePluginManifest({ ...manifest, contributions: { ...manifest.contributions, services: ["fixture.service", "fixture.unowned"] } })).toThrow(/without a behavior provider/);
   });
 
   it("registers a real Service and disposes its ctx.effect exactly once", async () => {

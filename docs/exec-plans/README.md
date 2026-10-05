@@ -16,22 +16,17 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [Composer 消息队列与运行中插入](active/20260930-composer-message-queue.md) | T1–T9 已完成（未提交）；剩 Electron 实机验收。 |
+| [Agent 重构最终清理与验收](active/20261005-agent-refactor-final-closeout/README.md) | 方案待批准；一次完成原始目标内的代码、文档、根目录清理和剩余验收。 |
+| [Agent 第二轮存储与代码清理](active/20261004-agent-storage-and-cleanup/README.md) | 实施完成；主要实机链路及修复复验通过，少量 UI 子项待补验。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [单一 Agent 形态与三种模式](active/20260928-agent-forms-and-modes.md) | T1–T7 已实现；主要实机路线通过，T8 剩余验收见执行摘要。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
 | [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |
 | [会话切换与后台运行](active/20260916-session-background-runs.md) | 按会话隔离 stream、后台工具状态与历史校准，补切换回归与桌面验收。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
-| [Cordis 事件 ABI 与 CLI 最终验收](active/20260829-actspace-cordis-event-abi-final-acceptance/README.md) | P00–P04 有通过证据；补 P05 deterministic retry/error fixture 后再闭环。 |
-| [P1/P2 契约与组合](active/20260829-actspace-p1-p2-contract-and-composition/README.md) | contract slices 已交付；G1 跨包回归、P2/G2 语义门禁继续。 |
-| [P1-A Session Core / Persistence](active/20260829-actspace-p1-session-core-persistence/README.md) | contract 与事件行为已交付；下一步独立迁移物理 `session-core` 包和 consumer imports。 |
-| [P1-B Service 三层](active/20260829-actspace-p1-service-roles/README.md) | slice 已交付；全域 Provider/Consumer 收口待完成。 |
-| [P1-C Profile / Bundle / Patch](active/20260829-actspace-p1-profile-bundle-patch/README.md) | schema/digest/transport 已交付；restart-only、失败清理及 one-shot 回归待完成。 |
-| [P2 Contract Matrix](active/20260829-actspace-p2-contract-matrix/README.md) | 字节漂移检查已恢复通过；语义 validator 与负向 fixtures 未完整交付，不能归档。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；剩 DropdownMenu、Switch、Textarea、Tabs 及对应迁移。 |
 
-2026-09-09 [逐项复核与设计合并清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)：初始 10 个 active 入口逐项复核；中文界面任务自行归档后，Context 补齐全仓回归也进入 completed，当前剩余 8 个入口。P2 按语义检查缺口保留 active。
+六个早期后端计划已移出执行导航，短页仅保留历史链接。独有目标与未完成项见[结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)，当前验证见本轮清理摘要。
 
 ## 最近完成
 
@@ -76,7 +71,7 @@
 
 - [LLM Core Pi](completed/20260922-llm-core-pi.md)：M0–M4 的请求配置冻结、retry lease、Host prepare、pi-ai backend policy、replay envelope 和自动化验证已实施；真实 Provider、packaged Electron 与既有全仓基线失败保留在执行摘要。
 
-- [Session 事件持久化与检查点重构](completed/20260920-session-event-persistence/README.md)：accepted/durable 分离、persistence coordinator、必需 checkpoint policy 和生命周期通知已实施；物理 `session-core` 包迁移仍由 P1-A 跟踪。
+- [Session 事件持久化与检查点重构](completed/20260920-session-event-persistence/README.md)：accepted/durable 分离、persistence coordinator、必需 checkpoint policy 和生命周期通知已实施；后续存储整体解耦见本轮清理，旧物理包迁移方案已替代。
 
 - [官网功能展示与截图占位](completed/20260919-site-showcase.md)：六组滚动图文、35 张截图对应24篇文档40处占位与浅紫引用完成；真实素材待用户交付。
 
@@ -155,7 +150,7 @@
 
 - [早期 Session 持久化与投影计划](discarded/20260830-actspace-session-persistence-projection/README.md)：2026-09-21 生产切换计划已替代剩余实施路径；保留原契约和验收证据。
 
-- [DSH-native 旧重定向](discarded/20260829-actspace-dsh-native-plugin-runtime/README.md)：无独立任务，当前入口为 Profile-first。
+- [DSH-native 旧重定向](../design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md)：无独立任务，当前入口为 Profile-first。
 
 - 旧版 Agent 工具能力总计划：`discarded/20260527-agent-tool-capabilities.md`
 - 已失效的基础 Bug 人工验收计划：`discarded/开发者手动验收-20260529-bugfix-foundation-manual-acceptance.md`
@@ -163,3 +158,20 @@
 - 基于 v1 `session.jsonl` 的 Bash 会话级动态 allowlist：`discarded/Bash工具和工具权限调度开发计划/README.md`
 
 每份 discarded plan 顶部都应说明丢弃日期、原因和替代入口。
+
+历史链接例外：`active/20260930-composer-message-queue.md` 仅保留旧 history 的回溯入口，已被 Host 队列契约替代，不是待执行任务。
+
+## 本轮已完成
+
+- [代码与文档清理](completed/20261004-agent-refactor-cleanup.md)：本批完成，保护 histories/learnings 和既有工作区修改。
+
+## 仅供历史链接回溯
+
+以下目录中的短页不是执行计划；保留原路径以保护 histories/learnings 引用。目标和欠账已经移交本轮清理与技术债。
+
+- [cordis-event-abi-final-acceptance](active/20260829-actspace-cordis-event-abi-final-acceptance/README.md)
+- [p1-p2-contract-and-composition](active/20260829-actspace-p1-p2-contract-and-composition/README.md)
+- [p1-profile-bundle-patch](active/20260829-actspace-p1-profile-bundle-patch/README.md)
+- [p1-service-roles](active/20260829-actspace-p1-service-roles/README.md)
+- [p1-session-core-persistence](active/20260829-actspace-p1-session-core-persistence/README.md)
+- [p2-contract-matrix](active/20260829-actspace-p2-contract-matrix/README.md)

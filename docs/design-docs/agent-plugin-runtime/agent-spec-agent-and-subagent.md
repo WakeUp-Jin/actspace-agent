@@ -228,41 +228,13 @@ Base Profile 的 Startup Validation 至少确认：
 
 Runtime diagnostics 至少展示 preset identity / version、child / parent lineage、当前 terminal state、被裁剪的工具能力、取消来源、pending child disposer 和恢复异常。diagnostics 不进入模型上下文，也不替代 Session facts。
 
-## 15. main Agent Durable Inbox
+## 15. 用户任务与后台通知
 
-main Agent 保留一个由 Session facts 驱动的 Inbox，用于当前 Turn 的 steering 和后续 Turn 的 follow-up。它不是独立可变真相，也不是 background job queue。
+用户首发、排队和指定“当前 Run 读取”统一经过 `AgentService.submit` 与 TaskLedger。队列只保存内容；当前配置在交付 Run/下一请求的约定边界读取。接纳返回 durable receipt，不把接纳等同于执行完成。
 
-### 15.1 两种 target
+同一条 pending Task 可以调整顺序、指定交付、撤回或删除；不再维护 next-step/next-turn 两套用户队列。停止当前 Run 会暂停队列，显式继续后再调度；重启恢复不重复领取已结算内容。详细字段、幂等性和模式限制见[Task/Run 规范](agent-task-run-lifecycle.md)。
 
-| target | 语义 | active 时 | idle 时 |
-|---|---|---|---|
-| `next-step` | steering：补充当前任务方向 | 在最近一个尚未开始的 pre-step boundary 领取，并继续当前 Turn | 唤醒 driver，打开一个新 Turn 后作为首批输入领取 |
-| `next-turn` | follow-up：排队一个新的用户请求 | 保持 FIFO，当前 Turn terminal 后每次只领取一条并打开下一 Turn | 唤醒 driver并打开新 Turn |
-
-`next-step` 是否赶得上某次请求由 claim boundary 决定：消息若在该 boundary 之后接纳，就只能进入更后的 Step，不能修改已经形成的 request snapshot。`next-turn` 不会被塞进当前 Turn。
-
-### 15.2 Durable queue
-
-接纳、领取和丢弃都必须是 Core Event Codec 管理的 Session 事实：
-
-- `enqueued` 保存稳定 message id、target、来源、接纳顺序、已脱敏内容和 attachment refs；
-- `claimed` 引用一个尚未领取或丢弃的 message id，并通过核心 Surface append 让它成为模型可见 user message；
-- `discarded` 引用仍 pending 的 message id 和稳定原因；
-- 当前 pending queue 由 Journal projection 重建，内存索引和 UI 草稿都不是 authority；
-- 多 Host 并发接纳通过 Session writer lease 和 Journal `seq` 串行，FIFO 以 `enqueued` event seq 为准。
-
-在 Turn boundary，driver 先 durable open Turn，再按顺序领取全部 pending `next-step` 和最多一条 `next-turn`。在 Step 之间只领取当时已接纳的全部 `next-step`。claim 形成的 user Surface nodes 必须在本次 request snapshot 和 checkpoint 之前完成。
-
-### 15.3 Wake、取消与恢复
-
-- 接纳 `next-step` 或 `next-turn` 都会请求 driver wake；多个 wake 可以合并，但不能丢掉 durable message；
-- 单条 pending message 可以按 message id 取消；只有尚未 claimed 时才追加 `discarded`，claimed 后必须通过 active Turn abort 处理；
-- abort active Turn 默认同时 durable discard 全部 pending Inbox；Host 显式选择 `keepPending` 时才保留；Runtime dispose 总是 discard 未领取项；
-- main Session resume 从 Journal 重建 pending queue；显式 resume 表示允许仍具 wake 语义的 pending input 继续驱动后续 Turn；
-- crash 若发生在 enqueue 后、claim 前，消息仍 pending；claim 已 durable 后则不会再次领取；
-- Inbox 操作返回 message identity 和接纳结果，不把某条 follow-up 与未来某个 assistant 输出伪装成同步 completion handle。
-
-one-shot child Agent 不开放 public Inbox、steering 或 follow-up。父 Agent 只能在创建时给出完整 task brief；取消后若要重做，必须创建新的 invocation 和 child Session。
+Agent Inbox 仍用于后台 `task_notification` 等领域输入，因此对应 codec/replay 不能删除。它不再拥有主用户任务队列。one-shot child 不提供公开续聊入口；重新执行需新 invocation/child Session，并在启动时取得当前 Harness 租约。
 
 ## 16. 明确不做
 
@@ -272,11 +244,11 @@ v2 明确不包含：
 - 可继续发送消息、resume、reopen 或 handoff 控制权的 continuable Subagent；
 - 长期驻留、无人持有或跨 main turn 自主运行的 background Agent；
 - Preset StandingMount、旧 Preset generation 保留和资源回收协议；
-- Preset、Prompt、Tool policy 或 Agent behavior 的 live reload；
+- 已运行 Run 中更换 Loop 或 Harness；后续 Run 可采用新 Harness。
 - 旧 Agent / Explore executor、ContextManager、ToolManager 和 bridge 的兼容壳；
 - Kairos 作为 Agent 形态或候选插件。
 
-main Agent 自身仍是正常的多轮 Session，并通过上述 durable Inbox 接受 steering / follow-up；“不可 continuation”只约束一次性 Subagent。
+main Agent 自身仍是正常的多轮 Session，并通过 TaskLedger 接受用户输入；“不可 continuation”只约束一次性 Subagent。
 
 ## 17. 实现前字段级评审清单
 
@@ -291,4 +263,4 @@ main Agent 自身仍是正常的多轮 Session，并通过上述 durable Inbox �
 - child completion 与 parent link 的幂等键、repair transaction 和 writer lease 细节；
 - Todo event payload、projection schema 和 fixed renderer 的 generic 展示 DTO；
 - child Session browse / export 的 Host 权限和 retention policy；
-- Inbox event、message envelope、`keepPending` option 和稳定错误码的精确字段名。
+- Task、Run 与后台通知的字段以各自类型及 codec 为准，不能重新引入旧 public Inbox API。

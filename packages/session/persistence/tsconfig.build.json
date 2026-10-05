@@ -13,10 +13,7 @@
       "path": "./../journal/tsconfig.build.json"
     },
     {
-      "path": "./../jsonl/tsconfig.build.json"
-    },
-    {
-      "path": "./../projection/tsconfig.build.json"
+      "path": "./../storage/tsconfig.build.json"
     },
     {
       "path": "./../../shared/tsconfig.build.json"

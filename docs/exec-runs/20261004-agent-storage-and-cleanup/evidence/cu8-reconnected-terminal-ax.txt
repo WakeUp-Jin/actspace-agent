@@ -1,0 +1,122 @@
+Window: "actspace", App: Actspace Dev actspace-agent-2067.
+0 标准窗口 actspace, Secondary Actions: Raise
+	1 container actspace
+		2 container
+			3 HTML 内容 actspace, URL: 127.0.0.1:5173/
+				4 container
+					5 切换按钮 Description: 收起会话侧栏, Help: 收起侧栏, Value: 1
+					6 container 会话导航
+						7 按钮 Description: 后退, Help: 返回
+						8 按钮 (disabled) 前进
+					9 切换按钮 Description: 查看执行轨迹, Value: 0
+					10 按钮 查看会话详情： New chat
+					11 弹出式按钮 Description: 新建右侧面板对象, Help: 新建对象
+					12 切换按钮 Description: 关闭面板, Help: 关闭右侧面板, Value: 1
+					13 container
+						14 按钮 新建会话
+						15 按钮 扩展
+						16 container 会话
+							17 container
+								18 按钮 工作区
+								19 按钮 排序工作区
+								20 按钮 添加工作区
+								21 按钮 收起 工作区
+								22 container
+									23 按钮 收起 Storage CU Remote · remote-workspace
+									24 弹出式按钮 Storage CU Remote · remote-workspace
+									25 container 工作区操作
+										26 按钮 在工作区中新建会话
+								27 按钮 会话状态： 空闲
+								28 按钮 New chat Storage CU Remote
+									29 文本 New chat
+									30 文本 Storage CU Remote
+								31 按钮 置顶会话
+								32 按钮 (disabled) 当前会话无法归档
+								33 文本 1m
+								34 container
+									35 按钮 收起 workspace
+									36 弹出式按钮 workspace
+									37 container 工作区操作
+										38 按钮 在工作区中新建会话
+								39 按钮 会话状态： 空闲
+								40 按钮 P5 正在输出… P5 摘要/普通回复已完成。保留目标、已完成步骤与后续动作。
+								41 按钮 置顶会话
+								42 按钮 归档会话
+								43 文本 21m
+								44 container
+									45 按钮 收起 Default workspace
+									46 弹出式按钮 Default workspace
+									47 container 工作区操作
+										48 按钮 在工作区中新建会话
+								49 container
+									50 按钮 收起 actspace-agent
+									51 弹出式按钮 actspace-agent
+									52 container 工作区操作
+										53 按钮 在工作区中新建会话
+						54 按钮 设置
+					55 分离器 Description: 调整会话侧栏宽度, Value: 260
+					56 container
+						57 container 会话消息
+							58 container
+								59 文本 P5_TOOL STORAGE_CU8_REMOTE
+								60 按钮 Worked for 1m 17s
+								61 container
+									62 文本 P5 正在输出… P5 夹具任务完成。模型：p5-test。工具结果：2。
+									63 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
+								64 container Turn output artifacts
+									65 container
+										66 文本 Edited 1 file
+										67 container 1 additions, 0 deletions
+											68 text + 1 - 0
+									69 按钮 Open result.txt
+										70 文本 result.txt
+										71 container 1 additions, 0 deletions
+											72 text + 1 - 0
+								73 container 本轮消耗：450 Token · $0.00
+									74 text 00:20 450 Token · $0.00
+								75 按钮 复制回复
+								76 按钮 可视化这条回复
+								77 弹出式按钮 更多消息操作
+							78 container
+								79 文本 STORAGE_CU8_OFFLINE_DRAFT
+								80 container
+									81 文本 P5 正在输出… P5 夹具任务完成。模型：p5-test。工具结果：0。
+									82 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
+								83 container 本轮消耗：150 Token · $0.00
+									84 text 00:30 150 Token · $0.00
+								85 按钮 复制回复
+								86 按钮 可视化这条回复
+								87 弹出式按钮 更多消息操作
+						88 container
+							89 弹出式按钮 (disabled) Description: 会话运行位置, Value: Storage CU Remote
+							90 弹出式按钮 (disabled) Description: 远端工作区, Value: Storage CU Remote · /private/tmp/actspace-storage-cleanup-cu/remote-workspace
+							91 container 消息输入面板
+								92 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续补充…
+								93 container 输入框工具栏
+									94 弹出式按钮 添加 Agent、上下文或工具
+									95 弹出式按钮 Description: 远端模型, Value: p5-test
+										96 (selected) p5-test
+									97 按钮 (disabled) 输入消息后发送
+							98 文本 Storage CU Remote
+							99 弹出式按钮 Description: 会话权限模式, Help: 权限：自动。完全权限仅扩大文件范围，Bash、删除和敏感文件仍按策略审批。
+							100 按钮 上下文用量 0%
+								101 文本 0
+								102 文本 %
+					103 分离器 Description: 调整预览面板宽度, Value: 390
+					104 container
+						105 标签组 右侧面板
+							106 标签 (selected) result.txt, Value: 1
+							107 按钮 关闭 result.txt
+						108 text P5 remote result verified.
+	109 关闭按钮
+	110 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	111 最小化按钮
+112 menu bar
+	113 Actspace Dev actspace-agent-2067
+	114 File
+	115 Edit
+	116 View
+	117 Window
+	118 Help
+
+The focused UI element is 97 按钮 (disabled) 输入消息后发送

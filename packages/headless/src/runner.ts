@@ -1,9 +1,8 @@
 import { SessionModeWriter, setInitialSessionTitle } from "@actspace/agent-service";
 import type { RuntimeV2AgentMode, RuntimeV2JsonValue, RuntimeV2RunTurnResponse, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 type HeadlessRunService = {
-  attach(session: SessionHandle): Promise<unknown>;
+  initialize(sessionId: string): Promise<void>;
   run(sessionId: string, input: { content: RuntimeV2JsonValue; model?: string }, signal?: AbortSignal): Promise<RuntimeV2RunTurnResponse>;
-  abort(sessionId: string): boolean;
   service: { exclusive<T>(sessionId: string, operation: () => Promise<T>): Promise<T> };
 };
 import type { SessionHandle } from "@actspace/session-persistence";
@@ -48,10 +47,10 @@ export class HeadlessRunner {
       ? host.persistent ? await sessions.create(undefined, host.workspaceRoot) : await sessions.createEphemeral(undefined, host.workspaceRoot)
       : await sessions.resume(host.sessionId);
     await setInitialSessionTitle(session, host.title);
-    await agents.attach(session);
+    await agents.initialize(session.header.sessionId);
     const sessionId = session.header.sessionId;
     const controller = new AbortController();
-    const abort = () => { controller.abort(host.signal?.reason ?? "host-abort"); return agents.abort(sessionId); };
+    const abort = () => { if (controller.signal.aborted) return false; controller.abort(host.signal?.reason ?? "host-abort"); return true; };
     if (host.mode !== undefined) {
       await agents.service.exclusive(sessionId, () => this.#modeWriter.change(session, host.mode!, value => sessions.snapshot(value), "headless"));
     }
@@ -63,8 +62,8 @@ export class HeadlessRunner {
       this.notify("headless/started", { sessionId: session.header.sessionId, agentId: `main:${sessionId}` });
       const result = await agents.run(sessionId, { content: host.content, model: host.model }, controller.signal);
       await session.flush();
-      host.appExit?.(result.reason === "completed" ? 0 : result.reason === "aborted" ? 130 : 1);
-      this.notify("headless/completed", { sessionId: session.header.sessionId, agentId: `main:${sessionId}`, reason: result.reason });
+      host.appExit?.(result.outcome === "completed" ? 0 : result.outcome === "cancelled" ? 130 : 1);
+      this.notify("headless/completed", { sessionId: session.header.sessionId, agentId: `main:${sessionId}`, outcome: result.outcome });
       return Object.freeze({ session, ...result, snapshot: sessions.snapshot(session), durationMs: Date.now() - started });
     } catch (error) {
       this.notify("headless/failed", { sessionId: session.header.sessionId, agentId: `main:${sessionId}`, error: error instanceof Error ? error.message : String(error) });

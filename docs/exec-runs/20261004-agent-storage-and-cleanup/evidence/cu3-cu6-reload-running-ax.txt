@@ -1,0 +1,124 @@
+Window: "actspace", App: Actspace Dev actspace-agent-2067.
+0 标准窗口 actspace, Secondary Actions: Raise
+	1 container actspace
+		2 container
+			3 HTML 内容 actspace, URL: 127.0.0.1:5173/
+				4 container
+					5 切换按钮 Description: 收起会话侧栏, Help: 收起侧栏, Value: 1
+					6 container 会话导航
+						7 按钮 (disabled) Description: 后退, Help: 返回
+						8 按钮 (disabled) 前进
+					9 切换按钮 Description: 查看执行轨迹, Value: 0
+					10 按钮 查看会话详情： P5 正在输出… P5 摘要/普通回复已完成。保留目标、已完成步骤与后续动作。
+					11 弹出式按钮 查看工作区环境
+					12 切换按钮 Description: 打开面板, Help: 打开右侧面板, Value: 0
+					13 container
+						14 按钮 新建会话
+						15 按钮 扩展
+						16 container 会话
+							17 container
+								18 按钮 工作区
+								19 按钮 排序工作区
+								20 按钮 添加工作区
+								21 按钮 收起 工作区
+								22 container
+									23 按钮 收起 workspace
+									24 弹出式按钮 workspace
+									25 container 工作区操作
+										26 按钮 在工作区中新建会话
+								27 按钮 会话状态： 运行中
+								28 按钮 P5 正在输出… P5 摘要/普通回复已完成。保留目标、已完成步骤与后续动作。
+								29 按钮 置顶会话
+								30 按钮 (disabled) 当前会话无法归档
+								31 文本 1m
+								32 container
+									33 按钮 收起 Default workspace
+									34 弹出式按钮 Default workspace
+									35 container 工作区操作
+										36 按钮 在工作区中新建会话
+								37 container
+									38 按钮 收起 actspace-agent
+									39 弹出式按钮 actspace-agent
+									40 container 工作区操作
+										41 按钮 在工作区中新建会话
+						42 按钮 设置
+					43 分离器 Description: 调整会话侧栏宽度, Value: 260
+					44 container
+						45 container
+							46 container 会话消息
+								47 container
+									48 文本 P5_STREAM_HOLD STORAGE_CU1_FIRST
+									49 container
+										50 文本 P5 流式第一段已显示，等待验收释放… P5 正在输出… P5 夹具任务完成。模型：p5-test。工具结果：0。
+										51 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
+									52 container 本轮消耗：150 Token · $0.00
+										53 text 23:03 150 Token · $0.00
+									54 按钮 复制回复
+									55 按钮 可视化这条回复
+									56 弹出式按钮 更多消息操作
+								57 container
+									58 文本 STORAGE_CU2_QUEUE_TWO
+									59 container
+										60 文本 P5 正在输出… P5 夹具任务完成。模型：p5-test。工具结果：0。
+										61 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
+									62 container 本轮消耗：150 Token · $0.00
+										63 text 23:04 150 Token · $0.00
+									64 按钮 复制回复
+									65 按钮 可视化这条回复
+									66 弹出式按钮 更多消息操作
+								67 container
+									68 文本 STORAGE_CU2_QUEUE_ONE
+									69 container
+										70 文本 P5 正在输出… P5 夹具任务完成。模型：p5-test。工具结果：0。
+										71 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
+									72 container 本轮消耗：150 Token · $0.00
+										73 text 23:04 150 Token · $0.00
+									74 按钮 复制回复
+									75 按钮 可视化这条回复
+									76 弹出式按钮 更多消息操作
+								77 文本 P5_STREAM_HOLD STORAGE_CU3_PLAN
+								78 文本 P5_STREAM_HOLD STORAGE_CU3_PLAN
+							79 container 会话轮次导航
+								80 按钮 跳到第 1 轮对话：P5_STREAM_HOLD STORAGE_CU1_FIRST
+								81 按钮 跳到第 2 轮对话：STORAGE_CU2_QUEUE_TWO
+								82 按钮 跳到第 3 轮对话：STORAGE_CU2_QUEUE_ONE
+								83 按钮 跳到第 4 轮对话：P5_STREAM_HOLD STORAGE_CU3_PLAN
+								84 按钮 跳到第 5 轮对话：P5_STREAM_HOLD STORAGE_CU3_PLAN
+						85 container
+							86 container 待处理的审查操作
+								87 按钮 查看工作区变更
+								88 按钮 更多审查操作
+							89 container 消息输入面板
+								90 container 消息队列
+									91 文本 1 条排队
+									92 文本 当前运行结束后依次发送
+									93 内容列表 排队的消息
+										94 container
+											95 文本 STORAGE_CU2_AFTER_STOP
+											96 按钮 ↳ 插入
+											97 按钮 删除排队消息 1
+											98 弹出式按钮 更多操作：排队消息 1
+								99 文本输入区 (settable) Description: 消息输入框, Placeholder: 输入下一条，Enter 加入队列
+								100 container 输入框工具栏
+									101 弹出式按钮 添加 Agent、上下文或工具
+									102 按钮 (disabled) 移除 Plan 模式
+									103 按钮 p5-test
+										104 文本 p5-test
+									105 按钮 停止 Agent
+							106 文本 本机
+							107 弹出式按钮 Description: 会话权限模式, Help: 权限：自动。完全权限仅扩大文件范围，Bash、删除和敏感文件仍按策略审批。
+							108 按钮 上下文用量 0%
+								109 文本 0
+								110 文本 %
+	111 关闭按钮
+	112 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	113 最小化按钮
+114 menu bar
+	115 Actspace Dev actspace-agent-2067
+	116 File
+	117 Edit
+	118 View
+	119 Window
+	120 Help
+
+The focused UI element is 3 HTML 内容 actspace, URL: 127.0.0.1:5173/

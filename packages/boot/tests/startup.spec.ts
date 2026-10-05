@@ -1,16 +1,23 @@
 import { describe, expect, it } from "vitest";
-import type { CompositionEntry } from "@actspace/bundle";
 import type { ResolvedComposition } from "@actspace/composition";
-import { createTrustedBootCandidate, validateStartup } from "../src/index.js";
+import type { CordisRootHandle } from "@actspace/cordis-adapter";
+import { createDshBootCandidate } from "../src/index.js";
 
-const entry: CompositionEntry = { entryId: "agent.loop", pluginId: "core", pluginVersion: "1", module: "builtin", required: true, enabled: true, config: {}, requiredCapabilities: [], optionalCapabilities: [], provides: ["agent.loop"], injects: ["llm.service"], frontendRequired: false, provenance: "builtin", state: "candidate" };
-describe("startup validation", () => {
-  it("publishes only active Fiber-backed required providers", () => expect(validateStartup([entry], [{ entryId: "agent.loop", hasFiber: true, state: "ACTIVE", providedServices: ["agent.loop"] }], ["agent.loop"]).ok).toBe(true));
-  it("rejects pending entries and missing providers", () => expect(validateStartup([entry], [{ entryId: "agent.loop", hasFiber: true, state: "PENDING", unresolvedServices: ["llm.service"] }], ["agent.loop"]).ok).toBe(false));
-  it("publishes a Trusted Boot candidate only after settlement and disposes its root", async () => {
-    let disposed = false;
-    const composition: ResolvedComposition = { schemaVersion: 1, profileId: "default", bundles: [], manifests: [], entries: [entry], patchResults: [], hostCapabilities: [], warnings: [], digest: "digest", config: {} };
-    const candidate = await createTrustedBootCandidate({ host: { hostKind: "cli-run", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test" }, composition, cordisAdmission: { status: "passed", packages: [], hmrAbsent: true, singleFamily: true, forbiddenPackages: [], failures: [] }, createCordisRoot: async () => ({ context: {}, mount: async () => undefined, getService: () => undefined, facts: () => [], awaitSettlement: async () => ({ settled: true, disposed: false, pendingServices: [] }), dispose: async () => { disposed = true; return { settled: true, disposed: true, pendingServices: [] }; } }), discoveredCodecs: [], activations: [{ entryId: "agent.loop", hasFiber: true, state: "ACTIVE", providedServices: ["agent.loop"] }], requiredProviders: ["agent.loop"] });
-    expect(candidate.manifest.profileId).toBe("default"); await candidate.disposeCandidate(); expect(disposed).toBe(true);
+const composition: ResolvedComposition = { schemaVersion: 1, profileId: "default", bundles: [], manifests: [], entries: [], patchResults: [], hostCapabilities: [], warnings: [], digest: "digest", config: {} };
+const options = { host: { hostKind: "cli-run" as const, capabilityCeiling: [], runtimeContract: "actspace.runtime.v2" as const, invocationId: "test" }, composition, cordisAdmission: { status: "passed" as const, packages: [], hmrAbsent: true, singleFamily: true, forbiddenPackages: [], failures: [] }, discoveredCodecs: [] };
+const probe = { settled: true, disposed: false, pendingServices: [] };
+function root(dispose: CordisRootHandle["dispose"]): CordisRootHandle { return { context: {}, mount: async () => undefined, getService: () => undefined, facts: () => [], awaitSettlement: async () => probe, dispose }; }
+
+describe("production boot candidate", () => {
+  it("rejects unsettled loader state before publishing", async () => {
+    const pending = root(async () => probe); pending.awaitSettlement = async () => ({ ...probe, settled: false, pendingServices: ["session.storage"] });
+    await expect(createDshBootCandidate({ ...options, root: pending })).rejects.toThrow("session.storage");
+  });
+  it("shares concurrent disposal and retries a failed release", async () => {
+    let calls = 0;
+    const candidate = await createDshBootCandidate({ ...options, root: root(async () => { calls++; if (calls === 1) throw new Error("release failed"); return { ...probe, disposed: true }; }) });
+    const first = candidate.disposeCandidate(); const second = candidate.disposeCandidate();
+    expect(first).toBe(second); await expect(first).rejects.toThrow("release failed");
+    await candidate.disposeCandidate(); await candidate.disposeCandidate(); expect(calls).toBe(2);
   });
 });

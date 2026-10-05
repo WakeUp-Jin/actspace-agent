@@ -35,7 +35,6 @@ export const currentTruthFiles = [
   "docs/design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md",
   "docs/design-docs/agent-plugin-runtime/agent-target-agent-core.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-agent-and-subagent.md",
-  "docs/design-docs/agent-plugin-runtime/agent-spec-core-cordis-services.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-service-definition-provider-consumer.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-profile-bundle-patch-layering.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-prompt-context-contributors.md",

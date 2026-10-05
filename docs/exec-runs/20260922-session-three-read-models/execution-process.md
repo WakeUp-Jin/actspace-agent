@@ -19,21 +19,21 @@
 ### 步骤 2：P1-P2 DTO、watermark 与 observation
 
 - **操作**：增加 Global summary、Session observation、Window support/deferred refs、水位类型；Runtime controller、Desktop App、IPC、preload 和 renderer bridge 接入一次性 observation。
-- **影响文件**：`packages/shared/src/runtime-v2/projection.ts`、`packages/runtime/src/runtime/session-controller.ts`、`packages/desktop-app/src/service.ts`、Desktop registry/IPC/preload/bridge。
+- **影响文件**：`packages/shared/src/runtime-v2/projection.ts`、`packages/runtime/src/session/session-controller.ts`、`packages/desktop-app/src/service.ts`、Desktop registry/IPC/preload/bridge。
 - **决定**：保留旧 projection envelope 作为兼容 DTO，但由 observation 同一读取切面生成；equal-seq same-value 幂等，冲突要求 resync。
 - **验证**：runtime observation/cursor tests、client equal-seq conflict tests、shared/runtime/desktop typecheck 通过。
 
 ### 步骤 3：P3 Global Index 与 Usage Index
 
 - **操作**：新增可删除的 `global-session-index.json` 和 `global-usage-index.json`；Global list 读取 summary，Usage activity/statistics 从按 Session 水位校验的 activity rows 聚合。
-- **影响文件**：`packages/session/projection-cache/src/global-index.ts`、`packages/runtime/src/runtime/session-controller.ts`、`packages/client/src/sessions/indexed-usage.ts`、Desktop usage cache/IPC。
+- **影响文件**：`packages/session/projection-cache/src/global-index.ts`、`packages/runtime/src/session/session-controller.ts`、`packages/client/src/sessions/indexed-usage.ts`、Desktop usage cache/IPC。
 - **决定**：索引写入挂在 durable flush 后；append/recovery 不依赖索引成功，索引丢失时从 Journal 重建。
 - **验证**：Global Index persistence/rebuild tests、Usage cache concurrency/retry test 通过。
 
 ### 步骤 4：P4-P5 Window 与 Client targets
 
 - **操作**：Window 加入事件数/JSON 字节上限；大工具事件只传短状态和 deferred ref；Client store 支持 watermarks、equal revision 幂等/conflict，Trajectory/Tool selector 独立读取 Window/facts。
-- **影响文件**：`packages/runtime/src/runtime/session-controller.ts`、`packages/client/src/sessions/session.ts`、`selectors.ts`、window/runtime/client tests。
+- **影响文件**：`packages/runtime/src/session/session-controller.ts`、`packages/client/src/sessions/session.ts`、`selectors.ts`、window/runtime/client tests。
 - **验证**：25 Turn 分页、超大 args/result、tool detail、trajectory/chat/client tests 通过。
 
 ## 遇到的问题

@@ -1,7 +1,7 @@
 import { isAbsolute } from "node:path";
 import { readFile } from "node:fs/promises";
 import type { JsonValue } from "@actspace/cordis-adapter";
-import type { BootManifest, ResolvedComposition } from "@actspace/composition";
+import type { ResolvedComposition } from "@actspace/composition";
 import { createCordisRoot, mountCordisConfig, type CordisContext, type CordisLifecycleProbe, type CordisRootHandle } from "@actspace/cordis-adapter";
 
 export type DshCordisBootOptions = {
@@ -22,19 +22,6 @@ export type DshCordisBoot = {
   readonly root: CordisRootHandle;
   readonly configPath: string;
   readonly dispose: () => Promise<CordisLifecycleProbe>;
-};
-
-/**
- * The process-local result of booting one resolved Profile. This is a
- * bootstrap boundary, not a runtime facade: application Bundles consume the
- * Context services directly and own their domain operations.
- */
-export type BootedProfile = {
-  readonly context: CordisContext;
-  readonly root: CordisRootHandle;
-  readonly configPath: string;
-  readonly manifest: BootManifest;
-  readonly shutdown: () => Promise<CordisLifecycleProbe>;
 };
 
 /**
@@ -65,21 +52,6 @@ export async function bootDshCordis(options: DshCordisBootOptions): Promise<DshC
     const detail = cause instanceof Error ? cause.message : String(cause);
     throw new Error(`${binName}: Cordis startup failed: ${detail}`, { cause });
   }
-}
-
-/**
- * Boot a resolved Profile and expose its immutable manifest alongside the
- * Cordis root. The helper deliberately returns no generic Handle or facade.
- */
-export async function bootProfile(options: DshCordisBootOptions & { readonly composition: BootManifest }): Promise<BootedProfile> {
-  const boot = await bootDshCordis(options);
-  return Object.freeze({
-    context: boot.context,
-    root: boot.root,
-    configPath: boot.configPath,
-    manifest: options.composition,
-    shutdown: boot.dispose,
-  });
 }
 
 /** Fail closed when the checked-in Include transport diverges from Composer. */

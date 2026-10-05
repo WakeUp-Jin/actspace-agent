@@ -1,3 +1,4 @@
+import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ function header(sessionId: string) { return { sessionId, createdAt: "2026-10-03T
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "actspace-tasks-"));
   resources.push(() => rm(root, { recursive: true, force: true }));
-  const store = new SessionStore({ dataRoot: root, runtimeId: "test", registry: registry() });
+  const store = new SessionStore({ registry: registry() }, new JsonlSessionStorage({ dataRoot: root, runtimeId: "test", registry: registry() }));
   const session = await store.create(header("tasks"));
   resources.push(() => session.close());
   const ledger = await TaskLedger.open(session);

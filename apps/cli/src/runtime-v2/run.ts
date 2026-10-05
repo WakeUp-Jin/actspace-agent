@@ -55,18 +55,18 @@ export function projectCliArtifactResult(result: RuntimeV2RunTurnResponse, conte
   readonly interrupted: boolean;
   readonly approvalName?: string;
 }): RuntimeV2CliArtifactResult {
-  const exitCode = context.approvalName !== undefined ? 4 : result.reason === "completed" ? 0 : context.interrupted || result.reason === "aborted" ? 130 : 1;
+  const exitCode = context.approvalName !== undefined ? 4 : result.outcome === "completed" ? 0 : context.interrupted || result.outcome === "cancelled" ? 130 : 1;
   return Object.freeze({
     schemaVersion: 1,
     ok: exitCode === 0,
-    status: context.approvalName !== undefined ? "approval_required" : result.reason === "completed" ? "completed" : result.reason === "aborted" ? "aborted" : "failed",
+    status: context.approvalName !== undefined ? "approval_required" : result.outcome === "completed" ? "completed" : result.outcome === "cancelled" ? "aborted" : "failed",
     exitCode,
     sessionId: result.sessionId,
-    agentRunId: result.agentRunId,
-    turnId: result.turnId,
-    reason: result.reason,
-    steps: result.steps,
-    finalText: result.finalText,
+    agentRunId: result.agentRunId ?? result.taskId,
+    taskId: result.taskId,
+    outcome: result.outcome,
+    value: result.value,
+    finalText: result.value && typeof result.value === "object" && !Array.isArray(result.value) && "finalText" in result.value && typeof result.value.finalText === "string" ? result.value.finalText : "",
     snapshot: result.snapshot,
     totalUsage: result.snapshot.usage,
     messageCount: result.snapshot.messages.length,

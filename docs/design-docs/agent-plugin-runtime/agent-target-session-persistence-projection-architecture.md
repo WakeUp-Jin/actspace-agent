@@ -13,7 +13,7 @@ Session Event Journal
 │  ├─ todos、sessionStats、providerUsage、pendingInbox、delegations
 │  └─ surface、tools、workspaceRoot、updatedAt、requestContext
 ├─ Projection Cache
-│  └─ projection-checkpoint.json（状态 checkpoint、JSONL 字节偏移与窗口索引）
+│  └─ 有界内存快照（状态 checkpoint、逻辑事件与窗口索引）
 └─ Client Raw Event Window
    ├─ Chat projection
    ├─ Trajectory projection
@@ -26,7 +26,7 @@ Goal 当前没有业务 producer 或 Session event，不预置空壳兼容实现
 
 Session Core append 校验事件并分配连续 seq，accepted watermark 与 durable watermark 分离。`session/event` 表示事件已被 Journal 接受，不能据此宣称已经 fsync。Persistence coordinator、checkpoint policy 和 flush barrier 决定 durable prefix；参见[Session Core / Persistence](./agent-spec-session-core-persistence-separation.md)和[Session 格式](./agent-spec-session-format-v1.md)。
 
-Live Host model 可以反映 accepted prefix。冷读缓存只能从磁盘 Journal 构建；flush callback 在 durability barrier 后刷新缓存。通知、投影或 cache 失败不能撤销已经接受的 Journal 事实。Live progress 是可丢失 overlay，不是第二份恢复日志。
+Live Host model 可以反映 accepted prefix。冷读缓存从所选存储 Provider 的一致快照构建，不能读取尚未完成存储屏障的事实。通知、投影或 cache 失败不能撤销已经接受的 Journal 事实。Live progress 是可丢失 overlay，不是第二份恢复日志。
 
 ## Host Projection Registry
 
@@ -46,11 +46,9 @@ Provider usage 来自持久化请求结果；requestContext 来自请求快照�
 
 ## 缓存与冷读
 
-`packages/session/projection-cache/src/journal-cache.ts` 读取 Journal Header、文件身份和长度，校验 codec digest、definition stateVersions、checkpoint 水位与 anchor。命中时恢复 reducer state 并通过 `replayTail` 批量折叠新增尾部，同时维护事件字节偏移、Turn 起点、Request 编号和 callId 索引。
+冷读缓存通过中性 Provider inspect，按 Provider identity、opaque revision、codec digest 与 reducer stateVersion 复用。变化时从完整快照重建，不依赖 JSONL 文件身份、字节偏移或磁盘 checkpoint。
 
-缺失、格式损坏、版本变化、文件替换或截断等失效条件触发 Journal 重建。checkpoint 文件采用临时文件写入后 rename；写缓存失败不阻止 Journal 读取。缓存可删除，不能参与 Agent resume、canonical export 或修复事实。
-
-首轮冷读或缓存失效仍需完整扫描。列表逐会话取得摘要，未引入后台索引调度；不能宣称超大历史首读无成本。追加检测以 Journal 的 append-only 约束为前提。
+缓存、列表重建与资源限制统一见[存储规范](agent-spec-session-core-persistence-separation.md#5-冷读与缓存)。当前启动后的列表首次读取会遍历 Provider 会话；大历史冷读性能是明确边界，不能沿用旧增量文件缓存的性能承诺。
 
 ## IPC 与事件窗口
 
@@ -62,7 +60,7 @@ Provider usage 来自持久化请求结果；requestContext 来自请求快照�
 - `activeMessageIds`：全 Session 当前有效 Surface 身份，用于清除被 replace 的旧消息；
 - `deferredToolCalls`：从普通页剥离的大工具正文，通过 detail API 按需读取。
 
-默认最近 20 个完整 Turn（2026-09-26 由 10 调整，同时历史页剔除已定稿消息的流式增量并收敛旧请求上下文，详见 `agent-session-three-read-models.md`）。`beforeSeq` 向前分页；`afterSeq` 读取尾部补齐。窗口包含 turn/start 前的 Inbox claim。全 Session 水位与历史页末尾水位是不同概念，客户端不能用历史页尾覆盖最新 facts。
+默认最近 20 个完整 Turn（2026-09-26 由 10 调整，同时历史页剔除已定稿消息的流式增量并收敛旧请求上下文，详见 `agent-session-three-read-models.md`）。`beforeSeq` 向前分页；`afterSeq` 读取尾部补齐。窗口包含 turn/start 前的 Task user/message。全 Session 水位与历史页末尾水位是不同概念，客户端不能用历史页尾覆盖最新 facts。
 
 单个大工具事件超过 24,000 字符时移除传输页中的 modelOutput/detail 和 Surface 正文，Journal 原文不变。该阈值不是整个 IPC envelope 的硬字节上限。完整复制对话使用完整读取，不依赖屏幕已加载页。
 
@@ -84,13 +82,13 @@ Desktop main 保留 Runtime 调用、权限、IPC 和 live stream adapter；prel
 
 已删除独立 browse index、旧 Main fixed renderer projection/tool preview/usage aggregates、session revision observer、旧 product projections 和 Host trajectory projector，以及被替代的 checkpoint/cold-restore/restore-floor 实现。没有保留旧 IPC cursor fallback 或双轨读取。
 
-仍被 persistence/compaction 使用的 `session/projection/src/projection.ts` 是运行时恢复投影，不因文件名相近而删除。仍使用的流式 adapter、权限系统和工具执行器也不是冗余兼容层。
+旧 `session/projection/src/projection.ts` 重复恢复包装已删除；恢复依赖 Journal/Surface。仍使用的流式 adapter、权限系统和工具执行器也不是冗余兼容层。
 
 ## 验证与入口
 
-验证重点：重放与增量一致、reducer 失败不污染状态、缓存可删除及损坏恢复、25 Turn 的 10/10/5 分页、冷读不打开 writer、Surface replacement、请求身份、重连与过期响应、大工具详情、流式与后台会话隔离。
+验证重点：重放与增量一致、reducer 失败不污染状态、缓存可删除及损坏恢复、按当前 20 Turn 上限的分页、冷读不打开 writer、Surface replacement、请求身份、重连与过期响应、大工具详情、流式与后台会话隔离。
 
-- `packages/runtime/src/runtime/session-projection.test.ts`
+- `packages/runtime/src/session/session-projection.test.ts`
 - `packages/session/projection/src/test/registry.test.ts`
 - `packages/session/projection-cache/src/test/cache.test.ts`
 - `packages/client/src/test/session-store.test.ts`

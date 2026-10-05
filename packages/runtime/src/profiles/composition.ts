@@ -79,7 +79,7 @@ export function toolTransportPatches(composition: ResolvedComposition) {
   });
 }
 const baseBundle: Bundle = Object.freeze({ id: BASE_BUNDLE.id, version: BASE_BUNDLE.version, manifests: Object.freeze([coreManifest, agentServiceManifest, todoManifest, filesystemreadManifest, filesystemsearchManifest, filesystemwriteManifest, shelltoolsManifest, webtoolsManifest, imagegenerationManifest, imageinspectionManifest]), provenance: "builtin:actspace.base" });
-const browserManifest: PluginManifest = Object.freeze({ schemaVersion: 1, pluginId: pluginId("actspace.browser-tools"), version: "2.0.0", name: "ActSpace Browser Tools", runtimeContract: "actspace.runtime.v2", source: { kind: "builtin" as const, reference: "builtin:actspace.browser-tools" }, codecs: [], behaviors: [{ entryId: entryId("browser-tools"), module: "builtin:browser-tools", required: false, enabled: true, config: {}, host: { required: ["browser" as const], optional: [] }, frontend: null, provides: [serviceId("browser-tools")], injects: [serviceId("tools")] }], contributions: { services: [], events: [], contributions: ["browser-tools"] } });
+const browserManifest: PluginManifest = Object.freeze({ schemaVersion: 1, pluginId: pluginId("actspace.browser-tools"), version: "2.0.0", name: "ActSpace Browser Tools", runtimeContract: "actspace.runtime.v2", source: { kind: "builtin" as const, reference: "builtin:actspace.browser-tools" }, codecs: [], behaviors: [{ entryId: entryId("browser-tools"), module: "builtin:browser-tools", required: false, enabled: true, config: {}, host: { required: ["browser" as const], optional: [] }, frontend: null, provides: [serviceId("browser-tools")], injects: [serviceId("tools")] }], contributions: { services: ["browser-tools"], events: [], contributions: ["browser-tools"] } });
 const browserBundle: Bundle = Object.freeze({ id: "actspace.host.browser", version: "2.0.0", manifests: Object.freeze([browserManifest]), provenance: "builtin:actspace.host.browser" });
 const headlessBundle: Bundle = Object.freeze({ id: "actspace.headless", version: headlessManifest.version, manifests: Object.freeze([headlessManifest]), provenance: "@actspace/headless" });
 
@@ -102,10 +102,10 @@ const profileDefinitions: Readonly<Record<RuntimeProfileId, Profile>> = Object.f
 export const TRUSTED_LOADER_ENTRIES = Object.freeze([
   Object.freeze({ id: "actspace-runtime", name: "@actspace/runtime/cordis", inject: ["actspace.host"] }),
   Object.freeze({ id: "session-journal", name: "@actspace/session-journal/plugin", inject: ["actspace.host.session.codecs"] }),
-  Object.freeze({ id: "session-persistence", name: "@actspace/session-persistence/plugin", inject: ["actspace.host.session", "session.journal"] }),
-  Object.freeze({ id: "session-jsonl", name: "@actspace/session-jsonl/plugin", inject: [] }),
+  Object.freeze({ id: "session-persistence", name: "@actspace/session-persistence/plugin", inject: ["session.journal", "session.storage"] }),
+  Object.freeze({ id: "session-jsonl", name: "@actspace/session-jsonl/plugin", inject: ["actspace.host.session", "session.journal"] }),
   Object.freeze({ id: "session-projection", name: "@actspace/session-projection/plugin", inject: [] }),
-  Object.freeze({ id: "session-runtime", name: "@actspace/runtime/session", inject: ["actspace.host.session", "session.journal", "session.persistence", "session.jsonl", "session.projection"] }),
+  Object.freeze({ id: "session-runtime", name: "@actspace/runtime/session", inject: ["actspace.host.session", "session.journal", "session.store", "session.projection"] }),
   Object.freeze({ id: "session-checkpoint-policy", name: "@actspace/session-checkpoint-policy/plugin", inject: ["session.runtime"] }),
   Object.freeze({ id: "llm-service", name: "@actspace/llm-service/plugin", inject: ["actspace.host.llm"] }),
   Object.freeze({ id: "todo-projection", name: "@actspace/runtime/todo-projection", inject: ["session.projection"] }),
@@ -146,15 +146,4 @@ export function createProfileComposition(profileId: RuntimeProfileId, host: Runt
   const runtimeProfile: Profile = Object.freeze({ ...profile, orderedBundleIds: Object.freeze(orderedBundleIds) });
   const bundles = [kernelBundle, baseBundle, ...(profileId === RUNTIME_PROFILE_IDS.headless ? [headlessBundle] : []), ...(profileId === RUNTIME_PROFILE_IDS.host ? [hostBundle] : []), ...(appBundle === undefined ? [] : [appBundle]), ...pluginBundles];
   return composeRuntime({ profile: runtimeProfile, bundles, hostBundle: browserBundle, homePatch: options.homePatch, invocationPatch: options.invocationPatch, hostCapabilities: host.capabilityCeiling, loaderConfig: { profileId: runtimeProfile.id, entries: TRUSTED_LOADER_ENTRIES } });
-}
-
-export function createDefaultComposition(host: RuntimeV2HostDescriptor, options: {
-  readonly plugins?: readonly PluginManifest[];
-  readonly homePatch?: Patch;
-  readonly invocationPatch?: Patch;
-} = {}): ResolvedComposition {
-  // Compatibility shim for callers that have not migrated to an explicit
-  // Profile yet. New production launchers must choose a profile directly.
-  const profileId = host.hostKind === "desktop" ? RUNTIME_PROFILE_IDS.desktop : host.hostKind === "host" ? RUNTIME_PROFILE_IDS.host : RUNTIME_PROFILE_IDS.headless;
-  return createProfileComposition(profileId, host, options);
 }

@@ -8,10 +8,10 @@
 
 ## 文件范围
 
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/runtime/src/runtime/run-controller.ts`
 - `packages/runtime/src/runtime/runtime-handle.ts`
-- `packages/runtime/src/runtime/shutdown.ts`
+- `packages/runtime/src/startup/shutdown.ts`
 - `packages/runtime/src/projection/live-progress.ts`
 - `packages/runtime/src/projection/cursor-stream.ts`
 - `packages/runtime/src/test/`

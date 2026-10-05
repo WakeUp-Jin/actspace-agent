@@ -40,7 +40,7 @@ export function projectTasks(sessionId: string, events: readonly SessionEventEnv
       case "operation-finish": {
         const task = tasks.get(data.taskId);
         if (!task || task.state !== "claimed" || task.runId !== null) invalid();
-        tasks.set(task.taskId, { ...task, state: data.outcome });
+        tasks.set(task.taskId, { ...task, state: data.outcome, ...(data.result !== undefined ? { result: data.result } : {}) });
         if (data.outcome !== "completed") paused = true;
         break;
       }

@@ -1,0 +1,40 @@
+The following is a diff from the previous accessibility tree for Window: "actspace" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 51, 61, 74, 85, 95, 106, 116, 127
+~					5 切换按钮 Description: 收起会话侧栏, Help: 收起侧栏, Value: 1
+~					9 切换按钮 Description: 查看执行轨迹, Value: 0
+~					12 切换按钮 Description: 打开面板, Help: 打开右侧面板, Value: 0
+~								27 按钮 会话状态： 运行中
+~								31 文本 21m
+~					43 分离器 Description: 调整会话侧栏宽度, Value: 260
++								170 container
++									171 文本 P5_STREAM_HOLD STORAGE_CU1_FIRST
++									172 text P5 流式第一段已显示，等待验收释放…
+P5 正在输出…
+P5 夹具任务完成。模型：p5-test。工具结果：0。
++									173 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++									174 container 本轮消耗：150 Token · $0.00
++										175 text 23:03 150 Token · $0.00
++									176 按钮 复制回复
++									177 按钮 可视化这条回复
++									178 弹出式按钮 更多消息操作
++										179 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										180 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										181 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										182 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										183 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										184 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										185 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++										186 link Description: 查看 result.txt, Value: 127.0.0.1:5173/result.txt
++								187 container
++									188 文本 STORAGE_CU7_REOPEN
++									189 文本 P5 正在输出…
++									190 container 回复时间：00:09
++										191 文本 00:09
++									192 按钮 复制回复
++									193 按钮 可视化这条回复
++									194 弹出式按钮 更多消息操作
++								195 按钮 跳到第 11 轮对话：STORAGE_CU7_REOPEN
++							196 按钮 滚动到底部
+~								149 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续补充…
+~									154 按钮 停止 Agent
+The focused UI element is 149 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续补充…

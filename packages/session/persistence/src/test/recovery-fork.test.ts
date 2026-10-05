@@ -1,10 +1,13 @@
+import { effectiveSessionEvents } from "@actspace/session-journal";
+import { repairTornJsonlSession, inspectJsonlSession, sessionFileLayout } from "@actspace/session-jsonl";
+import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { createCompactionTransaction, createCoreCodecRegistry } from "@actspace/session-journal";
 import type { SessionEventCandidateV1 } from "@actspace/session-journal";
-import { applySessionRecovery, classifySessionRecoveryAccess, planSessionRecovery, repairTornJsonlSession } from "../recovery.js";
+import { applySessionRecovery, classifySessionRecoveryAccess, planSessionRecovery } from "../recovery.js";
 import { SessionStore } from "../session-store.js";
 
 const roots: string[] = [];
@@ -38,12 +41,12 @@ function headerInput(registry: ReturnType<typeof createCoreCodecRegistry>, sessi
 
 describe("conservative Session recovery", () => {
   it.each([
-    { accessState: "read-write", tornTail: null, expected: "read-write" },
-    { accessState: "degraded", tornTail: null, expected: "read-only" },
-    { accessState: "corrupt", tornTail: null, expected: "forensic-required" },
-    { accessState: "read-write", tornTail: { offset: 1, bytes: Buffer.from("x") }, expected: "read-only" },
-  ])("classifies $accessState Journal as $expected", ({ accessState, tornTail, expected }) => {
-    expect(classifySessionRecoveryAccess({ header: {} as never, events: [], accessState: accessState as never, diagnostics: [], validation: {} as never, tornTail, rawBytes: Buffer.alloc(0), journalPath: "memory://journal" })).toBe(expected);
+    { accessState: "read-write", integrity: "complete", expected: "read-write" },
+    { accessState: "degraded", integrity: "complete", expected: "read-only" },
+    { accessState: "corrupt", integrity: "complete", expected: "forensic-required" },
+    { accessState: "read-write", integrity: "repair-required", expected: "read-only" },
+  ])("classifies $accessState Journal as $expected", ({ accessState, integrity, expected }) => {
+    expect(classifySessionRecoveryAccess({ header: {} as never, events: [], accessState: accessState as never, validation: {} as never, integrity: integrity as never, revision: "test" })).toBe(expected);
   });
 
   it.each([
@@ -52,7 +55,7 @@ describe("conservative Session recovery", () => {
   ])("records $expected for an interrupted tool", async ({ dispatched, expected }) => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     const session = await store.create(headerInput(registry, `tool-${expected}`));
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await session.append(candidate("step/start", { turnId: "turn-1", stepId: "step-1" }));
@@ -71,7 +74,7 @@ describe("conservative Session recovery", () => {
   it("resumes an uncommitted repair transaction without duplicating its start", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     const session = await store.create(headerInput(registry, "repair-resume"));
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await session.append(candidate("recovery/start", { repairId: "repair-existing", sourceBoundarySeq: 0 }));
@@ -83,7 +86,7 @@ describe("conservative Session recovery", () => {
     expect(closer).toBeDefined();
     await session.append(closer as SessionEventCandidateV1);
     expect(session.journal.validation.relations.openTurnId).toBe("turn-1");
-    expect(session.projection.eventCount).toBe(1);
+    expect(effectiveSessionEvents(session.journal.events).length).toBe(1);
     await applySessionRecovery(session);
     expect(session.journal.events.filter((event) => event.type === "recovery/committed")).toHaveLength(1);
     await session.close();
@@ -92,19 +95,19 @@ describe("conservative Session recovery", () => {
   it("preserves torn bytes before publishing a repaired complete Journal", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     const session = await store.create(headerInput(registry, "torn-repair"));
     await session.close();
-    const original = await readFile(session.layout.journalPath);
+    const original = await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath);
     const torn = Buffer.concat([original, Buffer.from('{"partial":')]);
-    await writeFile(session.layout.journalPath, torn);
-    const inspection = await store.inspect("torn-repair");
+    await writeFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath, torn);
+    const inspection = await inspectJsonlSession(sessionFileLayout(dataRoot, "torn-repair").journalPath, registry);
 
     const result = await repairTornJsonlSession({ inspection, registry, runtimeId: "repair-runtime" });
     expect(await readFile(result.forensicPath)).toEqual(torn);
     const repaired = await store.inspect("torn-repair");
     expect(repaired.accessState).toBe("read-write");
-    expect(repaired.tornTail).toBeNull();
+    expect(repaired.integrity).toBe("complete");
   });
 });
 
@@ -112,7 +115,7 @@ describe("cold fork and compaction provenance", () => {
   it("forks a persisted balanced prefix and rejects an open boundary", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     const parent = await store.create(headerInput(registry, "parent"));
     await parent.append(candidate("turn/start", { turnId: "turn-1" }));
     await parent.append(candidate("turn/end", { turnId: "turn-1", reason: "completed" }));
@@ -129,7 +132,7 @@ describe("cold fork and compaction provenance", () => {
   it("compacts Surface by appending one provenance-complete replacement", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     const session = await store.create(headerInput(registry, "compact"));
     await session.append(candidate("user/message", { messageId: "u1" }, { surface: { kind: "append", node: { kind: "user", messageId: "u1", content: "one" } } }));
     await session.append(candidate("assistant/message", { messageId: "a1" }, { surface: { kind: "append", node: { kind: "assistant", messageId: "a1", content: "two" } } }));

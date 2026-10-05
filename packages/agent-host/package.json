@@ -53,7 +53,8 @@
     "@actspace/tools-web-tools": "workspace:*",
     "@actspace/tools-image-generation": "workspace:*",
     "@actspace/tools-image-inspection": "workspace:*",
-    "@actspace/agent-service": "workspace:*"
+    "@actspace/agent-service": "workspace:*",
+    "@actspace/session-jsonl": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

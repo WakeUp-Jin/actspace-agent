@@ -33,7 +33,6 @@ describe("Browser Runtime restart admission", () => {
       listSessions: vi.fn(async () => []),
       subscribeSessionProjection: vi.fn(() => vi.fn()),
       isIdleForReconfigure: vi.fn(async () => true),
-      enqueueMainMessage: vi.fn(async () => ({ messageId: "message" })),
       inspectSession: vi.fn(async () => ({ sessionId: "session", throughJournalSeq: 1 })),
       resumeMainSession: vi.fn(async () => ({ sessionId: "session", throughJournalSeq: 1 })),
     };
@@ -64,12 +63,12 @@ describe("Browser Runtime restart admission", () => {
     expect(await fixture.registry.refreshBrowser()).toBe(false);
     expect(fixture.shutdown).not.toHaveBeenCalled();
     fixture.app.isIdleForReconfigure.mockResolvedValue(true);
-    const accepted = deferred<{ messageId: string }>();
-    fixture.app.enqueueMainMessage.mockReturnValueOnce(accepted.promise);
-    const pending = fixture.registry.enqueueMessage({ sessionId: "session", content: "hello" } as never);
+    const accepted = deferred<{ task: {} }>();
+    fixture.app.submitTask.mockReturnValueOnce(accepted.promise);
+    const pending = fixture.registry.submitTask("session", "submission", "hello");
     expect(await fixture.registry.refreshBrowser()).toBe(false);
     expect(fixture.shutdown).not.toHaveBeenCalled();
-    accepted.resolve({ messageId: "message" });
+    accepted.resolve({ task: {} });
     await pending;
     expect(await fixture.registry.refreshBrowser()).toBe(true);
     expect(fixture.shutdown).toHaveBeenCalledOnce();
@@ -100,8 +99,8 @@ describe("Browser Runtime restart admission", () => {
     fixture.connect();
     const switching = fixture.registry.refreshBrowser();
     await entered.promise;
-    await expect(fixture.registry.enqueueMessage({ sessionId: "session", content: "blocked" } as never)).rejects.toThrow("reconnecting Chrome");
-    expect(fixture.app.enqueueMainMessage).not.toHaveBeenCalled();
+    await expect(fixture.registry.submitTask("session", "submission", "blocked")).rejects.toThrow("reconnecting Chrome");
+    expect(fixture.app.submitTask).not.toHaveBeenCalled();
     expect(bootDesktopRuntimeV2).toHaveBeenCalledTimes(1);
     release.resolve();
     expect(await switching).toBe(true);
@@ -109,7 +108,7 @@ describe("Browser Runtime restart admission", () => {
     expect(fixture.learning.enableSession).toHaveBeenCalledWith("session");
     expect(fixture.learning.subscribe).toHaveBeenCalledTimes(2);
     expect(fixture.browser.setRuntimeReady).toHaveBeenLastCalledWith(true);
-    await fixture.registry.enqueueMessage({ sessionId: "session", content: "accepted" } as never);
-    expect(fixture.app.enqueueMainMessage).toHaveBeenCalledOnce();
+    await fixture.registry.submitTask("session", "submission", "accepted");
+    expect(fixture.app.submitTask).toHaveBeenCalledOnce();
   });
 });

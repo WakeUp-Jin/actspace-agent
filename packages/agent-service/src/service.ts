@@ -18,7 +18,7 @@ import { TaskLedger } from "./task-ledger.js";
 
 export interface AgentServicePorts {
   openSession(sessionId: string): Promise<SessionHandle>;
-  operationForTask?(session: SessionHandle, task: TaskRecord): ((signal: AbortSignal) => Promise<void>) | undefined;
+  operationForTask?(session: SessionHandle, task: TaskRecord): ((signal: AbortSignal) => Promise<RuntimeV2JsonValue | void>) | undefined;
   runIdForTask?(sessionId: string, task: TaskRecord): string | undefined;
   harnessId(session: SessionHandle): string;
   acquire(harnessId: string, signal?: AbortSignal): RunLease | Promise<RunLease>;
@@ -73,7 +73,6 @@ export class AgentService {
   }
   async stop(sessionId: string, runId: string): Promise<boolean> { return (await this.#manager(sessionId)).stop(runId); }
   async exclusive<T>(sessionId: string, operation: () => Promise<T>): Promise<T> { return (await this.#manager(sessionId)).exclusive(operation); }
-  async activeRunId(sessionId: string): Promise<string | null> { return (await this.#manager(sessionId)).activeRunId; }
   async waitForTask(sessionId: string, taskId: string): Promise<RunRecord | null> {
     const manager = await this.#manager(sessionId);
     if (manager.blocked) throw manager.failure ?? new Error("DURABILITY_BLOCKED");

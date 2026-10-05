@@ -1,6 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+export const HARNESS_EVENT_DECLARATION_PATHS = Object.freeze(['packages/cordis-adapter/src/event-contract.ts', 'packages/harness-control/src/contracts.ts', 'packages/agent-service/src/service.ts', 'packages/agent-service/src/application.ts', 'packages/runtime/src/session/session-plugin.ts']);
 /** Scan explicit dispatch literals. Dynamic wrappers are validated separately by adapter tests. */
 export function inspectHarnessEvents(declarations, sources) {
   const modes = new Map([...declarations.matchAll(/\/\*\*\s*@mode\s+(emit|waterfall|parallel|serial|bail)\s*\*\/\s*"([^"]+)"/g)].map(m => [m[2], m[1]]));
@@ -27,8 +28,8 @@ async function walk(root) {
   return result;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const declarations = (await Promise.all(['packages/cordis-adapter/src/event-contract.ts', 'packages/harness-control/src/contracts.ts', 'packages/agent-service/src/service.ts', 'packages/runtime/src/runtime/session-plugin.ts'].map(path => readFile(path, 'utf8')))).join('\n');
-  const sources = (await Promise.all(['packages/core/agent-loop/src', 'packages/tools/runtime/src', 'packages/runtime/src/runtime', 'packages/harness-control/src'].map(walk))).flat();
+  const declarations = (await Promise.all(HARNESS_EVENT_DECLARATION_PATHS.map(path => readFile(path, 'utf8')))).join('\n');
+  const sources = (await Promise.all(['packages/core/agent-loop/src', 'packages/tools/runtime/src', 'packages/runtime/src/startup', 'packages/runtime/src/session', 'packages/runtime/src/harness', 'packages/agent-service/src', 'packages/desktop-app/src', 'packages/harness-control/src'].map(walk))).flat();
   const errors = inspectHarnessEvents(declarations, sources);
   if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
   else console.log('Harness event mode declarations and explicit dispatch sites match');

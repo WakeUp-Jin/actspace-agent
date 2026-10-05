@@ -24,11 +24,11 @@
 | 路径 | 当前行为与迁移目的 |
 |---|---|
 | `packages/core/agent/src/main-preset.ts` | 两个静态 preset；转为唯一组合与旧 preset 解码 |
-| `packages/runtime/src/runtime/agent-factory-plugin.ts` | 工厂按 preset 一次绑定 prompt/tools/compaction；转为形态成员激活与按模式策略消费 |
+| `packages/runtime/src/harness/agent-factory-plugin.ts` | 工厂按 preset 一次绑定 prompt/tools/compaction；转为形态成员激活与按模式策略消费 |
 | `packages/core/agent-loop/src/loop.ts` | `plan/agent` 逐轮值；`toolDefinitions` 筛选、`runTools` 已拒绝不可见工具；保留检查并统一策略 |
 | `packages/tools/runtime/src/runtime.ts` | `executeBatch` 转入 scheduler；在真实准入/执行路径补 scope 策略校验 |
 | `packages/shared/src/runtime-v2/runtime.ts` | `MainAgentForm=agent/chat`、`RuntimeV2AgentMode=plan/agent`；拆清规范字段和旧输入 |
-| `packages/runtime/src/runtime/session-controller.ts` | Header preset、创建、恢复及 fork；新增组合绑定与模式恢复 |
+| `packages/runtime/src/session/session-controller.ts` | Header preset、创建、恢复及 fork；新增组合绑定与模式恢复 |
 | `packages/desktop-app/src/service.ts` | 旧 Chat 强制以 agent 参数执行并清空 selected Skills；移除 preset 特判 |
 | `packages/tools/core-tools/src/manifest.ts` | 已注册 `web` 与 `generate_image`；不重写工具业务实现 |
 | `packages/subagent/src/preset.ts` | 现有两个 child preset 只开放四个文件探索工具；继承父上限，保持子 Agent 只读 |
@@ -66,7 +66,7 @@ Composer → Desktop IPC / App Service → Session 串行接纳
 
 ### T2：实现 Agent 范围的插件激活
 
-- 修改 `packages/runtime/src/runtime/agent-factory-plugin.ts` 与 `agent-runtime-plugin.ts`；使用形态定义激活成员，再发布 Agent。
+- 修改 `packages/runtime/src/harness/agent-factory-plugin.ts` 与 `agent-runtime-plugin.ts`；使用形态定义激活成员，再发布 Agent。
 - 在 `packages/prompt/src/plugin.ts`、`packages/tools/core-tools/src/plugin.ts`、`packages/core/agent/src/todo-tool.ts`、`packages/subagent/src/tool-plugin.ts`、`packages/compaction/src/plugin.ts` 增加或提取 Agent 激活入口；Browser 使用 `packages/tools/browser-tools/src/plugin.ts` 的可选成员绑定。
 - 利用 `packages/core/scope/src/scope.ts`、`disposer.ts` 和 scoped registry；共享工具 executor 只注册一次，Agent 绑定由自身 scope 释放。英语辅助行为沿用现有显式启用 scope，不改变产品默认。
 - 保存实际组合成员/版本/digest。缺 required 成员失败；缺 optional Browser 不扩大其他模式。
@@ -75,7 +75,7 @@ Composer → Desktop IPC / App Service → Session 串行接纳
 ### T3：Session 模式持久化与串行接纳
 
 - 修改 `packages/session/journal/src/core-codecs.ts`、`packages/session/projection/src/facts.ts`、`projection.ts`；增加模式事件与兼容组合绑定事实、fold、codec 校验及 replay fixture。
-- 修改 `packages/runtime/src/runtime/session-controller.ts`、`run-controller.ts` 和 `packages/core/agent-loop/src/service.ts`；所有模式变更与 Run 接纳经过相同 Session 串行边界。
+- 修改 `packages/runtime/src/session/session-controller.ts`、`run-controller.ts` 和 `packages/core/agent-loop/src/service.ts`；所有模式变更与 Run 接纳经过相同 Session 串行边界。
 - 新建保存 initial mode；显式切换写入并 flush 后才更新可运行状态；busy/过期 revision 不写事件。持久化失败后保持不可运行直至重放恢复。
 - 同步 `packages/runtime/src/projection/durable-session.ts`、`packages/session/projection-cache/src/journal-cache.ts`、`global-index.ts`，升级派生缓存版本并支持重建。
 - fork 按截断位置恢复模式和组合，保持附件复制；旧 Chat、旧 main、无 preset、未知版本分别建 fixture，旧文件字节不修改。
@@ -91,7 +91,7 @@ Composer → Desktop IPC / App Service → Session 串行接纳
 
 ### T5：上下文与现有 Chat 行为收口
 
-- 修改 `packages/prompt/src/core-contributors.ts`、`plugin.ts`、`host-context.ts`、`packages/runtime/src/runtime/agent-factory-plugin.ts` 和 `packages/core/agent-loop/src/loop.ts`：在 resolveSource 前按模式决定是否读取工作区，prompt/Skills/compaction 消费同一策略。
+- 修改 `packages/prompt/src/core-contributors.ts`、`plugin.ts`、`host-context.ts`、`packages/runtime/src/harness/agent-factory-plugin.ts` 和 `packages/core/agent-loop/src/loop.ts`：在 resolveSource 前按模式决定是否读取工作区，prompt/Skills/compaction 消费同一策略。
 - 保留历史消息与工具结果，所有模式的新用户消息以持久 runtime-context 表达实际模式；隐藏块不进入 transcript、标题或自然语言压缩摘要。
 - 将 Chat 压缩阈值从 preset 判断改为模式判断，保留现有设置键、默认值和校验，不新增设置。
 - 验证：Chat 工作区读取 spy 为零；同模式稳定 prompt 字节不变；切换历史可重放；文本附件限制及 Artifact ownership 不退化；Plan Todo 可写会话进度但不能写工作区。

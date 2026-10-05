@@ -12,7 +12,7 @@
 - `apps/cli/src/runtime-v2/run.ts`
 - `apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts`
 - `packages/runtime/src/profiles/composition.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/cordis-adapter/src/source-loader.ts`
 - `packages/cordis-adapter/src/behavior-loader.ts`
 - `packages/cordis-adapter/src/manifest.ts`

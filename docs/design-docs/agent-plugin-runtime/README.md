@@ -1,6 +1,6 @@
 # Agent Plugin Runtime 文档导航
 
-当前分层以 [Host/Harness/Run 总览](agent-target-overall-architecture.md)为入口；[P5 摘要](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)跟踪自动化及尚未开始的 Computer Use。
+当前分层以 [Host/Harness/Run 总览](agent-target-overall-architecture.md)为入口；[P5 摘要](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)汇总已完成的自动化及 Computer Use；本次冗余与文档收尾见[清理计划](../../exec-plans/completed/20261004-agent-refactor-cleanup.md)。
 
 P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle.md)；[阶段验证记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)。
 
@@ -12,8 +12,8 @@ P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle
 ## 当前架构与启动
 
 1. [总体架构](agent-target-overall-architecture.md)：Host、Profile、应用 Service、Agent 与 Journal/Projection 的整体关系。
-2. [Runtime 与 Composition](agent-target-runtime-architecture.md)：生产 BootedRuntimeProfile、基础 BootedProfile、组合、启动失败与 shutdown。
-3. [插件组装与 Agent 启动](agent-spec-dsh-plugin-assembly-and-agent-startup.md)：从 Cordis 装载到 Session attach、followup、Inbox 和 Loop。
+2. [Runtime 与 Composition](agent-target-runtime-architecture.md)：生产 BootedRuntimeProfile、Host/Harness 组合、启动失败与 shutdown。
+3. [插件组装与 Agent 启动](agent-spec-dsh-plugin-assembly-and-agent-startup.md)：从三个 Host 入口到 TaskLedger、Run Factory 和 Loop。
 4. [Agent Run / Turn 分层](../agent-runtime/agent-turn-layers.md)：运行层级与数据流。
 5. [测试策略](agent-testing.md)：自动化、Host 和外部人工门禁的边界。
 
@@ -26,7 +26,7 @@ P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle
 | Plugin 与包边界 | [Plugin ABI](agent-spec-plugin-runtime-abi.md)、[Package layout](agent-spec-package-layout-and-plugin-packaging.md)、[包清单](agent-package-ledger.md) |
 | Session 与上下文 | [Session/Context](agent-target-session-and-context.md)、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)、[Prompt contributors](agent-spec-prompt-context-contributors.md) |
 | Agent 与 Loop | [Core 所有权](agent-target-agent-core.md)、[Agent/Subagent](agent-spec-agent-and-subagent.md)、[Scope](agent-spec-agent-scope-model.md)、[Loop surface](agent-spec-agent-loop-cordis-surface.md) |
-| Cordis Service 与事件 | [Service 三层契约](agent-spec-service-definition-provider-consumer.md)、[Cordis 原生事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md) |
+| Cordis Service 与事件 | [Service 所有权与契约](agent-spec-service-definition-provider-consumer.md)、[Cordis 原生事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md) |
 | LLM | [Adapter](agent-target-llm-adapter.md)、[Core Pi 收敛目标（已实施）](agent-llm-core-pi.md)、[多供应商](../model-context/agent-multi-provider-llm.md) |
 | Tools | [内核与外壳](agent-spec-tool-runtime-boundary.md)、[Prepared execution ABI](agent-spec-tool-runtime-abi.md)、[Tool name](agent-spec-tool-name-contract.md) |
 | Projection | [Runtime Projection](agent-spec-runtime-projection.md)、[持久化与投影收敛](agent-target-session-persistence-projection-architecture.md) |
@@ -35,29 +35,22 @@ P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle
 
 Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧产品资料。早期逻辑语义与后续事件规范冲突时，以 DSH 事件模型和实际 codec 为准。
 
-## 部分实施与后续收口
+## 本轮清理与证据
 
-| 工作 | 已有范围与剩余任务 | 入口 |
-|---|---|---|
-| Session Core / Persistence | contract slice 已交付；CLI persist/resume 独立验收与 G1 交接尚待收口 | [规范](agent-spec-session-core-persistence-separation.md)、[P1-A](../../exec-plans/active/20260829-actspace-p1-session-core-persistence/README.md) |
-| Service Definition / Provider / Consumer | 三层 contract slice 已交付；核心 Provider 全域迁移与 G1 尚待收口 | [规范](agent-spec-service-definition-provider-consumer.md)、[P1-B](../../exec-plans/active/20260829-actspace-p1-service-roles/README.md) |
-| Profile / Bundle / Patch | schema、digest、transport parity 已交付；restart-only 与 one-shot 回归尚待收口 | [规范](agent-spec-profile-bundle-patch-layering.md)、[P1-C](../../exec-plans/active/20260829-actspace-p1-profile-bundle-patch/README.md) |
-| Contract Matrix | 已有 generator、双产物、字节漂移检查与 CI；2026-09-09 复核确认语义 validator / 负向 fixtures 仍有缺口 | [规范](agent-spec-contract-matrix-generation.md)、[生成矩阵](agent-contract-matrix.generated.md)、[P2](../../exec-plans/active/20260829-actspace-p2-contract-matrix/README.md) |
-| Session Projection | Host Registry、可删除 checkpoint 与 Client raw window 已实现；Electron 环境门禁见摘要 | [计划](../../exec-plans/completed/20260921-session-projection-cutover.md) |
-| 最终事件/CLI 验收 | P00–P04 有通过证据；P05 deterministic retry/error fixture 尚缺 | [计划](../../exec-plans/active/20260829-actspace-cordis-event-abi-final-acceptance/README.md) |
+[第二轮清理计划](../../exec-plans/active/20261004-agent-storage-and-cleanup/README.md)统一跟踪存储整体解耦、任务入口和文档校准；[执行摘要](../../exec-runs/20261004-agent-storage-and-cleanup/execution-summary.md)是本轮验证入口。
 
-完整依赖与 G1/G2 见 [P1/P2 总计划](../../exec-plans/active/20260829-actspace-p1-p2-contract-and-composition/README.md)。不得把这些部分实施项写成完全未开始，也不得因已有类型或生成产物就声明验收完成。
+写入/恢复先读[存储规范](agent-spec-session-core-persistence-separation.md)，读取/投影先读[投影架构](agent-target-session-persistence-projection-architecture.md)。格式、Codec、三类读模型继续独立维护详细契约。
+
+六份早期后端计划的目标和独有欠账见[旧计划结算](../../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)。矩阵是审计视图，范围与未实现检查见[生成规范](agent-spec-contract-matrix-generation.md)。
 
 ## 决策与研究背景
 
 以下材料用于理解取舍，不替代上面的当前实现入口：
 
-- [Harness 插件化与 Agent Host 分离讨论](agent-harness-host-refactor-decisions.md)：2026-10-03 已确认目标与分阶段路线；P1/P2 已验收；P3 可替换基础的范围已确认，[执行计划](../../exec-plans/completed/20261003-agent-harness-host-refactor/phase-3.md) 已实施并验收，自进化功能后续独立开发。
+- [Harness 插件化与 Agent Host 分离讨论](agent-harness-host-refactor-decisions.md)：最终目标与决定；P1–P5 批准范围已验收，冗余与文档收尾仍在执行。自进化功能后续独立开发。
 
-- [P0 核心 Service 设计](agent-spec-core-cordis-services.md)：保留领域职责与 Service 化背景；当前三层 ABI 由上面的 Service 契约维护。
-- [Profile-first 决策](agent-decision-profile-first-headless-desktop.md)：两种 Profile 与应用操作所有权，保留当时迁移步骤。
+- [Profile-first 决策](agent-decision-profile-first-headless-desktop.md)：Profile 与应用操作所有权的历史理由。
 - [v2 foundation 决策](agent-decisions-v2-foundation.md)、[Cordis 采用](agent-decision-cordis-adoption.md)：方向、适用范围和证据边界。
-- [DSH-native 早期提案](agent-decision-dsh-native-plugin-runtime.md)、[全量插件组装决策背景](agent-spec-dsh-runtime-as-plugin-composition.md)：其中旧 facade、Host 与阶段说法是历史背景，不能据此恢复接口。
 - [DSH 研究](agent-research-dsh-architecture.md)、[能力去留研究](agent-research-capability-disposition.md)：研究快照与迁移判断。
 - [ActSpace v1 后端研究](../../archive/v1/design-docs/agent-research-actspace-current-state.md)：`v1-final` 历史快照。
 

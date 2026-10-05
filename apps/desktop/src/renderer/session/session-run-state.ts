@@ -46,6 +46,7 @@ export function createEmptyStreamingState(): StreamingState {
 
 /** Renderer-owned live projection. Runtime owns execution; selection never disposes this state. */
 export type SessionRunState = {
+  operationTaskId?: string;
   /** Reattached after renderer reload; completion comes from the host stream. */
   recovered?: boolean;
   sessionId: string;

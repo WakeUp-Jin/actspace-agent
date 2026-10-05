@@ -41,12 +41,10 @@ export type RunManagerOptions = {
   readonly canStart?: () => boolean;
   readonly ledger: TaskLedger;
   readonly harnessId: string;
-  readonly operationForTask?: (task: TaskRecord) => ((signal: AbortSignal) => Promise<void>) | undefined;
+  readonly operationForTask?: (task: TaskRecord) => ((signal: AbortSignal) => Promise<RuntimeV2JsonValue | void>) | undefined;
   readonly runIdForTask?: (task: TaskRecord) => string | undefined;
   readonly acquire: (harnessId: string, signal?: AbortSignal) => RunLease | Promise<RunLease>;
   readonly readConfiguration: () => ExecutionConfiguration | Promise<ExecutionConfiguration>;
-  /** @mode emit — observational only, never a durability barrier. */
-  readonly onSettled?: (runId: string, result: RunExecutionResult) => void;
   readonly onFailure?: (error: unknown) => void;
 };
 type ActiveRun = { readonly runId: string; readonly taskId: string; readonly controller: AbortController; readonly done: Promise<void> };
@@ -64,7 +62,6 @@ export class SessionRunManager {
   #failure: unknown;
   #failed = false;
   constructor(private readonly options: RunManagerOptions) { this.ledger = options.ledger; }
-  get activeRunId(): string | null { return this.#active?.runId ?? null; }
   get failure(): unknown { return this.#failure; }
 
   async submit(submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
@@ -136,15 +133,15 @@ export class SessionRunManager {
     this.#active = { runId, taskId: task.taskId, controller, done };
   }
 
-  async #executeOperation(task: TaskRecord, operation: (signal: AbortSignal) => Promise<void>, signal: AbortSignal): Promise<void> {
+  async #executeOperation(task: TaskRecord, operation: (signal: AbortSignal) => Promise<RuntimeV2JsonValue | void>, signal: AbortSignal): Promise<void> {
     let started = false;
     try {
       signal.throwIfAborted();
       await this.ledger.startOperation(task.taskId); started = true;
-      await operation(signal);
-      await this.ledger.finishOperation(task.taskId, signal.aborted ? "cancelled" : "completed");
+      const result = await operation(signal);
+      await this.ledger.finishOperation(task.taskId, signal.aborted ? "cancelled" : "completed", result ?? null);
     } catch (error) {
-      if (started && !this.ledger.blocked) await this.ledger.finishOperation(task.taskId, signal.aborted ? "cancelled" : "failed");
+      if (started && !this.ledger.blocked) await this.ledger.finishOperation(task.taskId, signal.aborted ? "cancelled" : "failed", { error: error instanceof Error ? error.message : String(error) });
       else if (error instanceof TaskError && ["QUEUE_PAUSED", "QUEUE_ORDER", "TASK_NOT_PENDING", "SESSION_BUSY"].includes(error.code)) return;
       if (!started || this.ledger.blocked) throw error;
       try { this.options.onFailure?.(error); } catch { /* observation only */ }
@@ -234,7 +231,6 @@ export class SessionRunManager {
       try { this.options.onFailure?.(failure); } catch { /* observation only */ }
     }
     if (lostClaim) return;
-    if (started) { try { this.options.onSettled?.(runId, result); } catch { /* fact already committed */ } }
   }
   #assertOpen(): void { if (this.#closed) throw new Error("Agent service is closed"); if (this.#failed) throw this.#failure; }
 }

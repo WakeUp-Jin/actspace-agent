@@ -1,4 +1,3 @@
-import { createSessionProjection } from "./projection.js";
 import { SessionProjectionRegistry } from "./registry.js";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { CordisContext } from "@actspace/cordis-adapter";
@@ -9,7 +8,6 @@ export type ProjectionContributor = {
 };
 
 export type SessionProjectionService = {
-  readonly createSessionProjection: typeof createSessionProjection;
   readonly createRegistry: (accepts?: (event: SessionEventEnvelopeV1) => boolean) => SessionProjectionRegistry;
   readonly registerContributor: (contributor: ProjectionContributor) => () => void;
   readonly applyContributors: (registry: SessionProjectionRegistry, redact: (text: string, limit?: number) => string) => void;
@@ -19,7 +17,6 @@ export function createSessionProjectionService(): SessionProjectionService {
   const contributors = new Map<string, ProjectionContributor>();
   let sealed = false;
   return Object.freeze({
-    createSessionProjection,
     createRegistry: (accepts?: (event: SessionEventEnvelopeV1) => boolean) => new SessionProjectionRegistry(accepts),
     registerContributor: (contributor: ProjectionContributor) => {
       if (sealed) throw new Error("Register projection contributors before restoring sessions.");

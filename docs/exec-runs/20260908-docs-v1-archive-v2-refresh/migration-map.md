@@ -86,7 +86,7 @@
 | 移动 | `docs/exec-plans/active/20260829-actspace-dsh-core-rebuild/p03-runtime-collector-cli-run.md` | `docs/exec-plans/completed/20260829-actspace-dsh-core-rebuild/p03-runtime-collector-cli-run.md` |
 | 移动 | `docs/exec-plans/active/20260829-actspace-dsh-core-rebuild/p04-cutover-legacy-boot.md` | `docs/exec-plans/completed/20260829-actspace-dsh-core-rebuild/p04-cutover-legacy-boot.md` |
 | 移动 | `docs/exec-plans/active/20260829-actspace-dsh-core-rebuild/p05-verification-and-handoff.md` | `docs/exec-plans/completed/20260829-actspace-dsh-core-rebuild/p05-verification-and-handoff.md` |
-| 移动 | `docs/exec-plans/active/20260829-actspace-dsh-native-plugin-runtime/README.md` | `docs/exec-plans/discarded/20260829-actspace-dsh-native-plugin-runtime/README.md` |
+| 移动 | `docs/exec-plans/active/20260829-actspace-dsh-native-plugin-runtime/README.md` | `docs/design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md` |
 | 移动 | `docs/exec-plans/active/20260829-actspace-dsh-plugin-assembly-and-agent-startup/README.md` | `docs/exec-plans/completed/20260829-actspace-dsh-plugin-assembly-and-agent-startup/README.md` |
 | 移动 | `docs/exec-plans/active/20260830-actspace-profile-first-runtime-simplification/README.md` | `docs/exec-plans/completed/20260830-actspace-profile-first-runtime-simplification/README.md` |
 | 移动 | `docs/exec-plans/active/20260830-actspace-settings-center-refactor/README.md` | `docs/exec-plans/completed/20260830-actspace-settings-center-refactor/README.md` |

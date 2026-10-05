@@ -228,7 +228,6 @@ export class RemoteDesktopAdapter {
       case C.setSessionPermissionMode: await call("sessions.update", { patch: { permissionMode: input.mode } }); return { ok: true, mode: input.mode };
       case C.forkSession: { const parent = await observation(); const next = await call("sessions.fork", { boundarySeq: parent.snapshot.throughJournalSeq, newSessionId: randomUUID() }) as { sessionId: string }; return this.handle(C.getSessionPage, {}, { hostId: ref.hostId, sessionId: next.sessionId }); }
       case C.submitTask: {
-        if (String(input.userInput).trim() === "/compact") { await call("sessions.compact"); this.#emitLive(sessionId, "runtime-live", "task-queue-updated"); return { compacted: true }; }
         const paths = Array.isArray(input.attachments) ? input.attachments.map(attachment => { if (!isRecord(attachment) || typeof attachment.path !== "string") throw new Error("Invalid attachment"); return attachment.path; }) : [];
         if (typeof input.submissionId !== "string") throw new Error("Missing submission identity");
         return this.#pending.withRecord(ref, input.submissionId, JSON.stringify({ text: input.userInput, paths, fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [] }), async (record, save) => {

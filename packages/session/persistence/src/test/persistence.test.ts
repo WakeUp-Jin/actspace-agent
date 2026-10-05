@@ -1,3 +1,4 @@
+import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,8 +6,8 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { CheckpointPolicy, createCoreCodecRegistry, SessionDurabilityFailure } from "@actspace/session-journal";
 import type { SessionEventCandidateV1 } from "@actspace/session-journal";
 import { SessionStore } from "../session-store.js";
-import { sessionFileLayout } from "../session.js";
-import { SessionWriterLease } from "../writer-lease.js";
+import { sessionFileLayout } from "@actspace/session-jsonl";
+import { SessionWriterLease } from "@actspace/session-jsonl";
 import type { JsonlWriteOperation } from "@actspace/session-jsonl";
 
 const roots: string[] = [];
@@ -44,13 +45,14 @@ describe("raw JSONL Session persistence", () => {
   it("publishes Header then durably appends LF-delimited events", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
-    const session = await store.create(headerInput(registry), { writerHooks: { maxWriteBytes: 7 } });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    Object.assign((store.storage as JsonlSessionStorage).options, { ["writerHooks"]: { maxWriteBytes: 7 } });
+    const session = await store.create(headerInput(registry), {  });
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await session.append(candidate("turn/end", { turnId: "turn-1", reason: "completed" }));
     await session.flush();
 
-    const bytes = await readFile(session.layout.journalPath);
+    const bytes = await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath);
     expect(bytes.at(-1)).toBe(0x0a);
     expect(bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))).toBe(false);
     expect(bytes.toString("utf8").trimEnd().split("\n")).toHaveLength(3);
@@ -59,16 +61,17 @@ describe("raw JSONL Session persistence", () => {
     expect(inspection.accessState).toBe("read-write");
     expect(inspection.events.map((event) => event.seq)).toEqual([0, 1]);
     await session.close();
-    expect(await readFile(session.layout.journalPath, "utf8")).not.toContain("context-state.json");
+    expect(await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath, "utf8")).not.toContain("context-state.json");
   });
 
   it("fires the session event hook after Journal acceptance and before the append write completes", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
     const order: string[] = [];
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    Object.assign((store.storage as JsonlSessionStorage).options, { ["writerHooks"]: { afterWriteChunk: (operation) => { if (operation === "append-write") order.push("write"); } } });
     const session = await store.create(headerInput(registry, "post-commit"), {
-      writerHooks: { afterWriteChunk: (operation) => { if (operation === "append-write") order.push("write"); } },
+
       onEvent: () => { order.push("event"); },
     });
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
@@ -81,9 +84,10 @@ describe("raw JSONL Session persistence", () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
     const order: string[] = [];
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    Object.assign((store.storage as JsonlSessionStorage).options, { ["writerHooks"]: { afterWriteChunk: (operation) => { if (operation === "append-write") order.push("durable-write"); } } });
     const session = await store.create(headerInput(registry, "flush-event-boundary"), {
-      writerHooks: { afterWriteChunk: (operation) => { if (operation === "append-write") order.push("durable-write"); } },
+
       onEvent: () => { order.push("session/event"); },
       onFlush: () => { order.push("session/flush"); },
     });
@@ -97,7 +101,7 @@ describe("raw JSONL Session persistence", () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
     const failures: unknown[] = [];
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     const session = await store.create(headerInput(registry, "observer-failure"), {
       onEvent: () => { throw new Error("observer failed"); },
       onBackgroundFailure: (error) => { failures.push(error); },
@@ -114,7 +118,7 @@ describe("raw JSONL Session persistence", () => {
   it("serializes close after already-submitted append and makes repeated close idempotent", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     const session = await store.create(headerInput(registry, "close-race"));
     const append = session.append(candidate("turn/start", { turnId: "turn-1" }));
     const firstClose = session.close();
@@ -130,17 +134,18 @@ describe("raw JSONL Session persistence", () => {
   it("fails closed when append durability fails and retains the accepted batch", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     let failAppend = true;
-    const session = await store.create(headerInput(registry), {
-      writerHooks: {
+    Object.assign((store.storage as JsonlSessionStorage).options, { ["writerHooks"]: {
         before(operation) {
           if (operation === "append-write" && failAppend) {
             failAppend = false;
             throw new Error("injected append failure");
           }
         },
-      },
+      } });
+    const session = await store.create(headerInput(registry), {
+
     });
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await expect(session.flush()).rejects.toThrow("Journal append failed");
@@ -153,7 +158,7 @@ describe("raw JSONL Session persistence", () => {
     const inspection = await store.inspect("session-1");
     expect(inspection.events).toHaveLength(0);
     const nextLease = await SessionWriterLease.acquire({
-      sessionDir: session.layout.sessionDir,
+      sessionDir: sessionFileLayout(dataRoot, session.header.sessionId).sessionDir,
       sessionId: "session-1",
       runtimeId: "runtime-2",
     });
@@ -163,22 +168,23 @@ describe("raw JSONL Session persistence", () => {
   it("restores the original Journal when append fsync fails", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     let fsyncs = 0;
-    const session = await store.create(headerInput(registry, "append-fsync-failure"), {
-      writerHooks: {
+    Object.assign((store.storage as JsonlSessionStorage).options, { ["writerHooks"]: {
         before(operation) {
           if (operation === "file-fsync" && ++fsyncs === 2) throw new Error("injected append fsync failure");
         },
-      },
+      } });
+    const session = await store.create(headerInput(registry, "append-fsync-failure"), {
+
     });
-    const original = await readFile(session.layout.journalPath);
+    const original = await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath);
 
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await expect(session.flush()).rejects.toThrow("Journal append failed");
     await expect(session.close()).rejects.toThrow();
 
-    expect(await readFile(session.layout.journalPath)).toEqual(original);
+    expect(await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath)).toEqual(original);
     const inspection = await store.inspect("append-fsync-failure");
     expect(inspection.accessState).toBe("read-write");
     expect(inspection.events).toHaveLength(0);
@@ -187,23 +193,24 @@ describe("raw JSONL Session persistence", () => {
   it("restores the original Journal after a partial append write fails", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     let appendChunks = 0;
-    const session = await store.create(headerInput(registry, "partial-append-recovery"), {
-      writerHooks: {
+    Object.assign((store.storage as JsonlSessionStorage).options, { ["writerHooks"]: {
         maxWriteBytes: 8,
         afterWriteChunk(operation) {
           if (operation === "append-write" && ++appendChunks === 1) throw new Error("injected partial write");
         },
-      },
+      } });
+    const session = await store.create(headerInput(registry, "partial-append-recovery"), {
+
     });
-    const original = await readFile(session.layout.journalPath);
+    const original = await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath);
 
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await expect(session.flush()).rejects.toThrow("Journal append failed");
     await expect(session.close()).rejects.toThrow();
 
-    expect(await readFile(session.layout.journalPath)).toEqual(original);
+    expect(await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath)).toEqual(original);
     const inspection = await store.inspect("partial-append-recovery");
     expect(inspection.accessState).toBe("read-write");
     expect(inspection.events).toHaveLength(0);
@@ -212,18 +219,18 @@ describe("raw JSONL Session persistence", () => {
   it("reports a torn final line without modifying forensic bytes", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     const session = await store.create(headerInput(registry));
     await session.close();
-    const original = await readFile(session.layout.journalPath);
+    const original = await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath);
     const torn = Buffer.concat([original, Buffer.from('{"recordKind":"event"')]);
-    await writeFile(session.layout.journalPath, torn);
+    await writeFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath, torn);
 
     const inspection = await store.inspect("session-1");
     expect(inspection.accessState).toBe("corrupt");
-    expect(inspection.tornTail?.bytes.toString("utf8")).toBe('{"recordKind":"event"');
-    expect(await readFile(session.layout.journalPath)).toEqual(torn);
-    await expect(store.open("session-1")).rejects.toThrow("forensic repair");
+    expect(inspection.integrity).toBe("repair-required");
+    expect(await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath)).toEqual(torn);
+    await expect(store.open("session-1")).rejects.toMatchObject({ code: "SESSION_CORRUPT" });
   });
 
   it.each<JsonlWriteOperation>([
@@ -235,18 +242,19 @@ describe("raw JSONL Session persistence", () => {
   ])("fails closed when Session creation injects a %s failure", async (failedOperation) => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     let injected = false;
-    await expect(
-      store.create(headerInput(registry, `create-${failedOperation}`), {
-        writerHooks: {
+    Object.assign((store.storage as JsonlSessionStorage).options, { ["writerHooks"]: {
           before(operation) {
             if (!injected && operation === failedOperation) {
               injected = true;
               throw new Error(`injected ${failedOperation}`);
             }
           },
-        },
+        } });
+    await expect(
+      store.create(headerInput(registry, `create-${failedOperation}`), {
+
       }),
     ).rejects.toThrow();
     const layout = sessionFileLayout(dataRoot, `create-${failedOperation}`);
@@ -257,10 +265,9 @@ describe("raw JSONL Session persistence", () => {
   it("marks the writer corrupt when a partial append cannot be truncated", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     let appendChunks = 0;
-    const session = await store.create(headerInput(registry, "truncate-failure"), {
-      writerHooks: {
+    Object.assign((store.storage as JsonlSessionStorage).options, { ["writerHooks"]: {
         maxWriteBytes: 8,
         afterWriteChunk(operation) {
           if (operation === "append-write" && ++appendChunks === 1) throw new Error("injected partial write");
@@ -268,7 +275,9 @@ describe("raw JSONL Session persistence", () => {
         before(operation) {
           if (operation === "truncate") throw new Error("injected truncate failure");
         },
-      },
+      } });
+    const session = await store.create(headerInput(registry, "truncate-failure"), {
+
     });
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await expect(session.flush()).rejects.toThrow("could not be restored");

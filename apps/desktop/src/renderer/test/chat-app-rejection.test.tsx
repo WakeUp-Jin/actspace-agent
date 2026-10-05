@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, SessionRecord, WorkspaceListResult, RunAgentInput } from "@actspace/shared";
+import type { AppSettings, BootstrapState, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
@@ -38,6 +38,7 @@ const defaultSettings: AppSettings = {
 const settingsApiStub = {
   getSessionPage: async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(await window.actspace.getSession({ sessionId })),
   getSettings: async () => defaultSettings,
+  taskCommand: async (input: { sessionId: string }) => ({ snapshot: { sessionId: input.sessionId, revision: 0, paused: false, tasks: [], queue: [], runs: [] } }),
   getReviewSnapshot: async () => ({ ok: false, code: "not_available", message: "No changes" }),
   listVisualizations: async () => ({ items: [] }),
   setUiZoom: () => {}, setNativeTheme: () => {}, onShuttingDown: () => () => {},
@@ -81,7 +82,7 @@ it("restores a rejected Chat draft without a phantom message, failed turn, or wo
   record.meta.agentMode = "chat";
   record.meta.workspaceRoot = "/tmp/workspace";
   const attachment = { id: "bad", kind: "file" as const, name: "bad.txt", path: "/fixture/bad.txt" };
-  const runAgent = vi.fn(async (input: RunAgentInput) => ({ status: "rejected" as const, sessionId: input.sessionId, agentRunId: input.agentRunId, error: { code: "invalid_utf8" as const, fileName: "bad.txt", attachmentId: "bad" } }));
+  const submitTask = vi.fn(async (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => ({ status: "submission-failed" as const, acknowledgement: "rejected" as const, message: "附件校验失败", attachmentIssue: { code: "invalid_utf8" as const, fileName: "bad.txt", attachmentId: "bad" } }));
   window.actspace = {
     ...settingsApiStub,
     getBootstrapState: async () => bootstrapState,
@@ -90,7 +91,7 @@ it("restores a rejected Chat draft without a phantom message, failed turn, or wo
     getSession: async () => record, createSession: async () => record,
     listPendingApprovals: async () => [], onAgentStream: () => () => {},
     selectFiles: async () => ({ canceled: false, attachments: [attachment] }),
-    runAgent,
+    submitTask,
   } as unknown as typeof window.actspace;
   const user = userEvent.setup(); renderApp();
   await screen.findByText("Chat");
@@ -106,7 +107,7 @@ it("restores a rejected Chat draft without a phantom message, failed turn, or wo
   expect(screen.getByLabelText("已附加的文件 bad.txt")).toBeVisible();
   expect(screen.queryByText("保留正文", { selector: "p" })).toBeNull();
   expect(screen.queryByRole("button", { name: /停止/ })).toBeNull();
-  expect(runAgent).toHaveBeenCalledTimes(1);
+  expect(submitTask).toHaveBeenCalledTimes(1);
   await user.click(screen.getByLabelText("移除 bad.txt"));
   expect(screen.queryByRole("alert")).toBeNull();
 });
@@ -116,7 +117,7 @@ it("restores the draft with a readable message when references are rejected", as
   const record = createEmptySessionRecord("reference-rejection");
   record.meta.agentForm = "chat";
   record.meta.workspaceRoot = "/tmp/workspace";
-  const runAgent = vi.fn(async (input: RunAgentInput) => ({ status: "rejected" as const, sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: { code: "annotation_source_missing" as const, kind: "annotation" as const, index: 0 } }));
+  const submitTask = vi.fn(async (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => ({ status: "submission-failed" as const, acknowledgement: "rejected" as const, message: "引用失效", referenceIssue: { code: "annotation_source_missing" as const, kind: "annotation" as const, index: 0 } }));
   window.actspace = {
     ...settingsApiStub,
     getBootstrapState: async () => bootstrapState,
@@ -124,7 +125,7 @@ it("restores the draft with a readable message when references are rejected", as
     listSessions: async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", workspaceRoot: "/tmp/workspace" }],
     getSession: async () => record, createSession: async () => record,
     listPendingApprovals: async () => [], onAgentStream: () => () => {},
-    runAgent,
+    submitTask,
   } as unknown as typeof window.actspace;
   renderApp();
   await screen.findByText("Chat");
@@ -132,7 +133,7 @@ it("restores the draft with a readable message when references are rejected", as
   fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("引用的回复已不在当前会话中"));
   expect(screen.getByRole("textbox")).toHaveValue("引用那段话");
-  expect(runAgent).toHaveBeenCalledTimes(1);
-  expect(runAgent.mock.calls[0]![0]).not.toHaveProperty("fileReferences");
-  expect(runAgent.mock.calls[0]![0]).not.toHaveProperty("responseAnnotations");
+  expect(submitTask).toHaveBeenCalledTimes(1);
+  expect(submitTask.mock.calls[0]![0]).toHaveProperty("fileReferences", undefined);
+  expect(submitTask.mock.calls[0]![0]).toHaveProperty("responseAnnotations", undefined);
 });

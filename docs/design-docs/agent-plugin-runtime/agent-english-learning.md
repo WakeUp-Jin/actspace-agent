@@ -22,7 +22,7 @@
 | `packages/prompt/src/assembler.ts`、`request-snapshot.ts` | 提示词分节、渲染文本、来源记录和请求快照有现成契约 |
 | `packages/core/scope/src/scope.ts` | `scopeContext` 使用真实 ScopeKey 注册监听并管理清理；父 Scope 可能收到子 Agent 事件 |
 | `packages/core/agent/src/registry.ts` | 可按已发布 Agent 获取实际 Scope 和 Session |
-| `packages/runtime/src/runtime/session-plugin.ts` | `session/event` 携带事件 Envelope，Session ID 通过 dispatch carrier 传递 |
+| `packages/runtime/src/session/session-plugin.ts` | `session/event` 携带事件 Envelope，Session ID 通过 dispatch carrier 传递 |
 | `packages/desktop-app/src/bundle.ts` | Desktop 应用 Bundle 可以组合独立插件 manifest |
 | `apps/desktop/src/renderer/components/extensions/CapabilitiesSection.tsx` | 已拆开 Browser Bridge 与英语辅助学习各自的可用性判断 |
 | `apps/desktop/src/main/settings-service.ts` | 已有非敏感设置与 main-only 凭据存储；可扩展语音配置 |

@@ -131,29 +131,6 @@ export {
 export type ComposerMode = "chat" | "plan" | "agent";
 export type { MainAgentForm } from "./runtime-v2/runtime";
 
-export type RunAgentInput = {
-  sessionId: string;
-  agentRunId: string;
-  userInput: string;
-  /** 首个普通 Agent Run 的执行目录准备；已有运行记录的 session 忽略该字段。 */
-  executionContext?: TurnExecutionContextInput;
-  attachments?: import("./session").ComposerAttachment[];
-  /** `@` 工作区文件引用；main 按 session workspace 重新解析校验。 */
-  fileReferences?: import("./composer-content").FileReference[];
-  /** 助手回复选区批注。 */
-  responseAnnotations?: import("./composer-content").ResponseAnnotationReference[];
-  mode?: ComposerMode;
-  selectedSkills?: string[];
-  /** 旧 renderer 兼容；Plan 5 新 UI 改发 modelKey。 */
-  model?: ModelId;
-  modelKey?: ModelKey;
-  thinkingEnabled?: boolean;
-  reasoningEffort?: import("./model-config").ModelReasoningEffort;
-  /** 内置 Explore 聚焦子代理模型；null/缺省 = deepseek-v4-flash。由 main 从 settings 注入。 */
-  exploreModelId?: ModelId | null;
-  exploreModelKey?: ModelKey | null;
-};
-
 export type SessionRunLocation = "this_mac" | "worktree";
 
 export type TurnExecutionContextInput = {
@@ -201,26 +178,6 @@ export type WorkspaceCreateFolderInput = {
 export type WorkspaceCreateFolderResult =
   | { ok: true; workspaceId: string; workspaceRoot: string }
   | { ok: false; error: string };
-
-export type CompactContextInput = {
-  sessionId: string;
-  agentRunId: string;
-  model?: ModelId;
-  modelKey?: ModelKey;
-};
-
-export type CompactContextResult = {
-  sessionId: string;
-  agentRunId: string;
-  status: "compacted" | "skipped" | "failed";
-  events: import("./session").SessionEvent[];
-  contextSnapshot: import("./session").ContextUsageSnapshot;
-  contextState?: import("./session").ContextState | null;
-  error?: {
-    code: string;
-    message: string;
-  };
-};
 
 // ─── 多供应商与模型管理 IPC（Plan 0 只锁契约，Plan 2/3/5 接实现） ───
 
@@ -436,35 +393,6 @@ export type AbortAgentRunInput = {
   agentRunId: string;
 };
 
-/** 运行中插入：把一条 Composer 消息送进正在运行的回合，Agent 开始下一步时读到。 */
-export type SteerAgentRunInput = {
-  sessionId: string;
-  agentRunId: string;
-  /** renderer 生成；读到时 `user_message_steered` 与 durable 投影都用它对应。 */
-  messageId: string;
-  userInput: string;
-  attachments?: import("./session").ComposerAttachment[];
-  fileReferences?: import("./composer-content").FileReference[];
-  responseAnnotations?: import("./composer-content").ResponseAnnotationReference[];
-};
-
-/** `unavailable`：会话已没有运行中的回合，renderer 把这条放回队列。 */
-export type SteerAgentRunResult =
-  | { status: "accepted"; sessionId: string; agentRunId: string; messageId: string }
-  | { status: "unavailable"; sessionId: string; agentRunId: string; messageId: string }
-  | import("./chat-attachments").RunAgentPreparationFailure;
-
-export type CancelSteerInput = {
-  sessionId: string;
-  messageId: string;
-};
-
-/**
- * `cancelled`：撤回成功；`claimed`：Agent 已经读到，留在对话里；
- * `discarded` / `missing`：运行结束时被丢弃或从未写入，renderer 放回队列。
- */
-export type CancelSteerResult = { status: "cancelled" | "claimed" | "discarded" | "missing" };
-
 export type ApprovalDecideInput =
   | { requestId: string; decision: "once" | "deny" }
   | { requestId: string; decision: "session"; suggestionId: string };
@@ -616,9 +544,7 @@ export type ListVisualizationsResult = {
 /**
  * 按需重建某会话的完整 Context（含各 bucket 的内容预览），供右侧 Context 完整视图实时展示。
  *
- * 持久化的 context-state.json 只在每次 Agent Run 结束时写入，且为控制体积不保存逐条内容预览。
- * 该接口在 main 进程重新装配该会话的 ContextManager（一次性吃完 session.jsonl），
- * 重新算出 systemPrompt / tools / conversation 等 bucket 的预览，不调用 LLM。
+ * Host 根据 Session 请求事实与当前 Surface 生成内容预览，不调用 LLM。
  */
 export type DescribeContextInput = {
   sessionId: string;

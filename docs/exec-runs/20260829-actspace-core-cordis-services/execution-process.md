@@ -26,7 +26,7 @@
 ### 步骤 3：Phase 2
 
 - **操作**：将 JSONL durability 抽成 `SessionPersistence` provider seam；添加 `JsonlSessionPersistenceService` 与 `SessionStoreService`，均由 Cordis Fiber 注册；SessionHandle 增加 post-commit `onEvent` 与 awaited `onFlush`；Runtime session plugin 注入 provider/store，而不是在 controller 内默认创建 JSONL backend；增加 fake provider 和事件边界测试。
-- **影响文件**：`packages/session/persistence/src/session-persistence.ts`、`session-store.ts`、`session.ts`、`plugin.ts`、`index.ts`、`src/test/provider-seam.test.ts`、`src/test/lifecycle.test.ts`、`src/test/persistence.test.ts`、`packages/runtime/src/runtime/session-plugin.ts`、`session-controller.ts`、`packages/runtime/cordis.yml`。
+- **影响文件**：`packages/session/persistence/src/session-persistence.ts`、`session-store.ts`、`session.ts`、`plugin.ts`、`index.ts`、`src/test/provider-seam.test.ts`、`src/test/lifecycle.test.ts`、`src/test/persistence.test.ts`、`packages/runtime/src/session/session-plugin.ts`、`session-controller.ts`、`packages/runtime/cordis.yml`。
 - **决定**：JSONL writer、lease、recovery、projection 算法不改；`SessionStore` 负责 header 校验和 live-log facade，provider 负责文件布局/inspect/open/fork/create；`session/event` 代表已 durable 的事实，`session/flush` 代表可等待 checkpoint。
 - **验证**：`@actspace/session-persistence` typecheck 通过；其 34 个测试通过；`@actspace/session-journal` 9 个测试、`@actspace/session-jsonl` 1 个测试、`@actspace/session-projection` 1 个测试通过；adapter/test-support 相关检查通过。
 
@@ -40,14 +40,14 @@
 ### 步骤 5：Phase 4
 
 - **操作**：把 AgentRegistry、AgentLoop driver 和 AgentRuntime 的 ownership 迁入真实 Cordis Service；Service 内部继续复用已有 Registry、durable followup、RunController 和 OneShotSubagentProvider，并将 quiesce/dispose drain 统一挂到 Fiber effect。补充 Agent 创建失败回滚、two-agent scope 隔离、observer failure 隔离和依赖环 negative contract，并同步更新 manifest 的 canonical service contributions。
-- **影响文件**：`packages/core/agent/src/registry.ts`、`packages/core/agent/src/plugin.ts`、`packages/core/agent/src/manifest.ts`、`packages/core/agent/src/test/lifecycle.test.ts`、`packages/core/agent-loop/src/service.ts`、`packages/core/agent-loop/src/plugin.ts`、`packages/core/agent-loop/src/manifest.ts`、`packages/core/agent-loop/src/test/lifecycle.test.ts`、`packages/runtime/src/runtime/agent-runtime-plugin.ts`、`packages/runtime/src/runtime/agent-runtime-lifecycle.test.ts`、`packages/compaction/src/manifest.ts`。
+- **影响文件**：`packages/core/agent/src/registry.ts`、`packages/core/agent/src/plugin.ts`、`packages/core/agent/src/manifest.ts`、`packages/core/agent/src/test/lifecycle.test.ts`、`packages/core/agent-loop/src/service.ts`、`packages/core/agent-loop/src/plugin.ts`、`packages/core/agent-loop/src/manifest.ts`、`packages/core/agent-loop/src/test/lifecycle.test.ts`、`packages/runtime/src/harness/agent-runtime-plugin.ts`、`packages/runtime/src/harness/agent-runtime-lifecycle.test.ts`、`packages/compaction/src/manifest.ts`。
 - **决定**：Registry、Loop driver、AgentRuntime 分别只有一个 Cordis owner；`AgentLoopService`/`RunController`/`OneShotSubagentProvider` 的行为算法不重写。当前 `agent-factory-plugin` 和 legacy boot 仍保留显式组装，待本阶段完成事务/依赖收敛后在 Phase 5 清理默认路径。
 - **验证**：`@actspace/core-agent` typecheck/test 通过（6 tests）；`@actspace/core-agent-loop` typecheck/test 通过（4 tests）；`@actspace/runtime` typecheck/test 通过（4 tests）；adapter dependency-cycle contract 通过（19 tests，1 skip）。
 
 ### 步骤 6：Phase 5
 
 - **操作**：收缩默认 DSH Boot 的 shutdown ownership：RuntimeHandle 不再直接调用 `agentRuntime.runs.dispose()`，而由 `AgentRuntimeService` 的 Cordis Fiber effect 负责 RunController/子 Agent drain；同步确认 Runtime facade 仍只暴露 Host-neutral service facade。完成 CLI 单次无头 mock run、SIGINT process smoke、CLI package tests 和仓库全量 typecheck/test。
-- **影响文件**：`packages/runtime/src/runtime/boot.ts`、`packages/runtime/src/runtime/index.ts`、本执行记录与摘要。
+- **影响文件**：`packages/runtime/src/startup/boot.ts`、`packages/runtime/src/runtime/index.ts`、本执行记录与摘要。
 - **决定**：默认 `cordis.yml` 路径保持唯一生产入口；legacy/diagnostic boot 仍显式可选，但不再影响默认 shutdown。工具 executor、Session 13 事件、Loop 9 干预和 5 通知均保持既有语义。
 - **验证**：`@actspace/runtime` typecheck/test 通过（4 tests）；`@actspace/runtime` 与 CLI build 通过；CLI package tests 14 passed；CLI process smoke 2 passed；CLI `run --mock --json` 返回 `ok:true`、`status:completed`、1 step、11 durable events；全量 `pnpm -r typecheck` 与 `pnpm -r test` 通过。
 

@@ -26,7 +26,7 @@
 ### 步骤 3：P01/P02 Agent carrier 与生产接线
 
 - **操作**：将 `Agent subject + Scope carrier` fused dispatcher 接入 `AgentLoop` 和 `AgentLoopService` 生命周期通知；为 main Agent 与 one-shot child Agent 生成实例级 subject；普通 child 继续通过 `parentScope.child()` 自动继承父 Scope，并增加显式 `isolatedChild()` flat scope 入口。
-- **影响文件**：`packages/core/scope/src/scope.ts`、`packages/core/agent/src/dispatch.ts`、`packages/core/agent/src/test/dispatch.test.ts`、`packages/core/agent-loop/src/service.ts`、`packages/runtime/src/runtime/run-controller.ts`、`packages/runtime/src/runtime/boot.ts`、`packages/runtime/src/runtime/agent-factory-plugin.ts`、`packages/subagent/src/provider.ts`。
+- **影响文件**：`packages/core/scope/src/scope.ts`、`packages/core/agent/src/dispatch.ts`、`packages/core/agent/src/test/dispatch.test.ts`、`packages/core/agent-loop/src/service.ts`、`packages/runtime/src/runtime/run-controller.ts`、`packages/runtime/src/startup/boot.ts`、`packages/runtime/src/harness/agent-factory-plugin.ts`、`packages/subagent/src/provider.ts`。
 - **决定**：生命周期通知不再以 `{ agentId }` carrier 作为 live routing identity，而是复用 assembly 的 subject 与 opaque scope carrier；descriptor/preset id 仅保留在 subject/诊断字段中。`scopeOf()` 使用模块私有 tag，避免把可伪造的字符串字段当作 live scope。
 - **验证**：Scope 18、Agent 11、Agent Loop 4、Subagent 6 项测试通过；Scope、Agent、Agent Loop、Subagent、Runtime typecheck/build 通过。
 

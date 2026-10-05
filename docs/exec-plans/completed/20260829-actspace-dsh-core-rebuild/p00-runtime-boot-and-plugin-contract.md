@@ -6,7 +6,7 @@
 
 把当前手工 `root.mount`/`activateBehavior` 启动改造成 DSH-native 的可信同进程 Boot：Host 准备能力，Boot 创建 root Cordis Context，Loader/Include 读取 `cordis.yml`，Behavior 通过 `apply(ctx, config)` 激活，settlement 成功后才发布 RuntimeHandle。
 
-依赖：无。必须先读 `AGENTS.md`、`docs/REPO_COLLAB_GUIDE.md`、`docs/ARCHITECTURE.md`、`docs/design-docs/core-beliefs.md` 和 [DSH-native 启动规范](../../../design-docs/agent-plugin-runtime/agent-decision-dsh-native-plugin-runtime.md)。Session 13-event 实现和 Tool Runtime 实现不是本包依赖；这里只定义它们被 Context 注入的 seam。
+依赖：无。必须先读 `AGENTS.md`、`docs/REPO_COLLAB_GUIDE.md`、`docs/ARCHITECTURE.md`、`docs/design-docs/core-beliefs.md` 和 [DSH-native 启动规范](../../../design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md)。Session 13-event 实现和 Tool Runtime 实现不是本包依赖；这里只定义它们被 Context 注入的 seam。
 
 ## 文件范围
 
@@ -17,9 +17,9 @@
 - `packages/cordis-adapter/src/cordis-types.ts`
 - `packages/cordis-adapter/src/plugin-contract.ts`
 - `packages/cordis-adapter/src/index.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/runtime/src/runtime/runtime-handle.ts`
-- `packages/runtime/src/runtime/shutdown.ts`
+- `packages/runtime/src/startup/shutdown.ts`
 - `packages/boot/tests/`、`packages/cordis-adapter/tests/`、`packages/runtime/src/test/`
 - 新增一个最小可信 fixture plugin 和对应 `cordis.yml` fixture；不得改 Session 或具体 Tool executor。
 

@@ -115,7 +115,7 @@ T1 → T2 → T3 → T4 → T5 顺序推进；每步测试通过后再继续。�
 
 ### T5：集成检查与记录
 
-检查 `packages/runtime/src/runtime/boot.ts`、`packages/runtime/src/profiles/composition.ts` 不被新增模块改变默认行为。更新 adapter/boot 的公开模块说明及设计决策中的已验证范围，写 history；按学习文档指南判断是否沉淀隔离/生命周期知识。记录修改文件与依赖新增情况。
+检查 `packages/runtime/src/startup/boot.ts`、`packages/runtime/src/profiles/composition.ts` 不被新增模块改变默认行为。更新 adapter/boot 的公开模块说明及设计决策中的已验证范围，写 history；按学习文档指南判断是否沉淀隔离/生命周期知识。记录修改文件与依赖新增情况。
 
 ## 验收矩阵
 

@@ -57,7 +57,7 @@ export class HostRpc {
   async dispatch(method: HostMethod, params: Params, context: HostRequestContext): Promise<unknown> {
     const { application: app, config, approvals, observations, uploads } = this.options;
     const state = this.options.state();
-    const mutating = ["sessions.create", "sessions.fork", "sessions.update", "sessions.compact", "tasks.submit", "uploads.begin", "uploads.write", "uploads.finish", "files.reference"].includes(method)
+    const mutating = ["sessions.create", "sessions.fork", "sessions.update", "tasks.submit", "uploads.begin", "uploads.write", "uploads.finish", "files.reference"].includes(method)
       || (method === "tasks.command" && !["snapshot", "stop", "cancel"].includes(String(params.op)));
     if (state !== "ready" && mutating) throw new HostError(state === "blocked" ? "RECOVERY_BLOCKED" : "MAINTENANCE", "Host is not accepting new work");
     switch (method) {
@@ -108,7 +108,6 @@ export class HostRpc {
         return app.updateSessionMetadata(sessionId, patch as { title?: string | null; pinned?: boolean; archived?: boolean });
       }
       case "sessions.output": fields(params, ["sessionId", "runId", "offset"]); return this.options.output.page(stringParam(params, "sessionId", 128), stringParam(params, "runId", 128), integerParam(params, "offset", Number.MAX_SAFE_INTEGER));
-      case "sessions.compact": fields(params, ["sessionId"]); return app.compactSession(stringParam(params, "sessionId", 128));
       case "tasks.submit": {
         fields(params, ["sessionId", "submissionId", "content", "uploadIds", "fileReferences", "responseAnnotations"]);
         if (typeof params.content !== "string") throw new TypeError("Task content must be text");

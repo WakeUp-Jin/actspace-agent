@@ -63,7 +63,7 @@
 - ActSpace：`packages/cordis-adapter/src/cordis-root.ts`
 - ActSpace：`packages/cordis-adapter/src/behavior-loader.ts`
 - ActSpace：`packages/cordis-adapter/src/plugin-contract.ts`
-- ActSpace：`packages/runtime/src/runtime/boot.ts`
+- ActSpace：`packages/runtime/src/startup/boot.ts`
 - ActSpace：`packages/runtime/src/runtime/run-controller.ts`
 - ActSpace：`packages/runtime/src/runtime/runtime-handle.ts`
 - ActSpace：`packages/core/agent-loop/src/loop.ts`
@@ -181,7 +181,7 @@ flowchart TD
 - `packages/core/agent/src/plugin.ts`
 - `packages/core/scope/src/scope.ts`
 - `packages/runtime/src/runtime/run-controller.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/runtime/src/runtime/runtime-handle.ts`
 - `packages/core/agent-loop/src/test/service.test.ts`（新增）
 - `packages/core/agent-loop/src/test/scope-isolation.test.ts`（新增）
@@ -213,7 +213,7 @@ flowchart TD
 - `packages/core/agent-loop/src/loop.ts`
 - `packages/cordis-adapter/src/event-contract.ts`、`dispatch.ts`（仅保留 Cordis typed event contract 与真实 Context dispatch helper；不再存在自定义事件总线）
 - `packages/session/persistence/src/session.ts`
-- `packages/runtime/src/runtime/session-controller.ts`
+- `packages/runtime/src/session/session-controller.ts`
 - `packages/runtime/src/runtime/runtime-handle.ts`
 - `packages/tools/runtime/src/prepared-execution.ts`
 - `packages/core/agent-loop/src/test/followup.test.ts`（新增）
@@ -247,7 +247,7 @@ flowchart TD
 - `apps/cli/src/runtime-v2/run.ts`
 - `apps/cli/src/runtime-v2/loader.ts`
 - `apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/runtime/src/runtime/runtime-handle.ts`
 - `packages/runtime/src/profiles/*.bundle.ts`
 - `apps/cli/src/test/runtime-v2.test.ts`

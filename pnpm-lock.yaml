@@ -334,6 +334,9 @@ importers:
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../llm/service
+      '@actspace/session-jsonl':
+        specifier: workspace:*
+        version: link:../session/jsonl
       '@actspace/session-persistence':
         specifier: workspace:*
         version: link:../session/persistence
@@ -411,6 +414,9 @@ importers:
       '@actspace/composition':
         specifier: workspace:*
         version: link:../composition
+      '@actspace/session-jsonl':
+        specifier: workspace:*
+        version: link:../session/jsonl
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -778,6 +784,9 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
+      '@actspace/session-jsonl':
+        specifier: workspace:*
+        version: link:../session/jsonl
       '@actspace/session-persistence':
         specifier: workspace:*
         version: link:../session/persistence
@@ -1018,6 +1027,9 @@ importers:
         specifier: workspace:*
         version: link:../tools/web-tools
     devDependencies:
+      '@actspace/session-storage':
+        specifier: workspace:*
+        version: link:../session/storage
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -1077,6 +1089,9 @@ importers:
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../journal
+      '@actspace/session-storage':
+        specifier: workspace:*
+        version: link:../storage
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../shared
@@ -1099,16 +1114,16 @@ importers:
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../journal
-      '@actspace/session-jsonl':
+      '@actspace/session-storage':
         specifier: workspace:*
-        version: link:../jsonl
-      '@actspace/session-projection':
-        specifier: workspace:*
-        version: link:../projection
+        version: link:../storage
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../shared
     devDependencies:
+      '@actspace/session-jsonl':
+        specifier: workspace:*
+        version: link:../jsonl
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -1149,9 +1164,28 @@ importers:
       '@actspace/session-projection':
         specifier: workspace:*
         version: link:../projection
+      '@actspace/session-storage':
+        specifier: workspace:*
+        version: link:../storage
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/storage:
+    dependencies:
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../journal
     devDependencies:
       '@types/node':
         specifier: ^24.0.3

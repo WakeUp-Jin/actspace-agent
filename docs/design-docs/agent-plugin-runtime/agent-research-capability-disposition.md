@@ -1,5 +1,8 @@
 # ActSpace v2 能力去留研究
 
+> 历史研究快照：用于理解当时取舍；其中路径、包名和迁移建议不代表当前实现。当前入口见[总览](agent-target-overall-architecture.md)和[启动追踪](agent-spec-dsh-plugin-assembly-and-agent-startup.md)。
+
+
 > 状态：研究判断，已同步 2026-08-22 确认的去留方向。本文档回答“现有资产怎么处理”，不定义 v2 的最终 API、包结构或迁移步骤。
 >
 > 具体架构所有权以 [v2 已确认决策](./agent-decisions-v2-foundation.md) 为准。

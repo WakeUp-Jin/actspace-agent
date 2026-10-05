@@ -1,34 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { activate, apply, inject } from "../plugin.js";
+import { apply, inject } from "../plugin.js";
 import { CordisContextClass } from "@actspace/cordis-adapter";
 import { createCoreCodecRegistry } from "@actspace/session-journal";
-import { JsonlSessionPersistenceService } from "../session-persistence.js";
+import { MemorySessionStorage } from "@actspace/session-storage/testing";
 import { SessionStoreService } from "../session-store.js";
 
-describe("session persistence plugin", () => {
-  it("publishes lease and recovery service and disposes", async () => {
-    const activation = activate();
-    expect(activation.services?.["session.persistence"]).toBeDefined();
-    await activation.dispose();
-  });
-
-  it("publishes JSONL persistence as a real Cordis Service with injected host/journal", async () => {
-    const ctx = new CordisContextClass();
-    ctx.provide("actspace.host.session", { dataRoot: "/tmp/actspace-session-test", runtimeId: "test" });
-    ctx.provide("session.journal", { registry: createCoreCodecRegistry() });
-    await ctx.plugin({ inject, apply: (inner, config) => apply(inner as never, config as Record<string, unknown>) });
-    expect(ctx.get("session.persistence")).toBeInstanceOf(JsonlSessionPersistenceService);
-    await ctx.fiber.dispose();
-    expect(ctx.get("session.persistence")).toBeUndefined();
-  });
-
-  it("creates SessionStore as a Cordis-owned live-log service over the injected provider", async () => {
-    const ctx = new CordisContextClass();
-    ctx.provide("actspace.host.session", { dataRoot: "/tmp/actspace-session-test", runtimeId: "test" });
-    ctx.provide("session.journal", { registry: createCoreCodecRegistry() });
-    await ctx.plugin({ inject, apply: (inner, config) => apply(inner as never, config as Record<string, unknown>) });
-    await ctx.plugin(SessionStoreService);
+describe("Session business plugin", () => {
+  it("uses the injected storage and withdraws its store on disposal", async () => {
+    const ctx = new CordisContextClass(); const registry = createCoreCodecRegistry();
+    const storage = new MemorySessionStorage(registry);
+    ctx.provide("session.journal", { registry }); ctx.provide("session.storage", storage);
+    await ctx.plugin({ inject, apply: inner => apply(inner as never) });
     expect(ctx.get("session.store")).toBeInstanceOf(SessionStoreService);
-    await ctx.fiber.dispose();
+    expect((ctx.get("session.store") as SessionStoreService).store.storage).toBe(storage);
+    await ctx.fiber.dispose(); expect(ctx.get("session.store")).toBeUndefined();
+    await storage.close();
   });
 });

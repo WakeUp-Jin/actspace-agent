@@ -1,5 +1,7 @@
+import { taskOperation } from "@actspace/shared/runtime-v2";
+import { randomUUID } from "node:crypto";
 import { SessionModeWriter } from "./session-commands.js";
-import type { CordisContext } from "@actspace/cordis-adapter";
+import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { isAbsolute, relative, resolve, sep } from "node:path";
@@ -40,24 +42,15 @@ export type ApplicationSessionService = {
   getOpen(sessionId: string): SessionHandle | undefined;
 };
 
-type RunAssembly = {
-  readonly session: SessionHandle;
-  readonly loop: { readonly active?: boolean; readonly abort: (reason?: string) => boolean };
-  readonly inbox: {
-    readonly enqueue: (content: RuntimeV2JsonValue, target: "next-step" | "next-turn", messageId?: string, source?: "task_notification" | "steer") => Promise<{ readonly messageId: string; readonly target: "next-step" | "next-turn"; readonly enqueuedSeq: number }>;
-    readonly discard: (messageId: string, reason?: string) => Promise<boolean>;
-    readonly status: (messageId: string) => "pending" | "claimed" | "discarded" | null;
-  };
-};
-
 export type ApplicationRunService = {
   readonly service: import("./service.js").AgentService;
-  compact(sessionId: string): Promise<boolean>;
   inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R): R | Promise<R>;
+  configuration(sessionId: string): import("@actspace/shared/runtime-v2").TaskConfiguration;
   configure(sessionId: string, configuration: import("@actspace/shared/runtime-v2").TaskConfiguration): void;
-  attach(session: SessionHandle): Promise<RunAssembly>;
+  initialize(sessionId: string): Promise<void>;
   run(sessionId: string, input: Omit<RuntimeV2RunTurnRequest, "sessionId">): Promise<RuntimeV2RunTurnResponse>;
-  get(sessionId: string): RunAssembly | undefined;
+  isActive(sessionId: string): boolean;
+  abort(sessionId: string): boolean;
   isIdle?: () => boolean;
 };
 
@@ -81,14 +74,8 @@ export type AgentApplicationContract = {
   readonly createMainSession: (sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm) => Promise<RuntimeV2SessionSnapshot>;
   readonly resumeMainSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly forkMainSession: (parentSessionId: string, boundarySeq: number, newSessionId: string) => Promise<RuntimeV2SessionSnapshot>;
-  readonly runTurn: (input: RuntimeV2RunTurnRequest) => Promise<RuntimeV2RunTurnResponse>;
-  readonly enqueueMainMessage: (sessionId: string, content: RuntimeV2JsonValue, target: "next-step" | "next-turn", messageId?: string) => Promise<{ readonly messageId: string; readonly target: "next-step" | "next-turn"; readonly enqueuedSeq: number }>;
-  readonly cancelPendingMessage: (sessionId: string, messageId: string) => Promise<boolean>;
-  readonly steerRun: (sessionId: string, content: RuntimeV2JsonValue, messageId: string) => Promise<{ readonly messageId: string; readonly enqueuedSeq: number }>;
-  readonly cancelSteer: (sessionId: string, messageId: string) => Promise<"cancelled" | "claimed" | "discarded" | "missing">;
   readonly abortRun: (sessionId: string, reason?: string) => boolean;
   readonly isRunActive: (sessionId: string) => boolean;
-  readonly compactSession: (sessionId: string) => Promise<{ readonly compacted: boolean; readonly snapshot: RuntimeV2SessionSnapshot }>;
   readonly flushSession: (sessionId: string) => Promise<void>;
   readonly updateSessionMetadata: (sessionId: string, patch: { readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean }) => Promise<RuntimeV2SessionSnapshot>;
   readonly updateSessionWorkspace: (sessionId: string, workspaceRoot: string) => Promise<RuntimeV2SessionSnapshot>;
@@ -106,7 +93,7 @@ export class AgentApplication implements AgentApplicationContract {
   readonly #manifestDigest: string;
   readonly #modeWriter = new SessionModeWriter();
 
-  constructor(ctx: CordisContext, private readonly source = "application") {
+  constructor(private readonly ctx: CordisContext, private readonly source = "application") {
     this.#sessions = required(ctx, "session.runtime");
     const agentRuntime = required<AgentRuntimeService>(ctx, "agent.runtime");
     this.#runs = agentRuntime.runs;
@@ -118,7 +105,14 @@ export class AgentApplication implements AgentApplicationContract {
   async browserAvailable(): Promise<boolean> {
     return this.#runs.inspectCapability<{ available?: boolean; registrations?: readonly unknown[]; definitions?: readonly unknown[] }, boolean>("tools.browser", browser => browser?.available === true && (browser.registrations?.length ?? 0) > 0 && browser.registrations?.length === browser.definitions?.length);
   }
-  submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) { this.#modeWriter.assertAvailable(sessionId); return this.#runs.service.submit(sessionId, submissionId, content); }
+  async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) {
+    this.#modeWriter.assertAvailable(sessionId);
+    const session = await this.#sessions.resume(sessionId);
+    const model = this.#runs.configuration(sessionId).model;
+    const receipt = await this.#runs.service.submit(sessionId, submissionId, content);
+    if (!taskOperation(content)) emitNotification(this.ctx, "application/run-preparing", { session, input: { sessionId, content, model }, snapshot: this.#sessions.snapshot(session) });
+    return receipt;
+  }
   async taskCommand(input: import("@actspace/shared/runtime-v2").TaskCommand): Promise<import("@actspace/shared/runtime-v2").TaskCommandResult> {
     const service = this.#runs.service;
     try {
@@ -139,7 +133,7 @@ export class AgentApplication implements AgentApplicationContract {
   }
   listSessions() { return this.#sessions.list(); }
   async isIdleForReconfigure(): Promise<boolean> {
-    if (this.hasPendingApplicationWork() || this.#runs.isIdle?.() !== true) return false;
+    if (this.#runs.isIdle?.() !== true) return false;
     if (this.#subagents?.activeCount) return false;
     for (const item of await this.#sessions.list()) {
       const snapshot = await this.#sessions.inspect(item.sessionId);
@@ -159,14 +153,14 @@ export class AgentApplication implements AgentApplicationContract {
 
   async createMainSession(sessionId?: string, workspaceRoot?: string, agentForm: MainAgentForm = "agent"): Promise<RuntimeV2SessionSnapshot> {
     const session = await this.#sessions.create(sessionId, workspaceRoot, agentForm);
-    await this.#runs.attach(session);
+    await this.#runs.initialize(session.header.sessionId);
     return this.#sessions.snapshot(session);
   }
 
   async resumeMainSession(sessionId: string): Promise<RuntimeV2SessionSnapshot> {
     const session = await this.#sessions.resume(sessionId);
     if (session.header.lineage?.origin === "delegation") throw new Error("Child Sessions cannot be resumed through the main application entry.");
-    await this.#runs.attach(session);
+    await this.#runs.initialize(session.header.sessionId);
     return this.#sessions.snapshot(session);
   }
 
@@ -185,30 +179,8 @@ export class AgentApplication implements AgentApplicationContract {
     await fork.close();
     const session = await this.#sessions.resume(newSessionId);
     await session.flush();
-    await this.#runs.attach(session);
+    await this.#runs.initialize(session.header.sessionId);
     return this.#sessions.snapshot(session);
-  }
-
-  async runTurn(input: RuntimeV2RunTurnRequest): Promise<RuntimeV2RunTurnResponse> {
-    this.#modeWriter.assertAvailable(input.sessionId);
-    const session = await this.#sessions.resume(input.sessionId);
-    let snapshot = this.#sessions.snapshot(session);
-    if (input.mode !== undefined && input.mode !== snapshot.agentMode) {
-      if ((snapshot.agentModeRevision ?? 0) !== 0 || snapshot.activity.turnCount !== 0) throw new Error("AGENT_MODE_CONFLICT");
-      snapshot = await this.#runs.service.exclusive(input.sessionId, () => this.#changeAgentMode(session, input.mode!));
-    }
-    this.onRunPreparing(session, input, snapshot);
-    return await this.#runs.run(input.sessionId, {
-      content: input.content,
-      messageId: input.messageId,
-      agentRunId: input.agentRunId,
-      model: input.model,
-      mode: snapshot.agentMode ?? "agent",
-      thinkingEnabled: input.thinkingEnabled,
-      reasoningEffort: input.reasoningEffort,
-      keepPendingOnAbort: input.keepPendingOnAbort,
-      selectedSkillIds: snapshot.agentMode === "chat" ? [] : input.selectedSkillIds,
-    });
   }
 
   async updateSessionAgentMode(sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number): Promise<RuntimeV2SessionSnapshot> {
@@ -227,43 +199,8 @@ export class AgentApplication implements AgentApplicationContract {
     return this.#modeWriter.change(session, mode, value => this.#sessions.snapshot(value), this.source);
   }
 
-  async enqueueMainMessage(sessionId: string, content: RuntimeV2JsonValue, target: "next-step" | "next-turn", messageId?: string) {
-    const session = await this.#sessions.resume(sessionId);
-    const agent = await this.#runs.attach(session);
-    return agent.inbox.enqueue(content, target, messageId);
-  }
-
-  async cancelPendingMessage(sessionId: string, messageId: string) {
-    const session = await this.#sessions.resume(sessionId);
-    return (await this.#runs.attach(session)).inbox.discard(messageId);
-  }
-
-  /** 运行中插入：只写 next-step inbox，由正在运行的 loop 在下一步开头读取。 */
-  async steerRun(sessionId: string, content: RuntimeV2JsonValue, messageId: string) {
-    const assembly = this.#runs.get(sessionId);
-    if (!assembly?.loop.active) throw new Error("STEER_UNAVAILABLE");
-    const item = await assembly.inbox.enqueue(content, "next-step", messageId, "steer");
-    return { messageId: item.messageId, enqueuedSeq: item.enqueuedSeq };
-  }
-
-  async cancelSteer(sessionId: string, messageId: string) {
-    const session = await this.#sessions.resume(sessionId);
-    const inbox = (await this.#runs.attach(session)).inbox;
-    const status = inbox.status(messageId);
-    if (status === "pending") return await inbox.discard(messageId, "steer-cancelled") ? "cancelled" as const : inbox.status(messageId) === "claimed" ? "claimed" as const : "discarded" as const;
-    return status ?? "missing";
-  }
-
-  abortRun(sessionId: string, reason?: string) { return this.#runs.get(sessionId)?.loop.abort(reason) ?? false; }
-  isRunActive(sessionId: string) { return this.#runs.get(sessionId)?.loop.active ?? false; }
-
-  async compactSession(sessionId: string) {
-    const assembly = this.#runs.get(sessionId);
-    if (assembly?.loop.active) throw new Error("Cannot compact a Session while its Agent turn is active.");
-    const session = await this.#sessions.resume(sessionId);
-    const compacted = await this.#runs.compact(sessionId);
-    return Object.freeze({ compacted, snapshot: this.#sessions.snapshot(session) });
-  }
+  abortRun(sessionId: string, _reason?: string) { return this.#runs.abort(sessionId); }
+  isRunActive(sessionId: string) { return this.#runs.isActive(sessionId); }
 
   async flushSession(sessionId: string): Promise<void> {
     const session = this.#sessions.getOpen(sessionId);
@@ -272,7 +209,7 @@ export class AgentApplication implements AgentApplicationContract {
   }
 
   async updateSessionMetadata(sessionId: string, patch: { readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean }) {
-    if (patch.title !== undefined) this.onTitleChanging(sessionId);
+    if (patch.title !== undefined) emitNotification(this.ctx, "application/title-changing", { sessionId });
     const session = await this.#sessions.resume(sessionId);
     const events: SessionEventCandidateV1[] = [];
     if (patch.title !== undefined) events.push(core("session/title-set", { title: patch.title === null ? null : patch.title.trim().slice(0, 160) || null }));
@@ -321,9 +258,6 @@ export class AgentApplication implements AgentApplicationContract {
     return this.#sessions.snapshot(session);
   }
 
-  protected hasPendingApplicationWork(): boolean { return false; }
-  protected onTitleChanging(_sessionId: string): void {}
-  protected onRunPreparing(_session: SessionHandle, _input: RuntimeV2RunTurnRequest, _snapshot: RuntimeV2SessionSnapshot): void {}
   async dispose(): Promise<void> {}
 
 }
@@ -342,3 +276,12 @@ function required<T>(ctx: CordisContext, id: string): T {
 function core(type: string, data: RuntimeV2JsonValue): SessionEventCandidateV1 { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 
 export type DesktopBrowsePage = { deferredToolCalls?: string[]; snapshot: RuntimeV2SessionSnapshot; journal: readonly SessionEventEnvelopeV1[]; history: { before: number | null; throughJournalSeq: number } };
+
+/** Same-process application observations; listeners own any background work. */
+export interface ApplicationEvents {
+  /** @mode emit */
+  "application/run-preparing": (event: { session: SessionHandle; input: RuntimeV2RunTurnRequest; snapshot: RuntimeV2SessionSnapshot }) => void;
+  /** @mode emit */
+  "application/title-changing": (event: { sessionId: string }) => void;
+}
+declare module "@actspace/cordis-adapter" { interface DomainEvents extends ApplicationEvents {} }

@@ -8,21 +8,9 @@ declare global {
       getBootstrapState: () => Promise<import("@actspace/shared").BootstrapState>;
       taskCommand?: (input: import("@actspace/shared/runtime-v2").TaskCommand) => Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>;
       submitTask?: (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult>;
-      runAgent: (
-        input: import("@actspace/shared").RunAgentInput
-      ) => Promise<import("@actspace/shared").AgentRunResult | import("@actspace/shared").RunAgentPreparationFailure>;
-      compactContext: (
-        input: import("@actspace/shared").CompactContextInput
-      ) => Promise<import("@actspace/shared").CompactContextResult>;
       abortAgentRun: (
         input: import("@actspace/shared").AbortAgentRunInput
       ) => Promise<boolean>;
-      steerAgentRun?: (
-        input: import("@actspace/shared").SteerAgentRunInput
-      ) => Promise<import("@actspace/shared").SteerAgentRunResult>;
-      cancelSteer?: (
-        input: import("@actspace/shared").CancelSteerInput
-      ) => Promise<import("@actspace/shared").CancelSteerResult>;
       selectFiles?: (input?: { remote?: boolean }) => Promise<import("@actspace/shared").SelectFilesResult>;
       selectImages?: () => Promise<import("@actspace/shared").SelectImagesResult>;
       importComposerImage?: (

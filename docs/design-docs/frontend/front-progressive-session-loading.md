@@ -3,21 +3,21 @@
 ## 行为
 
 - 文件夹首屏返回最近 10 条未归档会话摘要；Show more 按当前工作区与置顶分组继续取 10 条。列表摘要不携带消息正文。
-- 启动恢复最近更新的可见会话；其余会话点击后读取。首次读取和向上加载按 10 个完整 Runtime turn 分页，包括 turn/start 前由 Inbox claim 产生的用户输入。
+- 启动恢复最近更新的可见会话；其余会话点击后读取。首次读取和向上加载按 20 个完整 Runtime turn 分页，包括 turn/start 前由 Inbox claim 产生的用户输入。
 - 消息列表和正文分别显示加载、错误和重试。历史追加保持滚动锚点；快速切换丢弃过期结果。最近 3 个会话的首屏消息可复用，随后重新验证；已加载的较早消息在当前会话刷新时保留。
 - 较大的工具记录（事件集合或工具投影 JSON 达到 24,000 字符）从浏览页拆开；普通工具先显示已有摘要行，点击原有右侧下拉箭头时读取详情，并保持展开状态；不额外显示“展开完整工具结果”文字入口。加载失败后收起并重新展开可重试。Agent / Explore 直接显示紧凑卡片，点击走已有 child Session 详情面板，不用通用加载按钮替换卡片。完整正文没有被改写或删除。屏幕外回合使用浏览器 content-visibility 减少布局绘制。
 - 轨迹挂载时显式请求，关闭后普通会话刷新不再生成轨迹；使用统计沿用进入设置页面才请求。
 
 ## 派生索引与边界
 
-Runtime 使用 `projection-checkpoint.json` 保存可重建的 Host Registry state、Journal 字节偏移和 Turn/Request/call 索引，替代独立 browse index 与派生消息文件。缓存命中后恢复状态并 replay Journal 尾部，再读取所需事件范围；失效则从 Journal 重建。
+Runtime 的 projection-cache 经 storage 读取完整快照，以后端 identity、会话 revision、codec 和 projection 版本判断复用；revision 变化后重放。Turn/Request/call 索引在内存中派生，不再读取磁盘 checkpoint 或 Journal 字节偏移缓存。浏览分页限制返回的事件范围，不代表后端已经增量读取。
 
 Journal 仍是恢复、模型上下文和完整导出的唯一事实源。浏览页不能用于 Agent resume。完整复制对话走 getSession，不使用当前加载的消息窗口。批量归档工作区先读取完整摘要集，不只归档已显示的 10 条。
 
-旧数据首次读取或缓存失效仍需完整扫描；列表逐会话读取摘要，当前不再使用后台 indexing 状态。这里不承诺超长会话首读的性能上限，需在真实数据上测量。
+当前冷读或 revision 变化仍需完整读取与重放；列表逐会话读取摘要，当前不再使用后台 indexing 状态。这里不承诺超长会话首读的性能上限，需在真实数据上测量。
 
 上下文估算先从完整请求计算，浏览页仅保存紧凑的请求预览和估算结果；不以截短后的预览重新估算 Token。完整 Context 详情仍走现有详情入口。
 
 ## 验证
 
-覆盖摘要 10 条分页、25 回合 10/10/5 页、Inbox 用户消息、并发去重、缓存重启/追加/缺失重建、大工具详情、快速切换、轨迹显式开启和普通消息不请求轨迹。真实 Electron 使用隔离数据验证；当前切换结果和人工边界见[执行摘要](../../exec-runs/20260921-session-projection-cutover/execution-summary.md)。
+旧浏览行为的验收见[原执行摘要](../../exec-runs/20260921-session-projection-cutover/execution-summary.md)，其中磁盘缓存证据不代表当前实现。存储替换后的缓存隔离、revision 失效及当前实机范围见[本轮执行摘要](../../exec-runs/20261004-agent-storage-and-cleanup/execution-summary.md)。

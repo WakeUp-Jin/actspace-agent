@@ -20,7 +20,7 @@ Profile
 
 ## 2. 解决的问题
 
-当前仓库已经有 `@actspace/bundle`、`@actspace/composition` 和 `createDefaultComposition()`，但 Boot 同时看 `ResolvedComposition` 和静态 `cordis.yml`。这会产生“digest、diagnostics 和实际 Loader tree 不一致”的风险，也让 Patch 无法完整表达最终启动事实。
+当前仓库已经有 `@actspace/bundle`、`@actspace/composition` 和 `createProfileComposition()`，但 Boot 同时看 `ResolvedComposition` 和静态 `cordis.yml`。这会产生“digest、diagnostics 和实际 Loader tree 不一致”的风险，也让 Patch 无法完整表达最终启动事实。
 
 P1-C 的目标不是再加一个配置层，而是把现有 Profile/Bundle/Patch 收敛成唯一解析过程，并让所有 Host 消费同一份结果。
 
@@ -179,7 +179,7 @@ Host 消费 Profile Context
   └─ desktop.app：Desktop 会话应用操作
 ```
 
-组合事实保持不可变；启动结果只持有 Context、root、manifest、state/diagnostics、restart 通知与 shutdown，不持有通用 Session/run API。Context 可由受信任的同进程调用方使用，不跨 IPC/renderer。基础 BootedProfile 与生产 BootedRuntimeProfile 的精确差异见 [Runtime 文档](agent-target-runtime-architecture.md)。
+组合事实保持不可变；启动结果只持有 Context、root、manifest、state/diagnostics、restart 通知与 shutdown，不持有通用 Session/run API。Context 可由受信任的同进程调用方使用，不跨 IPC/renderer。唯一生产 BootedRuntimeProfile 的边界见 [Runtime 文档](agent-target-runtime-architecture.md)。
 
 ## 10. 简单 Patch 与组合切换
 
@@ -203,7 +203,7 @@ Host Profile、codec 读取规则或基底服务变化走受控重启和兼容�
 4. 生产默认路径不使用 `serviceValues`、手工 core activation 或第二份插件列表。
 5. `cordis.yml` 的 authoring/transport 角色在文件和 diagnostics 中可识别。
 6. Host 重启边界、失败候选保留原选择、新旧 Run 隔离与最后释放有 contract tests。
-7. CLI 单次无头 `run` 的 boot → followup → flush → dispose 回归通过。
+7. CLI 单次无头 `run` 的 boot → submitTask → Run settlement → flush → dispose 回归通过。
 
 ## 12. 回退和非目标
 
@@ -211,11 +211,11 @@ P1-C 不迁移 Session 数据、不改 Tool executor、不实现 CLI chat、不�
 
 ## 13. 参考
 
-- [DSH 风格 Runtime 插件组装规范](./agent-spec-dsh-runtime-as-plugin-composition.md)
+- [DSH 风格 Runtime 插件组装规范](agent-spec-dsh-plugin-assembly-and-agent-startup.md)
 - [插件 Runtime ABI](./agent-spec-plugin-runtime-abi.md)
 - [核心 Service 分层规范](./agent-spec-service-definition-provider-consumer.md)
 - `packages/bundle/src/index.ts`
 - `packages/composition/src/compose.ts`
 - `packages/runtime/src/profiles/composition.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `apps/cli/src/runtime-v2/host-adapter.ts`

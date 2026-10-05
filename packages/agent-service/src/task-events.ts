@@ -13,7 +13,7 @@ export type TaskEvent = Owned & (
   | { readonly op: "designate"; readonly taskId: string; readonly runId: string | null }
   | { readonly op: "cancel"; readonly taskId: string }
   | { readonly op: "operation-start"; readonly taskId: string }
-  | { readonly op: "operation-finish"; readonly taskId: string; readonly outcome: RunOutcome }
+  | { readonly op: "operation-finish"; readonly taskId: string; readonly outcome: RunOutcome; readonly result?: RuntimeV2JsonValue }
   | { readonly op: "claim"; readonly taskId: string; readonly runId: string }
 );
 export type RunEvent = Owned & (
@@ -53,7 +53,7 @@ export function validateSchedulingEvent(type: string, value: unknown): asserts v
       if (op === "claim" || value.runId !== null) text(value.runId);
       keys = ["taskId", "runId"];
     } else if (op === "cancel" || op === "operation-start") keys = ["taskId"];
-    else if (op === "operation-finish") { if (!["completed", "failed", "cancelled"].includes(String(value.outcome))) invalid(); keys = ["taskId", "outcome"]; }
+    else if (op === "operation-finish") { if (!["completed", "failed", "cancelled"].includes(String(value.outcome))) invalid(); if (value.result !== undefined) snapshotSessionJson(value.result); keys = ["taskId", "outcome", "result"]; }
     else invalid();
   } else if (type === RUN_EVENT) {
     text(value.runId);

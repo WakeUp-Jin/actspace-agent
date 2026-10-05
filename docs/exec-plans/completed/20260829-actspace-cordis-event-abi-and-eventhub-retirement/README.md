@@ -37,7 +37,7 @@
 - [Cordis 原生事件 ABI 与 EventHub 退役规范](../../../design-docs/agent-plugin-runtime/agent-spec-cordis-event-abi-and-eventhub-retirement.md)
 - [Agent Loop Cordis 插入面与通知面](../../../design-docs/agent-plugin-runtime/agent-spec-agent-loop-cordis-surface.md)
 - [DSH 风格 Session 事件模型](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-event-model.md)
-- [DSH 风格 Runtime 插件组装规范](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-runtime-as-plugin-composition.md)
+- [DSH 风格 Runtime 插件组装规范](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md)
 - [Agent 测试策略](../../../design-docs/agent-plugin-runtime/agent-testing.md)
 - `tmp/deepseek-harness/vendor/cordis/src/events.ts`
 - `tmp/deepseek-harness/packages/core/agent/src/dispatch.ts`
@@ -52,8 +52,8 @@
 - `packages/cordis-adapter/src/index.ts`
 - `packages/core/agent-loop/src/loop.ts`
 - `packages/core/agent-loop/src/service.ts`
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/tools/runtime/src/prepared-execution.ts`
 - `packages/headless/src/runner.ts`
 - `packages/headless/src/plugin.ts`

@@ -148,7 +148,7 @@ export class ClientSessionStore {
     if (event.seq <= cell.window.throughJournalSeq) return true;
     if (event.seq !== cell.window.throughJournalSeq + 1 || update.throughJournalSeq !== event.seq) return false;
     const snapshot = cell.snapshot;
-    const transactionBoundary = [...cell.window.events].reverse().find(item => ["compaction/start", "compaction/end", "recovery/start", "recovery/end"].includes(item.type));
+    const transactionBoundary = [...cell.window.events].reverse().find(item => ["compaction/start", "compaction/end", "recovery/start", "recovery/committed"].includes(item.type));
     const pendingTransaction = transactionBoundary?.type.endsWith("/start") === true;
     const node = !pendingTransaction && event.surface?.kind === "append" ? event.surface.node : null;
     const messages = node ? [...snapshot.messages, { kind: node.kind, messageId: node.messageId, content: node.content, ...(node.kind === "tool-result" ? { callId: node.callId } : {}) }] : snapshot.messages;

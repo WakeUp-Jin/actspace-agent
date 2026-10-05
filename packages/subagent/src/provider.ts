@@ -3,7 +3,7 @@ import type { AgentLoop } from "@actspace/core-agent-loop";
 import type { AgentScope } from "@actspace/core-scope";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { SessionStore } from "@actspace/session-persistence";
-import { resolveSessionWorkspaceRoot } from "@actspace/session-jsonl";
+import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
 import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
 import { createChildSession } from "./child-session.js";
 import { publishSubagentTerminal } from "./publication.js";

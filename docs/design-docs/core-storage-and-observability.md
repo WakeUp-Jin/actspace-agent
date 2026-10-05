@@ -35,9 +35,11 @@ Desktop 以这个 canonical root 作为 Electron `userData`，并解析以下根
 
 用户 workspace 与 `dataRoot` 是不同概念。`ACTSPACE_WORKSPACE_ROOT`、识别到的仓库根或 Host 默认目录决定文件工具 workspace；不得把 `userData` 当作代码 workspace。
 
-## Session Journal
+## 存储接口与当前 JSONL 实现
 
-每个持久 Session 的当前布局是：
+Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；创建、读写、列表、恢复、fork 和投影缓存经同一后端。JSONL 的目录、writer lease、fsync 和物理修复归 `@actspace/session-jsonl`。独立内存实现验证契约可替换；SQLite/MySQL 尚未实现，不能由接口存在推导为已支持。详见[存储规范](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
+
+下列是默认 JSONL 后端的物理布局，不是所有后端必须使用的公共格式：
 
 ```text
 <dataRoot>/sessions-v2/<sessionId>/
@@ -172,10 +174,10 @@ Desktop fork 会将该前缀实际引用的附件与工具制品复制为子会�
 
 ## 代码事实入口
 
-- `packages/session/persistence/src/session.ts`：Session layout、flush 与 close；
-- `packages/session/persistence/src/recovery.ts`：中断恢复与 torn-tail repair；
-- `packages/session/persistence/src/writer-lease.ts`：单 writer lease；
-- `packages/runtime/src/runtime/session-controller.ts`：Host-facing Session 操作；
+- `packages/session/persistence/src/session.ts`：Session 业务 handle、flush 与 close；
+- `packages/session/persistence/src/recovery.ts`：语义中断恢复；`packages/session/jsonl/src/repair.ts`：物理 torn-tail repair；
+- `packages/session/jsonl/src/writer-lease.ts`：单 writer lease；
+- `packages/runtime/src/session/session-controller.ts`：Host-facing Session 操作；
 - `packages/runtime/src/projection/durable-session.ts`：durable snapshot；
 - `apps/desktop/src/main/app-paths.ts`：Desktop data / log / tmp root；
 - `packages/runtime/src/projection/durable-session.ts`：Host durable facts、Surface、工具和 request context 派生；`packages/client/src/sessions/`：Client Chat、Trajectory、Tool Card 与 usage selectors；
@@ -183,4 +185,4 @@ Desktop fork 会将该前缀实际引用的附件与工具制品复制为子会�
 
 ## 可重建的会话浏览缓存
 
-Session 目录中的 `projection-checkpoint.json` 和 Journal byte-offset cache 是可删除的投影加速数据，不参与 Agent 恢复、模型上下文或 canonical export。失效或缺失时从 Journal 重建；参见[会话浏览按需加载](frontend/front-progressive-session-loading.md)。
+当前 projection-cache 从 storage 读取完整快照，按后端 identity、会话 revision、codec 和投影版本失效；最多保留 3 项及 16 MiB 序列化估算。已不使用 `projection-checkpoint.json` 或 Journal byte-offset cache；旧文件不参与读取或恢复，亦不在本轮操作用户数据时删除。分页面向展示，不代表底层已经增量读取。

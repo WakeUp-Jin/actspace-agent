@@ -77,16 +77,16 @@ export class CompactionPlugin {
   }
 
   async compact(session: SessionHandle, observer?: CompactionObserver): Promise<boolean> {
-    const region = chooseCompactionRegion(session.projection.surface, this.policy);
+    const region = chooseCompactionRegion(session.journal.surface, this.policy);
     if (region === null) return false;
     const startedAt = Date.now();
     try { observer?.onStarted?.({ entryCount: region.end - region.start }); } catch { /* Observers cannot change compaction. */ }
-    const entries = session.projection.surface.entries.slice(region.start, region.end);
+    const entries = session.journal.surface.entries.slice(region.start, region.end);
     await session.flush();
     const summary = await this.summarizer.summarize(entries, { sessionId: session.header.sessionId });
     const content: RuntimeV2JsonValue = summary.metadata === undefined ? summary.content : { text: summary.content, metadata: summary.metadata };
     const transaction = createCompactionTransaction({
-      surface: session.projection.surface,
+      surface: session.journal.surface,
       start: region.start,
       end: region.end,
       summary: { kind: "user", messageId: `compaction-${randomUUID()}`, content },

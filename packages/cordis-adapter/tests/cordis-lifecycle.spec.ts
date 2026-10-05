@@ -126,3 +126,14 @@ class FakeFiber implements PromiseLike<void> {
   async start() { try { if (Object.keys(this.inject).some((name) => !this.services.has(name))) return; const effect = await this.plugin.apply({ provide: (name, value) => { this.services.set(name, value); } }); if (typeof effect === "function") this.#effect = effect as () => void | Promise<void>; this.state = 2; } catch (error) { this.state = 3; throw error; } }
   async dispose() { if (this.state === 4) return; this.state = 4; await this.#effect?.(); }
 }
+
+it("does not mark a failed root disposal complete and shares concurrent cleanup", async () => {
+  let calls = 0;
+  class RetryingContext extends FakeContext {
+    async dispose() { calls++; if (calls === 1) throw new Error("close failed"); await super.dispose(); }
+  }
+  const root = await createCordisRootWithLoader(async () => ({ Context: RetryingContext }));
+  const results = await Promise.allSettled([root.dispose(), root.dispose()]);
+  expect(results.every(result => result.status === "rejected")).toBe(true); expect(calls).toBe(1);
+  expect(await root.dispose()).toMatchObject({ disposed: true }); await root.dispose(); expect(calls).toBe(2);
+});

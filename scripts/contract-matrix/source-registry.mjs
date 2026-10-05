@@ -1,3 +1,5 @@
+import { HARNESS_EVENT_DECLARATION_PATHS } from "../check-harness-event-contracts.mjs";
+export const DOMAIN_EVENT_PATHS = HARNESS_EVENT_DECLARATION_PATHS.slice(1);
 /**
  * Explicit, reviewable input allowlist for the contract matrix generator.
  * Keep this list small and intentional: the generator must never infer
@@ -21,6 +23,10 @@ export const SERVICE_SOURCE = Object.freeze({
 });
 
 export const MANIFEST_PATHS = Object.freeze([
+  "packages/english-learning/src/manifest.ts",
+  "packages/harness-control/src/manifest.ts",
+  "packages/agent-service/src/manifest.ts",
+  "packages/agent-host/src/manifest.ts",
   "packages/session/checkpoint-policy/src/manifest.ts",
   "packages/compaction/src/manifest.ts",
   "packages/context/src/manifest.ts",
@@ -51,6 +57,9 @@ export const MANIFEST_PATHS = Object.freeze([
 ]);
 
 export const COMPOSITION_SOURCES = Object.freeze([
+  "packages/runtime/src/harness/default-harness.ts",
+  "packages/runtime/src/harness/default-harness-definition.ts",
+  "packages/runtime/cordis.yml",
   "packages/runtime/src/profiles/composition.ts",
   "packages/runtime/src/profiles/base.bundle.ts",
   "packages/runtime/src/profiles/kernel.bundle.ts",
@@ -61,6 +70,13 @@ export const COMPOSITION_SOURCES = Object.freeze([
 ]);
 
 export const PACKAGE_PATHS = Object.freeze([
+  "packages/session/projection-cache/package.json",
+  "packages/session/storage/package.json",
+  "packages/english-learning/package.json",
+  "packages/session/checkpoint-policy/package.json",
+  "packages/harness-control/package.json",
+  "packages/agent-service/package.json",
+  "packages/agent-host/package.json",
   "packages/boot/package.json",
   "packages/bundle/package.json",
   "packages/client/package.json",
@@ -109,7 +125,7 @@ export const VERIFICATION_SOURCES = Object.freeze([
   Object.freeze({ id: "cordis-adapter/event-contract", path: "packages/cordis-adapter/tests/contract.spec.ts", kind: "contract" }),
   Object.freeze({ id: "cordis-adapter/service-contract", path: "packages/cordis-adapter/tests/service-contract.spec.ts", kind: "contract" }),
   Object.freeze({ id: "composition/admission-contract", path: "packages/composition/tests/composition.spec.ts", kind: "contract" }),
-  Object.freeze({ id: "runtime/lifecycle-contract", path: "packages/runtime/src/runtime/agent-runtime-lifecycle.test.ts", kind: "lifecycle" }),
+  Object.freeze({ id: "runtime/lifecycle-contract", path: "packages/runtime/src/harness/agent-runtime-lifecycle.test.ts", kind: "lifecycle" }),
   Object.freeze({ id: "runtime/profile-composition-contract", path: "packages/runtime/src/profiles/composition.test.ts", kind: "contract" }),
   Object.freeze({ id: "desktop-app/lifecycle-contract", path: "packages/desktop-app/src/test/lifecycle.test.ts", kind: "lifecycle" }),
 ]);

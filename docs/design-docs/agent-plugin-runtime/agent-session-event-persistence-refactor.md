@@ -15,12 +15,12 @@
 ## 职责与依赖
 
 ```text
-Loop / Inbox / Todo / 审批 / Subagent
+Loop / TaskLedger / 后台通知 Inbox / Todo / 审批 / Subagent
   -> Session Core.append
   -> Journal 校验、seq、不可变事实
   -> SessionStore 持久化接纳端口 -> coordinator 入队 -> JSONL backend
   -> session/event -> 投影、revision、英语学习观察
-执行边界 -> checkpoint policy -> Session.flush -> session/flush -> 持久化屏障
+执行边界 -> checkpoint policy -> Session.flush -> Provider append/flush 屏障 -> session/flush 通知
 ```
 
 - `session-journal`：纯事件、关系、Surface、重放；不依赖 Cordis 或文件系统。
@@ -72,7 +72,7 @@ Journal 接纳前失败不发布。接纳后必需入队失败保留事实、报
 - agent/pre-step 保存前一步事实；Turn 完成/失败/取消后的 settlement 检查点保存 closers 后再发布持久完成。
 - shutdown 经 Core.close 排空。
 
-实现使用具名且 awaited 的 `session/checkpoint` 必需处理入口，payload 包含 sessionId、throughSeq、reason（before-llm-dispatch/before-tool-body/before-next-step/after-turn-settled）。缺少处理器或处理器失败会阻止 LLM/tool 副作用。`llm/chunk` 只做增量通知，`llm/stream` 继续表示请求干预。
+实现使用显式 awaited 的 `session.checkpoint.flush` Service 入口，payload 包含 sessionId、throughSeq、reason（before-llm-dispatch/before-tool-body/before-next-step/after-turn-settled）。缺少处理器或处理器失败会阻止 LLM/tool 副作用。`llm/chunk` 只做增量通知，`llm/stream` 继续表示请求干预。
 
 保留 agent/request、agent/request-error、工具前后处理等可选干预；默认重试策略仍留在现有运行逻辑。agent/status、agent/error、tools/result 等允许零观察者。通知 failures 有诊断，不增加空处理器。
 

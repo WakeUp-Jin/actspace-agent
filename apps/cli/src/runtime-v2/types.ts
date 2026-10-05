@@ -27,9 +27,9 @@ export type RuntimeV2CliArtifactResult = {
   readonly exitCode: RuntimeV2CliExitCode;
   readonly sessionId: string;
   readonly agentRunId: string;
-  readonly turnId?: string;
-  readonly reason?: "completed" | "aborted" | "failed" | "step-limit" | "concludes-turn";
-  readonly steps?: number;
+  readonly taskId?: string;
+  readonly outcome?: import("@actspace/shared/runtime-v2").RunOutcome;
+  readonly value?: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue;
   readonly finalText: string;
   readonly snapshot?: RuntimeV2SessionSnapshot;
   readonly model?: string;

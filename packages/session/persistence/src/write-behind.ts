@@ -1,6 +1,5 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { SessionError } from "@actspace/session-journal";
-import { encodeRows } from "@actspace/session-jsonl";
 
 export type SessionWriteBehindOptions = {
   readonly write: (events: readonly SessionEventEnvelopeV1[]) => Promise<void>;
@@ -32,15 +31,11 @@ export class SessionWriteBehind {
     return !this.#closed && this.#blocked === undefined;
   }
 
-  get hasWork(): boolean {
-    return this.#pending.length > 0 || this.#active !== undefined;
-  }
-
   enqueue(event: SessionEventEnvelopeV1): void {
     if (this.#closed) throw new SessionError("SESSION_CLOSED", "Session write-behind is closed.");
     if (this.#blocked !== undefined) throw new SessionError("SESSION_DURABILITY_FAILED", "Session writer is blocked after a durability failure.", this.#blocked);
     this.#pending.push(event);
-    this.#pendingBytes += encodeRows([event]).length;
+    this.#pendingBytes += JSON.stringify(event).length;
     if (this.#pending.length >= this.#maxEvents || this.#pendingBytes >= this.#maxBytes) {
       this.#cancelTimer();
       void this.#startBackground();
@@ -60,11 +55,6 @@ export class SessionWriteBehind {
       this.#barrier = undefined;
     });
     return this.#barrier;
-  }
-
-  resumeAfterFailure(): void {
-    if (this.#closed) throw new SessionError("SESSION_CLOSED", "Session write-behind is closed.");
-    this.#blocked = undefined;
   }
 
   async close(): Promise<void> {
@@ -107,7 +97,7 @@ export class SessionWriteBehind {
       .then(() => this.options.write(batch))
       .catch((error: unknown) => {
         this.#pending = batch.concat(this.#pending);
-        this.#pendingBytes = encodeRows(this.#pending).length;
+        this.#pendingBytes = this.#pending.reduce((size, event) => size + JSON.stringify(event).length, 0);
         this.#blocked = error;
         if (background) this.options.reportBackgroundFailure(error);
         throw error;

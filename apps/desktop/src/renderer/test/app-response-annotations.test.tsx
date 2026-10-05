@@ -1,7 +1,9 @@
+import type { FixtureRunInput, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
+import { taskHostFixture } from "./task-host-fixture";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, RunAgentInput, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AppSettings, BootstrapState,  SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
@@ -42,9 +44,10 @@ function createAnsweredSession(sessionId: string): SessionRecord {
   };
 }
 
-function installBridge(runAgent: (input: RunAgentInput) => Promise<unknown>) {
+function installBridge(runAgent: (input: FixtureRunInput) => Promise<unknown>, prepare = false) {
   const records = new Map(Object.keys(TITLES).map((id) => [id, createAnsweredSession(id)] as const));
-  window.actspace = {
+  const execute = vi.fn(runAgent);
+  window.actspace = taskHostFixture({
     getBootstrapState: async () => bootstrapState,
     getSettings: async () => defaultSettings,
     getSessionPage: async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
@@ -57,9 +60,10 @@ function installBridge(runAgent: (input: RunAgentInput) => Promise<unknown>) {
     createSession: async () => records.get("annotated-a"),
     listPendingApprovals: async () => [],
     onAgentStream: () => () => {},
-    runAgent: vi.fn(runAgent),
-  } as unknown as typeof window.actspace;
-  return window.actspace.runAgent as ReturnType<typeof vi.fn>;
+    execute: prepare ? undefined : execute as (input: FixtureRunInput) => Promise<import("@actspace/shared").AgentRunResult>,
+    prepare: prepare ? runAgent : undefined,
+  });
+  return execute;
 }
 
 function renderApp() {
@@ -137,7 +141,7 @@ it("sends an annotation-only message and clears the pill once the run is submitt
 });
 
 it("restores the drafts when main rejects the annotation", async () => {
-  installBridge(async (input) => ({ status: "rejected", sessionId: input.sessionId, agentRunId: input.agentRunId, referenceIssue: { code: "annotation_source_missing", kind: "annotation", index: 0 } }));
+  installBridge(async (input) => ({ status: "submission-failed", acknowledgement: "rejected", message: "Annotation unavailable", referenceIssue: { code: "annotation_source_missing", kind: "annotation", index: 0 } }), true);
   renderApp();
   await selectSession("annotated-a");
   await annotateReply("annotated-a");
@@ -153,7 +157,7 @@ it("restores the drafts when main rejects the annotation", async () => {
 
 it("restores the drafts when sending throws", async () => {
   const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
-  installBridge(async () => { throw new Error("ipc failed"); });
+  installBridge(async () => { throw new Error("ipc failed"); }, true);
   renderApp();
   await selectSession("annotated-a");
   await annotateReply("annotated-a");

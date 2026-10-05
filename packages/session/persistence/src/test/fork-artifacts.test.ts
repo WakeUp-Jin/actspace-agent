@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { createCoreCodecRegistry } from "@actspace/session-journal";
 import { SessionStore } from "../session-store.js";
-import { createJsonlSessionPersistence } from "../session-persistence.js";
+import { JsonlSessionStorage } from "@actspace/session-jsonl";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
@@ -21,7 +21,7 @@ async function fixture() {
     deleteForSession: vi.fn(async (_session: string, id: string) => { copies.delete(id); }),
   };
   const options = { dataRoot, registry, runtimeId: "test", forkArtifacts: artifacts };
-  const persistence = createJsonlSessionPersistence(options);
+  const persistence = new JsonlSessionStorage(options);
   const store = new SessionStore(options, persistence);
   const createdWith = { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest };
   const parent = await store.create({ sessionId: "parent", lineage: null, createdAt: new Date().toISOString(), createdWith });
@@ -73,7 +73,12 @@ it("does not overwrite an existing child or copy artifacts for an invalid bounda
 
 it("rolls back artifacts when publishing the child Journal fails", async () => {
   const f = await fixture(); await f.message("image"); await f.parent.close();
-  vi.spyOn(f.persistence, "create").mockRejectedValueOnce(new Error("disk full"));
+  const create = f.persistence.create.bind(f.persistence);
+  vi.spyOn(f.persistence, "create").mockImplementationOnce(async header => {
+    const handle = await create(header);
+    vi.spyOn(handle, "append").mockRejectedValueOnce(new Error("disk full"));
+    return handle;
+  });
   await expect(f.fork()).rejects.toThrow("disk full");
   expect(f.artifacts.deleteForSession).toHaveBeenCalledWith("child", "child-image");
   expect(f.copies.size).toBe(0);

@@ -16,10 +16,9 @@ describe("Runtime v2 Host parity", () => {
     expect({
       sessionId: cli.sessionId,
       agentRunId: cli.agentRunId,
-      turnId: cli.turnId,
-      reason: cli.reason,
-      steps: cli.steps,
-      finalText: cli.finalText,
+      taskId: cli.taskId,
+      outcome: cli.outcome,
+      value: cli.value,
       snapshot: cli.snapshot,
     }).toEqual(desktop);
     expect(cli.totalUsage).toEqual(desktop.snapshot.usage);
@@ -34,10 +33,9 @@ function response(): RuntimeV2RunTurnResponse {
   return Object.freeze({
     sessionId: "session-1",
     agentRunId: "run-1",
-    turnId: "turn-1",
-    reason: "completed",
-    steps: 1,
-    finalText: "done",
+    taskId: "task-1",
+    outcome: "completed",
+    value: { customResult: true },
     snapshot: Object.freeze({
       kind: "session-snapshot",
       schemaVersion: 1,

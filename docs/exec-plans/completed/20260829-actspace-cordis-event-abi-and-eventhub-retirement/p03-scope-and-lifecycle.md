@@ -11,8 +11,8 @@
 - `packages/core/agent/src/inbox.ts`
 - `packages/core/agent/src/plugin.ts`
 - `packages/core/agent-loop/src/service.ts`
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
+- `packages/runtime/src/startup/boot.ts`
 - 新增 scope isolation、lifecycle disposal tests
 
 ## 具体动作

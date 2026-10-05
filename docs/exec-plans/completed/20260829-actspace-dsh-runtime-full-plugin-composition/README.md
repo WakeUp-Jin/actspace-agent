@@ -2,7 +2,7 @@
 
 状态：已归档；Phase 1–6 自动化实施完成，真实 Desktop/Electron/Chrome 宿主人工验收仍待执行。
 
-本计划执行 [DSH 风格 Runtime 插件组装规范](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-runtime-as-plugin-composition.md)。目标是把当前“Host/Runtime 手工创建领域实例，再由 Cordis 局部接管”的桥接态，迁移为“`cordis.yml`/Bundle/Patch 声明完整 Runtime，Cordis Loader 通过 `apply(ctx, config)` 创建和回收领域服务”。
+本计划执行 [DSH 风格 Runtime 插件组装规范](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md)。目标是把当前“Host/Runtime 手工创建领域实例，再由 Cordis 局部接管”的桥接态，迁移为“`cordis.yml`/Bundle/Patch 声明完整 Runtime，Cordis Loader 通过 `apply(ctx, config)` 创建和回收领域服务”。
 
 本计划消费既有 Session 事件、Agent Loop 插入面和 Tool Runtime 外壳的结果，但不修改既有 `20260829-actspace-dsh-core-rebuild` 计划中的 P00/P04 文件或状态。Session 13 种事件、9 个 AgentLoop 插入点和 5 个通知是本计划的输入契约，不在本计划中重新定义。
 
@@ -76,7 +76,7 @@ boot
 
 ### 目标规范
 
-- `docs/design-docs/agent-plugin-runtime/agent-spec-dsh-runtime-as-plugin-composition.md`
+- `docs/design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md`
 - `docs/design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md`
 - `docs/design-docs/agent-plugin-runtime/agent-spec-dsh-event-model.md`
 - `docs/design-docs/agent-plugin-runtime/agent-spec-agent-loop-cordis-surface.md`
@@ -101,7 +101,7 @@ boot
 - `packages/cordis-adapter/src/behavior-loader.ts`
 - `packages/cordis-adapter/src/events.ts`
 - `packages/boot/src/dsh-boot.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/runtime/src/runtime/run-controller.ts`
 - `packages/runtime/src/runtime/runtime-handle.ts`
 - `packages/runtime/src/profiles/composition.ts`
@@ -180,9 +180,9 @@ Desktop 使用同一组领域插件，通过不同 Host services 和 capability 
 - `packages/boot/src/types.ts`
 - `packages/cordis-adapter/src/cordis-root.ts`
 - `packages/cordis-adapter/src/cordis-types.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/runtime/src/runtime/runtime-handle.ts`
-- `packages/runtime/src/runtime/host-services.ts`（新增）
+- `packages/runtime/src/startup/host-services.ts`（新增）
 - `packages/runtime/src/runtime/runtime-facade.ts`（新增）
 - `packages/boot/tests/`
 - `packages/runtime/src/test/`
@@ -220,7 +220,7 @@ Desktop 使用同一组领域插件，通过不同 Host services 和 capability 
 - `packages/tools/runtime/src/plugin.ts`
 - `packages/tools/core-tools/src/plugin.ts`
 - `packages/tools/browser-tools/src/plugin.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `apps/cli/src/runtime-v2/host-adapter.ts`
 - `apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts`
 - 每个受影响 package 的 `manifest.ts`、`package.json` exports 和 lifecycle tests
@@ -258,7 +258,7 @@ Desktop 使用同一组领域插件，通过不同 Host services 和 capability 
 - `packages/core/agent-loop/src/loop.ts`
 - `packages/subagent/src/plugin.ts`
 - `packages/subagent/src/provider.ts`
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/runtime/src/runtime/run-controller.ts`
 - `packages/runtime/src/runtime/runtime-handle.ts`
 - `packages/core/agent-loop/src/test/`
@@ -354,7 +354,7 @@ Desktop 使用同一组领域插件，通过不同 Host services 和 capability 
 
 允许修改的主要文件：
 
-- `packages/runtime/src/runtime/boot.ts`
+- `packages/runtime/src/startup/boot.ts`
 - `packages/runtime/src/profiles/composition.ts`
 - `packages/cordis-adapter/src/behavior-loader.ts`
 - `packages/cordis-adapter/src/source-loader.ts`

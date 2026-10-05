@@ -93,9 +93,9 @@
 - `packages/tools/todo-tools/src/projection.ts`
 - `packages/core/agent/src/todo.ts`
 - `packages/core/agent/src/todo-tool.ts`
-- `packages/runtime/src/runtime/agent-runtime-plugin.ts`
+- `packages/runtime/src/harness/agent-runtime-plugin.ts`
 - `packages/runtime/src/projection/durable-session.ts`
-- `packages/runtime/src/runtime/session-controller.ts`
+- `packages/runtime/src/session/session-controller.ts`
 - `packages/runtime/cordis.yml`
 - `packages/runtime/src/profiles/base.bundle.ts`
 - `packages/runtime/src/profiles/composition.ts`

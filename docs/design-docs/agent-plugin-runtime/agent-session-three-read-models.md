@@ -49,7 +49,7 @@ Session Event Journal
 flowchart TD
     A[Agent / Tool / Session 操作] --> J[Session Journal<br/>唯一事实源]
     J --> R[SessionReadModel<br/>Host Projection Registry]
-    J --> C[SessionProjectionCache<br/>checkpoint 与事件 offset]
+    J --> C[SessionProjectionCache<br/>内存 checkpoint 与逻辑事件索引]
     C -. 冷读恢复 reducer state .-> R
     R --> S[Session Projection<br/>metadata / todos / usage / stats / context]
     S --> G[GlobalSessionIndex<br/>跨 Session 摘要]
@@ -85,7 +85,7 @@ Usage 仅保留 `projectSessionUsageActivities → UsageSourceCache → projectI
 - `packages/session/journal`：append-only Journal、codec、Surface 和关系验证；
 - `packages/session/persistence`：accepted prefix、durable barrier 和 recovery；
 - `SessionReadModel`：Registry facts、Surface、tools、workspace 和 requestContext；
-- `packages/session/projection-cache/src/journal-cache.ts`：checkpoint、Journal offset、Turn/Request/call 索引；
+- `packages/session/projection-cache/src/journal-cache.ts`：有界内存快照、Turn/Request/call 逻辑索引；
 - `packages/client/src/sessions/`：Chat、Trajectory、Tool Card 和 usage selector。
 
 本轮实现修正了以下边界和语义：
@@ -222,7 +222,7 @@ type SessionObservation = {
 
 Projection 和 window 必须来自同一读取切面。并发 append 时整体重试或明确进入下一次 observation。
 
-Session Projection Cache 保存 reducer state、stateVersion、checkpoint seq、pending transaction 和 Journal offsets。Global Index 保存 summary 与统计 bucket。Window Index 保存 Turn boundary、event offset、call detail offset。三者都可删除，删除后回到 Journal 重建。
+Session Projection Cache 保存 reducer state、stateVersion、checkpoint seq、pending transaction 和逻辑事件索引；Global Session Index 是从所选 Provider 重建的内存摘要；Usage 保持自己的派生缓存。当前冷读与缓存预算见[存储规范](agent-spec-session-core-persistence-separation.md#5-冷读与缓存)，不再读取旧磁盘 checkpoint。
 
 ## 8. 非目标与完成定义
 
@@ -231,7 +231,7 @@ Session Projection Cache 保存 reducer state、stateVersion、checkpoint seq、
 完成条件：
 
 1. 每个完整 Session 领域状态只有一个 canonical fold；
-2. Global Query 和 Usage 正常冷读不逐个扫描所有 Journal；索引删除后才进入重建路径；
+2. Global Session 列表初次从 Provider 枚举并重建摘要，后续复用进程内索引；Usage 另行维护派生缓存，不能据此宣称所有冷读均免扫描；
 3. Session Projection 与 Window Presentation 使用不同 DTO；
 4. Observation 能证明 projection 与 window 的读取切面；
 5. 删除缓存后结果与完整 replay 等价；

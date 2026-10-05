@@ -10,7 +10,7 @@
 
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/exec-plans/completed/20260929-context-compaction-timeline.md`
-- `docs/exec-plans/active/20260930-composer-message-queue.md`
+- `docs/design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md`
 - 两项功能对应的 `docs/exec-runs/` 执行摘要及当前源码。
 
 旧压缩摘要中「压缩期间不能发送」已被后续消息队列实现更新：当前预期是可以排队、不能插入、不能停止压缩。既有测试和浏览器 fixture 截图只作为检查依据，不算本轮 Electron 验收通过。

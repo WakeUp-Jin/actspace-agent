@@ -1,3 +1,5 @@
+import { SessionStore } from "@actspace/session-persistence";
+import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,24 +8,25 @@ import type { CordisContext } from "@actspace/cordis-adapter";
 import { createCoreCodecRegistry } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { DesktopAppService } from "@actspace/desktop-app";
-import { RuntimeSessionController } from "../runtime/session-controller.js";
+import { RuntimeSessionController } from "../session/session-controller.js";
 
 it("owns a Chat fork before first send, publishes changes and releases its writer on shutdown", async () => {
   const root = await mkdtemp(join(tmpdir(), "desktop-fork-"));
-  const sessions = new RuntimeSessionController({ dataRoot: root, runtimeId: "fork-test", registry: createCoreCodecRegistry(), profileId: "test", manifestDigest: "test", plugins: [] });
+  const sessions = new RuntimeSessionController({ dataRoot: root, runtimeId: "fork-test", registry: createCoreCodecRegistry(), profileId: "test", manifestDigest: "test", plugins: [] }, new SessionStore({ registry: createCoreCodecRegistry() }, new JsonlSessionStorage({ dataRoot: root, runtimeId: "fork-test", registry: createCoreCodecRegistry() })));
   const attached = new Map<string, SessionHandle>();
   const runs = {
     inspectCapability: (_name: string, inspect: (service: { hasRunningBackgroundTask: (sessionId: string) => boolean }) => unknown) => inspect({ hasRunningBackgroundTask: sessionId => sessionId === "parent" && backgroundRunning }),
-    service: { exclusive: async (_id: string, operation: () => Promise<unknown>) => operation() },
-    get: () => undefined,
-    attach: async (session: SessionHandle) => { attached.set(session.header.sessionId, session); },
-    run: async (sessionId: string) => {
+    configuration: () => ({}),
+    service: { exclusive: async (_id: string, operation: () => Promise<unknown>) => operation(), submit: async (sessionId: string) => {
       const session = attached.get(sessionId)!;
       expect(await sessions.resume(sessionId)).toBe(session);
       await session.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: "fork replied" }, surface: null });
       await session.flush();
-      return { sessionId, snapshot: sessions.snapshot(session) };
-    },
+      return { task: { taskId: "fork-task" } };
+    } },
+    isActive: () => false,
+    initialize: async (sessionId: string) => { attached.set(sessionId, await sessions.resume(sessionId)); },
+
   };
   let backgroundRunning = false;
   const services = new Map<string, unknown>([["session.runtime", sessions], ["agent.runtime", { runs }], ["compaction.runtime", {}], ["llm.service", {}], ["tools.shell-tools", { hasRunningBackgroundTask: (sessionId: string) => sessionId === "parent" && backgroundRunning }]]);
@@ -46,7 +49,8 @@ it("owns a Chat fork before first send, publishes changes and releases its write
     expect(fork.agentFormId).toBe("actspace.main");
     expect(fork.agentMode).toBe("chat");
     expect(fork.lineage).toMatchObject({ origin: "fork", parentSessionId: "parent" });
-    await expect(app.runTurn({ sessionId: "child", content: "hello", agentRunId: "fork-run" })).resolves.toMatchObject({ snapshot: { metadata: { title: "fork replied" } } });
+    await app.submitTask("child", "fork-run", "hello");
+    expect(await app.inspectSession("child")).toMatchObject({ metadata: { title: "fork replied" } });
     expect(sessions.getOpen("child")).toBe(attached.get("child"));
     expect((await sessions.browseSessions()).items.find(item => item.sessionId === "child")?.metadata.title).toBe("fork replied");
     await sessions.closeAll();

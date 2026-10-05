@@ -1,3 +1,4 @@
+import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { spawn } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,8 +9,8 @@ import { EventCodecRegistry, createCoreCodecRegistry } from "@actspace/session-j
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { SessionJournal } from "@actspace/session-journal";
 import { SessionStore } from "../../session-store.js";
-import { sessionFileLayout } from "../../session.js";
-import { SessionWriterLease } from "../../writer-lease.js";
+import { sessionFileLayout } from "@actspace/session-jsonl";
+import { SessionWriterLease } from "@actspace/session-jsonl";
 
 export const GOLDEN_ACCEPTANCE_CASES = Object.freeze([
   "basic-turn-round-trip",
@@ -94,7 +95,7 @@ describe("Session Format v1 golden acceptance inventory", () => {
   it("allows manifest provenance drift when codecs and behavior remain compatible", async () => {
     const root = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot: root, runtimeId: "runtime-a", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot: root, runtimeId: "runtime-a", registry }));
     const session = await store.create(headerInput(registry, "manifest-drift", "old-manifest"));
     await session.close();
     const reopened = await store.open("manifest-drift");
@@ -142,13 +143,13 @@ describe("Session Format v1 golden acceptance inventory", () => {
   it("keeps canonical bytes raw and rejects v1 or secret-bearing input", async () => {
     const root = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ dataRoot: root, runtimeId: "runtime-a", registry });
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot: root, runtimeId: "runtime-a", registry }));
     await mkdir(join(root, "sessions", "legacy"), { recursive: true });
     await expect(store.inspect("legacy")).rejects.toThrow();
     const session = await store.create(headerInput(registry, "canonical"));
     await expect(session.append(candidate("user/message", { messageId: "secret", apiKey: "CANARY_SECRET" }))).rejects.toThrow("apiKey");
     await session.close();
-    const bytes = await readFile(session.layout.journalPath);
+    const bytes = await readFile(sessionFileLayout(root, session.header.sessionId).journalPath);
     expect(bytes.includes(Buffer.from("CANARY_SECRET"))).toBe(false);
     expect(bytes.at(-1)).toBe(0x0a);
     expect(bytes.subarray(0, 1).toString()).toBe("{");

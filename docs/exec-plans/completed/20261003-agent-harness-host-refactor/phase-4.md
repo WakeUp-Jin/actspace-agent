@@ -25,7 +25,7 @@
 | apps/cli/src/runtime-v2/{host-adapter,tool-host-services,llm-adapter,artifact-store}.ts | 复用无 Electron 的能力装配；提取共同 Node Host 能力，CLI 不成为服务端依赖 |
 | packages/client/src/sessions/ | 保留投影与展示状态；增加薄 transport/client 子入口，不放运行调度 |
 | apps/desktop/src/main/{composer-attachment-service, runtime-v2/artifact-store}.ts | 复用格式、所有权、完整性与 realpath 检查，远端上传不得传本机绝对路径 |
-| packages/runtime/src/runtime/boot.ts、src/profiles/ | 一个进程一个 Cordis root；增加独立 Host 组合，不在 Desktop 内为每台服务器 boot Runtime |
+| packages/runtime/src/startup/boot.ts、src/profiles/ | 一个进程一个 Cordis root；增加独立 Host 组合，不在 Desktop 内为每台服务器 boot Runtime |
 
 本阶段涉及超过 8 个文件并增加一个 Host 接入服务，属于跨包架构改造。模块数由职责决定；不把网络、认证、调度和界面合进一个总管理器。
 

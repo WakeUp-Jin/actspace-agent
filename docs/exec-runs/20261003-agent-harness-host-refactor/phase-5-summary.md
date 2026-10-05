@@ -1,6 +1,6 @@
 # P5 执行摘要
 
-状态：**P5 计划范围已完成并签收，2026-10-04。** 开发与自动化验证通过，U1–U9 由前两轮覆盖；B1/B2 修复经 gpt-6.1-sol 真实 Electron 定向复验通过，B3 误报已撤回并以不同配置实机校准。见 [第三轮报告](phase-5-cu-round3.md)。整计划已归档至 completed；未 commit/push。
+状态：**P5 计划范围已完成并签收，2026-10-04。** 开发与自动化验证通过，U1–U9 由前两轮覆盖；B1/B2 修复经 gpt-6.1-sol 真实 Electron 定向复验通过，B3 误报已撤回并以不同配置实机校准。见 [第三轮报告](execution-summary.md)。整计划已归档至 completed；未 commit/push。
 
 ## 核心结果
 

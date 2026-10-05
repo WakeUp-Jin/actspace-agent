@@ -1,6 +1,8 @@
+import { taskHostFixture, type FixtureRunInput } from "../src/renderer/test/task-host-fixture";
+import { recordProjectionFixture } from "../src/renderer/test/projection-fixture";
 import React from "react";
 import { createRoot } from "react-dom/client";
-import type { AgentRunResult, AppSettings, BootstrapState, CompactContextInput, ReviewGetSnapshotResult, RunAgentInput, RuntimeStreamEvent, SessionEvent, SessionRecord } from "@actspace/shared";
+import type { AgentRunResult, AppSettings, BootstrapState, ReviewGetSnapshotResult, RuntimeStreamEvent, SessionEvent, SessionRecord } from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../src/renderer/App";
 import { TooltipProvider } from "../src/renderer/components/ui/Tooltip";
@@ -56,19 +58,6 @@ const settingsApiStub = {
     ok: true,
     alreadyRepository: true,
     workspaceRoot: "/tmp/workspace",
-  }),
-  compactContext: async (input: CompactContextInput) => ({
-    sessionId: input.sessionId,
-    agentRunId: input.agentRunId,
-    status: "skipped" as const,
-    events: [],
-    contextSnapshot: {
-      totalTokens: 0,
-      maxTokens: 200_000,
-      percentUsed: 0,
-      buckets: [],
-    },
-    contextState: null,
   }),
   listWorkspaceDir: async () => ({ root: "/tmp/workspace", relativePath: "", entries: [] }),
   readWorkspaceFile: async () => ({ relativePath: "", renderKind: "text" as const, size: 0, mtimeMs: 0, content: "" }),
@@ -140,21 +129,22 @@ const records = new Map(["a", "b"].map(id => [id, {
   events: [], messageBlocks: [], contextSnapshot: null,
 }] as [string, SessionRecord]));
 let emit: (event: RuntimeStreamEvent) => void = () => {};
-const runs = new Map<string, { input: RunAgentInput; resolve: (result: AgentRunResult) => void; count: number }>();
-window.actspace = {
+const runs = new Map<string, { input: FixtureRunInput; resolve: (result: AgentRunResult) => void; count: number }>();
+window.actspace = taskHostFixture({
   ...settingsApiStub,
   getBootstrapState: async () => bootstrapState,
   listSessions: async () => [...records.values()].map(r => ({ id: r.meta.id, title: r.meta.title, updatedAt: r.meta.updatedAt, agentRunCount: r.meta.agentRunCount })),
+  getSessionPage: async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
   getSession: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
   listPendingApprovals: async () => [],
   onAgentStream: (callback: typeof emit) => { emit = callback; return () => {}; },
   abortAgentRun: async ({ sessionId }: { sessionId: string }) => { finish(sessionId, true); return true; },
-  runAgent: (input: RunAgentInput) => new Promise<AgentRunResult>(resolve => {
+  execute: (input: FixtureRunInput) => new Promise<AgentRunResult>(resolve => {
     runs.set(input.sessionId, { input, resolve, count: 0 });
     emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
     advance(input.sessionId);
   }),
-} as unknown as Window["actspace"];
+});
 function advance(sessionId: string) {
   const run = runs.get(sessionId);
   if (!run) return;

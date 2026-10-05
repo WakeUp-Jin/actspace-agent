@@ -1,6 +1,6 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { SessionInspection } from "@actspace/session-jsonl";
+import type { SessionInspection } from "@actspace/session-persistence";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { SessionStore } from "@actspace/session-persistence";
 import type { SubagentTerminalResult } from "./terminal-result.js";
@@ -23,7 +23,7 @@ export async function repairSubagentPublications(options: {
     if (sessionId === options.parent.header.sessionId) continue;
     const inspection = await options.store.inspect(sessionId).catch(() => null);
     if (inspection?.header?.lineage?.origin !== "delegation" || inspection.header.lineage.parentSessionId !== options.parent.header.sessionId) continue;
-    if (inspection.validation === null || inspection.tornTail !== null || (inspection.accessState !== "read-write" && inspection.accessState !== "degraded")) continue;
+    if (inspection.validation === null || inspection.integrity !== "complete" || (inspection.accessState !== "read-write" && inspection.accessState !== "degraded")) continue;
     const event = [...inspection.events].reverse().find((candidate) => candidate.type === CHILD_TERMINAL);
     if (event === undefined) continue;
     const data = decodeTerminal(event.data);

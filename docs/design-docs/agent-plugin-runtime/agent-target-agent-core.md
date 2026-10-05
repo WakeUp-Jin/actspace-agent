@@ -28,7 +28,8 @@ ActSpace Trusted Boot
   - Root Context / ResolvedComposition manifest
   - Loader settlement / Startup Validation
   - Diagnostics / shutdown
-  - Profile lifecycle / App Service boundary
+  - Host lifecycle / App Service boundary
+  - TaskLedger / Run scheduling / Harness lease
 
 ActSpace Core Primitives and Providers
   - Scope primitive / scope-aware registry rules
@@ -51,7 +52,7 @@ Trusted Boot 不提供具体工具、Provider、Prompt 或产品工作流，也�
 | System Prompt | section、动态 context、tool schema 的确定性组装 | Conversation 所有权和 secret 解析 |
 | Tool Runtime | definition registry、参数验证、策略、审批 seam、prepared execution lease、staged execution、结果归一化 | 具体 Desktop preview、v1 autonomous 分支、静态全局注册 |
 | LLM | 稳定 Message/Stream/Failure/Usage 契约、Provider registry、one-shot PreparedCall | Provider SDK 类型泄漏和 Session 持久化 |
-| Agent Registry | unpublished setup、live identity、main Agent durable Inbox、create/resume/dispose | 默认 Loop 的具体 Turn/Step 算法 |
+| Agent Registry | unpublished setup、live identity、live identity、父子 Scope 和资源登记 | 默认 Loop 的具体 Turn/Step 算法 |
 | Agent Loop | Turn/Step 驱动、请求组装、工具调度、终止和恢复事实 | Host UI、stdout、进程退出和物理存储编码 |
 
 ## 4. 必须保留的行为不变量
@@ -114,25 +115,6 @@ Tool call 在参数物化、policy、approval、body dispatch 和 result finaliz
 
 插件卸载或 Runtime shutdown 遇到 in-flight call 时，只能按契约等待完成、协作取消并写入终止事实，或拒绝开始新调用；不能让旧定义通过审批后由新注册的 body 执行。最终 lease 类型名和超时数值可以在 execution plan 中细化。
 
-## 5. 现有资产如何进入新 Core
-
-“保留工具实现”只覆盖这些资产：
-
-- executor 的核心算法；
-- 外部命令、HTTP、socket 和文件协议；
-- 路径、防误写、输出上限、脱敏和错误分类；
-- 经过验证的行为测试与 fixtures。
-
-以下旧边界明确不保留：
-
-- 集中式 `createToolManager()` 枚举；
-- 旧 `ToolManager` / `ToolScheduler` 所有权结构；
-- `ToolResult` 中的 SessionEvent、v1 autonomous 字段、Desktop preview 和 provider runtime bag；
-- 旧 bridge 从可变 messages 反向生成 Session events；
-- 工具对 Desktop approval UI 或 renderer component 的直接知识。
-
-Browser Bridge 作为 Host capability 保留；Agent/Explore、Todo 等复合工具需要按新 Session、Scope 和 Agent seam 重写，不能按普通 executor 搬迁。
-
 ## 6. ContextManager 的替代
 
 旧 ContextManager 同时拥有 conversation、Prompt、Tools、压缩和 usage，形成运行期 messages 与持久 SessionEvent 两套真相。v2 不保留该所有权模型。
@@ -150,32 +132,6 @@ Browser Bridge 作为 Host capability 保留；Agent/Explore、Todo 等复合工
 
 Context 仍可以是一个领域概念，但不能再拥有独立、可变且未持久化的 conversation 真相。
 
-## 7. v2 完整 Agent 产品范围
-
-v2 的一次完整切换必须同时提供：
-
-- main Agent 与默认 Agent Loop；
-- 现有 `Agent` / `Explore` 能力的重写；
-- 一个统一的 synchronous one-shot Subagent seam；
-- 启动时解析的静态 Agent Preset descriptor；
-- 独立 child Session、parent lineage、受限 Scope、工具子集、级联取消和结构化结果；
-- Todo durable events、Skills、Compaction 和全部确认保留的工具；
-- Desktop 与 CLI run 复用领域语义，各自通过 App Service / runner 消费稳定投影。
-
-`Agent` 与 `Explore` 不是两套子代理内核：它们是同一个 one-shot Subagent provider 的不同静态 descriptor。Explore 默认只获得只读探索工具；通用 Agent 获得由父 Scope 和 Host ceiling 共同限制的工具子集。
-
-v2 明确不实现：
-
-- generic Workflow engine；
-- detached / background / continuable subagent；
-- continuation queue、跨进程 child activation 恢复或 child 多次续跑；
-- Preset StandingMount、旧 preset generation 保留或 live preset reload；
-- Agent Room / Team 等更高层产品协作形态的 v2 重写。
-
-这些能力未来可以基于稳定的 Agent、Session 和 Scope 契约另立设计，但不能成为 v2 完整交付无限延期的隐含范围。
-
-详细契约见 [Agent 与 Subagent 公共契约](./agent-spec-agent-and-subagent.md)。
-
 ## 8. Tool 与 Prompt 公共顺序
 
 Tool Runtime 固定遵循：捕获 registration、参数验证、pre-policy、Host approval、不可绕过 guard、durability checkpoint、body、post/finalizer、按模型顺序提交 Journal。普通 waterfall hook 不能绕过 Session admission、approval outcome、checkpoint 或 invariant validator。
@@ -187,29 +143,6 @@ Prompt / Context Contributor 固定按 composition layer、numeric order、stabl
 - [Tool Runtime 公共契约](./agent-spec-tool-runtime-abi.md)；
 - [Prompt 与 Context Contributor 公共契约](./agent-spec-prompt-context-contributors.md)。
 
-## 9. Package 策略
+## 模块导航
 
-ActSpace v2 采用 DSH 风格的领域包结构，但不复制 DSH 的 `vendor/`，也不建立一个承载全部实现的单一 ESM Runtime Core package。
-
-固定分组为：
-
-- Harness 基座：`cordis-adapter`、`boot`、`bundle`、`composition`、`diagnostics` 和薄 `runtime` facade；
-- Agent 核心语义：`core`、`session`、`llm`、`context`、`prompt`、`tools`、`subagent`、`compaction`；
-- Host / 展示边界：`host`、`client`、`shared`；
-- 测试与通用基础设施：`test-support`、`util`。
-
-不建立通用 `plugins/` 目录。每个可装载、可替换或可独立验证的领域包都是真实 workspace package，并通过独立的 Static Manifest、Codec Entry（如需要）和 Behavior Entry 参与 Cordis Loader。Session、LLM、Prompt、Agent Loop 是默认 Profile 中的核心语义插件，不属于插件系统之外的特殊代码。
-
-具体工具按 `tools/filesystem-read`、`tools/browser-tools` 等领域包组织；Browser Bridge 作为独立 Host capability 放在顶层 `browser-bridge/`，不作为同进程 TypeScript 插件伪装接入。
-
-详细目录、manifest、codec、behavior、依赖和迁移规则见 [包结构与真实插件包规范](./agent-spec-package-layout-and-plugin-packaging.md)。
-
-## 10. 实施时细化
-
-以下内容可以在 execution plan 中选择具体机械表达，但不得改变上文语义：
-
-- Agent Registry、Scope、Inbox 和 Subagent 接口的精确 TypeScript 方法名；
-- internal event carrier 和 layered registry 的数据结构；
-- lease timeout、协作取消和 forced shutdown 的具体数值；
-- 各领域 package 的精确 npm 名称、版本策略和最终字段命名；
-- cache、projection checkpoint 和内部测试 fixture 的文件布局。
+当前目录与包规则见[包规范](agent-spec-package-layout-and-plugin-packaging.md)。Host/Harness/Run 组合与生命周期见[重构决定](agent-harness-host-refactor-decisions.md)，完整生产链见[启动链](agent-spec-dsh-plugin-assembly-and-agent-startup.md)。不再重复未来包清单或旧迁移步骤。

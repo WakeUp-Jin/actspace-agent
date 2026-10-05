@@ -12,8 +12,8 @@
 - 修改 `packages/cordis-adapter/src/cordis-root.ts`
 - 修改 `packages/core/agent-loop/src/loop.ts`
 - 修改 `packages/core/agent-loop/src/service.ts`
-- 修改 `packages/runtime/src/runtime/agent-factory-plugin.ts`
-- 修改 `packages/runtime/src/runtime/boot.ts`
+- 修改 `packages/runtime/src/harness/agent-factory-plugin.ts`
+- 修改 `packages/runtime/src/startup/boot.ts`
 - 修改 `packages/tools/runtime/src/prepared-execution.ts`
 - 修改 `packages/headless/src/runner.ts`
 - 修改 `packages/headless/src/plugin.ts`

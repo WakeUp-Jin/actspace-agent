@@ -1,200 +1,63 @@
-# Session Core 与 Persistence Provider 分离规范
+# Session 业务与存储后端边界
 
-> 2026-09-20 更新：[Session 事件持久化重构](agent-session-event-persistence-refactor.md)已完成行为切换：write-behind 由 coordinator 持有，Session 暴露 accepted/durable 进度，Loop 使用必需 checkpoint。物理 `@actspace/session-core` 包拆分仍由 P1-A 继续。
+本规范描述当前实现。它替代早期新增 `session-core` 包、将 write-behind 放进 JSONL Provider 的方案。实施及验收进度见[第二轮清理计划](../../exec-plans/active/20261004-agent-storage-and-cleanup/README.md)；接口落地不等于整个清理计划或应用验收已完成。
 
+## 1. 依赖与所有权
 
-> 状态：目标设计已确认；P1-A contract slice 已实施，CLI persist/resume 与全量迁移仍由 G1 收口。
->
-> 本规范承接 P0 已冻结的 13 种 Session 核心事件、Journal replay、`session/event`、`session/flush` 和现有 JSONL 行为。它只重新划分所有权，不改变事件名称、顺序、恢复语义或具体工具 executor。
+| 模块 | 职责 |
+| --- | --- |
+| `@actspace/session-journal` | 事件、Codec、顺序和关系校验、Surface、语义 replay |
+| `@actspace/session-storage` | 不含文件路径的存储契约；提供一致快照、写入所有权与持久化屏障 |
+| `@actspace/session-persistence` | SessionStore、Handle、Coordinator、write-behind、业务恢复和 fork；显式注入存储 |
+| `@actspace/session-jsonl` | JSONL 生产实现；文件布局、writer、fsync、文件租约和物理修复 |
+| `@actspace/session-projection` | 投影注册、fold、checkpoint；不持有存储 |
+| `@actspace/session-projection-cache` | 通过存储契约重建冷读投影、分页和工具索引 |
+| `runtime/session` | 把 Session 业务接入 Host 的会话列表、观察、导出及生命周期 |
 
-## 1. 决策
+名称暂保留 `session-persistence`，避免仅为命名迁移全部消费者；它是 Session 业务实现，并非 JSONL 的别名。业务包的生产依赖不包含 JSONL。后端实现不反向依赖 SessionStore。
 
-ActSpace 将 Session 拆为四个可独立替换的层：
+Host Cordis 树装配：`session.journal` → `session.storage` → `session.store` → `session.runtime`。实际 JSONL Service 同时注入 Host 数据根目录与 Journal registry。替换 Harness 不会替换或关闭存储 Provider。
 
-```text
-Session Journal
-  └─ 事件 Envelope、Codec、关系校验、Surface、Replay
+## 2. 公共存储契约
 
-Session Core
-  └─ live Session、SessionStore、append、通知、运行时生命周期
+以 `packages/session/storage/src/index.ts` 为接口来源：
 
-Persistence Definition
-  └─ backend-neutral 的 create/load/append/flush/inspect/fork contract
+- Provider：`identity`、`inspect(sessionId)`、`listSessionIds()`、`create(header)`、`open(sessionId, access)`、`discard(handle)`、`close()`。
+- 会话 Handle：`header`、`access`、`read()`、`append(events)`、`flush()`、`assertOwned()`、`close()`。
+- 快照：`revision`、`header`、`events`、`integrity`、可选 `problem`。
 
-Persistence Provider
-  └─ JSONL 文件、writer lease、write-behind、torn-tail、物理 recovery
-```
+`inspect` 一次返回快照和 revision，不另造一次 stat 后再 read 的公共时序。revision 是不透明值，只能在同一 Provider identity、同一 Session 下比较；调用者不得解释为文件偏移或数据库版本号。
 
-唯一事实源仍然是 Session Journal。物理 backend 只保存和读取已验证的事件，不拥有 Agent、Prompt、Tool 或 UI 语义。
+`create` 不覆盖已有会话。读 Handle 固定创建时的快照，不阻塞 writer；写 Handle 独占所有权。`discard` 只接受本 Provider 当前持有的写 Handle，用于创建或 fork 失败清理，不是任意会话删除 API。JSONL 在租约内先移走目录，再释放和清理，避免误删同 ID 的后来创建者。
 
-## 2. 为什么现在做
+公开接口不含文件路径、字节偏移、锁文件、SQL 查询或数据库连接。JSONL 的物理诊断和修复 API 属于后端专用维护能力，不由通用业务层模拟。
 
-当前 `@actspace/session-persistence` 中的 `SessionStore`、`SessionHandle` 和 `JsonlSessionPersistence` 已经有 seam，但 `SessionHandle` 仍直接导入 `JsonlSessionWriter`，导致“Session 核心”和“JSONL 后端”只是逻辑分层而不是可替换边界。目标是让 fake、JSONL 和未来 backend 都消费同一份 Session Core contract。
+## 3. 接纳、持久化与关闭
 
-DSH 的可迁移机制是：Session 作为 live service，Persistence 作为独立 Service Definition/Provider；append 事实与 flush durability 是两个不同的 Cordis 事件。ActSpace 采用这个边界，但保留自己的 raw JSONL 格式、recovery 规则和工具行为。
+Journal 接纳的事件不等于已经持久化。Coordinator 持有 write-behind；在需要持久确认时依次等待 Provider `append` 与 `flush`，成功后才推进 durable 水位和发送 flush 通知。JSONL 的 append 已执行 fsync；独立内存测试实现到 flush 才发布可检查快照，验证业务层没有省略屏障。
 
-## 3. 包边界
+持久化失败阻断该 Session 的后续写入，不通过吞错推进水位。关闭时即使最后的 checkpoint、flush 或某个资源释放失败，仍尝试关闭该会话的 driver 和其他会话，保留聚合错误。关闭与通知不构成第二套事件事实源。
 
-```text
-@actspace/session-journal
-  纯事件和投影原语；禁止 node:fs、Cordis Context、writer lease
+`session/event`、`session/flush` 使用 Cordis 通知；重要写入与持久屏障通过明确的 await 调用完成，不依赖通知监听器返回值。
 
-@actspace/session-core              新增
-  SessionHandle、SessionStore、SessionPreparation、live lifecycle
-  依赖 session-journal + persistence contract
+## 4. 恢复、fork 与附件
 
-@actspace/session-persistence
-  只导出 Persistence Definition、snapshot/inspection 类型和 Provider ABI
-  不返回 SessionHandle，不导入 JSONL writer
+物理损坏检测和 JSONL 有效前缀修复归 JSONL；任务中断、未结束轮次和语义恢复事件归 Session 业务层。恢复提交事件是 `recovery/committed`。
 
-@actspace/session-jsonl
-  JSONL Provider；持有文件布局、writer、lease、write-behind 和物理 repair
+SessionStore 读取父快照，计算合法 fork 种子，预留子会话的 writer，再复制必要附件并重写引用，追加种子并 flush。失败时清理本次新建的附件与子会话，不能清理父会话。附件通过独立 artifact port 访问，不要求未来数据库保存二进制内容。
 
-@actspace/session-projection
-  从 Journal/Snapshot 派生只读 projection
-```
+临时 fork Handle 由调用者关闭；应用随后通过 Runtime controller 打开正式 Handle，从而统一观察与退出时的生命周期所有权。
 
-`@actspace/session-core` 可以依赖 `@actspace/session-persistence` 的纯 contract；Persistence Provider 只能依赖 `session-journal` 和 `session-core` 的 detached snapshot 类型，不能反向持有 `SessionStore`。如果 TypeScript 类型边界产生循环，Provider contract 中只允许出现 detached `SessionInspection`、`SessionSeed` 和 event arrays，不允许出现 live handle。
+## 5. 冷读与缓存
 
-## 4. 所有权和职责
+冷读、列表、分页、导出和 fork 都经过选中的 Provider。缓存以 Provider identity、Session revision、Codec digest、projection stateVersions 判定能否复用。缓存保存逻辑事件索引，不把 JSONL 字节偏移暴露给 Runtime。
 
-| 层 | 负责 | 明确不负责 |
-| --- | --- | --- |
-| Journal | 12 个核心事件、扩展 Codec、连续 seq、关系不变量、Surface fold | 文件、锁、Cordis、Host |
-| Session Core | 创建/恢复 live Session、append、projection 入口、accepted `session/event`、关闭 | JSONL 编码、`fsync`、跨进程锁 |
-| Persistence Definition | provider 方法、错误类别、revision、durability 语义 | 具体文件或数据库 |
-| JSONL Provider | locate、create、append、load、inspect、readFrom、list、flush、lease、torn-tail | Agent Loop、工具 policy、通知语义 |
-| Projection | 只读 UI/model DTO | append、repair、持久化副作用 |
+缓存最多保留 3 份完整事件快照，并按序列化字符估算的 16 MiB 预算淘汰；这是保留缓存预算，不是读取过程峰值内存上限。
 
-## 5. Provider contract
+当前冷读实现读取完整一致快照；revision 未变时复用语义投影。旧磁盘 checkpoint 和全局列表缓存不再作为当前真源，全局列表从当前 Provider 重建。此实现简化了后端边界，但不承诺大历史冷读性能与旧文件索引相同；后续优化应在该契约内测量，不能让通用层重新绕过 Provider 读文件。
 
-Provider contract 是数据边界，不要求 Provider 返回 live Session：
+## 6. 替换与验证边界
 
-```ts
-interface SessionPersistenceProvider {
-  locate(meta: SessionHeaderV1): SessionLocation | undefined
-  create(meta: SessionHeaderV1): Promise<void>
-  append(sessionId: string, events: readonly SessionEventEnvelopeV1[]): Promise<void>
-  flush(sessionId: string, throughSeq: number): Promise<void>
-  load(sessionId: string): Promise<SessionInspection>
-  inspect(sessionId: string): Promise<SessionInspection>
-  readFrom(sessionId: string, fromSeq: number): Promise<SessionInspectionSuffix>
-  list(): Promise<readonly SessionHeaderV1[]>
-  fork(input: SessionForkInput): Promise<SessionSeed>
-  close(sessionId: string): Promise<void>
-}
-```
+生产后端仍为 JSONL。`session-storage/testing` 提供独立内存后端，共用契约用例覆盖重复创建、writer 冲突、只读快照、连续事件、flush、关闭重开及受控 discard；Runtime 的独立用例验证无文件依赖的列表、分页、导出、fork 和恢复。
 
-Provider 必须遵守：
-
-1. `append` 只接受已由 Session Core 接纳、seq 连续的 immutable envelope。
-2. `flush` 是明确 durability barrier；成功返回前，`throughSeq` 已满足 provider 的 durability contract。
-3. `load` 可以做冷恢复，但不得删除已 durable 的 open turn；必须追加保守 closers 或返回明确 corruption。
-4. `inspect` 不获取 writer lease，不隐式修复物理文件。
-5. `list` 返回轻量 metadata，不要求完整读取每个 Journal。
-6. `fork` 只接受经过验证的完整 prefix，不复制 live registry、credential 或 Fiber。
-7. Provider 失败必须保留原始 cause、标记 Session writer blocked，并让后续有副作用操作 fail closed。
-
-## 6. Session Core contract
-
-Session Core 接受 provider 作为构造依赖，但对上层只暴露 live-log API：
-
-```ts
-interface SessionCore {
-  create(input: CreateSessionHeaderInput): Promise<SessionHandle>
-  open(sessionId: string): Promise<SessionHandle>
-  inspect(sessionId: string): Promise<SessionInspection>
-  list(): Promise<readonly SessionHeaderV1[]>
-}
-
-interface SessionHandle {
-  readonly header: SessionHeaderV1
-  readonly journal: ReadonlySessionJournal
-  append(candidate: SessionEventCandidateV1): Promise<SessionEventEnvelopeV1>
-  appendMany(candidates: readonly SessionEventCandidateV1[]): Promise<readonly SessionEventEnvelopeV1[]>
-  flush(throughSeq?: number): Promise<void>
-  close(): Promise<void>
-}
-```
-
-Session Core 不暴露 provider class、writer、lease、文件路径或 Cordis Context 给 Agent Loop、Tool Runtime、Host 或 renderer。
-
-## 7. 事件和 durability 时序
-
-```mermaid
-sequenceDiagram
-  participant L as Agent/Tool
-  participant C as Session Core
-  participant J as Journal
-  participant N as session/event
-  participant P as Persistence Provider
-  participant F as session/flush
-
-  L->>C: append(candidate)
-  C->>J: validate + assign seq + freeze
-  J-->>C: committed in-memory fact
-  C-->>N: post-commit session/event
-  C->>P: queue append(envelope)
-  L->>C: flush(throughSeq)
-  C->>P: durable append + barrier
-  P-->>C: success/failure
-  C-->>F: awaited checkpoint notification
-```
-
-不变量：
-
-- `session/event` 只在 Journal 接纳事实后触发；通知失败不能回滚事实。
-- `session/flush` 只在 provider barrier 完成后完成；它不是另一种 append。
-- persistent Session 在 LLM dispatch、工具副作用边界和下一 Step 前必须 checkpoint。
-- ephemeral Session 仍执行同样的 Journal/invariant 流程，只把 durability 明确标为内存边界。
-
-## 8. JSONL Provider 保留内容
-
-`@actspace/session-jsonl` 继续保留当前已验证行为：
-
-- UTF-8 raw JSONL、Header 首行、一个 envelope 一行；
-- `SessionWriteBehind` 的批写和 `flush(throughSeq)`；
-- `SessionWriterLease` 的跨进程排他、heartbeat 和 stale 诊断；
-- torn-tail 检测、保守 recovery、fork seed 和 artifact layout；
-- 现有 golden、recovery、fork、lease 和 process smoke 语义。
-
-这些实现只从 `SessionHandle` 移入 Provider，不在本 P1 中改成 SQLite、zstd、远程存储或新的物理格式。
-
-## 9. 生命周期
-
-```text
-Provider apply
-  → Session Core apply
-  → create/open unpublished state
-  → publish Session
-  → ACTIVE
-  → reject new work
-  → flush owned batches
-  → close provider handle / lease
-  → DISPOSED
-```
-
-Cordis Service 的 Effect 只归属拥有资源的一层：Provider 拥有 writer/lease，Session Core 拥有 live Session 和 observer registration。关闭顺序必须先停止新 append，再 drain/flush Provider，最后释放 Context effect。
-
-## 10. 验收标准
-
-1. `session-core` 的生产源码不导入 `@actspace/session-jsonl` 或 `JsonlSessionWriter`。
-2. JSONL Provider 可以被 fake/in-memory Provider 替换，Agent Loop 和 projection 测试不改代码。
-3. 12 个核心事件、扩展事件、Surface、replay、recovery、fork 和 `session/end-seed` golden 结果与 P0 基线一致。
-4. `session/event` 与 `session/flush` 的先后、失败和 observer containment 有独立 contract tests。
-5. provider append/flush 失败时，后续 LLM/tool 副作用不会继续执行。
-6. 两个并行 Session 的 writer lease、seq 和通知不串线。
-7. `pnpm -r typecheck`、Session 相关 tests、CLI `run --persist/--resume` 和 process smoke 全部通过。
-
-## 11. 回退
-
-P1-A 不迁移或删除现有 Session 数据，不引入双写。若新 Core contract 出现回归，回退范围只包括 Core/Provider adapter；JSONL 物理文件和 13-event 语义保持不变。不得通过重新让 Core 导入 JSONL writer 来掩盖 contract 问题。
-
-## 12. 参考
-
-- [DSH 风格 Session 事件模型](./agent-spec-dsh-event-model.md)
-- [Session 格式公共契约](./agent-spec-session-format-v1.md)
-- [核心 Cordis Service 化与能力 seam](./agent-spec-core-cordis-services.md)
-- `tmp/deepseek-harness/packages/core/session/src/index.ts`
-- `tmp/deepseek-harness/packages/session/session-persistence/src/index.ts`
-- `tmp/deepseek-harness/packages/session/session-persistence-jsonl/src/index.ts`
+内存通过不代表验证了 SQLite/MySQL 的事务或崩溃持久性。更换生产后端采用受控停机、配置变更与重新启动；数据迁移和多 Host 并发执行不在本轮范围。

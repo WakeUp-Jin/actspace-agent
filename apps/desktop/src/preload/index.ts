@@ -9,7 +9,6 @@ import type {
   AbortAgentRunInput,
   AgentSystemPromptFile,
   AgentRunResult,
-  RunAgentPreparationFailure,
   AppSettings,
   ApprovalDecideInput,
   ApprovalDecideResult,
@@ -20,8 +19,6 @@ import type {
   BootstrapState,
   ClearProviderKeyInput,
   ClearProviderKeyResult,
-  CompactContextInput,
-  CompactContextResult,
   ContextState,
   DeepSeekBalanceSnapshot,
   KimiBalanceSnapshot,
@@ -75,7 +72,6 @@ import type {
   WorkspaceOpenInput,
   WorkspaceOpenResult,
   WorkspaceOpenToolsResult,
-  RunAgentInput,
   RuntimeStreamEvent,
   SelectFilesResult,
   SelectImagesResult,
@@ -173,10 +169,6 @@ import type {
   TerminalResizeInput,
   TerminalSessionResult,
   TerminalWriteInput,
-  SteerAgentRunInput,
-  SteerAgentRunResult,
-  CancelSteerInput,
-  CancelSteerResult,
 } from "@actspace/shared";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 
@@ -184,11 +176,7 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "app:get-bootstrap-state": RUNTIME_V2_FIXED_RENDERER_CHANNELS.bootstrapState,
   "agent:task-command": RUNTIME_V2_FIXED_RENDERER_CHANNELS.taskCommand,
   "agent:submit-task": RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask,
-  "agent:run": RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent,
-  "context:compact": RUNTIME_V2_FIXED_RENDERER_CHANNELS.compactContext,
   "agent:abort-run": RUNTIME_V2_FIXED_RENDERER_CHANNELS.abortAgentRun,
-  "agent:steer": RUNTIME_V2_FIXED_RENDERER_CHANNELS.steerAgentRun,
-  "agent:cancel-steer": RUNTIME_V2_FIXED_RENDERER_CHANNELS.cancelSteer,
   "dialog:select-files": RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectFiles,
   "dialog:select-images": RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectImages,
   "composer:import-image": RUNTIME_V2_FIXED_RENDERER_CHANNELS.importComposerImage,
@@ -333,18 +321,7 @@ contextBridge.exposeInMainWorld("actspace", {
   getBootstrapState: () => invokeFixedRenderer("app:get-bootstrap-state") as Promise<BootstrapState>,
   taskCommand: (input: import("@actspace/shared/runtime-v2").TaskCommand) => invokeFixedRenderer("agent:task-command", input) as Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>,
   submitTask: (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => invokeFixedRenderer("agent:submit-task", input) as Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult>,
-  runAgent: async (input: RunAgentInput): Promise<AgentRunResult | RunAgentPreparationFailure> => {
-    const response = await invokeFixedRenderer("agent:run", input) as RunAgentPreparationFailure | (Omit<AgentRunResult, "events" | "contextSnapshot"> & { projection: RuntimeV2DesktopSessionProjection });
-    if (response.status === "rejected") return response;
-    const { projection, ...result } = response;
-    const record = projectChatWindow(projection);
-    return { ...result, events: record.events, contextSnapshot: record.contextSnapshot };
-  },
-  compactContext: (input: CompactContextInput) =>
-    invokeFixedRenderer("context:compact", input) as Promise<CompactContextResult>,
   abortAgentRun: (input: AbortAgentRunInput) => invokeFixedRenderer("agent:abort-run", input) as Promise<boolean>,
-  steerAgentRun: (input: SteerAgentRunInput) => invokeFixedRenderer("agent:steer", input) as Promise<SteerAgentRunResult>,
-  cancelSteer: (input: CancelSteerInput) => invokeFixedRenderer("agent:cancel-steer", input) as Promise<CancelSteerResult>,
   selectFiles: (input?: { remote?: boolean }) => invokeFixedRenderer("dialog:select-files", input) as Promise<SelectFilesResult>,
   selectImages: () => invokeFixedRenderer("dialog:select-images") as Promise<SelectImagesResult>,
   importComposerImage: (input: ImportComposerImageInput) =>

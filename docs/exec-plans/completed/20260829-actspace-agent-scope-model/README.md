@@ -70,8 +70,8 @@ Scope registry 的可见性沿 parent 向下继承；Agent event admission 沿 p
 
 - `packages/core/agent/src/**` 中的 Agent identity、registry 和 dispatch adapter
 - `packages/core/agent-loop/src/**` 中仅涉及 Scope carrier/Agent identity 的调用点
-- `packages/runtime/src/runtime/agent-factory-plugin.ts`
-- `packages/runtime/src/runtime/agent-runtime-plugin.ts`
+- `packages/runtime/src/harness/agent-factory-plugin.ts`
+- `packages/runtime/src/harness/agent-runtime-plugin.ts`
 - `packages/subagent/src/provider.ts`
 - 对应 package tests
 
