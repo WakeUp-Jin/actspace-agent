@@ -356,7 +356,7 @@ export function StatusDot({ tone, children }: { tone: StatusTone; children: Reac
         tone === "warn" ? "text-warning" : tone === "error" ? "text-on-danger" : "text-text-muted",
       )}
     >
-      <span aria-hidden="true" className={cx("shrink-0 rounded-full", STATUS_DOT_CLASS[tone])} />
+      <span aria-hidden="true" data-state={tone} className={cx("shrink-0 rounded-full", STATUS_DOT_CLASS[tone])} />
       {children}
     </span>
   );

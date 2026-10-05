@@ -1,7 +1,7 @@
 # 11 安全与 IPC 验收交接
 
-- 主线提交：`refactor/desktop-frontend` @ `<squash 提交哈希>`（squash 后填写）
-- 子分支：`refactor/desktop-fe-11`（`7e271f96..<收尾提交>`，每个 T 一个提交，另有一个处理复核发现的提交和一个收尾提交）
+- 主线提交：`refactor/desktop-frontend` @ `99f9a7be`
+- 子分支：`refactor/desktop-fe-11`（`7e271f96..d08f6e59`，共 13 个提交：T0–T10 各一个，另有一个处理复核发现的提交和一个收尾提交）。squash 提交信息中写的「共 14 个提交」是笔误，应为 13；按 00 §5 不改写已有提交，在这里更正
 - 状态：**可以交给验收**
 - 启动方式：
   - `pnpm install`（如有需要），然后 `pnpm --filter @actspace/desktop build`。

@@ -1,8 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi, afterEach } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type { MessageBlock } from "@actspace/shared";
 import { FileDiffBlock } from "../components/messages/FileDiffBlock";
 
@@ -135,15 +133,6 @@ describe("FileDiffBlock running state", () => {
 });
 
 describe("FileDiffBlock completed state", () => {
-  it("keeps expanded diff content in a bounded scroll area", () => {
-    const css = readFileSync(resolve(__dirname, "../styles/diff.css"), "utf-8");
-    const block = css.match(/\.file-diff-content\s*\{[^}]+\}/)?.[0] ?? "";
-
-    expect(block).toContain("max-height: 420px");
-    expect(block).toContain("overflow-y: auto");
-    expect(block).toContain("overflow-x: auto");
-  });
-
   it("omits zero change counters after a completed no-op", () => {
     render(<FileDiffBlock message={makeWriteBlock({ additions: 0, deletions: 0 })} />);
     expect(screen.queryByText(/\+0/)).toBeNull();

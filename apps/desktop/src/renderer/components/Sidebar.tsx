@@ -366,7 +366,7 @@ function SessionStatusButton({ status, dotClass }: { status: unknown; dotClass: 
           setOpen((value) => !value);
         }}
       >
-        <span className={dotClass} aria-hidden="true" />
+        <span className={dotClass} data-state={resolvedStatus} aria-hidden="true" />
       </IconButton>
       {open ? (
         <div className={SESSION_STATUS_MENU_CLASS} role="status">
