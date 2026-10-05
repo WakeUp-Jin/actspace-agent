@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Composer 与运行目标 Demo</title>
+<style>
+/* ---- 主题 token：取自 apps/desktop/src/renderer/styles/tokens.css；composer-* 为 06 文档新增 ---- */
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --surface-raised: #ffffff;
+  --hover: #eaeae7; --selected: #e4e4e1;
+  --border: #deded9; --border-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #72726b; --subtle: #85857e;
+  --action: #20201e; --on-action: #ffffff;
+  --operational: #087a4b; --warning: #91600e; --warning-soft: #f7eedb; --danger: #c74747; --info: #3978b8;
+  --operational-soft: #e5f2ea; --on-tint: #ffffff;
+  --shadow-popover: 0 24px 64px rgba(20, 21, 18, 0.14);
+  --composer-border: rgb(0 0 0 / 0.07);
+  --composer-border-focus: rgb(0 0 0 / 0.11);
+  --shadow-composer: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.06);
+  --shadow-composer-focus: 0 1px 2px rgb(0 0 0 / 0.05), 0 8px 28px -6px rgb(0 0 0 / 0.10);
+  --radius: 18px;
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --surface-raised: #30312d;
+  --hover: #2a2b27; --selected: #30312d;
+  --border: #353630; --border-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #787870;
+  --action: #f1f1ed; --on-action: #181916;
+  --operational: #36c783; --warning: #d2a14d; --warning-soft: #3e321c; --danger: #e06b6b; --info: #6ca6da;
+  --operational-soft: #193a2b; --on-tint: #181916;
+  --shadow-popover: 0 24px 64px rgba(0, 0, 0, 0.5);
+  --composer-border: rgb(255 255 255 / 0.07);
+  --composer-border-focus: rgb(255 255 255 / 0.12);
+  --shadow-composer: 0 1px 2px rgb(0 0 0 / 0.30), 0 6px 20px -6px rgb(0 0 0 / 0.40);
+  --shadow-composer-focus: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 32px -6px rgb(0 0 0 / 0.55);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font-ui); -webkit-font-smoothing: antialiased; }
+svg.i { width: 15px; height: 15px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.sm { width: 13px; height: 13px; }
+svg.i.lg { width: 18px; height: 18px; stroke-width: 2.1; }
+button { font: inherit; color: inherit; }
+
+/* ---- demo 控制条（不属于设计本身） ---- */
+.demo-bar { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 16px; background: var(--surface-subtle); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.demo-bar b { color: var(--text); font-weight: 600; margin-right: 4px; }
+.ctl { display: inline-flex; align-items: center; gap: 6px; }
+.seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.seg button { border: 0; background: transparent; padding: 3px 9px; border-radius: 6px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+
+/* ---- 舞台 ---- */
+.stage { padding: 24px 16px 8px; }
+.window { max-width: 980px; margin: 0 auto; height: 620px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.window-title { height: 36px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--faint); border-bottom: 1px solid var(--border); }
+.col { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 760px; margin: 0 auto; padding: 0 24px; }
+.col.initial { justify-content: center; padding-bottom: 60px; }
+.greet { text-align: center; font-size: 22px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 18px; color: var(--text); }
+.messages { flex: 1; min-height: 0; overflow: auto; padding: 24px 0 12px; display: flex; flex-direction: column; gap: 18px; }
+.bubble { align-self: flex-end; max-width: 70%; background: var(--surface-subtle); padding: 8px 12px; border-radius: 14px; font-size: 14px; }
+.reply { color: var(--text); font-size: 14px; }
+.reply p { margin: 0 0 8px; }
+.line { height: 9px; border-radius: 5px; background: var(--hover); margin: 9px 0; }
+.thinking { font-size: 13px; color: var(--faint); display: inline-flex; gap: 6px; align-items: center; }
+.thinking i { width: 6px; height: 6px; border-radius: 9px; background: var(--operational); animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.dock { flex: none; padding-bottom: 14px; }
+
+/* ---- 运行目标行（新） ---- */
+.target-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 0 0 8px 4px; }
+.tb { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; max-width: 260px; }
+.tb span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb:hover, .tb[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+.tb:focus-visible, .mi:focus-visible, .ib:focus-visible { outline: 2px solid var(--border-strong); outline-offset: 1px; }
+.tb .chev { opacity: .6; }
+.tb .state { font-size: 12px; color: var(--faint); display: inline-flex; align-items: center; gap: 5px; }
+
+/* ---- 状态点 ---- */
+.dot { width: 7px; height: 7px; border-radius: 9px; flex: none; display: inline-block; }
+.dot.connected { background: var(--operational); }
+.dot.connecting { background: var(--warning); animation: pulse 1.2s infinite; }
+.dot.offline { border: 1.5px solid var(--subtle); }
+.dot.revoked, .dot.incompatible, .dot.removed { background: var(--danger); }
+
+/* ---- Composer（新） ---- */
+.panel { position: relative; background: var(--surface); border: 1px solid var(--composer-border); border-radius: var(--radius); box-shadow: var(--shadow-composer); transition: box-shadow .14s ease, border-color .14s ease; }
+.panel:focus-within { border-color: var(--composer-border-focus); box-shadow: var(--shadow-composer-focus); }
+.panel.flat, .panel.flat:focus-within { box-shadow: none; }
+.panel:not(.stacked):not(.old) { border-radius: 999px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 6px 0 8px; border-radius: 7px; background: var(--surface-subtle); font-size: 12px; color: var(--muted); }
+.chip .x { border: 0; background: transparent; padding: 2px; border-radius: 4px; cursor: pointer; color: var(--faint); display: inline-flex; }
+.chip .x:hover { background: var(--hover); color: var(--text); }
+.body { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "plus mode input send"; align-items: center; column-gap: 4px; padding: 8px; min-height: 46px; }
+.panel:not(.stacked):not(.old) .model-btn { display: none; }
+.panel.stacked .body { grid-template-columns: auto auto auto minmax(0, 1fr) auto; grid-template-areas: "input input input input input" "plus mode model . send"; row-gap: 6px; padding: 10px 8px 8px; }
+.ta { grid-area: input; border: 0; outline: 0; resize: none; background: transparent; font: inherit; font-size: 14px; line-height: 22px; color: var(--text); padding: 3px 4px; height: 28px; max-height: 200px; overflow-y: auto; }
+.panel.stacked .ta { padding: 0 6px; }
+.panel.initial .ta { min-height: 44px; }
+.ta::placeholder { color: var(--subtle); }
+.ib { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
+.ib:hover, .ib[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+.ib.plus { grid-area: plus; }
+.mode-slot { grid-area: mode; display: flex; }
+.mode-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 4px 0 8px; border-radius: 999px; font-size: 13px; }
+.mode-chip.plan { background: var(--warning-soft); color: var(--warning); }
+.mode-chip.chat { background: var(--operational-soft); color: var(--operational); }
+.mode-chip button { border: 0; background: transparent; color: inherit; padding: 2px; border-radius: 999px; display: inline-flex; cursor: pointer; opacity: .75; }
+.mode-chip button:hover { opacity: 1; background: rgb(0 0 0 / .06); }
+.model-btn { grid-area: model; border: 0; background: transparent; display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 6px 0 8px; border-radius: 999px; color: var(--muted); font-size: 13px; cursor: pointer; white-space: nowrap; max-width: 180px; }
+.model-btn svg { opacity: .7; } .model-btn:hover svg { opacity: 1; }
+.model-btn:hover, .model-btn[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+.send { grid-area: send; width: 28px; height: 28px; border-radius: 999px; border: 0; background: var(--action); color: var(--on-action); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.send.plan { background: var(--warning); color: var(--on-tint); }
+.send.chat { background: var(--operational); color: var(--on-tint); }
+.send:disabled { opacity: .3; cursor: not-allowed; }
+.send svg.i { stroke-width: 2.4; }
+.send .stop { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
+
+/* ---- 状态行（对话中，只读） ---- */
+.status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px 0; font-size: 12px; color: var(--faint); }
+.status .facts { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.status .fact { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.status .sep { opacity: .6; }
+.status .perm { margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--faint); font-size: 12px; padding: 2px 6px; border-radius: 6px; cursor: pointer; }
+.status .perm:hover { background: var(--hover); color: var(--text); }
+.ctx { display: inline-flex; align-items: center; gap: 6px; }
+.ring { width: 12px; height: 12px; border-radius: 99px; background: conic-gradient(var(--muted) 0 42%, var(--border) 42% 100%); }
+
+/* ---- Review strip ---- */
+.review { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); padding: 0 6px 8px; }
+.review .add { color: var(--operational); font-weight: 500; }
+.review .del { color: var(--danger); font-weight: 500; }
+.review button { border: 0; background: transparent; color: var(--muted); font-size: 12px; padding: 2px 6px; border-radius: 6px; cursor: pointer; }
+.review button:hover { background: var(--hover); color: var(--text); }
+
+/* ---- 队列托盘（新：输入框上方） ---- */
+.tray { background: var(--surface); border: 1px solid var(--composer-border); border-radius: 12px; margin-bottom: 6px; padding: 2px 4px; max-height: 148px; overflow-y: auto; }
+.tray-paused { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 4px 0 8px; font-size: 12px; color: var(--text); border-bottom: 1px solid var(--composer-border); }
+.qr { display: flex; align-items: center; gap: 4px; min-height: 34px; padding: 0 2px 0 8px; font-size: 13px; }
+.qr + .qr { border-top: 1px solid var(--composer-border); }
+.qr .qi { color: var(--faint); display: inline-flex; }
+.qr .qt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 4px; }
+.qr .meta { font-size: 12px; color: var(--faint); padding: 0 4px; white-space: nowrap; }
+.qr .acts { display: inline-flex; align-items: center; gap: 2px; opacity: .55; transition: opacity .12s; }
+.qr:hover .acts, .qr:focus-within .acts { opacity: 1; }
+.qb { border: 0; background: transparent; color: var(--muted); font-size: 12px; height: 26px; padding: 0 8px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.qb:hover { background: var(--hover); color: var(--text); }
+.qb.icon { width: 26px; padding: 0; justify-content: center; }
+.qr.steering .qt { color: var(--muted); }
+.qr .reading { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--operational); padding: 0 4px; white-space: nowrap; }
+.qr .reading i { width: 6px; height: 6px; border-radius: 9px; background: var(--operational); animation: pulse 1.4s infinite; }
+
+/* ---- 弹层 ---- */
+.pop { position: fixed; z-index: 80; background: var(--surface-raised); border: 1px solid var(--composer-border-focus); border-radius: 10px; box-shadow: var(--shadow-popover); padding: 4px; font-size: 13px; color: var(--text); animation: popin .14s ease; max-height: 360px; overflow-y: auto; }
+@keyframes popin { from { opacity: 0; transform: translateY(2px) scale(.99); } }
+@media (prefers-reduced-motion: reduce) { .pop { animation: none; } .panel { transition: none; } }
+.mi { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 8px; border-radius: 6px; cursor: default; outline: none; }
+.mi.active { background: var(--hover); }
+.mi[aria-disabled="true"] { color: var(--subtle); }
+.mi .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mi .two { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.mi .two small { color: var(--faint); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mi .desc { margin-left: auto; padding-left: 12px; color: var(--faint); font-size: 12px; white-space: nowrap; }
+.mi .end { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--faint); font-size: 12px; padding-left: 12px; }
+.mi .chk { color: var(--text); }
+.mi .ico { color: var(--muted); display: inline-flex; }
+.mi .ico.agent { color: var(--info); } .mi .ico.plan { color: var(--warning); } .mi .ico.chat { color: var(--operational); }
+.ml { padding: 6px 8px 3px; font-size: 11px; color: var(--faint); }
+.ms { height: 1px; background: var(--border); margin: 4px 2px; }
+.psearch { display: flex; align-items: center; gap: 8px; margin: -4px -4px 4px; padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--faint); }
+.psearch input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; color: var(--text); }
+.psearch input::placeholder { color: var(--subtle); }
+.pback { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
+.tray-pop { padding: 4px 6px 6px; border-radius: 12px; border-color: var(--composer-border-focus); box-shadow: var(--shadow-composer); max-height: 340px; }
+.tray-pop .psearch { margin: 0 0 2px; padding: 4px 6px; height: 32px; border-bottom: 0; }
+.tray-pop .psback { border: 0; background: transparent; color: var(--muted); display: inline-flex; padding: 2px; margin-left: -2px; border-radius: 4px; cursor: pointer; }
+.tray-pop .psback:hover { background: var(--hover); color: var(--text); }
+.tray-pop .mi { min-height: 28px; padding: 4px 8px; border-radius: 8px; }
+.tray-pop .mi .lbl { flex: none; color: var(--muted); }
+.tray-pop .mi.active .lbl { color: var(--text); }
+.tray-pop .mi .desc { margin-left: 0; padding-left: 0; flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.tray-pop .mi .ico { color: var(--faint); }
+.tray-pop .mi .ico.plan { color: var(--warning); } .tray-pop .mi .ico.chat { color: var(--operational); }
+.tray-pop .ms { margin: 4px 8px; }
+.tray-pop .ml { padding: 6px 8px 2px; }
+.empty { padding: 18px 8px; text-align: center; color: var(--faint); font-size: 12px; }
+
+/* ---- 旧版（对照） ---- */
+.panel.old { border-color: var(--border); box-shadow: none; border-radius: 12px; }
+.panel.old:focus-within { border-color: var(--border-strong); box-shadow: none; }
+.panel.old .ib.plus { background: var(--surface-subtle); width: 32px; height: 32px; }
+.old-tray { margin: 12px 12px 0; border: 1px solid var(--border); background: var(--surface-subtle); border-radius: 8px; }
+.old-tray header { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; font-size: 12px; color: var(--muted); }
+.old-tray header b { color: var(--text); font-weight: 500; }
+.old-tray ul { margin: 0; padding: 0 4px 2px; list-style: none; border-top: 1px solid var(--border); }
+.old-tray li { display: flex; align-items: center; gap: 4px; min-height: 36px; padding-left: 8px; font-size: 13px; }
+.old-tray li + li { border-top: 1px solid var(--border); }
+.old-tray li .qt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.native { font: inherit; font-size: 13px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; max-width: 260px; }
+.old-hint { font-size: 11px; color: var(--faint); }
+
+/* ---- 说明区 ---- */
+.notes { max-width: 980px; margin: 0 auto 40px; padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.notes section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 13px; }
+.notes h3 { margin: 0 0 6px; font-size: 13px; }
+.notes ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.notes li { margin: 3px 0; }
+.notes code { font-size: 12px; background: var(--surface-subtle); padding: 0 4px; border-radius: 4px; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--action); color: var(--on-action); font-size: 12px; padding: 8px 14px; border-radius: 8px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 100; }
+.toast.show { opacity: .95; }
+.tip { position: fixed; z-index: 90; background: var(--action); color: var(--on-action); font-size: 12px; padding: 5px 8px; border-radius: 6px; pointer-events: none; max-width: 280px; }
+.mirror { position: absolute; visibility: hidden; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 22px; padding: 3px 4px; top: -9999px; left: -9999px; }
+@media (max-width: 720px) {
+  .notes { grid-template-columns: 1fr; }
+  .window { height: 660px; }
+  .col { padding: 0 12px; }
+  .panel:not(.old) .body { grid-template-areas: "input input input input input" "plus mode . model send"; row-gap: 8px; padding: 12px 8px 8px; }
+}
+</style>
+</head>
+<body>
+<header class="demo-bar" id="bar"></header>
+<main class="stage">
+  <div class="window">
+    <div class="window-title" id="wtitle">ActSpace</div>
+    <div class="col" id="col"></div>
+  </div>
+</main>
+<div class="notes" id="notes"></div>
+<div id="layer"></div>
+<div class="toast" id="toast"></div>
+<div class="mirror" id="mirror"></div>
+
+<script>
+/* ============ 图标（lucide 路径） ============ */
+const P = {
+  chevDown: '<path d="m6 9 6 6 6-6"/>', chevRight: '<path d="m9 18 6-6-6-6"/>', chevLeft: '<path d="m15 18-6-6 6-6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>', plus: '<path d="M5 12h14"/><path d="M12 5v14"/>', arrowUp: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  branch: '<line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  laptop: '<path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/>',
+  server: '<rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/>',
+  list: '<path d="M10 12h11"/><path d="M10 18h11"/><path d="M10 6h11"/><path d="M4 10h2"/><path d="M4 6h1v4"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  clip: '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  sparkles: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>',
+  bot: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
+  todo: '<rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  fork: '<circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
+  plug: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+};
+const ic = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ============ 数据 ============ */
+const LOCAL_WS = [
+  { id: "actspace", name: "actspace-agent", path: "~/Desktop/code-project/side-project/actspace-agent", git: true },
+  { id: "site", name: "actspace-site", path: "~/code/actspace-site", git: true },
+  { id: "notes", name: "notes", path: "~/Documents/notes", git: false },
+];
+const BRANCHES = ["main", "feat/composer-redesign", "fix/ipc-sender", "docs/frontend-refactor"];
+const ALL_HOSTS = [
+  { id: "dev-box", name: "dev-box", state: "connected", endpoint: "SSH · dev-box", models: ["Sonnet 5.5", "Opus 5.5"],
+    workspaces: [{ id: "api", name: "api-server", path: "/home/dev/work/api-server" }, { id: "web", name: "web-console", path: "/home/dev/work/web-console" }] },
+  { id: "gpu", name: "gpu-server", state: "connected", endpoint: "WSS · gpu.internal", models: ["Sonnet 5.5"],
+    workspaces: [{ id: "train", name: "training", path: "/data/training" }] },
+  { id: "nas", name: "home-nas", state: "offline", endpoint: "SSH · nas", models: ["Sonnet 5.5"],
+    workspaces: [{ id: "media", name: "media-tools", path: "/volume1/dev/media-tools" }] },
+  { id: "mac", name: "old-mac", state: "revoked", endpoint: "WSS · old-mac.local", models: [], workspaces: [] },
+];
+const STATE_LABEL = { connected: "", connecting: "连接中", offline: "离线", revoked: "需要重新配对", incompatible: "版本不兼容" };
+const NOT_READY_TIP = {
+  connecting: (h) => `正在连接 ${h}，草稿会保留`,
+  offline: (h) => `${h} 离线。前往设置重新连接`,
+  revoked: (h) => `${h} 的授权已失效，需要重新配对`,
+  incompatible: (h) => `${h} 的 Agent 版本与当前应用不兼容`,
+};
+const LOCAL_MODELS = [
+  { group: "Anthropic", items: ["Opus 5.5", "Sonnet 5.5"] },
+  { group: "OpenAI", items: ["GPT-5.5"] },
+  { group: "DeepSeek", items: ["DeepSeek V4"] },
+];
+const SKILLS = [
+  { name: "代码审查", desc: "按仓库规范审查改动" },
+  { name: "前端设计规范", desc: "对齐 token 与组件规则" },
+  { name: "写执行计划", desc: "生成 exec-plan 草稿" },
+  { name: "Electron 验证", desc: "真机验证清单" },
+];
+const MODES = [
+  { id: "agent", label: "Agent", icon: "bot", desc: "自主读写代码、运行命令" },
+  { id: "plan", label: "Plan", icon: "todo", desc: "先出计划，确认后再执行" },
+  { id: "chat", label: "Chat", icon: "chat", desc: "纯对话，不使用工具" },
+];
+
+/* ============ 状态 ============ */
+const S = {
+  theme: "light", surface: "initial", version: "new", radius: 18, shadow: "soft", hostsAvailable: true, stuck: false,
+  target: { kind: "local", ws: "actspace", branch: "main", placement: "in-place" },
+  mode: "agent", model: "Opus 5.5", skills: [], attachments: [], text: "",
+  running: true, paused: false,
+  messages: ["把 Composer 的队列挪到输入框上方，样式参考 Codex。"],
+  queue: [
+    { id: 1, text: "顺便把测试也补上，尤其是切换会话时附件清空", meta: "" },
+    { id: 2, text: "README 里的截图也换一下", meta: "1 个文件" },
+  ],
+  steering: [],
+  overlay: null, inlineWidth: 0, nextId: 3,
+};
+const hosts = () => (S.hostsAvailable ? ALL_HOSTS : []);
+const hostById = (id) => ALL_HOSTS.find((h) => h.id === id);
+const localWs = () => LOCAL_WS.find((w) => w.id === S.target.ws) || LOCAL_WS[0];
+function readiness() {
+  if (S.target.kind !== "remote") return { ready: true };
+  const h = hostById(S.target.host);
+  if (!h) return { ready: false, state: "removed", tip: "这台机器已从列表移除" };
+  if (h.state !== "connected") return { ready: false, state: h.state, tip: NOT_READY_TIP[h.state](h.name) };
+  if (!S.target.ws) return { ready: false, state: "workspace-missing", tip: "选择一个远端工作区" };
+  return { ready: true };
+}
+function modelGroups() {
+  if (S.target.kind === "remote") {
+    const h = hostById(S.target.host);
+    return h && h.models.length ? [{ group: h.name, items: h.models }] : [];
+  }
+  return LOCAL_MODELS;
+}
+function effectiveModel() {
+  const all = modelGroups().flatMap((g) => g.items);
+  return all.includes(S.model) ? S.model : all[0] || "";
+}
+
+/* ============ 控制条 ============ */
+const CONTROLS = [
+  { key: "theme", label: "主题", opts: [["light", "浅色"], ["dark", "深色"]] },
+  { key: "surface", label: "视图", opts: [["initial", "新建对话"], ["followup", "对话中"]] },
+  { key: "targetPreset", label: "运行目标", opts: [["local", "本机"], ["worktree", "本机 · 工作树"], ["remote", "远端 dev-box"], ["remote-off", "远端 home-nas（离线）"]] },
+  { key: "hostsAvailable", label: "已配置远端", opts: [[true, "有"], [false, "无"]] },
+  { key: "running", label: "Agent", opts: [[true, "运行中"], [false, "空闲"]] },
+  { key: "version", label: "版本", opts: [["new", "新版"], ["old", "旧版（现状）"]] },
+  { key: "radius", label: "多行圆角", opts: [[12, "12px (lg)"], [18, "18px (xl)"]] },
+  { key: "shadow", label: "阴影", opts: [["soft", "柔和阴影"], ["none", "Cursor 原样（无阴影）"]] },
+];
+function targetPreset() {
+  const t = S.target;
+  if (t.kind === "remote") return t.host === "nas" ? "remote-off" : t.host === "dev-box" ? "remote" : "";
+  return t.placement === "new-worktree" ? "worktree" : "local";
+}
+function applyPreset(v) {
+  if (v === "local") S.target = { kind: "local", ws: "actspace", branch: S.target.branch || "main", placement: "in-place" };
+  if (v === "worktree") S.target = { kind: "local", ws: "actspace", branch: "main", placement: "new-worktree" };
+  if (v === "remote") { S.hostsAvailable = true; S.target = { kind: "remote", host: "dev-box", ws: "api" }; }
+  if (v === "remote-off") { S.hostsAvailable = true; S.target = { kind: "remote", host: "nas", ws: "media" }; }
+}
+function renderBar() {
+  const cur = { ...S, targetPreset: targetPreset() };
+  document.getElementById("bar").innerHTML = '<span><b>Demo 控制</b>（不属于设计）</span>' + CONTROLS.map((c) =>
+    `<span class="ctl">${c.label}<span class="seg">${c.opts.map(([v, l]) =>
+      `<button data-ctl="${c.key}" data-v="${v}" aria-pressed="${String(cur[c.key]) === String(v)}">${l}</button>`).join("")}</span></span>`).join("");
+}
+document.getElementById("bar").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-ctl]"); if (!b) return;
+  const k = b.dataset.ctl; let v = b.dataset.v;
+  if (v === "true") v = true; else if (v === "false") v = false; else if (/^\d+$/.test(v)) v = Number(v);
+  if (k === "targetPreset") applyPreset(v);
+  else if (k === "hostsAvailable") { S.hostsAvailable = v; if (!v && S.target.kind === "remote") applyPreset("local"); }
+  else if (k === "running") { S.running = v; S.paused = !v && S.queue.length > 0; }
+  else S[k] = v;
+  S.overlay = null;
+  render();
+});
+
+/* ============ 渲染：新版 ============ */
+function renderTargetRow() {
+  const t = S.target;
+  let html = '<div class="target-row" role="group" aria-label="运行目标">';
+  if (t.kind === "local") {
+    const ws = localWs();
+    html += `<button class="tb" data-act="open-ws" data-anchor="ws" aria-haspopup="menu" aria-expanded="false" title="${esc(ws.path)}">${ic("folder")}<span class="t">${esc(ws.name)}</span>${ic("chevDown", "sm chev")}</button>`;
+    if (ws.git) html += `<button class="tb" data-act="open-branch" data-anchor="branch" aria-haspopup="menu" aria-expanded="false" title="${t.placement === "new-worktree" ? "从该分支创建工作树" : "首次发送时切换到该分支"}">${ic("branch")}<span class="t">${esc(t.branch)}</span>${ic("chevDown", "sm chev")}</button>`;
+    html += t.placement === "new-worktree"
+      ? `<button class="tb" data-act="open-loc" data-anchor="loc" aria-haspopup="menu" aria-expanded="false">${ic("fork")}<span class="t">新建工作树</span>${ic("chevDown", "sm chev")}</button>`
+      : `<button class="tb" data-act="open-loc" data-anchor="loc" aria-haspopup="menu" aria-expanded="false">${ic("laptop")}<span class="t">本机</span>${ic("chevDown", "sm chev")}</button>`;
+  } else {
+    const h = hostById(t.host); const ws = h?.workspaces.find((w) => w.id === t.ws);
+    html += `<button class="tb" data-act="open-ws" data-anchor="ws" aria-haspopup="menu" aria-expanded="false" title="${esc(ws?.path || "")}">${ic("folder")}<span class="t">${esc(ws?.name || "选择工作区")}</span>${ic("chevDown", "sm chev")}</button>`;
+    const st = h?.state || "removed";
+    html += `<button class="tb" data-act="open-loc" data-anchor="loc" aria-haspopup="menu" aria-expanded="false">${ic("server")}<span class="t">${esc(h?.name || "远端 · 已移除")}</span>${st !== "connected" ? `<span class="state"><i class="dot ${st}"></i>${STATE_LABEL[st] || "已移除"}</span>` : ""}${ic("chevDown", "sm chev")}</button>`;
+  }
+  return html + "</div>";
+}
+function renderChips() {
+  const items = [
+    ...S.attachments.map((a, i) => `<span class="chip">${ic("image", "sm")}${esc(a)}<button class="x" data-act="att-del" data-v="${i}" aria-label="移除附件">${ic("x", "sm")}</button></span>`),
+    ...S.skills.map((s, i) => `<span class="chip">${ic("book", "sm")}${esc(s)}<button class="x" data-act="skill-del" data-v="${i}" aria-label="移除 Skill">${ic("x", "sm")}</button></span>`),
+  ];
+  return items.length ? `<div class="chips">${items.join("")}</div>` : "";
+}
+function renderModeChip() {
+  if (S.mode === "agent") return '<span class="mode-slot"></span>';
+  const m = MODES.find((x) => x.id === S.mode);
+  return `<span class="mode-slot"><span class="mode-chip ${m.id}">${ic(m.icon, "sm")}${m.label}<button data-act="mode-clear" aria-label="退出 ${m.label}，回到 Agent">${ic("x", "sm")}</button></span></span>`;
+}
+function renderSendButton() {
+  const r = readiness();
+  if (S.surface === "followup" && S.running) return `<button class="send" data-act="stop" data-tip="停止">${'<span class="stop"></span>'}</button>`;
+  const disabled = !r.ready;
+  return `<span ${disabled ? `data-tip="${esc(r.tip)}" tabindex="0"` : ""} style="grid-area:send;display:inline-flex"><button class="send ${S.mode}" data-act="send" ${disabled ? "disabled" : ""} aria-label="发送">${ic("arrowUp")}</button></span>`;
+}
+function renderPanel() {
+  const model = effectiveModel();
+  const ph = S.mode === "plan" ? "描述要规划的改动…" : S.mode === "chat" ? "问点什么…"
+    : S.surface === "initial" ? "描述你要做的事，@ 引用文件，/ 调用命令" : (S.running ? "继续追问，运行中发送会进入队列…" : "继续追问…");
+  return `<div class="panel ${S.surface === "initial" ? "initial" : ""} ${S.shadow === "none" ? "flat" : ""}" id="panel" style="--radius:${S.radius}px">
+    ${renderChips()}
+    <div class="body">
+      <button class="ib plus" data-act="open-plus" data-anchor="plus" aria-haspopup="menu" aria-expanded="false" aria-label="添加">${ic("plus", "lg")}</button>
+      ${renderModeChip()}
+      <button class="model-btn" data-act="open-model" data-anchor="model" aria-haspopup="menu" aria-expanded="false"><span class="lbl" style="overflow:hidden;text-overflow:ellipsis">${esc(model || "选择模型")}</span>${ic("chevDown", "sm")}</button>
+      <textarea class="ta" id="ta" rows="1" placeholder="${ph}" aria-label="消息输入框"></textarea>
+      ${renderSendButton()}
+    </div>
+  </div>`;
+}
+function renderTray() {
+  if (!S.queue.length && !S.steering.length) return "";
+  let html = '<section class="tray" aria-label="消息队列">';
+  if (S.paused && S.queue.length) html += `<div class="tray-paused">已暂停，当前运行已停止<button class="qb" style="margin-left:auto" data-act="resume">继续发送</button></div>`;
+  html += S.steering.map((q) => `<div class="qr steering"><span class="qt" title="${esc(q.text)}">${esc(q.text)}</span><span class="reading" data-tip="Agent 开始下一步时会读到这条消息"><i></i>下一步读取</span><span class="acts" style="opacity:1"><button class="qb" data-act="q-unsteer" data-v="${q.id}" data-tip="读到之前可以撤回，撤回后回到队列">撤回</button></span></div>`).join("");
+  html += S.queue.map((q, i) => `<div class="qr"><span class="qi" data-tip="${S.queue.length} 条排队 · 当前运行结束后依次发送">${ic("list", "sm")}</span><span class="qt" title="${esc(q.text)}">${esc(q.text)}</span>${q.meta ? `<span class="meta">${esc(q.meta)}</span>` : ""}<span class="acts">${S.running ? `<button class="qb" data-act="q-steer" data-v="${q.id}" data-tip="让 Agent 在下一步看到这条消息">↳ 引导</button>` : ""}<button class="qb icon" data-act="q-del" data-v="${q.id}" aria-label="删除排队消息 ${i + 1}" data-tip="删除">${ic("trash", "sm")}</button><button class="qb icon" data-act="q-more" data-v="${q.id}" data-anchor="qmore-${q.id}" aria-haspopup="menu" aria-expanded="false" aria-label="更多" data-tip="更多">${ic("more", "sm")}</button></span></div>`).join("");
+  return html + "</section>";
+}
+function renderStatus() {
+  const t = S.target; let facts;
+  if (t.kind === "local") {
+    facts = t.placement === "new-worktree"
+      ? `<span class="fact">${ic("branch", "sm")}actspace/92803054</span><span class="sep">·</span><span class="fact" data-tip="原工作区：actspace-agent · 基于 main">${ic("fork", "sm")}工作树</span>`
+      : `<span class="fact">${ic("branch", "sm")}${esc(t.branch)}</span><span class="sep">·</span><span class="fact">${ic("laptop", "sm")}本机</span>`;
+  } else {
+    const h = hostById(t.host); const ws = h?.workspaces.find((w) => w.id === t.ws);
+    const st = h?.state || "removed";
+    facts = `<span class="fact" data-tip="${esc(h ? `${h.endpoint} · ${st === "connected" ? "已连接" : STATE_LABEL[st]}` : "已移除")}">${ic("server", "sm")}${esc(h?.name || "远端")}</span><span class="sep">·</span>` +
+      (st === "connected" ? `<span class="fact" data-tip="${esc(ws?.path || "")}">${ic("folder", "sm")}${esc(ws?.name || "")}</span>` : `<span class="fact"><i class="dot ${st}"></i>${STATE_LABEL[st] || "已移除"}</span>`);
+  }
+  const ctx = t.kind === "remote" && hostById(t.host)?.state !== "connected" ? "—" : '<span class="ring"></span>42%';
+  return `<div class="status"><div class="facts">${facts}<button class="perm" data-act="toast" data-v="（demo）权限模式控件保持不变">${ic("shield", "sm")}请求批准${ic("chevDown", "sm")}</button></div><span class="ctx" data-tip="打开 Context 弹窗">${ctx}</span></div>`;
+}
+function renderMessages() {
+  return `<div class="messages">${S.messages.map((m, i) => `<div class="bubble">${esc(m)}</div>${i < S.messages.length - 1 || !S.running ? `<div class="reply"><p>好的，已经按要求处理。</p><div class="line" style="width:92%"></div><div class="line" style="width:78%"></div></div>` : `<div class="reply"><p>先看一下 <code>MessageQueueTray</code> 的挂载点，它现在在输入面板内部……</p><div class="line" style="width:88%"></div><div class="line" style="width:64%"></div><span class="thinking"><i></i>正在修改 Composer.tsx</span></div>`}`).join("")}</div>`;
+}
+function renderNew() {
+  const col = document.getElementById("col");
+  if (S.surface === "initial") {
+    col.className = "col initial";
+    col.innerHTML = `<div class="greet">要做点什么？</div>${renderTargetRow()}${renderPanel()}`;
+  } else {
+    col.className = "col";
+    const review = S.target.kind === "local" ? `<div class="review"><span>Review</span><span class="add">+12</span><span class="del">−3</span><button data-act="toast" data-v="（demo）打开 Review 标签页">查看</button></div>` : "";
+    col.innerHTML = `${renderMessages()}<div class="dock">${review}${renderTray()}${renderPanel()}${renderStatus()}</div>`;
+  }
+}
+
+/* ============ 渲染：旧版（现状对照） ============ */
+function oldRemoteSelects(disabled) {
+  const t = S.target;
+  const opts = `<option value="local" ${t.kind === "local" ? "selected" : ""}>本机</option>` + hosts().map((h) => `<option value="${h.id}" ${t.kind === "remote" && t.host === h.id ? "selected" : ""}>${esc(h.name)}${h.state === "connected" ? "" : " · 离线"}</option>`).join("");
+  let html = `<select class="native" aria-label="会话运行位置" data-act="old-host" ${disabled ? "disabled" : ""}>${opts}</select>`;
+  if (t.kind === "remote") {
+    const h = hostById(t.host);
+    html += `<select class="native" aria-label="远端工作区" ${disabled ? "disabled" : ""}>${h.workspaces.map((w) => `<option>${esc(w.name)} · ${esc(w.path)}</option>`).join("")}</select>`;
+    if (h.state !== "connected") html += '<span class="old-hint">Host 未就绪，草稿仍可编辑</span>';
+  }
+  return html;
+}
+function renderOldRow() {
+  const t = S.target; let html = '<div class="target-row">';
+  if (hosts().length) html += oldRemoteSelects(false);
+  if (t.kind === "local") {
+    const ws = localWs();
+    html += `<button class="tb" data-act="toast" data-v="旧版：工作区菜单">${ic("folder")}<span class="t">${esc(ws.name)}</span>${ic("chevDown", "sm chev")}</button>`;
+    html += `<button class="tb" data-act="toast" data-v="旧版：分支菜单">${ic("branch")}<span class="t">${esc(t.branch)}</span>${ic("chevDown", "sm chev")}</button>`;
+    html += `<button class="tb" data-act="open-old-loc" data-anchor="loc" aria-expanded="false">${ic("laptop")}<span class="t">${t.placement === "new-worktree" ? "新建工作树" : "本机"}</span>${ic("chevDown", "sm chev")}</button>`;
+  }
+  return html + "</div>";
+}
+function renderOldPanel() {
+  const t = S.target;
+  const tray = S.surface === "followup" && S.queue.length ? `<section class="old-tray"><header>${ic("list", "sm")}<b>${S.queue.length} 条排队</b><span>当前运行结束后依次发送</span></header><ul>${S.queue.map((q) => `<li><span class="qt">${esc(q.text)}</span>${S.running ? '<button class="qb">↳ 插入</button>' : ""}<button class="qb icon">${ic("trash", "sm")}</button><button class="qb icon">${ic("more", "sm")}</button></li>`).join("")}</ul></section>` : "";
+  const model = t.kind === "remote"
+    ? `<select class="native" style="grid-area:model" aria-label="远端模型">${(hostById(t.host).models.length ? hostById(t.host).models : ["等待 Host 模型"]).map((m) => `<option>${m}</option>`).join("")}</select>`
+    : `<button class="model-btn" data-act="toast" data-v="旧版：独立模型面板">${esc(S.model)}${ic("chevDown", "sm")}</button>`;
+  const send = S.surface === "followup" && S.running ? '<button class="send"><span class="stop"></span></button>' : `<button class="send" ${readiness().ready ? "" : "disabled"}>${ic("arrowUp")}</button>`;
+  return `<div class="panel old ${S.surface === "initial" ? "stacked" : ""}" id="panel">${tray}${renderChips()}<div class="body"><button class="ib plus" data-act="open-old-plus" data-anchor="plus" aria-expanded="false">${ic("plus", "lg")}</button>${renderModeChip()}<textarea class="ta" id="ta" rows="1" placeholder="${S.surface === "initial" ? "描述你要做的事" : "继续追问…"}"></textarea>${model}${send}</div></div>`;
+}
+function renderOld() {
+  const col = document.getElementById("col"); const t = S.target;
+  if (S.surface === "initial") {
+    col.className = "col initial";
+    col.innerHTML = `<div class="greet">要做点什么？</div>${renderOldRow()}${renderOldPanel()}`;
+  } else {
+    col.className = "col";
+    const h = t.kind === "remote" ? hostById(t.host) : null;
+    const loc = h ? `${esc(h.name)}${h.state === "connected" ? "" : " · 未就绪"}` : t.placement === "new-worktree" ? "工作树" : "本机";
+    const remoteRow = h ? `<div class="target-row">${oldRemoteSelects(true)}</div>` : "";
+    const status = `<div class="status"><div class="facts">${h ? "" : `<span class="fact">${ic("branch", "sm")}${esc(t.branch)}</span>`}<span class="fact">${ic("laptop", "sm")}${loc}</span></div><span class="ctx"><span class="ring"></span>42%</span></div>`;
+    col.innerHTML = `${renderMessages()}<div class="dock">${remoteRow}${renderOldPanel()}${status}</div>`;
+  }
+}
+
+/* ============ 说明区 ============ */
+const NOTES = {
+  "new-initial": ["新建对话 · 新版", [
+    "运行目标行：工作区 / 分支 / 运行位置三个<b>无边框文字按钮</b>，与 Cursor 新建页一致",
+    "运行位置菜单只有 <b>本机 / 远端机器 › / 新建工作树</b>；没有 Cloud、没有「即将推出」占位（D2）",
+    "切到远端：分支按钮隐藏；工作区只显示名称，路径在 tooltip 和菜单第二行",
+    "远端未就绪（选「远端 home-nas」）：运行位置旁显示状态，发送按钮禁用，悬停看原因",
+    "输入框：低对比细边 + 柔和阴影；<b>点一下输入框</b>看聚焦态。顶部「阴影」可切到 Cursor 原样（Cursor 源码里没有阴影）",
+    "底部工具行与 Cursor 一致：<b>左</b> <code>+</code> · 模式 chip · 模型 ⌄，<b>右</b> 发送",
+    "<code>+</code> 面板与 Cursor 一致：输入框<b>上方、同宽</b>的独立卡片；搜索 → Plan / Chat → 图片与文件 · Skills › · 模型 ›；试试输入「son」",
+    "选 Plan / Chat 后出现模式 chip（× 回到 Agent），发送按钮和 placeholder 跟着变色 / 变文案；Shift+Tab 也能切 Plan",
+  ]],
+  "new-followup": ["对话中 · 新版", [
+    "队列移到输入框<b>上方</b>的独立托盘，输入框位置不随队列变化；超过 4 条托盘内部滚动",
+    "行操作：<b>↳ 引导</b>（运行中）、删除、⋯（编辑、上移）；引导后显示「下一步读取」可撤回",
+    "运行中按 Enter：消息进入队列；点停止：队列暂停，出现「继续发送」",
+    "状态行<b>只读</b>：分支 · 本机 / 工作树，或 Host · 远端工作区；没有下拉，不能中途换机器（D3）",
+    "单行时是胶囊形，文字和按钮同一行（模型收进 <code>+</code> 面板）；文字溢出一行、Shift+Enter 换行或带附件时切成多行布局",
+    "多行后<b>清空</b>才回到单行（Cursor 同款，避免删到一行时来回跳）",
+    "<code>+</code> 面板在输入框上方、与输入框同宽",
+    "远端会话不显示 Review strip（远端没有 Git Review）",
+  ]],
+  "old-initial": ["新建对话 · 旧版（现状）", [
+    "配置了远端时，本机状态下也会同时出现<b>两个运行位置入口</b>：原生 <code>&lt;select&gt;</code> + 「本机 ⌄」菜单",
+    "「本机 ⌄」菜单里还有「Cloud / 远程 SSH · 即将推出」，和真实远端入口冲突",
+    "选远端后：工作区变成原生 select，选项是 <code>name · path</code>；模型也变成原生 select",
+    "输入框：<code>#deded9</code> 实线边框，无阴影；聚焦时边框加深到 <code>#8c8c85</code>",
+    "<code>+</code> 菜单与输入框同宽、无搜索、无模型入口；<code>+</code> 有底色",
+  ]],
+  "old-followup": ["对话中 · 旧版（现状）", [
+    "队列在输入框<b>里面</b>（框中框），条数一多把输入行挤到底部",
+    "远端会话：输入框上方仍显示禁用的原生 select；状态行再显示一次 Host 名，图标仍是笔记本",
+    "按钮文案「↳ 插入」",
+  ]],
+};
+function renderNotes() {
+  const [title, items] = NOTES[`${S.version}-${S.surface}`];
+  const other = NOTES[`${S.version === "new" ? "old" : "new"}-${S.surface}`];
+  document.getElementById("notes").innerHTML =
+    `<section><h3>${title}：看什么</h3><ul>${items.map((x) => `<li>${x}</li>`).join("")}</ul></section>` +
+    `<section><h3>对照：${other[0]}</h3><ul>${other[1].map((x) => `<li>${x}</li>`).join("")}</ul><p style="margin:8px 0 0;color:var(--faint);font-size:12px">对应文档：06-Composer与运行目标交互重设计.md · 03-运行目标抽象-本机与远端.md<br>直达参数：<code>?theme=dark&amp;surface=followup&amp;target=remote&amp;version=old&amp;open=location&amp;sub=hosts</code></p></section>`;
+}
+
+/* ============ 主渲染 ============ */
+function render() {
+  document.documentElement.dataset.theme = S.theme;
+  const prev = document.getElementById("ta");
+  const hadFocus = prev && document.activeElement === prev;
+  const sel = prev ? [prev.selectionStart, prev.selectionEnd] : null;
+  renderBar();
+  document.getElementById("wtitle").textContent = S.surface === "initial" ? "ActSpace · 新对话" : "ActSpace · Composer 队列位置调整";
+  (S.version === "new" ? renderNew : renderOld)();
+  const ta = document.getElementById("ta");
+  ta.value = S.text;
+  bindTextarea(ta);
+  autosize(ta); updateLayout();
+  if (hadFocus) { ta.focus(); if (sel) ta.setSelectionRange(sel[0], sel[1]); }
+  const msgs = document.querySelector(".messages"); if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  renderNotes();
+  renderOverlay();
+}
+
+/* ============ 输入框：自动高度 + inline/stacked ============ */
+function autosize(ta) { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 200) + "px"; }
+function updateLayout() {
+  const panel = document.getElementById("panel"); const ta = document.getElementById("ta");
+  if (!panel || panel.classList.contains("old") && S.surface === "initial") return;
+  if (panel.classList.contains("old")) {
+    const m = document.getElementById("mirror"); m.style.width = ta.clientWidth + "px"; m.textContent = S.text + " ";
+    panel.classList.toggle("stacked", m.scrollHeight > 30); autosize(ta); return;
+  }
+  const force = S.surface === "initial" || S.attachments.length > 0 || S.skills.length > 0 || window.innerWidth <= 720;
+  if (!panel.classList.contains("stacked") && !force) S.inlineWidth = ta.clientWidth;
+  if (!S.text) S.stuck = false;
+  else if (!S.stuck && !force) {
+    const m = document.getElementById("mirror");
+    m.style.width = (S.inlineWidth || ta.clientWidth) + "px";
+    m.textContent = S.text + " ";
+    S.stuck = S.text.includes("\n") || m.scrollHeight > 30;
+  }
+  panel.classList.toggle("stacked", force || S.stuck);
+  autosize(ta);
+}
+function bindTextarea(ta) {
+  ta.addEventListener("input", () => { S.text = ta.value; updateLayout(); });
+  ta.addEventListener("keydown", (e) => {
+    const composing = e.isComposing || e.keyCode === 229;
+    if (composing) return;
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === "Tab" && e.shiftKey) { e.preventDefault(); S.mode = S.mode === "plan" ? "agent" : "plan"; render(); }
+  });
+}
+function send() {
+  if (S.version === "old") return toast("旧版仅作视觉对照");
+  const text = S.text.trim(); if (!text) return;
+  if (!readiness().ready) return toast(readiness().tip);
+  if (S.surface === "initial") { S.surface = "followup"; S.messages = [text]; S.queue = []; S.steering = []; S.running = true; }
+  else if (S.running) { S.queue.push({ id: S.nextId++, text, meta: S.attachments.length ? `${S.attachments.length} 个文件` : "" }); }
+  else { S.messages.push(text); S.running = true; }
+  S.text = ""; S.attachments = []; S.skills = [];
+  render();
+}
+
+/* ============ 弹层 ============ */
+function openOverlay(kind, extra = {}) {
+  const anchorMap = { ws: "ws", branch: "branch", location: "loc", palette: "plus", model: "model", "old-palette": "plus", "old-location": "loc" };
+  S.overlay = { kind, anchor: extra.anchor || anchorMap[kind], page: "root", query: "", active: 0, sub: null, subActive: 0, ...extra };
+  renderOverlay(true);
+}
+function closeOverlay(focusAnchor = true) {
+  const o = S.overlay; if (!o) return;
+  S.overlay = null; renderOverlay();
+  if (focusAnchor) document.querySelector(`[data-anchor="${o.anchor}"]`)?.focus();
+}
+const mi = (o) => `<div class="mi" role="${o.role || "menuitem"}" tabindex="-1" ${o.act ? `data-act="${o.act}"` : ""} ${o.v !== undefined ? `data-v="${esc(o.v)}"` : ""} ${o.sub ? `data-sub="${o.sub}"` : ""} ${o.disabled ? 'aria-disabled="true"' : ""} ${o.checked !== undefined ? `aria-checked="${o.checked}"` : ""}>${o.icon ? `<span class="ico ${o.icoCls || ""}">${ic(o.icon)}</span>` : ""}${o.second ? `<span class="two"><span class="lbl">${o.label}</span><small>${o.second}</small></span>` : `<span class="lbl">${o.label}</span>`}${o.desc ? `<span class="desc">${o.desc}</span>` : ""}${o.end || o.checked || o.sub ? `<span class="end">${o.end || ""}${o.checked ? `<span class="chk">${ic("check", "sm")}</span>` : ""}${o.sub ? ic("chevRight", "sm") : ""}</span>` : ""}</div>`;
+const sep = '<div class="ms" role="separator"></div>';
+const label = (t) => `<div class="ml">${t}</div>`;
+
+function buildWorkspace() {
+  const t = S.target;
+  if (t.kind === "local") return { w: 260, html: label("最近") + LOCAL_WS.map((w) => mi({ act: "ws", v: w.id, icon: "folder", label: esc(w.name), second: esc(w.path), checked: w.id === t.ws, role: "menuitemradio" })).join("") + sep + mi({ act: "toast", v: "（demo）打开系统目录选择器", label: "使用已有目录…" }) + mi({ act: "toast", v: "（demo）选择父目录并命名", label: "新建文件夹…" }) };
+  const h = hostById(t.host);
+  if (!h.workspaces.length) return { w: 260, html: '<div class="empty">这台机器上还没有工作区</div>' };
+  return { w: 280, html: label(`${esc(h.name)} 上的工作区`) + h.workspaces.map((w) => mi({ act: "ws", v: w.id, icon: "folder", label: esc(w.name), second: esc(w.path), checked: w.id === t.ws, role: "menuitemradio" })).join("") };
+}
+function buildBranch(o) {
+  const q = o.query.toLowerCase();
+  const list = BRANCHES.filter((b) => b.toLowerCase().includes(q));
+  return { w: 300, search: "搜索分支", html: label(S.target.placement === "new-worktree" ? "从哪个分支创建工作树" : "本地分支") + (list.length ? list.map((b) => mi({ act: "branch", v: b, icon: "branch", label: esc(b), checked: b === S.target.branch, role: "menuitemradio", end: b === "fix/ipc-sender" ? "工作树占用" : "" })).join("") : '<div class="empty">没有匹配的分支</div>') };
+}
+function buildLocation() {
+  const t = S.target; const ws = t.kind === "local" ? localWs() : null;
+  let html = mi({ act: "loc-local", icon: "laptop", label: "本机", checked: t.kind === "local" && t.placement === "in-place", role: "menuitemradio" });
+  html += hosts().length
+    ? mi({ act: "loc-sub", sub: "hosts", icon: "server", label: "远端机器", end: t.kind === "remote" ? esc(hostById(t.host)?.name || "") : "" })
+    : mi({ act: "toast", v: "（demo）跳转 设置 › Agent 服务器 › 添加", icon: "plug", label: "连接远端机器…" });
+  html += sep;
+  if (t.kind === "remote") html += mi({ icon: "fork", label: "新建工作树", second: "远端机器暂不支持", disabled: true });
+  else if (!ws.git) html += mi({ icon: "fork", label: "新建工作树", second: "需要 Git 仓库", disabled: true });
+  else html += mi({ act: "worktree", icon: "fork", label: "新建工作树", second: `从 ${esc(t.branch)} 创建隔离分支`, checked: t.placement === "new-worktree", role: "menuitemradio" });
+  return { w: 240, html };
+}
+function buildHosts(o) {
+  const hs = hosts(); const showSearch = hs.length >= 5;
+  const list = hs.filter((h) => h.name.includes(o.subQuery || ""));
+  return { w: 260, search: showSearch ? "搜索机器" : null, html: list.map((h) => mi({ act: "host", v: h.id, icon: null, label: `<span style="display:inline-flex;align-items:center;gap:8px"><i class="dot ${h.state}"></i>${esc(h.name)}</span>`, end: STATE_LABEL[h.state], checked: S.target.kind === "remote" && S.target.host === h.id, role: "menuitemradio" })).join("") + sep + mi({ act: "toast", v: "（demo）跳转 设置 › Agent 服务器 › 添加", icon: "plus", label: "连接新机器…" }) + `<div class="ml" style="padding-top:2px">Host 少于 5 台时不显示搜索</div>` };
+}
+function paletteEntries() {
+  const chatStarted = S.surface === "followup" && S.mode === "chat";
+  const modes = chatStarted ? [] : MODES.filter((m) => m.id !== "agent" && !(S.surface === "followup" && m.id === "chat"));
+  const model = effectiveModel();
+  return {
+    modes: modes.map((m) => ({ act: "mode", v: m.id, icon: m.icon, icoCls: m.id, label: m.label, desc: m.desc, key: m.label + " mode" })),
+    ctx: [
+      { act: "files", icon: "clip", label: "图片与文件", key: "图片与文件 附件 file image" },
+      { act: "page", v: "skills", sub: "page", icon: "book", label: "Skills", key: "skills 技能" },
+      { act: "page", v: "models", sub: "page", icon: "sparkles", label: "模型", desc: esc(model), key: "模型 model" },
+    ],
+  };
+}
+function buildPalette(o) {
+  const q = o.query.trim().toLowerCase();
+  if (o.page === "skills") {
+    const list = SKILLS.filter((s) => (s.name + s.desc).toLowerCase().includes(q));
+    return { tray: true, search: "搜索 Skills", back: true, html: list.length ? list.map((s) => mi({ act: "skill", v: s.name, icon: "book", label: esc(s.name), desc: esc(s.desc), checked: S.skills.includes(s.name) })).join("") : '<div class="empty">没有匹配的 Skill</div>' };
+  }
+  if (o.page === "models") return { tray: true, search: "搜索模型", back: true, html: buildModelList(q) };
+  const { modes, ctx } = paletteEntries();
+  if (!q) return { tray: true, search: "搜索 Skills、文件、模型…", html: (modes.length ? modes.map(mi).join("") + sep : "") + ctx.map(mi).join("") };
+  const m = (e) => e.key.toLowerCase().includes(q) || e.label.toLowerCase().includes(q);
+  const skills = SKILLS.filter((s) => (s.name + s.desc).toLowerCase().includes(q)).map((s) => mi({ act: "skill", v: s.name, icon: "book", label: esc(s.name), desc: esc(s.desc), checked: S.skills.includes(s.name) }));
+  const models = modelGroups().flatMap((g) => g.items.filter((x) => x.toLowerCase().includes(q) || g.group.toLowerCase().includes(q)).map((x) => mi({ act: "model", v: x, icon: "sparkles", label: esc(x), desc: esc(g.group), checked: x === effectiveModel(), role: "menuitemradio" })));
+  const parts = [];
+  const fm = modes.filter(m); if (fm.length) parts.push(label("模式") + fm.map(mi).join(""));
+  const fc = ctx.filter(m).filter((e) => e.act === "files"); if (fc.length) parts.push(label("文件") + fc.map(mi).join(""));
+  if (skills.length) parts.push(label("Skills") + skills.join(""));
+  if (models.length) parts.push(label("模型") + models.join(""));
+  return { tray: true, search: "搜索 Skills、文件、模型…", html: parts.length ? parts.join(sep) : '<div class="empty">没有匹配的条目</div>' };
+}
+function buildModelList(q) {
+  const groups = modelGroups();
+  if (!groups.length) return '<div class="empty">这台机器没有可用模型</div>';
+  const cur = effectiveModel();
+  const html = groups.map((g) => {
+    const items = g.items.filter((x) => !q || x.toLowerCase().includes(q) || g.group.toLowerCase().includes(q));
+    return items.length ? label(esc(g.group)) + items.map((x) => mi({ act: "model", v: x, label: esc(x), checked: x === cur, role: "menuitemradio" })).join("") : "";
+  }).join("");
+  return html || '<div class="empty">没有匹配的模型</div>';
+}
+function buildModel(o) { return { w: 260, search: "搜索模型", html: buildModelList(o.query.trim().toLowerCase()) }; }
+function buildQueueMore(o) {
+  const idx = S.queue.findIndex((q) => q.id === o.id);
+  return { w: 170, html: mi({ act: "q-edit", v: o.id, label: "编辑", end: S.text ? "先清空输入框" : "", disabled: !!S.text }) + mi({ act: "q-up", v: o.id, label: "上移", disabled: idx <= 0 }) };
+}
+function buildOldPalette() {
+  return { w: document.getElementById("panel").offsetWidth, html: MODES.map((m) => mi({ act: "mode", v: m.id, icon: m.icon, icoCls: m.id, label: m.label, desc: m.desc, checked: S.mode === m.id })).join("") + sep + mi({ act: "toast", v: "旧版：图片", icon: "image", label: "图片" }) + mi({ act: "toast", v: "旧版：Skills 二级页", icon: "book", label: "Skills", sub: "x" }), full: true };
+}
+function buildOldLocation() {
+  return { w: 240, html: label("运行位置") + mi({ icon: "server", label: "Cloud", end: "即将推出", disabled: true }) + mi({ act: "loc-local", icon: "laptop", label: "本机", checked: S.target.placement === "in-place" }) + mi({ icon: "server", label: "远程 SSH", end: "即将推出", disabled: true }) + sep + mi({ act: "worktree", icon: "fork", label: "新建工作树", checked: S.target.placement === "new-worktree" }) };
+}
+const BUILDERS = { ws: buildWorkspace, branch: buildBranch, location: buildLocation, palette: buildPalette, model: buildModel, "q-more": buildQueueMore, "old-palette": buildOldPalette, "old-location": buildOldLocation };
+
+function popHtml(spec, which) {
+  let head = "";
+  if (spec.search) head = `<div class="psearch">${spec.back ? `<button class="psback" data-act="back" aria-label="返回">${ic("chevLeft", "sm")}</button>` : ic("search", "sm")}<input data-search="${which}" placeholder="${spec.search}" autocomplete="off" /></div>`;
+  return head + spec.html;
+}
+function renderOverlay(initialFocus = false) {
+  const layer = document.getElementById("layer");
+  document.querySelectorAll("[data-anchor][aria-expanded]").forEach((el) => el.setAttribute("aria-expanded", "false"));
+  layer.innerHTML = ""; const o = S.overlay; if (!o) return;
+  const anchor = document.querySelector(`[data-anchor="${o.anchor}"]`);
+  if (!anchor) { S.overlay = null; return; }
+  anchor.setAttribute("aria-expanded", "true");
+  const spec = BUILDERS[o.kind](o);
+  const pop = document.createElement("div");
+  pop.className = "pop"; pop.setAttribute("role", "menu"); pop.dataset.level = "0";
+  const panelRect = document.getElementById("panel").getBoundingClientRect();
+  if (spec.tray) { pop.classList.add("tray-pop"); spec.w = panelRect.width; }
+  pop.style.width = spec.w + "px"; pop.innerHTML = popHtml(spec, "main");
+  layer.appendChild(pop);
+  const inComposer = ["palette", "model", "old-palette", "q-more"].includes(o.kind);
+  const prefer = spec.tray || (inComposer && S.surface === "followup") ? "above" : "below";
+  const rect = spec.full || spec.tray ? panelRect : anchor.getBoundingClientRect();
+  place(pop, rect, prefer, o.kind === "q-more" ? "end" : "start", spec.tray ? 8 : 6);
+  const input = pop.querySelector("[data-search=main]");
+  if (input) { input.value = o.query; input.addEventListener("input", () => { o.query = input.value; o.active = 0; renderOverlay(); const ni = document.querySelector("[data-search=main]"); ni.focus(); ni.setSelectionRange(ni.value.length, ni.value.length); }); }
+  if (o.sub === "hosts") {
+    const item = pop.querySelector('[data-sub="hosts"]');
+    item.classList.add("active");
+    const sspec = buildHosts(o);
+    const sub = document.createElement("div");
+    sub.className = "pop"; sub.setAttribute("role", "menu"); sub.dataset.level = "1"; sub.style.width = sspec.w + "px";
+    sub.innerHTML = popHtml(sspec, "sub"); layer.appendChild(sub);
+    const ir = item.getBoundingClientRect();
+    let left = ir.right + 6; if (left + sub.offsetWidth > innerWidth - 8) left = ir.left - sub.offsetWidth - 6;
+    sub.style.left = left + "px"; sub.style.top = Math.max(8, Math.min(ir.top - 5, innerHeight - sub.offsetHeight - 8)) + "px";
+  }
+  syncActive(initialFocus);
+}
+function place(pop, rect, prefer, align, gap = 6) {
+  const h = pop.offsetHeight, w = pop.offsetWidth;
+  let top = prefer === "above" ? rect.top - h - gap : rect.bottom + gap;
+  if (prefer === "below" && top + h > innerHeight - 8) top = rect.top - h - gap;
+  if (prefer === "above" && top < 8) top = rect.bottom + gap;
+  let left = align === "end" ? rect.right - w : rect.left;
+  left = Math.max(8, Math.min(left, innerWidth - w - 8));
+  pop.style.top = Math.max(8, top) + "px"; pop.style.left = left + "px";
+}
+function currentLevel() { return S.overlay?.sub ? "1" : "0"; }
+function items(level = currentLevel()) { return [...document.querySelectorAll(`#layer .pop[data-level="${level}"] .mi:not([aria-disabled="true"])`)]; }
+function syncActive(focus) {
+  const o = S.overlay; if (!o) return;
+  const lvl = currentLevel(); const list = items(lvl);
+  document.querySelectorAll(`#layer .pop[data-level="${lvl}"] .mi.active`).forEach((el) => el.classList.remove("active"));
+  if (o.sub) document.querySelector('#layer [data-sub="hosts"]')?.classList.add("active");
+  const idx = lvl === "1" ? o.subActive : o.active;
+  const el = list[Math.max(0, Math.min(idx, list.length - 1))];
+  if (el) { el.classList.add("active"); el.scrollIntoView({ block: "nearest" }); }
+  if (focus) {
+    const search = document.querySelector(`#layer .pop[data-level="${lvl}"] [data-search]`);
+    (search || el)?.focus();
+  }
+}
+
+/* ============ 动作 ============ */
+function act(name, v, el) {
+  const t = S.target;
+  switch (name) {
+    case "open-ws": return toggle("ws");
+    case "open-branch": return toggle("branch");
+    case "open-loc": return toggle("location");
+    case "open-plus": return toggle("palette");
+    case "open-model": return toggle("model");
+    case "open-old-plus": return toggle("old-palette");
+    case "open-old-loc": return toggle("old-location");
+    case "q-more": return S.overlay?.kind === "q-more" && S.overlay.id === Number(v) ? closeOverlay() : openOverlay("q-more", { id: Number(v), anchor: `qmore-${v}` });
+    case "ws": t.ws = v; break;
+    case "branch": t.branch = v; break;
+    case "loc-local": S.target = { kind: "local", ws: t.ws && LOCAL_WS.some((w) => w.id === t.ws) ? t.ws : "actspace", branch: t.branch || "main", placement: "in-place" }; break;
+    case "loc-sub": S.overlay.sub = S.overlay.sub ? null : "hosts"; S.overlay.subActive = 0; renderOverlay(true); return;
+    case "host": { const h = hostById(v); S.target = { kind: "remote", host: v, ws: h.workspaces[0]?.id || "" }; break; }
+    case "worktree": S.target = { kind: "local", ws: t.kind === "local" ? t.ws : "actspace", branch: t.branch || "main", placement: "new-worktree" }; break;
+    case "mode": S.mode = v; break;
+    case "mode-clear": S.mode = "agent"; break;
+    case "files": S.attachments.push(S.attachments.length ? `截图-${S.attachments.length + 1}.png` : "截图.png"); break;
+    case "page": S.overlay.page = v; S.overlay.query = ""; S.overlay.active = 0; renderOverlay(true); return;
+    case "back": S.overlay.page = "root"; S.overlay.query = ""; S.overlay.active = 0; renderOverlay(true); return;
+    case "skill": S.skills = S.skills.includes(v) ? S.skills.filter((s) => s !== v) : [...S.skills, v]; break;
+    case "model": S.model = v; break;
+    case "att-del": S.attachments.splice(Number(v), 1); break;
+    case "skill-del": S.skills.splice(Number(v), 1); break;
+    case "send": return send();
+    case "stop": S.running = false; S.paused = S.queue.length > 0; break;
+    case "resume": { const next = S.queue.shift(); if (next) S.messages.push(next.text); S.running = true; S.paused = false; break; }
+    case "q-steer": { const i = S.queue.findIndex((q) => q.id === Number(v)); S.steering.push(...S.queue.splice(i, 1)); break; }
+    case "q-unsteer": { const i = S.steering.findIndex((q) => q.id === Number(v)); S.queue.unshift(...S.steering.splice(i, 1)); break; }
+    case "q-del": S.queue = S.queue.filter((q) => q.id !== Number(v)); if (!S.queue.length) S.paused = false; break;
+    case "q-edit": { const i = S.queue.findIndex((q) => q.id === Number(v)); S.text = S.queue[i].text; S.queue.splice(i, 1); S.overlay = null; render(); document.getElementById("ta").focus(); return; }
+    case "q-up": { const i = S.queue.findIndex((q) => q.id === Number(v)); if (i > 0) [S.queue[i - 1], S.queue[i]] = [S.queue[i], S.queue[i - 1]]; break; }
+    case "toast": toast(v); if (S.overlay) closeOverlay(false); return;
+    default: return;
+  }
+  const wasOpen = !!S.overlay; const anchor = S.overlay?.anchor;
+  S.overlay = null; render();
+  if (wasOpen && anchor) document.querySelector(`[data-anchor="${anchor}"]`)?.focus();
+}
+function toggle(kind) { if (S.overlay?.kind === kind) closeOverlay(); else openOverlay(kind); }
+
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-act]");
+  if (el && el.getAttribute("aria-disabled") !== "true" && !el.disabled && el.tagName !== "SELECT") { e.preventDefault(); act(el.dataset.act, el.dataset.v, el); return; }
+  if (S.overlay && !e.target.closest("#layer")) closeOverlay(false);
+});
+document.addEventListener("change", (e) => {
+  if (e.target.dataset.act === "old-host") { const v = e.target.value; if (v === "local") applyPreset("local"); else S.target = { kind: "remote", host: v, ws: hostById(v).workspaces[0]?.id || "" }; render(); }
+});
+document.addEventListener("mouseover", (e) => {
+  const item = e.target.closest("#layer .mi"); if (!item || !S.overlay) return;
+  const lvl = item.closest(".pop").dataset.level; const list = items(lvl); const i = list.indexOf(item); if (i < 0) return;
+  if (lvl === "0" && S.overlay.kind === "location") {
+    if (item.dataset.sub === "hosts" && !S.overlay.sub) { S.overlay.active = i; S.overlay.sub = "hosts"; S.overlay.subActive = 0; renderOverlay(); return; }
+    if (item.dataset.sub !== "hosts" && S.overlay.sub) { S.overlay.sub = null; S.overlay.active = i; renderOverlay(); return; }
+  }
+  if (lvl === "1") S.overlay.subActive = i; else S.overlay.active = i;
+  syncActive(false);
+});
+document.addEventListener("keydown", (e) => {
+  const o = S.overlay; if (!o) return;
+  if (e.isComposing || e.keyCode === 229) return;
+  const lvl = currentLevel(); const list = items(lvl);
+  const key = lvl === "1" ? "subActive" : "active";
+  const inSearch = e.target.matches?.("[data-search]");
+  if (e.key === "Escape") { e.preventDefault(); if (o.sub) { o.sub = null; renderOverlay(true); } else if (o.page && o.page !== "root") { act("back"); } else closeOverlay(); return; }
+  if (e.key === "ArrowDown") { e.preventDefault(); o[key] = (o[key] + 1) % list.length; syncActive(!inSearch); return; }
+  if (e.key === "ArrowUp") { e.preventDefault(); o[key] = (o[key] - 1 + list.length) % list.length; syncActive(!inSearch); return; }
+  if (e.key === "Home" && !inSearch) { e.preventDefault(); o[key] = 0; syncActive(true); return; }
+  if (e.key === "End" && !inSearch) { e.preventDefault(); o[key] = list.length - 1; syncActive(true); return; }
+  const cur = list[Math.max(0, Math.min(o[key], list.length - 1))];
+  if (e.key === "ArrowRight" && cur?.dataset.sub && (!inSearch || !e.target.value)) { e.preventDefault(); act(cur.dataset.act, cur.dataset.v, cur); return; }
+  if (e.key === "ArrowLeft" && (!inSearch || !e.target.value)) {
+    if (o.sub) { e.preventDefault(); o.sub = null; renderOverlay(true); return; }
+    if (o.page && o.page !== "root") { e.preventDefault(); act("back"); return; }
+  }
+  if (e.key === "Backspace" && inSearch && !e.target.value && o.page && o.page !== "root") { e.preventDefault(); act("back"); return; }
+  if (e.key === "Enter" || (e.key === " " && !inSearch)) { if (cur) { e.preventDefault(); act(cur.dataset.act, cur.dataset.v, cur); } }
+});
+
+/* ============ tooltip / toast ============ */
+let tipEl = null;
+document.addEventListener("mouseover", (e) => {
+  const el = e.target.closest("[data-tip]");
+  if (!el) { tipEl?.remove(); tipEl = null; return; }
+  if (tipEl?.dataset.for === el.dataset.tip) return;
+  tipEl?.remove(); tipEl = document.createElement("div"); tipEl.className = "tip"; tipEl.dataset.for = el.dataset.tip; tipEl.textContent = el.dataset.tip;
+  document.body.appendChild(tipEl);
+  const r = el.getBoundingClientRect();
+  tipEl.style.left = Math.max(8, Math.min(r.left + r.width / 2 - tipEl.offsetWidth / 2, innerWidth - tipEl.offsetWidth - 8)) + "px";
+  tipEl.style.top = (r.top - tipEl.offsetHeight - 6 < 8 ? r.bottom + 6 : r.top - tipEl.offsetHeight - 6) + "px";
+});
+let toastTimer;
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1800); }
+window.addEventListener("resize", () => { if (S.overlay) renderOverlay(); updateLayout(); });
+
+/* URL 参数直达某个状态：?theme=dark&surface=followup&target=remote&version=old&open=location */
+(() => {
+  const q = new URLSearchParams(location.search);
+  if (q.get("theme")) S.theme = q.get("theme");
+  if (q.get("surface")) S.surface = q.get("surface");
+  if (q.get("version")) S.version = q.get("version");
+  if (q.get("target")) applyPreset(q.get("target"));
+  if (q.get("mode")) S.mode = q.get("mode");
+  if (q.get("text")) S.text = q.get("text");
+  if (q.get("running") === "false") S.running = false;
+  render();
+  const open = q.get("open");
+  if (open === "location") { openOverlay("location"); if (q.get("sub") === "hosts") { S.overlay.sub = "hosts"; renderOverlay(); } }
+  else if (open === "palette") { openOverlay("palette"); if (q.get("query")) { S.overlay.query = q.get("query"); renderOverlay(); } }
+})();
+</script>
+</body>
+</html>

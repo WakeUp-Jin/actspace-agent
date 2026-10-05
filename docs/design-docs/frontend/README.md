@@ -57,7 +57,7 @@
 - `docs/design-docs/frontend/front-environment-and-git-actions.md`：顶部 Environment、编辑器选择、本地分支创建、Commit 和 Push 工作流。
 - `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范；右侧 Review Tab、六种 scope、upstream Branch、Review Options 与 Git actions 都以此为准。
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`：会话、Pinned 和 Workspaces 分区。
-- `docs/design-docs/frontend/front-space-工作台设计.md`：Space（类 Claude Projects）讨论稿：主会话只读 + 派活、线程即完整会话、概览（线程 / 库 / 记忆）、指令与记忆注入；待 demo 评审后定稿。
+- `docs/design-docs/frontend/front-space-工作台设计.md`：Space（类 Claude Projects）前端设计稿：协调 Agent + 工作 Agent、中间标签栏、右栏概览（Agents / 库 / 记忆）、状态胶囊与三层审批；待 demo 评审后定稿。
 - `docs/design-docs/frontend/front-中间消息区规范.md`：消息语法、工具流和执行状态。
 - `docs/design-docs/frontend/front-聊天输入框规范.md`：Composer、模型、附件、Context 和发送。
 - `docs/design-docs/frontend/front-composer-slash-command.md`：Composer 内 `/` 快捷菜单的 Functions / Skills 分组、命令语义、键盘交互和验证边界。
@@ -100,7 +100,8 @@
 - `actspace-deepseek-workbench.html`：工作台高保真原型。
 - `agent-subagent-flow-prototype.html`：Agent 工具与 Subagent 执行流原型。
 - `compact-command-states.html`：`/compact` 消息流三态及浅深主题原型。
-- `space-demo.html`：2026-10-02 Space 工作台交互 demo（左栏 Space 分区、主会话派活、概览三页签、线程详情与审批、新建 / 设置弹窗；浅深双主题）。
+- `space-demo.html`：2026-10-03 Space 工作台交互 demo（左栏会话列表、中间协调 Agent / 工作 Agent 标签页、右栏 Agents / 库 / 记忆、状态胶囊与审批托盘；浅深双主题）。
+- `space-demo-v1.html`：2026-10-02 第一版 demo（主会话 + 线程，右栏推入详情），已被 `space-demo.html` 取代，仅留作对照。
 - `settings-redesign-demo.html`：2026-09-25 设置中心视觉重设计定稿 demo（内嵌分组 + 翡翠绿开关 + 独立「搜索」页 + 使用统计微调）；右下角调节面板只用于方案对比。
 - `review-v1-git-review-prototype.html`：Review V1 Git-first 右侧面板历史原型；新 Workbench 以 `../core-review-change-sources.md` 为准。
 
