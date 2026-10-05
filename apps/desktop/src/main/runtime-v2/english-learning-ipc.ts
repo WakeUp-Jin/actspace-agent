@@ -2,13 +2,14 @@ import { ipcMain, type BrowserWindow } from "electron";
 import { ENGLISH_LEARNING_CHANNELS, type EnglishLearningTargetInput } from "@actspace/shared";
 import type { SettingsService } from "../settings-service";
 import type { DesktopRuntimeV2Registry } from "./runtime-registry";
+import { assertTrustedSender } from "../ipc/trusted-sender";
 
 export function registerEnglishLearningIpc(options: { registry: DesktopRuntimeV2Registry; settings: SettingsService; getMainWindow: () => BrowserWindow | null }): () => void {
   const { registry, settings } = options;
   const channels = ENGLISH_LEARNING_CHANNELS;
   const handle = (channel: string, action: (input: unknown) => unknown) => {
     ipcMain.handle(channel, async (event, input) => {
-      if (event.sender !== options.getMainWindow()?.webContents || event.senderFrame !== event.sender.mainFrame) throw new Error("无效的英语辅助学习请求来源。");
+      assertTrustedSender(event, options.getMainWindow, "无效的英语辅助学习请求来源。");
       try { return await action(input); }
       catch { throw new Error("英语辅助学习操作失败，请检查会话与配置后重试。"); }
     });

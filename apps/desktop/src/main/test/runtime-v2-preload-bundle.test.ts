@@ -31,5 +31,8 @@ describe("runtime v2 preload packaging", () => {
     const bundled = result.outputFiles[0]?.text ?? "";
     expect(bundled).toContain('require("electron")');
     expect(bundled).not.toMatch(/require\(["']@actspace\//);
+    // sandbox: true 的 preload 只能 require("electron")（另有少数内置模块，这里不需要）。
+    const required = [...bundled.matchAll(/require\(["']([^"']+)["']\)/g)].map((match) => match[1]);
+    expect(new Set(required)).toEqual(new Set(["electron"]));
   });
 });

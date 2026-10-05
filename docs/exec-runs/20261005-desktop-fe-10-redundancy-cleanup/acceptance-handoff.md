@@ -1,7 +1,7 @@
 # 10 冗余清理 验收交接
 
-- 主线提交：`refactor/desktop-frontend` @ `<squash 提交哈希>`（squash 后填写，随 11 的第一个 T 提交）
-- 子分支：`refactor/desktop-fe-10`（`e4e2d1af..<收尾提交>`，每个 T 一个提交，最后一个是收尾提交）
+- 主线提交：`refactor/desktop-frontend` @ `f08802ed`
+- 子分支：`refactor/desktop-fe-10`（`e4e2d1af..165c038c`，共 13 个提交，每个 T 一个，最后一个是收尾提交）
 - 状态：**可以交给验收**
 - 启动方式：
   - `pnpm install`（如有需要），然后 `pnpm --filter @actspace/desktop build`。

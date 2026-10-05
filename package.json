@@ -46,6 +46,7 @@
     "gen:contract-matrix": "node scripts/contract-matrix/generate.mjs",
     "check:frontend-theme": "node scripts/check-frontend-theme-colors.mjs",
     "check:frontend-tokens": "node scripts/check-frontend-design-tokens.mjs",
+    "check:ipc-channels": "node scripts/check-ipc-channels.mjs",
     "check:actions": "./scripts/check-action-pinning.sh",
     "repo:stats": "node scripts/repo-stats.mjs",
     "refactor:stats": "node scripts/refactor-stats.mjs",

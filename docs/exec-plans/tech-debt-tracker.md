@@ -26,6 +26,17 @@
 | 2026-09-26 | 设置表单内部 | `CustomConnectionModels` 行内操作、API Key 显隐切换等与 36px 输入框同排的控件，以及 `CustomModelForm`、连接状态块的「边框卡片」式分组仍是旧写法。 | 与 Input / Textarea 基础组件一起收口；分组样式需要用户决定是否改为内嵌分组。 |
 | 2026-09-26 | dialog 圆角 | 8 处 dialog 仍用 `rounded-act-xl`（18px），规范为 12px。 | 单独做一次 dialog 外观统一，与 `Dialog` 基础组件一起。 |
 
+## Desktop 安全遗留
+
+2026-10-06 Desktop 前端重构 11（安全与 IPC，`active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md`）之后仍未处理的项：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-10-06 | main / 子进程环境（C1） | `settings-service` 的 `applyToEnv` 把搜索服务 Key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY` / `TINYFISH_API_KEY`）等写进 `process.env`。以下子进程继承完整环境：bash 工具（`packages/tools/shell-tools/src/node-ports.ts`）、`rg`（`packages/tools/filesystem-search/src/node-ports.ts`）、git / gh（`review-git-service`、`review-git-engine`、`review-git-worker`、`review-pr-service`、`workspace-environment-service`、`workspace-git-context-service`）、ssh（`remote-hosts/ssh.ts`）、Browser Bridge 命令、本地更新脚本。只有终端 pty 经 `sanitizeEnvironment` 过滤。 | 01 S7：工具配置改由 Runtime 配置端口注入，删除 `applyToEnv`；子进程改用环境变量白名单。需要单独设计。 |
+| 2026-10-06 | main / Browser Bridge 安装 | `installBrowserBridgeFromRepo`（`fixed-renderer-ipc.ts`）把 renderer 传来的 `repoRoot` 交给 `browser-bridge-service.buildAndInstall`，只校验扩展 manifest（名称、key、扩展 id）就在该目录执行 `build.sh`。renderer 被注入脚本时，可以让 main 在任意满足条件的目录里跑脚本。11 的复核发现，不在 11 范围内。 | 改为 main 弹系统对话框选择源码目录（与 `selectWorkspaceDirectory` 相同的做法），channel 不再接受路径参数。 |
+| 2026-10-06 | scripts / IPC 审计 | `check:ipc-channels` 只核对常量、注册和 preload 引用三者一致，不检查注册是否经过 `assertTrustedSender`；preload 只要出现 channel 字符串就算引用，不区分 invoke 和 on。 | 13 落地统一注册器和 IPC contract 后，由注册器强制 sender 校验，审计脚本改为以 contract 为来源并区分方向。 |
+| 2026-10-06 | renderer / 主文档 CSP | 主文档没有 CSP。实测严格策略会让 HTML 预览（srcdoc iframe 继承父策略）的内联脚本、样式和桥脚本失效，mermaid SVG 内的 `<style>` 被拦；应用本身启动、React style prop、highlight.js、`data:` 图片不受影响。结论见 `docs/exec-runs/20261005-desktop-fe-11-security-ipc/execution-process.md` 的 T9。 | 先把 HTML 预览改用自定义协议（例如 `actspace-preview://`）加载，使其不继承主文档策略；mermaid 样式改走 nonce / hash 或隔离渲染；之后由 main 用 `onHeadersReceived` 注入严格 CSP。 |
+
 ## v1 历史债务记录
 
 以下条目保留原日期与旧实现语境，不作为当前 v2 漏洞、缺陷或可直接执行的修复计划。重新立项前须按当前源码核实；当前安全边界见 [执行安全](../design-docs/execution-safety/README.md)。

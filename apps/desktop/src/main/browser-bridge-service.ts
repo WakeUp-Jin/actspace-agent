@@ -80,6 +80,8 @@ export class BrowserBridgeService {
   private statusErrorCache:
     | { key: string; expiresAt: number; status: BrowserBridgeStatus }
     | undefined;
+  private readonly activeCommands = new Set<ChildProcess>();
+  private disposed = false;
 
   constructor(options: BrowserBridgeServiceOptions) {
     this.dataRoot = options.dataRoot;
@@ -252,7 +254,7 @@ export class BrowserBridgeService {
           record.protocolVersion !== "0.2.0" || typeof record.hostVersion !== "string" || typeof record.extensionVersion !== "string") continue;
         const socket = await stat(socketPath);
         if (!socket.isSocket() || socket.uid !== process.getuid?.() || socket.mode & 0o077) continue;
-        const info = await runCommand(this.binPath, ["info", "--json", "--socket", socketPath], undefined, 2_000);
+        const info = await this.run(this.binPath, ["info", "--json", "--socket", socketPath], undefined, 2_000);
         if (!info.ok) continue;
         const response = JSON.parse(info.stdout) as Record<string, unknown>;
         const running = response.result as Record<string, unknown> | undefined;
@@ -405,7 +407,7 @@ export class BrowserBridgeService {
     this.selectedSocketPath = selected?.socketPath;
     let probeReady = false;
     if (selected) {
-      const probe = await runCommand(this.binPath, ["tabs", "--json", "--socket", selected.socketPath], undefined, 3_000);
+      const probe = await this.run(this.binPath, ["tabs", "--json", "--socket", selected.socketPath], undefined, 3_000);
       probeReady = probe.ok;
     }
     const doctorChecks = parsedDoctor.checks.map((check) => check.name !== "local_rpc_socket" ? check : selected
@@ -460,7 +462,7 @@ export class BrowserBridgeService {
     }
 
     this.log("browser-bridge build started", { pluginDir });
-    const build = await runCommand("bash", [buildScript], pluginDir, BROWSER_BRIDGE_BUILD_TIMEOUT_MS, (line) => {
+    const build = await this.run("bash", [buildScript], pluginDir, BROWSER_BRIDGE_BUILD_TIMEOUT_MS, (line) => {
       this.log("[plugin:browser-bridge] build", { line });
     });
     if (!build.ok) {
@@ -639,7 +641,33 @@ export class BrowserBridgeService {
   }
 
   private runAbbAt(command: string, args: string[]): Promise<AbbCommandResult> {
-    return runCommand(command, args, undefined, this.commandTimeoutMs);
+    return this.run(command, args, undefined, this.commandTimeoutMs);
+  }
+
+  private run(
+    command: string,
+    args: string[],
+    cwd: string | undefined,
+    timeoutMs: number,
+    onLine?: (line: string) => void,
+  ): Promise<AbbCommandResult> {
+    if (this.disposed) {
+      return Promise.resolve({ ok: false, stdout: "", stderr: "", error: "Browser Bridge 已关闭" });
+    }
+    return runCommand(command, args, cwd, timeoutMs, onLine, this.activeCommands);
+  }
+
+  /** 应用退出时调用：杀掉仍在运行的 abb / 构建子进程，之后的命令直接失败。可重复调用。 */
+  dispose(): void {
+    this.disposed = true;
+    for (const child of this.activeCommands) {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // 进程可能已退出
+      }
+    }
+    this.activeCommands.clear();
   }
 
   private invalidateStatusState(): void {
@@ -729,6 +757,7 @@ function runCommand(
   cwd: string | undefined,
   timeoutMs: number,
   onLine?: (line: string) => void,
+  active?: Set<ChildProcess>,
 ): Promise<AbbCommandResult> {
   return new Promise((resolve) => {
     let child: ChildProcess;
@@ -740,6 +769,12 @@ function runCommand(
     } catch (error) {
       resolve({ ok: false, stdout: "", stderr: "", error: error instanceof Error ? error.message : String(error) });
       return;
+    }
+    if (active) {
+      active.add(child);
+      const untrack = () => active.delete(child);
+      child.once("exit", untrack);
+      child.once("error", untrack);
     }
 
     let settled = false;

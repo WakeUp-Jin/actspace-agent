@@ -6,6 +6,7 @@ import { UsageSourceCache } from "./usage-source-cache";
 import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
+import { resolve as resolvePath } from "node:path";
 import { dialog, ipcMain, nativeImage, nativeTheme, shell, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import { spawn } from "node:child_process";
 import {
@@ -47,6 +48,7 @@ import {
 } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2UpdateCustomConnectionInput } from "@actspace/shared/runtime-v2";
 import type { AppDataRoots } from "../app-paths";
+import { assertTrustedSender, isTrustedSender } from "../ipc/trusted-sender";
 import type { PendingApprovalRegistry } from "../approval-registry";
 import { showArtifactContextMenu, showResolvedArtifactContextMenu } from "../artifact-context-menu-service";
 import { importComposerImage } from "../composer-attachment-service";
@@ -57,7 +59,8 @@ import type { ModelStoreService, ModelStoreResult } from "../model-store-service
 import type { BrowserBridgeService } from "../browser-bridge-service";
 import type { QuickOpenShortcutController } from "../quick-open-shortcut-controller";
 import type { SettingsService } from "../settings-service";
-import { createWorkspaceFolder, resolveWorkspaceSelection, resolveRegisteredWorkspaceSelection, setWorkspaceHidden, type WorkspaceRegistryOptions } from "../workspace-registry-service";
+import { createWorkspaceFolder, resolveWorkspaceSelection, setWorkspaceHidden } from "../workspace-registry-service";
+import { createWorkspaceAccessDeps, registeredWorkspaceRoot, resolveWorkspaceAccess, workspaceRegistryOptions, WORKSPACE_NOT_REGISTERED } from "../workspace-access";
 import { getWorkspaceGitContext } from "../workspace-git-context-service";
 import { openWorkspaceInIde } from "../workspace-ide-service";
 import { initializeGitRepository } from "../review-git-service";
@@ -114,7 +117,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     listener: (event: IpcMainInvokeEvent, ...args: T) => R | Promise<R>,
   ): void => {
     ipcMain.handle(channel, async (event, ...args) => {
-      assertTrustedSender(event, options.getMainWindow());
+      assertTrustedSender(event, options.getMainWindow, "Runtime v2 fixed renderer IPC rejected an untrusted sender.");
       const input = args[0] && typeof args[0] === "object" ? args[0] as Record<string, unknown> : {};
       if (options.remote) {
         if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession && input.hostId) return options.remote.create(input);
@@ -172,7 +175,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     }
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, async (_event, input: { title?: string; workspaceRoot?: string; agentForm?: import("@actspace/shared/runtime-v2").MainAgentForm } = {}) => {
-    let snapshot = await options.registry.createSession(undefined, input.workspaceRoot ?? options.roots.workspaceRoot, input.agentForm);
+    const workspaceRoot = await registeredWorkspaceRoot(workspaceRegistryOptions(options.roots), input.workspaceRoot ?? options.roots.workspaceRoot);
+    let snapshot = await options.registry.createSession(undefined, workspaceRoot, input.agentForm);
     if (input.title?.trim()) {
       snapshot = await options.registry.updateSessionMetadata({ sessionId: snapshot.sessionId, title: input.title.trim() });
     }
@@ -331,7 +335,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   const themeListener = (event: Electron.IpcMainEvent, mode: unknown) => {
-    if (!isTrustedSender(event.sender.id, options.getMainWindow())) return;
+    if (!isTrustedSender(event, options.getMainWindow())) return;
     if (mode === "light" || mode === "dark" || mode === "system") nativeTheme.themeSource = mode;
   };
   ipcMain.on(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setNativeTheme, themeListener);
@@ -552,6 +556,10 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
 
 function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, handle: Handle): void {
   const registryOptions = workspaceRegistryOptions(options.roots);
+  const workspaceAccess = createWorkspaceAccessDeps(registryOptions, () => options.registry.listSessions());
+  // 「新建文件夹工作区」的父目录来自系统对话框，不在 registry 里。只认用户最近一次在对话框里选的目录，
+  // 不接受 renderer 自己拼的路径；建成功后作废，名字不合法或目录已存在时可以换个名字重试。
+  let pickedParentDirectory: string | null = null;
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectFiles, async (_event, input: { remote?: boolean } = {}) => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), {
       properties: ["openFile", "multiSelections"],
@@ -587,15 +595,31 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, async (_event, input: import("@actspace/shared").SelectWorkspaceDirectoryInput = {}): Promise<SelectWorkspaceDirectoryResult> => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), { properties: ["openDirectory"] });
     if (result.canceled || !result.filePaths[0]) return { canceled: true };
-    if (!input.registerWorkspace) return { canceled: false, workspaceRoot: result.filePaths[0] };
+    if (!input.registerWorkspace) {
+      pickedParentDirectory = resolvePath(result.filePaths[0]);
+      return { canceled: false, workspaceRoot: result.filePaths[0] };
+    }
     const resolved = await resolveWorkspaceSelection(registryOptions, { workspaceRoot: result.filePaths[0] });
     if (resolved.ok === false) throw new Error(resolved.error);
     return { canceled: false, workspaceRoot: resolved.workspaceRoot };
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.openWorkspaceInIde, (_event, input: { workspaceId: string }) => openWorkspaceInIde(registryOptions, input.workspaceId));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setWorkspaceVisibility, (_event, input: { workspaceId: string; hidden: boolean }) => setWorkspaceHidden(registryOptions, input.workspaceId, input.hidden));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getWorkspaceGitContext, async (_event, input: { workspaceRoot?: string }) => getWorkspaceGitContext(input?.workspaceRoot ?? options.roots.workspaceRoot));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, (_event, input: { parentRoot: string; name: string }) => createWorkspaceFolder(registryOptions, input));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getWorkspaceGitContext, async (_event, input: { workspaceRoot?: string }) => getWorkspaceGitContext(
+    await resolveWorkspaceAccess({ workspaceRoot: input?.workspaceRoot ?? options.roots.workspaceRoot }, workspaceAccess),
+  ));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, async (_event, input: { parentRoot: string; name: string }) => {
+    const parent = typeof input?.parentRoot === "string" && input.parentRoot.trim() ? resolvePath(input.parentRoot.trim()) : "";
+    if (!parent) return { ok: false as const, error: WORKSPACE_NOT_REGISTERED };
+    const picked = parent === pickedParentDirectory;
+    if (!picked) {
+      const registered = await resolveWorkspaceAccess({ workspaceRoot: parent }, workspaceAccess).then(() => true, () => false);
+      if (!registered) return { ok: false as const, error: WORKSPACE_NOT_REGISTERED };
+    }
+    const created = await createWorkspaceFolder(registryOptions, input);
+    if (picked && created.ok) pickedParentDirectory = null;
+    return created;
+  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readSessionArtifact, async (_event, input: { sessionId: string; artifactPath: string }) => {
     try {
       const artifact = await options.registry.resolveArtifact(input.sessionId, input.artifactPath);
@@ -617,7 +641,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     }
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.showArtifactContextMenu, async (_event, input: ArtifactContextMenuInput) => {
-    if (input.kind === "workspace_file") return showArtifactContextMenu(input, options.roots, options.getMainWindow());
+    if (input.kind === "workspace_file") {
+      const workspaceRoot = await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot ?? options.roots.defaultWorkspaceRoot }, workspaceAccess)
+        .catch(() => null);
+      if (!workspaceRoot) return { shown: false, error: "invalid_target" as const };
+      return showArtifactContextMenu({ ...input, workspaceRoot }, options.roots, options.getMainWindow());
+    }
     try {
       const artifact = await options.registry.resolveArtifact(input.sessionId, input.artifactPath);
       if (!isSupportedSessionImageMime(artifact.mediaType) || artifact.bytes.byteLength > 25 * 1024 * 1024) {
@@ -726,9 +755,9 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.installBrowserBridgeFromRepo, (_event, input: { repoRoot: string }) => options.browserBridge.buildAndInstall(input.repoRoot));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.installBrowserBridgeNativeHost, () => options.browserBridge.installNativeHost());
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSkills, (_event, input: { workspaceRoot?: string } = {}) => listFixedRendererSkills({
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSkills, async (_event, input: { workspaceRoot?: string } = {}) => listFixedRendererSkills({
     dataRoot: options.roots.dataRoot,
-    workspaceRoot: input.workspaceRoot ?? options.roots.workspaceRoot,
+    workspaceRoot: input.workspaceRoot ? await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot }, workspaceAccess) : options.roots.workspaceRoot,
     homeDir: homedir(),
     disabled: options.settings.get().skills.disabled,
   }));
@@ -848,20 +877,6 @@ async function toRunContent(
   return { content: blocks, importedArtifactIds };
 }
 
-function workspaceRegistryOptions(roots: AppDataRoots): WorkspaceRegistryOptions {
-  return {
-    dataRoot: roots.dataRoot,
-    defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
-    fallbackWorkspaceRoot: roots.workspaceRoot,
-  };
-}
-
-async function registeredWorkspaceRoot(options: WorkspaceRegistryOptions, requested?: string): Promise<string> {
-  const resolved = await resolveRegisteredWorkspaceSelection(options, { workspaceRoot: requested ?? options.defaultWorkspaceRoot });
-  if (resolved.ok === false) throw new Error(resolved.error);
-  return resolved.workspaceRoot;
-}
-
 async function providerBalance(options: FixedRendererIpcOptions, provider: "deepseek" | "kimi" | "openrouter") {
   const runtime = provider === "openrouter"
     ? options.settings.getOpenRouterManagementRuntimeConfig()
@@ -945,10 +960,3 @@ function safeErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function isTrustedSender(senderId: number, mainWindow: BrowserWindow | undefined): boolean {
-  return mainWindow !== undefined && !mainWindow.isDestroyed() && senderId === mainWindow.webContents.id;
-}
-
-function assertTrustedSender(event: IpcMainInvokeEvent, mainWindow: BrowserWindow | undefined): void {
-  if (!isTrustedSender(event.sender.id, mainWindow)) throw new Error("Runtime v2 fixed renderer IPC rejected an untrusted sender.");
-}

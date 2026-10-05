@@ -10,7 +10,7 @@ import { registerPerformanceIpc } from "../performance-ipc";
 import { PERFORMANCE_CHANNELS } from "@actspace/shared";
 it("rejects foreign frames, samples only while enabled, and cleans up on hide/dispose", () => {
   const contents = Object.assign(new EventEmitter(), { mainFrame: {} });
-  const window = Object.assign(new EventEmitter(), { webContents: contents, isVisible: () => true, isMinimized: () => false });
+  const window = Object.assign(new EventEmitter(), { webContents: contents, isDestroyed: () => false, isVisible: () => true, isMinimized: () => false });
   const dispose = registerPerformanceIpc(() => window as never);
   const active = mocks.handlers.get(PERFORMANCE_CHANNELS.active)!;
   const sample = mocks.handlers.get(PERFORMANCE_CHANNELS.sample)!;

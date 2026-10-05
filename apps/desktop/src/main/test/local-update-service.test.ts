@@ -184,6 +184,37 @@ describe("LocalUpdateService", () => {
     });
   });
 
+  it("dispose stops readiness polling without killing the detached helper", async () => {
+    const dataRoot = await makeTempRoot("actspace-update-data-");
+    const sourceRoot = await makeSourceRoot();
+    const appExe = await makeInstalledApp();
+    const onReadyToReplace = vi.fn();
+    const helper = { unref: vi.fn(), kill: vi.fn() };
+    const svc = makeService({
+      dataRoot,
+      appPath: appExe,
+      spawnHelper: vi.fn(() => helper as unknown as ChildProcess),
+      onReadyToReplace,
+      readinessPollMs: 5,
+    });
+    await svc.load();
+    await svc.setSourceRoot(sourceRoot);
+    expect((await svc.start()).ok).toBe(true);
+
+    svc.dispose();
+    svc.dispose();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    await writeFile(
+      join(dataRoot, "tmp", "local-update", "status.json"),
+      JSON.stringify({ phase: "ready_to_replace", message: "ready", updatedAt: "2026-05-31T16:00:01.000Z" }),
+      "utf8",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(onReadyToReplace).not.toHaveBeenCalled();
+    expect(helper.kill).not.toHaveBeenCalled();
+  });
+
   it("treats failed helper status as retryable instead of stuck running", async () => {
     const dataRoot = await makeTempRoot("actspace-update-data-");
     const sourceRoot = await makeSourceRoot();

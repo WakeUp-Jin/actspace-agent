@@ -61,6 +61,13 @@
 - 单测：传 `/`、`~`、registry 外目录、registry 内 symlink 指向外部、`..foo` 文件名，分别断言拒绝 / 拒绝 / 拒绝 / 拒绝 / 允许。
 - Electron 手测：右侧文件树、文件预览、「在 Finder / 编辑器中打开」在普通工作区和 worktree 会话中都正常。
 
+> 已在 [11 安全与 IPC 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md) 执行（T4、T5）：新增 `main/workspace-access.ts`，`toInsideRoot` 改为 realpath 加 `path.relative`，右侧文件 list / read / stat、Git context、工作区文件右键菜单走 `resolveWorkspaceAccess`；`createSession` 只认 registry，`createWorkspaceFolder` 的父目录要么是刚在对话框中选中的目录，要么通过校验。与上文有两处不同：
+>
+> - 签名是 `resolveWorkspaceAccess({ workspaceRoot }, deps)`，直接返回 realpath 后的 root，不带 `sessionId` / `workspaceId`。
+> - 背景更正：`workspace-open-service`、`workspace-environment-service` 的 IPC 入口在 11 之前就已经用 `registeredWorkspaceRoot` 校验 registry，没有上文说的越界问题，11 未改动它们。
+>
+> worktree 会话目前在生产代码中创建不出来（`prepareExecutionContext` 没有调用方），worktree 路径只由单测覆盖。
+
 ### P0-2 `desktop-shell-ipc` 的 sender 校验 fail-open
 
 **证据**：`main/runtime-v2/desktop-shell-ipc.ts:59`
@@ -84,6 +91,8 @@ if (window && (event.sender !== window.webContents || event.senderFrame !== wind
   ```
 
 - 6 个注册点全部改用它（见 §4 的统一注册器）。
+
+> 已在 [11 安全与 IPC 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md) 执行（T1）：新增 `main/ipc/trusted-sender.ts`，当时剩下的 5 个注册点（`projection-ipc.ts` 已在 10 删除）全部改用，保留各处原有的错误文案。统一注册器仍随 13 执行。
 
 ### P0-3 窗口缺导航防护与 CSP
 
@@ -115,12 +124,18 @@ if (window && (event.sender !== window.webContents || event.senderFrame !== wind
    mermaid 动态 import、highlight.js、xterm 都需要实测；`style-src 'unsafe-inline'` 暂时保留（Tailwind 运行时与 React inline style）。
 3. 新增 `openExternalSafely(url)`：只允许 `https:`、`mailto:`；`cursor://`、`vscode://` 这类编辑器协议走单独白名单，且只接受本机绝对路径。
 
+> 第 1、3 步已在 [11 安全与 IPC 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md) 执行（T6、T7）：`main/window-security.ts` 负责窗口参数、导航防护和 webview 拦截；`main/platform-actions.ts` 的 `openExternalSafely` 放行 `https:`、`http:`、`mailto:`（加入 `http:` 是因为消息中的普通外链需要在系统浏览器打开），「在 Cursor 中打开」也收进该文件。
+>
+> 第 2 步（CSP）按 11 的 J1 = A 本轮不做，只在 T9 做了实验：React style prop 走 CSSOM，不受 `style-src` 限制，上面「Tailwind 运行时与 React inline style」需要 `'unsafe-inline'` 的判断不成立；真正的阻碍是 HTML 预览的 srcdoc iframe 继承父文档 CSP（`frame-src` 管不到 srcdoc），以及 mermaid SVG 内嵌的 `<style>`。后续方案记入 `docs/exec-plans/tech-debt-tracker.md`「Desktop 安全遗留」。
+
 ### P0-4 `shell.openExternal` 未校验
 
 - `desktop-shell-ipc.ts:139`：`shell.openExternal(result.url)`，url 来自 `gh pr create` 的输出，不校验协议和主机。
 - `artifact-context-menu-service.ts:60`：拼 `cursor://file${encodeURI(path)}`，风险较低，但同样纳入白名单。
 
 改为统一走 `openExternalSafely`。
+
+> 已在 [11 安全与 IPC 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md) 执行（T6）。
 
 ## 3. P1 问题
 
@@ -209,6 +224,8 @@ if (window && (event.sender !== window.webContents || event.senderFrame !== wind
 | 无全局异常处理 | 全 main 无 `unhandledRejection` / `uncaughtException` | 记录到 `logMain`，不吞掉 |
 | 单窗口假设 | `getMainWindow()` + `webContents.send` 广播 | 维持单窗口，但把「广播」收进一个 `RendererEvents` 对象，方便以后多窗口 |
 
+> 前三行已在 [11 安全与 IPC 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md) 执行（T2、T3）：窗口 `closed` 时用创建时保存的 webContents id 调用 `closeOwner`；`before-quit` 调用 Browser Bridge 和本地更新服务的 `dispose`；`installProcessErrorLogging` 监听 `uncaughtExceptionMonitor` / `unhandledRejection`。背景更正：SSH 隧道在 11 之前就由 `remoteHosts.dispose` 关闭（`remote-hosts/registry.ts`），上表「未见显式清理」不准确。本地更新服务的子进程是更新脚本，必须比应用活得久，所以它的 `dispose` 只清定时器，不终止子进程。「单窗口假设」一行未做。
+
 ### P1-7 preload 在做业务转换
 
 `preload/index.ts:1-6` import 了 `projectChatWindow`、`projectChatEvents`、`createMessageBlocks`，在 bridge 层拼消息块。这违反 `docs/SECURITY.md:30`「最小 bridge」原则，也让同一份投影逻辑在 preload 和 renderer 各跑一遍（renderer 的 `App.tsx` 还在调用 `createMessageBlocks`，见 02）。
@@ -234,6 +251,8 @@ export function createIpcRegistry(getWindow: () => BrowserWindow | undefined) {
 - `schema` 先从高风险的入口做起：所有带路径、URL、shell 参数、hostId 的 channel。可以用 zod 或手写 guard，不强求一次覆盖 142 个。
 - `FixedRendererContract` 放在 `@actspace/shared`，preload 用同一个类型生成方法签名（见 04），彻底消除「main / preload / global.d.ts」三处手写漂移。
 - CI 检查脚本 `scripts/check-ipc-channels.mjs`：列出 contract 中每个 channel 是否在 main 注册、是否被 preload 暴露；任何一侧缺失则失败。
+
+> 审计脚本已在 [11 安全与 IPC 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md) 执行（T8）：`pnpm check:ipc-channels` 目前以 shared 中的 4 组 channel 常量为来源，13 落地 contract 后改为以 contract 为来源。
 
 ## 5. 实施步骤
 

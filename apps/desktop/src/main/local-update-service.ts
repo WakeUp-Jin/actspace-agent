@@ -179,6 +179,14 @@ export class LocalUpdateService {
     void tick();
   }
 
+  /**
+   * 应用退出时调用：只停掉就绪轮询。更新 helper 是 detached 进程，
+   * 要在应用退出后继续替换应用，所以不能在这里终止。可重复调用。
+   */
+  dispose(): void {
+    this.clearReadinessTimer();
+  }
+
   private clearReadinessTimer(): void {
     if (!this.readinessTimer) return;
     clearInterval(this.readinessTimer);

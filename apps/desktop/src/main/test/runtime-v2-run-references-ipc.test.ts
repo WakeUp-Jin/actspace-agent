@@ -9,6 +9,9 @@ vi.mock("electron", () => ({ dialog: {}, nativeImage: {}, nativeTheme: {}, ipcMa
   removeHandler: (channel: string) => handlers.delete(channel), on: vi.fn(), removeListener: vi.fn(),
 } }));
 import { registerFixedRendererIpc, type FixedRendererIpcOptions } from "../runtime-v2/fixed-renderer-ipc";
+import { trustedWindow } from "./ipc-sender-fixture";
+
+const trusted = trustedWindow();
 
 let workspace: string;
 beforeEach(async () => {
@@ -45,10 +48,10 @@ function setup(overrides: { agentForm?: "agent" | "chat"; journal?: Record<numbe
       taskCommand: async () => ({ snapshot: { tasks } }),
     },
     settings: { subscribeV4Changes: () => () => {} },
-    getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
+    getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
   const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask)!;
-  return { registration, submitTask, importAttachment, readSessionProjection, run: (input: Record<string, unknown>) => handler({ sender: { id: 7 } }, { sessionId: "s", submissionId: "r", userInput: "看这里", ...input }) };
+  return { registration, submitTask, importAttachment, readSessionProjection, run: (input: Record<string, unknown>) => handler(trusted.event, { sessionId: "s", submissionId: "r", userInput: "看这里", ...input }) };
 }
 
 it("writes text, file references, excerpts and attachments as ordered content blocks", async () => {

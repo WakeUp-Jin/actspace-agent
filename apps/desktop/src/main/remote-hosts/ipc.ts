@@ -3,12 +3,12 @@ import { RemoteSessionRouter } from "./session-router";
 import { ipcMain, type BrowserWindow } from "electron";
 import { HOST_IPC, HOST_METHODS, isRecord, type AddHostInput, type HostMethod } from "@actspace/shared/host-protocol";
 import type { RemoteHostRegistry } from "./registry";
+import { assertTrustedSender } from "../ipc/trusted-sender";
 export function registerRemoteHostIpc(registry: RemoteHostRegistry, getWindow: () => BrowserWindow | null, activate: (sessionId: string | null) => Promise<void>): () => void {
   const channels: string[] = [];
   const handle = (channel: string, listener: (input: unknown) => unknown) => {
     ipcMain.handle(channel, (event, input) => {
-      const window = getWindow();
-      if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) throw new Error("Untrusted Host IPC sender");
+      assertTrustedSender(event, getWindow, "Untrusted Host IPC sender");
       return listener(input);
     }); channels.push(channel);
   };

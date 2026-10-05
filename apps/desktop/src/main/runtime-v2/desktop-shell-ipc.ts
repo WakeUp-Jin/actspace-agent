@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, shell } from "electron";
+import { BrowserWindow, ipcMain } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
@@ -14,7 +14,10 @@ import type {
 } from "@actspace/shared";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import type { AppDataRoots } from "../app-paths";
+import { assertTrustedSender } from "../ipc/trusted-sender";
 import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, type WorkspaceRegistryOptions } from "../workspace-registry-service";
+import { openExternalSafely } from "../platform-actions";
+import { createWorkspaceAccessDeps, resolveWorkspaceAccess, workspaceRegistryOptions } from "../workspace-access";
 import { listWorkspaceDir, readWorkspaceFile, statWorkspaceFile } from "../workspace-fs-service";
 import { ReviewCoordinator, type ResolvedReviewWorkspace } from "../review-coordinator";
 import { ReviewGitEngine } from "../review-git-engine";
@@ -26,13 +29,20 @@ import type { TerminalAckInput, TerminalAttachInput, TerminalCloseInput, Termina
 
 type ShellOptions = {
   readonly roots: AppDataRoots;
-  readonly getMainWindow?: () => BrowserWindow | undefined;
+  readonly getMainWindow: () => BrowserWindow | undefined;
+  /** 本地会话列表，用来放行不在 registry 里的 worktree 会话路径。 */
+  readonly listSessions: () => Promise<readonly { readonly workspaceRoot?: string | null }[]>;
   readonly terminal?: TerminalSessionService;
   readonly terminalAvailable?: boolean;
 };
 
 export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(): void } {
   const registryOptions = workspaceRegistryOptions(options.roots);
+  const workspaceAccess = createWorkspaceAccessDeps(registryOptions, options.listSessions);
+  const withWorkspaceAccess = async <T extends { workspaceRoot?: string }>(input: T): Promise<T> => ({
+    ...input,
+    workspaceRoot: await resolveWorkspaceAccess({ workspaceRoot: input?.workspaceRoot ?? options.roots.defaultWorkspaceRoot }, workspaceAccess),
+  });
   const reviewWorker = new ReviewGitWorkerClient(join(__dirname, "..", "review-git-worker.js"));
   const reviewEngine = new ReviewGitEngine({ runner: reviewWorker.runGit, patchParser: reviewWorker.parsePatches, objectLoader: reviewWorker.loadGitObjects });
   const review = new ReviewCoordinator({
@@ -43,7 +53,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   });
   const reviewPullRequests = new ReviewPullRequestService();
   const unsubscribeReview = review.subscribe((notification) => {
-    const target = options.getMainWindow?.();
+    const target = options.getMainWindow();
     if (target && !target.isDestroyed()) {
       target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reviewChanged, notification);
     }
@@ -53,8 +63,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   const handlers: string[] = [];
   const handle = <T extends unknown[]>(channel: string, listener: (...args: T) => unknown): void => {
     ipcMain.handle(channel, (event, ...args) => {
-      const window = options.getMainWindow?.();
-      if (window && (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame)) throw new Error("Untrusted shell sender");
+      assertTrustedSender(event, options.getMainWindow, "Untrusted shell sender");
       const input = args[0];
       if (input && typeof input === "object" && (("sessionId" in input && typeof input.sessionId === "string" && input.sessionId.startsWith("host:")) || ("hostId" in input && input.hostId))) throw new Error("Local shell capabilities are unavailable for remote Sessions");
       return listener(...([event, ...args] as unknown as T));
@@ -63,9 +72,9 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   };
 
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaces, () => readWorkspaceRegistry(registryOptions));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaceDir, (_event: unknown, input: WorkspaceListDirInput) => listWorkspaceDir(input, options.roots));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readWorkspaceFile, (_event: unknown, input: WorkspaceReadFileInput) => readWorkspaceFile(input, options.roots));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.statWorkspaceFile, (_event: unknown, input: WorkspaceStatFileInput) => statWorkspaceFile(input, options.roots));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaceDir, async (_event: unknown, input: WorkspaceListDirInput) => listWorkspaceDir(await withWorkspaceAccess(input), options.roots));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readWorkspaceFile, async (_event: unknown, input: WorkspaceReadFileInput) => readWorkspaceFile(await withWorkspaceAccess(input), options.roots));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.statWorkspaceFile, async (_event: unknown, input: WorkspaceStatFileInput) => statWorkspaceFile(await withWorkspaceAccess(input), options.roots));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot, (_event: unknown, input: ReviewGetSnapshotInput) => review.getSnapshot(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot, (_event: unknown, input: ReviewGetSnapshotInput) => review.refreshSnapshot(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewFileDiffs, (_event: unknown, input: ReviewGetFileDiffsInput) => review.getFileDiffs(input));
@@ -119,7 +128,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
       baseBranch: input.baseBranch,
       draft: input.draft,
     });
-    if (result.ok) await shell.openExternal(result.url);
+    if (result.ok) await openExternalSafely(result.url);
     return result;
   });
   if (terminalAvailable && options.terminal) {
@@ -149,14 +158,6 @@ function safeErrorMessage(error: unknown): string {
 
 function quoteShellArgument(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function workspaceRegistryOptions(roots: AppDataRoots): WorkspaceRegistryOptions {
-  return {
-    dataRoot: roots.dataRoot,
-    defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
-    fallbackWorkspaceRoot: roots.workspaceRoot,
-  };
 }
 
 async function resolveReviewWorkspace(

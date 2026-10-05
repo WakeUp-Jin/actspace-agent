@@ -28,6 +28,8 @@ import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { RuntimeV2OpenRouterCatalogService } from "./runtime-v2/openrouter-catalog-service";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
 import { LocalUpdateService } from "./local-update-service";
+import { attachWindowLifecycle, installProcessErrorLogging } from "./main-lifecycle";
+import { attachNavigationGuards, blockWebviewAttachment, createAppUrlMatcher, createMainWindowOptions } from "./window-security";
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const APP_ID = process.env.ACTSPACE_DEV_APP_ID?.trim() || "com.actspace.desktop";
@@ -57,6 +59,14 @@ let browserBridgeService: BrowserBridgeService | undefined;
 let browserConnectionTimer: NodeJS.Timeout | undefined;
 let localUpdateService: LocalUpdateService | undefined;
 let shuttingDown = false;
+
+blockWebviewAttachment(app);
+
+installProcessErrorLogging((message, details) => {
+  // 日志目录还没准备好时，错误只能写到 stderr。
+  if (startupLogPath) void logMain(message, details);
+  else process.stderr.write(formatLogLine(message, details));
+});
 
 const approvalRegistry = new PendingApprovalRegistry({
   onApprovalRequired: (request, sessionId, agentRunId) => {
@@ -123,9 +133,13 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
 }
 
 async function logMain(message: string, details?: Record<string, unknown>): Promise<void> {
-  const line = `${JSON.stringify({ at: new Date().toISOString(), message, ...(details ? { details } : {}) })}\n`;
+  const line = formatLogLine(message, details);
   if (startupLogPath) await appendFile(startupLogPath, line, "utf8").catch(() => undefined);
   if (process.env.ACTSPACE_LOG_STDERR === "1") process.stderr.write(line);
+}
+
+function formatLogLine(message: string, details?: Record<string, unknown>): string {
+  return `${JSON.stringify({ at: new Date().toISOString(), message, ...(details ? { details } : {}) })}\n`;
 }
 
 function getMainWindow(): BrowserWindow | undefined {
@@ -133,24 +147,20 @@ function getMainWindow(): BrowserWindow | undefined {
 }
 
 async function createMainWindow(): Promise<BrowserWindow> {
-  const win = new BrowserWindow({
-    width: 1440,
-    height: 960,
-    minWidth: 480,
-    minHeight: 760,
+  const indexHtmlPath = join(__dirname, "..", "..", "dist", "index.html");
+  const win = new BrowserWindow(createMainWindowOptions({
+    preload: join(__dirname, "..", "preload", "index.bundle.js"),
     title: APP_DISPLAY_NAME,
-    titleBarStyle: "hidden",
-    trafficLightPosition: { x: 16, y: 16 },
-    webPreferences: {
-      preload: join(__dirname, "..", "preload", "index.bundle.js"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+  }));
   mainWindow = win;
+  attachNavigationGuards(win, createAppUrlMatcher({ devServerUrl: DEV_SERVER_URL, indexHtmlPath }));
+  attachWindowLifecycle(win, {
+    onClosed: () => { if (mainWindow === win) mainWindow = undefined; },
+    closeOwnedTerminals: async (ownerId) => { await terminalSessionService?.closeOwner(ownerId); },
+    log: (message, details) => void logMain(message, details),
+  });
   if (DEV_SERVER_URL) await win.loadURL(DEV_SERVER_URL);
-  else await win.loadFile(join(__dirname, "..", "..", "dist", "index.html"));
-  win.on("closed", () => { if (mainWindow === win) mainWindow = undefined; });
+  else await win.loadFile(indexHtmlPath);
   return win;
 }
 
@@ -236,6 +246,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   disposeRuntimeV2DesktopShell = registerRuntimeV2DesktopShell({
     roots,
     getMainWindow,
+    listSessions: async () => runtimeV2Registry?.listSessions() ?? [],
     terminal: terminalSessionService,
     terminalAvailable: terminalNativeAvailable,
   }).dispose;
@@ -334,6 +345,9 @@ app.on("before-quit", (event) => {
     } catch (error) {
       await logMain("v2 shutdown incomplete", { error: error instanceof Error ? error.message : String(error) });
     } finally {
+      // 两者都是同步、不抛错的清理；放在 finally 里，前面的异步清理失败时也照样执行。
+      browserBridgeService?.dispose();
+      localUpdateService?.dispose();
       disposePerformanceIpc?.();
       disposeEnglishLearningIpc?.();
       await speechPlayback?.dispose();

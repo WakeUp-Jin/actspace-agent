@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import hljs from "highlight.js";
@@ -262,5 +262,43 @@ describe("language mapping integrity", () => {
   it("only maps languages that highlight.js actually provides", () => {
     const missing = listMappedLanguages().filter((language) => !hljs.getLanguage(language));
     expect(missing).toEqual([]);
+  });
+});
+
+describe("workspace root containment", () => {
+  it("rejects symlinks that point outside the root but follows ones that stay inside", async () => {
+    const roots = await makeWorkspace();
+    const outside = await mkdtemp(join(tmpdir(), "actspace-fs-outside-"));
+    created.push(outside);
+    await writeFile(join(outside, "secret.txt"), "secret", "utf8");
+    await mkdir(join(roots.dataRoot, "docs"));
+    await writeFile(join(roots.dataRoot, "docs", "a.md"), "# a", "utf8");
+    await symlink(outside, join(roots.dataRoot, "escape"));
+    await symlink(join(outside, "secret.txt"), join(roots.dataRoot, "secret-link.txt"));
+    await symlink(join(roots.dataRoot, "docs"), join(roots.dataRoot, "docs-link"));
+
+    expect((await listWorkspaceDir({ relativePath: "escape" }, roots)).error).toBe("escapes_root");
+    expect((await readWorkspaceFile({ relativePath: "escape/secret.txt" }, roots)).error).toBe("escapes_root");
+    expect((await readWorkspaceFile({ relativePath: "secret-link.txt" }, roots)).error).toBe("escapes_root");
+    expect((await statWorkspaceFile({ relativePath: "secret-link.txt" }, roots)).error).toBe("escapes_root");
+    // 不存在的目标也要按 symlink 解析后的位置判断，否则 escapes_root / not_found 的区别会泄露 root 外的文件是否存在。
+    expect((await statWorkspaceFile({ relativePath: "escape/missing.txt" }, roots)).error).toBe("escapes_root");
+    expect((await statWorkspaceFile({ relativePath: "docs/missing.txt" }, roots)).error).toBe("not_found");
+
+    const inside = await readWorkspaceFile({ relativePath: "docs-link/a.md" }, roots);
+    expect(inside.error).toBeUndefined();
+    expect(inside.relativePath).toBe("docs-link/a.md");
+    expect(inside.content).toBe("# a");
+  });
+
+  it("does not treat names starting with .. as escaping the root", async () => {
+    const roots = await makeWorkspace();
+    await writeFile(join(roots.dataRoot, "..foo"), "dots", "utf8");
+
+    const result = await readWorkspaceFile({ relativePath: "..foo" }, roots);
+
+    expect(result.error).toBeUndefined();
+    expect(result.content).toBe("dots");
+    expect((await statWorkspaceFile({ relativePath: "..foo" }, roots)).error).toBeUndefined();
   });
 });

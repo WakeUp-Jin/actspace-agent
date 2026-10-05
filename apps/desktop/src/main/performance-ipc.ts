@@ -1,15 +1,15 @@
 import { app, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import { PERFORMANCE_CHANNELS, type DesktopPerformanceSnapshot } from "@actspace/shared";
+import { assertTrustedSender } from "./ipc/trusted-sender";
 
 export function registerPerformanceIpc(getWindow: () => BrowserWindow | null): () => void {
   let histogram: ReturnType<typeof monitorEventLoopDelay> | undefined;
   let owner: BrowserWindow | null = null;
   const stop = () => { histogram?.disable(); histogram = undefined; };
   const authorize = (event: IpcMainInvokeEvent) => {
-    const window = getWindow();
-    if (!window || event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame) throw new Error("Invalid performance request.");
-    return window;
+    assertTrustedSender(event, getWindow, "Invalid performance request.");
+    return getWindow()!;
   };
   const unbind = () => {
     owner?.removeListener("hide", stop);
