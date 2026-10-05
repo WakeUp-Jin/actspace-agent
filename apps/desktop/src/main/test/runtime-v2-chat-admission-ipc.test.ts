@@ -31,8 +31,40 @@ it("returns a serializable rejection before starting a turn and identifies the s
     importChatAttachments.mockRejectedValueOnce(new ChatAttachmentValidationError({ code: "total_text_too_large", limit: 256000 }, undefined, [130000, 130000]));
     expect(await handler({ sender: { id: 7 } }, input)).toMatchObject({ attachmentIssue: { textCharacterCounts: { good: 130000, bad: 130000 } } });
     importChatAttachments.mockRejectedValueOnce(new Error("store unavailable"));
-    await expect(handler({ sender: { id: 7 } }, input)).rejects.toThrow("store unavailable");
+    expect(await handler({ sender: { id: 7 } }, input)).toMatchObject({ status: "submission-failed", acknowledgement: "rejected", message: expect.stringContaining("store unavailable") });
     expect(submitTask).not.toHaveBeenCalled();
+  } finally { registration.dispose(); }
+});
+
+it.each(["agent", "plan"])("rejects %s preparation failures but keeps admission reply loss uncertain", async mode => {
+  const submitTask = vi.fn().mockRejectedValue(new Error("reply lost after admission"));
+  const rollbackImportedAttachments = vi.fn().mockResolvedValue(undefined);
+  const importAttachment = vi.fn()
+    .mockResolvedValueOnce({ artifactId: "valid", mimeType: "image/png", name: "visible.png" })
+    .mockRejectedValueOnce(new Error("Attachment exceeds the 20 MiB limit."));
+  const registration = registerFixedRendererIpc({
+    roots: { dataRoot: "/tmp/attachment-admission", workspaceRoot: "/work" },
+    registry: {
+      taskCommand: async () => ({ snapshot: { tasks: [] } }), subscribe: () => () => {}, subscribeRendererStream: () => () => {},
+      inspectSession: async () => ({ agentMode: mode }), importAttachment, rollbackImportedAttachments, submitTask,
+    },
+    settings: { subscribeV4Changes: () => () => {} },
+    getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
+  } as unknown as FixedRendererIpcOptions);
+  try {
+    const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask)!;
+    const input = { sessionId: "session", submissionId: "attempt", userInput: "keep body", attachments: [
+      { id: "valid", name: "visible.png", path: "/fixture/visible.png", kind: "image" },
+      { id: "large", name: "oversized.png", path: "/fixture/oversized.png", kind: "image" },
+    ] };
+    expect(await handler({ sender: { id: 7 } }, input)).toMatchObject({
+      status: "submission-failed", acknowledgement: "rejected", message: expect.stringContaining("20 MiB"),
+    });
+    expect(submitTask).not.toHaveBeenCalled();
+    expect(rollbackImportedAttachments).toHaveBeenCalledExactlyOnceWith("session", ["valid"]);
+    // A failure after the admission boundary may already have persisted the Task.
+    await expect(handler({ sender: { id: 7 } }, { ...input, attachments: [] })).rejects.toThrow("reply lost after admission");
+    expect(submitTask).toHaveBeenCalledTimes(1);
   } finally { registration.dispose(); }
 });
 

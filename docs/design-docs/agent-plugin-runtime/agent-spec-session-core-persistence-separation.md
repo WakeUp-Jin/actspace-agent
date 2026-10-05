@@ -1,6 +1,6 @@
 # Session 业务与存储后端边界
 
-本规范描述当前实现。它替代早期新增 `session-core` 包、将 write-behind 放进 JSONL Provider 的方案。实施及验收进度见[第二轮清理计划](../../exec-plans/active/20261004-agent-storage-and-cleanup/README.md)；接口落地不等于整个清理计划或应用验收已完成。
+本规范描述当前实现。它替代早期新增 `session-core` 包、将 write-behind 放进 JSONL Provider 的方案。实施及验收进度见[第二轮清理计划](../../exec-plans/completed/20261004-agent-storage-and-cleanup/README.md)；接口落地不等于整个清理计划或应用验收已完成。
 
 ## 1. 依赖与所有权
 
@@ -61,3 +61,15 @@ SessionStore 读取父快照，计算合法 fork 种子，预留子会话的 wri
 生产后端仍为 JSONL。`session-storage/testing` 提供独立内存后端，共用契约用例覆盖重复创建、writer 冲突、只读快照、连续事件、flush、关闭重开及受控 discard；Runtime 的独立用例验证无文件依赖的列表、分页、导出、fork 和恢复。
 
 内存通过不代表验证了 SQLite/MySQL 的事务或崩溃持久性。更换生产后端采用受控停机、配置变更与重新启动；数据迁移和多 Host 并发执行不在本轮范围。
+
+## 7. 接纳、通知与恢复的不变量
+
+生产者（Loop、TaskLedger、Todo、审批、Subagent）直接 append 事实。append 校验、分配连续 seq、交付唯一持久化端口后发布 `session/event`；该通知表示已接纳，不能据此立即冷读磁盘或宣称 fsync。appendMany 先验证整批；接纳后入队失败保留事实并阻断后续写入/副作用，不自动重放业务。
+
+acceptedSeq 与 durableSeq 分离；空日志前缀为 -1，临时会话的 durableSeq 为 null。flush 固定目标前缀，未知目标拒绝，允许实际写过目标。持久模式缺失或重复权威消费者应在发布前失败，临时模式必须明确选择。
+
+`session/created` 在 live 注册完成后通知，恢复 seed 不逐条重发历史事件；`session/disposed` 报告关闭尝试结果。观察者异常各自诊断，不阻断其他观察者，也不递归写入失败的 Session。
+
+`session.checkpoint.flush` 是必需 awaited Service：LLM dispatch、tool body、下一步和最终 settlement 各自等待检查点；处理器缺失或失败阻断副作用。shutdown 排空 Run、Session 后再释放存储和插件树。JSONL lease 只在实现层检验，业务层不读取锁文件。
+
+创建/恢复失败释放已取得资源；fork 只写新后缀，不重新发送历史通知。中断工具的 outcome-unknown 保守保留，不能自动重试。压缩以追加 summary/replacement 改变未来上下文，失败不提交半事务。历史事实不删除，用户数据不因本次清理迁移。

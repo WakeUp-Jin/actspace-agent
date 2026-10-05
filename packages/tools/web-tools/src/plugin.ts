@@ -31,7 +31,7 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
   try {
     for (const item of TOOL_DEFINITIONS) {
       const handler = ports[item.localName] ?? (async () => ({ status: "failed" as const, modelOutput: [{ type: "text" as const, text: `${item.localName} Host capability is unavailable.` }], summary: `${item.localName} unavailable`, failure: { code: "CAPABILITY_UNAVAILABLE", message: `${item.localName} Host capability is unavailable.`, retryable: false } }));
-      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract(item.localName) }) }));
+      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract() }) }));
     }
     return Object.freeze(registrations);
   } catch (error) {
@@ -40,7 +40,7 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
   }
 }
 
-function permissionContract(name: ToolName): ToolPermissionContract {
+function permissionContract(): ToolPermissionContract {
   return { extractResources: () => [], evaluate: () => ({ kind: "allow" as const }) };
 }
 type DefinitionEntry = { readonly localName: ToolName; readonly definition: ToolDefinition };
@@ -50,10 +50,8 @@ export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
   definition("web_search", "Search the public web and return raw result metadata. Use web_fetch to read a selected URL.", WEB, "read-only", objectSchema({ query: stringSchema("Specific search keywords."), max_results: { type: "integer", minimum: 1, maximum: 10, default: 5 } }, ["query"])),
   definition("web_fetch", "Fetch a known public HTTP(S) URL and normalize its content to Markdown or text.", WEB, "read-only", objectSchema({ url: { type: "string", pattern: "^https?://" } }, ["url"])),
 ]);
-export function activate() { return { services: { "tools.web-tools": Object.freeze({ registerTools, TOOL_DEFINITIONS }) }, dispose: () => undefined }; }
 function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
   return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: WEB_TOOLS_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
 }
 function objectSchema(properties: Readonly<Record<string, unknown>>, required: readonly string[]) { return Object.freeze({ type: "object", properties, required, additionalProperties: false }); }
 function stringSchema(description: string) { return Object.freeze({ type: "string", description, minLength: 1 }); }
-function integerSchema(description: string, minimum: number) { return Object.freeze({ type: "integer", description, minimum }); }

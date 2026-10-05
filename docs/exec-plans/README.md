@@ -16,19 +16,21 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [Agent 重构最终清理与验收](active/20261005-agent-refactor-final-closeout/README.md) | 方案待批准；一次完成原始目标内的代码、文档、根目录清理和剩余验收。 |
-| [Agent 第二轮存储与代码清理](active/20261004-agent-storage-and-cleanup/README.md) | 实施完成；主要实机链路及修复复验通过，少量 UI 子项待补验。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
-| [单一 Agent 形态与三种模式](active/20260928-agent-forms-and-modes.md) | T1–T7 已实现；主要实机路线通过，T8 剩余验收见执行摘要。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
 | [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |
-| [会话切换与后台运行](active/20260916-session-background-runs.md) | 按会话隔离 stream、后台工具状态与历史校准，补切换回归与桌面验收。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；剩 DropdownMenu、Switch、Textarea、Tabs 及对应迁移。 |
 
 六个早期后端计划已移出执行导航，短页仅保留历史链接。独有目标与未完成项见[结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)，当前验证见本轮清理摘要。
 
 ## 最近完成
+
+- [Agent 重构最终清理与验收](completed/20261005-agent-refactor-final-closeout/README.md)：代码、文档、根目录清理与自动化完成，35/35 界面验收通过；两项产品缺陷修复复验，保护记录与范围限制见[摘要](../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。
+
+- [Agent 第二轮存储与代码清理](completed/20261004-agent-storage-and-cleanup/README.md)：实施完成；原剩余 UI 子项由 10-05 最终收尾逐项补验通过。
+- [单一 Agent 形态与三种模式](completed/20260928-agent-forms-and-modes.md)：T1–T7 已实现；主要实机路线通过，T8 剩余验收见执行摘要。
+- [会话切换与后台运行](completed/20260916-session-background-runs.md)：按会话隔离 stream、后台工具状态与历史校准，补切换回归与桌面验收。
 
 - [Agent Harness 插件化与 Host 分离](completed/20261003-agent-harness-host-refactor/README.md)：P1–P5 实施与计划范围验收通过，P5 错误反馈修复经 Sol 实机复验；手机 Web、自进化具体工作流与真实云部署留待独立计划。见 [P5 摘要](../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)。
 
@@ -175,3 +177,7 @@
 - [p1-service-roles](active/20260829-actspace-p1-service-roles/README.md)
 - [p1-session-core-persistence](active/20260829-actspace-p1-session-core-persistence/README.md)
 - [p2-contract-matrix](active/20260829-actspace-p2-contract-matrix/README.md)
+
+- [后台运行旧入口](active/20260916-session-background-runs.md)
+- [Agent Forms 旧入口](active/20260928-agent-forms-and-modes.md)
+- [存储与清理旧入口](active/20261004-agent-storage-and-cleanup/README.md)

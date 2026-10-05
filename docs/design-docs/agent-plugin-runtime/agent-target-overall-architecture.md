@@ -54,8 +54,16 @@ Journal 是恢复事实源，Projection、live progress 和 diagnostics 各自�
 
 - [Runtime 与 Composition](agent-target-runtime-architecture.md)：Profile 启动与生命周期。
 - [Cordis ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md)、[Loop surface](agent-spec-agent-loop-cordis-surface.md)：事件与屏障。
-- [Host 指南](../../agent-host/README.md)：连接、附件与维护。
+- [Host 指南](agent-host-guide.md)：连接、附件与维护。
 - [测试策略](agent-testing.md)：包、进程和真实 UI 的证据边界。
 - [设计决策](agent-harness-host-refactor-decisions.md)：讨论历史；最新简化结论覆盖共享实例探索。
 
 手机 Web 前端、自进化源码工具、Member/Room/Team、远端终端/Git 后续单独设计。P5 保留设置、凭据、prompts 与远端连接，未执行用户历史重置；不批量删除 tmp、包或用户工作目录。旧 v1 设计保留在 [历史归档](../../archive/v1/README.md)。
+
+## 独立 Host 装配与退出
+
+CLI `runtime-v2/host.ts` 保留 managed Runtime 加载、Profile 和模型/工具端口组装；`agent-host/src/bootstrap.ts` 拥有认证、网关、订阅、上传维护与启动失败回收；`lifecycle.ts` 协调状态、诊断、drain 和强停。模块通过 `HostRuntime` 端口连接，不引入 agent-host 到 Runtime 的反向依赖。
+
+正常停止等待任务、子 Run 和后台 shell；强停保留截止退出。上传维护停止调度后等待当前 pass 完成，再释放相关资源。重试 stop 不重复释放。用户命令、WSS/SSH、配置与数据路径不变。
+
+启动、配对和停机命令见[Host 使用指南](agent-host-guide.md)。

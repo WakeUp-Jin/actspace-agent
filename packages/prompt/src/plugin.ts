@@ -49,10 +49,3 @@ export async function apply(ctx: CordisContext): Promise<void> {
   const service = new SystemPromptService(ctx as never, source, host);
   ctx.provide?.("prompt.assembly", Object.freeze({ RequestAssembler, ContributorRegistry, service }));
 }
-
-export function activate() {
-  return {
-    services: { "prompt.assembly": Object.freeze({ RequestAssembler, ContributorRegistry, SystemPromptService }) },
-    dispose: () => undefined,
-  };
-}

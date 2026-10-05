@@ -62,7 +62,6 @@ export class ToolRuntimeService extends Service {
     this.runtime = new ToolRuntime({ ...config, requireAgentScope: true });
     this.registry = this.runtime.registry;
     this.scheduler = this.runtime.scheduler;
-    ctx.effect(() => () => undefined, "tools.runtime");
   }
 
   register(registration: ToolExecutorRegistration): ToolRegistrationHandle { return this.runtime.register(registration); }

@@ -1,5 +1,5 @@
-import type { RuntimeV2JsonValue } from "./host-dto";
-import type { AgentSystemPromptFile, AppSettingsV2, CustomConnectionInput, ProviderConnectionErrorKind, ProviderConnectionSettings, ProviderProxySettings, SearchUsageResult, SecretProviderId, SettingsV2UpdateInput, SettingsV4Snapshot } from "../settings";
+
+import type { AgentSystemPromptFile, AppSettingsV2, CustomConnectionInput, ProviderConnectionErrorKind, ProviderProxySettings, SearchUsageResult, SecretProviderId, SettingsV2UpdateInput, SettingsV4Snapshot } from "../settings";
 import type { ModelKey } from "../model-config";
 import type { ModelsCatalogListResult, ProviderBalanceSnapshot } from "../ipc";
 import type { ProviderId as LlmProviderId } from "../provider-config";
@@ -7,8 +7,6 @@ import type { RuntimeV2DiagnosticsSnapshot, RuntimeV2LiveEvent, RuntimeV2Session
 import type {
   MainAgentForm,
   RuntimeV2BootManifest,
-  RuntimeV2RunTurnRequest,
-  RuntimeV2RunTurnResponse,
   RuntimeV2RuntimeState,
   RuntimeV2SessionListItem,
 } from "./runtime";

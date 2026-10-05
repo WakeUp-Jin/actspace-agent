@@ -35,7 +35,7 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
   try {
     for (const item of TOOL_DEFINITIONS) {
       const handler = ports[item.localName] ?? (async () => ({ status: "failed" as const, modelOutput: [{ type: "text" as const, text: `${item.localName} Host capability is unavailable.` }], summary: `${item.localName} unavailable`, failure: { code: "CAPABILITY_UNAVAILABLE", message: `${item.localName} Host capability is unavailable.`, retryable: false } }));
-      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract(item.localName) }) }));
+      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract() }) }));
     }
     return Object.freeze(registrations);
   } catch (error) {
@@ -44,7 +44,7 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
   }
 }
 
-function permissionContract(name: ToolName): ToolPermissionContract {
+function permissionContract(): ToolPermissionContract {
   const access = "read" as const;
   const contract: ToolPermissionContract = {
     grantAudience: FILE_AUDIENCE,
@@ -70,10 +70,8 @@ export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
   definition("grep", "Search file contents using a regular expression. Use glob to find paths by name.", READ, "read-only", objectSchema({ pattern: stringSchema("Regular expression."), path: stringSchema("Directory or file; defaults to workspace root."), glob: stringSchema("Optional file-name glob filter.") }, ["pattern"])),
   definition("glob", "Find workspace files by name pattern, sorted by modification time.", READ, "read-only", objectSchema({ pattern: stringSchema("Glob pattern, for example **/*.ts."), path: stringSchema("Search directory; defaults to workspace root.") }, ["pattern"])),
 ]);
-export function activate() { return { services: { "tools.filesystem-search": Object.freeze({ registerTools, TOOL_DEFINITIONS }) }, dispose: () => undefined }; }
 function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
   return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: FILESYSTEM_SEARCH_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
 }
 function objectSchema(properties: Readonly<Record<string, unknown>>, required: readonly string[]) { return Object.freeze({ type: "object", properties, required, additionalProperties: false }); }
 function stringSchema(description: string) { return Object.freeze({ type: "string", description, minLength: 1 }); }
-function integerSchema(description: string, minimum: number) { return Object.freeze({ type: "integer", description, minimum }); }

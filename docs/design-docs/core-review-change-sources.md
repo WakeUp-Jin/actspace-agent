@@ -8,12 +8,12 @@
 - 产品边界：Review 是人工 Git 审阅工作台，不包含 AI Review、Review 专用模型、findings、独立审查任务或评论回注 Agent。
 - 视觉关联：右侧对象系统见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`；布局见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
-## 当前实现映射（2026-07-30）
+## 当前实现映射（2026-10-05 路径核对）
 
 - 共享契约：`packages/shared/src/review.ts`。
 - 查询、缓存与失效：`apps/desktop/src/main/review-coordinator.ts`。
 - Git 查询与 mutation：`apps/desktop/src/main/review-git-engine.ts`。
-- Last Turn：`apps/desktop/src/main/review-last-turn-service.ts`。
+- Last Turn：`review-git-engine.ts` 保留 `loadLastTurn` / `loadLastTurnFileDiff` 注入端口；原独立 service 已退役，端口存在不等于所有调用入口已实现。
 - PR capability：`apps/desktop/src/main/review-pr-service.ts`。
 - Renderer：`apps/desktop/src/renderer/components/review/`。
 

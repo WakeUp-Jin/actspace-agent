@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { SessionError, validateSessionEvents, validateSessionHeader, type EventCodecRegistry, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
+import { SessionError, validateSessionEvents, validateSessionHeader, type EventCodecRegistry, type SessionHeaderV1 } from "@actspace/session-journal";
 import type { SessionStorage, SessionStorageHandle, SessionStorageSnapshot } from "@actspace/session-storage";
 import { inspectJsonlSession } from "./jsonl-reader.js";
 import { JsonlSessionWriter, encodeRows, type JsonlWriterHooks } from "./jsonl-writer.js";

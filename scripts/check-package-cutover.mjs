@@ -18,7 +18,7 @@ async function walk(path) {
   let entries;
   try { entries = await readdir(path, { withFileTypes: true }); } catch { return; }
   for (const entry of entries) {
-    if (entry.name === "node_modules" || entry.name.startsWith("dist") || entry.name === ".tmp") continue;
+    if (entry.name === "node_modules" || entry.name.startsWith("dist") || entry.name === ".tmp" || entry.name === ".astro") continue;
     const target = join(path, entry.name);
     if (entry.isDirectory()) await walk(target);
     else if (sourceExtensions.test(entry.name)) await scanFile(target);
@@ -35,7 +35,7 @@ async function scanFile(path) {
     if (source.includes("@actspace/agent-runtime")) findings.monolith.push(label);
     if (/packages\/agent-runtime\/src\//.test(source) || /@actspace\/[^"']+\/src\//.test(source)) findings.deepImports.push(label);
     if (/(?:^|[\\/])plugins(?:[\\/]|['"])/.test(source) && !source.includes("browser-bridge")) findings.genericPlugins.push(label);
-    for (const token of retired) if (source.includes(token)) findings.retiredPaths.push(`${label}: ${token}`);
+    for (const token of retired) if (token === "/eval" ? /\/eval(?=[\s/\x22\x27`]|$)/u.test(source) : source.includes(token)) findings.retiredPaths.push(`${label}: ${token}`);
   }
 }
 

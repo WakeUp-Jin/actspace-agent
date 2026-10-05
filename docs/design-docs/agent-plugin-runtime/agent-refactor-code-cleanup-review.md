@@ -4,6 +4,8 @@
 
 目标来源：[Harness/Host 决定](agent-harness-host-refactor-decisions.md)；配套[文档清理](agent-refactor-docs-cleanup-review.md)。模块化和可替换性优先于包数量，精简的是重复事实、无消费者接口和混杂职责。生产仍用 JSONL，SQLite/MySQL、数据迁移、自进化具体工作流和手机 Web 另案。
 
+2026-10-05 更新：旧 activate 协议、空生命周期、无消费者局部符号和重复规范已清理，根目录与逐路径处置已结算，隔离快照自动化通过。下面是 10-04 的审计背景；新增结果和 35/35 CU 签收以[最终收尾摘要](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)为准，本次批准范围已完成；不把保留项解释为已证明全仓无冗余。
+
 ## 当前链路
 
 ```text
@@ -57,8 +59,7 @@ HarnessControl 仍是独立包；主要生产路径由 AgentRuntimeService 构�
 | Projection Registry / Cache / Client 三读模型 | 领域折叠 / 可重建冷读索引 / 不同展示目的 |
 | Host RPC 与 Desktop 附件/审批 adapter | 网络信任边界、上传及重连 / 本机磁盘与界面生命周期；可共用语义，不能直接互相依赖整包 |
 
-Inbox 的 status、旧 steer/next-turn 写入分支、无消费者 claim options 可再收窄；历史 codec 不因没有新写入就删除。ManagedRuns.#states 是同步观察缓存，RunManager.#active 是 acquire 前占位，也不能简单按“多一份状态”删除。
-
+10-05 已删除 Inbox 的 status、旧 steer/next-turn 写入参数与无消费者 claim options；历史 codec 不因没有新写入就删除。ManagedRuns.#states 是同步观察缓存，RunManager.#active 是 acquire 前占位，也不能简单按“多一份状态”删除。
 
 ## 验证和保护
 

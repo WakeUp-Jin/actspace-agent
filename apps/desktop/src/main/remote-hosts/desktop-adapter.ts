@@ -8,7 +8,7 @@ import type { BrowserWindow } from "electron";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C, type RuntimeV2SessionListItem, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
 import type { SessionListItem, SessionListPage, SessionListPageInput } from "@actspace/shared";
 import { HOST_IPC, isRecord, type SessionRef } from "@actspace/shared/host-protocol";
-import { RemoteSessionRouter, parseRemoteSessionKey, remoteSessionKey } from "./session-router";
+import { RemoteSessionRouter, attachmentUploadSources, parseRemoteSessionKey, remoteSessionKey } from "./session-router";
 import { RemoteSessionCache } from "./session-cache";
 import { desktopRemoteObservation, desktopRemotePage } from "./projection";
 import type { RemoteHostRegistry } from "./registry";
@@ -228,14 +228,14 @@ export class RemoteDesktopAdapter {
       case C.setSessionPermissionMode: await call("sessions.update", { patch: { permissionMode: input.mode } }); return { ok: true, mode: input.mode };
       case C.forkSession: { const parent = await observation(); const next = await call("sessions.fork", { boundarySeq: parent.snapshot.throughJournalSeq, newSessionId: randomUUID() }) as { sessionId: string }; return this.handle(C.getSessionPage, {}, { hostId: ref.hostId, sessionId: next.sessionId }); }
       case C.submitTask: {
-        const paths = Array.isArray(input.attachments) ? input.attachments.map(attachment => { if (!isRecord(attachment) || typeof attachment.path !== "string") throw new Error("Invalid attachment"); return attachment.path; }) : [];
+        const paths = attachmentUploadSources(ref, input.attachments);
         if (typeof input.submissionId !== "string") throw new Error("Missing submission identity");
         return this.#pending.withRecord(ref, input.submissionId, JSON.stringify({ text: input.userInput, paths, fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [] }), async (record, save) => {
           // Once prepared, the exact same Host content is used even after Main restarts.
           const progress = (bytes: number, total: number, state = "uploading") => this.#send(HOST_IPC.uploadProgress, { sessionId, submissionId: input.submissionId, bytes, total, state });
           let submitted = false;
           try {
-          if (!record.ready) { await this.#router.upload(ref, paths, (bytes, total) => progress(bytes, total), record.uploadIds, save); record.ready = true; await save(); }
+          if (!record.ready) { await this.#router.upload(ref, paths, (bytes, total) => progress(bytes, total), record.uploadIds, save, id => this.#artifacts.read(ref, id)); record.ready = true; await save(); }
           progress(0, 0, "submitting");
           submitted = true;
           return await call("tasks.submit", { submissionId: input.submissionId, content: input.userInput, fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [], ...(record.uploadIds.length ? { uploadIds: record.uploadIds } : {}) });

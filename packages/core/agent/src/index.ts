@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply, activate } from "./plugin.js";
+export { apply } from "./plugin.js";
 export * from "./descriptor.js";
 export * from "./main-preset.js";
 export * from "./agent-mode-policy.js";

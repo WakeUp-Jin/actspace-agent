@@ -35,11 +35,3 @@ export function apply(ctx: CordisContext): void {
   const service = createSessionProjectionService();
   ctx.provide?.("session.projection", service);
 }
-
-export function activate() {
-  const service = createSessionProjectionService();
-  return {
-    services: { "session.projection": service },
-    dispose: () => undefined,
-  };
-}

@@ -41,7 +41,6 @@ export class CompactionService extends Service {
     const routeId = config.routeId ?? routes.find(route => route.routeId === "utility")?.routeId ?? routes[0]?.routeId;
     if (routeId === undefined) throw new Error("Compaction Service requires an active LLM route.");
     this.runtime = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, new LlmCompactionSummarizer({ llm, routeId, model: config.model ?? "default" }));
-    ctx.effect(() => () => undefined, "compaction.runtime");
   }
 
   withTriggerRatio(triggerRatio: number | (() => number)): CompactionPlugin { return this.runtime.withTriggerRatio(triggerRatio); }
@@ -100,8 +99,4 @@ export class CompactionPlugin {
     await session.flush();
     return true;
   }
-}
-
-export function activate() {
-  return { services: { "compaction.surface": Object.freeze({ CompactionPlugin, CompactionService }) }, dispose: () => undefined };
 }

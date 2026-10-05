@@ -128,6 +128,5 @@ export class SessionStoreService extends Service {
     if (journal === undefined) throw new Error("Session Store Service requires session.journal.");
     if (persistence === undefined) throw new Error("Session Store Service requires session.storage.");
     this.store = new SessionStore({ registry: journal.registry, forkArtifacts: ctx.get("host.artifacts") as SessionForkArtifactPort | undefined }, persistence);
-    ctx.effect(() => () => undefined, "session.store");
   }
 }

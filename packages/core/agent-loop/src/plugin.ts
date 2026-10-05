@@ -5,6 +5,3 @@ import type { CordisContext } from "@actspace/cordis-adapter";
 export function apply(ctx: CordisContext): void {
   ctx.provide?.("core.agent-loop", Object.freeze({ AgentLoop }));
 }
-export function activate() {
-  return { services: { "core.agent-loop": Object.freeze({ AgentLoop }) }, dispose: () => undefined };
-}

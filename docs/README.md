@@ -1,6 +1,6 @@
 # 文档导航
 
-P5 架构收敛：从 [Host/Harness/Run 总览](design-docs/agent-plugin-runtime/agent-target-overall-architecture.md)进入；执行状态见 [P5 摘要](exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)。
+当前架构从 [Host/Harness/Run 总览](design-docs/agent-plugin-runtime/agent-target-overall-architecture.md)进入；本次代码、目录与文档清理的状态见[最终收尾摘要](exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。P1–P5 的阶段记录保留作为实施证据。
 
 本目录是仓库知识的正式来源。先按任务选择入口，再进入具体专题；当前实现、未来设计和历史证据分开阅读。
 

@@ -61,7 +61,6 @@ export class ContextAssemblerService extends Service {
   constructor(ctx: CordisServiceContext) {
     super(ctx, "context.assembly");
     this.assembler = new ContextAssembler();
-    ctx.effect(() => () => undefined, "context.assembly");
   }
 
   register(contribution: ContextContribution): () => void { return this.assembler.register(contribution); }

@@ -71,10 +71,8 @@ export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
   definition("write_file", "Write a complete small file atomically. Prefer edit_file for focused changes to existing files.", WRITE, "exclusive", objectSchema({ path: stringSchema("File path."), content: stringSchema("Complete file content.") }, ["path", "content"]), ["/content"]),
   definition("delete_file", "Delete one regular workspace file. Directories and glob deletion are unsupported.", WRITE, "exclusive", objectSchema({ path: stringSchema("Regular file path.") }, ["path"])),
 ]);
-export function activate() { return { services: { "tools.filesystem-write": Object.freeze({ registerTools, TOOL_DEFINITIONS }) }, dispose: () => undefined }; }
 function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
   return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: FILESYSTEM_WRITE_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
 }
 function objectSchema(properties: Readonly<Record<string, unknown>>, required: readonly string[]) { return Object.freeze({ type: "object", properties, required, additionalProperties: false }); }
 function stringSchema(description: string) { return Object.freeze({ type: "string", description, minLength: 1 }); }
-function integerSchema(description: string, minimum: number) { return Object.freeze({ type: "integer", description, minimum }); }

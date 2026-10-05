@@ -152,7 +152,6 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
 }
 
 function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-function integerArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string, fallback: number): number { const value = args[key]; return typeof value === "number" && Number.isInteger(value) ? Math.max(1, value) : fallback; }
 function displayPath(path: string, workspaceRoot: string): string { const nested = relative(workspaceRoot, path); return nested && !nested.startsWith("..") && !isAbsolute(nested) ? nested : path; }
 function normalizeSearchLine(line: string, workspaceRoot: string): string { return line.startsWith(`${workspaceRoot}/`) ? line.slice(workspaceRoot.length + 1) : line; }
 function formatBytes(size: number): string { if (size < 1024) return `${size} B`; const units = ["KB", "MB", "GB", "TB"]; let value = size / 1024; let index = 0; while (value >= 1024 && index < units.length - 1) { value /= 1024; index += 1; } return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[index]}`; }

@@ -696,3 +696,143 @@ Runtime 重启后不恢复旧 live progress。Session repair 根据 Journal：
 - diagnostics 聚合窗口、日志采样和 metrics 名称。
 
 这些机械选择不得引入插件前端代码、第二份 renderer-only tool state、未脱敏 live payload 或绕过 Journal 的 terminal 更新路径。
+
+## 14. 当前读取实现与独立水位
+
+### 水位
+
+Journal 是唯一事实源。Projection、Global Index、Window Index 和 Client store 都必须可删除、可重建，不能参与 Agent resume 或 canonical export。
+
+每个读模型显式携带自己的水位，Runtime observation 已通过 Desktop IPC 暴露：
+
+```text
+acceptedThroughSeq   当前进程已接受的 Journal prefix
+durableThroughSeq    Persistence barrier 已确认的 prefix
+projectionThroughSeq Session Projection 覆盖的 prefix
+  windowThroughSeq     当前 Window observation 的尾部
+indexGeneration      Global Index 自身的发布代次
+```
+
+accepted 与 durable 不合并。对外宣称“已持久化”的 API 必须经过 flush barrier。
+
+### Global Aggregate
+
+Global Index 保存每个 Session 的摘要贡献，并用新水位替换旧贡献。它不保存完整消息，也不作为 Agent resume 输入。Usage Index 保存按 Session 水位校验的 `UsageActivityRow[]`，统计页从这些行聚合，缺失时才回到 Journal replay。
+
+```ts
+type GlobalSessionSummary = {
+  sessionId: string
+  throughJournalSeq: number
+  summaryVersion: number
+  createdAt: string
+  updatedAt: string
+  workspaceRoot: string | null
+  profileId: string
+  title: string | null
+  pinned: boolean
+  archived: boolean
+  completedTurnCount: number
+  usage: RuntimeV2UsageSummary
+  accessState: SessionAccessState
+}
+```
+
+Usage 页面还需要按日、模型、请求状态的活动 bucket；不能只保存 total token/cost。未知费用、币种和失败请求必须保留。
+
+规则：
+
+- 每条摘要独立保存 `throughJournalSeq`；
+- 同一 Session 只接受更高水位或更高 `summaryVersion`；
+- 缺失、损坏、版本不匹配时只重建该 Session；
+- Index 写入失败不阻止 Journal append 或 recovery；
+- 删除 Index 后从 Session Projection 重建；
+- Global Query 不直接读取全部 Journal。
+
+### Session Projection Registry
+
+Host Registry 是完整 Session Projection 的唯一生产驱动器。领域只注册纯 definition，不自行维护第二份完整状态。
+
+当前 keys：
+
+| Key | 来源 | 用途 |
+| --- | --- | --- |
+| `metadata` | title、pinned、archived | Global、Client |
+| `todos` | `plugin/actspace.todo/todo-write` | Client |
+| `sessionStats` | turn、step、compaction | Client |
+| `providerUsage` | request/assistant/step usage | Global、Client |
+| `pendingInbox` | Inbox enqueue/claim/discard | Client |
+| `delegations` | delegation lifecycle | Client |
+| `surface`、`tools` | Journal Surface、tool lifecycle | Window support |
+| `requestContext` | request header/context/compaction | Client |
+
+Goal 不预建空 key。没有 producer 和 Journal event 时，Goal 是能力缺失，不是空值。
+
+每个领域状态只有一个 canonical reducer。Todo 必须按 todoId 合并 `items[]`，使用每个 item 的 revision，保留未出现在本次写入中的 Todo 和 cancelled 状态。
+
+Definition 必须满足：
+
+- `init/apply/view` 同步、确定性、JSON-safe；
+- 不相关事件返回相同 state reference；
+- reducer 不原地修改已提交 state；
+- `stateVersion` 变化使旧 checkpoint 失效；
+- view 是 detached、脱敏、不可变的公开值；
+- full replay 与 incremental apply 结果一致。
+
+### Window Presentation
+
+Host 提供有界 raw event window，Client 为 Chat、Trajectory、Tool Card 分别建立展示投影：
+
+```ts
+type SessionEventWindow = {
+  sessionId: string
+  fromSeq: number
+  throughSeq: number
+  journalThroughSeq: number
+  beforeSeq: number | null
+  events: readonly SessionEventEnvelopeV1[]
+  deferredDetails: readonly DeferredDetailRef[]
+  support: readonly WindowSupportFact[]
+}
+```
+
+Window 规则：
+
+- 默认按完整 Turn 分页（每页 20 个 Turn），同时受事件数（默认 2000，调用方可降低）和 JSON 字节数（默认约 2 MB）限制；
+- 历史页（非 `afterSeq`、非 `includeToolDetails`）先剔除展示用不到的负载再计上限：已有 `assistant/message` 定稿的消息不再携带其 `assistant/chunk` 流式增量；窗口内只保留最新一份完整 `request/context`，其余超过 24,000 字符的收敛为 `deferredDetail` 身份字段（request/turn/step id、`prepared.model/route/contextWindow`、`requestOptions`）。2026-09-26 本机 59 个会话统计：chunk 占 journal 事件约 97%，request/context 占字节约 22%，精简前 55/59 个会话首页装不下一轮完整 Turn；
+- 超大 Turn 可以在 Turn 内续页；
+- Surface replacement、跨页工具关联和请求关系进入 support；
+- 大型 args/result/detail/artifact 返回 `DeferredDetailRef`，详情必须按 `sessionId + callId/artifactId` 读取并重新执行 redaction；
+- prepend、append、replace 按 seq 和 message/call identity 去重；
+- 加载历史页不能修改 Session Projection 的 title、todo、usage 或 activity。
+
+Chat 读取 Surface 和 Host facts；Trajectory 保留 raw events、source、surface 和绝对 seq；Tool Card 读取结构化 args/result/detail，不解析模型文字推断后台任务。
+
+### Observation 与缓存
+
+Host 已提供一次性 observation，避免 Desktop 先读 snapshot、再读 events、最后自行猜测一致性：
+
+```ts
+type SessionObservation = {
+  sessionId: string
+  acceptedThroughSeq: number
+  durableThroughSeq: number | null
+  projection: SessionProjectionSnapshot
+  window?: SessionEventWindow
+}
+```
+
+`RuntimeV2DesktopSessionProjection` 由同一次 observation 生成，供固定 UI 使用；renderer 不得再自行组合完整 snapshot 与独立事件读取。
+
+Projection 和 window 必须来自同一读取切面。并发 append 时整体重试或明确进入下一次 observation。
+
+Session Projection Cache 保存 reducer state、stateVersion、checkpoint seq、pending transaction 和逻辑事件索引；Global Session Index 是从所选 Provider 重建的内存摘要；Usage 保持自己的派生缓存。当前冷读与缓存预算见[存储规范](agent-spec-session-core-persistence-separation.md#5-冷读与缓存)，不再读取旧磁盘 checkpoint。
+
+### Registry 原子提交与恢复
+
+`packages/session/projection/src/registry.ts` 是唯一 Host registry。所有 definition 成功后才提交新状态与水位；checkpoint 保存内部 reducer state 而非展示 value。`replayTail` 先验证尾部连续性，再折叠有效事务与 pending，不生成中间 view 或实时通知；实时事件走 apply。未知 required 事件不伪装成可写会话。
+
+Runtime 的 SessionReadModel 组合 Surface、tool lifecycle、workspaceRoot、updatedAt 和 requestContext；昂贵预览按语义输入复用，不能用累计 token 代替当前占用，也不虚构缺失模型容量。
+
+`RuntimeSessionController.readProjection` 返回全会话水位、snapshot/values、window、activeMessageIds 和 deferredToolCalls。用户 Task 消息可以位于 turn/start 前；历史页尾不能覆盖最新 facts。大工具传输裁剪不修改 Journal 原文；完整导出不得只复制已加载页。
+
+ClientSessionStore 按 sessionId 管理 facts/window/live overlay，请求 generation 防旧响应覆盖新状态；equal-seq same-value 幂等，equal-seq conflict 触发 resync。Desktop main 负责权限、传输和 live adapter，renderer 共用一个 Session store。Chat、Trajectory、Tool Card 各自展示，不创建独立历史文件。

@@ -96,7 +96,7 @@
 ### 7.7 Thinking 传输归因
 
 - [x] 确认 Codex 真实 session 中存在 reasoning token 和加密 reasoning item，但最终 `summary` 为空；opaque 协议状态不等于可展示 Thinking。
-- [x] 新增独立 `scripts/diagnose-duckcoding-thinking.ts`，对比 Responses 不请求 summary 与 `reasoning.summary=auto`。
+- [x] 新增独立 `scripts/diagnostics/diagnose-duckcoding-thinking.ts`，对比 Responses 不请求 summary 与 `reasoning.summary=auto`。
 - [x] 增加旧参数 `reasoning.generate_summary=auto` 对照，排除 DuckCoding 仅兼容旧 Responses 参数的可能。
 - [x] 同一脚本探测 Grok Chat 流中的 `reasoning_content`、`reasoning`、`analysis` 字段，不预设 DuckCoding 的转换来源。
 - [x] 默认只输出事件、字段和长度；Codex/Grok Key 从各自环境变量独立读取且不交叉 fallback，正文预览需要显式 `--show-content`。

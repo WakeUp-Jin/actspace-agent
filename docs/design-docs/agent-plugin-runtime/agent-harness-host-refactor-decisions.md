@@ -1,6 +1,6 @@
 # Harness 与 Host 重构：最终决定
 
-更新：2026-10-04。P1–P5 的批准范围已实施并验收；代码冗余、目录与文档的首批清理已按本次[收尾计划](../../exec-plans/completed/20261004-agent-refactor-cleanup.md)完成。其他专题仍需逐项审计，阶段完成不等于全仓可维护性目标完成。
+更新：2026-10-05。P1–P5 架构与[最终收尾计划](../../exec-plans/completed/20261005-agent-refactor-final-closeout/README.md)已完成本次批准范围：模块解耦、Host/客户端分离、冗余代码与根目录清理、文档校准及逐项验收。隔离源码自动化与 35/35 Computer Use 通过，证据和保留限制见[最终结算](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。这不表示全仓已被证明不存在任何冗余，也不包含未来自进化具体功能。
 
 ## 目标与优先级
 
@@ -32,7 +32,7 @@
 - 共享 Host 能力、codec 或持久格式变化按重启与兼容检查处理，不在线改历史读取规则。恢复失败阻断执行，保留诊断和维护入口，不静默换成其他组合。
 - 最近成功选择持久化，旧实例无租约后释放；固定文件保留供回退，不新增自动 GC，也不承诺卸载 Node ESM 内存。
 
-详见[组合契约](agent-spec-profile-bundle-patch-layering.md)和[Host 指南](../../agent-host/README.md)。
+详见[组合契约](agent-spec-profile-bundle-patch-layering.md)和[Host 指南](agent-host-guide.md)。
 
 ## 任务、队列、配置与审批
 
@@ -75,3 +75,9 @@
 [P1–P5 计划](../../exec-plans/completed/20261003-agent-harness-host-refactor/README.md)记录批准范围；[最终验收](../../exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)区分 UI、协议、进程和未覆盖项。实机验收委派 gpt-6.1-sol，开发与修复由主智能体负责。
 
 原始讨论可通过 Git 查看：`git show 1bc434d62152a783990e30e738eacc9ec302e140:docs/design-docs/agent-plugin-runtime/agent-harness-host-refactor-decisions.md`。该快照包含被后续决定替代的方案，不作当前实现依据。
+
+## 早期决定保留的理由
+
+采用 DSH 发布的 Cordis 基底而不引入其完整产品；Agent 语义、Session 格式和 Host 流程归 ActSpace。Provider wire/catalog 留在 LLM Adapter，凭据和代理留在 Host；固定前端不执行任意插件代码。
+
+Profile-first 表示先确定组合身份和资源所有者，不表示全应用只有一棵执行树。Headless 与 Desktop 复用应用服务，保留各自输入和退出策略；managed ESM 支持插件装配，CLI 默认临时会话、显式持久化。早期全量 restart-only、用户 Inbox、仅允许 JSONL 的限制已由本页决定替代。

@@ -34,21 +34,21 @@ export function HostConnectionsSettings() {
     finally { setBusy(false); }
   };
   return <div className="mx-auto max-w-2xl space-y-6 px-8 py-7 text-text-main">
-    <div><h2 className="text-lg font-semibold">Agent 服务器</h2><p className="mt-2 text-sm text-text-muted">连接自己的服务器。会话留在创建它的服务器上，关闭桌面应用后远端任务继续运行。</p></div>
+    <div><h2 className="text-act-lg font-semibold">Agent 服务器</h2><p className="mt-2 text-act-sm text-text-muted">连接自己的服务器。会话留在创建它的服务器上，关闭桌面应用后远端任务继续运行。</p></div>
     <ul className="space-y-3">{hosts.map(host => <li key={host.id} className="rounded-act-sm border border-line bg-surface p-4">
-      <div className="flex items-start justify-between gap-3"><div><div className="font-medium">{host.name}</div><div className="mt-1 break-all text-xs text-text-muted">{host.endpoint.kind === "wss" ? host.endpoint.url : `SSH · ${host.endpoint.alias}:${host.endpoint.port}`}</div></div><span className={host.state === "connected" ? "text-operational text-xs" : "text-text-muted text-xs"}>{stateNames[host.state]}</span></div>
-      {host.error && <p className="mt-2 text-sm text-danger" role="status">{connectionError(host.error)}</p>}
+      <div className="flex items-start justify-between gap-3"><div><div className="font-medium">{host.name}</div><div className="mt-1 break-all text-act-xs text-text-muted">{host.endpoint.kind === "wss" ? host.endpoint.url : `SSH · ${host.endpoint.alias}:${host.endpoint.port}`}</div></div><span className={host.state === "connected" ? "text-operational text-act-xs" : "text-text-muted text-act-xs"}>{stateNames[host.state]}</span></div>
+      {host.error && <p className="mt-2 text-act-sm text-danger" role="status">{connectionError(host.error)}</p>}
       <div className="mt-3 flex gap-2"><Button disabled={busy || host.state === "connecting"} onClick={() => void perform(() => window.actspaceHosts!.reconnect(host.id))}>重新连接</Button><Button disabled={busy} onClick={() => void perform(() => window.actspaceHosts!.remove(host.id))}>移除连接</Button></div>
     </li>)}</ul>
     <form className="space-y-4 rounded-act-sm border border-line p-5" onSubmit={event => { event.preventDefault(); const endpoint: HostEndpoint = kind === "wss" ? { kind, url: address.trim() } : { kind, alias: address.trim(), port: Number(port) }; void perform(async () => { await window.actspaceHosts!.add({ name, endpoint, code }); setCode(""); setName(""); setAddress(""); }); }}>
       <h3 className="font-medium">添加服务器</h3>
-      <label className="block space-y-1 text-sm"><span>名称</span><input className={inputClass} value={name} onChange={event => setName(event.target.value)} required maxLength={128} placeholder="我的云端 Agent" /></label>
-      <label className="block space-y-1 text-sm"><span>连接方式</span><select className={inputClass} value={kind} onChange={event => { setKind(event.target.value as "wss" | "ssh"); setAddress(""); }}><option value="wss">WSS</option><option value="ssh">SSH 隧道</option></select></label>
-      <label className="block space-y-1 text-sm"><span>{kind === "wss" ? "服务器地址" : "SSH 配置别名"}</span><input className={inputClass} value={address} onChange={event => setAddress(event.target.value)} required placeholder={kind === "wss" ? "wss://agent.example.com/rpc" : "my-server"} /></label>
-      {kind === "ssh" && <><label className="block space-y-1 text-sm"><span>服务器上的 Host 端口</span><input className={inputClass} type="number" min={1} max={65535} value={port} onChange={event => setPort(event.target.value)} required /></label><p className="text-xs text-text-muted">使用系统 SSH 密钥和已验证的服务器指纹。首次连接前，请先在终端完成 SSH 连接验证。</p></>}
-      <label className="block space-y-1 text-sm"><span>一次性配对码</span><input className={inputClass} type="password" autoComplete="off" value={code} onChange={event => setCode(event.target.value)} required maxLength={128} /></label>
-      <p className="text-xs text-text-muted">在服务器运行 host pair 命令获取配对码。配对后，此设备可自动重连。</p>
-      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      <label className="block space-y-1 text-act-sm"><span>名称</span><input className={inputClass} value={name} onChange={event => setName(event.target.value)} required maxLength={128} placeholder="我的云端 Agent" /></label>
+      <label className="block space-y-1 text-act-sm"><span>连接方式</span><select className={inputClass} value={kind} onChange={event => { setKind(event.target.value as "wss" | "ssh"); setAddress(""); }}><option value="wss">WSS</option><option value="ssh">SSH 隧道</option></select></label>
+      <label className="block space-y-1 text-act-sm"><span>{kind === "wss" ? "服务器地址" : "SSH 配置别名"}</span><input className={inputClass} value={address} onChange={event => setAddress(event.target.value)} required placeholder={kind === "wss" ? "wss://agent.example.com/rpc" : "my-server"} /></label>
+      {kind === "ssh" && <><label className="block space-y-1 text-act-sm"><span>服务器上的 Host 端口</span><input className={inputClass} type="number" min={1} max={65535} value={port} onChange={event => setPort(event.target.value)} required /></label><p className="text-act-xs text-text-muted">使用系统 SSH 密钥和已验证的服务器指纹。首次连接前，请先在终端完成 SSH 连接验证。</p></>}
+      <label className="block space-y-1 text-act-sm"><span>一次性配对码</span><input className={inputClass} type="password" autoComplete="off" value={code} onChange={event => setCode(event.target.value)} required maxLength={128} /></label>
+      <p className="text-act-xs text-text-muted">在服务器运行 host pair 命令获取配对码。配对后，此设备可自动重连。</p>
+      {error && <p role="alert" className="text-act-sm text-danger">{error}</p>}
       <Button type="submit" disabled={busy || !window.actspaceHosts}>{busy ? "正在连接…" : "配对并连接"}</Button>
     </form>
   </div>;

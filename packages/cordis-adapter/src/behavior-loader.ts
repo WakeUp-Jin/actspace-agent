@@ -1,6 +1,5 @@
 import type { Context, Plugin } from "@deepseek-ai/cordis";
-import type { PluginBehaviorDescriptor, PluginManifest } from "./manifest.js";
-import type { JsonObject, JsonValue } from "./plugin-contract.js";
+import type { JsonObject} from "./plugin-contract.js";
 
 /** DSH-native Behavior ABI. The wrapper below intentionally presents an arrow
  * `apply` callback to Cordis so a Behavior's returned disposer is collected as
@@ -12,9 +11,6 @@ export type ActSpaceBehavior = {
 };
 
 export type ActSpaceBehaviorModule = ActSpaceBehavior | ((ctx: Context, config: JsonObject) => unknown);
-
-export type BehaviorActivation = { readonly services: Readonly<Record<string, unknown>>; readonly dispose: () => void | Promise<void> };
-export type BehaviorModule = { readonly activate: (context: { readonly pluginId: string; readonly entryId: string; readonly config: unknown }) => { readonly services?: Readonly<Record<string, unknown>>; readonly dispose: () => void | Promise<void> } | Promise<{ readonly services?: Readonly<Record<string, unknown>>; readonly dispose: () => void | Promise<void> }> };
 
 /**
  * Normalize a trusted module's default/named export into a real Cordis plugin
@@ -51,18 +47,6 @@ export async function loadCordisBehavior(
   entryId = specifier,
 ): Promise<Plugin> {
   return toCordisBehavior(await load(specifier), entryId);
-}
-
-export async function activateBehavior(manifest: PluginManifest, descriptor: PluginBehaviorDescriptor, load: (specifier: string) => Promise<BehaviorModule>): Promise<BehaviorActivation> {
-  const module = await load(descriptor.module);
-  if (typeof module.activate !== "function") throw new Error(`Behavior ${descriptor.entryId} has no activate export.`);
-  const activation = await module.activate({ pluginId: manifest.pluginId, entryId: descriptor.entryId, config: descriptor.config });
-  if (typeof activation?.dispose !== "function") throw new Error(`Behavior ${descriptor.entryId} did not return an owned disposer.`);
-  const services = Object.freeze({ ...(activation.services ?? {}) });
-  const expected = [...(descriptor.provides ?? [])].sort(); const actual = Object.keys(services).sort();
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) { await activation.dispose(); throw new Error(`Behavior ${descriptor.entryId} service exports do not match its manifest.`); }
-  let disposed = false;
-  return Object.freeze({ services, dispose: async () => { if (disposed) return; disposed = true; await activation.dispose(); } });
 }
 
 function asRecord(value: unknown): Record<string, any> | undefined {

@@ -1,0 +1,95 @@
+# 20261005-agent-refactor-final-closeout 重构后统计
+
+> 由 `pnpm refactor:stats after` 生成。代码行变化只用于观察，不代表单独的质量评分。
+
+## 前后对比
+
+| 指标 | 重构前 | 重构后 | 变化 |
+| --- | ---: | ---: | ---: |
+| 源代码文件 | 891 | 897 | +6 |
+| 源代码行 | 131,804 | 133,226 | +1,422 |
+| 测试文件 | 343 | 344 | +1 |
+| 测试代码行 | 39,175 | 39,518 | +343 |
+| Docs 文件 | 1,559 | 1,581 | +22 |
+| Docs 非空白字符 | 5,031,763 | 5,160,242 | +128,479 |
+
+## 主要目录变化
+
+| 目录 | 重构前源代码行 | 重构后源代码行 | 变化 | 测试行变化 |
+| --- | ---: | ---: | ---: | ---: |
+| (root) | 54 | 0 | -54 | 0 |
+| .agents | 4,749 | 4,749 | 0 | 0 |
+| apps/cli | 838 | 857 | +19 | 0 |
+| apps/desktop | 53,908 | 53,970 | +62 | +64 |
+| apps/site | 3,549 | 3,549 | 0 | 0 |
+| browser-bridge | 10,753 | 10,753 | 0 | 0 |
+| docs | 21,792 | 23,070 | +1,278 | 0 |
+| packages/agent-host | 1,554 | 1,553 | -1 | 0 |
+| packages/agent-service | 1,102 | 1,099 | -3 | 0 |
+| packages/boot | 397 | 397 | 0 | 0 |
+| packages/bundle | 8 | 8 | 0 | 0 |
+| packages/client | 1,266 | 1,265 | -1 | 0 |
+| packages/compaction | 221 | 216 | -5 | -6 |
+| packages/composition | 214 | 214 | 0 | 0 |
+| packages/context | 85 | 80 | -5 | -5 |
+| packages/cordis-adapter | 1,111 | 1,046 | -65 | +37 |
+| packages/core | 1,379 | 1,355 | -24 | -10 |
+| packages/desktop-app | 181 | 181 | 0 | 0 |
+| packages/diagnostics | 9 | 9 | 0 | 0 |
+| packages/english-learning | 380 | 380 | 0 | 0 |
+| packages/harness-control | 378 | 378 | 0 | 0 |
+| packages/headless | 112 | 115 | +3 | 0 |
+| packages/llm | 1,593 | 1,585 | -8 | -3 |
+| packages/prompt | 566 | 559 | -7 | -5 |
+| packages/runtime | 2,120 | 2,120 | 0 | 0 |
+| packages/session | 3,429 | 3,417 | -12 | +23 |
+| packages/shared | 7,089 | 7,089 | 0 | 0 |
+| packages/subagent | 485 | 481 | -4 | +2 |
+| packages/test-support | 73 | 73 | 0 | 0 |
+| packages/tools | 5,734 | 5,705 | -29 | +18 |
+| packages/util | 3 | 3 | 0 | 0 |
+| scripts | 6,672 | 6,950 | +278 | +228 |
+
+## Git 变化摘要
+
+- 变化文件：225
+- 新增 / 删除 / 重命名文件：0 / 33 / 0
+- 新增 / 删除行：2,756 / 33,501
+- 未跟踪项：24（会计入规模统计，但 Git diff 摘要不含其行变化）
+
+## 基本信息
+
+- **计划**：`20261005-agent-refactor-final-closeout`
+- **统计阶段**：`after`
+- **统计时间**：2026-10-05T14:16:49.106Z
+- **Git 分支**：`main`
+- **Git commit**：`e02f37f7f94ed4ffbf1ce221c03ce38a3862dc5c`
+- **工作区**：有 249 项未提交变化
+
+## 重构后仓库总览
+
+| 指标 | 数量 |
+| --- | ---: |
+| 源代码文件 | 897 |
+| 源代码行 | 133,226 |
+| 测试文件 | 344 |
+| 测试代码行 | 39,518 |
+| Docs 文件 | 1,581 |
+| Docs 非空白字符 | 5,160,242 |
+
+## 重构后按语言
+
+| 分类 | 源文件 | 源代码行 | 测试文件 | 测试行 |
+| --- | ---: | ---: | ---: | ---: |
+| Astro | 18 | 1,234 | 0 | 0 |
+| CSS | 17 | 3,312 | 0 | 0 |
+| Go | 22 | 6,741 | 10 | 1,955 |
+| HTML | 57 | 23,198 | 0 | 0 |
+| JavaScript | 64 | 8,319 | 20 | 1,649 |
+| Python | 4 | 1,938 | 0 | 0 |
+| Shell | 10 | 591 | 0 | 0 |
+| TypeScript | 705 | 87,893 | 314 | 35,914 |
+
+<!-- refactor-stats-data
+{"schemaVersion":1,"plan":"20261005-agent-refactor-final-closeout","slot":"after","generatedAt":"2026-10-05T14:16:49.106Z","git":{"commit":"e02f37f7f94ed4ffbf1ce221c03ce38a3862dc5c","branch":"main","dirty":true,"changedEntries":249,"untrackedEntries":24},"metrics":{"totals":{"sourceFiles":897,"sourceLines":133226,"testFiles":344,"testLines":39518,"docsFiles":1581,"docsCharacters":5160242},"areas":{".agents":{"sourceFiles":19,"sourceLines":4749,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"apps/cli":{"sourceFiles":16,"sourceLines":857,"testFiles":5,"testLines":271,"docsFiles":0,"docsCharacters":0},"apps/desktop":{"sourceFiles":278,"sourceLines":53970,"testFiles":140,"testLines":23784,"docsFiles":0,"docsCharacters":0},"apps/site":{"sourceFiles":46,"sourceLines":3549,"testFiles":4,"testLines":310,"docsFiles":0,"docsCharacters":0},"browser-bridge":{"sourceFiles":44,"sourceLines":10753,"testFiles":10,"testLines":1955,"docsFiles":0,"docsCharacters":0},"docs":{"sourceFiles":37,"sourceLines":23070,"testFiles":0,"testLines":0,"docsFiles":1581,"docsCharacters":5160242},"packages/agent-host":{"sourceFiles":23,"sourceLines":1553,"testFiles":18,"testLines":646,"docsFiles":0,"docsCharacters":0},"packages/agent-service":{"sourceFiles":13,"sourceLines":1099,"testFiles":5,"testLines":482,"docsFiles":0,"docsCharacters":0},"packages/boot":{"sourceFiles":7,"sourceLines":397,"testFiles":4,"testLines":309,"docsFiles":0,"docsCharacters":0},"packages/bundle":{"sourceFiles":1,"sourceLines":8,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"packages/client":{"sourceFiles":13,"sourceLines":1265,"testFiles":4,"testLines":216,"docsFiles":0,"docsCharacters":0},"packages/compaction":{"sourceFiles":7,"sourceLines":216,"testFiles":2,"testLines":182,"docsFiles":0,"docsCharacters":0},"packages/composition":{"sourceFiles":7,"sourceLines":214,"testFiles":3,"testLines":105,"docsFiles":0,"docsCharacters":0},"packages/context":{"sourceFiles":4,"sourceLines":80,"testFiles":2,"testLines":34,"docsFiles":0,"docsCharacters":0},"packages/cordis-adapter":{"sourceFiles":16,"sourceLines":1046,"testFiles":8,"testLines":597,"docsFiles":0,"docsCharacters":0},"packages/core":{"sourceFiles":26,"sourceLines":1355,"testFiles":14,"testLines":899,"docsFiles":0,"docsCharacters":0},"packages/desktop-app":{"sourceFiles":7,"sourceLines":181,"testFiles":2,"testLines":154,"docsFiles":0,"docsCharacters":0},"packages/diagnostics":{"sourceFiles":1,"sourceLines":9,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"packages/english-learning":{"sourceFiles":11,"sourceLines":380,"testFiles":2,"testLines":160,"docsFiles":0,"docsCharacters":0},"packages/harness-control":{"sourceFiles":8,"sourceLines":378,"testFiles":5,"testLines":271,"docsFiles":0,"docsCharacters":0},"packages/headless":{"sourceFiles":4,"sourceLines":115,"testFiles":1,"testLines":26,"docsFiles":0,"docsCharacters":0},"packages/llm":{"sourceFiles":30,"sourceLines":1585,"testFiles":14,"testLines":1075,"docsFiles":0,"docsCharacters":0},"packages/prompt":{"sourceFiles":12,"sourceLines":559,"testFiles":4,"testLines":161,"docsFiles":0,"docsCharacters":0},"packages/runtime":{"sourceFiles":33,"sourceLines":2120,"testFiles":16,"testLines":1048,"docsFiles":0,"docsCharacters":0},"packages/session":{"sourceFiles":50,"sourceLines":3417,"testFiles":18,"testLines":1373,"docsFiles":0,"docsCharacters":0},"packages/shared":{"sourceFiles":47,"sourceLines":7089,"testFiles":17,"testLines":1974,"docsFiles":0,"docsCharacters":0},"packages/subagent":{"sourceFiles":12,"sourceLines":481,"testFiles":2,"testLines":265,"docsFiles":0,"docsCharacters":0},"packages/test-support":{"sourceFiles":2,"sourceLines":73,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"packages/tools":{"sourceFiles":69,"sourceLines":5705,"testFiles":24,"testLines":1572,"docsFiles":0,"docsCharacters":0},"packages/util":{"sourceFiles":1,"sourceLines":3,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"scripts":{"sourceFiles":53,"sourceLines":6950,"testFiles":20,"testLines":1649,"docsFiles":0,"docsCharacters":0}},"languages":{"Astro":{"sourceFiles":18,"sourceLines":1234,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"CSS":{"sourceFiles":17,"sourceLines":3312,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"Go":{"sourceFiles":22,"sourceLines":6741,"testFiles":10,"testLines":1955,"docsFiles":0,"docsCharacters":0},"HTML":{"sourceFiles":57,"sourceLines":23198,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"JavaScript":{"sourceFiles":64,"sourceLines":8319,"testFiles":20,"testLines":1649,"docsFiles":0,"docsCharacters":0},"Python":{"sourceFiles":4,"sourceLines":1938,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"Shell":{"sourceFiles":10,"sourceLines":591,"testFiles":0,"testLines":0,"docsFiles":0,"docsCharacters":0},"TypeScript":{"sourceFiles":705,"sourceLines":87893,"testFiles":314,"testLines":35914,"docsFiles":0,"docsCharacters":0}}}}
+-->

@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+
 import { SessionError } from "./errors.js";
 
 export type { SessionEventCriticality, SessionEventSourceV1, SessionEventProvenanceV1, SessionSurfaceNodeV1, SessionSurfaceOperationV1, SessionEventEnvelopeV1, SessionEventCandidateV1 } from "@actspace/shared/runtime-v2";

@@ -35,7 +35,7 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
   try {
     for (const item of TOOL_DEFINITIONS) {
       const handler = ports[item.localName] ?? (async () => ({ status: "failed" as const, modelOutput: [{ type: "text" as const, text: `${item.localName} Host capability is unavailable.` }], summary: `${item.localName} unavailable`, failure: { code: "CAPABILITY_UNAVAILABLE", message: `${item.localName} Host capability is unavailable.`, retryable: false } }));
-      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract(item.localName) }) }));
+      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract() }) }));
     }
     return Object.freeze(registrations);
   } catch (error) {
@@ -44,7 +44,7 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
   }
 }
 
-function permissionContract(name: ToolName): ToolPermissionContract {
+function permissionContract(): ToolPermissionContract {
   const access = "read" as const;
   const contract: ToolPermissionContract = {
     grantAudience: FILE_AUDIENCE,
@@ -70,7 +70,6 @@ export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
   definition("read_file", "Read a targeted line range from a workspace file. Prefer small ranges and page with offset/limit.", READ, "read-only", objectSchema({ path: stringSchema("File path, absolute or relative to workspace."), offset: integerSchema("Starting line, 1-based.", 1), limit: integerSchema("Maximum lines to read.", 1), force: { type: "boolean", default: false } }, ["path"])),
   definition("list_directory", "List files and subdirectories in a workspace directory. Use read_file for contents.", READ, "read-only", objectSchema({ path: stringSchema("Directory path, absolute or relative to workspace.") }, ["path"])),
 ]);
-export function activate() { return { services: { "tools.filesystem-read": Object.freeze({ registerTools, TOOL_DEFINITIONS }) }, dispose: () => undefined }; }
 function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
   return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: FILESYSTEM_READ_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
 }

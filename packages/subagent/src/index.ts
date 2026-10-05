@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply, activate } from "./plugin.js";
+export { apply } from "./plugin.js";
 export * from "./agent-tool.js";
 export * from "./child-session.js";
 export * from "./descriptor.js";

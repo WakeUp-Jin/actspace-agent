@@ -108,13 +108,13 @@ ActSpace 当前已经具备一部分基础能力：
 | 图片 / 文件附件 | `Composer.tsx`、`composer-attachment-service.ts`、`ComposerAttachment` | 独立 attachment tile | 保持独立，增加和 mention / annotation 共存的布局规则 |
 | 助手 Markdown | `messages/MarkdownProse.tsx`、`messages/AssistantReply.tsx` | `react-markdown` + GFM + highlight | 增加可选 selection layer / marker layer，不替换 Markdown renderer |
 | 用户消息 | `messages/UserMessage.tsx` | `content` + `attachments` | 增加已发送 reference summary 的非编辑投影 |
-| 发送契约 | `packages/shared/src/ipc.ts`、`App.tsx` | `RunAgentInput.userInput` + attachments | 增加结构化 composer context，保留 userInput 兼容字段 |
+| 发送契约 | `packages/shared/src/ipc.ts`、`App.tsx` | `SubmitTaskInput` 的 userInput、附件与结构化引用 | 结构化编辑状态归 Composer；实际提交使用共享 Task 契约 |
 | Session payload | `packages/shared/src/session.ts`、`packages/client/src/sessions/chat.ts`、selectors | user message payload 有 content / attachments | 增加可选 reference / annotation payload |
 | 文件安全边界 | main / Host / Tool Runtime | 已有 workspace、realpath、permission 约束 | mention resolve 必须复用同一边界 |
 
 ### 4.2 不改动的基础能力
 
-- 现有 `/compact` 仍走独立 context compaction IPC，不写入普通 user message。
+- `/compact` 经统一 Task 接纳识别为调度操作，不写入普通 user message。
 - 现有图片文件选择、粘贴图片、预览恢复和 `previewUrl` 剥离规则保持不变。
 - 现有 Chat / Plan / Agent 模式硬边界保持不变。
 - 现有 `MarkdownProse` 的普通 Markdown、代码和链接语义保持不变。
@@ -235,20 +235,7 @@ type ComposerContentPayload = {
 
 `plainText` 的 mention 降级文本建议为 `@relative/path`，但不能作为安全身份来源。发送链路必须以 `fileReferences` 重新解析并校验。
 
-已有 `RunAgentInput.userInput: string` 可以短期保留：
-
-```ts
-type RunAgentInput = {
-  // 兼容字段：等于 content.plainText
-  userInput: string;
-  composerContent?: ComposerContentPayload;
-  attachments?: ComposerAttachment[];
-  responseAnnotations?: ResponseAnnotationReference[];
-  // 其他现有字段保持不变
-};
-```
-
-当 `composerContent` 存在时，Runtime 以结构化内容为准，`userInput` 仅作为兼容和诊断摘要；二者的 plain text 不一致时 fail closed，不静默选择其中一个。
+当前提交使用共享 `SubmitTaskInput`（`packages/shared/src/runtime-v2/tasks.ts`），结构化引用为 fileReferences 和 responseAnnotations；Composer document 属于编辑器状态，不作为另一套 Runtime 输入契约。稳定 submissionId 支持失败核对和去重，完整任务语义只在[Task/Run 规范](../agent-plugin-runtime/agent-task-run-lifecycle.md)维护。
 
 ### 6.4 Markdown 行为
 
@@ -597,22 +584,11 @@ type UserMessagePayload = {
 
 ### 10.3 Runtime 输入
 
-```ts
-type RunAgentInput = {
-  sessionId: string;
-  agentRunId: string;
-  userInput: string;
-  composerContent?: ComposerContentPayload;
-  attachments?: ComposerAttachment[];
-  responseAnnotations?: ResponseAnnotationReference[];
-  mode?: ComposerMode;
-  // 现有模型、技能、执行上下文字段保持不变
-};
-```
+实际类型以 `SubmitTaskInput` 为准，Renderer 经 `submitTask` 提交内容；模型等配置通过 Task configure 独立更新，消息交付时读取。不要在此复制另一份 DTO。
 
 Runtime 处理：
 
-- 验证 `composerContent.plainText === userInput`，否则拒绝。
+- 验证 userInput、fileReferences、responseAnnotations 与附件的长度、身份和权限；编辑文档不替代后端安全校验。
 - 解析并校验所有 file reference 的 workspace identity 和 relative path。
 - 验证 annotation 的 assistantMessageId 属于当前 session；不存在则返回结构化错误。
 - 验证 selectedText 与 prefix / suffix context 长度在上限内。

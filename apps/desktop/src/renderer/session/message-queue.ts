@@ -1,4 +1,23 @@
 import type { ComposerSendOptions } from "../components/Composer";
+import type { ComposerAttachment } from "@actspace/shared";
+import type { TaskContentEnvelope } from "@actspace/shared/runtime-v2";
+
+/** Reconstruct remote attachments from durable Host facts, including after Reload. */
+export function taskAttachments(sessionId: string, envelope: TaskContentEnvelope): ComposerAttachment[] | undefined {
+  if (envelope?.kind !== "composer-task") return undefined;
+  const original = envelope.original as unknown as { attachments?: ComposerAttachment[]; uploadIds?: string[] };
+  if (!sessionId.startsWith("host:")) return original.attachments;
+  if (!Array.isArray(original.uploadIds) || !Array.isArray(envelope.prepared)) return undefined;
+  const prepared = envelope.prepared;
+  return original.uploadIds.flatMap(artifactId => {
+    const block = prepared.find(value => value && typeof value === "object" && !Array.isArray(value) && value.type === "artifact" && value.artifact && typeof value.artifact === "object" && !Array.isArray(value.artifact) && value.artifact.artifactId === artifactId);
+    if (!block || typeof block !== "object" || Array.isArray(block)) return [];
+    const artifact = block.artifact as { mediaType?: string };
+    return [{ id: artifactId, kind: artifact.mediaType?.startsWith("image/") ? "image" as const : "file" as const,
+      name: typeof block.label === "string" ? block.label : artifactId, mimeType: artifact.mediaType,
+      remoteArtifact: { sessionId, artifactId } }];
+  });
+}
 
 /** Host 持久队列的内容投影；执行配置在消费时独立读取。 */
 export type QueuedComposerMessage = {
@@ -37,7 +56,7 @@ export function projectTaskQueue(snapshot: import("@actspace/shared/runtime-v2")
     const envelope = task.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
     const original = envelope?.kind === "composer-task" ? envelope.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
     const text = original?.userInput ?? (typeof task.content === "string" ? task.content : "待执行消息");
-    const item: QueuedComposerMessage = { id, text, kind: text.trim() === "/compact" ? "compact" : "message", options: { attachments: original?.attachments, fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations } };
+    const item: QueuedComposerMessage = { id, text, kind: text.trim() === "/compact" ? "compact" : "message", options: { attachments: taskAttachments(snapshot.sessionId, envelope), fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations } };
     (task.targetRunId ? steering : items).push(item);
   }
   return { items, steering, paused: snapshot.paused };

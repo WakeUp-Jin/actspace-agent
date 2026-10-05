@@ -1,6 +1,6 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolFailure } from "./errors.js";
-import type { NormalizedToolDefinition } from "./definition.js";
+
 import type { ToolResource } from "./permission/types.js";
 import type { PermissionMode } from "@actspace/shared/runtime-v2";
 

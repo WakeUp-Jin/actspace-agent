@@ -5,7 +5,7 @@
 
 > 状态：研究判断，已同步 2026-08-22 确认的去留方向。本文档回答“现有资产怎么处理”，不定义 v2 的最终 API、包结构或迁移步骤。
 >
-> 具体架构所有权以 [v2 已确认决策](./agent-decisions-v2-foundation.md) 为准。
+> 具体架构所有权以 [v2 已确认决策](./agent-harness-host-refactor-decisions.md) 为准。
 
 ## 判断口径
 

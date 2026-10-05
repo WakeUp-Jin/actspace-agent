@@ -1,6 +1,6 @@
 import { taskOperation } from "@actspace/shared/runtime-v2";
 import { useRemoteTarget } from "./hooks/useRemoteTarget";
-import { projectTaskQueue } from "./session/message-queue";
+import { projectTaskQueue, taskAttachments } from "./session/message-queue";
 import { createEmptyStreamingState, type ToolEntry, type StreamingState, type StreamingSegment, type SessionRunState } from "./session/session-run-state";
 import { SessionBrowseContext } from "./session/SessionBrowseContext";
 import {
@@ -1026,7 +1026,7 @@ export function App() {
       const original = content?.kind === "composer-task" ? content.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
       const submittedOptions = submittedOptionsRef.current.get(initial.submissionId);
       currentRun.userBlock = { kind: "user", id: `turn:${currentRun.agentRunId}:user:0`, content: original?.userInput ?? (typeof initial.content === "string" ? initial.content : ""), createdAt: new Date().toISOString(),
-        attachments: submittedOptions?.attachments ?? original?.attachments, fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations };
+        attachments: submittedOptions?.attachments ?? taskAttachments(snapshot.sessionId, content), fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations };
       refreshStreamingBlocks(snapshot.sessionId);
     }
 
@@ -1854,8 +1854,17 @@ export function App() {
     const snapshot = sessionId ? taskSnapshotsRef.current.get(sessionId) : undefined;
     const item = sessionId ? messageQueuesRef.current.get(sessionId)?.items.find(item => item.id === id) : undefined;
     if (!sessionId || !snapshot || !item) return;
+    const attachments = await Promise.all((item.options.attachments ?? []).map(async attachment => {
+      if (attachment.kind !== "image" || !attachment.remoteArtifact || !window.actspace.readSessionArtifact) return attachment;
+      try {
+        const preview = await window.actspace.readSessionArtifact({ sessionId, artifactPath: attachment.remoteArtifact.artifactId });
+        return { ...attachment, previewUrl: preview.dataUrl };
+      } catch { return attachment; } // Preview failure must not discard the durable attachment.
+    }));
     if (!await taskCommand({ op: "cancel", sessionId, taskId: id, revision: snapshot.revision })) return;
-    setComposerDraftRestore({ id: Date.now(), sessionId, text: item.text, ...item.options });
+    const draft = { id: Date.now(), sessionId, text: item.text, ...item.options, attachments };
+    draftsRef.current.set(sessionId, draft);
+    if (activeSessionIdRef.current === sessionId) setComposerDraftRestore(draft);
   }, [taskCommand]);
 
   const handleSend = useCallback(async (

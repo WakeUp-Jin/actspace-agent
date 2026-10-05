@@ -25,6 +25,16 @@ it("projects Host order and keeps consumed supplements out of the pending tray",
   expect(takeSteering(steered, "0").queue.steering).toEqual([]);
 });
 
+it("restores remote queued attachments and annotations from the durable snapshot after Reload", () => {
+  const content = { kind: "composer-task", original: { userInput: "edit me", uploadIds: ["image-1"], responseAnnotations: [{ annotationId: "a", comment: "keep me" }] },
+    prepared: [{ type: "artifact", artifact: { artifactId: "image-1", mediaType: "image/png" }, label: "visible.png" }] };
+  const snapshot = { sessionId: "host:remote-session", revision: 4, paused: true, runs: [], queue: ["task"], tasks: [{ taskId: "task", submissionId: "send", content, acceptedSeq: 1, state: "pending" as const, runId: null, targetRunId: null, continuationOf: null }] };
+  const queue = projectTaskQueue(JSON.parse(JSON.stringify(snapshot)));
+  expect(queue.items[0]?.options).toEqual({ attachments: [{ id: "image-1", kind: "image", name: "visible.png", mimeType: "image/png", remoteArtifact: { sessionId: snapshot.sessionId, artifactId: "image-1" } }], fileReferences: undefined, responseAnnotations: [{ annotationId: "a", comment: "keep me" }] });
+  renderTray(queue, { running: false });
+  expect(screen.getByRole("region", { name: "消息队列" })).toHaveTextContent("1 个文件 · 1 条引用");
+});
+
 describe("MessageQueueTray", () => {
   it("renders nothing for an empty queue", () => {
     renderTray(EMPTY_MESSAGE_QUEUE);

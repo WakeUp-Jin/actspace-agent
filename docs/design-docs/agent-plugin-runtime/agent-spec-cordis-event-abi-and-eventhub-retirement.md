@@ -72,4 +72,4 @@ ctx.on("session/event", containNotification(ctx, function (event) {
 - `pnpm gen:contract-matrix`：从源声明生成目录；禁止手改生成物。
 - cordis-adapter/core-agent 测试：continuation、bail、carrier、同步/异步异常、非阻塞 emit 和资源释放。
 
-旧 EventHub 已退役，不增加兼容 alias。详细 Loop 调用阶段只维护在 [Loop surface](agent-spec-agent-loop-cordis-surface.md)，Session 事实与持久化只维护在 [Session 持久化规范](agent-session-event-persistence-refactor.md)。
+旧 EventHub 已退役，不增加兼容 alias。详细 Loop 调用阶段只维护在 [Loop surface](agent-spec-agent-loop-cordis-surface.md)，Session 事实与持久化只维护在 [Session 持久化规范](agent-spec-session-core-persistence-separation.md)。

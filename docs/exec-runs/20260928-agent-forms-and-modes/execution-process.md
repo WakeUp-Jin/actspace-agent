@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- 关联计划：`docs/exec-plans/active/20260928-agent-forms-and-modes.md`
+- 关联计划：`docs/exec-plans/completed/20260928-agent-forms-and-modes.md`
 - 执行模式：交互
 - 日期：2026-09-28
 - 状态：代码与确定性测试完成；真实 Chat/Plan 主要路线已验收，部分 Electron 路线待验收

@@ -419,7 +419,8 @@ export async function generate({ check = false } = {}) {
   const matrix = await buildMatrix();
   const json = renderJson(matrix);
   const markdown = renderMarkdown(matrix);
-  const outputs = [[jsonOutput, json], [markdownOutput, markdown]];
+  // JSON is a disposable local artifact; only Markdown is versioned and checked.
+  const outputs = check ? [[markdownOutput, markdown]] : [[jsonOutput, json], [markdownOutput, markdown]];
   const failures = [];
   for (const [relativePath, content] of outputs) {
     const absolutePath = resolve(repoRoot, relativePath);

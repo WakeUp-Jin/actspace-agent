@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { activate, apply, CompactionPlugin, CompactionService } from "../plugin.js";
+import { apply, CompactionPlugin, CompactionService } from "../plugin.js";
 import { CordisContextClass } from "@actspace/cordis-adapter";
 
 import { compactionSession } from "./session-fixture.js";
@@ -29,12 +29,6 @@ describe("compaction plugin lifecycle", () => {
       await session.close();
       await ctx.fiber.dispose();
     }
-  });
-
-  it("publishes the compaction behavior entry and disposes", async () => {
-    const activation = activate();
-    expect(activation.services?.["compaction.surface"]).toMatchObject({ CompactionPlugin: expect.any(Function) });
-    await activation.dispose();
   });
 
   it("owns the compaction runtime through a Cordis Service", async () => {

@@ -111,3 +111,8 @@
 - 新增资产时同步更新本入口或对应组件规范，写清它验证的状态。
 
 - [会话浏览按需加载](front-progressive-session-loading.md)：摘要与消息真实分页、轨迹按需、浏览索引与验证边界。
+
+## 工具流交互演示
+
+- [消息流排版演示](tool-stream-typography-demo.html)：静态排版与工具摘要视觉参考。
+- [Explore 工具归组演示](tool-experience-explore-demo.html)：工具流交互原型，不代表运行时验收。

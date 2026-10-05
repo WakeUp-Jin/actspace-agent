@@ -1,5 +1,5 @@
 import { taskOperation } from "@actspace/shared/runtime-v2";
-import { randomUUID } from "node:crypto";
+
 import { SessionModeWriter } from "./session-commands.js";
 import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
@@ -82,7 +82,6 @@ export type AgentApplicationContract = {
   readonly updateSessionPermissionMode: (sessionId: string, mode: import("@actspace/shared/runtime-v2").PermissionMode) => Promise<RuntimeV2SessionSnapshot>;
   readonly updateSessionAgentMode: (sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number) => Promise<RuntimeV2SessionSnapshot>;
   readonly revokeSessionGrant: (sessionId: string, grantId: string) => Promise<RuntimeV2SessionSnapshot>;
-  readonly dispose: () => Promise<void>;
 };
 
 export class AgentApplication implements AgentApplicationContract {
@@ -257,8 +256,6 @@ export class AgentApplication implements AgentApplicationContract {
     await session.flush();
     return this.#sessions.snapshot(session);
   }
-
-  async dispose(): Promise<void> {}
 
 }
 

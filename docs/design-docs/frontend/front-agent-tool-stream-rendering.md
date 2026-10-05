@@ -25,24 +25,24 @@ Agent 输出期间，正文、思考和工具调用分别渲染。工具从参�
 ```text
 LLM typed stream
   -> Agent Loop: text / reasoning / tool arguments + tool lifecycle
-  -> Desktop internal stream adapter: accumulate arguments, build safe typed preview
+  -> Desktop stream adapter: stable placeholder / bounded generation counter / prepared arguments
   -> existing agentStream IPC
   -> App tool entries keyed by session + run + call
   -> existing MessageBlock components
 
 Tool result + Session Journal
-  -> shared Desktop tool preview builder
+  -> Client shared tool preview builder
   -> historical MessageBlock projection
 ```
 
-Core 和 Tools 只描述执行事实，不依赖 React、ToolUiPreview 或 Electron。Desktop 内部适配器承担参数增量提取和展示转换。Runtime 通用 live/revision 通道继续为 Session/Trajectory 提供现有能力，新增的工具参数原文不通过通用 live envelope 直接广播给 renderer。
+Core 和 Tools 只描述执行事实，不依赖 React、ToolUiPreview 或 Electron。Desktop 内部适配器仅对写/编辑参数做有界字符计数，prepared 后传完整参数给 Client 纯转换函数。Runtime 通用 live/revision 通道继续为 Session/Trajectory 提供现有能力，新增的工具参数原文不通过通用 live envelope 直接广播给 renderer。
 
 ## 契约与事件所有权
 
 | 事实 | 生产位置 | 内容与前端行为 |
 | --- | --- | --- |
 | 正文、思考增量 | AgentLoop.collectStream | 保留 messageId、requestId、stepId；仅真实正文进入 assistant_text_delta |
-| 工具参数增量 | AgentLoop.collectStream | 独立 tool-call-delta，携带 callId、name、argumentsDelta、requestId；Main 累积并发出 typed tool_call_streaming |
+| 工具参数增量 | AgentLoop.collectStream | 独立 tool-call-delta，携带 callId、name、argumentsDelta、requestId；Main 发稳定占位；写/编辑按节流字符计数更新 typed tool_call_streaming |
 | 工具已准备 | AgentLoop.runTools，tool/call append 成功后、executeBatch 前 | 完整参数和身份；发出一次初始/补全预览。即使 Provider 只在 done 返回工具，也能出现条目 |
 | 真正开始执行 | ToolPreparedExecution，通过策略、审批与 checkpoint，进入 body 前 | 增加可选的内部 onExecutionStarted 回调，携带调用身份；发 tool_started。校验失败、拒绝不伪造 started |
 | 等待审批、审批决定 | 现有 Desktop approvalRegistry 回调 | 保留权限逻辑和单一生产者；按 callId 更新同一条工具。resolved 不代表工具已完成 |
@@ -68,7 +68,7 @@ requestId 是模型请求身份；llmCallId 兼容字段映射实际 requestId�
 - 其他工具参数增量只触发一次稳定占位；Write/Edit 额外使用常量空间扫描器统计指定字符串，跨分片保留转义与代理对状态，不恢复 partial JSON 缓冲。字符量使用每次调用独立的一秒尾随定时器，prepared、started、finished、run 结束与 dispose 均清理；无参数增量时不模拟字符量。底层完整参数校验保留。
 - 不向 renderer 发送未筛选 args/ToolExecutionResult；输出沿用现有 redaction、artifact 和 DTO 边界。正文中的用户合法 JSON 不能被前端正则删除。
 
-工具预览规范中的 `engine/streaming-preview-extractors.ts` 等是旧路径，本次采用上述 Main 模块并同步规范，不恢复旧 engine。
+历史 `engine/streaming-preview-extractors.ts` 已退役；当前使用上述 adapter 与 Client builder，不恢复旧 engine。
 
 ## 前端合并与收尾
 

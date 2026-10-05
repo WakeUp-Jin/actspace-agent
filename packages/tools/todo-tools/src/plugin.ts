@@ -31,7 +31,3 @@ export function apply(ctx: CordisContext): void {
   applyProjection(ctx);
   applyTools(ctx);
 }
-
-export function activate() {
-  return { services: { "tools.todo": Object.freeze({ registerTodoTools, todoProjectionContributor }) }, dispose: () => undefined };
-}

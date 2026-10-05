@@ -4,6 +4,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const currentTruthFiles = [
   "AGENTS.md",
+  "packages/README.md",
+  "docs/design-docs/agent-plugin-runtime/agent-spec-package-layout-and-plugin-packaging.md",
+  "docs/design-docs/frontend/front-composer-file-mentions-and-response-annotations.md",
+  "docs/design-docs/frontend/front-composer-slash-command.md",
+  "docs/design-docs/frontend/front-中间消息区规范.md",
+  "docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md",
   "README.md",
   "docs/README.md",
   "docs/ARCHITECTURE.md",
@@ -45,11 +51,12 @@ export const currentTruthFiles = [
 ];
 
 const forbiddenCurrentClaims = [
+  { pattern: /\b(?:bootProfile\b\s*\(|BootedProfile\b|RunAgentInput\b)|context:compact|engine\/streaming-preview-extractors\.ts/g, message: "仍把退役的启动或任务 API 当作当前契约", allowHistoricalLine: true },
   { pattern: /(?:docs\/)?design-docs\/v1-legacy(?:\/|\b)/g, message: "仍引用已搬移的 v1 归档路径" },
   { pattern: /(?:actspace-agent|actspace|dist\/cli\.js)\s+chat\b/g, message: "仍提供已退役的 CLI chat 命令示例" },
   { pattern: /`run`\s*\/\s*`chat`/g, message: "仍把 run/chat 并列为当前业务命令" },
   { pattern: /(?:Promise<RuntimeHandle>|RuntimeHandle\.(?:runTurn|run|abort)\s*\()/g, message: "仍提供已删除的 RuntimeHandle API 示例" },
-  { pattern: /packages\/agent-runtime(?:\/|\b)/g, message: "仍把单一 packages/agent-runtime 当作当前实现" },
+  { pattern: /packages\/agent-runtime(?:\/|\b)/g, message: "仍把单一 packages/agent-runtime 当作当前实现", allowHistoricalLine: true },
   { pattern: /docs\/design-docs\/agent-runtime\/agent-testing\.md/g, message: "仍链接已失效的测试规范路径" },
   { pattern: /docs\/design-docs\/execution-safety\/agent-(?:bash-policy-allowlist-design|tool-approval-pause-resume|bash工具设计文档)\.md/g, message: "仍把 v1 execution-safety 文档当作当前入口" },
   { pattern: /docs\/design-docs\/model-context\/agent-cache-loss-audit\.md/g, message: "仍把 v1 cache audit 当作当前入口" },
@@ -93,9 +100,11 @@ export async function checkMarkdownFiles(repoRoot, files, { checkClaims = true }
       continue;
     }
 
-    for (const { pattern, message } of checkClaims ? forbiddenCurrentClaims : []) {
+    for (const { pattern, message, allowHistoricalLine } of checkClaims ? forbiddenCurrentClaims : []) {
       pattern.lastIndex = 0;
       for (const match of source.matchAll(pattern)) {
+        const line = source.split("\n")[lineNumber(source, match.index) - 1];
+        if (allowHistoricalLine && /历史|追溯|已删除|已退役|旧路径|不提供|无 `|退役|historical|retired/iu.test(line)) continue;
         failures.push(`${relativePath}:${lineNumber(source, match.index)}: ${message}`);
       }
     }

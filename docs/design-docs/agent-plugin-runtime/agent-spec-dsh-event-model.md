@@ -1,9 +1,9 @@
 # DSH 风格 Session 事件模型
 
-> 2026-09-20 更新：[Session 事件持久化重构](agent-session-event-persistence-refactor.md)的核心行为已实施。Journal 接纳后先交给 persistence coordinator，再发布 observer 通知；`flush` 是独立 durability barrier。
+> 2026-09-20 更新：[Session 事件持久化重构](agent-spec-session-core-persistence-separation.md)的核心行为已实施。Journal 接纳后先交给 persistence coordinator，再发布 observer 通知；`flush` 是独立 durability barrier。
 
 
-> 状态：12 个核心事件与默认 Loop 已实现；最终 CLI retry/error 验收仍待完成。2026-09-09 按 ActSpace 当前 codec / Session Format v1 校准 seq 描述。
+> 状态：12 个核心事件与默认 Loop 已实现；最终 CLI retry/error 已有真实 HTTP fixture 定向证据，完整收尾状态见本轮执行记录。2026-09-09 按 ActSpace 当前 codec / Session Format v1 校准 seq 描述。
 >
 > 日期：2026-08-29
 

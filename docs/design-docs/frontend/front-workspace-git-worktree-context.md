@@ -10,7 +10,7 @@
 2. Git 操作以哪个分支为当前或起始基线。
 3. Agent 在原目录还是隔离 worktree 中运行。
 
-本规范定义首版 Workspace、Git branch、`This Mac` 和 `New Worktree` 的产品语义、视觉结构、状态模型、持久化边界与失败恢复。Cloud 和 Remote SSH 只保留可发现入口，不在首版实现运行能力。
+本规范定义首版 Workspace、Git branch、`This Mac` 和 `New Worktree` 的产品语义、视觉结构、状态模型、持久化边界与失败恢复。本文保留本机 Git/worktree 的首版范围。2026-10-03 起，远端 Host 已通过独立运行位置选择器和设置连接页提供 WSS/SSH 接入，详见[Host 指南](../agent-plugin-runtime/agent-host-guide.md)；Cloud 占位不是远端能力的状态说明。
 
 ## 设计目标
 
@@ -22,7 +22,7 @@
 
 ## 非目标
 
-- 不实现 Cloud Runner、Remote SSH、远端仓库克隆或工作区上传。
+- 本机 worktree 模块不承担 Cloud Runner、远端克隆或工作区上传；远端连接归 Host 客户端模块。
 - 不实现完整 Git 客户端，不提供 commit、merge、rebase、push、pull 或冲突解决 UI。
 - 不实现 worktree 删除、批量清理、重命名和长期管理页。
 - 不自动复制原目录的未跟踪文件、`.env`、依赖目录或未提交改动到 worktree。
@@ -186,7 +186,7 @@ New Worktree
 ```
 
 - `This Mac` 为默认值。
-- `Cloud` 与 `Remote SSH` 可见但禁用，带 `Coming soon`；不能表现为点击后无反馈的可用项。
+- 下图的 `Cloud` / `Remote SSH` 为早期本机菜单占位。现行远端会话使用独立 Host 选择器，创建后绑定 Host/工作区；不得把该历史占位解释为远端连接尚未实现。
 - `New Worktree` 仅在 Workspace 是带有效 `HEAD` 的 Git repository 时可用。
 - Git repository 尚无首次提交时，Branch 仍只显示 symbolic branch 名称（例如 `main`）；`This Mac` 可以直接运行，`New Worktree` 保持禁用并在入口显示 `Requires commit`。
 - ActSpace 不为启用 Worktree 自动创建首次提交，也不使用 `git worktree add --orphan` 复制当前 Index；后者会得到独立的空 Index，不代表当前 staged workspace。

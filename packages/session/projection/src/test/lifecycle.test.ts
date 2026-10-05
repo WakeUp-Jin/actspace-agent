@@ -1,5 +1,6 @@
+import { CordisContextClass } from "@actspace/cordis-adapter";
 import { describe, expect, it } from "vitest";
-import { activate, createSessionProjectionService } from "../plugin.js";
+import { apply, createSessionProjectionService } from "../plugin.js";
 
 describe("session projection plugin", () => {
   it("sorts contributors, rejects duplicate ids and keys, and removes an unmounted contribution", () => {
@@ -36,9 +37,10 @@ describe("session projection plugin", () => {
     dispose();
   });
   it("publishes deterministic projection service and disposes", async () => {
-    const activation = activate();
-    expect(activation.services?.["session.projection"]).toBeDefined();
-    expect(activation.services?.["session.projection"]?.createRegistry()).toBeDefined();
-    await activation.dispose();
+    const ctx = new CordisContextClass();
+    await ctx.plugin({ apply: inner => apply(inner as never) });
+    expect(ctx.get("session.projection")).toBeDefined();
+    expect((ctx.get("session.projection") as ReturnType<typeof createSessionProjectionService>).createRegistry()).toBeDefined();
+    await ctx.fiber.dispose();
   });
 });

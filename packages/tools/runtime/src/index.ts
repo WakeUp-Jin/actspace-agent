@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply, activate } from "./plugin.js";
+export { apply } from "./plugin.js";
 export * from "./activation-lease.js";
 export type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/tools-approval";
 export * from "./argument-validator.js";

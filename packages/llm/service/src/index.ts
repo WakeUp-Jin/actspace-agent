@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply, activate, LLM_HOST_PORT_ID } from "./plugin.js";
+export { apply, LLM_HOST_PORT_ID } from "./plugin.js";
 export type { LlmHostPort } from "./plugin.js";
 export * from "./activation-lease.js";
 export * from "./adapter.js";

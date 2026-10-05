@@ -1,6 +1,6 @@
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { RuntimeV2LiveEvent, RuntimeV2RunTurnResponse } from "@actspace/shared/runtime-v2";
+import type { RuntimeV2LiveEvent, RuntimeV2RunTurnResponse, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { writeArtifacts } from "../artifacts";
 import { CliUsageError } from "../errors";
 import { bootCliV2 } from "./host-adapter";
@@ -28,11 +28,13 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
       if (runner === undefined) throw new Error("Headless runner is not enabled for the selected Profile.");
       const result = await runner.run(); activeSessionId = result.sessionId; throughJournalSeq = result.snapshot.throughJournalSeq;
       const approval = booted.approval.approvalRequired;
-      const output = projectCliArtifactResult(result, { workspace, startedAt, endedAt: (io.now?.() ?? new Date()).toISOString(), persistent, interrupted: io.isInterrupted?.() ?? false, approvalName: approval?.toolName });
+      const sessions = booted.profile.context.get?.("session.runtime") as { inspectEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]> } | undefined;
+      const durableEvents = result.outcome === "failed" || options.out ? await sessions?.inspectEvents(result.sessionId) : undefined;
+      const failure = result.outcome === "failed" ? failedRunDiagnostic(durableEvents ?? [], result.taskId) : undefined;
+      const output = projectCliArtifactResult(result, { failure, workspace, startedAt, endedAt: (io.now?.() ?? new Date()).toISOString(), persistent, interrupted: io.isInterrupted?.() ?? false, approvalName: approval?.toolName });
+      if (output.error) io.onDiagnostic?.(output.error.code, output.error.message);
       if (options.out) {
-        const sessions = booted.profile.context.get?.("session.runtime") as { inspectEvents: (sessionId: string) => Promise<readonly unknown[]> } | undefined;
-        if (sessions === undefined) throw new Error("Session service is not available for the selected Profile.");
-        const durableEvents = await sessions.inspectEvents(result.sessionId);
+        if (durableEvents === undefined) throw new Error("Session service is not available for the selected Profile.");
         await writeArtifacts({ outDir: options.out, result: output, events: durableEvents, finalText: output.finalText });
         const artifacts = result.snapshot.tools.flatMap((tool) => tool.artifacts.map((artifact) => ({ artifactId: artifact.artifactId, mediaType: artifact.mimeType })));
         await booted.artifacts.exportForSession(result.sessionId, artifacts, resolve(options.out));
@@ -54,6 +56,7 @@ export function projectCliArtifactResult(result: RuntimeV2RunTurnResponse, conte
   readonly persistent: boolean;
   readonly interrupted: boolean;
   readonly approvalName?: string;
+  readonly failure?: { readonly code: string; readonly message: string };
 }): RuntimeV2CliArtifactResult {
   const exitCode = context.approvalName !== undefined ? 4 : result.outcome === "completed" ? 0 : context.interrupted || result.outcome === "cancelled" ? 130 : 1;
   return Object.freeze({
@@ -76,10 +79,26 @@ export function projectCliArtifactResult(result: RuntimeV2RunTurnResponse, conte
     startedAt: context.startedAt,
     endedAt: context.endedAt,
     persistent: context.persistent,
-    ...(context.approvalName === undefined ? {} : { error: { code: "APPROVAL_REQUIRED", message: `${context.approvalName} requires interactive approval.` } }),
+    ...(context.approvalName === undefined ? (context.failure ? { error: context.failure } : {}) : { error: { code: "APPROVAL_REQUIRED", message: `${context.approvalName} requires interactive approval.` } }),
   });
 }
 
 async function resolveInput(options: RuntimeV2RunCommandOptions, io: RunV2Io): Promise<string> { if (options.input && options.inputFile) throw new CliUsageError("Use only one of --input, --input-file, or stdin"); if (options.input !== undefined) return requireInput(options.input); if (options.inputFile) { const { readFile } = await import("node:fs/promises"); return requireInput(await readFile(resolve(options.inputFile), "utf8")); } if (io.stdinIsTTY === false && io.readStdin) return requireInput(await io.readStdin()); throw new CliUsageError("Missing input: use --input, --input-file, or non-TTY stdin"); }
 function requireInput(value: string): string { if (!value.trim()) throw new CliUsageError("Agent input must not be empty"); return value; }
 async function resolveWorkspace(value: string | undefined, cwd: string): Promise<string> { const workspace = resolve(value ?? cwd); try { if (!(await stat(workspace)).isDirectory()) throw new Error("not a directory"); } catch { throw new CliUsageError(`Workspace is not an accessible directory: ${workspace}`, "INVALID_WORKSPACE"); } return workspace; }
+
+// A failed custom Loop need not produce built-in turn events. Keep its value
+// untouched, and only use a built-in failure within this Task's Run boundary.
+function failedRunDiagnostic(events: readonly SessionEventEnvelopeV1[], taskId: string): { code: string; message: string } {
+  const start = events.findIndex(event => event.type === "plugin/actspace.agent-service/run" && record(event.data).op === "start" && record(event.data).taskId === taskId);
+  if (start >= 0) for (const event of events.slice(start + 1)) {
+    if (event.type === "plugin/actspace.agent-service/run") break;
+    const data = record(event.data);
+    if (event.type === "turn/end" && data.reason === "failed") {
+      const failure = record(data.failure);
+      if (typeof failure.message === "string") return { code: typeof failure.kind === "string" ? failure.kind : "RUN_FAILED", message: failure.message };
+    }
+  }
+  return { code: "RUN_FAILED", message: "Agent task failed. Inspect the Session journal for details." };
+}
+function record(value: unknown): Record<string, unknown> { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; }

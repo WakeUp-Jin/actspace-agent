@@ -13,5 +13,4 @@ export function apply(ctx: CordisContext): void {
   if (agents === undefined) throw new Error("Headless runner requires agent.runtime.");
   const runner = new HeadlessRunner({ host, sessions, agents, context: ctx });
   ctx.provide?.("headless.runner", runner);
-  ctx.effect?.(() => () => undefined, "headless-runner");
 }

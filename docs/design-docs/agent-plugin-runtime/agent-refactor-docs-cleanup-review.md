@@ -2,6 +2,8 @@
 
 2026-10-04：第二轮文档校准已实施，最终校验与本轮执行状态见[摘要](../../exec-runs/20261004-agent-storage-and-cleanup/execution-summary.md)。配套[代码清理](agent-refactor-code-cleanup-review.md)。
 
+2026-10-05 更新：旧 activate 协议、空生命周期、无消费者局部符号和重复规范已清理，根目录与逐路径处置已结算，隔离快照自动化通过。下面是 10-04 的审计背景；新增结果和 35/35 CU 签收以[最终收尾摘要](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)为准，本次批准范围已完成；不把保留项解释为已证明全仓无冗余。
+
 ## 保护与方法
 
 histories、learnings 保留，不删除、不搬迁、不改原文；本轮可新增必要学习记录。前端工作台、产品概念和其他并行修改不纳入清理。当前规范解释实现，历史决定解释取舍，执行记录解释验证；不继续复制完整架构与完成表。
@@ -34,7 +36,7 @@ histories、learnings 保留，不删除、不搬迁、不改原文；本轮可�
 
 六个旧后端 active 计划（共12份 Markdown）缩为历史入口，从待执行表移出。逐文件路径、独有目标、取消方案和未完成门禁见[旧计划结算](../../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)。原路径保留保障 histories/learnings 和其他旧记录引用；不修改保护区链接。
 
-七个独立未来功能计划保持；Composer queue 旧短页仅回溯。CLI deterministic retry/error 进程 fixture 仍缺，明确登记技术债；不能因删除旧计划正文将它标为完成。
+七个独立未来功能计划保持；Composer queue 旧短页仅回溯。当时尚缺的 CLI deterministic retry/error 进程 fixture 已在 10-05 由真实 HTTP 进程用例补齐，见最终收尾摘要；不是因删除旧计划而消除欠账。
 
 exec-runs 第一批已合并本次重构的部分重复轮次。本轮不再按日期清理其他任务截图、JSON或执行过程：未逐个核实独有失败、环境和外部门禁，暂留。本次只维护必要的执行过程、摘要、逐项CU、统计和结算，不复制所有历史测试表。
 

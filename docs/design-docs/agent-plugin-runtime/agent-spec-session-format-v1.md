@@ -467,8 +467,8 @@ ActSpace v2：
 ## 23. 相关设计
 
 - [v2 总体架构](./agent-target-overall-architecture.md)
-- [v2 已确认决策](./agent-decisions-v2-foundation.md)
+- [v2 已确认决策](./agent-harness-host-refactor-decisions.md)
 - [Agent Core 目标边界](./agent-target-agent-core.md)
-- [Session 与 Context 目标设计](./agent-target-session-and-context.md)
+- [Session 与 Context 目标设计](./agent-spec-session-core-persistence-separation.md)
 - [LLM Adapter 目标设计](./agent-target-llm-adapter.md)
 - [Runtime 与 Composition 目标设计](./agent-target-runtime-architecture.md)

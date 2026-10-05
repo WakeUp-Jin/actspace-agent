@@ -1,6 +1,6 @@
 import type { LlmCredential, CredentialResolver } from "./credential-port.js";
 import type { LlmFailure } from "./failure.js";
-import type { LlmContentBlock, LlmMessage, LlmRequestOptions, LlmToolDefinition } from "./message.js";
+import type { LlmMessage, LlmRequestOptions, LlmToolDefinition } from "./message.js";
 import type { LlmStreamSource } from "./stream.js";
 import type { LlmRetryPolicy } from "./retry-policy.js";
 

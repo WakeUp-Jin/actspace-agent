@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -24,10 +24,18 @@ describe("filesystem-write ports", () => {
     await expect(invoke(ports.delete_file, { path: "nested" })).resolves.toMatchObject({ status: "failed", failure: { code: "NOT_A_FILE" } });
   });
 });
-async function waitFor(predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error("Timed out waiting for asynchronous notification.");
-    await new Promise((resolveWait) => setTimeout(resolveWait, 10));
+
+it("counts header-like content as additions and deletions in write and edit previews", async () => {
+  const root = await workspace();
+  const ports = createNodeToolPorts({ workspaceRoot: root });
+  for (const name of ["write_file", "edit_file"] as const) {
+    await writeFile(join(root, "markers.txt"), "--removed\nkeep\n");
+    const args = name === "write_file"
+      ? { path: "markers.txt", content: "++added\nkeep\n" }
+      : { path: "markers.txt", old_string: "--removed", new_string: "++added" };
+    await expect(invoke(ports[name], args)).resolves.toMatchObject({
+      status: "completed",
+      detail: [{ label: "result", value: { additions: 1, deletions: 1 } }],
+    });
   }
-}
+});

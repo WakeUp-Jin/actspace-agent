@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tools-runtime";
+import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext } from "@actspace/tools-runtime";
 import type { ToolPorts } from "./plugin.js";
 export type NodeToolPortsOptions = { readonly workspaceRoot: string };
 export function createNodeToolPorts(options: NodeToolPortsOptions): ToolPorts { return Object.freeze({ edit_file: (args, context) => editFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)), write_file: (args, context) => writeFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)), delete_file: (args, context) => deleteFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)) }); }
@@ -152,10 +152,13 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
 }
 
 function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-function integerArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string, fallback: number): number { const value = args[key]; return typeof value === "number" && Number.isInteger(value) ? Math.max(1, value) : fallback; }
 function displayPath(path: string, workspaceRoot: string): string { const nested = relative(workspaceRoot, path); return nested && !nested.startsWith("..") && !isAbsolute(nested) ? nested : path; }
-function normalizeSearchLine(line: string, workspaceRoot: string): string { return line.startsWith(`${workspaceRoot}/`) ? line.slice(workspaceRoot.length + 1) : line; }
 function countOccurrences(text: string, needle: string): number { let count = 0; let offset = 0; while ((offset = text.indexOf(needle, offset)) !== -1) { count += 1; offset += Math.max(needle.length, 1); } return count; }
 function replaceOnePreservingLine(text: string, oldText: string, newText: string): string { const index = text.indexOf(oldText); if (newText !== "" || oldText.includes("\n") || text[index + oldText.length] !== "\n") return text.slice(0, index) + newText + text.slice(index + oldText.length); return text.slice(0, index) + text.slice(index + oldText.length + 1); }
 function createUnifiedDiff(path: string, before: string, after: string): string { const oldLines = before.split("\n"); const newLines = after.split("\n"); let prefix = 0; while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) prefix += 1; let suffix = 0; while (suffix < oldLines.length - prefix && suffix < newLines.length - prefix && oldLines[oldLines.length - 1 - suffix] === newLines[newLines.length - 1 - suffix]) suffix += 1; const contextStart = Math.max(0, prefix - 3); const oldEnd = Math.min(oldLines.length, oldLines.length - suffix + 3); const newEnd = Math.min(newLines.length, newLines.length - suffix + 3); return [`--- a/${path}`, `+++ b/${path}`, `@@ -${contextStart + 1},${oldEnd - contextStart} +${contextStart + 1},${newEnd - contextStart} @@`, ...oldLines.slice(contextStart, prefix).map((line) => ` ${line}`), ...oldLines.slice(prefix, oldLines.length - suffix).map((line) => `-${line}`), ...newLines.slice(prefix, newLines.length - suffix).map((line) => `+${line}`), ...newLines.slice(newLines.length - suffix, newEnd).map((line) => ` ${line}`)].join("\n"); }
-function countDiff(diff: string, marker: "+" | "-"): number { return diff.split("\n").filter((line) => line.startsWith(marker) && !line.startsWith(`${marker}${marker}${marker}`)).length; }
+function countDiff(diff: string, marker: "+" | "-"): number {
+  // File headers precede the first hunk; header-like text inside a hunk is content.
+  const lines = diff.split("\n");
+  const firstHunk = lines.findIndex((line) => line.startsWith("@@ "));
+  return firstHunk < 0 ? 0 : lines.slice(firstHunk + 1).filter((line) => line.startsWith(marker)).length;
+}

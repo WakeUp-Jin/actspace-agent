@@ -3,17 +3,18 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
 
 export type InboxTarget = "next-step" | "next-turn";
-/** `task_notification` 是后台任务回报；`steer` 是用户在运行中插入的消息。 */
+/** 读侧保留旧 journal 的 steer/next-turn；新写入仅用于后台任务通知。 */
 export type InboxSource = "task_notification" | "steer";
-export type InboxItemStatus = "pending" | "claimed" | "discarded";
 export type InboxItem = { readonly messageId: string; readonly target: InboxTarget; readonly content: RuntimeV2JsonValue; readonly enqueuedSeq: number; readonly source?: InboxSource };
-export type InboxClaimOptions = { readonly materializeSurface?: boolean; readonly messageId?: string };
 
 export class MainAgentInbox {
   constructor(private readonly session: SessionHandle) {}
-  async enqueue(content: RuntimeV2JsonValue, target: InboxTarget, messageId: string = randomUUID(), source?: InboxSource): Promise<InboxItem> {
-    const event = await this.session.append(core("agent/inbox/spliced", { operation: "enqueue", messageId, target, content, ...(source === undefined ? {} : { source }) }));
-    return Object.freeze({ messageId, target, content, enqueuedSeq: event.seq, ...(source === undefined ? {} : { source }) });
+  async enqueue(content: RuntimeV2JsonValue): Promise<InboxItem> {
+    const messageId = randomUUID();
+    const target = "next-step";
+    const source = "task_notification";
+    const event = await this.session.append(core("agent/inbox/spliced", { operation: "enqueue", messageId, target, content, source }));
+    return Object.freeze({ messageId, target, content, enqueuedSeq: event.seq, source });
   }
   pending(): readonly InboxItem[] {
     const pending = new Map<string, InboxItem>();
@@ -28,11 +29,13 @@ export class MainAgentInbox {
     }
     return Object.freeze([...pending.values()].sort((a, b) => a.enqueuedSeq - b.enqueuedSeq));
   }
-  async claim(target: InboxTarget, limit = target === "next-turn" ? 1 : Number.POSITIVE_INFINITY, options: InboxClaimOptions = {}): Promise<readonly InboxItem[]> {
-    const items = this.pending().filter((item) => item.target === target && (options.messageId === undefined || item.messageId === options.messageId)).slice(0, limit);
+  async claim(): Promise<readonly InboxItem[]> {
+    const items = this.pending().filter((item) => item.target === "next-step" && item.source !== "steer");
     for (const item of items) {
-      const surface = options.materializeSurface === false ? {} : { surface: { kind: "append", node: { kind: "user", messageId: item.messageId, content: item.content } }, provenance: { sourceEventSeqs: [item.enqueuedSeq], contributorIds: ["core/inbox"], runtimeSelectionSeq: null } };
-      await this.session.append(core("agent/inbox/spliced", { operation: "claim", messageId: item.messageId, target, ...(item.source === undefined ? {} : { source: item.source }) }, surface));
+      await this.session.append(core("agent/inbox/spliced", { operation: "claim", messageId: item.messageId, target: item.target, ...(item.source === undefined ? {} : { source: item.source }) }, {
+        surface: { kind: "append", node: { kind: "user", messageId: item.messageId, content: item.content } },
+        provenance: { sourceEventSeqs: [item.enqueuedSeq], contributorIds: ["core/inbox"], runtimeSelectionSeq: null },
+      }));
     }
     return Object.freeze(items);
   }
@@ -41,18 +44,6 @@ export class MainAgentInbox {
     await this.session.append(core("agent/inbox/spliced", { operation: "discard", messageId, target: item.target, reason })); return true;
   }
   async discardAll(reason: string): Promise<void> { for (const item of this.pending()) await this.discard(item.messageId, reason); }
-  /** 最后一次 inbox 操作决定状态；从未入队返回 null。 */
-  status(messageId: string): InboxItemStatus | null {
-    let status: InboxItemStatus | null = null;
-    for (const event of this.session.journal.events) {
-      if (event.type !== "agent/inbox/spliced") continue;
-      const data = record(event.data); if (data.messageId !== messageId) continue;
-      if (data.operation === "enqueue") status = "pending";
-      if (data.operation === "claim") status = "claimed";
-      if (data.operation === "discard") status = "discarded";
-    }
-    return status;
-  }
 }
 
 function core(type: string, data: RuntimeV2JsonValue, extra: Record<string, unknown> = {}) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null, ...extra } as never; }

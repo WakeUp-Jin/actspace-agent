@@ -22,5 +22,3 @@ export function apply(ctx: CordisContext): void {
     await session.flush(record.throughSeq);
   } }));
 }
-
-export function activate() { return { services: {}, dispose: () => undefined }; }

@@ -1,10 +1,12 @@
+import { CordisContextClass } from "@actspace/cordis-adapter";
 import { describe, expect, it } from "vitest";
-import { activate } from "../plugin.js";
+import { apply } from "../plugin.js";
 
 describe("session journal plugin", () => {
   it("publishes codec-aware journal service and disposes", async () => {
-    const activation = activate();
-    expect(activation.services?.["session.journal"]).toBeDefined();
-    await activation.dispose();
+    const ctx = new CordisContextClass();
+    await ctx.plugin({ apply: inner => apply(inner as never) });
+    expect(ctx.get("session.journal")).toBeDefined();
+    await ctx.fiber.dispose();
   });
 });

@@ -37,6 +37,24 @@ describe("Session Journal", () => {
     expect(reloaded.surface).toEqual(journal.surface);
   });
 
+  it("settles a failed request before retry wait and preserves that boundary on replay", () => {
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
+    journal.append(candidate("turn/start", { turnId: "t" }));
+    journal.append(candidate("step/start", { turnId: "t", stepId: "s" }));
+    journal.append(candidate("request/header", { requestId: "r", turnId: "t", stepId: "s" }));
+    journal.append(candidate("request/context", { requestId: "r", turnId: "t", stepId: "s" }));
+    expect(() => journal.append(candidate("step/end", { stepId: "s", turnId: "t" }))).toThrow();
+    const retry = candidate("llm/retry", { requestId: "r", retryId: "retry", attempt: 1, nextAttempt: 2, delayMs: 10 });
+    journal.append(retry);
+    expect(journal.validation.relations.openRequestIds).toEqual([]);
+    expect(() => journal.append(retry)).toThrow("invalid request");
+    journal.append(candidate("step/end", { stepId: "s", turnId: "t", reason: "aborted" }));
+    journal.append(candidate("turn/end", { turnId: "t", reason: "aborted" }));
+    const replay = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal.events });
+    expect(replay.validation.relations.openRequestIds).toEqual([]);
+    expect(replay.validation.relations.openTurnId).toBeNull();
+  });
+
   it("does not consume seq or mutate Surface when a candidate is invalid", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-08-29T12:00:00.000Z" });
     journal.append(candidate("turn/start", { turnId: "turn-1" }));

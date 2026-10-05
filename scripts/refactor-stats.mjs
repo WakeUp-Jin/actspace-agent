@@ -253,7 +253,7 @@ function renderInfo(snapshot) {
 function renderMetricsTable(metrics) {
   return [
     "| 指标 | 数量 |",
-    "|---|---:|",
+    "| --- | ---: |",
     `| 源代码文件 | ${number(metrics.sourceFiles)} |`,
     `| 源代码行 | ${number(metrics.sourceLines)} |`,
     `| 测试文件 | ${number(metrics.testFiles)} |`,
@@ -271,7 +271,7 @@ function renderBreakdown(title, record) {
     `## ${title}`,
     "",
     "| 分类 | 源文件 | 源代码行 | 测试文件 | 测试行 |",
-    "|---|---:|---:|---:|---:|",
+    "| --- | ---: | ---: | ---: | ---: |",
     ...rows,
   ].join("\n");
 }
@@ -319,7 +319,7 @@ function renderComparisonTable(before, after) {
   ];
   return [
     "| 指标 | 重构前 | 重构后 | 变化 |",
-    "|---|---:|---:|---:|",
+    "| --- | ---: | ---: | ---: |",
     ...labels.map(([key, label]) => `| ${label} | ${number(before[key])} | ${number(after[key])} | ${signed(after[key] - before[key])} |`),
   ].join("\n");
 }
@@ -328,7 +328,7 @@ function renderAreaComparison(before, after) {
   const names = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
   return [
     "| 目录 | 重构前源代码行 | 重构后源代码行 | 变化 | 测试行变化 |",
-    "|---|---:|---:|---:|---:|",
+    "| --- | ---: | ---: | ---: | ---: |",
     ...names.map((name) => {
       const left = before[name] ?? emptyMetrics();
       const right = after[name] ?? emptyMetrics();

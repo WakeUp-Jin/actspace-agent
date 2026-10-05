@@ -193,6 +193,15 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
       request.context = true;
       break;
     }
+    // A retry records a completed failed attempt, before waiting or starting
+    // another request. Keeping it open breaks settlement and cold recovery.
+    case "llm/retry": {
+      const requestId = id(data.requestId, event.type);
+      const request = state.requests.get(requestId);
+      if (request === undefined || !request.context || request.terminal) invalid(`Retry references an invalid request ${requestId}.`);
+      request.terminal = true;
+      break;
+    }
     case "assistant/message": {
       const requestId = typeof data.requestId === "string" ? data.requestId : null;
       if (requestId !== null) {

@@ -267,7 +267,12 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       try {
         prepared = await toRunContent(options.registry, input.sessionId, { userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: references.fileReferences, responseAnnotations: references.responseAnnotations });
       } catch (error) {
-        if (!(error instanceof ChatAttachmentValidationError)) throw error;
+        // Preparation has not attempted Task admission, so its failure is a definite rejection.
+        // Keep errors from submitTask below outside this catch: a lost reply may hide an accepted Task.
+        if (!(error instanceof ChatAttachmentValidationError)) return {
+          status: "submission-failed", acknowledgement: "rejected",
+          message: `附件准备失败，草稿已保留。${error instanceof Error ? error.message : "请检查附件后重试。"}`,
+        };
         const attachments = (input.attachments ?? []).filter(attachment => Boolean(attachment.path));
         return { status: "submission-failed", acknowledgement: "rejected", message: "附件校验失败，请检查后重试。", attachmentIssue: {
           ...error.issue,
@@ -824,15 +829,21 @@ async function toRunContent(
   }
 
   const importedArtifactIds: string[] = [];
-  for (const attachment of attachments) {
-    if (!attachment.path) continue;
-    const imported = await registry.importAttachment(sessionId, attachment.path);
-    importedArtifactIds.push(imported.artifactId);
-    if (attachment.kind === "image") {
-      blocks.push({ type: "artifact", artifact: { artifactId: imported.artifactId, mediaType: imported.mimeType }, label: imported.name });
-    } else {
-      blocks.push({ type: "text", text: `Attached file: ${imported.name} (${imported.artifactId})` });
+  try {
+    for (const attachment of attachments) {
+      if (!attachment.path) continue;
+      const imported = await registry.importAttachment(sessionId, attachment.path);
+      importedArtifactIds.push(imported.artifactId);
+      if (attachment.kind === "image") {
+        blocks.push({ type: "artifact", artifact: { artifactId: imported.artifactId, mediaType: imported.mimeType }, label: imported.name });
+      } else {
+        blocks.push({ type: "text", text: `Attached file: ${imported.name} (${imported.artifactId})` });
+      }
     }
+  } catch (error) {
+    // Nothing has been admitted yet; do not strand earlier imports when a later file fails.
+    await registry.rollbackImportedAttachments(sessionId, importedArtifactIds).catch(() => undefined);
+    throw error;
   }
   return { content: blocks, importedArtifactIds };
 }

@@ -8,10 +8,10 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 
 - `agent-plugin-runtime/agent-target-overall-architecture.md`：面向新读者的 v2 总体分层、启动流、单次任务流、Session 真相模型和决策状态。
 - `agent-plugin-runtime/README.md`：研究证据、已确认目标、公共契约和条件采用门禁的总入口。
-- `agent-plugin-runtime/agent-decisions-v2-foundation.md`：当前已确认决策总账、已关闭开放项和完整交付边界。
+- `agent-plugin-runtime/agent-harness-host-refactor-decisions.md`：当前已确认决策总账、已关闭开放项和完整交付边界。
 - `agent-plugin-runtime/agent-decision-cordis-adoption.md`：DSH Cordis 发布族的采用范围、门禁和回退条件。
 - `agent-plugin-runtime/agent-target-agent-core.md`：ActSpace 自有 Agent Core、固定 Boot 边界和核心不变量。
-- `agent-plugin-runtime/agent-target-session-and-context.md`：append-only Session、Surface、Event Codec 和 Context assembly。
+- `agent-plugin-runtime/agent-spec-session-core-persistence-separation.md`：append-only Session、Surface、Event Codec 和 Context assembly。
 - `agent-plugin-runtime/agent-target-llm-adapter.md`：pi-ai Adapter 边界、proxy/error/usage 门禁。
 - `agent-plugin-runtime/agent-target-runtime-architecture.md`：当前 Profile / Bundle / Patch、生产启动类型、Host 与 shutdown 边界。
 - `agent-plugin-runtime/agent-spec-plugin-runtime-abi.md`：受信任插件来源、manifest / codec / behavior 分离、稳定 identity、Host ceiling、restart-only 和生命周期公共契约。

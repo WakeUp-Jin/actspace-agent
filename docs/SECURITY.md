@@ -121,4 +121,4 @@ nono 挡住了边界外的破坏，但边界内仍有需要人工兜底的风险
 - 大响应使用连接内有界分页，不能无限累积慢客户端队列。管理命令仅通过受保护的本地 dataRoot 管理目录，未暴露网络管理权限。
 - 远端会话历史缓存、待确认正文和附件路径会保留在本机应用数据中，以支持离线查看和查证；它们不是设备密钥。移除连接不等于删除 Host 上的会话或撤销服务器设备授权；撤销使用服务器管理命令。
 
-操作说明与当前验收边界见 [Agent Host](agent-host/README.md) 和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。
+操作说明与当前验收边界见 [Agent Host](design-docs/agent-plugin-runtime/agent-host-guide.md) 和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。

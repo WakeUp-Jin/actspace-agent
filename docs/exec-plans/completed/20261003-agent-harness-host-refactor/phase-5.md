@@ -157,7 +157,7 @@ CLI 保留配置/命令/退出码、managed Runtime 加载和 Profile/Host ports
 | `agent-spec-agent-loop-cordis-surface.md` | Loop 插入点及 checkpoint 服务边界；共性 mode 说明链接事件 ABI |
 | `agent-spec-tool-runtime-abi.md`、`agent-spec-tool-runtime-boundary.md` | 删除旧 middleware API，保留工具服务与可替换扩展的边界 |
 | `agent-testing.md`、`agent-package-ledger.md` | 当前测试归属与模块职责，不保留旧路径作为使用入口 |
-| `docs/agent-host/README.md` | 启动、维护和连接；更新源码位置，不改变使用方式 |
+| `docs/design-docs/agent-plugin-runtime/agent-host-guide.md` | 启动、维护和连接；更新源码位置，不改变使用方式 |
 
 以上 agent-* 文件位于 `docs/design-docs/agent-plugin-runtime/`。同步该目录 README、`docs/design-docs/index.md`、`docs/README.md` 的导航。`agent-spec-dsh-event-model.md` 的 Session 事实模型仍有独立价值，保留而不误合并成通知事件文档。
 

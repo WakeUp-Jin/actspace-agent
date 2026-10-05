@@ -6,7 +6,7 @@
 
 `scripts/contract-matrix/source-registry.mjs` 明确列出 package、manifest、Service metadata、组合与验证来源；领域事件的声明文件与 Harness event checker 共用清单。生成器不启动插件、不访问用户数据、不调用 Provider。
 
-`pnpm gen:contract-matrix` 更新 `artifacts/agent-contract-matrix.json` 与本专题的[生成文档](agent-contract-matrix.generated.md)；`pnpm gen:contract-matrix --check` 比较字节，禁止手改产物。
+`pnpm gen:contract-matrix` 更新 `artifacts/agent-contract-matrix.json` 与本专题的[生成文档](agent-contract-matrix.generated.md)；JSON 位于整体 Git 忽略的 artifacts；`pnpm gen:contract-matrix --check` 校验源码并比较已提交 Markdown 字节，不要求 JSON 存在。禁止手改生成文档。无 artifacts 正例、源码漂移反例及 JSON/Markdown 两次生成一致性由测试覆盖。
 
 - Package/exports/dependencies 来自 package.json。
 - Plugin 身份、提供/注入声明与能力来自 manifest。`agent-service`、`agent-host`、`harness-control`、checkpoint 与英语学习均纳入；存在 manifest 不等于生产以独立插件挂载它。

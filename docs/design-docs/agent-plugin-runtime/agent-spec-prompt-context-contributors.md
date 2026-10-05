@@ -265,3 +265,9 @@ Request Assembly 的结构化诊断至少区分：
 - 插件 identity、manifest、Host ceiling 和 lifecycle 见 [插件 Runtime ABI](./agent-spec-plugin-runtime-abi.md)。
 - 固定 Host / Renderer 消费的 DTO 见 [Runtime Projection 公共契约](./agent-spec-runtime-projection.md)。
 - 总体控制流见 [ActSpace v2 总体架构](./agent-target-overall-architecture.md)。
+
+## Session 与请求快照的边界
+
+Session Journal 保存运行事实，Surface 派生有效模型历史；Context 每步组装不可变请求，不持有另一份可变 conversation。模型可见内容必须已在 Surface 或本次 logical request snapshot 中。先 prepare 并确定模型/Adapter registration，记录实际请求与 defaults，通过持久化屏障后调用该 PreparedCall。凭据、代理对象、HTTP headers、AbortSignal 和 wire Base64 不写入会话。
+
+Session 创建 provenance 不固定后续所有 Harness：每个 Run 固定自己的组合租约，下一任务可选择新组合。存储与恢复细节见[Session 规范](agent-spec-session-core-persistence-separation.md)。

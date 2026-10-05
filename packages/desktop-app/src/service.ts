@@ -4,7 +4,7 @@ import type { LlmService } from "@actspace/llm-service";
 import { completeText } from "./complete-text.js";
 import type { SessionTitleBehavior } from "./session-title.js";
 export type { DesktopBrowsePage } from "@actspace/agent-service";
-export type DesktopAppServiceContract = AgentApplicationContract & Pick<DesktopAppService, "completeText">;
+export type DesktopAppServiceContract = AgentApplicationContract & Pick<DesktopAppService, "completeText" | "dispose">;
 
 /** Desktop utilities composed with the common application operations. */
 export class DesktopAppService extends AgentApplication {
@@ -21,5 +21,5 @@ export class DesktopAppService extends AgentApplication {
   override async isIdleForReconfigure(): Promise<boolean> {
     return !this.#titles?.busy && await super.isIdleForReconfigure() && !this.#titles?.busy;
   }
-  override async dispose(): Promise<void> { await this.#titles?.dispose(); }
+  async dispose(): Promise<void> { await this.#titles?.dispose(); }
 }

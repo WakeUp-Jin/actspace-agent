@@ -13,7 +13,7 @@
 - agent-core 运行时：在 provider 调用前后接入 `CacheAuditTracker`。
 - session 持久化：低缓存时在 `llm_usage` 事件写入 `cacheStatus/cacheAuditId`。
 - 旁路文件：写入 `last.context.json`、`summary.json`、`previous.context.json`、`current.context.json`、`diff.txt`。
-- 分析脚本：`scripts/analyze-cache-audit.mjs`。
+- 分析脚本：`scripts/diagnostics/analyze-cache-audit.mjs`。
 
 不包含：
 
@@ -44,7 +44,7 @@
 - `packages/agent-core/src/observability/cache-audit.ts`
 - `packages/agent-core/src/persistence/session-store.ts`
 - `packages/desktop/src/main/agent-run.ts`
-- `scripts/analyze-cache-audit.mjs`
+- `scripts/diagnostics/analyze-cache-audit.mjs`
 
 已知约束：
 
@@ -88,8 +88,8 @@
 
 命令：
 
-- `node scripts/analyze-cache-audit.mjs --previous <previous.context.json> --current <current.context.json>`
-- `node scripts/analyze-cache-audit.mjs <cache-audit-session-dir>`
+- `node scripts/diagnostics/analyze-cache-audit.mjs --previous <previous.context.json> --current <current.context.json>`
+- `node scripts/diagnostics/analyze-cache-audit.mjs <cache-audit-session-dir>`
 - `pnpm --filter @actspace/shared typecheck`
 - `pnpm --filter @actspace/agent-core test`
 - `pnpm --filter @actspace/agent-core typecheck`
@@ -111,7 +111,7 @@
 ## 进度记录
 
 - [x] 完成设计规范 `docs/archive/v1/design-docs/model-context-agent-cache-loss-audit.md`。
-- [x] 完成离线分析脚本 `scripts/analyze-cache-audit.mjs`。
+- [x] 完成离线分析脚本 `scripts/diagnostics/analyze-cache-audit.mjs`。
 - [x] 扩展 `LlmUsagePayload` 共享契约。
 - [x] 接入 agent-core `CacheAuditTracker`。
 - [x] 写入 `cacheStatus/cacheAuditId/cacheHitRatio` 与 audit 旁路文件。

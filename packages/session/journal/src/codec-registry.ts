@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { EventCodec as PluginEventCodec } from "@actspace/cordis-adapter";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { SessionEventCriticality, SessionEventEnvelopeV1 } from "./event-envelope.js";
+import type { SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
 
 export type EventCodecRelationContext = {

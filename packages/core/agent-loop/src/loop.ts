@@ -117,8 +117,8 @@ export class AgentLoop {
       }
       const persistedContent = appendRuntimeContext(input.content, mode, modeRevision);
       if (!hasUserMessage(this.options.session, messageId)) await this.options.session.append(core("user/message", { messageId, agentRunId, turnId }, { surface: { kind: "append", node: { kind: "user", messageId, content: persistedContent } } }));
-      // 上一回合结束后才到的插入不能排到本回合用户消息之后；Host 看到 discarded 会把它放回队列。
-      for (const item of this.options.inbox.pending()) if (item.source === "steer") await this.options.inbox.discard(item.messageId, "stale-steer");
+      // 旧 journal 的插入记录不能进入新 Run；当前用户输入仅由 Host Task 管理。
+      for (const item of this.options.inbox.pending()) if (item.source === "steer" || item.target === "next-turn") await this.options.inbox.discard(item.messageId, "stale-steer");
       while (stepCount < this.options.descriptor.maxSteps) {
         if (controller.signal.aborted) throw new AgentRuntimeError("TURN_ABORTED", "Turn was aborted.");
         if (this.options.inputSource) {
@@ -126,9 +126,9 @@ export class AgentLoop {
           if (consumed.messageIds.length) configuration = consumed.configuration;
           for (const messageId of consumed.messageIds) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId, source: "steer" });
         }
-        for (const item of await this.options.inbox.claim("next-step")) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId: item.messageId, ...(item.source === undefined ? {} : { source: item.source }) });
+        for (const item of await this.options.inbox.claim()) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId: item.messageId, ...(item.source === undefined ? {} : { source: item.source }) });
         const stepId = randomUUID(); stepCount += 1;
-        const preStep = await this.waterfall("agent/pre-step", { agentRunId, turnId, stepId, stepIndex: stepCount, mode }, controller.signal);
+        const preStep = await this.waterfall("agent/pre-step", { agentRunId, turnId, stepId, stepIndex: stepCount, mode });
         this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "step-started" });
         await this.options.session.append(core("step/start", { turnId, stepId, agentRunId, stepIndex: stepCount, ...(isRecord(preStep) ? { metadata: preStep as RuntimeV2JsonValue } : {}) }));
         const budgetSummary = this.options.descriptor.kind === "subagent" && stepCount === this.options.descriptor.maxSteps;
@@ -143,7 +143,7 @@ export class AgentLoop {
           hostFacts: { agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
           selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(configuration.selectedSkillIds ?? [])]),
         }, tools as unknown as RuntimeV2JsonValue[], { routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model });
-        const assembled = await this.waterfall("system-prompt/assemble", candidate, controller.signal);
+        const assembled = await this.waterfall("system-prompt/assemble", candidate);
         if (isRecord(assembled)) candidate = assembled as typeof candidate;
         let requestId = randomUUID();
         const requestMessages = Object.freeze([
@@ -151,7 +151,7 @@ export class AgentLoop {
           ...await this.requestMessages(candidate.messages),
           ...(budgetSummary ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
         ]);
-        const requestPlan = await this.waterfall("agent/request", { requestId, turnId, stepId, routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model, messages: requestMessages, tools }, controller.signal);
+        const requestPlan = await this.waterfall("agent/request", { requestId, turnId, stepId, routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model, messages: requestMessages, tools });
         const requestRecord: Readonly<Record<string, unknown>> = isRecord(requestPlan) ? requestPlan : {};
         const requestRouteId = typeof requestRecord.routeId === "string" ? requestRecord.routeId : this.options.descriptor.routeId;
         const requestModel = typeof requestRecord.model === "string" ? requestRecord.model : configuration.model ?? this.options.descriptor.model;
@@ -181,7 +181,7 @@ export class AgentLoop {
         while (output === undefined) {
           try {
             this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, requestId, message: "request-started" });
-            const stream = await this.waterfall("llm/stream", { requestId, turnId, stepId, request: activePrepared.request, signal: controller.signal }, controller.signal, () => activePrepared.dispatch() as unknown as Promise<Awaited<ReturnType<typeof activePrepared.dispatch>>>);
+            const stream = await this.waterfall("llm/stream", { requestId, turnId, stepId, request: activePrepared.request, signal: controller.signal }, () => activePrepared.dispatch() as unknown as Promise<Awaited<ReturnType<typeof activePrepared.dispatch>>>);
             output = await collectStream(stream as AsyncIterable<LlmStreamEvent>, controller.signal, async (event) => {
               this.emitLive({ ...event.live, agentRunId, turnId, stepId, requestId, messageId: event.messageId });
               await this.options.session.append(core("assistant/chunk", { messageId: event.messageId, chunkIndex: event.chunkIndex, requestId, turnId, stepId, kind: event.live.kind, content: event.live.kind === "tool-call-delta" ? event.live.argumentsDelta : event.live.message, ...(event.live.kind === "tool-call-delta" ? { callId: event.live.callId, name: event.live.name } : {}) }));
@@ -191,7 +191,7 @@ export class AgentLoop {
             output = failedStreamOutput(normalizeLlmFailure(error, attempt));
           }
           if (output.failure === null) break;
-          const recovery = await this.waterfall("agent/request-error", { requestId, turnId, stepId, attempt, failure: output.failure }, controller.signal, () => undefined as unknown as Readonly<Record<string, unknown>>);
+          const recovery = await this.waterfall("agent/request-error", { requestId, turnId, stepId, attempt, failure: output.failure }, () => undefined as unknown as Readonly<Record<string, unknown>>);
           const recoveryRecord: Readonly<Record<string, unknown>> = isRecord(recovery) ? recovery : {};
           const delayOverride = typeof recoveryRecord.delayMs === "number" ? recoveryRecord.delayMs : undefined;
           const delayMs = recoveryRecord.kind === "abort" || output.aborted || output.sawObservableDelta ? null : recoveryRecord.kind === "retry" ? (delayOverride ?? retryDelay(retryPolicy, output.failure, attempt)) : retryDelay(retryPolicy, output.failure, attempt);
@@ -220,7 +220,7 @@ export class AgentLoop {
             hostFacts: { agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
             selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(configuration.selectedSkillIds ?? [])]),
           }, tools as unknown as RuntimeV2JsonValue[], { routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model });
-          const retryAssembled = await this.waterfall("system-prompt/assemble", candidate, controller.signal);
+          const retryAssembled = await this.waterfall("system-prompt/assemble", candidate);
           if (isRecord(retryAssembled)) candidate = retryAssembled as typeof candidate;
           requestMessageList = Object.freeze([
             ...(candidate.renderedSystemPrompt.length > 0 ? [{ role: "system" as const, content: candidate.renderedSystemPrompt }] : []),
@@ -247,9 +247,9 @@ export class AgentLoop {
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");
         // 模型写最后回复时用户插入了消息：回合不结束，下一步开头读到它（仍受 maxSteps 约束）。
-        const steerPending = this.options.inputSource?.hasPending(agentRunId) || this.options.inbox.pending().some((item) => item.target === "next-step" && item.source === "steer");
+        const steerPending = this.options.inputSource?.hasPending(agentRunId);
         if (output.toolCalls.length === 0 && !budgetSummary && !steerPending) {
-          await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "completed", stepCount }, controller.signal);
+          await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "completed", stepCount });
           await this.options.session.append(core("turn/end", { turnId, reason: "completed" }));
           await this.checkpoint("after-turn-settled");
           const usage = compactionUsage(output.usage);
@@ -259,7 +259,7 @@ export class AgentLoop {
           return Object.freeze({ agentRunId, turnId, reason: "completed", steps: stepCount, finalText });
         }
       }
-      await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "step-limit", stepCount }, controller.signal);
+      await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "step-limit", stepCount });
       await this.options.session.append(core("turn/end", { turnId, reason: "step-limit" }));
       await this.checkpoint("after-turn-settled");
       this.notify("agent/status", { agentRunId, turnId, status: "step-limit" });
@@ -366,10 +366,10 @@ export class AgentLoop {
   private notify(type: AgentNotification, payload: unknown): void {
     this.#events.emit(type, this.recordPayload(payload));
   }
-  private async waterfall<T, R = T>(type: AgentLoopIntervention, payload: T, signal: AbortSignal, next: () => R | Promise<R> = () => this.recordPayload(payload) as unknown as R): Promise<T | R> {
+  private async waterfall<T, R = T>(type: AgentLoopIntervention, payload: T, next: () => R | Promise<R> = () => this.recordPayload(payload) as unknown as R): Promise<T | R> {
     return await this.#events.waterfall(type, this.recordPayload(payload), () => next()) as T | R;
   }
-  private async serial(type: AgentLoopIntervention, payload: unknown, signal: AbortSignal): Promise<unknown> {
+  private async serial(type: AgentLoopIntervention, payload: unknown): Promise<unknown> {
     return this.#events.serial(type, this.recordPayload(payload));
   }
   private async checkpoint(reason: "before-llm-dispatch" | "before-tool-body" | "before-next-step" | "after-turn-settled"): Promise<void> {
@@ -416,7 +416,7 @@ export class AgentLoop {
       onExecutionStarted: (call) => {
         this.emitLive({ kind: "tool-started", ...ids, callId: call.callId, name: call.name });
         try { base.onExecutionStarted?.(call); } catch { /* Isolate optional observers. */ }
-      }, notifyAgent: async (content) => { await this.options.inbox.enqueue(content, "next-step", undefined, "task_notification"); }, journal: {
+      }, notifyAgent: async (content) => { await this.options.inbox.enqueue(content); }, journal: {
       recordDispatch: async (fact) => { await this.options.session.append(core("tool-workflow/run-start", fact)); },
       checkpointBeforeBody: async () => { await this.checkpoint("before-tool-body"); },
       recordPermission: async (type, data) => { await this.options.session.append(core(type, data as RuntimeV2JsonValue)); },

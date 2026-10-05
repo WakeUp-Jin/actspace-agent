@@ -658,6 +658,8 @@ export type ComposerAttachment = {
   kind: "file" | "image" | "link";
   name: string;
   path?: string;
+  /** An authenticated artifact owned by this remote session, not a local path. */
+  remoteArtifact?: { sessionId: string; artifactId: string };
   mimeType?: string;
   previewUrl?: string;
 };

@@ -1,6 +1,6 @@
 # ActSpace v2 Runtime 与 Composition
 
-> 状态：当前启动与生命周期说明，2026-10-04 按源码校准。整体职责见[总体架构](agent-target-overall-architecture.md)，演进取舍见 [Profile-first 决策](agent-decision-profile-first-headless-desktop.md)。
+> 状态：当前启动与生命周期说明，2026-10-04 按源码校准。整体职责见[总体架构](agent-target-overall-architecture.md)，演进取舍见 [Profile-first 决策](agent-harness-host-refactor-decisions.md)。
 
 ## 1. 三种 Profile 与应用所有权
 

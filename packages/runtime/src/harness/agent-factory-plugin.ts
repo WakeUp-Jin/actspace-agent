@@ -102,7 +102,7 @@ export function apply(ctx: CordisContext): AgentFactoryService {
     const agentId = `main:${session.header.sessionId}`;
     const scope = run.scope.child(agentId);
     try {
-      const activatedForm = activateMainAgentFormTools(scope, tools);
+      activateMainAgentFormTools(scope, tools);
       const binding = tools.bindAgentScope(session.header.sessionId, agentId, () => {
         const mode = run.mode;
         const names = scope.tools.entries().map(entry => entry.id);

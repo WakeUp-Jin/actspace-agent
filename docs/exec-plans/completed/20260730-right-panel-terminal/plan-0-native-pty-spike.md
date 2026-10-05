@@ -14,7 +14,7 @@
 
 - `packages/desktop/package.json`
 - `pnpm-lock.yaml`
-- `scripts/terminal-native-spike/`
+- `scripts/experiments/terminal-native-spike/`
 - 本计划文件，记录命令、制品和结果
 - 本轮 history 与必要的 learning 文档
 
@@ -47,7 +47,7 @@
 
 ### Task 0.2：构建隔离 Electron spike
 
-在 `scripts/terminal-native-spike/` 创建与产品 renderer / preload 无关的最小 Electron 入口，它只执行：
+在 `scripts/experiments/terminal-native-spike/` 创建与产品 renderer / preload 无关的最小 Electron 入口，它只执行：
 
 1. 从明确 cwd 启动默认 shell。
 2. 发送 `pwd`、ANSI 输出和中文输出。

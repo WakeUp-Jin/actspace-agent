@@ -66,7 +66,6 @@ export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
   definition("bash_output", "Read new output or a bounded tail from a background bash task. Do not poll in a loop.", SHELL, "read-only", objectSchema({ taskId: stringSchema("Background task id."), tailLines: integerSchema("Optional tail line count.", 1) }, ["taskId"])),
   definition("bash_kill", "Terminate a background bash task by id.", SHELL, "exclusive", objectSchema({ taskId: stringSchema("Background task id.") }, ["taskId"])),
 ]);
-export function activate() { return { services: { "tools.shell-tools": Object.freeze({ registerTools, TOOL_DEFINITIONS }) }, dispose: () => undefined }; }
 function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
   return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: SHELL_TOOLS_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" && localName !== "bash_output" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
 }

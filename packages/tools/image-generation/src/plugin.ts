@@ -31,7 +31,7 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
   try {
     for (const item of TOOL_DEFINITIONS) {
       const handler = ports[item.localName] ?? (async () => ({ status: "failed" as const, modelOutput: [{ type: "text" as const, text: `${item.localName} Host capability is unavailable.` }], summary: `${item.localName} unavailable`, failure: { code: "CAPABILITY_UNAVAILABLE", message: `${item.localName} Host capability is unavailable.`, retryable: false } }));
-      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract(item.localName) }) }));
+      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract() }) }));
     }
     return Object.freeze(registrations);
   } catch (error) {
@@ -40,7 +40,7 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
   }
 }
 
-function permissionContract(name: ToolName): ToolPermissionContract {
+function permissionContract(): ToolPermissionContract {
   return { extractResources: () => [], evaluate: () => ({ kind: "allow" as const }) };
 }
 type DefinitionEntry = { readonly localName: ToolName; readonly definition: ToolDefinition };
@@ -48,10 +48,8 @@ const IMAGE = ["network", "filesystem.write"] as const;
 export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
   definition("generate_image", "Generate images from a detailed prompt using the configured image service.", IMAGE, "exclusive", objectSchema({ prompt: stringSchema("Detailed image description."), size: { type: "string", enum: ["1024x1024", "1536x1024", "1024x1536"], default: "1024x1024" }, n: { type: "integer", minimum: 1, maximum: 10, default: 1 } }, ["prompt"]), ["/prompt"]),
 ]);
-export function activate() { return { services: { "tools.image-generation": Object.freeze({ registerTools, TOOL_DEFINITIONS }) }, dispose: () => undefined }; }
 function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
   return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: IMAGE_GENERATION_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
 }
 function objectSchema(properties: Readonly<Record<string, unknown>>, required: readonly string[]) { return Object.freeze({ type: "object", properties, required, additionalProperties: false }); }
 function stringSchema(description: string) { return Object.freeze({ type: "string", description, minLength: 1 }); }
-function integerSchema(description: string, minimum: number) { return Object.freeze({ type: "integer", description, minimum }); }

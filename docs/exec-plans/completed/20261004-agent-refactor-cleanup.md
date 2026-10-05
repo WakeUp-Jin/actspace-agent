@@ -22,4 +22,4 @@ Runtime 的 runtime/ 平铺实现按 startup/（启动与退出）、session/（
 
 histories/learnings 已存 hash 快照，既有文件不删不改。被其引用的退役文档保留短回溯入口，其他已被替代文件可删；当前入口链接到最终真源。前端/产品概念 WIP 不混入。
 
-每批验证后独立可运行；失败回退本批文件，不用旧 dist 或改用户配置绕过。实际过程与结果只记同任务的[过程](../../exec-runs/20261004-agent-refactor-cleanup/execution-process.md)和[摘要](../../exec-runs/20261004-agent-refactor-cleanup/execution-summary.md)，不复制设计全文。
+每批验证后独立可运行；失败回退本批文件，不用旧 dist 或改用户配置绕过。实际过程与结果只记同任务的[过程](../../exec-runs/20261004-agent-refactor-cleanup/execution-summary.md)和[摘要](../../exec-runs/20261004-agent-refactor-cleanup/execution-summary.md)，不复制设计全文。

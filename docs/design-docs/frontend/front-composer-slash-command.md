@@ -41,7 +41,7 @@ Functions 使用固定顺序，不按字母排序。当前模式项显示勾选�
 | `/chat` | Chat mode | 调用现有 `onModeChange("chat")`，切换为无工具对话模式 | 清除 Slash 查询并恢复焦点 |
 | `/plan` | Plan mode | 调用现有 `onModeChange("plan")`，切换为只读计划模式 | 清除 Slash 查询并恢复焦点 |
 | `/agent` | Agent mode | 调用现有 `onModeChange("agent")`，恢复完整 Agent 模式 | 清除 Slash 查询并恢复焦点 |
-| `/compact` | Compact context | 复用现有 `/compact` 发送链，立即发起上下文压缩 | 清除 Slash 查询；不消费已选 Skill 和已有附件 |
+| `/compact` | Compact context | 通过统一 Task 入口提交压缩操作，空闲执行、繁忙排队 | 清除 Slash 查询；不消费已选 Skill 和已有附件 |
 | `/status` | Context status | 调用现有 `onExpandContext`，打开 Context 视图 | 清除 Slash 查询并恢复焦点 |
 | `/review` | Review changes | 调用现有 `onOpenReview`，打开 Review 视图 | 清除 Slash 查询并恢复焦点 |
 
@@ -90,7 +90,7 @@ Slash 菜单中的项目分成两种行为，但视觉上仍只属于 `Functions
 
 1. 状态切换：Chat / Plan / Agent，立即调用现有模式回调。
 2. 产品动作：Compact / Context / Review，立即复用现有动作链。
-菜单层不得直接访问文件系统、Skill 文件或 Agent Runtime。Renderer 只传递现有回调、Skill name 和已有命令文本；`/compact` 的真实执行仍由当前 App / IPC 链负责。
+菜单层不得直接访问文件系统、Skill 文件或 Agent Runtime。Renderer 只传递现有回调、Skill name 和已有命令文本；`/compact` 的真实执行经 App / IPC 的统一 submitTask 入口，由 Host Task 服务负责。
 
 ## 与 `+` 菜单的关系
 
@@ -149,7 +149,7 @@ Slash 菜单延续 ActSpace Editor Design System 的 Ink & Emerald 方向，重�
 - 不把 Model、Reasoning、Image、New chat 重复塞入 Slash 菜单。
 - 不新增 Skill marketplace、推荐安装、远程搜索或 Composer 内管理能力。
 - 不把所有功能抽象成跨进程通用 Command Registry；V1 只在 renderer 维护小型展示 catalog，并复用现有行为回调。
-- 不改变 `/compact` 的 main / preload / Agent Runtime 协议。
+- `/compact` 复用[Task/Run 契约](../agent-plugin-runtime/agent-task-run-lifecycle.md)，不新增命令专属 IPC。
 - 不持久化菜单开关、active item、查询或最近选择。
 
 ## 验收基线

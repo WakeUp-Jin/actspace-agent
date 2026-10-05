@@ -66,7 +66,3 @@ export function apply(ctx: CordisContext, config: { readonly disposeHost?: boole
     if (failures.length > 0) throw new AggregateError(failures.map((failure) => failure.reason), "Browser Tools cleanup failed.");
   }, "browser-tools");
 }
-
-export function activate() {
-  return { services: { "tools.browser": Object.freeze({ registerBrowserTools, BROWSER_TOOL_DEFINITIONS }) }, dispose: () => undefined };
-}

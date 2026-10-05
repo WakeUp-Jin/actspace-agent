@@ -22,7 +22,7 @@
     "dev:site": "pnpm --filter @actspace/site dev",
     "build": "pnpm --filter @actspace/agent-cli build && pnpm --filter @actspace/desktop build",
     "build:site": "pnpm --filter @actspace/site build",
-    "test": "pnpm run test:dev-runner && pnpm run test:repo-stats && pnpm run test:refactor-stats && pnpm run test:package-boundaries && pnpm run test:current-docs && pnpm run test:contract-matrix && pnpm check:harness-events && pnpm test:harness-events && pnpm test:harness-recovery && pnpm test:agent-host:process && pnpm -r --if-present test",
+    "test": "pnpm run test:dev-runner && pnpm run test:repo-stats && pnpm run test:refactor-stats && pnpm run test:package-cutover && pnpm run test:package-boundaries && pnpm run test:current-docs && pnpm run test:contract-matrix && pnpm check:harness-events && pnpm test:harness-events && pnpm test:harness-recovery && pnpm test:agent-host:process && pnpm -r --if-present test",
     "test:dev-runner": "node --test scripts/test/dev-process-runner.test.mjs",
     "test:repo-stats": "node --test scripts/test/repo-stats.test.mjs",
     "test:refactor-stats": "node --test scripts/test/refactor-stats.test.mjs",
@@ -32,7 +32,7 @@
     "test:frontend-tokens": "node --test scripts/test/frontend-design-tokens.test.mjs",
     "test:site": "pnpm --filter @actspace/site test",
     "typecheck": "pnpm run typecheck:contracts && pnpm -r typecheck",
-    "typecheck:contracts": "pnpm --filter @actspace/runtime... build",
+    "typecheck:contracts": "pnpm --filter @actspace/runtime... --filter @actspace/client... build",
     "check:site": "pnpm --filter @actspace/site check",
     "ci": "./scripts/ci.sh",
     "check:docs": "./scripts/check-docs.sh",
@@ -62,7 +62,8 @@
     "check:harness-events": "node scripts/check-harness-event-contracts.mjs",
     "test:harness-events": "node --test scripts/test/harness-event-contracts.test.mjs",
     "test:harness-recovery": "node --test scripts/test/harness-recovery-process.test.mjs",
-    "test:agent-host:protocol": "pnpm --filter @actspace/agent-host test && ACTSPACE_TEST_SSH=1 pnpm --filter @actspace/desktop exec vitest run src/main/test/remote-host-ssh.test.ts"
+    "test:agent-host:protocol": "pnpm --filter @actspace/agent-host test && ACTSPACE_TEST_SSH=1 pnpm --filter @actspace/desktop exec vitest run src/main/test/remote-host-ssh.test.ts",
+    "test:package-cutover": "node --test scripts/test/package-cutover.test.mjs"
   },
   "dependencies": {
     "@actspace/english-learning": "workspace:*",

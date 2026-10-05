@@ -191,7 +191,7 @@ flowchart LR
 | `src/tools/`、`src/plugins/core-tools/` | `packages/tools/runtime/`、`packages/tools/filesystem-read/`、`packages/tools/filesystem-search/`、`packages/tools/filesystem-write/`、`packages/tools/shell-tools/`、`packages/tools/web-tools/`、`packages/tools/image-generation/`、`packages/tools/image-inspection/` | Tool Runtime 契约和具体 executor 分开 |
 | `src/plugins/browser-tools/` | `packages/tools/browser-tools/` | Browser 具体工具成为领域插件，不使用通用 plugins 目录 |
 | `src/agent/` | `packages/core/agent/`、`packages/core/agent-loop/`、`packages/subagent/` | Registry、Loop、Subagent 按独立替换边界拆分 |
-| `src/runtime/`、`src/boot/` | `packages/runtime/`、`packages/boot/` | Runtime 提供生产 BootedRuntimeProfile，App Bundle 拥有产品操作；基础 BootedProfile 由 packages/boot 提供，二者字段和 shutdown 结果不同 |
+| `src/runtime/`、`src/boot/` | `packages/runtime/`、`packages/boot/` | Runtime 提供生产 BootedRuntimeProfile，App Bundle 拥有产品操作；packages/boot 提供 Harness/Run 生命周期契约，不再提供旧 Profile 启动门面 |
 | `browser-bridge/` | `browser-bridge/` | 顶层使用产品能力名称，保留独立 Go/Extension 构建边界 |
 
 旧 v1 Session 只保留一份迁移参考数据，不由新 Runtime 读取或导入。新格式只使用 `sessions-v2/<id>/journal.jsonl`。

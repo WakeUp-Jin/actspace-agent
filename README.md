@@ -33,7 +33,8 @@ Actspace 是一个本地优先的 Agent 桌面应用，也是一套可观察、�
 
 ## 当前能力
 
-- Desktop 与 CLI 分别使用 `desktop` / `headless` Profile Bundle，共享 Agent 领域语义但不共享通用 Runtime facade。
+- Desktop 与 CLI 分别使用 `desktop` / `headless` Profile Bundle，共享任务服务与可替换 Harness；本机 Desktop 内嵌运行，远端由独立 Agent Host 持有任务生命周期。
+- Desktop 通过 WSS 或 SSH 隧道连接自管 Host，统一展示本地/远端会话，支持远端审批、取消、附件上传与结果访问。
 - 持久 Session Journal、恢复、Fork、Compaction、Inbox、Todo 与一次性 Agent / Explore Subagent。
 - DeepSeek、Kimi、OpenRouter 模型配置，以及 provider 级代理和 usage 统计。
 - 文件读写、Grep / Glob、Bash、Web、图片分析和图片生成等工具能力。
@@ -60,7 +61,7 @@ CLI 通过当前 shell 的显式环境变量读取 provider 配置。先在本�
 env LLM_PROVIDER=deepseek node apps/cli/dist/cli.js run --input "hello"
 ```
 
-运行 CLI 前先执行 `pnpm --filter @actspace/agent-cli build`。无真实 provider 时可使用 CLI `--mock` 验证 Runtime、Session 和输出契约。完整参数以 `node apps/cli/dist/cli.js --help` 为准。
+运行 CLI 前先执行 `pnpm --filter @actspace/agent-cli... build`。无真实 provider 时可使用 CLI `--mock` 验证 Runtime、Session 和输出契约。完整参数以 `node apps/cli/dist/cli.js --help` 为准。
 
 常用验证：
 
@@ -94,10 +95,10 @@ pnpm package:desktop
 ## 当前架构
 
 ```text
-apps/desktop ─┐
-              ├─> @actspace/runtime ─> domain plugin packages ─> @actspace/shared
-apps/cli ─────┘              │
-                             └─ Host capability ─> browser-bridge
+Desktop 本机 / CLI -> App Service -> Agent Service -> Run（固定 Harness）
+Desktop 远端 -> Client -> WSS / SSH -> Agent Host -> App Service
+Agent Service -> Session -> Storage port -> JSONL
+Host capability -> browser-bridge
 ```
 
 仓库采用 `pnpm workspace` 多包结构：
@@ -105,7 +106,10 @@ apps/cli ─────┘              │
 - `apps/desktop`：Electron main、preload 和固定 renderer。
 - `apps/cli`：managed ESM CLI Host。
 - `apps/site`：Astro 官网和公开内容。
-- `packages/runtime`：BootedRuntimeProfile、Profile / Bundle / Patch、Projection 与 shutdown；Session/Agent 操作由对应 App Bundle Service 提供。
+- `packages/runtime`：唯一 `bootProfileRuntime` 装配、Projection 与有序 shutdown；领域行为留在各自插件。
+- `packages/agent-host` / `client` / `agent-service`：进程与认证接入、客户端连接、内容队列与统一任务调度。
+- `packages/harness-control`：组合准备、授权、启用与恢复；Run 固定当前组合，后续 Run 可采用新组合。
+- `packages/session/storage` / `jsonl` / `persistence`：存储中性契约、文件实现与 Session 业务语义，保留未来数据库接入边界。
 - `packages/core`、`packages/session`、`packages/llm`、`packages/context`、`packages/prompt`、`packages/tools`、`packages/subagent`、`packages/compaction`：领域 package 与真实 Plugin Entry。
 - `packages/shared`：跨进程和 Host-facing 公共契约。
 - `browser-bridge`：独立 Go / Chrome Extension Host capability，不属于 pnpm workspace plugin 目录。
@@ -113,6 +117,7 @@ apps/cli ─────┘              │
 当前事实入口：
 
 - [架构总览](docs/ARCHITECTURE.md)
+- [Agent Host 配置与连接](docs/design-docs/agent-plugin-runtime/agent-host-guide.md)
 - [Agent v2 设计入口](docs/design-docs/agent-plugin-runtime/README.md)
 - [包结构与真实插件包规范](docs/design-docs/agent-plugin-runtime/agent-spec-package-layout-and-plugin-packaging.md)
 - [Session 格式](docs/design-docs/agent-plugin-runtime/agent-spec-session-format-v1.md)

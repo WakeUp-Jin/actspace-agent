@@ -100,3 +100,14 @@ test("link checks accept angle-wrapped filenames with spaces, parentheses and ti
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("retired Host and Task APIs require explicit historical labels on their own lines", async () => {
+  const root = await mkdtemp(join(tmpdir(), "actspace-current-api-"));
+  try {
+    const examples = ["bootProfile()", "BootedProfile", "RunAgentInput", "context:compact", "engine/streaming-preview-extractors.ts"];
+    await writeFile(join(root, "current.md"), "历史背景\n\n" + examples.map(api => `Use \`${api}\`.`).join("\n"));
+    assert.equal((await checkMarkdownFiles(root, ["current.md"])).length, examples.length);
+    await writeFile(join(root, "current.md"), examples.map(api => `历史：已退役 \`${api}\`。`).join("\n") + "\nUse bootProfileRuntime().");
+    assert.deepEqual(await checkMarkdownFiles(root, ["current.md"]), []);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

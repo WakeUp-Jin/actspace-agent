@@ -4,11 +4,10 @@ import { readFile, realpath } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { CodecModuleLoader, EventCodec } from "./codec-discovery.js";
-import type { BehaviorModule } from "./behavior-loader.js";
 import { validatePluginManifest, type PluginManifest, type PluginSource } from "./manifest.js";
 
 export type ExplicitPluginConfig = { readonly schemaVersion: 1; readonly plugins: readonly PluginSource[] };
-export type LoadedPluginSet = { readonly manifests: readonly PluginManifest[]; readonly codecLoader: CodecModuleLoader; readonly behaviorLoader: (specifier: string, manifest: PluginManifest) => Promise<BehaviorModule> };
+export type LoadedPluginSet = { readonly manifests: readonly PluginManifest[]; readonly codecLoader: CodecModuleLoader; readonly behaviorLoader: (specifier: string, manifest: PluginManifest) => Promise<unknown> };
 type LoadedRoot = { readonly manifest: PluginManifest; readonly root: string };
 
 export async function loadConfiguredPlugins(configPath: string): Promise<LoadedPluginSet> {
@@ -17,7 +16,7 @@ export async function loadConfiguredPlugins(configPath: string): Promise<LoadedP
   const roots: LoadedRoot[] = []; for (const source of parsed.plugins) roots.push(await loadSource(source));
   const byPlugin = new Map(roots.map((item) => [item.manifest.pluginId, item])); if (byPlugin.size !== roots.length) throw new Error("Configured plugins contain duplicate plugin ids.");
   const loadModule = async (specifier: string, manifest: PluginManifest) => { const item = byPlugin.get(manifest.pluginId); if (item === undefined) throw new Error(`Plugin ${manifest.pluginId} was not explicitly configured.`); return import(await resolveModule(item.root, specifier)); };
-  return Object.freeze({ manifests: Object.freeze(roots.map((item) => item.manifest)), codecLoader: async (specifier: string, manifest: PluginManifest): Promise<{ readonly codecs: readonly EventCodec[] }> => await loadModule(specifier, manifest) as { readonly codecs: readonly EventCodec[] }, behaviorLoader: async (specifier: string, manifest: PluginManifest): Promise<BehaviorModule> => await loadModule(specifier, manifest) as BehaviorModule });
+  return Object.freeze({ manifests: Object.freeze(roots.map((item) => item.manifest)), codecLoader: async (specifier: string, manifest: PluginManifest): Promise<{ readonly codecs: readonly EventCodec[] }> => await loadModule(specifier, manifest) as { readonly codecs: readonly EventCodec[] }, behaviorLoader: async (specifier: string, manifest: PluginManifest): Promise<unknown> => await loadModule(specifier, manifest) });
 }
 
 export function emptyPluginSet(): LoadedPluginSet { return Object.freeze({ manifests: Object.freeze([]), codecLoader: async (specifier) => { throw new Error(`Codec module ${specifier} is not configured.`); }, behaviorLoader: async (specifier) => { throw new Error(`Behavior module ${specifier} is not configured.`); } }); }

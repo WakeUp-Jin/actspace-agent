@@ -4,7 +4,7 @@
 
 Session、Surface 和 request snapshot 的规范分别见：
 
-- [`agent-target-session-and-context.md`](../agent-plugin-runtime/agent-target-session-and-context.md)
+- [`agent-spec-session-core-persistence-separation.md`](../agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)
 - [`agent-spec-session-format-v1.md`](../agent-plugin-runtime/agent-spec-session-format-v1.md)
 - [`agent-spec-prompt-context-contributors.md`](../agent-plugin-runtime/agent-spec-prompt-context-contributors.md)
 

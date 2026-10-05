@@ -13,14 +13,3 @@ export function apply(ctx: CordisContext): void {
   const registry = createCoreCodecRegistry([...(discovered ?? []).filter((codec) => !localTypes.has(codec.type)), ...codecs]);
   ctx.provide?.("session.journal", Object.freeze({ registry, EventCodecRegistry, SessionJournal, codecs, createCoreCodecRegistry: () => registry }));
 }
-
-export function activate() {
-  const registry = createCoreCodecRegistry(codecs);
-  const service = Object.freeze({
-    EventCodecRegistry,
-    SessionJournal,
-    codecs,
-    createCoreCodecRegistry: () => registry,
-  });
-  return { services: { "session.journal": service }, dispose: () => undefined };
-}

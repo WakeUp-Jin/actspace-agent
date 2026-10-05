@@ -7,7 +7,7 @@
 
 费用能够解释来源；没有价格或完整用量时显示未知；模型目录在断网时仍可使用；目录更新不阻塞启动、请求发送或统计页面。
 
-2026-09-06 源码检查与离线探针确认：
+2026-09-06 历史问题快照（下列旧路径与缺陷用于解释修复动机，现行实现已迁至 pi-ai-adapter 与对应价格投影，不应据此恢复旧 wire engine）：
 
 - `packages/llm/pi-ai/src/pi-ai-wire-engine.ts` 的 `createModel` 将四类 token 单价固定为零；`mapUsage` 又将 SDK 计算出的 `cost.total` 标记成 `provider-reported`。这不是供应商实际返回的账单金额。
 - `packages/llm/pi-ai/src/legacy-proxy-wire-engine.ts` 缺少价格计算，费用保持空值。两条请求路径需要共用计价规则。

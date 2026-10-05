@@ -9,7 +9,3 @@ export function apply(ctx: CordisContext, config: ToolRuntimePluginConfig = {}):
   const runtime = new ToolRuntimeService(ctx as never, { maxParallel: config.maxParallel });
   ctx.provide?.("tools.runtime.types", Object.freeze({ ToolRuntime, ToolRuntimeService, ToolRegistry, ToolExecutionScheduler, runtime }));
 }
-
-export function activate() {
-  return { services: { "tools.runtime": Object.freeze({ ToolRuntime, ToolRegistry, ToolExecutionScheduler }) }, dispose: () => undefined };
-}

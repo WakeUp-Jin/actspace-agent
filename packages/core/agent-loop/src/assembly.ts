@@ -1,4 +1,4 @@
-import type { AgentDescriptor, AgentSubject, MainAgentInbox } from "@actspace/core-agent";
+import type { AgentDescriptor, MainAgentInbox } from "@actspace/core-agent";
 import type { AgentScope } from "@actspace/core-scope";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { AgentLoop } from "./loop.js";

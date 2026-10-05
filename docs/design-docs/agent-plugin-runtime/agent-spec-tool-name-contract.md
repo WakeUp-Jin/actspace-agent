@@ -25,7 +25,7 @@ ActSpace 不再把 `pluginId/tool-name` 拼接成模型可见工具名，也不�
 
 这条链路中不存在 `encodeToolName()`、`decodeToolName()`、wire alias 或“先用名字查内部命名空间再转发”的隐式层。
 
-## 2. 证据与当前缺陷
+## 2. 历史证据与修复前缺陷
 
 ### 2.1 DSH 的真实模型
 
@@ -42,9 +42,9 @@ DSH 也把 `toolName` 作为某些错误对象的字段，但它仍然代表同�
 
 ### 2.2 ActSpace 的缺陷链
 
-当前实现把 `toolId` 强制定义为 `<pluginId>/<localName>`，并在 Agent Loop 和 pi-ai wire 中原样转发：
+2026-08-29 修复前的实现曾把 `toolId` 强制定义为 `<pluginId>/<localName>`，并在 Agent Loop 和 pi-ai wire 中原样转发：
 
-| 层 | 当前行为 | 结果 |
+| 层 | 修复前行为 | 结果 |
 |---|---|---|
 | `packages/tools/runtime/src/definition.ts` | `toolId` 必须以 `pluginId/` 开头 | 内部身份带 `/` |
 | 2026-08-29 旧 `core-tools` 与 Browser definitions | 曾生成 `actspace.core-tools/read_file` 等值 | 所有 Core/Browser 工具进入问题路径 |
@@ -54,7 +54,7 @@ DSH 也把 `toolName` 作为某些错误对象的字段，但它仍然代表同�
 
 DeepSeek 返回的错误正是这一链路的直接结果：`actspace.core-tools/read_file` 不符合 `^[a-zA-Z0-9_-]+$`。
 
-受影响的当前 first-party 定义约 29 个：Core 14、Browser 11、Todo 2、Subagent 2。Todo/Subagent 已有 aliases 不能解决问题，因为模型 schema 仍然由 namespaced `toolId` 生成；Core/Browser 甚至没有这层 aliases。
+当时受影响的 first-party 定义约 29 个：Core 14、Browser 11、Todo 2、Subagent 2。Todo/Subagent 已有 aliases 不能解决问题，因为模型 schema 仍然由 namespaced `toolId` 生成；Core/Browser 甚至没有这层 aliases。
 
 ## 3. 三种身份必须分离
 

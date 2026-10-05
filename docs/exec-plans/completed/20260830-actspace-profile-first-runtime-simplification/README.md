@@ -2,7 +2,7 @@
 
 状态：实现已完成，2026-09-08 按计划生命周期归档；历史记录中的真实宿主、人工验收及回归证据边界继续保留，本次未重跑产品验收。
 
-> 设计依据：[`agent-decision-profile-first-headless-desktop.md`](../../../design-docs/agent-plugin-runtime/agent-decision-profile-first-headless-desktop.md)
+> 设计依据：[`agent-harness-host-refactor-decisions.md`](../../../design-docs/agent-plugin-runtime/agent-harness-host-refactor-decisions.md)
 > 计划 slug：`20260830-actspace-profile-first-runtime-simplification`
 
 ## 目标

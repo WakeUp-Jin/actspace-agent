@@ -1,6 +1,6 @@
 # ActSpace v2 插件 Runtime ABI 设计规范
 
-> 状态：v2 契约基线，2026-09-08 已按 Profile-first 校准启动与应用职责。当前 API 见 [Runtime 与 Composition](agent-target-runtime-architecture.md)；P1/P2 全域收口仍按 active 计划执行。
+> 状态：v2 契约基线，2026-10-05 已校准 Host/Harness 启动与应用职责。当前 API 见 [Runtime 与 Composition](agent-target-runtime-architecture.md)；最终清理与验证由当前收尾计划跟踪。
 >
 > 本文固定插件 Runtime 的信任边界、组合语义、生命周期和失败行为。已实现字段与 TypeScript API 以包 exports/schema 为准，未收口部分仍需在对应计划中验证，但不得改变本文已经确认的语义。
 >
@@ -183,17 +183,11 @@ v2 renderer 不插件化。后端插件不能向 renderer 安装、发送或执�
 
 工具和 Agent 状态必须通过 ActSpace 固定投影契约进入前端。未知内置 renderer 使用 generic fallback；这不等于执行插件提供的 renderer。
 
-## 11. Restart-only 生产基线
+## 11. Host 重启与 Harness 替换
 
-v2 生产 Runtime 只支持 restart-only：
+Host 基底、共享能力、codec 或持久格式变更经过有界 shutdown 和完整启动、兼容检查。Harness 通过受控准备与独立授权启用完整新组合；后续 Run 使用新选择，正在运行的 Run 保留旧树租约至结束，不在线 reconcile 当前树。
 
-- 插件安装、移除、升级、Behavior code 变化、Profile / Bundle / Patch 或生效配置变化，都不对当前 root Context 做在线 reconcile；
-- Runtime 可以报告候选变化和 `restart required`，但当前 `ResolvedComposition` 与已激活贡献保持不变；
-- 应用更新配置的唯一方式是完成有界 shutdown，再按完整 Boot 流程创建新的 root Context；
-- 不启用 `cordis-plugin-hmr`，不提供 live reload、双实例零中断切换或 previous-tree 在线恢复承诺；
-- 不引入全局 `CompositionGenerationManager` 或 StandingMount 来掩盖在线更新问题。
-
-领域内的 PreparedCall、prepared Tool execution 和 request snapshot 仍用于保护一次已经开始的工作，但不构成在线刷新能力。
+Profile / Bundle / Patch 的声明与启用语义见[组合规范](agent-spec-profile-bundle-patch-layering.md)和[重构决定](agent-harness-host-refactor-decisions.md)。不启用 HMR，不承诺回滚外部副作用，不做跨代树实例共享优化。
 
 ## 12. Startup Validation 与发布门禁
 
@@ -215,14 +209,14 @@ Trusted Boot 必须按顺序完成以下检查：
 
 每个生产 Host 进程只 boot 一个 Runtime。CLI headless 与 Desktop 各自持有独立的 `BootedRuntimeProfile`，共享领域实现而非同一个业务句柄。
 
-基础 `@actspace/boot.bootProfile()` 返回 `BootedProfile`，包含 Context、root、configPath、manifest 和 shutdown。生产 `bootProfileRuntime()` 返回 `BootedRuntimeProfile`，另有 state、diagnostics 和 restart 通知；两者返回类型和 shutdown 结果不同，详见 [Runtime 与 Composition](agent-target-runtime-architecture.md)。
+生产入口 `bootProfileRuntime()` 返回 `BootedRuntimeProfile`，公开组合事实、Context、状态、诊断和 shutdown。底层受信任装配由 `@actspace/boot` 负责，业务方法由应用 Service 提供，不另建启动结果门面。详细启动顺序只在[启动追踪](agent-spec-dsh-plugin-assembly-and-agent-startup.md)维护。
 
 生产状态为 `booting → ready → quiescing → disposed`；只在 required Service 与启动校验通过后发布结果。restartRequired 是诊断，不授权在线修改组合。
 
 业务操作由应用 Service 持有：
 
 - CLI 使用 `headless.runner.run()`；
-- Desktop 使用 `desktop.app` 创建、恢复、检查 main Session，执行 run、Inbox、abort、flush 和 metadata 操作；
+- Desktop 使用 `desktop.app` 创建、恢复、检查 main Session，通过 AgentApplication/AgentService 提交 Task、操作队列、取消、flush 和 metadata 操作；
 - 一次性 child Session 不能通过 main Session continuation 接口恢复为长期 Agent；
 - Host 等待 Profile shutdown，领域 Service 负责其资源与持久化生命周期。
 

@@ -42,6 +42,7 @@ export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[]): 
         if (request) request.context = true;
         break;
       }
+      case "llm/retry":
       case "assistant/message": {
         const request = requests.get(string(data.requestId));
         if (request) request.terminal = true;

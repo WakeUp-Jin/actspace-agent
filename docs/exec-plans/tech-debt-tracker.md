@@ -2,9 +2,9 @@
 
 这里记录那些暂时不阻塞当前任务、但已经值得留档的技术债。
 
-## Agent 架构收尾的独立验收债务
+## Agent 架构收尾状态
 
-- 2026-10-04：旧 P05 的 CLI deterministic retry/error 进程 fixture 尚未实现。须覆盖可重试失败后成功、最终失败、退出码、纯协议 stdout、诊断 stderr、持久结果/replay 和释放；库级 retry 或 SIGINT 不替代该证据。[目标结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)。
+- 2026-10-05：旧 P05 CLI deterministic retry/error 欠账已关闭，真实 HTTP 进程及 fixture 保活/恢复 12 项覆盖成功/失败/取消、严格 stdout/stderr、冷恢复与释放。最终重构 35/35 Computer Use 已签收，见[收尾摘要](../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)，本次目标内无剩余验收项。
 - 中性存储冷读采用完整一致快照和有界内存缓存；列表初次重建会遍历会话。后续在真实大历史上测量峰值内存/延迟，再决定 Provider 扩展，不恢复通用层直接读取 JSONL 偏移。
 
 ## 当前文档债务
@@ -12,7 +12,7 @@
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
 | 2026-09-08 | 历史/学习文档链接 | 全量初扫剩余 16 处候选断链：15 处在旧 history，1 处在学习文档的示例图片。当前设计、归档、计划和执行记录链接已通过门禁。 | 按历史源码证据、错误相对路径、示例路径分别处理，不将历史源码一律指向当前实现；详见本轮执行摘要。 |
-| 2026-09-09 | 当前设计重复与正文漂移 | 设置中心约 1,200 行，与模型/Usage 子规范重复；工具预览中的旧 extractor、参数展示、审批与 Subagent 位置说法仍需逐项校准。 | 按 [后续复核清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)分配主规范和章节去向，保留独有内容与历史依据。P2 旧要求现由 2026-10-04 旧计划结算明确承接或取消。 |
+| 2026-10-05 | 当前设计重复与正文漂移 | 本轮已合并设置模型/Usage 重复章节，校准工具预览事实/Client 投影/界面事件和旧路径。 | 已结算，见[逐路径清单](../exec-runs/20261005-agent-refactor-final-closeout/cleanup-ledger.tsv)；保留项的证据限制单列，不宣称所有文档逐字段验证。 |
 
 ## 前端设计 token 遗留
 

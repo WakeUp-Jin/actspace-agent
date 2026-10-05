@@ -57,7 +57,7 @@ Lifecycle test 只证明该 Entry 的边界，不证明完整 Runtime shutdown�
 - Session：Header、codec、invariant、Surface、writer lease、write-behind、repair、fork、compaction 和 golden cases；
 - LLM：route、prepared request、usage、failure classification、retry、abort、credential redaction 和 adapter dispose；
 - Tool Runtime：argument validation、policy、approval、dispatch checkpoint、lease、ordered commit、artifact、redaction 和 outcome-unknown；
-- Agent Loop：request snapshot、tool loop、Inbox steering、Todo、abort、Compaction 与 terminal reason；
+- Agent Loop：request snapshot、tool loop、Task 插入与后台通知、Todo、abort、Compaction 与 terminal reason；
 - Subagent：Preset、工具限制、child Session lineage、publication 和级联取消；
 - Prompt / Context：contributor 排序、required / optional、Skill discovery、JSON-safe snapshot 和 secret rejection。
 
@@ -68,7 +68,7 @@ Lifecycle test 只证明该 Entry 的边界，不证明完整 Runtime shutdown�
 `packages/runtime` 必须直接覆盖：
 
 - Boot partial failure 的逆序清理；
-- 单进程唯一 ready `BootedProfile`；
+- Host 装配返回 ready `BootedRuntimeProfile`，Harness generation 可并存并由租约管理；
 - create / resume / fork / run / abort Session；
 - stop accepting work；
 - graceful timeout、blocker diagnostics 和 final shutdown；

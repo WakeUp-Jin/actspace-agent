@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+
 import { ToolRegistrationLeaseOwner } from "./activation-lease.js";
 import { normalizeToolDefinition, type NormalizedToolDefinition, type ToolDefinition } from "./definition.js";
 import type { ToolExecutor } from "./executor.js";

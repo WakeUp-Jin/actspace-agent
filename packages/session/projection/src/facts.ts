@@ -1,5 +1,5 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { type FileGrantSelector, type GrantAccess, type GrantAction, type GrantAudience, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
+import { type FileGrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
 import { SessionProjectionRegistry } from "./registry.js";
 
 export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;

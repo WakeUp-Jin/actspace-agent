@@ -1,11 +1,16 @@
+import { ToolRuntime } from "@actspace/tools-runtime";
+import { CordisContextClass } from "@actspace/cordis-adapter";
 import { describe, expect, it } from "vitest";
-import { activate } from "../plugin.js";
+import { apply } from "../plugin.js";
 
 describe("browser tools plugin", () => {
   it("publishes browser registration behavior", async () => {
-    const activation = activate();
-    expect(activation.services?.["tools.browser"]).toMatchObject({ registerBrowserTools: expect.any(Function) });
-    await activation.dispose();
+    const ctx = new CordisContextClass();
+    ctx.provide("tools.runtime", new ToolRuntime());
+    ctx.provide("actspace.host.tools.browser", { ready: false, dispose: async () => undefined });
+    await ctx.plugin({ apply: inner => apply(inner as never) });
+    expect(ctx.get("tools.browser")).toMatchObject({ available: false, registrations: [] });
+    await ctx.fiber.dispose();
   });
 });
 

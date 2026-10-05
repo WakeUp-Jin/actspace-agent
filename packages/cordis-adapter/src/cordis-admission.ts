@@ -5,7 +5,6 @@ import { CORDIS_PACKAGES, type CordisAdmissionReport, type CordisPackageFingerpr
 
 export async function inspectCordisAdmission(): Promise<CordisAdmissionReport> {
   const fingerprints = await Promise.all(Object.entries(CORDIS_PACKAGES).map(([name, version]) => fingerprint(name as CordisPackageName, version)));
-  const forbiddenPackages = ["cordis", "@cordisjs/plugin-hmr", "@deepseek-ai/cordis-plugin-hmr"];
   const failures = fingerprints.flatMap((item) => item.actualVersion !== item.expectedVersion ? [`${item.name}: expected ${item.expectedVersion}, found ${item.actualVersion ?? "missing"}`] : item.esm && item.exportsPublic && item.typesPublic ? [] : [`${item.name}: public ESM/types export unavailable`]);
   const loaded = fingerprints.filter((item) => item.actualVersion !== null); const singleFamily = new Set(loaded.map((item) => `${item.name}@${item.actualVersion}`)).size === loaded.length;
   const familyRoots = new Set(loaded.map((item) => item.familyRoot).filter((value): value is string => value !== null));

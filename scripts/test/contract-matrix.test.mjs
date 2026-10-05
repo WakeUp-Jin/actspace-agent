@@ -61,3 +61,40 @@ test("matrix covers workspace packages and plugin manifests without stale source
   assert.ok(validateRows(invalid).some(row => row.code === "INVALID_SOURCE_REF"));
   assert.ok(validateRows(invalid).some(row => row.code === "INVALID_DIGEST"));
 });
+
+test("clean checkout checks Markdown without artifacts and rejects source drift", async () => {
+  const { mkdtemp, mkdir, copyFile, readFile, writeFile, rm, access, realpath } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join, dirname } = await import("node:path");
+  const { spawnSync } = await import("node:child_process");
+  const registry = await import("../contract-matrix/source-registry.mjs");
+  const root = await realpath(await mkdtemp(join(tmpdir(), "actspace-matrix-")));
+  const markdown = "docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md";
+  const paths = new Set([
+    "scripts/contract-matrix/generate.mjs", "scripts/contract-matrix/source-registry.mjs", "scripts/check-harness-event-contracts.mjs", markdown,
+    ...Object.values(registry.EVENT_SOURCES).map(item => item.path), registry.SERVICE_SOURCE.path,
+    ...registry.DOMAIN_EVENT_PATHS, ...registry.MANIFEST_PATHS, ...registry.COMPOSITION_SOURCES,
+    ...registry.PACKAGE_PATHS, ...registry.VERIFICATION_SOURCES.map(item => item.path),
+  ]);
+  const matrix = await buildMatrix();
+  for (const key of ["services", "events", "sessions", "capabilities", "plugins", "packages", "verification"])
+    for (const row of matrix[key]) for (const ref of row.sourceRefs) paths.add(ref.split("#")[0]);
+  const run = (...args) => spawnSync(process.execPath, [join(root, "scripts/contract-matrix/generate.mjs"), ...args], { encoding: "utf8" });
+  try {
+    for (const path of paths) { await mkdir(dirname(join(root, path)), { recursive: true }); await copyFile(path, join(root, path)); }
+    { const result = run("--check"); assert.equal(result.status, 0, result.stdout + result.stderr); }
+    await assert.rejects(access(join(root, "artifacts")));
+    const manifest = join(root, registry.MANIFEST_PATHS[0]);
+    await writeFile(manifest, (await readFile(manifest, "utf8")) + "\n// source drift fixture\n");
+    const stale = run("--check");
+    assert.equal(stale.status, 1);
+    assert.match(stale.stderr, /stale or missing/);
+    assert.equal(run().status, 0);
+    const first = await readFile(join(root, "artifacts/agent-contract-matrix.json"), "utf8");
+    const firstMarkdown = await readFile(join(root, markdown), "utf8");
+    assert.equal(run().status, 0);
+    assert.equal(await readFile(join(root, "artifacts/agent-contract-matrix.json"), "utf8"), first);
+    assert.equal(await readFile(join(root, markdown), "utf8"), firstMarkdown);
+    { const result = run("--check"); assert.equal(result.status, 0, result.stdout + result.stderr); }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

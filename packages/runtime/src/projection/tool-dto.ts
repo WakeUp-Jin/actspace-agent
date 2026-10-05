@@ -9,7 +9,7 @@ import type {
 } from "@actspace/shared/runtime-v2/projection";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { ToolExecutionResult } from "@actspace/tools-runtime";
-import type { ToolArtifactRef, ToolDetailBlock, ToolModelOutputBlock } from "@actspace/tools-runtime";
+import type { ToolDetailBlock, ToolModelOutputBlock } from "@actspace/tools-runtime";
 import { projectUnknownArtifact } from "./artifact.js";
 import { redactProjectionText, redactProjectionValue, truncate } from "./redaction.js";
 

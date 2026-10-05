@@ -3,7 +3,7 @@ import type { RuntimeV2AgentMode, RuntimeV2JsonValue, RuntimeV2RunTurnResponse, 
 type HeadlessRunService = {
   initialize(sessionId: string): Promise<void>;
   run(sessionId: string, input: { content: RuntimeV2JsonValue; model?: string }, signal?: AbortSignal): Promise<RuntimeV2RunTurnResponse>;
-  service: { exclusive<T>(sessionId: string, operation: () => Promise<T>): Promise<T> };
+  service: Pick<import("@actspace/agent-service").AgentService, "exclusive" | "snapshot" | "resume">;
 };
 import type { SessionHandle } from "@actspace/session-persistence";
 import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
@@ -60,6 +60,10 @@ export class HeadlessRunner {
     else host.signal?.addEventListener("abort", abort, { once: true });
     try {
       this.notify("headless/started", { sessionId: session.header.sessionId, agentId: `main:${sessionId}` });
+      if (host.sessionId !== undefined) {
+        const state = await agents.service.snapshot(sessionId);
+        if (state.paused) await agents.service.resume(sessionId, state.revision);
+      }
       const result = await agents.run(sessionId, { content: host.content, model: host.model }, controller.signal);
       await session.flush();
       host.appExit?.(result.outcome === "completed" ? 0 : result.outcome === "cancelled" ? 130 : 1);

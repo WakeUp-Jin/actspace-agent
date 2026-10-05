@@ -1,10 +1,12 @@
+import { CordisContextClass } from "@actspace/cordis-adapter";
 import { describe, expect, it } from "vitest";
-import { activate } from "../plugin.js";
+import { apply } from "../plugin.js";
 
 describe("pi-ai plugin", () => {
   it("publishes provider adapter constructors and disposes", async () => {
-    const activation = activate();
-    expect(activation.services?.["llm.route.pi-ai"]).toMatchObject({ PiAiAdapter: expect.any(Function) });
-    await activation.dispose();
+    const ctx = new CordisContextClass();
+    await ctx.plugin({ apply: inner => apply(inner as never) });
+    expect(ctx.get("llm.route.pi-ai")).toMatchObject({ PiAiAdapter: expect.any(Function) });
+    await ctx.fiber.dispose();
   });
 });

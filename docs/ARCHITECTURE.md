@@ -12,15 +12,16 @@
 - `packages/core/`、`packages/session/`、`packages/llm/`、`packages/prompt/`、`packages/tools/`、`packages/subagent/`、`packages/compaction/`：独立领域 workspace packages，每个可装载包拥有自己的 Plugin Entry 与生命周期测试。
 - `packages/english-learning`：Desktop 内置英语辅助学习插件，拥有单会话双语提示词与英文语音队列；凭据、临时文件和系统播放由 Desktop Host 提供。详见[设计](design-docs/agent-plugin-runtime/agent-english-learning.md)。
 - `packages/agent-service`：Host 共同任务服务，拥有持久内容队列、单会话调度与结构化 Run 工厂契约。详见[Task/Run 生命周期](design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md)。
-- `packages/agent-host`：独立 Node Host 接入、认证、观察与文件传输；bootstrap/lifecycle 拥有装配、维护和退出，CLI 注入 Runtime 端口；应用操作复用 AgentApplication，任务仍由 AgentService 调度。CLI 提供 `host` 启动与管理命令，Desktop Main 持有远端连接。当前验证边界见 [Host 指南](agent-host/README.md)和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。
+- `packages/agent-host`：独立 Node Host 接入、认证、观察与文件传输；bootstrap/lifecycle 拥有装配、维护和退出，CLI 注入 Runtime 端口；应用操作复用 AgentApplication，任务仍由 AgentService 调度。CLI 提供 `host` 启动与管理命令，Desktop Main 持有远端连接。当前验证边界见 [Host 指南](design-docs/agent-plugin-runtime/agent-host-guide.md)和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。
 - `packages/harness-control`：Host 级固定 Harness 选择服务，负责 Patch 准备、独立授权、持久启用、恢复与回退；执行者只能经它异步获取租约。详见 [P3 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-3.md)。
 - `packages/session/storage`：存储中性 provider/handle 契约；`session/jsonl` 提供物理实现，`session/persistence` 负责 Session 业务语义。读写、列表、恢复、fork 与缓存均通过注入后端，详见[存储规范](design-docs/agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
 - `packages/shared`：IPC contracts、session schema、跨进程共享类型。
 - `apps/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。
 - `browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层。
-- `infra/`：部署、基础设施和环境定义。
-- `scripts/`：仓库级自动化脚本，供人和 Agent 直接调用。
-- `docs/`：仓库知识库，也是本地规则和上下文的正式来源。
+- `scripts/`：正式自动化入口；人工诊断位于 `diagnostics/`，原生实验位于 `experiments/`，可复建验收环境位于 `acceptance/`。
+- `docs/`：仓库知识库；规范、计划、验收证据、历史与参考资料按用途分区。
+- `artifacts/`：Git 忽略的可再生成制品，包括 CLI 包、矩阵 JSON、图片与 Rust 输出；不再使用根 `output/` 或 `target/`。
+- `tmp/`：Git 忽略的临时工作和参考仓库，禁止被生产源码导入；工具自身的 `dist/`、`node_modules/` 和 `logs/` 保留默认位置。
 
 ## 包分层与依赖边界
 

@@ -58,7 +58,7 @@
 
 ### 3.2 不迁移的机制
 
-- 不引入 ActSpace 当前没有的 Runtime Host 选择器。
+- 设置中心重构本身不引入参考产品的 Host 模型；后续已实现的远端连接现位于「能力 → 远端 Host」，由独立 Host 契约负责。
 - 不引入 Bot Chat、WorkHub、宠物、每日回顾和远程项目管理。
 - 不为了视觉一致而把搜索 Provider 改造成 LLM Provider。
 - 不把图片生成强行当成普通文本模型；连接能力归“模型”，默认使用方式归“通用 → 媒体默认”。
@@ -76,6 +76,7 @@
 │   └── 外观
 │
 ├── 能力
+│   ├── 远端 Host
 │   ├── 模型
 │   ├── 搜索
 │   ├── 工具
@@ -95,6 +96,7 @@
 | --- | --- |
 | 通用 | 我希望 ActSpace 和 Agent 怎样按我的习惯工作？ |
 | 外观 | 我希望界面怎样显示？ |
+| 远端 Host | 我连接到哪里，如何配对和管理连接？ |
 | 模型 | 我连接了哪些模型服务，哪些模型可以被使用？ |
 | 搜索 | Agent 联网搜索用哪些服务？ |
 | 子 Agent | 主 Agent 可以路由给哪些专门代理？ |
@@ -301,127 +303,9 @@ Agent System Prompt
 
 ### 6.3 模型
 
-模型页面是 Provider、Connection、Model 的统一用户入口。
+连接、模型目录、能力和页面路由统一见[模型页面规范](front-模型设置页面-Maka重做规范.md)。本页只规定设置壳层：模型页负责连接与模型管理；默认会话、轻量任务、Explore 和媒体默认选择归「通用」。不另存一份模型页面字段表。
 
-#### 对象边界
-
-```text
-Provider
-  = 服务商类型和默认协议能力
-
-Connection
-  = 一个具体的凭据、Endpoint、代理和连接状态
-
-Model
-  = 属于某个 Provider 或 Connection 的模型定义
-
-Task Model Binding
-  = 某种任务默认使用哪个 ModelKey
-```
-
-UI 合并这些对象的配置路径，数据层不合并对象。
-
-#### 页面路由
-
-```text
-模型列表
-  ├── 添加连接
-  │     └── 服务商目录
-  │           └── 连接配置
-  │                 └── 连接详情
-  └── 已有连接详情
-```
-
-模型列表每一行展示：
-
-- Provider 标识和名称。
-- Connection 名称。
-- 当前默认模型。
-- 连接状态。
-- 已启用模型数量。
-- 默认连接动作或默认标记。
-- 进入详情的箭头。
-
-#### 服务商目录
-
-- 搜索优先。
-- 按官方 API、第三方兼容、本地或聚合等类别筛选。
-- 选择 Provider 后进入完整配置页。
-- 返回目录时保留搜索和类别筛选。
-- 不用一个狭窄 Dialog 承载大量 Provider 和多步配置。
-
-#### 连接详情
-
-```text
-连接
-├── 连接名称
-├── API Key / OAuth 状态
-├── Endpoint
-├── 连接测试
-└── 当前连接状态
-
-高级请求设置
-├── Provider 代理
-├── Request Headers
-└── Request Body Overlay
-
-模型管理
-├── 远程模型刷新
-├── 已启用模型
-├── 手动添加模型
-└── 默认模型
-
-模型能力
-├── Thinking
-├── Vision
-├── Context Window
-└── Fast Mode
-
-危险区
-└── 删除连接
-```
-
-关键规则：
-
-- API Key 只显示“已配置”状态，不回显明文。
-- Endpoint 只有确实属于用户可编辑范围时才显示编辑控件。
-- 连接测试显示测试中的 loading、成功或具体失败原因。
-- 删除连接不删除模型定义、会话历史、Journal 和 Usage。
-- 失效连接和失效模型保留原引用，并显示原因。
-- Provider-qualified `ModelKey` 是模型身份的最小单位，不能只按裸模型名称聚合。
-
-#### 媒体模型
-
-图片生成和图片分析的连接与能力定义属于模型数据层；用户选择默认使用方式时进入“通用 → 媒体默认”：
-
-- 使用与文本模型相同的连接、凭据安全和状态语法。
-- 图片生成连接可以拥有自己的 Endpoint 和模型名。
-- `inspect_image` 的视觉模型从可用 Provider 凭据中选择，不把文本模型伪装成原生多模态模型。
-
-#### 页面职责和标题层级
-
-模型页面只负责连接、模型目录、启用状态和模型能力。任务默认模型、图片生成模型和图片分析模型属于“应用默认行为”，统一放入“通用”页面：
-
-```text
-h2 通用
-├── h3 个人偏好
-├── h3 Agent 指令
-├── h3 任务默认
-│   ├── h4 默认会话模型
-│   ├── h4 轻量任务模型
-│   ├── h4 Explore 模型
-│   ├── h4 温度
-│   └── h4 最大输出 Token
-├── h3 媒体默认
-│   ├── h4 图片生成模型
-│   └── h4 图片分析模型
-└── h3 快捷键
-```
-
-模型页面的唯一页面标题为 `h2 模型`，连接列表、模型目录和模型能力为 `h3`。连接详情仍属于模型页面，不创建第二个页面级 `h2`。
-
-2026-09-10：DeepSeek 与 OpenRouter 连接详情均支持“更新模型目录”和“从目录添加”。刷新展示等待、完成时间/数量、失败保留缓存；成功后已安装模型与主界面候选立即同步。DeepSeek 提示原生图片能力与官方美元高峰估算，区分远端 ID 发现和随版本维护的能力/价格档案。
-- 媒体能力的成本和数据传输边界必须在说明文字中明确。
+连接、模型和任务绑定保持独立身份；API Key 不回显，删除连接不删除历史。媒体连接同样遵循凭据安全规则，并明确成本和数据传输范围。
 
 ### 6.4 子 Agent
 
@@ -519,119 +403,9 @@ Bash 命令审查
 
 ### 6.7 使用统计
 
-Usage 是活动分析页面，不是账单系统。它回答：
+页面布局、分类、筛选和查询契约统一见[使用统计规范](front-usage-statistics-refresh.md)；事实与费用归因见[Token Usage 与 Context State](../model-context/agent-token-usage-and-context-state.md)。Usage 是活动分析，不能充当服务商账单。
 
-```text
-用了多少
-  → 哪个 Provider / Model / Tool 消耗最多
-    → 哪一次请求有问题
-      → 回到原始会话查看上下文
-```
-
-#### 页面结构
-
-页面沿用 PageShell 默认 760px / 22px 标题、单层指标、下划线分类和详情开关；价格视图为当前本地目录，普通刷新不触发网络。费用统一按 USD 汇总，外部 CNY 价格在边界转换，未知不显示为免费。
-
-```text
-使用统计
-├── 时间范围与刷新
-├── 汇总指标
-│   ├── 模型调用
-│   ├── 总成本
-│   ├── 总 Token
-│   └── 缓存 Token
-└── 统计 Tab
-    ├── 请求
-    ├── 服务商
-    ├── 模型
-    ├── 工具
-    └── 定价
-```
-
-时间范围采用：
-
-- `24h`：滚动 24 小时。
-- `7d`：最近 7 天。
-- `30d`：最近 30 天。
-- `all`：全部可用历史。
-
-旧的 `day / week / month / total` 只作为迁移期间的兼容输入，不作为新 UI 文案。
-
-#### 汇总指标
-
-默认只回答整体情况，不在首屏堆叠多个图表：
-
-- 模型调用次数。
-- 总成本。
-- 总 Token，并可附输入 / 输出拆分。
-- 缓存 Token，并可附命中、创建和未命中拆分。
-
-刷新是低频工具动作，使用安静的图标按钮，不改变当前时间范围、Tab 或筛选条件。
-
-#### 请求 Tab
-
-默认状态先显示汇总说明，用户主动打开明细后才加载或展示详细请求表：
-
-| 列 | 含义 |
-| --- | --- |
-| 时间 | 活动发生时间 |
-| 类型 | 模型请求或工具调用 |
-| 对象 | Model 或 Tool 名称 |
-| 任务 | 所属 Session 的短标识 |
-| Token | 输入、输出和缓存的合计或拆分 |
-| 成本 | 估算值和成本依据 |
-| 延迟 | 可用时展示 |
-| 状态 | 成功、错误、中止或未知 |
-
-筛选支持：
-
-- Provider。
-- Connection。
-- Model。
-- Tool。
-- 状态。
-- 文本搜索。
-- 清除筛选。
-
-筛选后无结果和当前范围完全无数据是两个不同的空状态。点击任务标识回到原始 Session，形成统计到问题源头的闭环。
-
-#### Provider、Model、Tool 和 Pricing Tab
-
-| Tab | 主要字段 | 回答的问题 |
-| --- | --- | --- |
-| 服务商 | Provider、请求、Token、成本 | 哪个服务商使用最多 |
-| 模型 | Provider、Model、请求、Token、成本 | 哪个模型最常用或最贵 |
-| 工具 | Tool、调用、成功、错误、平均耗时 | 哪个工具最慢或失败最多 |
-| 定价 | Provider、Model、输入单价、输出单价 | 成本估算依据是什么 |
-
-#### 成本可信度
-
-成本必须能表达来源：
-
-```text
-costUsd
-costBasis: priced | estimated | unavailable
-```
-
-界面不能把未知价格渲染为 `$0.00`。当存在日志但无法估算成本时，显示“无法估算”，并解释缺少的定价信息。
-
-#### 热力图和旧控件
-
-第一版不展示：
-
-- 热力图。
-- 2D 切换。
-- 3D 切换。
-- Share。
-- 没有真实数据的详情弹窗。
-
-daily 数据可以继续保留在投影中，未来如果明确需要趋势分析，再作为独立的“趋势”视图加入。不要为保留旧视觉而保留无行为控件。
-
-#### 当前数据能力的诚实边界
-
-Usage 现在优先消费从 Session Journal 冷启动重建的事件级活动投影：每个 `request/header` 形成一个稳定的 LLM request row，每个 `tool/call` 形成一个 Tool invocation row。`assistant/message` 是请求终态的首选事实，`step/end` 只作为缺少 assistant terminal 时的兼容回退，因此不会因为同一请求同时出现两类事件而重复计数。
-
-旧 `UsageStatisticsSnapshot` 仅为兼容消费者保留，新页面不再静默回退；默认显示时间、模型、Token、费用、状态，详情提供耗时、缓存分解和费用来源。缺少 provider usage 或价格依据时显示 unknown / unavailable，不把未知成本渲染为 `$0.00`。重试生成的新 request ID 保持独立，并通过 `retryOfRequestId` 建立链路。
+当前协议范围是 `day / week / month / total`，页面展示滚动 24 小时、7 天、30 天和全部；不新增 `24h / 7d / 30d / all` 协议。费用由请求保存的价格快照解释，未知费用不能显示为免费。页面读取事件级活动投影，不回退为旧运行聚合统计。
 
 ### 6.8 归档会话
 
@@ -697,7 +471,7 @@ UI 归属如下：
 | `models.installed` | 模型 |
 | `tools.disabledTools` | 工具 → 工具能力总览 |
 | `tools.bash.alwaysAsk` | 工具 → 执行审查 |
-| `tools.searchProviders` | 工具 → 联网能力 |
+| `tools.searchProviders` | 搜索 |
 | `media.imageGeneration` | 模型连接数据；默认使用方式位于通用 → 媒体默认 |
 | `media.imageInspection` | 模型能力数据；默认使用方式位于通用 → 媒体默认 |
 | `skills` | Skills |
@@ -706,60 +480,11 @@ UI 归属如下：
 
 ### 7.2 模型对象关系
 
-```text
-Provider Registry
-      ↓
-Model Connection
-      ↓
-Model Definition / Installed Model
-      ↓
-ModelKey
-      ↓
-Task Model Binding / Subagent Preset
-```
-
-连接和模型页面可以合并用户流程，但所有引用必须使用 provider-qualified `ModelKey` 或等价稳定身份，不能使用裸模型名称作为唯一键。
+模型关系、稳定标识与连接归属以[模型页面规范](front-模型设置页面-Maka重做规范.md)为准。数据层不能因页面合并而混合 Provider、Connection、Model；引用使用 provider-qualified `ModelKey`，不以裸模型名作为全局身份。
 
 ### 7.3 Usage 查询模型
 
-目标查询维度：
-
-```text
-UsageQuery
-├── range
-├── sessionId?
-├── providerId?
-├── connectionId?
-├── modelId?
-├── toolName?
-└── status?
-```
-
-目标活动记录（当前实现使用同语义的 `UsageActivityRow`）：
-
-```text
-UsageLogRow
-├── id
-├── timestamp
-├── kind: model | tool
-├── providerId?
-├── connectionId?
-├── modelId?
-├── toolName?
-├── inputTokens?
-├── outputTokens?
-├── cacheTokens?
-├── reasoningTokens?
-├── costUsd?
-├── costBasis
-├── latencyMs?
-├── status
-├── sessionId?
-├── turnId?
-└── diagnostics?
-```
-
-这不是要求一次性重写 Journal，而是规定新 Usage UI 需要的目标契约。当前由 fixed-renderer projection 从既有 Journal 事件生成 `UsageActivitySnapshot`；该快照带有每个 Session 的 `throughJournalSeq` 水位，可在删除派生缓存后重新构建。每个 retry request 保持独立 activity row，`assistant/message` 优先于 `step/end`，Tool terminal 事件形成独立调用行。旧运行聚合投影仅服务旧消费者，不作为当前页面失败后的回退事实源。
+查询字段、分页与筛选以[使用统计规范](front-usage-statistics-refresh.md)及 `packages/shared/src/ipc.ts` 为准。活动投影从 Journal 重建，每次模型请求按 request ID 形成独立行，重试保留关联；工具调用独立计数。此处不重复维护目标伪 DTO。
 
 ## 8. 持久化存储设计
 
@@ -808,125 +533,15 @@ ActSpace：main-only 凭据、Session Journal 单一事实源
 
 `settings.json` 保存非敏感、可序列化、可版本迁移的应用和 Runtime 配置。P0 将物理写入切换到 `version: 4`，仍保留现有 `version` 字段命名，避免为了模仿参考项目而额外引入 `schemaVersion` 重命名迁移。
 
-目标逻辑 namespace：
-
-```text
-settings.json
-├── version: 4
-├── general
-│   ├── personalization
-│   ├── agentInstructions
-│   ├── taskDefaults
-│   └── shortcuts
-├── models
-│   ├── connections
-│   ├── definitions
-│   ├── installed
-│   └── taskBindings
-├── tools
-│   ├── disabledTools
-│   ├── bash
-│   └── searchProviders
-├── media
-├── skills
-├── subagents
-└── activity
-    └── usage
-```
-
-这里的 namespace 是同一个 JSON 文件内的逻辑所有权边界，不表示现在就要拆成多个物理文件。这样可以先获得 Maka 和 DeepSeek 的结构收益，同时保留 ActSpace 当前的原子写入和简单迁移机制。
+namespace 的页面归属见 §7.1；完整字段、默认值与校验只在 `packages/shared/src/settings.ts` 和 SettingsService 中维护，不在本文复制 JSON 示例。
 
 ### 8.4 目标设置结构
 
-以下是目标语义结构，字段名称以实现阶段的 shared contract 最终冻结为准：
-
-```json
-{
-  "version": 4,
-  "general": {
-    "personalization": {
-      "displayName": "",
-      "responseStyle": ""
-    },
-    "agentInstructions": {
-      "systemPromptPath": "prompts/main-agent.md"
-    },
-    "taskDefaults": {
-      "temperature": null,
-      "maxOutputTokens": null,
-      "chatCompactionTriggerRatio": 0.8
-    },
-    "shortcuts": {
-      "quickOpen": {}
-    }
-  },
-  "models": {
-    "connections": {},
-    "definitions": {},
-    "installed": {},
-    "taskBindings": {
-      "defaultChat": null,
-      "utility": null,
-      "explore": null
-    }
-  },
-  "tools": {
-    "disabledTools": [],
-    "bash": {
-      "alwaysAsk": false
-    },
-    "searchProviders": {}
-  },
-  "skills": {
-    "disabled": []
-  },
-  "subagents": {
-    "routes": {}
-  },
-  "media": {
-    "imageGeneration": {},
-    "imageInspection": {}
-  },
-  "activity": {
-    "usage": {
-      "range": "30d",
-      "status": "all",
-      "modelFilter": "",
-      "showDetails": false,
-      "activeTab": "requests"
-    }
-  }
-}
-```
-
-这段结构表达的是所有权和迁移目标，不要求第一阶段一次性迁移所有字段。`permissionMode`、`thinkingLevel` 等尚未有稳定运行时语义的字段不进入 v4 正式结构；等对应能力真正接入后再扩展 namespace。实现时必须提供 v3 到 v4 的幂等迁移，并继续兼容旧 Renderer 需要的投影视图。
-
-`general.taskDefaults.chatCompactionTriggerRatio` 只覆盖 Chat 形态的自动压缩触发比例，范围 0.5～0.95，默认 0.8。它沿用现有 Compaction 算法、摘要 route 与 replacement 语义，不引入新的 token 硬预算或历史 include/exclude 系统；Agent、Subagent、CLI 和手动 compact 不受影响。Desktop Host 以只读 resolver 提供当前值，使设置保存后无需重启 Runtime 即影响 Chat 下一次自动判断。
+现行结构为 `SettingsV4`，以 shared contract 为准。`general.taskDefaults.chatCompactionTriggerRatio` 仅影响 Chat 自动压缩判断，范围 0.5～0.95，默认 0.8；手动 compact 不受该阈值限制。
 
 ### 8.5 模型数据的正规化
 
-UI 合并 Provider、Connection、Model，不代表存储把它们混成一张表。目标关系为：
-
-```text
-Provider Registry
-      ↓ providerId
-Model Connection
-      ↓ connectionId
-Model Definition / Installed Model
-      ↓ modelKey
-Task Model Binding / Subagent Preset
-```
-
-目标数据规则：
-
-- `connections` 以稳定 `connectionId` 为键；Provider 类型只是连接的一个属性。
-- `definitions` 保存模型定义和能力元数据。
-- `installed` 保存启用状态、自定义名称和凭据引用。
-- `taskBindings` 只保存 `modelKey` 或等价的稳定模型引用。
-- 连接、模型和任务绑定之间不通过展示名称关联。
-- 当前每个 Provider 只有一组连接时，由迁移层生成稳定的默认连接记录；未来多连接不需要再次改变 UI 模型。
-
-采用对象映射而不是无身份数组，是为了支持局部 namespace patch、稳定引用和并发冲突检查。列表排序属于 Renderer 派生视图，不属于存储身份。
+连接、模型定义、已安装模型与任务绑定保持独立身份；具体关系统一见[模型页面规范](front-模型设置页面-Maka重做规范.md)。页面合并不改变数据所有权。
 
 ### 8.6 凭据存储
 
@@ -1039,7 +654,7 @@ Usage UI
 
 ## 9. 保存、错误和风险交互
 
-### 8.1 保存策略
+### 9.1 保存策略
 
 | 设置类型 | 默认交互 |
 | --- | --- |
@@ -1053,7 +668,7 @@ Usage UI
 | Endpoint、Headers、Body | 展开编辑，验证后显式保存 |
 | 删除连接、删除 Skill、删除归档 | 更多菜单 + 二次确认 |
 
-### 8.2 状态模型
+### 9.2 状态模型
 
 每个有异步行为的页面或分组至少区分：
 
@@ -1069,7 +684,7 @@ Usage UI
 
 不能用“空数组”同时代表“还没加载”和“确实没有数据”。
 
-### 8.3 破坏性操作
+### 9.3 破坏性操作
 
 - 连接删除必须明确影响范围。
 - 删除连接不删除历史数据。
@@ -1089,7 +704,7 @@ Usage UI
 
 ## 11. 视觉、响应式和无障碍约束
 
-### 10.1 视觉
+### 11.1 视觉
 
 - 继续使用 ActSpace `Ink & Emerald`。
 - 设置导航 selected 使用 neutral，不使用蓝色或绿色主色条。
@@ -1098,7 +713,7 @@ Usage UI
 - Warning、Danger、Info 和 chart 数据颜色职责分离。
 - 不使用 Emoji 作为结构性图标，统一使用 Lucide 或现有线性图标。
 
-### 10.2 响应式
+### 11.2 响应式
 
 - 大窗口使用侧栏加主内容。
 - 窄窗口侧栏变成顶部横向列表。
@@ -1106,7 +721,7 @@ Usage UI
 - Usage Tab 在窄窗口局部横向滚动，页面主体不出现横向滚动。
 - 表格必须在小窗口提供列裁剪、局部滚动或详情展开，不整体撑破页面。
 
-### 10.3 无障碍
+### 11.3 无障碍
 
 - 所有交互控件保持清晰 focus ring。
 - 图标按钮必须有 `aria-label` 和必要 Tooltip。
@@ -1117,48 +732,9 @@ Usage UI
 
 ## 12. 实现边界与阶段
 
-本规范不是执行计划。实现时应另写 execution plan，并按以下可独立交付阶段拆分：
+实施阶段与原验收边界统一见[设置中心执行计划](../../exec-plans/completed/20260830-actspace-settings-center-refactor/README.md)；后续视觉调整见[视觉重设计记录](../../exec-plans/completed/20260925-settings-visual-redesign.md)。本文不再维护另一份阶段清单。
 
-### Phase 1：设置壳层和导航
-
-- 分组导航。
-- 新的开放式 Settings Section / Row 语法。
-- 页面标题、说明、加载和错误态统一。
-- 不改变现有设置数据。
-
-### Phase 2：模型页面统一
-
-- 删除顶层“服务商”入口。
-- 将 Provider 和 Model 路由收敛到一个模型页面。
-- 增加目录、配置、详情和返回状态。
-- 保留现有凭据安全和模型数据。
-
-### Phase 3：功能分散与身份设置
-
-- 取消顶层“智能体”。
-- System Prompt 迁移到通用 → 身份与指令。
-- 温度和最大输出 Token 迁移到通用 → 任务默认。
-- 工具开关和 Bash 审查迁移到工具。
-- Explore 路由迁移到子 Agent。
-- 增加 `personalization.displayName` 和 `personalization.responseStyle`。
-
-### Phase 4：Maka 式 Usage
-
-- Usage 迁移到活动分组。
-- 四个汇总指标和五个统计 Tab。
-- 筛选、明细开关、空状态、成本来源和回到 Session。
-- 删除无行为控件。
-- 第一阶段使用兼容投影，不伪造事件级粒度。
-
-### Phase 5：事件级活动投影（已完成）
-
-- 增加真实 LLM Call 和 Tool Invocation 记录。
-- 补齐 request ID、延迟、状态、成本依据和诊断信息。
-- 将运行级汇总升级为可分页的活动日志。
-
-当前实现通过 `usage-activity:get` typed IPC 返回事件级快照；当 Journal 缺少 provider usage、currency 或可验证价格来源时，活动行保留 `unknown` / `unavailable`，不生成虚假零成本。旧 `getUsageStatistics` IPC 仍是显式兼容边界，待后续确认外部消费者清零后再删除。
-
-每个阶段完成后，应用仍然可以正常使用，不能要求后续阶段完成后才具备可用页面。实现期间必须保留现有 Journal 数据。
+使用统计现行行为见[使用统计规范](front-usage-statistics-refresh.md)。历史计划完成不代表本轮重新验证了真实 Provider、真实凭据或所有窗口尺寸。
 
 ## 13. 验收标准
 

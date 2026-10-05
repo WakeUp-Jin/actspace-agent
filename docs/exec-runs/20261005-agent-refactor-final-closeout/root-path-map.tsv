@@ -1,0 +1,20 @@
+old_path	new_path	action	evidence
+myplan.md	docs/references/harness-host-discussions/original-refactor-notes.md	原样迁移	2f8a8d8de15c3184e1f075337fa0acd6867119363c220c672476e05e3f763446
+view-dsh.md	docs/references/harness-host-discussions/deepseek-architecture-notes.md	原样迁移	4ef01d907ea449f379f62a3772c0c5f5424490ad38b399c341f3e7ce4679adfd
+pelican-bike.html	—	用户复审后删除（此前已原样迁移；哈希为原件）	693d233c6330b8e7dc0e4ebc5a6cb01678233f486ff862865cf685dd82cee9bd
+undefined/A-prompts.md	docs/references/visual-design/beaver-candidates.md	原样迁移	7c5a1dd2c368cfdbd956b113592ce96b6321dc75a79f16ae84153554cebfc1ea
+TODO.md	docs/TODOLIST.md	合并删除	保留两个未来独立事项
+0829-todo.md		删除	本计划承接唯一整理目标
+test.md		删除	已被文档治理规则替代
+output/		删除	原为空；生成物归 artifacts
+target/		删除	退役 Rust 生成物；无手写源文件或活动构建
+undefined/		删除空壳	提示词按上表迁移
+logo-design/		删除	原为空
+.agent-tmp/sandbox-runtime/	tmp/reference-checkouts/sandbox-runtime/	保护迁移	所有文件哈希与 Git 状态一致
+.tmp/clean-checkout.*/	.tmp/clean-checkout.*/	保留4个独立仓库	绝对路径或外部链接绑定；批准保护例外
+.tmp/abb-native-host.json、abb-support/	tmp/browser-bridge-fixtures/	迁移	8个原生注册位置无本次实验引用
+.tmp/生成缓存		分类删除	已核对内容及进程，无活动所有者
+artifacts/	artifacts/	取消7项跟踪并整体忽略	本地保留；新制品隔离重建
+scripts/diagnose-*、analyze-cache-audit.mjs	scripts/diagnostics/	迁移	调用路径修正；help/synthetic smoke
+scripts/terminal-native-spike/	scripts/experiments/terminal-native-spike/	迁移	repoRoot修正；prepare/run/package通过
+scripts/create-project.sh		退役删除	独立全局初始化工具不受影响

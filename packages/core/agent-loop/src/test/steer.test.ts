@@ -7,56 +7,53 @@ import { runToolStreamFixture } from "../testing.js";
 const STEER = "Keep the offset parameter.";
 const mentionsSteer = (messages: readonly LlmMessage[]) => JSON.stringify(messages).includes(STEER);
 
-describe("AgentLoop steer messages", () => {
-  it("claims a steer at the next step and reports it live", async () => {
+describe("AgentLoop notifications and Task input", () => {
+  it("claims a background notification once at the next step", async () => {
     let inbox: MainAgentInbox | undefined;
+    let messageId: string;
     const requests: (readonly LlmMessage[])[] = [];
     const { result, events, journal } = await runToolStreamFixture({
       onLoop: (_loop, value) => { inbox = value; },
-      onMessages: (messages) => requests.push(messages),
+      onMessages: messages => requests.push(messages),
       execute: async () => {
-        await inbox!.enqueue([{ type: "text", text: STEER }], "next-step", "steer-1", "steer");
-        return { status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture content" }] };
+        messageId = (await inbox!.enqueue([{ type: "text", text: STEER }])).messageId;
+        return { status: "completed", summary: "Read fixture.txt", modelOutput: [] };
       },
     });
-
-    expect(result.reason).toBe("completed");
     expect(result.steps).toBe(2);
     expect(requests.map(mentionsSteer)).toEqual([false, true]);
-    expect(events.filter((event) => event.kind === "inbox-claimed")).toEqual([expect.objectContaining({ messageId: "steer-1", source: "steer" })]);
-    expect(journal.some((event) => event.type === "agent/inbox/spliced" && (event.data as { operation?: string }).operation === "claim")).toBe(true);
-    expect(inbox!.status("steer-1")).toBe("claimed");
+    expect(events.filter(event => event.kind === "inbox-claimed")).toEqual([expect.objectContaining({ messageId: messageId!, source: "task_notification" })]);
+    expect(journal.filter(event => event.type === "agent/inbox/spliced" && (event.data as { operation?: string }).operation === "claim")).toHaveLength(1);
+    expect(inbox!.pending()).toEqual([]);
   });
 
-  it("runs one more step when a steer arrives while the final reply is streaming", async () => {
-    let inbox: MainAgentInbox | undefined;
-    let steered = false;
-    const requests: (readonly LlmMessage[])[] = [];
-    const { result } = await runToolStreamFixture({
-      onLoop: (_loop, value) => { inbox = value; },
-      onMessages: (messages) => requests.push(messages),
-      beforeFinalText: async () => {
-        if (steered) return;
-        steered = true;
-        await inbox!.enqueue([{ type: "text", text: STEER }], "next-step", "steer-final", "steer");
+  it("extends a final reply only for Host-owned user input", async () => {
+    let pending = false;
+    let inserted = false;
+    const { result, events } = await runToolStreamFixture({
+      beforeFinalText: async () => { if (!inserted) { inserted = true; pending = true; } },
+      inputSource: {
+        hasPending: () => pending,
+        claim: async () => {
+          const messageIds = pending ? ["task-insert"] : [];
+          pending = false;
+          return { messageIds, configuration: {} };
+        },
       },
     });
-
-    expect(result.reason).toBe("completed");
     expect(result.steps).toBe(3);
-    expect(requests.map(mentionsSteer)).toEqual([false, false, true]);
-    expect(inbox!.status("steer-final")).toBe("claimed");
+    expect(events.filter(event => event.kind === "inbox-claimed")).toEqual([expect.objectContaining({ messageId: "task-insert", source: "steer" })]);
   });
 
   it("does not extend the turn for pending task notifications", async () => {
     let inbox: MainAgentInbox | undefined;
     const { result } = await runToolStreamFixture({
       onLoop: (_loop, value) => { inbox = value; },
-      beforeFinalText: async () => { await inbox!.enqueue("background done", "next-step", "task-1", "task_notification"); },
+      beforeFinalText: async () => { await inbox!.enqueue("background done"); },
     });
 
     expect(result.steps).toBe(2);
-    expect(inbox!.status("task-1")).toBe("pending");
+    expect(inbox!.pending()).toEqual([expect.objectContaining({ content: "background done", source: "task_notification" })]);
   });
 
   it("returns a cancelled result after settlement and does not report an execution error", async () => {
@@ -84,19 +81,19 @@ describe("AgentLoop steer messages", () => {
     })).rejects.toThrow("settlement checkpoint also failed");
   });
 
-  it("discards an unread steer when the turn is aborted", async () => {
+  it("discards an unread notification when the turn is aborted", async () => {
     let inbox: MainAgentInbox | undefined;
     let loop: AgentLoop | undefined;
     await expect(runToolStreamFixture({
       onLoop: (value, valueInbox) => { loop = value; inbox = valueInbox; },
       execute: async () => {
-        await inbox!.enqueue([{ type: "text", text: STEER }], "next-step", "steer-abort", "steer");
+        await inbox!.enqueue([{ type: "text", text: STEER }]);
         loop!.abort("user");
         return { status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture content" }] };
       },
     })).resolves.toMatchObject({ result: { reason: "aborted" } });
 
-    expect(inbox!.status("steer-abort")).toBe("discarded");
+    expect(inbox!.pending()).toEqual([]);
   });
 
   it("drops a steer left over from the previous turn instead of placing it after the new user message", async () => {
@@ -106,14 +103,15 @@ describe("AgentLoop steer messages", () => {
       terminalOnly: true,
       onLoop: (_loop, value) => { inbox = value; },
       seedSession: async (session) => {
-        const { MainAgentInbox: Inbox } = await import("@actspace/core-agent");
-        await new Inbox(session).enqueue([{ type: "text", text: STEER }], "next-step", "steer-stale", "steer");
+        await session.append({ type: "agent/inbox/spliced", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: {
+          operation: "enqueue", messageId: "steer-stale", target: "next-step", source: "steer", content: [{ type: "text", text: STEER }],
+        }, surface: null });
       },
       onMessages: (messages) => requests.push(messages),
     });
 
     expect(requests.map(mentionsSteer)).toEqual([false]);
-    expect(inbox!.status("steer-stale")).toBe("discarded");
+    expect(inbox!.pending()).toEqual([]);
   });
 });
 

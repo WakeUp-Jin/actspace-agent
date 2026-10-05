@@ -34,7 +34,6 @@ export class AgentRegistryService extends Service {
   constructor(ctx: CordisServiceContext) {
     super(ctx, "agent.registry");
     this.registry = new AgentRegistry();
-    ctx.effect(() => () => undefined, "agent.registry");
   }
 
   publish(agent: AgentHandle): () => void { return this.registry.publish(agent); }

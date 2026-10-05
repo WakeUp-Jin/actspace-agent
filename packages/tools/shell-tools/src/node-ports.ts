@@ -8,7 +8,7 @@ import type { Readable } from "node:stream";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tools-runtime";
 import { redactToolText } from "@actspace/tools-runtime";
-import type { ToolHandler, ToolPorts } from "./plugin.js";
+import type { ToolPorts } from "./plugin.js";
 
 const INLINE_OUTPUT_CHARS = 8_000;
 const OUTPUT_DISK_CAP_CHARS = 5 * 1024 * 1024;

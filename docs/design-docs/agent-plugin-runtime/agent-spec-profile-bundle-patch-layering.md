@@ -20,9 +20,9 @@ Profile
 
 ## 2. 解决的问题
 
-当前仓库已经有 `@actspace/bundle`、`@actspace/composition` 和 `createProfileComposition()`，但 Boot 同时看 `ResolvedComposition` 和静态 `cordis.yml`。这会产生“digest、diagnostics 和实际 Loader tree 不一致”的风险，也让 Patch 无法完整表达最终启动事实。
+早期 P1-C 实施前，仓库已有 `@actspace/bundle`、`@actspace/composition` 和 `createProfileComposition()`，但 Boot 同时看 `ResolvedComposition` 和静态 `cordis.yml`。这会产生“digest、diagnostics 和实际 Loader tree 不一致”的风险，也让 Patch 无法完整表达最终启动事实。
 
-P1-C 的目标不是再加一个配置层，而是把现有 Profile/Bundle/Patch 收敛成唯一解析过程，并让所有 Host 消费同一份结果。
+现已将 Profile/Bundle/Patch 收敛为唯一解析过程，所有 Host 消费同一份结果；下面规定当前契约。
 
 ## 3. 三层定义
 

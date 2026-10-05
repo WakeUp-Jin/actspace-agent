@@ -1,7 +1,7 @@
 # Agent 形态与三种工作模式
 
 > 状态：2026-09-28 已授权实施；代码已接入，实机与外部服务验收结果见执行摘要。
-> 执行入口：[执行计划](../../exec-plans/active/20260928-agent-forms-and-modes.md)与[执行摘要](../../exec-runs/20260928-agent-forms-and-modes/execution-summary.md)。
+> 执行入口：[执行计划](../../exec-plans/completed/20260928-agent-forms-and-modes.md)与[执行摘要](../../exec-runs/20260928-agent-forms-and-modes/execution-summary.md)。
 
 ## 1. 已确认的产品方向
 

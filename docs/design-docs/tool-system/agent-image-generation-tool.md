@@ -395,7 +395,7 @@ run log 可以记录：
 - `packages/tools/image-generation/src/node-ports.ts`：Provider 请求、响应解析、下载与 artifact 保存。
 - `packages/tools/image-inspection/src/`：独立的图片分析工具和 LLM adapter。
 - `apps/desktop/src/main/runtime-v2/tool-host-services.ts`：Host 分别提供生成与分析端口；生成凭据在每次调用时读取。
-- `apps/cli/src/runtime-v2/tool-host-services.ts`：CLI 的独立 Host 接线。
+- `apps/cli/src/runtime-v2/host-adapter.ts`：CLI Host 接线；是否提供具体能力由 Host 服务及组合决定，不假设 Desktop 设置会自动进入 CLI。
 - `apps/desktop/src/main/settings-service.ts`、`session-artifact-service.ts`：设置和会话产物边界。
 - `apps/desktop/src/renderer/components/messages/TurnOutputArtifacts.tsx`：产物展示。
 
