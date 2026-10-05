@@ -26,7 +26,7 @@
 
 ## 目标与完成条件
 
-完成[原始目标](../../../design-docs/agent-plugin-runtime/agent-harness-host-refactor-decisions.md)的最后一轮收尾：核心与扩展解耦、Host 与客户端分离、冗余代码与目录清理、当前文档与实现一致。本计划承接两份已有[代码审计](../../../design-docs/agent-plugin-runtime/agent-refactor-code-cleanup-review.md)、[文档审计](../../../design-docs/agent-plugin-runtime/agent-refactor-docs-cleanup-review.md)，包括[上轮未覆盖项](../../../exec-runs/20261004-agent-storage-and-cleanup/execution-summary.md)，不再以“实施完成”替代目标验收。
+完成[原始目标](../../../design-docs/agent-plugin-runtime/agent-harness-host-refactor-decisions.md)的最后一轮收尾：核心与扩展解耦、Host 与客户端分离、冗余代码与目录清理、当前文档与实现一致。本计划承接[上轮未覆盖项](../../../exec-runs/20261004-agent-storage-and-cleanup/execution-summary.md)，不再以“实施完成”替代目标验收。
 
 - 当前 workspace 包、apps、browser-bridge、scripts、根目录，以及当前规范/计划/过程文档全部进入处置清单；每项写明保留、修改、合并、迁移或删除及依据，不抽样后宣称全仓清理完成。
 - 删除项同时检查源码、manifest、动态加载、脚本、构建、测试与文档引用；不能只凭没有静态 import 就删除插件或公共契约。

@@ -68,7 +68,6 @@ runtime --(Host capability)--> browser-bridge
 
 - [LLM Core Pi 收敛目标](design-docs/agent-plugin-runtime/agent-llm-core-pi.md)：已实施的 LLM prepare、Host 配置绑定、pi-ai 调用、backend policy 和重试生命周期边界；验收边界见执行摘要。
 
-- `docs/design-docs/agent-runtime/agent-turn-layers.md`：Agent Run 从 Host 输入到 Journal、Agent Loop、LLM / Tool 与 Projection 的五层职责边界，并定义 `agentRunId → turnId → stepId → requestId` 的运行层级。
 - `docs/design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md`：v2 Runtime、Profile / Bundle / Patch、基础与生产启动类型、Host 和固定前端边界。
 - `docs/design-docs/agent-runtime/agent-observability-trace-model.md`：Journal 观测的数据契约，解释 Session V2、真实 Turn、LLM Call、重试、Trace 安全边界及投影边界。
 - `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`：v2 当前架构总图，解释启动、单次任务、Session、Host、Cordis 和 Agent Core 的关系。
@@ -87,7 +86,6 @@ runtime --(Host capability)--> browser-bridge
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
 - `docs/design-docs/tool-system/agent-image-generation-tool.md`：图片生成工具的 provider/key 边界、`generate_image` 参数、会话产物、上下文控制和多图预览规范。
 - `docs/design-docs/tool-system/agent-image-inspection-tool.md`：文本主模型按需委托 Kimi 或 OpenRouter Luna 分析图片的配置、路径安全、固定视觉提示词、稳定输出和验收边界。
-- `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
 - `docs/design-docs/frontend/README.md`：前端工作台设计文档入口。
 - `docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md`：右侧交互式 Terminal 的 Electron main / preload / renderer 边界、PTY 会话、输出背压、进程清理和 native 发布制品要求。
 - `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档，不作为主线架构事实来源。
@@ -107,6 +105,6 @@ runtime --(Host capability)--> browser-bridge
 
 - `ARCHITECTURE.md` 只做顶层导航，不继续堆实现清单。
 - 长期设计原则优先放入 `docs/design-docs/`。
-- 当前 v2 模块边界优先维护在 `docs/design-docs/agent-plugin-runtime/` 与各领域 package 的公共 exports/manifest 中；旧模块地图只在 `docs/archive/v1/design-docs/` 归档。
+- 当前 v2 模块边界优先维护在 `docs/design-docs/agent-plugin-runtime/` 与各领域 package 的公共 exports/manifest 中。
 - 存储、日志和可观测性边界优先维护在 `docs/design-docs/core-storage-and-observability.md`。
 - 只要架构变化会让文档过期，就在同一轮任务里同步更新相关文档。

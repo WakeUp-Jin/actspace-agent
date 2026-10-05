@@ -278,7 +278,7 @@ interface ToolFailureProjectionV1 {
 stateDiagram-v2
   [*] --> running
   running --> completed: ordered commit succeeds
-  running --> failed: validation/body/post/finalizer/checkpoint failure
+  running --> failed: validation/body failure committed as terminal
   running --> denied: policy/approval/capability deny
   running --> aborted: confirmed cancellation without unknown side effect
   completed --> [*]
@@ -295,7 +295,7 @@ stateDiagram-v2
 - specialized renderer 不得拥有独立状态机；
 - 迟到 progress、重复 terminal 和低于当前 Journal seq 的更新被忽略并产生有界 diagnostic。
 
-Invalid arguments 可以从第一个可观察 snapshot 直接显示为 `failed`；实现不必为了动画先发一个 `running` frame。语义上它仍经过同一个 call lifecycle 和有序 terminal slot。
+post hook/finalizer 异常记录在 `finalizerFailures`，不改写 executor 的成败；checkpoint 或终态提交失败阻断执行，不能伪造 durable terminal。Invalid arguments 可以从第一个可观察 snapshot 直接显示为 `failed`；实现不必为了动画先发一个 `running` frame。语义上它仍经过同一个 call lifecycle 和有序 terminal slot。
 
 ## 6. Live Progress 合同
 
@@ -746,7 +746,7 @@ Usage 页面还需要按日、模型、请求状态的活动 bucket；不能只�
 - 缺失、损坏、版本不匹配时只重建该 Session；
 - Index 写入失败不阻止 Journal append 或 recovery；
 - 删除 Index 后从 Session Projection 重建；
-- Global Query 不直接读取全部 Journal。
+- 当前 Global Index 首次构建会遍历所选 Provider 的 Session，并读取一致快照生成摘要；后续查询复用内存索引。不能据此承诺冷启动无需读取全部 Journal。
 
 ### Session Projection Registry
 

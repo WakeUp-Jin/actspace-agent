@@ -36,6 +36,6 @@
 
 ## 入口
 
-- [当前设计](../../design-docs/agent-plugin-runtime/agent-target-session-persistence-projection-architecture.md)
+- [当前投影契约](../../design-docs/agent-plugin-runtime/agent-spec-runtime-projection.md)
 - [完成计划](../../exec-plans/completed/20260921-session-projection-cutover.md)
 - [学习记录](../../learnings/2026-09/20260921-session-facts-and-views.md)

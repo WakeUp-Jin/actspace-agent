@@ -216,8 +216,8 @@ english-learning 相关 channel 是否仍在使用，实施前先查一遍（07 
 - 生产构建产物中搜不到 `create-mock-bridge` / 场景数据。
 - 浏览器 `pnpm dev:renderer`：三个 mock 场景可用，Settings 页在 mock 下可打开（当前会报错）。
 
-## 6. 开放问题
+## 6. 开放问题（2026-10-05 已拍板）
 
-1. contract 放在 `@actspace/shared` 还是 desktop 自己的 `packages/`？建议放 shared，因为 01 的 main 注册器和 CLI 的 Host 调试工具都可能复用类型。
-2. 兼容层保留几轮？建议只保留一个提交周期：S2 引入，S7 删除，中间不发版。
-3. mock 场景是否也给设计评审用（Story 化）？建议先只做 dev 场景，Story 工具不引入。
+1. contract 放 **`@actspace/shared`**。
+2. 兼容层**只保留一个提交周期**：S2 引入，S7 删除，中间不发版。
+3. mock 场景**只做 dev 场景**，不引入 Story 工具。

@@ -2,7 +2,7 @@
 
 状态：本批实施与验收完成；A2精确30秒竞争实机未覆盖，单测补证；全仓其他专题未作完成声明。2026-10-04 用户授权执行两份清理分析；不提交、不推送、不删除用户数据。
 
-依据：[代码清理](../../design-docs/agent-plugin-runtime/agent-refactor-code-cleanup-review.md)、[文档清理](../../design-docs/agent-plugin-runtime/agent-refactor-docs-cleanup-review.md)。
+
 
 ## 执行顺序与验证
 

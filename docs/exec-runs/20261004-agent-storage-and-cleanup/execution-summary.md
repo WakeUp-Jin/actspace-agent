@@ -8,10 +8,10 @@
 
 1. 存储方式与 Session 业务解耦：新增 `@actspace/session-storage`，JSONL 与独立 Memory 使用同一 handle/provider 契约。冷读、列表、恢复、fork 和缓存一起迁移。文件布局、writer lease 与物理修复留在 JSONL。附件复制仍是独立 port，不假装已实现数据库附件存储。
 2. 统一任务入口：本地首发、远端、排队共用 submitTask 与 Host snapshot；`/compact` 是队列中的应用操作，可在等待时取消。通用 Run outcome/value 不再要求默认 Loop 文本结果，Headless 等 settlement 后返回。
-3. 删除审计 C01–C14 的无消费者 API、别名、重复启动包装和旧 DTO，测试跟随当前契约。保留存储 port、任务/通知职责区别、Host/Harness/Run 边界。详见[代码审计实施结果](../../design-docs/agent-plugin-runtime/agent-refactor-code-cleanup-review.md)。
+3. 删除审计 C01–C14 的无消费者 API、别名、重复启动包装和旧 DTO，测试跟随当前契约。保留存储 port、任务/通知职责区别、Host/Harness/Run 边界。
 4. 修复关闭重试、多个 Session 失败仍释放、恢复后的 Client 增量；补充解决 JSONL acquisition/close 竞争、读取缓存无界保留，以及 Cordis 释放顺序导致 Session 最后落盘失败。Host 明确先 drain 执行、关闭 Session，再释放插件树。
 5. 默认 Harness 构建与运行共用定义；矩阵覆盖实际 package/manifest 和领域事件声明。生产 manifest 校验声明服务集合，负向测试覆盖失配；未宣称已构建动态消费者语义分析器。
-6. 当前架构文档按最终源码重写或精简；六组旧后端计划改为短回溯入口，并逐项记录独有剩余工作。[旧计划处理表](legacy-plan-resolution.md)和[文档审计结果](../../design-docs/agent-plugin-runtime/agent-refactor-docs-cleanup-review.md)说明取舍。
+6. 当前架构文档按最终源码重写或精简；六组旧后端计划改为短回溯入口，并逐项记录独有剩余工作。[旧计划处理表](legacy-plan-resolution.md)说明取舍。
 
 ## 自动化与进程证据
 

@@ -16,7 +16,7 @@
 - [编码行为](../../CODING_BEHAVIOR.md)、[历史规范](../../HISTORY_GUIDE.md)、[质量记录](../../QUALITY_SCORE.md)。
 - [现有 Adapter 边界](../../design-docs/agent-plugin-runtime/agent-target-llm-adapter.md)、[多供应商设计](../../design-docs/model-context/agent-multi-provider-llm.md)。
 - [Agent 测试](../../design-docs/agent-plugin-runtime/agent-testing.md)、[执行记录](../../exec-runs/README.md)、[Frontend 验证](../../FRONTEND_VERIFICATION.md)。
-- [Session 持久化](../../design-docs/agent-plugin-runtime/agent-session-event-persistence-refactor.md)：保留既有事件和 checkpoint 语义；仅添加 replay 所需可选字段。
+- [当前持久化契约](../../design-docs/agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)：保留既有事件和 checkpoint 语义；仅添加 replay 所需可选字段。
 - [自定义模型推理计划](../active/20260912-custom-model-reasoning.md)：共享 capability/defaults 语义，开始前核对实际源码，避免覆盖同期改动。
 
 顺序依赖为 M0 → M1 → M2 → M3 → M4。DSH 仅作参考，不是 workspace 或执行环境前置依赖。

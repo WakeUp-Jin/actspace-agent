@@ -36,7 +36,6 @@ interface Profile {
   runtimeContract: "actspace.runtime.v2"
   orderedBundleIds: readonly string[]
   patch?: Patch
-  requiredCapabilities?: readonly string[]
 }
 ```
 
@@ -63,34 +62,17 @@ Patch 只按稳定 Entry id 操作：
 
 ```ts
 type PatchOperation =
-  | { kind: "insert"; entry: CompositionEntry; after?: string; optional?: boolean }
-  | { kind: "replace-config"; target: string; config: JsonValue; optional?: boolean }
-  | { kind: "disable" | "remove"; target: string; optional?: boolean }
+  | { id: string; kind: "replace"; target: string; artifactId: string; manifestEntryId: string; optional?: boolean }
+  | { id: string; kind: "insert"; entry: CompositionEntry; after?: string; optional?: boolean }
+  | { id: string; kind: "replace-config"; target: string; config: JsonValue; optional?: boolean }
+  | { id: string; kind: "disable" | "remove"; target: string; optional?: boolean }
 ```
 
 Patch 不做隐式 deep merge，不按 package version、数组位置或 module path 猜目标。required target 缺失直接失败；optional target 缺失记录 skipped diagnostic。
 
 ## 4. 唯一解析结果
 
-```ts
-interface ResolvedComposition {
-  schemaVersion: 1
-  profileId: string
-  bundles: readonly BundleIdentity[]
-  entries: readonly CompositionEntry[]
-  services: readonly ServiceAdmission[]
-  codecs: readonly CodecAdmission[]
-  hostCapabilities: readonly string[]
-  patchResults: readonly PatchOperationResult[]
-  warnings: readonly Diagnostic[]
-  digest: string
-}
-
-interface BootManifest extends ResolvedComposition {
-  readonly loaderConfig: JsonValue
-  readonly startupRequirements: readonly string[]
-}
-```
+`ResolvedComposition` 保存 Profile/Bundle/manifest、Entry、admission、Patch 结果、Host ceiling、诊断及配置摘要。`BootManifest` 在其上要求 `loaderConfig` 和 `startupRequirements`。准确字段与可选性由 `packages/composition/src/types.ts` 定义，不在文档重复维护另一份接口。
 
 `digest` 必须覆盖 Profile、Bundle identity、Manifest/Entry、Patch results、Service/Codec admission、Host capability ceiling 和最终 Loader config。只读结果创建后不可修改，也不能在 Boot 中重新解析同一输入得到另一份配置。
 

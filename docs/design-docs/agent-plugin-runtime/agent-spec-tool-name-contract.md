@@ -166,7 +166,7 @@ Registry 的核心索引改为 `Map<name, CapturedToolRegistration>`。
 validate name
 → validate pluginId / effects / schema
 → reject duplicate name in the same visible scope
-→ capture { name, pluginId, definition, executor, policy, middleware, registrationId }
+→ capture { name, pluginId, definition, executor, policy, registrationId }
 → publish atomically
 ```
 
@@ -263,9 +263,9 @@ read_file → actspace.core-tools/read_file
 ### Session / Loop / Notification
 
 1. `tool/call` 和 `tool/result` 只写 `name`，codec 不接受 `toolId` fallback；
-2. 9 个 Agent Loop 干预点、5 个主要通知、approval、diagnostics、projection 使用相同的 `name`；
+2. Agent Loop 干预点、通知、approval、diagnostics、projection 使用相同的 `name`；具体事件集合由生成矩阵维护；
 3. replay、resume、abort、retry 和 outcome-unknown 保留同一扁平名字；
-4. `session/event` 仍是 post-commit，通知失败不影响 durable fact。
+4. `session/event` 表示内存接纳并进入持久化队列，不能等同 fsync；通知失败不撤销事实，durability 由 flush 确认。
 
 ### 工具行为
 

@@ -4,7 +4,6 @@
 
 目标交付：2026-09-25 首版。
 
-正式设计：[主 Agent 的 Chat 形态](../../design-docs/agent-runtime/agent-main-chat-form.md)。
 
 ## 1. 目标
 

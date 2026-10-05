@@ -80,7 +80,7 @@ Preset 可以由受信任的后端插件作为 Effect-owned contribution 注册�
 
 Preset 的 Tool policy 只能继续收窄 Tool definition 和 Host policy 已声明的安全属性：它可以从 allow 变为 deny、从并发变为 exclusive、从可写变为只读集合，但不能把有副作用工具重分类为只读、把 unknown / exclusive 工具改成 concurrency-safe，或关闭不可绕过的 approval 与 durability guard。
 
-static Preset 不需要 StandingMount 或跨 generation 回收，因为 v2 没有在线替换。已经开始的 Agent 只会在正常完成或 shutdown 取消时结束。
+当前 static Preset registry 由 Host 持有，不使用 StandingMount；descriptor 变化仍走 Host 重启。Harness 是另一条生命周期边界：每次子 Run 独立取得当前组合租约，旧 Run 使用原组合直到释放，不在执行中替换 Loop。
 
 ## 6. 一次委派的完整流程
 
@@ -134,11 +134,11 @@ child Agent 使用 ActSpace 自有的 Scope 语义子集：
 
 - 每个 scope 有由 Runtime 签发的不透明稳定 identity 和可选 parent；该 identity 用于关联与 Registry 可见性，不是抵御同进程恶意代码的安全防伪边界；
 - scope-aware Registry 支持祖先可见性和本地 shadow，但注册冲突仍遵循领域规则；
-- 普通 child 默认通过 parent Scope chain 看见父级的 Scope-aware contribution，再由 Host、Profile、Preset 和委派 policy 共同裁剪；需要注册隔离时才显式选择 flat child Scope；
+- 生产 child 从自己取得的 Harness lease 派生 Scope，不继承父 Run 的策略 Scope；父权限上限、workspace 和取消通过显式输入传入。无 Harness lease 的库级调用才默认继承 parent Scope，也可显式选择 flat child；
 - child 创建的 Tool lease、listener、timer、subprocess 和其他资源都由 child activation Effect 拥有；
 - child terminal 后等待资源静止，再完成 scope dispose。
 
-Scope parent chain 只定义 Scope-aware contribution 的可见性和生命周期归属，不代表文件、网络、credential 或任意未声明 Scope-aware 的 Cordis Service 自动继承，更不是权限沙箱。普通 child 自动继承 parent Scope；flat child 仅在调用方明确要求注册隔离时使用。
+Scope parent chain 只定义 Scope-aware contribution 的可见性和生命周期归属，不代表权限继承。Session lineage 记录父子委派关系；生产子 Run 的 Scope 则属于所选 Harness，两者不是同一棵树。
 
 ## 9. 工具限制
 

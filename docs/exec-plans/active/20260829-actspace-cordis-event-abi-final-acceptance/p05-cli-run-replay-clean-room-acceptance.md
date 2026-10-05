@@ -1,7 +1,0 @@
-# P05：CLI run、replay 与 clean-room 验收单
-
-状态：2026-10-04 被替代，仅保留历史回溯入口，不是待执行计划。
-
-目标处置和未完成门禁见[旧计划结算](../../../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)，当前实施见[第二轮清理](../20261004-agent-storage-and-cleanup/README.md)。
-
-原文：`git show 1bc434d:docs/exec-plans/active/20260829-actspace-cordis-event-abi-final-acceptance/p05-cli-run-replay-clean-room-acceptance.md`。

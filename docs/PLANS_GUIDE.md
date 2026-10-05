@@ -13,7 +13,7 @@ execution plan 适合用在那些超出单轮聊天上下文、需要多次推�
 
 - 进行中的 plan 放在 `docs/exec-plans/active/`
 - 已完成的 plan 移到 `docs/exec-plans/completed/`
-- 已失效、被取代或明确不再执行，但仍需保留决策上下文的 plan 移到 `docs/exec-plans/discarded/`
+- 已失效、被取代或明确不再执行的 plan 经确认后删除，不另建归档或历史跳转页。
 - 复用模板在 `docs/exec-plans/templates/execution-plan.md`
 - 暂不处理但值得保留的债务放到 `docs/exec-plans/tech-debt-tracker.md`
 
@@ -23,8 +23,8 @@ execution plan 适合用在那些超出单轮聊天上下文、需要多次推�
 - 推进过程和关键决定要落在仓库里，不要只存在聊天记录里。
 - 状态变化要同步更新；完成后应在同一轮移动到 `completed/`。
 - 实现已经完成、仅保留人工验收边界的 plan 也应进入 `completed/`，并在正文明确尚未验证的范围。
-- 被替代计划先核对独有决定、未完成工作、验收证据及入链；有效内容由当前规范/最终摘要接住后可以删除。仍有决策价值的留在 `discarded/`。histories/learnings 不删除；被其引用的退役路径可只保留短回溯入口，明确不再属于 active 任务。
-- `active/` 的历史回溯入口只为保护既有链接保留，不纳入待执行任务；其他每个一级入口必须出现在 `docs/exec-plans/README.md`，并具有可执行的下一步，保证目录可信。
+- 清理时按文件选择删除或保留，不搬迁或提炼旧内容；现有 histories 保持原样。
+- `active/` 每个一级入口必须出现在 `docs/exec-plans/README.md`，并具有可执行的下一步。
 
 ## 执行模式
 

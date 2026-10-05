@@ -392,36 +392,18 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 ## 首版边界
 
 - 先支持 `md`、`html`、`图片` 三种文件预览优先级。
-- Git-first Review 作为第二主线；无 Git 时提示创建 Git repository，`Last Turn` 仍可展示 Agent 本轮记录到的局部改动，但必须标明不代表完整工作区状态。
+- Git-first Review 作为第二主线；无 Git 时提示创建 Git repository，`Last Turn` 当前未接通数据源，显示不可用状态；不能用聊天工具 diff 冒充该 scope 已实现。
 - 其他类型后续再补，不抢首版设计重点。
-
-## 历史基线链接
-
-- [右侧 Markdown 定稿图](right-panel-markdown-final.png)
-- [右侧 HTML 定稿图](right-panel-html-final.png)
-- [右侧 Image 定稿图](right-panel-image-final.png)
-- [Review V1 历史基线图](right-panel-diff-final.png)
-
-## 历史基线图
-
-![Markdown 定稿图](right-panel-markdown-final.png)
-
-![HTML 定稿图](right-panel-html-final.png)
-
-![Image 定稿图](right-panel-image-final.png)
-
-![Review V1 历史基线图](right-panel-diff-final.png)
 
 ## Review / Diff 展示边界
 
 - 聊天区继续保留单次工具调用或编辑动作的局部 diff；Review Workbench 负责跨文件、跨 scope 的完整审阅。
 - Composer、Environment 和右侧对象菜单都可以打开 Review；入口去重到同一 workspace Review 实例。
 - 完整 Review 直接渲染在右侧对象面板，聊天主区和 Composer 保持可用。
-- `Last Turn`、`Uncommitted`、`Unstaged`、`Staged`、`Committed`、`Branch` 都必须接真实数据，不再展示 disabled 的未来 scope。
+- `Uncommitted`、`Unstaged`、`Staged`、`Committed`、`Branch` 使用真实 Git 数据；`Last Turn` 当前未注入查询实现，必须如实显示不可用。
 - Review 内部以单列 Diff Canvas 为主；Changed Files 在 Review 容器不小于 `560px` 时停靠于右侧，更窄时切换为独占内容区的文件列表。它不使用遮罩覆盖 Diff；大 diff 继续按单文件与 capped 策略加载。
 - 不换行时，Diff Canvas 是唯一的横向滚动所有者，行号、增删标记和代码随 Canvas 同步移动；禁止给每个 `<code>` 行单独设置横向滚动。开启 word wrap 后 Canvas 回到面板宽度并由代码列折行。
 - unified/split、上下文折叠、Jump to file、viewed、Review Options 和 Git actions 的完整规则以 `docs/design-docs/core-review-change-sources.md` 为准。
-- 旧 `right-panel-diff-final.png` 和 `review-v1-git-review-prototype.html` 只保留为 V1 历史参考，不再代表目标 Review Workbench。
 
 ## Subagents（2026-09-06）
 

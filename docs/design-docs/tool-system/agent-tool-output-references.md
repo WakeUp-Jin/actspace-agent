@@ -4,7 +4,7 @@
 
 ## Bash 输出
 
-`node-bash-ports.ts` 执行期间持续写输出文件，内存头部上限为 8,000 字符；磁盘上限继续由 Bash runner 控制。短输出直接内联，长输出保留头部与总长度，并通过 `createArtifact` 保存完整 `text/plain` 文件。磁盘安全阀命中时明确标记截断，不能称其为无限完整输出。
+`packages/tools/shell-tools/src/node-ports.ts` 执行期间持续写输出文件，内存头部上限为 8,000 字符；磁盘上限继续由 Bash runner 控制。短输出直接内联，长输出保留头部与总长度，并通过 `createArtifact` 保存完整 `text/plain` 文件。磁盘安全阀命中时明确标记截断，不能称其为无限完整输出。
 
 工具 Journal 保存 `text + artifact`，artifact 包含 ID、MIME、大小、SHA-256，所有权由 Host store 记录。Agent Loop 在每次请求组装时通过 Host 的 `resolveArtifact(sessionId, artifactId)` 解析本会话文件，形成完整路径与 `read_file offset/limit`、`grep path/pattern` 引导，不自动展开全文。解析结果也进入本次 `request/context`，历史工具事实保持不变。
 

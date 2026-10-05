@@ -58,7 +58,7 @@
 所以**所有作为 `SplitView.main` 的页面级根容器必须满足**：
 
 - 根容器要么 `padding-top: var(--window-chrome-strip-height)`，要么内部 grid/flex 的第一行明确给出等高的让位区。
-- `Sidebar` 已经按这条规则做了顶部 padding，`.conversation-shell` 和 `.kairos-page` 是参考实现。
+- `Sidebar` 已经按这条规则做了顶部 padding，`.conversation-shell` 是当前参考实现。
 - `.placeholder-view` 利用 flex 居中规避了顶部遮挡，但严格意义上仍应补 padding-top；任何新页面别照搬 placeholder 模式。
 - 不要试图改 `WindowChromeBar` 的 `z-index` 或 `pointer-events` 来"避让" chrome bar——chrome bar 浮层语义是这条规范的契约前提。
 - 紧凑布局打开右侧覆盖面板时，中间标题和主工作区操作必须退场，同时关闭中间拖拽命中，让右侧 Tab 可以接收点击；左右窗口级入口仍保持可用。

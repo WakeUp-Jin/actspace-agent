@@ -1,6 +1,6 @@
 # 英语辅助学习插件设计
 
-> 状态：已实施；真实 AgentLoop、插件生命周期、配置、IPC 和 renderer 自动化已验证。Electron 与真实 MiniMax 音频仍待验收，详见[执行摘要](../../exec-runs/20260906-actspace-english-learning/execution-summary.md)。
+> 状态：插件、配置与固定 UI 已实现；Host/Harness 重构后发现 live Agent 绑定与空闲会话开启的接线限制，见第 5.1 节。早期自动化不证明当前生产入口可用；Electron 与真实 MiniMax 音频验收见[执行摘要](../../exec-runs/20260906-actspace-english-learning/execution-summary.md)。
 >
 > 日期：2026-09-06。执行入口：[英语辅助学习执行计划](../../exec-plans/completed/20260906-actspace-english-learning/README.md)。
 
@@ -8,7 +8,7 @@
 
 用户在「扩展 → 能力」开启「英语辅助学习」，选择一个会话后，该会话的后续模型请求加入双语输出规则：每段先英文、后简体中文；回答完成后默认只朗读英文。语音连接、模型、音色和语速在「设置 → 通用 → 语音播放」配置，首版使用 MiniMax。
 
-提示词注入与英文朗读由同一个插件和目标会话控制。其他主会话、子 Agent、标题生成、压缩摘要及其他后台模型调用不受影响。用户无需安装 Skill、配置 Hook 或复制提示词。
+提示词注入与英文朗读由同一个插件控制。其他主会话、子 Agent、标题生成、压缩摘要及其他后台模型调用不受影响。目标产品行为是持续绑定一个会话；当前实现仍绑定 live Agent Scope，Run 结束会关闭能力，且空闲开启存在第 5.1 节所述接线限制。用户无需安装 Skill、配置 Hook 或复制提示词。
 
 首版范围：单目标会话、成功完成回答后的英文朗读、MiniMax 同步合成、macOS 播放、固定桌面端控制界面。暂不提供逐 token 朗读、多会话混播、中文朗读、自动翻译历史消息、语音输入、发音评分、词汇本、插件市场或通用 Hook 编辑器。
 
@@ -85,7 +85,7 @@ Session commit ── session/event ── 完成判断与英文提取
 
 ### 5.1 绑定真实 Scope
 
-Desktop 开启能力前通过现有应用服务恢复目标主会话，使其 Agent 已发布；插件通过 `agent.registry` 查到该 Session 对应的主 Agent Handle。使用其真实 `scope.scopeKey` 和 disposer 创建 `scopeContext`，在这个 Context 注册 `system-prompt/assemble`。
+当前服务通过 `agent.registry` 查找目标 Session 的 live main Agent Handle，再使用其 `scope.scopeKey` 和 disposer 注册 `system-prompt/assemble`。Host/Harness 重构后，`resumeMainSession()` 只恢复 Session，不发布 Agent；Handle 仅在 RunFactory 创建到释放之间存在。因此当前 Desktop 的“resume 后 enableSession”接线不能保证空闲会话开启成功，缺少 Handle 时返回“目标会话尚未就绪”。这是现有实现限制，需要单独修复并做真实交互验收，不能把早期长期 Agent 的绑定流程继续当作已实现保证。
 
 handler 同时核对候选的 `sessionId`、Agent subject 和当前绑定版本。父 Scope 监听可能接收到子 Agent 事件，因此只绑定 Scope 仍不足以排除子会话；必须显式比较目标 Session 和 live Agent 身份。禁止靠工作目录、会话标题或字符串 Scope ID 代替 ScopeKey。
 

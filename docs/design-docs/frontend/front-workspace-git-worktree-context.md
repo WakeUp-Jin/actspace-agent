@@ -211,16 +211,11 @@ New Worktree
 
 `actspace/` 明确表示分支来源，避免照搬其它产品的 `cursor/` 或 `codex/` 命名空间。
 
-### 创建顺序
+### 当前接线边界
 
-1. Renderer 通过一次首条 `run-turn` 请求提交用户输入与待执行上下文，但在准备成功前不清空输入。
-2. Main 在同一次 turn 编排中重新验证 Workspace 是 Git repository 且 base branch 存在；renderer 不单独调用 worktree mutation IPC。
-3. Main 解析 base commit，并确认目标 branch 与目录都不存在。
-4. Main 创建目标父目录。
-5. Main 执行等价于 `git worktree add -b <branch> <path> <baseCommit>` 的受控命令。
-6. Main 验证新目录的 branch、commit 和 repository common dir。
-7. Session 写入 `workspaceId`、worktree execution root 与 `SessionWorktreeContext`。
-8. Main 从最终 execution root 构建 Agent dependencies；ContextManager 恢复历史完成后，再按 `user_message -> workspace_preparation` 顺序持久化首条 turn 起始事件并启动 Agent。这样既不会把本轮用户消息重复注入模型，也能保证 preparation 失败时零污染。
+当前 renderer 在 Task 接纳前经 `setSessionWorkspace` 设置空闲会话的工作区，再通过 `submitTask` 提交内容；模式和模型配置分别经会话模式接口与 Task configuration 管理。
+
+本机 `New Worktree` 选择器和 Git 服务仍有对应代码，但当前 `App.handleSend` 的 Task payload 不携带 `runLocation` / `baseBranch`，不能把下面的创建与恢复目标视为已完成的端到端行为。重新接通时必须在 Task 启动前完成目录准备和 Journal 事实写入；不能恢复旧 `run-turn` / ContextManager 编排。
 
 ### 原目录未提交内容
 

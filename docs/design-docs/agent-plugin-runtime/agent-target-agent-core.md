@@ -28,8 +28,10 @@ ActSpace Trusted Boot
   - Root Context / ResolvedComposition manifest
   - Loader settlement / Startup Validation
   - Diagnostics / shutdown
-  - Host lifecycle / App Service boundary
-  - TaskLedger / Run scheduling / Harness lease
+
+Host Application Services
+  - App Service / TaskLedger / Run scheduling
+  - Harness selection and lease
 
 ActSpace Core Primitives and Providers
   - Scope primitive / scope-aware registry rules
@@ -52,7 +54,7 @@ Trusted Boot 不提供具体工具、Provider、Prompt 或产品工作流，也�
 | System Prompt | section、动态 context、tool schema 的确定性组装 | Conversation 所有权和 secret 解析 |
 | Tool Runtime | definition registry、参数验证、策略、审批 seam、prepared execution lease、staged execution、结果归一化 | 具体 Desktop preview、v1 autonomous 分支、静态全局注册 |
 | LLM | 稳定 Message/Stream/Failure/Usage 契约、Provider registry、one-shot PreparedCall | Provider SDK 类型泄漏和 Session 持久化 |
-| Agent Registry | unpublished setup、live identity、live identity、父子 Scope 和资源登记 | 默认 Loop 的具体 Turn/Step 算法 |
+| Agent Registry | unpublished setup、live identity、Scope 和资源登记 | 默认 Loop 的具体 Turn/Step 算法 |
 | Agent Loop | Turn/Step 驱动、请求组装、工具调度、终止和恢复事实 | Host UI、stdout、进程退出和物理存储编码 |
 
 ## 4. 必须保留的行为不变量
@@ -97,9 +99,7 @@ Prompt section、Tool definition、LLM route、event listener、timer、watcher�
 
 ### 4.6 完整构造后发布 Agent
 
-Agent factory 必须先在 unpublished scope 中完成 awaited setup，再通过同步、顺序明确、可回滚的 publication transaction 发布 Session 和 Agent。
-
-成功观察者不能看到半配置 Agent。若部分通知已经送达后发生失败，回滚必须发出配对 disposal；这不是数据库意义的跨事件原子事务。
+Host 先打开 Session 并接纳 Task；RunFactory 再在 unpublished AgentScope 中完成工具、Prompt、Loop 初始化，最后发布 live Agent Handle。Run 结束时撤销 Handle 并释放 Scope，Session 保持可读。初始化失败清理本次资源；不能把 Session 与 Agent 描述成一个同时发布或同时销毁的对象。
 
 ### 4.7 Compaction 不破坏原始事实
 

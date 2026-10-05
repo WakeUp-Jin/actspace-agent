@@ -6,7 +6,7 @@
 
 ## 定位
 
-`actspace.subagent/explore` 用于聚焦、只读的仓库探索，例如：
+`explore`（所属 plugin 为 `actspace.subagent`） 用于聚焦、只读的仓库探索，例如：
 
 - 定位一两个相关文件；
 - 查找类型、调用链或配置来源；

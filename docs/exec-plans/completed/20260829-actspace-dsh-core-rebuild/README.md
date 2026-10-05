@@ -18,7 +18,6 @@
 - [Tool Runtime 内核与外壳边界](../../../design-docs/agent-plugin-runtime/agent-spec-tool-runtime-boundary.md)
 - [DSH-native 启动规范](../../../design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md)
 - [插件 Runtime ABI](../../../design-docs/agent-plugin-runtime/agent-spec-plugin-runtime-abi.md)
-- [Session 与 Context 背景设计](../../../design-docs/agent-plugin-runtime/agent-target-session-and-context.md)
 - [现有 Tool Runtime ABI 背景](../../../design-docs/agent-plugin-runtime/agent-spec-tool-runtime-abi.md)
 - `tmp/deepseek-harness/packages/core/session/src/types.ts`
 - `tmp/deepseek-harness/packages/core/agent-loop/src/agent.ts`

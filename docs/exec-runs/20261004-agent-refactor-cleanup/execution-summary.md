@@ -12,7 +12,7 @@
 - Runtime 按 startup、session、harness 分目录，同步公开出口、默认固定产物构建、imports 和测试。没有压合领域包。
 - Session driver/provider seam 已存在，本批保留；没有把旧物理拆包计划冒充已完成。
 
-文档退役明细见[文档分析](../../design-docs/agent-plugin-runtime/agent-refactor-docs-cleanup-review.md)，源码移动表见[代码分析](../../design-docs/agent-plugin-runtime/agent-refactor-code-cleanup-review.md)。删除3份重复历史设计、14份交接/轮次记录；3份旧页缩成 Git 回溯入口。P1–P5 最终验收索引保留轮次覆盖、修复和限制。Profile-first旧文明确标为历史，当前决定与实际实现同步。
+删除3份重复历史设计、14份交接/轮次记录；3份旧页缩成 Git 回溯入口。P1–P5 最终验收索引保留轮次覆盖、修复和限制。Profile-first旧文明确标为历史，当前决定与实际实现同步。
 
 ## 验证
 

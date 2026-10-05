@@ -6,12 +6,13 @@
 
 ## 定位
 
-主 Agent 通过 `actspace.subagent/agent` 或 `actspace.subagent/explore` 工具委托一个独立任务。每次调用创建：
+主 Agent 通过 `agent` 或 `explore`（所属 plugin 为 `actspace.subagent`） 工具委托一个独立任务。每次调用创建：
 
 - 独立 `invocationId`；
 - 独立 `childAgentId`；
 - 独立 `childSessionId`；
-- child `AgentScope`；
+- 独立 Harness 租约，以及该租约 Scope 下的 child `AgentScope`；
+- child Session 自己的 TaskLedger / Run 记录；
 - 静态 Preset；
 - 父 Agent 当前可见工具与 Preset 工具的交集；
 - 与父 Tool Call 关联的 lineage。
@@ -48,12 +49,15 @@ Child Session 不能通过主会话恢复入口当作普通 main Session 续跑�
 ```text
 parent tool/call
 → delegation/requested
-→ create child Session + child Scope
+→ create child Session
+→ acquire independent Harness lease + child Scope
+→ child TaskLedger submit/start
 → create AgentLoop with static Preset
 → child runTurn(task)
-→ child flush
+→ child flush + Loop quiesce/waitForIdle
+→ child TaskLedger finish
 → delegation/child-terminal
-→ child close + scope dispose
+→ child close + scope dispose + Harness lease release
 → parent delegation/completed
 → parent tool/result
 ```
@@ -70,7 +74,7 @@ Preset 是不可变启动配置：
 id / version
 routeId / model
 promptContributorIds
-allowedToolIds
+allowedToolNames
 readOnly
 maxSteps
 maxDurationMs
@@ -85,7 +89,7 @@ maxDelegationDepth
 最终工具集是：
 
 ```text
-parentVisibleToolIds ∩ preset.allowedToolIds
+parentVisibleToolIds ∩ preset.allowedToolNames
 ```
 
 Preset 不能扩大父 Agent 看不到的能力，也不能超过 Host capability ceiling。
@@ -97,7 +101,7 @@ Preset 不能扩大父 Agent 看不到的能力，也不能超过 Host capabilit
 - 父 AbortSignal 级联到 child；
 - Preset timeout 会中止 child；
 - Runtime shutdown 调用 `abortAll()`，再等待全部 inflight invocation settle；
-- child Session、child Scope 和 publication cleanup 都必须等待完成；
+- child Session、child Scope、Harness lease release 和 publication cleanup 都必须等待完成；
 - delegation depth 达到 Preset 上限时拒绝启动。
 
 当前最大 delegation depth 为 1，因此 Subagent 不能继续创建新的 Subagent 层级。

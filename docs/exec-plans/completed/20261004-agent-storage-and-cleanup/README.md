@@ -2,7 +2,7 @@
 
 状态：实施完成。本文原记录验收部分通过；其剩余子项已由[10-05 最终收尾](../../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)补验签收。原阶段测试与限制保留为历史快照。
 
-依据：[代码审计](../../../design-docs/agent-plugin-runtime/agent-refactor-code-cleanup-review.md)、[文档审计](../../../design-docs/agent-plugin-runtime/agent-refactor-docs-cleanup-review.md)。以当前未提交工作树为基线；保护前端工作台等无关修改，保护 histories/learnings，不提交、不操作用户数据。
+以当前未提交工作树为基线；保护前端工作台等无关修改，保护 histories/learnings，不提交、不操作用户数据。
 
 ## 分批执行
 

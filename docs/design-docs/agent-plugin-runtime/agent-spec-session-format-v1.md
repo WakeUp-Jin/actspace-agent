@@ -6,7 +6,7 @@
 >
 > 规范日期：2026-08-22。
 >
-> 2026-08-29 起，事件词汇、Agent Loop 顺序和三平面边界由 [DSH 风格 Session 事件模型](./agent-spec-dsh-event-model.md) 取代；本文保留为 raw JSONL、Header、repair 和物理格式背景，不作为本轮事件实施真源。
+> 本文维护 Header、Envelope、JSONL Provider 格式与兼容性边界；事件词汇见[事件模型](agent-spec-dsh-event-model.md)，Session/存储所有权见[存储规范](agent-spec-session-core-persistence-separation.md)，用户队列见[Task/Run](agent-task-run-lifecycle.md)。
 
 ## 1. 决策摘要
 
@@ -17,7 +17,7 @@ ActSpace v2 完全替换 v1 Session、持久化日志和可变 Conversation 双�
 - Surface 是从 Journal 确定性派生的模型可见历史，不是第二份可写 conversation；
 - 每次模型请求使用的完整逻辑输入在 dispatch 前写成不可变 request snapshot；
 - ActSpace 拥有 format、核心 event、Event Codec、兼容性和升级规则；
-- v1 的规范持久化形态只有 raw UTF-8 JSONL，不采用 zstd、SQLite 或 packed row；
+- 当前生产 JSONL Provider 使用 raw UTF-8 JSONL；Session 业务通过中性存储契约访问，不排斥后续独立实现数据库 Provider；
 - v2 不读取、不迁移、也不继续写入 v1 Session 数据。
 
 Agent Loop、Tool 和 LLM 必须遵守本规范，但不能直接拥有或绕过 Session writer。与调用顺序相关的不变量见 [Agent Core 目标边界](./agent-target-agent-core.md) 和 [LLM Adapter 目标设计](./agent-target-llm-adapter.md)。
@@ -105,7 +105,7 @@ Header 后的每条记录使用统一 envelope：
 {
   "recordKind": "event",
   "seq": 0,
-  "type": "turn/started",
+  "type": "turn/start",
   "eventVersion": 1,
   "criticality": "required",
   "time": "RFC3339 timestamp",
@@ -148,14 +148,14 @@ Header 后的每条记录使用统一 envelope：
 | 事件族 | 必须表达的事实 |
 |---|---|
 | Runtime selection | 创建后实际采用的 Profile、Preset、Provider、插件能力和变化后的 provenance |
-| Turn | `turn/started`、成功/失败/中止的 `turn/ended` |
-| Step | `step/started`、成功/失败/中止的 `step/ended` |
+| Turn | `turn/start`、成功/失败/中止的 `turn/end` |
+| Step | `step/start`、成功/失败/中止的 `step/end` |
 | User message | 用户输入、durable attachment refs 和 Surface append |
 | Logical request | 完整 request snapshot、实际 route/model/defaults/retry policy、system、tools、messages 和 contributor provenance |
 | LLM execution | dispatch boundary、stream chunk、assembled assistant message、usage、stop/error/abort |
 | Tool execution | call、prepared registration identity、dispatch boundary、result、denied、aborted 和 recovery outcome |
 | Approval | request、decision、Host policy 和对应 tool call |
-| Agent Inbox | main Agent message enqueue、claim、discard、target 和 Surface provenance |
+| Task 与后台通知 | 主用户内容由 TaskLedger 接纳、领取和结算；Inbox 仅承担后台通知，不能作为第二套用户队列 |
 | Delegation | parent request、child lineage、child terminal result，以及 parent link / tool result 的幂等补偿 |
 | Surface replacement | compaction 或明确裁剪产生的 positional replacement 及完整来源 |
 | Recovery | repair transaction、`not-started`、`outcome-unknown` 和 open Turn/Step closers |
@@ -227,7 +227,7 @@ resolve installed plugin metadata
   -> activate behavior plugins needed by the Runtime/Profile
 ```
 
-Trusted Boot 从 Core 与全部显式登记、受信任且已安装的插件元数据发现 codec。ResolvedComposition、Header、runtime selection 和 event owner 只决定实际需要哪些 codec，不是发现来源的上限；否则 Header 创建后追加的后来插件事件将无法读取。Codec 装载阶段不能依赖 Session 行为 Service、credential、Agent Registry 或已经读取该 Session 才能建立的状态。Codec 的 validate、upgrade、invariant 和 projection hook 必须是确定性、无外部副作用的纯逻辑。Runtime 不扫描任意目录、不自动下载，也不因日志出现 plugin id 就执行未知代码。
+当前 Trusted Boot 从 Core 和组合中 enabled、未 skipped 的插件 manifest 发现 codec。尚未实现全部已安装插件的独立 codec catalog；移除提供 codec 的插件可能使已有 Session 进入 browse-only。Codec 装载阶段不能依赖 Session 行为 Service、credential、Agent Registry 或已经读取该 Session 才能建立的状态。Codec 的 validate、upgrade、invariant 和 projection hook 必须是确定性、无外部副作用的纯逻辑。Runtime 不扫描任意目录、不自动下载，也不因日志出现 plugin id 就执行未知代码。
 
 同一 event `type` 只能有一个 owner。重复注册、owner 不匹配、版本链不连续或 codec descriptor digest 不匹配时，Startup Validation 必须失败。
 
@@ -278,7 +278,7 @@ Persistence Coordinator 可以使用短窗口 write-behind，但必须提供以�
 
 1. 完整 logical request snapshot 后、LLM dispatch 前；
 2. tool call 接纳后，使崩溃可判断为尚未开始；
-3. approval 已完成且 `tool/dispatch-started` 接纳后、进入可能有副作用的 tool body 前；
+3. approval 已完成且 `tool/code-dispatch-start` 接纳后、进入可能有副作用的 tool body 前；
 4. 上一 Step 的 assistant/tool results 和结束事实后、下一 Step 前；
 5. graceful shutdown 发布 Session 已 flush 状态前。
 
@@ -307,8 +307,8 @@ Desktop 与显式持久化的 CLI run 共享 Session root 时，持久 Session �
 
 | durable tail | repair 结果 |
 |---|---|
-| 有 tool call，没有 `tool/dispatch-started` | 追加 `not-started` |
-| 有 `tool/dispatch-started`，没有 terminal result | 追加 `outcome-unknown` |
+| 有 tool call，没有 `tool/code-dispatch-start` | 追加 `not-started` |
+| 有 `tool/code-dispatch-start`，没有 terminal result | 追加 `outcome-unknown` |
 | Step 未结束 | 追加 interrupted Step end |
 | Turn 未结束 | 追加 interrupted Turn end |
 
@@ -415,7 +415,7 @@ ActSpace v2：
 4. Turn、Step 的 parent/开始/结束关系有效，terminal event 不重复；
 5. request snapshot 位于对应 Step 内，先于 LLM dispatch boundary；
 6. 每个 tool result/denied/aborted/recovery outcome 引用唯一既有 call；
-7. `tool/dispatch-started` 位于 call 和 terminal result 之间；
+7. `tool/code-dispatch-start` 位于 call 和 terminal result 之间；
 8. concurrency-safe tool body 可以并行，但模型可见 result 按原 tool-call 顺序提交；
 9. Surface append/replace 只引用已经接纳的 event，replace span 连续且 provenance 完整；
 10. approval decision 引用既有 request 和 call；
@@ -424,7 +424,7 @@ ActSpace v2：
 13. request snapshot 足以重建 Agent-facing logical request；
 14. read-write writer 始终持有有效 exclusive lease；
 15. Session 中不存在已知 secret 字段或未脱敏 credential material；
-16. main Inbox 的每个 message id 只有一次 enqueue，且最多进入 claimed 或 discarded 其中一个终态；claim 顺序遵守 target 和 enqueue seq，claimed Surface provenance 指回原 enqueue。
+16. 用户内容由 TaskLedger 按稳定 submissionId/taskId 去重与领取；`user/message` 的 provenance 指回接纳事实。后台 Inbox 不重新接管用户队列。
 
 ## 21. Golden acceptance cases
 
@@ -446,7 +446,7 @@ ActSpace v2：
 14. canonical export 是可逐行解析的 raw UTF-8 JSONL，不存在 compressed frame、SQLite 或 packed row；
 15. Header、request snapshot、Provider error、tool output 和 diagnostics 经过 secret fixture 扫描；
 16. v1 Session 和 `context-state.json` 被明确拒绝，不被静默解释或升级。
-17. crash / resume 能从 Journal 重建 pending Inbox；claimed 不重复领取，discarded 不进入 Surface，`next-step` 与 `next-turn` 在正确边界消费。
+17. crash / resume 重建 TaskLedger：已领取 Run 标为中断，pending 队列暂停，不自动重放未知副作用；后台通知按自己的 Inbox codec 恢复。
 
 ## 22. 留给 execution plan 的实现细节
 

@@ -68,7 +68,7 @@ Browser Bridge 等外部进程是由受信任的同进程 Provider 管理的 Hos
 1. 根据 Profile / Bundle 的来源引用读取 Static Manifest，不 import Behavior Entry；
 2. 完成来源、Static Manifest schema 和 `runtimeContract` 校验；
 3. 解析 Profile / Bundle / Patch 和稳定 Entry tree，应用 Host ceiling，再校验最终 JSON-safe 配置、required capability 和身份冲突；
-4. 从 Core 和全部显式登记、受信任且已安装插件的静态元数据中发现并验证 Codec Modules，形成可用 codec catalog；本次组合、Session header 与事件命名空间只确定所需子集，不能作为唯一发现来源，Behavior Entry 最终是否激活也不影响 codec 可用性；
+4. 当前生产 Boot 从 Core 和组合中 enabled、未 skipped 的插件 manifest 发现 Codec；发现发生在 Behavior activation 之前。它尚不维护覆盖全部已安装但未启用插件的独立 catalog；
 5. 才允许 import、activate Behavior Entry；
 6. Loader settlement 和 Startup Validation 全部通过后，才发布可供 Host 使用的 `BootedRuntimeProfile`。
 
@@ -76,7 +76,7 @@ Codec Module 与 Behavior Entry 分离是恢复前提，不是打包风格偏好
 
 Behavior module evaluation 必须是资源无副作用的：不得在顶层启动进程、打开 socket、创建 watcher / timer、注册全局 listener 或修改外部状态。所有资源获取和贡献注册只能发生在 activation Effect 内，才能进入统一的失败回滚与可等待回收。
 
-Codec discovery 与 Behavior activation 是两条独立路径。一个 optional Entry 因 Host 或 frontend 不兼容而跳过 Behavior，或者曾写入事件的插件后来不再位于当前组合中，都不得因此失去读取既有 Session 事件所需的 codec。Session 引用的 codec 仍必须来自本文允许的显式安装可信来源并通过 `runtimeContract`、身份和纯度校验；Runtime 不扫描任意目录、不自动下载，也不因日志中出现 plugin id 就执行未知代码。无法取得 required codec 时按 Session 兼容规则阻止 resume / 新写入，但仍保留 raw browse / forensic export 能力。
+Codec discovery 先于 Behavior activation，但当前发现范围仍受组合准入限制：移除或跳过提供 codec 的插件可能使旧 Session 缺少 required codec。此时保留 browse-only/原始导出，阻止继续执行，不自动激活旧行为、扫描任意目录或下载插件。独立的全安装范围 codec catalog 尚未实现，不能作为恢复保证。
 
 ## 5. Manifest 的语义 Schema
 
@@ -255,7 +255,7 @@ diagnostics 是 Host UI 和 CLI stderr 的来源。它不进入模型上下文�
 
 - 不支持不可信插件隔离、签名市场或自动更新。
 - 不支持插件前端代码。
-- 不支持生产 HMR、在线 reconcile、live reload 或零中断插件替换。
+- 不支持生产 HMR、在线 reconcile 或运行中替换已有 Loop；完整 Harness 候选可以独立启用，后续 Run 使用新选择。
 - 同进程 Host 可以消费 Context 中的应用 Service；Context、Fiber 和 Service object 不进入 IPC、renderer 或 Session 数据。
 - 不允许插件覆盖 Host ceiling、Trusted Boot 或稳定身份冲突规则。
 - v2 主分发采用 managed ESM runtime；strict standalone SEA 不在 v2 范围内。

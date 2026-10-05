@@ -58,7 +58,7 @@ Journal 是恢复事实源，Projection、live progress 和 diagnostics 各自�
 - [测试策略](agent-testing.md)：包、进程和真实 UI 的证据边界。
 - [设计决策](agent-harness-host-refactor-decisions.md)：讨论历史；最新简化结论覆盖共享实例探索。
 
-手机 Web 前端、自进化源码工具、Member/Room/Team、远端终端/Git 后续单独设计。P5 保留设置、凭据、prompts 与远端连接，未执行用户历史重置；不批量删除 tmp、包或用户工作目录。旧 v1 设计保留在 [历史归档](../../archive/v1/README.md)。
+手机 Web 前端、自进化源码工具、Member/Room/Team、远端终端/Git 后续单独设计。P5 保留设置、凭据、prompts 与远端连接，未执行用户历史重置；不批量删除 tmp、包或用户工作目录。
 
 ## 独立 Host 装配与退出
 

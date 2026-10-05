@@ -19,7 +19,6 @@ Exec-run slug：`actspace-v2-plan-04-session-journal-and-persistence`
 ## 2. 必读与当前基线
 
 - [Session Format v1](../../../design-docs/agent-plugin-runtime/agent-spec-session-format-v1.md)
-- [Session 与 Context 目标设计](../../../design-docs/agent-plugin-runtime/agent-target-session-and-context.md)
 - `packages/agent-core/src/persistence/`
 - `packages/agent-core/src/context/modules/conversation.ts`
 - `packages/shared/src/session.ts`

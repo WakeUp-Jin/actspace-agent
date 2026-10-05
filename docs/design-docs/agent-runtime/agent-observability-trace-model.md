@@ -26,8 +26,8 @@ sessionId
 
 - `sessionId`：持久 Session 身份；
 - `agentRunId`：一次用户触发的主 Agent 运行；
-- `turnId`：Agent Loop 中的一次 LLM -> Tool -> Result 迭代；
-- `stepId`：Turn 内可恢复的执行步骤；
+- `turnId`：一次 `runTurn()` 的执行回合，可包含多次模型与工具迭代；
+- `stepId`：该 Turn 中一次模型请求与其工具处理步骤；同一步的 retry 使用新的 requestId；
 - `requestId`：一次真实 provider request，包括 retry 后的新 request；
 - `callId`：一次工具调用。
 
@@ -43,12 +43,14 @@ sessions-v2/<sessionId>/journal.jsonl
 
 关键事件：
 
-- `turn/started`、`turn/ended`；
-- `step/started`、`step/ended`；
-- `request/snapshot`；
-- `llm/dispatch-started`、`llm/ended`、`llm/error`、`llm/aborted`、`llm/retry`、`llm/usage`；
-- `tool/call`、`tool/dispatch-started`、`tool/result`、`tool/denied`、`tool/aborted`、`tool/recovery-outcome`；
-- `compaction/started`、`surface/replaced`、`compaction/ended`。
+- `turn/start`、`turn/end`；
+- `step/start`、`step/end`；
+- `request/header`、`request/context`；
+- `assistant/chunk`、`assistant/message` 与 `llm/retry-started`、`llm/retry`；
+- `tool/call`、`tool/code-dispatch-start`、`tool/code-dispatch`、`tool/result`、`tool/recovery-outcome`；
+- `permission/asked`、`permission/decided` 等权限事实；
+- `compaction/start`、`compaction/summary`、`surface/replaced`、`compaction/end`；
+- `plugin/actspace.agent-service/task`、`run`、`queue` 记录接纳、调度和 Run 终态。
 
 当前实现没有：
 
@@ -61,7 +63,7 @@ sessions-v2/<sessionId>/journal.jsonl
 
 ## Request 观测
 
-`request/snapshot` 在 dispatch 前冻结，至少记录：
+逻辑请求由 `request/header` 与 `request/context` 在 dispatch 前冻结，至少记录：
 
 - messages；
 - rendered system prompt 与 system sections；
@@ -72,7 +74,7 @@ sessions-v2/<sessionId>/journal.jsonl
 - retry policy 与 request options；
 - composition 与 host capability digest。
 
-`llm/dispatch-started` 标识副作用边界。其后若进程中断且没有终态，恢复逻辑必须把 request 标记为 `outcome-unknown`，不能假设“未请求”或自动重放。
+当前没有持久化 `llm/dispatch-started` 事件。Loop 在请求事实 checkpoint 后才调用 PreparedCall；仅凭已有请求快照，不能证明 Provider 已收到请求。崩溃后按未结束 Turn/Step 与 Run 恢复规则结算，不自动重放未知外部副作用。
 
 ## Usage 与 retry
 

@@ -18,7 +18,6 @@ Exec-run slug：`actspace-v2-plan-09-built-in-tools-and-browser`
 
 ## 2. 必读与迁移账本
 
-- [能力去留研究](../../../design-docs/agent-plugin-runtime/agent-research-capability-disposition.md)
 - [Tool Runtime ABI](../../../design-docs/agent-plugin-runtime/agent-spec-tool-runtime-abi.md)
 - `packages/agent-core/src/tools/tools/`
 - `browser-bridge/`

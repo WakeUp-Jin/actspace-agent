@@ -14,7 +14,7 @@ Slash Command 是 Composer 内的键盘优先能力入口。用户在空白输�
 
 它不建立第二套 Agent 能力系统，也不把所有产品导航塞进输入框。第一版只解决三个问题：
 
-1. 让已经存在的 `/compact`、Chat / Plan / Agent、Context 和 Review 能力可发现。
+1. 让已经存在的 `/compact`、Plan / Agent、Context 和 Review 能力可发现。
 2. 让当前 workspace 的可用 Skills 可以通过键盘快速绑定。
 3. 让 `/` 与 `+` 复用同一套行为和 Skill registry，避免两个入口产生不同状态。
 
@@ -38,7 +38,6 @@ Functions 使用固定顺序，不按字母排序。当前模式项显示勾选�
 
 | 命令 | 检索别名 | 行为 | 选择后的输入框 |
 | --- | --- | --- | --- |
-| `/chat` | Chat mode | 调用现有 `onModeChange("chat")`，切换为无工具对话模式 | 清除 Slash 查询并恢复焦点 |
 | `/plan` | Plan mode | 调用现有 `onModeChange("plan")`，切换为只读计划模式 | 清除 Slash 查询并恢复焦点 |
 | `/agent` | Agent mode | 调用现有 `onModeChange("agent")`，恢复完整 Agent 模式 | 清除 Slash 查询并恢复焦点 |
 | `/compact` | Compact context | 通过统一 Task 入口提交压缩操作，空闲执行、繁忙排队 | 清除 Slash 查询；不消费已选 Skill 和已有附件 |
@@ -88,7 +87,7 @@ Functions 使用固定顺序，不按字母排序。当前模式项显示勾选�
 
 Slash 菜单中的项目分成两种行为，但视觉上仍只属于 `Functions` 或 `Skills` 两组：
 
-1. 状态切换：Chat / Plan / Agent，立即调用现有模式回调。
+1. 状态切换：Plan / Agent，立即调用现有模式回调。Chat 从 `+` 模式菜单选择，不在 Slash catalog 中。
 2. 产品动作：Compact / Context / Review，立即复用现有动作链。
 菜单层不得直接访问文件系统、Skill 文件或 Agent Runtime。Renderer 只传递现有回调、Skill name 和已有命令文本；`/compact` 的真实执行经 App / IPC 的统一 submitTask 入口，由 Host Task 服务负责。
 
@@ -96,7 +95,7 @@ Slash 菜单中的项目分成两种行为，但视觉上仍只属于 `Functions
 
 | 能力 | `+` 菜单 | `/` 菜单 |
 | --- | --- | --- |
-| Chat / Plan | 保留 | 提供 Chat / Plan / Agent 搜索入口 |
+| Chat / Plan / Agent | 提供三种模式 | 提供 Plan / Agent 搜索入口 |
 | Image | 保留 | V1 不重复展示 |
 | Skills | 保留二级菜单和多选 | 提供搜索后单次切换绑定 |
 | Compact | 不展示 | 提供可发现入口 |
@@ -108,7 +107,7 @@ Slash 菜单中的项目分成两种行为，但视觉上仍只属于 `Functions
 
 ## 键盘与输入法
 
-- Textarea 始终保留真实输入焦点，用户可以继续输入过滤词。
+- Composer 编辑器始终保留真实输入焦点，用户可以继续输入过滤词。
 - `ArrowDown` / `ArrowUp` 在当前可见结果中循环移动 active item。
 - `Enter` 选择 active item，不发送普通消息。
 - `Shift+Enter` 保留换行语义；产生换行后 Slash 菜单关闭。
@@ -119,7 +118,7 @@ Slash 菜单中的项目分成两种行为，但视觉上仍只属于 `Functions
 
 ## 可访问性
 
-- Textarea 在 Slash 菜单打开时暴露 `aria-expanded`、`aria-controls` 与当前项 `aria-activedescendant`。
+- Composer 编辑器在 Slash 菜单打开时暴露 `aria-expanded`、`aria-controls` 与当前项 `aria-activedescendant`。
 - 结果容器使用 `role="listbox"`，Function 和 Skill 行使用稳定 id 与 `role="option"`。
 - 分组标题不进入键盘结果序列。
 - 每个 Function 的可访问名称包含不带 `/` 前缀的展示命令和简短作用；检索仍使用完整 Slash command，检索别名不作为重复的可见名称。
@@ -179,7 +178,7 @@ Slash 菜单延续 ActSpace Editor Design System 的 Ink & Emerald 方向，重�
 本规范建议第一版采用以下固定决策：
 
 - 只有 `Functions` 与 `Skills` 两组。
-- Functions 为 Chat、Plan、Agent、Compact、Context、Review。
+- Functions 为 Plan、Agent、Compact、Context、Review。
 - Model、Reasoning、Image、New chat 不进入 V1。
 - `/` 与 `+` 复用行为和 Skill registry，但不要求菜单内容完全一致。
-- Compact 立即执行；Eval 进入参数补全；Skill 选择切换绑定并返回输入。
+- Compact 立即提交 Task；Skill 选择切换绑定并返回输入。当前没有 Eval 命令。

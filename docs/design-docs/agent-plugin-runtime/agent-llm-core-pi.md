@@ -202,7 +202,7 @@ Adapter 在 Provider I/O 之前完成模型级配置校验和默认值物化：
 - `reasoning: false`、自动模式和显式 effort 保持不同语义。
 - SDK 内部 retry 关闭，避免一次 ActSpace dispatch 对应多个不可见 wire attempt。
 - request-scoped `AbortSignal` 始终传到 pi-ai。
-- Anthropic 自定义连接的 `promptCacheMode` 在 prepare 阶段归一为 wire 级 `cacheRetention: "short" | "none"`。direct `streamSimple` 与 request-scoped proxy 必须消费同一语义：short 标记稳定 system、最后一个工具定义和最后一个 user 内容块，none 不发送 `cache_control`。不得因代理与否改变缓存断点，也不得在 provider 拒绝缓存字段后自动重发同一生成请求。
+- Anthropic 缓存在 prepare 阶段归一为 `cacheRetention: "short" | "long" | "none"`，连接级关闭优先于请求模式；direct 与 request-scoped proxy 消费同一时长语义。完整模式与断点规则见第 16 节，不在 Provider 拒绝字段后自动重发生成请求。
 
 ## 6. PreparedLlmCall 与 Adapter generation
 
@@ -388,7 +388,7 @@ owner lease 在成功、不可重试失败、重试耗尽、backoff abort、snap
 | DeepSeek 图片且配置文件上传器 | legacy 文件上传 | image/artifact/file replay、上传取消及生命周期 parity |
 | 自定义连接及显式协议覆盖 | 按上述特性选择 | endpoint owner、protocol、credential 身份与 capability 一致 |
 
-任何一路的错误、usage 或 packaged gate 不通过都保留该路 legacy。diagnostics 记录脱敏 backend、选择原因及 generation，不记录秘密。LegacyTransportAdapter 必须转发 cancel/dispose 并拥有或明确借用 proxy pool/file uploader；仅有 send 转发的当前实现不满足目标生命周期。
+任何一路的错误、usage 或 packaged gate 不通过都保留该路 legacy。diagnostics 记录脱敏 backend、选择原因及 generation，不记录秘密。LegacyTransportAdapter 已转发底层可选 cancel/dispose；底层 transport 仍须拥有或明确借用 proxy pool/file uploader，不能把接口转发等同于所有外部资源已验证释放。
 
 文件上传与聊天生成分别计数；“一次 wire attempt”指生成请求不得被 SDK 隐式重试，不把合法的附件准备请求误算成第二次生成。
 
@@ -403,7 +403,7 @@ owner lease 在成功、不可重试失败、重试耗尽、backoff abort、snap
 验证包含同模型重启恢复、旧 signature-only 记录、跨 provider/model 切换、未知 schema、工具调用回放和无秘密序列化。真实 Provider 是否接受恢复的 signature 单独验收。
 
 
-## 15. 按模式选择 Claude 提示缓存
+## 16. 按模式选择 Claude 提示缓存
 
 Agent Loop 在每次准备请求时设置 `LlmRequestOptions.cacheRetention`：Chat 使用 `long`（1 小时），Plan、Agent 等其他模式使用 `short`（5 分钟）。模式切换从下一次请求生效；同一次请求的重试复用已准备的选项。缺少模式策略的辅助请求默认短缓存。
 

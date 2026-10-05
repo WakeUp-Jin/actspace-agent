@@ -4,7 +4,7 @@
 >
 > 权限目标合同：[`agent-tool-permission-model.md`](./agent-tool-permission-model.md)。
 >
-> 当前实现入口：[`README.md`](./README.md)、[`../agent-plugin-runtime/agent-spec-tool-runtime-abi.md`](../agent-plugin-runtime/agent-spec-tool-runtime-abi.md)。目标设计尚未实施；旧 ToolScheduler、`checkPermissions`、`session.jsonl` allowlist 与 v1 审批状态机已经归档，不是当前 API 事实。
+> 当前实现入口：[`README.md`](./README.md)、[`../agent-plugin-runtime/agent-spec-tool-runtime-abi.md`](../agent-plugin-runtime/agent-spec-tool-runtime-abi.md)。基础 Runtime、once 审批与 Desktop 文件 Session Grant 已实施；旧 ToolScheduler、`checkPermissions` 和 `session.jsonl` allowlist 不是当前 API。
 
 ## 目标
 
@@ -56,7 +56,7 @@ Host capability ceiling
 - 一次性或明确的 Session scope；
 - 过期、取消和重放规则。
 
-已确认目标只支持 prepared invocation `once` 与 Desktop 文件 `session` Grant，不支持动态 Bash allowlist、project 或用户级永久授权。实现必须使用新的 strict permission event/codec，不能复用 v1 `bash_allowlist_added` 或当前宽松 approval 事件。
+当前只支持 prepared invocation `once` 与 Desktop 文件 `session` Grant，不支持动态 Bash allowlist、project 或用户级永久授权。实现使用 strict permission event/codec，不复用 v1 `bash_allowlist_added` 或旧宽松 approval 事件。
 
 ### 5. Renderer 不拥有执行能力
 

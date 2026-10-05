@@ -59,8 +59,8 @@ sequenceDiagram
     S->>K: execute(existing implementation)
     K-->>S: raw result / artifact
     S->>S: normalize + redact + post hook
-    S-->>N: tools/result
     S->>J: tool/result
+    S-->>N: tools/result
     J-->>N: session/event (post-commit)
 ```
 

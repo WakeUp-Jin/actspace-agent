@@ -100,7 +100,7 @@ models.dev / OpenRouter public API
 
 `costProvenance` 包含：`version: 1`、`basis`（provider-reported / estimated / unknown）、`reason`、`pricingSnapshot`（可空）。快照包含 `providerId`、`connectionId`（可空）、`apiModel`、`modelKey`、`currency`、归一化单价、倍率、unsupportedBilling、source、contentHash、fetchedAt、capturedAt。只保存所用模型，不保存整份目录、凭据或请求正文。
 
-- 只有响应协议中可验证的实际费用字段才允许标记 provider-reported。官方 OpenRouter 端点的 Chat Completions / Responses 经公共 OpenAI SDK 读取原始 usage.cost，保留有限非负 USD 金额（包括 0），优先于估算。直连从 PiAiWireEngine 转到已有 SDK 接入层；代理仍使用 request-scoped fetch。其他端点不能仅凭 providerId 或 SDK cost 冒充实际扣款。没有可验证实际金额时继续估算。
+- 只有响应协议中可验证的实际费用字段才允许标记 provider-reported。官方 OpenRouter 端点的 Chat Completions / Responses 经公共 OpenAI SDK 读取原始 usage.cost，保留有限非负 USD 金额（包括 0），优先于估算。当前由 `PiAiAdapter` 在请求前选择对应 wire backend；官方 OpenRouter 请求在兼容 backend 读取实际费用，代理仍使用 request-scoped fetch。其他端点不能仅凭 providerId 或 SDK cost 冒充实际扣款。没有可验证实际金额时继续估算。
 - 本地估算统一由纯计算器负责，不读取 SDK 默认零费用。SDK 如需数值型 cost 配置可保留兼容占位，但不能作为账单事实。
 - 输入先统一为未缓存输入、缓存读取、缓存写入等互斥计费桶；不同协议的 input 是否包含 cache 必须在引擎映射层处理。缓存命中率分母使用总输入，不叠加已经包含的缓存。
 - 推理 token 若已包含于输出，不重复收费。只有协议明确提供独立计费桶及对应价格时才单独计算。

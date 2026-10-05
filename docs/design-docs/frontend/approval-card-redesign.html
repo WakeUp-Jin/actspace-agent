@@ -485,13 +485,13 @@ const SAMPLES = [
     log: { act: "Ran", tgt: "git push --force origin main" }, denyText: "已拒绝运行 git push --force origin main",
   },
   {
-    id: "browser", kind: "浏览器 · 会话级授权", risk: "mid", icon: "globe",
+    id: "browser", kind: "浏览器 · 单次授权", risk: "mid", icon: "globe",
     context: "我需要打开页面核对一下线上文案。",
     verb: "使用浏览器", intent: "Chrome",
-    chips: [["整个会话", "info"]],
-    preview: { type: "text", text: "Agent 将可以查看并操作你的 Chrome 标签页：打开网页、点击、输入、截图、读取页面内容。" },
-    primary: "本会话允许", primaryShort: "允许",
-    log: { act: "正在连接浏览器…", tgt: "" }, denyText: "已拒绝本轮浏览器授权",
+    chips: [["仅这次", "info"]],
+    preview: { type: "text", text: "允许本次工具调用修改 Chrome 页面或浏览器状态；后续写操作仍按权限模式判断。" },
+    primary: "允许这次", primaryShort: "允许",
+    log: { act: "执行浏览器操作", tgt: "" }, denyText: "已拒绝本次浏览器操作",
   },
 ];
 
@@ -605,7 +605,7 @@ let trayIndex = 0;
 let traySel = 0;
 function pendingIds() { return SAMPLES.filter((s) => state[s.id].status === "pending" || state[s.id].status === "submitting").map((s) => s.id); }
 function trayOptions(s) {
-  const o = [{ act: "once", label: s.primary, dsc: s.session ? "仅这一次" : s.id === "browser" ? "本会话内不再询问" : "仅这一次", tone: s.primaryTone }];
+  const o = [{ act: "once", label: s.primary, dsc: s.session ? "仅这一次" : s.id === "browser" ? "仅这次浏览器操作" : "仅这一次", tone: s.primaryTone }];
   if (s.session) o.push({ act: "session", label: s.session.label, dsc: s.session.scope });
   o.push({ act: "deny", label: "拒绝", dsc: "Agent 会收到拒绝结果并换一种做法" });
   o.push({ act: "deny-note", label: "拒绝并说明", input: true });

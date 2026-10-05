@@ -27,4 +27,4 @@
 - 中文界面任务收口后，本任务重新执行 `pnpm -r --if-present typecheck` 和 `pnpm -r --if-present test`，均通过。Desktop 97 个测试文件、651 个用例通过，包含 ContextPopup、Composer、ContextRenderView 与 Main projection。
 - 文档、current-docs、前端主题与 diff 检查通过，G1 自动化项完成。
 - 按计划生命周期移入 completed。G2 的不同模型容量、默认值重启持久化、临时模型不改默认值、Electron 左右边缘和截图验收仍待执行；没有用中文界面任务的局部 UI 检查代替这些场景。
-- 没有为本次归档修改产品代码或用户数据。具体文档整理见 [后续复核](../20260908-docs-v1-archive-v2-refresh/followup-audit.md)。
+- 没有为本次归档修改产品代码或用户数据。

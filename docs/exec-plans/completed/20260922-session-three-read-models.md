@@ -2,7 +2,7 @@
 
 状态：已完成。代码、测试、执行记录和已知外部门禁已同步。
 
-设计依据：[Session 三类读模型设计规范](../../design-docs/agent-plugin-runtime/agent-session-three-read-models.md)。本计划以当前源码为准，不执行早期方案中已经完成或已删除的 BrowseIndex、Main projector 和旧 cache 迁移步骤。
+设计依据：[当前投影契约](../../design-docs/agent-plugin-runtime/agent-spec-runtime-projection.md)。本计划以当前源码为准，不执行早期方案中已经完成或已删除的 BrowseIndex、Main projector 和旧 cache 迁移步骤。
 
 ## 目标与范围
 

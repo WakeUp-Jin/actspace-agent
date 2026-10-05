@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-本文档定义 actspace-agent 接入 Browser Use 能力的集成方案。Plan 5 已完整收敛：62 条 canonical command 全部由 Go handler 实现，Agent Core 稳定注册 11 个分类/辅助工具，但模型默认只看到 `browser_help`，成功调用后下一次 LLM 请求才披露完整工具包。Extension 只保留 session-scoped primitive backend。2026-09-28 的连接、启动、打包和使用验收单独记录在当前执行计划；历史 Chrome 与审批验收不能代替本轮验收。统一入口见 `docs/design-docs/browser/agent-browser-use-index.md`。
+本文档定义 Browser 工具、Go Bridge 与 Chrome Extension 的当前集成边界。62 条 canonical command 由 Go registry 管理；capability ready 时注册 11 个工具，模型可见集合由 Agent mode 白名单、registry 和调用范围共同决定。连接、启动、打包与真实 Chrome 验收见 `docs/exec-plans/active/20260928-chrome-connect-experience.md`。
 
 ## 设计决策
 
@@ -11,7 +11,7 @@
 ```
 packages/tools/browser-tools       Go command engine          Injected JS          Chrome Extension
 ───────────────────             ─────────────────          ───────────          ────────────────
-11 个稳定注册工具（1→11 披露）    62 条 canonical registry   Locator Runtime      Native Messaging
+11 个稳定注册工具（模式过滤）    62 条 canonical registry   Locator Runtime      Native Messaging
 approval + preview              CUA / DOM CUA / Locator    DOM 状态与读写        chrome.debugger
 BridgeClient                    waits / events / sessions  TS 构建 + go:embed    Chrome APIs / cursor
 ```
@@ -21,7 +21,7 @@ BridgeClient                    waits / events / sessions  TS 构建 + go:embed 
 | 方案 | 否决理由 |
 |------|----------|
 | 纯 CLI bash 调用 | 无状态、无事件、高延迟、输出解析负担 |
-| MCP 接入 | actspace 当前无 MCP 客户端层，只为浏览器加 MCP ROI 不足 |
+| MCP 接入 | Browser 使用专用 Host capability 与现有 Tool Runtime，无需增加一层协议转换 |
 | TS 完全集成（重写 browser-client.mjs） | 3000+ 行侵入 v2 Runtime，浏览器逻辑和 Agent Runtime 边界混淆 |
 | Codex 进程内插件模式 | 需要 Node REPL 沙箱环境，不适用于 actspace 的 TS 架构 |
 
@@ -31,7 +31,7 @@ BridgeClient                    waits / events / sessions  TS 构建 + go:embed 
 2. **Go bridge 承担重逻辑**：62 条 registry、CUA、DOM CUA、Locator 注入管理、CDP 会话、导航等待和事件协调。
 3. **Injected JS 只提供页面语义**：它是 ActSpace 自研 Locator Runtime，不复制 Codex、不依赖 Playwright 运行时，也不承载 session/权限或 Chrome API。
 4. **Chrome Extension 做原语执行**：只直接调用 `chrome.debugger` 和 Chrome APIs，维护宿主权限与光标。
-5. **注册态与暴露态分离**：ToolManager 可以稳定持有 executor，但只有当前 definitions 中的工具才允许模型调用；隐藏工具在披露前按不存在拒绝执行。
+5. **注册态与调用门禁分离**：工具注册由插件持有；Agent mode 白名单与调用范围过滤可用工具，没有 Browser gateway 披露状态。
 6. **长连接解决 CLI 缺陷**：一次连接整个 turn，支持事件通知和状态持续。
 
 ## 架构分层
@@ -49,7 +49,7 @@ packages/tools/browser-tools/src/
 职责：
 - 注册浏览器工具到 tool registry，遵守现有 approval/permission 流程
 - 维护与 Go bridge 的 socket 长连接
-- 发送 JSON-RPC 请求，接收响应和事件通知
+- 发送版本化 JSON 请求，按 id 接收响应
 - 管理连接生命周期（第一次调用时连接，Turn 结束时关闭）
 - 提供 sessionId/turnId 上下文
 
@@ -71,7 +71,7 @@ browser-bridge/apps/cli/
   ├── internal/backend/    ← ExtensionBackend adapter
   ├── session.go           ← CDP attach 状态 + session 管理
   ├── events.go            ← 事件路由与广播
-  └── internal/actionplan/ ← browser_run 批处理与 preflight
+  └── command_router.go    ← browser_run 批处理与 preflight
 ```
 
 职责：
@@ -120,7 +120,7 @@ browser-bridge/apps/chrome-extension/
 
 不做：
 - 高层 command registry、selector 编排、导航等待和重试
-- 上下文/session 业务语义（只透传 session_id）
+- Agent 产品的 Session / 审批语义；Extension 仍按 sessionId + turnId 维护 Browser ownership 与 Tab Group，拒绝跨 Session 占用冲突。
 
 ## 通信协议
 
@@ -132,50 +132,26 @@ Runtime 不额外启动 `abb serve`。Chrome Extension 负责拉起 Native Host�
 
 帧格式：
 ```
-[4 bytes: uint32 payload length, native endian]
-[N bytes: JSON-RPC 2.0 payload, UTF-8]
+[4 bytes: uint32 payload length, little-endian]
+[N bytes: versioned JSON payload, UTF-8]
 ```
 
-请求示例：
+请求使用 `agent_browser_bridge.*` 命名空间，例如：
+
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "browser.click",
-  "params": {
-    "session_id": "sess_abc",
-    "turn_id": "turn_123",
-    "tab_id": 42,
-    "selector": "button[type=submit]"
-  }
+  "protocolVersion": "0.2.0",
+  "id": "1",
+  "method": "agent_browser_bridge.command.execute",
+  "params": { "category": "tabs", "action": "list", "params": {} }
 }
 ```
 
-响应示例：
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {}
-}
-```
-
-事件通知（无 id，后端主动推送）：
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "browser.event.cdp",
-  "params": {
-    "tab_id": 42,
-    "cdp_method": "Page.loadEventFired",
-    "cdp_params": { "timestamp": 1720000000.123 }
-  }
-}
-```
+transport 连接后先发送 `agent_browser_bridge.session.start`，参数为 `sessionId` 和 `turnId`。响应按 id 关联；事件由 Go 编排层消费。TS Socket 客户端的帧上限为 16 MiB。
 
 ### Go bridge ↔ Chrome Extension
 
-传输：Chrome Native Messaging（stdio JSON-RPC）
+传输：Chrome Native Messaging（stdio 版本化 JSON envelope）
 
 沿用现有 `agent_browser_bridge.*` 协议命名空间。
 
@@ -201,75 +177,9 @@ Runtime 不额外启动 `abb serve`。Chrome Extension 负责拉起 Native Host�
 
 62 条叶子能力以 `category + action` 进入 Go registry，不平铺成 62 个模型工具。
 
-### Turn 级渐进披露
+### 可见集合与注册生命周期
 
-初始 LLM 请求只携带 `browser_help`。模型成功调用该 gateway 后，ToolManager 先记录 pending disclosure；Agent Loop 在下一次 LLM 调用前提交 `browser` group，并刷新 Context 中的 tool definitions：
-
-```text
-Agent.run start
-  -> reset disclosure
-  -> LLM call #1: browser_help only
-  -> browser_help success: browser group pending
-  -> before LLM call #2: commit pending group
-  -> LLM call #2+: full 11 Browser tools
-  -> next Agent.run: reset to browser_help only
-```
-
-ToolManager 不动态注册或注销 executor，避免重复绑定 permission checker、disposer 和 Socket 生命周期。gateway 披露也不等于用户授权；第一次真实 Browser action 仍走 Session 授权租约。
-
-### 首版兼容工具（15 个，迁移期）
-
-根据 actspace-agent 的实际使用场景，首阶段暴露以下工具：
-
-| 工具名 | 对应底层命令 | 权限等级 |
-|--------|-------------|----------|
-| `browser_screenshot` | cua_get_visible_screenshot | low |
-| `browser_dom_snapshot` | playwright_dom_snapshot | low |
-| `browser_click` | playwright_locator_click / cua_click | medium |
-| `browser_fill` | playwright_locator_fill | medium |
-| `browser_select` | playwright_locator_select_option | medium |
-| `browser_press_key` | playwright_locator_press / cua_keypress | medium |
-| `browser_scroll` | cua_scroll / dom_cua_scroll | low |
-| `browser_navigate` | navigate_tab_url | medium |
-| `browser_back` | navigate_tab_back | low |
-| `browser_open_tab` | create_tab + navigate | medium |
-| `browser_close_tab` | close_tab | medium |
-| `browser_list_tabs` | list_tabs | low |
-| `browser_user_tabs` | browser_user_open_tabs | low |
-| `browser_claim_tab` | browser_user_claim_tab | medium |
-| `browser_finalize` | finalize_tabs | medium |
-
-这 15 个工具不再进入新模型默认 definitions，只保留一个迁移阶段的内部 alias 和旧 session preview 兼容。
-
-### 渐进扩展
-
-后续根据需要逐步添加：
-
-- Phase 2：dom_cua 命令（get_visible_dom + dom_click 等）
-- Phase 3：下载/文件上传命令
-- Phase 4：剪贴板命令
-- Phase 5：dev_logs 调试命令
-- Phase 6：完整 CUA 坐标命令面（drag、move 等）
-
-### 历史工具定义示例
-
-```typescript
-export const browserClickDefinition: ToolDefinition = {
-  name: 'browser_click',
-  description: '点击页面元素。支持 CSS 选择器或坐标。',
-  parameters: {
-    type: 'object',
-    properties: {
-      tab_id: { type: 'number', description: '目标标签页 ID' },
-      selector: { type: 'string', description: 'CSS 选择器（优先使用）' },
-      x: { type: 'number', description: '点击 x 坐标（无选择器时使用）' },
-      y: { type: 'number', description: '点击 y 坐标（无选择器时使用）' },
-    },
-    required: ['tab_id'],
-  },
-  approvalLevel: 'medium',
-};
-```
+`plugin.ts` 在 Browser capability ready 时注册全部 11 工具，scope dispose 时注销工具；只有 `disposeHost !== false` 时同时释放 Host capability，Desktop 默认 Harness 传入 false，由 Host 管理共享 capability。`packages/core/agent/src/agent-mode-policy.ts` 将 Browser 工具列入 Agent 模式白名单，Chat / Plan 不包含它们。`browser_help` 用于查询命令，不改变下一次请求的工具集合。
 
 ## 连接生命周期
 
@@ -279,8 +189,8 @@ export const browserClickDefinition: ToolDefinition = {
 Turn 开始
   │
   ├─ 模型第一次调用浏览器工具
-  │    └─ BridgeClient.connect() → 建立 socket 连接
-  │       └─ 发送 browser.session.start { session_id, turn_id }
+  │    └─ Socket transport connect() → 建立 socket 连接
+  │       └─ 发送 agent_browser_bridge.session.start { sessionId, turnId }
   │
   ├─ 后续浏览器工具调用
   │    └─ 复用同一连接
@@ -339,9 +249,7 @@ Chrome Native Messaging host 可能长期运行在已注册的 `abb` 路径上�
 
 事件主要在 **Go bridge 内部** 被消费（用于编排等待逻辑），不需要全部转发给 Runtime。
 
-只有以下场景需要通知 Runtime：
-- 下载完成（Runtime 需要返回文件路径给模型）
-- 严重错误（页面崩溃等需要告知模型）
+当前 TS Socket 客户端按请求 id 接收响应，忽略无 id 帧；下载结果和失败由 action 返回值交给 Runtime，不承诺额外推送通路。
 
 ## 用户可见性设计
 
@@ -379,22 +287,20 @@ Chrome 标签栏：
 ```
 
 规则：
-- 每个 session 创建一个 tab group，颜色随机
+- session tab group 使用固定蓝色
 - 未显式命名时 group 标题为 `ActSpace`；`name_session` 可设置更具体的会话标题
 - Agent 创建/claim 的 tab 自动加入 group
 - `finalize_tabs` 时：
   - `deliverable` tab → 移入 "✅ actspace" 固定分组
   - `handoff` tab → 留在 session 分组
   - 其余 → 关闭
-- session 结束后，空的 session group 自动清理
+- 连接结束释放 ownership，不自动关闭或 ungroup 用户页面；页面清理由显式 finalize 负责。
 
-### 工具预览
+### 工具预览与结果
 
-遵守 `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`：
-- Browser preview 只展示 category/action、目标 URL/selector/坐标、文件名或 tab 数量等最小动作摘要。
-- 截图的原生 image content、DOM、console、clipboard 和页面读取结果只进入当前 LLM 调用，不进入持久化 preview 正文。截图同时可作为 Session-owned image artifact 持久化；preview 只保留 artifact ID、媒体类型和显示名，由会话产物面板按需读取图片，不写入 base64。
-- session 与运行日志中的 Browser 结果统一替换为脱敏占位符；输入文本、fill value、rich clipboard 和内部 approval token 先清洗再记录。
-- finalize 在预览中只显示保留/关闭数量与安全的 tab 标识，不展开页面正文。
+预览遵循 [工具预览规范](../tool-system/agent-tool-preview-design-guidelines.md)，优先展示动作、目标与状态。`node-capability.ts` 将实际结果转为 `modelOutput`，文本脱敏并限制总长度 100K；DOM snapshot 单项限制 50K，命令帮助限制 20K。截图创建 Session-owned image artifact，返回 artifact 引用，不在文本中展开 base64。
+
+这些结果会随 `packages/core/agent-loop/src/loop.ts` 的普通 `tool/result` 事件进入 Session Journal。预览简短不等于正文未持久化；当前没有 Browser 专属的 ephemeral-result 通路。
 
 ## 安全约束
 
@@ -413,97 +319,21 @@ Go backend capability 仍可在命令执行前拒绝不可用动作；用户审�
 
 审批卡片只提供“拒绝 / 允许”两个动作。状态必须依次展示为“等待浏览器授权 → 执行中 → 完成/失败”，不得在工具开始时提前显示 `Completed`。
 
-### 站点策略
+### 配置与持久化边界
 
-首阶段不实现远程 site policy（Codex 的 chatgpt.com API 不适用）。但预留本地 blocklist：
+设置页保留 Browser 总开关、工具项和高风险 capability 偏好。当前 `browser-tools/src/plugin.ts` 的 permission evaluator 读取 action metadata 和权限模式，不读取 `browser_capability_*` 偏好；不能把这些 UI 开关描述为已接通的逐 action hard deny。工具是否进入本次请求，以实际 registry 和 Agent 调用门禁为准。
 
-```typescript
-const BLOCKED_ORIGINS = [
-  // 银行、支付等高风险站点
-];
-```
-
-### 工具暴露控制
-
-用户可在设置页控制整个浏览器工具组和披露后的细粒度能力：
-
-```
-设置 → 工具 → 浏览器
-  ☑ 浏览器（总开关；默认只暴露 browser_help）
-  ▸ 高级设置（默认折叠）
-      ☑ browser_cua / browser_dom / browser_locator
-      ☑ browser_navigation / browser_tabs / browser_user
-      ☑ browser_wait / browser_io / browser_debug / browser_run
-
-      高风险 capability（不注册为额外模型工具）：
-        ☐ 触发下载
-        ☐ 文件上传
-        ☐ 写剪贴板
-```
-
-`browser_capability_download`、`browser_capability_file_upload`、`browser_capability_clipboard_write` 进入现有 disabled-tools 配置；permission checker 按 registry `effect` 做 hard deny。分类工具仍可见，未被禁用的低风险 action 不受影响；batch 命中禁用 capability 时整批拒绝且不发送 `command.run`。
-
-未勾选的细粒度工具不会在 Browser group 展开后出现在模型 definitions 中。关闭总开关时，Browser prompt segment、Socket runtime 注入和全部 Browser 工具注册都会关闭，但子项禁用偏好保留，重新开启后恢复。
-
-### 临时结果与持久化边界
-
-浏览器页面属于用户真实 profile，读取结果可能包含密码、cookie 派生内容、剪贴板、调试日志或未预期的私有页面文本。因此 Browser 工具采用 ephemeral-result 契约：
-
-- executor 返回真实结果给当前 Agent loop，保证模型可以继续完成任务；
-- `tool_result` session event、stream preview、assistant tool-call 日志和 state-level run log 只记录脱敏参数、状态与占位符；
-- screenshot base64、structured result、raw output ref 和 Browser error details 都不能绕过该边界；
-- 恢复历史会话时模型看到占位符，需要时重新调用 Browser read action 获取最新页面状态。
-
-这个边界优先保护真实浏览器数据，不依赖每条叶子命令逐一判断“是否可能敏感”。
-
-## 实现路线
-
-当前执行事实以 `docs/exec-plans/completed/20260710-browser-use/plan-5-go-command-engine-convergence.md` 为准。以下 Phase 1-5 是首版实施记录；原先未完成项已在 Plan 5 的 Go command engine 中收敛，不再作为当前状态表。
-
-### Phase 1：基础连接（已完成）
-
-- [x] BridgeClient socket 连接和 JSON-RPC 实现
-- [x] Native Host socket 支持单连接多请求
-- [x] 5 个基础工具：screenshot、dom_snapshot、navigate、open_tab、list_tabs
-- [x] 工具定义和 executor 注册
-- [x] turn 结束时发送 session.end 并释放 socket
-- [x] 正常浏览器任务使用标准 `browser_*` 工具，CLI 仅用于诊断与安装
-
-### Phase 2：交互能力（已完成首版）
-
-- [x] click（selector + 坐标两种模式）
-- [x] fill、press_key、select
-- [x] scroll
-- [x] 导航等待（Plan 5 Go bridge 实现）
-
-### Phase 3：Tab 生命周期（已完成首版）
-
-- [x] Tab Group 管理（extension 实现）
-- [x] claim_tab、finalize_tabs
-- [x] 光标可视化（content script）
-
-### Phase 4：高级能力
-
-- [x] DOM CUA 命令（Plan 5）
-- [x] 下载/文件上传（Plan 5 token/event 编排）
-- [x] 剪贴板（Plan 5 text + rich representation）
-- [x] dev_logs（Plan 5 bounded ring buffer）
-
-### Phase 5：完整 CUA
-
-- [x] 坐标级全套命令（drag、move 等，Plan 5）
-- [x] element_info、element_screenshot（Plan 5）
+当前没有独立远程站点策略。浏览器输出经过通用脱敏后仍可能包含页面私有内容，且会持久化；文档不能承诺“历史仅含占位符”或“恢复时必须重新读取”。截图 artifact 的保留和读取遵循 Session artifact 契约。
 
 ## 与现有文档的关系
 
 - `docs/design-docs/browser/agent-browser-bridge-design.md`：定义浏览器桥接层本身的三层架构、协议和 CLI 设计。本文档是其消费侧补充。
 - `docs/design-docs/browser/agent-browser-use-command-surface.md`：完整命令面参考。本文档引用其中命令作为实现目标。
-- `docs/design-docs/browser/agent-browser-use-command-implementation.md`：每条命令的 CDP 调用链和实现编排。本文档定义集成架构，实现文档定义具体怎么写代码。
+- `docs/design-docs/browser/agent-browser-use-command-implementation.md`：CDP 原语、实现职责和源码入口。
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`：工具前端预览契约。浏览器工具的预览需遵守。
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`：权限分层基础。浏览器工具的 approval 需遵守。
 
 ## 维护规则
 
 - 新增叶子命令时先更新 Go canonical registry，再通过生成检查同步工具 action 和文档状态。
-- Phase 推进时更新 checklist 状态。
 - 如果架构边界发生变化，先更新 `docs/design-docs/browser/agent-browser-use-index.md`，再同步本文档。

@@ -27,7 +27,7 @@ Tool Runtime 只拥有注册、参数验证、权限准入、prepared execution�
 4. Todo Behavior 注册 Contributor；SessionReadModel 在创建 registry、安装通用事实 projection 后统一应用 Contributor，再 ensureSession / restore / replay。
 5. 工具 Behavior 从专用 Host port 创建资源，注册工具，并在 Context effect 清理时 drain/dispose registrations 和 Host 资源。注册失败回滚本次已注册项。
 
-生产仍为 restart-only：配置变化通过 `requestRestart` 进入 `restartRequired`，启动 patches 不提供在线热替换。
+Host/codec 变更仍需受控重启；执行工具由独立 Harness 装配，新选择只影响后续 Run，旧 Run 的工具树保留至租约释放。启动 patches 不原位修改已运行的树。
 
 ## 权限和 Scope
 
@@ -49,4 +49,4 @@ Projection Contributor 必须在 Session 读取前注册。注册重复 Contribu
 
 ## 后续边界
 
-Plan Profile / Plan preset 由后续大设计决定。本轮只实现通用 scope 输入。真实 Provider、Chrome、Electron packaged lifecycle、签名和公证需要各自的外部验收，本轮自动化结果不代表这些门禁通过。
+当前唯一主形态具有 Chat / Plan / Agent 三种模式；工具集合通过形态贡献、模式白名单和委派上限收窄，详见[形态与模式](../agent-runtime/agent-forms-and-modes.md)。真实 Provider、Chrome、Electron packaged lifecycle、签名和公证需要各自的外部验收，本轮自动化结果不代表这些门禁通过。

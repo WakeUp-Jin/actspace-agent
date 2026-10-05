@@ -34,7 +34,7 @@
 
 Todo 新事件为 `plugin/actspace.todo/todo-write`，owner 为 `actspace.todo`，required / version 1。旧 required `todo/write` 没有兼容 Codec，会产生 `UNKNOWN_REQUIRED_CODEC` 并进入 browse-only；详见 [工具边界](agent-tool-plugin-boundaries.md)。
 
-以下 12 种为当前 ActSpace Core Journal 的持久化核心。Todo 已移入插件领域事件：
+以下 12 种为当前 ActSpace Core Journal 的持久化核心。Todo 已移入插件领域事件。表中数据列说明用途，不是完整 wire schema；Surface 列描述展示语义，实际 envelope 使用下面定义的 operation/null：
 
 | 事件 | 写入时机 | 关键数据 | Surface |
 |---|---|---|---|
@@ -71,7 +71,7 @@ sequenceDiagram
     A->>J: session/end-seed (close only)
 ```
 
-`user/message` 必须位于 `turn/start` 之后；根 Agent 的外部输入也先进入同一条 Inbox/消息入口，不允许绕过事件模型。
+生产用户输入由 TaskLedger 接纳并在领取时写入 `user/message`，可以位于 `turn/start` 之前。Loop 检查已有 messageId，避免重复追加；只有没有预先提交消息的直接 Loop 调用，才在 turn/start 后补写。上图表示直接 Loop 路径，不能作为所有 Host 的唯一事件顺序。
 
 ### 3.2 含工具的多步骤顺序
 
@@ -100,16 +100,16 @@ flowchart TD
 所有 `[S]` 记录使用统一 Envelope，JSONL 每行一个完整对象：
 
 ```text
-recordKind   = "session-event"
+recordKind   = "event"
 seq          = 从 0 开始严格连续的 session 内序号；Header 不占 seq
 type         = 上述事件名
 eventVersion = 事件 codec 版本，当前从 1 开始
-criticality  = "core" | "extension"
+criticality  = "required" | "ignorable"，由 codec 固定
 time         = RFC3339 UTC 时间
-source       = { agentId, turnId?, stepId?, runtimeInstanceId }
+source       = { ownerPluginId, agentId?, turnId?, stepId? }
 data         = 事件 payload，禁止把 UI 临时字段塞入此处
-surface      = "internal" | "user" | "assistant" | "tool-result"
-provenance   = { sourceEventSeqs?, parentSeq?, generatedBy? }
+surface      = null | { kind: "append", node } | { kind: "replace", start, end, node, sourceEventSeqs }
+provenance   = { sourceEventSeqs: number[], contributorIds: string[], runtimeSelectionSeq: number | null }
 ```
 
 `seq` 只由 Journal 分配，调用方不得自行生成。2026-09-09 按当前 codec、Journal 和 [Session Format v1](agent-spec-session-format-v1.md) 校准起点；此前从 1 开始的描述是文档错误，本次不修改任何事件或用户数据。`provenance.sourceEventSeqs` 用于把收束后的 `assistant/message` 链回它所聚合的 chunk；任何 projection 都可以依此去重和重建。
@@ -118,7 +118,7 @@ Journal 的 append 是唯一逻辑提交点：先校验 codec 和序号并接纳
 
 ## 5. DSH 持久化扩展目录
 
-13 种事件是核心，不代表持久化目录只有 13 种。ActSpace 预留并实现 codec/replay 的扩展分类如下：
+12 种事件是核心，不代表持久化目录只有 12 种。ActSpace 预留并实现 codec/replay 的扩展分类如下：
 
 | 分类 | 事件 |
 |---|---|
@@ -132,7 +132,7 @@ Journal 的 append 是唯一逻辑提交点：先校验 codec 和序号并接纳
 | Session 与用户反馈 | `session/title`, `session/title-llm-request`, `feedback/record` |
 | 外部请求 | `web/deepseek-search-llm-request` |
 
-`goal/change` 和 `schedule/change` 本轮只建立 codec、replay 和未知事件治理；当前没有 Goal/Schedule producer，不因提前建模而虚构运行时能力。扩展事件不能改变 13 种核心事件的顺序和含义。
+`goal/change` 和 `schedule/change` 本轮只建立 codec、replay 和未知事件治理；当前没有 Goal/Schedule producer，不因提前建模而虚构运行时能力。扩展事件不能改变 12 种核心事件的含义。完整目录（含模式、委派、恢复及 Task 插件事件）以 codec 和[生成矩阵](agent-contract-matrix.generated.md)为准。
 
 ### 5.1 明确删除的旧事件
 
@@ -152,19 +152,19 @@ usage、finish、error、abort 都分别归入 `assistant/chunk`、`assistant/me
 - Codec 缺失、Envelope 非法或 `seq` 断裂：fail closed，Journal 不提交该记录并报告结构化诊断。
 - LLM 请求错误：在同一 `step` 内先写 `llm/retry-started`，重试结果写 `llm/retry`；重试耗尽后写 `step/end(status=error)` 和 `turn/end(status=error)`，通知面发 `agent/error`。
 - 用户取消或 Host abort：停止流式消费，保留已写入 chunk，写收束的 `assistant/message`（如可形成）及 `step/end/turn/end(reason=aborted)`。
-- 进程崩溃：恢复器以最后一个完整 JSONL 记录为边界，依据 `turn/start`、`step/start`、`tool/call` 与 `tool/result` 判定未闭合步骤；不重写历史，只从新 `step` 继续。
+- 进程崩溃：Provider 处理物理有效前缀，Session 业务根据未闭合 Turn/Step/Tool 追加恢复事实；TaskLedger 把未结束 Run 标为中断并暂停队列，不恢复旧 Loop 内存或自动从新 Step 继续。
 - `session/end-seed` 只在正常 flush/dispose 路径写入，不能作为业务成功标志。
 
 ## 7. 表面投影
 
-`surface` 是最小、稳定的 UI/Host 投影分类：
+Surface node 是最小的模型可见历史节点；envelope 的 `surface` 是 append/replace operation 或 null，不是 UI 分类字符串：
 
 - `user`：用户可见输入消息；
-- `assistant`：增量和收束后的 Assistant 输出；
+- `assistant`：收束后的 Assistant 消息；chunk 保留为 Journal 事实，不单独创建完整历史消息；
 - `tool-result`：脱敏后的工具结果和 artifact 摘要；
-- `internal`：turn/step/request/todo 等只供恢复、诊断和开发者观测。
+- 无模型历史变更的 turn/step/request 等事件使用 `surface: null`；Todo 等领域投影独立消费其事件。
 
-默认 CLI `run` 输出 JSONL 只发布 `assistant`、`tool-result` 与最终状态；完整 `[S]` 事件仍写入 Session 文件，诊断走 stderr。任何 Host 都可以从 Journal replay 重新生成投影，不依赖 live 通知是否到达。
+CLI `run` 默认输出最终文本，`--jsonl` 才输出结构化流；显式持久化会话写 Journal，默认 ephemeral 不保存会话文件，诊断走 stderr。任何 Host 都可以从 Journal replay 重新生成投影，不依赖 live 通知是否到达。
 
 ## 8. 非目标与验收门
 
@@ -172,7 +172,7 @@ usage、finish、error、abort 都分别归入 `assistant/chunk`、`assistant/me
 
 设计完成的验收条件：
 
-1. 13 种核心事件有唯一 codec、schema、golden JSONL 和 replay 测试；
+1. 12 种核心事件有唯一 codec、schema、golden JSONL 和 replay 测试；
 2. 无工具、含工具、重试、错误、取消五种顺序都能由 `seq` 重放；
 3. 扩展目录中的 codec 不影响核心事件，未知扩展按策略记录诊断或 fail closed；
 4. `session/event` 只能在 Journal 接纳且 coordinator 入队后触发，通知丢失不会破坏恢复；

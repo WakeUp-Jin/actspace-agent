@@ -7,7 +7,7 @@ P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle
 
 - [Tool 插件边界与 Todo 领域事件](agent-tool-plugin-boundaries.md)：独立工具包、Host port、Projection Contributor、scope 和不兼容旧 Todo 的事件断点。
 
-> 当前入口：v2 Profile-first、多包 Cordis Plugin Runtime。本文按用途导航；每份文档的实现状态与未完成门禁分别维护。v2 决策保留原位置，v1 资料集中到 [archive/v1](../../archive/v1/README.md)。
+> 当前入口：v2 Profile-first、多包 Cordis Plugin Runtime。本文按用途导航；每份文档的实现状态与未完成门禁分别维护。
 
 ## 当前架构与启动
 
@@ -16,7 +16,7 @@ P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle
 1. [总体架构](agent-target-overall-architecture.md)：Host、Profile、应用 Service、Agent 与 Journal/Projection 的整体关系。
 2. [Runtime 与 Composition](agent-target-runtime-architecture.md)：生产 BootedRuntimeProfile、Host/Harness 组合、启动失败与 shutdown。
 3. [插件组装与 Agent 启动](agent-spec-dsh-plugin-assembly-and-agent-startup.md)：从三个 Host 入口到 TaskLedger、Run Factory 和 Loop。
-4. [Agent Run / Turn 分层](../agent-runtime/agent-turn-layers.md)：运行层级与数据流。
+4. [Task、Run 与 Harness 生命周期](agent-task-run-lifecycle.md)：任务调度、执行与组合租约。
 5. [测试策略](agent-testing.md)：自动化、Host 和外部人工门禁的边界。
 
 ## 领域契约
@@ -49,12 +49,10 @@ Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧�
 
 以下材料用于理解取舍，不替代上面的当前实现入口：
 
-- [Harness 插件化与 Agent Host 分离讨论](agent-harness-host-refactor-decisions.md)：最终目标与决定；P1–P5 批准范围已验收，冗余与文档收尾仍在执行。自进化功能后续独立开发。
+- [Harness 插件化与 Agent Host 分离讨论](agent-harness-host-refactor-decisions.md)：最终目标与决定；P1–P5 及最终收尾的批准范围已验收；自进化功能后续独立开发。
 
 - [Profile-first 决策](agent-harness-host-refactor-decisions.md)：Profile 与应用操作所有权的历史理由。
 - [v2 foundation 决策](agent-harness-host-refactor-decisions.md)、[Cordis 采用](agent-decision-cordis-adoption.md)：方向、适用范围和证据边界。
-- [DSH 研究](agent-research-dsh-architecture.md)、[能力去留研究](agent-research-capability-disposition.md)：研究快照与迁移判断。
-- [ActSpace v1 后端研究](../../archive/v1/design-docs/agent-research-actspace-current-state.md)：`v1-final` 历史快照。
 
 ## 验收边界
 

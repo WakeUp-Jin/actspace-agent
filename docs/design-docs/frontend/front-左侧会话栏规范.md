@@ -41,7 +41,7 @@
 - `New Agent`：替代原 `New chat`，承担"开启一次新的 Agent 任务"语义；展示快捷键 `⌘N`。
 - `扩展`：管理能力、Skills 与 MCP，保留会话侧栏；Usage 位于设置中心的「活动」分组。
 - 两个入口共用同一组 hover / active 状态语言；当前 view 视为 active。
-- Kairos 与 Lab 不属于当前公开导航；历史原型和设计资产见 `docs/archive/v1/design-docs/`。
+- Kairos 与 Lab 不属于当前公开导航。
 
 ## 分区列表
 
@@ -195,7 +195,7 @@
 
 - 底部 `Settings` 是页面级入口，不是弹窗入口。
 - 点击后从聊天态切换到设置态，原侧边栏被设置导航替换。
-- 切换规则与设置态布局见 `设置页规范.md`。
+- 切换规则与设置态布局见 `front-设置中心重构规范.md`。
 - 不显示账号卡片、登录信息卡片或登出浮层。
 
 ## 面板状态
@@ -253,11 +253,11 @@
 - `SessionListItem` 同步透出这些字段，让前端按 workspace 分组并标记 pinned / archived。
 - `WorkspaceEntry` 增加可选 `hidden?: boolean`；该字段持久化在 `workspaces.json`，不因 session 反向合并自动清除。
 - v2 Runtime 在创建 Session 时根据 Host 提供的 workspace context 写入 Journal header；列出时由 Runtime Projection 透出。
-- 切换 pin 走 `pinSession({ sessionId, pinned })`，主进程调用 `setSessionPinned` 重写 meta。
-- 重命名走 `renameSession({ sessionId, title })`，主进程调用 `setSessionTitle` 重写既有 `SessionMeta.title`。
+- 切换 pin 走 `pinSession({ sessionId, pinned })`，主进程经 AgentApplication 追加 `session/pinned-set` Journal 事件并刷新投影。
+- 重命名走 `renameSession({ sessionId, title })`，主进程经 AgentApplication 追加 `session/title-set` Journal 事件并刷新投影。
 - Fork 走 typed Runtime IPC；主进程拒绝 active turn，并调用 v2 Session store 创建独立 Journal 后返回完整 Session Projection。
 - Copy ID 只使用列表已有 `sessionId`；Copy Transcript 对当前会话复用 renderer 消息，对其他会话按需读取完整 `SessionRecord`，再通过 shared formatter 过滤为 User / Assistant Markdown。
-- 切换 archive 走 `archiveSession({ sessionId, archived })`，主进程调用 `setSessionArchived` 重写 meta；普通 `listSessions()` 默认只返回未归档会话，设置页通过 `listSessions({ archived: true })` 读取归档列表。
+- 切换 archive 走 `archiveSession({ sessionId, archived })`，主进程经 AgentApplication 追加 `session/archived-set` Journal 事件；普通 `listSessions()` 默认只返回未归档会话，设置页通过 `listSessions({ archived: true })` 读取归档列表。
 - `Archive All` 在 renderer 中先冻结 Workspace 当前 session id 快照并处理 active session 导航落点，再通过 main-owned 批量归档契约执行；返回值至少包含 `archivedSessionIds` 和 `failedSessionIds`。
 - `Open in IDE` 走 main-owned Workspace IPC，输入只包含 `workspaceId`，main 根据 registry 解析并校验目录后打开 Cursor。
 - `Remove from Sidebar` 走 main-owned Workspace visibility IPC，只更新 registry 的 `hidden`；当用户再次选择同一目录时，Workspace selection 逻辑必须复用原条目并将 `hidden` 置回 `false`。

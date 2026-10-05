@@ -118,18 +118,18 @@ document	docs/design-docs/agent-index.md	D11	按规则校准/合并/退役，先
 document	docs/design-docs/agent-plugin-runtime/README.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md	D5	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-decision-cordis-adoption.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-decision-profile-first-headless-desktop.md	D2	按规则校准/合并/退役，先保护唯一内容与入链	已结算：合并并删除；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-decisions-v2-foundation.md	D2	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
+document	docs/design-docs/agent-plugin-runtime/agent-decision-profile-first-headless-desktop.md	D2	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/agent-plugin-runtime/agent-decisions-v2-foundation.md	D2	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/agent-plugin-runtime/agent-english-learning.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-harness-host-refactor-decisions.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-llm-core-pi.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-package-ledger.md	D5	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-refactor-code-cleanup-review.md	D10	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-refactor-docs-cleanup-review.md	D10	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-research-capability-disposition.md	D6	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-research-dsh-architecture.md	D6	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-session-event-persistence-refactor.md	D4	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-session-three-read-models.md	D4	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
+document	docs/design-docs/agent-plugin-runtime/agent-refactor-code-cleanup-review.md	D10	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/agent-plugin-runtime/agent-refactor-docs-cleanup-review.md	D10	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/agent-plugin-runtime/agent-research-capability-disposition.md	D6	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/agent-plugin-runtime/agent-research-dsh-architecture.md	D6	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/agent-plugin-runtime/agent-session-event-persistence-refactor.md	D4	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/agent-plugin-runtime/agent-session-three-read-models.md	D4	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/agent-plugin-runtime/agent-spec-agent-and-subagent.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-spec-agent-loop-cordis-surface.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-spec-agent-scope-model.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
@@ -152,15 +152,15 @@ document	docs/design-docs/agent-plugin-runtime/agent-target-agent-core.md	D11	�
 document	docs/design-docs/agent-plugin-runtime/agent-target-llm-adapter.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md	D1	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md	D1	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-target-session-and-context.md	D3	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-plugin-runtime/agent-target-session-persistence-projection-architecture.md	D4	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
+document	docs/design-docs/agent-plugin-runtime/agent-target-session-and-context.md	D3	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/agent-plugin-runtime/agent-target-session-persistence-projection-architecture.md	D4	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-testing.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-plugin-runtime/agent-tool-plugin-boundaries.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/agent-runtime/agent-forms-and-modes.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-runtime/agent-main-chat-form.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/agent-runtime/agent-main-chat-form.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/agent-runtime/agent-observability-trace-model.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/agent-runtime/agent-turn-layers.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/agent-runtime/agent-turn-layers.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/browser/agent-browser-bridge-design.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/browser/agent-browser-use-command-implementation.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/browser/agent-browser-use-command-surface.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
@@ -181,18 +181,18 @@ document	docs/design-docs/execution-safety/README.md	D11	按规则校准/合并/
 document	docs/design-docs/execution-safety/agent-tool-permission-model.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/execution-safety/agent-权限设计规则和原则.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/README.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：原样保护；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/actspace-deepseek-workbench.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/agent-subagent-flow-prototype.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/frontend/actspace-deepseek-workbench.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/frontend/agent-subagent-flow-prototype.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/frontend/anthropic-custom-connection-demo.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/approval-card-redesign.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/compact-command-states.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/composer-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/frontend/compact-command-states.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/frontend/composer-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/frontend/context-compaction-demo.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/context-popup-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/frontend/context-popup-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/frontend/design-token-convergence-demo.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/front-DSH轨迹能力迁移规范.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/front-accent-palette.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/front-agent-analysis-observability.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/frontend/front-agent-analysis-observability.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/frontend/front-agent-tool-stream-rendering.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/front-chat-mermaid-diagrams.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/front-composer-file-mentions-and-response-annotations.md	D8	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
@@ -201,7 +201,7 @@ document	docs/design-docs/frontend/front-desktop-chinese-ui.md	D11	按规则校�
 document	docs/design-docs/frontend/front-environment-and-git-actions.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/front-icon-button-tooltip-guidelines.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/front-progressive-session-loading.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/front-runspace-项目工作台草案.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/frontend/front-runspace-项目工作台草案.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/frontend/front-space-工作台设计.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：原样保护；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/front-tailwind-style-architecture.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/front-tool-stream-typography.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
@@ -220,21 +220,21 @@ document	docs/design-docs/frontend/front-聊天输入框规范.md	D11	按规则�
 document	docs/design-docs/frontend/front-设置中心重构规范.md	D7	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/ink-emerald-color-preview.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/frontend/message-queue-demo.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/overview-two-column.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/read-search-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/review-v1-git-review-prototype.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/right-panel-diff-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/right-panel-html-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/right-panel-image-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/right-panel-markdown-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/frontend/overview-two-column.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/frontend/read-search-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/frontend/review-v1-git-review-prototype.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/frontend/right-panel-diff-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/frontend/right-panel-html-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/frontend/right-panel-image-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/frontend/right-panel-markdown-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/frontend/settings-redesign-demo.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/sidebar-chat-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/space-demo-v1.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：原样保护；证据限制见 cleanup-ledger
+document	docs/design-docs/frontend/sidebar-chat-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/frontend/space-demo-v1.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/frontend/space-demo.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：原样保护；证据限制见 cleanup-ledger
-document	docs/design-docs/frontend/thinking-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/frontend/thinking-final.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/index.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
 document	docs/design-docs/model-context/agent-context-model-facts-and-composer.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/model-context/agent-model-catalog-and-usage-cost.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
 document	docs/design-docs/model-context/agent-multi-provider-llm.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/model-context/agent-token-usage-and-context-state.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
@@ -247,18 +247,18 @@ document	docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md	D9
 document	docs/design-docs/tool-system/agent-web-tools.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/website-introduction-site-design.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/design-docs/website-preview-assets/character-01.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-preview-assets/character-02.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-preview-assets/character-03.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-preview-assets/character-04.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-preview-assets/character-05.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-preview-assets/character-07.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-preview-assets/character-08.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-preview-assets/pi-llm-events.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/website-preview-assets/character-02.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/website-preview-assets/character-03.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/website-preview-assets/character-04.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/website-preview-assets/character-05.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/website-preview-assets/character-07.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/website-preview-assets/character-08.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/website-preview-assets/pi-llm-events.png	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/design-docs/website-redesign-demo.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-style-demo.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-style-demo.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-xai-preview.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
-document	docs/design-docs/website-xai-preview.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
+document	docs/design-docs/website-style-demo.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/website-style-demo.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/website-xai-preview.html	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
+document	docs/design-docs/website-xai-preview.md	D11	按规则校准/合并/退役，先保护唯一内容与入链	后续设计文档清理已删除；此前处置列保留当时审查记录
 document	docs/exec-plans/README.md	D10	按规则校准/合并/退役，先保护唯一内容与入链	已结算：修改；证据限制见 cleanup-ledger
 document	docs/exec-plans/active/20260829-actspace-cordis-event-abi-final-acceptance/README.md	P3	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger
 document	docs/exec-plans/active/20260829-actspace-cordis-event-abi-final-acceptance/p00-session-journal-acceptance.md	P3	按规则校准/合并/退役，先保护唯一内容与入链	已结算：保留；证据限制见 cleanup-ledger

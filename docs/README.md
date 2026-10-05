@@ -13,12 +13,11 @@
 | 查验证与安全要求 | [Agent 测试](design-docs/agent-plugin-runtime/agent-testing.md)、[前端验证](FRONTEND_VERIFICATION.md)、[安全](SECURITY.md) |
 | 查变更与学习 | [history 约定](HISTORY_GUIDE.md)、[学习文档](learnings/README.md)、[发布记录](releases/README.md) |
 | 查外部研究或诊断工具 | [参考资料](references/README.md)、[Session Viewer](tools/session-viewer/README.md) |
-| 追溯 v1 | [v1 归档](archive/v1/README.md) |
 
 ## 状态与维护
 
 - 当前实现以源码、公开契约和对应执行摘要共同核对；文档注明部分实施时，不能把目标当作已交付事实。
 - Member、Room、Team 仍是未来产品设计，不代表当前 v2 已实现对应 Runtime。
-- v1 资料集中到 `archive/v1/`。v2 文档在原专题目录持续更新，历史决策注明被替代的范围，不另建 v2 归档树。
-- 已完成实现的计划进入 `completed/`，保留尚未通过的人工门禁；被替代的计划进入 `discarded/`。
-- 历史和学习按原时间组织，执行记录按任务组织；它们可以引用归档，但不构成当前 API 依据。
+- 当前规范在原专题目录持续更新，失效文档经确认后删除。
+- 已完成实现的计划进入 `completed/`，保留尚未通过的人工门禁；被替代的计划经确认后删除。
+- 历史和学习按原时间组织，执行记录按任务组织；其中旧路径只作为当时记录，不构成当前 API 依据。

@@ -1,25 +1,10 @@
 # Agent Skill 设计与加载规范
 
-本文档是 actspace 主 Agent Skill 体系的长期设计事实来源。它回答 Skill 应该长什么样、从哪里发现、如何进入上下文、如何读取正文，以及哪些能力暂不进入第一版。
+当前 v2 Skill 发现、catalog 与按需正文加载规范，2026-10-05 对照 `packages/prompt/src/skills/` 校准。
 
-执行层面的拆分见 `docs/exec-plans/completed/20260603-agent-skill-loading.md`。
+## 目标与内容
 
-## 目标
-
-Skill 是 Agent 的能力扩展机制，用来保存模型默认不知道、容易忘、或项目特有的工作方法。Skill 不只是提示词片段，而是一个目录：`SKILL.md` 负责触发和使用说明，`references/`、`scripts/`、`assets/` 等子目录承载按需探索的资源。
-
-actspace 的 Skill 加载遵循两层渐进式披露：
-
-1. 第一层：每轮 Agent runtime context 构建时，扫描可用 Skill，只注入 `name`、`description`、`scope`、`source`、`location`。
-2. 第二层：Agent 判断任务需要某个 Skill 时，使用已有 `read_file` 工具读取 catalog 中 `location` 指向的 `SKILL.md` 绝对路径。
-
-任务需要更深材料时，Agent 再按 `SKILL.md` 指引，用已有 `read_file`、`list_directory`、`grep` 等读类工具探索 `references/`、查看 `assets/`，或在用户授权后使用相关脚本。
-
-这样做的核心取舍是：让 Agent 知道有哪些能力存在，但不把所有 Skill 正文提前塞进系统提示词，避免上下文膨胀和缓存前缀频繁漂移；同时复用已有读文件工具，不为 Skill 正文读取新增专用工具。
-
-## 目录结构
-
-有效 Skill 必须是包含 `SKILL.md` 的目录：
+Skill 用目录保存任务方法。`SKILL.md` 提供名称、触发描述与使用步骤；相邻 `references/`、`scripts/`、`assets/` 按需读取。发现 Skill 不执行脚本，不改变工具权限。
 
 ```text
 <skill-root>/<skill-name>/SKILL.md
@@ -28,159 +13,53 @@ actspace 的 Skill 加载遵循两层渐进式披露：
 <skill-root>/<skill-name>/assets/
 ```
 
-`references/`、`scripts/`、`assets/` 都是可选目录。第一版只扫描 Skill 根目录的一级子目录，不递归搜索任意深度，避免误扫依赖目录、构建产物或大型仓库。
+典型 frontmatter：
 
-`SKILL.md` 由 YAML frontmatter 和 Markdown 正文组成：
-
-```markdown
+```yaml
 ---
 name: frontend-design
-description: Use when building or improving web UI, layout, visual style, responsive behavior, or frontend interaction details.
-license: MIT
-allowed-tools:
-  - read_file
-  - grep
+description: Use when building or reviewing frontend interfaces.
 ---
-
-# Frontend Design
-
-Use this skill when...
 ```
 
-## Frontmatter 规范
+当前解析器只提取简单的逐行键值，不是完整 YAML 解析器。内部 `id` 优先取 frontmatter `id`，其次 `name`，最后目录名；必须匹配小写字母数字/连字符规则且不超过 64 字符。`description` 必须非空且不超过 1,024 字符。`name` 缺省时采用 `id`。
 
-必需字段：
+不合法 frontmatter、ID 或 description 不进入 catalog。当前没有单条 Skill warning/shadowed DTO；目录读取失败会跳过，已发现文件读取失败可能传播为发现失败，不能承诺所有错误都只产生 warning。
 
-- `name`：Skill 名称，最多 64 字符，推荐小写字母、数字和连字符。
-- `description`：触发条件说明，最多 1024 字符。它应该写“什么时候使用”，而不是只写“这是什么”。
+## 发现根与去重
 
-可选字段：
+按以下顺序扫描，先加入的相同 `id` 生效：
 
-- `license`：许可证或来源说明。
-- `compatibility`：运行环境要求，例如目标产品、系统命令、网络访问要求。
-- `metadata`：附加结构化元数据。
-- `allowed-tools`：该 Skill 期望使用的工具清单。第一版只展示和记录，不自动提升权限。
+1. `<workspaceRoot>/.actspace/skills/`
+2. `<workspaceRoot>/.agents/skills/`
+3. `<workspaceRoot>/.claude/skills/`
+4. `<dataRoot>/skills/`
+5. `<dataRoot>/.actspace/skills/`
+6. `<home>/.agents/skills/`
+7. `<home>/.claude/skills/`
 
-解析策略应宽松：frontmatter 小错误不应阻断普通对话。缺少必需字段、格式不合法或读取失败时，该 Skill 进入 warning 状态，并在 catalog 中暴露 warning 摘要。
+每个根按目录名稳定排序，递归深度上限为 6，每根最多处理 512 个 `SKILL.md`。重复判断使用 `id`，不是显示名称。Catalog 保留来源和绝对路径；来源包括 `.actspace/skills`、`actspace-userData`、`actspace-userData-legacy`、`agents-user` 等实际扫描标识。
 
-## Description 编写原则
+## Prompt 与正文读取
 
-`description` 是 Skill 触发准确性的核心。它不应是泛泛介绍，而应包含明确使用场景和限制。
+Host 在构建运行所需的 prompt source 时调用 `discoverSkills()`。`core/skills-catalog` contributor 注入 `id/name/description/location/source` 与内容 digest provenance，不包含正文。Chat 模式不注入工作区 Skill catalog。
 
-推荐：
+模型可用通用 `read_file` 按 catalog 的绝对 `location` 读取正文，再相对 `SKILL.md` 所在目录探索资源。没有 `load_skill` 专用工具。
 
-```text
-Use when the user asks to create, style, review, or verify frontend UI, including React components, dashboards, landing pages, responsive layouts, visual polish, and browser screenshot QA.
-```
+另有显式选择入口：`core/selected-skills` contributor 根据 selected IDs 读取正文，每份最多注入 65,536 字符；缺少选中 ID 或读取失败会让该 required contributor 失败。不能把这一入口误写成“正文只能通过工具读取”。
 
-不推荐：
+当前没有独立 Skill 正文持久库或不可压缩标记。已读内容遵循 Session Surface 与通用压缩规则，需要时重新读取。`allowed-tools` 等附加 frontmatter 不授予权限。
 
-```text
-A skill about frontend design.
-```
+## 所有权与安全
 
-好的 description 可以适度 pushy：宁可在明显相关任务中稳定触发，也不要让 Agent 错过关键项目知识。但 description 也不应覆盖过宽，避免无关 Skill 被频繁加载。
+- `packages/prompt/src/host-context.ts`：读取 Host / workspace 指令，发现 Skills，形成 prompt source。
+- `packages/prompt/src/skills/`：扫描、catalog、prompt contributor。
+- `packages/runtime/src/harness/agent-factory-plugin.ts`：在 Harness 内装配 contributor，按 Agent mode 选择来源。
+- 文件工具：按统一 Tool Runtime 的读取权限执行正文与资源读取。
+- Host：负责来源目录与凭据边界；renderer 不直接读本地 Skill 文件。
 
-## 发现路径
+不扫描误拼目录，不自动安装、执行脚本或放宽 workspace/Session 权限。未来缓存、文件监听和更完整 YAML 支持需明确新增合同。
 
-actspace 同时兼容项目级、用户级、actspace 私有生态、跨客户端 `.agents` 生态和 Claude 兼容目录。
+## 验证入口
 
-扫描根按优先级排列如下：
-
-| 优先级 | scope | source | 路径 |
-| --- | --- | --- | --- |
-| 1 | project | actspace | `<workspaceRoot>/.actspace/skills/` |
-| 2 | project | agents | `<workspaceRoot>/.agents/skills/` |
-| 3 | project | claude | `<workspaceRoot>/.claude/skills/` |
-| 4 | user | actspace-userData | `<userData>/skills/` |
-| 5 | user | actspace-userData | `<userData>/.actspace/skills/` |
-| 6 | user | agents | `<home>/.agents/skills/` |
-| 7 | user | claude | `<home>/.claude/skills/` |
-
-标准路径使用 `skills` 复数形式。若本地历史中出现误拼目录，例如 `.agents/skilll/`，第一版不把它固化为正式扫描源；可以在迁移或诊断中提示用户改为 `.agents/skills/`。
-
-## 去重与优先级
-
-同名 Skill 只保留一个可用版本：
-
-- 项目级优先于用户级。
-- 同一 scope 内，按上表 source 顺序优先。
-- 同一 source 内，按目录名稳定排序，保证 catalog 输出确定。
-
-被覆盖的 Skill 不进入可加载 catalog，但可以在诊断结果里记录为 `shadowed`，便于排查为什么某个全局 Skill 没生效。
-
-## Catalog 注入
-
-Skill catalog 作为 `SystemPromptContext` 的 `skills` bucket 注入，并使用稳定 segment。注入内容只包含元信息，不包含正文。
-
-建议格式：
-
-```xml
-<available_skills>
-  <skill>
-    <name>frontend-design</name>
-    <description>Use when building or improving web UI...</description>
-    <scope>project</scope>
-    <source>agents</source>
-    <location>/abs/path/.agents/skills/frontend-design/SKILL.md</location>
-  </skill>
-</available_skills>
-```
-
-`location` 必须是绝对路径，用于让 Agent 在需要时直接调用 `read_file` 读取 `SKILL.md`，也让它能理解 Skill 内部资源的相对路径边界。
-
-当没有发现 Skill 时，catalog segment 可以不注入；Context usage 的 `skills` bucket 为 0。
-
-## Skill 正文读取
-
-Skill 正文读取复用通用 `read_file` 工具，不新增 `load_skill` 专用工具。
-
-推荐调用：
-
-```json
-{ "path": "/abs/path/.agents/skills/frontend-design/SKILL.md" }
-```
-
-读取结果就是 `SKILL.md` 原文，包含 frontmatter 和 Markdown 正文。Agent 应按 frontmatter 判断名称、描述和兼容性，按正文执行具体工作流。
-
-如果正文引用了相对路径，例如 `references/style-guide.md`，Agent 应以 `SKILL.md` 所在目录为基准解析。需要列资源时使用 `list_directory`；需要搜索引用材料时使用 `grep` 或 `glob`。
-
-读取 Skill 不执行脚本、不授予额外权限、不绕过现有工具权限系统。脚本是否运行仍由 bash/权限审批等既有机制决定。
-
-## 上下文与压缩
-
-Skill catalog 属于系统级上下文，稳定性低于核心 system prompt，高于普通 conversation。它应该进入 `skills` bucket，便于 Context Popup 和 token usage 显示。
-
-已读取 Skill 正文是当前会话的行为指导，原则上不应被历史压缩错误吞掉。第一版先依赖工具结果保留和压缩提示；如果后续引入专门的 protected tool result 标记，应让 Skill `read_file` 结果进入不可压缩或可重新读取提醒路径。
-
-如果未来必须压缩已加载 Skill 内容，压缩摘要中必须显式说明“Skill 内容已被压缩，如有需要请重新加载”，避免 Agent 误以为仍持有完整指令。
-
-## 安全边界
-
-第一版采用保守只读策略：
-
-- 只自动扫描 `SKILL.md` frontmatter 并注入 catalog；正文和资源由 Agent 按需用已有读类工具读取。
-- 不自动执行 Skill 目录内脚本。
-- 不因 `allowed-tools` 自动放宽工具权限。
-- 项目级 Skill 标记 `scope=project`，用户级 Skill 标记 `scope=user`。
-- 读取失败、frontmatter 异常、重复覆盖等情况都只产生 warning，不阻断普通 turn。
-
-后续可增加 workspace trust 配置、按 source 禁用、Skill 管理 UI、文件监听和加载缓存。
-
-## 与现有模块的关系
-
-- `apps/desktop/src/main/runtime-v2/` 负责装配真实 turn 的 runtime context，应在这里把 Skill catalog 与 AGENTS.md rules 一起注入。
-- `packages/prompt/src/` 提供 v2 的 Prompt Contributor、Skill discovery 和上下文组装边界。
-- `packages/tools/filesystem-read/`、`packages/tools/filesystem-search/`、`packages/tools/filesystem-write/`、`packages/tools/shell-tools/`、`packages/tools/web-tools/`、`packages/tools/image-generation/`、`packages/tools/image-inspection/` 提供受 Host capability 约束的读类工具，Skill 正文和资源读取复用统一 Tool Runtime。
-- `packages/shared/src/runtime-v2/` 保存 v2 跨进程投影与公共契约，不新增旧版 context bucket。
-
-## 第一版不做
-
-- 不做 Skill 安装器。
-- 不做 Composer Skill 菜单和 UI 管理。
-- 不做 `load_skill` 专用工具；Skill 正文读取复用 `read_file`。
-- 不做文件监听热更新；每轮 runtime context 构建时重新扫描即可。
-- 不做 subAgent 隔离执行。
-- 不递归扫描任意目录。
-- 不把 `.agents/skilll/` 误拼路径纳入正式规范。
-- 不自动执行 `scripts/` 下任何文件。
+`packages/prompt/src/test/discovery.test.ts`、`host-context.test.ts` 与 contributor 测试覆盖根目录优先级、去重、目录注入、显式正文及 Chat 隔离。脚本执行的真实权限和副作用仍由工具验收负责。

@@ -8,10 +8,10 @@
 
 - [外观强调色](front-accent-palette.md)：已实施，Electron 验收待做；强调色覆盖范围、调色板色值、对比度门槛与 `data-accent` 机制。
 - [设置内使用统计页面更新](front-usage-statistics-refresh.md)：已实施，实机门禁见执行摘要；借鉴 Maka 信息结构，统一 ActSpace 视觉和中文，连接可靠费用投影及本地价目。
-- [英语辅助学习插件设计](../agent-plugin-runtime/agent-english-learning.md)：已实施，实机门禁见执行摘要；扩展能力卡片控制选定会话，通用设置配置 MiniMax 语音。
+- [英语辅助学习插件设计](../agent-plugin-runtime/agent-english-learning.md)：提示词与 MiniMax 朗读设计；当前 live Agent 绑定存在接线限制，详见正文。
 - [Agent 工具流式渲染修复设计](front-agent-tool-stream-rendering.md)：已实施，定义工具事件链与实时/历史预览对齐；体验调整见后续计划。
 
-本目录汇总 `actspace` 桌面端 renderer 的视觉语言、主题、工程样式、基础组件、工作台区域、页面规范和设计原型。目录中的 Markdown、HTML 和 PNG 均直接平铺，不再创建资产子目录。
+本目录汇总 `actspace` 桌面端 renderer 的视觉语言、主题、工程样式、基础组件、工作台区域、页面规范和设计原型。Markdown 规范与主要 HTML 原型位于本层；Space 原型的配套图片集中在 `assets/`。
 
 当前产品级设计系统名称为 **ActSpace Editor Design System**，内部视觉方向为 **Ink & Emerald / 墨色与翡翠绿**。总纲见仓库根目录 `DESIGN.md`。
 
@@ -68,46 +68,15 @@
 - `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的产品信息架构、页面职责、模型连接流程、身份设置、Usage 活动分析和实施边界。后续设置中心实现以本文为准。
 - `docs/design-docs/frontend/front-模型设置页面-Maka重做规范.md`：模型页面的 Maka 风格重做规范，冻结连接列表、目录、配置、详情和模型目录的页面语法与验收标准。
 
-旧设置页、独立 Usage、Kairos 和 Lab 原型属于已退役/暂停的 v1 设计资产，统一归档在 [v1 归档](../../archive/v1/README.md)，不作为当前桌面端页面入口。
-
-## 结构参考图
-
-> 以下 PNG / HTML 记录迁移前的历史实现状态，其中部分仍使用蓝色主强调。结构和交互可以参考；颜色、层级和状态职责以 `DESIGN.md`、全局视觉语言和主题规范为准。
-
-![两栏总览图](overview-two-column.png)
-
-![Composer 定稿图](composer-final.png)
-
-![Context 定稿图](context-popup-final.png)
-
-![Thinking 定稿图](thinking-final.png)
-
-![Read / Search 定稿图](read-search-final.png)
-
-![左侧会话栏定稿图](sidebar-chat-final.png)
-
-![右侧 Markdown 定稿图](right-panel-markdown-final.png)
-
-![右侧 HTML 定稿图](right-panel-html-final.png)
-
-![右侧 Image 定稿图](right-panel-image-final.png)
-
-![Review V1 历史基线图](right-panel-diff-final.png)
-
 
 ## HTML 原型
 
-- `actspace-deepseek-workbench.html`：工作台高保真原型。
-- `agent-subagent-flow-prototype.html`：Agent 工具与 Subagent 执行流原型。
-- `compact-command-states.html`：`/compact` 消息流三态及浅深主题原型。
 - `space-demo.html`：2026-10-03 Space 工作台交互 demo（左栏会话列表、中间协调 Agent / 工作 Agent 标签页、右栏 Agents / 库 / 记忆、状态胶囊与审批托盘；浅深双主题）。
-- `space-demo-v1.html`：2026-10-02 第一版 demo（主会话 + 线程，右栏推入详情），已被 `space-demo.html` 取代，仅留作对照。
 - `settings-redesign-demo.html`：2026-09-25 设置中心视觉重设计定稿 demo（内嵌分组 + 翡翠绿开关 + 独立「搜索」页 + 使用统计微调）；右下角调节面板只用于方案对比。
-- `review-v1-git-review-prototype.html`：Review V1 Git-first 右侧面板历史原型；新 Workbench 以 `../core-review-change-sources.md` 为准。
 
 ## 资产约定
 
-- 图片和原型直接放在本目录，不创建 `assets/` 或 `public/` 子目录。
+- 主要原型放在本目录；成组配套素材可集中放入 `assets/`，引用必须能从原型或规范追踪。
 - 每个资产尽量只表达一个明确状态，并使用可识别的功能名。
 - 新增资产时同步更新本入口或对应组件规范，写清它验证的状态。
 
@@ -116,4 +85,3 @@
 ## 工具流交互演示
 
 - [消息流排版演示](tool-stream-typography-demo.html)：静态排版与工具摘要视觉参考。
-- [Explore 工具归组演示](tool-experience-explore-demo.html)：工具流交互原型，不代表运行时验收。

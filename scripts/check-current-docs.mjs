@@ -24,7 +24,7 @@ export const currentTruthFiles = [
   "docs/design-docs/core-storage-and-observability.md",
   "docs/design-docs/model-context/agent-token-usage-and-context-state.md",
   "docs/design-docs/model-context/agent-multi-provider-llm.md",
-  "docs/design-docs/agent-runtime/agent-turn-layers.md",
+  "docs/design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md",
   "docs/design-docs/agent-runtime/agent-observability-trace-model.md",
   "docs/design-docs/agent-plugin-runtime/README.md",
   "docs/design-docs/agent-plugin-runtime/agent-testing.md",
@@ -175,7 +175,7 @@ export async function checkDocumentationLinks(repoRoot, directories) {
 export async function checkCurrentDocs(repoRoot) {
   const [claims, links] = await Promise.all([
     checkMarkdownFiles(repoRoot, currentTruthFiles),
-    checkDocumentationLinks(repoRoot, ["docs/design-docs", "docs/archive", "docs/exec-plans", "docs/exec-runs"]),
+    checkDocumentationLinks(repoRoot, ["docs/design-docs", "docs/exec-plans", "docs/exec-runs"]),
   ]);
   return [...new Set([...claims, ...links])];
 }
@@ -192,6 +192,6 @@ if (isMain) {
     process.stderr.write(`current docs check failed (${failures.length}):\n${failures.join("\n")}\n`);
     process.exitCode = 1;
   } else {
-    process.stdout.write(`current docs check passed (${currentTruthFiles.length} truth files; design/archive/plans/runs links and assets)\n`);
+    process.stdout.write(`current docs check passed (${currentTruthFiles.length} truth files; design/plans/runs links and assets)\n`);
   }
 }

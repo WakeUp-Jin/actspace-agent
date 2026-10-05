@@ -258,8 +258,10 @@ export function createIpcRegistry(getWindow: () => BrowserWindow | undefined) {
   - 退出应用 → 无残留 Browser Bridge / SSH 子进程。
   - CSP 打开后：mermaid、代码高亮、HTML 预览、图片附件、xterm 正常，控制台无 CSP 违规。
 
-## 7. 开放问题
+## 7. 开放问题（2026-10-05 已拍板）
 
-1. 终端生命周期：窗口关闭时直接销毁终端，还是保留到会话结束、允许新窗口重新 attach？
-2. 设置迁移最早要支持到哪个版本？v1 数据是否还需要自动迁移？
-3. IPC 入参校验用 zod（新增依赖）还是手写 guard？
+1. 终端生命周期：**窗口关闭时销毁该窗口拥有的终端**，不做重新 attach。
+2. 设置迁移版本：S8（拆分 `settings-service`）只搬代码不改逻辑，历代迁移代码原样保留，不涉及此问题。
+3. IPC 入参校验：**手写 guard**，不引入 zod。
+
+范围调整：S6 并入 [13 执行计划](13-Preload与MockBridge执行计划.md)；S7（`applyToEnv` 退役）本轮不做，以后单独设计（本轮只核实子进程是否继承这些 Key）；S8 单独成 [17 执行计划](17-settings-service拆分执行计划.md)；S9 并入 [15 执行计划](15-运行目标执行计划.md)。

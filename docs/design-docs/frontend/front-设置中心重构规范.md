@@ -311,29 +311,9 @@ Agent System Prompt
 
 取消独立的“智能体”页面，不取消子 Agent 能力。
 
-第一版页面只展示真实存在的 Explore 路由：
+当前页面展示 Explore 的只读能力说明和模型选择，未单独设置时跟随默认会话模型。可选模型来自 `listUsableModels({ purpose: "explore" })`，保存走 `updateTaskModels({ exploreModel })`。
 
-```text
-子 Agent
-└── Explore
-    ├── 用途说明
-    ├── 能力边界
-    ├── 模型连接
-    ├── 模型
-    ├── 思考级别
-    └── 是否启用
-```
-
-Explore 是只读代码探索能力，不等同于主 Agent，也不负责完整实现。
-
-规则：
-
-- Connection → Model → Thinking level 级联选择。
-- 上层选择变化时，重新计算下层可用选项。
-- 引用失效时保留失效值并显示原因，不静默切换。
-- 停用保留配置，删除才移除 preset。
-- 删除 preset 不删除已产生的历史子任务或会话。
-- 未来新增其他子 Agent 时复用同一 preset 结构，不再创建新的“智能体总设置页”。
+当前页面没有独立连接、思考级别、启停或 preset 删除控件；这些能力不能作为已实现验收项。Explore 只读代码探索不等同于主 Agent，也不负责完整实现。
 
 ### 6.5 工具
 
@@ -688,7 +668,6 @@ Usage UI
 
 - 连接删除必须明确影响范围。
 - 删除连接不删除历史数据。
-- 删除子 Agent preset 不删除历史子任务。
 - 清理 Usage 只能作用于明确的 Usage 数据，不得碰 Session Journal、设置或密钥。
 - 任何删除失败都保留原列表和原状态，不乐观移除后静默失败。
 

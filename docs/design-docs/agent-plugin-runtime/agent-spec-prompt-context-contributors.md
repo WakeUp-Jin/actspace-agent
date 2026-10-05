@@ -80,7 +80,7 @@ Contributor 不得：
 - `request-fact` 是用于审计、诊断和重放解释的动态事实，例如 `agentRunId`、Host invocation identity 与单次 request identity；它进入 snapshot 的 `facts`，但不进入 system prompt；
 - snapshot schema v2 同时保存 `facts` 和 `modelFacts`。读取 schema v1 时可将旧 `facts` 作为历史模型事实解释，不能修改已落盘 Journal。
 
-模型需要的逐轮动态事实不得重新塞回 system prompt。Agent 的 `plan/agent` 模式作为持久化 `runtime-context` 内容块追加在当前 `user/message` 末尾，使现场请求和后续 Surface 重放看到同一份动态尾部。Chat 形态固定，不写该块。renderer、标题和自然语言 Compaction 摘要必须隐藏它，但 Context token estimate 仍计算它。
+模式是同一形态的 `chat/plan/agent` 状态，不是固定 Chat 形态。当前 Loop 在自行创建 `user/message` 时附加 `runtime-context`，不按 Chat 排除；已由 TaskLedger 提交的消息不会重复追加或改写。Run 的实际模式/修订同时记录在 `turn/start` 与 `request/header`。renderer、标题与自然语言摘要过滤内部控制块。
 
 需要网络、文件或外部进程的动态能力应先由拥有它的 Service 产生受约束事实 snapshot，再由 Contributor 读取该 snapshot。Request Assembly 不是隐藏的工具执行器。
 
@@ -225,7 +225,7 @@ Compaction 只能：
 - cache miss、进程重启或 cache 丢失不能改变语义输出。
 - Runtime 进入 quiescing 后拒绝新的 assembly，并等待已准备的 LLM / Tool leases 结束或协作取消。
 
-v2.0 配置和插件代码变更采用 restart-only。运行中检测到变化只产生 `restartRequired` diagnostic，不设计 Prompt generation manager 或在线 Contributor rebind。
+Host 基底与 codec 变更通过受控重启生效；Harness 内的 Prompt/Contributor 随完整候选独立装配，新 Run 使用新组合，旧 Run 保留原租约。不在已有 Run 内重新绑定 Contributor，也不另建 Prompt generation manager。
 
 ## 13. 失败与诊断
 

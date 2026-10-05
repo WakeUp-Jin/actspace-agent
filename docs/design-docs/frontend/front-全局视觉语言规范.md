@@ -36,7 +36,7 @@ ActSpace 的视觉气质是：安静、精确、克制、高密度、适合长�
 - 浅色主题：近黑底、浅色文字或图标。
 - 深色主题：近白底、深色文字或图标。
 
-用于发送、确认提交等最高优先级动作。普通按钮和导航项继续使用中性 surface。
+用于确认提交等最高优先级动作。发送按钮默认回落到此反色，用户选择强调色后使用 accent；普通按钮和导航项继续使用中性 surface。
 
 ### Operational accent
 
@@ -44,7 +44,7 @@ ActSpace 的视觉气质是：安静、精确、克制、高密度、适合长�
 
 - Agent 正在运行。
 - 已连接、在线、健康。
-- Toggle 开启。
+- 默认强调色下的 Toggle 开启；其他调色板使用 toggle-on 映射到用户强调色。
 - 成功、确认和 diff additions。
 - 必要的 operational focus / progress 反馈。
 
@@ -137,7 +137,7 @@ AI 输出正文继续跟随 UI 字体，代码、diff、Bash 和行内 code 使�
 - 时间戳、徽标、kicker：11px；界面中不再出现小于 11px 的字。
 - Sidebar 分区标题：12px。
 - Sidebar 主入口、会话标题、Settings、文件名：13px。
-- 消息正文、Thinking、工具行：14px。
+- Thinking、工具行：14px；消息正文默认 16px，完整排版规则见 `front-tool-stream-typography.md`。
 - Composer 输入：16px。
 - 页面和主要面板标题：20–24px。
 - 代码、diff、Bash：13px。

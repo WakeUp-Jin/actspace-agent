@@ -95,7 +95,7 @@ SessionRecord / Context / Usage
 
 ## Context、Usage 与 Trajectory
 
-当前 Context 面板没有独立持久化文件。Desktop 从最近一次 `request/snapshot` Journal event 生成 Context entries、bucket 和 token 估算：
+当前 Context 面板没有独立持久化文件。Desktop 从最近一次 `request/context` Journal event 生成 Context entries、bucket 和 token 估算：
 
 - `systemSections` -> System Prompt、Rules、Skills；
 - `tools` -> Tool Definitions；

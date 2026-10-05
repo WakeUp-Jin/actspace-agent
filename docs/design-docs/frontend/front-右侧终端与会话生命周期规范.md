@@ -72,7 +72,7 @@ Review      Context
 Objects     Reply
 ```
 
-Terminal Tab 使用 `Terminal` 作为基础标题；存在多个终端时可显示 `Terminal 2`、`Terminal 3`。首版底层支持每会话多终端，UI 在终端视图顶部提供轻量 `+` 创建入口，不引入独立 IDE 终端面板树。
+Terminal Tab 使用 `Terminal` 作为基础标题；存在多个终端时可显示 `Terminal 2`、`Terminal 3`。底层支持每会话多终端，UI 通过右侧对象栏已有的 `+` 菜单创建，不在终端内容区重复提供创建入口，也不引入独立 IDE 终端面板树。
 
 ### 宽度与紧凑布局
 

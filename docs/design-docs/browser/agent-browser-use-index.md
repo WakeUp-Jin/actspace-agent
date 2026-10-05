@@ -1,155 +1,43 @@
 # Browser Use 设计专题入口
 
-本文档是 ActSpace Browser Use 设计的专题导航和架构口径入口。详细命令参数、实现草图和阶段计划仍分别维护在相邻文档中；当这些文档的历史阶段描述与本文冲突时，以本文和当前 active execution plan 为准。
+Browser Use 接入用户真实 Chrome。当前实现是 11 个模型工具通过 Unix socket 调用 Go command engine，再由 Chrome Extension 执行 Chrome API / CDP 原语。命令 registry 是命令 ID、schema、风险和实现状态的机器事实来源。
 
-> 2026-09-28 连接体验正在按 `docs/exec-plans/active/20260928-chrome-connect-experience.md` 执行。当前产品路线只有 Chrome Extension → Native Messaging Host → Browser Tools；多 backend 与内嵌浏览器不在本轮范围。Host 采用每实例独立 socket，连接授权不等于浏览器写操作授权。下面 Plan 5 的验收陈述是历史阶段记录，不代表本轮首次连接、打包安装和真实 Chrome 验收已经完成。
+## 当前职责
 
-## 当前结论
-
-Browser Use Plan 5 已完成：62/62 canonical commands 全部由 Go handler 实现，Agent Core 稳定注册 9 个分类工具、`browser_help` 和 `browser_run`，真实 Chrome profile、Agent approval/denial 和跨 session isolation 均已验收。模型默认只看到 `browser_help`；入口成功后，从下一次 LLM 调用开始在当前 `Agent.run()` 内披露完整 11 工具。完整 Plan 5 证据见 `docs/exec-plans/completed/20260710-browser-use/plan-5-go-command-engine-convergence.md`。
-
-- Agent Core 保持薄，只负责工具定义、审批、预览、Socket client 和 turn 生命周期。
-- Go Browser Bridge 是 62 条命令的 canonical registry 和高层 command engine，负责参数验证、session、CUA、DOM CUA、Locator、等待、重试、事件和批处理编排。
-- 页面内 DOM 语义由插件内自研 TypeScript Locator Runtime 提供：开发期构建为单一 JavaScript 产物，Go 使用 `go:embed` 打入二进制，再通过 CDP `Runtime.evaluate` 注入页面。产品运行时不依赖 Node、Playwright 或 Codex bundle。
-- Chrome Extension 只保留 Chrome 权限域内的原语：Native Messaging、`chrome.debugger`、Tabs、History、Tab Groups、Downloads、事件转发和 cursor content script。
-- 模型默认只看到 `browser_help`；成功调用后下一次 LLM 请求看到完整 11 工具，下一条用户消息重新恢复为单入口。62 条叶子命令不会平铺成 62 个模型工具。
-- CLI 保留安装、诊断、人工调用和机器可读帮助能力，但不再是 Agent 正常执行 Browser Use 的主接入面。
-
-## 目标架构
-
-```text
-Model
-  -> browser_help gateway
-  -> next LLM call: 9 category tools + browser_help + browser_run
-  -> packages/tools/browser-tools Browser capability adapter
-       - definitions / approval / preview
-       - BridgeClient / turn lifecycle
-  -> Unix socket
-  -> Go Browser Command Engine
-       - canonical registry for 62 commands
-       - validation / session / CUA / DOM CUA / Locator
-       - waits / retries / events / action plan
-       - CLI help and schema generation
-  -> Extension primitive RPC
-       - attach / detach / executeCdp
-       - tabs / history / tabGroups / downloads
-       - event forwarding / cursor
-  -> chrome.debugger / Chrome APIs
-  -> user's Chrome profile
-```
-
-## 唯一职责表
-
-| 层 | 负责 | 不负责 |
-| --- | --- | --- |
-| Agent Core | 11 个稳定注册工具、1→11 渐进 schema 披露、用户审批、preview、输出裁剪、Socket 生命周期 | CDP 序列、selector 实现、导航等待、Chrome API |
-| Go Command Engine | 62 条 registry、严格参数验证、高层 handler、session/tab 状态、CUA/DOM CUA/Locator、等待/重试/事件、批处理 preflight | 用户审批最终决定、直接调用浏览器扩展 API |
-| Injected Locator runtime | 结构化 css/role/text/label/placeholder/test-id Locator、accessible name、open Shadow DOM、单 Frame context 内的 strict match、页面内自动等待/actionability、文本/属性与表单 DOM 语义 | 任意模型 JS、Chrome API、session/权限、跨域/OOPIF 的宿主路由 |
-| Chrome Extension | Native Messaging、`chrome.debugger`、Chrome Tabs/History/TabGroups/Downloads、事件与 cursor 原语 | 高层 command registry、selector 编排、Agent 工具与权限 |
-
-## Agent 工具面
-
-初始模型可见工具：
-
-1. `browser_help`
-
-`browser_help` 成功执行后，从下一次 LLM 调用开始在当前 `Agent.run()` 内披露：
-
-1. `browser_cua`
-2. `browser_dom`
-3. `browser_locator`
-4. `browser_navigation`
-5. `browser_tabs`
-6. `browser_user`
-7. `browser_wait`
-8. `browser_io`
-9. `browser_debug`
-10. `browser_help`
-11. `browser_run`
-
-ToolManager 始终注册上述 11 个 executor；渐进披露只改变模型 definitions，不改变执行器、Socket client 或审批器的注册生命周期。隐藏工具在披露前即使被模型生成，也按不存在拒绝执行。
-
-既有 15 个 `browser_*` 首版工具只保留迁移期 alias 和旧 session preview 兼容，不再作为新模型默认工具面。
-
-## Playwright 命名边界
-
-本项目不引入 `playwright` 或 `playwright-core` 运行时依赖，也不复制 Codex 的大型 Node browser client；Locator 行为由 ActSpace 按 DOM、HTML 与 WAI-ARIA 语义自研。
-
-- 模型可见名称使用 `browser_locator`。
-- 既有 62 条 canonical command ID 暂时保留 `playwright_*` 前缀，作为命令兼容 ID。
-- 模型优先传结构化 `target`，支持 `css / role / text / label / placeholder / test_id`；旧 `selector` 继续作为 CSS 兼容入口。
-- Runtime v5 已实现 accessible name、隐式 role、显式/隐式 label、open Shadow DOM、strict match、稳定/可见/启用/可编辑/receives-events 检查和页面内自动等待。
-- `frame_path` 由 Go 逐层解析 frame element；同源 Frame 可直接进入子 context，跨域/OOPIF 则通过 `DOM.describeNode -> frameId -> flat CDP session -> Page.createIsolatedWorld` 路由到子 Frame。Extension 只维护 frameId/sessionId 映射和 primitive CDP 转发。
-
-## 阅读顺序
-
-1. `docs/design-docs/browser/agent-browser-use-index.md`：当前架构和状态入口。
-2. `docs/design-docs/browser/agent-browser-use-integration-design.md`：Agent、Go、Extension 的集成方式和模型工具面。
-3. `docs/design-docs/browser/agent-browser-use-command-surface.md`：62 条 canonical command 的参数和行为语义。
-4. `docs/design-docs/browser/agent-browser-use-command-implementation.md`：每条命令的 CDP 原语和实现草图。
-5. `docs/design-docs/browser/agent-browser-bridge-design.md`：Browser Bridge 的宿主、传输、安装和 backend 边界；其中 CLI-first v0 章节只作历史记录。
-6. `docs/exec-plans/completed/20260710-browser-use/plan-5-go-command-engine-convergence.md`：已完成的执行顺序、验证和回退策略。
-
-## 事实来源
-
-| 主题 | 事实来源 |
+| 层 | 负责 |
 | --- | --- |
-| 当前架构边界 | 本文档 |
-| 模型工具面与集成生命周期 | `docs/design-docs/browser/agent-browser-use-integration-design.md` |
-| 62 条命令 ID、参数、返回语义 | `docs/design-docs/browser/agent-browser-use-command-surface.md` |
-| CDP 调用链与实现状态 | `docs/design-docs/browser/agent-browser-use-command-implementation.md` 和未来 Go registry |
-| 安装、Native Messaging、Extension/CDP backend 边界 | `docs/design-docs/browser/agent-browser-bridge-design.md` |
-| 当前实施进度 | Plan 5 与 Go canonical registry |
+| `packages/tools/browser-tools` | 工具定义与注册、action 风险判断、结果脱敏与裁剪、Turn transport |
+| Desktop Host | 组件准备、实例发现与验证、绑定 socket、向 Runtime 提供 Browser capability |
+| Go command engine | 62 条 canonical command、参数校验、Session/tab ownership、CUA/DOM CUA/Locator、等待与批处理 |
+| Injected Locator runtime | 页面内定位、accessible name、open Shadow DOM、actionability、文本与表单语义 |
+| Chrome Extension | Native Messaging、`chrome.debugger`、Tabs/History/TabGroups/Downloads、事件转发与光标 |
 
-命令数量、分类、schema、risk、preview、backend 和 implementation status 以 Go registry 为机器事实来源；`scripts/check-browser-command-registry.mjs` 同步生成 Agent action metadata，并检查 62 条文档标题 parity。
+当前只有 Chrome Extension 路线。CLI 保留安装、诊断、人工调用和机器可读帮助；Agent 正常调用不经过 Bash CLI。
 
-## 2026-07-10 实现状态
+## 模型工具面与权限
 
-- Go registry：62/62 `implemented`，且全部使用 `go.*` handler。
-- Agent Core：稳定注册 11 个模型工具，普通模型调用默认只暴露 `browser_help`；入口成功后，下一次模型调用才披露其余工具。旧 15 工具仅保留 alias 与 preview 读取兼容。
-- Browser 读取输出：`browser_dom.snapshot` 使用 50K DOM 专属保真通道；精确 `browser_help(category, action)` 使用 20K schema 保真通道；Locator 批量读取支持 offset/limit 分页；`browser_run` 向模型返回逐 action 真实结果。
-- Extension：旧 `playwright-injected.js` 和 click/fill/select/scroll 等高层 handler 已删除，只保留 primitive backend、Chrome APIs、事件转发与 cursor。
-- 测试：Go、registry parity、Locator fixture、Agent Core Socket integration、desktop typecheck 已通过。
-- 真实环境：Extension 0.2.1、Locator runtime v3 与原子部署 Native Host 已完成多轮 reload/重连验收；确定性 fixture、I/O、claim/handoff、deliverable、Agent approval/denial 和 A/B session isolation smoke 均通过。Locator runtime v4 的 DOM 保真与分页源码测试已通过；品牌与 cursor runtime v2 随 Extension 0.2.2 源码完成，两者都需 reload 后进入真实 Chrome。
+Browser capability ready 后注册 9 个分类工具和 `browser_help`、`browser_run`。Agent 模式允许完整 11 工具；Chat / Plan 的白名单不包含 Browser 工具。实际工具集合还受当前 registry 和调用范围限制。`browser_help` 查询 schema，不承担调用后才解锁其他工具的职责。
 
-## 2026-07-17 Locator Runtime v5 进展
+分类工具为 `browser_cua`、`browser_dom`、`browser_locator`、`browser_navigation`、`browser_tabs`、`browser_user`、`browser_wait`、`browser_io`、`browser_debug`。62 条叶子能力通过 category/action 调用，不平铺为 62 个模型工具。
 
-- 插件新增 `internal/locator/runtime-src/*.ts`，通过确定性 esbuild 脚本生成 `generated/runtime.js`，并由现有 Go `go:embed` 链路进入单一二进制。
-- 结构化 Locator 已进入 Go command schema、command router、Agent Core `browser_locator` schema 和 preview；旧 CSS `selector` 保持兼容。
-- jsdom fixture 已覆盖 role + accessible name、`aria-labelledby`、显式/隐式 label、placeholder、open Shadow DOM、同源 iframe、延迟元素自动等待和既有 DOM/clipboard/pagination 行为。
-- Go Locator engine 已实现 frame element 解析、frameId 获取、isolated world 创建、frame-scoped runtime 注入和坐标回算；Extension 已按 Chrome flat session 语义递归跟踪 OOPIF child session。
-- `pnpm check:browser` 增加 Runtime TypeScript 类型检查和生成产物漂移检查。
-- 源码与 mock acceptance 已覆盖跨域/OOPIF 路由；真实 Chrome v5 acceptance 仍需在本地 unpacked extension reload 后关闭，当前验收状态以 active execution plan 为准。
+- `browser_help` 允许读取命令说明；未知 action 拒绝。
+- 已知只读 action 允许；写 action 在 `default` 权限模式请求审批，`full-access` 按其权限语义允许。
+- 批处理按全部 action 判断风险，并由 Go preflight 签发绑定 action 参数和 Turn 的 token；该 token 不等于用户批准。
+- Desktop 的连接授权不授予 Session 内所有写操作通用权限。
+- Browser 文本经过脱敏和裁剪后进入普通 `tool/result` 持久化；截图存为 Session artifact。不能承诺读取结果仅临时存在。
 
-## 2026-07-25 渐进式工具披露
+## 生命周期
 
-- ToolManager 将“executor 已注册”和“definition 对模型可见”分离；非 Browser 工具继续始终可见。
-- `browser_help` 是 Browser progressive disclosure gateway，成功结果只写入 pending group；Agent Loop 到下一次 LLM 调用前才提交，避免同一批 tool calls 顺序执行时意外放行隐藏工具。
-- 披露范围是单次 `Agent.run()`；下一条用户消息会重置为仅 gateway 可见。
-- Context usage、Context 完整视图和手动 compact 统一消费 `getToolDefinitions()`，不再从全部注册工具重新组装。
-- 设置页首屏只显示“浏览器”总开关；分类工具、批处理和高风险 capability 位于默认折叠的高级设置中。关闭总开关保留子项偏好，并同时移除 Browser prompt segment 与 Socket runtime 注入。
+每个 Chrome 扩展实例启动自己的 Native Host，并发布独立 socket。Desktop 绑定已验证实例；多个实例不能隐式选定。Browser transport 按 `sessionId + turnId` 懒创建并复用，Turn 结束后关闭。执行中断线不会自动重放写操作，恢复连接后由新的 Turn 使用重新验证的 capability。
 
-## 已确认设计闸门
+页面 Locator 源码为 TypeScript，构建为 JavaScript 后由 Go `go:embed` 打入二进制，经 CDP 注入页面。产品运行时不需要 Node 或 Playwright。模型使用 `browser_locator`；canonical ID 的 `playwright_*` 前缀仅为兼容命名。
 
-2026-07-10 用户确认：
+## 阅读与维护
 
-- 采用 9 个分类工具 + `browser_help` + `browser_run`，不平铺 62 个工具。
-- 模型层使用 `browser_locator`，canonical command ID 保留 `playwright_*`。
-- Go 负责 CUA、DOM CUA、Locator、导航等待和事件编排；Extension 只执行 Chrome/CDP 原语；injected JS 只负责页面内 DOM 语义。
-- 当前核心范围为既有 62 条命令，`tab_content_export*` 留作未来 capability extension。
-- raw CDP 只保留 CLI 诊断入口，不默认暴露给 Agent。
-- Browser Use 使用一次性 Session 授权租约：除 `browser_help` 外，当前应用运行期间某 Session 第一次调用 Browser 工具时只展示“允许 / 拒绝”。允许后该 Session 后续 Browser 工具不再重复审批；拒绝或超时只阻止当前 Turn，下一次用户输入可重新申请。
-- `browser_run` 仍执行整批 preflight 和 capability hard deny，但用户交互复用上述 Session 授权，不再单独按 action 重复弹窗。
-- 旧 15 个工具保留一个迁移阶段的 alias 与旧会话兼容。
+1. [集成设计](agent-browser-use-integration-design.md)：工具、传输、权限和输出边界。
+2. [命令面](agent-browser-use-command-surface.md)：62 条命令参数与行为。
+3. [命令实现](agent-browser-use-command-implementation.md)：实现分层、CDP 原语与源码导航。
+4. [Bridge 设计](agent-browser-bridge-design.md)：Host、安装、实例路由与宿主边界。
+5. [当前连接体验执行计划](../../exec-plans/active/20260928-chrome-connect-experience.md)：首次连接、安装打包与真实 Chrome 的未完成验收。
 
-2026-07-25 用户确认：
-
-- Browser executor 保持稳定注册，模型 definitions 使用 Turn 级渐进披露。
-- 初始只暴露 `browser_help`；成功后下一次 LLM 调用披露完整工具包，下一条用户消息重置。
-- 设置页使用一个浏览器总入口和默认折叠的高级设置，不把 11 个工具继续平铺在首屏。
-
-## 维护规则
-
-- 架构职责变化时先更新本文档，再更新其他专题文档。
-- 命令 ID、schema 或实现状态变化时先更新 Go registry，再运行生成与一致性检查。
-- Browser Use 文件直接平铺在当前一级专题目录；禁止在 `browser/` 内继续创建子目录，并继续使用 `agent-browser-use-*` 稳定前缀。
+源码入口：`packages/tools/browser-tools/src/plugin.ts`、`node-capability.ts`，`packages/core/agent/src/agent-mode-policy.ts`，`browser-bridge/apps/cli/internal/commands/registry.go`。命令变化先更新 Go registry，再运行 `node scripts/check-browser-command-registry.mjs`。该检查验证生成 metadata 和文档标题 parity，不替代真实 Chrome 验收。

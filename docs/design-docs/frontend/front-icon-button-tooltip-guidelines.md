@@ -177,7 +177,7 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
   - Bash 输出三点：更多 Bash 输出操作。
 - `apps/desktop/src/renderer/components/ContextPopup.tsx`
   - 关闭按钮：关闭上下文用量。
-- 已退役页面与原型不在当前 tooltip 迁移范围；历史资产统一见 `docs/archive/v1/design-docs/`。
+- 已退役页面与原型不在当前 tooltip 迁移范围。
 
 ### P1：已有 `title`，应迁到统一 Tooltip
 
@@ -204,7 +204,7 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
 - `apps/desktop/src/renderer/components/UsageStatisticsPage.tsx`
   - 详情弹窗关闭按钮。
   - 成本详情关闭按钮。
-- 当前 Analysis / Usage 页面中的关闭、分页和详情操作按同一套规则迁移。
+- 当前 Usage 页面中的关闭、分页和详情操作按同一套规则迁移。
 
 ## 后续建议
 
@@ -214,6 +214,6 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
 2. 消息区工具块。
 3. Sidebar。
 4. RightPanel。
-5. Settings / Usage / Analysis 页面。
+5. Settings / Usage 页面。
 
 每批都补对应 renderer 测试，避免 tooltip 变成只能靠人工目测的细节。

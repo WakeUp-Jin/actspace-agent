@@ -11,7 +11,7 @@ ActSpace v2 采用 DSH 风格的领域包结构，但不复制 DSH 的 `vendor/`
 固定规则如下：
 
 1. `vendor/` 不进入 ActSpace v2。Cordis 使用精确锁定的 DSH 发布包；只有未来明确维护 fork 时才允许引入 `vendor/`。
-2. `harness` 是架构概念，不是源码目录。Harness 基座的职责平铺到 `cordis-adapter`、`boot`、`bundle`、`composition`、`diagnostics` 和 Profile bootstrap；应用操作由各自 App Bundle Service 提供。
+2. 不建立承载所有源码的顶层 `harness/` 总目录。Runtime 内部的 `src/harness/` 按执行装配职责分组；`boot` 与 `harness-control` 分别提供组合装配与选择服务，应用操作由 `agent-service` 及 App Service 提供。
 3. 不建立通用 `plugins/` 目录。插件是 Runtime ABI 中的身份、manifest、behavior entry、codec entry 和生命周期，不是文件夹名称。
 4. 采用 DSH 的领域分组：`core`、`session`、`llm`、`context`、`prompt`、`tools`、`subagent`、`compaction`、`desktop-app` 和 `client`。
 5. 每个可装载、可替换或可独立验证的领域包都必须拥有自己的 package boundary 和 Cordis Plugin Entry。Session、LLM、Prompt、Agent Loop 不是“插件之外的特殊代码”，而是默认 Profile 中的核心语义插件。
@@ -38,71 +38,11 @@ flowchart TD
 
 “一切皆插件”表达的是第二层和第三层都通过统一生命周期进入 Runtime，而不是要求所有源码都位于 `plugins/` 目录。
 
-## 3. 目标目录
+## 3. 当前目录来源
 
-```text
-actspace-agent/
-├── apps/
-│   ├── desktop/                         # Electron 应用入口
-│   ├── cli/                             # CLI headless run 入口
-│   └── site/                            # Astro 静态官网与公开内容
-│
-├── packages/
-│   ├── runtime/                         # Profile bootstrap、BootedRuntimeProfile 与 shutdown 边界
-│   ├── cordis-adapter/                  # ActSpace 对 DSH Cordis 的边界封装
-│   ├── boot/                            # Trusted Boot、Startup Validation、shutdown
-│   ├── bundle/                          # Profile / Bundle / Patch schema 与 composer
-│   ├── composition/                     # Loader / Include / Group 组合适配
-│   ├── diagnostics/                     # Boot、插件、Fiber、lease 与资源诊断
-│
-│   ├── core/                            # 核心语义插件组
-│   │   ├── scope/                       # Agent Scope 原语
-│   │   ├── agent/                       # Agent Registry、Inbox、状态
-│   │   └── agent-loop/                  # 默认 Turn / Step Loop
-│
-│   ├── session/                         # Session 核心语义插件组
-│   │   ├── journal/                     # append-only Journal、Surface、事件不变量
-│   │   ├── persistence/                 # persistence capability 与协调器
-│   │   ├── jsonl/                       # raw UTF-8 journal.jsonl 后端
-│   │   └── projection/                  # Journal 到模型/Host 投影
-│
-│   ├── llm/                             # LLM 核心语义插件组
-│   │   ├── service/                     # Message、Stream、Failure、Usage、PreparedCall
-│   │   ├── pi-ai/                       # pi-ai Provider Adapter
-│   │   └── legacy-transport/            # 仅在 pi-ai proxy 门禁要求时保留
-│
-│   ├── context/                         # Context Contributor 与 Request Assembly 输入
-│   ├── prompt/                          # Prompt section 组装
-│   ├── tools/                           # Tool Runtime 与具体工具插件组
-│   │   ├── runtime/                     # definition、prepared execution、调度
-│   │   ├── approval/                    # Host approval seam
-│   │   ├── filesystem-read/             # read_file、list_directory
-│   │   ├── filesystem-search/           # grep、glob
-│   │   ├── filesystem-write/            # edit、write、delete
-│   │   ├── shell-tools/                 # Bash 与后台进程
-│   │   ├── web-tools/                   # Web search / fetch
-│   │   ├── image-generation/            # 图片生成
-│   │   ├── image-inspection/            # 图片分析
-│   │   ├── todo-tools/                  # Todo 领域事件与 projection
-│   │   └── browser-tools/               # Browser Tool Adapter
-│   ├── subagent/                        # one-shot Subagent、Agent、Explore descriptor
-│   ├── compaction/                      # append-only Surface compaction
-│
-│   ├── desktop-app/                     # Desktop App Bundle 与 DesktopAppService
-│   ├── client/                          # 固定前端 IPC 投影与 renderer DTO
-│   ├── shared/                          # 跨进程共享契约
-│   ├── test-support/                    # 测试基础设施
-│   └── util/                            # 无领域所有权的通用小工具
-│
-├── browser-bridge/                      # Go CLI、Chrome Extension、协议层
-├── examples/
-├── docs/
-├── scripts/
-├── patches/
-└── python/
-```
+顶层结构由[仓库架构](../../ARCHITECTURE.md)维护；完整 package、exports 与 manifest 清单由[契约矩阵](agent-contract-matrix.generated.md)生成，避免维护第二张会过期的目录树。
 
-这里的“平铺”指不再人为增加 `harness/` 和 `plugins/` 两层总目录；领域组仍保留两级结构，因为它能让开发者先按职责找到代码，再看到该领域的独立插件包。
+Host、Task 和 Harness 分别有 `agent-host`、`agent-service`、`harness-control` 包；`runtime/src/startup`、`session`、`harness` 按装配职责分组。`session/storage` 提供中性后端契约，`jsonl` 是生产实现；这些目录不构成通用插件总目录。
 
 ## 4. 什么是一个真实插件包
 
@@ -144,8 +84,9 @@ flowchart LR
     D["apps/desktop"] --> DA["packages/desktop-app"]
     C["apps/cli"] --> HL["packages/headless"]
     S["apps/site"] --> PUBLIC["公开 docs / roadmap / release notes"]
-    DA --> R["packages/runtime"]
-    HL --> R["packages/runtime"]
+    DA --> AS["packages/agent-service"]
+    HL --> AS
+    R["packages/runtime"] --> AS
     R --> B["boot / bundle / composition / diagnostics"]
     B --> CA["cordis-adapter"]
     R --> CORE["core / session / llm / context / prompt / tools / subagent"]
@@ -157,10 +98,10 @@ flowchart LR
 
 约束如下：
 
-- 只有 `cordis-adapter`、`boot`、`composition` 和 Runtime 装配层直接接触 DSH Cordis Context/Loader 类型。
+- 上游 Cordis 类型与实现经 `cordis-adapter` 收口；领域 Behavior 可以消费其公开 `CordisContext` 类型，不能绕过包 exports deep import 上游内部文件。
 - Agent 领域包依赖 ActSpace 自有契约，不依赖 DSH Agent Core 包。
-- 具体工具包依赖 `tools/runtime`，不能直接写入 Session 或访问 renderer。
-- Desktop App Bundle / Headless Bundle 只依赖 `runtime` 与领域包的公开 exports；Electron/CLI Host 仍只负责能力、进程和输出边界。
+- 具体工具包依赖 `tools/runtime`，不访问 renderer。拥有持久领域状态的工具（如 Todo）可通过 Session 公共契约追加自己的 codec 事件；通用工具执行终态仍由 Runtime/Loop 提交。
+- Desktop App / Headless 消费 `agent-service` 与领域包的公开 exports，不反向依赖 Runtime 装配实现；Electron/CLI Host 提供能力、进程和输出边界。
 - `apps/` 可以消费公开 package exports；任何 `packages/` manifest 都不得依赖应用 package，应用之间也不通过 sibling `src/` 耦合。
 - `client` 只消费固定 Projection DTO；后端插件不携带 React、CSS、HTML 或 renderer JavaScript。
 - `browser-bridge` 不进入 pnpm 的 TypeScript Agent package 图；它通过 Host capability 和协议适配接入。

@@ -20,10 +20,8 @@
 ## 2. 设计来源
 
 - [v2 总体架构](../../../design-docs/agent-plugin-runtime/agent-target-overall-architecture.md)
-- [v2 已确认决策](../../../design-docs/agent-plugin-runtime/agent-decisions-v2-foundation.md)
 - [Cordis 采用决策](../../../design-docs/agent-plugin-runtime/agent-decision-cordis-adoption.md)
 - [Agent Core 目标边界](../../../design-docs/agent-plugin-runtime/agent-target-agent-core.md)
-- [Session 与 Context 目标设计](../../../design-docs/agent-plugin-runtime/agent-target-session-and-context.md)
 - [LLM Adapter 目标设计](../../../design-docs/agent-plugin-runtime/agent-target-llm-adapter.md)
 - [Runtime 与 Composition 目标设计](../../../design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md)
 - [插件 Runtime ABI](../../../design-docs/agent-plugin-runtime/agent-spec-plugin-runtime-abi.md)

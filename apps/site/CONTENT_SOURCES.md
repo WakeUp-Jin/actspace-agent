@@ -33,7 +33,7 @@
 | [设置与本地数据](src/content/docs/settings-and-data.md) | `apps/desktop/src/renderer/components/settings/SettingsNav.tsx`、`apps/desktop/src/renderer/components/settings/SettingsPage.tsx`、`README.md` |
 | [常见问题](src/content/docs/troubleshooting.md) | `README.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/frontend/front-workspace-git-worktree-context.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md` |
 | [命令行使用](src/content/docs/cli.md) | `README.md`、`apps/cli/src/args.ts`、`apps/cli/package.json` |
-| [一次 Agent 执行](src/content/docs/agent-turn.md) | `docs/ARCHITECTURE.md`、`docs/design-docs/agent-runtime/agent-turn-layers.md`、`packages/compaction/README.md` |
+| [一次 Agent 执行](src/content/docs/agent-turn.md) | `docs/ARCHITECTURE.md`、`docs/design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md`、`packages/compaction/README.md` |
 | [开发与贡献](src/content/docs/contributing.md) | `AGENTS.md`、`docs/REPO_COLLAB_GUIDE.md`、`docs/ARCHITECTURE.md`、`package.json` |
 
 ## 博客搬运规则

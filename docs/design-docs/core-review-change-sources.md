@@ -2,7 +2,7 @@
 
 ## 文档状态
 
-- 状态：功能基线已完成；大 Diff 的加载调度、批量 Git、完整正文和虚拟渲染仍待按性能纠偏计划实施。disposable Git mutation 和真实远端操作仍由用户手动验收。
+- 状态：功能基线与大 Diff 的加载调度、批量 Git、完整正文和虚拟渲染已实现。disposable Git mutation 和真实远端操作仍由用户手动验收。
 - 事实源：本文件定义 Review 的 scope、结构化 diff、工具栏、显示选项、Git actions、刷新和安全边界。
 - 性能事实源：`docs/design-docs/core-review-large-diff-loading.md` 定义 Standard/capped 双模式、批量请求、完整正文和虚拟渲染边界。
 - 产品边界：Review 是人工 Git 审阅工作台，不包含 AI Review、Review 专用模型、findings、独立审查任务或评论回注 Agent。
@@ -13,7 +13,7 @@
 - 共享契约：`packages/shared/src/review.ts`。
 - 查询、缓存与失效：`apps/desktop/src/main/review-coordinator.ts`。
 - Git 查询与 mutation：`apps/desktop/src/main/review-git-engine.ts`。
-- Last Turn：`review-git-engine.ts` 保留 `loadLastTurn` / `loadLastTurnFileDiff` 注入端口；原独立 service 已退役，端口存在不等于所有调用入口已实现。
+- Last Turn：`review-git-engine.ts` 保留 `loadLastTurn` / `loadLastTurnFileDiff` 注入端口，但当前 `desktop-shell-ipc.ts` 未注入，查询返回 unavailable；不能把六种 scope 的目标契约当作六种均已接通。
 - PR capability：`apps/desktop/src/main/review-pr-service.ts`。
 - Renderer：`apps/desktop/src/renderer/components/review/`。
 

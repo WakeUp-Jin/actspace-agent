@@ -8,7 +8,7 @@
 >
 > 2026-08-29 起，本文中关于工具稳定身份的 `toolId` 语义由 [Tool Name 与 Plugin Namespace 契约](./agent-spec-tool-name-contract.md) 取代。新的公共身份是扁平 `name`，`pluginId` 独立表示归属，`registrationId` 表示进程内 lease；本文其余 prepared execution、policy、approval、lease 和 parity 语义仍然有效。本文中的旧字段名不构成兼容要求。
 
-上位插件身份、Host ceiling、restart-only 和生命周期合同见 [插件 Runtime ABI](./agent-spec-plugin-runtime-abi.md)；固定 Host DTO 见 [Runtime Projection 规范](./agent-spec-runtime-projection.md)。
+上位插件身份、Host ceiling、Host 重启与 Harness 租约生命周期合同见 [插件 Runtime ABI](./agent-spec-plugin-runtime-abi.md)；固定 Host DTO 见 [Runtime Projection 规范](./agent-spec-runtime-projection.md)。
 
 ## 1. 决策
 

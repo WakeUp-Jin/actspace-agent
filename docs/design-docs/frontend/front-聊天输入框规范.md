@@ -2,16 +2,15 @@
 
 > 2026-09-09 文案更新：日常界面展示名称以[中文文案规范](front-desktop-chinese-ui.md)为准；保留 Chat、Plan、Thinking、Effort 和工具执行展示。本文英文名称仍可用于指代内部概念，协议与行为不变。
 >
-> 2026-09-24 形态更新：Chat 已从逐轮模式升级为创建 Session 时固定的主 Agent 形态；Plan/Agent 仍是 Agent 形态内的单轮模式。下文与此冲突的旧三模式描述由本节及[主 Agent 的 Chat 形态](../agent-runtime/agent-main-chat-form.md)取代。
+> Runtime 模式契约见[Agent 形态与三种工作模式](../agent-runtime/agent-forms-and-modes.md)；本文定义 Composer 的对应交互。
 
-## 2026-09-24 Chat 形态边界
+## 当前模式边界
 
-- 新建会话入口提供 Agent 与 Chat；`Command+N` 默认 Agent。已有消息的会话不切换形态；空会话可在 Composer 内切换（2026-09-26，见下文 `+` 菜单）。
-- Agent Composer 的 `+` 菜单提供 Agent、Plan、图片与 Skills（空会话额外提供 Chat）；Chat Composer 显示不可关闭的 Chat 标识：空会话保留 `+`（Agent / Plan / Chat + 图片与文件），对话开始后 `+` 换成直接选文件的回形针按钮，并隐藏 Plan/Agent、Skills、Workspace/Worktree 和权限入口。以后若支持中途切换，只需让已开始的 Chat 恢复 `+`。
-- Chat 保留模型、Thinking、Context、图片与文件附件、发送/停止。
-- Chat 文件入口只接受 PNG/JPEG/WEBP/GIF、TXT、Markdown、JSON、CSV；首版明确不支持 PDF、DOC、DOCX。
-- `/chat` 不再是 Slash Command；Chat 只能从新建会话入口创建。
-- Chat 的硬工具边界是 `web` 与 `generate_image`，不是无工具模式；Agent 的 Plan/Agent 工具边界保持原语义。
+- 主会话使用同一个 `actspace.main` 形态，提供 Agent、Plan、Chat 三种模式；空闲时可从 `+` 菜单切换，已有消息不阻止切换。
+- Chat 隐藏工作区、Skills 与权限入口，保留模型、Thinking、Context、附件、发送/停止；工具仅为 `web` 与 `generate_image`。
+- Chat 文件入口接受 PNG/JPEG/WEBP/GIF、TXT、Markdown、JSON、CSV；不支持 PDF、DOC、DOCX。
+- Chat 切换到 Plan/Agent 时必须有工作区；缺失时先选择工作区，再写入模式。
+- `/chat` 不在 Slash Command catalog 中；三种模式都可从 `+` 菜单选择。
 
 ## 定位
 
@@ -45,12 +44,12 @@
 - 默认态保持轻量、贴底、低高度；不要把输入区域做成大面积白色卡片。
 - 保留继续输入的舒适空间，但默认视觉重心应让位给上方消息流。
 - 不显示语音按钮。
-- 发送按钮保持单一、轻量、克制：使用编辑器式反色圆形按钮 + 上箭头，用 `bg-text-main` / `text-surface` 语义类随主题翻转（浅色 = 近黑底白箭头，深色 = 近白底深箭头），禁用态退为灰底；不使用彩色 accent。
+- 发送按钮使用 `IconButton variant="accent"` 圆形按钮与上箭头。默认调色板回落为主题反色，其余调色板使用用户强调色；停止按钮保持 primary。
 - `model` 选择保持文字化，不加边框。
 - Context usage 只在 follow-up 底部状态行右侧显示和打开，不再放在输入 panel 内。
-- 普通 focus ring 使用高对比中性 token；运行状态可使用 operational green。Context usage 默认保持中性，只有接近阈值时切 warning / danger；Thinking toggle 不再默认使用品牌蓝。
+- 普通 focus ring 消费 focus-ring token，默认调色板为中性、其它调色板跟随强调色；运行状态可使用 operational green。Context usage 默认保持中性，只有接近阈值时切 warning / danger；Thinking toggle 不再默认使用品牌蓝。
 - workspace、branch、runtime 都应表现为下拉入口；真实交互、Git 和 Worktree 边界统一遵循 `front-workspace-git-worktree-context.md`。
-- Chat / Plan / Agent 不是只改 placeholder 的视觉标签；每次发送都必须把模式作为显式运行参数传入 main 和 Agent Runtime，由工具暴露层强制能力边界。Prompt 只负责行为指导，不承担权限隔离。
+- Chat / Plan / Agent 不是只改 placeholder 的视觉标签；模式先经会话命令持久化，Run 创建时读取 Session 模式快照，由工具暴露层强制能力边界。Prompt 只负责行为指导，不承担权限隔离。
 - Slash Command 在普通 Agent Turn 之前分流：`/compact` 触发上下文压缩，命令文本不作为普通用户消息显示。v2 不提供 `/eval`。可发现菜单、键盘行为、Functions / Skills 分组统一见 `front-composer-slash-command.md`。
 
 ## 草稿与历史输入
@@ -66,7 +65,7 @@
 ### Ink & Emerald 视觉职责
 
 - Composer 使用主题 `surface` 和 1px 中性 hairline，不使用蓝色描边或蓝色光晕建立默认层级。
-- 发送按钮继续使用主题反色的 ink action：浅色近黑底、深色近白底，不改成绿色 CTA。
+- 发送按钮消费 accent token；默认调色板回落为 ink action，其他调色板使用用户选定的强调色。
 - 运行 / 停止状态可以使用小型 operational 绿点、细环或中性停止控件。
 - Context usage、branch、This Mac / Worktree 等状态行默认使用 muted / faint 灰阶。
 - operational green 只表示运行、连接或确认，不用于模型选择、附件、普通 `+` 按钮或菜单选中。
@@ -129,7 +128,7 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 菜单固定结构（2026-09-26 对齐 Cursor）：
 
 - 面板与输入框同宽，从输入框上方弹出；不设搜索框和顶部提示。每行为「图标 · 名称 · 灰色一句说明」。
-- 模式区是完整的模式选择器，当前模式打勾：空会话（任一形态）显示 `Agent`、`Plan`、`Chat`；已开始的 Agent 会话显示 `Agent`、`Plan`；已开始的 Chat 会话不显示菜单（见回形针按钮）。
+- 模式区始终提供 `Agent`、`Plan`、`Chat`，当前模式打勾；会话正在执行时禁用切换。
 - 分隔线（模式区为空时省略）。
 - 上下文入口：Agent 为 `图片`、`Skills ›`；Chat 为 `图片与文件`。
 - 图标（lucide）：Agent `Bot`、Plan `ListTodo`、Chat `MessageCircle`、图片 `Image`、Chat 附件 `Paperclip`、Skills `BookOpen`；模式图标使用模式语义色。
@@ -159,17 +158,17 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 
 - 新会话默认为 `Agent`。
 - `Agent` 默认态不显示 mode pill，输入栏保持最小噪音。只有选中 `Chat` 或 `Plan` 后，才在 `+` 与 model selector 之间显示彩色 pill。
-- Plan pill 带有关闭图标，点击直接恢复 Agent；Chat pill 表示会话形态，不带关闭图标。切换模式统一从 `+` command menu 完成。
+- Plan pill 可关闭并恢复 Agent；Chat pill 不带关闭图标，但可从 `+` command menu 切换到其他模式。
 - 切换只影响下一次发送，不改变已在运行的 Turn。流式生成期间模式控件与其他 Composer 编辑控件一样禁用。
-- 模式在当前会话的 initial / follow-up Composer 切换中保持；切换到其他会话时按各会话独立保持。V1 不写入 session 持久化，应用重启后回到 Agent。
+- 模式按 Session 独立保存：`setSessionAgentMode` 校验 revision，并追加、flush `agent/mode-set` Journal 事件。切换会话或重启后从投影恢复，不重置为 Agent。
 - 每次发送的 user message 仍只展示用户输入，不把“[Plan mode]”之类前缀拼进用户消息文本。
 
 #### 能力契约
 
 | 模式 | 用户意图 | 工具 profile | 运行时硬边界 |
 | --- | --- | --- | --- |
-| `Chat` | 纯对话、解释、头脑风暴 | `none` | 不向模型暴露任何工具 definition；除用户显式绑定的 Image / Skill 上下文外，不主动读取工作区、不搜索、不执行、不修改文件 |
-| `Plan` | 调查现状、分析取舍、产出可执行计划 | `read-only` | 只允许明确 allowlist 中的只读工具；禁止通用 Bash、写/删文件、Browser、图片生成和 SubAgent |
+| `Chat` | 对话、联网查询、图片生成 | `web`、`generate_image` | 不暴露工作区文件、Bash、Browser 或 Subagent 工具 |
+| `Plan` | 调查现状、分析取舍、产出计划 | 显式 allowlist | 可读取、联网、图片分析、Explore 和 Todo；禁止 Bash、文件写删、Browser、图片生成和通用 agent |
 | `Agent` | 规划并执行任务 | `full` | 使用当前主 Agent 完整工具集，仍受设置页工具开关、provider 能力、工作区边界和审批机制约束 |
 
 profile 必须在工具注册 / 暴露阶段生效，不允许先把完整工具集发给模型，再依赖模型自律。为避免后续新工具自动泄露到 Plan，Plan 采用 allowlist，不采用“排除已知写工具”的 denylist。
@@ -177,7 +176,10 @@ profile 必须在工具注册 / 暴露阶段生效，不允许先把完整工具
 Plan V1 允许的工具为：
 
 - 工作区读取：`read_file`、`grep`、`glob`、`list_directory`。
-- 外部资料读取：`web_search`、`web_fetch`，仅在对应 provider 可用时暴露。
+- 外部资料读取：`web_search`、`web_fetch`。
+- 补充能力：`inspect_image`、`explore`、`todo_read`、`todo_write`。
+
+具体暴露集合是模式 allowlist 与当前注册工具的交集；缺少服务凭据时由工具执行返回配置错误，不保证通过隐藏 schema 表达。
 
 Plan 的行为指导需要以独立 system prompt segment 注入：
 
@@ -186,7 +188,7 @@ Plan 的行为指导需要以独立 system prompt segment 注入：
 - 计划应包含目标、影响边界、关键设计决策、实施顺序、验证方式和主要风险，粒度与任务复杂度匹配。
 - 不得声称已编辑文件、已执行命令、已通过测试或已完成实施。
 
-Skill 是上下文指导，不是权限包。无论 Skill 正文写了什么，都不得绕过当前模式的工具 profile：Chat 中 Skill 只能指导文本回复，Plan 中 Skill 只能使用 Plan allowlist，Agent 中也仍遵守审批和路径边界。
+Skill 是上下文指导，不是权限包。无论 Skill 正文写了什么，都不得绕过当前模式的工具 profile：Chat 不开放 Skills 选择入口，Plan 中 Skill 只能使用 Plan allowlist，Agent 中也仍遵守审批和路径边界。
 
 #### 文案
 
@@ -290,19 +292,9 @@ placeholder 随模式改变，但不代替彩色 pill 和运行时契约：
 - 以占用和构成为主，不做复杂编辑。
 - 视觉上接近你给的那张参考图。
 
-## Context 定稿图
-
-![Context 定稿图](context-popup-final.png)
-
 ## 附件展示
 
 - 图片附件显示真实缩略图；点击后进入右侧 Image Tab，不新增模态预览层。
 - 文件附件只显示文件名。
 - 附件位于 follow-up 输入栏上方、Review / overflow 层下方，简洁排列。
 - 图片删除按钮使用约 `18px` 点击区与 `11px` X 图标；默认隐藏，仅在鼠标悬浮到附件或键盘聚焦到附件控件时显示。删除只移除当前 Composer 附件，不删除原始文件。
-
-## Composer 定稿图
-
-![Composer 定稿图](composer-final.png)
-
-当前实现计划以 `/Users/wakeup-jin/Desktop/actspace-learing-design/bug/19-2.png` 和 `/Users/wakeup-jin/Desktop/actspace-learing-design/bug/19-3.png` 的 follow-up bar 方向为准；仓库内 `composer-final.png` 后续需要在视觉稿更新时同步替换。

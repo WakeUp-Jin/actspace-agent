@@ -36,7 +36,7 @@
 ## 当前现状说明
 
 - `scripts/ci.sh` 当前只做仓库级基础检查：
-  - docs 骨架、active/discarded 生命周期与 current truth zone 校验；current truth zone 会拒绝已删除 v1 路径、已丢弃 active 入口和相对 Markdown 断链
+  - docs 骨架、active/completed 生命周期与 current truth zone 校验；current truth zone 会拒绝已删除 v1 路径、已丢弃 active 入口和相对 Markdown 断链
   - repo hygiene
   - GitHub Actions pinning
   - shell 脚本语法检查

@@ -201,10 +201,10 @@ aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
           <li><b>「↳ 插入」</b>把消息送进正在运行的回合，Agent 开始下一步时读到。它在对话里就是一条普通用户消息，出现在被读到的位置。</li>
           <li>Agent 正在写最后的回复时插入，<b>回合不结束，多跑一步</b>处理这条消息。</li>
           <li><b>读到之前可以撤回</b>，撤回后回到队列。停止时还没读到的插入回到队列顶部，不丢。</li>
-          <li><b>停止或失败后队列暂停</b>，不自动发出。点「继续发送」或直接发一条新消息后恢复。</li>
+          <li><b>停止或失败后队列暂停</b>，不自动发出。点「继续发送」后恢复；暂停期间的新消息继续入队。</li>
           <li><b>/compact</b> 可以排队，不能插入。压缩进行中或等待审批时，「插入」不可用。</li>
           <li>「···」里是编辑（输入框为空时把这条拿回输入框）和上移。删除直接生效，不二次确认。</li>
-          <li>队列只在本次打开应用期间保留，和草稿一样；每个会话一份，切到别的会话后照常在后台发出。</li>
+          <li>正式应用的队列由 TaskLedger 持久化，每个会话一份；进程重启后中断的队列保持暂停，需显式恢复。本页只在内存中模拟这些交互。</li>
         </ul>
       </div>
     </aside>
@@ -408,8 +408,8 @@ aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   function submit(extra = {}) {
     const text = inputText(); if (!text) return;
     input.textContent = "";
-    if (S.running) S.queue.push(makeItem(text, extra));
-    else { S.paused = false; startRun(makeItem(text, extra)); }
+    if (S.running || S.paused) S.queue.push(makeItem(text, extra));
+    else startRun(makeItem(text, extra));
     renderAll();
   }
   function stopRun() {

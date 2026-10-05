@@ -102,7 +102,7 @@ Journal 保留原有 assistant/chunk 容器；新增工具 kind 时保存 callId
 ## 后续工具体验调整（2026-09-06）
 
 - Thinking 开关与 effort 经 fixed-renderer IPC、Desktop App、RunController、AgentLoop 到 LLM options；Desktop adapter 按模型能力规范化，直连和代理传输都携带请求选项。
-- 默认内置工具仅 Bash 弹操作审批；Browser 保留规范命令检查和 Bridge preflight，文件工具保留 schema、能力、workspace/符号链接边界。
+- 工具审批由当前权限策略决定：Browser 的非只读命令在非 full-access 模式下请求审批；Bash 使用其执行策略。Browser 仍保留规范命令检查和 Bridge preflight，文件工具保留 schema、能力、workspace/符号链接边界。
 - 工作空间路径由 Node path.relative 计算：根为 `.`，内部相对路径，外部绝对路径；Raw 与实际调用不改。
 - 轨迹页隐藏整个 composer-zone，但保留挂载；草稿、附件、模型选择不会因切换卸载。运行时顶部保留 Stop。
 - Subagents 使用右侧列表/详情导航。委派 requested 记录 childSessionId；列表每秒刷新，运行中详情每 750ms 刷新，关闭/切换时释放轮询并忽略迟到响应。详情 IPC 返回 SessionEvent，与前端契约一致，展示未提交正文/Thinking chunk 和已准备的运行工具，完成后以持久消息代替 chunk。Todo UI 保持现状。

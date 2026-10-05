@@ -6,7 +6,6 @@
 
 - `active/`：仍有明确下一步、责任边界和验证方式的计划。
 - `completed/`：实现已经完成；尚未执行的人工验收边界可以保留在计划中，但不能因此长期占用 `active/`。
-- `discarded/`：已经失效、被后续方案取代或不再采用，但仍值得保留决策上下文的计划。
 - `templates/`：新计划模板。
 - `tech-debt-tracker.md`：暂不立项、但需要持续跟踪的技术债。
 
@@ -104,7 +103,6 @@
 - [日常主界面中文统一](completed/20260908-desktop-chinese-ui.md)：保留模式、思考档位和工具执行展示；renderer 验证与 Electron 主界面/设置检查完成，验证范围见摘要。
 
 
-- [Docs v1 归档与 v2 原位校准](completed/20260908-docs-v1-archive-v2-refresh.md)：50 个 v1 文件移动、3 份完整稿归档；v2 原位更新，文档门禁扩展。
 
 2026-09-08 生命周期整理：以下计划实现已完成，人工/宿主门禁仍保留在各自正文和执行摘要中。
 
@@ -130,7 +128,6 @@
 - ActSpace 核心 Cordis Service 化与能力 seam（Phase 1–5 完成）：`completed/20260829-actspace-core-cordis-services/README.md`
 
 - Agent Todo 工具 V1：`completed/20260808-agent-todo-tools.md`
-- Kairos 默认隐藏与功能门控：`completed/20260808-kairos-feature-gate.md`
 - Actspace 本地明文凭据存储迁移：`completed/20260802-local-plaintext-credential-storage.md`
 - 分析观测会话索引：`completed/20260801-analysis-session-index.md`
 - 全局快捷唤起：`completed/20260801-global-quick-open-shortcut.md`
@@ -138,8 +135,6 @@
 - 分析观测与工作台交互收口：`completed/20260801-analysis-observability-ui-polish.md`
 - Agent 图片分析工具：`completed/20260801-image-inspection-tool.md`
 - Agent 分析观测生产页面：`completed/20260730-agent-analysis-observability-page.md`
-- 文档计划生命周期清理：`completed/20260801-docs-exec-plan-lifecycle-cleanup.md`
-- 本地 Agent CLI 与 host-neutral runtime：`completed/20260731-agent-runtime-desktop-cli.md`
 - DeepSeek OpenAI Thinking：`completed/20260731-deepseek-openai-thinking-effort.md`
 - 终端启动与关闭可靠性：`completed/20260731-terminal-startup-shutdown-reliability.md`
 - Review Workbench：`completed/20260730-review-workbench/README.md`
@@ -148,36 +143,6 @@
 
 更早的完成记录直接从 `completed/` 按日期或主题检索，不在本页重复维护完整清单。
 
-## 已丢弃或被替代
-
-- [早期 Session 持久化与投影计划](discarded/20260830-actspace-session-persistence-projection/README.md)：2026-09-21 生产切换计划已替代剩余实施路径；保留原契约和验收证据。
-
-- [DSH-native 旧重定向](../design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md)：无独立任务，当前入口为 Profile-first。
-
-- 旧版 Agent 工具能力总计划：`discarded/20260527-agent-tool-capabilities.md`
-- 已失效的基础 Bug 人工验收计划：`discarded/开发者手动验收-20260529-bugfix-foundation-manual-acceptance.md`
-- 基于 v1 SessionEvent / ToolScheduler 的 Agent Team V1：`discarded/20260711-agent-team/README.md`
-- 基于 v1 `session.jsonl` 的 Bash 会话级动态 allowlist：`discarded/Bash工具和工具权限调度开发计划/README.md`
-
-每份 discarded plan 顶部都应说明丢弃日期、原因和替代入口。
-
-历史链接例外：`active/20260930-composer-message-queue.md` 仅保留旧 history 的回溯入口，已被 Host 队列契约替代，不是待执行任务。
-
 ## 本轮已完成
 
 - [代码与文档清理](completed/20261004-agent-refactor-cleanup.md)：本批完成，保护 histories/learnings 和既有工作区修改。
-
-## 仅供历史链接回溯
-
-以下目录中的短页不是执行计划；保留原路径以保护 histories/learnings 引用。目标和欠账已经移交本轮清理与技术债。
-
-- [cordis-event-abi-final-acceptance](active/20260829-actspace-cordis-event-abi-final-acceptance/README.md)
-- [p1-p2-contract-and-composition](active/20260829-actspace-p1-p2-contract-and-composition/README.md)
-- [p1-profile-bundle-patch](active/20260829-actspace-p1-profile-bundle-patch/README.md)
-- [p1-service-roles](active/20260829-actspace-p1-service-roles/README.md)
-- [p1-session-core-persistence](active/20260829-actspace-p1-session-core-persistence/README.md)
-- [p2-contract-matrix](active/20260829-actspace-p2-contract-matrix/README.md)
-
-- [后台运行旧入口](active/20260916-session-background-runs.md)
-- [Agent Forms 旧入口](active/20260928-agent-forms-and-modes.md)
-- [存储与清理旧入口](active/20261004-agent-storage-and-cleanup/README.md)

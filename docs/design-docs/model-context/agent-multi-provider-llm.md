@@ -14,10 +14,8 @@
 相关当前实现文档：
 
 - `packages/runtime/`、`packages/llm/` 与 `docs/design-docs/agent-plugin-runtime/`：当前 v2 Runtime、LLM 领域包与插件边界事实。
-- `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`：当前 DeepSeek / Kimi 协议与能力边界。
 - `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的信息架构、模型统一流程和持久化边界；旧设置页仅作迁移追溯。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：模型 usage、价格快照和成本统计。
-- `docs/archive/v1/design-docs/model-context-duckcoding-multi-key-model-catalog.md`：已退役的 DuckCoding 文字模型方案，仅供历史追溯。
 
 ## 背景
 
@@ -243,7 +241,7 @@ Provider adapter 可提供：
 - 连接测试实现。
 - 模型目录加载与归一化。
 
-当前 `OpenAICompletionsService` 中的 Kimi thinking 分支应逐步下沉到 provider request adapter，避免通用协议层继续增长品牌判断。
+Kimi thinking 等供应商差异由当前 pi-ai adapter / 私有 wire 实现处理；业务层不维护旧协议 Service 分支。
 
 ### DeepSeek V4.1 目录与兼容（2026-09-10）
 
@@ -307,17 +305,20 @@ ProxyAgent 需要按标准化代理 URL 缓存复用，避免每轮 turn 新建�
 所有模型选择入口统一调用：
 
 ```ts
-listUsableModels(purpose: "chat" | "utility" | "explore" | "kairos" | "vision")
+listUsableModels(purpose: "chat" | "utility" | "explore" | "vision")
 ```
 
 基础过滤：
 
 ```text
 provider.enabled
-&& provider.lastConnection.status === available
+&& selectedCredential.hasApiKey
+&& selectedCredential.lastConnection.status !== unavailable
 && installedModel.enabled
 && capabilityMatches(purpose)
 ```
+
+凭据可在尚未执行可选连接测试时使用；只有显式失败测试会使其不可用。选定附加 Key 时检查该 Key 的独立状态。
 
 任务能力：
 
@@ -326,7 +327,6 @@ provider.enabled
 | `chat` | text + toolUse verified/declared |
 | `utility` | text；不要求工具调用 |
 | `explore` | text + toolUse verified/declared |
-| `kairos` | text + toolUse verified/declared |
 | `vision` | image，并叠加调用方自身要求 |
 
 `toolUse: unknown` 的远端模型可以加入本地列表，也可以作为 utility 模型，但不能默认进入主 Agent / Explore；用户完成兼容性测试或未来人工覆写后才可提升状态。v1 autonomous runtime 不再是当前 purpose。
@@ -463,7 +463,7 @@ Kairos 已随 v2 唯一切换移除，不再是当前设置导航或模型分配
 → available 后安装默认模型
 ```
 
-联网搜索服务仍属于 ToolManager 搜索通道，不与 LLM Model Registry 混合；它们在设置 UI 中归入“工具 → 联网能力”，不再占用独立顶层入口。
+联网搜索服务属于 `packages/tools/web-tools` 的 Host 搜索通道，不与 LLM Model Registry 混合；它们在设置 UI 中归入“工具 → 联网能力”，不再占用独立顶层入口。
 
 “添加连接”只展示尚未配置的三家受支持服务商，不展示尚未实现的供应商。
 
@@ -504,7 +504,7 @@ Composer 只展示 `listUsableModels("chat")`，不会因为远端 catalog 增�
 
 ## Settings 与持久化
 
-当前实现仍兼容 `settings.json` v2 / v3 结构；设置中心重构的目标版本是 `version: 4`。非敏感配置继续落 `<userData>/settings.json`，通过幂等迁移进入逻辑 namespace：
+当前持久化结构为 `settings.json` `version: 4`；旧版本通过 SettingsService 迁移读取。非敏感配置继续落 `<userData>/settings.json`，通过幂等迁移进入逻辑 namespace：
 
 ```text
 settings.json
@@ -518,7 +518,7 @@ settings.json
 └── activity.usage
 ```
 
-其中 `models.connections`、`models.definitions` 和 `models.installed` 使用稳定 ID，`taskBindings` 只保存稳定的 `modelKey` 引用。完整目标结构、v3 → v4 迁移和页面偏好边界见 [`front-设置中心重构规范.md`](../frontend/front-设置中心重构规范.md)。
+其中 `models.connections`、`models.definitions` 和 `models.installed` 使用稳定 ID，`taskBindings` 只保存稳定的 `modelKey` 引用。完整结构、v3 → v4 迁移和页面偏好边界见 [`front-设置中心重构规范.md`](../frontend/front-设置中心重构规范.md)。
 
 敏感值：
 
@@ -555,40 +555,17 @@ renderer 只调用结构化 IPC：
 
 ## LLM Service 与请求构造
 
-`createLLMService()` 继续按 `LLMConfig.api` 选择协议服务：
+当前唯一模型调用链是 Host 绑定请求配置 → `LlmService.prepare()` → prepared dispatch → `PiAiAdapter`。`routeId`、模型能力、凭据引用和实际连接在请求准备边界确定；Session Journal 保存当次请求事实，adapter 不拥有另一份可变对话历史。
 
-- OpenRouter → `OpenAICompletionsService`。
-- Kimi → `OpenAICompletionsService`。
-- DeepSeek → `OpenAICompletionsService`，请求适配层发送 `thinking.type=enabled|disabled`；开启时支持 `reasoning_effort=low|high|max`；V4.1 Flash 缺省 `high`。
-- 已声明 `openai-responses` 的历史模型仍可由 `OpenAIResponsesService` 处理；当前三家内置供应商默认使用 `OpenAICompletionsService`。
+`PiAiAdapter` 在 Provider I/O 前决定使用 pi-ai 或兼容 wire backend：
 
-`LLMConfig` 目标扩展：
+- 常规请求通过 `streamPiAi()` 调用 pi-ai `streamSimple`。
+- 显式请求代理、官方 OpenRouter 的非 Anthropic 请求，以及具备 Files 接线的 DeepSeek 图片请求使用 `LegacyProxyWireEngine`。
+- 开始 Provider I/O 后不跨 backend fallback；代理是 request-scoped，不修改进程全局 dispatcher。
 
-```ts
-interface LLMConfig {
-  provider: ProviderId;
-  api: ModelApi;
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-  transport?: { proxyUrl?: string };
-  defaultHeaders?: Record<string, string>;
-  promptCacheKey?: string;
-  // existing input / temperature / maxTokens / retry...
-}
-```
+协议转换、图片字节读取、reasoning 参数和 usage 归一由对应 adapter/wire 路径负责。业务层不再实例化 `OpenAICompletionsService`、`OpenAIResponsesService` 或携带明文 Key 的旧 `LLMConfig`。
 
-OpenRouter 可设置固定、非敏感的 `X-OpenRouter-Title: Actspace`；`HTTP-Referer` 为可选项，首版没有稳定公开产品 URL 时可省略。
-
-Provider request adapter 只处理请求差异，不拥有消息历史：
-
-- Kimi thinking 参数。
-- OpenRouter headers 或未来 provider routing extras。
-- provider display name 与错误分类补充。
-
-消息转换、tool call 对账、usage 归一仍归协议服务。
-
-Responses 协议使用本地上下文管理：请求保持 `store: false`，不依赖 `previous_response_id`。主 Agent 的 `promptCacheKey` 由 session id 哈希派生，只用于稳定前缀缓存；加密 reasoning item 作为 opaque provider signature 进入 session 事件并在后续工具轮次回放，不能把缓存键或普通文本消息误当作完整的 Responses 会话状态。
+详细生命周期与 backend policy 以 [LLM Core Pi](../agent-plugin-runtime/agent-llm-core-pi.md) 为准。Responses 的 opaque reasoning 签名属于 Provider 上下文，不得将缓存标识或普通文本误当完整会话状态。
 
 ### 推理强度能力与请求链路
 
@@ -597,7 +574,7 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 - OpenRouter catalog 将 `supported_efforts`、`default_effort`、`default_enabled` 和 `mandatory` 归一化到 `ModelCapabilities`；`null` 表示目录声明支持全部标准化强度，缺失则表示不展示强度选择器。
 - Composer 只展示当前模型支持的强度，并按模型分别保存临时选择，避免切换模型时相互污染。
 - `Auto` 不向 provider 发送显式 effort，让模型或供应商使用默认策略；用户显式选择后，`reasoningEffort` 经 renderer IPC、Agent runtime 和每次 loop 请求传到 provider adapter。
-- runtime 会再次校验强度是否属于模型能力范围；不支持的值被丢弃，不能仅依赖 UI 防御。`reasoningMandatory` 会强制开启推理且隐藏关闭入口。
+- runtime 会再次校验强度是否属于模型能力范围；显式非法档位由 Host 拒绝，不能仅依赖 UI 防御。`reasoningMandatory` 会强制开启推理且隐藏关闭入口。
 - OpenRouter adapter 将关闭态映射为 `reasoning.enabled = false`，显式强度映射为 `reasoning.effort`，仅开启但没有强度覆盖时映射为 `reasoning.enabled = true`。
 
 上下文长度不在 Composer 中作为请求级控制项。模型使用注册表中的原生 `contextWindow` 上限，避免把上下文窗口与输出 `maxTokens` 混为一谈。
@@ -684,9 +661,9 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 - OpenRouter 使用 OpenAI-compatible service 和正确 base URL / headers。
 - 代理 dispatcher 只注入目标 provider。
 - Kimi thinking 行为不泄漏到 OpenRouter。
-- reasoning effort 从 runtime 贯通到每次模型请求；不支持的强度被过滤，mandatory 模型始终开启推理。
+- reasoning effort 从 runtime 贯通到每次模型请求；显式非法强度由 Host 拒绝，mandatory 模型始终开启推理。
 - utility 模型可用、不可用、主模型 fallback、确定性 fallback。
-- 动态模型 toolUse unknown 不进入 chat / explore / kairos。
+- 动态模型 toolUse unknown 不进入 chat / explore。
 
 ### Desktop main
 
@@ -719,18 +696,6 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 - utility 选择 OpenRouter 模型后，会话标题和 `/compact` 不再请求 DeepSeek。
 
 真实探针不得携带仓库、session 或个人数据。
-
-## 实施顺序
-
-1. 契约地基：Provider Registry、ModelKey、ModelDefinition、purpose resolver、settings v2 / v3 migration；后续设置中心重构再由 v3 迁移到 v4 namespace。
-2. 服务商运行配置：OpenRouter key/base URL、provider adapter、代理 transport、连接测试。
-3. 模型管理：installed/custom model、OpenRouter catalog cache、添加/启用/删除。
-4. 任务模型：默认会话、utility、Explore 统一 resolver；标题与 summarizer 去 DeepSeek 固定绑定。
-5. 设置页：将服务商连接、模型目录、模型启用和 Composer 联动收敛到统一的模型页面。
-6. Member 等仍在维护的消费方迁移到统一 resolver，删除独立 allowlist。
-7. 文档、history、测试和真实 provider 验收同步收口。
-
-该改动跨 shared、v2 Runtime、desktop main、preload、renderer 与 settings migration，实施前应单独编写 execution plan。
 
 ## 已确认决策
 

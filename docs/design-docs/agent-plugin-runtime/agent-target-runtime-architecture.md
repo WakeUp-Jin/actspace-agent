@@ -43,7 +43,7 @@ Profile/Patch schema、digest 和 transport parity 已有实现。Host Profile �
 
 Runtime Profile 生命周期为 `booting → ready → quiescing → disposed`。`requestRestart()` 报告需要重启，不在线重写已激活插件树；Host 基底/codec 配置更新要求受控 shutdown 后重新 Boot；新 Harness 选择不修改已被 Run 固定的树。
 
-`shutdown()` 先将 state 与 Run controller 置为 quiescing，再等待 candidate/root、领域资源及 Host 扩展的 disposer。Session flush、取消与 Effect 清理由各自生命周期实现负责，Bootstrap 不通过另一个通用业务句柄逐条调度。
+`shutdown()` 先进入 quiescing，再显式等待 `agentRuntime.dispose()` 排空执行、`session.runtime.closeAll()` 关闭会话，最后释放 candidate/root 与 Host 扩展 disposer。Cordis 同树 Effect 的释放顺序不能代替这一 durability 顺序；每阶段失败仍继续尝试后续清理并聚合错误。
 
 当前 graceful 等待默认为 30 秒，超时后再次请求停止接纳，并追加 5 秒最终等待。失败或超时记录 `SHUTDOWN_INCOMPLETE` 并抛出 `RuntimeShutdownFailure`；只有完成清理才进入 disposed 并释放启动占用。并发 shutdown 共享同一请求；实际失败后允许重试，超时后的重试继续等待尚未结束的 cleanup，不重复释放在途资源。Host 必须处理失败结果，不能把退出进程当作持久化成功证明。
 

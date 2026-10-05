@@ -1,6 +1,6 @@
 # ActSpace Site 设计规范
 
-状态：2026-09-19 用户确认的视觉方向；2026-09-26 首页按 `docs/design-docs/website-redesign-demo.html` 改版，并统一全站强调色与字体。正式实现位于本目录，两个原型只作对照，不作为内容源。
+状态：2026-09-19 用户确认的视觉方向；2026-09-26 首页按 `docs/design-docs/website-redesign-demo.html` 改版，并统一全站强调色与字体。正式实现位于本目录，`website-redesign-demo.html` 只作对照，不作为内容源。
 
 ## 产品与风格
 

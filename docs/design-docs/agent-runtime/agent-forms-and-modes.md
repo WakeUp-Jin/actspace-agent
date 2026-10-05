@@ -11,7 +11,7 @@
 4. Chat 只提供当前实现的两个模型工具：`web` 与 `generate_image`。`web` 保留现有 `search/open` 操作，不额外暴露 `web_search`、`web_fetch`。
 5. 设计与计划经用户审核后已授权实施。
 
-本文取代早期讨论稿中 Chat / Workspace / Minimal 多形态的建议。[主 Agent Chat 形态](agent-main-chat-form.md)保留为旧方案记录；本文是当前规范，实机覆盖边界以执行摘要为准。
+本文取代早期讨论稿中 Chat / Workspace / Minimal 多形态的建议。本文是当前规范，实机覆盖边界以执行摘要为准。
 
 ## 2. 本稿建议审核的决定
 
@@ -29,8 +29,8 @@
 
 | 概念 | 职责 | 生命周期 |
 |---|---|---|
-| Host Profile / Bundle | 启动共享服务、准入插件代码与 Host 能力 | Runtime 启停；不增加第三种 Profile |
-| Agent 形态 | 定义插件组合、配置、依赖、支持模式与默认模式 | Session 创建时固定组合身份 |
+| Host Profile / Bundle | 启动共享服务、准入插件代码与 Host 能力 | Runtime 启停；当前有 headless、desktop、host 三种 Profile |
+| Agent 形态 | 定义插件组合、配置、依赖、支持模式与默认模式 | Session 保存形态身份；每个 Run 固定自己的 Harness 组合 |
 | Agent 模式 | 选择同一组合内的当前行为、上下文贡献及能力范围 | Session 内持久化，可在安全边界切换 |
 | 权限策略 | 对具体调用的路径、资源、审批与沙箱做校验 | 沿用 `default/full-access` 和已有 Grant 生命周期 |
 
@@ -41,7 +41,9 @@
 ## 4. 真正的插件组合与生命周期
 
 ```text
-Host Profile / Bundle：共享 LLM、Journal、Tools、Host ports 和插件准入
+Host Profile / Bundle：共享 Journal、存储、调度、Host ports 和插件准入
+    ↓
+Harness：本次 Run 使用的 Loop、LLM、Tools、Prompt 与策略
     ↓
 actspace.main 形态定义：版本、插件成员、依赖、配置、支持模式
     ↓
@@ -56,7 +58,7 @@ Journal → Projection → Desktop / Headless
 
 ### 4.1 共享服务与 Agent 行为
 
-不复制每个 Agent 的 LLM 连接、全局工具注册表和存储服务。已有插件的 Host/Runtime 安装负责提供共享 executor 与服务；增加明确的 Agent 激活入口，负责为当前 Agent 绑定该插件的工具贡献、上下文贡献、事件订阅和状态。
+Session 与存储服务由 Host 持有；LLM、工具注册表、Prompt 与 Loop 随 Harness 独立装配。每次 Run 从所选 Harness 创建 AgentScope，绑定工具贡献、上下文与监听，结束后释放实例；同一 Session 不持有长寿命 Loop。
 
 首版组合包括现有 Prompt/Skills、Filesystem Read/Search/Write、Shell、Web、Image Generation/Inspection、Todo、Subagent、Compaction 的 Agent 行为；Browser 在 Profile 已装载时作为可选成员，英语辅助插件保持现有显式启用规则。基础 Loop、Inbox、Session 仍复用现有领域服务。形态清单引用已有插件/entry 身份，不把字符串标签冒充独立插件。
 
@@ -69,7 +71,7 @@ Journal → Projection → Desktop / Headless
 - 释放前停止 Loop，处理关联后台执行、审批与子 Agent，然后清理订阅和插件状态；一个 Agent 的释放不能卸载其他 Agent 使用的共享服务。
 - 恢复时从 Session 解析形态与模式，重建实例，不恢复过期的内存状态。
 - 模式切换更新插件消费的策略快照，不改变插件成员，不重启整个 Runtime。
-- Session provenance 保存形态 ID、版本、组合摘要和实际成员；继续已有 `createdWith.plugins` 作为 Host 装载证据，不把两者混用。升级后无法提供旧组合版本时禁止继续执行，保留只读访问，不静默替换组合。
+- Session provenance 保存创建时形态及 Host 装载证据；Run 记录本次 Harness 的身份、revision 和固定产物摘要。下一 Run 可以使用新启用组合，不要求恢复 Session 创建时的整棵插件树。未知形态/模式、缺失 required codec 或 Harness 恢复失败仍阻断执行。
 
 第一版只实现这一个静态内建组合与其 Agent 激活契约，不做第三方形态市场、动态安装、热重载或整套工具包物理拆分。
 

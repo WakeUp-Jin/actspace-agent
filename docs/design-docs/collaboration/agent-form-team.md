@@ -2,7 +2,7 @@
 
 > 文档等级：future-product-design。当前 v2 尚未实现本产品形态；本文只保留产品意图和不变量，不作为当前 Runtime、存储或接口规范。
 >
-> 含旧实现细节的[完整 v1 稿](../../archive/v1/design-docs/agent-form-team.md)已归档。当前一次性委派见 [Subagent](agent-subagent-runtime.md)。
+> 当前一次性委派见 [Subagent](agent-subagent-runtime.md)。
 
 ## 目标与角色
 

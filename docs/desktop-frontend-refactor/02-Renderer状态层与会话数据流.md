@@ -97,7 +97,7 @@ type BlockIdentity =
 type TurnKey = { runId: string };      // 一个 turn 的 durable 块与 live 块按 runId 对齐
 ```
 
-- durable 块由 projection 产出时带 `journalSeq` 和 `runId`；live 块带 `runId`。
+- durable 块由 projection 产出时带 `sourceSeq` 和 `runId`；live 块带 `runId`。（2026-10-05 核实：数据源头已有这两个值——journal envelope 的 `seq` 与 `data.agentRunId`；只是 `projectChatWindow` 把 seq 拼进了 `id: "v2-${seq}"`（`packages/client/src/sessions/chat.ts:606`），`createMessageBlocks` 把 runId 拼进了 `renderKey: "turn:${agentRunId}:…"`（`packages/shared/src/session-selectors.ts:406-415`），`MessageBlock` 类型上没有对应字段。）
 - 合并规则只有一条：**某个 runId 一旦在 durable 里出现 `run_completed`（或已持久化到对应 part），该 runId 的 live 块整体让位**。
 - 事件序号使用 envelope 自带的 `seq`，不再从 id 字符串解析。
 
@@ -247,7 +247,7 @@ function selectTranscript(cell: SessionCell, live: LiveRunState | undefined, loc
 3. 压缩失败块、后台 bash 状态覆写作为最后一层装饰。
 4. 纯函数，单测覆盖：正常流式、恢复中的 run、durable 先到 / live 先到、重复 user 消息、超长会话分页。
 
-需要 `@actspace/session-projection` 配合：surface message 带 `runId` 和 `journalSeq`。若当前没有，列为本重构对投影层的唯一接口需求。
+实现方式（02-2 已拍板方案一）：`MessageBlock` 新增可选字段 `runId`、`sourceSeq`，由 `packages/client` 的 `projectChatWindow` 与 `packages/shared` 的 `createMessageBlocks` 从已收到的 envelope 填充；只是新增可选字段，renderer 本地计算，不改 Runtime / Host / Session 协议。`renderKey` 保留，仅用于 DOM 复用，不再参与去重。
 
 ### 3.3 Context 取代 prop 钻取
 
@@ -267,7 +267,7 @@ function selectTranscript(cell: SessionCell, live: LiveRunState | undefined, loc
 | S1 | 迁出纯函数：`toolEntryToBlock`、`streamingStateToBlocks`、`createCompactionBlock` 等 → `session/live-runs/stream-blocks.ts`；`getSessionTitle` 等小 helper → 各自模块 | 纯搬家，现有测试不变即通过 |
 | S2 | 修 P0-1：删除 `sessions` effect 的全量刷新，改为启动补齐 + 事件驱动 | 补测试：列表刷新不触发 N 次 IPC |
 | S3 | `SessionLocalStore` + `evict`；把 drafts / composerState / compactionFailure / bashUpdates / lastSendOptions / approval / failed 迁入；删除 `setActiveSessionId` 中的镜像 | 每迁一类跑一次 `app-*.test.tsx` |
-| S4 | durable 单一事实源：删 `sessionRecord` state、`pageCacheRef`、手工合并；`useSessionCell` | 需要先确认 projection 是否带 runId / seq |
+| S4 | durable 单一事实源：删 `sessionRecord` state、`pageCacheRef`、手工合并；`useSessionCell` | `MessageBlock.runId` / `sourceSeq` 字段在 S5 补齐（数据已在 envelope 中） |
 | S5 | `transcript.ts` + 类型化 identity；删字符串前缀去重 | 先写对照测试：新旧合并结果在现有 fixture 上一致 |
 | S6 | live-run-store、task-queue 迁出；`terminalRunIdsRef` 有界 | |
 | S7 | 4 个 Context 替换 prop；WorkbenchLayout / ConversationView prop 降到 < 10 | |
@@ -284,8 +284,8 @@ function selectTranscript(cell: SessionCell, live: LiveRunState | undefined, loc
 - 性能：100 个会话、单会话 2000 条事件、连续加载 10 页早期历史 —— 记录 IPC 次数和 `createMessageBlocks` 调用次数，前后对比。
 - Electron 真机：流式中切换会话再切回、流式中刷新窗口恢复、加载早期历史后再收到新消息、归档会话后内存不再增长（Performance 面板）。
 
-## 6. 开放问题
+## 6. 开放问题（2026-10-05 已拍板）
 
-1. 本地会话「已提交未确认」的草稿，是否也要跨应用重启恢复（远端目前会）？
-2. `@actspace/session-projection` 的 surface message 是否已经带 `runId` / `journalSeq`？没有的话需要先在投影层补，这会跨出 Desktop 范围。
-3. 是否引入状态库（zustand 等）？建议**不引入**，用 `useSyncExternalStore` + 小 store 足够，和 `ClientSessionStore` 的风格一致。
+1. 本地会话「已提交未确认」的消息：**跨重启恢复**，作为草稿回到输入框，不自动重发；恢复前先查 durable 记录确认 Runtime 是否已收到，已收到则只清理残留记录。
+2. 投影是否带 `runId` / `journalSeq`：数据已在 envelope 中，只是没有成为 `MessageBlock` 字段。**方案一**：新增可选字段 `runId`、`sourceSeq`（见 §3），不改协议。
+3. 状态库：**不引入**，用 `useSyncExternalStore` + 小 store。

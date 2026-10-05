@@ -17,7 +17,7 @@ ActSpace 需要一套同时服务于以下四类行为的 Scope 原语：
 
 Scope 不是另一个权限系统，也不是把任意 Cordis Service 自动复制到子 Agent。它是同进程受信任插件之间的可见性、路由和清理边界。
 
-本规范吸收 DSH 的 Scope 原语，但不把 DSH one-shot provider 的 flat registration 选择误认为唯一模型：ActSpace 的普通 child Agent 默认加入父 Scope chain；只有明确要求强注册隔离时，才创建 flat child Scope。
+本规范区分 Scope 原语与生产 Run 接线：`scope.child()` 建立继承链，`isolatedChild()` 创建独立 Scope。生产子 Run 独立取得 Harness lease，并从该 lease 派生 Scope；它与父 Run 的关系通过 Session lineage、权限输入和取消链表达。
 
 ## 2. 核心决策
 
@@ -45,7 +45,7 @@ runtime
         └── child-agent
 ```
 
-普通 child Agent 的默认关系是 `scopeParent(child) = parent`。child 仍然拥有自己的 `ScopeKey`，不能复用 parent key。需要阻断父级注册可见性时，调用方必须显式选择 `isolated child scope`；flat scope 不是普通 Subagent 的默认语义。
+调用 `parent.child()` 时，`scopeParent(child) = parent`，child 拥有独立 `ScopeKey`；调用 `isolatedChild()` 则不建立 parent link。生产 Subagent 使用 `lease.scope.child()`，不能从这条原语规则推导出它继承父 Agent 的注册。
 
 注册表沿链向下继承：子 Scope 看见祖先贡献，最近 Scope 对同名项具有 shadow 优先级。事件准入沿链向上扩展：事件发给某个 Scope 时，该 Scope、所有祖先 Scope 和无 Scope listener 可以收到；兄弟 Scope、祖先 Scope 的事件不会反向进入子 Scope。
 
@@ -81,7 +81,7 @@ Scope 只约束同进程受信任插件的：
 
 ### 2.5 继承矩阵
 
-普通 child Agent 自动绑定 parent Scope，但“继承”只适用于明确采用 Scope-aware 机制的能力：
+下表描述通过 `parent.child()` 创建的库级 child Scope；生产子 Run 绑定自己的 Harness Scope，不自动继承父 Agent 注册。“继承”只适用于明确采用 Scope-aware 机制的能力：
 
 | 能力或对象 | 普通 child 默认行为 | 说明 |
 |---|---|---|
@@ -117,11 +117,11 @@ Agent 创建采用两个阶段：
 mint unpublished Scope
   → 注册 Prompt / Tool / policy / listener / cancel chain
   → 校验 required capability 和有效工具集合
-  → publication point：发布 Session 与 Agent identity
+  → publication point：发布本次 Run 的 live Agent identity（Session 已由 Host 打开）
   → 发出生命周期通知
 ```
 
-setup 失败时只能清理 unpublished Scope。publication 途中失败时，已发布对象必须按逆序撤销；已经送达的创建通知必须有配对 disposal 通知。
+setup 失败清理本次 unpublished Scope；成功发布的 Agent Handle 在 Run 结束时撤销。Session 属于 Host，不能因本次 Run 的 Scope 释放而销毁用户会话。
 
 ### 3.3 dispose 与 quiescence
 
@@ -129,7 +129,7 @@ Scope dispose 必须是幂等且可等待静止的：
 
 1. 先停止新注册和新事件进入；
 2. 取消或拒绝新的 Agent/Tool/LLM 工作；
-3. 等待已开始的 listener、stream、tool lease 和 child scope settlement；
+3. 等待已开始的干预调用、stream、tool lease 和 child scope settlement；emit 通知不持有 Run scope lease，其异步工作由监听插件单独管理；
 4. 逆序撤销该 Scope 的注册和 Effect；
 5. 最后释放 Scope 引用。
 
@@ -205,7 +205,7 @@ Agent 事件的公共 dispatch 入口必须是一个把 subject 和 scope carrie
 
 - 调用者只提供事件 payload 的业务字段，Agent subject 由 dispatcher 注入；
 - dispatcher 在创建时捕获目标 Agent 实例和其 Scope carrier；
-- `emit`、`parallel`、`serial`、`waterfall` 都复用同一个 carrier；
+- 当前 fused dispatcher 的 `emit`、`serial`、`waterfall` 复用同一个 carrier；`parallel` 是 Cordis 原生能力，不是当前 Agent dispatcher 的公开方法；
 - payload 中若存在不同 Agent identity，调用立即失败或被安全覆盖；
 - Agent dispose 后 dispatcher 不再接受新 dispatch。
 
@@ -219,16 +219,16 @@ main Agent 的 scope identity 必须基于 live Agent instance，诊断 id 使�
 
 ### 7.2 child Agent
 
-普通 child Agent 默认使用父 Agent Scope 作为 parent，创建独立的：
+生产 child Agent 使用独立 Harness lease 的 Scope 作为 parent，创建独立的：
 
 - child Scope key；
 - child Agent identity；
 - child Session；
 - 后台通知 Inbox、Prompt/Tool effective view 和取消链；主用户队列归 TaskLedger，详见 Task/Run 规范。
 
-child 看到父 Scope 允许继承的能力，但不获得父 Agent 的可变 conversation、writer、credential object 或 Agent identity。child 的 listener 只观察 child 及其后代；parent listener 可以按事件契约观察 child。
+child 看到其 Harness Scope 的贡献，工具集合另与父 Agent 显式下放的上限取交集。父 Agent 的局部 listener/contributor 不会自动进入另一 Harness；父子取消、workspace 和 Session lineage 仍保留。child 不共享父 conversation、writer、credential object 或 Agent identity。
 
-当任务要求注册隔离（例如不希望 child 看到 parent-local contribution）时，可以显式创建 flat child Scope。该模式仍保留 parent Agent、parent Session 和 child Session 的显式关系，但不建立 Scope parent link；它不能悄悄改变普通 child Agent 的默认语义。
+只有没有配置 `acquireRun` 的库级调用，才按 `isolatedScope` 选择 parent child 或 flat child。生产路径优先使用 Harness lease，不能用这个后备参数切换生产 Scope 所有权。
 
 ### 7.3 lineage 与 Scope 的边界
 
@@ -242,7 +242,7 @@ Scope P0 已完成以下代码接线：
 2. `ScopedRegistry` 支持 global、exact-scope 和 ancestor-to-nearest effective view，并保留最近层 shadow；
 3. `ScopeDisposer` 具备 active/quiescing/disposed 状态、逆序清理、并发 dispose 共享 Promise 和 in-flight work lease；
 4. `createAgentEventDispatcher()` 将 Agent subject 与 Scope carrier 融合，统一 `emit`、`serial`、`waterfall` 的路由，并在 subject/carrier 不一致时 fail closed；
-5. Agent Loop、生命周期通知、main Agent 和 one-shot child Agent 已使用 live subject + opaque carrier；普通 child 默认继承 parent Scope，显式 `isolatedChild()` 才建立 flat registration scope；
+5. Agent Loop、生命周期通知、main Agent 和 one-shot child Agent 已使用 live subject + opaque carrier；库级 child 支持 parent 继承或显式 `isolatedChild()`；生产 child 绑定独立 Harness lease；
 6. contract tests 已覆盖同 descriptor Agent 隔离、parent/child admission、sibling isolation、registry shadow、child cleanup、dispose race 和 mismatch。
 
 仍属于后续验收或其他 P0 所有权的差距：
@@ -281,12 +281,12 @@ Scope P0 已完成以下代码接线：
 3. child registry 可读取祖先贡献，最近 scope shadow 生效，parent view 不被 child 污染；
 4. child dispose 不删除 parent 或 sibling contribution；
 5. Agent subject 与 carrier 不一致时 dispatch 被拒绝；
-6. Scope dispose 等待 active listener、stream、tool lease 和 child scope 静止；
+6. Scope dispose 等待有 lease 的干预、stream、tool 和 child scope；异步通知由监听插件管理，不用 emit 延长 Run 生命周期；
 7. unpublished setup 失败不会发布半配置 Agent；
 8. Agent descriptor id、preset id 变化或复用不会改变 live Scope identity；
 9. Scope 路由不是权限旁路，工具有效集合仍由 Host/Tool policy 约束；
 10. CLI one-shot、one-shot Subagent 和恢复后的主 Agent 使用同一 Scope 语义。
-11. 普通 child Agent 自动绑定 parent Scope；显式 isolated child Scope 不读取 parent-local contribution，且两种模式都保持唯一 live Agent identity。
+11. 库级 child/isolatedChild 分别验证继承和隔离；生产 child 验证独立 Harness 选择、父权限上限及取消，保持唯一 live Agent identity。
 12. parent Scope 的工具 contribution 可被 child 发现，但 parent 的 deny、Host ceiling 和 Approval 不能被 child Scope 或 Preset 放宽。
 
 ## 11. 迁移策略与前提
@@ -311,5 +311,5 @@ Scope P0 已完成以下代码接线：
 - `ScopeKey` 是按对象 identity 比较的 opaque object，parent chain 由 `WeakMap` 维护，`scopeTarget()` 只向目标 key 及其祖先准入事件；见 DSH Scope 原语（历史快照路径：`tmp/deepseek-harness/packages/core/scope/src/index.ts`）。
 - Agent dispatch 将 live Agent subject 与 Scope carrier 绑定；见 DSH Agent dispatch（历史快照路径：`tmp/deepseek-harness/packages/core/agent/src/dispatch.ts`）。
 - Preset composition 通过 standing mount 和显式 child composition 组织，而不是把 descriptor/preset id 当作 live Agent scope；见 DSH Agent preset composition（历史快照路径：`tmp/deepseek-harness/packages/preset/agent-presets/src/index.ts`） 与 DSH child composition（历史快照路径：`tmp/deepseek-harness/packages/subagent/subagent/src/child-agent.ts`）。
-- DSH 的 one-shot provider 选择 fresh flat registration scope，是一种隔离策略；ActSpace 将其保留为显式 `isolated child Scope`，不覆盖普通 child 自动继承 parent Scope 的默认语义。
+- DSH 的 one-shot provider 选择 fresh flat registration scope，是一种隔离策略；ActSpace 原语保留显式 `isolatedChild()`。当前生产接线按独立 Harness lease 建树，不由早期参考实现决定。
 - Scope、工具 visibility、sandbox/approval policy 和 Session lineage 在 DSH 中是不同层次；见 DSH Scope README（历史快照路径：`tmp/deepseek-harness/packages/core/scope/README.zh.md`）、DSH Tools README（历史快照路径：`tmp/deepseek-harness/packages/core/tools/README.zh.md`） 和 DSH Session types（历史快照路径：`tmp/deepseek-harness/packages/core/session/src/types.ts`）。

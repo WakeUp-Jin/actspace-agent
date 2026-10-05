@@ -6,7 +6,7 @@
 
 ## 目标与设计真源
 
-[已批准设计](../../../design-docs/agent-plugin-runtime/agent-session-event-persistence-refactor.md)：保留生产者直接 append，补齐 Session 事件驱动持久化，建立必需检查点；不采用 Loop 唯一事件生产者方案。
+[当前持久化契约](../../../design-docs/agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)：保留生产者直接 append，补齐 Session 事件驱动持久化，建立必需检查点；不采用 Loop 唯一事件生产者方案。
 
 本计划交付 Session 行为语义和 CLI/process 回归。实施复核后保留现有包导入兼容面：一次性迁移 42 个 consumer 到新 `session-core` 包不会改变事件正确性，且会扩大本次行为切换的风险，因此物理包拆分继续由 P1-A 负责。本计划完成 coordinator 所有权、accepted/durable 边界、Cordis 处理器和 Loop 检查点。
 

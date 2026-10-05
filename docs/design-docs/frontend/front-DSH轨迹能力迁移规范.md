@@ -85,7 +85,7 @@ Session Journal
 - request/context.snapshot 提供 renderedSystemPrompt、systemSections、tools、requestOptions 和 prepared 模型事实。工具 Schema 支持真实 inputSchema；Result 读取 modelOutput，保留 resultRaw 与来源序列。
 - 主进程先读取 Session snapshot，再将 Journal 截取到 snapshot.throughJournalSeq，所有投影共享同一版本；缺失版本范围直接报错，不拼接混合版本。
 - `getSessionProjectionSnapshot` 的 `beforeSeq` / `afterSeq` 驱动同一 Journal 的事件窗口：初始返回最近 20 个完整 Turn（历史页不携带已定稿消息的 chunk，旧的大 request/context 只保留模型/路由等身份字段，Trajectory 对这些请求不再展示完整提示词），向前读取时按 `beforeSeq` 继续；绝对序列、Turn 与 Request 编号保留。Chat、Trajectory、Tool Card 分别解释窗口中的原始事件，窗口纳入 turn/start 前已入 Surface 的 Inbox claim。
-- 2026-09-21：Host Registry facts 反映全 Session；窗口传输仅含对应 raw events、Surface 和 tools。持久 checkpoint 与字节偏移用于尾部 replay 和范围读取，缓存失效仍需完整扫描。
+- 2026-09-21：Host Registry facts 反映全 Session；窗口传输仅含对应 raw events、Surface 和 tools。当前 projection-cache 从 storage 读取完整快照，按后端 identity、revision、codec 和 projection 版本复用；Turn/Request/call 索引只在内存派生，不读取磁盘 checkpoint 或 Journal 字节偏移缓存。展示分页不代表后端增量读取。
 - 2026-09-21：Desktop 传递 journal-update 的事件与 changed values；accepted 与 durable 水位分离，客户端遇到缺口再读窗口，不把 live 通知当作 fsync 证明。
 - Bridge 在刷新时保留已加载窗口，校验会话身份和版本，拒绝失效加载结果。运行中 Assistant 与最终消息维持稳定选择；异常流使用同 requestId 关联终止消息。
 - TTFT 优先从对应 request/header 计时，避免重试时包含前次请求等待；缺失首 token 或 usage 不估造。

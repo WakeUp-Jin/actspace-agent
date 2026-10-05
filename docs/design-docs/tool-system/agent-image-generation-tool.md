@@ -11,7 +11,7 @@
 V0 需要满足：
 
 - 用户可以在设置页配置图片生成 API Key、Base URL 与模型名称；Key 明文只存在于 Electron main Host / v2 Runtime 运行时，Base URL 和模型名称作为非敏感配置保存。
-- 主 Agent 在已配置 Key 时获得 `generate_image` 工具；缺 Key 时不暴露该工具。
+- 插件贡献 `generate_image`，Agent / Chat 模式允许该工具；缺 Key 时执行返回 `IMAGE_GENERATION_NOT_CONFIGURED`，不通过 Key 动态删减 schema。
 - 模型可以选择生成数量 `n`，范围为 1 到 10，未传时默认 1。
 - 一次工具调用对应一次图片生成请求，返回的每张有效图片都保存为独立会话产物。
 - 消息流能够恢复并展示单图或多图结果，不依赖短期有效的远程 URL。
@@ -37,11 +37,11 @@ V0 不处理以下能力：
 用户路径：
 
 ```text
-设置 → 服务商 → 图片生成服务 → 填写 API Key / Base URL / 模型名称
+设置 → 图片生成配置 → 填写 API Key / Base URL / 模型名称
   ↓
-下一轮主 Agent Runtime 检测到图片生成 Key
+Runtime 按插件、Scope 与 Agent mode 提供 generate_image
   ↓
-向模型注册 generate_image
+执行时由 Host 读取图片生成配置
   ↓
 用户提出图片生成需求
   ↓
@@ -49,7 +49,7 @@ V0 不处理以下能力：
   ↓
 配置的 Images API 返回 1..n 个结果
   ↓
-下载或解码 → 原子写入当前 session artifacts
+下载或解码 → 交给 Host Artifact Store 保存并绑定 Session
   ↓
 消息流展示图片网格 → Agent 返回简短说明
 ```
@@ -67,16 +67,16 @@ V0 不处理以下能力：
 
 | 概念 | V0 值 | 说明 |
 |---|---|---|
-| 工具名 | `generate_image` | 给 LLM 与 ToolManager 使用，snake_case |
-| 工具目录 | `tools/tools/generate-image/` | 仓库目录使用 kebab-case |
-| `previewKind` | `image_generation` | 给 bridge、shared contract 与 renderer 使用 |
+| 工具名 | `generate_image` | 给 LLM 与 ToolRuntime 使用，snake_case |
+| 工具目录 | `packages/tools/image-generation/` | 仓库目录使用 kebab-case |
+| `ToolUiPreview.kind` | `image_generation` | Client 投影语义，供 renderer 使用 |
 | 接入协议 | `openai-compatible` | V0 只有一份连接配置，不建立图片 provider registry |
 | 默认模型名称 | `gpt-image-2` | 用户可在设置页覆盖，但不作为单次工具参数 |
 | 默认 Base URL | `https://www.duckcoding.ai/v1` | 用户可在设置页覆盖 |
 | Endpoint | `<normalizedBaseUrl>/images/generations` | OpenAI-compatible Images API |
-| 运行时 Key | `IMAGE_GENERATION_API_KEY` | `$NEW_API_KEY` 只是 curl 示例里的 shell 变量名，不作为产品配置名 |
-| 运行时 Base URL | `IMAGE_GENERATION_BASE_URL` | 默认 DuckCoding，设置页值可覆盖 |
-| 运行时模型名称 | `IMAGE_GENERATION_MODEL` | 默认 `gpt-image-2`，设置页值可覆盖 |
+| CLI 环境 Key | `IMAGE_GENERATION_API_KEY` | Desktop 使用显式 Host 配置；不回写全局环境 |
+| CLI 环境 Base URL | `IMAGE_GENERATION_BASE_URL` | 默认 DuckCoding，设置页值可覆盖 |
+| CLI 环境模型名称 | `IMAGE_GENERATION_MODEL` | 默认 `gpt-image-2`，设置页值可覆盖 |
 
 图片生成服务与现有配置保持三类分离：
 
@@ -195,7 +195,7 @@ adapter 负责：
 - 禁止 URL 内嵌用户名、密码、query 或 fragment。
 - 保留必要路径前缀，例如 `/v1`；去掉末尾 `/` 后再拼接 `/images/generations`。
 - 如果用户误填完整 endpoint，应返回“请输入 API Base URL”的明确错误，不产生双重路径。
-- V0 允许用户配置本机或自托管 OpenAI-compatible 网关；使用非 HTTPS 地址时，设置页应提示 API Key 可能以明文网络流量传输。
+- executor 要求 HTTPS；仅 hostname 为 `localhost` 的本机入口例外。不能把任意 HTTP 自托管地址写成当前可执行范围。
 - Base URL 本身不是秘密，可以进入 renderer 设置视图和 `settings.json`，但日志只记录脱敏后的 origin/host，不记录可能包含租户标识的完整路径。
 
 ### URL 下载安全
@@ -210,10 +210,10 @@ adapter 负责：
 
 ### 超时与重试
 
-- 图片生成比普通搜索耗时更长，建议请求总超时为 180 秒。
+- 图片生成比普通搜索耗时更长，当前生成请求与单张下载各使用 120 秒 timeout，并响应调用 abort。
 - 用户停止 turn 时必须中止尚未完成的请求和下载。
 - V0 不自动重试完整生成请求。图片请求可能已经被上游接受并计费，盲目重试会产生重复图片和重复费用。
-- 认证、额度、限流和参数错误均不可自动重试。
+- 工具本身不自动重发。认证与参数错误不可重试；429、5xx 可带 retryable failure 元数据，但这不表示已经重发或可以忽略重复计费风险。
 - 网络或 5xx 错误返回可诊断但脱敏的失败信息，由用户或下一轮 Agent 决定是否重试。
 
 ### 部分成功
@@ -244,27 +244,15 @@ adapter 负责：
 
 ## 9. 模型上下文边界
 
-生成结果默认不把图片像素自动回填给下一次 LLM 调用，原因是：
+工具结果包含文本摘要与每张图片的 `artifact` 引用；Journal 不直接存像素。Agent Loop 按 MIME 将 `image/*` artifact 转为逻辑 image block，wire adapter 才读取字节并适配供应商协议。
 
-- `n` 最大为 10，Base64 会显著膨胀上下文。
-- 当前主模型可能是 text-only，直接注入图片会导致协议失败。
-- 图片已经保存为可回读产物，模型通常只需要知道生成是否成功和文件位置。
+支持图片的模型可以在后续请求收到这些图片；text-only 模型得到不可见图片的元信息和按需 `inspect_image` 提示，不隐式调用另一个视觉模型。不能再宣称生成结果只返回文件名、永远不进入模型图片上下文。
 
-模型回填建议：
-
-```text
-Generated 3 images with <configuredModel> at 1024x1024.
-Artifacts:
-- image-01.png
-- image-02.png
-- image-03.png
-```
-
-如果后续任务确实需要模型检查某张图片，支持视觉输入的模型可以显式调用 `read_file` 读取指定 artifact。不要把全部图片自动放进 `ToolResult.content`。
+并行工具结果顺序、协议归一化和图片读取边界统一遵循[工具输出与引用](agent-tool-output-references.md)。
 
 ## 10. Key 配置与工具暴露
 
-共享设置契约建议新增：
+共享设置对外视图：
 
 ```ts
 type ImageGenerationSecretId = "image-generation";
@@ -276,9 +264,8 @@ interface ImageGenerationSettingsView {
   model: string;
 }
 
-interface AppSettingsV2 {
-  imageGeneration: ImageGenerationSettingsView;
-}
+// 当前持久配置位于 settings v4 的 media 命名空间；
+// 对外设置视图继续提供 imageGeneration。
 ```
 
 配置边界：
@@ -292,10 +279,8 @@ interface AppSettingsV2 {
 - UI 只读取 `hasApiKey`，不读取旧 Key 明文，也不把 Key 写进 renderer store。
 - Key 以明文写入 main-only `secrets.json` v2，文件权限固定为 `0600`；renderer 不读取文件或明文。
 - Base URL 和模型名称规范化后写入 `settings.json`，不进入 `secrets.json`。
-- main 读取 Key，并把 Key/Base URL/模型名称写入当前运行时的 `IMAGE_GENERATION_API_KEY` / `IMAGE_GENERATION_BASE_URL` / `IMAGE_GENERATION_MODEL` overlay。
-- v2 Host credential resolver 集中解析这三个字段，executor 不直接散落读取 `process.env`。
-- `ToolRuntimeConfig.hasImageGenerationKey` 为 true 时才注册 `generate_image`。
-- 缺 Key 时 executor 仍保留防御性错误，但正常路径下模型看不到该工具，避免同一轮反复失败。
+- Desktop Host 在调用时读取 `ModelRuntimeService.getToolEnvironment().imageGeneration`，向 executor 注入显式 apiKey/baseUrl/model；executor 不直接读取 `process.env`。CLI 可由环境配置构建自己的 Host 端口。
+- 插件注册不依赖 Key，模式和 Scope 决定模型可见性。缺配置返回不可重试的 `IMAGE_GENERATION_NOT_CONFIGURED`，Agent 应提示配置而非重复调用。
 - V0 保存 Key 时不额外发起付费图片探针；第一次真实生成请求完成鉴权验证。
 
 图片生成配置不加入 LLM provider 的代理、模型安装或余额逻辑。未来若具体 endpoint 提供稳定的免费鉴权探针或用量接口，再单独设计连接测试与用量展示。
@@ -303,9 +288,9 @@ interface AppSettingsV2 {
 ## 11. Agent 暴露范围与调度
 
 - V0 只向主 Agent 注册 `generate_image`。
-- v1 autonomous runtime 默认不注册该工具，避免后台 tick 触发不可预期的付费生成。
+- 已退役的 v1 autonomous runtime 不构成当前暴露或后台执行入口。
 - Explore 与通用 SubAgent 默认不注册；需要图片时由主 Agent 统一执行并管理产物。
-- `isReadOnly` 设为 `false`：它会产生外部计费副作用并写入会话 artifact。
+- ToolDefinition 声明网络与文件写入 effects，采用 exclusive concurrency；图片生成产生外部计费副作用并写入受管 artifact。
 - 单次调用内部由 provider 批量生成 `n` 张，不让模型为了多张图片并行发起多个重复工具调用。
 - V0 不增加二次审批弹窗；用户的图片生成请求视为本次调用授权。工具描述必须禁止无明确图片生成意图时主动调用。
 
@@ -321,13 +306,9 @@ type ImageGenerationPreview = {
   promptPreview: string;
   requestedCount: number;
   generatedCount?: number;
-  model: string;
+  model?: string;
   size: string;
-  images?: Array<{
-    name: string;
-    path: string;
-    mimeType: string;
-  }>;
+  images?: ToolArtifact[];
   warning?: string;
   errorMessage?: string;
 };
@@ -345,7 +326,7 @@ type ImageGenerationPreview = {
 
 - `image_generation` 属于工具过程，进入 `Worked for` 分组，不在消息流中占据大面积媒体卡片。
 - 最终回复后渲染本轮 `Artifacts` 组件，逐行展示图片文件名与 session-relative artifact 路径。
-- 点击图片行后，renderer 通过 `session:read-artifact` IPC 请求 main 读取文件；main 必须校验文件位于当前 `<sessionId>/artifacts/` 子树、大小与真实图片签名，再返回单张 data URL。
+- 点击图片行后，renderer 通过 `session:read-artifact` IPC 请求 main 读取文件；main 通过 registry 的 `resolveArtifact(sessionId, artifactPath)` 验证当前会话引用与受管产物，再读取校验后的图片并返回单张 data URL。不能按旧 `<sessionId>/artifacts/` 目录布局推断权限。
 - 悬浮图片产物行时展示完整绝对路径；右键菜单由 main 进程创建，支持打开、复制路径、复制图片与 Finder 定位。上下文菜单与预览共享同一 session realpath 边界，不扩大 renderer 的文件系统权限。
 - renderer 禁止自行拼接或加载 `file://`，也不在聊天区预加载全部图片 Base64。
 - 右侧 Image Tab 使用 `object-contain` 展示完整图片，不裁掉生成内容。
@@ -406,7 +387,7 @@ run log 可以记录：
 ### Agent Core
 
 - definition schema：`prompt` 必填，`n` 默认 1，范围 1 到 10，`additionalProperties: false`。
-- exposure：有 Key 注册、缺 Key 不注册；v1 autonomous runtime / SubAgent 不注册。
+- exposure：Agent / Chat 模式允许，Plan 与内置 Subagent 不允许；缺 Key 调用返回配置错误。
 - Base URL：默认值、用户覆盖、末尾斜线规范化、非法协议、内嵌凭据、query/fragment 和误填完整 endpoint。
 - 模型名称：默认值、用户覆盖、空值、超长值和控制字符校验。
 - 请求构造：使用配置后的 Base URL 与模型名称，正确传递 prompt / size / n。
@@ -421,13 +402,13 @@ run log 可以记录：
 
 ### Shared / Desktop
 
-- settings：图片生成 Key 只返回 `hasApiKey`，Base URL 与模型名称可读写，Key 加密存储与清除路径正确。
+- settings：图片生成 Key 只返回 `hasApiKey`，Base URL 与模型名称可读写，main-only `0600` 凭据存储与清除路径正确。
 - session selectors：running / completed / partial / failed preview 都能恢复。
 - renderer：图片工具单行状态、长 prompt 截断、本轮产物栏、点击加载与右侧 Image Tab。
 - session artifact：合法图片读取、越界路径、逃逸 symlink、伪造扩展名和大小上限。
 - tool lifecycle：每个 `toolCallId` 完成后立即更新自己的图片块。
 - 主题：浅色、深色和系统主题下无字面量颜色回归。
-- Fork：图片目录被复制，持久化路径重写后仍可预览。
+- Fork：按 Host owner/reference 契约核验产物引用与预览，不以复制旧 Session 图片目录作为验收前提。
 
 ### 真实验收
 
@@ -436,7 +417,7 @@ run log 可以记录：
 1. 生成 1 张 `1024x1024` 图片。
 2. 生成 3 张图片，确认 `n` 与 UI 网格。
 3. 验证至少一种非方形尺寸；若 provider 不支持则收窄 schema enum。
-4. 断开 Key，确认下一轮不再暴露 `generate_image`。
+4. 断开 Key，确认下一次调用返回配置错误且不请求 Provider。
 5. 修改为另一个可用的 OpenAI-compatible Base URL 和对应模型名称，确认请求切换且不需要重新显示旧 Key。
 6. 输入无效模型名称，确认返回可诊断错误且不修改工具 schema。
 7. 检查 `sessions-v2/<sessionId>/journal.jsonl`、run log、artifact metadata 和 settings 文件没有 Key、Authorization、Base64 或签名 URL；`settings.json` 只包含非敏感 Base URL 与模型名称。
@@ -454,18 +435,6 @@ V1 可以引入：
 - 高数量或高成本生成的显式审批策略。
 
 升级时保持 `generate_image(prompt, size, n)` 的基础语义稳定；新增参数应是可选能力，不要求历史模型调用和 session 事件迁移后才能恢复。
-
-## 18. 决策记录
-
-- 2026-07-27：图片生成作为独立 Agent 工具，不并入主 LLM Provider Registry，也不混入网络搜索 provider 类型。
-- 2026-07-27：V0 使用一份用户可配置的 OpenAI-compatible 图片连接；DuckCoding 是默认 Base URL，API Key、Base URL 与模型名称都在设置页提供，模型名称默认 `gpt-image-2`。
-- 2026-07-27：`n` 由模型按用户意图选择，默认 1，合法范围 1 到 10；越界直接报错，不静默修正。
-- 2026-07-27：生成图片保存为 session artifacts，消息流展示本地产物；不把 Base64 或短期 URL 持久化。
-- 2026-07-27：图片默认不作为 `ToolResult.content` 自动注入模型上下文，需要检查时再由视觉模型显式读取。
-- 2026-07-27：V0 只向主 Agent 暴露，不向 v1 autonomous runtime、Explore 或通用 SubAgent 默认开放付费生成能力。
-- 2026-07-28：工具执行状态改为 Read 风格单行日志；生成图片不再直接占据消息流，而是在最终回复后的本轮产物栏中展示。
-- 2026-07-28：开发态 renderer 不加载 `file://`；点击图片时通过按 session artifacts 边界校验的 IPC 返回单张 data URL，再在右侧面板打开。
-- 2026-07-28：Artifacts 行新增完整路径 Tooltip 和 main-owned 原生右键菜单；系统操作仍只允许当前 session artifacts 或 workspace 边界内的真实文件。
 
 ## 2026-09-25：配置生效与失败阶段
 
