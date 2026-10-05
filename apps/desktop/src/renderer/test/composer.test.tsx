@@ -7,16 +7,10 @@ import { Composer } from "../components/Composer";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { ResponseAnnotationContext } from "../components/messages/response-annotation-context";
 import { createAnnotationContextValue } from "./fixtures/response-annotation-helpers";
-
-type PartialActspaceBridge = Partial<NonNullable<typeof window.actspace>>;
-
-function setPartialActspaceBridge(bridge: PartialActspaceBridge) {
-  (window as unknown as { actspace?: PartialActspaceBridge }).actspace = bridge;
-}
+import { setupBridge } from "./helpers/bridge";
 
 afterEach(() => {
   vi.restoreAllMocks();
-  delete (window as unknown as { actspace?: unknown }).actspace;
 });
 
 function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
@@ -295,7 +289,7 @@ describe("Composer follow-up bar", () => {
       },
     ];
     const selectImages = vi.fn(async () => ({ canceled: false, attachments: selectedAttachments }));
-    setPartialActspaceBridge({ selectImages });
+    setupBridge({ "dialogs.selectImages": selectImages });
 
     renderComposer();
 
@@ -407,7 +401,7 @@ describe("Composer follow-up bar", () => {
         { id: "att-1", kind: "image" as const, name: "notes.png", path: "/Users/test/notes.png" },
       ],
     }));
-    setPartialActspaceBridge({ selectImages });
+    setupBridge({ "dialogs.selectImages": selectImages });
     renderComposer();
 
     const panel = screen.getByLabelText("消息输入面板");
@@ -482,7 +476,7 @@ describe("Composer follow-up bar", () => {
   it("opens the slash menu with Functions and workspace Skills", async () => {
     const user = userEvent.setup();
     const listSkills = vi.fn(async () => ({ items: [createSkill()], warnings: [] }));
-    setPartialActspaceBridge({ listSkills });
+    setupBridge({ "skills.list": listSkills });
     renderComposer({ selectedWorkspaceRoot: "/work" });
 
     const input = screen.getByLabelText("消息输入框");
@@ -535,7 +529,7 @@ describe("Composer follow-up bar", () => {
         warnings: [],
       });
     });
-    setPartialActspaceBridge({ listSkills });
+    setupBridge({ "skills.list": listSkills });
     const { rerender } = renderComposer({ selectedWorkspaceRoot: "/work/a" });
 
     await user.type(screen.getByLabelText("消息输入框"), "/");
@@ -581,9 +575,9 @@ describe("Composer follow-up bar", () => {
       mimeType: "image/png",
       previewUrl: "file:///Users/test/screenshot.png",
     }];
-    setPartialActspaceBridge({
-      listSkills: vi.fn(async () => ({ items: [], warnings: [] })),
-      selectImages: vi.fn(async () => ({ canceled: false, attachments })),
+    setupBridge({
+      "skills.list": vi.fn(async () => ({ items: [], warnings: [] })),
+      "dialogs.selectImages": vi.fn(async () => ({ canceled: false, attachments })),
     });
     const { onSend } = renderComposer({ selectedSkills: ["frontend-design"] });
 
@@ -610,7 +604,7 @@ describe("Composer follow-up bar", () => {
     const onExpandContext = vi.fn();
     const onOpenReview = vi.fn();
     const onSelectedSkillsChange = vi.fn();
-    setPartialActspaceBridge({ listSkills: vi.fn(async () => ({ items: [createSkill()], warnings: [] })) });
+    setupBridge({ "skills.list": vi.fn(async () => ({ items: [createSkill()], warnings: [] })) });
     renderComposer({ onExpandContext, onOpenReview, onSelectedSkillsChange });
     const input = screen.getByLabelText("消息输入框");
 
@@ -680,7 +674,7 @@ describe("Composer follow-up bar", () => {
       shadowed: false,
     };
     const listSkills = vi.fn(async () => ({ items: [skill], warnings: [] }));
-    setPartialActspaceBridge({ listSkills });
+    setupBridge({ "skills.list": listSkills });
 
     const { rerender } = renderComposer({
       selectedWorkspaceRoot: "/work",
@@ -741,7 +735,7 @@ describe("Composer follow-up bar", () => {
       },
     ];
     const selectImages = vi.fn(async () => ({ canceled: false, attachments }));
-    setPartialActspaceBridge({ selectImages });
+    setupBridge({ "dialogs.selectImages": selectImages });
 
     renderComposer();
 
@@ -762,8 +756,8 @@ describe("Composer follow-up bar", () => {
       mimeType: "image/png",
       previewUrl: "data:image/png;base64,preview",
     };
-    setPartialActspaceBridge({
-      selectImages: vi.fn(async () => ({ canceled: false, attachments: [attachment] })),
+    setupBridge({
+      "dialogs.selectImages": vi.fn(async () => ({ canceled: false, attachments: [attachment] })),
     });
     const { onOpenAttachmentPreview } = renderComposer();
 
@@ -785,7 +779,7 @@ describe("Composer follow-up bar", () => {
       previewUrl: "data:image/png;base64,preview",
     };
     const importComposerImage = vi.fn(async () => ({ ok: true as const, attachment: pastedAttachment }));
-    setPartialActspaceBridge({ importComposerImage });
+    setupBridge({ "dialogs.importComposerImage": importComposerImage });
     const { onSend } = renderComposer();
     const input = screen.getByLabelText("消息输入框");
     const file = new File([new Uint8Array([1, 2, 3])], "image.png", { type: "image/png" });
@@ -831,7 +825,7 @@ describe("Composer follow-up bar", () => {
   it("adds dropped files, removes attachments, and sends only remaining attachments", async () => {
     const user = userEvent.setup();
     const getPathForFile = vi.fn((file: File) => file.name === "photo.png" ? "/Users/test/photo.png" : "/Users/test/report.pdf");
-    setPartialActspaceBridge({ getPathForFile });
+    setupBridge({ "dialogs.getPathForFile": getPathForFile });
     const { onSend } = renderComposer();
 
     const panel = screen.getByLabelText("消息输入面板");
@@ -1084,8 +1078,8 @@ describe("Composer follow-up bar", () => {
   it("renders initial composer selectors with the input above the toolbar", async () => {
     const user = userEvent.setup();
     const onSelectWorkspace = vi.fn();
-    setPartialActspaceBridge({
-      getWorkspaceEnvironment: vi.fn(async () => ({
+    setupBridge({
+      "workspaces.getEnvironment": vi.fn(async () => ({
         workspaceRoot: "/work/actspace-agent",
         workspaceLabel: "actspace-agent",
         locationKind: "worktree" as const,

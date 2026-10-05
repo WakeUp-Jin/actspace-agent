@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import type { AppShutdownNotice } from "@actspace/shared";
+import { eventsApi } from "../api/events";
 
 /**
  * 优雅退出遮罩。
@@ -10,7 +11,7 @@ import type { AppShutdownNotice } from "@actspace/shared";
  * 通知 renderer。这里收到通知后铺一层全屏遮罩，告诉用户「正在安全关闭」，
  * 避免用户以为软件卡死而强杀进程导致丢账。
  *
- * - 仅桌面端（`window.actspace.onShuttingDown` 存在）才挂监听；mock 模式直接 no-op。
+ * - 浏览器 mock 下 `onShuttingDown` 不会触发。
  * - 遮罩一旦出现就不再撤下——后续要么进程退出、要么主进程 5s 超时强退。
  * - 颜色全部走主题语义类（浅/深双主题翻转），不写死字面量色值。
  */
@@ -18,10 +19,7 @@ export function ShutdownOverlay() {
   const [notice, setNotice] = useState<AppShutdownNotice | null>(null);
 
   useEffect(() => {
-    const bridge = typeof window !== "undefined" ? window.actspace : undefined;
-    if (!bridge?.onShuttingDown) return;
-    const off = bridge.onShuttingDown((next) => setNotice(next));
-    return off;
+    return eventsApi.shuttingDown((next) => setNotice(next));
   }, []);
 
   if (!notice) return null;

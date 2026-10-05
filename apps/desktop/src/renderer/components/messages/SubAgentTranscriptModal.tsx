@@ -8,6 +8,7 @@ import { ToolLogLine } from "./ToolLogLine";
 import { TOOL_LOG_LINE_CLASS, TOOL_LOG_LINE_TEXT_CLASS } from "./toolLogStyles";
 import { formatWorkedDuration } from "./workedDuration";
 import { IconButton } from "../ui/IconButton";
+import { sessionsApi } from "../../api/sessions";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 type AssistantMessage = Extract<MessageBlock, { kind: "assistant" }>;
@@ -379,10 +380,10 @@ function finalReportFromAgentSummary(message: AgentMessage): AssistantMessage | 
 }
 
 export async function loadTranscript(ref: SubAgentTranscriptRef | undefined): Promise<SessionEvent[]> {
-  if (!ref || typeof window === "undefined" || !window.actspace?.getSubAgentTranscript) {
+  if (!ref) {
     return [];
   }
-  return window.actspace.getSubAgentTranscript({ transcriptRef: ref });
+  return sessionsApi.getSubAgentTranscript({ transcriptRef: ref });
 }
 
 export function SubAgentTranscriptPanel({

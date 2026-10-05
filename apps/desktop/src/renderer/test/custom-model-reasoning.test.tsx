@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, it } from "vitest";
 import type { CustomModelReasoning } from "@actspace/shared";
 import { CustomModelReasoningFields } from "../components/settings/CustomModelReasoningFields";
+import { setupBridge } from "./helpers/bridge";
 
 it("prefills exact matches, permits manual efforts and clears a deselected default", async () => {
   function Fixture() { const [value, setValue] = useState<CustomModelReasoning>({ mode: "auto" }); return <><CustomModelReasoningFields apiModel="gpt-6-astra" value={value} onChange={setValue} /><output>{JSON.stringify(value)}</output></>; }
@@ -25,7 +26,7 @@ it("edits an existing model through models:update without recreating its connect
   const { vi } = await import("vitest");
   const model = { definition: { key: "openrouter:connection/relay/alias", provider: "openrouter", api: "openai-completions", apiModel: "alias", source: "custom", label: "Relay model", contextWindow: null, capabilities: { input: ["text"], toolUse: "declared", reasoning: false, thinkingToggle: false } }, settings: { enabled: true, connectionId: "relay" }, unavailableReasons: {} };
   const updateModel = vi.fn(async () => ({ ok: true, model }));
-  window.actspace = { listInstalledModels: async () => ({ models: [model] }), updateModel } as unknown as typeof window.actspace;
+  setupBridge({ "models.listInstalled": async () => ({ models: [model] }), "models.update": updateModel });
   render(<ModelSettings settings={{ providers: {} } as never} connectionFilter="relay" embedded />);
   await userEvent.click(await screen.findByRole("button", { name: "选择启用模型" }));
   await userEvent.click(await screen.findByRole("button", { name: "配置推理能力：Relay model" }));

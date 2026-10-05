@@ -1,7 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 import * as React from "react";
-import { vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { resetBridge, setupBridge } from "./helpers/bridge";
 
 vi.mock("@testing-library/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@testing-library/react")>();
@@ -26,6 +27,13 @@ vi.mock("@testing-library/react", async (importOriginal) => {
     },
   };
 });
+
+// 每个 renderer 用例默认装一个完整的 mock bridge，用例里用 `setupBridge(overrides)` 替换。
+// 本文件同时被 node 环境的 main 进程测试加载，那里没有 window。
+if (typeof window !== "undefined") {
+  beforeEach(() => { setupBridge(); });
+  afterEach(() => { resetBridge(); });
+}
 
 class ResizeObserverMock {
   observe() {}

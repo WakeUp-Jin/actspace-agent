@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { HostConnection } from "@actspace/shared/host-protocol";
+import { eventsApi } from "../api/events";
+import { hostsApi } from "../api/hosts";
 export type HostDescription = { state: string; workspaces: { id: string; name: string; path: string }[]; models: { id: string; name: string }[]; defaultModel: string };
 export function remoteSessionRef(sessionId: string | null): { hostId: string; sessionId: string } | null {
   if (!sessionId?.startsWith("host:")) return null;
@@ -16,22 +18,21 @@ export function useRemoteTarget(sessionId: string | null, sessionWorkspace?: str
   const modelKey = sessionId ?? `new:${hostId ?? "local"}`;
   const selectModel = (value: string) => setModels(current => { const next = { ...current, [modelKey]: value }; localStorage.setItem("actspace:remote-models", JSON.stringify(next)); return next; });
   useEffect(() => {
-    const bridge = window.actspaceHosts; if (!bridge) return;
     let live = true;
     const update = (items: HostConnection[]) => {
       if (!live) return; setHosts(items);
-      for (const host of items.filter(host => host.state === "connected")) void bridge.call(host.hostId, "host.describe", {}).then(value => {
+      for (const host of items.filter(host => host.state === "connected")) void hostsApi.call({ hostId: host.hostId, method: "host.describe", params: {} }).then(value => {
         if (live) setDescriptions(current => ({ ...current, [host.hostId]: value as HostDescription }));
       }).catch(() => undefined);
     };
-    void bridge.list().then(update); const cleanup = bridge.onChanged(update);
-    const events = bridge.onEvent(({ hostId, event }) => {
+    void hostsApi.list().then(update); const cleanup = eventsApi.hostsChanged(update);
+    const events = eventsApi.hostEvent(({ hostId, event }) => {
       const value = event.value as { kind?: string; state?: string } | undefined;
       if (value?.kind === "state" && value.state) setDescriptions(current => current[hostId] ? { ...current, [hostId]: { ...current[hostId]!, state: value.state! } } : current);
     });
     return () => { live = false; cleanup(); events(); };
   }, []);
-  useEffect(() => { void window.actspaceHosts?.activate(sessionId).catch(() => undefined); }, [sessionId, hosts]);
+  useEffect(() => { void hostsApi.activate(sessionId).catch(() => undefined); }, [sessionId, hosts]);
   const description = hostId ? descriptions[hostId] : undefined;
   const host = hosts.find(item => item.hostId === hostId);
   const selectedModel = models[modelKey] ?? models[`new:${hostId ?? "local"}`] ?? description?.defaultModel ?? "";

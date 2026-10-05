@@ -77,6 +77,10 @@ import { selectRequestContextEstimate } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { Button } from "./ui/Button";
 import { IconButton } from "./ui/IconButton";
+import { dialogsApi } from "../api/dialogs";
+import { skillsApi } from "../api/skills";
+import { tasksApi } from "../api/tasks";
+import { eventsApi } from "../api/events";
 
 export type ComposerSendOptions = {
   model: ModelSelectionId;
@@ -432,7 +436,7 @@ function inferAttachmentKind(file: File, path?: string): ComposerAttachment["kin
 }
 
 function attachmentFromDroppedFile(file: File): ComposerAttachment {
-  const path = window.actspace?.getPathForFile?.(file) || undefined;
+  const path = dialogsApi.getPathForFile(file) || undefined;
   const kind = inferAttachmentKind(file, path);
   return {
     id: createAttachmentId(),
@@ -620,7 +624,7 @@ export function Composer({
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
   const [uploadProgress, setUploadProgress] = useState<import("@actspace/shared/host-protocol").HostUploadProgress | null>(null);
-  useEffect(() => window.actspaceHosts?.onUploadProgress(value => { if (value.sessionId === sessionId) setUploadProgress(value.state === "finished" ? null : value); }), [sessionId]);
+  useEffect(() => eventsApi.hostUploadProgress(value => { if (value.sessionId === sessionId) setUploadProgress(value.state === "finished" ? null : value); }), [sessionId]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<{ message: string; issue?: ChatAttachmentIssue } | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -651,8 +655,8 @@ export function Composer({
   const selectedModelOptions = currentModelRuntimeOptions(selectedModelSpec, modelRuntimeOptions[selectedModelId]);
   const configurationKey = JSON.stringify({ model: executionContext?.remote?.hostId ? executionContext.remote.model : selectedModelId, thinkingEnabled: selectedModelOptions.thinkingEnabled, reasoningEffort: selectedModelOptions.reasoningEffort, selectedSkillIds: selectedSkills });
   useEffect(() => {
-    if (!sessionId || !window.actspace?.taskCommand || (executionContext?.remote?.hostId && !executionContext.remote.canSend)) return;
-    void window.actspace.taskCommand({ sessionId, op: "configure", configuration: JSON.parse(configurationKey) }).catch(error => console.error("Failed to update execution configuration", error));
+    if (!sessionId || (executionContext?.remote?.hostId && !executionContext.remote.canSend)) return;
+    void tasksApi.command({ sessionId, op: "configure", configuration: JSON.parse(configurationKey) }).catch(error => console.error("Failed to update execution configuration", error));
   }, [sessionId, configurationKey, executionContext?.remote?.hostId, executionContext?.remote?.canSend]);
   const editingReasoningEfforts = modelReasoningEfforts(editingModelSpec);
   const normalizedModelSearchQuery = modelSearchQuery.trim().toLocaleLowerCase();
@@ -968,40 +972,28 @@ export function Composer({
     setCommandOpen(false);
     setSkillsOpen(false);
 
-    if (window.actspace?.selectImages) {
-      try {
-        const result = await window.actspace.selectImages();
-        if (!result.canceled) {
-          appendAttachments(result.attachments);
-        }
-      } catch (error) {
-        console.error("Failed to select images", error);
-        setAttachmentError("图片选择失败。");
+    try {
+      const result = await dialogsApi.selectImages();
+      if (!result.canceled) {
+        appendAttachments(result.attachments);
       }
-      return;
+    } catch (error) {
+      console.error("Failed to select images", error);
+      setAttachmentError("图片选择失败。");
     }
-
-    console.warn("Image picker is only available in the desktop app.");
-    setAttachmentError("当前环境不支持图片选择。");
   }
 
   async function handleSelectChatFiles() {
     setCommandOpen(false);
     setSkillsOpen(false);
 
-    if (window.actspace?.selectFiles) {
-      try {
-        const result = await window.actspace.selectFiles(executionContext?.remote?.hostId ? { remote: true } : undefined);
-        if (!result.canceled) appendAttachments(result.attachments);
-      } catch (error) {
-        console.error("Failed to select Chat attachments", error);
-        setAttachmentError("附件选择失败。");
-      }
-      return;
+    try {
+      const result = await dialogsApi.selectFiles(executionContext?.remote?.hostId ? { remote: true } : undefined);
+      if (!result.canceled) appendAttachments(result.attachments);
+    } catch (error) {
+      console.error("Failed to select Chat attachments", error);
+      setAttachmentError("附件选择失败。");
     }
-
-    console.warn("File picker is only available in the desktop app.");
-    setAttachmentError("当前环境不支持附件选择。");
   }
 
   async function handlePasteImages(event: ClipboardEvent<HTMLTextAreaElement>) {
@@ -1012,14 +1004,9 @@ export function Composer({
     if (imageFiles.length === 0) return;
 
     event.preventDefault();
-    if (!window.actspace?.importComposerImage) {
-      setAttachmentError("当前环境不支持粘贴图片。");
-      return;
-    }
-
     const results = await Promise.all(imageFiles.map(async (file) => {
       try {
-        return await window.actspace.importComposerImage!({
+        return await dialogsApi.importComposerImage({
           name: file.name || "pasted-image.png",
           mimeType: file.type || undefined,
           bytes: new Uint8Array(await file.arrayBuffer()),
@@ -1041,12 +1028,6 @@ export function Composer({
   }
 
   async function loadSkills(forceReload = false) {
-    if (!window.actspace?.listSkills) {
-      skillLoadRequestRef.current += 1;
-      setSkillsLoading(false);
-      setSkillsError("请在桌面应用中使用 Skills。");
-      return;
-    }
     const workspaceKey = selectedWorkspaceRoot ?? "__default__";
     if (!forceReload && skillLoadWorkspaceRef.current === workspaceKey) return;
     skillLoadWorkspaceRef.current = workspaceKey;
@@ -1055,7 +1036,7 @@ export function Composer({
     setSkillsLoading(true);
     setSkillsError(null);
     try {
-      const result = await window.actspace.listSkills({ workspaceRoot: selectedWorkspaceRoot ?? undefined });
+      const result = await skillsApi.list({ workspaceRoot: selectedWorkspaceRoot ?? undefined });
       if (skillLoadRequestRef.current !== requestId) return;
       setSkillItems(result.items
         .filter((skill) => skill.enabledForAgent && !skill.shadowed && skill.status === "available")
@@ -1245,7 +1226,7 @@ export function Composer({
     const files = Array.from(event.dataTransfer.files);
     if (isChatForm) {
       const unsupported = files.find((file) => {
-        const path = window.actspace?.getPathForFile?.(file) || file.name;
+        const path = dialogsApi.getPathForFile(file) || file.name;
         return !/\.(png|jpe?g|webp|gif|txt|md|markdown|json|csv)$/i.test(path);
       });
       if (unsupported) {

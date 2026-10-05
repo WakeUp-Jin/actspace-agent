@@ -7,6 +7,8 @@ import type {
   ReviewSelection,
   ReviewSnapshot,
 } from "@actspace/shared";
+import { eventsApi } from "../../api/events";
+import { reviewApi } from "../../api/review";
 
 export type ReviewDiffMode = "unified" | "split";
 export type ReviewFileRequestState = { status: "idle" | "loading" | "ready" | "partial" | "failed"; error?: string };
@@ -72,14 +74,10 @@ export function useReviewWorkspaceStore(input: {
       setState((current) => ({ ...current, selection, loading: false, error: null, snapshot: null, diffs: new Map(), fileRequests: new Map(), fileContents: new Map() }));
       return;
     }
-    const api = refresh ? window.actspace?.refreshReviewSnapshot : window.actspace?.getReviewSnapshot;
+    const api = refresh ? reviewApi.refreshSnapshot : reviewApi.getSnapshot;
     const currentRequest = ++snapshotRequestId.current;
     inFlightDiffs.current.clear();
     inFlightContents.current.clear();
-    if (!api) {
-      setState((current) => ({ ...current, loading: false, error: "变更审查连接不可用。" }));
-      return;
-    }
     setState((current) => ({ ...current, selection, loading: true, error: null, feedback: null }));
     try {
       const result = await api({
@@ -118,8 +116,8 @@ export function useReviewWorkspaceStore(input: {
 
   const loadDiffs = useCallback(async (fileIds: string[], contextOverride?: number) => {
     const snapshot = stateRef.current.snapshot;
-    const api = window.actspace?.getReviewFileDiffs;
-    if (!snapshot || !api) return;
+    const api = reviewApi.getFileDiffs;
+    if (!snapshot) return;
     const requestIds = [...new Set(fileIds)].filter((fileId) => {
       const file = snapshot.files.find((candidate) => candidate.id === fileId);
       return file?.renderKind === "text" && !inFlightDiffs.current.has(fileId);
@@ -185,8 +183,8 @@ export function useReviewWorkspaceStore(input: {
 
   const loadFileContents = useCallback(async (fileIds: string[]) => {
     const snapshot = stateRef.current.snapshot;
-    const api = window.actspace?.getReviewFileContents;
-    if (!snapshot || !api || !stateRef.current.loadFullFiles) return;
+    const api = reviewApi.getFileContents;
+    if (!snapshot || !stateRef.current.loadFullFiles) return;
     const requested = [...new Set(fileIds)].filter((fileId) => {
       const file = snapshot.files.find((candidate) => candidate.id === fileId);
       return file?.renderKind === "text" && !stateRef.current.fileContents.has(fileId) && !inFlightContents.current.has(fileId);
@@ -225,9 +223,7 @@ export function useReviewWorkspaceStore(input: {
   }, [input.workspaceRoot, input.sessionId, loadSnapshot]);
 
   useEffect(() => {
-    const subscribe = window.actspace?.onReviewChanged;
-    if (!subscribe) return;
-    return subscribe((notification) => {
+    return eventsApi.reviewChanged((notification) => {
       if (notification.workspaceId !== stateRef.current.snapshot?.workspaceId) return;
       setState((current) => ({ ...current, feedback: "变更已更新，正在刷新审查视图…", diffs: new Map(), fileRequests: new Map(), fileContents: new Map() }));
       void loadSnapshot(stateRef.current.selection);
@@ -302,16 +298,16 @@ export function useReviewWorkspaceStore(input: {
 
   const setViewed = useCallback(async (fileId: string, viewed: boolean) => {
     const snapshot = stateRef.current.snapshot;
-    if (!snapshot || !window.actspace?.setReviewFileViewed) return;
+    if (!snapshot) return;
     setState((current) => ({ ...current, snapshot: current.snapshot ? { ...current.snapshot, files: current.snapshot.files.map((file) => file.id === fileId ? { ...file, viewed } : file) } : null }));
-    const result = await window.actspace.setReviewFileViewed({ workspaceRoot: input.workspaceRoot, sessionId: input.sessionId ?? undefined, snapshotId: snapshot.id, expectedGeneration: snapshot.generation, fileId, viewed });
+    const result = await reviewApi.setFileViewed({ workspaceRoot: input.workspaceRoot, sessionId: input.sessionId ?? undefined, snapshotId: snapshot.id, expectedGeneration: snapshot.generation, fileId, viewed });
     if (result.ok === false) setState((current) => ({ ...current, feedback: result.message }));
   }, [input.sessionId, input.workspaceRoot]);
 
   const applyMutation = useCallback(async (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">): Promise<ReviewMutationResult | null> => {
     const snapshot = stateRef.current.snapshot;
-    if (!snapshot || !window.actspace?.applyReviewMutation) return null;
-    const result = await window.actspace.applyReviewMutation({ workspaceRoot: input.workspaceRoot, sessionId: input.sessionId ?? undefined, mutation: { ...mutation, snapshotId: snapshot.id, expectedGeneration: snapshot.generation } });
+    if (!snapshot) return null;
+    const result = await reviewApi.applyMutation({ workspaceRoot: input.workspaceRoot, sessionId: input.sessionId ?? undefined, mutation: { ...mutation, snapshotId: snapshot.id, expectedGeneration: snapshot.generation } });
     setState((current) => ({ ...current, feedback: mutationFeedback(result) }));
     if (result.status === "success" || result.status === "partialSuccess" || result.status === "stale") void loadSnapshot(stateRef.current.selection);
     return result;

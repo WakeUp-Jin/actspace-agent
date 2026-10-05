@@ -27,6 +27,7 @@ import type {
 import type { ComposerReviewSummary } from "../Composer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { Button } from "../ui/Button";
+import { workspacesApi } from "../../api/workspaces";
 
 const BRANCH_PREFIX_KEY = "actspace.workspace.branch-prefix.v1";
 const DEFAULT_BRANCH_PREFIX = "actspace";
@@ -132,11 +133,7 @@ export function WorkspaceChromeControls({
   const sources = useMemo(() => collectSources(workspaceRoot, messages), [messages, workspaceRoot]);
 
   const loadEnvironment = async () => {
-    const api = window.actspace?.getWorkspaceEnvironment;
-    if (!api) {
-      setEnvironment(null);
-      return;
-    }
+    const api = workspacesApi.getEnvironment;
     setLoadingEnvironment(true);
     try {
       setEnvironment(await api({ workspaceRoot }));
@@ -227,8 +224,7 @@ export function WorkspaceChromeControls({
   };
 
   const runPush = async (remote?: string) => {
-    const api = window.actspace?.pushWorkspaceBranch;
-    if (!api) return;
+    const api = workspacesApi.push;
     setBusy(true);
     try {
       const result = await api({ workspaceRoot, remote });
@@ -248,11 +244,7 @@ export function WorkspaceChromeControls({
       queueMicrotask(() => branchAnchorRef.current?.focus());
       return;
     }
-    const api = window.actspace?.switchWorkspaceBranch;
-    if (!api) {
-      setFeedback({ tone: "danger", message: "请在桌面应用中切换分支。" });
-      return;
-    }
+    const api = workspacesApi.switchBranch;
     setBusy(true);
     try {
       await handleMutationResult(await api({ workspaceRoot, branchName }), false);
@@ -415,8 +407,7 @@ export function WorkspaceChromeControls({
           busy={busy}
           onClose={closeDialog}
           onCreateBranch={async (branchName) => {
-            const api = window.actspace?.createWorkspaceBranch;
-            if (!api) return;
+            const api = workspacesApi.createBranch;
             setBusy(true);
             try {
               await handleMutationResult(await api({ workspaceRoot, branchName }));
@@ -429,8 +420,7 @@ export function WorkspaceChromeControls({
               await runPush();
               return;
             }
-            const api = action === "commit_and_push" ? window.actspace?.commitAndPushWorkspaceChanges : window.actspace?.commitWorkspaceChanges;
-            if (!api) return;
+            const api = action === "commit_and_push" ? workspacesApi.commitAndPush : workspacesApi.commit;
             setBusy(true);
             try {
               const result = await api({ workspaceRoot, ...input });
@@ -447,8 +437,8 @@ export function WorkspaceChromeControls({
             setBusy(true);
             try {
               const result = action === "push"
-                ? await window.actspace!.pushWorkspaceBranch!({ workspaceRoot, remote })
-                : await window.actspace!.commitAndPushWorkspaceChanges!({ workspaceRoot, ...(input ?? {}), remote });
+                ? await workspacesApi.push({ workspaceRoot, remote })
+                : await workspacesApi.commitAndPush({ workspaceRoot, ...(input ?? {}), remote });
               await handleMutationResult(result);
             } finally {
               setBusy(false);

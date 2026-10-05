@@ -5,10 +5,9 @@ import type { ReviewChangeNotification, ReviewFileDiff, ReviewSnapshot } from "@
 import { ReviewRenderView } from "../components/right-panel/ReviewRenderView";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { WorkbenchLayout } from "../components/WorkbenchLayout";
+import { setupBridge } from "./helpers/bridge";
 
-const originalActspace = (window as { actspace?: unknown }).actspace;
 afterEach(() => {
-  (window as { actspace?: unknown }).actspace = originalActspace;
   localStorage.removeItem("actspace.review.display.v2");
   vi.restoreAllMocks();
 });
@@ -17,13 +16,13 @@ describe("Review workbench", () => {
   it("renders six real scopes, an on-demand file list, and a structured diff", async () => {
     const user = userEvent.setup();
     const bridge = reviewBridge(dirtySnapshot());
-    window.actspace = bridge as unknown as Window["actspace"];
+    setupBridge(bridge);
     render(<ReviewRenderView workspaceRoot="/tmp/workspace" sessionId="session-1" refreshKey={1} />);
 
     expect(await screen.findByText("apps/desktop/src/renderer/App.tsx")).toBeInTheDocument();
     expect(screen.getAllByText("+2").every((element) => element.classList.contains("text-success"))).toBe(true);
     expect(screen.getAllByText("-1").every((element) => element.classList.contains("text-danger"))).toBe(true);
-    await waitFor(() => expect(bridge.getReviewFileDiffs).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(bridge["review.getFileDiffs"]).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("return value.name;")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "审查范围" }));
@@ -53,7 +52,7 @@ describe("Review workbench", () => {
 
   it("refreshes through the coordinator bridge when refreshKey changes", async () => {
     const bridge = reviewBridge(emptySnapshot());
-    window.actspace = bridge as unknown as Window["actspace"];
+    setupBridge(bridge);
     const { rerender } = render(<ReviewRenderView workspaceRoot="/tmp/workspace" refreshKey={1} />);
     expect(await screen.findByText("暂无变更")).toBeInTheDocument();
     expect(screen.queryByText("+0")).not.toBeInTheDocument();
@@ -61,22 +60,22 @@ describe("Review workbench", () => {
     expect(screen.getByRole("button", { name: "展开全部差异" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "跳转到文件" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "显示文件列表" })).toHaveAttribute("aria-disabled", "true");
-    expect(bridge.getReviewSnapshot).toHaveBeenCalledTimes(1);
+    expect(bridge["review.getSnapshot"]).toHaveBeenCalledTimes(1);
     rerender(<ReviewRenderView workspaceRoot="/tmp/workspace" refreshKey={2} />);
-    await waitFor(() => expect(bridge.refreshReviewSnapshot).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(bridge["review.refreshSnapshot"]).toHaveBeenCalledTimes(1));
   });
 
   it("refreshes an open Review when a workspace Git mutation invalidates its snapshot", async () => {
     let notifyReviewChanged: ((notification: ReviewChangeNotification) => void) | undefined;
     const bridge = reviewBridge(dirtySnapshot());
-    bridge.getReviewSnapshot
+    bridge["review.getSnapshot"]
       .mockResolvedValueOnce({ ok: true as const, snapshot: dirtySnapshot() })
       .mockResolvedValueOnce({ ok: true as const, snapshot: emptySnapshot() });
-    bridge.onReviewChanged.mockImplementation((callback) => {
+    bridge["events.reviewChanged"].mockImplementation((callback) => {
       notifyReviewChanged = callback;
       return () => undefined;
     });
-    window.actspace = bridge as unknown as Window["actspace"];
+    setupBridge(bridge);
     render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
 
     expect(await screen.findByText("apps/desktop/src/renderer/App.tsx")).toBeInTheDocument();
@@ -91,14 +90,14 @@ describe("Review workbench", () => {
   it("shows recent Git log entries under Committed and opens the selected commit diff", async () => {
     const user = userEvent.setup();
     const bridge = reviewBridge(dirtySnapshot());
-    bridge.listReviewCommits.mockResolvedValue({
+    bridge["review.listCommits"].mockResolvedValue({
       ok: true as const,
       commits: [
         { sha: "a".repeat(40), subject: "fix: keep commit history read-only", authoredAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString() },
         { sha: "b".repeat(40), subject: "feat: add Review scopes", authoredAt: new Date(Date.now() - 24 * 60 * 60_000).toISOString() },
       ],
     });
-    window.actspace = bridge as unknown as Window["actspace"];
+    setupBridge(bridge);
     render(<ReviewRenderView workspaceRoot="/tmp/workspace" sessionId="session-1" />);
 
     expect(await screen.findByText("apps/desktop/src/renderer/App.tsx")).toBeInTheDocument();
@@ -106,10 +105,10 @@ describe("Review workbench", () => {
     await user.click(within(await screen.findByRole("menu", { name: "审查范围选项" })).getByRole("menuitem", { name: "已提交" }));
 
     const commits = await screen.findByRole("menu", { name: "最近提交" });
-    expect(bridge.listReviewCommits).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", sessionId: "session-1" });
+    expect(bridge["review.listCommits"]).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", sessionId: "session-1" });
     expect(within(commits).queryByRole("textbox")).not.toBeInTheDocument();
     await user.click(within(commits).getByRole("menuitem", { name: /fix: keep commit history read-only/ }));
-    await waitFor(() => expect(bridge.getReviewSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+    await waitFor(() => expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({
       selection: { kind: "commit", sha: "a".repeat(40) },
     })));
   });
@@ -127,7 +126,7 @@ describe("Review workbench", () => {
       toJSON: () => ({}),
     });
     const user = userEvent.setup();
-    window.actspace = reviewBridge(dirtySnapshot()) as unknown as Window["actspace"];
+    setupBridge(reviewBridge(dirtySnapshot()));
     render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
 
     expect(await screen.findByText("apps/desktop/src/renderer/App.tsx")).toBeInTheDocument();
@@ -139,7 +138,7 @@ describe("Review workbench", () => {
 
   it("opens Review from the object menu inside the right panel and keeps chat visible", async () => {
     const user = userEvent.setup();
-    window.actspace = reviewBridge(emptySnapshot()) as unknown as Window["actspace"];
+    setupBridge(reviewBridge(emptySnapshot()));
     render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-review", title: "Review menu", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-review" title="Review menu" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
     await user.click(screen.getByRole("menuitem", { name: "Review" }));
@@ -153,7 +152,7 @@ describe("Review workbench", () => {
 
   it("opens Review from the right panel launcher", async () => {
     const user = userEvent.setup();
-    window.actspace = reviewBridge(emptySnapshot()) as unknown as Window["actspace"];
+    setupBridge(reviewBridge(emptySnapshot()));
     render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-launcher", title: "Review launcher", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-launcher" title="Review launcher" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "Review" }));
     expect(await screen.findByRole("region", { name: "工作区变更审查" })).toBeInTheDocument();
@@ -162,7 +161,7 @@ describe("Review workbench", () => {
   it("reloads an open Review against the currently selected workspace", async () => {
     const user = userEvent.setup();
     const bridge = reviewBridge(emptySnapshot());
-    window.actspace = bridge as unknown as Window["actspace"];
+    setupBridge(bridge);
     const props = {
       sessions: [{ id: "session-workspace", title: "Workspace review", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace-a" }],
       activeSessionId: "session-workspace",
@@ -172,48 +171,48 @@ describe("Review workbench", () => {
     };
     const { rerender } = render(<RightPanelProvider initialOpen><WorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-a" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "Review" }));
-    await waitFor(() => expect(bridge.getReviewSnapshot).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-a" })));
+    await waitFor(() => expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-a" })));
 
     rerender(<RightPanelProvider initialOpen><WorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-b" /></RightPanelProvider>);
-    await waitFor(() => expect(bridge.getReviewSnapshot).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" })));
+    await waitFor(() => expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" })));
     expect(screen.getAllByRole("tab", { name: "Review" })).toHaveLength(1);
   });
 
   it("keeps capped Review requests scoped to the selected file", async () => {
     const user = userEvent.setup();
     const bridge = reviewBridge(cappedSnapshot());
-    window.actspace = bridge as unknown as Window["actspace"];
+    setupBridge(bridge);
     render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
 
-    await waitFor(() => expect(bridge.getReviewFileDiffs).toHaveBeenCalledTimes(1));
-    expect(bridge.getReviewFileDiffs.mock.calls[0]?.[0].requests).toEqual([{ fileId: "app", contextLines: 3 }]);
+    await waitFor(() => expect(bridge["review.getFileDiffs"]).toHaveBeenCalledTimes(1));
+    expect(bridge["review.getFileDiffs"].mock.calls[0]?.[0].requests).toEqual([{ fileId: "app", contextLines: 3 }]);
     expect(await screen.findByText("变更较多，每次显示一个文件")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "显示文件列表" }));
     const tree = screen.getByRole("complementary", { name: "已变更文件" });
     expect(within(tree).getAllByRole("treeitem")).toHaveLength(2);
     await user.click(within(tree).getByTitle("src/second.ts"));
-    await waitFor(() => expect(bridge.getReviewFileDiffs).toHaveBeenCalledTimes(2));
-    expect(bridge.getReviewFileDiffs.mock.calls[1]?.[0].requests).toEqual([{ fileId: "second", contextLines: 3 }]);
+    await waitFor(() => expect(bridge["review.getFileDiffs"]).toHaveBeenCalledTimes(2));
+    expect(bridge["review.getFileDiffs"].mock.calls[1]?.[0].requests).toEqual([{ fileId: "second", contextLines: 3 }]);
 
     await user.click(screen.getByRole("button", { name: "收起当前差异" }));
     await user.click(screen.getByRole("button", { name: "展开当前差异" }));
-    expect(bridge.getReviewFileDiffs).toHaveBeenCalledTimes(2);
+    expect(bridge["review.getFileDiffs"]).toHaveBeenCalledTimes(2);
   });
 
   it("does not load full content while disabled and loads visible files when enabled", async () => {
     localStorage.setItem("actspace.review.display.v2", JSON.stringify({ loadFullFiles: false }));
     const user = userEvent.setup();
     const bridge = reviewBridge(dirtySnapshot());
-    window.actspace = bridge as unknown as Window["actspace"];
+    setupBridge(bridge);
     render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
 
     expect(await screen.findByText("return value.name;")).toBeInTheDocument();
-    expect(bridge.getReviewFileContents).not.toHaveBeenCalled();
+    expect(bridge["review.getFileContents"]).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "审查选项" }));
     await user.click(await screen.findByRole("button", { name: "加载完整文件" }));
-    await waitFor(() => expect(bridge.getReviewFileContents).toHaveBeenCalledTimes(1));
-    expect(bridge.getReviewFileContents.mock.calls[0]?.[0].fileIds).toEqual(["app"]);
+    await waitFor(() => expect(bridge["review.getFileContents"]).toHaveBeenCalledTimes(1));
+    expect(bridge["review.getFileContents"].mock.calls[0]?.[0].fileIds).toEqual(["app"]);
   });
 });
 
@@ -250,18 +249,18 @@ function fileDiff(fileId = "app", path = "apps/desktop/src/renderer/App.tsx", sn
 
 function reviewBridge(snapshot: ReviewSnapshot) {
   return {
-    getReviewSnapshot: vi.fn(async () => ({ ok: true as const, snapshot })),
-    refreshReviewSnapshot: vi.fn(async () => ({ ok: true as const, snapshot })),
-    getReviewFileDiffs: vi.fn(async (input: { requests: Array<{ fileId: string }> }) => ({ ok: true as const, outcomes: input.requests.map((request) => {
+    "review.getSnapshot": vi.fn(async () => ({ ok: true as const, snapshot })),
+    "review.refreshSnapshot": vi.fn(async () => ({ ok: true as const, snapshot })),
+    "review.getFileDiffs": vi.fn(async (input: { requests: Array<{ fileId: string }> }) => ({ ok: true as const, outcomes: input.requests.map((request) => {
       const file = snapshot.files.find((candidate) => candidate.id === request.fileId);
       return { fileId: request.fileId, status: "ready" as const, diff: fileDiff(request.fileId, file?.path, snapshot.id) };
     }) })),
-    getReviewFileContents: vi.fn(async (_input: { fileIds: string[] }) => ({ ok: true as const, outcomes: [] })),
-    setReviewFileViewed: vi.fn(async (_input: unknown) => ({ ok: true as const, viewed: true })),
-    applyReviewMutation: vi.fn(),
-    listReviewBranches: vi.fn(async () => ({ ok: true as const, branches: [] })),
-    listReviewCommits: vi.fn(async () => ({ ok: true as const, commits: [] })),
-    copyReviewGitApplyCommand: vi.fn(),
-    onReviewChanged: vi.fn((_callback: (notification: ReviewChangeNotification) => void) => () => undefined),
+    "review.getFileContents": vi.fn(async (_input: { fileIds: string[] }) => ({ ok: true as const, outcomes: [] })),
+    "review.setFileViewed": vi.fn(async (_input: unknown) => ({ ok: true as const, viewed: true })),
+    "review.applyMutation": vi.fn(),
+    "review.listBranches": vi.fn(async () => ({ ok: true as const, branches: [] })),
+    "review.listCommits": vi.fn(async () => ({ ok: true as const, commits: [] })),
+    "review.copyGitApplyCommand": vi.fn(),
+    "events.reviewChanged": vi.fn((_callback: (notification: ReviewChangeNotification) => void) => () => undefined),
   };
 }

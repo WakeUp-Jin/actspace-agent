@@ -9,11 +9,8 @@ import { CircleAlert, FolderDown, Trash2 } from "lucide-react";
 import type { AppSettings, SettingsUpdateInput, SkillCatalogItem } from "@actspace/shared";
 import { SectionShell, SettingGroup, Toggle } from "../settings/SettingsPrimitives";
 import { Button } from "../ui/Button";
+import { skillsApi } from "../../api/skills";
 
-
-function hasSkillsBridge(): boolean {
-  return typeof window !== "undefined" && Boolean(window.actspace?.listSkills);
-}
 
 const SOURCE_LABELS: Record<string, string> = {
   actspace: ".actspace",
@@ -31,20 +28,15 @@ export function SkillsSection({
   onUpdate: (input: SettingsUpdateInput) => Promise<void>;
   query?: string;
 }) {
-  const bridgeReady = hasSkillsBridge();
   const [items, setItems] = useState<SkillCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!bridgeReady || !window.actspace.listSkills) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
-      const result = await window.actspace.listSkills();
+      const result = await skillsApi.list();
       setItems(result.items);
     } catch (error) {
       console.error("Failed to list skills", error);
@@ -52,7 +44,7 @@ export function SkillsSection({
     } finally {
       setLoading(false);
     }
-  }, [bridgeReady]);
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -74,10 +66,9 @@ export function SkillsSection({
   };
 
   const install = async () => {
-    if (!window.actspace.installSkill) return;
     setMessage(null);
     try {
-      const result = await window.actspace.installSkill();
+      const result = await skillsApi.install();
       if (result.ok) {
         setMessage(`已安装 Skill：${result.name ?? ""}`);
         await refresh();
@@ -90,11 +81,10 @@ export function SkillsSection({
   };
 
   const uninstall = async (item: SkillCatalogItem) => {
-    if (!window.actspace.uninstallSkill) return;
     if (!window.confirm(`确定卸载 Skill「${item.name}」？其目录将被删除。`)) return;
     setMessage(null);
     try {
-      const result = await window.actspace.uninstallSkill({ directory: item.directory });
+      const result = await skillsApi.uninstall({ directory: item.directory });
       if (result.ok) {
         setMessage(`已卸载：${item.name}`);
         await refresh();
@@ -105,16 +95,6 @@ export function SkillsSection({
       setMessage("卸载失败，请稍后重试。");
     }
   };
-
-  if (!bridgeReady) {
-    return (
-      <SectionShell>
-        <div className="rounded-act-lg border border-line bg-surface px-4 py-6 text-center text-act-sm text-text-faint">
-          Skill 管理仅在桌面端可用。
-        </div>
-      </SectionShell>
-    );
-  }
 
   const discovered = items.filter((item) => !item.shadowed);
   const needle = query.trim().toLowerCase();

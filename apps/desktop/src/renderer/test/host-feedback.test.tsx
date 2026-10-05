@@ -6,11 +6,10 @@ import { Composer } from "../components/Composer";
 import { useRemoteTarget } from "../hooks/useRemoteTarget";
 import { projectionFixture } from "./projection-fixture";
 import { mockContextSnapshot } from "./fixtures/workbenchFixture";
+import { setupBridge } from "./helpers/bridge";
 
 afterEach(() => {
   cleanup();
-  delete (window as { actspace?: unknown }).actspace;
-  delete (window as { actspaceHosts?: unknown }).actspaceHosts;
   window.localStorage.clear();
 });
 
@@ -19,9 +18,9 @@ it.each([
   "Error invoking remote method 'host:add': Error: Error while encrypting the text provided to safeStorage.encryptString. Encryption is not available.",
   "Error while decrypting the ciphertext provided to safeStorage.decryptString.",
 ])("explains local credential storage failure instead of blaming the server: %s", async message => {
-  window.actspaceHosts = {
-    list: async () => { throw new Error(message); }, onChanged: () => () => {},
-  } as unknown as Window["actspaceHosts"];
+  setupBridge({
+    "hosts.list": async () => { throw new Error(message); }, "events.hostsChanged": () => () => {},
+  });
   render(<HostConnectionsSettings />);
   const alert = await screen.findByRole("alert");
   expect(alert).toHaveTextContent("本机凭据存储不可用");
@@ -30,9 +29,9 @@ it.each([
 });
 
 it("keeps revoked device authorization distinct from a local keyring failure", async () => {
-  window.actspaceHosts = {
-    list: async () => { throw new Error("Device credential unavailable; pair again"); }, onChanged: () => () => {},
-  } as unknown as Window["actspaceHosts"];
+  setupBridge({
+    "hosts.list": async () => { throw new Error("Device credential unavailable; pair again"); }, "events.hostsChanged": () => () => {},
+  });
   render(<HostConnectionsSettings />);
   expect(await screen.findByRole("alert")).toHaveTextContent("设备授权已失效");
 });
@@ -48,15 +47,15 @@ it.each([
     if (disconnected) throw new Error(message);
     return projectionFixture(id);
   });
-  window.actspace = {
-    getBootstrapState: async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    listWorkspaces: async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
-    listSessions: async () => [{ id, hostId: "server", hostName: "Cloud", connectionState: "offline", title: "Remote session", workspaceRoot: "/tmp/workspace", agentRunCount: 0, updatedAt: "2026-10-04T00:00:00Z" }],
-    getSessionPage: page, listPendingApprovals: async () => [],
-    onSessionLiveEvent: () => () => {}, onAgentStream: () => () => {},
-    getReviewSnapshot: async () => ({ ok: false }), listVisualizations: async () => ({ items: [] }),
-    setUiZoom: () => {}, setNativeTheme: () => {}, onShuttingDown: () => () => {},
-  } as unknown as Window["actspace"];
+  setupBridge({
+    "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
+    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
+    "sessions.list": async () => [{ id, hostId: "server", hostName: "Cloud", connectionState: "offline", title: "Remote session", workspaceRoot: "/tmp/workspace", agentRunCount: 0, updatedAt: "2026-10-04T00:00:00Z" }],
+    "sessions.getPage": page, "approvals.listPending": async () => [],
+    "events.sessionLive": () => () => {}, "events.agentStream": () => () => {},
+    "review.getSnapshot": async () => ({ ok: false }), "visualize.list": async () => ({ items: [] }),
+    "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
+  });
   render(<App />);
   const alert = await screen.findByRole("alert");
   expect(alert).toHaveTextContent(expected);
@@ -71,10 +70,13 @@ it.each([
 it("switches workspace and model to the selected blocked Host's own description", async () => {
   const onSend = vi.fn();
   const hosts = ["ready", "blocked"].map(hostId => ({ id: hostId, hostId, name: hostId, state: "connected", endpoint: { kind: "wss", url: `wss://${hostId}.example/rpc` } }));
-  window.actspaceHosts = {
-    list: async () => hosts, onChanged: () => () => {}, onEvent: () => () => {}, onUploadProgress: () => () => {}, activate: async () => {},
-    call: async (hostId: string) => ({ state: hostId, workspaces: [{ id: "main", name: `${hostId} workspace`, path: `/${hostId}` }], models: [{ id: `${hostId}/model`, name: `${hostId} model` }], defaultModel: `${hostId}/model` }),
-  } as unknown as Window["actspaceHosts"];
+  setupBridge({
+    "hosts.list": async () => hosts, "events.hostsChanged": () => () => {}, "events.hostEvent": () => () => {}, "events.hostUploadProgress": () => () => {}, "hosts.activate": async () => {},
+    "hosts.call": async (input) => {
+      const hostId = input?.hostId ?? "";
+      return { state: hostId, workspaces: [{ id: "main", name: `${hostId} workspace`, path: `/${hostId}` }], models: [{ id: `${hostId}/model`, name: `${hostId} model` }], defaultModel: `${hostId}/model` };
+    },
+  });
   function Harness() {
     const remote = useRemoteTarget(null);
     return <Composer contextSnapshot={mockContextSnapshot} onSend={onSend} surface="initial" executionContext={{ remote, gitContext: null, runLocation: "this_mac" }} />;

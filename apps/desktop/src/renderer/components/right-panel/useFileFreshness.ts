@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { isWorkspaceFileTab, useRightPanel, type WorkspaceFileMeta } from "./RightPanelContext";
 import { readFailureTab, tabFromFile } from "./workspaceFileTab";
+import { workspacesApi } from "../../api/workspaces";
 
 /**
  * 已打开文件 Tab 的新鲜度检测。
@@ -39,8 +40,7 @@ export function useFileFreshness({
 
   const revalidate = useCallback(async () => {
     if (!enabled) return;
-    const api = typeof window !== "undefined" ? window.actspace?.statWorkspaceFile : undefined;
-    if (!api) return;
+    const api = workspacesApi.statFile;
 
     const targets = tabsRef.current.filter((tab) => {
       if (!isWorkspaceFileTab(tab)) return false;
@@ -139,8 +139,7 @@ export function useReloadFileTab(workspaceRoot?: string) {
 
   return useCallback(
     async (relativePath: string, title: string) => {
-      const api = typeof window !== "undefined" ? window.actspace?.readWorkspaceFile : undefined;
-      if (!api) return;
+      const api = workspacesApi.readFile;
       try {
         replaceTab(tabFromFile(await api({ workspaceRoot, relativePath })));
       } catch {

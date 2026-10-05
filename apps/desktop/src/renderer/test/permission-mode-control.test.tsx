@@ -1,16 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PermissionModeControl } from "../components/WorkbenchLayout";
-
-afterEach(() => {
-  delete window.actspace;
-});
+import { setupBridge } from "./helpers/bridge";
 
 describe("PermissionModeControl", () => {
   it("persists a mode change and refreshes the Session projection", async () => {
     const setSessionPermissionMode = vi.fn(async () => ({ ok: true as const }));
     const onChanged = vi.fn(async () => undefined);
-    window.actspace = { setSessionPermissionMode } as unknown as typeof window.actspace;
+    setupBridge({ "sessions.setPermissionMode": setSessionPermissionMode });
 
     render(<PermissionModeControl sessionId="session-1" mode="default" disabled={false} onChanged={onChanged} />);
     fireEvent.click(screen.getByRole("button", { name: "会话权限模式" }));
@@ -22,7 +19,7 @@ describe("PermissionModeControl", () => {
 
   it("does not submit while a turn is running", () => {
     const setSessionPermissionMode = vi.fn(async () => ({ ok: true as const }));
-    window.actspace = { setSessionPermissionMode } as unknown as typeof window.actspace;
+    setupBridge({ "sessions.setPermissionMode": setSessionPermissionMode });
 
     render(<PermissionModeControl sessionId="session-1" mode="default" disabled onChanged={() => undefined} />);
 

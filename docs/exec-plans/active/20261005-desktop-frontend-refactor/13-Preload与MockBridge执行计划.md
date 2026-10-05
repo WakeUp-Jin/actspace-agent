@@ -1,6 +1,6 @@
 # 13 Preload 与 Mock Bridge 执行计划
 
-> 状态：**已批准**（2026-10-06），按 [00](00-总执行计划.md) 的顺序执行；进度见本文「进度记录」和 00 §11。
+> 状态：**已完成，待验收**（2026-10-06），按 [00](00-总执行计划.md) 的顺序执行；进度见本文「进度记录」和 00 §11。
 > 总计划：[00 总执行计划](00-总执行计划.md)。执行顺序第 4 位：在 10、11、12 之后，14 之前。
 > 设计来源：[04 Preload 接口与 Mock Bridge](../../../desktop-frontend-refactor/04-Preload接口与MockBridge.md) S1–S7；合并 [01](../../../desktop-frontend-refactor/01-安全与IPC收口.md) S6（统一 IPC 注册器和入参校验）、[08](../../../desktop-frontend-refactor/08-测试与验证整理.md) §3.3（手写 stub 迁移）和 §5（验证矩阵写入 `FRONTEND_VERIFICATION.md`）。
 > 执行记录：`docs/exec-runs/20261005-desktop-fe-13-preload-bridge/`。
@@ -167,7 +167,7 @@ pnpm check:current-docs         # T11
 
 ## 进度记录
 
-- [ ] T0–T11
+- [x] T0–T11（2026-10-06）。执行顺序调整（T6 → T8 → T9 → T6b → T9h → T7 → T10 → T11）、偏差和复核处理见执行记录；交接见 `docs/exec-runs/20261005-desktop-fe-13-preload-bridge/acceptance-handoff.md`。
 
 ## 执行模式
 

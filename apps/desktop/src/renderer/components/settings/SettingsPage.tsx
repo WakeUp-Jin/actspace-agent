@@ -76,25 +76,14 @@ import {
   type UiFontId,
 } from "../../appearance/types";
 import { Button } from "../ui/Button";
+import { modelsApi } from "../../api/models";
+import { providersApi } from "../../api/providers";
+import { sessionsApi } from "../../api/sessions";
+import { settingsApi } from "../../api/settings";
+import { updatesApi } from "../../api/updates";
 
 const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
 const LOCAL_UPDATE_POLL_MS = 700;
-
-function hasSettingsBridge(): boolean {
-  return typeof window !== "undefined" && Boolean(window.actspace?.getSettings);
-}
-
-function hasPromptFileBridge(): boolean {
-  return typeof window !== "undefined" && Boolean(window.actspace?.readAgentSystemPrompt);
-}
-
-function hasLocalUpdateBridge(): boolean {
-  return typeof window !== "undefined" && Boolean(window.actspace?.getLocalUpdateState);
-}
-
-function hasArchivedSessionsBridge(): boolean {
-  return typeof window !== "undefined" && Boolean(window.actspace?.listSessions && window.actspace?.archiveSession);
-}
 
 function isActiveLocalUpdatePhase(phase: LocalUpdateProgressPhase): boolean {
   return phase === "starting" || phase === "building" || phase === "ready_to_replace" || phase === "waiting_for_exit" || phase === "replacing";
@@ -121,26 +110,6 @@ function formatUpdatedAt(timestamp: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
-
-/** 浏览器预览模式（无 IPC 桥）下模拟密钥保存/断开的本地状态更新。 */
-function previewSetKeyState(
-  current: AppSettings,
-  provider: SecretProviderId,
-  hasApiKey: boolean,
-): AppSettings {
-  if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
-    return { ...current, providers: { ...current.providers, [provider]: { hasApiKey } } };
-  }
-  if (provider === "image-generation") {
-    const currentImage = current.imageGeneration ?? {
-      hasApiKey: false,
-      baseUrl: DEFAULT_IMAGE_GENERATION_BASE_URL,
-      model: DEFAULT_IMAGE_GENERATION_MODEL,
-    };
-    return { ...current, imageGeneration: { ...currentImage, hasApiKey } };
-  }
-  return { ...current, searchProviders: { ...current.searchProviders, [provider]: { hasApiKey } } };
 }
 
 function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSettings {
@@ -206,13 +175,9 @@ export function SettingsPage({
   }, [focusSpeech, settings, section, onSpeechFocused]);
 
   useEffect(() => {
-    if (!hasSettingsBridge()) {
-      setSettingsError("设置仅在桌面端可用。");
-      return;
-    }
     void Promise.all([
-      window.actspace.getSettings(),
-      window.actspace.getSettingsV4?.() ?? Promise.resolve(null),
+      settingsApi.get(),
+      settingsApi.getV4(),
     ])
       .then(([next, nextV4]) => {
         setSettings(next);
@@ -226,13 +191,10 @@ export function SettingsPage({
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!hasSettingsBridge()) return;
     try {
-      const next = await window.actspace.getSettings();
+      const next = await settingsApi.get();
       setSettings(next);
-      if (window.actspace.getSettingsV4) {
-        setSettingsV4(await window.actspace.getSettingsV4());
-      }
+      setSettingsV4(await settingsApi.getV4());
       onSettingsChange?.(next);
     } catch (error) {
       console.error("Failed to refresh settings", error);
@@ -240,27 +202,23 @@ export function SettingsPage({
   }, [onSettingsChange]);
 
   const handleUpdateNamespace = useCallback(async (input: SettingsV4NamespacePatch): Promise<SettingsV4Snapshot | null> => {
-    if (!window.actspace?.updateSettingsV4 || !settingsV4) return null;
-    const result = await window.actspace.updateSettingsV4({ ...input, expectedRevision: settingsV4.revision });
+    if (!settingsV4) return null;
+    const result = await settingsApi.updateV4({ ...input, expectedRevision: settingsV4.revision });
     if ("latest" in result) {
       setSettingsV4(result.latest);
       throw new Error(result.message);
     }
     setSettingsV4(result.snapshot);
-    if (window.actspace.getSettings) {
-      const legacy = await window.actspace.getSettings();
-      setSettings(legacy);
-      onSettingsChange?.(legacy);
-    }
+    const legacy = await settingsApi.get();
+    setSettings(legacy);
+    onSettingsChange?.(legacy);
     return result.snapshot;
   }, [onSettingsChange, settingsV4]);
 
   const handleUpdate = useCallback(
     (input: SettingsUpdateInput) => {
       setSettings((current) => (current ? mergeSettings(current, input) : current));
-      if (!hasSettingsBridge()) return;
-      window.actspace
-        .updateSettings(input)
+      settingsApi.update(input)
         .then((next) => {
           setSettings(next);
           onSettingsChange?.(next);
@@ -274,11 +232,7 @@ export function SettingsPage({
 
   const handleSaveKey = useCallback(
     async (provider: SecretProviderId, apiKey: string): Promise<SetProviderKeyResult> => {
-      if (!hasSettingsBridge()) {
-        setSettings((current) => (current ? previewSetKeyState(current, provider, true) : current));
-        return { ok: true };
-      }
-      const result = await window.actspace.setProviderKey({ provider, apiKey });
+      const result = await providersApi.setKey({ provider, apiKey });
       if (result.ok) await refresh();
       return result;
     },
@@ -287,11 +241,7 @@ export function SettingsPage({
 
   const handleClearKey = useCallback(
     async (provider: SecretProviderId) => {
-      if (!hasSettingsBridge()) {
-        setSettings((current) => (current ? previewSetKeyState(current, provider, false) : current));
-        return;
-      }
-      await window.actspace.clearProviderKey({ provider });
+      await providersApi.clearKey({ provider });
       await refresh();
     },
     [refresh],
@@ -645,11 +595,7 @@ function ImageGenerationSettingsDialog({
     setBusy("save");
     setError(null);
     try {
-      if (!window.actspace.updateImageGeneration) {
-        setError("当前环境不支持保存图片生成配置。");
-        return;
-      }
-      const result = await window.actspace.updateImageGeneration({
+      const result = await settingsApi.updateImageGeneration({
         ...(apiKey.trim() && { apiKey }),
         baseUrl,
         model,
@@ -828,7 +774,7 @@ function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) {
   const [responseStyle, setResponseStyle] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const v4Ready = Boolean(settingsV4 && settingsV4Available());
+  const v4Ready = Boolean(settingsV4);
 
   useEffect(() => {
     if (!saved || editor.openId) return;
@@ -986,15 +932,14 @@ export function TaskModelDefaultsSection({
   const [draft, setDraft] = useState<GenerationDefaults>({ temperature: "", maxOutputTokens: "", compactionPercent: 80 });
   const [fieldError, setFieldError] = useState<{ temperature?: string; maxOutputTokens?: string }>({});
   const [error, setError] = useState<string | null>(null);
-  const v4Ready = Boolean(settingsV4 && onUpdateNamespace && settingsV4Available());
+  const v4Ready = Boolean(settingsV4 && onUpdateNamespace);
   const savedDefaults = settingsV4?.settings.general.taskDefaults;
 
   const load = async () => {
-    if (!window.actspace?.listUsableModels) return;
     const [chat, utility, explore] = await Promise.all([
-      window.actspace.listUsableModels({ purpose: "chat" }),
-      window.actspace.listUsableModels({ purpose: "utility" }),
-      window.actspace.listUsableModels({ purpose: "explore" }),
+      modelsApi.listUsable({ purpose: "chat" }),
+      modelsApi.listUsable({ purpose: "utility" }),
+      modelsApi.listUsable({ purpose: "explore" }),
     ]);
     setUsable({ chat: chat.models, utility: utility.models, explore: explore.models });
   };
@@ -1011,10 +956,9 @@ export function TaskModelDefaultsSection({
   }, [savedDefaults]);
 
   const updateTask = async (field: keyof TaskModelSettings, value: ModelKey | null) => {
-    if (!window.actspace?.updateTaskModels) return;
     setError(null);
     try {
-      const result = await window.actspace.updateTaskModels({ [field]: value });
+      const result = await modelsApi.updateTaskModels({ [field]: value });
       setTaskModels(result.taskModels);
       notifySaved();
       await onChanged?.();
@@ -1138,36 +1082,27 @@ export function TaskModelDefaultsSection({
   );
 }
 
-function settingsV4Available(): boolean {
-  return typeof window !== "undefined" && Boolean(window.actspace?.getSettingsV4 && window.actspace?.updateSettingsV4);
-}
-
 function LocalUpdateSection() {
   const [state, setState] = useState<LocalUpdateState | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [progressOpen, setProgressOpen] = useState(false);
-  const bridgeReady = hasLocalUpdateBridge();
-
   useEffect(() => {
-    if (!bridgeReady || !window.actspace.getLocalUpdateState) return;
-    window.actspace
-      .getLocalUpdateState()
+    updatesApi.getState()
       .then(setState)
       .catch(() => {
         setStatus("读取本地更新状态失败。");
       });
-  }, [bridgeReady]);
+  }, []);
 
   useEffect(() => {
-    if (!bridgeReady || !window.actspace.getLocalUpdateState) return;
     if (!progressOpen && !isLocalUpdateActive(state)) return;
 
     let canceled = false;
     const refreshState = async () => {
       try {
-        const next = await window.actspace.getLocalUpdateState?.();
-        if (!canceled && next) {
+        const next = await updatesApi.getState();
+        if (!canceled) {
           setState(next);
           if (next.progress.phase === "failed") {
             setStatus(next.progress.message);
@@ -1184,14 +1119,13 @@ function LocalUpdateSection() {
       canceled = true;
       window.clearInterval(timer);
     };
-  }, [bridgeReady, progressOpen, state?.running, state?.progress.phase]);
+  }, [progressOpen, state?.running, state?.progress.phase]);
 
   const chooseSource = async () => {
-    if (!window.actspace.selectLocalUpdateSource) return;
     setBusy(true);
     setStatus(null);
     try {
-      const result = await window.actspace.selectLocalUpdateSource();
+      const result = await updatesApi.selectSource();
       setState(result.state);
       if (!result.canceled && !result.state.sourceValid) {
         setStatus(result.state.reason ?? "所选目录不可用于本地更新。");
@@ -1204,12 +1138,11 @@ function LocalUpdateSection() {
   };
 
   const startUpdate = async () => {
-    if (!window.actspace.startLocalUpdate) return;
     setBusy(true);
     setStatus("正在启动本地更新…");
     setProgressOpen(true);
     try {
-      const result = await window.actspace.startLocalUpdate();
+      const result = await updatesApi.start();
       setState(result.state);
       setStatus(result.ok ? "本地更新已启动，正在构建。" : result.message ?? "本地更新启动失败。");
       if (!result.ok) setProgressOpen(false);
@@ -1223,10 +1156,8 @@ function LocalUpdateSection() {
 
   const sourceText = state?.sourceRoot ?? "尚未选择源码目录";
   const appTargetText = state?.appPath ?? "尚未识别到已安装的 Actspace.app";
-  const reason = !bridgeReady
-    ? "仅桌面端安装版可用。"
-    : state?.reason;
-  const canStart = Boolean(bridgeReady && state?.canUpdate && !busy);
+  const reason = state?.reason;
+  const canStart = Boolean(state?.canUpdate && !busy);
   const active = isLocalUpdateActive(state);
 
   return (
@@ -1241,7 +1172,7 @@ function LocalUpdateSection() {
               </span>
             }
             control={
-              <Button variant="secondary" onClick={() => void chooseSource()} disabled={!bridgeReady || busy || active}>
+              <Button variant="secondary" onClick={() => void chooseSource()} disabled={busy || active}>
                 选择目录
               </Button>
             }
@@ -1449,22 +1380,14 @@ function AgentInstructionsSection({ settings }: SectionProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
-  const promptBridgeReady = hasPromptFileBridge();
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadPrompt() {
       setPromptError(null);
-      if (!promptBridgeReady) {
-        setPromptFile(null);
-        setDraftPrompt("");
-        setPromptError("系统提示词文件接口不可用。");
-        return;
-      }
-
       try {
-        const next = await window.actspace.readAgentSystemPrompt();
+        const next = await settingsApi.readSystemPrompt();
         if (cancelled) return;
         setPromptFile(next);
         setDraftPrompt(next.content);
@@ -1481,7 +1404,7 @@ function AgentInstructionsSection({ settings }: SectionProps) {
     return () => {
       cancelled = true;
     };
-  }, [promptBridgeReady]);
+  }, []);
 
   const dirty = Boolean(promptFile && draftPrompt !== promptFile.content);
   const closeEditor = () => {
@@ -1490,14 +1413,14 @@ function AgentInstructionsSection({ settings }: SectionProps) {
     setEditorOpen(false);
   };
   const savePrompt = async () => {
-    if (!promptBridgeReady || !promptFile) {
+    if (!promptFile) {
       setPromptError("系统提示词文件接口不可用。");
       return;
     }
     setSaving(true);
     setPromptError(null);
     try {
-      const next = await window.actspace.writeAgentSystemPrompt({ content: draftPrompt });
+      const next = await settingsApi.writeSystemPrompt({ content: draftPrompt });
       setPromptFile(next);
       setDraftPrompt(next.content);
       setEditorOpen(false);
@@ -1521,7 +1444,7 @@ function AgentInstructionsSection({ settings }: SectionProps) {
         ariaLabel={editorOpen ? "收起 Agent 指令" : "编辑 Agent 指令"}
         expanded={editorOpen}
         controlsId="agent-system-prompt-editor"
-        disabled={!promptBridgeReady || !promptFile}
+        disabled={!promptFile}
         onClick={() => (editorOpen ? closeEditor() : setEditorOpen(true))}
       />
       {editorOpen ? (
@@ -1561,19 +1484,17 @@ function SubagentSection({
 
   useEffect(() => { setExploreModel(settings.taskModels?.exploreModel ?? null); }, [settings.taskModels?.exploreModel]);
   useEffect(() => {
-    if (!window.actspace?.listUsableModels) return;
     let cancelled = false;
-    void window.actspace.listUsableModels({ purpose: "explore" })
+    void modelsApi.listUsable({ purpose: "explore" })
       .then((result) => { if (!cancelled) setModels(result.models); })
       .catch(() => { if (!cancelled) setError("可用模型读取失败。"); });
     return () => { cancelled = true; };
   }, []);
 
   const update = async (value: ModelKey | null) => {
-    if (!window.actspace?.updateTaskModels) return;
     setError(null);
     try {
-      const result = await window.actspace.updateTaskModels({ exploreModel: value });
+      const result = await modelsApi.updateTaskModels({ exploreModel: value });
       setExploreModel(result.taskModels.exploreModel);
       notifySaved();
       await onRefresh();
@@ -1590,7 +1511,6 @@ function SubagentSection({
         emptyLabel="跟随会话模型"
         value={exploreModel}
         models={models}
-        disabled={!window.actspace?.updateTaskModels}
         onChange={(value) => void update(value)}
       />
       {error ? <div role="alert" className="px-4 py-2.5 text-act-xs text-on-danger">{error}</div> : null}
@@ -1752,19 +1672,12 @@ function ArchivedChatsSection({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
-  const bridgeReady = hasArchivedSessionsBridge();
 
   const loadArchived = useCallback(async () => {
     setLoading(true);
     setError(null);
-    if (!bridgeReady) {
-      setSessions([]);
-      setLoading(false);
-      return;
-    }
-
     try {
-      const archived = await window.actspace.listSessions({ archived: true });
+      const archived = await sessionsApi.list({ archived: true });
       setSessions(archived);
     } catch (err) {
       console.error("Failed to load archived sessions", err);
@@ -1772,7 +1685,7 @@ function ArchivedChatsSection({
     } finally {
       setLoading(false);
     }
-  }, [bridgeReady]);
+  }, []);
 
   useEffect(() => {
     void loadArchived();
@@ -1781,14 +1694,8 @@ function ArchivedChatsSection({
   const restoreSession = async (sessionId: string) => {
     setRestoringId(sessionId);
     setError(null);
-    if (!bridgeReady) {
-      setError("归档会话仅桌面端可恢复。");
-      setRestoringId(null);
-      return;
-    }
-
     try {
-      const result = await window.actspace.archiveSession({ sessionId, archived: false });
+      const result = await sessionsApi.archive({ sessionId, archived: false });
       if (!result.ok) {
         setError(result.error ?? "恢复归档会话失败。");
         return;

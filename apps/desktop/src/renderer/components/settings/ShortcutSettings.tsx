@@ -12,6 +12,9 @@ import {
 import { Kbd, SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
+import { quickOpenApi } from "../../api/quick-open";
+import { sessionsApi } from "../../api/sessions";
+import { workspacesApi } from "../../api/workspaces";
 
 const FALLBACK_QUICK_OPEN_SETTINGS: QuickOpenShortcutSettings = {
   enabled: true,
@@ -72,9 +75,9 @@ export function ShortcutSettings({
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      window.actspace.getQuickOpenShortcutStatus?.() ?? Promise.resolve(null),
-      window.actspace.listWorkspaces?.() ?? Promise.resolve(null),
-      window.actspace.listSessions?.() ?? Promise.resolve([]),
+      quickOpenApi.getShortcutStatus(),
+      workspacesApi.list(),
+      sessionsApi.list(),
     ]).then(([nextStatus, registry, listedSessions]) => {
       if (cancelled) return;
       setStatus(nextStatus);
@@ -89,10 +92,10 @@ export function ShortcutSettings({
   }, []);
 
   const update = async (input: QuickOpenShortcutUpdateInput) => {
-    if (!window.actspace.updateQuickOpenShortcut || saving) return;
+    if (saving) return;
     setSaving(true);
     try {
-      const result = await window.actspace.updateQuickOpenShortcut(input);
+      const result = await quickOpenApi.updateShortcut(input);
       setStatus(result.status);
       onSettingsChange(result.settings);
     } catch (error) {

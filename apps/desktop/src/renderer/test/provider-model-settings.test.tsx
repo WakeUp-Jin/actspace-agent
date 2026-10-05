@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type {
+  CustomConnectionInput,
   AppSettings,
   CatalogModelView,
   InstalledModelView,
@@ -15,8 +16,8 @@ import { TaskModelDefaultsSection } from "../components/settings/SettingsPage";
 import { OpenRouterModelCatalogDialog } from "../components/settings/OpenRouterModelCatalogDialog";
 import { ProviderLogo } from "../components/settings/ProviderLogo";
 import { protocolLogoKey } from "../components/settings/custom-connection-shared";
+import { setupBridge } from "./helpers/bridge";
 
-type ActspaceBridge = NonNullable<typeof window.actspace>;
 const readyCredentialStorage = { status: "ready" as const };
 
 const providerViews: Record<"deepseek" | "kimi" | "openrouter", ProviderSettingsView> = {
@@ -167,17 +168,13 @@ const settings = {
 } as AppSettings;
 
 describe("provider and model settings", () => {
-  afterEach(() => {
-    delete (window as { actspace?: ActspaceBridge }).actspace;
-  });
-
   it("shows connection-shaped rows while local settings are pending, then replaces the skeleton", async () => {
     let resolveProviders!: (value: unknown) => void;
     let resolveSettings!: (value: unknown) => void;
-    window.actspace = {
-      listProviders: () => new Promise((resolve) => { resolveProviders = resolve; }),
-      getSettingsV4: () => new Promise((resolve) => { resolveSettings = resolve; }),
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": () => new Promise((resolve) => { resolveProviders = resolve; }),
+      "settings.getV4": () => new Promise((resolve) => { resolveSettings = resolve; }),
+    });
     render(<ProviderSettings />);
     const loading = screen.getByLabelText("正在加载服务商");
     expect(loading).toHaveAttribute("aria-busy", "true");
@@ -199,10 +196,10 @@ describe("provider and model settings", () => {
   it("allows opening connections while balance is pending and confines failure to the balance row", async () => {
     let rejectBalance!: (error: Error) => void;
     const getProviderBalance = vi.fn(() => new Promise((_, reject) => { rejectBalance = reject; }));
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-      getProviderBalance,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+      "providers.getBalance": getProviderBalance,
+    });
     render(<ProviderSettings />);
     await waitFor(() => expect(getProviderBalance).toHaveBeenCalledOnce());
     expect(screen.queryByLabelText("正在加载服务商")).not.toBeInTheDocument();
@@ -216,10 +213,10 @@ describe("provider and model settings", () => {
 
   it("saves an OpenRouter key and a provider-scoped proxy without echoing the key", async () => {
     const connectProvider = vi.fn(async () => ({ ok: true as const, provider: providerViews.openrouter }));
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-      connectProvider,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+      "providers.connect": connectProvider,
+    });
 
     render(<ProviderSettings settings={settings} />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
@@ -245,8 +242,8 @@ describe("provider and model settings", () => {
     const unavailableProviders = Object.fromEntries(
       Object.entries(providerViews).map(([id, provider]) => [id, { ...provider, hasApiKey: false }]),
     ) as typeof providerViews;
-    window.actspace = {
-      listProviders: async () => ({
+    setupBridge({
+      "providers.list": async () => ({
         providers: unavailableProviders,
         credentialStorage: {
           status: "unavailable" as const,
@@ -254,7 +251,7 @@ describe("provider and model settings", () => {
           message: "旧版凭据无法解密。请使用最后一次能读取这些 Key 的 Actspace 版本启动后再迁移。",
         },
       }),
-    } as unknown as ActspaceBridge;
+    });
 
     render(<ProviderSettings />);
 
@@ -264,9 +261,9 @@ describe("provider and model settings", () => {
   });
 
   it("filters the provider catalog and returns to the connection list", async () => {
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+    });
 
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
@@ -282,10 +279,10 @@ describe("provider and model settings", () => {
 
   it("shows the selected provider catalog and routes API providers to setup", async () => {
     const createCustomConnection = vi.fn(async () => ({}));
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-      createCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+      "settings.createCustomConnection": createCustomConnection,
+    });
 
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
@@ -300,10 +297,10 @@ describe("provider and model settings", () => {
   });
 
   it("groups the catalog, hides the three old protocol entries, and keeps 自定义服务 at the bottom", async () => {
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: { relay: { connectionId: "relay", providerId: "openrouter", catalogId: "anthropic-compatible", displayName: "Existing relay", baseUrl: "https://relay.example", enabled: true } } } } }),
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: { relay: { connectionId: "relay", providerId: "openrouter", catalogId: "anthropic-compatible", displayName: "Existing relay", baseUrl: "https://relay.example", enabled: true } } } } }),
+    });
     render(<ProviderSettings />);
     // 已保存的旧连接照常显示。
     expect(await screen.findByRole("button", { name: /Existing relay/ })).toBeInTheDocument();
@@ -327,19 +324,20 @@ describe("provider and model settings", () => {
     const ids = ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5", "claude-opus-4-5", "relay-alpha", "relay-beta", "relay-gamma", "relay-delta", "relay-epsilon"];
     const probeCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", resolvedAuth: "bearer", models: ids.map((id) => ({ id })) }));
     const connections: Record<string, unknown> = {};
-    const createCustomConnection = vi.fn(async (input: { connectionId: string }) => {
-      connections[input.connectionId] = { connectionId: input.connectionId, providerId: "openrouter", protocol: "anthropic-messages", catalogId: "custom", displayName: "relay.example", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", proxy: { enabled: false, url: null }, lastConnection: { status: "untested" }, enabled: true };
+    const createCustomConnection = vi.fn(async (input?: CustomConnectionInput) => {
+      const connectionId = input?.connectionId ?? "";
+      connections[connectionId] = { connectionId, providerId: "openrouter", protocol: "anthropic-messages", catalogId: "custom", displayName: "relay.example", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", proxy: { enabled: false, url: null }, lastConnection: { status: "untested" }, enabled: true };
       return {};
     });
     const testCustomConnection = vi.fn();
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections } } }),
-      listInstalledModels: async () => ({ models: [] }),
-      probeCustomConnection,
-      createCustomConnection,
-      testCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections } } }),
+      "models.listInstalled": async () => ({ models: [] }),
+      "settings.probeCustomConnection": probeCustomConnection,
+      "settings.createCustomConnection": createCustomConnection,
+      "settings.testCustomConnection": testCustomConnection,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
     await userEvent.click(screen.getByRole("button", { name: "选择 自定义服务" }));
@@ -393,19 +391,20 @@ describe("provider and model settings", () => {
   it("switches the protocol from a pasted endpoint and adds models by hand when the service has no list", async () => {
     const probeCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", models: null }));
     const connections: Record<string, unknown> = {};
-    const createCustomConnection = vi.fn(async (input: { connectionId: string; protocol: string }) => {
-      connections[input.connectionId] = { connectionId: input.connectionId, providerId: "openrouter", protocol: input.protocol, catalogId: "custom", displayName: "relay.example", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", proxy: { enabled: false, url: null }, enabled: true };
+    const createCustomConnection = vi.fn(async (input?: CustomConnectionInput) => {
+      const connectionId = input?.connectionId ?? "";
+      connections[connectionId] = { connectionId, providerId: "openrouter", protocol: input?.protocol, catalogId: "custom", displayName: "relay.example", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", proxy: { enabled: false, url: null }, enabled: true };
       return {};
     });
     const testCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z" }));
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections } } }),
-      listInstalledModels: async () => ({ models: [] }),
-      probeCustomConnection,
-      createCustomConnection,
-      testCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections } } }),
+      "models.listInstalled": async () => ({ models: [] }),
+      "settings.probeCustomConnection": probeCustomConnection,
+      "settings.createCustomConnection": createCustomConnection,
+      "settings.testCustomConnection": testCustomConnection,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
     await userEvent.click(screen.getByRole("button", { name: "选择 自定义服务" }));
@@ -440,10 +439,10 @@ describe("provider and model settings", () => {
     const probeCustomConnection = vi.fn()
       .mockResolvedValueOnce({ ok: false, message: "请检查 API Key 是否正确。", checkedAt: "2026-09-26T00:00:00.000Z", errorKind: "auth", statusCode: 401, models: null })
       .mockResolvedValue({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", models: null });
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      probeCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.probeCustomConnection": probeCustomConnection,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
     await userEvent.click(screen.getByRole("button", { name: "选择 自定义服务" }));
@@ -478,12 +477,12 @@ describe("provider and model settings", () => {
   it("connects official Anthropic with only a key and saves it at official prices", async () => {
     const probeCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", models: [{ id: "claude-opus-5" }, { id: "claude-sonnet-5" }, { id: "claude-haiku-4-5" }] }));
     const createCustomConnection = vi.fn(async () => ({}));
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: {} } } }),
-      probeCustomConnection,
-      createCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: {} } } }),
+      "settings.probeCustomConnection": probeCustomConnection,
+      "settings.createCustomConnection": createCustomConnection,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
     await userEvent.click(screen.getByRole("button", { name: "选择 Anthropic" }));
@@ -511,9 +510,9 @@ describe("provider and model settings", () => {
   });
 
   it("uses the Maka flat catalog and a single page h2", async () => {
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+    });
 
     render(<ProviderSettings />);
     expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
@@ -545,9 +544,9 @@ describe("provider and model settings", () => {
   });
 
   it("renders a required key label and primary save action on setup", async () => {
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+    });
 
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
@@ -561,7 +560,7 @@ describe("provider and model settings", () => {
   });
 
   it("returns from compatible setup to the filtered catalog with its search intact", async () => {
-    window.actspace = { listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }) } as unknown as ActspaceBridge;
+    setupBridge({ "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }) });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
     await userEvent.type(screen.getByLabelText("搜索模型服务"), "minimax");
@@ -577,7 +576,7 @@ describe("provider and model settings", () => {
 
   it("submits a replacement key for an existing provider and retains the draft on failure", async () => {
     const updateProvider = vi.fn().mockRejectedValueOnce(new Error("network unavailable")).mockResolvedValue({ ok: true, provider: providerViews.deepseek });
-    window.actspace = { listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }), updateProvider } as unknown as ActspaceBridge;
+    setupBridge({ "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }), "providers.update": updateProvider });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "DeepSeek" }));
     await userEvent.click(screen.getByRole("button", { name: "更换模型密钥" }));
@@ -597,13 +596,13 @@ describe("provider and model settings", () => {
       return { settings: { models: { connections: { office: connection } } } };
     });
     const testCustomConnection = vi.fn();
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: { office: connection } } } }),
-      listInstalledModels: async () => ({ models: [] }),
-      updateCustomConnection,
-      testCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: { office: connection } } } }),
+      "models.listInstalled": async () => ({ models: [] }),
+      "settings.updateCustomConnection": updateCustomConnection,
+      "settings.testCustomConnection": testCustomConnection,
+    });
     render(<ProviderSettings />);
     const row = await screen.findByRole("button", { name: /Office API/ });
     expect(row.querySelector('[data-provider-logo="openai"]')).toBeInTheDocument();
@@ -630,13 +629,13 @@ describe("provider and model settings", () => {
       connection = { ...connection, lastConnection: { status: "available", checkedAt: new Date().toISOString() } };
       return { ok: true, message: "ok", checkedAt: new Date().toISOString() };
     });
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => snapshot(),
-      listInstalledModels: async () => ({ models: [] }),
-      updateCustomConnection,
-      testCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => snapshot(),
+      "models.listInstalled": async () => ({ models: [] }),
+      "settings.updateCustomConnection": updateCustomConnection,
+      "settings.testCustomConnection": testCustomConnection,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
     expect(screen.getByText("https://relay.example/v1/messages")).toBeInTheDocument();
@@ -654,11 +653,11 @@ describe("provider and model settings", () => {
 
   it("hides name, address and auth rows for the official Anthropic connection and prices it officially", async () => {
     const connection = { connectionId: "official", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic", displayName: "Anthropic", baseUrl: "https://api.anthropic.com", defaultModel: "claude-sonnet-5", authMode: "x-api-key", billingMode: "reference", defaultPricingMultiplier: 1, promptCacheMode: "short", proxy: { enabled: false, url: null }, enabled: true };
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: { official: connection } } } }),
-      listInstalledModels: async () => ({ models: [] }),
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: { official: connection } } } }),
+      "models.listInstalled": async () => ({ models: [] }),
+    });
     render(<ProviderSettings />);
     const row = await screen.findByRole("button", { name: /Anthropic/ });
     expect(row).toHaveTextContent("Anthropic 官方 API");
@@ -677,12 +676,12 @@ describe("provider and model settings", () => {
       connection = { ...connection, ...(input.billingMode ? { billingMode: input.billingMode } : {}), ...(input.pricingMultiplier !== undefined ? { defaultPricingMultiplier: input.pricingMultiplier } : {}) };
       return { settings: { models: { connections: { relay: connection } } } };
     });
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: { relay: connection } } } }),
-      listInstalledModels: async () => ({ models: [] }),
-      updateCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: { relay: connection } } } }),
+      "models.listInstalled": async () => ({ models: [] }),
+      "settings.updateCustomConnection": updateCustomConnection,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /Relay/ }));
     // 旧连接缺省按「逐个填写单价」。
@@ -698,14 +697,14 @@ describe("provider and model settings", () => {
 
   it("labels custom connections by their last test result instead of claiming they are connected", async () => {
     const base = { providerId: "openrouter", protocol: "openai-completions", baseUrl: "https://relay.example/v1", enabled: true };
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: {
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: {
         fresh: { ...base, connectionId: "fresh", displayName: "Fresh relay" },
         good: { ...base, connectionId: "good", displayName: "Good relay", lastConnection: { status: "available", checkedAt: "2026-09-26T00:00:00.000Z" } },
         bad: { ...base, connectionId: "bad", displayName: "Bad relay", lastConnection: { status: "unavailable", checkedAt: "2026-09-26T00:00:00.000Z" } },
       } } } }),
-    } as unknown as ActspaceBridge;
+    });
     render(<ProviderSettings />);
     expect(await screen.findByRole("button", { name: /Fresh relay/ })).toHaveTextContent("未测试");
     expect(screen.getByRole("button", { name: /Good relay/ })).toHaveTextContent("可用");
@@ -716,12 +715,12 @@ describe("provider and model settings", () => {
   it("asks before deleting a custom connection and keeps it on cancel", async () => {
     const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic-compatible", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-opus-alias", enabled: true };
     const removeCustomConnection = vi.fn(async () => ({}));
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
-      listInstalledModels: async () => ({ models: [customConnectionModel] }),
-      removeCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
+      "models.listInstalled": async () => ({ models: [customConnectionModel] }),
+      "settings.removeCustomConnection": removeCustomConnection,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
     await userEvent.click(screen.getByRole("button", { name: "删除" }));
@@ -739,12 +738,12 @@ describe("provider and model settings", () => {
     const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "anthropic-compatible", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-sonnet-5", proxy: { enabled: false, url: null }, enabled: true };
     const defaultModel: InstalledModelView = { ...customConnectionModel, definition: { ...customConnectionModel.definition, key: "openrouter:connection/anthropic-relay/claude-sonnet-5", apiModel: "claude-sonnet-5", label: "Claude Sonnet 5" } };
     const removeModel = vi.fn(async () => ({ ok: true as const, model: customConnectionModel }));
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
-      listInstalledModels: async () => ({ models: [defaultModel, customConnectionModel] }),
-      removeModel,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
+      "models.listInstalled": async () => ({ models: [defaultModel, customConnectionModel] }),
+      "models.remove": removeModel,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
     expect(await screen.findByRole("switch", { name: "启用 Claude Sonnet 5" })).toBeDisabled();
@@ -770,13 +769,13 @@ describe("provider and model settings", () => {
     const connection = { connectionId: "anthropic-relay", providerId: "openrouter", protocol: "anthropic-messages", catalogId: "custom", displayName: "Anthropic Relay", baseUrl: "https://relay.example", defaultModel: "claude-opus-alias", proxy: { enabled: false, url: null }, enabled: true };
     const addCustomModel = vi.fn(async (input: { apiModel: string }) => ({ ok: true as const, model: { ...customConnectionModel, definition: { ...customConnectionModel.definition, key: `k:${input.apiModel}`, label: input.apiModel } } }));
     const probeCustomConnection = vi.fn(async () => ({ ok: true, message: "ok", checkedAt: "2026-09-26T00:00:00.000Z", models: [{ id: "claude-opus-alias" }, { id: "claude-haiku-4-5", label: "Haiku" }] }));
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
-      listInstalledModels: async () => ({ models: [customConnectionModel] }),
-      addCustomModel,
-      probeCustomConnection,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: { [connection.connectionId]: connection } } } }),
+      "models.listInstalled": async () => ({ models: [customConnectionModel] }),
+      "models.addCustom": addCustomModel,
+      "settings.probeCustomConnection": probeCustomConnection,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
     await userEvent.click(await screen.findByRole("button", { name: "添加" }));
@@ -800,12 +799,12 @@ describe("provider and model settings", () => {
       unavailableReasons: {},
     };
     const editCustomModel = vi.fn(async () => ({ ok: true as const, model: sonnet }));
-    window.actspace = {
-      listProviders: async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
-      getSettingsV4: async () => ({ settings: { models: { connections: { relay: connection } } } }),
-      listInstalledModels: async () => ({ models: [sonnet] }),
-      editCustomModel,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: {}, credentialStorage: readyCredentialStorage }),
+      "settings.getV4": async () => ({ settings: { models: { connections: { relay: connection } } } }),
+      "models.listInstalled": async () => ({ models: [sonnet] }),
+      "models.editCustom": editCustomModel,
+    });
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /Relay/ }));
     await userEvent.click(await screen.findByRole("button", { name: "编辑 Claude Sonnet 5" }));
@@ -836,10 +835,10 @@ describe("provider and model settings", () => {
       },
     };
     const updateProvider = vi.fn(async () => ({ ok: true as const, provider: configured.openrouter }));
-    window.actspace = {
-      listProviders: async () => ({ providers: configured, credentialStorage: readyCredentialStorage }),
-      updateProvider,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: configured, credentialStorage: readyCredentialStorage }),
+      "providers.update": updateProvider,
+    });
 
     render(<ProviderSettings />);
     await screen.findByRole("heading", { name: "OpenRouter" });
@@ -871,10 +870,10 @@ describe("provider and model settings", () => {
       };
       return { ok: true as const, provider: current.deepseek };
     });
-    window.actspace = {
-      listProviders: async () => ({ providers: current, credentialStorage: readyCredentialStorage }),
-      removeProvider,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: current, credentialStorage: readyCredentialStorage }),
+      "providers.remove": removeProvider,
+    });
 
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /^DeepSeek/ }));
@@ -890,9 +889,9 @@ describe("provider and model settings", () => {
   });
 
   it("uses an inline setup route and returns to the provider catalog after Escape", async () => {
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+    });
 
     render(<ProviderSettings />);
     const opener = await screen.findByRole("button", { name: "添加服务" });
@@ -907,9 +906,9 @@ describe("provider and model settings", () => {
   });
 
   it("renders only connected providers as a flat connection list", async () => {
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+    });
 
     render(<ProviderSettings />);
     await screen.findByRole("heading", { name: "DeepSeek" });
@@ -925,9 +924,9 @@ describe("provider and model settings", () => {
   });
 
   it("opens a provider detail route and returns to the connection list", async () => {
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+    });
 
     render(<ProviderSettings />);
     await screen.findByRole("heading", { name: "DeepSeek" });
@@ -943,11 +942,11 @@ describe("provider and model settings", () => {
 
   it("keeps provider detail aligned to the Maka two-column sections", async () => {
     const updateModel = vi.fn(async () => ({ ok: true as const, model: installedModel }));
-    window.actspace = {
-      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
-      listInstalledModels: async () => ({ models: [installedModel] }),
-      updateModel,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
+      "models.listInstalled": async () => ({ models: [installedModel] }),
+      "models.update": updateModel,
+    });
 
     render(<ProviderSettings settings={settings} />);
     await userEvent.click(await screen.findByRole("button", { name: /^DeepSeek/ }));
@@ -971,12 +970,12 @@ describe("provider and model settings", () => {
       taskModels: { ...settings.taskModels, ...input },
     }));
     const updateModel = vi.fn(async () => ({ ok: true as const, model: installedModel }));
-    window.actspace = {
-      listInstalledModels: async () => ({ models: [installedModel] }),
-      listUsableModels: async () => ({ models: [usableModel, openRouterUsableModel] }),
-      updateTaskModels,
-      updateModel,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "models.listInstalled": async () => ({ models: [installedModel] }),
+      "models.listUsable": async () => ({ models: [usableModel, openRouterUsableModel] }),
+      "models.updateTaskModels": updateTaskModels,
+      "models.update": updateModel,
+    });
 
     render(<TaskModelDefaultsSection settings={settings} />);
     await userEvent.click(await screen.findByRole("button", { name: "轻量任务模型" }));
@@ -996,10 +995,10 @@ describe("provider and model settings", () => {
 
   it("updates model enablement from the model directory", async () => {
     const updateModel = vi.fn(async () => ({ ok: true as const, model: installedModel }));
-    window.actspace = {
-      listInstalledModels: async () => ({ models: [installedModel] }),
-      updateModel,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "models.listInstalled": async () => ({ models: [installedModel] }),
+      "models.update": updateModel,
+    });
 
     render(<ModelSettings settings={settings} />);
     await userEvent.click(await screen.findByRole("switch", { name: `启用 ${installedModel.definition.label}` }));
@@ -1008,10 +1007,10 @@ describe("provider and model settings", () => {
 
   it("uses a searchable multi-select for models inside provider details", async () => {
     const updateModel = vi.fn(async () => ({ ok: true as const, model: installedModel }));
-    window.actspace = {
-      listInstalledModels: async () => ({ models: [installedModel] }),
-      updateModel,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "models.listInstalled": async () => ({ models: [installedModel] }),
+      "models.update": updateModel,
+    });
 
     render(<ModelSettings settings={settings} embedded providerFilter="deepseek" />);
     await userEvent.click(await screen.findByRole("button", { name: "选择启用模型" }));
@@ -1030,11 +1029,11 @@ describe("provider and model settings", () => {
         references: ["utilityModel" as const, "exploreModel" as const],
       },
     }));
-    window.actspace = {
-      listInstalledModels: async () => ({ models: [catalogInstalledModel] }),
-      listUsableModels: async () => ({ models: [] }),
-      removeModel,
-    } as unknown as ActspaceBridge;
+    setupBridge({
+      "models.listInstalled": async () => ({ models: [catalogInstalledModel] }),
+      "models.listUsable": async () => ({ models: [] }),
+      "models.remove": removeModel,
+    });
 
     render(<ModelSettings settings={settings} />);
     await userEvent.click(await screen.findByRole("button", { name: `删除 ${catalogInstalledModel.definition.label}` }));
@@ -1055,7 +1054,7 @@ describe("provider and model settings", () => {
       skippedCount: 0,
     }));
     const addModel = vi.fn(async () => ({ ok: true as const, model: installedModel }));
-    window.actspace = { listModelCatalog, addModel } as unknown as ActspaceBridge;
+    setupBridge({ "models.listCatalog": listModelCatalog, "models.add": addModel });
 
     render(<OpenRouterModelCatalogDialog onClose={onClose} onAdded={onAdded} />);
     expect(await screen.findByText(openRouterModel.name)).toBeInTheDocument();
@@ -1075,18 +1074,18 @@ describe("provider and model settings", () => {
   it("notifies the app model list immediately after adding a catalog model", async () => {
     const onChanged = vi.fn();
     const addModel = vi.fn(async () => ({ ok: true as const, model: catalogInstalledModel }));
-    window.actspace = {
-      listInstalledModels: async () => ({ models: [installedModel] }),
-      listUsableModels: async () => ({ models: [usableModel] }),
-      listModelCatalog: async () => ({
+    setupBridge({
+      "models.listInstalled": async () => ({ models: [installedModel] }),
+      "models.listUsable": async () => ({ models: [usableModel] }),
+      "models.listCatalog": async () => ({
         provider: "openrouter" as const,
         state: "fresh" as const,
         stale: false,
         models: [openRouterModel],
         skippedCount: 0,
       }),
-      addModel,
-    } as unknown as ActspaceBridge;
+      "models.add": addModel,
+    });
 
     render(<ModelSettings settings={settings} onChanged={onChanged} />);
     await userEvent.click(await screen.findByRole("button", { name: "从 OpenRouter 添加" }));
@@ -1117,7 +1116,7 @@ describe("provider and model settings", () => {
       models: [openRouterModel],
       skippedCount: 0,
     }));
-    window.actspace = { listModelCatalog, reloadModelCatalog } as unknown as ActspaceBridge;
+    setupBridge({ "models.listCatalog": listModelCatalog, "models.reloadCatalog": reloadModelCatalog });
 
     render(<OpenRouterModelCatalogDialog onClose={() => {}} onAdded={() => {}} onReloaded={onReloaded} />);
     expect(await screen.findByText(openRouterModel.name)).toBeInTheDocument();
@@ -1130,15 +1129,15 @@ describe("provider and model settings", () => {
   });
 
   it("cycles catalog focus and restores the opener when the modal closes", async () => {
-    window.actspace = {
-      listModelCatalog: async () => ({
+    setupBridge({
+      "models.listCatalog": async () => ({
         provider: "openrouter" as const,
         state: "fresh" as const,
         stale: false,
         models: [openRouterModel],
         skippedCount: 0,
       }),
-    } as unknown as ActspaceBridge;
+    });
 
     function Harness() {
       const [open, setOpen] = useState(false);
@@ -1164,7 +1163,7 @@ it("refreshes the DeepSeek catalog, reloads installed models, and reports errors
   const listInstalledModels = vi.fn(async () => ({ models: [] }));
   const reloadModelCatalog = vi.fn(async () => ({ provider: "deepseek" as const, state: "fresh" as const, stale: false, models: [{ ...openRouterModel, provider: "deepseek" as const, apiModel: "deepseek-flash" }], skippedCount: 0, fetchedAt: "2026-09-10T05:00:00Z" }));
   const onChanged = vi.fn();
-  window.actspace = { listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }), listInstalledModels, reloadModelCatalog } as unknown as ActspaceBridge;
+  setupBridge({ "providers.list": async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }), "models.listInstalled": listInstalledModels, "models.reloadCatalog": reloadModelCatalog });
   render(<ProviderSettings settings={{ providers: providerViews } as AppSettings} onChanged={onChanged} />);
   await userEvent.click(await screen.findByRole("button", { name: /^DeepSeek/ }));
   const before = listInstalledModels.mock.calls.length;
@@ -1183,7 +1182,7 @@ it("adds a DeepSeek catalog model using its own provider and refreshes consumers
   const onAdded = vi.fn();
   const listModelCatalog = vi.fn(async () => ({ provider: "deepseek", state: "fresh", stale: false, models: [{ ...openRouterModel, provider: "deepseek", apiModel: "deepseek-flash", name: "DeepSeek V4.1 Flash" }], skippedCount: 0 }));
   const addModel = vi.fn(async () => ({ ok: true }));
-  window.actspace = { listModelCatalog, addModel } as unknown as ActspaceBridge;
+  setupBridge({ "models.listCatalog": listModelCatalog, "models.add": addModel });
   render(<OpenRouterModelCatalogDialog provider="deepseek" onAdded={onAdded} onClose={() => {}} />);
   await userEvent.click(await screen.findByRole("button", { name: "添加" }));
   expect(addModel).toHaveBeenCalledWith({ provider: "deepseek", apiModel: "deepseek-flash" });

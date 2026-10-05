@@ -52,6 +52,7 @@
 - `docs/design-docs/frontend/front-主题与配色规范.md`：浅色、深色、跟随系统三态主题和颜色硬约束。
 - `docs/design-docs/frontend/front-tailwind-style-architecture.md`：Tailwind v4 样式架构和迁移策略。
 - `docs/design-docs/frontend/front-基础组件封装规范.md`：基础 UI wrapper 分层和组件抽象边界。
+- `docs/design-docs/frontend/front-preload-bridge与mock规范.md`：`window.actspace` 契约、renderer `api/<域>` 访问约定、新增 IPC 的步骤、guard 约定、mock bridge 与场景、测试打桩。
 - `docs/design-docs/frontend/front-icon-button-tooltip-guidelines.md`：图标按钮 Tooltip 和可访问性规范。
 - `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`：SplitView、resize、collapse 和 restore。
 - `docs/design-docs/frontend/front-environment-and-git-actions.md`：顶部 Environment、编辑器选择、本地分支创建、Commit 和 Push 工作流。

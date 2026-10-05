@@ -1,6 +1,6 @@
 # 12 测试整理 验收交接
 
-- 主线提交：`refactor/desktop-frontend` @ `<squash 提交哈希>`（squash 后在 13 的 T0 中登记）
+- 主线提交：`refactor/desktop-frontend` @ `05ffe370`
 - 子分支：`refactor/desktop-fe-12`（`06c625e3` 起，共 11 个提交：T0–T8 各一个，另有一个处理复核发现的提交和一个收尾提交）
 - 状态：**可以交给验收**
 - 启动方式：

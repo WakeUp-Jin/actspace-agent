@@ -1,20 +1,11 @@
-import { BrowserWindow, ipcMain } from "electron";
+import type { BrowserWindow } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type {
-  ReviewCopyApplyCommandInput,
-  ReviewCreatePullRequestInput,
-  ReviewGetFileContentsInput,
-  ReviewGetFileDiffsInput,
-  ReviewGetSnapshotInput,
-  ReviewWorkspaceInput,
-  WorkspaceListDirInput,
-  WorkspaceReadFileInput,
-  WorkspaceStatFileInput,
-} from "@actspace/shared";
+import type { ReviewWorkspaceInput } from "@actspace/shared";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
+import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
 import type { AppDataRoots } from "../app-paths";
-import { assertTrustedSender } from "../ipc/trusted-sender";
+import { createIpcRegistrar } from "../ipc/registry";
 import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, type WorkspaceRegistryOptions } from "../workspace-registry-service";
 import { openExternalSafely } from "../platform-actions";
 import { createWorkspaceAccessDeps, resolveWorkspaceAccess, workspaceRegistryOptions } from "../workspace-access";
@@ -25,7 +16,6 @@ import { ReviewGitWorkerClient } from "../review-git-worker-client";
 import { ReviewViewStateService } from "../review-view-state-service";
 import { ReviewPullRequestService } from "../review-pr-service";
 import type { TerminalSessionService } from "../terminal/terminal-session-service";
-import type { TerminalAckInput, TerminalAttachInput, TerminalCloseInput, TerminalCreateInput, TerminalDetachInput, TerminalListInput, TerminalResizeInput, TerminalWriteInput } from "@actspace/shared";
 
 type ShellOptions = {
   readonly roots: AppDataRoots;
@@ -60,28 +50,28 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   });
 
   const terminalAvailable = options.terminalAvailable === true && options.terminal !== undefined;
-  const handlers: string[] = [];
-  const handle = <T extends unknown[]>(channel: string, listener: (...args: T) => unknown): void => {
-    ipcMain.handle(channel, (event, ...args) => {
-      assertTrustedSender(event, options.getMainWindow, "Untrusted shell sender");
-      const input = args[0];
+  const ipc = createIpcRegistrar({
+    getWindow: options.getMainWindow,
+    untrustedMessage: "Untrusted shell sender",
+    // 工作区、Review、终端都是本机能力，远端会话一律拒绝。
+    middleware: (call, next) => {
+      const input = call.input;
       if (input && typeof input === "object" && (("sessionId" in input && typeof input.sessionId === "string" && input.sessionId.startsWith("host:")) || ("hostId" in input && input.hostId))) throw new Error("Local shell capabilities are unavailable for remote Sessions");
-      return listener(...([event, ...args] as unknown as T));
-    });
-    handlers.push(channel);
-  };
+      return next();
+    },
+  });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaces, () => readWorkspaceRegistry(registryOptions));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaceDir, async (_event: unknown, input: WorkspaceListDirInput) => listWorkspaceDir(await withWorkspaceAccess(input), options.roots));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readWorkspaceFile, async (_event: unknown, input: WorkspaceReadFileInput) => readWorkspaceFile(await withWorkspaceAccess(input), options.roots));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.statWorkspaceFile, async (_event: unknown, input: WorkspaceStatFileInput) => statWorkspaceFile(await withWorkspaceAccess(input), options.roots));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot, (_event: unknown, input: ReviewGetSnapshotInput) => review.getSnapshot(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot, (_event: unknown, input: ReviewGetSnapshotInput) => review.refreshSnapshot(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewFileDiffs, (_event: unknown, input: ReviewGetFileDiffsInput) => review.getFileDiffs(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewFileContents, (_event: unknown, input: ReviewGetFileContentsInput) => review.getFileContents(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.applyReviewMutation, (_event: unknown, input: Parameters<ReviewCoordinator["applyMutation"]>[0]) => review.applyMutation(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setReviewFileViewed, (_event: unknown, input: Parameters<ReviewCoordinator["setFileViewed"]>[0]) => review.setFileViewed(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listReviewBranches, async (_event: unknown, input: ReviewWorkspaceInput) => {
+  ipc.handle(contract.workspaces.list, () => readWorkspaceRegistry(registryOptions));
+  ipc.handle(contract.workspaces.listDir, async (input) => listWorkspaceDir(await withWorkspaceAccess(input), options.roots));
+  ipc.handle(contract.workspaces.readFile, async (input) => readWorkspaceFile(await withWorkspaceAccess(input), options.roots));
+  ipc.handle(contract.workspaces.statFile, async (input) => statWorkspaceFile(await withWorkspaceAccess(input), options.roots));
+  ipc.handle(contract.review.getSnapshot, (input) => review.getSnapshot(input));
+  ipc.handle(contract.review.refreshSnapshot, (input) => review.refreshSnapshot(input));
+  ipc.handle(contract.review.getFileDiffs, (input) => review.getFileDiffs(input));
+  ipc.handle(contract.review.getFileContents, (input) => review.getFileContents(input));
+  ipc.handle(contract.review.applyMutation, (input) => review.applyMutation(input));
+  ipc.handle(contract.review.setFileViewed, (input) => review.setFileViewed(input));
+  ipc.handle(contract.review.listBranches, async (input) => {
     const resolved = await resolveReviewWorkspace(registryOptions, input);
     if (resolved.ok === false) return { ok: false as const, code: "invalid_workspace" as const, message: resolved.message };
     try {
@@ -90,7 +80,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
       return { ok: false as const, code: "command_failed" as const, message: safeErrorMessage(error) };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listReviewCommits, async (_event: unknown, input: ReviewWorkspaceInput) => {
+  ipc.handle(contract.review.listCommits, async (input) => {
     const resolved = await resolveReviewWorkspace(registryOptions, input);
     if (resolved.ok === false) return { ok: false as const, code: "invalid_workspace" as const, message: resolved.message };
     try {
@@ -99,9 +89,9 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
       return { ok: false as const, code: "command_failed" as const, message: safeErrorMessage(error) };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.copyReviewGitApplyCommand, async (_event: unknown, input: ReviewCopyApplyCommandInput) => {
+  ipc.handle(contract.review.copyGitApplyCommand, async (input) => {
     const loaded = await review.getLoadedSnapshot(input);
-    if (!loaded.ok) return loaded;
+    if (loaded.ok === false) return loaded;
     try {
       const patch = await reviewEngine.createPatch(loaded.workspace, loaded.snapshot);
       const directory = join(options.roots.tmpRoot, "review-patches");
@@ -113,12 +103,12 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
       return { ok: false as const, code: "command_failed" as const, message: safeErrorMessage(error) };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewPullRequestCapability, async (_event: unknown, input: ReviewWorkspaceInput & { baseBranch?: string }) => {
+  ipc.handle(contract.review.getPullRequestCapability, async (input) => {
     const resolved = await resolveReviewWorkspace(registryOptions, input);
     if (resolved.ok === false) return { ok: false as const, code: "invalid_workspace" as const, message: resolved.message };
     return reviewPullRequests.getCapability(resolved.workspace.workspaceRoot, input.baseBranch);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createReviewPullRequest, async (_event: unknown, input: ReviewCreatePullRequestInput) => {
+  ipc.handle(contract.review.createPullRequest, async (input) => {
     const resolved = await resolveReviewWorkspace(registryOptions, input);
     if (resolved.ok === false) return { ok: false as const, code: "invalid_workspace" as const, message: resolved.message };
     const result = await reviewPullRequests.create({
@@ -132,19 +122,19 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     return result;
   });
   if (terminalAvailable && options.terminal) {
-    handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalCreate, (event: Electron.IpcMainInvokeEvent, input: TerminalCreateInput) => options.terminal!.create(input.sessionId, event.sender.id, input.cols, input.rows));
-    handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalList, (event: Electron.IpcMainInvokeEvent, input: TerminalListInput) => ({ terminals: options.terminal!.list(input.sessionId, event.sender.id) }));
-    handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalAttach, (event: Electron.IpcMainInvokeEvent, input: TerminalAttachInput) => options.terminal!.attach(input.terminalId, event.sender.id, input.cols, input.rows));
-    handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalDetach, (event: Electron.IpcMainInvokeEvent, input: TerminalDetachInput) => options.terminal!.detach(input.terminalId, event.sender.id));
-    handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalWrite, (event: Electron.IpcMainInvokeEvent, input: TerminalWriteInput) => options.terminal!.write(input.terminalId, event.sender.id, input.data));
-    handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalResize, (event: Electron.IpcMainInvokeEvent, input: TerminalResizeInput) => options.terminal!.resize(input.terminalId, event.sender.id, input.cols, input.rows));
-    handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalAck, (event: Electron.IpcMainInvokeEvent, input: TerminalAckInput) => options.terminal!.ack(input.terminalId, event.sender.id, input.bytes));
-    handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalClose, (event: Electron.IpcMainInvokeEvent, input: TerminalCloseInput) => options.terminal!.close(input.terminalId, event.sender.id));
+    ipc.handle(contract.terminal.create, (input, event) => options.terminal!.create(input.sessionId, event.sender.id, input.cols, input.rows));
+    ipc.handle(contract.terminal.list, (input, event) => ({ terminals: options.terminal!.list(input.sessionId, event.sender.id) }));
+    ipc.handle(contract.terminal.attach, (input, event) => options.terminal!.attach(input.terminalId, event.sender.id, input.cols, input.rows));
+    ipc.handle(contract.terminal.detach, (input, event) => options.terminal!.detach(input.terminalId, event.sender.id));
+    ipc.handle(contract.terminal.write, (input, event) => options.terminal!.write(input.terminalId, event.sender.id, input.data));
+    ipc.handle(contract.terminal.resize, (input, event) => options.terminal!.resize(input.terminalId, event.sender.id, input.cols, input.rows));
+    ipc.handle(contract.terminal.ack, (input, event) => options.terminal!.ack(input.terminalId, event.sender.id, input.bytes));
+    ipc.handle(contract.terminal.close, (input, event) => options.terminal!.close(input.terminalId, event.sender.id));
   }
 
   return {
     dispose: () => {
-      for (const channel of handlers) ipcMain.removeHandler(channel);
+      ipc.dispose();
       unsubscribeReview();
       review.dispose();
       reviewWorker.dispose();

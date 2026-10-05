@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { createMessageBlocks, type MessageBlock } from "@actspace/shared";
 import { AgentAvatar, AgentStatus } from "../messages/AgentIdentity";
 import { renderMessage } from "../ConversationView";
+import { sessionsApi } from "../../api/sessions";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 const buttonClass = "w-full rounded-act-md px-3 py-3 text-left hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring";
@@ -19,8 +20,8 @@ export function SubagentsPanel({ sessionId, selected }: { sessionId: string | nu
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
       try {
-        const items = await window.actspace?.getSubagents?.({ sessionId: sessionId! });
-        if (!disposed && items) { setAgents(items.filter((item): item is AgentMessage => item.kind === "agent")); setError(undefined); }
+        const items = await sessionsApi.getSubagents({ sessionId: sessionId! });
+        if (!disposed) { setAgents(items.filter((item): item is AgentMessage => item.kind === "agent")); setError(undefined); }
       } catch { if (!disposed) setError("无法加载子智能体，请稍后重试。"); }
       finally { if (!disposed) timer = setTimeout(refresh, 1000); }
     }
@@ -39,8 +40,8 @@ export function SubagentsPanel({ sessionId, selected }: { sessionId: string | nu
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
       try {
-        const events = await window.actspace?.getSubAgentTranscript?.({ transcriptRef: ref });
-        if (!disposed && events) { setMessages(createMessageBlocks(events)); setError(undefined); }
+        const events = await sessionsApi.getSubAgentTranscript({ transcriptRef: ref });
+        if (!disposed) { setMessages(createMessageBlocks(events)); setError(undefined); }
       } catch { if (!disposed) setError("执行记录暂不可用，正在重试。"); }
       finally { if (!disposed && active?.status === "running") timer = setTimeout(refresh, 750); }
     }

@@ -42,6 +42,9 @@ import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages } f
 import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { readFailureTab, tabFromFile } from "./right-panel/workspaceFileTab";
+import { getSessionToolDetail } from "../api/sessions";
+import { visualizeApi } from "../api/visualize";
+import { workspacesApi } from "../api/workspaces";
 
 type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
 type AssistantMessageBlock = Extract<MessageBlock, { kind: "assistant" }>;
@@ -162,9 +165,9 @@ function DeferredToolMessage({ message, className, onOpenAgentTranscript, replyC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const load = async () => {
-    if (loading || !message.deferredToolDetail || !window.actspace?.getSessionToolDetail) return;
+    if (loading || !message.deferredToolDetail) return;
     setLoading(true); setError(null);
-    try { setBlocks(await window.actspace.getSessionToolDetail(message.deferredToolDetail)); }
+    try { setBlocks(await getSessionToolDetail(message.deferredToolDetail)); }
     catch (e) { setError(e instanceof Error ? e.message : '工具详情加载失败'); }
     finally { setLoading(false); }
   };
@@ -611,7 +614,7 @@ function TurnActions({
       focusVisualizeTab(visualizeHtmlRef.current);
       return;
     }
-    if (typeof window === "undefined" || !window.actspace?.visualizeReply || !sessionId) {
+    if (!sessionId) {
       setVisualizeState("error");
       setVisualizeError("当前环境不支持可视化转换。");
       return;
@@ -620,7 +623,7 @@ function TurnActions({
     setVisualizeState("generating");
     setVisualizeError(null);
     try {
-      const result = await window.actspace.visualizeReply({
+      const result = await visualizeApi.convertReply({
         sessionId,
         messageId: latestAssistantMessage.id,
         content: copyText,
@@ -889,15 +892,14 @@ export function ConversationView({
     const workspaceRoot = selectedWorkspaceRoot?.trim();
     const relativePath = message.filePath.trim();
     const ref = remoteSessionRef(sessionId ?? null);
-    if (ref && window.actspaceHosts) {
+    if (ref) {
       try { await openRemoteFile(sessionId!, relativePath, openTab); }
       catch { openTab({ id: `remote-error:${sessionId}:${relativePath}`, kind: "text", title: relativePath.split("/").at(-1) || "远端文件", content: "远端文件读取失败，请确认连接后重试。" }); }
       return;
     }
-    const api = typeof window !== "undefined" ? window.actspace?.readWorkspaceFile : undefined;
-    if (!workspaceRoot || !api || !isSafeWorkspaceRelativePath(relativePath)) return;
+    if (!workspaceRoot || !isSafeWorkspaceRelativePath(relativePath)) return;
     try {
-      openTab(tabFromFile(await api({ workspaceRoot, relativePath })));
+      openTab(tabFromFile(await workspacesApi.readFile({ workspaceRoot, relativePath })));
     } catch {
       const title = relativePath.split(/[\\/]/).pop() || relativePath;
       openTab(readFailureTab(relativePath, title));

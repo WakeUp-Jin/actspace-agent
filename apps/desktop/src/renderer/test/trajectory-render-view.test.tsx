@@ -1,12 +1,13 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { loadTrajectoryFixture } from "../trajectory/fixtures";
 import { TrajectoryView } from "../components/TrajectoryView";
 import { SessionProjectionProvider } from "../session";
 import { projectionFixture } from "./projection-fixture";
 import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import { setupBridge } from "./helpers/bridge";
 
 const snapshot: RuntimeV2TrajectorySnapshot = {
   kind: "trajectory",
@@ -21,10 +22,6 @@ const snapshot: RuntimeV2TrajectorySnapshot = {
 };
 
 describe("TrajectoryView", () => {
-  afterEach(() => {
-    delete (window as { actspace?: unknown }).actspace;
-  });
-
   it("renders the Journal projection nodes with stable sequence identity", () => {
     render(<TrajectoryView snapshot={snapshot} />);
     expect(screen.getByTestId("trajectory-view")).toBeInTheDocument();
@@ -70,10 +67,10 @@ describe("TrajectoryView", () => {
       provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
     }));
     const projection = projectionFixture("session-1", snapshot.throughJournalSeq, events);
-    (window as { actspace?: unknown }).actspace = {
-      getSessionProjectionSnapshot: async () => projection,
-      onSessionLiveEvent: () => () => undefined,
-    };
+    setupBridge({
+      "sessions.getProjectionSnapshot": async () => projection,
+      "events.sessionLive": () => () => undefined,
+    });
 
     render(
       <SessionProjectionProvider sessionId="session-1">

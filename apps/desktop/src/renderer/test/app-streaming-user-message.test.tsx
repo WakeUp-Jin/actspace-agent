@@ -12,6 +12,8 @@ import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { overrideBridge, setupBridge } from "./helpers/bridge";
+import { projectRecord } from "./helpers/session-records";
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
@@ -43,39 +45,38 @@ const defaultSettings: AppSettings = {
   skills: { disabled: [] },
 };
 
-/** window.actspace 的设置相关方法默认 stub，供各用例 spread 进 mock。 */
+/** bridge 的设置相关方法默认覆盖，供各用例 spread 进 `taskHostFixture`。 */
 const settingsApiStub = {
-  getSessionPage: async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(await window.actspace.getSession({ sessionId })),
-  getSettings: async () => defaultSettings,
-  readAgentSystemPrompt: async () => ({ path: defaultSettings.agent.systemPromptPath, content: "" }),
-  writeAgentSystemPrompt: async (input: { content: string }) => ({
+  "settings.get": async () => defaultSettings,
+  "settings.readSystemPrompt": async () => ({ path: defaultSettings.agent.systemPromptPath, content: "" }),
+  "settings.writeSystemPrompt": async (input: { content: string }) => ({
     path: defaultSettings.agent.systemPromptPath,
     content: input.content,
   }),
-  updateSettings: async () => defaultSettings,
-  setProviderKey: async () => ({ ok: true }),
-  clearProviderKey: async () => ({ ok: true }),
-  testProviderConnection: async () => ({ ok: true, message: "连接成功" }),
-  visualizeReply: async () => ({ html: "<!doctype html><html></html>", sourceHash: "stub", cached: false }),
-  listVisualizations: async () => ({ items: [] }),
-  describeContext: async () => null,
-  getReviewSnapshot: async () => createReviewChanges(0, 0),
-  initGitRepository: async () => ({
+  "settings.update": async () => defaultSettings,
+  "providers.setKey": async () => ({ ok: true }),
+  "providers.clearKey": async () => ({ ok: true }),
+  "providers.testConnection": async () => ({ ok: true, message: "连接成功" }),
+  "visualize.convertReply": async () => ({ html: "<!doctype html><html></html>", sourceHash: "stub", cached: false }),
+  "visualize.list": async () => ({ items: [] }),
+  "sessions.describeContext": async () => null,
+  "review.getSnapshot": async () => createReviewChanges(0, 0),
+  "review.initGit": async () => ({
     ok: true,
     alreadyRepository: true,
     workspaceRoot: "/tmp/workspace",
   }),
-  listWorkspaceDir: async () => ({ root: "/tmp/workspace", relativePath: "", entries: [] }),
-  readWorkspaceFile: async () => ({ relativePath: "", renderKind: "text" as const, size: 0, mtimeMs: 0, content: "" }),
-  archiveSession: async () => ({ ok: true }),
-  archiveSessions: async (input: { sessionIds: string[] }) => ({
+  "workspaces.listDir": async () => ({ root: "/tmp/workspace", relativePath: "", entries: [] }),
+  "workspaces.readFile": async () => ({ relativePath: "", renderKind: "text" as const, size: 0, mtimeMs: 0, content: "" }),
+  "sessions.archive": async () => ({ ok: true }),
+  "sessions.archiveMany": async (input: { sessionIds: string[] }) => ({
     ok: true,
     archivedSessionIds: input.sessionIds,
     failedSessionIds: [],
   }),
-  setUiZoom: () => {},
-  setNativeTheme: () => {},
-  onShuttingDown: () => () => {},
+  "appearance.setUiZoom": () => {},
+  "appearance.setNativeTheme": () => {},
+  "events.shuttingDown": () => () => {},
 };
 
 function createWorkspaceRegistryFixture(createdAt: string, updatedAt = createdAt): WorkspaceListResult {
@@ -200,8 +201,6 @@ describe("App streaming user message", () => {
   });
 
   afterEach(() => {
-    delete (window as unknown as { actspace?: unknown }).actspace;
-
     if (originalScrollWidthDescriptor) {
       Object.defineProperty(HTMLElement.prototype, "scrollWidth", originalScrollWidthDescriptor);
     } else {
@@ -227,21 +226,21 @@ describe("App streaming user message", () => {
     let resolveArchive!: (result: { ok: boolean; error?: string }) => void;
     const archiveSession = vi.fn(() => new Promise<{ ok: boolean; error?: string }>((resolve) => { resolveArchive = resolve; }));
     const listSessions = vi.fn(async () => sessions);
-    window.actspace = taskHostFixture({
+    setupBridge(taskHostFixture({
       ...settingsApiStub,
-      getBootstrapState: async () => bootstrapState,
-      listSessions,
-      getSession: async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null,
-      createSession: async () => active,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      listPendingApprovals: async () => [],
-      archiveSession,
-      onAgentStream: () => () => {},
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": listSessions,
+      getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null,
+      "sessions.create": projectRecord(async () => active),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "approvals.listPending": async () => [],
+      "sessions.archive": archiveSession,
+      "events.agentStream": () => () => {},
       execute: vi.fn(),
-    }) as unknown as Window['actspace'];
+    }));
     return { archiveSession, listSessions, resolveArchive: (result: { ok: boolean; error?: string }) => resolveArchive(result) };
   }
 
@@ -299,24 +298,24 @@ describe("App streaming user message", () => {
     }));
     const records = new Map([[active.meta.id, active], [fallback.meta.id, fallback]]);
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(now),
-      listSessions: async () => sessions,
-      getSession: async ({ sessionId }) => records.get(sessionId) ?? null,
-      createSession: async () => active,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
-      getKimiBalance: async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
-      listPendingApprovals: async () => [],
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(now),
+      "sessions.list": async () => sessions,
+      getRecord: async ({ sessionId }) => records.get(sessionId) ?? null,
+      "sessions.create": projectRecord(async () => active),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      "providers.getKimiBalance": async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      archiveSessions,
-      onAgentStream: () => () => {},
+      "sessions.archiveMany": archiveSessions,
+      "events.agentStream": () => () => {},
       execute: async () => ({ sessionId: active.meta.id, agentRunId: "unused", status: "completed", events: [], contextSnapshot: null, contextState: null }),
-    });
+    }));
 
     renderApp();
     await screen.findByRole("button", { name: "查看会话详情： Active workspace session" });
@@ -353,24 +352,24 @@ describe("App streaming user message", () => {
     });
     const records = new Map([[active.meta.id, active], [fallback.meta.id, fallback]]);
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => registry,
-      listSessions: async () => sessions,
-      getSession: async ({ sessionId }) => records.get(sessionId) ?? null,
-      createSession: async () => active,
-      setWorkspaceVisibility,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
-      getKimiBalance: async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
-      listPendingApprovals: async () => [],
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => registry,
+      "sessions.list": async () => sessions,
+      getRecord: async ({ sessionId }) => records.get(sessionId) ?? null,
+      "sessions.create": projectRecord(async () => active),
+      "workspaces.setVisibility": setWorkspaceVisibility,
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      "providers.getKimiBalance": async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: () => () => {},
+      "events.agentStream": () => () => {},
       execute: async () => ({ sessionId: active.meta.id, agentRunId: "unused", status: "completed", events: [], contextSnapshot: null, contextState: null }),
-    });
+    }));
 
     renderApp();
     await screen.findByRole("button", { name: "查看会话详情： Hidden active session" });
@@ -416,39 +415,39 @@ describe("App streaming user message", () => {
       value: vi.fn(),
     });
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      getReviewSnapshot,
-      onAgentStream: () => () => {},
+      "review.getSnapshot": getReviewSnapshot,
+      "events.agentStream": () => () => {},
       execute: () =>
         new Promise((resolve) => {
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -514,34 +513,34 @@ describe("App streaming user message", () => {
       },
     }));
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      getSessionPreview,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.getPreview": getSessionPreview,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: () => () => {},
+      "events.agentStream": () => () => {},
       execute: async () => ({
         sessionId,
         agentRunId: "turn-unused",
@@ -550,7 +549,7 @@ describe("App streaming user message", () => {
         contextSnapshot: null,
         contextState: null,
       }),
-    });
+    }));
 
     renderApp();
 
@@ -570,16 +569,16 @@ describe("App streaming user message", () => {
     type LiveListener = (envelope: { event: { kind: string; sessionId: string; message: string } }) => void;
     const listeners = new Set<LiveListener>();
     const createSession = vi.fn(async () => record);
-    window.actspace = taskHostFixture({
+    setupBridge(taskHostFixture({
       ...settingsApiStub,
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0 }],
-      getSession: async () => record,
-      createSession,
-      listPendingApprovals: async () => [],
-      onAgentStream: () => () => {},
-      onSessionLiveEvent: (listener: LiveListener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    }) as unknown as NonNullable<typeof window.actspace>;
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0 }],
+      getRecord: async () => record,
+      "sessions.create": projectRecord(createSession),
+      "approvals.listPending": async () => [],
+      "events.agentStream": () => () => {},
+      "events.sessionLive": (listener: LiveListener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    }));
     renderApp();
     await screen.findByRole("button", { name: "查看会话详情： New chat" });
     await userEvent.click(screen.getByRole("button", { name: "新建会话" }));
@@ -613,38 +612,38 @@ describe("App streaming user message", () => {
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: () => () => {},
+      "events.agentStream": () => () => {},
       execute: () =>
         new Promise((resolve) => {
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -689,33 +688,33 @@ describe("App streaming user message", () => {
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -728,7 +727,7 @@ describe("App streaming user message", () => {
           streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -770,40 +769,40 @@ describe("App streaming user message", () => {
     }];
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) streamHandler = null;
         };
       },
       prepare: async () => ({ status: "submission-failed", acknowledgement: "rejected", message: "Git repository has no commits yet." }),
-    });
+    }));
 
     renderApp();
 
@@ -834,33 +833,33 @@ describe("App streaming user message", () => {
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -873,7 +872,7 @@ describe("App streaming user message", () => {
         streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
         resolveExecution = resolve;
       }),
-    });
+    }));
 
     renderApp();
 
@@ -1045,32 +1044,32 @@ sessionId,
       for (const listener of streamListeners) listener(event);
     };
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async ({ sessionId }) => records[sessionId] ?? null,
-      createSession: async () => alphaRecord,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async ({ sessionId }) => records[sessionId] ?? null,
+      "sessions.create": projectRecord(async () => alphaRecord),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamListeners.add(callback);
         return () => {
           streamListeners.delete(callback);
@@ -1104,7 +1103,7 @@ sessionId: input.sessionId,
           contextState: null,
         }));
       }),
-    });
+    }));
 
     renderApp();
 
@@ -1176,38 +1175,38 @@ sessionId: alphaSessionId,
     let listSessionsCallCount = 0;
     const getSession = vi.fn(async () => currentRecord);
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: () => {
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": () => {
         listSessionsCallCount += 1;
         if (listSessionsCallCount === 1) return Promise.resolve(sessions);
         return new Promise((resolve) => {
           resolveFinalSessionList = resolve;
         });
       },
-      getSession,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+      getRecord: getSession,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) streamHandler = null;
@@ -1259,7 +1258,7 @@ sessionId,
           };
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -1320,35 +1319,36 @@ sessionId,
       contextState: null,
     }));
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => [],
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => [],
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "sessions.setWorkspace": async () => ({ ok: true }),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: () => () => {},
+      "events.agentStream": () => () => {},
       execute,
-    });
+    }));
 
     renderApp();
 
@@ -1370,9 +1370,10 @@ sessionId,
     await waitFor(() => {
       expect(execute).toHaveBeenCalledTimes(2);
     });
+    // 模型列表来自 mock bridge 的 `models.listUsable`（键形如 provider:model）。
     expect(execute.mock.calls.map(([input]) => input.model)).toEqual([
-      "deepseek-v4-flash",
-      "deepseek-v4-flash",
+      "deepseek:deepseek-flash",
+      "deepseek:deepseek-flash",
     ]);
   });
 
@@ -1380,34 +1381,34 @@ sessionId,
     const record = createEmptySessionRecord(sessionId);
     const sessions: SessionListItem[] = [{ id: sessionId, title: "New chat", updatedAt: record.meta.updatedAt, agentRunCount: 0 }];
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
       executeCompaction: compactContext,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -1416,7 +1417,7 @@ sessionId,
         };
       },
       execute,
-    });
+    }));
 
     return execute;
   }
@@ -1510,34 +1511,34 @@ sessionId,
     });
 
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      getSessionPage: async () => storedProjection,
-      onAgentStream: (callback) => {
+      "sessions.getPage": async () => storedProjection,
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -1557,7 +1558,7 @@ sessionId,
         record = projectChatSession(snapshot, fixture.journal, "/tmp/workspace");
         return { sessionId: input.sessionId, agentRunId: input.agentRunId, status: "completed", events: record.events, contextSnapshot: { totalTokens: 0, maxTokens: 200_000, percentUsed: 0, buckets: [] }, contextState: null };
       },
-    });
+    }));
 
     renderApp();
 
@@ -1603,33 +1604,33 @@ sessionId,
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -1665,7 +1666,7 @@ sessionId: input.sessionId,
           }
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -1750,33 +1751,33 @@ sessionId,
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: now,
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: now,
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) streamHandler = null;
@@ -1813,7 +1814,7 @@ sessionId,
           });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -1941,34 +1942,34 @@ sessionId,
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
-      getSubAgentTranscript: async () => [{ ...transcriptEvent, type: "tool_result", payload: { toolCallId: "tool-read-app", status: "running", uiPreview: { kind: "read", filePath: "apps/desktop/src/renderer/App.tsx", displayText: "Read apps/desktop/src/renderer/App.tsx" } } }],
+      "approvals.listPending": async () => [],
+      "sessions.getSubAgentTranscript": async () => [{ ...transcriptEvent, type: "tool_result", payload: { toolCallId: "tool-read-app", status: "running", uiPreview: { kind: "read", filePath: "apps/desktop/src/renderer/App.tsx", displayText: "Read apps/desktop/src/renderer/App.tsx" } } }],
       ...settingsApiStub,
-      getReviewSnapshot,
-      onAgentStream: (callback) => {
+      "review.getSnapshot": getReviewSnapshot,
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -2033,7 +2034,7 @@ sessionId: input.sessionId,
           });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -2089,33 +2090,33 @@ sessionId: input.sessionId,
     }));
     const createSession = vi.fn(async () => createdRecord);
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(createSession),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
-      selectWorkspaceDirectory,
+      "approvals.listPending": async () => [],
+      "dialogs.selectWorkspaceDirectory": selectWorkspaceDirectory,
       ...settingsApiStub,
-      onAgentStream: () => () => {},
+      "events.agentStream": () => () => {},
       execute: async () => ({
         sessionId,
         agentRunId: "turn-unused",
@@ -2129,7 +2130,7 @@ sessionId: input.sessionId,
         },
         contextState: null,
       }),
-    });
+    }));
 
     renderApp();
 
@@ -2192,36 +2193,36 @@ sessionId: input.sessionId,
       };
     });
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      setSessionWorkspace,
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "sessions.setWorkspace": setSessionWorkspace,
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: () => () => {},
+      "events.agentStream": () => () => {},
       execute,
-    });
+    }));
 
     renderApp();
 
@@ -2267,32 +2268,32 @@ sessionId: input.sessionId,
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
-      selectImages: async () => ({ canceled: false, attachments: [selectedAttachment] }),
-      listUsableModels: async () => ({
+      "approvals.listPending": async () => [],
+      "dialogs.selectImages": async () => ({ canceled: false, attachments: [selectedAttachment] }),
+      "models.listUsable": async () => ({
         models: [{
           key: "deepseek:deepseek-v4-pro",
           label: "DeepSeek V4 Pro",
@@ -2309,7 +2310,7 @@ sessionId: input.sessionId,
         }],
       }),
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -2323,7 +2324,7 @@ sessionId: input.sessionId,
           streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -2394,32 +2395,32 @@ sessionId: input.sessionId,
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -2448,7 +2449,7 @@ sessionId: input.sessionId,
           });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -2493,32 +2494,32 @@ sessionId: input.sessionId,
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -2563,7 +2564,7 @@ sessionId: input.sessionId,
           });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -2610,30 +2611,30 @@ sessionId: input.sessionId,
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async (input) =>
+      "approvals.listPending": async (input) =>
         input?.sessionId === sessionId && approvalPending
           ? [{
               requestId: "approval-bash-1",
@@ -2646,7 +2647,7 @@ sessionId: input.sessionId,
             }]
           : [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -2690,7 +2691,7 @@ sessionId: input.sessionId,
           });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -2765,30 +2766,30 @@ sessionId,
       null;
     const submitApproval = vi.fn(async () => ({ ok: true }));
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval,
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": submitApproval,
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async (input) =>
+      "approvals.listPending": async (input) =>
         input?.sessionId === sessionId && approvalPending
           ? [{
               requestId: "approval-delete-1",
@@ -2800,7 +2801,7 @@ sessionId,
             }]
           : [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -2842,7 +2843,7 @@ sessionId: input.sessionId,
           });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -2924,32 +2925,32 @@ sessionId,
       null;
     const submitApproval = vi.fn(async () => ({ ok: true }));
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval,
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": submitApproval,
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) streamHandler = null;
@@ -2981,7 +2982,7 @@ sessionId: input.sessionId,
           });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -3026,32 +3027,32 @@ sessionId: input.sessionId,
       },
     ];
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: async () => record,
-      createSession: async () => record,
-      abortAgentRun: async () => true,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: async () => record,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": async () => true,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         return () => {
           void callback;
         };
@@ -3073,7 +3074,7 @@ sessionId: input.sessionId,
           message: "Provider failed",
         },
       }),
-    });
+    }));
 
     renderApp();
 
@@ -3176,32 +3177,32 @@ sessionId: input.sessionId,
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
 
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => sessions,
-      getSession: getSessionMock,
-      createSession: async () => record,
-      abortAgentRun: abortAgentRunMock,
-      submitApproval: async () => ({ ok: true }),
-      pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null,
-      getDeepSeekBalance: async () => ({
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => sessions,
+      getRecord: getSessionMock,
+      "sessions.create": projectRecord(async () => record),
+      "tasks.abort": abortAgentRunMock,
+      "approvals.submit": async () => ({ ok: true }),
+      "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({
         provider: "deepseek",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      getKimiBalance: async () => ({
+      "providers.getKimiBalance": async () => ({
         provider: "kimi",
         isConfigured: false,
         isAvailable: null,
         generatedAt: new Date().toISOString(),
         displayBalance: null,
       }),
-      listPendingApprovals: async () => [],
+      "approvals.listPending": async () => [],
       ...settingsApiStub,
-      onAgentStream: (callback) => {
+      "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {
           if (streamHandler === callback) {
@@ -3214,7 +3215,7 @@ sessionId: input.sessionId,
           streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           resolveExecution = resolve;
         }),
-    });
+    }));
 
     renderApp();
 
@@ -3298,15 +3299,15 @@ sessionId: input.sessionId,
     const earlierProjection = projectionPage(earlier, 0, null);
     const getSessionPage = vi.fn(async ({ beforeSeq }: { sessionId: string; beforeSeq?: number }) => beforeSeq === undefined ? latestProjection : earlierProjection);
     const listSessions = vi.fn(async () => []);
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState,
-      listWorkspaces: async () => createWorkspaceRegistryFixture(latest.meta.createdAt),
-      listSessionPage: async () => ({ items: [{ id: 'paged', title: 'Paged session', updatedAt: latest.meta.updatedAt, agentRunCount: 2 }], groups: [], indexing: false, failed: 0 }),
-      listSessions, getSession,
-      createSession: async () => latest, abortAgentRun: async () => true, submitApproval: async () => ({ ok: true }), pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null, listPendingApprovals: async () => [], ...settingsApiStub, getSessionPage,
-      onAgentStream: () => () => {}, execute: vi.fn(),
-    }) as unknown as Window['actspace'];
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => createWorkspaceRegistryFixture(latest.meta.createdAt),
+      "sessions.listPage": async () => ({ items: [{ id: 'paged', title: 'Paged session', updatedAt: latest.meta.updatedAt, agentRunCount: 2 }], groups: [], indexing: false, failed: 0 }),
+      "sessions.list": listSessions, getRecord: getSession,
+      "sessions.create": projectRecord(async () => latest), "tasks.abort": async () => true, "approvals.submit": async () => ({ ok: true }), "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null, "approvals.listPending": async () => [], ...settingsApiStub, "sessions.getPage": getSessionPage,
+      "events.agentStream": () => () => {}, execute: vi.fn(),
+    }));
     renderApp();
     await screen.findByText('Latest question');
     expect(screen.queryByText('Earlier question')).not.toBeInTheDocument();
@@ -3323,15 +3324,15 @@ sessionId: input.sessionId,
     const b = createEmptySessionRecord('page-b'); b.meta.title = 'Page B';
     b.events = [{ id: 'v2-1', sessionId: 'page-b', agentRunId: 'rb', schemaVersion: 2, timestamp: b.meta.createdAt, type: 'user_message', payload: { content: 'B visible question' } }];
     let resolveA!: (page: import('@actspace/shared/runtime-v2').RuntimeV2DesktopSessionProjection) => void;
-    window.actspace = taskHostFixture({
-      getBootstrapState: async () => bootstrapState, listWorkspaces: async () => createWorkspaceRegistryFixture(a.meta.createdAt),
-      listSessionPage: async () => ({ items: [a, b].map(record => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0 })), groups: [], indexing: false, failed: 0 }),
-      listSessions: async () => [], getSession: vi.fn(),
-      createSession: async () => a, abortAgentRun: async () => true, submitApproval: async () => ({ ok: true }), pinSession: async () => ({ ok: true }),
-      getUsageStatistics: async () => null, listPendingApprovals: async () => [], ...settingsApiStub,
-      getSessionPage: ({ sessionId }: { sessionId: string }) => sessionId === 'page-a' ? new Promise(resolve => { resolveA = resolve; }) : Promise.resolve(recordProjectionFixture(b)),
-      onAgentStream: () => () => {}, execute: vi.fn(),
-    }) as unknown as Window['actspace'];
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState, "workspaces.list": async () => createWorkspaceRegistryFixture(a.meta.createdAt),
+      "sessions.listPage": async () => ({ items: [a, b].map(record => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0 })), groups: [], indexing: false, failed: 0 }),
+      "sessions.list": async () => [], getRecord: vi.fn(),
+      "sessions.create": projectRecord(async () => a), "tasks.abort": async () => true, "approvals.submit": async () => ({ ok: true }), "sessions.pin": async () => ({ ok: true }),
+      "usage.getStatistics": async () => null, "approvals.listPending": async () => [], ...settingsApiStub,
+      "sessions.getPage": ({ sessionId }: { sessionId: string }) => sessionId === 'page-a' ? new Promise(resolve => { resolveA = resolve; }) : Promise.resolve(recordProjectionFixture(b)),
+      "events.agentStream": () => () => {}, execute: vi.fn(),
+    }));
     renderApp();
     await userEvent.click(await screen.findByText('Page B'));
     await screen.findByText('B visible question');
@@ -3348,19 +3349,19 @@ sessionId: input.sessionId,
     let emit!: (event: RuntimeStreamEvent) => void;
     const pending = new Map<string, { input: FixtureRunInput; resolve: (result: AgentRunResult) => void; reject: (error: Error) => void }>();
     const abort = vi.fn(async () => true);
-    window.actspace = taskHostFixture({
+    setupBridge(taskHostFixture({
       ...settingsApiStub,
-      getBootstrapState: async () => bootstrapState,
-      listSessions: async () => [...records.values()].map(r => ({ id: r.meta.id, title: r.meta.title, updatedAt: r.meta.updatedAt, agentRunCount: r.meta.agentRunCount })),
-      getSession: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
-      createSession: async () => createEmptySessionRecord('background-new'),
-      abortAgentRun: abort, listPendingApprovals: async () => [],
-      onAgentStream: (callback: typeof emit) => { emit = callback; return () => {}; },
+      "app.getBootstrapState": async () => bootstrapState,
+      "sessions.list": async () => [...records.values()].map(r => ({ id: r.meta.id, title: r.meta.title, updatedAt: r.meta.updatedAt, agentRunCount: r.meta.agentRunCount })),
+      getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
+      "sessions.create": projectRecord(async () => createEmptySessionRecord('background-new')),
+      "tasks.abort": abort, "approvals.listPending": async () => [],
+      "events.agentStream": (callback: typeof emit) => { emit = callback; return () => {}; },
       execute: (input: FixtureRunInput) => new Promise<AgentRunResult>((resolve, reject) => {
         pending.set(input.sessionId, { input, resolve, reject });
         emit({ type: 'agent_run_started', sessionId: input.sessionId, agentRunId: input.agentRunId });
       }),
-    }) as unknown as Window['actspace'];
+    }));
     const send = async (text: string) => {
       await userEvent.type(await screen.findByLabelText('消息输入框'), text);
       await userEvent.click(screen.getByLabelText('发送消息'));
@@ -3507,17 +3508,16 @@ sessionId: input.sessionId,
     renderApp();
     await fixture.send('A durable question');
     await fixture.select('background-b');
-    const originalGet = window.actspace.getSession;
     let resolveStale!: (record: SessionRecord) => void;
     const stale = { ...fixture.records.get('background-a')!, events: [] };
     let delayNext = true;
-    window.actspace.getSession = vi.fn(input => {
+    overrideBridge({ "sessions.getPage": projectRecord(vi.fn(async (input: { sessionId: string }) => {
       if (input.sessionId === 'background-a' && delayNext) {
         delayNext = false;
         return new Promise<SessionRecord>(resolve => { resolveStale = resolve; });
       }
-      return originalGet(input);
-    });
+      return fixture.records.get(input.sessionId);
+    })) });
     await fixture.select('background-a');
     expect(screen.getByText('A durable question')).toBeInTheDocument();
     await act(async () => fixture.complete('background-a'));
@@ -3534,7 +3534,7 @@ sessionId: input.sessionId,
     await fixture.send('A requires approval');
     await fixture.select('background-b');
     let resolveApproval!: (items: []) => void;
-    window.actspace.listPendingApprovals = vi.fn(() => new Promise<[]>(resolve => { resolveApproval = resolve; }));
+    overrideBridge({ "approvals.listPending": vi.fn(() => new Promise<[]>(resolve => { resolveApproval = resolve; })) });
     await fixture.select('background-a');
     await act(async () => {
       fixture.event('background-a', { type: 'tool_started', toolCallId: 'approval-tool', toolName: 'browser_tabs' });
@@ -3552,7 +3552,7 @@ sessionId: input.sessionId,
     await fixture.send('Pinned live question');
     await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: 'Pinned reply' }));
     for (const id of ['c', 'd', 'e']) await userEvent.click(screen.getByRole('button', { name: `Cache ${id}` }));
-    window.actspace.getSession = () => new Promise(() => {});
+    overrideBridge({ "sessions.getPage": () => new Promise(() => {}) });
     await fixture.select('background-a');
     expect(screen.getByText('Pinned live question')).toBeInTheDocument();
     expect(screen.getByText('Pinned reply')).toBeInTheDocument();

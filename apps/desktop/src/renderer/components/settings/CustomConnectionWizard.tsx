@@ -31,6 +31,7 @@ import {
   probeErrorResult,
   type ProbeState,
 } from "./custom-connection-shared";
+import { settingsApi } from "../../api/settings";
 
 /**
  * 自定义服务的两步向导：① 协议、地址、Key，测试并拿到模型列表；② 勾选模型、定默认模型和倍率。
@@ -80,12 +81,12 @@ export function CustomConnectionWizard({ onCancel, onSaved }: { onCancel: () => 
   const proxy = () => ({ enabled: proxyEnabled, url: proxyEnabled ? proxyUrl.trim() : null });
 
   const test = async () => {
-    if (!canTest || running || !window.actspace.probeCustomConnection) return;
+    if (!canTest || running) return;
     const token = ++probeToken.current;
     setProbe({ status: "running" });
     setError(null);
     try {
-      const result = await window.actspace.probeCustomConnection({ kind: "draft", protocol, baseUrl: url.trim(), apiKey: apiKey.trim(), authMode, proxy: proxy() });
+      const result = await settingsApi.probeCustomConnection({ kind: "draft", protocol, baseUrl: url.trim(), apiKey: apiKey.trim(), authMode, proxy: proxy() });
       if (token !== probeToken.current) return;
       if (!result.ok) {
         setProbe({ status: "fail", result });
@@ -109,14 +110,14 @@ export function CustomConnectionWizard({ onCancel, onSaved }: { onCancel: () => 
   };
 
   const save = async () => {
-    if (!picker.selected.length || !picker.defaultId || "reason" in address || !window.actspace.createCustomConnection) return;
+    if (!picker.selected.length || !picker.defaultId || "reason" in address) return;
     setSaving(true);
     setError(null);
     const connectionId = newConnectionId();
     const labels = new Map((listed ?? []).flatMap((model) => (model.label ? [[model.id, model.label] as const] : [])));
     const resolvedAuth = tested && anthropic && authMode === "auto" ? probe.result.resolvedAuth : undefined;
     try {
-      await window.actspace.createCustomConnection({
+      await settingsApi.createCustomConnection({
         providerId: "openrouter",
         connectionId,
         protocol,

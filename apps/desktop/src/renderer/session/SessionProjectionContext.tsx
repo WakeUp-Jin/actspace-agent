@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ClientSessionStore, type ClientLiveOverlay, type ClientSessionCell } from "@actspace/client/sessions";
 import { createDesktopSessionBridge, type DesktopSessionBridge } from "./desktop-session-bridge";
+import { eventsApi } from "../api/events";
+import { sessionsApi } from "../api/sessions";
 
 export type SessionProjectionContextValue = {
   readonly sessionId: string | null;
@@ -35,13 +37,9 @@ export function SessionProjectionProvider({
 
   useEffect(() => {
     const unsubscribeStore = store.subscribe(() => setVersion((value) => value + 1));
-    const api = typeof window === "undefined" ? undefined : window.actspace;
-    if (!api?.getSessionProjectionSnapshot || !api.onSessionLiveEvent) {
-      return unsubscribeStore;
-    }
     const bridge = createDesktopSessionBridge({
-      getSessionProjectionSnapshot: api.getSessionProjectionSnapshot,
-      onSessionLiveEvent: api.onSessionLiveEvent,
+      getSessionProjectionSnapshot: sessionsApi.getProjectionSnapshot,
+      onSessionLiveEvent: eventsApi.sessionLive,
     }, store);
     bridgeRef.current = bridge;
     bridge.start();

@@ -23,6 +23,8 @@ import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../sess
 import { ExtensionsPage } from "./extensions/ExtensionsPage";
 import { SettingsPage } from "./settings/SettingsPage";
 import type { SettingsSectionId } from "./settings/SettingsNav";
+import { sessionsApi } from "../api/sessions";
+import { usageApi } from "../api/usage";
 
 type StoredWorkbenchLayout = {
   leftMode?: SidebarMode | "rail";
@@ -498,12 +500,6 @@ export function WorkbenchLayout({
     search = "",
     kind?: import("@actspace/shared").UsageActivityKind,
   ) => {
-    if (typeof window === "undefined" || !window.actspace?.getUsageActivity) {
-      setUsageSnapshot(null);
-      setUsageError(null);
-      return;
-    }
-
     const sequence = ++usageLoadSequence.current;
     setUsageLoading(true);
     setUsageError(null);
@@ -517,8 +513,7 @@ export function WorkbenchLayout({
         ...(status === "all" ? {} : { status }),
         requestRowsPage: { page: requestRowsPage },
       } as const;
-      if (!window.actspace.getUsageActivity) throw new Error("使用统计接口不可用，请重新启动应用。");
-      const activitySnapshot = await window.actspace.getUsageActivity(input);
+      const activitySnapshot = await usageApi.getActivity(input);
       if (sequence !== usageLoadSequence.current) return;
       setUsageActivitySnapshot(activitySnapshot);
     } catch (error) {
@@ -818,10 +813,9 @@ export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: 
   const update = async (next: PermissionMode) => {
     if (disabled || submitting) return;
     if (next === mode) { setOpen(false); trigger.current?.focus(); return; }
-    if (!window.actspace?.setSessionPermissionMode) return;
     setSubmitting(true);
     try {
-      const result = await window.actspace.setSessionPermissionMode({ sessionId, mode: next });
+      const result = await sessionsApi.setPermissionMode({ sessionId, mode: next });
       if (result.ok) {
         setOpen(false);
         await onChanged();

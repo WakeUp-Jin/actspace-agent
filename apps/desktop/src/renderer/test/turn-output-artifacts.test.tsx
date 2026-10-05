@@ -1,11 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { ConversationView } from "../components/ConversationView";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { collectTurnOutputArtifacts, TurnOutputArtifacts } from "../components/messages/TurnOutputArtifacts";
 import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
+import { setupBridge } from "./helpers/bridge";
 
 const imageMessage: Extract<MessageBlock, { kind: "image_generation" }> = {
   kind: "image_generation",
@@ -43,14 +44,10 @@ function ActiveFileProbe() {
   return <div data-testid="active-file-tab">{activeTab?.kind === "markdown" ? `${activeTab.relativePath}:${activeTab.source}` : ""}</div>;
 }
 
-afterEach(() => {
-  Reflect.deleteProperty(window, "actspace");
-});
-
 describe("image generation presentation", () => {
   it("previews a Browser screenshot stored as a generic tool artifact", async () => {
     const readSessionArtifact = vi.fn(async () => ({ name: "screenshot.jpeg", relativePath: "browser-shot", mimeType: "image/jpeg" as const, size: 68, dataUrl: "data:image/jpeg;base64,AAAA" }));
-    Object.defineProperty(window, "actspace", { configurable: true, value: { readSessionArtifact } });
+    setupBridge({ "sessions.readArtifact": readSessionArtifact });
     const screenshot: MessageBlock = { kind: "tool", id: "browser-shot", createdAt: "now", toolName: "browser_cua", title: "Screenshot", content: "Captured", artifacts: [{ type: "image", name: "Chrome 截图", path: "browser-artifact-id", mimeType: "image/jpeg" }] };
     render(<RightPanelProvider><TurnOutputArtifacts messages={[screenshot]} sessionId="session-1" /><ActiveTabProbe /></RightPanelProvider>);
     expect(screen.getByText("1 image")).toBeInTheDocument();
@@ -218,10 +215,7 @@ describe("image generation presentation", () => {
       size: 68,
       dataUrl: "data:image/png;base64,AAAA",
     }));
-    Object.defineProperty(window, "actspace", {
-      configurable: true,
-      value: { readSessionArtifact },
-    });
+    setupBridge({ "sessions.readArtifact": readSessionArtifact });
 
     render(
       <RightPanelProvider>
@@ -253,10 +247,7 @@ describe("image generation presentation", () => {
 
   it("asks main to open the generated image context menu", async () => {
     const showArtifactContextMenu = vi.fn(async () => ({ shown: true }));
-    Object.defineProperty(window, "actspace", {
-      configurable: true,
-      value: { showArtifactContextMenu },
-    });
+    setupBridge({ "dialogs.showArtifactContextMenu": showArtifactContextMenu });
 
     render(
       <RightPanelProvider>
@@ -293,10 +284,7 @@ describe("image generation presentation", () => {
       content: "# Report",
       size: 8,
     }));
-    Object.defineProperty(window, "actspace", {
-      configurable: true,
-      value: { readWorkspaceFile },
-    });
+    setupBridge({ "workspaces.readFile": readWorkspaceFile });
 
     render(
       <RightPanelProvider>
@@ -319,10 +307,7 @@ describe("image generation presentation", () => {
       mtimeMs: 0,
       error: "not_found" as const,
     }));
-    Object.defineProperty(window, "actspace", {
-      configurable: true,
-      value: { readWorkspaceFile },
-    });
+    setupBridge({ "workspaces.readFile": readWorkspaceFile });
     const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
       kind: "write_diff",
       id: "write-missing",
@@ -377,10 +362,7 @@ describe("image generation presentation", () => {
 
   it("asks main to open a workspace output context menu by relative path", () => {
     const showArtifactContextMenu = vi.fn(async () => ({ shown: true }));
-    Object.defineProperty(window, "actspace", {
-      configurable: true,
-      value: { showArtifactContextMenu },
-    });
+    setupBridge({ "dialogs.showArtifactContextMenu": showArtifactContextMenu });
     const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
       kind: "write_diff",
       id: "write-output-menu",
@@ -558,7 +540,7 @@ describe("generic tool result presentation", () => {
       mtimeMs: 1,
       content: "# Architecture",
     }));
-    Object.defineProperty(window, "actspace", { configurable: true, value: { readWorkspaceFile } });
+    setupBridge({ "workspaces.readFile": readWorkspaceFile });
     render(
       <RightPanelProvider>
         <ConversationView

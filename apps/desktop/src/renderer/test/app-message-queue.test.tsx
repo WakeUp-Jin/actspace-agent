@@ -14,6 +14,8 @@ import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
+import { overrideBridge, setupBridge } from "./helpers/bridge";
+import { projectRecord } from "./helpers/session-records";
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
@@ -96,27 +98,27 @@ function setupQueueFixture() {
   const clearDesignation = vi.fn(async (_input: Extract<TaskCommand, { op: "designate" }>) => {});
   const abort = vi.fn(async () => true);
 
-  window.actspace = {
-    taskCommand, submitTask,
-    onSessionLiveEvent: (callback: any) => { live.add(callback); return () => live.delete(callback); },
-    getBootstrapState: async () => bootstrapState,
-    getSettings: async () => ({ version: 1, defaultModelId: null, providers: {}, searchProviders: {}, agent: {}, skills: { disabled: [] } }),
-    listSessions: async () => [...records.values()].map((record) => ({
+  setupBridge({
+    "tasks.command": taskCommand, "tasks.submit": submitTask,
+    "events.sessionLive": (callback: any) => { live.add(callback); return () => live.delete(callback); },
+    "app.getBootstrapState": async () => bootstrapState,
+    "settings.get": async () => ({ version: 1, defaultModelId: null, providers: {}, searchProviders: {}, agent: {}, skills: { disabled: [] } }),
+    "sessions.list": async () => [...records.values()].map((record) => ({
       id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: record.meta.agentRunCount,
     })),
-    getSession: async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null,
-    getSessionPage: async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
-    createSession: async () => records.get("queue-a")!,
-    abortAgentRun: abort,
-    listPendingApprovals: async () => [],
-    getUsageStatistics: async () => null,
-    describeContext: async () => null,
-    getReviewSnapshot: async () => ({ ok: false, reason: "not_git_repository" }),
-    setUiZoom: () => {},
-    setNativeTheme: () => {},
-    onShuttingDown: () => () => {},
-    onAgentStream: (callback: typeof emit) => { emit = callback; return () => {}; },
-  } as unknown as Window["actspace"];
+    "sessions.get": projectRecord(async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null),
+    "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
+    "sessions.create": projectRecord(async () => records.get("queue-a")!),
+    "tasks.abort": abort,
+    "approvals.listPending": async () => [],
+    "usage.getStatistics": async () => null,
+    "sessions.describeContext": async () => null,
+    "review.getSnapshot": async () => ({ ok: false, reason: "not_git_repository" }),
+    "appearance.setUiZoom": () => {},
+    "appearance.setNativeTheme": () => {},
+    "events.shuttingDown": () => () => {},
+    "events.agentStream": (callback: typeof emit) => { emit = callback; return () => {}; },
+  });
 
   const event = (sessionId: string, value: Record<string, unknown>) => {
     if (value.type === "user_message_steered") {
@@ -178,10 +180,6 @@ async function queueText(text: string) {
 const tray = () => screen.queryByRole("region", { name: "消息队列" });
 
 describe("App message queue", () => {
-  afterEach(() => {
-    delete (window as unknown as { actspace?: unknown }).actspace;
-  });
-
   it("hydrates an active task without duplicating its persisted user message", async () => {
     const fixture = setupQueueFixture();
     const record = fixture.records.get("queue-a")!;
@@ -194,7 +192,7 @@ describe("App message queue", () => {
         content: { kind: "composer-task", original: { userInput: text }, prepared: text } }],
       runs: [{ runId: "recovered-run", taskId: "accepted-task", state: "running", result: null, configuration: {}, harness: { harnessId: "main", generationId: "fixture", revision: 1 } }],
     };
-    window.actspace.taskCommand = vi.fn(async () => ({ snapshot }));
+    overrideBridge({ "tasks.command": vi.fn(async () => ({ snapshot })) });
     renderApp();
     await selectSession("queue-a", "Queue A");
     await screen.findByLabelText("停止 Agent");

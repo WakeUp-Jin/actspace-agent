@@ -1,5 +1,7 @@
-import type { AgentRunResult, RuntimeStreamEvent } from "@actspace/shared";
+import type { AgentRunResult, RuntimeStreamEvent, SessionRecord } from "@actspace/shared";
 import type { SubmitTaskInput, TaskCommand, TaskConfiguration, TaskSnapshot } from "@actspace/shared/runtime-v2";
+import type { BridgeOverrides } from "./helpers/bridge";
+import { projectRecord } from "./helpers/session-records";
 
 /** Execution callback input is fixture-only; production accepts SubmitTaskInput. */
 export type FixtureRunInput = Omit<SubmitTaskInput, "submissionId"> & {
@@ -32,9 +34,21 @@ export type FixtureCompactionResult = {
 };
 
 
-/** Renderer fixture: submission receipt and Host execution have independent lifetimes. */
-export function taskHostFixture(bridge: Record<string, any> & { execute?: (input: FixtureRunInput) => Promise<AgentRunResult> }): Window["actspace"] {
-  const { execute, executeCompaction, prepare, ...api } = bridge;
+type FixtureOptions = {
+  execute?: (input: FixtureRunInput) => Promise<AgentRunResult>;
+  executeCompaction?: (input: { sessionId: string; agentRunId: string }) => Promise<FixtureCompactionResult | undefined> | FixtureCompactionResult | undefined;
+  // 用例常把同一个回调既当 execute 又当 prepare，入参保持宽松。
+  prepare?: (input: any) => unknown;
+  /** 用例里的会话以 SessionRecord 描述：fixture 据此提供 `sessions.get` / `sessions.getPage`，运行结束后把事件写回 record。 */
+  getRecord?: (input: { sessionId: string }) => SessionRecord | null | undefined | Promise<SessionRecord | null | undefined>;
+};
+
+/**
+ * Renderer fixture: submission receipt and Host execution have independent lifetimes.
+ * 其余键是 `setupBridge` 的契约路径覆盖，原样透传。
+ */
+export function taskHostFixture(bridge: FixtureOptions & Record<string, any>): BridgeOverrides {
+  const { execute, executeCompaction, prepare, getRecord, ...api } = bridge;
   const states = new Map<string, TaskSnapshot>();
   const configs = new Map<string, TaskConfiguration>();
   const streams = new Set<(event: RuntimeStreamEvent) => void>();
@@ -44,11 +58,11 @@ export function taskHostFixture(bridge: Record<string, any> & { execute?: (input
   const emit = (event: RuntimeStreamEvent) => { for (const fn of streams) fn(event); };
   const publish = (value: TaskSnapshot) => { states.set(value.sessionId, { ...value, revision: state(value.sessionId).revision + 1 }); for (const fn of live) fn({ event: { sessionId: value.sessionId, message: "task-queue-updated" } }); };
   return {
+    ...(getRecord ? { "sessions.get": projectRecord(getRecord), "sessions.getPage": projectRecord(getRecord) } : {}),
     ...api,
-    onAgentStream: (fn: (event: RuntimeStreamEvent) => void) => { streams.add(fn); const unsub = api.onAgentStream?.(fn); return () => { streams.delete(fn); unsub?.(); }; },
-    onSessionLiveEvent: (fn: (event: any) => void) => { live.add(fn); const unsub = api.onSessionLiveEvent?.(fn); return () => { live.delete(fn); unsub?.(); }; },
-    getSessionPage: async (input: { sessionId: string }) => api.getSessionPage(input),
-    taskCommand: async (input: TaskCommand) => {
+    "events.agentStream": (fn: (event: RuntimeStreamEvent) => void) => { streams.add(fn); const unsub = api["events.agentStream"]?.(fn); return () => { streams.delete(fn); unsub?.(); }; },
+    "events.sessionLive": (fn: (event: any) => void) => { live.add(fn); const unsub = api["events.sessionLive"]?.(fn); return () => { live.delete(fn); unsub?.(); }; },
+    "tasks.command": async (input: TaskCommand) => {
       if (input.op === "resume") {
         publish({ ...state(input.sessionId), paused: false });
         const resume = pendingOperations.get(input.sessionId);
@@ -56,10 +70,10 @@ export function taskHostFixture(bridge: Record<string, any> & { execute?: (input
         resume?.();
       }
       if (input.op === "configure") configs.set(input.sessionId, input.configuration);
-      if (input.op === "stop") { publish({ ...state(input.sessionId), paused: true }); await api.abortAgentRun?.({ sessionId: input.sessionId, agentRunId: input.runId }); }
+      if (input.op === "stop") { publish({ ...state(input.sessionId), paused: true }); await api["tasks.abort"]?.({ sessionId: input.sessionId, agentRunId: input.runId }); }
       return { snapshot: state(input.sessionId) };
     },
-    submitTask: async (input: SubmitTaskInput) => {
+    "tasks.submit": async (input: SubmitTaskInput) => {
       const rejection = await prepare?.(input);
       if (rejection) return rejection;
       const current = state(input.sessionId);
@@ -86,7 +100,7 @@ export function taskHostFixture(bridge: Record<string, any> & { execute?: (input
       emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: runId });
       const configuration = configs.get(input.sessionId) ?? {};
       void execute?.({ ...input, mode: "agent", ...configuration, selectedSkills: [...configuration.selectedSkillIds ?? []], agentRunId: runId } as FixtureRunInput).then(async result => {
-        const record = await api.getSession({ sessionId: input.sessionId });
+        const record = await getRecord?.({ sessionId: input.sessionId });
         if (record && result.events?.length) Object.assign(record, { events: result.events, messageBlocks: undefined, contextSnapshot: result.contextSnapshot });
         const outcome = result.status === "aborted" ? "cancelled" : result.status;
         publish({ ...state(input.sessionId), runs: state(input.sessionId).runs.map(run => run.runId === runId ? { ...run, state: outcome } : run), tasks: state(input.sessionId).tasks.map(item => item.taskId === task.taskId ? { ...item, state: outcome } : item) });
@@ -97,5 +111,5 @@ export function taskHostFixture(bridge: Record<string, any> & { execute?: (input
       });
       return { task, revision: state(input.sessionId).revision, durableSeq: state(input.sessionId).revision };
     },
-  } as Window["actspace"];
+  };
 }

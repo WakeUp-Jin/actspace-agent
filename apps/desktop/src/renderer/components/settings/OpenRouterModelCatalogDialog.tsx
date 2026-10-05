@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, RefreshCw, Search, X } from "lucide-react";
 import type { CatalogModelView, ModelsCatalogListResult } from "@actspace/shared";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
+import { modelsApi } from "../../api/models";
 
 const ROW_HEIGHT = 92;
 const VIEWPORT_HEIGHT = 460;
@@ -31,17 +32,15 @@ export function OpenRouterModelCatalogDialog({
 
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedQuery(query), 250); return () => window.clearTimeout(timer); }, [query]);
   useEffect(() => {
-    if (!window.actspace.listModelCatalog) return;
     setLoading(true);
-    window.actspace.listModelCatalog({ provider, query: debouncedQuery }).then(setResult).catch(() => setError("模型目录读取失败，请重试。")).finally(() => setLoading(false));
+    modelsApi.listCatalog({ provider, query: debouncedQuery }).then(setResult).catch(() => setError("模型目录读取失败，请重试。")).finally(() => setLoading(false));
   }, [debouncedQuery, provider]);
 
   const reload = async () => {
-    if (!window.actspace.reloadModelCatalog) return;
     setLoading(true);
     setError(null);
     try {
-      const next = await window.actspace.reloadModelCatalog({ provider, query: debouncedQuery });
+      const next = await modelsApi.reloadCatalog({ provider, query: debouncedQuery });
       setResult(next);
       if (!next.error && next.state === "fresh") await onReloaded?.();
     }
@@ -50,10 +49,9 @@ export function OpenRouterModelCatalogDialog({
   };
 
   const add = async (model: CatalogModelView) => {
-    if (!window.actspace.addModel) return;
     setAdding(model.apiModel);
     try {
-      const mutation = await window.actspace.addModel({ provider, apiModel: model.apiModel });
+      const mutation = await modelsApi.add({ provider, apiModel: model.apiModel });
       if (mutation.ok) {
         await onAdded();
         setResult((current) => current ? { ...current, models: current.models.map((item) => item.apiModel === model.apiModel ? { ...item, added: true } : item) } : current);

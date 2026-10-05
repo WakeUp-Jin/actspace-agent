@@ -1,9 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { DeleteFileBlock } from "../components/messages/DeleteFileBlock";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
+import { setupBridge } from "./helpers/bridge";
 
 function makeDeleteBlock(
   partial: Partial<Extract<MessageBlock, { kind: "delete" }>> = {},
@@ -22,13 +23,9 @@ function makeDeleteBlock(
 }
 
 describe("DeleteFileBlock", () => {
-  afterEach(() => {
-    delete (window as unknown as { actspace?: unknown }).actspace;
-  });
-
   it("submits a one-time delete approval", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
-    window.actspace = { submitApproval } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": submitApproval });
 
     render(<DeleteFileBlock message={makeDeleteBlock()} />);
 
@@ -51,7 +48,7 @@ describe("DeleteFileBlock", () => {
 
   it("submits deny when skipping delete", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
-    window.actspace = { submitApproval } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": submitApproval });
 
     render(<DeleteFileBlock message={makeDeleteBlock()} />);
 
@@ -66,7 +63,7 @@ describe("DeleteFileBlock", () => {
 
   it("keeps the approval block open when the bridge rejects the decision", async () => {
     const submitApproval = vi.fn(async () => ({ ok: false, reason: "not_found_or_already_resolved" }));
-    window.actspace = { submitApproval } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": submitApproval });
 
     render(<DeleteFileBlock message={makeDeleteBlock()} />);
 

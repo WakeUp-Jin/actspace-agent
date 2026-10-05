@@ -8,22 +8,22 @@ vi.mock("node:perf_hooks", () => {
 });
 import { registerPerformanceIpc } from "../performance-ipc";
 import { PERFORMANCE_CHANNELS } from "@actspace/shared";
-it("rejects foreign frames, samples only while enabled, and cleans up on hide/dispose", () => {
+it("rejects foreign frames, samples only while enabled, and cleans up on hide/dispose", async () => {
   const contents = Object.assign(new EventEmitter(), { mainFrame: {} });
   const window = Object.assign(new EventEmitter(), { webContents: contents, isDestroyed: () => false, isVisible: () => true, isMinimized: () => false });
   const dispose = registerPerformanceIpc(() => window as never);
   const active = mocks.handlers.get(PERFORMANCE_CHANNELS.active)!;
   const sample = mocks.handlers.get(PERFORMANCE_CHANNELS.sample)!;
   const event = { sender: contents, senderFrame: contents.mainFrame };
-  expect(() => active({ ...event, senderFrame: {} }, true)).toThrow("Invalid");
-  expect(() => sample(event)).toThrow("paused");
-  active(event, true);
-  expect(sample(event)).toMatchObject({ mainDelayMs: 20, processes: [{ pid: 1, workingSetKiB: 4096 }] });
+  await expect(active({ ...event, senderFrame: {} }, true)).rejects.toThrow("Invalid");
+  await expect(sample(event)).rejects.toThrow("paused");
+  await active(event, true);
+  await expect(sample(event)).resolves.toMatchObject({ mainDelayMs: 20, processes: [{ pid: 1, workingSetKiB: 4096 }] });
   window.emit("hide");
   expect(mocks.disable).toHaveBeenCalled();
-  expect(() => sample(event)).toThrow("paused");
-  active(event, true); active(event, false);
-  expect(() => sample(event)).toThrow("paused");
+  await expect(sample(event)).rejects.toThrow("paused");
+  await active(event, true); await active(event, false);
+  await expect(sample(event)).rejects.toThrow("paused");
   dispose(); expect(mocks.handlers.size).toBe(0);
   expect(window.listenerCount("hide")).toBe(0);
 });

@@ -3,8 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MessageBlock, WorkspaceEnvironmentSnapshot } from "@actspace/shared";
 import { WorkspaceChromeControls } from "../components/workspace/WorkspaceChromeControls";
-
-const originalActspace = (window as { actspace?: unknown }).actspace;
+import { setupBridge, type BridgeOverrides } from "./helpers/bridge";
 
 const environment: WorkspaceEnvironmentSnapshot = {
   workspaceRoot: "/tmp/workspace",
@@ -41,24 +40,24 @@ const messages: MessageBlock[] = [
   },
 ];
 
-function installBridge(overrides: Partial<NonNullable<typeof window.actspace>> = {}) {
+function installBridge(overrides: BridgeOverrides = {}) {
   const bridge = {
-    getWorkspaceEnvironment: vi.fn(async () => environment),
-    createWorkspaceBranch: vi.fn(async (input) => ({
+    "workspaces.getEnvironment": vi.fn(async () => environment),
+    "workspaces.createBranch": vi.fn(async (input) => ({
       ok: true as const,
       action: "create_branch" as const,
       phase: "branch" as const,
       workspaceRoot: "/tmp/workspace",
       branch: input.branchName,
     })),
-    switchWorkspaceBranch: vi.fn(async (input) => ({
+    "workspaces.switchBranch": vi.fn(async (input) => ({
       ok: true as const,
       action: "switch_branch" as const,
       phase: "branch" as const,
       workspaceRoot: "/tmp/workspace",
       branch: input.branchName,
     })),
-    commitWorkspaceChanges: vi.fn(async () => ({
+    "workspaces.commit": vi.fn(async () => ({
       ok: true as const,
       action: "commit" as const,
       phase: "commit" as const,
@@ -67,7 +66,7 @@ function installBridge(overrides: Partial<NonNullable<typeof window.actspace>> =
       commitCreated: true,
       commitHash: "abc1234",
     })),
-    pushWorkspaceBranch: vi.fn(async () => ({
+    "workspaces.push": vi.fn(async () => ({
       ok: true as const,
       action: "push" as const,
       phase: "push" as const,
@@ -76,7 +75,7 @@ function installBridge(overrides: Partial<NonNullable<typeof window.actspace>> =
       pushed: true,
       remote: "origin",
     })),
-    commitAndPushWorkspaceChanges: vi.fn(async () => ({
+    "workspaces.commitAndPush": vi.fn(async () => ({
       ok: true as const,
       action: "commit_and_push" as const,
       phase: "push" as const,
@@ -89,7 +88,7 @@ function installBridge(overrides: Partial<NonNullable<typeof window.actspace>> =
     })),
     ...overrides,
   };
-  (window as unknown as { actspace: Partial<NonNullable<typeof window.actspace>> }).actspace = bridge;
+  setupBridge(bridge);
   return bridge;
 }
 
@@ -114,7 +113,6 @@ describe("WorkspaceChromeControls", () => {
 
   afterEach(() => {
     window.localStorage.clear();
-    (window as { actspace?: unknown }).actspace = originalActspace;
   });
 
   it("opens the Environment popover with worktree, branch, changes, and deduplicated sources", async () => {
@@ -152,7 +150,7 @@ describe("WorkspaceChromeControls", () => {
     const getWorkspaceEnvironment = vi.fn()
       .mockResolvedValueOnce(environment)
       .mockResolvedValueOnce(nextEnvironment);
-    const bridge = installBridge({ getWorkspaceEnvironment });
+    const bridge = installBridge({ "workspaces.getEnvironment": getWorkspaceEnvironment });
     const user = userEvent.setup();
     renderControls();
 
@@ -165,7 +163,7 @@ describe("WorkspaceChromeControls", () => {
     expect(within(menu).queryByRole("menuitemradio", { name: "main" })).not.toBeInTheDocument();
     await user.click(within(menu).getByRole("menuitemradio", { name: "codex/add-branch-selector" }));
 
-    expect(bridge.switchWorkspaceBranch).toHaveBeenCalledWith({
+    expect(bridge["workspaces.switchBranch"]).toHaveBeenCalledWith({
       workspaceRoot: "/tmp/workspace",
       branchName: "codex/add-branch-selector",
     });
@@ -191,7 +189,7 @@ describe("WorkspaceChromeControls", () => {
 
   it("keeps the branch menu usable during a dev IPC snapshot version mismatch", async () => {
     installBridge({
-      getWorkspaceEnvironment: vi.fn(async () => ({
+      "workspaces.getEnvironment": vi.fn(async () => ({
         ...environment,
         git: { ...environment.git, branches: undefined },
       } as unknown as WorkspaceEnvironmentSnapshot)),
@@ -209,7 +207,7 @@ describe("WorkspaceChromeControls", () => {
 
   it("creates a branch from detached HEAD", async () => {
     const bridge = installBridge({
-      getWorkspaceEnvironment: vi.fn(async () => ({
+      "workspaces.getEnvironment": vi.fn(async () => ({
         ...environment,
         git: { ...environment.git, branch: undefined, detached: true },
       })),
@@ -226,12 +224,12 @@ describe("WorkspaceChromeControls", () => {
     await user.type(input, "actspace/new-branch");
     await user.click(within(dialog).getByRole("button", { name: "创建并切换" }));
 
-    expect(bridge.createWorkspaceBranch).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", branchName: "actspace/new-branch" });
+    expect(bridge["workspaces.createBranch"]).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", branchName: "actspace/new-branch" });
   });
 
   it("starts the unified Git panel on New branch for detached HEAD", async () => {
     const bridge = installBridge({
-      getWorkspaceEnvironment: vi.fn(async () => ({
+      "workspaces.getEnvironment": vi.fn(async () => ({
         ...environment,
         git: { ...environment.git, branch: undefined, detached: true },
       })),
@@ -246,7 +244,7 @@ describe("WorkspaceChromeControls", () => {
     expect(within(dialog).getByRole("textbox", { name: "分支名称" })).toHaveValue("actspace/environment-controls");
 
     await user.click(within(dialog).getByRole("button", { name: "提交" }));
-    expect(bridge.commitWorkspaceChanges).toHaveBeenCalledWith({
+    expect(bridge["workspaces.commit"]).toHaveBeenCalledWith({
       workspaceRoot: "/tmp/workspace",
       message: undefined,
       includeUnstagedChanges: true,
@@ -266,7 +264,7 @@ describe("WorkspaceChromeControls", () => {
     await user.type(within(dialog).getByRole("textbox", { name: "提交说明" }), "ship environment controls");
     await user.click(within(dialog).getByRole("button", { name: "提交" }));
 
-    expect(bridge.commitWorkspaceChanges).toHaveBeenCalledWith({
+    expect(bridge["workspaces.commit"]).toHaveBeenCalledWith({
       workspaceRoot: "/tmp/workspace",
       message: "ship environment controls",
       includeUnstagedChanges: true,
@@ -297,7 +295,7 @@ describe("WorkspaceChromeControls", () => {
         pushed: true,
         remote: "backup",
       });
-    installBridge({ commitAndPushWorkspaceChanges });
+    installBridge({ "workspaces.commitAndPush": commitAndPushWorkspaceChanges });
     const user = userEvent.setup();
     renderControls();
 
@@ -317,7 +315,7 @@ describe("WorkspaceChromeControls", () => {
 
   it("reports a partial commit-and-push result without hiding the created commit", async () => {
     installBridge({
-      commitAndPushWorkspaceChanges: vi.fn(async () => ({
+      "workspaces.commitAndPush": vi.fn(async () => ({
         ok: false as const,
         action: "commit_and_push" as const,
         phase: "push" as const,

@@ -35,6 +35,7 @@ import { useFileFreshness, useReloadFileTab } from "./right-panel/useFileFreshne
 import { cancelTerminalStart, useOpenTerminal } from "./right-panel/useOpenTerminal";
 import { LazyTerminalRenderView, preloadTerminalRenderView } from "./right-panel/terminal-render-loader";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
+import { terminalApi } from "../api/terminal";
 
 const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
 // 右面板纵向三段（对齐 Cursor 右侧）：① tab 条（全宽）→ ② 工作区操作栏（全宽，仅浏览态出现）→ ③ 两栏 [内容 | 文件树]。
@@ -125,13 +126,12 @@ export function RightPanel({
 
   useEffect(() => {
     if (!developmentEnabled) return;
-    const listTerminals = window.actspace?.listTerminals;
-    if (!sessionId || !listTerminals) {
-      if (!sessionId) syncTerminalTabs("", []);
+    if (!sessionId) {
+      syncTerminalTabs("", []);
       return;
     }
     let cancelled = false;
-    void listTerminals({ sessionId }).then((result) => {
+    void terminalApi.list({ sessionId }).then((result) => {
       if (!cancelled) syncTerminalTabs(sessionId, result.terminals);
     });
     return () => { cancelled = true; };
@@ -328,8 +328,8 @@ function RightPanelTabs({ developmentEnabled }: { developmentEnabled: boolean })
     if (tab.kind === "terminal") {
       setClosingTabIds((current) => new Set(current).add(tab.id));
       try {
-        const result = await window.actspace.closeTerminal?.({ terminalId: tab.terminalId });
-        if (result?.ok === false) {
+        const result = await terminalApi.close({ terminalId: tab.terminalId });
+        if (result.ok === false) {
           setCloseErrors((current) => ({ ...current, [tab.id]: result.error.message }));
           setClosingTabIds((current) => {
             const next = new Set(current);

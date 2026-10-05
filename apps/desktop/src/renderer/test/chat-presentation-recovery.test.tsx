@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Composer } from "../components/Composer";
@@ -8,8 +8,8 @@ import { RightPanelProvider } from "../components/right-panel/RightPanelContext"
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { mockContextSnapshot } from "./fixtures/workbenchFixture";
 import { formatChatAttachmentIssue } from "@actspace/shared";
+import { setupBridge } from "./helpers/bridge";
 
-afterEach(() => { delete (window as { actspace?: unknown }).actspace; });
 const attachments = [
   { id: "good", kind: "file" as const, name: "good.txt", path: "/fixture/good.txt" },
   { id: "bad", kind: "file" as const, name: "bad.txt", path: "/fixture/bad.txt" },
@@ -45,7 +45,7 @@ describe("Chat presentation and attachment recovery", () => {
   });
   it("keeps the mode menu available after Chat messages", async () => {
     const selectFiles = vi.fn(async () => ({ canceled: true, attachments: [] }));
-    (window as { actspace?: unknown }).actspace = { selectFiles };
+    setupBridge({ "dialogs.selectFiles": selectFiles });
     const user = userEvent.setup();
     render(composer({ surface: "followup" }));
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));

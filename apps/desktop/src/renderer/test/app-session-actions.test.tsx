@@ -1,20 +1,21 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
+
+// 会话由 setup 默认安装的 mock bridge 内存表提供（原 App 内的本地会话逻辑已移到 `mock/mock-db`）。
 
 describe("App session copy and fork actions", () => {
   const originalClipboard = (navigator as Navigator & { clipboard?: Clipboard }).clipboard;
 
   afterEach(() => {
-    delete (window as unknown as { actspace?: unknown }).actspace;
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: originalClipboard,
     });
   });
 
-  it("copies the local session id/transcript and activates an independent fork", async () => {
+  it("copies the session id/transcript and activates an independent fork", async () => {
     const user = userEvent.setup();
     const writeText = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -27,7 +28,7 @@ describe("App session copy and fork actions", () => {
 
     let sourceRow: HTMLElement | null = null;
     await waitFor(() => {
-      sourceRow = document.querySelector<HTMLElement>('.session-row[data-session-id^="local-session-"]');
+      sourceRow = document.querySelector<HTMLElement>('.session-row[data-session-id^="mock-session-"]');
       expect(sourceRow).not.toBeNull();
     });
     const sourceSessionId = sourceRow?.dataset.sessionId;

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AppSettings } from "@actspace/shared";
@@ -35,9 +35,6 @@ function renderSearch(overrides: Partial<Parameters<typeof SearchSettings>[0]> =
   return props;
 }
 
-afterEach(() => {
-  delete (window as { actspace?: unknown }).actspace;
-});
 
 describe("SearchSettings", () => {
   it("lists the four channels without logos and counts connected ones", () => {

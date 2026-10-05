@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import { Info } from "lucide-react";
 import type { GrantSuggestion, RuntimeV2ApprovalDecisionInput } from "@actspace/shared/runtime-v2";
 import { Button, type ButtonSize } from "../ui/Button";
+import { approvalsApi } from "../../api/approvals";
+import { eventsApi } from "../../api/events";
+import { hostsApi } from "../../api/hosts";
 
 // 工具审批的共享外壳：一行审批条（读取/搜索/编辑/写入/删除）与卡片（Bash/浏览器）。
 // 设计稿见 docs/design-docs/frontend/approval-card-redesign.html（B 方向）。
@@ -75,12 +78,8 @@ export function compactApprovalDir(dir: string): string {
 }
 
 export async function submitApprovalDecision(input: RuntimeV2ApprovalDecisionInput): Promise<boolean> {
-  if (typeof window === "undefined" || !window.actspace?.submitApproval) {
-    console.warn("submitApproval bridge unavailable");
-    return false;
-  }
   try {
-    const result = await window.actspace.submitApproval(input);
+    const result = await approvalsApi.submit(input);
     if (!result?.ok) {
       console.warn("Approval decision was not accepted", result?.reason);
       return false;
@@ -103,11 +102,11 @@ export function useApprovalDecision(requestId: string | undefined): ApprovalDeci
   const [remoteConnected, setRemoteConnected] = useState(false);
   const remoteHost = requestId?.startsWith("remote-approval:") ? requestId.slice("remote-approval:".length).split(":")[0] : null;
   useEffect(() => {
-    if (!remoteHost || !window.actspaceHosts) return;
+    if (!remoteHost) return;
     let active = true;
     const update = (hosts: import("@actspace/shared/host-protocol").HostConnection[]) => { if (active) setRemoteConnected(hosts.some(host => host.hostId === remoteHost && host.state === "connected")); };
-    void window.actspaceHosts.list().then(update).catch(() => { if (active) setRemoteConnected(false); });
-    const cleanup = window.actspaceHosts.onChanged(update);
+    void hostsApi.list().then(update).catch(() => { if (active) setRemoteConnected(false); });
+    const cleanup = eventsApi.hostsChanged(update);
     return () => { active = false; cleanup(); };
   }, [remoteHost]);
   const unavailable = Boolean(remoteHost && !remoteConnected);
@@ -131,8 +130,8 @@ export function useExactGrantSuggestion(requestId: string | undefined): GrantSug
   const [suggestion, setSuggestion] = useState<GrantSuggestion>();
   useEffect(() => {
     let active = true;
-    if (!requestId || typeof window === "undefined" || !window.actspace?.listPendingApprovals) return;
-    void window.actspace.listPendingApprovals().then((pending) => {
+    if (!requestId) return;
+    void approvalsApi.listPending().then((pending) => {
       const request = pending.find((item) => item.requestId === requestId);
       if (active) setSuggestion(request?.grantSuggestions.find((item) => item.selector.kind === "exact"));
     }).catch(() => undefined);

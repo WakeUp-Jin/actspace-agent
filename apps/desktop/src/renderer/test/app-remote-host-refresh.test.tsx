@@ -3,8 +3,9 @@ import { act, render, waitFor } from "@testing-library/react";
 import type { SessionListItem } from "@actspace/shared";
 import { App } from "../App";
 import { projectionFixture } from "./projection-fixture";
+import { setupBridge } from "./helpers/bridge";
 
-afterEach(() => { delete (window as { actspace?: unknown }).actspace; delete (window as { actspaceHosts?: unknown }).actspaceHosts; window.localStorage.clear(); });
+afterEach(() => { window.localStorage.clear(); });
 function fixture(initial = false) {
   const id = "host:" + btoa(JSON.stringify(["server", "same-session"]));
   let rows: SessionListItem[] = initial ? [row("revoked")] : [];
@@ -13,18 +14,21 @@ function fixture(initial = false) {
   }
   const hostListeners = new Set<(hosts: unknown[]) => void>();
   let hosts: unknown[] = initial ? [{ hostId: "server", name: "Cloud", state: "revoked" }] : [];
-  window.actspaceHosts = { list: async () => hosts, onChanged: (callback: (hosts: unknown[]) => void) => { hostListeners.add(callback); return () => hostListeners.delete(callback); }, onEvent: () => () => {}, onUploadProgress: () => () => {}, activate: async () => {}, call: async () => ({ state: "ready", workspaces: [], models: [], defaultModel: "" }) } as unknown as Window["actspaceHosts"];
   const listeners = new Set<(event: unknown) => void>();
   const listPage = vi.fn(async () => ({ items: rows, groups: rows.length ? [{ hostId: "server", workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }] : [], indexing: false, failed: 0 }));
-  window.actspace = {
-    getBootstrapState: async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    listWorkspaces: async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
-    listSessions: async () => rows, listSessionPage: listPage,
-    getSessionPage: async () => projectionFixture(id), listPendingApprovals: async () => [],
-    onSessionLiveEvent: (callback: (event: unknown) => void) => { listeners.add(callback); return () => listeners.delete(callback); },
-    onAgentStream: () => () => {}, getReviewSnapshot: async () => ({ ok: false }), listVisualizations: async () => ({ items: [] }),
-    setUiZoom: () => {}, setNativeTheme: () => {}, onShuttingDown: () => () => {},
-  } as unknown as Window["actspace"];
+  setupBridge({
+    "hosts.list": async () => hosts,
+    "events.hostsChanged": (callback: (hosts: unknown[]) => void) => { hostListeners.add(callback); return () => { hostListeners.delete(callback); }; },
+    "events.hostEvent": () => () => {}, "events.hostUploadProgress": () => () => {}, "hosts.activate": async () => {},
+    "hosts.call": async () => ({ state: "ready", workspaces: [], models: [], defaultModel: "" }),
+    "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
+    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
+    "sessions.list": async () => rows, "sessions.listPage": listPage,
+    "sessions.getPage": async () => projectionFixture(id), "approvals.listPending": async () => [],
+    "events.sessionLive": (callback: (event: unknown) => void) => { listeners.add(callback); return () => listeners.delete(callback); },
+    "events.agentStream": () => () => {}, "review.getSnapshot": async () => ({ ok: false }), "visualize.list": async () => ({ items: [] }),
+    "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
+  });
   render(<App />);
   return { id, listPage, remove: () => act(() => { hosts = []; rows = []; for (const listener of hostListeners) listener(hosts); }), connect: (targeted = false) => act(() => {
     rows = [row("connected")];

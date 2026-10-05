@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ApprovalReason,
   compactApprovalDir,
@@ -7,6 +7,7 @@ import {
   splitApprovalPath,
   submitApprovalDecision,
 } from "../components/messages/ApprovalParts";
+import { setupBridge } from "./helpers/bridge";
 
 describe("approval path formatting", () => {
   it("splits the base name from its directory", () => {
@@ -40,16 +41,12 @@ describe("approval reason mapping", () => {
 });
 
 describe("submitApprovalDecision", () => {
-  afterEach(() => {
-    delete (window as unknown as { actspace?: unknown }).actspace;
-  });
-
   it("returns false when the bridge rejects or is missing", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     expect(await submitApprovalDecision({ requestId: "r1", decision: "once" })).toBe(false);
-    window.actspace = { submitApproval: vi.fn(async () => ({ ok: false, reason: "expired" })) } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": vi.fn(async () => ({ ok: false, reason: "expired" })) });
     expect(await submitApprovalDecision({ requestId: "r1", decision: "deny" })).toBe(false);
-    window.actspace = { submitApproval: vi.fn(async () => ({ ok: true })) } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": vi.fn(async () => ({ ok: true })) });
     expect(await submitApprovalDecision({ requestId: "r1", decision: "once" })).toBe(true);
     warn.mockRestore();
   });

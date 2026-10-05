@@ -8,6 +8,7 @@ import { RightPanelProvider } from "../components/right-panel/RightPanelContext"
 
 import { SessionProjectionProvider } from "../session";
 import { mockContextSnapshot } from "./fixtures/workbenchFixture";
+import { setupBridge } from "./helpers/bridge";
 
 const originalInnerWidth = window.innerWidth;
 
@@ -74,7 +75,6 @@ describe("WorkbenchLayout narrow window behavior", () => {
   afterEach(() => {
     window.localStorage.clear();
     setViewportWidth(originalInnerWidth);
-    delete (window as { actspace?: typeof window.actspace }).actspace;
   });
 
   it("keeps chrome, footer and popup on the complete estimate instead of the generic projection", async () => {
@@ -98,7 +98,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
         },
       },
     }));
-    (window as { actspace?: unknown }).actspace = { getSessionProjectionSnapshot, onSessionLiveEvent: () => () => undefined };
+    setupBridge({ "sessions.getProjectionSnapshot": getSessionProjectionSnapshot, "events.sessionLive": () => () => undefined });
     const user = userEvent.setup();
     render(
       <SessionProjectionProvider sessionId="session-responsive">

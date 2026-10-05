@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { BookOpen, ChevronDown, Square } from "lucide-react";
 import type { EnglishLearningState, SessionListItem } from "@actspace/shared";
 import { Toggle } from "../settings/SettingsPrimitives";
+import { englishLearningApi } from "../../api/english-learning";
+import { eventsApi } from "../../api/events";
+import { sessionsApi } from "../../api/sessions";
+import { settingsApi } from "../../api/settings";
 
 export const SPEECH_STATUS_LABELS: Record<EnglishLearningState["speechStatus"], string> = {
   idle: "等待新回答", unconfigured: "未配置语音", unsupported: "当前平台暂不支持语音播放",
@@ -18,10 +22,7 @@ export function EnglishLearningCapability({ onConfigure }: { onConfigure?: () =>
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
-  const available = Boolean(window.actspace?.getEnglishLearningState);
-
   useEffect(() => {
-    if (!available) return;
     let cancelled = false;
     const accept = (next: EnglishLearningState) => {
       if (cancelled || (latest.current && next.revision < latest.current.revision)) return;
@@ -29,9 +30,9 @@ export function EnglishLearningCapability({ onConfigure }: { onConfigure?: () =>
       setState(next);
       if (next.targetSessionId) setSelected(next.targetSessionId);
     };
-    const remove = window.actspace.onEnglishLearningStateChanged?.(accept);
+    const remove = eventsApi.englishLearningStateChanged(accept);
     setError(null);
-    void Promise.all([window.actspace.getEnglishLearningState!(), window.actspace.listSessions(), window.actspace.getSettingsV4?.()]).then(([next, list, settings]) => {
+    void Promise.all([englishLearningApi.getState(), sessionsApi.list(), settingsApi.getV4()]).then(([next, list, settings]) => {
       if (cancelled) return;
       const sorted = list.filter((item) => !item.archived && !item.isChildSession && (!item.accessState || ["read-write", "degraded"].includes(item.accessState))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
       setSessions(sorted);
@@ -39,13 +40,13 @@ export function EnglishLearningCapability({ onConfigure }: { onConfigure?: () =>
       setSelected(sorted.some((item) => item.id === last) ? last! : sorted[0]?.id ?? "");
       accept(next);
     }).catch(() => { if (!cancelled) setError("读取英语辅助学习失败，请重试。"); });
-    return () => { cancelled = true; remove?.(); };
-  }, [available, reload]);
+    return () => { cancelled = true; remove(); };
+  }, [reload]);
 
   const change = async (enabled: boolean, sessionId = selected) => {
     setBusy(true); setError(null);
     try {
-      const next = await window.actspace.setEnglishLearningTarget!({ enabled, sessionId: sessionId || null });
+      const next = await englishLearningApi.setTarget({ enabled, sessionId: sessionId || null });
       if (!latest.current || next.revision >= latest.current.revision) {
         latest.current = next;
         setState(next);
@@ -63,26 +64,24 @@ export function EnglishLearningCapability({ onConfigure }: { onConfigure?: () =>
           <span className="min-w-0 flex-1"><span className="block text-act-sm font-medium text-text-main">英语辅助学习</span><span className="mt-0.5 block text-act-xs text-text-faint">让选定会话按英文、中文对照回答，并朗读英文。</span></span>
           <ChevronDown size={15} className={`shrink-0 text-text-faint ${expanded ? "" : "-rotate-90"}`} />
         </button>
-        <Toggle ariaLabel="开启英语辅助学习" checked={state?.enabled ?? false} disabled={!available || !state || !selected || busy} onChange={(enabled) => { setExpanded(true); void change(enabled); }} />
+        <Toggle ariaLabel="开启英语辅助学习" checked={state?.enabled ?? false} disabled={!state || !selected || busy} onChange={(enabled) => { setExpanded(true); void change(enabled); }} />
       </div>
       {(expanded || error) && <div id="english-learning-details" className="flex flex-col gap-4 border-t border-line px-4 py-4">
-        {!available ? <p className="text-act-xs text-text-faint">英语辅助学习仅在桌面端可用。</p> : <>
-          <label className="flex flex-col gap-2 text-act-xs text-text-muted">目标会话
-            <select aria-label="英语学习目标会话" value={selected} disabled={busy || !state} onChange={(event) => void change(state?.enabled ?? false, event.target.value)} className="h-9 min-w-0 rounded-act-md border border-line bg-surface px-3 text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">
-              {!sessions.length && <option value="">请先创建会话</option>}
-              {sessions.map((session) => <option key={session.id} value={session.id}>{session.title || "未命名会话"}</option>)}
-            </select>
-          </label>
-          <p role="status" className="text-act-xs text-text-faint">{!state ? "加载中…" : state.enabled ? `双语已开启 · ${SPEECH_STATUS_LABELS[state.speechStatus]}` : "已关闭 · 开启后从下一次模型请求生效"}{state && state.queuedSegments > 0 ? ` · 待播 ${state.queuedSegments} 段` : ""}</p>
-          {state?.notice && <p className="text-act-xs text-text-faint">{state.notice}</p>}
-          {state?.error && <p role="alert" className="text-act-xs text-on-danger">{state.error.message}</p>}
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={button} disabled={busy || !state || (!state.queuedSegments && !["playing", "synthesizing"].includes(state.speechStatus))} onClick={() => { void window.actspace.stopEnglishLearningSpeech?.().catch(() => setError("停止语音失败，请重试。")); }}><Square size={12} />停止播放</button>
-            <button type="button" className={button} onClick={() => setReload((value) => value + 1)} disabled={busy}>刷新会话</button>
-            {onConfigure && <button type="button" className={button} onClick={onConfigure}>语音配置</button>}
-          </div>
-          <p className="text-act-xxs leading-relaxed text-text-faint">只影响选定会话。停止播放会保留双语模式，历史回答不会补播。</p>
-        </>}
+        <label className="flex flex-col gap-2 text-act-xs text-text-muted">目标会话
+          <select aria-label="英语学习目标会话" value={selected} disabled={busy || !state} onChange={(event) => void change(state?.enabled ?? false, event.target.value)} className="h-9 min-w-0 rounded-act-md border border-line bg-surface px-3 text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">
+            {!sessions.length && <option value="">请先创建会话</option>}
+            {sessions.map((session) => <option key={session.id} value={session.id}>{session.title || "未命名会话"}</option>)}
+          </select>
+        </label>
+        <p role="status" className="text-act-xs text-text-faint">{!state ? "加载中…" : state.enabled ? `双语已开启 · ${SPEECH_STATUS_LABELS[state.speechStatus]}` : "已关闭 · 开启后从下一次模型请求生效"}{state && state.queuedSegments > 0 ? ` · 待播 ${state.queuedSegments} 段` : ""}</p>
+        {state?.notice && <p className="text-act-xs text-text-faint">{state.notice}</p>}
+        {state?.error && <p role="alert" className="text-act-xs text-on-danger">{state.error.message}</p>}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={button} disabled={busy || !state || (!state.queuedSegments && !["playing", "synthesizing"].includes(state.speechStatus))} onClick={() => { void englishLearningApi.stopSpeech().catch(() => setError("停止语音失败，请重试。")); }}><Square size={12} />停止播放</button>
+          <button type="button" className={button} onClick={() => setReload((value) => value + 1)} disabled={busy}>刷新会话</button>
+          {onConfigure && <button type="button" className={button} onClick={onConfigure}>语音配置</button>}
+        </div>
+        <p className="text-act-xxs leading-relaxed text-text-faint">只影响选定会话。停止播放会保留双语模式，历史回答不会补播。</p>
         {error && <p role="alert" className="text-act-xs text-on-danger">{error}</p>}
       </div>}
     </section>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import type { ReviewBranch, ReviewCommit, ReviewSelection } from "@actspace/shared";
+import { reviewApi } from "../../api/review";
 
 const ITEM = "flex min-h-8 w-full items-center gap-2 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-act-sm text-text-main hover:bg-surface-subtle [cursor:pointer]";
 
@@ -26,11 +27,7 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
 
   useEffect(() => {
     if (picker !== "commit") return;
-    const api = window.actspace?.listReviewCommits;
-    if (!api) {
-      setCommitError("提交历史不可用。");
-      return;
-    }
+    const api = reviewApi.listCommits;
     let active = true;
     setLoadingCommits(true);
     setCommitError(null);
@@ -45,11 +42,7 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
 
   useEffect(() => {
     if (picker !== "branch") return;
-    const api = window.actspace?.listReviewBranches;
-    if (!api) {
-      setBranchError("分支比较不可用。");
-      return;
-    }
+    const api = reviewApi.listBranches;
     let active = true;
     setLoadingBranches(true);
     setBranchError(null);

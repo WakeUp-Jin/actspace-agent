@@ -18,6 +18,7 @@ import {
   probeErrorResult,
   type ProbeState,
 } from "./custom-connection-shared";
+import { settingsApi } from "../../api/settings";
 
 /** 官方 Anthropic：只填 Key，测试通过后在同一页选模型；地址、协议、认证方式和价格都是固定的。 */
 export function AnthropicKeySetup({ onCancel, onSaved }: { onCancel: () => void; onSaved: (connectionId: string, autoTest: boolean) => void | Promise<void> }) {
@@ -33,12 +34,12 @@ export function AnthropicKeySetup({ onCancel, onSaved }: { onCancel: () => void;
   const tested = probe.status === "ok";
 
   const test = async () => {
-    if (!apiKey.trim() || running || !window.actspace.probeCustomConnection) return;
+    if (!apiKey.trim() || running) return;
     const token = ++probeToken.current;
     setProbe({ status: "running" });
     setError(null);
     try {
-      const result = await window.actspace.probeCustomConnection({ kind: "draft", protocol: "anthropic-messages", baseUrl: OFFICIAL_ANTHROPIC_BASE_URL, apiKey: apiKey.trim(), authMode: "x-api-key" });
+      const result = await settingsApi.probeCustomConnection({ kind: "draft", protocol: "anthropic-messages", baseUrl: OFFICIAL_ANTHROPIC_BASE_URL, apiKey: apiKey.trim(), authMode: "x-api-key" });
       if (token !== probeToken.current) return;
       setProbe({ status: result.ok ? "ok" : "fail", result });
       if (!result.ok) return;
@@ -51,13 +52,13 @@ export function AnthropicKeySetup({ onCancel, onSaved }: { onCancel: () => void;
   };
 
   const save = async () => {
-    if (!picker.selected.length || !picker.defaultId || !window.actspace.createCustomConnection) return;
+    if (!picker.selected.length || !picker.defaultId) return;
     setSaving(true);
     setError(null);
     const connectionId = newConnectionId();
     const labels = new Map((listed ?? []).flatMap((model) => (model.label ? [[model.id, model.label] as const] : [])));
     try {
-      await window.actspace.createCustomConnection({
+      await settingsApi.createCustomConnection({
         providerId: "openrouter",
         connectionId,
         protocol: "anthropic-messages",

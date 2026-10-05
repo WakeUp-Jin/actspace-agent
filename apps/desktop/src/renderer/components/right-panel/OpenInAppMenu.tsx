@@ -12,6 +12,7 @@ import { Loader2, SquareArrowOutUpRight } from "lucide-react";
 import type { WorkspaceOpenTool, WorkspaceOpenToolId } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { OPEN_TOOL_LABELS, readStoredOpenTool, storeOpenTool, toolIcon } from "../workspace/workspaceOpenTool";
+import { workspacesApi } from "../../api/workspaces";
 
 const TRIGGER_CLASS =
   "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
@@ -37,8 +38,6 @@ export function OpenInAppMenu({
   const anchorRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const available = typeof window !== "undefined" && typeof window.actspace?.openWorkspaceInTool === "function";
-
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: PointerEvent) {
@@ -57,11 +56,8 @@ export function OpenInAppMenu({
     };
   }, [open]);
 
-  if (!available) return null;
-
   const loadTools = async () => {
-    const api = window.actspace?.listWorkspaceOpenTools;
-    if (!api) return;
+    const api = workspacesApi.listOpenTools;
     try {
       setTools((await api()).tools);
     } catch {
@@ -71,8 +67,7 @@ export function OpenInAppMenu({
   };
 
   const openWith = async (toolId: WorkspaceOpenToolId) => {
-    const api = window.actspace?.openWorkspaceInTool;
-    if (!api) return;
+    const api = workspacesApi.openInTool;
     setBusy(true);
     setError(null);
     try {

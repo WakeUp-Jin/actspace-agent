@@ -51,11 +51,23 @@ import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { SessionProjectionProvider } from "./session";
 import { ClientSessionStore, selectChatSession, projectChatWindow } from "@actspace/client/sessions";
+import { createSession, forkSession, getSession, sessionsApi } from "./api/sessions";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
 import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import { resolveQuickOpenTarget } from "./quick-open-routing";
+import { appApi } from "./api/app";
+import { approvalsApi } from "./api/approvals";
+import { dialogsApi } from "./api/dialogs";
+import { eventsApi } from "./api/events";
+import { modelsApi } from "./api/models";
+import { quickOpenApi } from "./api/quick-open";
+import { reviewApi } from "./api/review";
+import { settingsApi } from "./api/settings";
+import { tasksApi } from "./api/tasks";
+import { workspacesApi } from "./api/workspaces";
+import { hostsApi } from "./api/hosts";
 
 function sessionReadError(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message : "";
@@ -72,10 +84,6 @@ const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } =
 /** `not_started`：会话已有运行，没有发出。`rejected`：发送前校验失败，正文已放回输入框。 */
 type SessionRunOutcome = AgentRunResult["status"] | "rejected" | "not_started";
 type SessionPageCache = { record: SessionRecord; history: { before: number | null; throughJournalSeq: number } };
-
-function hasActspaceBridge(): boolean {
-  return typeof window !== "undefined" && Boolean(window.actspace);
-}
 
 function attachmentForRuntime(attachment: ComposerAttachment): ComposerAttachment {
   const { previewUrl: _previewUrl, ...runtimeAttachment } = attachment;
@@ -240,64 +248,6 @@ function dropTrailingStreamSegments(segments: StreamingSegment[]): void {
       break;
     }
   }
-}
-
-function createLocalEmptySession(input: NewSessionInput = {}): SessionRecord {
-  const now = new Date().toISOString();
-  const id = `local-session-${Date.now()}`;
-  return {
-    meta: {
-      schemaVersion: 2,
-      id,
-      title: "New chat",
-      createdAt: now,
-      updatedAt: now,
-      agentRunCount: 0,
-      agentForm: input.agentForm ?? "agent",
-      agentMode: input.agentForm === "chat" ? "chat" : "agent",
-      agentModeRevision: 0,
-      workspaceRoot: input.workspaceRoot,
-    },
-    events: [],
-    messageBlocks: [],
-    contextSnapshot: null,
-  };
-}
-
-function rewriteLocalSessionId<T>(value: T, sourceSessionId: string, targetSessionId: string, key?: string): T {
-  if (Array.isArray(value)) {
-    return value.map((item) => rewriteLocalSessionId(item, sourceSessionId, targetSessionId)) as T;
-  }
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([entryKey, entryValue]) => [
-        entryKey,
-        rewriteLocalSessionId(entryValue, sourceSessionId, targetSessionId, entryKey),
-      ]),
-    ) as T;
-  }
-  if (key === "sessionId" && value === sourceSessionId) {
-    return targetSessionId as T;
-  }
-  return value;
-}
-
-function createLocalForkSession(source: SessionRecord): SessionRecord {
-  const now = new Date().toISOString();
-  const targetSessionId = `local-session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const fork = rewriteLocalSessionId(source, source.meta.id, targetSessionId);
-  return {
-    ...fork,
-    meta: {
-      ...fork.meta,
-      id: targetSessionId,
-      title: `${source.meta.title} (fork)`,
-      createdAt: now,
-      updatedAt: now,
-      pinned: false,
-      archived: false,
-    },
-  };
 }
 
 function copyWithSelection(value: string): void {
@@ -795,7 +745,7 @@ export function App() {
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(null);
   const [browseGroups, setBrowseGroups] = useState<import("@actspace/shared").SessionListPage['groups']>([]);
-  const [listLoading, setListLoading] = useState(hasActspaceBridge());
+  const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [listRetry, setListRetry] = useState(0);
   const [messageLoading, setMessageLoading] = useState(false);
@@ -807,8 +757,7 @@ export function App() {
   sidebarSessionsRef.current = sessions;
   const loadedListPages = useRef(new Map<string, number>());
   const readSidebarSessions = useCallback(async () => {
-    if (!window.actspace.listSessionPage) return window.actspace.listSessions();
-    const first = await window.actspace.listSessionPage();
+    const first = await sessionsApi.listPage();
     const items = [...first.items];
     const groups = [...first.groups];
     for (const group of first.groups) {
@@ -816,21 +765,19 @@ export function App() {
       let hasMore = group.hasMore;
       for (let page = 1; page < (loadedListPages.current.get(key) ?? 1) && hasMore; page++) {
         const after = items.filter(s => s.hostId === group.hostId && (s.workspaceRoot ?? '') === group.workspaceRoot && !!s.pinned === group.pinned).at(-1)?.id;
-        const next = await window.actspace.listSessionPage({ hostId: group.hostId, workspaceRoot: group.workspaceRoot, pinned: group.pinned, after });
+        const next = await sessionsApi.listPage({ hostId: group.hostId, workspaceRoot: group.workspaceRoot, pinned: group.pinned, after });
         items.push(...next.items); hasMore = next.groups[0]?.hasMore ?? false;
       }
       group.hasMore = hasMore;
     }
     // Removing a connection must not remove already displayed history. Its
     // Session remains bound to the absent Host and can never become local.
-    if (window.actspaceHosts) {
-      const known = new Set((await window.actspaceHosts.list()).map(host => host.hostId));
-      for (const item of sidebarSessionsRef.current) {
-        if (!item.hostId || known.has(item.hostId) || items.some(next => next.id === item.id)) continue;
-        items.push({ ...item, connectionState: "offline" });
-        if (!groups.some(group => group.hostId === item.hostId && group.workspaceRoot === (item.workspaceRoot ?? "") && group.pinned === !!item.pinned)) {
-          groups.push({ hostId: item.hostId, workspaceRoot: item.workspaceRoot ?? "", pinned: !!item.pinned, hasMore: false });
-        }
+    const known = new Set((await hostsApi.list()).map(host => host.hostId));
+    for (const item of sidebarSessionsRef.current) {
+      if (!item.hostId || known.has(item.hostId) || items.some(next => next.id === item.id)) continue;
+      items.push({ ...item, connectionState: "offline" });
+      if (!groups.some(group => group.hostId === item.hostId && group.workspaceRoot === (item.workspaceRoot ?? "") && group.pinned === !!item.pinned)) {
+        groups.push({ hostId: item.hostId, workspaceRoot: item.workspaceRoot ?? "", pinned: !!item.pinned, hasMore: false });
       }
     }
     setBrowseGroups(groups);
@@ -839,10 +786,8 @@ export function App() {
   const pageCacheRef = useRef(new Map<string, SessionPageCache>());
   const messageRequestRef = useRef(0);
   const historyPendingRef = useRef<number | null>(null);
-  const [localSessionRecords, setLocalSessionRecords] = useState<Record<string, SessionRecord>>({});
-  const [agentRunResult, setAgentRunResult] = useState<AgentRunResult | null>(null);
   const [workspaceRegistry, setWorkspaceRegistry] = useState<WorkspaceListResult | null>(null);
-  const [sessionBootstrapComplete, setSessionBootstrapComplete] = useState(!hasActspaceBridge());
+  const [sessionBootstrapComplete, setSessionBootstrapComplete] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
   const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
@@ -928,8 +873,7 @@ export function App() {
   const userPickedChatModelRef = useRef(false);
 
   const refreshWorkspaces = useCallback(async () => {
-    if (!hasActspaceBridge() || !window.actspace.listWorkspaces) return null;
-    const registry = await window.actspace.listWorkspaces();
+    const registry = await workspacesApi.list();
     setWorkspaceRegistry(registry);
     return registry;
   }, []);
@@ -1032,21 +976,18 @@ export function App() {
 
   }, [refreshStreamingBlocks]);
   const refreshTaskQueue = useCallback(async (sessionId: string) => {
-    if (!hasActspaceBridge() || !window.actspace.taskCommand) return;
-    const result = await window.actspace.taskCommand({ sessionId, op: "snapshot" });
+    const result = await tasksApi.command({ sessionId, op: "snapshot" });
     applyTaskSnapshot(result.snapshot);
   }, [applyTaskSnapshot]);
   const taskCommand = useCallback(async (command: import("@actspace/shared/runtime-v2").TaskCommand) => {
-    if (!hasActspaceBridge() || !window.actspace.taskCommand) throw new Error("Host task service unavailable");
-    const result = await window.actspace.taskCommand(command);
+    const result = await tasksApi.command(command);
     applyTaskSnapshot(result.snapshot);
     if (result.error) { setComposerNotice({ sessionId: command.sessionId, text: "队列状态已变化，请根据最新状态重试。" }); return false; }
     return true;
   }, [applyTaskSnapshot]);
   useEffect(() => {
     if (selectedSessionId) void refreshTaskQueue(selectedSessionId).catch(console.error);
-    if (!hasActspaceBridge() || !window.actspace.onSessionLiveEvent) return;
-    return window.actspace.onSessionLiveEvent(({ event }) => {
+    return eventsApi.sessionLive(({ event }) => {
       if (event.sessionId && event.message === "task-queue-updated") void refreshTaskQueue(event.sessionId).catch(console.error);
     });
   }, [selectedSessionId, refreshTaskQueue]);
@@ -1064,14 +1005,6 @@ export function App() {
   }, [composerNotice]);
 
   const refreshReviewSummary = useCallback(async (workspaceRoot?: string | null) => {
-    if (!hasActspaceBridge()) return;
-
-    const api = window.actspace?.getReviewSnapshot;
-    if (!api) {
-      setReviewSummary(null);
-      return;
-    }
-
     const resolvedWorkspaceRoot = normalizeWorkspaceRoot(
       workspaceRoot ?? sessionRecord?.meta.worktree?.workspaceRoot ?? selectedWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
     );
@@ -1079,7 +1012,7 @@ export function App() {
     setReviewSummary({ status: "loading" });
 
     try {
-      const result = await api({
+      const result = await reviewApi.getSnapshot({
         workspaceRoot: resolvedWorkspaceRoot ?? undefined,
         sessionId: sessionRecord?.meta.id,
         selection: { kind: "uncommitted" },
@@ -1097,8 +1030,6 @@ export function App() {
   }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessionRecord?.meta.worktree?.workspaceRoot]);
 
   const refreshPendingApprovalStatuses = useCallback(async (sessionIds: string[]) => {
-    if (!hasActspaceBridge() || !window.actspace.listPendingApprovals) return;
-
     const uniqueSessionIds = [...new Set(sessionIds.filter(Boolean))];
     if (uniqueSessionIds.length === 0) return;
 
@@ -1106,7 +1037,7 @@ export function App() {
       const version = (approvalVersionsRef.current.get(sessionId) ?? 0) + 1;
       approvalVersionsRef.current.set(sessionId, version);
       try {
-        const pending = await window.actspace.listPendingApprovals({ sessionId });
+        const pending = await approvalsApi.listPending({ sessionId });
         return { sessionId, version, hasPending: pending.length > 0, pending };
       } catch (error) {
         console.error("Failed to load pending approvals", error);
@@ -1149,10 +1080,7 @@ export function App() {
   }, [refreshStreamingBlocks]);
 
   useEffect(() => {
-    if (!hasActspaceBridge()) return;
-
-    window.actspace
-      .getBootstrapState()
+    appApi.getBootstrapState()
       .then(setBootstrapState)
       .catch((error: unknown) => {
         console.error("Failed to load bootstrap state", error);
@@ -1176,14 +1104,14 @@ export function App() {
       return;
     }
     const workspaceRoot = selectedWorkspaceRoot ?? bootstrapState?.workspaceRoot;
-    if (remoteTarget.hostId || !hasActspaceBridge() || !workspaceRoot || !window.actspace.getWorkspaceGitContext) {
+    if (remoteTarget.hostId || !workspaceRoot) {
       setWorkspaceGitContext(null);
       setSelectedBranch(undefined);
       setRunLocation("this_mac");
       return;
     }
     let cancelled = false;
-    window.actspace.getWorkspaceGitContext({ workspaceRoot }).then((context) => {
+    workspacesApi.getGitContext({ workspaceRoot }).then((context) => {
       if (cancelled) return;
       setWorkspaceGitContext(context);
       setSelectedBranch(
@@ -1205,7 +1133,6 @@ export function App() {
   }, [remoteTarget.hostId, bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.agentRunCount, sessionRecord?.meta.worktree]);
 
   useEffect(() => {
-    if (!hasActspaceBridge()) return;
     refreshPendingApprovalStatuses(sessions.map((session) => session.id)).catch((error: unknown) => {
       console.error("Failed to refresh pending approval statuses", error);
     });
@@ -1213,36 +1140,19 @@ export function App() {
   }, [refreshPendingApprovalStatuses, refreshTaskQueue, sessions]);
 
   useEffect(() => {
-    if (!hasActspaceBridge()) return;
     void refreshReviewSummary();
   }, [refreshReviewSummary]);
 
   useEffect(() => {
-    if (!hasActspaceBridge() || !window.actspace.onReviewChanged) return;
-    return window.actspace.onReviewChanged(() => {
+    return eventsApi.reviewChanged(() => {
       void refreshReviewSummary();
     });
   }, [refreshReviewSummary]);
 
   useEffect(() => {
-    if (!hasActspaceBridge() || !window.actspace.getSettings) return;
-
-    if (!window.actspace.listUsableModels) {
-      window.actspace.getSettings()
-        .then((settings) => {
-          const configured = settings.taskModels?.defaultChatModel ?? settings.defaultModelId ?? DEFAULT_MODEL_ID;
-          setDefaultModelId(configured);
-          if (!userPickedChatModelRef.current) setSelectedChatModelId(configured);
-        })
-        .catch((error: unknown) => {
-          console.error("Failed to load settings", error);
-        });
-      return;
-    }
-
     Promise.all([
-      window.actspace.getSettings(),
-      window.actspace.listUsableModels({ purpose: "chat" }),
+      settingsApi.get(),
+      modelsApi.listUsable({ purpose: "chat" }),
     ])
       .then(([settings, usable]) => {
         const configured = resolvePreferredChatModel(settings, usable.models);
@@ -1258,13 +1168,7 @@ export function App() {
   }, []);
 
   const handleSettingsChange = useCallback((settings: AppSettings) => {
-    if (!window.actspace.listUsableModels) {
-      const configured = settings.taskModels?.defaultChatModel ?? settings.defaultModelId ?? DEFAULT_MODEL_ID;
-      setDefaultModelId(configured);
-      if (!userPickedChatModelRef.current) setSelectedChatModelId(configured);
-      return;
-    }
-    void window.actspace.listUsableModels({ purpose: "chat" }).then((result) => {
+    void modelsApi.listUsable({ purpose: "chat" }).then((result) => {
       const configured = resolvePreferredChatModel(settings, result.models);
       setUsableChatModels(result.models);
       setDefaultModelId(configured);
@@ -1280,7 +1184,6 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!hasActspaceBridge() || !window.actspace.onSessionLiveEvent) return;
     let disposed = false;
     // Serialize notifications: an older response must not overwrite a newer Host state.
     let refreshing = false;
@@ -1303,11 +1206,11 @@ export function App() {
       } catch (error) { console.error("Failed to refresh session list", error); }
       finally { refreshing = false; }
     };
-    const unsubscribe = window.actspace.onSessionLiveEvent(({ event }) => {
+    const unsubscribe = eventsApi.sessionLive(({ event }) => {
       if (event.message === "session-title-updated") void refresh();
     });
-    const unhosts = window.actspaceHosts?.onChanged(() => { void refresh(); });
-    return () => { disposed = true; unsubscribe(); unhosts?.(); };
+    const unhosts = eventsApi.hostsChanged(() => { void refresh(); });
+    return () => { disposed = true; unsubscribe(); unhosts(); };
   }, [readSidebarSessions]);
 
   const cacheSessionPage = useCallback((sessionId: string, page: SessionPageCache) => {
@@ -1336,7 +1239,7 @@ export function App() {
       setMessageLoading(!cachedRecord && !run?.record); setMessageError(null); setEarlierError(null);
     }
     try {
-      const projection = await window.actspace.getSessionPage({ sessionId });
+      const projection = await sessionsApi.getPage({ sessionId });
       if (version !== pageVersionsRef.current.get(sessionId)) return null;
       sessionStore.applyEnvelope(projection);
       const page = { record: selectChatSession(sessionStore.get(sessionId)), history: { before: projection.window.beforeSeq, throughJournalSeq: projection.throughJournalSeq } };
@@ -1371,7 +1274,7 @@ export function App() {
     const request = messageRequestRef.current;
     historyPendingRef.current = request; setEarlierLoading(true); setEarlierError(null);
     try {
-      const projection = await window.actspace.getSessionPage({ sessionId, beforeSeq: historyBefore });
+      const projection = await sessionsApi.getPage({ sessionId, beforeSeq: historyBefore });
       sessionStore.applyEnvelope(projection);
       const page = { record: projectChatWindow(projection, bootstrapState?.workspaceRoot), history: { before: projection.window.beforeSeq, throughJournalSeq: projection.throughJournalSeq } };
       if (request !== messageRequestRef.current || activeSessionIdRef.current !== sessionId) return;
@@ -1388,8 +1291,7 @@ export function App() {
   }, [historyBefore]);
 
   const loadMoreSessions = useCallback(async (input: import("@actspace/shared").SessionListPageInput) => {
-    if (!window.actspace?.listSessionPage) return;
-    const page = await window.actspace.listSessionPage(input);
+    const page = await sessionsApi.listPage(input);
     const key = JSON.stringify([input.hostId ?? "local", input.workspaceRoot ?? "", input.pinned === true]);
     loadedListPages.current.set(key, (loadedListPages.current.get(key) ?? 1) + 1);
     setSessions(current => { const byId = new Map(current.map(s => [s.id, s])); for (const s of page.items) byId.set(s.id, s); return [...byId.values()]; });
@@ -1397,14 +1299,13 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!hasActspaceBridge()) return;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     async function bootstrapSession() {
       setListLoading(true); setListError(null);
       const [page, registry] = await Promise.all([
-        window.actspace.listSessionPage ? window.actspace.listSessionPage() : readSidebarSessions().then(items => ({ items, groups: [], indexing: false, failed: 0 })),
-        window.actspace.listWorkspaces?.() ?? Promise.resolve(null),
+        sessionsApi.listPage(),
+        workspacesApi.list(),
       ]);
       if (disposed) return;
       const listedSessions = page.items;
@@ -1445,7 +1346,6 @@ export function App() {
 
       setActiveSessionId(null);
       setSessionRecord(null);
-      setAgentRunResult(null);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
         registry?.items.find((workspace) => workspace.id === registry.defaultWorkspaceId)?.path ??
         bootstrapState?.workspaceRoot,
@@ -1717,9 +1617,7 @@ export function App() {
   }, [refreshStreamingBlocks, updateMessageQueue]);
 
   useEffect(() => {
-    if (!hasActspaceBridge()) return;
-
-    return window.actspace.onAgentStream((event) => {
+    return eventsApi.agentStream((event) => {
       if (event.type === "agent_run_started" && terminalRunIdsRef.current.has(event.agentRunId)) return;
       if (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed") {
         terminalRunIdsRef.current.add(event.agentRunId);
@@ -1782,31 +1680,9 @@ export function App() {
   }, [handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshStreamingBlocks, refreshReviewSummary]);
 
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
-    if (!hasActspaceBridge()) {
-      const created = createLocalEmptySession(input);
-      setActiveSessionId(created.meta.id);
-      setSessionRecord(created);
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
-      setLocalSessionRecords((current) => ({ ...current, [created.meta.id]: created }));
-      setSessions((current) => [
-        {
-          id: created.meta.id,
-          title: created.meta.title,
-          updatedAt: created.meta.updatedAt,
-          agentRunCount: created.meta.agentRunCount,
-          agentForm: created.meta.agentForm,
-          agentMode: created.meta.agentMode,
-          agentModeRevision: created.meta.agentModeRevision,
-          workspaceRoot: created.meta.workspaceRoot,
-        },
-        ...current,
-      ]);
-      return created;
-    }
-
     const selectionRequest = messageRequestRef.current;
     try {
-      const created = await window.actspace.createSession({
+      const created = await createSession({
         ...(input.hostId ? { hostId: input.hostId } : {}),
         ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
         ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
@@ -1855,9 +1731,9 @@ export function App() {
     const item = sessionId ? messageQueuesRef.current.get(sessionId)?.items.find(item => item.id === id) : undefined;
     if (!sessionId || !snapshot || !item) return;
     const attachments = await Promise.all((item.options.attachments ?? []).map(async attachment => {
-      if (attachment.kind !== "image" || !attachment.remoteArtifact || !window.actspace.readSessionArtifact) return attachment;
+      if (attachment.kind !== "image" || !attachment.remoteArtifact) return attachment;
       try {
-        const preview = await window.actspace.readSessionArtifact({ sessionId, artifactPath: attachment.remoteArtifact.artifactId });
+        const preview = await sessionsApi.readArtifact({ sessionId, artifactPath: attachment.remoteArtifact.artifactId });
         return { ...attachment, previewUrl: preview.dataUrl };
       } catch { return attachment; } // Preview failure must not discard the durable attachment.
     }));
@@ -1880,28 +1756,26 @@ export function App() {
         const created = await createSessionForInput({ hostId: remoteTarget.hostId, workspaceId: remoteTarget.workspaceId, agentForm: options.mode === "chat" ? "chat" : "agent" });
         if (!created) throw new Error("Unable to create remote Session");
         visibleSessionId = created.meta.id;
-        if (options.mode === "plan") await window.actspace.setSessionAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
+        if (options.mode === "plan") await sessionsApi.setAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
       }
     }
     if (!visibleSessionId) {
       const created = await createSessionForInput({ ...(selectedWorkspaceRoot ? { workspaceRoot: selectedWorkspaceRoot } : {}), agentForm: options.mode === "chat" ? "chat" : "agent" });
       if (!created) throw new Error("Unable to create Session");
       visibleSessionId = created.meta.id;
-      if (hasActspaceBridge() && options.mode === "plan") await window.actspace.setSessionAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
+      if (options.mode === "plan") await sessionsApi.setAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
     }
-    if (!hasActspaceBridge()) return;
     const sessionId = visibleSessionId;
     setComposerStateBySession(current => ({ ...current, [sessionId]: { mode: options.mode, selectedSkills: options.selectedSkills } }));
     // Keep workspace changes on the idle Session boundary before task admission.
     if (!sessionId.startsWith("host:") && !sessionRunsRef.current.has(sessionId) && !sessionRecord?.meta.worktree && selectedWorkspaceRoot &&
-        selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot) && window.actspace.setSessionWorkspace) {
-      const result = await window.actspace.setSessionWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
+        selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot)) {
+      const result = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
       if (!result.ok) throw new Error(result.error ?? "无法更新会话工作区");
     }
     lastSendOptionsRef.current.set(sessionId, options);
     setFailedForSession(sessionId, false);
     setCompactionFailureForSession(sessionId, null);
-    if (!window.actspace.submitTask) throw new Error("Host task service unavailable");
     const submitted = { sessionId: visibleSessionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
     const pendingKey = `actspace:pending-submission:${visibleSessionId}`;
     const pendingStorage = visibleSessionId.startsWith("host:") ? localStorage : sessionStorage;
@@ -1927,7 +1801,7 @@ export function App() {
       restore(message); throw new Error(message);
     }
     const attempt = async (): Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult> => {
-      try { return await window.actspace.submitTask!({ ...submitted, submissionId }); }
+      try { return await tasksApi.submit({ ...submitted, submissionId }); }
       catch { return { status: "submission-failed" as const, acknowledgement: "unknown" as const, message: "提交尚未确认，再次发送将核对同一次提交。" }; }
     };
     let result = await attempt();
@@ -1958,8 +1832,7 @@ export function App() {
   }, [remoteTarget, sessionRecord, selectedWorkspaceRoot, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, createSessionForInput, taskCommand, refreshTaskQueue]);
 
   useEffect(() => {
-    if (!window.actspaceHosts) return;
-    return window.actspaceHosts.onChanged(hosts => {
+    return eventsApi.hostsChanged(hosts => {
       const id = activeSessionIdRef.current;
       if (id?.startsWith("host:") && hosts.some(host => host.hostId === remoteTarget.hostId && host.state === "connected")) {
         void readSessionPage(id); void refreshTaskQueue(id); void refreshPendingApprovalStatuses([id]);
@@ -1985,7 +1858,7 @@ export function App() {
   const handleAbort = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
     const run = sessionId ? sessionRunsRef.current.get(sessionId) : undefined;
-    if (!hasActspaceBridge() || !run || !sessionId) return;
+    if (!run || !sessionId) return;
 
     const input: AbortAgentRunInput = {
       sessionId,
@@ -1995,7 +1868,7 @@ export function App() {
     try {
       run.aborting = true;
       refreshStreamingBlocks(sessionId);
-      const aborted = await window.actspace.abortAgentRun(input);
+      const aborted = await tasksApi.abort(input);
       if (!aborted) {
         run.aborting = false;
         refreshStreamingBlocks(sessionId);
@@ -2009,12 +1882,12 @@ export function App() {
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
     if (!remoteTarget.hosts.length && !input.hostId) {
-      setAgentRunResult(null); setComposerStateBySession(current => ({ ...current, __draft__: DEFAULT_COMPOSER_STATE }));
+      setComposerStateBySession(current => ({ ...current, __draft__: DEFAULT_COMPOSER_STATE }));
       const created = await createSessionForInput(input);
       if (created) setComposerStateBySession(current => ({ ...current, [created.meta.id]: { ...DEFAULT_COMPOSER_STATE, mode: created.meta.agentMode ?? "agent" } }));
       return;
     }
-    setAgentRunResult(null); setActiveSessionId(null); setSessionRecord(null); setHistoryBefore(null);
+    setActiveSessionId(null); setSessionRecord(null); setHistoryBefore(null);
     setComposerStateBySession(current => ({ ...current, __draft__: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" } }));
     remoteTarget.selectHost(input.hostId ?? null);
     if (input.workspaceId) remoteTarget.selectWorkspace(input.workspaceId);
@@ -2022,17 +1895,8 @@ export function App() {
   }, [remoteTarget.hosts.length, remoteTarget.selectHost, remoteTarget.selectWorkspace, setActiveSessionId, createSessionForInput]);
 
   const handleAddWorkspace = useCallback(async () => {
-    if (!hasActspaceBridge()) {
-      return;
-    }
-
-    if (!window.actspace.selectWorkspaceDirectory) {
-      console.error("Workspace directory picker is not available");
-      return;
-    }
-
     try {
-      const result = await window.actspace.selectWorkspaceDirectory({ registerWorkspace: true });
+      const result = await dialogsApi.selectWorkspaceDirectory({ registerWorkspace: true });
       if (result.canceled || !result.workspaceRoot) return;
       await handleCreateSession({ workspaceRoot: result.workspaceRoot });
     } catch (error) {
@@ -2041,9 +1905,8 @@ export function App() {
   }, [handleCreateSession]);
 
   const handleUseExistingWorkspace = useCallback(async () => {
-    if (!hasActspaceBridge() || !window.actspace.selectWorkspaceDirectory) return;
     try {
-      const result = await window.actspace.selectWorkspaceDirectory({ registerWorkspace: true });
+      const result = await dialogsApi.selectWorkspaceDirectory({ registerWorkspace: true });
       if (result.canceled || !result.workspaceRoot) return;
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(result.workspaceRoot));
     } catch (error) {
@@ -2052,15 +1915,10 @@ export function App() {
   }, []);
 
   const handleCreateWorkspaceFolder = useCallback(async (name: string) => {
-    if (
-      !hasActspaceBridge() ||
-      !window.actspace.selectWorkspaceDirectory ||
-      !window.actspace.createWorkspaceFolder
-    ) return;
     try {
-      const parent = await window.actspace.selectWorkspaceDirectory();
+      const parent = await dialogsApi.selectWorkspaceDirectory();
       if (parent.canceled || !parent.workspaceRoot) return;
-      const result = await window.actspace.createWorkspaceFolder({
+      const result = await workspacesApi.createFolder({
         parentRoot: parent.workspaceRoot,
         name,
       });
@@ -2079,23 +1937,10 @@ export function App() {
     async (sessionId: string) => {
       if (!sessionId || sessionId === activeSessionIdRef.current) return;
 
-      setAgentRunResult(null);
       setActiveSessionId(sessionId);
       refreshPendingApprovalStatuses([sessionId]).catch((error: unknown) => {
         console.error("Failed to refresh selected session approvals", error);
       });
-
-      if (!hasActspaceBridge()) {
-        const selected = localSessionRecords[sessionId];
-        if (selected) {
-          setSessionRecord(selected);
-          setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-            selected.meta.worktree?.sourceWorkspaceRoot ?? selected.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
-          ));
-          return;
-        }
-        return;
-      }
 
       setSessionRecord(null); setHistoryBefore(null);
       const restored = await readSessionPage(sessionId, true)
@@ -2104,35 +1949,30 @@ export function App() {
         restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
       ));
     },
-    [bootstrapState?.workspaceRoot, localSessionRecords, refreshPendingApprovalStatuses, readSessionPage],
+    [bootstrapState?.workspaceRoot, refreshPendingApprovalStatuses, readSessionPage],
   );
 
   useEffect(() => {
-    const bridge = window.actspace;
-    if (
-      !sessionBootstrapComplete ||
-      !bridge?.consumeQuickOpenRequest ||
-      !bridge.onQuickOpenRequested
-    ) return;
+    if (!sessionBootstrapComplete) return;
     let disposed = false;
 
     const consumeRequest = async () => {
-      const request = await bridge.consumeQuickOpenRequest();
+      const request = await quickOpenApi.consume();
       if (!request || disposed) return;
       const [settings, listedSessions, registry] = await Promise.all([
-        bridge.getSettings(),
-        bridge.listSessions(),
-        bridge.listWorkspaces?.() ?? Promise.resolve(workspaceRegistry),
+        settingsApi.get(),
+        sessionsApi.list(),
+        workspacesApi.list(),
       ]);
       if (disposed) return;
       setSessions(listedSessions);
-      if (registry) setWorkspaceRegistry(registry);
+      setWorkspaceRegistry(registry);
       const shortcut = settings.shortcuts?.quickOpen ?? {
         enabled: true,
         accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR,
         target: { kind: "automatic" as const },
       };
-      const resolution = resolveQuickOpenTarget(shortcut, registry?.items ?? [], listedSessions);
+      const resolution = resolveQuickOpenTarget(shortcut, registry.items, listedSessions);
       if (resolution.kind === "session") {
         await handleSelectSession(resolution.sessionId);
       } else if (resolution.kind === "workspace") {
@@ -2146,7 +1986,7 @@ export function App() {
       if (!disposed) setComposerFocusRequestId((value) => value + 1);
     };
 
-    const unsubscribe = bridge.onQuickOpenRequested(() => {
+    const unsubscribe = eventsApi.quickOpenRequested(() => {
       void consumeRequest().catch((error: unknown) => {
         console.error("Failed to handle quick open request", error);
       });
@@ -2158,9 +1998,9 @@ export function App() {
       disposed = true;
       unsubscribe();
     };
-  }, [handleCreateSession, handleSelectSession, sessionBootstrapComplete, workspaceRegistry]);
+  }, [handleCreateSession, handleSelectSession, sessionBootstrapComplete]);
 
-  const persistedEvents = sessionRecord?.events ?? agentRunResult?.events ?? [];
+  const persistedEvents = sessionRecord?.events ?? [];
   const isRecoveredRun = selectedSessionId ? sessionRunsRef.current.get(selectedSessionId)?.recovered === true : false;
   const persistedMessages = useMemo<MessageBlock[]>(() => {
     const streamingAgentRunId = streamingBlocks.length > 0 && !isRecoveredRun ? activeAgentRunId : null;
@@ -2211,11 +2051,10 @@ export function App() {
 
   const contextSnapshot: ContextUsageSnapshot | null =
     sessionRecord?.contextSnapshot ??
-    agentRunResult?.contextSnapshot ??
     getLatestContextSnapshot(persistedEvents);
 
   const contextState: ContextState | null =
-    sessionRecord?.contextState ?? agentRunResult?.contextState ?? null;
+    sessionRecord?.contextState ?? null;
 
   const visibleSessions = useMemo(() => {
     if (!workspaceRegistry) return sessions;
@@ -2255,20 +2094,18 @@ export function App() {
     if (sessionId && (busySessionIds.has(sessionId) || modeChangePendingRef.current.has(sessionId))) throw new Error("会话正在执行，请等待任务结束后切换模式");
     if (sessionId) modeChangePendingRef.current.add(sessionId);
     try {
-      if (sessionId && hasActspaceBridge()) {
-        if (!window.actspace.setSessionAgentMode) throw new Error("当前应用版本不支持模式切换");
+      if (sessionId) {
         const revision = sessionRecord?.meta.id === sessionId
           ? sessionRecord.meta.agentModeRevision
           : visibleSessions.find((session) => session.id === sessionId)?.agentModeRevision;
-        let result = await window.actspace.setSessionAgentMode({ sessionId, mode, expectedRevision: revision });
+        let result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision: revision });
         if (!result.ok && result.error === "WORKSPACE_REQUIRED") {
-          if (!window.actspace.selectWorkspaceDirectory || !window.actspace.setSessionWorkspace) throw new Error("请先为当前会话选择工作区，再切换到 Plan 或 Agent");
-          const selection = await window.actspace.selectWorkspaceDirectory({ registerWorkspace: true });
+          const selection = await dialogsApi.selectWorkspaceDirectory({ registerWorkspace: true });
           if (selection.canceled || !selection.workspaceRoot) return;
-          const workspace = await window.actspace.setSessionWorkspace({ sessionId, workspaceRoot: selection.workspaceRoot });
+          const workspace = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selection.workspaceRoot });
           if (!workspace.ok) throw new Error(workspace.error ?? "设置工作区失败");
           setSelectedWorkspaceRoot(normalizeWorkspaceRoot(selection.workspaceRoot));
-          result = await window.actspace.setSessionAgentMode({ sessionId, mode, expectedRevision: revision });
+          result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision: revision });
         }
         if (!result.ok) {
           if (result.error === "AGENT_MODE_CONFLICT") await readSessionPage(sessionId);
@@ -2311,7 +2148,7 @@ export function App() {
       },
     }));
   };
-  const isSessionReady = Boolean(sessionRecord || agentRunResult || streamingBlocks.length > 0 || sessionBootstrapComplete);
+  const isSessionReady = Boolean(sessionRecord || streamingBlocks.length > 0 || sessionBootstrapComplete);
   const title = getSessionTitle(sessionRecord, visibleSessions, activeSessionId);
   const workspaceOptions = useMemo(
     () => {
@@ -2384,27 +2221,20 @@ export function App() {
       let transcriptMessages: MessageBlock[];
       let transcriptTitle = listedSession?.title ?? "Untitled session";
 
-      if (!hasActspaceBridge() && sessionId === activeSessionId) {
-        transcriptMessages = messages;
-        transcriptTitle = sessionRecord?.meta.title ?? transcriptTitle;
-      } else {
-        const record = !hasActspaceBridge()
-          ? localSessionRecords[sessionId] ?? null
-          : await window.actspace.getSession({ sessionId });
-        if (!record) {
-          throw new Error(`Session not found: ${sessionId}`);
-        }
-        transcriptTitle = record.meta.title;
-        transcriptMessages = record.messageBlocks?.length
-          ? record.messageBlocks
-          : createMessageBlocks(record.events);
+      const record = await getSession({ sessionId });
+      if (!record) {
+        throw new Error(`Session not found: ${sessionId}`);
       }
+      transcriptTitle = record.meta.title;
+      transcriptMessages = record.messageBlocks?.length
+        ? record.messageBlocks
+        : createMessageBlocks(record.events);
 
       await copyTextToClipboard(formatSessionTranscript(transcriptTitle, transcriptMessages));
     } catch (error) {
       console.error("Failed to copy session transcript", error);
     }
-  }, [activeSessionId, localSessionRecords, messages, sessionRecord?.meta.title, sessions]);
+  }, [sessions]);
 
   const handleForkSession = useCallback(async (sessionId: string) => {
     if (
@@ -2416,35 +2246,12 @@ export function App() {
     }
 
     try {
-      let forked: SessionRecord;
-      if (!hasActspaceBridge()) {
-        const source = localSessionRecords[sessionId] ?? (sessionRecord?.meta.id === sessionId ? sessionRecord : null);
-        if (!source) throw new Error(`Session not found: ${sessionId}`);
-        forked = createLocalForkSession(source);
-        setLocalSessionRecords((current) => ({ ...current, [forked.meta.id]: forked }));
-        setSessions((current) => [
-          {
-            id: forked.meta.id,
-            title: forked.meta.title,
-            updatedAt: forked.meta.updatedAt,
-            agentRunCount: forked.meta.agentRunCount,
-            workspaceId: forked.meta.workspaceId,
-            workspaceRoot: forked.meta.workspaceRoot,
-          },
-          ...current,
-        ]);
-      } else {
-        if (!window.actspace.forkSession) {
-          throw new Error("Session fork is not available");
-        }
-        forked = await window.actspace.forkSession({ sessionId });
-        const refreshed = await readSidebarSessions();
-        setSessions(refreshed);
-        await refreshWorkspaces();
-      }
+      const forked = await forkSession({ sessionId });
+      const refreshed = await readSidebarSessions();
+      setSessions(refreshed);
+      await refreshWorkspaces();
 
       setActiveSessionId(forked.meta.id);
-      setAgentRunResult(null);
       setSessionRecord(forked);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
         forked.meta.worktree?.sourceWorkspaceRoot ?? forked.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
@@ -2458,24 +2265,15 @@ export function App() {
     approvalPendingSessionIds,
     bootstrapState?.workspaceRoot,
     busySessionIds,
-    localSessionRecords,
     refreshWorkspaces,
-    sessionRecord,
     setApprovalPendingForSession,
     setFailedForSession,
   ]);
 
   const handleTogglePin = useCallback(
     async (sessionId: string, nextPinned: boolean) => {
-      if (!hasActspaceBridge()) {
-        setSessions((current) =>
-          current.map((session) => (session.id === sessionId ? { ...session, pinned: nextPinned } : session)),
-        );
-        return;
-      }
-
       try {
-        await window.actspace.pinSession({ sessionId, pinned: nextPinned });
+        await sessionsApi.pin({ sessionId, pinned: nextPinned });
         const refreshed = await readSidebarSessions();
         setSessions(refreshed);
       } catch (error) {
@@ -2501,32 +2299,8 @@ export function App() {
         );
       };
 
-      if (!hasActspaceBridge()) {
-        updateSessionTitle();
-        setLocalSessionRecords((current) => {
-          const record = current[sessionId];
-          if (!record) return current;
-          return {
-            ...current,
-            [sessionId]: {
-              ...record,
-              meta: {
-                ...record.meta,
-                title: nextTitle,
-              },
-            },
-          };
-        });
-        return;
-      }
-
-      if (!window.actspace.renameSession) {
-        console.error("Session rename is not available");
-        return;
-      }
-
       try {
-        const result = await window.actspace.renameSession({ sessionId, title: nextTitle });
+        const result = await sessionsApi.rename({ sessionId, title: nextTitle });
         if (!result.ok) {
           console.error("Failed to rename session", result.error);
           return;
@@ -2550,19 +2324,9 @@ export function App() {
     async (sessionId: string) => {
       if (!sessionId || sessionId === activeSessionId) return;
 
-      if (!hasActspaceBridge()) {
-        setSessions((current) => current.filter((session) => session.id !== sessionId));
-        setLocalSessionRecords((current) => {
-          const next = { ...current };
-          delete next[sessionId];
-          return next;
-        });
-        return;
-      }
-
       setSessions((current) => current.filter((session) => session.id !== sessionId));
       try {
-        const result = await window.actspace.archiveSession({ sessionId, archived: true });
+        const result = await sessionsApi.archive({ sessionId, archived: true });
         if (!result.ok) throw new Error(result.error ?? "Archive request failed");
       } catch (error) {
         console.error("Failed to archive session", error);
@@ -2577,8 +2341,7 @@ export function App() {
   );
 
   const handleOpenWorkspace = useCallback(async (workspaceId: string) => {
-    if (!hasActspaceBridge() || !window.actspace.openWorkspaceInIde) return;
-    const result = await window.actspace.openWorkspaceInIde({ workspaceId });
+    const result = await workspacesApi.openInIde({ workspaceId });
     if (!result.ok) {
       console.error("Failed to open workspace in IDE", result.error);
     }
@@ -2588,7 +2351,7 @@ export function App() {
     if (!workspaceRoot && workspaceId === workspaceRegistry?.defaultWorkspaceId) {
       workspaceRoot = workspaceRegistry.items.find((workspace) => workspace.id === workspaceId)?.path;
     }
-    const archiveCandidates = hasActspaceBridge() ? await window.actspace.listSessions() : sessions;
+    const archiveCandidates = await sessionsApi.list();
     const targetSessionIds = archiveCandidates
       .filter((session) =>
         session.workspaceId === workspaceId ||
@@ -2618,16 +2381,7 @@ export function App() {
       }
     }
 
-    if (!hasActspaceBridge()) {
-      const targets = new Set(targetSessionIds);
-      setSessions((current) => current.filter((session) => !targets.has(session.id)));
-      setLocalSessionRecords((current) => Object.fromEntries(
-        Object.entries(current).filter(([sessionId]) => !targets.has(sessionId)),
-      ));
-      return;
-    }
-    if (!window.actspace.archiveSessions) return;
-    const result = await window.actspace.archiveSessions({ sessionIds: targetSessionIds });
+    const result = await sessionsApi.archiveMany({ sessionIds: targetSessionIds });
     const refreshed = await readSidebarSessions();
     setSessions(refreshed);
     if (!result.ok) {
@@ -2655,12 +2409,9 @@ export function App() {
       );
       if (fallback) {
         setActiveSessionId(fallback.id);
-        const restored = hasActspaceBridge()
-          ? await readSessionPage(fallback.id)
-          : localSessionRecords[fallback.id] ?? null;
+        const restored = await readSessionPage(fallback.id);
         if (!restored || activeSessionIdRef.current !== fallback.id) return;
         setSessionRecord(restored);
-        setAgentRunResult(null);
         setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
           restored.meta.workspaceRoot ?? fallback.workspaceRoot ?? bootstrapState?.workspaceRoot,
         ));
@@ -2670,14 +2421,7 @@ export function App() {
       }
     }
 
-    if (!hasActspaceBridge() || !window.actspace.setWorkspaceVisibility) {
-      setWorkspaceRegistry((current) => current ? {
-        ...current,
-        items: current.items.map((workspace) => workspace.id === workspaceId ? { ...workspace, hidden: true } : workspace),
-      } : current);
-      return;
-    }
-    const result = await window.actspace.setWorkspaceVisibility({ workspaceId, hidden: true });
+    const result = await workspacesApi.setVisibility({ workspaceId, hidden: true });
     if (!result.ok) {
       console.error("Failed to remove workspace from sidebar", result.error);
       return;
@@ -2689,11 +2433,9 @@ export function App() {
         bootstrapState?.workspaceRoot,
       ));
     }
-  }, [activeSessionId, bootstrapState?.workspaceRoot, createSessionForInput, localSessionRecords, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry]);
+  }, [activeSessionId, bootstrapState?.workspaceRoot, createSessionForInput, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry]);
 
   const handleArchivedSessionsChange = useCallback(async () => {
-    if (!hasActspaceBridge()) return;
-
     try {
       const refreshed = await readSidebarSessions();
       setSessions(refreshed);
@@ -2703,8 +2445,7 @@ export function App() {
   }, []);
 
   const getSessionPreview = useCallback(async (session: SessionListItem) => {
-    if (!hasActspaceBridge() || !window.actspace.getSessionPreview) return null;
-    return window.actspace.getSessionPreview({ sessionId: session.id });
+    return sessionsApi.getPreview({ sessionId: session.id });
   }, []);
 
   const handleReviewChanged = useCallback(() => {

@@ -30,17 +30,18 @@ vi.mock("@xterm/addon-fit", () => ({
 }));
 
 import { TerminalRenderView } from "../components/right-panel/TerminalRenderView";
+import { setupBridge } from "./helpers/bridge";
 
 describe("TerminalRenderView chrome", () => {
   beforeEach(() => {
     terminalMocks.listener = undefined;
     terminalMocks.write.mockClear();
-    window.actspace = {
-      onTerminalEvent: vi.fn((listener) => {
+    setupBridge({
+      "events.terminal": vi.fn((listener) => {
         terminalMocks.listener = listener as (event: Record<string, unknown>) => void;
         return () => undefined;
       }),
-      attachTerminal: vi.fn(async () => ({
+      "terminal.attach": vi.fn(async () => ({
         ok: true as const,
         terminal: {
           id: "terminal-1",
@@ -50,10 +51,10 @@ describe("TerminalRenderView chrome", () => {
           createdAt: new Date().toISOString(),
         },
       })),
-      resizeTerminal: vi.fn(async () => ({ ok: true as const })),
-      ackTerminal: vi.fn(async () => ({ ok: true as const })),
-      detachTerminal: vi.fn(async () => ({ ok: true as const })),
-    } as unknown as Window["actspace"];
+      "terminal.resize": vi.fn(async () => ({ ok: true as const })),
+      "terminal.ack": vi.fn(async () => ({ ok: true as const })),
+      "terminal.detach": vi.fn(async () => ({ ok: true as const })),
+    });
   });
 
   it("hides the decorative bottom scrollbar and only shows status chrome after exit", async () => {

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
 import { mockUsageActivity } from "./fixtures/usageStatisticsFixture";
 import type { SettingsV4Snapshot, UsageActivitySnapshot } from "@actspace/shared";
+import { overrideBridge } from "./helpers/bridge";
 
 const data: UsageActivitySnapshot = { ...mockUsageActivity, costSummary: { costUsd: 0.123456, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 }, rows: mockUsageActivity.rows.map((row) => row.costUsd === null ? row : { ...row, costAmount: row.costUsd, costCurrency: "USD", costBasis: "estimated" }) };
 describe("使用统计", () => {
@@ -43,7 +44,7 @@ describe("使用统计", () => {
   });
   it("removes pricing UI and never reads or refreshes the catalog on entry", () => {
     const get = vi.fn(); const refresh = vi.fn();
-    window.actspace = { ...window.actspace, getPricingCatalog: get, refreshPricingCatalog: refresh };
+    overrideBridge({ "models.getPricingCatalog": get, "models.refreshPricingCatalog": refresh });
     const saved = { settings: { activity: { usage: { range: "30d", status: "all", modelFilter: "", showDetails: true, activeTab: "pricing" } } } } as unknown as SettingsV4Snapshot;
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={data} settingsV4={saved} />);
     expect(screen.getByRole("tab", { name: /请求日志/ })).toHaveAttribute("aria-selected", "true");

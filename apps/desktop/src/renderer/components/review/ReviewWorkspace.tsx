@@ -4,6 +4,8 @@ import { ReviewDiffCanvas } from "./ReviewDiffCanvas";
 import { ReviewFileTree } from "./ReviewFileTree";
 import { ReviewToolbar } from "./ReviewToolbar";
 import { useReviewWorkspaceStore } from "./review-store";
+import { reviewApi } from "../../api/review";
+import { workspacesApi } from "../../api/workspaces";
 
 export function ReviewWorkspace({ workspaceRoot, sessionId, refreshKey, onReviewChanged }: {
   workspaceRoot?: string;
@@ -50,8 +52,8 @@ export function ReviewWorkspace({ workspaceRoot, sessionId, refreshKey, onReview
   }, [patchState, splitAvailable, state.diffMode]);
 
   const copyGitApplyCommand = async () => {
-    if (!state.snapshot || !window.actspace?.copyReviewGitApplyCommand) return;
-    const result = await window.actspace.copyReviewGitApplyCommand({
+    if (!state.snapshot) return;
+    const result = await reviewApi.copyGitApplyCommand({
       workspaceRoot,
       sessionId: sessionId ?? undefined,
       snapshotId: state.snapshot.id,
@@ -135,8 +137,8 @@ function GitDialog({ workspaceRoot, onClose, onDone }: { workspaceRoot?: string;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async (push: boolean) => {
-    const api = push ? window.actspace?.commitAndPushWorkspaceChanges : window.actspace?.commitWorkspaceChanges;
-    if (!api || !message.trim()) return;
+    const api = push ? workspacesApi.commitAndPush : workspacesApi.commit;
+    if (!message.trim()) return;
     setBusy(true); setError(null);
     const result = await api({ workspaceRoot, message: message.trim(), includeUnstagedChanges: true });
     setBusy(false);
@@ -147,7 +149,7 @@ function GitDialog({ workspaceRoot, onClose, onDone }: { workspaceRoot?: string;
 
 function PullRequestDialog({ workspaceRoot, onClose }: { workspaceRoot?: string; onClose: () => void }) {
   const [title, setTitle] = useState(""); const [body, setBody] = useState(""); const [baseBranch, setBaseBranch] = useState("main"); const [draft, setDraft] = useState(false); const [busy, setBusy] = useState(false); const [message, setMessage] = useState<string | null>(null);
-  useEffect(() => { void window.actspace?.getReviewPullRequestCapability?.({ workspaceRoot }).then((result) => { if (result.ok) { if (result.capability.baseBranch) setBaseBranch(result.capability.baseBranch); if (!result.capability.enabled) setMessage(result.capability.message ?? "创建 PR 暂不可用。"); } }); }, [workspaceRoot]);
-  const create = async () => { if (!window.actspace?.createReviewPullRequest || !title.trim()) return; setBusy(true); const result = await window.actspace.createReviewPullRequest({ workspaceRoot, title: title.trim(), body, baseBranch, draft }); setBusy(false); if (result.ok === true) onClose(); else setMessage(result.message); };
+  useEffect(() => { void reviewApi.getPullRequestCapability({ workspaceRoot }).then((result) => { if (result.ok) { if (result.capability.baseBranch) setBaseBranch(result.capability.baseBranch); if (!result.capability.enabled) setMessage(result.capability.message ?? "创建 PR 暂不可用。"); } }); }, [workspaceRoot]);
+  const create = async () => { if (!title.trim()) return; setBusy(true); const result = await reviewApi.createPullRequest({ workspaceRoot, title: title.trim(), body, baseBranch, draft }); setBusy(false); if (result.ok === true) onClose(); else setMessage(result.message); };
   return <DialogShell title="创建拉取请求" onClose={onClose}><div className="grid gap-3 p-4"><label className="grid gap-1 text-act-xs text-text-muted">标题<input autoFocus className="h-9 rounded-act-sm border border-line bg-surface px-2 text-act-sm text-text-main outline-none focus:border-focus-ring" value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="grid gap-1 text-act-xs text-text-muted">目标分支<input className="h-9 rounded-act-sm border border-line bg-surface px-2 text-act-sm text-text-main outline-none focus:border-focus-ring" value={baseBranch} onChange={(event) => setBaseBranch(event.target.value)} /></label><label className="grid gap-1 text-act-xs text-text-muted">说明<textarea className="min-h-24 resize-y rounded-act-sm border border-line bg-surface p-2 text-act-xs text-text-main outline-none focus:border-focus-ring" value={body} onChange={(event) => setBody(event.target.value)} /></label><label className="flex items-center gap-2 text-act-xs text-text-main"><input type="checkbox" checked={draft} onChange={(event) => setDraft(event.target.checked)} />创建为草稿</label>{message ? <div className="text-act-xs text-text-muted">{message}</div> : null}<div className="flex justify-end gap-2"><button type="button" className="h-8 px-3 text-act-xs text-text-muted" onClick={onClose}>取消</button><button type="button" disabled={busy || !title.trim()} className="inline-flex h-8 items-center gap-1.5 rounded-act-sm bg-action px-3 text-act-xs font-medium text-on-action disabled:opacity-40" onClick={() => void create()}>{busy ? <Loader2 size={13} className="animate-spin" /> : <GitPullRequestArrow size={13} />}创建 PR</button></div></div></DialogShell>;
 }

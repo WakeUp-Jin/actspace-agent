@@ -5,6 +5,8 @@ import { Boxes, Check, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
 import { PROVIDER_IDS, PROVIDER_REGISTRY, type AppSettings, type InstalledModelView, type ModelKey, type ProviderSettingsView, type LlmProviderId } from "@actspace/shared";
 import { SectionShell, Toggle } from "./SettingsPrimitives";
 import { OpenRouterModelCatalogDialog } from "./OpenRouterModelCatalogDialog";
+import { modelsApi } from "../../api/models";
+import { settingsApi } from "../../api/settings";
 
 export function ModelSettings({ settings, onChanged, embedded = false, embeddedPlain = false, providerFilter, connectionFilter }: { settings: AppSettings; onChanged?: () => void | Promise<void>; embedded?: boolean; embeddedPlain?: boolean; providerFilter?: LlmProviderId; connectionFilter?: string }) {
   const [installed, setInstalled] = useState<InstalledModelView[]>([]);
@@ -16,33 +18,29 @@ export function ModelSettings({ settings, onChanged, embedded = false, embeddedP
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    if (!window.actspace.listInstalledModels) return;
     const [installedResult] = await Promise.all([
-      window.actspace.listInstalledModels(),
+      modelsApi.listInstalled(),
     ]);
     setInstalled(installedResult.models);
   };
-  useEffect(() => { void load(); void window.actspace.refreshPricingCatalog?.({ force: false }).catch(() => undefined); }, []);
-  useEffect(() => { void window.actspace.getSettingsV4?.().then((snapshot) => { if (snapshot) setConnections(Object.values(snapshot.settings.models.connections).map((connection) => ({ id: connection.connectionId, label: connection.displayName ?? connection.connectionId }))); }); }, []);
+  useEffect(() => { void load(); void modelsApi.refreshPricingCatalog({ force: false }).catch(() => undefined); }, []);
+  useEffect(() => { void settingsApi.getV4().then((snapshot) => { setConnections(Object.values(snapshot.settings.models.connections).map((connection) => ({ id: connection.connectionId, label: connection.displayName ?? connection.connectionId }))); }); }, []);
 
   const toggleModel = async (modelKey: ModelKey, enabled: boolean) => {
-    if (!window.actspace.updateModel) return;
-    const result = await window.actspace.updateModel({ modelKey, enabled });
+    const result = await modelsApi.update({ modelKey, enabled });
     if ("error" in result) setError(result.error.message);
     await load(); await onChanged?.();
   };
 
   const removeModel = async (modelKey: ModelKey) => {
-    if (!window.actspace.removeModel) return;
-    const result = await window.actspace.removeModel({ modelKey });
+    const result = await modelsApi.remove({ modelKey });
     if ("error" in result) setError(`${result.error.message}${result.error.references?.length ? `（${result.error.references.join("、")}）` : ""}`);
     await load(); await onChanged?.();
   };
 
   const updateCredential = async (modelKey: ModelKey, credentialId: string | null) => {
-    if (!window.actspace.updateModel) return;
     setError(null);
-    const result = await window.actspace.updateModel({ modelKey, credentialId });
+    const result = await modelsApi.update({ modelKey, credentialId });
     if ("error" in result) setError(result.error.message);
     await load(); await onChanged?.();
   };
@@ -52,13 +50,11 @@ export function ModelSettings({ settings, onChanged, embedded = false, embeddedP
     await onChanged?.();
   };
 
-  if (!window.actspace?.listInstalledModels) return <SectionShell title="模型" description="仅桌面端可管理模型。"><div /></SectionShell>;
-
   const saveReasoning = async () => {
-    if (!reasoningModel || !window.actspace.updateModel) return;
+    if (!reasoningModel) return;
     setSavingReasoning(true); setError(null);
     try {
-      const result = await window.actspace.updateModel({ modelKey: reasoningModel.definition.key, reasoningConfig });
+      const result = await modelsApi.update({ modelKey: reasoningModel.definition.key, reasoningConfig });
       if ("error" in result) { setError(result.error.message); return; }
       setReasoningModel(null); await load(); await onChanged?.();
     } catch (e) { setError(e instanceof Error ? e.message : "保存失败。"); }
@@ -74,7 +70,7 @@ export function ModelSettings({ settings, onChanged, embedded = false, embeddedP
               ? model.settings.connectionId === connectionFilter
               : !providerFilter || !model.settings.connectionId || model.settings.connectionId === `${provider}:default`));
             if (!models.length) return null;
-              return <section key={provider}>{embeddedPlain ? null : <div className="mb-2 flex items-center gap-2 text-act-sm font-medium text-text-main"><Boxes size={15} />{PROVIDER_REGISTRY[provider].label}<span className="text-act-xxs font-normal text-text-faint">{models.filter((model) => model.settings.enabled).length} / {models.length} 启用</span></div>}{embedded ? <ModelMultiSelector models={models} onChange={async (keys) => { const enabled = new Set(keys); await Promise.all(models.map((model) => toggleModel(model.definition.key, enabled.has(model.definition.key)))); }} onReasoning={(model) => { setReasoningModel(model); setReasoningConfig(model.definition.reasoningConfig ?? { mode: "auto" }); setError(null); }} /> : <div className="divide-y divide-line/70 overflow-hidden rounded-act-lg bg-surface-subtle">{models.map((model) => <ModelRow key={model.definition.key} model={model} provider={settings.providers[provider]} connections={connections.filter((connection) => connection.id.endsWith(":default") || connection.id.startsWith(`${provider}:`) || connection.id === model.settings.connectionId)} onToggle={toggleModel} onRemove={removeModel} onCredentialChange={updateCredential} onConnectionChange={async (key, connectionId) => { if (!window.actspace.updateModel) return; await window.actspace.updateModel({ modelKey: key, connectionId }); await load(); await onChanged?.(); }} onReasoning={model.definition.source === "custom" ? () => { setReasoningModel(model); setReasoningConfig(model.definition.reasoningConfig ?? { mode: "auto" }); setError(null); } : undefined} />)}</div>}</section>;
+              return <section key={provider}>{embeddedPlain ? null : <div className="mb-2 flex items-center gap-2 text-act-sm font-medium text-text-main"><Boxes size={15} />{PROVIDER_REGISTRY[provider].label}<span className="text-act-xxs font-normal text-text-faint">{models.filter((model) => model.settings.enabled).length} / {models.length} 启用</span></div>}{embedded ? <ModelMultiSelector models={models} onChange={async (keys) => { const enabled = new Set(keys); await Promise.all(models.map((model) => toggleModel(model.definition.key, enabled.has(model.definition.key)))); }} onReasoning={(model) => { setReasoningModel(model); setReasoningConfig(model.definition.reasoningConfig ?? { mode: "auto" }); setError(null); }} /> : <div className="divide-y divide-line/70 overflow-hidden rounded-act-lg bg-surface-subtle">{models.map((model) => <ModelRow key={model.definition.key} model={model} provider={settings.providers[provider]} connections={connections.filter((connection) => connection.id.endsWith(":default") || connection.id.startsWith(`${provider}:`) || connection.id === model.settings.connectionId)} onToggle={toggleModel} onRemove={removeModel} onCredentialChange={updateCredential} onConnectionChange={async (key, connectionId) => { await modelsApi.update({ modelKey: key, connectionId }); await load(); await onChanged?.(); }} onReasoning={model.definition.source === "custom" ? () => { setReasoningModel(model); setReasoningConfig(model.definition.reasoningConfig ?? { mode: "auto" }); setError(null); } : undefined} />)}</div>}</section>;
           })}
         </div>
       </>;

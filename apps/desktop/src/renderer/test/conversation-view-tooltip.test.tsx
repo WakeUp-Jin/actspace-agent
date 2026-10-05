@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, vi } from "vitest";
+import { vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { ConversationView } from "../components/ConversationView";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { setupBridge } from "./helpers/bridge";
 
 const messages: MessageBlock[] = [
   {
@@ -84,10 +85,6 @@ function renderConversation(inputMessages: MessageBlock[] = messages) {
     </TooltipProvider>,
   );
 }
-
-afterEach(() => {
-  delete (window as unknown as { actspace?: unknown }).actspace;
-});
 
 describe("ConversationView tooltips", () => {
   it("keeps Thinking open until the final reply finishes, then collapses Work and Thinking", () => {
@@ -274,10 +271,7 @@ describe("ConversationView tooltips", () => {
       sourceHash: "hash",
       cached: false,
     }));
-    Object.defineProperty(window, "actspace", {
-      configurable: true,
-      value: { visualizeReply },
-    });
+    setupBridge({ "visualize.convertReply": visualizeReply });
     renderConversation([
       {
         kind: "user",
