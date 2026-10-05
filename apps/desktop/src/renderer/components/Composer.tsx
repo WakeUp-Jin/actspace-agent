@@ -46,7 +46,6 @@ import type {
   ContextUsageSnapshot,
   FileReference,
   LlmProviderId,
-  MainAgentForm,
   ModelReasoningEffort,
   ModelSelectionId,
   ResponseAnnotationReference,
@@ -102,7 +101,6 @@ export type ComposerExecutionContext = {
   gitContext: WorkspaceGitContext | null;
   selectedBranch?: string;
   runLocation: SessionRunLocation;
-  locked?: boolean;
   onSelectBranch?: (branch: string) => void;
   onSelectRunLocation?: (location: SessionRunLocation) => void;
   onUseExistingWorkspace?: () => void;
@@ -123,12 +121,6 @@ export type ComposerDraftRestore = {
 
 export type ComposerDraftReader = (draftKey: string) => string;
 export type ComposerDraftWriter = (draftKey: string, text: string) => void;
-/** 旧组件调用方的过渡类型；模式切换不再替换 Session。 */
-export type ComposerAgentFormSwitch = {
-  agentForm: MainAgentForm;
-  mode: ComposerMode;
-  draft: { text: string; attachments: ComposerAttachment[] };
-};
 export type ComposerReviewSummary = {
   status: "loading" | "changes" | "empty" | "notAvailable" | "noBaseline" | "partial" | "failed";
   additions?: number;
@@ -542,7 +534,6 @@ export function Composer({
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   mode?: ComposerMode;
   onModeChange?: (mode: ComposerMode) => void | Promise<void>;
-  onAgentFormChange?: (change: ComposerAgentFormSwitch) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
@@ -561,7 +552,6 @@ export function Composer({
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
   models?: UsableModelView[];
-  agentForm?: MainAgentForm;
   permissionControl?: ReactNode;
   /** 当前会话的草稿回复批注；由上层按会话持有，发送后通过 onResponseAnnotationsChange 清空。 */
   responseAnnotations?: readonly ResponseAnnotationReference[];

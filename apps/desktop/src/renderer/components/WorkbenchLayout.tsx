@@ -1,7 +1,7 @@
 import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
 import type { MessageQueueControls } from "./composer/MessageQueueTray";
-import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, ResponseAnnotationReference, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, ResponseAnnotationReference, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import type { PermissionMode } from "@actspace/shared/runtime-v2";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, FlaskConical, ShieldCheck } from "lucide-react";
@@ -16,7 +16,7 @@ import { SplitView } from "./SplitView";
 import { WindowChromeBar } from "./WindowChromeBar";
 import type { SessionMainView } from "./SessionViewToggle";
 import { WorkspaceChromeControls } from "./workspace/WorkspaceChromeControls";
-import type { ComposerAgentFormSwitch, ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
+import type { ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages, selectTrajectory } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
@@ -130,7 +130,6 @@ export function WorkbenchLayout({
   onSelectedModelChange,
   composerMode,
   onComposerModeChange,
-  onAgentFormChange,
   selectedSkills,
   onSelectedSkillsChange,
   onSettingsChange,
@@ -182,7 +181,6 @@ export function WorkbenchLayout({
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   composerMode?: ComposerMode;
   onComposerModeChange?: (mode: ComposerMode) => void | Promise<void>;
-  onAgentFormChange?: (change: ComposerAgentFormSwitch) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;
   models?: UsableModelView[];
@@ -197,7 +195,6 @@ export function WorkbenchLayout({
   getSessionPreview?: SessionPreviewResolver;
   reviewSummary?: ComposerReviewSummary | null;
   onReviewChanged?: () => void;
-  agentForm?: MainAgentForm;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(() =>
@@ -553,7 +550,7 @@ export function WorkbenchLayout({
       </div>
     );
   } else if (view === "lab") {
-    // Lab 仍在产品设计阶段：原型实现保留在 LabPage.tsx，功能定型后换回 <LabPage />。
+    // Lab 仍在产品设计阶段，入口先显示占位页；功能定型后再实现。
     mainContent = (
       <PlaceholderView
         eyebrow="Lab"
@@ -592,7 +589,6 @@ export function WorkbenchLayout({
         onSelectedModelChange={onSelectedModelChange}
         composerMode={composerMode}
         onComposerModeChange={onComposerModeChange}
-        onAgentFormChange={onAgentFormChange}
         selectedSkills={selectedSkills}
         onSelectedSkillsChange={onSelectedSkillsChange}
         workspaceOptions={workspaceOptions}

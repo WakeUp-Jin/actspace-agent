@@ -122,7 +122,7 @@ function Preview() {
       </div>
       <ConversationView messages={messages} contextSnapshot={null}
         sessionId="mermaid-fixture" isStreaming={streaming} composerPhase="active"
-        executionContext={{ locked: true, runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
+        executionContext={{ runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
     </div>
   </RightPanelProvider></TooltipProvider>;
 }

@@ -151,6 +151,8 @@ if (window && (event.sender !== window.webContents || event.senderFrame !== wind
 1. 只保留 `RUNTIME_V2_FIXED_RENDERER_CHANNELS` 这一套（它是 preload 实际使用的）。
 2. 删除 `projection-ipc.ts`、`RUNTIME_V2_DESKTOP_CHANNELS`、`RUNTIME_V2_DESKTOP_SHELL_CHANNELS`，以及对应的重复 `handle(...)` 行和双发事件。
 3. 删除 preload 的短别名表，preload 直接引用常量（见 04）。
+
+> 第 1、2 步已在 [10 冗余清理执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/10-冗余清理执行计划.md) 执行：`projection-ipc.ts`、DESKTOP_SHELL 的重复注册和双发事件已删除；`RUNTIME_V2_DESKTOP_SHELL_CHANNELS` 随 `shared/runtime-v2/desktop-shell.ts` 一起删除；`RUNTIME_V2_DESKTOP_CHANNELS` 已删除，`desktop-ipc.ts` 只保留仍被引用的类型。上面「证据」中的行号是 10 执行之前的。第 3 步随 13 执行。
 4. 先做一次 channel 使用审计脚本：列出 shared 里每个 channel 常量 → main 是否注册 → preload 是否调用，作为删除依据并放进 CI（见 §4）。
 
 ### P1-3 `fixed-renderer-ipc.ts` 是胖路由

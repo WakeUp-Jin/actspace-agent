@@ -37,7 +37,7 @@
 | D4 | `+` 面板范围 | 认可方案：Cursor 式统一面板（搜索、模式、文件、Skills、模型）；MCP 未实现不放；搜索里的「对话」暂无数据源不放 |
 | D4+ | 输入框外观 | 边框线太重，改为低对比细边 + 柔和阴影（Cursor 式），聚焦时加深阴影而不是加深边框 |
 | D5 | 浏览器 mock 模式 | **保留**。从 App 内 40 处分支改成注入式 mock bridge |
-| D6 | LabPage | **删除**，功能已不存在 |
+| D6 | LabPage | **删除**，功能已不存在（已在 10 删除；Lab 导航入口保留为占位页） |
 | D7 | UI 改动先出 demo | 输入框与远端连接的改动先给 HTML demo 确认，见 [`demo/composer-run-target-demo.html`](demo/composer-run-target-demo.html) |
 | D8 | 输入框 demo 第二轮确认（2026-10-05） | 按 demo 实施，06 §9 九项按 demo 默认值定稿；执行计划见 [09](../exec-plans/active/20261005-desktop-frontend-refactor/09-输入框优化执行计划.md)；2026-10-06 已批准，执行中 |
 | D9 | 执行方式（2026-10-05） | A1 按本文 §5 顺序；B1 每份设计文档一份任务级执行计划（10–17，加修订后的 09），由 [00 总执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/00-总执行计划.md) 统领，一起审一次；C2 settings-service 拆分纳入、排最后；C1（`applyToEnv`）、C3（协议）以后单独做；E 连续执行，只在设计偏差、修不好的测试、需要改协议时停下；J1 本轮不加主文档 CSP；J2 主线 `refactor/desktop-frontend` 加每份计划一个子分支，结束时 squash 成一个提交，不打 tag；J3 计划移进 `exec-plans/active/`；J4 附件随草稿保存 |
@@ -108,10 +108,10 @@
 | P1 | 切换会话时附件可能串会话（待真机验证） | 06 |
 | P1 | `useRemoteTarget` 返回值不稳定，`handleSend` / `executionContext` 每次重建 | 03 |
 | P1 | macOS 关窗后 pty 成孤儿；退出时 Browser Bridge / 更新服务未清理 | 01 |
-| P1 | 三套 IPC channel 并行注册，`projection-ipc` 18 个 handler 无调用方 | 01 |
+| P1 | ~~三套 IPC channel 并行注册，`projection-ipc` 18 个 handler 无调用方~~ 已在 10 处理：DESKTOP / DESKTOP_SHELL 两套已删除，只剩 FIXED | 01 |
 | P1 | 10+ 套弹层实现，Esc 一次关多层，多数对话框无焦点陷阱 | 05 |
-| P2 | LabPage / ExploreRunBlock / Sheet / terminal-ipc 等死代码 | 07 |
-| P2 | 70KB 轨迹 fixture 被打进生产包 | 07 |
+| P2 | ~~LabPage / ExploreRunBlock / Sheet / terminal-ipc 等死代码~~ 已在 10 处理 | 07 |
+| P2 | ~~70KB 轨迹 fixture 被打进生产包~~ 已在 10 处理 | 07 |
 
 ## 7. 本轮不做
 

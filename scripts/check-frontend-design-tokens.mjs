@@ -8,9 +8,6 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const rendererRoot = path.join(repoRoot, "apps/desktop/src/renderer");
 
-// v1 遗留页，主题规范已声明不属于当前契约（front-主题与配色规范.md「已退役页面」）。
-const SKIPPED_FILES = new Set(["components/LabPage.tsx"]);
-
 // 精确到「文件 + 匹配串」的例外；每条都要能说清为什么不用 token。
 export const LITERAL_ALLOWLIST = new Map([
   // 1–3px 的细进度条、时间轴刻度和指示点：圆角跟随元素厚度，不属于组件圆角档位。
@@ -51,7 +48,6 @@ function lineOf(source, index) {
 
 /** 检查单个文件的写死值；返回 { rule, match, line, hint }[]。 */
 export function checkSource(relative, source) {
-  if (SKIPPED_FILES.has(relative)) return [];
   const allowed = LITERAL_ALLOWLIST.get(relative) ?? [];
   const code = stripComments(source);
   const violations = [];
@@ -75,7 +71,6 @@ export function collectDefinedVariables(styleSources) {
 
 /** 检查组件引用的 token 是否已定义；返回 { match, variable, line }[]。 */
 export function checkTokenReferences(relative, source, defined) {
-  if (SKIPPED_FILES.has(relative)) return [];
   const code = stripComments(source);
   const missing = [];
   for (const reference of TOKEN_REFERENCES) {

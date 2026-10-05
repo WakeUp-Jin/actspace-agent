@@ -41,6 +41,21 @@ describe("TrajectoryView", () => {
     expect(screen.getByText(/暂无可展示的 Agent 轨迹/)).toBeInTheDocument();
   });
 
+  it("lazily loads the URL fixture and its theme override, restoring the theme on unmount", async () => {
+    const previousUrl = window.location.href;
+    window.history.replaceState(null, "", "?trajectoryFixture=complete&trajectoryTheme=dark");
+    try {
+      const view = render(<TrajectoryView snapshot={null} />);
+      await waitFor(() => expect(screen.queryByText(/暂无可展示的 Agent 轨迹/)).not.toBeInTheDocument());
+      expect(screen.getAllByRole("row").length).toBeGreaterThan(0);
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      view.unmount();
+      expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    } finally {
+      window.history.replaceState(null, "", previousUrl);
+    }
+  });
+
   it("reads the active Session trajectory directly from ClientSessionStore selectors", async () => {
     const events: SessionEventEnvelopeV1[] = snapshot.nodes.map(node => ({
       recordKind: "event",

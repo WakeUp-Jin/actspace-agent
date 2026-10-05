@@ -1901,63 +1901,60 @@ export function App() {
     lastSendOptionsRef.current.set(sessionId, options);
     setFailedForSession(sessionId, false);
     setCompactionFailureForSession(sessionId, null);
-    {
-      if (!window.actspace.submitTask) throw new Error("Host task service unavailable");
-      const submitted = { sessionId: visibleSessionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
-      const pendingKey = `actspace:pending-submission:${visibleSessionId}`;
-      const pendingStorage = visibleSessionId.startsWith("host:") ? localStorage : sessionStorage;
-      const previous = pendingStorage.getItem(pendingKey);
-      let saved: { content: string; id: string } | null = null;
-      try { saved = previous ? JSON.parse(previous) : null; } catch { /* obsolete draft */ }
-      const serialized = JSON.stringify(submitted);
-      const submissionId = saved?.content === serialized ? saved.id : crypto.randomUUID();
-      submittedOptionsRef.current.set(submissionId, options);
-      pendingStorage.setItem(pendingKey, JSON.stringify({ content: serialized, id: submissionId, draft: { sessionId: visibleSessionId, text, attachments: options.attachments?.map(({ previewUrl: _preview, ...attachment }) => attachment), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } }));
-      const restore = (error: string, issues?: { attachmentIssue?: import("@actspace/shared").ChatAttachmentIssue; referenceIssue?: import("@actspace/shared").ComposerReferenceIssue }) => {
-        const draft = { id: Date.now(), sessionId: visibleSessionId!, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error, ...issues };
-        draftsRef.current.set(visibleSessionId!, draft);
-        if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(draft);
-      };
-      try {
-        const configured = await taskCommand({ sessionId: visibleSessionId, op: "configure", configuration: { model: visibleSessionId.startsWith("host:") ? remoteTarget.model : options.model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills } });
-        if (!configured) throw new Error("无法更新任务配置，草稿已保留。");
-      } catch (error) {
+    if (!window.actspace.submitTask) throw new Error("Host task service unavailable");
+    const submitted = { sessionId: visibleSessionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
+    const pendingKey = `actspace:pending-submission:${visibleSessionId}`;
+    const pendingStorage = visibleSessionId.startsWith("host:") ? localStorage : sessionStorage;
+    const previous = pendingStorage.getItem(pendingKey);
+    let saved: { content: string; id: string } | null = null;
+    try { saved = previous ? JSON.parse(previous) : null; } catch { /* obsolete draft */ }
+    const serialized = JSON.stringify(submitted);
+    const submissionId = saved?.content === serialized ? saved.id : crypto.randomUUID();
+    submittedOptionsRef.current.set(submissionId, options);
+    pendingStorage.setItem(pendingKey, JSON.stringify({ content: serialized, id: submissionId, draft: { sessionId: visibleSessionId, text, attachments: options.attachments?.map(({ previewUrl: _preview, ...attachment }) => attachment), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } }));
+    const restore = (error: string, issues?: { attachmentIssue?: import("@actspace/shared").ChatAttachmentIssue; referenceIssue?: import("@actspace/shared").ComposerReferenceIssue }) => {
+      const draft = { id: Date.now(), sessionId: visibleSessionId!, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error, ...issues };
+      draftsRef.current.set(visibleSessionId!, draft);
+      if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(draft);
+    };
+    try {
+      const configured = await taskCommand({ sessionId: visibleSessionId, op: "configure", configuration: { model: visibleSessionId.startsWith("host:") ? remoteTarget.model : options.model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills } });
+      if (!configured) throw new Error("无法更新任务配置，草稿已保留。");
+    } catch (error) {
+      pendingStorage.removeItem(pendingKey);
+      submittedOptionsRef.current.delete(submissionId);
+      const message = error instanceof Error ? error.message : "无法更新任务配置，草稿已保留。";
+      restore(message); throw new Error(message);
+    }
+    const attempt = async (): Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult> => {
+      try { return await window.actspace.submitTask!({ ...submitted, submissionId }); }
+      catch { return { status: "submission-failed" as const, acknowledgement: "unknown" as const, message: "提交尚未确认，再次发送将核对同一次提交。" }; }
+    };
+    let result = await attempt();
+    if ("status" in result && result.status === "submission-failed" && result.acknowledgement === "unknown") {
+      setComposerNotice({ sessionId: visibleSessionId, text: "提交结果尚未确认，正在用同一标识核对。" });
+      result = await attempt();
+    }
+    if ("status" in result && result.status === "submission-failed") {
+      if (result.acknowledgement === "rejected") {
         pendingStorage.removeItem(pendingKey);
         submittedOptionsRef.current.delete(submissionId);
-        const message = error instanceof Error ? error.message : "无法更新任务配置，草稿已保留。";
-        restore(message); throw new Error(message);
       }
-      const attempt = async (): Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult> => {
-        try { return await window.actspace.submitTask!({ ...submitted, submissionId }); }
-        catch { return { status: "submission-failed" as const, acknowledgement: "unknown" as const, message: "提交尚未确认，再次发送将核对同一次提交。" }; }
-      };
-      let result = await attempt();
-      if ("status" in result && result.status === "submission-failed" && result.acknowledgement === "unknown") {
-        setComposerNotice({ sessionId: visibleSessionId, text: "提交结果尚未确认，正在用同一标识核对。" });
-        result = await attempt();
-      }
-      if ("status" in result && result.status === "submission-failed") {
-        if (result.acknowledgement === "rejected") {
-          pendingStorage.removeItem(pendingKey);
-          submittedOptionsRef.current.delete(submissionId);
-        }
-        const message = result.acknowledgement === "unknown" ? "提交尚未确认，再次发送将核对同一次提交。" : result.message;
-        restore(result.attachmentIssue ? formatChatAttachmentIssue(result.attachmentIssue) : result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : message, result); throw new Error(message);
-      }
-      pendingStorage.removeItem(pendingKey);
-      draftsRef.current.delete(visibleSessionId);
-      if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(null);
-      if (activeSessionIdRef.current === visibleSessionId) setSendScrollRequestId(value => value + 1);
-      // Receipt already proves acceptance; a failed refresh must not restore a sent draft.
-      await refreshTaskQueue(visibleSessionId).catch(console.error);
-      const snapshot = taskSnapshotsRef.current.get(visibleSessionId);
-      const acceptedTaskId = "task" in result ? result.task.taskId : null;
-      if (resumeAfterAcceptance && snapshot?.paused && snapshot.tasks.some(task => task.taskId === acceptedTaskId && task.state === "pending")) {
-        await taskCommand({ op: "resume", sessionId: visibleSessionId, revision: snapshot.revision });
-      }
-      return;
+      const message = result.acknowledgement === "unknown" ? "提交尚未确认，再次发送将核对同一次提交。" : result.message;
+      restore(result.attachmentIssue ? formatChatAttachmentIssue(result.attachmentIssue) : result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : message, result); throw new Error(message);
     }
-
+    pendingStorage.removeItem(pendingKey);
+    draftsRef.current.delete(visibleSessionId);
+    if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(null);
+    if (activeSessionIdRef.current === visibleSessionId) setSendScrollRequestId(value => value + 1);
+    // Receipt already proves acceptance; a failed refresh must not restore a sent draft.
+    await refreshTaskQueue(visibleSessionId).catch(console.error);
+    const snapshot = taskSnapshotsRef.current.get(visibleSessionId);
+    const acceptedTaskId = "task" in result ? result.task.taskId : null;
+    if (resumeAfterAcceptance && snapshot?.paused && snapshot.tasks.some(task => task.taskId === acceptedTaskId && task.state === "pending")) {
+      await taskCommand({ op: "resume", sessionId: visibleSessionId, revision: snapshot.revision });
+    }
+    return;
   }, [remoteTarget, sessionRecord, selectedWorkspaceRoot, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, createSessionForInput, taskCommand, refreshTaskQueue]);
 
   useEffect(() => {
@@ -2342,7 +2339,6 @@ export function App() {
     targetLocked: !!sessionRecord,
     selectedBranch,
     runLocation,
-    locked: (sessionRecord?.meta.agentRunCount ?? 0) > 0,
     onSelectBranch: setSelectedBranch,
     onSelectRunLocation: setRunLocation,
     onUseExistingWorkspace: handleUseExistingWorkspace,

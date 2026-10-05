@@ -41,7 +41,6 @@
     "src/main/terminal/node-pty-terminal-backend.ts",
     "src/main/terminal/shell-environment-service.ts",
     "src/main/terminal/terminal-process-cleanup.ts",
-    "src/main/terminal/terminal-ipc.ts",
     "src/main/runtime-v2",
     "src/preload/index.ts"
   ]

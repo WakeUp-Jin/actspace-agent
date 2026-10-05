@@ -80,12 +80,6 @@ export function SessionProjectionProvider({
   return <SessionProjectionContext.Provider value={value}>{children}</SessionProjectionContext.Provider>;
 }
 
-export function useSessionProjection(): SessionProjectionContextValue {
-  const value = useContext(SessionProjectionContext);
-  if (value === null) throw new Error("useSessionProjection must be used within a SessionProjectionProvider");
-  return value;
-}
-
 /** Optional form for isolated renderer component tests and non-chat surfaces. */
 export function useOptionalSessionProjection(): SessionProjectionContextValue | null {
   return useContext(SessionProjectionContext);

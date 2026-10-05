@@ -60,7 +60,7 @@ describe("Composer Git status evidence", () => {
     "does not claim detached HEAD for a locked session with %s context",
     (status) => {
       renderComposer({ surface: "followup", executionContext: {
-        locked: true, runLocation: "this_mac",
+        runLocation: "this_mac",
         gitContext: status === "loading" ? null : { status, workspaceRoot: "/work/notes", branches: [] },
       } });
       expect(screen.getByText("本机")).toBeVisible();
@@ -70,7 +70,7 @@ describe("Composer Git status evidence", () => {
 
   it("shows detached HEAD only with confirmed commit evidence", () => {
     renderComposer({ surface: "followup", executionContext: {
-      locked: true, runLocation: "this_mac",
+      runLocation: "this_mac",
       gitContext: { status: "ready", workspaceRoot: "/work/repo", branches: [], detachedCommit: "01234567", headCommit: "0123456789abcdef" },
     } });
     expect(screen.getByText("分离的 HEAD")).toBeVisible();
@@ -78,7 +78,7 @@ describe("Composer Git status evidence", () => {
 
   it("keeps the known worktree branch while Git context is absent", () => {
     renderComposer({ surface: "followup", executionContext: {
-      locked: true, runLocation: "worktree", selectedBranch: "actspace/12345678", gitContext: null,
+      runLocation: "worktree", selectedBranch: "actspace/12345678", gitContext: null,
     } });
     expect(screen.getByText("actspace/12345678")).toBeVisible();
   });

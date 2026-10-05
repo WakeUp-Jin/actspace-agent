@@ -42,7 +42,7 @@ function Preview() {
       </div>
       <ConversationView messages={messages} contextSnapshot={null}
         sessionId="visual-fixture" isStreaming={phase !== "completed"} composerPhase="active"
-        executionContext={{ locked: true, runLocation: "this_mac", gitContext: contexts[git] }} />
+        executionContext={{ runLocation: "this_mac", gitContext: contexts[git] }} />
     </div>
   </RightPanelProvider></TooltipProvider>;
 }

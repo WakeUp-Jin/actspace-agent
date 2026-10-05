@@ -12,7 +12,7 @@ import type {
   WorkspaceReadFileInput,
   WorkspaceStatFileInput,
 } from "@actspace/shared";
-import { RUNTIME_V2_DESKTOP_SHELL_CHANNELS, RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
+import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import type { AppDataRoots } from "../app-paths";
 import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, type WorkspaceRegistryOptions } from "../workspace-registry-service";
 import { listWorkspaceDir, readWorkspaceFile, statWorkspaceFile } from "../workspace-fs-service";
@@ -29,7 +29,6 @@ type ShellOptions = {
   readonly getMainWindow?: () => BrowserWindow | undefined;
   readonly terminal?: TerminalSessionService;
   readonly terminalAvailable?: boolean;
-  readonly terminalUnavailableReason?: string;
 };
 
 export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(): void } {
@@ -46,7 +45,6 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   const unsubscribeReview = review.subscribe((notification) => {
     const target = options.getMainWindow?.();
     if (target && !target.isDestroyed()) {
-      target.webContents.send(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.reviewChanged, notification);
       target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reviewChanged, notification);
     }
   });
@@ -64,30 +62,15 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     handlers.push(channel);
   };
 
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.capabilities, () => ({
-    workspace: { available: true },
-    review: { available: true },
-    terminal: { available: terminalAvailable, reason: terminalAvailable ? null : (options.terminalUnavailableReason ?? "Terminal capability is unavailable in this build.") },
-  }));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.listWorkspaces, () => readWorkspaceRegistry(registryOptions));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaces, () => readWorkspaceRegistry(registryOptions));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.listWorkspaceDir, (_event: unknown, input: WorkspaceListDirInput) => listWorkspaceDir(input, options.roots));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaceDir, (_event: unknown, input: WorkspaceListDirInput) => listWorkspaceDir(input, options.roots));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.readWorkspaceFile, (_event: unknown, input: WorkspaceReadFileInput) => readWorkspaceFile(input, options.roots));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readWorkspaceFile, (_event: unknown, input: WorkspaceReadFileInput) => readWorkspaceFile(input, options.roots));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.statWorkspaceFile, (_event: unknown, input: WorkspaceStatFileInput) => statWorkspaceFile(input, options.roots));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.statWorkspaceFile, (_event: unknown, input: WorkspaceStatFileInput) => statWorkspaceFile(input, options.roots));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.getReviewSnapshot, (_event: unknown, input: ReviewGetSnapshotInput) => review.getSnapshot(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot, (_event: unknown, input: ReviewGetSnapshotInput) => review.getSnapshot(input));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.refreshReviewSnapshot, (_event: unknown, input: ReviewGetSnapshotInput) => review.refreshSnapshot(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot, (_event: unknown, input: ReviewGetSnapshotInput) => review.refreshSnapshot(input));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.getReviewFileDiffs, (_event: unknown, input: ReviewGetFileDiffsInput) => review.getFileDiffs(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewFileDiffs, (_event: unknown, input: ReviewGetFileDiffsInput) => review.getFileDiffs(input));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.getReviewFileContents, (_event: unknown, input: ReviewGetFileContentsInput) => review.getFileContents(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewFileContents, (_event: unknown, input: ReviewGetFileContentsInput) => review.getFileContents(input));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.applyReviewMutation, (_event: unknown, input: Parameters<ReviewCoordinator["applyMutation"]>[0]) => review.applyMutation(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.applyReviewMutation, (_event: unknown, input: Parameters<ReviewCoordinator["applyMutation"]>[0]) => review.applyMutation(input));
-  handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.setReviewFileViewed, (_event: unknown, input: Parameters<ReviewCoordinator["setFileViewed"]>[0]) => review.setFileViewed(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setReviewFileViewed, (_event: unknown, input: Parameters<ReviewCoordinator["setFileViewed"]>[0]) => review.setFileViewed(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listReviewBranches, async (_event: unknown, input: ReviewWorkspaceInput) => {
     const resolved = await resolveReviewWorkspace(registryOptions, input);
@@ -140,14 +123,6 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     return result;
   });
   if (terminalAvailable && options.terminal) {
-    handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.terminalCreate, (event: Electron.IpcMainInvokeEvent, input: TerminalCreateInput) => options.terminal!.create(input.sessionId, event.sender.id, input.cols, input.rows));
-    handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.terminalList, (event: Electron.IpcMainInvokeEvent, input: TerminalListInput) => ({ terminals: options.terminal!.list(input.sessionId, event.sender.id) }));
-    handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.terminalAttach, (event: Electron.IpcMainInvokeEvent, input: TerminalAttachInput) => options.terminal!.attach(input.terminalId, event.sender.id, input.cols, input.rows));
-    handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.terminalDetach, (event: Electron.IpcMainInvokeEvent, input: TerminalDetachInput) => options.terminal!.detach(input.terminalId, event.sender.id));
-    handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.terminalWrite, (event: Electron.IpcMainInvokeEvent, input: TerminalWriteInput) => options.terminal!.write(input.terminalId, event.sender.id, input.data));
-    handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.terminalResize, (event: Electron.IpcMainInvokeEvent, input: TerminalResizeInput) => options.terminal!.resize(input.terminalId, event.sender.id, input.cols, input.rows));
-    handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.terminalAck, (event: Electron.IpcMainInvokeEvent, input: TerminalAckInput) => options.terminal!.ack(input.terminalId, event.sender.id, input.bytes));
-    handle(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.terminalClose, (event: Electron.IpcMainInvokeEvent, input: TerminalCloseInput) => options.terminal!.close(input.terminalId, event.sender.id));
     handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalCreate, (event: Electron.IpcMainInvokeEvent, input: TerminalCreateInput) => options.terminal!.create(input.sessionId, event.sender.id, input.cols, input.rows));
     handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalList, (event: Electron.IpcMainInvokeEvent, input: TerminalListInput) => ({ terminals: options.terminal!.list(input.sessionId, event.sender.id) }));
     handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalAttach, (event: Electron.IpcMainInvokeEvent, input: TerminalAttachInput) => options.terminal!.attach(input.terminalId, event.sender.id, input.cols, input.rows));

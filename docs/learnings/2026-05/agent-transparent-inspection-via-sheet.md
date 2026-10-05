@@ -154,7 +154,7 @@ export function Sheet({ open, onOpenChange, title, children }: Props) {
 }
 ```
 
-完整版见 `apps/desktop/src/renderer/components/ui/Sheet.tsx`，大约 150 行。
+完整版原在 `apps/desktop/src/renderer/components/ui/Sheet.tsx`，大约 150 行。（补记 2026-10-06：该组件没有使用方，已在桌面前端重构计划 10 中删除，可从 git 历史查看；侧滑形态改由计划 16 的 Radix Dialog 提供。）
 
 ---
 

@@ -79,7 +79,7 @@ function Preview() {
       <ConversationView messages={messages} contextSnapshot={null} sessionId="visual-fixture" draftKey="visual-fixture"
         isStreaming={false} composerPhase="active" composerMode={params.get("mode") === "chat" ? "chat" : "agent"}
         readAnnotationDraft={() => drafts} writeAnnotationDraft={() => {}}
-        executionContext={{ locked: true, runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
+        executionContext={{ runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
     </div>
   </RightPanelProvider></TooltipProvider>;
 }

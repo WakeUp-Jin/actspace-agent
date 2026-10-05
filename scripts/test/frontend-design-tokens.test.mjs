@@ -28,9 +28,8 @@ test("flags radius, z-index, duration literals and the retired cold shadow", () 
   assert.deepEqual(rules("components/A.tsx", 'const A = "z-[1] z-[2] z-1 z-(--act-z-modal) duration-(--motion-fast) rounded-act-group";'), []);
 });
 
-test("ignores comments, the retired Lab page and exact allowlisted literals", () => {
+test("ignores comments and exact allowlisted literals", () => {
   assert.deepEqual(rules("components/A.tsx", '// text-[13px] 只是说明\nconst A = "text-act-sm";'), []);
-  assert.deepEqual(rules("components/LabPage.tsx", 'const A = "text-[13px]";'), []);
   assert.deepEqual(rules("components/ContextPopup.tsx", 'const A = "rounded-[3px]";'), []);
   assert.deepEqual(rules("components/ContextPopup.tsx", 'const A = "rounded-[4px]";'), ["radius-literal:rounded-[4px]"]);
 });

@@ -5,7 +5,7 @@ import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, WheelEvent as ReactWheelEvent } from "react";
-import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MainAgentForm, MessageBlock, ModelSelectionId, ResponseAnnotationReference, UsableModelView } from "@actspace/shared";
+import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, ResponseAnnotationReference, UsableModelView } from "@actspace/shared";
 import { ResponseAnnotationContext, isAnnotatableMessageId } from "./messages/response-annotation-context";
 import { ResponseSelectionMenu } from "./messages/ResponseSelectionMenu";
 import { ResponseAnnotationCommentPopover } from "./messages/ResponseAnnotationCommentPopover";
@@ -13,7 +13,7 @@ import { ResponseAnnotationHighlights } from "./messages/ResponseAnnotationHighl
 import { ResponseAnnotationPill } from "./composer/ResponseAnnotationPill";
 import { useResponseAnnotationState } from "./messages/useResponseAnnotationState";
 import type { MessageQueueControls } from "./composer/MessageQueueTray";
-import { Composer, type ComposerAgentFormSwitch, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
+import { Composer, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
@@ -756,7 +756,6 @@ export function ConversationView({
   onSelectedModelChange,
   composerMode,
   onComposerModeChange,
-  onAgentFormChange,
   selectedSkills,
   onSelectedSkillsChange,
   workspaceOptions,
@@ -772,7 +771,6 @@ export function ConversationView({
   models,
   activeView = "chat",
   trajectory,
-  agentForm = "agent",
   permissionControl,
   readAnnotationDraft,
   writeAnnotationDraft,
@@ -805,7 +803,6 @@ export function ConversationView({
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   composerMode?: ComposerMode;
   onComposerModeChange?: (mode: ComposerMode) => void | Promise<void>;
-  onAgentFormChange?: (change: ComposerAgentFormSwitch) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;
   models?: UsableModelView[];
@@ -821,7 +818,6 @@ export function ConversationView({
   onOpenReview?: () => void;
   activeView?: SessionMainView;
   trajectory?: RuntimeV2TrajectorySnapshot | null;
-  agentForm?: MainAgentForm;
   permissionControl?: ReactNode;
   /** 草稿回复批注按 draftKey 存在上层，切换会话、切到设置页再回来都不丢。 */
   readAnnotationDraft?: (draftKey: string) => ResponseAnnotationReference[];
@@ -1135,7 +1131,6 @@ export function ConversationView({
                     onSelectedModelChange={onSelectedModelChange}
                     mode={composerMode}
                     onModeChange={onComposerModeChange}
-                    onAgentFormChange={onAgentFormChange}
                     selectedSkills={selectedSkills}
                     onSelectedSkillsChange={onSelectedSkillsChange}
                     onOpenAttachmentPreview={openAttachmentPreview}
@@ -1154,7 +1149,6 @@ export function ConversationView({
                     inputHistory={inputHistory}
                     focusRequestId={focusRequestId}
                     models={models}
-                    agentForm={agentForm}
                     sessionId={sessionId}
                     permissionControl={permissionControl}
                   />
@@ -1254,7 +1248,6 @@ export function ConversationView({
             reviewSummary={reviewSummary}
             onOpenReview={onOpenReview}
             models={models}
-            agentForm={agentForm}
             sessionId={sessionId}
             permissionControl={permissionControl}
           />
