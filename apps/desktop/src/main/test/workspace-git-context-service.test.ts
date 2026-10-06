@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AppDataRoots } from "../agent-run";
 import type { GitRunner } from "../git/run-git";
 import {
@@ -68,6 +68,32 @@ describe("workspace Git context service", () => {
       return;
     }
     expect(result).toMatchObject({ status: "not_repository", branches: [] });
+  });
+
+  // 15 验收反馈：git 的提示随系统语言翻译，中文系统下原来判断不出「不是仓库」。
+  it("detects a non-repository workspace under a Chinese locale", async (context) => {
+    if (!gitAvailable) context.skip();
+    vi.stubEnv("LANG", "zh_CN.UTF-8");
+    vi.stubEnv("LANGUAGE", "zh_CN");
+    vi.stubEnv("LC_ALL", "");
+    vi.stubEnv("LC_MESSAGES", "");
+    try {
+      const roots = await createRoots();
+      expect(await getWorkspaceGitContext(roots.workspaceRoot)).toMatchObject({ status: "not_repository", branches: [] });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("asks git for English messages only on the call it classifies by text", async () => {
+    const roots = await createRoots();
+    const seen: { args: string[]; env?: Record<string, string> }[] = [];
+    const runner: GitRunner = async (args, options) => {
+      seen.push({ args, env: options.env });
+      return { stdout: "", stderr: "fatal: not a git repository\n", exitCode: 128, timedOut: false, truncated: false };
+    };
+    await getWorkspaceGitContext(roots.workspaceRoot, runner);
+    expect(seen).toEqual([{ args: ["rev-parse", "--show-toplevel"], env: { LC_ALL: "C" } }]);
   });
 
   // 15 T13：run-git 的 startError 改为 { code, message } 后，git 缺失和非仓库的判断不变。

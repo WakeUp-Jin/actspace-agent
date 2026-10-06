@@ -1,6 +1,12 @@
 import { execFile } from "node:child_process";
 
-export type GitRunOptions = { cwd: string; timeoutMs: number; maxOutputChars: number };
+export type GitRunOptions = {
+  cwd: string;
+  timeoutMs: number;
+  maxOutputChars: number;
+  /** 追加的环境变量。按错误文字分类的调用传 `{ LC_ALL: "C" }`，让 git 的提示固定为英文，不随系统语言变化。 */
+  env?: Record<string, string>;
+};
 
 /**
  * 子进程没能正常跑完 git 时的错误：spawn 失败（ENOENT、EACCES）、输出超出 maxBuffer 等。
@@ -41,7 +47,7 @@ export const runGitCommand: GitRunner = (args, options) => new Promise((resolveR
       maxBuffer: options.maxOutputChars,
       windowsHide: true,
       encoding: "utf8",
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      env: { ...process.env, ...options.env, GIT_TERMINAL_PROMPT: "0" },
     },
     (error, out, err) => {
       const stdout = String(out ?? "");

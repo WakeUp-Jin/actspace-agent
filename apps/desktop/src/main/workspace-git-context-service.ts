@@ -52,7 +52,8 @@ export async function getWorkspaceGitContext(
     return contextFailure("failed", resolvedRoot, "Workspace folder was not found.");
   }
 
-  const repository = await runGit(runner, ["rev-parse", "--show-toplevel"], resolvedRoot);
+  // 按错误文字区分「不是仓库」，git 的提示会随系统语言翻译（中文系统是「致命错误：不是 Git 仓库」），所以这一次固定为英文。
+  const repository = await runGit(runner, ["rev-parse", "--show-toplevel"], resolvedRoot, { LC_ALL: "C" });
   if (isGitMissing(repository)) {
     return contextFailure("git_not_found", resolvedRoot, "Git is not available on this machine.");
   }
@@ -390,8 +391,8 @@ function failed(
   return { ok: false, code, message };
 }
 
-async function runGit(runner: GitRunner, args: string[], cwd: string): Promise<GitRunResult> {
-  return runner(args, { cwd, timeoutMs: GIT_TIMEOUT_MS, maxOutputChars: GIT_MAX_OUTPUT_CHARS });
+async function runGit(runner: GitRunner, args: string[], cwd: string, env?: Record<string, string>): Promise<GitRunResult> {
+  return runner(args, { cwd, timeoutMs: GIT_TIMEOUT_MS, maxOutputChars: GIT_MAX_OUTPUT_CHARS, ...(env ? { env } : {}) });
 }
 
 function isGitMissing(result: GitRunResult): boolean {

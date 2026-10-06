@@ -52,6 +52,15 @@ describe("runGitCommand", () => {
     expect(execOptions.env.GIT_TERMINAL_PROMPT).toBe("0");
   });
 
+  it("adds caller env vars but never lets them re-enable terminal prompts", async () => {
+    const cwd = await tempDir();
+    calls.length = 0;
+    await runGitCommand(["--version"], { ...options(cwd), env: { LC_ALL: "C", GIT_TERMINAL_PROMPT: "1" } });
+    const execOptions = calls[0]![2] as { env: NodeJS.ProcessEnv };
+    expect(execOptions.env.LC_ALL).toBe("C");
+    expect(execOptions.env.GIT_TERMINAL_PROMPT).toBe("0");
+  });
+
   it("returns stdout and exit code 0 on success", async (context) => {
     if (!gitAvailable) context.skip();
     const result = await runGitCommand(["--version"], options(await tempDir()));
