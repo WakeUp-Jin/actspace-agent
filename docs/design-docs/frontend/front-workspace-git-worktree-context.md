@@ -186,7 +186,7 @@ New Worktree
 ```
 
 - `This Mac` 为默认值。
-- 下图的 `Cloud` / `Remote SSH` 为早期本机菜单占位。现行远端会话使用独立 Host 选择器，创建后绑定 Host/工作区；不得把该历史占位解释为远端连接尚未实现。
+- 下图的 `Cloud` / `Remote SSH` 为早期本机菜单占位。现行远端会话使用独立 Host 选择器，创建后绑定 Host/工作区；不得把该历史占位解释为远端连接尚未实现。远端目标的模型见下文「运行目标（本机与远端）」；09 将用「本机 / 远端机器 ›」菜单替换这些占位和远端的原生 select。
 - `New Worktree` 仅在 Workspace 是带有效 `HEAD` 的 Git repository 时可用。
 - Git repository 尚无首次提交时，Branch 仍只显示 symbolic branch 名称（例如 `main`）；`This Mac` 可以直接运行，`New Worktree` 保持禁用并在入口显示 `Requires commit`。
 - ActSpace 不为启用 Worktree 自动创建首次提交，也不使用 `git worktree add --orphan` 复制当前 Index；后者会得到独立的空 Index，不代表当前 staged workspace。
@@ -297,6 +297,85 @@ actspace/92803054   Worktree
 - 状态不能只靠图标或颜色表达。
 - V1 不允许在已有 turn 的会话中切换 Workspace、branch 或运行位置；用户需要创建新会话。
 
+## 运行目标（本机与远端）
+
+> 2026-10-06 按[计划 15](../../exec-plans/active/20261005-desktop-frontend-refactor/15-运行目标执行计划.md)实施，设计来源是 [03 运行目标抽象](../../desktop-frontend-refactor/03-运行目标抽象-本机与远端.md)。代码在 `apps/desktop/src/renderer/target/`。
+
+上文的 Workspace、Branch、Worktree 都是本机运行目标的属性。远端 Host 是另一种运行目标。组件不再判断 `hostId` 或 `host:` 前缀，只读下面几个值。
+
+### 会话定位（locator）
+
+- 远端会话的 key 是 `host:` 加 `base64url(JSON.stringify([hostId, sessionId]))`。编码和解码只有一份，在 `packages/shared/src/session-locator.ts`（`encodeSessionLocator` / `decodeSessionLocator`），main 和 renderer 共用。
+- 解码是严格的：不以 `host:` 开头时返回 null（本机会话）。以 `host:` 开头但形状、类型、长度（不超过 128）或 round-trip 任何一项不符，就抛 `InvalidSessionLocatorError`。
+- renderer 用 `locateSession(key)`，返回 `local`、`remote { hostId, sessionId }` 或 `invalid { key }`。它不抛错，以免渲染时白屏。损坏的 key 不按本机处理，本机专属能力都不能用在它身上（`isLocalSession` 对它返回 false）。
+
+### RunTarget 与 capabilities
+
+```ts
+type RunTarget =
+  | { kind: "local"; workspaceRoot?: string; branch?: string; worktree?: SessionWorktreeContext }
+  | { kind: "remote"; hostId: string; hostName: string; workspaceId?: string; workspaceName?: string }
+  | { kind: "invalid"; key: string };
+```
+
+- `useRunTarget({ sessionId, sessionWorkspacePath, locked, local })` 得出当前会话或新建页的 `target`、`capabilities`、`readiness` 和 `choices`。App 经 `RunTargetContext` 交给 WorkbenchLayout、ConversationView 和 Composer，不再逐层传。
+- 已有会话的目标由会话决定，不能再改（`locked`）。新建页的 Host 和远端工作区是 `useRunTarget` 内的本地选择，换 Host 时远端工作区回到该 Host 的第一个。
+- `capabilitiesOf(target, { gitStatus })` 是唯一的能力表。每项都是 `{ enabled, reason? }`，禁用时 `reason` 说明原因：
+
+| 能力 | 本机 | 远端 | 损坏的 key |
+| --- | --- | --- | --- |
+| `newWorktree` | Git 状态为 ready 时可用，否则「当前工作区不是可用的 Git 仓库」 | 「远端机器暂不支持」 | 「会话标识损坏」 |
+| `branchSwitch` | Git 状态为 ready 或 no_head 时可用 | 同上 | 同上 |
+| `localFileOpen` | 可用 | 同上（打开文件改为经 Host 下载） | 同上 |
+| `terminal` | 可用 | 同上 | 同上 |
+| `review` | 可用 | 同上 | 同上 |
+| `attachments` | 只收图片 | 图片和文件都收（经 Host 上传） | 都不收 |
+
+- 远端支持某项能力时，只改这张表。
+
+### readiness
+
+`ready` 当且仅当可以发送。其余状态都附带原因，界面不再只显示「未就绪」：
+
+| 状态 | 含义 |
+| --- | --- |
+| `connecting` | Host 列表还没读到，或 Host 正在连接 |
+| `offline` / `revoked` / `incompatible` | 直接对应 Host 的连接状态 |
+| `removed` | 会话属于已删除的 Host，或会话 key 损坏 |
+| `describing` / `describe-failed` | 已连接，正在读取或未能读取 `host.describe` |
+| `host-unavailable` | Host 报告 `draining`（正在停止）或 `blocked`（恢复上次的任务时出错），暂不接受新任务 |
+| `workspace-missing` / `model-missing` | 会话记下的工作区或模型在 Host 上已不存在 |
+
+- 判断顺序和文案见 `readiness.ts` 的 `resolveReadiness` / `describeReadiness`，文案以 [06 §4.5](../../desktop-frontend-refactor/06-Composer与运行目标交互重设计.md) 为准。
+- 未就绪时草稿照常编辑，发送按钮 disabled，tooltip 和状态行显示原因。
+
+### HostDirectory
+
+- `target/host-directory.ts` 的 `hostDirectory` 是整个窗口唯一的 Host 列表和 Host 事件订阅。第一个使用者出现时开始订阅，最后一个离开时释放。
+- 快照包含 `hosts`、`descriptions`、`describeErrors`、`describing`、`loaded`、`listError`。Host 变为已连接时自动 describe，失败原因记在 `describeErrors`，readiness 据此显示 `describe-failed`。
+- `onHostsChanged` 和 `onHostRemoved` 供侧栏刷新、重连补齐和 Host 移除时的清理使用。Host 移除后，它的会话仍留在侧栏，显示为「远端 · 未连接」；本地状态被释放。
+
+### 远端会话的本地记录
+
+Host 协议不返回会话的 `workspaceId`，本轮也不改协议。renderer 在本地记录：
+
+- `localStorage["actspace:remote-session-prefs"]`：`{ [sessionKey]: { workspaceId?, modelId?, recordedAt } }`。
+  - 建远端会话时，写入所选的工作区和模型。
+  - 没有记录的旧会话，按会话 meta 里的路径反查一次并写回，之后不再反查。
+  - 会话被 evict 时删除对应条目。
+- `localStorage["actspace:new-session-model:<hostId>"]`：新建页在这台 Host 上上次选的模型。
+- 记录的模型在 Host 上已没有时，回落为 Host 的默认模型。
+- 旧的 `actspace:remote-models` 在启动时迁移一次：会话条目进 prefs，`new:<hostId>` 进新建页记录，不覆盖已有记录，然后删除旧 key。
+
+### 发送与审批
+
+- renderer 的 `R/session/session-gateway.ts` 负责建会话（按 `target.kind` 带 `hostId` 和工作区）、pending 记录、configure 和 submit。远端目标没有 ready 时，它拒绝发送。
+- main 的 `M/session-gateway.ts` 是 fixed IPC 的中间件，负责远端分流：
+  - 带 `hostId` 的建会话和审批决定交给远端；
+  - 能解出远端 key 的请求交给远端；
+  - 其余请求先走本地，再合并远端的列表结果。
+- 审批事件和 pending 列表带 `hostId`，由 main 的 desktop-adapter 拼出。renderer 提交审批决定时，从当前会话的 RunTarget 取 `hostId`，不解析审批 id。
+
 ## Session 与存储边界
 
 ### Session Meta
@@ -384,3 +463,4 @@ type SessionMeta = {
 - 2026-07-29：Worktree V1 不自动清理，不自动复制原目录未提交内容或环境。
 - 2026-07-29：初始执行上下文菜单使用独立的向下展开定位，选择器行保持 overflow visible；Workspace Recents 首版限制为 5 项。
 - 2026-07-29：Workspace registry 的读取修复与路径注册按事务串行执行，每次原子写使用唯一临时文件，避免并发 rename 竞争和丢失更新。
+- 2026-10-06：运行目标统一为 `RunTarget` + `capabilities` + `readiness`（计划 15）；远端会话的 `workspaceId` 和模型由 renderer 本地记录，不改 Host 协议；远端会话禁用新建工作树并说明原因。

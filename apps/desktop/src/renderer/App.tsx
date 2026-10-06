@@ -1,5 +1,7 @@
-import { useRemoteTarget } from "./hooks/useRemoteTarget";
 import { useShallowStable } from "./hooks/useShallowStable";
+import { remoteSessionPrefs } from "./target/remote-session-prefs";
+import { useRunTarget } from "./target/use-run-target";
+import type { RunTargetValue } from "./target/run-target-context";
 import { createEmptyStreamingState } from "./session/session-run-state";
 import { upsertStreamingTool } from "./session/live-runs/stream-state";
 import type { CompactionBlock } from "./session/live-runs/stream-blocks";
@@ -28,15 +30,12 @@ import {
   createMessageBlocks,
   formatSessionTranscript,
   getLatestContextSnapshot,
-  formatChatAttachmentIssue,
-  formatComposerReferenceIssue,
 } from "@actspace/shared";
 import type {
   AbortAgentRunInput,
   AgentRunResult,
   AppSettings,
   BootstrapState,
-  ComposerAttachment,
   ComposerMode,
   ContextState,
   ContextUsageSnapshot,
@@ -57,6 +56,7 @@ import type {
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { AppProviders } from "./app/providers";
 import { clearPendingSubmission, readPendingSubmission, sweepExpiredPendingSubmissions, writePendingSubmission } from "./session/pending-submission";
+import { createSessionGateway } from "./session/session-gateway";
 import { ClientSessionStore, selectChatSession, projectChatWindow } from "@actspace/client/sessions";
 import { getSession, sessionsApi } from "./api/sessions";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
@@ -75,7 +75,8 @@ import { reviewApi } from "./api/review";
 import { settingsApi } from "./api/settings";
 import { tasksApi } from "./api/tasks";
 import { workspacesApi } from "./api/workspaces";
-import { hostsApi } from "./api/hosts";
+import { hostDirectory, useHostDirectory, type HostDirectorySnapshot } from "./target/host-directory";
+import { isLocalSession, locateSession } from "./target/locate-session";
 
 function sessionReadError(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message : "";
@@ -103,11 +104,6 @@ const DEFAULT_COMPOSER_STATE: ComposerSessionState = {
 };
 /** `not_started`：会话已有运行，没有发出。`rejected`：发送前校验失败，正文已放回输入框。 */
 type SessionRunOutcome = AgentRunResult["status"] | "rejected" | "not_started";
-
-function attachmentForRuntime(attachment: ComposerAttachment): ComposerAttachment {
-  const { previewUrl: _previewUrl, ...runtimeAttachment } = attachment;
-  return runtimeAttachment;
-}
 
 function normalizeWorkspaceRoot(root: string | undefined | null): string | null {
   const trimmed = root?.trim();
@@ -192,6 +188,8 @@ async function copyTextToClipboard(value: string): Promise<void> {
   }
 }
 
+const selectKnownHosts = (snapshot: HostDirectorySnapshot) => snapshot.loaded ? snapshot.hosts : null;
+
 export function App() {
   const sessionStore = useMemo(() => new ClientSessionStore(), []);
   const [cellRetention] = useState(() => createSessionCellRetention(sessionStore));
@@ -224,7 +222,8 @@ export function App() {
     }
     // Removing a connection must not remove already displayed history. Its
     // Session remains bound to the absent Host and can never become local.
-    const known = new Set((await hostsApi.list()).map(host => host.hostId));
+    const directory = hostDirectory.getSnapshot();
+    const known = new Set((directory.loaded && !directory.listError ? directory.hosts : await hostDirectory.refresh()).map(host => host.hostId));
     for (const item of sidebarSessionsRef.current) {
       if (!item.hostId || known.has(item.hostId) || items.some(next => next.id === item.id)) continue;
       items.push({ ...item, connectionState: "offline" });
@@ -288,7 +287,14 @@ export function App() {
   const messageQueue = useSessionLocalState(localStore, selectedSessionId, selectMessageQueue);
   // durable 历史从 store 的 cell 派生；cell 不放进 App 的作用域，见 useChatSessionRecord。
   const { sessionRecord, historyBefore } = useChatSessionRecord(sessionStore, selectedSessionId, bootstrapState?.workspaceRoot);
-  const remoteTarget = useRemoteTarget(selectedSessionId, sessionRecord?.meta.workspaceRoot);
+  const runTarget = useRunTarget({
+    sessionId: selectedSessionId,
+    sessionWorkspacePath: sessionRecord?.meta.workspaceRoot,
+    locked: !!sessionRecord,
+    local: { workspaceRoot: sessionRecord?.meta.workspaceRoot ?? selectedWorkspaceRoot ?? bootstrapState?.workspaceRoot ?? undefined, branch: selectedBranch, worktree: sessionRecord?.meta.worktree, gitStatus: workspaceGitContext?.status },
+  });
+  const { choices: targetChoices } = runTarget;
+  const isLocalTarget = runTarget.target.kind === "local";
   const setActiveSessionId = useCallback((sessionId: string | null) => {
     ++messageRequestRef.current;
     historyPendingRef.current = null;
@@ -498,7 +504,7 @@ export function App() {
       return;
     }
     const workspaceRoot = selectedWorkspaceRoot ?? bootstrapState?.workspaceRoot;
-    if (remoteTarget.hostId || !workspaceRoot) {
+    if (!isLocalTarget || !workspaceRoot) {
       setWorkspaceGitContext(null);
       setSelectedBranch(undefined);
       setRunLocation("this_mac");
@@ -524,7 +530,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [remoteTarget.hostId, bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.agentRunCount, sessionRecord?.meta.worktree]);
+  }, [isLocalTarget, bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.agentRunCount, sessionRecord?.meta.worktree]);
 
   const visibleSessions = useMemo(() => {
     if (!workspaceRegistry) return sessions;
@@ -541,15 +547,21 @@ export function App() {
   }, [sessions, workspaceRegistry]);
   // 每个会话 id 只补齐一次审批徽标和任务队列；之后靠 live 事件和选中会话时的刷新保持最新（14 T3）。
   // 只补齐侧栏可见的会话：移除工作区后，它的会话被 evict，不能因为仍在 sessions 里又被补齐回来。
+  // 远端会话等 Host 列表读到之后再补齐；Host 已被移除的不补齐（15 T4：移除时被 evict，侧栏仍显示为未连接）。
+  const knownHosts = useHostDirectory(selectKnownHosts);
   useEffect(() => {
-    const fresh = visibleSessions.map((session) => session.id).filter((id) => !hydratedSessionIdsRef.current.has(id));
+    const fresh = visibleSessions.map((session) => session.id).filter((id) => {
+      if (hydratedSessionIdsRef.current.has(id)) return false;
+      const location = locateSession(id);
+      return location.kind !== "remote" || (knownHosts?.some((host) => host.hostId === location.hostId) ?? false);
+    });
     if (fresh.length === 0) return;
     for (const id of fresh) hydratedSessionIdsRef.current.add(id);
     refreshPendingApprovalStatuses(fresh).catch((error: unknown) => {
       console.error("Failed to refresh pending approval statuses", error);
     });
     for (const id of fresh) void refreshTaskQueue(id).catch(reportSessionFailure(id, QUEUE_REFRESH_FAILED));
-  }, [refreshPendingApprovalStatuses, refreshTaskQueue, reportSessionFailure, visibleSessions]);
+  }, [knownHosts, refreshPendingApprovalStatuses, refreshTaskQueue, reportSessionFailure, visibleSessions]);
 
   // 归档 / 移除后释放会话的本地状态，并让它重新出现时重新补齐。当前会话不释放；运行中的会话等 run 结束。
   const evictSession = useCallback((sessionId: string) => {
@@ -562,10 +574,18 @@ export function App() {
     taskQueue.evict(sessionId);
     cellRetention.forget(sessionId);
     hydratedSessionIdsRef.current.delete(sessionId);
+    remoteSessionPrefs.remove(sessionId);
   }, [localStore, liveRuns, taskQueue, cellRetention]);
   useEffect(() => {
     for (const sessionId of [...pendingEvictionsRef.current]) if (!busySessionIds.has(sessionId)) evictSession(sessionId);
   }, [busySessionIds, evictSession]);
+  // Host 被移除：释放它的会话的本地状态。会话仍留在侧栏，显示为「远端 · 未连接」（03-3）。
+  useEffect(() => hostDirectory.onHostRemoved((hostId) => {
+    for (const item of sidebarSessionsRef.current) {
+      const location = locateSession(item.id);
+      if (location.kind === "remote" && location.hostId === hostId) evictSession(item.id);
+    }
+  }), [evictSession]);
   // cell 保留：当前会话和运行中的会话常驻，其余只留最近查看的几个（14 T9 / T10）。
   useEffect(() => {
     cellRetention.retain(new Set(selectedSessionId ? [...busySessionIds, selectedSessionId] : busySessionIds));
@@ -636,7 +656,7 @@ export function App() {
       finally { refreshing = false; }
     };
     const unsubscribe = liveEvents.onMessage("session-title-updated", () => { void refresh(); });
-    const unhosts = eventsApi.hostsChanged(() => { void refresh(); });
+    const unhosts = hostDirectory.onHostsChanged(() => { void refresh(); });
     return () => { disposed = true; unsubscribe(); unhosts(); };
   }, [readSidebarSessions]);
 
@@ -880,32 +900,36 @@ export function App() {
     patchLocal(sessionId, { draft });
   }, [taskCommand, taskQueue, localStore, patchLocal]);
 
+  // 15 T12：建会话、configure、提交和 pending 记录在 session gateway 里。
+  const sessionGateway = useMemo(() => createSessionGateway({
+    createSession: createSessionForInput,
+    setPlanMode: (sessionId, expectedRevision) => sessionsApi.setAgentMode({ sessionId, mode: "plan", expectedRevision }),
+    recordRemoteSession: (sessionId, prefs) => remoteSessionPrefs.set(sessionId, prefs),
+    configure: async (sessionId, configuration) => Boolean(await taskCommand({ sessionId, op: "configure", configuration })),
+    submit: (input) => tasksApi.submit(input),
+    pending: { read: readPendingSubmission, write: writePendingSubmission, clear: clearPendingSubmission },
+    rememberOptions: (sessionId, submissionId, options) => taskQueue.rememberOptions(sessionId, submissionId, options),
+    forgetOptions: (submissionId) => taskQueue.forgetOptions(submissionId),
+    notice: (sessionId, text) => setComposerNotice({ sessionId, text }),
+    restoreDraft: (sessionId, draft) => patchLocal(sessionId, { draft }),
+    newSubmissionId: () => crypto.randomUUID(),
+    now: Date.now,
+  }), [createSessionForInput, taskCommand, taskQueue, patchLocal]);
+
   const handleSend = useCallback(async (
     text: string,
     options: ComposerSendOptions,
     resumeAfterAcceptance = false,
   ) => {
     if (!text.trim() && !options.attachments?.length && !options.fileReferences?.length && !options.responseAnnotations?.length) return;
-    let visibleSessionId = activeSessionIdRef.current;
-    if (remoteTarget.hostId) {
-      if (!remoteTarget.canSend) throw new Error("Host is not ready; your draft has been preserved");
-      if (!visibleSessionId) {
-        const created = await createSessionForInput({ hostId: remoteTarget.hostId, workspaceId: remoteTarget.workspaceId, agentForm: options.mode === "chat" ? "chat" : "agent" });
-        if (!created) throw new Error("Unable to create remote Session");
-        visibleSessionId = created.meta.id;
-        if (options.mode === "plan") await sessionsApi.setAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
-      }
-    }
-    if (!visibleSessionId) {
-      const created = await createSessionForInput({ ...(selectedWorkspaceRoot ? { workspaceRoot: selectedWorkspaceRoot } : {}), agentForm: options.mode === "chat" ? "chat" : "agent" });
-      if (!created) throw new Error("Unable to create Session");
-      visibleSessionId = created.meta.id;
-      if (options.mode === "plan") await sessionsApi.setAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
-    }
+    const visibleSessionId = await sessionGateway.ensureSession(activeSessionIdRef.current, {
+      target: runTarget.target, readiness: runTarget.readiness,
+      remoteWorkspaceId: runTarget.target.kind === "remote" ? runTarget.target.workspaceId : undefined, remoteModelId: targetChoices.modelId, localWorkspaceRoot: selectedWorkspaceRoot,
+    }, options);
     const sessionId = visibleSessionId;
     patchLocal(sessionId, { composer: { mode: options.mode, selectedSkills: options.selectedSkills } });
     // Keep workspace changes on the idle Session boundary before task admission.
-    if (!sessionId.startsWith("host:") && !liveRuns.has(sessionId) && !sessionRecord?.meta.worktree && selectedWorkspaceRoot &&
+    if (isLocalSession(sessionId) && !liveRuns.has(sessionId) && !sessionRecord?.meta.worktree && selectedWorkspaceRoot &&
         selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot)) {
       const result = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
       if (!result.ok) throw new Error(result.error ?? "无法更新会话工作区");
@@ -913,47 +937,11 @@ export function App() {
     patchLocal(sessionId, { lastSendOptions: options });
     setFailedForSession(sessionId, false);
     setCompactionFailureForSession(sessionId, null);
-    const submitted = { sessionId: visibleSessionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
-    const saved = readPendingSubmission(visibleSessionId);
-    const serialized = JSON.stringify(submitted);
-    const submissionId = saved?.content === serialized ? saved.id : crypto.randomUUID();
-    taskQueue.rememberOptions(visibleSessionId, submissionId, options);
     let result: import("@actspace/shared/runtime-v2").TaskSubmissionResult;
     const inFlight = sendsInFlightRef.current;
     inFlight.set(visibleSessionId, (inFlight.get(visibleSessionId) ?? 0) + 1);
     try {
-      writePendingSubmission(visibleSessionId, { content: serialized, id: submissionId, draft: { sessionId: visibleSessionId, text, attachments: options.attachments?.map(({ previewUrl: _preview, ...attachment }) => attachment), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } });
-      const restore = (error: string, issues?: { attachmentIssue?: import("@actspace/shared").ChatAttachmentIssue; referenceIssue?: import("@actspace/shared").ComposerReferenceIssue }) => {
-        const draft = { id: Date.now(), sessionId: visibleSessionId!, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error, ...issues };
-        patchLocal(visibleSessionId!, { draft });
-      };
-      try {
-        const configured = await taskCommand({ sessionId: visibleSessionId, op: "configure", configuration: { model: visibleSessionId.startsWith("host:") ? remoteTarget.model : options.model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills } });
-        if (!configured) throw new Error("无法更新任务配置，草稿已保留。");
-      } catch (error) {
-        clearPendingSubmission(visibleSessionId);
-        taskQueue.forgetOptions(submissionId);
-        const message = error instanceof Error ? error.message : "无法更新任务配置，草稿已保留。";
-        restore(message); throw new Error(message);
-      }
-      const attempt = async (): Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult> => {
-        try { return await tasksApi.submit({ ...submitted, submissionId }); }
-        catch { return { status: "submission-failed" as const, acknowledgement: "unknown" as const, message: "提交尚未确认，再次发送将核对同一次提交。" }; }
-      };
-      result = await attempt();
-      if ("status" in result && result.status === "submission-failed" && result.acknowledgement === "unknown") {
-        setComposerNotice({ sessionId: visibleSessionId, text: "提交结果尚未确认，正在用同一标识核对。" });
-        result = await attempt();
-      }
-      if ("status" in result && result.status === "submission-failed") {
-        if (result.acknowledgement === "rejected") {
-          clearPendingSubmission(visibleSessionId);
-          taskQueue.forgetOptions(submissionId);
-        }
-        const message = result.acknowledgement === "unknown" ? "提交尚未确认，再次发送将核对同一次提交。" : result.message;
-        restore(result.attachmentIssue ? formatChatAttachmentIssue(result.attachmentIssue) : result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : message, result); throw new Error(message);
-      }
-      clearPendingSubmission(visibleSessionId);
+      result = await sessionGateway.submit(visibleSessionId, text, options, !isLocalSession(visibleSessionId) ? targetChoices.modelId : options.model);
     } finally {
       const remaining = (inFlight.get(visibleSessionId) ?? 1) - 1;
       if (remaining > 0) inFlight.set(visibleSessionId, remaining); else inFlight.delete(visibleSessionId);
@@ -968,10 +956,10 @@ export function App() {
       await taskCommand({ op: "resume", sessionId: visibleSessionId, revision: snapshot.revision });
     }
     return;
-  }, [remoteTarget, sessionRecord, selectedWorkspaceRoot, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, createSessionForInput, taskCommand, taskQueue, liveRuns, refreshTaskQueue, reportSessionFailure, patchLocal]);
+  }, [sessionGateway, runTarget, targetChoices, sessionRecord, selectedWorkspaceRoot, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, liveRuns, refreshTaskQueue, reportSessionFailure, patchLocal]);
 
   useEffect(() => {
-    return eventsApi.hostsChanged(hosts => {
+    return hostDirectory.onHostsChanged(hosts => {
       const id = activeSessionIdRef.current;
       // Host 断线期间的审批 / 队列事件收不到：重连后让它的后台会话在下一次列表刷新时重新补齐。
       const connected = new Set(hosts.filter(host => host.state === "connected").map(host => host.hostId));
@@ -980,11 +968,12 @@ export function App() {
         for (const item of sidebarSessionsRef.current) if (item.hostId === hostId && item.id !== id) hydratedSessionIdsRef.current.delete(item.id);
       }
       connectedHostIdsRef.current = connected;
-      if (id?.startsWith("host:") && hosts.some(host => host.hostId === remoteTarget.hostId && host.state === "connected")) {
+      const location = locateSession(id);
+      if (id && location.kind === "remote" && hosts.some(host => host.hostId === location.hostId && host.state === "connected")) {
         void readSessionPage(id); void refreshTaskQueue(id); void refreshPendingApprovalStatuses([id]);
       }
     });
-  }, [remoteTarget.hostId, readSessionPage, refreshTaskQueue, refreshPendingApprovalStatuses]);
+  }, [readSessionPage, refreshTaskQueue, refreshPendingApprovalStatuses]);
 
   const handleRetryCompaction = useCallback(() => {
     const sessionId = activeSessionIdRef.current;
@@ -1027,7 +1016,7 @@ export function App() {
   }, [liveRuns]);
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
-    if (!remoteTarget.hosts.length && !input.hostId) {
+    if (!targetChoices.hosts.length && !input.hostId) {
       patchLocal(DRAFT_COMPOSER_KEY, { composer: DEFAULT_COMPOSER_STATE });
       const created = await createSessionForInput(input);
       if (created) patchLocal(created.meta.id, { composer: { ...DEFAULT_COMPOSER_STATE, mode: created.meta.agentMode ?? "agent" } });
@@ -1035,10 +1024,10 @@ export function App() {
     }
     setActiveSessionId(null);
     patchLocal(DRAFT_COMPOSER_KEY, { composer: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" } });
-    remoteTarget.selectHost(input.hostId ?? null);
-    if (input.workspaceId) remoteTarget.selectWorkspace(input.workspaceId);
+    targetChoices.selectHost(input.hostId ?? null);
+    if (input.workspaceId) targetChoices.selectWorkspace(input.workspaceId);
     if (input.workspaceRoot) setSelectedWorkspaceRoot(input.workspaceRoot);
-  }, [remoteTarget.hosts.length, remoteTarget.selectHost, remoteTarget.selectWorkspace, setActiveSessionId, createSessionForInput, patchLocal]);
+  }, [targetChoices.hosts.length, targetChoices.selectHost, targetChoices.selectWorkspace, setActiveSessionId, createSessionForInput, patchLocal]);
 
   const handleAddWorkspace = useCallback(async () => {
     try {
@@ -1248,9 +1237,7 @@ export function App() {
     [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessions, workspaceRegistry],
   );
   const executionContext = useMemo<ComposerExecutionContext>(() => ({
-    gitContext: remoteTarget.hostId ? null : workspaceGitContext,
-    remote: remoteTarget,
-    targetLocked: !!sessionRecord,
+    gitContext: isLocalTarget ? workspaceGitContext : null,
     selectedBranch,
     runLocation,
     onSelectBranch: setSelectedBranch,
@@ -1258,13 +1245,11 @@ export function App() {
     onUseExistingWorkspace: handleUseExistingWorkspace,
     onCreateWorkspaceFolder: handleCreateWorkspaceFolder,
   }), [
-    remoteTarget,
-    sessionRecord,
+    isLocalTarget,
     handleCreateWorkspaceFolder,
     handleUseExistingWorkspace,
     runLocation,
     selectedBranch,
-    sessionRecord?.meta.agentRunCount,
     workspaceGitContext,
   ]);
   const sessionStatuses = useMemo<Record<string, SessionUiStatusKind>>(() => {
@@ -1519,7 +1504,7 @@ export function App() {
 
   const retryList = useCallback(() => setListRetry(n => n + 1), []);
   const retryMessages = useCallback(() => { if (activeSessionIdRef.current) void readSessionPage(activeSessionIdRef.current); }, [readSessionPage]);
-  // 四个 Context value 用 useShallowStable 而不是 useMemo：工厂闭包会把 messages、contextState 等放进 App 的渲染作用域，
+  // Context value 用 useShallowStable 而不是 useMemo：工厂闭包会把 messages、contextState 等放进 App 的渲染作用域，
   // 旧作用域被 useCallback 链留住时，已归档会话的数据就释放不掉。
   const browse = useShallowStable<SessionBrowseState>({
     groups: browseGroups, listLoading, listError, retryList, loadMore: loadMoreSessions, messageLoading, messageError, retryMessages,
@@ -1536,6 +1521,9 @@ export function App() {
     onSelectedModelChange: handleSelectedChatModelChange, composerMode: activeComposerState.mode, onComposerModeChange: handleComposerModeChange,
     selectedSkills: activeComposerState.selectedSkills, onSelectedSkillsChange: handleSelectedSkillsChange, models: usableChatModels, draftRestore: composerDraftRestore,
   });
+  const runTargetValue = useShallowStable<RunTargetValue>({
+    ...runTarget, workspaceOptions, selectedWorkspaceRoot, onSelectWorkspace: setSelectedWorkspaceRoot, execution: executionContext,
+  });
   const sessionActions = useShallowStable<SessionActionsValue>({
     onNewSession: handleCreateSession, onAddWorkspace: handleAddWorkspace, onSelectSession: handleSelectSession, onTogglePin: handleTogglePin,
     onRenameSession: handleRenameSession, onCopySessionId: handleCopySessionId, onCopyTranscript: handleCopyTranscript, onForkSession: handleForkSession,
@@ -1543,7 +1531,7 @@ export function App() {
   });
 
   return (
-    <AppProviders sessionStore={sessionStore} browse={browse} localStore={localStore} activeSession={activeSession} composer={composer} sessionActions={sessionActions}>
+    <AppProviders sessionStore={sessionStore} browse={browse} localStore={localStore} activeSession={activeSession} composer={composer} sessionActions={sessionActions} runTarget={runTargetValue}>
       <WorkbenchLayout
         sessions={visibleSessions}
         busySessionIds={busySessionIds}
@@ -1551,10 +1539,6 @@ export function App() {
         onSettingsChange={handleSettingsChange}
         onArchivedSessionsChange={handleArchivedSessionsChange}
         workspaces={workspaceRegistry?.items.filter((workspace) => !workspace.hidden)}
-        workspaceOptions={workspaceOptions}
-        selectedWorkspaceRoot={selectedWorkspaceRoot}
-        onSelectWorkspace={setSelectedWorkspaceRoot}
-        executionContext={executionContext}
         getSessionPreview={getSessionPreview}
         reviewSummary={reviewSummary}
         onReviewChanged={handleReviewChanged}

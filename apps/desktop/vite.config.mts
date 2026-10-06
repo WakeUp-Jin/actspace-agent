@@ -15,6 +15,7 @@ export default defineConfig({
       "@actspace/shared/runtime-v2": resolve(__dirname, "../../packages/shared/src/runtime-v2/index.ts"),
       "@actspace/shared/composer-reference-validation": resolve(__dirname, "../../packages/shared/src/composer-reference-validation.ts"),
       "@actspace/shared/session-list-page": resolve(__dirname, "../../packages/shared/src/session-list-page.ts"),
+      "@actspace/shared/session-locator": resolve(__dirname, "../../packages/shared/src/session-locator.ts"),
       "@actspace/shared": resolve(__dirname, "../../packages/shared/src/index.ts"),
       "@actspace/shared/session-selectors": resolve(__dirname, "../../packages/shared/src/session-selectors.ts")
     }

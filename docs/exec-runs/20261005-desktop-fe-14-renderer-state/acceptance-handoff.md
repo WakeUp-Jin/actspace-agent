@@ -1,6 +1,6 @@
 # 14 状态层验收交接
 
-- 主线提交：`refactor/desktop-frontend` @ `<squash 提交哈希>`
+- 主线提交：`refactor/desktop-frontend` @ `07e0f2b8`
 - 子分支：`refactor/desktop-fe-14`（`c83c3d4f` 起：T0–T21 按计划拆分的提交、你中途做的临时提交 `dbfab197`、两个修复提交、一个收尾提交）
 - 状态：**可以交给验收**
 - 启动方式：

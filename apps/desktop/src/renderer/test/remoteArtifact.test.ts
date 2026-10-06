@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import { encodeSessionLocator } from "@actspace/shared/session-locator";
 import { expect, it, vi } from "vitest";
 import { openRemoteFile } from "../hooks/remoteArtifact";
 import { setupBridge } from "./helpers/bridge";
-const key = `host:${btoa(JSON.stringify(["host", "session"])) .replace(/=/g, "")}`;
+const key = encodeSessionLocator({ hostId: "host", sessionId: "session" });
 it("previews remote text without invoking local file APIs or enabling HTML", async () => {
   const call = vi.fn(async () => ({ id: "artifact" })), preview = vi.fn(async () => ({ name: "result.html", size: 8, text: "<script>unsafe()</script>" })), localRead = vi.fn(), open = vi.fn();
   setupBridge({ "hosts.call": call, "hosts.preview": preview, "workspaces.readFile": localRead });

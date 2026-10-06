@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AppDataRoots } from "../agent-run";
+import type { GitRunner, GitRunResult } from "../git/run-git";
 import { initializeGitRepository } from "../review-git-service";
 
 const execFileAsync = promisify(execFile);
@@ -60,5 +61,20 @@ describe("review git initialization", () => {
     await execFileAsync("git", ["init"], { cwd: roots.workspaceRoot });
 
     await expect(initializeGitRepository({}, roots)).resolves.toMatchObject({ ok: true, alreadyRepository: true });
+  });
+
+  // 15 T13：run-git 的 startError 改为 { code, message } 后，这里仍按 message 判断和展示。
+  const failed = (startError: GitRunResult["startError"]): GitRunner => async () => ({ stdout: "", stderr: "", exitCode: null, timedOut: false, truncated: false, startError });
+
+  it("reports git_not_found when spawning git fails with ENOENT", async () => {
+    const roots = await makeWorkspace();
+    const result = await initializeGitRepository({}, roots, failed({ code: "ENOENT", message: "spawn git ENOENT" }));
+    expect(result).toMatchObject({ ok: false, error: "git_not_found" });
+  });
+
+  it("shows the start error message for other spawn failures", async () => {
+    const roots = await makeWorkspace();
+    const result = await initializeGitRepository({}, roots, failed({ code: "EACCES", message: "spawn  git\nEACCES" }));
+    expect(result).toMatchObject({ ok: false, error: "command_failed", message: "spawn git EACCES" });
   });
 });

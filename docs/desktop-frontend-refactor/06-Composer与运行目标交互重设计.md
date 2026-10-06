@@ -201,6 +201,7 @@
 | removed | 红点 + 已移除 | 这台机器已从列表移除 |
 | describing | 黄点 + 正在读取 | 正在读取 {host} 的工作区和模型 |
 | describe-failed | 红点 + 读取失败（可点击重试） | 无法读取 {host} 的信息：{error} |
+| host-unavailable | 黄点 + 暂不接受任务 | {host} 正在停止，暂不接受新任务（draining）/ {host} 恢复上次的任务时出错，暂不接受新任务（blocked） |
 | workspace-missing | — | 选择一个远端工作区 / 该工作区在 {host} 上已不存在 |
 | model-missing | — | 选择一个模型 |
 

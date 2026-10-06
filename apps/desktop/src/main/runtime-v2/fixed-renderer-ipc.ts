@@ -1,6 +1,6 @@
 import { validateRunReferences as validateSharedRunReferences } from "@actspace/shared/composer-reference-validation";
-import { parseRemoteSessionKey } from "../remote-hosts/session-router";
 import type { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
+import { createSessionGateway } from "../session-gateway";
 import { paginateSessionSummaries } from "./session-list-page";
 import { UsageSourceCache } from "./usage-source-cache";
 import { isDeepStrictEqual } from "node:util";
@@ -119,18 +119,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   const ipc = createIpcRegistrar({
     getWindow: options.getMainWindow,
     untrustedMessage: "Runtime v2 fixed renderer IPC rejected an untrusted sender.",
-    // 远端会话路由：带 hostId 的新建、远端审批、`host:` 会话 id 转给 remote adapter；列表类结果合并远端条目。
-    middleware: async ({ channel, input: raw }, next) => {
-      const input = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
-      if (options.remote) {
-        if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession && input.hostId) return options.remote.create(input);
-        if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval && typeof input.requestId === "string" && input.requestId.startsWith("remote-approval:")) return options.remote.decide(input);
-        const ref = typeof input.sessionId === "string" ? parseRemoteSessionKey(input.sessionId) : null;
-        if (ref) return options.remote.handle(channel, input, ref);
-      }
-      const result = await next();
-      return options.remote ? options.remote.mergeList(channel, input, result) : result;
-    },
+    // 本机 / 远端分流见 session-gateway（15 T9）。
+    middleware: createSessionGateway(options.remote),
   });
 
   ipc.handle(contract.app.getBootstrapState, (): BootstrapState => ({

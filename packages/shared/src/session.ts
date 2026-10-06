@@ -104,8 +104,8 @@ export type RuntimeStreamEvent =
       event: SessionEvent;
       preview: AgentToolPreview;
     }
-  | { type: "tool_approval_required"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session"; executionEnvironment?: "sandbox" | "real" }
-  | { type: "tool_approval_resolved"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; requestId: string; decision: string; approvalScope?: "browser_session" }
+  | { type: "tool_approval_required"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; toolName: string; requestId: string; /** 远端审批所在的 Host；本机审批没有。 */ hostId?: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session"; executionEnvironment?: "sandbox" | "real" }
+  | { type: "tool_approval_resolved"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; requestId: string; hostId?: string; decision: string; approvalScope?: "browser_session" }
   | {
       /** LLM 调用命中可重试错误、agent loop 正在退避重试；renderer 据此清掉半截 streaming 内容并显示重试提示 */
       type: "llm_retry";

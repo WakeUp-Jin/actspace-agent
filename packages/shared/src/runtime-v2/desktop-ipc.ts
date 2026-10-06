@@ -34,8 +34,8 @@ export type RuntimeV2AttachmentRef = {
   readonly textContent?: string;
 };
 export type RuntimeV2ApprovalDecisionInput =
-  | { readonly requestId: string; readonly decision: "once" | "deny" }
-  | { readonly requestId: string; readonly decision: "session"; readonly suggestionId: string };
+  | { readonly requestId: string; readonly hostId?: string; readonly decision: "once" | "deny" }
+  | { readonly requestId: string; readonly hostId?: string; readonly decision: "session"; readonly suggestionId: string };
 export type RuntimeV2DesktopLiveEnvelope = {
   readonly event: RuntimeV2LiveEvent;
   readonly emittedAt: string;

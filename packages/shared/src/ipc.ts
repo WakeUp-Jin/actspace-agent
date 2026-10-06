@@ -393,9 +393,10 @@ export type AbortAgentRunInput = {
   agentRunId: string;
 };
 
+/** `hostId`：远端审批所在的 Host，main 按它路由（15 T10）；本机审批不带。 */
 export type ApprovalDecideInput =
-  | { requestId: string; decision: "once" | "deny" }
-  | { requestId: string; decision: "session"; suggestionId: string };
+  | { requestId: string; hostId?: string; decision: "once" | "deny" }
+  | { requestId: string; hostId?: string; decision: "session"; suggestionId: string };
 
 export type ApprovalDecideResult = {
   ok: boolean;
@@ -408,6 +409,8 @@ export type ApprovalListPendingInput = {
 
 export type PendingApprovalInfo = {
   requestId: string;
+  /** 远端审批所在的 Host；本机审批没有。 */
+  hostId?: string;
   /** Live recovery facts; absent on older hosts, never inferred from stale history. */
   recovery?: {
     agentRunId: string;

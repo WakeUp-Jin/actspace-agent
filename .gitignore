@@ -39,6 +39,8 @@ dist/
 build/
 coverage/
 target/
+# Desktop renderer 的运行目标模块（15）不是构建产物。
+!apps/desktop/src/renderer/target/
 bin/
 obj/
 .cache/

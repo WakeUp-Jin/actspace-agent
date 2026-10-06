@@ -1,12 +1,14 @@
 import type { ComposerSendOptions } from "../components/Composer";
 import type { ComposerAttachment } from "@actspace/shared";
 import type { TaskContentEnvelope } from "@actspace/shared/runtime-v2";
+import { isLocalSession } from "../target/locate-session";
 
 /** Reconstruct remote attachments from durable Host facts, including after Reload. */
 export function taskAttachments(sessionId: string, envelope: TaskContentEnvelope): ComposerAttachment[] | undefined {
   if (envelope?.kind !== "composer-task") return undefined;
   const original = envelope.original as unknown as { attachments?: ComposerAttachment[]; uploadIds?: string[] };
-  if (!sessionId.startsWith("host:")) return original.attachments;
+  // 损坏的 key 按远端处理：不信任本地路径。
+  if (isLocalSession(sessionId)) return original.attachments;
   if (!Array.isArray(original.uploadIds) || !Array.isArray(envelope.prepared)) return undefined;
   const prepared = envelope.prepared;
   return original.uploadIds.flatMap(artifactId => {

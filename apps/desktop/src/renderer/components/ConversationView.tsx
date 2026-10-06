@@ -1,5 +1,5 @@
 import { openRemoteFile } from "../hooks/remoteArtifact";
-import { remoteSessionRef } from "../hooks/useRemoteTarget";
+import { useRunTargetContext } from "../target/run-target-context";
 import { messageFlowKind } from "./messages/messageFlowStyles";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
@@ -12,7 +12,7 @@ import { ResponseAnnotationCommentPopover } from "./messages/ResponseAnnotationC
 import { ResponseAnnotationHighlights } from "./messages/ResponseAnnotationHighlights";
 import { ResponseAnnotationPill } from "./composer/ResponseAnnotationPill";
 import { useResponseAnnotationState } from "./messages/useResponseAnnotationState";
-import { Composer, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerWorkspaceOption } from "./Composer";
+import { Composer, type ComposerReviewSummary } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
@@ -38,7 +38,6 @@ import { TrajectoryView } from "./TrajectoryView";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import { formatUsdCost } from "../usage-format";
 import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
-import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { useActiveSession } from "../session/active-session-context";
 import { useComposerContext } from "./composer/composer-context";
@@ -743,14 +742,9 @@ export function ConversationView({
   durableSurfaceMessageCount,
   composerPhase,
   isSessionReady = true,
-  workspaceOptions,
-  selectedWorkspaceRoot,
-  onSelectWorkspace,
-  executionContext,
   reviewSummary,
   onOpenReview,
   activeView = "chat",
-  trajectory,
   permissionControl,
 }: {
   /** 与投影合并后的上下文用量（WorkbenchLayout 计算）。 */
@@ -761,14 +755,9 @@ export function ConversationView({
   /** Session-owned phase from ClientSessionStore; local message length is only a fallback for isolated tests. */
   composerPhase?: "blank" | "engaging" | "active";
   isSessionReady?: boolean;
-  workspaceOptions?: ComposerWorkspaceOption[];
-  selectedWorkspaceRoot?: string | null;
-  onSelectWorkspace?: (workspaceRoot: string) => void;
-  executionContext?: ComposerExecutionContext;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
   activeView?: SessionMainView;
-  trajectory?: RuntimeV2TrajectorySnapshot | null;
   permissionControl?: ReactNode;
 }) {
   const { sessionId, messages, isStreaming, isAborting, isCompacting, sendScrollRequestId, composerFocusRequestId, onSend, onAbort, onRetryCompaction } = useActiveSession();
@@ -781,9 +770,13 @@ export function ConversationView({
     ? sessionProjection.cell
     : null;
   const browse = useSessionBrowse();
+  const { target, workspaceOptions, selectedWorkspaceRoot, onSelectWorkspace, execution: executionContext } = useRunTargetContext();
+  const isRemoteTarget = target.kind === "remote";
   // 14 S9：App 读页失败用 browse.messageError；投影 cell 的打开 / refresh 失败（bridge 重试用完前也会先显示）用 cell 的 status/error。
   const projectionError = projectionCell?.status === "error" ? `会话同步失败：${projectionCell.error ?? "未知错误"}` : null;
-  const sessionError = browse?.messageError ?? projectionError;
+  // 15 S2：key 损坏时不去读页，也不给「重试」。
+  const locatorError = target.kind === "invalid" ? "会话标识损坏，无法打开这个会话。" : null;
+  const sessionError = locatorError ?? browse?.messageError ?? projectionError;
   const projectionBridge = sessionProjection?.bridge ?? null;
   const projectionSessionId = sessionProjection?.sessionId ?? null;
   const retrySession = useCallback(() => {
@@ -855,9 +848,8 @@ export function ConversationView({
   const openReadFile = useCallback(async (message: ReadMessageBlock) => {
     const workspaceRoot = selectedWorkspaceRoot?.trim();
     const relativePath = message.filePath.trim();
-    const ref = remoteSessionRef(sessionId ?? null);
-    if (ref) {
-      try { await openRemoteFile(sessionId!, relativePath, openTab); }
+    if (isRemoteTarget && sessionId) {
+      try { await openRemoteFile(sessionId, relativePath, openTab); }
       catch { openTab({ id: `remote-error:${sessionId}:${relativePath}`, kind: "text", title: relativePath.split("/").at(-1) || "远端文件", content: "远端文件读取失败，请确认连接后重试。" }); }
       return;
     }
@@ -868,7 +860,7 @@ export function ConversationView({
       const title = relativePath.split(/[\\/]/).pop() || relativePath;
       openTab(readFailureTab(relativePath, title));
     }
-  }, [sessionId, openTab, selectedWorkspaceRoot]);
+  }, [isRemoteTarget, sessionId, openTab, selectedWorkspaceRoot]);
   const openWorkspaceFile = useCallback((path: string) => {
     const normalizedPath = path.replace(/^file:\/\//i, "").replace(/\\/g, "/");
     const root = selectedWorkspaceRoot?.replace(/\\/g, "/").replace(/\/+$/, "");
@@ -1047,7 +1039,7 @@ export function ConversationView({
   if (messages.length === 0 && (browse?.messageLoading || browse?.listLoading || sessionError)) {
     return <main className={CONVERSATION_SHELL_CLASS}><p role={sessionError ? 'alert' : 'status'} className="px-5 py-4 text-act-md leading-5 text-text-muted">
       {sessionError ?? (browse?.messageLoading ? '正在加载消息…' : '正在加载会话…')}
-      {sessionError && <button onClick={retrySession}>重试</button>}
+      {sessionError && !locatorError && <button onClick={retrySession}>重试</button>}
     </p></main>;
   }
   return (
@@ -1076,7 +1068,7 @@ export function ConversationView({
             aria-label="会话消息"
           >
               {browse?.messageLoading && <p role="status" className="px-5 py-3 text-act-md leading-5 text-text-muted">正在加载消息…</p>}
-              {sessionError && <p role="alert" className="px-5 py-3 text-act-md leading-5 text-text-muted">{sessionError} <button onClick={retrySession}>重试</button></p>}
+              {sessionError && <p role="alert" className="px-5 py-3 text-act-md leading-5 text-text-muted">{sessionError}{locatorError ? null : <> <button onClick={retrySession}>重试</button></>}</p>}
               {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"><Loader2 className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
               {browse?.earlierError && <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">{browse.earlierError} <button onClick={requestEarlier}>重试</button></p>}
               {isInitialComposer ? (
@@ -1170,7 +1162,7 @@ export function ConversationView({
         </div>
         {activeView === "trajectory" ? <div className="flex h-full min-h-0 flex-col">
           {isStreaming ? <div className="flex shrink-0 justify-end border-b border-line px-4 py-2"><button type="button" className="rounded-act-md border border-line px-3 py-1 text-act-xs text-text-main hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring" onClick={onAbort} disabled={isAborting}>{isAborting ? "正在停止…" : "停止"}</button></div> : null}
-          <div className="min-h-0 flex-1"><TrajectoryView snapshot={trajectory ?? null} /></div>
+          <div className="min-h-0 flex-1"><TrajectoryView /></div>
         </div> : null}
       </div>
       {/* 放在消息区之后：React 按树序挂 ref 并跑 layout effect，放前面时首帧拿不到 scrollContainerRef。 */}

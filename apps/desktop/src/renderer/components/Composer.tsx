@@ -78,6 +78,8 @@ import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../sess
 import { Button } from "./ui/Button";
 import { IconButton } from "./ui/IconButton";
 import { dialogsApi } from "../api/dialogs";
+import { useRunTargetContext } from "../target/run-target-context";
+import { describeReadiness } from "../target/readiness";
 import { skillsApi } from "../api/skills";
 import { tasksApi } from "../api/tasks";
 import { eventsApi } from "../api/events";
@@ -99,9 +101,8 @@ export type ComposerWorkspaceOption = {
   workspaceId?: string;
 };
 
+/** 本机的 Git 状态、分支和运行位置。运行目标本身（本机 / 远端、能力、是否锁定）从 RunTargetContext 读（15 T6）。 */
 export type ComposerExecutionContext = {
-  remote?: ReturnType<typeof import("../hooks/useRemoteTarget").useRemoteTarget>;
-  targetLocked?: boolean;
   gitContext: WorkspaceGitContext | null;
   selectedBranch?: string;
   runLocation: SessionRunLocation;
@@ -563,6 +564,9 @@ export function Composer({
   responseAnnotationNotice?: string | null;
 }) {
   const isChatForm = mode === "chat";
+  const { target, capabilities, locked: targetLocked, readiness, choices } = useRunTargetContext();
+  const isRemoteTarget = target.kind === "remote";
+  const remoteHostState = target.kind === "remote" ? choices?.hosts.find(host => host.hostId === target.hostId)?.state : undefined;
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && sessionProjection.sessionId === (sessionId ?? sessionProjection.sessionId)
     ? sessionProjection.cell
@@ -645,7 +649,10 @@ export function Composer({
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const modelOptionsRef = useRef<HTMLDivElement | null>(null);
   const hasAttachments = attachments.length > 0 || (!isChatForm && selectedSkills.length > 0);
-  const selectedModelAvailable = executionContext?.remote?.hostId ? executionContext.remote.canSend : modelList.some((model) => model.id === selectedModelId);
+  // 远端是否可发送只看 readiness（15 T7）；不能时的原因进发送按钮 tooltip 和状态行。
+  const remoteReady = readiness.state === "ready";
+  const remoteNotReady = isRemoteTarget && readiness.state !== "ready" ? describeReadiness(readiness, target.hostName) : null;
+  const selectedModelAvailable = isRemoteTarget ? remoteReady : modelList.some((model) => model.id === selectedModelId);
   const selectedModelSpec = modelList.find((spec) => spec.id === selectedModelId);
   const canSendMessage = Boolean(
     (message.trim() || attachments.length > 0 || responseAnnotations.length > 0) && selectedModelAvailable && !sending,
@@ -653,11 +660,11 @@ export function Composer({
   const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
   const editingModelOptions = currentModelRuntimeOptions(editingModelSpec, modelRuntimeOptions[editingModelId]);
   const selectedModelOptions = currentModelRuntimeOptions(selectedModelSpec, modelRuntimeOptions[selectedModelId]);
-  const configurationKey = JSON.stringify({ model: executionContext?.remote?.hostId ? executionContext.remote.model : selectedModelId, thinkingEnabled: selectedModelOptions.thinkingEnabled, reasoningEffort: selectedModelOptions.reasoningEffort, selectedSkillIds: selectedSkills });
+  const configurationKey = JSON.stringify({ model: isRemoteTarget ? choices?.modelId : selectedModelId, thinkingEnabled: selectedModelOptions.thinkingEnabled, reasoningEffort: selectedModelOptions.reasoningEffort, selectedSkillIds: selectedSkills });
   useEffect(() => {
-    if (!sessionId || (executionContext?.remote?.hostId && !executionContext.remote.canSend)) return;
+    if (!sessionId || (isRemoteTarget && !remoteReady)) return;
     void tasksApi.command({ sessionId, op: "configure", configuration: JSON.parse(configurationKey) }).catch(error => console.error("Failed to update execution configuration", error));
-  }, [sessionId, configurationKey, executionContext?.remote?.hostId, executionContext?.remote?.canSend]);
+  }, [sessionId, configurationKey, isRemoteTarget, remoteReady]);
   const editingReasoningEfforts = modelReasoningEfforts(editingModelSpec);
   const normalizedModelSearchQuery = modelSearchQuery.trim().toLocaleLowerCase();
   const filteredModelList = normalizedModelSearchQuery
@@ -988,7 +995,7 @@ export function Composer({
     setSkillsOpen(false);
 
     try {
-      const result = await dialogsApi.selectFiles(executionContext?.remote?.hostId ? { remote: true } : undefined);
+      const result = await dialogsApi.selectFiles(isRemoteTarget ? { remote: true } : undefined);
       if (!result.canceled) appendAttachments(result.attachments);
     } catch (error) {
       console.error("Failed to select Chat attachments", error);
@@ -1155,7 +1162,7 @@ export function Composer({
   function sendCurrentMessage() {
     if (!canSendMessage || !onSend || inputLocked || sendingRef.current) return;
     const sentAttachments = [...attachments];
-    const remoteSend = Boolean(executionContext?.remote?.hostId);
+    const remoteSend = isRemoteTarget;
     if (remoteSend) { sendingRef.current = true; setSending(true); }
     const options = createSendOptions(true);
     let sendResult: void | Promise<void>;
@@ -1675,7 +1682,7 @@ export function Composer({
     if (!isChatForm && skillsOpen) return renderSkillsMenu();
 
     const modeKeys: CommandMenuModeKey[] = ["agent", "plan", "chat"];
-    const acceptsFiles = isChatForm || Boolean(executionContext?.remote?.hostId);
+    const acceptsFiles = isChatForm || capabilities.attachments.files;
     const AttachmentIcon = acceptsFiles ? Paperclip : Image;
     return (
       <div className={COMMAND_MENU_CLASS} ref={commandMenuRef} role="menu" aria-label="添加上下文或工具">
@@ -1741,9 +1748,8 @@ export function Composer({
   }
 
   function renderModelSelector() {
-    const remote = executionContext?.remote;
-    if (remote?.hostId) return <select aria-label="远端模型" className="max-w-[220px] rounded-act-sm bg-surface-base px-2 py-1 text-act-sm text-text-main" value={remote.model} disabled={remote.host?.state !== "connected"} onChange={event => remote.selectModel(event.target.value)}>
-      {!remote.description ? <option value="">等待 Host 模型</option> : remote.description.models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
+    if (isRemoteTarget && choices) return <select aria-label="远端模型" className="max-w-[220px] rounded-act-sm bg-surface-base px-2 py-1 text-act-sm text-text-main" value={choices.modelId} disabled={remoteHostState !== "connected"} onChange={event => choices.selectModel(event.target.value)}>
+      {!choices.description ? <option value="">等待 Host 模型</option> : choices.description.models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
     </select>;
 
     // inline 时模型按钮靠右，菜单向左锚定；stacked 时从左侧向右展开。
@@ -1995,7 +2001,7 @@ export function Composer({
     const showStop = isStreaming && !(messageQueue && canSendMessage);
     const queueing = isStreaming && !showStop;
     const stopBlockedByCompaction = showStop && isCompacting;
-    const sendDisabled = showStop ? isAborting || stopBlockedByCompaction || Boolean(executionContext?.remote?.hostId && executionContext.remote.host?.state !== "connected") : !canSendMessage;
+    const sendDisabled = showStop ? isAborting || stopBlockedByCompaction || Boolean(isRemoteTarget && remoteHostState !== "connected") : !canSendMessage;
     const modelUnavailable = !selectedModelAvailable;
     const tooltipLabel = stopBlockedByCompaction
       ? "压缩完成后可继续"
@@ -2003,6 +2009,8 @@ export function Composer({
         ? "停止 Agent"
         : queueing
           ? "加入队列，当前运行结束后发送"
+          : remoteNotReady
+            ? remoteNotReady.reason
           : modelUnavailable
             ? "请先在设置中连接模型服务"
             : canSendMessage
@@ -2014,6 +2022,8 @@ export function Composer({
         ? "停止 Agent"
         : queueing
           ? "加入队列"
+          : remoteNotReady
+            ? remoteNotReady.reason
           : modelUnavailable
             ? "暂无可用模型，请在设置中连接服务商"
             : canSendMessage
@@ -2128,7 +2138,7 @@ export function Composer({
   }
 
   function renderReviewActionsStrip() {
-    if (executionContext?.remote?.hostId) return null;
+    if (!capabilities.review.enabled) return null;
     if (isChatForm) return null;
     if (surface !== "followup" && surface !== "initial") return null;
     if (!reviewSummary || reviewSummary.status === "empty") return null;
@@ -2210,7 +2220,7 @@ export function Composer({
           ) : null}
           <span className={STATUS_ITEM_CLASS}>
             <Laptop className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
-            <span>{executionContext?.remote?.hostId ? `${executionContext.remote.host?.name ?? "远端"}${executionContext.remote.canSend ? "" : " · 未就绪"}` : runLocation === "worktree" ? "工作树" : "本机"}</span>
+            <span>{isRemoteTarget ? `${target.hostName || "远端"}${remoteNotReady?.label ? ` · ${remoteNotReady.label}` : ""}` : runLocation === "worktree" ? "工作树" : "本机"}</span>
           </span>
           {permissionControl ? <span className={STATUS_ITEM_CLASS}>{permissionControl}</span> : null}
         </div>
@@ -2392,17 +2402,18 @@ export function Composer({
   }
 
   function renderInitialContextRow() {
-    if (surface !== "initial" && !executionContext?.remote?.hostId) return null;
-    const remote = executionContext?.remote;
-    if (remote) return <div className={INITIAL_CONTEXT_ROW_CLASS}>
-      <select aria-label="会话运行位置" className="max-w-[200px] rounded-act-sm bg-surface-base text-act-sm text-text-muted" value={remote.hostId ?? ""} disabled={executionContext?.targetLocked} onChange={event => remote.selectHost(event.target.value || null)}>
+    if (surface !== "initial" && !isRemoteTarget) return null;
+    // 远端的 3 个 select 保留到 09（新菜单）；数据来自 RunTargetContext 的 `choices`。
+    const remoteHostId = target.kind === "remote" ? target.hostId : null;
+    if (choices) return <div className={INITIAL_CONTEXT_ROW_CLASS}>
+      <select aria-label="会话运行位置" className="max-w-[200px] rounded-act-sm bg-surface-base text-act-sm text-text-muted" value={remoteHostId ?? ""} disabled={targetLocked} onChange={event => choices.selectHost(event.target.value || null)}>
         <option value="">本机 Mac</option>
-        {remote.hostId && !remote.hosts.some(host => host.hostId === remote.hostId) ? <option value={remote.hostId}>远端 · 未连接</option> : null}
-        {remote.hosts.map(host => <option key={host.hostId} value={host.hostId}>{host.name}{host.state === "connected" ? "" : " · 离线"}</option>)}
+        {remoteHostId && !choices.hosts.some(host => host.hostId === remoteHostId) ? <option value={remoteHostId}>远端 · 未连接</option> : null}
+        {choices.hosts.map(host => <option key={host.hostId} value={host.hostId}>{host.name}{host.state === "connected" ? "" : " · 离线"}</option>)}
       </select>
-      {remote.hostId ? <><select aria-label="远端工作区" className="max-w-[260px] rounded-act-sm bg-surface-base text-act-sm text-text-muted" value={remote.workspaceId} disabled={executionContext?.targetLocked} onChange={event => remote.selectWorkspace(event.target.value)}>
-        {!remote.description ? <option value="">等待 Host 工作区</option> : remote.description.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name} · {workspace.path}</option>)}
-      </select>{!remote.canSend ? <span className="text-act-xxs text-text-faint">Host 未就绪，草稿仍可编辑</span> : null}</> : <>{renderContextSelector("workspace", selectedWorkspaceLabel)}{gitHasBranch && branchLabel ? renderContextSelector("branch", branchLabel, "branch") : null}{renderContextSelector("runtime", runLocation === "worktree" ? "新建工作树" : "本机", "runtime")}</>}
+      {remoteHostId ? <><select aria-label="远端工作区" className="max-w-[260px] rounded-act-sm bg-surface-base text-act-sm text-text-muted" value={target.kind === "remote" ? target.workspaceId ?? "" : ""} disabled={targetLocked} onChange={event => choices.selectWorkspace(event.target.value)}>
+        {!choices.description ? <option value="">等待 Host 工作区</option> : choices.description.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name} · {workspace.path}</option>)}
+      </select>{remoteNotReady ? <span className="text-act-xxs text-text-faint">{remoteNotReady.reason}</span> : null}</> : <>{renderContextSelector("workspace", selectedWorkspaceLabel)}{gitHasBranch && branchLabel ? renderContextSelector("branch", branchLabel, "branch") : null}{renderContextSelector("runtime", runLocation === "worktree" ? "新建工作树" : "本机", "runtime")}</>}
     </div>;
     if (isChatForm) return null;
 

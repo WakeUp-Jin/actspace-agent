@@ -1,9 +1,10 @@
 import { hostsApi } from "../api/hosts";
-import { remoteSessionRef } from "./useRemoteTarget";
+import { locateSession } from "../target/locate-session";
 import type { RightPanelTab } from "../components/right-panel/RightPanelContext";
 export async function openRemoteFile(sessionId: string, path: string, openTab: (tab: RightPanelTab) => void, download = false): Promise<boolean> {
-  const ref = remoteSessionRef(sessionId);
-  if (!ref) return false;
+  const location = locateSession(sessionId);
+  if (location.kind !== "remote") return false;
+  const ref = { hostId: location.hostId, sessionId: location.sessionId };
   const artifact = await hostsApi.call({ hostId: ref.hostId, method: "files.reference", params: { sessionId: ref.sessionId, path } }) as { id: string };
   const input = { ...ref, artifactId: artifact.id };
   if (download) { await hostsApi.download(input); return true; }

@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { dialogsApi } from "../../api/dialogs";
 import { sessionsApi } from "../../api/sessions";
 import { workspacesApi } from "../../api/workspaces";
+import { useRunTargetContext } from "../../target/run-target-context";
 
 type TurnOutputArtifact = {
   id: string;
@@ -154,6 +155,8 @@ export function TurnOutputArtifacts({
 }) {
   const outputs = useMemo(() => collectTurnOutputArtifacts(messages), [messages]);
   const { openTab } = useRightPanel();
+  // 产物属于当前会话；远端会话的文件经 Host 读取和下载（15 T6）。
+  const isRemoteTarget = useRunTargetContext().target.kind === "remote";
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -188,7 +191,7 @@ export function TurnOutputArtifacts({
         return;
       }
 
-      if (sessionId && await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab)) return;
+      if (isRemoteTarget && sessionId && await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab)) return;
       if (!workspaceRoot || !artifact.workspaceRelativePath) {
         setError("该文件不在当前工作区内，暂时不能预览。");
         return;
@@ -211,7 +214,7 @@ export function TurnOutputArtifacts({
 
   async function showContextMenu(artifact: TurnOutputArtifact) {
     setError(null);
-    if (artifact.kind === "file" && sessionId?.startsWith("host:")) {
+    if (artifact.kind === "file" && sessionId && isRemoteTarget) {
       try { await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab, true); }
       catch { setError("远端文件下载失败，请确认连接后重试。"); }
       return;

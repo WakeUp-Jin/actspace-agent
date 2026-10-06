@@ -8,6 +8,9 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { ResponseAnnotationContext } from "../components/messages/response-annotation-context";
 import { createAnnotationContextValue } from "./fixtures/response-annotation-helpers";
 import { setupBridge } from "./helpers/bridge";
+import { legacyRunTarget } from "./helpers/workbench";
+import { RunTargetContext } from "../target/run-target-context";
+import type { RunTargetReadiness } from "../target/readiness";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -1289,12 +1292,71 @@ describe("Composer response annotation pill", () => {
 });
 
 it("keeps a removed remote Host as the selected locked target", () => {
-  renderComposer({ surface: "followup", executionContext: { gitContext: null, runLocation: "this_mac", targetLocked: true, remote: {
-    hostId: "removed", hosts: [], host: undefined, description: undefined, workspaceId: "workspace", canSend: false,
-    selectHost: vi.fn(), selectWorkspace: vi.fn(), model: "fixture", selectModel: vi.fn(),
-  } } });
+  const choices = { hosts: [], description: undefined, modelId: "fixture", selectHost: vi.fn(), selectWorkspace: vi.fn(), selectModel: vi.fn() };
+  render(
+    <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "removed", hostName: "removed", workspaceId: "workspace" }, targetLocked: true, readiness: { state: "removed" }, choices })}>
+      <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={{ gitContext: null, runLocation: "this_mac" }} /></TooltipProvider>
+    </RunTargetContext.Provider>,
+  );
   const location = screen.getByLabelText("会话运行位置") as HTMLSelectElement;
   expect(location).toHaveValue("removed");
   expect(location.selectedOptions[0].textContent).toContain("远端");
   expect(location).toBeDisabled();
+});
+
+describe("Composer on a remote run target", () => {
+  // 15 T6：Composer 按 RunTargetContext 的 target / capabilities 判断，不再读 executionContext.remote。
+  const choices = { hosts: [], description: undefined, modelId: "m", selectHost: vi.fn(), selectWorkspace: vi.fn(), selectModel: vi.fn() };
+  function renderRemote(props: Partial<Parameters<typeof Composer>[0]> = {}, readiness?: RunTargetReadiness) {
+    return render(
+      <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "server", hostName: "Cloud" }, targetLocked: true, readiness, choices })}>
+        <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={{ gitContext: null, runLocation: "this_mac" }} {...props} /></TooltipProvider>
+      </RunTargetContext.Provider>,
+    );
+  }
+
+  it("offers files as well as images in Agent mode", async () => {
+    const user = userEvent.setup();
+    renderRemote();
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    expect(within(screen.getByRole("menu", { name: "添加上下文或工具" })).getByRole("menuitem", { name: "图片与文件" })).toBeInTheDocument();
+  });
+
+  it("hides the review strip", () => {
+    renderRemote({ reviewSummary: { status: "changes", additions: 1, deletions: 1 } });
+    expect(screen.queryByLabelText("待处理的审查操作")).not.toBeInTheDocument();
+  });
+
+  // 15 T7：远端能否发送只看 readiness；不能时发送按钮说明原因，状态行显示短状态。
+  it("sends when the run target is ready", async () => {
+    const onSend = vi.fn();
+    renderRemote({ onSend }, { state: "ready" });
+    fireEvent.change(screen.getByLabelText("消息输入框"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送消息" }));
+    await waitFor(() => expect(onSend).toHaveBeenCalled());
+    expect(screen.getByText("Cloud")).toBeInTheDocument();
+  });
+
+  it("explains why it cannot send and keeps the draft", () => {
+    const onSend = vi.fn();
+    renderRemote({ onSend }, { state: "offline" });
+    fireEvent.change(screen.getByLabelText("消息输入框"), { target: { value: "hi" } });
+    const send = screen.getByRole("button", { name: "Cloud 离线。前往设置重新连接" });
+    expect(send).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(send);
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("hi");
+    expect(screen.getByText("Cloud · 离线")).toBeInTheDocument();
+  });
+
+  it("pushes the execution configuration to a remote Session only when it is ready", async () => {
+    const command = vi.fn(async () => ({ snapshot: { sessionId: "s", revision: 1, paused: false, queue: [], tasks: [], runs: [] } }));
+    setupBridge({ "tasks.command": command, "events.hostUploadProgress": () => () => {} });
+    const { unmount } = renderRemote({ sessionId: "s" }, { state: "describing" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(command).not.toHaveBeenCalled();
+    unmount();
+    renderRemote({ sessionId: "s" }, { state: "ready" });
+    await waitFor(() => expect(command).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "s", op: "configure" })));
+  });
 });

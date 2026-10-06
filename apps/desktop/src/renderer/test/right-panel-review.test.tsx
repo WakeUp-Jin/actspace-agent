@@ -158,6 +158,22 @@ describe("Review workbench", () => {
     expect(await screen.findByRole("region", { name: "工作区变更审查" })).toBeInTheDocument();
   });
 
+  it("hides workspace controls and development objects on a remote run target", async () => {
+    // 15 T6：WorkbenchLayout 按 capabilities.review / terminal 判断，不再看有没有 hostId。
+    const user = userEvent.setup();
+    setupBridge(reviewBridge(emptySnapshot()));
+    const props = { sessions: [], activeSessionId: null, title: "Remote", messages: [], contextSnapshot: null, selectedWorkspaceRoot: "/tmp/workspace" };
+    const { unmount } = render(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} /></RightPanelProvider>);
+    expect(screen.getByRole("button", { name: "查看工作区环境" })).toBeInTheDocument();
+    unmount();
+    render(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} runTarget={{ kind: "remote", hostId: "server", hostName: "Cloud" }} /></RightPanelProvider>);
+    expect(screen.queryByRole("button", { name: "查看工作区环境" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
+    expect(screen.queryByRole("menuitem", { name: "工作区文件" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Review" })).not.toBeInTheDocument();
+  });
+
   it("reloads an open Review against the currently selected workspace", async () => {
     const user = userEvent.setup();
     const bridge = reviewBridge(emptySnapshot());

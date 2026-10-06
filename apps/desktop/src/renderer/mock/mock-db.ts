@@ -8,6 +8,7 @@ import type {
   WorkspaceRegistry,
 } from "@actspace/shared";
 import type { HostConnection } from "@actspace/shared/host-protocol";
+import { encodeSessionLocator } from "@actspace/shared/session-locator";
 import type {
   RuntimeV2DesktopSessionProjection,
   RuntimeV2SessionObservation,
@@ -59,11 +60,9 @@ export type MockDb = {
   nextId(prefix: string): string;
 };
 
-/** 与 main 的 `remoteSessionKey` 同格式：`host:` + base64url(JSON [hostId, sessionId])。 */
+/** 与 main 的 `remoteSessionKey` 同一份编码（shared 的 session-locator）。 */
 export function remoteSessionId(hostId: string, sessionId: string): string {
-  const bytes = new TextEncoder().encode(JSON.stringify([hostId, sessionId]));
-  const base64 = btoa(String.fromCharCode(...bytes));
-  return `host:${base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
+  return encodeSessionLocator({ hostId, sessionId });
 }
 
 const SEED_TIME = Date.parse("2026-10-01T09:00:00.000Z");

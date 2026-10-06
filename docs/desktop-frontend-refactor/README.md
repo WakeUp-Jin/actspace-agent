@@ -49,7 +49,7 @@
 | --- | --- | --- | --- | --- |
 | 01 | [安全与 IPC 收口](01-安全与IPC收口.md) | workspace root 校验、sender 校验、导航 / CSP、openExternal、IPC 去重、生命周期 | 高 | `docs/exec-plans/active/` + `docs/SECURITY.md` 补条款 |
 | 02 | [Renderer 状态层与会话数据流](02-Renderer状态层与会话数据流.md) | 拆 App.tsx、per-session store、正文单一事实源、类型化 identity、IPC 风暴 | 高 | `docs/design-docs/frontend/` + exec-plan |
-| 03 | [运行目标抽象：本机与远端](03-运行目标抽象-本机与远端.md) | `RunTarget` 模型、`host:` id 统一解码、30 处分支收口、`useRemoteTarget` 重写 | 中 | `docs/design-docs/frontend/front-workspace-git-worktree-context.md` 合并 |
+| 03 | [运行目标抽象：本机与远端](03-运行目标抽象-本机与远端.md) | `RunTarget` 模型、`host:` id 统一解码、30 处分支收口、`useRemoteTarget` 重写。**已按 15 实施** | 中 | 已合并进 `docs/design-docs/frontend/front-workspace-git-worktree-context.md`「运行目标」一节 |
 | 04 | [Preload 接口与 Mock Bridge](04-Preload接口与MockBridge.md) | 接口按域分组、必选类型、`satisfies` 对齐、注入式 mock bridge | 中 | `docs/design-docs/frontend/` |
 | 05 | [UI 基础组件与大组件拆分](05-UI基础组件与大组件拆分.md) | Popover / Menu / Dialog 原语、焦点陷阱、Esc 栈、拆 Settings / Sidebar / Conversation / Workbench | 中 | `front-基础组件封装规范.md` 合并 |
 | 06 | [Composer 与运行目标交互重设计](06-Composer与运行目标交互重设计.md) | 队列移到输入框上方、运行位置菜单、输入框外观、`+` 面板 | 中 | `front-聊天输入框规范.md`、`front-workspace-git-worktree-context.md` 改写 |

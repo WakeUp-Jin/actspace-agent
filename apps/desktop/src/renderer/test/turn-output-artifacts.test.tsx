@@ -2,7 +2,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
-import { TestConversationView } from "./helpers/workbench";
+import { encodeSessionLocator } from "@actspace/shared/session-locator";
+import { legacyRunTarget, TestConversationView } from "./helpers/workbench";
+import { RunTargetContext } from "../target/run-target-context";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { collectTurnOutputArtifacts, TurnOutputArtifacts } from "../components/messages/TurnOutputArtifacts";
 import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
@@ -561,5 +563,67 @@ describe("generic tool result presentation", () => {
     await userEvent.click(screen.getByRole("button", { name: "Read docs/ARCHITECTURE.md" }));
     expect(readWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/ARCHITECTURE.md" });
     expect(screen.getByTestId("active-file-tab")).toHaveTextContent("docs/ARCHITECTURE.md:# Architecture");
+  });
+
+  // 15 T6：是否经 Host 读取由 RunTargetContext 的 target 决定，不再各自解析会话 key。
+  const remoteKey = encodeSessionLocator({ hostId: "server", sessionId: "remote-1" });
+  const remoteTarget = { kind: "remote", hostId: "server", hostName: "Cloud" } as const;
+
+  it("reads a file through the Host when the run target is remote", async () => {
+    const call = vi.fn(async () => ({ id: "artifact-1" }));
+    const preview = vi.fn(async () => ({ name: "ARCHITECTURE.md", size: 14, text: "# Remote" }));
+    const readWorkspaceFile = vi.fn();
+    setupBridge({ "hosts.call": call, "hosts.preview": preview, "workspaces.readFile": readWorkspaceFile });
+    render(
+      <RightPanelProvider>
+        <TestConversationView
+          messages={[
+            { kind: "user", id: "user-read", content: "Read it", createdAt: "2026-07-28T00:00:00.000Z" },
+            { kind: "read", id: "read-1", filePath: "docs/ARCHITECTURE.md", displayText: "Read docs/ARCHITECTURE.md", resultPreview: ["# Architecture"], status: "completed", createdAt: "2026-07-28T00:00:01.000Z" },
+          ]}
+          contextSnapshot={null}
+          sessionId={remoteKey}
+          selectedWorkspaceRoot="/workspace"
+          runTarget={remoteTarget}
+          isSessionReady={false}
+        />
+        <ActiveTabTitleProbe />
+      </RightPanelProvider>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Worked/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Read docs/ARCHITECTURE.md" }));
+    expect(call).toHaveBeenCalledWith({ hostId: "server", method: "files.reference", params: { sessionId: "remote-1", path: "docs/ARCHITECTURE.md" } });
+    expect(readWorkspaceFile).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("active-tab-title")).toHaveTextContent("text:ARCHITECTURE.md");
+  });
+
+  it("opens and downloads output files through the Host when the run target is remote", async () => {
+    const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
+      kind: "write_diff", id: "write-remote", filePath: "report.md", outputPath: "/srv/docs/report.md", outputRelativePath: "docs/report.md",
+      additions: 3, deletions: 0, diff: "", collapsedLines: 0, status: "completed", createdAt: "2026-07-28T00:00:01.000Z",
+    };
+    const call = vi.fn(async () => ({ id: "artifact-2" }));
+    const preview = vi.fn(async () => ({ name: "report.md", size: 8, text: "# Report" }));
+    const download = vi.fn(async () => undefined);
+    const readWorkspaceFile = vi.fn();
+    const showArtifactContextMenu = vi.fn();
+    setupBridge({ "hosts.call": call, "hosts.preview": preview, "hosts.download": download, "workspaces.readFile": readWorkspaceFile, "dialogs.showArtifactContextMenu": showArtifactContextMenu });
+    render(
+      <RightPanelProvider>
+        <RunTargetContext.Provider value={legacyRunTarget({ runTarget: remoteTarget })}>
+          <TurnOutputArtifacts messages={[writeMessage]} sessionId={remoteKey} workspaceRoot="/workspace" />
+        </RunTargetContext.Provider>
+        <ActiveTabTitleProbe />
+      </RightPanelProvider>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Open report.md" }));
+    expect(preview).toHaveBeenCalledWith({ hostId: "server", sessionId: "remote-1", artifactId: "artifact-2" });
+    expect(screen.getByTestId("active-tab-title")).toHaveTextContent("text:report.md");
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Open report.md" }));
+    await vi.waitFor(() => expect(download).toHaveBeenCalledWith({ hostId: "server", sessionId: "remote-1", artifactId: "artifact-2" }));
+    expect(readWorkspaceFile).not.toHaveBeenCalled();
+    expect(showArtifactContextMenu).not.toHaveBeenCalled();
   });
 });

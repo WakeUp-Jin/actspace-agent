@@ -69,6 +69,12 @@
       "require": "./dist/composer-reference-validation.js",
       "default": "./dist/composer-reference-validation.js"
     },
+    "./session-locator": {
+      "types": "./dist/session-locator.d.ts",
+      "import": "./dist/session-locator.js",
+      "require": "./dist/session-locator.js",
+      "default": "./dist/session-locator.js"
+    },
     "./session-list-page": {
       "types": "./dist/session-list-page.d.ts",
       "import": "./dist/session-list-page.js",

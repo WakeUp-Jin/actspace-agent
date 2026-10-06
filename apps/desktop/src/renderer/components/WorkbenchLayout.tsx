@@ -18,9 +18,10 @@ import { SplitView } from "./SplitView";
 import { WindowChromeBar } from "./WindowChromeBar";
 import type { SessionMainView } from "./SessionViewToggle";
 import { WorkspaceChromeControls } from "./workspace/WorkspaceChromeControls";
-import type { ComposerExecutionContext, ComposerReviewSummary, ComposerWorkspaceOption } from "./Composer";
+import type { ComposerReviewSummary } from "./Composer";
+import { useRunTargetContext } from "../target/run-target-context";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
-import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages, selectTrajectory } from "@actspace/client/sessions";
+import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { ExtensionsPage } from "./extensions/ExtensionsPage";
 import { SettingsPage } from "./settings/SettingsPage";
@@ -104,10 +105,6 @@ export function WorkbenchLayout({
   onSettingsChange,
   onArchivedSessionsChange,
   workspaces,
-  workspaceOptions,
-  selectedWorkspaceRoot,
-  onSelectWorkspace,
-  executionContext,
   getSessionPreview,
   reviewSummary,
   onReviewChanged,
@@ -118,10 +115,6 @@ export function WorkbenchLayout({
   onSettingsChange?: (settings: AppSettings) => void;
   onArchivedSessionsChange?: () => void;
   workspaces?: WorkspaceEntry[];
-  workspaceOptions?: ComposerWorkspaceOption[];
-  selectedWorkspaceRoot?: string | null;
-  onSelectWorkspace?: (workspaceRoot: string) => void;
-  executionContext?: ComposerExecutionContext;
   getSessionPreview?: SessionPreviewResolver;
   reviewSummary?: ComposerReviewSummary | null;
   onReviewChanged?: () => void;
@@ -129,6 +122,9 @@ export function WorkbenchLayout({
   const { sessionId: activeSessionId, title, messages, contextSnapshot, contextState, isStreaming, isSessionReady, onSend } = useActiveSession();
   const { composerMode, selectedModelId, defaultModelId, selectedSkills } = useComposerContext();
   const { onSelectSession } = useSessionActions();
+  const { capabilities, selectedWorkspaceRoot } = useRunTargetContext();
+  const reviewEnabled = capabilities.review.enabled;
+  const terminalEnabled = capabilities.terminal.enabled;
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(() =>
     typeof window === "undefined" ? 0 : window.innerWidth,
@@ -148,7 +144,6 @@ export function WorkbenchLayout({
   const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
   const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
   const projectedComposer = projectionCell ? selectComposer(projectionCell) : null;
-  const projectedTrajectory = projectionCell ? selectTrajectory(projectionCell) : null;
   const projectedContextSnapshot = projectedContextEstimate
     ? contextEstimateToSnapshot(projectedContextEstimate)
     : null;
@@ -385,7 +380,7 @@ export function WorkbenchLayout({
   }
 
   const openReviewTab = useCallback(() => {
-    if (executionContext?.remote?.hostId) return;
+    if (!reviewEnabled) return;
     const refreshKey = ++reviewTabRefreshCounterRef.current;
     openTab({
       id: "review",
@@ -396,7 +391,7 @@ export function WorkbenchLayout({
       refreshKey,
     });
     onReviewChanged?.();
-  }, [executionContext?.remote?.hostId, onReviewChanged, openTab, selectedWorkspaceRoot]);
+  }, [reviewEnabled, onReviewChanged, openTab, selectedWorkspaceRoot]);
 
   const handleSelectView = useCallback((next: SidebarView) => {
     setView(next);
@@ -478,14 +473,9 @@ export function WorkbenchLayout({
         durableSurfaceMessageCount={projectedSurfaceMessages.length > 0 ? projectedSurfaceMessages.length : undefined}
         composerPhase={projectedComposer?.phase}
         isSessionReady={effectiveIsSessionReady}
-        workspaceOptions={workspaceOptions}
-        selectedWorkspaceRoot={selectedWorkspaceRoot}
-        onSelectWorkspace={onSelectWorkspace}
-        executionContext={executionContext}
-        reviewSummary={composerMode === "chat" || executionContext?.remote?.hostId ? null : reviewSummary}
-        onOpenReview={composerMode === "chat" || executionContext?.remote?.hostId ? undefined : openReviewTab}
+        reviewSummary={composerMode === "chat" || !reviewEnabled ? null : reviewSummary}
+        onOpenReview={composerMode === "chat" || !reviewEnabled ? undefined : openReviewTab}
         activeView={sessionMainView}
-        trajectory={projectedTrajectory}
         permissionControl={permissionControl}
       />
     );
@@ -555,7 +545,7 @@ export function WorkbenchLayout({
   );
   const rightPanel = (
     <RightPanel
-      developmentEnabled={composerMode !== "chat" && !executionContext?.remote?.hostId}
+      developmentEnabled={composerMode !== "chat" && terminalEnabled}
       contextState={effectiveContextState}
       contextSnapshot={effectiveContextSnapshot}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
@@ -594,14 +584,14 @@ export function WorkbenchLayout({
         sessionView={view === "chat" ? sessionMainView : undefined}
         onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
         centerTrailing={view === "chat" ? <>
-          {!executionContext?.remote?.hostId && composerMode !== "chat" && selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
+          {reviewEnabled && composerMode !== "chat" && selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
         </> : undefined}
         rightLeading={
           view === "chat" ? (
             <>
               {isRightPanelOpen ? (
                 <RightPanelObjectMenu
-                  developmentEnabled={composerMode !== "chat" && !executionContext?.remote?.hostId}
+                  developmentEnabled={composerMode !== "chat" && terminalEnabled}
                   sessionId={activeSessionId}
                   onOpenReview={openReviewTab}
                 />

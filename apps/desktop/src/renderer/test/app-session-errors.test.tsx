@@ -93,4 +93,22 @@ describe("session errors are visible", () => {
     expect(error).toHaveBeenCalledWith("队列状态读取失败，请稍后重试。", expect.any(Error));
     error.mockRestore();
   });
+
+  it("shows a corrupt-key error state instead of crashing when a session key cannot be decoded", async () => {
+    // 15 T2：以 `host:` 开头但解不开的 key。main 会对它抛错；renderer 不在渲染中抛错，也不给「重试」。
+    const corrupt = "host:not-a-locator";
+    const item = { ...listItem(), id: corrupt, title: "Corrupt" };
+    fixture({
+      "sessions.list": async () => [item],
+      "sessions.listPage": async () => ({ items: [item], groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }], indexing: false, failed: 0 }),
+      "sessions.getPage": async () => { throw new Error("Invalid remote SessionRef"); },
+      "tasks.command": async () => { throw new Error("Invalid remote SessionRef"); },
+    });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    renderApp();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("会话标识损坏，无法打开这个会话。");
+    expect(within(alert).queryByRole("button", { name: "重试" })).toBeNull();
+    expect(screen.getAllByText("Corrupt").length).toBeGreaterThan(0);
+  });
 });

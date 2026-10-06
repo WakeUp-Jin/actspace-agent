@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AppDataRoots } from "../agent-run";
+import type { GitRunner } from "../git/run-git";
 import {
   getWorkspaceGitContext,
   prepareExecutionContext,
@@ -67,6 +68,15 @@ describe("workspace Git context service", () => {
       return;
     }
     expect(result).toMatchObject({ status: "not_repository", branches: [] });
+  });
+
+  // 15 T13：run-git 的 startError 改为 { code, message } 后，git 缺失和非仓库的判断不变。
+  it("classifies an ENOENT start error as git_not_found and an English non-repository error as not_repository", async () => {
+    const roots = await createRoots();
+    const missing: GitRunner = async () => ({ stdout: "", stderr: "", exitCode: null, timedOut: false, truncated: false, startError: { code: "ENOENT", message: "spawn git ENOENT" } });
+    expect(await getWorkspaceGitContext(roots.workspaceRoot, missing)).toMatchObject({ status: "git_not_found" });
+    const outside: GitRunner = async () => ({ stdout: "", stderr: "fatal: not a git repository (or any of the parent directories): .git\n", exitCode: 128, timedOut: false, truncated: false });
+    expect(await getWorkspaceGitContext(roots.workspaceRoot, outside)).toMatchObject({ status: "not_repository", branches: [] });
   });
 
   it("lists local branches and marks the current checkout", async () => {

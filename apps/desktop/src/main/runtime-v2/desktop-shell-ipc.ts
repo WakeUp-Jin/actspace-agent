@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { ReviewWorkspaceInput } from "@actspace/shared";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
+import { hasSessionLocatorPrefix } from "@actspace/shared/session-locator";
 import type { AppDataRoots } from "../app-paths";
 import { createIpcRegistrar } from "../ipc/registry";
 import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, type WorkspaceRegistryOptions } from "../workspace-registry-service";
@@ -56,7 +57,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     // 工作区、Review、终端都是本机能力，远端会话一律拒绝。
     middleware: (call, next) => {
       const input = call.input;
-      if (input && typeof input === "object" && (("sessionId" in input && typeof input.sessionId === "string" && input.sessionId.startsWith("host:")) || ("hostId" in input && input.hostId))) throw new Error("Local shell capabilities are unavailable for remote Sessions");
+      if (input && typeof input === "object" && (("sessionId" in input && typeof input.sessionId === "string" && hasSessionLocatorPrefix(input.sessionId)) || ("hostId" in input && input.hostId))) throw new Error("Local shell capabilities are unavailable for remote Sessions");
       return next();
     },
   });
