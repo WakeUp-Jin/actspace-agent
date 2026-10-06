@@ -5,15 +5,14 @@ import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, WheelEvent as ReactWheelEvent } from "react";
-import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, ResponseAnnotationReference, UsableModelView } from "@actspace/shared";
-import { ResponseAnnotationContext, isAnnotatableMessageId } from "./messages/response-annotation-context";
+import type { ComposerAttachment, ContextState, ContextUsageSnapshot, MessageBlock } from "@actspace/shared";
+import { ResponseAnnotationContext, annotatableMessageIds } from "./messages/response-annotation-context";
 import { ResponseSelectionMenu } from "./messages/ResponseSelectionMenu";
 import { ResponseAnnotationCommentPopover } from "./messages/ResponseAnnotationCommentPopover";
 import { ResponseAnnotationHighlights } from "./messages/ResponseAnnotationHighlights";
 import { ResponseAnnotationPill } from "./composer/ResponseAnnotationPill";
 import { useResponseAnnotationState } from "./messages/useResponseAnnotationState";
-import type { MessageQueueControls } from "./composer/MessageQueueTray";
-import { Composer, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
+import { Composer, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
@@ -41,6 +40,8 @@ import { formatUsdCost } from "../usage-format";
 import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
 import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
+import { useActiveSession } from "../session/active-session-context";
+import { useComposerContext } from "./composer/composer-context";
 import { readFailureTab, tabFromFile } from "./right-panel/workspaceFileTab";
 import { getSessionToolDetail } from "../api/sessions";
 import { visualizeApi } from "../api/visualize";
@@ -737,100 +738,59 @@ function TurnActions({
 }
 
 export function ConversationView({
-  messages,
   contextSnapshot,
   contextState,
   durableSurfaceMessageCount,
   composerPhase,
-  sessionId = null,
-  isStreaming = false,
-  isAborting = false,
-  isCompacting = false,
-  messageQueue,
-  composerNotice = null,
-  onRetryCompaction,
-  sendScrollRequestId = 0,
-  composerFocusRequestId = 0,
-  onSend,
-  onAbort,
   isSessionReady = true,
-  defaultModelId,
-  selectedModelId,
-  onSelectedModelChange,
-  composerMode,
-  onComposerModeChange,
-  selectedSkills,
-  onSelectedSkillsChange,
   workspaceOptions,
   selectedWorkspaceRoot,
   onSelectWorkspace,
   executionContext,
-  draftRestore,
-  draftKey,
-  readDraft,
-  writeDraft,
   reviewSummary,
   onOpenReview,
-  models,
   activeView = "chat",
   trajectory,
   permissionControl,
-  readAnnotationDraft,
-  writeAnnotationDraft,
 }: {
-  messages: MessageBlock[];
+  /** 与投影合并后的上下文用量（WorkbenchLayout 计算）。 */
   contextSnapshot: ContextUsageSnapshot | null;
   contextState?: ContextState | null;
   /** Durable Surface count from ClientSessionStore; prevents the composer from treating a stale local list as blank. */
   durableSurfaceMessageCount?: number;
   /** Session-owned phase from ClientSessionStore; local message length is only a fallback for isolated tests. */
   composerPhase?: "blank" | "engaging" | "active";
-  sessionId?: string | null;
-  isStreaming?: boolean;
-  isAborting?: boolean;
-  /** 上下文压缩进行中：停止按钮置灰（压缩不可中止）。 */
-  isCompacting?: boolean;
-  /** 运行中发送的消息队列；只在后续对话的 Composer 上显示。 */
-  messageQueue?: MessageQueueControls;
-  /** Composer 上方的一次性提示，例如「对话还很短，暂时不需要压缩」。 */
-  composerNotice?: string | null;
-  /** 失败分隔线上的「重试」。 */
-  onRetryCompaction?: () => void;
-  sendScrollRequestId?: number;
-  composerFocusRequestId?: number;
-  onSend?: (text: string, options: ComposerSendOptions) => void;
-  onAbort?: () => void;
   isSessionReady?: boolean;
-  defaultModelId?: ModelSelectionId;
-  selectedModelId?: ModelSelectionId;
-  onSelectedModelChange?: (modelId: ModelSelectionId) => void;
-  composerMode?: ComposerMode;
-  onComposerModeChange?: (mode: ComposerMode) => void | Promise<void>;
-  selectedSkills?: string[];
-  onSelectedSkillsChange?: (skills: string[]) => void;
-  models?: UsableModelView[];
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
   executionContext?: ComposerExecutionContext;
-  draftRestore?: ComposerDraftRestore | null;
-  draftKey?: string;
-  readDraft?: ComposerDraftReader;
-  writeDraft?: ComposerDraftWriter;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
   activeView?: SessionMainView;
   trajectory?: RuntimeV2TrajectorySnapshot | null;
   permissionControl?: ReactNode;
-  /** 草稿回复批注按 draftKey 存在上层，切换会话、切到设置页再回来都不丢。 */
-  readAnnotationDraft?: (draftKey: string) => ResponseAnnotationReference[];
-  writeAnnotationDraft?: (draftKey: string, annotations: readonly ResponseAnnotationReference[]) => void;
 }) {
+  const { sessionId, messages, isStreaming, isAborting, isCompacting, sendScrollRequestId, composerFocusRequestId, onSend, onAbort, onRetryCompaction } = useActiveSession();
+  const {
+    messageQueue, composerNotice, defaultModelId, selectedModelId, onSelectedModelChange, composerMode, onComposerModeChange,
+    selectedSkills, onSelectedSkillsChange, models, draftRestore, draftKey, readDraft, writeDraft, readAnnotationDraft, writeAnnotationDraft,
+  } = useComposerContext();
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
     ? sessionProjection.cell
     : null;
   const browse = useSessionBrowse();
+  // 14 S9：App 读页失败用 browse.messageError；投影 cell 的打开 / refresh 失败（bridge 重试用完前也会先显示）用 cell 的 status/error。
+  const projectionError = projectionCell?.status === "error" ? `会话同步失败：${projectionCell.error ?? "未知错误"}` : null;
+  const sessionError = browse?.messageError ?? projectionError;
+  const projectionBridge = sessionProjection?.bridge ?? null;
+  const projectionSessionId = sessionProjection?.sessionId ?? null;
+  const retrySession = useCallback(() => {
+    if (browse) { browse.retryMessages(); return; }
+    // 没有 App（单独挂 SessionProjectionProvider）时直接重新打开；失败会再次写进 cell。
+    if (projectionBridge && projectionSessionId) void projectionBridge.open(projectionSessionId).catch(() => undefined);
+  }, [browse, projectionBridge, projectionSessionId]);
   const historyAnchor = useRef<{ sessionId: string | null | undefined; height: number; top: number } | null>(null);
   const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
   const projectedComposer = projectionCell ? selectComposer(projectionCell) : null;
@@ -856,12 +816,16 @@ export function ConversationView({
     : requestedComposerPhase ?? (durableMessageCount === 0 ? "blank" : "active");
   const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
   const resolvedSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
-  const isInitialComposer = !browse?.messageLoading && !browse?.messageError && !browse?.listLoading && resolvedSessionReady && resolvedComposerPhase === "blank" && !isStreaming;
+  const isInitialComposer = !browse?.messageLoading && !sessionError && !browse?.listLoading && resolvedSessionReady && resolvedComposerPhase === "blank" && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const messageStackRef = useRef<HTMLDivElement | null>(null);
   const turnElementsRef = useRef(new Map<string, HTMLElement>());
-  const annotations = useResponseAnnotationState({ draftKey, draftRestore, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef });
+  // 可批注的回复随 messages 变化；经 ref 读取，canAnnotate 保持稳定，选区监听不随每次流式刷新重挂。
+  const annotatableIdsRef = useRef<ReadonlySet<string>>(new Set());
+  annotatableIdsRef.current = useMemo(() => annotatableMessageIds(messages), [messages]);
+  const canAnnotate = useCallback((messageId: string) => annotatableIdsRef.current.has(messageId), []);
+  const annotations = useResponseAnnotationState({ draftKey, draftRestore, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef, canAnnotate });
   // 评论框保存 / 取消后把焦点还给 Composer：和上层的聚焦请求叠加成同一个递增 id。
   const [annotationFocusRequest, setAnnotationFocusRequest] = useState(0);
   const focusRequestId = composerFocusRequestId + annotationFocusRequest;
@@ -1080,10 +1044,10 @@ export function ConversationView({
 
 
 
-  if (browse && messages.length === 0 && (browse.messageLoading || browse.listLoading || browse.messageError)) {
-    return <main className={CONVERSATION_SHELL_CLASS}><p role={browse.messageError ? 'alert' : 'status'} className="px-5 py-4 text-act-md leading-5 text-text-muted">
-      {browse.messageError ?? (browse.messageLoading ? '正在加载消息…' : '正在加载会话…')}
-      {browse.messageError && <button onClick={browse.retryMessages}>重试</button>}
+  if (messages.length === 0 && (browse?.messageLoading || browse?.listLoading || sessionError)) {
+    return <main className={CONVERSATION_SHELL_CLASS}><p role={sessionError ? 'alert' : 'status'} className="px-5 py-4 text-act-md leading-5 text-text-muted">
+      {sessionError ?? (browse?.messageLoading ? '正在加载消息…' : '正在加载会话…')}
+      {sessionError && <button onClick={retrySession}>重试</button>}
     </p></main>;
   }
   return (
@@ -1092,7 +1056,7 @@ export function ConversationView({
     <main className={CONVERSATION_SHELL_CLASS}>
       <ResponseSelectionMenu
         scrollContainerRef={scrollContainerRef}
-        canAnnotate={isAnnotatableMessageId}
+        canAnnotate={canAnnotate}
         onAddAnnotation={annotations.contextValue.addDraft}
       />
       <ResponseAnnotationCommentPopover
@@ -1112,7 +1076,7 @@ export function ConversationView({
             aria-label="会话消息"
           >
               {browse?.messageLoading && <p role="status" className="px-5 py-3 text-act-md leading-5 text-text-muted">正在加载消息…</p>}
-              {browse?.messageError && <p role="alert" className="px-5 py-3 text-act-md leading-5 text-text-muted">{browse.messageError} <button onClick={browse.retryMessages}>重试</button></p>}
+              {sessionError && <p role="alert" className="px-5 py-3 text-act-md leading-5 text-text-muted">{sessionError} <button onClick={retrySession}>重试</button></p>}
               {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"><Loader2 className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
               {browse?.earlierError && <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">{browse.earlierError} <button onClick={requestEarlier}>重试</button></p>}
               {isInitialComposer ? (

@@ -93,6 +93,8 @@ export function projectChatEvents(
       ...(identity.requestId === null ? {} : { llmCallId: identity.requestId }),
       timestamp: event.time,
       schemaVersion: 2 as const,
+      // 同一条 envelope 投影出的多个事件（如 assistant 与它的 thinking）共用这个 seq。
+      sourceSeq: event.seq,
     };
     if (event.type === "user/message" || (event.type === "agent/inbox/spliced" && string(data.operation) === "claim")) {
       const node = appendNode(event);

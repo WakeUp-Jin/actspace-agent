@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { MessageBlock, WorkspaceGitContext } from "@actspace/shared";
-import { ConversationView } from "../../components/ConversationView";
+import { TestConversationView } from "../helpers/workbench";
 import { RightPanelProvider } from "../../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../../components/ui/Tooltip";
 import "../../styles/index.css";
@@ -40,7 +40,7 @@ function Preview() {
           <option value="folder">普通目录</option><option value="branch">正常分支</option><option value="detached">Detached HEAD</option>
         </select>
       </div>
-      <ConversationView messages={messages} contextSnapshot={null}
+      <TestConversationView messages={messages} contextSnapshot={null}
         sessionId="visual-fixture" isStreaming={phase !== "completed"} composerPhase="active"
         executionContext={{ runLocation: "this_mac", gitContext: contexts[git] }} />
     </div>

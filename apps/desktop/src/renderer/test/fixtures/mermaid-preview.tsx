@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { MessageBlock } from "@actspace/shared";
-import { ConversationView } from "../../components/ConversationView";
+import { TestConversationView } from "../helpers/workbench";
 import { RightPanelProvider } from "../../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../../components/ui/Tooltip";
 import { mermaidPngBlob, mermaidTheme, renderMermaid } from "../../components/messages/mermaid-renderer";
@@ -120,7 +120,7 @@ function Preview() {
         <button onClick={() => setStreaming(false)}>回复完成</button>
         <a href="?theme=light">浅色</a><a href="?theme=dark">深色</a>
       </div>
-      <ConversationView messages={messages} contextSnapshot={null}
+      <TestConversationView messages={messages} contextSnapshot={null}
         sessionId="mermaid-fixture" isStreaming={streaming} composerPhase="active"
         executionContext={{ runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
     </div>

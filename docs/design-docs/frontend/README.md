@@ -53,6 +53,7 @@
 - `docs/design-docs/frontend/front-tailwind-style-architecture.md`：Tailwind v4 样式架构和迁移策略。
 - `docs/design-docs/frontend/front-基础组件封装规范.md`：基础 UI wrapper 分层和组件抽象边界。
 - `docs/design-docs/frontend/front-preload-bridge与mock规范.md`：`window.actspace` 契约、renderer `api/<域>` 访问约定、新增 IPC 的步骤、guard 约定、mock bridge 与场景、测试打桩。
+- `docs/design-docs/frontend/front-会话状态与数据流规范.md`：renderer 会话数据的三类归属（durable cell / live run / 本地状态）、cell LRU、`runId` / `sourceSeq` 与正文合并规则、SessionLocalStore、evict 时机、live 事件分发、三个 Context、错误可见、未确认提交。
 - `docs/design-docs/frontend/front-icon-button-tooltip-guidelines.md`：图标按钮 Tooltip 和可访问性规范。
 - `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`：SplitView、resize、collapse 和 restore。
 - `docs/design-docs/frontend/front-environment-and-git-actions.md`：顶部 Environment、编辑器选择、本地分支创建、Commit 和 Push 工作流。

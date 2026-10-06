@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
-import { ConversationView } from "../components/ConversationView";
+import { TestConversationView } from "./helpers/workbench";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { collectTurnOutputArtifacts, TurnOutputArtifacts } from "../components/messages/TurnOutputArtifacts";
 import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
@@ -401,7 +401,7 @@ describe("image generation presentation", () => {
 
     render(
       <RightPanelProvider>
-        <ConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isSessionReady={false} />
+        <TestConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isSessionReady={false} />
       </RightPanelProvider>,
     );
 
@@ -418,7 +418,7 @@ describe("image generation presentation", () => {
 
     render(
       <RightPanelProvider>
-        <ConversationView
+        <TestConversationView
           messages={messages}
           contextSnapshot={null}
           sessionId="session-1"
@@ -440,7 +440,7 @@ describe("image generation presentation", () => {
 
     render(
       <RightPanelProvider>
-        <ConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isSessionReady={false} />
+        <TestConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isSessionReady={false} />
       </RightPanelProvider>,
     );
 
@@ -456,7 +456,7 @@ describe("image generation presentation", () => {
 
     render(
       <RightPanelProvider>
-        <ConversationView
+        <TestConversationView
           messages={messages}
           contextSnapshot={null}
           sessionId="session-1"
@@ -543,7 +543,7 @@ describe("generic tool result presentation", () => {
     setupBridge({ "workspaces.readFile": readWorkspaceFile });
     render(
       <RightPanelProvider>
-        <ConversationView
+        <TestConversationView
           messages={[
             { kind: "user", id: "user-read", content: "Read it", createdAt: "2026-07-28T00:00:00.000Z" },
             { kind: "read", id: "read-1", filePath: "docs/ARCHITECTURE.md", displayText: "Read docs/ARCHITECTURE.md", resultPreview: ["# Architecture"], status: "completed", createdAt: "2026-07-28T00:00:01.000Z" },

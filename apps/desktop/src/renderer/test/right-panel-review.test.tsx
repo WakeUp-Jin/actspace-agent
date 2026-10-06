@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReviewChangeNotification, ReviewFileDiff, ReviewSnapshot } from "@actspace/shared";
 import { ReviewRenderView } from "../components/right-panel/ReviewRenderView";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
-import { WorkbenchLayout } from "../components/WorkbenchLayout";
+import { TestWorkbenchLayout } from "./helpers/workbench";
 import { setupBridge } from "./helpers/bridge";
 
 afterEach(() => {
@@ -139,7 +139,7 @@ describe("Review workbench", () => {
   it("opens Review from the object menu inside the right panel and keeps chat visible", async () => {
     const user = userEvent.setup();
     setupBridge(reviewBridge(emptySnapshot()));
-    render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-review", title: "Review menu", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-review" title="Review menu" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
+    render(<RightPanelProvider initialOpen><TestWorkbenchLayout sessions={[{ id: "session-review", title: "Review menu", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-review" title="Review menu" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
     await user.click(screen.getByRole("menuitem", { name: "Review" }));
     expect(await screen.findByRole("region", { name: "工作区变更审查" })).toBeInTheDocument();
@@ -153,7 +153,7 @@ describe("Review workbench", () => {
   it("opens Review from the right panel launcher", async () => {
     const user = userEvent.setup();
     setupBridge(reviewBridge(emptySnapshot()));
-    render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-launcher", title: "Review launcher", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-launcher" title="Review launcher" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
+    render(<RightPanelProvider initialOpen><TestWorkbenchLayout sessions={[{ id: "session-launcher", title: "Review launcher", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-launcher" title="Review launcher" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "Review" }));
     expect(await screen.findByRole("region", { name: "工作区变更审查" })).toBeInTheDocument();
   });
@@ -169,11 +169,11 @@ describe("Review workbench", () => {
       messages: [],
       contextSnapshot: null,
     };
-    const { rerender } = render(<RightPanelProvider initialOpen><WorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-a" /></RightPanelProvider>);
+    const { rerender } = render(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-a" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "Review" }));
     await waitFor(() => expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-a" })));
 
-    rerender(<RightPanelProvider initialOpen><WorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-b" /></RightPanelProvider>);
+    rerender(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-b" /></RightPanelProvider>);
     await waitFor(() => expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" })));
     expect(screen.getAllByRole("tab", { name: "Review" })).toHaveLength(1);
   });

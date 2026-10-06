@@ -32,7 +32,11 @@ vi.mock("@testing-library/react", async (importOriginal) => {
 // 本文件同时被 node 环境的 main 进程测试加载，那里没有 window。
 if (typeof window !== "undefined") {
   beforeEach(() => { setupBridge(); });
-  afterEach(() => { resetBridge(); });
+  afterEach(() => {
+    resetBridge();
+    // 14 T20：所有会话的未确认提交都存 localStorage，用例之间不能互相影响。
+    for (const key of Object.keys(localStorage)) if (key.startsWith("actspace:pending-submission:")) localStorage.removeItem(key);
+  });
 }
 
 class ResizeObserverMock {

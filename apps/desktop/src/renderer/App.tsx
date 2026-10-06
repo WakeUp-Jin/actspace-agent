@@ -1,13 +1,23 @@
-import { taskOperation } from "@actspace/shared/runtime-v2";
 import { useRemoteTarget } from "./hooks/useRemoteTarget";
-import { projectTaskQueue, taskAttachments } from "./session/message-queue";
-import { createEmptyStreamingState, type ToolEntry, type StreamingState, type StreamingSegment, type SessionRunState } from "./session/session-run-state";
-import { SessionBrowseContext } from "./session/SessionBrowseContext";
+import { useShallowStable } from "./hooks/useShallowStable";
+import { createEmptyStreamingState } from "./session/session-run-state";
+import { upsertStreamingTool } from "./session/live-runs/stream-state";
+import type { CompactionBlock } from "./session/live-runs/stream-blocks";
+import { getSessionTitle } from "./session/session-title";
+import { createSessionCellRetention, useChatSessionRecord } from "./session/session-store";
+import { mergeTranscript } from "./session/transcript";
+import { createLiveRunStore, useBusySessionIds, useLiveRunView, type StreamEvent } from "./session/live-runs/live-run-store";
+import { applyTaskSnapshot as applyHostTaskSnapshot, createTaskQueueStore } from "./session/task-queue";
+import { loadEarlier } from "./session/session-pages";
+import { createSessionLocalStore, useSessionLocalIds, useSessionLocalState, type ComposerSessionState, type SessionLocalState } from "./session/session-local-store";
+import type { SessionBrowseState } from "./session/SessionBrowseContext";
+import type { ActiveSessionValue } from "./session/active-session-context";
+import type { SessionActionsValue } from "./session/session-actions-context";
+import { useSessionDrafts, type ComposerContextValue } from "./components/composer/composer-context";
 import {
   EMPTY_MESSAGE_QUEUE,
   isQueueEmpty,
   takeSteering,
-  type QueuedComposerMessage,
   type SessionMessageQueue,
 } from "./session/message-queue";
 import type { MessageQueueControls } from "./components/composer/MessageQueueTray";
@@ -25,8 +35,6 @@ import type {
   AbortAgentRunInput,
   AgentRunResult,
   AppSettings,
-  BashBackgroundStatus,
-  BashStatus,
   BootstrapState,
   ComposerAttachment,
   ComposerMode,
@@ -38,29 +46,29 @@ import type {
   ModelKey,
   UsableModelView,
   ReviewGetSnapshotResult,
-  RuntimeStreamEvent,
+  SessionEvent,
   SessionRunLocation,
   SessionListItem,
   SessionRecord,
-  ToolUiPreview,
   WorkspaceEntry,
   WorkspaceGitContext,
   WorkspaceListResult,
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
-import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
-import { SessionProjectionProvider } from "./session";
+import { AppProviders } from "./app/providers";
+import { clearPendingSubmission, readPendingSubmission, sweepExpiredPendingSubmissions, writePendingSubmission } from "./session/pending-submission";
 import { ClientSessionStore, selectChatSession, projectChatWindow } from "@actspace/client/sessions";
-import { createSession, forkSession, getSession, sessionsApi } from "./api/sessions";
+import { getSession, sessionsApi } from "./api/sessions";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
-import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
+import type { ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import { resolveQuickOpenTarget } from "./quick-open-routing";
 import { appApi } from "./api/app";
 import { approvalsApi } from "./api/approvals";
 import { dialogsApi } from "./api/dialogs";
 import { eventsApi } from "./api/events";
+import { liveEvents } from "./api/live-events";
 import { modelsApi } from "./api/models";
 import { quickOpenApi } from "./api/quick-open";
 import { reviewApi } from "./api/review";
@@ -77,32 +85,28 @@ function sessionReadError(error: unknown, fallback: string): string {
 }
 
 const DEFAULT_WORKSPACE_LABEL = "默认工作区";
-const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } = {
+/** 还没有会话（新建会话页）时 composer 模式与技能的存放键。 */
+const DRAFT_COMPOSER_KEY = "__draft__";
+const EMPTY_EVENTS: SessionEvent[] = [];
+const QUEUE_REFRESH_FAILED = "队列状态读取失败，请稍后重试。";
+const QUEUE_COMMAND_FAILED = "队列操作没有完成，请重试。";
+const selectComposerState = (state: SessionLocalState) => state.composer;
+const selectApprovalPending = (state: SessionLocalState) => state.approvalPending;
+const selectFailed = (state: SessionLocalState) => state.failed;
+const selectBashUpdates = (state: SessionLocalState) => state.bashUpdates;
+const selectDraft = (state: SessionLocalState) => state.draft ?? null;
+const selectCompactionFailure = (state: SessionLocalState) => state.compactionFailure ?? null;
+const selectMessageQueue = (state: SessionLocalState) => state.messageQueue;
+const DEFAULT_COMPOSER_STATE: ComposerSessionState = {
   mode: "agent",
   selectedSkills: [],
 };
 /** `not_started`：会话已有运行，没有发出。`rejected`：发送前校验失败，正文已放回输入框。 */
 type SessionRunOutcome = AgentRunResult["status"] | "rejected" | "not_started";
-type SessionPageCache = { record: SessionRecord; history: { before: number | null; throughJournalSeq: number } };
 
 function attachmentForRuntime(attachment: ComposerAttachment): ComposerAttachment {
   const { previewUrl: _previewUrl, ...runtimeAttachment } = attachment;
   return runtimeAttachment;
-}
-
-function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionListItem[], sessionId: string | null): string {
-  const selected = sessionId === null ? null : sessions.find((session) => session.id === sessionId);
-  const rawTitle = sessionRecord?.meta.title ?? selected?.title ?? "新建会话";
-  const normalized = rawTitle.replace(/^Session\s+/i, "").replace(/^session-/i, "");
-  if (normalized === rawTitle) {
-    return rawTitle;
-  }
-
-  return normalized
-    .split("-")
-    .filter(Boolean)
-    .map((part, index) => (index === 0 ? `${part.charAt(0).toUpperCase()}${part.slice(1)}` : part))
-    .join(" ");
 }
 
 function normalizeWorkspaceRoot(root: string | undefined | null): string | null {
@@ -163,93 +167,6 @@ function reviewResultToSummary(result: ReviewGetSnapshotResult): ComposerReviewS
   };
 }
 
-function hasFinishedAllActiveTools(state: StreamingState): boolean {
-  return state.activeTools.size > 0 && [...state.activeTools.values()].every(
-    (tool) => tool.finished && !tool.approvalPending,
-  );
-}
-
-function isEmptyTodoPreview(preview: Extract<ToolUiPreview, { kind: "todo" }>): boolean {
-  return preview.todos.length === 0 && preview.totalCount === 0 && preview.completedCount === 0 && preview.revision === 0;
-}
-
-function upsertStreamingTool(
-  state: StreamingState,
-  toolCallId: string,
-  toolName: string,
-  preview: ToolUiPreview | undefined,
-): void {
-  const existing = state.activeTools.get(toolCallId);
-  if (existing) {
-    if (existing.terminalStatus) return;
-    if (!(preview?.kind === "todo" && isEmptyTodoPreview(preview) && existing.preview?.kind === "todo")) {
-      existing.preview = preview ?? existing.preview;
-    }
-    existing.toolName = toolName;
-    return;
-  }
-
-  let effectivePreview = preview;
-  if (preview?.kind === "todo") {
-    const previous = [...state.activeTools.entries()].find(([, tool]) => tool.preview?.kind === "todo");
-    if (previous) {
-      if (isEmptyTodoPreview(preview) && previous[1].preview?.kind === "todo") {
-        effectivePreview = previous[1].preview;
-      }
-      state.activeTools.delete(previous[0]);
-      const segment = state.segments.find(
-        (candidate): candidate is Extract<StreamingSegment, { type: "tool" }> =>
-          candidate.type === "tool" && candidate.toolCallId === previous[0],
-      );
-      if (segment) segment.toolCallId = toolCallId;
-    }
-  }
-
-  state.activeTools.set(toolCallId, { toolName, preview: effectivePreview });
-  if (!state.segments.some((segment) => segment.type === "tool" && segment.toolCallId === toolCallId)) {
-    state.segments.push({ type: "tool", toolCallId });
-  }
-}
-
-function updateStringSet(current: Set<string>, value: string, included: boolean): Set<string> {
-  if (current.has(value) === included) {
-    return current;
-  }
-
-  const next = new Set(current);
-  if (included) {
-    next.add(value);
-  } else {
-    next.delete(value);
-  }
-  return next;
-}
-
-function appendOrMergeSegment(
-  segments: StreamingSegment[],
-  segType: "thinking" | "text",
-  delta: string,
-): void {
-  const last = segments[segments.length - 1];
-  if (last && last.type === segType) {
-    last.text += delta;
-  } else {
-    segments.push({ type: segType, text: delta });
-  }
-}
-
-/** LLM 重试前清掉失败尝试留下的半截 thinking/text 段（已完成的工具块保留） */
-function dropTrailingStreamSegments(segments: StreamingSegment[]): void {
-  while (segments.length > 0) {
-    const last = segments[segments.length - 1];
-    if (last.type === "thinking" || last.type === "text") {
-      segments.pop();
-    } else {
-      break;
-    }
-  }
-}
-
 function copyWithSelection(value: string): void {
   const textArea = document.createElement("textarea");
   textArea.value = value;
@@ -275,482 +192,17 @@ async function copyTextToClipboard(value: string): Promise<void> {
   }
 }
 
-function getStreamingBashStatus(tool: {
-  isError?: boolean;
-  finished?: boolean;
-  approvalPending?: boolean;
-}, previewStatus?: BashStatus): BashStatus {
-  if (tool.approvalPending) {
-    return "pending";
-  }
-  if (!tool.finished) {
-    return "running";
-  }
-
-  if (previewStatus === "denied" || previewStatus === "expired" || previewStatus === "cancelled") {
-    return previewStatus;
-  }
-
-  return tool.isError ? "failed" : "success";
-}
-
-function getStreamingReadText(preview: Extract<ToolUiPreview, { kind: "read" }>): string {
-  return `Read ${preview.filePath}${preview.range ? ` ${preview.range}` : ""}`;
-}
-
-function getStreamingSearchText(preview: Extract<ToolUiPreview, { kind: "search" }>): string {
-  const scope = preview.scope ? `${preview.scope} ` : "";
-  return `Searched files ${scope}for ${preview.query}`;
-}
-
-function getStreamingGrepText(preview: Extract<ToolUiPreview, { kind: "grep" }>): string {
-  return `Grep ${preview.pattern}${preview.scope ? ` in ${preview.scope}` : ""}`;
-}
-
-function getStreamingGlobText(preview: Extract<ToolUiPreview, { kind: "glob" }>): string {
-  return `Glob ${preview.pattern}${preview.scope ? ` in ${preview.scope}` : ""}`;
-}
-
-function getStreamingWebSearchText(preview: Extract<ToolUiPreview, { kind: "web_search" }>): string {
-  return preview.displayText;
-}
-
-function getStreamingMediaAnalysisText(preview: Extract<ToolUiPreview, { kind: "media_analysis" }>): string {
-  return preview.displayText;
-}
-
-function getStreamingDirectoryText(
-  preview: Extract<ToolUiPreview, { kind: "directory_list" }>,
-  finished?: boolean,
-): string {
-  if (finished && preview.entryCount !== undefined) {
-    return `Listed ${preview.path} (${preview.entryCount} entries)`;
-  }
-
-  return `Listed ${preview.path}`;
-}
-
-function displayFileName(path: string): string {
-  const normalized = path.replace(/[\\/]+$/, "");
-  return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized ?? path;
-}
-
-function getStreamingDeleteText(
-  preview: Extract<ToolUiPreview, { kind: "delete" }>,
-  status: Extract<MessageBlock, { kind: "delete" }>["status"],
-): string {
-  const fileLabel = displayFileName(preview.filePath || "file...");
-  if (status === "completed") return `Deleted ${fileLabel}`;
-  if (status === "failed") return `Delete ${fileLabel} failed`;
-  if (status === "denied") return `Denied delete ${fileLabel}`;
-  if (status === "pending") return "Delete file requires approval";
-  return `Delete ${fileLabel}`;
-}
-
-function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agentRunId?: string): MessageBlock {
-  const blockId = agentRunId ? `turn:${agentRunId}:tool:${toolCallId}` : `streaming-tool-${toolCallId}`;
-
-  if (tool.preview?.kind === "bash") {
-    return {
-      kind: "bash",
-      id: blockId,
-      status: getStreamingBashStatus(tool, tool.preview.status),
-      title: tool.approvalPending
-        ? (tool.approvalSummary ?? "Bash command needs approval")
-        : tool.preview.title,
-      command: tool.preview.command || "Waiting for Bash result...",
-      commandPreview: tool.preview.commandPreview || "bash",
-      cwd: tool.preview.cwd,
-      stdout: tool.finished ? tool.preview.stdout : undefined,
-      stderr: tool.isError && !tool.preview.stdout ? (tool.preview.stderr ?? "Tool execution failed") : undefined,
-      reason: tool.approvalReason ?? tool.preview.reason,
-      approvalRequestId: tool.approvalRequestId,
-      intent: tool.preview.intent,
-      backgroundTaskId: tool.preview.backgroundTaskId,
-      backgroundStatus: tool.preview.backgroundStatus,
-      outputFilePath: tool.preview.outputFilePath,
-      sandboxed: tool.preview.sandboxed,
-      notExecuted: tool.preview.notExecuted,
-      createdAt: now,
-    };
-  }
-
-  if (tool.preview?.kind === "read") {
-    return {
-      kind: "read",
-      id: blockId,
-      filePath: tool.preview.filePath,
-      range: tool.preview.range,
-      displayText: tool.finished ? tool.preview.displayText : getStreamingReadText(tool.preview),
-      resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
-      createdAt: now,
-      status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
-      approvalRequestId: tool.approvalRequestId,
-      reason: tool.approvalReason,
-    };
-  }
-
-  if (tool.preview?.kind === "search") {
-    return {
-      kind: "search",
-      id: blockId,
-      query: tool.preview.query,
-      scope: tool.preview.scope,
-      resultCount: tool.finished ? tool.preview.resultCount : undefined,
-      displayText: tool.finished ? tool.preview.displayText : getStreamingSearchText(tool.preview),
-      resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
-      createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
-    };
-  }
-
-  if (tool.preview?.kind === "grep") {
-    return {
-      kind: "grep",
-      id: blockId,
-      pattern: tool.preview.pattern,
-      scope: tool.preview.scope,
-      resultCount: tool.finished ? tool.preview.resultCount : undefined,
-      displayText: tool.finished ? tool.preview.displayText : getStreamingGrepText(tool.preview),
-      resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
-      createdAt: now,
-      status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
-      approvalRequestId: tool.approvalRequestId,
-      reason: tool.approvalReason,
-    };
-  }
-
-  if (tool.preview?.kind === "glob") {
-    return {
-      kind: "glob",
-      id: blockId,
-      pattern: tool.preview.pattern,
-      scope: tool.preview.scope,
-      resultCount: tool.finished ? tool.preview.resultCount : undefined,
-      displayText: tool.finished ? tool.preview.displayText : getStreamingGlobText(tool.preview),
-      resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
-      createdAt: now,
-      status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
-      approvalRequestId: tool.approvalRequestId,
-      reason: tool.approvalReason,
-    };
-  }
-
-  if (tool.preview?.kind === "web_search") {
-    return {
-      kind: "web_search",
-      id: blockId,
-      mode: tool.preview.mode,
-      query: tool.preview.query,
-      url: tool.preview.url,
-      displayText: getStreamingWebSearchText(tool.preview),
-      createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
-      resultUrls: tool.finished ? tool.preview.resultUrls : undefined,
-      contentPreview: tool.finished ? tool.preview.contentPreview : undefined,
-    };
-  }
-
-  if (tool.preview?.kind === "media_analysis") {
-    return {
-      kind: "media_analysis",
-      id: blockId,
-      mediaName: tool.preview.mediaName,
-      mediaKind: tool.preview.mediaKind,
-      displayText: getStreamingMediaAnalysisText(tool.preview),
-      createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
-      isError: tool.isError,
-    };
-  }
-
-  if (tool.preview?.kind === "image_generation") {
-    return {
-      kind: "image_generation",
-      id: blockId,
-      status: tool.finished
-        ? tool.isError ? "failed" : tool.preview.status
-        : "running",
-      promptPreview: tool.preview.promptPreview,
-      requestedCount: tool.preview.requestedCount,
-      generatedCount: tool.finished ? tool.preview.generatedCount : undefined,
-      model: tool.preview.model,
-      size: tool.preview.size,
-      displayText: tool.preview.displayText,
-      images: tool.finished ? tool.preview.images : undefined,
-      warning: tool.preview.warning,
-      errorMessage: tool.isError ? tool.preview.errorMessage : undefined,
-      createdAt: now,
-    };
-  }
-
-  if (tool.preview?.kind === "directory_list") {
-    return {
-      kind: "directory_list",
-      id: blockId,
-      path: tool.preview.path,
-      entryCount: tool.finished ? tool.preview.entryCount : undefined,
-      displayText: tool.finished ? tool.preview.displayText : getStreamingDirectoryText(tool.preview, tool.finished),
-      createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
-    };
-  }
-
-  if (tool.preview?.kind === "delete") {
-    const status = tool.approvalPending
-      ? "pending"
-      : tool.finished
-        ? tool.isError
-          ? tool.preview.status === "denied" ? "denied" : "failed"
-          : "completed"
-        : "running";
-    return {
-      kind: "delete",
-      id: blockId,
-      filePath: displayFileName(tool.preview.filePath || "file..."),
-      ...(tool.preview.outputPath ? { outputPath: tool.preview.outputPath } : {}),
-      ...(tool.preview.outputRelativePath ? { outputRelativePath: tool.preview.outputRelativePath } : {}),
-      displayText: getStreamingDeleteText(tool.preview, status),
-      createdAt: now,
-      status,
-      isError: status === "failed" || status === "denied",
-      approvalRequestId: tool.approvalRequestId,
-      reason: tool.approvalReason,
-    };
-  }
-
-  if (tool.preview?.kind === "edit_diff") {
-    const status = tool.approvalPending
-      ? "pending"
-      : tool.finished
-        ? tool.preview.status ?? (tool.isError ? "failed" : "completed")
-        : "running";
-    return {
-      kind: "edit_diff",
-      id: blockId,
-      filePath: tool.preview.filePath,
-      ...(tool.preview.outputPath ? { outputPath: tool.preview.outputPath } : {}),
-      ...(tool.preview.outputRelativePath ? { outputRelativePath: tool.preview.outputRelativePath } : {}),
-      additions: tool.preview.additions,
-      deletions: tool.preview.deletions,
-      diff: tool.preview.diff,
-      collapsedLines: tool.preview.collapsedLines,
-      generationProgress: tool.preview.generationProgress,
-      createdAt: now,
-      status,
-      approvalRequestId: tool.approvalRequestId,
-      reason: tool.approvalReason,
-      errorMessage: tool.preview.errorMessage,
-    };
-  }
-
-  if (tool.preview?.kind === "write") {
-    const status = tool.approvalPending
-      ? "pending"
-      : tool.finished
-        ? tool.preview.status ?? (tool.isError ? "failed" : "completed")
-        : "running";
-    return {
-      kind: "write_diff",
-      id: blockId,
-      filePath: tool.preview.filePath,
-      ...(tool.preview.outputPath ? { outputPath: tool.preview.outputPath } : {}),
-      ...(tool.preview.outputRelativePath ? { outputRelativePath: tool.preview.outputRelativePath } : {}),
-      additions: tool.preview.additions,
-      deletions: tool.preview.deletions,
-      diff: tool.preview.diff,
-      collapsedLines: tool.preview.collapsedLines,
-      generationProgress: tool.preview.generationProgress,
-      streamingContent: tool.finished ? undefined : tool.preview.streamingContent,
-      createdAt: now,
-      status,
-      approvalRequestId: tool.approvalRequestId,
-      reason: tool.approvalReason,
-      errorMessage: tool.preview.errorMessage,
-    };
-  }
-
-  if (tool.preview?.kind === "agent") {
-    return {
-      kind: "agent",
-      id: blockId,
-      description: tool.preview.description,
-      status: tool.finished ? tool.preview.status : "running",
-      subagentType: tool.preview.subagentType,
-      agentKind: tool.preview.agentKind,
-      displayText: tool.preview.displayText,
-      summary: tool.preview.summary,
-      recentEvents: tool.preview.recentEvents,
-      transcriptRef: tool.preview.transcriptRef,
-      stats: tool.preview.stats,
-      error: tool.preview.error,
-      // 流式首帧也必须沿用统一的右侧 child Session 入口，不能回退到旧 inline transcript。
-      display: tool.preview.display ?? "panel",
-      transcriptEvents: tool.transcriptEvents,
-      createdAt: now,
-    };
-  }
-
-  if (tool.preview?.kind === "todo") {
-    return {
-      kind: "todo",
-      id: agentRunId ? `turn:${agentRunId}:todo` : `streaming-todo-${toolCallId}`,
-      todos: tool.preview.todos,
-      totalCount: tool.preview.totalCount,
-      completedCount: tool.preview.completedCount,
-      revision: tool.preview.revision,
-      displayText: tool.preview.displayText,
-      status: tool.finished ? tool.isError ? "failed" : "completed" : "running",
-      isError: tool.isError,
-      createdAt: now,
-    };
-  }
-
-  return {
-    kind: "tool",
-    id: blockId,
-    toolName: tool.toolName,
-    artifacts: tool.preview?.kind === "generic" ? tool.preview.artifacts : undefined,
-    title: tool.preview?.kind === "generic"
-      ? tool.preview.title
-      : tool.finished ? `${tool.toolName}` : `Running ${tool.toolName}...`,
-    content: tool.approvalPending && tool.toolName.startsWith("browser_")
-      ? "等待确认浏览器操作"
-      : tool.preview?.kind === "generic"
-        ? tool.preview.content
-      : tool.finished
-        ? tool.isError ? "Tool execution failed" : "Completed"
-        : "Executing...",
-    createdAt: now,
-    isError: tool.isError,
-    status: tool.approvalPending
-      ? "pending"
-      : tool.finished
-        ? tool.isError ? "failed" : "completed"
-        : "running",
-    approvalRequestId: tool.approvalRequestId,
-    approvalReason: tool.approvalReason,
-    approvalScope: tool.approvalScope,
-  };
-}
-
-function streamingStateToBlocks(state: StreamingState, agentRunId?: string): MessageBlock[] {
-  const now = new Date().toISOString();
-  const blocks: MessageBlock[] = [];
-  let thinkingIdx = 0;
-  let textIdx = 0;
-
-  for (const [segmentIndex, seg] of state.segments.entries()) {
-    if (seg.type === "thinking") {
-      if (!seg.text.trim()) continue;
-      const index = thinkingIdx++;
-      blocks.push({
-        kind: "thinking",
-        id: agentRunId ? `turn:${agentRunId}:thinking:${index}` : `streaming-thinking-${index}`,
-        title: "Thinking...",
-        content: seg.text,
-        createdAt: now,
-        collapsedByDefault: false,
-        status: segmentIndex === state.segments.length - 1 ? "running" : "completed",
-      });
-    } else if (seg.type === "text") {
-      const index = textIdx++;
-      blocks.push({
-        kind: "assistant",
-        id: agentRunId ? `turn:${agentRunId}:assistant:${index}` : `streaming-assistant-${index}`,
-        content: seg.text,
-        createdAt: now,
-      });
-    } else if (seg.type === "tool") {
-      const tool = state.activeTools.get(seg.toolCallId);
-      if (tool) {
-        blocks.push(toolEntryToBlock(seg.toolCallId, tool, now, agentRunId));
-      }
-    } else if (seg.type === "compaction") {
-      const block = state.activeCompactions.get(seg.agentRunId);
-      if (block) {
-        blocks.push(block);
-      }
-    } else if (seg.type === "workspace_preparation") {
-      const block = state.activeWorkspacePreparations.get(seg.agentRunId);
-      if (block) blocks.push(block);
-    } else if (seg.type === "user_message") {
-      blocks.push(seg.block);
-    }
-  }
-
-  if (state.retryNotice) {
-    blocks.push({
-      kind: "status",
-      id: agentRunId
-        ? `turn:${agentRunId}:retry:${state.retryNotice.attempt}`
-        : `llm-retry-${state.retryNotice.attempt}`,
-      content: `网关异常，正在重试 (${state.retryNotice.attempt}/${state.retryNotice.maxAttempts})`,
-      createdAt: now,
-      tone: "muted",
-    });
-  }
-
-  if (state.waitingForModel && !state.retryNotice) {
-    blocks.push({
-      kind: "status",
-      id: agentRunId ? `turn:${agentRunId}:model-wait` : "model-wait",
-      content: "Operating Space · Expanding",
-      createdAt: now,
-      tone: "muted",
-    });
-  }
-
-  return blocks;
-}
-
-type CompactionBlock = Extract<MessageBlock, { kind: "context_compaction" }>;
-
-// 手动 /compact 与自动压缩共用同一个块；完成后的可展开摘要以 durable 投影为准，这里只负责本次运行期间的状态。
-function createCompactionBlock(input: {
-  agentRunId: string;
-  status: CompactionBlock["status"];
-  startedAt?: string;
-  removedCount?: number;
-  durationMs?: number;
-  errorMessage?: string;
-}): CompactionBlock {
-  return {
-    kind: "context_compaction",
-    id: `turn:${input.agentRunId}:context-compaction:0`,
-    status: input.status,
-    ...(input.startedAt ? { startedAt: input.startedAt } : {}),
-    ...(input.removedCount !== undefined ? { removedCount: input.removedCount } : {}),
-    ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
-    ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
-    createdAt: new Date().toISOString(),
-  };
-}
-
-function upsertCompactionSegment(state: StreamingState, agentRunId: string): void {
-  if (!state.segments.some((segment) => segment.type === "compaction" && segment.agentRunId === agentRunId)) {
-    state.segments.push({ type: "compaction", agentRunId });
-  }
-}
-
-function upsertWorkspacePreparationSegment(state: StreamingState, agentRunId: string): void {
-  if (!state.segments.some((segment) => segment.type === "workspace_preparation" && segment.agentRunId === agentRunId)) {
-    state.segments.push({ type: "workspace_preparation", agentRunId });
-  }
-}
-
 export function App() {
   const sessionStore = useMemo(() => new ClientSessionStore(), []);
+  const [cellRetention] = useState(() => createSessionCellRetention(sessionStore));
   const [bootstrapState, setBootstrapState] = useState<BootstrapState | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
-  const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(null);
   const [browseGroups, setBrowseGroups] = useState<import("@actspace/shared").SessionListPage['groups']>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [listRetry, setListRetry] = useState(0);
   const [messageLoading, setMessageLoading] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
-  const [historyBefore, setHistoryBefore] = useState<number | null>(null);
   const [earlierLoading, setEarlierLoading] = useState(false);
   const [earlierError, setEarlierError] = useState<string | null>(null);
   const sidebarSessionsRef = useRef(sessions);
@@ -783,69 +235,60 @@ export function App() {
     setBrowseGroups(groups);
     return [...new Map(items.map(s => [s.id, s])).values()];
   }, []);
-  const pageCacheRef = useRef(new Map<string, SessionPageCache>());
   const messageRequestRef = useRef(0);
   const historyPendingRef = useRef<number | null>(null);
   const [workspaceRegistry, setWorkspaceRegistry] = useState<WorkspaceListResult | null>(null);
   const [sessionBootstrapComplete, setSessionBootstrapComplete] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [isAborting, setIsAborting] = useState(false);
-  const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
-  const [streamingBlocks, setStreamingBlocks] = useState<MessageBlock[]>([]);
+  // 运行中的 run 和 Host 任务队列缓存（14 T16）；当前会话的流式视图在 selectedSessionId 之后读取。
+  const [liveRuns] = useState(createLiveRunStore);
+  const [taskQueue] = useState(createTaskQueueStore);
   // 后台 bash 任务状态（taskId → 最新状态）；bash_task_update 事件驱动，覆写块显示
-  const [bashTaskUpdates, setBashTaskUpdates] = useState<Record<string, { status: BashBackgroundStatus; exitCode?: number | null }>>({});
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
   const [composerFocusRequestId, setComposerFocusRequestId] = useState(0);
   const [defaultModelId, setDefaultModelId] = useState<ModelSelectionId | undefined>(undefined);
   const [selectedChatModelId, setSelectedChatModelId] = useState<ModelSelectionId>(DEFAULT_MODEL_ID);
-  const [composerStateBySession, setComposerStateBySession] = useState<
-    Record<string, { mode: ComposerMode; selectedSkills: string[] }>
-  >({});
   const [usableChatModels, setUsableChatModels] = useState<UsableModelView[] | undefined>(undefined);
-  const [approvalPendingSessionIds, setApprovalPendingSessionIds] = useState<Set<string>>(() => new Set());
-  const [failedSessionIds, setFailedSessionIds] = useState<Set<string>>(() => new Set());
   const [selectedWorkspaceRoot, setSelectedWorkspaceRoot] = useState<string | null>(null);
   const [workspaceGitContext, setWorkspaceGitContext] = useState<WorkspaceGitContext | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<string | undefined>(undefined);
   const [runLocation, setRunLocation] = useState<SessionRunLocation>("this_mac");
-  const [composerDraftRestore, setComposerDraftRestore] = useState<ComposerDraftRestore | null>(null);
   const [reviewSummary, setReviewSummary] = useState<ComposerReviewSummary | null>(null);
-  const sessionRunsRef = useRef(new Map<string, SessionRunState>());
-  const terminalRunIdsRef = useRef(new Set<string>());
-  const [busySessionIds, setBusySessionIds] = useState<Set<string>>(() => new Set());
+  const busySessionIds = useBusySessionIds(liveRuns);
   const modeChangePendingRef = useRef(new Set<string>());
-  const pageVersionsRef = useRef(new Map<string, number>());
-  const approvalVersionsRef = useRef(new Map<string, number>());
-  const draftsRef = useRef(new Map<string, ComposerDraftRestore>());
+  // 页 / 审批请求的版本号全局递增，各会话在 store 里只记最近一次的值：evict 之后重新计数也不会和在途的旧请求撞号。
+  const requestVersionRef = useRef(0);
+  const hydratedSessionIdsRef = useRef(new Set<string>());
+  // 每个会话被 evict 的次数：evict 之前发出、之后才回来的快照不能把释放掉的状态重新建出来。
+  const evictionCountRef = useRef(new Map<string, number>());
+  // 每个会话正在进行的发送数：发送期间不恢复未确认提交，避免把正在发的内容又放回输入框。
+  const sendsInFlightRef = useRef(new Map<string, number>());
+  // 已归档 / 移除、但 run 还没结束的会话：run 结束后再释放本地状态（14 T7）。
+  const pendingEvictionsRef = useRef(new Set<string>());
+  const connectedHostIdsRef = useRef(new Set<string>());
+  // 按会话的本地状态（草稿、composer 模式与技能……）；14 T5 起逐类从各个 ref / state 迁入。
+  const [localStore] = useState(createSessionLocalStore);
+  const patchLocal = useCallback((sessionId: string, patch: Partial<SessionLocalState>) => {
+    localStore.update(sessionId, (state) => ({ ...state, ...patch }));
+  }, [localStore]);
+  const setLocalFlag = useCallback((sessionId: string, flag: "approvalPending" | "failed", value: boolean) => {
+    localStore.update(sessionId, (state) => state[flag] === value ? state : { ...state, [flag]: value });
+  }, [localStore]);
+  const approvalPendingSessionIds = useSessionLocalIds(localStore, selectApprovalPending);
+  const failedSessionIds = useSessionLocalIds(localStore, selectFailed);
   // 压缩失败没有 durable 事件；运行结束后按会话保留失败分隔线，直到该会话下一次发送。
-  const compactionFailuresRef = useRef(new Map<string, CompactionBlock>());
-  const [compactionFailure, setCompactionFailure] = useState<CompactionBlock | null>(null);
   const [composerNotice, setComposerNotice] = useState<{ sessionId: string; text: string } | null>(null);
-  const lastSendOptionsRef = useRef(new Map<string, ComposerSendOptions>());
-  // Host 队列快照缓存；刷新窗口后从持久任务事实重建。
-  const messageQueuesRef = useRef(new Map<string, SessionMessageQueue>());
-  const [messageQueue, setMessageQueue] = useState<SessionMessageQueue>(EMPTY_MESSAGE_QUEUE);
-  // 插入的正文：loop 读到后用它在当前回合里显示用户消息。
-  const steerContentRef = useRef(new Map<string, QueuedComposerMessage>());
   const continueQueueRef = useRef<(sessionId: string, outcome: SessionRunOutcome) => Promise<void>>(async () => {});
-  const bashUpdatesRef = useRef(new Map<string, Record<string, { status: BashBackgroundStatus; exitCode?: number | null }>>());
   const activeSessionIdRef = useRef<string | null>(null);
-  useEffect(() => sessionStore.subscribe(cell => {
-    if (cell.sessionId !== activeSessionIdRef.current) return;
-    const record = selectChatSession(cell, bootstrapState?.workspaceRoot);
-    if (record) { setSessionRecord(record); setHistoryBefore(cell.window?.beforeSeq ?? null); }
-  }), [sessionStore, bootstrapState?.workspaceRoot]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const { blocks: streamingBlocks, isStreaming, isAborting, runId: activeAgentRunId, recovered: isRecoveredRun } = useLiveRunView(liveRuns, selectedSessionId);
+  // 当前会话的本地状态直接从 store 选取；切换会话不再需要逐项复制（14 T6）。
+  const bashTaskUpdates = useSessionLocalState(localStore, selectedSessionId, selectBashUpdates);
+  const composerDraftRestore = useSessionLocalState(localStore, selectedSessionId, selectDraft);
+  const compactionFailure = useSessionLocalState(localStore, selectedSessionId, selectCompactionFailure);
+  const messageQueue = useSessionLocalState(localStore, selectedSessionId, selectMessageQueue);
+  // durable 历史从 store 的 cell 派生；cell 不放进 App 的作用域，见 useChatSessionRecord。
+  const { sessionRecord, historyBefore } = useChatSessionRecord(sessionStore, selectedSessionId, bootstrapState?.workspaceRoot);
   const remoteTarget = useRemoteTarget(selectedSessionId, sessionRecord?.meta.workspaceRoot);
-  const refreshStreamingBlocks = useCallback((sessionId: string | null) => {
-    if (activeSessionIdRef.current !== sessionId) return;
-    const run = sessionId ? sessionRunsRef.current.get(sessionId) : undefined;
-    const blocks = run ? streamingStateToBlocks(run.state, run.agentRunId) : [];
-    setStreamingBlocks(run?.userBlock ? [run.userBlock, ...blocks] : blocks);
-    setIsStreaming(Boolean(run));
-    setIsAborting(run?.aborting ?? false);
-    setActiveAgentRunId(run?.agentRunId ?? null);
-  }, []);
   const setActiveSessionId = useCallback((sessionId: string | null) => {
     ++messageRequestRef.current;
     historyPendingRef.current = null;
@@ -854,21 +297,9 @@ export function App() {
     setMessageLoading(false);
     setMessageError(null);
     activeSessionIdRef.current = sessionId;
+    if (sessionId) pendingEvictionsRef.current.delete(sessionId);
     setSelectedSessionId(sessionId);
-    setSessionRecord(null);
-    setHistoryBefore(null);
-    setBashTaskUpdates(sessionId ? bashUpdatesRef.current.get(sessionId) ?? {} : {});
-    if (sessionId?.startsWith("host:") && !draftsRef.current.has(sessionId)) {
-      try {
-        const saved = JSON.parse(localStorage.getItem(`actspace:pending-submission:${sessionId}`) ?? "null");
-        if (saved?.draft?.sessionId === sessionId && typeof saved.draft.text === "string") draftsRef.current.set(sessionId, { ...saved.draft, id: Date.now(), error: "上次提交尚未确认，再次发送将核对同一次提交。" });
-      } catch { /* An invalid local draft must not block opening durable history. */ }
-    }
-    setComposerDraftRestore(sessionId ? draftsRef.current.get(sessionId) ?? null : null);
-    setCompactionFailure(sessionId ? compactionFailuresRef.current.get(sessionId) ?? null : null);
-    setMessageQueue(sessionId ? messageQueuesRef.current.get(sessionId) ?? EMPTY_MESSAGE_QUEUE : EMPTY_MESSAGE_QUEUE);
-    refreshStreamingBlocks(sessionId);
-  }, [refreshStreamingBlocks]);
+  }, []);
   const reviewRefreshRequestIdRef = useRef(0);
   const userPickedChatModelRef = useRef(false);
 
@@ -886,97 +317,39 @@ export function App() {
 
   const setApprovalPendingForSession = useCallback((sessionId: string | null | undefined, pending: boolean) => {
     if (!sessionId) return;
-    approvalVersionsRef.current.set(sessionId, (approvalVersionsRef.current.get(sessionId) ?? 0) + 1);
-    setApprovalPendingSessionIds((current) => updateStringSet(current, sessionId, pending));
-  }, []);
+    patchLocal(sessionId, { approvalVersion: ++requestVersionRef.current });
+    setLocalFlag(sessionId, "approvalPending", pending);
+  }, [patchLocal, setLocalFlag]);
 
   const setFailedForSession = useCallback((sessionId: string | null | undefined, failed: boolean) => {
     if (!sessionId) return;
-    setFailedSessionIds((current) => updateStringSet(current, sessionId, failed));
-  }, []);
+    setLocalFlag(sessionId, "failed", failed);
+  }, [setLocalFlag]);
 
   const updateMessageQueue = useCallback((sessionId: string, update: (queue: SessionMessageQueue) => SessionMessageQueue) => {
-    const current = messageQueuesRef.current.get(sessionId) ?? EMPTY_MESSAGE_QUEUE;
+    const current = localStore.get(sessionId).messageQueue;
     const updated = update(current);
     if (updated === current) return;
     const next = isQueueEmpty(updated) ? EMPTY_MESSAGE_QUEUE : updated;
-    if (next === EMPTY_MESSAGE_QUEUE) messageQueuesRef.current.delete(sessionId);
-    else messageQueuesRef.current.set(sessionId, next);
-    if (activeSessionIdRef.current === sessionId) setMessageQueue(next);
-  }, []);
+    patchLocal(sessionId, { messageQueue: next });
+  }, [localStore, patchLocal]);
 
   const refreshSessionRef = useRef<(id: string) => Promise<unknown>>(async () => {});
-  const taskSnapshotsRef = useRef(new Map<string, import("@actspace/shared/runtime-v2").TaskSnapshot>());
-  const submittedOptionsRef = useRef(new Map<string, ComposerSendOptions>());
-  const applyTaskSnapshot = useCallback((snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot) => {
-    if ((taskSnapshotsRef.current.get(snapshot.sessionId)?.revision ?? -2) > snapshot.revision) return;
-    const previous = taskSnapshotsRef.current.get(snapshot.sessionId);
-    taskSnapshotsRef.current.set(snapshot.sessionId, snapshot);
-    for (const run of snapshot.runs) if (run.state !== "running") terminalRunIdsRef.current.add(run.runId);
-    const settled = snapshot.tasks.filter(task => !["pending", "claimed"].includes(task.state) && previous?.tasks.find(item => item.taskId === task.taskId)?.state !== task.state);
-    for (const task of settled) submittedOptionsRef.current.delete(task.submissionId);
-    if (settled.length) void refreshSessionRef.current(snapshot.sessionId).catch(console.error);
-    const queue = projectTaskQueue(snapshot);
-    messageQueuesRef.current.set(snapshot.sessionId, queue);
-    if (activeSessionIdRef.current === snapshot.sessionId) setMessageQueue(queue);
-    const running = snapshot.runs.find(run => run.state === "running" && !terminalRunIdsRef.current.has(run.runId));
-    const existing = sessionRunsRef.current.get(snapshot.sessionId);
-    const operation = snapshot.tasks.find(task => task.state === "claimed" && task.runId === null && taskOperation(task.content));
-    // Initial hydration must not replay notices from historical operations.
-    for (const task of settled.filter(task => previous && taskOperation(task.content))) {
-      const result = task.result && typeof task.result === "object" && !Array.isArray(task.result) ? task.result as Record<string, unknown> : {};
-      if (task.state === "failed") {
-        const block = createCompactionBlock({ agentRunId: task.taskId, status: "failed", errorMessage: typeof result.error === "string" ? result.error : "压缩失败，可以重试。" });
-        compactionFailuresRef.current.set(snapshot.sessionId, block);
-        if (activeSessionIdRef.current === snapshot.sessionId) setCompactionFailure(block);
-      } else if (task.state === "completed" && result.compacted === false) {
-        setComposerNotice({ sessionId: snapshot.sessionId, text: "对话还很短，暂时不需要压缩" });
-      }
-    }
-    if (existing?.operationTaskId && !operation) {
-      sessionRunsRef.current.delete(snapshot.sessionId);
-      setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, false));
-      refreshStreamingBlocks(snapshot.sessionId);
-    }
-    if (operation && !sessionRunsRef.current.has(snapshot.sessionId)) {
-      const state = createEmptyStreamingState();
-      upsertCompactionSegment(state, operation.taskId);
-      state.activeCompactions.set(operation.taskId, createCompactionBlock({ agentRunId: operation.taskId, status: "running", startedAt: new Date().toISOString() }));
-      sessionRunsRef.current.set(snapshot.sessionId, { sessionId: snapshot.sessionId, agentRunId: operation.taskId, operationTaskId: operation.taskId, recovered: true,
-        state, userBlock: null, aborting: false, record: pageCacheRef.current.get(snapshot.sessionId)?.record ?? null, historyBefore: null });
-      setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, true));
-      refreshStreamingBlocks(snapshot.sessionId);
-    }
-    if (!running && existing?.recovered && !existing.operationTaskId && snapshot.runs.some(run => run.runId === existing.agentRunId && run.state !== "running")) {
-      sessionRunsRef.current.delete(snapshot.sessionId);
-      setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, false));
-      refreshStreamingBlocks(snapshot.sessionId);
-    }
-    if (running && !sessionRunsRef.current.has(snapshot.sessionId)) {
-      const state = createEmptyStreamingState();
-      state.waitingForModel = true;
-      sessionRunsRef.current.set(snapshot.sessionId, {
-        sessionId: snapshot.sessionId, agentRunId: running.runId, recovered: true,
-        state, userBlock: null, aborting: false,
-        record: pageCacheRef.current.get(snapshot.sessionId)?.record ?? null, historyBefore: null,
-      });
-      setBusySessionIds(current => updateStringSet(current, snapshot.sessionId, true));
-      refreshStreamingBlocks(snapshot.sessionId);
-    }
-    const currentRun = sessionRunsRef.current.get(snapshot.sessionId);
-    const initial = running && snapshot.tasks.find(task => task.taskId === running.taskId);
-    if (currentRun && initial && !currentRun.userBlock) {
-      const content = initial.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
-      const original = content?.kind === "composer-task" ? content.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
-      const submittedOptions = submittedOptionsRef.current.get(initial.submissionId);
-      currentRun.userBlock = { kind: "user", id: `turn:${currentRun.agentRunId}:user:0`, content: original?.userInput ?? (typeof initial.content === "string" ? initial.content : ""), createdAt: new Date().toISOString(),
-        attachments: submittedOptions?.attachments ?? taskAttachments(snapshot.sessionId, content), fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations };
-      refreshStreamingBlocks(snapshot.sessionId);
-    }
-
-  }, [refreshStreamingBlocks]);
+  const applyTaskSnapshot = useCallback((snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot) => applyHostTaskSnapshot(snapshot, {
+    tasks: taskQueue, runs: liveRuns, patchLocal,
+    notice: (sessionId, text) => setComposerNotice({ sessionId, text }),
+    refreshSession: (sessionId) => { void refreshSessionRef.current(sessionId).catch(console.error); },
+  }), [taskQueue, liveRuns, patchLocal]);
+  // 14 S9：影响界面的后台请求失败时，在当前会话的输入框上方提示（3 秒后消失），同时打到控制台。
+  // 只提示当前会话，避免后台会话的失败顶掉当前会话的提示。
+  const reportSessionFailure = useCallback((sessionId: string, text: string) => (error: unknown) => {
+    console.error(text, error);
+    if (activeSessionIdRef.current === sessionId) setComposerNotice({ sessionId, text });
+  }, []);
   const refreshTaskQueue = useCallback(async (sessionId: string) => {
+    const evictions = evictionCountRef.current.get(sessionId);
     const result = await tasksApi.command({ sessionId, op: "snapshot" });
+    if (evictionCountRef.current.get(sessionId) !== evictions) return;
     applyTaskSnapshot(result.snapshot);
   }, [applyTaskSnapshot]);
   const taskCommand = useCallback(async (command: import("@actspace/shared/runtime-v2").TaskCommand) => {
@@ -986,17 +359,43 @@ export function App() {
     return true;
   }, [applyTaskSnapshot]);
   useEffect(() => {
-    if (selectedSessionId) void refreshTaskQueue(selectedSessionId).catch(console.error);
-    return eventsApi.sessionLive(({ event }) => {
-      if (event.sessionId && event.message === "task-queue-updated") void refreshTaskQueue(event.sessionId).catch(console.error);
+    if (selectedSessionId) void refreshTaskQueue(selectedSessionId).catch(reportSessionFailure(selectedSessionId, QUEUE_REFRESH_FAILED));
+    return liveEvents.onMessage("task-queue-updated", ({ event }) => {
+      if (event.sessionId) void refreshTaskQueue(event.sessionId).catch(reportSessionFailure(event.sessionId, QUEUE_REFRESH_FAILED));
     });
-  }, [selectedSessionId, refreshTaskQueue]);
+  }, [selectedSessionId, refreshTaskQueue, reportSessionFailure]);
+  // 启动时清理超过 7 天的未确认提交记录。
+  useEffect(() => { sweepExpiredPendingSubmissions(); }, []);
+  // 14 S10：激活会话时，上次未确认的提交恢复为草稿（本地与远端会话相同）。先查任务快照：
+  // 已有相同 submissionId 说明 Runtime 收到了，只清理记录；查询失败时降级为恢复草稿。永不自动重发。
+  // 正在发送、或输入框里已有用户输入时不恢复：前者会把正在发的内容放回去，后者会覆盖用户刚输入的内容。
+  useEffect(() => {
+    const sessionId = selectedSessionId;
+    const blocked = (id: string) => {
+      const local = localStore.get(id);
+      return Boolean(local.draft || local.composerText?.trim() || sendsInFlightRef.current.get(id));
+    };
+    if (!sessionId || blocked(sessionId)) return;
+    const record = readPendingSubmission(sessionId);
+    if (!record) return;
+    let cancelled = false;
+    void (async () => {
+      let accepted = false;
+      try {
+        await refreshTaskQueue(sessionId);
+        accepted = taskQueue.snapshot(sessionId)?.tasks.some((task) => task.submissionId === record.id) ?? false;
+      } catch (error) { console.error("Failed to check pending submission", error); }
+      if (accepted) { clearPendingSubmission(sessionId); return; }
+      // 等待期间切走了会话、开始了发送、有了输入或草稿、记录变了，就不覆盖。
+      if (cancelled || blocked(sessionId) || readPendingSubmission(sessionId)?.id !== record.id) return;
+      patchLocal(sessionId, { draft: { ...record.draft, id: Date.now(), error: "上次提交尚未确认，再次发送将核对同一次提交。" } });
+    })();
+    return () => { cancelled = true; };
+  }, [selectedSessionId, refreshTaskQueue, taskQueue, localStore, patchLocal]);
 
   const setCompactionFailureForSession = useCallback((sessionId: string, block: CompactionBlock | null) => {
-    if (block) compactionFailuresRef.current.set(sessionId, block);
-    else compactionFailuresRef.current.delete(sessionId);
-    if (activeSessionIdRef.current === sessionId) setCompactionFailure(block);
-  }, []);
+    patchLocal(sessionId, { compactionFailure: block ?? undefined });
+  }, [patchLocal]);
 
   useEffect(() => {
     if (!composerNotice) return;
@@ -1034,8 +433,8 @@ export function App() {
     if (uniqueSessionIds.length === 0) return;
 
     const results = await Promise.all(uniqueSessionIds.map(async (sessionId) => {
-      const version = (approvalVersionsRef.current.get(sessionId) ?? 0) + 1;
-      approvalVersionsRef.current.set(sessionId, version);
+      const version = ++requestVersionRef.current;
+      patchLocal(sessionId, { approvalVersion: version });
       try {
         const pending = await approvalsApi.listPending({ sessionId });
         return { sessionId, version, hasPending: pending.length > 0, pending };
@@ -1048,17 +447,16 @@ export function App() {
     // The host owns pending requests across renderer reloads. Reattach only
     // current host facts, never replay historical approval requests as grants.
     for (const result of results) {
-      if (approvalVersionsRef.current.get(result.sessionId) !== result.version) continue;
+      if (localStore.get(result.sessionId).approvalVersion !== result.version) continue;
       for (const pending of result.pending) {
         const recovery = pending.recovery;
         if (!recovery || pending.expiresAt <= Date.now()) continue;
-        let run = sessionRunsRef.current.get(result.sessionId);
+        let run = liveRuns.get(result.sessionId);
         if (run && (!run.recovered || run.agentRunId !== recovery.agentRunId)) continue;
         if (!run) {
           run = { sessionId: result.sessionId, agentRunId: recovery.agentRunId, recovered: true,
-            state: createEmptyStreamingState(), userBlock: null, aborting: false, record: null, historyBefore: null };
-          sessionRunsRef.current.set(result.sessionId, run);
-          setBusySessionIds(current => updateStringSet(current, result.sessionId, true));
+            state: createEmptyStreamingState(), userBlock: null, aborting: false };
+          liveRuns.start(run);
         }
         if (run.state.activeTools.get(recovery.toolCallId)?.terminalStatus) continue;
         upsertStreamingTool(run.state, recovery.toolCallId, pending.toolName, recovery.preview);
@@ -1067,17 +465,13 @@ export function App() {
           approvalSummary: pending.summary, approvalScope: recovery.approvalScope,
         });
       }
-      refreshStreamingBlocks(result.sessionId);
+      liveRuns.refresh(result.sessionId);
     }
-    setApprovalPendingSessionIds((current) => {
-      let next = current;
-      for (const result of results) {
-        if (result.hasPending === null || approvalVersionsRef.current.get(result.sessionId) !== result.version) continue;
-        next = updateStringSet(next, result.sessionId, result.hasPending);
-      }
-      return next;
-    });
-  }, [refreshStreamingBlocks]);
+    for (const result of results) {
+      if (result.hasPending === null || localStore.get(result.sessionId).approvalVersion !== result.version) continue;
+      setLocalFlag(result.sessionId, "approvalPending", result.hasPending);
+    }
+  }, [liveRuns, localStore, patchLocal, setLocalFlag]);
 
   useEffect(() => {
     appApi.getBootstrapState()
@@ -1132,12 +526,51 @@ export function App() {
     };
   }, [remoteTarget.hostId, bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.agentRunCount, sessionRecord?.meta.worktree]);
 
+  const visibleSessions = useMemo(() => {
+    if (!workspaceRegistry) return sessions;
+    const hiddenWorkspaceIds = new Set(
+      workspaceRegistry.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id),
+    );
+    const hiddenWorkspacePaths = new Set(
+      workspaceRegistry.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path),
+    );
+    return sessions.filter((session) =>
+      !hiddenWorkspaceIds.has(session.workspaceId ?? "") &&
+      !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
+    );
+  }, [sessions, workspaceRegistry]);
+  // 每个会话 id 只补齐一次审批徽标和任务队列；之后靠 live 事件和选中会话时的刷新保持最新（14 T3）。
+  // 只补齐侧栏可见的会话：移除工作区后，它的会话被 evict，不能因为仍在 sessions 里又被补齐回来。
   useEffect(() => {
-    refreshPendingApprovalStatuses(sessions.map((session) => session.id)).catch((error: unknown) => {
+    const fresh = visibleSessions.map((session) => session.id).filter((id) => !hydratedSessionIdsRef.current.has(id));
+    if (fresh.length === 0) return;
+    for (const id of fresh) hydratedSessionIdsRef.current.add(id);
+    refreshPendingApprovalStatuses(fresh).catch((error: unknown) => {
       console.error("Failed to refresh pending approval statuses", error);
     });
-    for (const session of sessions) void refreshTaskQueue(session.id).catch(console.error);
-  }, [refreshPendingApprovalStatuses, refreshTaskQueue, sessions]);
+    for (const id of fresh) void refreshTaskQueue(id).catch(reportSessionFailure(id, QUEUE_REFRESH_FAILED));
+  }, [refreshPendingApprovalStatuses, refreshTaskQueue, reportSessionFailure, visibleSessions]);
+
+  // 归档 / 移除后释放会话的本地状态，并让它重新出现时重新补齐。当前会话不释放；运行中的会话等 run 结束。
+  const evictSession = useCallback((sessionId: string) => {
+    if (sessionId === activeSessionIdRef.current) return;
+    if (liveRuns.has(sessionId)) { pendingEvictionsRef.current.add(sessionId); return; }
+    pendingEvictionsRef.current.delete(sessionId);
+    evictionCountRef.current.set(sessionId, (evictionCountRef.current.get(sessionId) ?? 0) + 1);
+    localStore.evict(sessionId);
+    liveRuns.evict(sessionId);
+    taskQueue.evict(sessionId);
+    cellRetention.forget(sessionId);
+    hydratedSessionIdsRef.current.delete(sessionId);
+  }, [localStore, liveRuns, taskQueue, cellRetention]);
+  useEffect(() => {
+    for (const sessionId of [...pendingEvictionsRef.current]) if (!busySessionIds.has(sessionId)) evictSession(sessionId);
+  }, [busySessionIds, evictSession]);
+  // cell 保留：当前会话和运行中的会话常驻，其余只留最近查看的几个（14 T9 / T10）。
+  useEffect(() => {
+    cellRetention.retain(new Set(selectedSessionId ? [...busySessionIds, selectedSessionId] : busySessionIds));
+    if (selectedSessionId) cellRetention.viewed(selectedSessionId);
+  }, [cellRetention, busySessionIds, selectedSessionId]);
 
   useEffect(() => {
     void refreshReviewSummary();
@@ -1198,97 +631,54 @@ export function App() {
           const items = await readSidebarSessions();
           if (disposed) return;
           setSessions(items);
-          setSessionRecord(current => {
-            const item = items.find(item => item.id === current?.meta.id);
-            return current && item ? { ...current, meta: { ...current.meta, title: item.title } } : current;
-          });
         } while (pending && !disposed);
       } catch (error) { console.error("Failed to refresh session list", error); }
       finally { refreshing = false; }
     };
-    const unsubscribe = eventsApi.sessionLive(({ event }) => {
-      if (event.message === "session-title-updated") void refresh();
-    });
+    const unsubscribe = liveEvents.onMessage("session-title-updated", () => { void refresh(); });
     const unhosts = eventsApi.hostsChanged(() => { void refresh(); });
     return () => { disposed = true; unsubscribe(); unhosts(); };
   }, [readSidebarSessions]);
 
-  const cacheSessionPage = useCallback((sessionId: string, page: SessionPageCache) => {
-    pageCacheRef.current.delete(sessionId);
-    pageCacheRef.current.set(sessionId, page);
-    while (pageCacheRef.current.size > 3) pageCacheRef.current.delete(pageCacheRef.current.keys().next().value!);
-    const run = sessionRunsRef.current.get(sessionId);
-    if (run) { run.record = page.record; run.historyBefore = page.history.before; }
-  }, []);
-
-  const readSessionPage = useCallback(async (sessionId: string, restoreCache = false) => {
-    const version = (pageVersionsRef.current.get(sessionId) ?? 0) + 1;
-    pageVersionsRef.current.set(sessionId, version);
+  const readSessionPage = useCallback(async (sessionId: string) => {
+    const version = ++requestVersionRef.current;
+    patchLocal(sessionId, { pageVersion: version });
     const visible = () => activeSessionIdRef.current === sessionId;
     const request = visible() ? ++messageRequestRef.current : messageRequestRef.current;
-    const run = sessionRunsRef.current.get(sessionId);
-    const cached = restoreCache ? pageCacheRef.current.get(sessionId) : undefined;
-    const cachedRecord = cached?.record ?? (restoreCache ? run?.record : null);
     if (visible()) {
       historyPendingRef.current = null;
       setEarlierLoading(false);
-      if (cachedRecord) {
-        setSessionRecord(cachedRecord);
-        setHistoryBefore(cached ? cached.history.before : run?.historyBefore ?? null);
-      }
-      setMessageLoading(!cachedRecord && !run?.record); setMessageError(null); setEarlierError(null);
+      // store 里已有这个会话的 cell（保留策略留下的）时直接显示它，后台刷新。
+      const held = sessionStore.peek(sessionId);
+      setMessageLoading(!held?.snapshot || !held.window); setMessageError(null); setEarlierError(null);
     }
     try {
       const projection = await sessionsApi.getPage({ sessionId });
-      if (version !== pageVersionsRef.current.get(sessionId)) return null;
+      if (version !== localStore.get(sessionId).pageVersion) return null;
+      // 合并（与已加载的早期页相邻时并入、较旧的修订不覆盖）由 applyEnvelope 负责。
       sessionStore.applyEnvelope(projection);
-      const page = { record: selectChatSession(sessionStore.get(sessionId)), history: { before: projection.window.beforeSeq, throughJournalSeq: projection.throughJournalSeq } };
-      if (version !== pageVersionsRef.current.get(sessionId)) return null;
-      if (!page.record) throw new Error('会话读取失败，请重试');
-      cacheSessionPage(sessionId, { record: page.record, history: page.history });
-      if (visible() && request === messageRequestRef.current) {
-        setSessionRecord(current => {
-          if (!current || current.meta.id !== sessionId) return page.record;
-          const oldest = Math.min(...page.record!.events.map(e => Number(/^v2-(\d+)/.exec(e.id)?.[1] ?? Infinity)));
-          const earlier = current.events.filter(e => Number(/^v2-(\d+)/.exec(e.id)?.[1] ?? Infinity) < oldest);
-          const events = [...earlier, ...page.record!.events];
-          const deferred = new Map([...(current.messageBlocks ?? []), ...(page.record!.messageBlocks ?? [])].filter(b => b.deferredToolDetail).map(b => [b.id, b.deferredToolDetail]));
-          return { ...page.record!, events, messageBlocks: createMessageBlocks(events).map(b => deferred.has(b.id) ? { ...b, deferredToolDetail: deferred.get(b.id) } : b) };
-        });
-        setHistoryBefore(current => current === null ? page.history.before : page.history.before === null ? null : Math.min(current, page.history.before));
-      }
-      return page.record;
+      const record = selectChatSession(sessionStore.get(sessionId));
+      if (!record) throw new Error('会话读取失败，请重试');
+      return record;
     } catch (error) {
-      if (version === pageVersionsRef.current.get(sessionId) && visible() && request === messageRequestRef.current) setMessageError(sessionReadError(error, '消息加载失败'));
+      if (version === localStore.get(sessionId).pageVersion && visible() && request === messageRequestRef.current) setMessageError(sessionReadError(error, '消息加载失败'));
       return null;
     } finally {
-      if (version === pageVersionsRef.current.get(sessionId) && visible() && request === messageRequestRef.current) setMessageLoading(false);
+      if (version === localStore.get(sessionId).pageVersion && visible() && request === messageRequestRef.current) setMessageLoading(false);
     }
-  }, [cacheSessionPage, sessionStore]);
+  }, [sessionStore, localStore, patchLocal]);
 
   refreshSessionRef.current = readSessionPage;
 
   const loadEarlierMessages = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
-    if (!sessionId || historyBefore === null || historyPendingRef.current !== null) return;
+    if (!sessionId || sessionStore.peek(sessionId)?.window?.beforeSeq == null || historyPendingRef.current !== null) return;
     const request = messageRequestRef.current;
     historyPendingRef.current = request; setEarlierLoading(true); setEarlierError(null);
-    try {
-      const projection = await sessionsApi.getPage({ sessionId, beforeSeq: historyBefore });
-      sessionStore.applyEnvelope(projection);
-      const page = { record: projectChatWindow(projection, bootstrapState?.workspaceRoot), history: { before: projection.window.beforeSeq, throughJournalSeq: projection.throughJournalSeq } };
-      if (request !== messageRequestRef.current || activeSessionIdRef.current !== sessionId) return;
-      setSessionRecord(current => {
-        if (!current || current.meta.id !== sessionId) return current;
-        const ids = new Set(current.events.map(e => e.id));
-        const events = [...page.record.events.filter(e => !ids.has(e.id)), ...current.events];
-        const deferred = new Map([...(page.record.messageBlocks ?? []), ...(current.messageBlocks ?? [])].filter(b => b.deferredToolDetail).map(b => [b.id, b.deferredToolDetail]));
-        return { ...current, events, messageBlocks: createMessageBlocks(events).map(b => deferred.has(b.id) ? { ...b, deferredToolDetail: deferred.get(b.id) } : b) };
-      });
-      setHistoryBefore(page.history.before);
-    } catch (error) { if (request === messageRequestRef.current) setEarlierError(sessionReadError(error, '历史消息加载失败')); }
+    try { await loadEarlier(sessionStore, sessionId); }
+    catch (error) { if (request === messageRequestRef.current) setEarlierError(sessionReadError(error, '历史消息加载失败')); }
     finally { if (historyPendingRef.current === request) { historyPendingRef.current = null; setEarlierLoading(false); } }
-  }, [historyBefore]);
+  }, [sessionStore]);
 
   const loadMoreSessions = useCallback(async (input: import("@actspace/shared").SessionListPageInput) => {
     const page = await sessionsApi.listPage(input);
@@ -1328,7 +718,7 @@ export function App() {
       );
       if (existing) {
         setActiveSessionId(existing.id);
-        const restored = await readSessionPage(existing.id, true);
+        const restored = await readSessionPage(existing.id);
         if (disposed || activeSessionIdRef.current !== existing.id) return;
         if (!restored) return;
         setSelectedWorkspaceRoot(
@@ -1345,7 +735,6 @@ export function App() {
       }
 
       setActiveSessionId(null);
-      setSessionRecord(null);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
         registry?.items.find((workspace) => workspace.id === registry.defaultWorkspaceId)?.path ??
         bootstrapState?.workspaceRoot,
@@ -1362,271 +751,23 @@ export function App() {
     return () => { disposed = true; if (timer) clearTimeout(timer); };
   }, [listRetry, readSessionPage]);
 
-  const handleStreamEvent = useCallback((event: Exclude<RuntimeStreamEvent, { type: "bash_task_update" }>) => {
-    const run = sessionRunsRef.current.get(event.sessionId);
-    if (!run || run.agentRunId !== event.agentRunId) return;
-    // A recovered run keeps its durable transcript, including text completed
-    // before reload. Subsequent text is supplied by the live Journal projection.
-    if (run.recovered && (event.type === "assistant_text_delta" || event.type === "assistant_thinking_delta")) return;
-    const state = run.state;
-
-    switch (event.type) {
-      case "agent_run_started":
-        state.waitingForModel = true;
-        break;
-
-      case "user_message_steered": {
-        const item = steerContentRef.current.get(event.messageId);
-        steerContentRef.current.delete(event.messageId);
-        updateMessageQueue(event.sessionId, (queue) => takeSteering(queue, event.messageId).queue);
-        if (!item) break;
-        state.segments.push({
-          type: "user_message",
-          block: {
-            kind: "user", id: `turn:${event.agentRunId}:steer:${event.messageId}`, content: item.text,
-            createdAt: new Date().toISOString(), attachments: item.options.attachments,
-            ...(item.options.fileReferences?.length ? { fileReferences: item.options.fileReferences } : {}),
-            ...(item.options.responseAnnotations?.length ? { responseAnnotations: item.options.responseAnnotations } : {}),
-          },
-        });
-        state.waitingForModel = true;
-        break;
-      }
-
-      case "workspace_preparation_started":
-        state.waitingForModel = false;
-        upsertWorkspacePreparationSegment(state, event.agentRunId);
-        state.activeWorkspacePreparations.set(event.agentRunId, {
-          kind: "workspace_preparation",
-          id: `turn:${event.agentRunId}:workspace-preparation:0`,
-          status: "running",
-          sourceWorkspaceRoot: event.sourceWorkspaceRoot,
-          baseBranch: event.baseBranch,
-          createdAt: new Date().toISOString(),
-        });
-        break;
-
-      case "workspace_preparation_finished":
-        upsertWorkspacePreparationSegment(state, event.agentRunId);
-        state.activeWorkspacePreparations.set(event.agentRunId, {
-          kind: "workspace_preparation",
-          id: `turn:${event.agentRunId}:workspace-preparation:0`,
-          status: "completed",
-          sourceWorkspaceRoot: event.payload.sourceWorkspaceRoot,
-          workspaceRoot: event.payload.workspaceRoot,
-          baseBranch: event.payload.baseBranch,
-          branch: event.payload.branch,
-          baseCommit: event.payload.baseCommit,
-          durationMs: event.payload.durationMs,
-          environmentSetup: event.payload.environmentSetup,
-          createdAt: new Date().toISOString(),
-        });
-        state.waitingForModel = true;
-        break;
-
-      case "context_compaction_started":
-        state.waitingForModel = false;
-        upsertCompactionSegment(state, event.agentRunId);
-        state.activeCompactions.set(event.agentRunId, createCompactionBlock({
-          agentRunId: event.agentRunId,
-          status: "running",
-          startedAt: event.startedAt,
-        }));
-        break;
-
-      case "context_compaction_finished": {
-        state.waitingForModel = false;
-        if (event.payload.status === "skipped") {
-          state.activeCompactions.delete(event.agentRunId);
-          state.segments = state.segments.filter((segment) => !(segment.type === "compaction" && segment.agentRunId === event.agentRunId));
-          break;
-        }
-        upsertCompactionSegment(state, event.agentRunId);
-        state.activeCompactions.set(event.agentRunId, createCompactionBlock({
-          agentRunId: event.agentRunId,
-          status: event.payload.status === "failed" ? "failed" : "completed",
-          removedCount: event.payload.removedCount ?? Math.max(event.payload.beforeCount - event.payload.afterCount, 0),
-          durationMs: event.payload.durationMs,
-          errorMessage: event.payload.reason,
-        }));
-        break;
-      }
-
-      case "context_compaction_failed":
-        state.waitingForModel = false;
-        upsertCompactionSegment(state, event.agentRunId);
-        state.activeCompactions.set(event.agentRunId, createCompactionBlock({
-          agentRunId: event.agentRunId,
-          status: "failed",
-          errorMessage: event.error.message,
-        }));
-        break;
-
-      case "assistant_thinking_delta":
-        if (!event.delta) break;
-        state.retryNotice = undefined;
-        if (event.delta.trim().length > 0) {
-          state.waitingForModel = false;
-        }
-        appendOrMergeSegment(state.segments, "thinking", event.delta);
-        break;
-
-      case "assistant_text_delta":
-        state.retryNotice = undefined;
-        if (event.delta.length > 0) {
-          state.waitingForModel = false;
-        }
-        appendOrMergeSegment(state.segments, "text", event.delta);
-        break;
-
-      case "llm_retry":
-        dropTrailingStreamSegments(state.segments);
-        state.waitingForModel = false;
-        state.retryNotice = { attempt: event.attempt, maxAttempts: event.maxAttempts };
-        break;
-
-      case "tool_call_streaming": {
-        state.waitingForModel = false;
-        upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
-        break;
-      }
-
-      case "tool_started": {
-        state.waitingForModel = false;
-        upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
-        break;
-      }
-
-      case "tool_finished": {
-        if (state.activeTools.get(event.toolCallId)?.terminalStatus) break;
-        upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
-        const tool = state.activeTools.get(event.toolCallId);
-        if (tool) {
-          if (event.preview) {
-            tool.preview = event.preview;
-          }
-          tool.finished = true;
-          tool.terminalStatus = event.status ?? (event.isError ? "failed" : "completed");
-          tool.approvalPending = false;
-          tool.approvalRequestId = undefined;
-          tool.isError = event.isError;
-        }
-        state.waitingForModel = hasFinishedAllActiveTools(state);
-        break;
-      }
-
-      case "subagent_event": {
-        state.waitingForModel = false;
-        const existing = state.activeTools.get(event.toolCallId);
-        if (existing?.terminalStatus) break;
-        if (existing) {
-          existing.preview = event.preview;
-          existing.transcriptEvents = [...(existing.transcriptEvents ?? []), event.event];
-        } else {
-          state.activeTools.set(event.toolCallId, {
-            toolName: "agent",
-            preview: event.preview,
-            transcriptEvents: [event.event],
-          });
-          state.segments.push({ type: "tool", toolCallId: event.toolCallId });
-        }
-        break;
-      }
-
-      case "tool_approval_required": {
-        state.waitingForModel = false;
-        const tool = state.activeTools.get(event.toolCallId);
-        if (tool && !tool.terminalStatus) {
-          tool.approvalPending = true;
-          tool.approvalRequestId = event.requestId;
-          tool.approvalReason = event.reason;
-          tool.approvalSummary = event.summary;
-          tool.approvalScope = event.approvalScope;
-          if (tool.preview?.kind === "bash") {
-            tool.preview = {
-              ...tool.preview,
-              command: event.command ?? tool.preview.command,
-              sandboxed: event.executionEnvironment === undefined
-                ? tool.preview.sandboxed
-                : event.executionEnvironment === "sandbox",
-              notExecuted: undefined,
-            };
-          }
-          if (tool.preview?.kind === "delete") {
-            tool.preview = {
-              ...tool.preview,
-              displayText: "Delete file requires approval",
-              status: "pending",
-              approvalRequestId: event.requestId,
-            };
-          }
-        }
-        break;
-      }
-
-      case "tool_approval_resolved": {
-        const tool = state.activeTools.get(event.toolCallId);
-        if (tool && !tool.terminalStatus) {
-          tool.approvalPending = false;
-          if (tool.preview?.kind === "delete" && event.decision === "deny") {
-            tool.finished = true;
-            tool.isError = true;
-            tool.preview = {
-              ...tool.preview,
-              displayText: `Denied delete ${tool.preview.filePath || "file..."}`,
-              status: "denied",
-            };
-          }
-          if (tool.preview?.kind === "bash" && event.decision === "deny") {
-            tool.finished = true;
-            tool.isError = true;
-            tool.preview = {
-              ...tool.preview,
-              status: "denied",
-              title: "Bash command denied",
-              sandboxed: undefined,
-              notExecuted: true,
-            };
-          }
-        }
-        state.waitingForModel = hasFinishedAllActiveTools(state);
-        break;
-      }
-
-      case "agent_run_finished":
-      case "agent_run_aborted":
-      case "agent_run_failed":
-        state.waitingForModel = false;
-        for (const tool of state.activeTools.values()) {
-          if (tool.terminalStatus) continue;
-          tool.finished = true;
-          tool.isError = true;
-          tool.terminalStatus = event.type === "agent_run_aborted" ? "aborted" : "failed";
-          tool.approvalPending = false;
-          tool.approvalRequestId = undefined;
-          if (tool.preview?.kind === "write" || tool.preview?.kind === "edit_diff" || tool.preview?.kind === "delete") {
-            tool.preview = { ...tool.preview, status: "failed" };
-          } else if (tool.preview?.kind === "agent") {
-            tool.preview = { ...tool.preview, status: tool.terminalStatus === "aborted" ? "aborted" : "failed" };
-          }
-        }
-        break;
-    }
-
-    refreshStreamingBlocks(event.sessionId);
-  }, [refreshStreamingBlocks, updateMessageQueue]);
+  // 流式事件归并进 live run（规则在 live-run-store.ts）；steer 的正文取自任务队列缓存。
+  const handleStreamEvent = useCallback((event: StreamEvent) => liveRuns.applyStreamEvent(event, (sessionId, messageId) => {
+    const item = taskQueue.takeSteer(messageId);
+    updateMessageQueue(sessionId, (queue) => takeSteering(queue, messageId).queue);
+    return item;
+  }), [liveRuns, taskQueue, updateMessageQueue]);
 
   useEffect(() => {
     return eventsApi.agentStream((event) => {
-      if (event.type === "agent_run_started" && terminalRunIdsRef.current.has(event.agentRunId)) return;
+      if (event.type === "agent_run_started" && liveRuns.isTerminal(event.agentRunId)) return;
       if (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed") {
-        terminalRunIdsRef.current.add(event.agentRunId);
+        liveRuns.markTerminal(event.agentRunId);
       }
-      let run = sessionRunsRef.current.get(event.sessionId);
+      let run = liveRuns.get(event.sessionId);
       if (event.type === "agent_run_started" && (event.recoveredReset || !run || run.agentRunId !== event.agentRunId)) {
-        run = { sessionId: event.sessionId, agentRunId: event.agentRunId, recovered: event.recoveredReset === true, state: createEmptyStreamingState(), userBlock: null, aborting: false, record: pageCacheRef.current.get(event.sessionId)?.record ?? null, historyBefore: null };
-        sessionRunsRef.current.set(event.sessionId, run);
-        setBusySessionIds(current => updateStringSet(current, event.sessionId, true));
+        run = { sessionId: event.sessionId, agentRunId: event.agentRunId, recovered: event.recoveredReset === true, state: createEmptyStreamingState(), userBlock: null, aborting: false };
+        liveRuns.start(run);
         void readSessionPage(event.sessionId);
       }
       if (event.type === "agent_run_started" && run && !event.recoveredReset) {
@@ -1657,9 +798,8 @@ export function App() {
       }
 
       if (event.type === "bash_task_update") {
-        const updates = { ...bashUpdatesRef.current.get(event.sessionId), [event.taskId]: { status: event.status, exitCode: event.exitCode } };
-        bashUpdatesRef.current.set(event.sessionId, updates);
-        if (event.sessionId === activeSessionIdRef.current) setBashTaskUpdates(updates);
+        const updates = { ...localStore.get(event.sessionId).bashUpdates, [event.taskId]: { status: event.status, exitCode: event.exitCode } };
+        patchLocal(event.sessionId, { bashUpdates: updates });
         return;
       }
 
@@ -1668,29 +808,27 @@ export function App() {
         // Host events settle every run; no renderer-owned execution promise.
         void readSidebarSessions().then(setSessions).catch(console.error);
         void readSessionPage(event.sessionId).finally(() => {
-          if (sessionRunsRef.current.get(event.sessionId) !== run) return;
-          sessionRunsRef.current.delete(event.sessionId);
-          setBusySessionIds(current => updateStringSet(current, event.sessionId, false));
-          refreshStreamingBlocks(event.sessionId);
+          if (!liveRuns.end(event.sessionId, run)) return;
           if (activeSessionIdRef.current === event.sessionId) void refreshReviewSummary();
           void continueQueueRef.current(event.sessionId, event.type === "agent_run_finished" ? "completed" : event.type === "agent_run_aborted" ? "aborted" : "failed");
         });
       }
     });
-  }, [handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshStreamingBlocks, refreshReviewSummary]);
+  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal]);
 
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
     const selectionRequest = messageRequestRef.current;
     try {
-      const created = await createSession({
+      const projection = await sessionsApi.create({
         ...(input.hostId ? { hostId: input.hostId } : {}),
         ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
         ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
         ...(input.agentForm ? { agentForm: input.agentForm } : {}),
       });
+      sessionStore.applyEnvelope(projection);
+      const created = projectChatWindow(projection);
       if (selectionRequest === messageRequestRef.current) {
         setActiveSessionId(created.meta.id);
-        setSessionRecord(created);
         setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
       }
       const refreshed = await readSidebarSessions();
@@ -1708,27 +846,27 @@ export function App() {
   continueQueueRef.current = continueQueue;
   const handleSteerQueued = useCallback((id: string) => {
     const sessionId = activeSessionIdRef.current;
-    const snapshot = sessionId ? taskSnapshotsRef.current.get(sessionId) : undefined;
+    const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
     const runId = snapshot?.runs.find(run => run.state === "running")?.runId;
     if (!sessionId || !snapshot || !runId) return;
-    const item = messageQueuesRef.current.get(sessionId)?.items.find(item => item.id === id);
-    if (item) steerContentRef.current.set(id, item);
-    void taskCommand({ op: "designate", sessionId, taskId: id, runId, revision: snapshot.revision }).catch(console.error);
-  }, [taskCommand]);
+    const item = localStore.get(sessionId).messageQueue.items.find(item => item.id === id);
+    if (item) taskQueue.rememberSteer(sessionId, id, item);
+    void taskCommand({ op: "designate", sessionId, taskId: id, runId, revision: snapshot.revision }).catch(reportSessionFailure(sessionId, QUEUE_COMMAND_FAILED));
+  }, [taskCommand, taskQueue, localStore, reportSessionFailure]);
   const handleUnsteerQueued = useCallback(async (id: string) => {
     const sessionId = activeSessionIdRef.current;
-    const snapshot = sessionId ? taskSnapshotsRef.current.get(sessionId) : undefined;
+    const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
     if (sessionId && snapshot) await taskCommand({ op: "designate", sessionId, taskId: id, runId: null, revision: snapshot.revision });
-  }, [taskCommand]);
+  }, [taskCommand, taskQueue]);
   const handleResumeQueue = useCallback(() => {
     const sessionId = activeSessionIdRef.current;
-    const snapshot = sessionId ? taskSnapshotsRef.current.get(sessionId) : undefined;
-    if (sessionId && snapshot) void taskCommand({ op: "resume", sessionId, revision: snapshot.revision }).catch(console.error);
-  }, [taskCommand]);
+    const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
+    if (sessionId && snapshot) void taskCommand({ op: "resume", sessionId, revision: snapshot.revision }).catch(reportSessionFailure(sessionId, QUEUE_COMMAND_FAILED));
+  }, [taskCommand, taskQueue, reportSessionFailure]);
   const handleEditQueued = useCallback(async (id: string) => {
     const sessionId = activeSessionIdRef.current;
-    const snapshot = sessionId ? taskSnapshotsRef.current.get(sessionId) : undefined;
-    const item = sessionId ? messageQueuesRef.current.get(sessionId)?.items.find(item => item.id === id) : undefined;
+    const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
+    const item = sessionId ? localStore.get(sessionId).messageQueue.items.find(item => item.id === id) : undefined;
     if (!sessionId || !snapshot || !item) return;
     const attachments = await Promise.all((item.options.attachments ?? []).map(async attachment => {
       if (attachment.kind !== "image" || !attachment.remoteArtifact) return attachment;
@@ -1739,9 +877,8 @@ export function App() {
     }));
     if (!await taskCommand({ op: "cancel", sessionId, taskId: id, revision: snapshot.revision })) return;
     const draft = { id: Date.now(), sessionId, text: item.text, ...item.options, attachments };
-    draftsRef.current.set(sessionId, draft);
-    if (activeSessionIdRef.current === sessionId) setComposerDraftRestore(draft);
-  }, [taskCommand]);
+    patchLocal(sessionId, { draft });
+  }, [taskCommand, taskQueue, localStore, patchLocal]);
 
   const handleSend = useCallback(async (
     text: string,
@@ -1766,74 +903,83 @@ export function App() {
       if (options.mode === "plan") await sessionsApi.setAgentMode({ sessionId: visibleSessionId, mode: "plan", expectedRevision: created.meta.agentModeRevision ?? 0 });
     }
     const sessionId = visibleSessionId;
-    setComposerStateBySession(current => ({ ...current, [sessionId]: { mode: options.mode, selectedSkills: options.selectedSkills } }));
+    patchLocal(sessionId, { composer: { mode: options.mode, selectedSkills: options.selectedSkills } });
     // Keep workspace changes on the idle Session boundary before task admission.
-    if (!sessionId.startsWith("host:") && !sessionRunsRef.current.has(sessionId) && !sessionRecord?.meta.worktree && selectedWorkspaceRoot &&
+    if (!sessionId.startsWith("host:") && !liveRuns.has(sessionId) && !sessionRecord?.meta.worktree && selectedWorkspaceRoot &&
         selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot)) {
       const result = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
       if (!result.ok) throw new Error(result.error ?? "无法更新会话工作区");
     }
-    lastSendOptionsRef.current.set(sessionId, options);
+    patchLocal(sessionId, { lastSendOptions: options });
     setFailedForSession(sessionId, false);
     setCompactionFailureForSession(sessionId, null);
     const submitted = { sessionId: visibleSessionId, userInput: text, attachments: options.attachments?.map(attachmentForRuntime), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
-    const pendingKey = `actspace:pending-submission:${visibleSessionId}`;
-    const pendingStorage = visibleSessionId.startsWith("host:") ? localStorage : sessionStorage;
-    const previous = pendingStorage.getItem(pendingKey);
-    let saved: { content: string; id: string } | null = null;
-    try { saved = previous ? JSON.parse(previous) : null; } catch { /* obsolete draft */ }
+    const saved = readPendingSubmission(visibleSessionId);
     const serialized = JSON.stringify(submitted);
     const submissionId = saved?.content === serialized ? saved.id : crypto.randomUUID();
-    submittedOptionsRef.current.set(submissionId, options);
-    pendingStorage.setItem(pendingKey, JSON.stringify({ content: serialized, id: submissionId, draft: { sessionId: visibleSessionId, text, attachments: options.attachments?.map(({ previewUrl: _preview, ...attachment }) => attachment), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } }));
-    const restore = (error: string, issues?: { attachmentIssue?: import("@actspace/shared").ChatAttachmentIssue; referenceIssue?: import("@actspace/shared").ComposerReferenceIssue }) => {
-      const draft = { id: Date.now(), sessionId: visibleSessionId!, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error, ...issues };
-      draftsRef.current.set(visibleSessionId!, draft);
-      if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(draft);
-    };
+    taskQueue.rememberOptions(visibleSessionId, submissionId, options);
+    let result: import("@actspace/shared/runtime-v2").TaskSubmissionResult;
+    const inFlight = sendsInFlightRef.current;
+    inFlight.set(visibleSessionId, (inFlight.get(visibleSessionId) ?? 0) + 1);
     try {
-      const configured = await taskCommand({ sessionId: visibleSessionId, op: "configure", configuration: { model: visibleSessionId.startsWith("host:") ? remoteTarget.model : options.model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills } });
-      if (!configured) throw new Error("无法更新任务配置，草稿已保留。");
-    } catch (error) {
-      pendingStorage.removeItem(pendingKey);
-      submittedOptionsRef.current.delete(submissionId);
-      const message = error instanceof Error ? error.message : "无法更新任务配置，草稿已保留。";
-      restore(message); throw new Error(message);
-    }
-    const attempt = async (): Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult> => {
-      try { return await tasksApi.submit({ ...submitted, submissionId }); }
-      catch { return { status: "submission-failed" as const, acknowledgement: "unknown" as const, message: "提交尚未确认，再次发送将核对同一次提交。" }; }
-    };
-    let result = await attempt();
-    if ("status" in result && result.status === "submission-failed" && result.acknowledgement === "unknown") {
-      setComposerNotice({ sessionId: visibleSessionId, text: "提交结果尚未确认，正在用同一标识核对。" });
-      result = await attempt();
-    }
-    if ("status" in result && result.status === "submission-failed") {
-      if (result.acknowledgement === "rejected") {
-        pendingStorage.removeItem(pendingKey);
-        submittedOptionsRef.current.delete(submissionId);
+      writePendingSubmission(visibleSessionId, { content: serialized, id: submissionId, draft: { sessionId: visibleSessionId, text, attachments: options.attachments?.map(({ previewUrl: _preview, ...attachment }) => attachment), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } });
+      const restore = (error: string, issues?: { attachmentIssue?: import("@actspace/shared").ChatAttachmentIssue; referenceIssue?: import("@actspace/shared").ComposerReferenceIssue }) => {
+        const draft = { id: Date.now(), sessionId: visibleSessionId!, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error, ...issues };
+        patchLocal(visibleSessionId!, { draft });
+      };
+      try {
+        const configured = await taskCommand({ sessionId: visibleSessionId, op: "configure", configuration: { model: visibleSessionId.startsWith("host:") ? remoteTarget.model : options.model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills } });
+        if (!configured) throw new Error("无法更新任务配置，草稿已保留。");
+      } catch (error) {
+        clearPendingSubmission(visibleSessionId);
+        taskQueue.forgetOptions(submissionId);
+        const message = error instanceof Error ? error.message : "无法更新任务配置，草稿已保留。";
+        restore(message); throw new Error(message);
       }
-      const message = result.acknowledgement === "unknown" ? "提交尚未确认，再次发送将核对同一次提交。" : result.message;
-      restore(result.attachmentIssue ? formatChatAttachmentIssue(result.attachmentIssue) : result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : message, result); throw new Error(message);
+      const attempt = async (): Promise<import("@actspace/shared/runtime-v2").TaskSubmissionResult> => {
+        try { return await tasksApi.submit({ ...submitted, submissionId }); }
+        catch { return { status: "submission-failed" as const, acknowledgement: "unknown" as const, message: "提交尚未确认，再次发送将核对同一次提交。" }; }
+      };
+      result = await attempt();
+      if ("status" in result && result.status === "submission-failed" && result.acknowledgement === "unknown") {
+        setComposerNotice({ sessionId: visibleSessionId, text: "提交结果尚未确认，正在用同一标识核对。" });
+        result = await attempt();
+      }
+      if ("status" in result && result.status === "submission-failed") {
+        if (result.acknowledgement === "rejected") {
+          clearPendingSubmission(visibleSessionId);
+          taskQueue.forgetOptions(submissionId);
+        }
+        const message = result.acknowledgement === "unknown" ? "提交尚未确认，再次发送将核对同一次提交。" : result.message;
+        restore(result.attachmentIssue ? formatChatAttachmentIssue(result.attachmentIssue) : result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : message, result); throw new Error(message);
+      }
+      clearPendingSubmission(visibleSessionId);
+    } finally {
+      const remaining = (inFlight.get(visibleSessionId) ?? 1) - 1;
+      if (remaining > 0) inFlight.set(visibleSessionId, remaining); else inFlight.delete(visibleSessionId);
     }
-    pendingStorage.removeItem(pendingKey);
-    draftsRef.current.delete(visibleSessionId);
-    if (activeSessionIdRef.current === visibleSessionId) setComposerDraftRestore(null);
+    patchLocal(visibleSessionId, { draft: undefined });
     if (activeSessionIdRef.current === visibleSessionId) setSendScrollRequestId(value => value + 1);
     // Receipt already proves acceptance; a failed refresh must not restore a sent draft.
-    await refreshTaskQueue(visibleSessionId).catch(console.error);
-    const snapshot = taskSnapshotsRef.current.get(visibleSessionId);
+    await refreshTaskQueue(visibleSessionId).catch(reportSessionFailure(visibleSessionId, QUEUE_REFRESH_FAILED));
+    const snapshot = taskQueue.snapshot(visibleSessionId);
     const acceptedTaskId = "task" in result ? result.task.taskId : null;
     if (resumeAfterAcceptance && snapshot?.paused && snapshot.tasks.some(task => task.taskId === acceptedTaskId && task.state === "pending")) {
       await taskCommand({ op: "resume", sessionId: visibleSessionId, revision: snapshot.revision });
     }
     return;
-  }, [remoteTarget, sessionRecord, selectedWorkspaceRoot, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, createSessionForInput, taskCommand, refreshTaskQueue]);
+  }, [remoteTarget, sessionRecord, selectedWorkspaceRoot, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, createSessionForInput, taskCommand, taskQueue, liveRuns, refreshTaskQueue, reportSessionFailure, patchLocal]);
 
   useEffect(() => {
     return eventsApi.hostsChanged(hosts => {
       const id = activeSessionIdRef.current;
+      // Host 断线期间的审批 / 队列事件收不到：重连后让它的后台会话在下一次列表刷新时重新补齐。
+      const connected = new Set(hosts.filter(host => host.state === "connected").map(host => host.hostId));
+      for (const hostId of connected) {
+        if (connectedHostIdsRef.current.has(hostId)) continue;
+        for (const item of sidebarSessionsRef.current) if (item.hostId === hostId && item.id !== id) hydratedSessionIdsRef.current.delete(item.id);
+      }
+      connectedHostIdsRef.current = connected;
       if (id?.startsWith("host:") && hosts.some(host => host.hostId === remoteTarget.hostId && host.state === "connected")) {
         void readSessionPage(id); void refreshTaskQueue(id); void refreshPendingApprovalStatuses([id]);
       }
@@ -1843,8 +989,8 @@ export function App() {
   const handleRetryCompaction = useCallback(() => {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
-    const composerState = composerStateBySession[sessionId];
-    const options = lastSendOptionsRef.current.get(sessionId) ?? {
+    const composerState = localStore.get(sessionId).composer;
+    const options = localStore.get(sessionId).lastSendOptions ?? {
       model: selectedChatModelId,
       mode: composerState?.mode ?? "agent",
       selectedSkills: composerState?.selectedSkills ?? [],
@@ -1853,11 +999,11 @@ export function App() {
     void handleSend("/compact", { ...options, attachments: undefined, fileReferences: undefined, responseAnnotations: undefined }, true).catch(error => {
       setComposerNotice({ sessionId, text: error instanceof Error ? error.message : "重试未完成，请检查队列状态。" });
     });
-  }, [composerStateBySession, handleSend, selectedChatModelId]);
+  }, [localStore, handleSend, selectedChatModelId]);
 
   const handleAbort = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
-    const run = sessionId ? sessionRunsRef.current.get(sessionId) : undefined;
+    const run = sessionId ? liveRuns.get(sessionId) : undefined;
     if (!run || !sessionId) return;
 
     const input: AbortAgentRunInput = {
@@ -1867,32 +1013,32 @@ export function App() {
 
     try {
       run.aborting = true;
-      refreshStreamingBlocks(sessionId);
+      liveRuns.refresh(sessionId);
       const aborted = await tasksApi.abort(input);
       if (!aborted) {
         run.aborting = false;
-        refreshStreamingBlocks(sessionId);
+        liveRuns.refresh(sessionId);
       }
     } catch (error) {
       console.error("Failed to abort turn", error);
       run.aborting = false;
-      refreshStreamingBlocks(sessionId);
+      liveRuns.refresh(sessionId);
     }
-  }, [refreshStreamingBlocks]);
+  }, [liveRuns]);
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
     if (!remoteTarget.hosts.length && !input.hostId) {
-      setComposerStateBySession(current => ({ ...current, __draft__: DEFAULT_COMPOSER_STATE }));
+      patchLocal(DRAFT_COMPOSER_KEY, { composer: DEFAULT_COMPOSER_STATE });
       const created = await createSessionForInput(input);
-      if (created) setComposerStateBySession(current => ({ ...current, [created.meta.id]: { ...DEFAULT_COMPOSER_STATE, mode: created.meta.agentMode ?? "agent" } }));
+      if (created) patchLocal(created.meta.id, { composer: { ...DEFAULT_COMPOSER_STATE, mode: created.meta.agentMode ?? "agent" } });
       return;
     }
-    setActiveSessionId(null); setSessionRecord(null); setHistoryBefore(null);
-    setComposerStateBySession(current => ({ ...current, __draft__: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" } }));
+    setActiveSessionId(null);
+    patchLocal(DRAFT_COMPOSER_KEY, { composer: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" } });
     remoteTarget.selectHost(input.hostId ?? null);
     if (input.workspaceId) remoteTarget.selectWorkspace(input.workspaceId);
     if (input.workspaceRoot) setSelectedWorkspaceRoot(input.workspaceRoot);
-  }, [remoteTarget.hosts.length, remoteTarget.selectHost, remoteTarget.selectWorkspace, setActiveSessionId, createSessionForInput]);
+  }, [remoteTarget.hosts.length, remoteTarget.selectHost, remoteTarget.selectWorkspace, setActiveSessionId, createSessionForInput, patchLocal]);
 
   const handleAddWorkspace = useCallback(async () => {
     try {
@@ -1942,8 +1088,7 @@ export function App() {
         console.error("Failed to refresh selected session approvals", error);
       });
 
-      setSessionRecord(null); setHistoryBefore(null);
-      const restored = await readSessionPage(sessionId, true)
+      const restored = await readSessionPage(sessionId)
       if (activeSessionIdRef.current !== sessionId) return;
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
         restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
@@ -2000,53 +1145,13 @@ export function App() {
     };
   }, [handleCreateSession, handleSelectSession, sessionBootstrapComplete]);
 
-  const persistedEvents = sessionRecord?.events ?? [];
-  const isRecoveredRun = selectedSessionId ? sessionRunsRef.current.get(selectedSessionId)?.recovered === true : false;
-  const persistedMessages = useMemo<MessageBlock[]>(() => {
-    const streamingAgentRunId = streamingBlocks.length > 0 && !isRecoveredRun ? activeAgentRunId : null;
-    const streamingTurnEventIds = streamingAgentRunId
-      ? new Set(
-          persistedEvents
-            .filter((event) => event.agentRunId === streamingAgentRunId)
-            .map((event) => event.id),
-        )
-      : null;
-    const fromRecord = sessionRecord?.messageBlocks;
-    if (fromRecord && fromRecord.length > 0) {
-      if (isRecoveredRun) {
-        const recoveredToolKeys = new Set(streamingBlocks.filter(block => block.id.includes(":tool:")).map(block => block.id));
-        return fromRecord.filter(block => !recoveredToolKeys.has(block.renderKey ?? block.id));
-      }
-      return streamingTurnEventIds
-        ? fromRecord.filter((block) => !streamingTurnEventIds.has(block.id) && !block.renderKey?.startsWith(`turn:${streamingAgentRunId}:`))
-        : fromRecord;
-    }
-
-    const visibleEvents = streamingAgentRunId
-      ? persistedEvents.filter((event) => event.agentRunId !== streamingAgentRunId)
-      : persistedEvents;
-    const fromEvents = createMessageBlocks(visibleEvents);
-    if (fromEvents.length > 0) return fromEvents;
-    return [];
-  }, [activeAgentRunId, persistedEvents, sessionRecord?.messageBlocks, streamingBlocks, isRecoveredRun]);
-
-  const messages = useMemo<MessageBlock[]>(() => {
-    // Recovery can supply both a durable user message and a Task-derived placeholder.
-    // Keep the durable block (including its metadata), matching identity rather than text.
-    const durableUserKeys = new Set(persistedMessages.filter(block => block.kind === "user").map(block => block.renderKey ?? block.id));
-    const visibleStreaming = streamingBlocks.filter(block => block.kind !== "user" || !durableUserKeys.has(block.renderKey ?? block.id));
-    const withStreaming = visibleStreaming.length === 0 ? persistedMessages : [...persistedMessages, ...visibleStreaming];
-    const merged = compactionFailure && !isStreaming ? [...withStreaming, compactionFailure] : withStreaming;
-    // 后台 bash 任务状态覆写：bash_task_update 事件在 turn 结束后仍会到达，
-    // 持久化块里的 backgrounded 状态以内存最新事件为准
-    if (Object.keys(bashTaskUpdates).length === 0) return merged;
-    return merged.map((block) => {
-      if (block.kind !== "bash" || !block.backgroundTaskId) return block;
-      const update = bashTaskUpdates[block.backgroundTaskId];
-      if (!update) return block;
-      return { ...block, backgroundStatus: update.status, exitCode: update.exitCode ?? block.exitCode };
-    });
-  }, [persistedMessages, streamingBlocks, bashTaskUpdates, compactionFailure, isStreaming]);
+  const persistedEvents = sessionRecord?.events ?? EMPTY_EVENTS;
+  // durable 与 live 按块的 runId 合并（14 S5），规则见 session/transcript.ts。
+  const messages = useMemo<MessageBlock[]>(() => mergeTranscript(
+    { blocks: sessionRecord?.messageBlocks, events: persistedEvents },
+    { blocks: streamingBlocks, runId: activeAgentRunId, recovered: isRecoveredRun },
+    { compactionFailure, isStreaming, bashUpdates: bashTaskUpdates },
+  ), [sessionRecord?.messageBlocks, persistedEvents, streamingBlocks, activeAgentRunId, isRecoveredRun, compactionFailure, isStreaming, bashTaskUpdates]);
   const isCompacting = streamingBlocks.some((block) => block.kind === "context_compaction" && block.status === "running");
 
   const contextSnapshot: ContextUsageSnapshot | null =
@@ -2056,40 +1161,29 @@ export function App() {
   const contextState: ContextState | null =
     sessionRecord?.contextState ?? null;
 
-  const visibleSessions = useMemo(() => {
-    if (!workspaceRegistry) return sessions;
-    const hiddenWorkspaceIds = new Set(
-      workspaceRegistry.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id),
-    );
-    const hiddenWorkspacePaths = new Set(
-      workspaceRegistry.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path),
-    );
-    return sessions.filter((session) =>
-      !hiddenWorkspaceIds.has(session.workspaceId ?? "") &&
-      !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
-    );
-  }, [sessions, workspaceRegistry]);
   const activeSessionId = selectedSessionId;
-  const messageQueueControls: MessageQueueControls = {
+  const steerBlockedReason = isCompacting
+    ? "压缩中不能插入，完成后会自动发送"
+    : activeSessionId && approvalPendingSessionIds.has(activeSessionId) ? "等待审批时不能插入" : null;
+  // 引用稳定，WorkbenchLayout / Composer 不随每次流式刷新重渲染队列托盘（14 T16）。
+  const messageQueueControls = useMemo<MessageQueueControls>(() => ({
     queue: messageQueue,
     running: isStreaming,
-    steerBlockedReason: isCompacting
-      ? "压缩中不能插入，完成后会自动发送"
-      : activeSessionId && approvalPendingSessionIds.has(activeSessionId) ? "等待审批时不能插入" : null,
+    steerBlockedReason,
     onSteer: handleSteerQueued,
     onUnsteer: (id) => void handleUnsteerQueued(id),
-    onRemove: (id) => { const snapshot = activeSessionId ? taskSnapshotsRef.current.get(activeSessionId) : undefined; if (activeSessionId && snapshot) void taskCommand({ op: "cancel", sessionId: activeSessionId, taskId: id, revision: snapshot.revision }).catch(console.error); },
-    onMoveUp: (id) => { const snapshot = activeSessionId ? taskSnapshotsRef.current.get(activeSessionId) : undefined; const index = messageQueue.items.findIndex(item => item.id === id); if (activeSessionId && snapshot && index > 0) void taskCommand({ op: "move", sessionId: activeSessionId, taskId: id, beforeTaskId: messageQueue.items[index - 1].id, revision: snapshot.revision }).catch(console.error); },
+    onRemove: (id) => { const snapshot = activeSessionId ? taskQueue.snapshot(activeSessionId) : undefined; if (activeSessionId && snapshot) void taskCommand({ op: "cancel", sessionId: activeSessionId, taskId: id, revision: snapshot.revision }).catch(reportSessionFailure(activeSessionId, QUEUE_COMMAND_FAILED)); },
+    onMoveUp: (id) => { const snapshot = activeSessionId ? taskQueue.snapshot(activeSessionId) : undefined; const index = messageQueue.items.findIndex(item => item.id === id); if (activeSessionId && snapshot && index > 0) void taskCommand({ op: "move", sessionId: activeSessionId, taskId: id, beforeTaskId: messageQueue.items[index - 1].id, revision: snapshot.revision }).catch(reportSessionFailure(activeSessionId, QUEUE_COMMAND_FAILED)); },
     onEdit: handleEditQueued,
     onResume: handleResumeQueue,
-  };
-  const composerStateKey = activeSessionId ?? "__draft__";
-  const storedComposerState = composerStateBySession[composerStateKey] ?? DEFAULT_COMPOSER_STATE;
+  }), [messageQueue, isStreaming, steerBlockedReason, handleSteerQueued, handleUnsteerQueued, activeSessionId, taskQueue, taskCommand, handleEditQueued, handleResumeQueue, reportSessionFailure]);
+  const composerStateKey = activeSessionId ?? DRAFT_COMPOSER_KEY;
+  const storedComposerState = useSessionLocalState(localStore, composerStateKey, selectComposerState) ?? DEFAULT_COMPOSER_STATE;
   const projectedMode = activeSessionId
     ? sessionRecord?.meta.id === activeSessionId ? sessionRecord.meta.agentMode : visibleSessions.find((session) => session.id === activeSessionId)?.agentMode
     : undefined;
   const activeComposerState = { ...storedComposerState, mode: projectedMode ?? storedComposerState.mode };
-  const handleComposerModeChange = async (mode: ComposerMode) => {
+  const handleComposerModeChange = useCallback(async (mode: ComposerMode) => {
     const sessionId = activeSessionIdRef.current;
     if (sessionId && (busySessionIds.has(sessionId) || modeChangePendingRef.current.has(sessionId))) throw new Error("会话正在执行，请等待任务结束后切换模式");
     if (sessionId) modeChangePendingRef.current.add(sessionId);
@@ -2122,32 +1216,15 @@ export function App() {
         setSessions((current) => current.map((session) => session.id === sessionId
           ? { ...session, agentMode: result.mode ?? mode, agentModeRevision: result.revision }
           : session));
-      } else if (sessionId) {
-        setSessionRecord((current) => current?.meta.id === sessionId
-          ? { ...current, meta: { ...current.meta, agentMode: mode, agentModeRevision: (current.meta.agentModeRevision ?? 0) + 1 } }
-          : current);
-        setSessions((current) => current.map((session) => session.id === sessionId ? { ...session, agentMode: mode } : session));
       }
-      setComposerStateBySession((current) => ({
-        ...current,
-        [composerStateKey]: {
-          mode,
-          selectedSkills: current[composerStateKey]?.selectedSkills ?? [],
-        },
-      }));
+      localStore.update(composerStateKey, (state) => ({ ...state, composer: { mode, selectedSkills: state.composer?.selectedSkills ?? [] } }));
     } finally {
       if (sessionId) modeChangePendingRef.current.delete(sessionId);
     }
-  };
-  const handleSelectedSkillsChange = (selectedSkills: string[]) => {
-    setComposerStateBySession((current) => ({
-      ...current,
-      [composerStateKey]: {
-        mode: current[composerStateKey]?.mode ?? "agent",
-        selectedSkills,
-      },
-    }));
-  };
+  }, [busySessionIds, sessionRecord, visibleSessions, readSessionPage, localStore, composerStateKey]);
+  const handleSelectedSkillsChange = useCallback((selectedSkills: string[]) => {
+    localStore.update(composerStateKey, (state) => ({ ...state, composer: { mode: state.composer?.mode ?? "agent", selectedSkills } }));
+  }, [localStore, composerStateKey]);
   const isSessionReady = Boolean(sessionRecord || streamingBlocks.length > 0 || sessionBootstrapComplete);
   const title = getSessionTitle(sessionRecord, visibleSessions, activeSessionId);
   const workspaceOptions = useMemo(
@@ -2246,13 +1323,14 @@ export function App() {
     }
 
     try {
-      const forked = await forkSession({ sessionId });
+      const projection = await sessionsApi.fork({ sessionId });
+      sessionStore.applyEnvelope(projection);
+      const forked = projectChatWindow(projection);
       const refreshed = await readSidebarSessions();
       setSessions(refreshed);
       await refreshWorkspaces();
 
       setActiveSessionId(forked.meta.id);
-      setSessionRecord(forked);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
         forked.meta.worktree?.sourceWorkspaceRoot ?? forked.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
       ));
@@ -2288,17 +1366,6 @@ export function App() {
       const nextTitle = title.trim();
       if (!sessionId || !nextTitle) return;
 
-      const updateSessionTitle = () => {
-        setSessions((current) =>
-          current.map((session) => (session.id === sessionId ? { ...session, title: nextTitle } : session)),
-        );
-        setSessionRecord((current) =>
-          current?.meta.id === sessionId
-            ? { ...current, meta: { ...current.meta, title: nextTitle } }
-            : current,
-        );
-      };
-
       try {
         const result = await sessionsApi.rename({ sessionId, title: nextTitle });
         if (!result.ok) {
@@ -2308,11 +1375,6 @@ export function App() {
 
         const refreshed = await readSidebarSessions();
         setSessions(refreshed);
-        setSessionRecord((current) =>
-          current?.meta.id === sessionId
-            ? { ...current, meta: { ...current.meta, title: nextTitle } }
-            : current,
-        );
       } catch (error) {
         console.error("Failed to rename session", error);
       }
@@ -2328,6 +1390,7 @@ export function App() {
       try {
         const result = await sessionsApi.archive({ sessionId, archived: true });
         if (!result.ok) throw new Error(result.error ?? "Archive request failed");
+        evictSession(sessionId);
       } catch (error) {
         console.error("Failed to archive session", error);
         try {
@@ -2337,7 +1400,7 @@ export function App() {
         }
       }
     },
-    [activeSessionId, readSidebarSessions],
+    [activeSessionId, readSidebarSessions, evictSession],
   );
 
   const handleOpenWorkspace = useCallback(async (workspaceId: string) => {
@@ -2382,12 +1445,14 @@ export function App() {
     }
 
     const result = await sessionsApi.archiveMany({ sessionIds: targetSessionIds });
+    const failed = new Set(result.ok ? [] : result.failedSessionIds);
+    for (const sessionId of targetSessionIds) if (!failed.has(sessionId)) evictSession(sessionId);
     const refreshed = await readSidebarSessions();
     setSessions(refreshed);
     if (!result.ok) {
       console.error("Some workspace sessions could not be archived", result.failedSessionIds);
     }
-  }, [activeSessionId, approvalPendingSessionIds, busySessionIds, createSessionForInput, handleSelectSession, sessions, workspaceRegistry]);
+  }, [activeSessionId, approvalPendingSessionIds, busySessionIds, createSessionForInput, handleSelectSession, sessions, workspaceRegistry, evictSession]);
 
   const handleRemoveWorkspace = useCallback(async (workspaceId: string, workspaceRoot?: string) => {
     if (!workspaceRegistry || workspaceId === workspaceRegistry.defaultWorkspaceId) return;
@@ -2411,7 +1476,6 @@ export function App() {
         setActiveSessionId(fallback.id);
         const restored = await readSessionPage(fallback.id);
         if (!restored || activeSessionIdRef.current !== fallback.id) return;
-        setSessionRecord(restored);
         setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
           restored.meta.workspaceRoot ?? fallback.workspaceRoot ?? bootstrapState?.workspaceRoot,
         ));
@@ -2426,6 +1490,7 @@ export function App() {
       console.error("Failed to remove workspace from sidebar", result.error);
       return;
     }
+    for (const sessionId of targetSessionIds) evictSession(sessionId);
     await refreshWorkspaces();
     if (normalizeWorkspaceRoot(selectedWorkspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) {
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
@@ -2433,7 +1498,7 @@ export function App() {
         bootstrapState?.workspaceRoot,
       ));
     }
-  }, [activeSessionId, bootstrapState?.workspaceRoot, createSessionForInput, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry]);
+  }, [activeSessionId, bootstrapState?.workspaceRoot, createSessionForInput, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry, evictSession]);
 
   const handleArchivedSessionsChange = useCallback(async () => {
     try {
@@ -2452,49 +1517,37 @@ export function App() {
     void refreshReviewSummary();
   }, [refreshReviewSummary]);
 
+  const retryList = useCallback(() => setListRetry(n => n + 1), []);
+  const retryMessages = useCallback(() => { if (activeSessionIdRef.current) void readSessionPage(activeSessionIdRef.current); }, [readSessionPage]);
+  // 四个 Context value 用 useShallowStable 而不是 useMemo：工厂闭包会把 messages、contextState 等放进 App 的渲染作用域，
+  // 旧作用域被 useCallback 链留住时，已归档会话的数据就释放不掉。
+  const browse = useShallowStable<SessionBrowseState>({
+    groups: browseGroups, listLoading, listError, retryList, loadMore: loadMoreSessions, messageLoading, messageError, retryMessages,
+    hasEarlier: historyBefore !== null, earlierLoading, earlierError, loadEarlier: loadEarlierMessages,
+  });
+  const activeSession = useShallowStable<ActiveSessionValue>({
+    sessionId: activeSessionId, title, messages, contextSnapshot, contextState, isStreaming, isAborting, isCompacting, isSessionReady,
+    sendScrollRequestId, composerFocusRequestId, onSend: handleSend, onAbort: handleAbort, onRetryCompaction: handleRetryCompaction,
+  });
+  const drafts = useSessionDrafts(localStore, activeSessionId);
+  const activeComposerNotice = composerNotice && composerNotice.sessionId === activeSessionId ? composerNotice.text : null;
+  const composer = useShallowStable<ComposerContextValue>({
+    ...drafts, messageQueue: messageQueueControls, composerNotice: activeComposerNotice, defaultModelId, selectedModelId: selectedChatModelId,
+    onSelectedModelChange: handleSelectedChatModelChange, composerMode: activeComposerState.mode, onComposerModeChange: handleComposerModeChange,
+    selectedSkills: activeComposerState.selectedSkills, onSelectedSkillsChange: handleSelectedSkillsChange, models: usableChatModels, draftRestore: composerDraftRestore,
+  });
+  const sessionActions = useShallowStable<SessionActionsValue>({
+    onNewSession: handleCreateSession, onAddWorkspace: handleAddWorkspace, onSelectSession: handleSelectSession, onTogglePin: handleTogglePin,
+    onRenameSession: handleRenameSession, onCopySessionId: handleCopySessionId, onCopyTranscript: handleCopyTranscript, onForkSession: handleForkSession,
+    onArchiveSession: handleArchiveSession, onOpenWorkspace: handleOpenWorkspace, onArchiveWorkspace: handleArchiveWorkspace, onRemoveWorkspace: handleRemoveWorkspace,
+  });
+
   return (
-    <SessionProjectionProvider sessionId={activeSessionId} store={sessionStore}>
-      <SessionBrowseContext.Provider value={{ groups: browseGroups, listLoading, listError, retryList: () => setListRetry(n => n + 1), loadMore: loadMoreSessions, messageLoading, messageError, retryMessages: () => { if (activeSessionIdRef.current) void readSessionPage(activeSessionIdRef.current); }, hasEarlier: historyBefore !== null, earlierLoading, earlierError, loadEarlier: loadEarlierMessages }}>
-      <RightPanelProvider>
-        <WorkbenchLayout
+    <AppProviders sessionStore={sessionStore} browse={browse} localStore={localStore} activeSession={activeSession} composer={composer} sessionActions={sessionActions}>
+      <WorkbenchLayout
         sessions={visibleSessions}
-        activeSessionId={activeSessionId}
-        title={title}
-        messages={messages}
-        contextSnapshot={contextSnapshot}
-        contextState={contextState}
-        isStreaming={isStreaming}
-        isAborting={isAborting}
-        isCompacting={isCompacting}
-        messageQueue={messageQueueControls}
-        composerNotice={composerNotice && composerNotice.sessionId === activeSessionId ? composerNotice.text : null}
-        onRetryCompaction={handleRetryCompaction}
-        sendScrollRequestId={sendScrollRequestId}
-        composerFocusRequestId={composerFocusRequestId}
         busySessionIds={busySessionIds}
         sessionStatuses={sessionStatuses}
-        onSend={handleSend}
-        onAbort={handleAbort}
-        onNewSession={handleCreateSession}
-        onAddWorkspace={handleAddWorkspace}
-        onSelectSession={handleSelectSession}
-        onTogglePin={handleTogglePin}
-        onRenameSession={handleRenameSession}
-        onCopySessionId={handleCopySessionId}
-        onCopyTranscript={handleCopyTranscript}
-        onForkSession={handleForkSession}
-        onArchiveSession={handleArchiveSession}
-        onOpenWorkspace={handleOpenWorkspace}
-        onArchiveWorkspace={handleArchiveWorkspace}
-        onRemoveWorkspace={handleRemoveWorkspace}
-        isSessionReady={isSessionReady}
-        defaultModelId={defaultModelId}
-        selectedModelId={selectedChatModelId}
-        onSelectedModelChange={handleSelectedChatModelChange}
-        composerMode={activeComposerState.mode}
-        onComposerModeChange={handleComposerModeChange}
-        selectedSkills={activeComposerState.selectedSkills}
-        onSelectedSkillsChange={handleSelectedSkillsChange}
         onSettingsChange={handleSettingsChange}
         onArchivedSessionsChange={handleArchivedSessionsChange}
         workspaces={workspaceRegistry?.items.filter((workspace) => !workspace.hidden)}
@@ -2502,15 +1555,11 @@ export function App() {
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={setSelectedWorkspaceRoot}
         executionContext={executionContext}
-        draftRestore={composerDraftRestore}
         getSessionPreview={getSessionPreview}
         reviewSummary={reviewSummary}
         onReviewChanged={handleReviewChanged}
-        models={usableChatModels}
-        />
-        <ShutdownOverlay />
-      </RightPanelProvider>
-      </SessionBrowseContext.Provider>
-    </SessionProjectionProvider>
+      />
+      <ShutdownOverlay />
+    </AppProviders>
   );
 }

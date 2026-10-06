@@ -1,4 +1,4 @@
-import type { MessageBlock, RuntimeStreamEvent, SessionEvent, SessionRecord, ToolUiPreview } from "@actspace/shared";
+import type { MessageBlock, RuntimeStreamEvent, SessionEvent, ToolUiPreview } from "@actspace/shared";
 
 export type ToolEntry = {
   toolName: string;
@@ -54,6 +54,4 @@ export type SessionRunState = {
   state: StreamingState;
   userBlock: MessageBlock | null;
   aborting: boolean;
-  record: SessionRecord | null;
-  historyBefore: number | null;
 };

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDesktopSessionBridge } from "../session/desktop-session-bridge";
 import { projectionFixture } from "./projection-fixture";
 import type { RuntimeV2DesktopSessionProjection, RuntimeV2LiveEvent, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
@@ -61,5 +61,71 @@ describe("Desktop Session event transport", () => {
     const pending = createDesktopSessionBridge({ getSessionProjectionSnapshot: () => new Promise(done => { resolve = done; }), onSessionLiveEvent: () => () => {} });
     const loading = pending.open("s"); pending.dispose(); resolve(projectionFixture("s")); await loading;
     expect(pending.store.get("s").snapshot).toBeNull();
+  });
+});
+
+// 14 T19：live 事件触发的 refresh 失败后按 1s、2s、4s 退避重试，错误经 cell 的 status/error 暴露。
+describe("Desktop Session refresh retries", () => {
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  function gapBridge(read: (attempt: number) => Promise<RuntimeV2DesktopSessionProjection>) {
+    let emit!: (event: RuntimeV2LiveEvent) => void; let reads = 0;
+    const bridge = createDesktopSessionBridge({
+      getSessionProjectionSnapshot: () => read(reads++),
+      onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; },
+    });
+    return { bridge, emit: (event: RuntimeV2LiveEvent) => emit(event), reads: () => reads };
+  }
+  const baseline = () => Promise.resolve(projectionFixture("s", 0, [event(0)]));
+  const repaired = () => Promise.resolve(projectionFixture("s", 2, [event(0), event(1), event(2)]));
+
+  it("sets the cell error on a failed refresh and clears it once a retry succeeds", async () => {
+    vi.useFakeTimers();
+    const { bridge, emit, reads } = gapBridge((attempt) => attempt === 0 ? baseline() : attempt === 1 ? Promise.reject(new Error("IPC 断开")) : repaired());
+    bridge.start(); await bridge.open("s");
+    emit(update(2));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reads()).toBe(2);
+    expect(bridge.store.get("s")).toMatchObject({ status: "error", error: "IPC 断开" });
+
+    await vi.advanceTimersByTimeAsync(999);
+    expect(reads()).toBe(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(reads()).toBe(3);
+    expect(bridge.store.get("s")).toMatchObject({ status: "ready", error: null });
+    expect(bridge.store.get("s").window?.throughJournalSeq).toBe(2);
+    bridge.dispose();
+  });
+
+  it("gives up after three retries spaced 1s, 2s, 4s and leaves the error on the cell", async () => {
+    vi.useFakeTimers();
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { bridge, emit, reads } = gapBridge((attempt) => attempt === 0 ? baseline() : Promise.reject(new Error("Host 不可用")));
+    bridge.start(); await bridge.open("s");
+    emit(update(2));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reads()).toBe(2);
+    for (const [delay, expected] of [[1000, 3], [2000, 4], [4000, 5]] as const) {
+      await vi.advanceTimersByTimeAsync(delay - 1);
+      expect(reads()).toBe(expected - 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(reads()).toBe(expected);
+    }
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(reads()).toBe(5);
+    expect(bridge.store.get("s")).toMatchObject({ status: "error", error: "Host 不可用" });
+    expect(error).toHaveBeenCalledWith("Session refresh failed after retries", expect.any(Error));
+    bridge.dispose();
+  });
+
+  it("stops retrying once disposed", async () => {
+    vi.useFakeTimers();
+    const { bridge, emit, reads } = gapBridge((attempt) => attempt === 0 ? baseline() : Promise.reject(new Error("断开")));
+    bridge.start(); await bridge.open("s");
+    emit(update(2));
+    await vi.advanceTimersByTimeAsync(0);
+    bridge.dispose();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(reads()).toBe(2);
   });
 });

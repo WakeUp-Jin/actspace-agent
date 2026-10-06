@@ -1,9 +1,11 @@
 import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
-import type { MessageQueueControls } from "./composer/MessageQueueTray";
-import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, ResponseAnnotationReference, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, MessageBlock, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
 import type { PermissionMode } from "@actspace/shared/runtime-v2";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useActiveSession } from "../session/active-session-context";
+import { useSessionActions } from "../session/session-actions-context";
+import { useComposerContext } from "./composer/composer-context";
 import { Check, ChevronDown, FlaskConical, ShieldCheck } from "lucide-react";
 import { ConversationView } from "./ConversationView";
 import { PlaceholderView } from "./PlaceholderView";
@@ -11,12 +13,12 @@ import { RightPanel } from "./RightPanel";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { useAgentEditSignals } from "./right-panel/useFileFreshness";
 import { RightPanelObjectMenu } from "./right-panel/RightPanelObjectMenu";
-import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
+import { Sidebar, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
 import { WindowChromeBar } from "./WindowChromeBar";
 import type { SessionMainView } from "./SessionViewToggle";
 import { WorkspaceChromeControls } from "./workspace/WorkspaceChromeControls";
-import type { ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
+import type { ComposerExecutionContext, ComposerReviewSummary, ComposerWorkspaceOption } from "./Composer";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages, selectTrajectory } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
@@ -97,43 +99,8 @@ function loadStoredLayout(): ResolvedLayout {
 
 export function WorkbenchLayout({
   sessions,
-  activeSessionId,
-  title,
-  messages,
-  contextSnapshot,
-  contextState,
-  isStreaming = false,
-  isAborting = false,
-  isCompacting = false,
-  messageQueue,
-  composerNotice = null,
-  onRetryCompaction,
-  sendScrollRequestId = 0,
-  composerFocusRequestId = 0,
   busySessionIds,
   sessionStatuses,
-  onSend,
-  onAbort,
-  onNewSession,
-  onAddWorkspace,
-  onSelectSession,
-  onTogglePin,
-  onRenameSession,
-  onCopySessionId,
-  onCopyTranscript,
-  onForkSession,
-  onArchiveSession,
-  onOpenWorkspace,
-  onArchiveWorkspace,
-  onRemoveWorkspace,
-  isSessionReady = true,
-  defaultModelId,
-  selectedModelId,
-  onSelectedModelChange,
-  composerMode,
-  onComposerModeChange,
-  selectedSkills,
-  onSelectedSkillsChange,
   onSettingsChange,
   onArchivedSessionsChange,
   workspaces,
@@ -141,51 +108,13 @@ export function WorkbenchLayout({
   selectedWorkspaceRoot,
   onSelectWorkspace,
   executionContext,
-  draftRestore,
   getSessionPreview,
   reviewSummary,
   onReviewChanged,
-  models,
 }: {
   sessions: SessionListItem[];
-  activeSessionId: string | null;
-  title: string;
-  messages: MessageBlock[];
-  contextSnapshot: ContextUsageSnapshot | null;
-  contextState?: ContextState | null;
-  isStreaming?: boolean;
-  isAborting?: boolean;
-  isCompacting?: boolean;
-  messageQueue?: MessageQueueControls;
-  composerNotice?: string | null;
-  onRetryCompaction?: () => void;
-  sendScrollRequestId?: number;
-  composerFocusRequestId?: number;
   busySessionIds?: Set<string>;
   sessionStatuses?: Record<string, SessionUiStatusKind>;
-  onSend?: (text: string, options: ComposerSendOptions) => void;
-  onAbort?: () => void;
-  onNewSession?: (input?: NewSessionInput) => void;
-  onAddWorkspace?: () => void;
-  onSelectSession?: (sessionId: string) => void;
-  onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
-  onRenameSession?: (sessionId: string, title: string) => void;
-  onCopySessionId?: (sessionId: string) => void;
-  onCopyTranscript?: (sessionId: string) => void;
-  onForkSession?: (sessionId: string) => void;
-  onArchiveSession?: (sessionId: string) => void;
-  onOpenWorkspace?: (workspaceId: string) => void;
-  onArchiveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
-  onRemoveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
-  isSessionReady?: boolean;
-  defaultModelId?: ModelSelectionId;
-  selectedModelId?: ModelSelectionId;
-  onSelectedModelChange?: (modelId: ModelSelectionId) => void;
-  composerMode?: ComposerMode;
-  onComposerModeChange?: (mode: ComposerMode) => void | Promise<void>;
-  selectedSkills?: string[];
-  onSelectedSkillsChange?: (skills: string[]) => void;
-  models?: UsableModelView[];
   onSettingsChange?: (settings: AppSettings) => void;
   onArchivedSessionsChange?: () => void;
   workspaces?: WorkspaceEntry[];
@@ -193,11 +122,13 @@ export function WorkbenchLayout({
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
   executionContext?: ComposerExecutionContext;
-  draftRestore?: ComposerDraftRestore | null;
   getSessionPreview?: SessionPreviewResolver;
   reviewSummary?: ComposerReviewSummary | null;
   onReviewChanged?: () => void;
 }) {
+  const { sessionId: activeSessionId, title, messages, contextSnapshot, contextState, isStreaming, isSessionReady, onSend } = useActiveSession();
+  const { composerMode, selectedModelId, defaultModelId, selectedSkills } = useComposerContext();
+  const { onSelectSession } = useSessionActions();
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(() =>
     typeof window === "undefined" ? 0 : window.innerWidth,
@@ -245,26 +176,6 @@ export function WorkbenchLayout({
   const [sessionNavigationPending, setSessionNavigationPending] = useState(false);
   const [, setSessionHistoryVersion] = useState(0);
   const reviewTabRefreshCounterRef = useRef(0);
-  const composerDraftsRef = useRef(new Map<string, string>());
-  const draftKey = activeSessionId ?? "__draft__";
-  const readDraft = useCallback<ComposerDraftReader>((key) => composerDraftsRef.current.get(key) ?? "", []);
-  const writeDraft = useCallback<ComposerDraftWriter>((key, text) => {
-    if (text.length === 0) {
-      composerDraftsRef.current.delete(key);
-      return;
-    }
-    composerDraftsRef.current.set(key, text);
-  }, []);
-  // 回复批注草稿和文字草稿一样按会话隔离，只存在内存里。
-  const annotationDraftsRef = useRef(new Map<string, ResponseAnnotationReference[]>());
-  const readAnnotationDraft = useCallback((key: string) => annotationDraftsRef.current.get(key) ?? [], []);
-  const writeAnnotationDraft = useCallback((key: string, annotations: readonly ResponseAnnotationReference[]) => {
-    if (annotations.length === 0) {
-      annotationDraftsRef.current.delete(key);
-      return;
-    }
-    annotationDraftsRef.current.set(key, [...annotations]);
-  }, []);
 
   useEffect(() => {
     setSessionMainView(activeSessionId ? sessionViewByIdRef.current.get(activeSessionId) ?? "chat" : "chat");
@@ -562,43 +473,17 @@ export function WorkbenchLayout({
   } else {
     mainContent = (
       <ConversationView
-        messages={messages}
         contextSnapshot={effectiveContextSnapshot}
         contextState={effectiveContextState}
         durableSurfaceMessageCount={projectedSurfaceMessages.length > 0 ? projectedSurfaceMessages.length : undefined}
         composerPhase={projectedComposer?.phase}
-        sessionId={activeSessionId}
-        isStreaming={isStreaming}
-        isAborting={isAborting}
-        isCompacting={isCompacting}
-        messageQueue={messageQueue}
-        composerNotice={composerNotice}
-        onRetryCompaction={onRetryCompaction}
-        sendScrollRequestId={sendScrollRequestId}
-        composerFocusRequestId={composerFocusRequestId}
-        onSend={onSend}
-        onAbort={onAbort}
         isSessionReady={effectiveIsSessionReady}
-        defaultModelId={defaultModelId}
-        selectedModelId={selectedModelId}
-        onSelectedModelChange={onSelectedModelChange}
-        composerMode={composerMode}
-        onComposerModeChange={onComposerModeChange}
-        selectedSkills={selectedSkills}
-        onSelectedSkillsChange={onSelectedSkillsChange}
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={onSelectWorkspace}
         executionContext={executionContext}
-        draftRestore={draftRestore}
-        draftKey={draftKey}
-        readDraft={readDraft}
-        writeDraft={writeDraft}
-        readAnnotationDraft={readAnnotationDraft}
-        writeAnnotationDraft={writeAnnotationDraft}
         reviewSummary={composerMode === "chat" || executionContext?.remote?.hostId ? null : reviewSummary}
         onOpenReview={composerMode === "chat" || executionContext?.remote?.hostId ? undefined : openReviewTab}
-        models={models}
         activeView={sessionMainView}
         trajectory={projectedTrajectory}
         permissionControl={permissionControl}
@@ -665,18 +550,6 @@ export function WorkbenchLayout({
       busySessionIds={busySessionIds}
       sessionStatuses={sessionStatuses}
       onToggleMode={toggleSidebarMode}
-      onNewSession={onNewSession}
-      onAddWorkspace={onAddWorkspace}
-      onSelectSession={onSelectSession}
-      onTogglePin={onTogglePin}
-      onRename={onRenameSession}
-      onCopySessionId={onCopySessionId}
-      onCopyTranscript={onCopyTranscript}
-      onFork={onForkSession}
-      onArchive={onArchiveSession}
-      onOpenWorkspace={onOpenWorkspace}
-      onArchiveWorkspace={onArchiveWorkspace}
-      onRemoveWorkspace={onRemoveWorkspace}
       onSelectView={handleSelectView}
     />
   );

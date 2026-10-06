@@ -16,6 +16,11 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { projectRecord } from "./helpers/session-records";
+import { transcriptShadow } from "./helpers/transcript-shadow";
+
+// 14 T15：每次 durable / live 合并都与旧实现对照，不一致就让用例失败（见 helpers/transcript-shadow.ts）。
+vi.mock("../session/transcript", async (importOriginal) => (await import("./helpers/transcript-shadow")).shadowTranscript(await importOriginal()));
+afterEach(() => { expect(transcriptShadow.mismatches.splice(0)).toEqual([]); });
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
@@ -144,7 +149,8 @@ function setupQueueFixture() {
     schedule(sessionId);
   };
   const sentTexts = () => startExecution.mock.calls.map(([input]) => input.userInput);
-  return { records, pending, startExecution, submitTask, executeCompaction, designateSupplement, clearDesignation, abort, event, finish, sentTexts, nextSeq: () => ++seq };
+  const seedTasks = (id: string, tasks: TaskSnapshot["tasks"]) => { states.set(id, { ...state(id), tasks }); };
+  return { records, pending, startExecution, submitTask, taskCommand, seedTasks, executeCompaction, designateSupplement, clearDesignation, abort, event, finish, sentTexts, nextSeq: () => ++seq };
 }
 
 function renderApp() {
@@ -253,8 +259,118 @@ describe("App message queue", () => {
     await screen.findByText("单个文件不能超过 20 MiB。");
     expect(fixture.submitTask).toHaveBeenCalledTimes(2);
     expect(screen.getByLabelText("消息输入框")).toHaveValue("oversized draft");
-    expect(sessionStorage.getItem("actspace:pending-submission:queue-a")).toBeNull();
+    expect(localStorage.getItem("actspace:pending-submission:queue-a")).toBeNull();
     expect(screen.queryByText("提交结果尚未确认，正在用同一标识核对。")).not.toBeInTheDocument();
+  });
+
+  describe("pending submission recovery (14 T20)", () => {
+    const KEY = "actspace:pending-submission:queue-a";
+    const unknown = { status: "submission-failed", acknowledgement: "unknown" } as never;
+    const seedRecord = (id: string, text: string) => localStorage.setItem(KEY, JSON.stringify({
+      content: JSON.stringify({ sessionId: "queue-a", userInput: text }), id, createdAt: new Date().toISOString(), draft: { sessionId: "queue-a", text },
+    }));
+
+    it("restores an unconfirmed local submission as a draft after remount without resending it", async () => {
+      const fixture = setupQueueFixture();
+      const view = renderApp(); await startFirstRun(fixture);
+      fixture.submitTask.mockResolvedValueOnce(unknown).mockResolvedValueOnce(unknown);
+      await queueText("maybe sent");
+      await screen.findByText("提交尚未确认，再次发送将核对同一次提交。");
+      const record = JSON.parse(localStorage.getItem(KEY)!);
+      expect(record.draft.text).toBe("maybe sent");
+      view.unmount();
+      fixture.submitTask.mockClear();
+
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("maybe sent"));
+      expect(screen.getByText("上次提交尚未确认，再次发送将核对同一次提交。")).toBeInTheDocument();
+      expect(fixture.taskCommand).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "queue-a", op: "snapshot" }));
+      expect(fixture.submitTask).not.toHaveBeenCalled();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
+    });
+
+    it("only clears the record when the task snapshot already holds the same submission", async () => {
+      const fixture = setupQueueFixture();
+      fixture.seedTasks("queue-a", [{ taskId: "sub-1", submissionId: "sub-1", content: { kind: "composer-task", original: { userInput: "landed" }, prepared: "landed" }, acceptedSeq: 1, state: "completed", targetRunId: null, runId: null, continuationOf: null }] as TaskSnapshot["tasks"]);
+      seedRecord("sub-1", "landed");
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+      expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
+      expect(fixture.submitTask).not.toHaveBeenCalled();
+    });
+
+    it("falls back to restoring the draft when the snapshot cannot be read", async () => {
+      const fixture = setupQueueFixture();
+      seedRecord("sub-2", "offline draft");
+      const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      fixture.taskCommand.mockRejectedValue(new Error("IPC 断开"));
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("offline draft"));
+      expect(error).toHaveBeenCalledWith("Failed to check pending submission", expect.any(Error));
+      expect(fixture.submitTask).not.toHaveBeenCalled();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
+      error.mockRestore();
+    });
+
+    // 复核发现：恢复要等一次快照查询。期间用户开始发送或已经输入了内容，都不能再把记录恢复进输入框。
+    const holdSnapshots = (fixture: ReturnType<typeof setupQueueFixture>) => {
+      const original = fixture.taskCommand.getMockImplementation()!;
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      fixture.taskCommand.mockImplementation(async (input: TaskCommand) => {
+        if (input.op === "snapshot") await gate;
+        return original(input);
+      });
+      return () => act(async () => { release(); await Promise.resolve(); });
+    };
+
+    it("does not restore the record while the same content is being sent", async () => {
+      const fixture = setupQueueFixture();
+      seedRecord("sub-4", "in flight");
+      const releaseSnapshots = holdSnapshots(fixture);
+      const submit = fixture.submitTask.getMockImplementation()!;
+      let releaseSubmit!: () => void;
+      const submitGate = new Promise<void>((resolve) => { releaseSubmit = resolve; });
+      fixture.submitTask.mockImplementationOnce(async (input: SubmitTaskInput) => { await submitGate; return submit(input); });
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await userEvent.type(screen.getByLabelText("消息输入框"), "in flight");
+      await userEvent.click(screen.getByLabelText("发送消息"));
+      await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledTimes(1));
+      expect(fixture.submitTask.mock.calls[0]![0].submissionId).toBe("sub-4");
+      await releaseSnapshots();
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+      await act(async () => { releaseSubmit(); await Promise.resolve(); });
+      await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+      expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
+    });
+
+    it("keeps what the user typed while the snapshot was being checked", async () => {
+      const fixture = setupQueueFixture();
+      seedRecord("sub-5", "old draft");
+      const releaseSnapshots = holdSnapshots(fixture);
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await userEvent.type(screen.getByLabelText("消息输入框"), "my own words");
+      await releaseSnapshots();
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("my own words");
+      expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
+      expect(fixture.submitTask).not.toHaveBeenCalled();
+    });
+
+    it("reuses the recorded submissionId when the restored draft is sent unchanged", async () => {
+      const fixture = setupQueueFixture();
+      seedRecord("sub-3", "send again");
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("send again"));
+      await userEvent.click(screen.getByLabelText("发送消息"));
+      await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledTimes(1));
+      expect(fixture.submitTask.mock.calls[0]![0].submissionId).toBe("sub-3");
+      await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
+    });
   });
 
   it("steers a queued message into the running turn and shows it where it was read", async () => {

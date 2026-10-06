@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
-import { ConversationView } from "../components/ConversationView";
+import { TestConversationView } from "./helpers/workbench";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { setupBridge } from "./helpers/bridge";
@@ -80,7 +80,7 @@ function renderConversation(inputMessages: MessageBlock[] = messages) {
   return render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider>
-        <ConversationView messages={inputMessages} contextSnapshot={null} sessionId="session-1" />
+        <TestConversationView messages={inputMessages} contextSnapshot={null} sessionId="session-1" />
       </RightPanelProvider>
     </TooltipProvider>,
   );
@@ -94,7 +94,7 @@ describe("ConversationView tooltips", () => {
     };
     const view = (active: boolean, blocks: MessageBlock[]) => (
       <TooltipProvider><RightPanelProvider>
-        <ConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
+        <TestConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
       </RightPanelProvider></TooltipProvider>
     );
     const { rerender } = render(view(true, [messages[0], thinking]));
@@ -326,7 +326,7 @@ describe("ConversationView tooltips", () => {
 it("hides the trajectory composer without losing the draft and keeps Stop available", async () => {
   const abort = vi.fn();
   const draft = { id: 1, sessionId: "draft-test", text: "initial draft", attachments: [{ id: "att", kind: "file" as const, name: "notes.txt", path: "/fixture/notes.txt" }] };
-  const view = (activeView: "chat" | "trajectory") => <TooltipProvider><RightPanelProvider><ConversationView messages={messages} contextSnapshot={null} activeView={activeView} draftKey="draft-test" draftRestore={draft} selectedModelId="deepseek-v4-flash" isStreaming onAbort={abort} /></RightPanelProvider></TooltipProvider>;
+  const view = (activeView: "chat" | "trajectory") => <TooltipProvider><RightPanelProvider><TestConversationView messages={messages} contextSnapshot={null} activeView={activeView} draftKey="draft-test" draftRestore={draft} selectedModelId="deepseek-v4-flash" isStreaming onAbort={abort} /></RightPanelProvider></TooltipProvider>;
   const rendered = render(view("chat"));
   const input = rendered.container.querySelector("textarea")!;
   const model = screen.getByRole("button", { name: "deepseek-flash" });
@@ -345,7 +345,7 @@ it("hides the trajectory composer without losing the draft and keeps Stop availa
 
 it("shows and resumes accepted tasks even before the first conversation turn exists", async () => {
   const resume = vi.fn();
-  render(<TooltipProvider><RightPanelProvider><ConversationView messages={[]} contextSnapshot={null} sessionId="recovered" isSessionReady
+  render(<TooltipProvider><RightPanelProvider><TestConversationView messages={[]} contextSnapshot={null} sessionId="recovered" isSessionReady
     messageQueue={{ queue: { paused: true, steering: [], items: [{ id: "pending", kind: "message", text: "Accepted before startup failure", options: {} }] }, running: false, steerBlockedReason: null,
       onSteer: vi.fn(), onUnsteer: vi.fn(), onRemove: vi.fn(), onMoveUp: vi.fn(), onEdit: vi.fn(), onResume: resume }}
   /></RightPanelProvider></TooltipProvider>);

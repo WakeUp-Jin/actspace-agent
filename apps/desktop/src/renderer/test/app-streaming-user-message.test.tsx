@@ -14,6 +14,11 @@ import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { projectRecord } from "./helpers/session-records";
+import { transcriptShadow } from "./helpers/transcript-shadow";
+
+// 14 T15：每次 durable / live 合并都与旧实现对照，不一致就让用例失败（见 helpers/transcript-shadow.ts）。
+vi.mock("../session/transcript", async (importOriginal) => (await import("./helpers/transcript-shadow")).shadowTranscript(await importOriginal()));
+afterEach(() => { expect(transcriptShadow.mismatches.splice(0)).toEqual([]); });
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
@@ -381,6 +386,57 @@ describe("App streaming user message", () => {
       expect(screen.queryByText("Hidden active session")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "查看会话详情： Visible fallback session" })).toBeInTheDocument();
     });
+  });
+
+  it("does not hydrate sessions of a removed workspace again when the session list refreshes", async () => {
+    const user = userEvent.setup();
+    const now = new Date().toISOString();
+    const visible = createEmptySessionRecord("session-visible");
+    visible.meta.title = "Visible session";
+    visible.meta.workspaceId = "ws_alt";
+    visible.meta.workspaceRoot = "/tmp/alt-workspace";
+    const sessions: SessionListItem[] = [
+      { id: visible.meta.id, title: visible.meta.title, updatedAt: now, agentRunCount: 1, workspaceId: "ws_alt", workspaceRoot: "/tmp/alt-workspace" },
+      { id: "session-removed", title: "Removed workspace session", updatedAt: now, agentRunCount: 1, workspaceId: "ws_source", workspaceRoot: "/tmp/workspace" },
+    ];
+    let registry = createWorkspaceRegistryFixture(now);
+    const setWorkspaceVisibility = vi.fn(async () => {
+      registry = { ...registry, items: registry.items.map((workspace) => workspace.id === "ws_source" ? { ...workspace, hidden: true } : workspace) };
+      return { ok: true as const };
+    });
+    const listSessions = vi.fn(async () => sessions.map((session) => ({ ...session })));
+    const listPending = vi.fn(async (_input: { sessionId: string }) => []);
+    const hostListeners = new Set<(hosts: unknown[]) => void>();
+
+    setupBridge(taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "workspaces.list": async () => registry,
+      "sessions.list": listSessions,
+      getRecord: async ({ sessionId }) => sessionId === visible.meta.id ? visible : null,
+      "workspaces.setVisibility": setWorkspaceVisibility,
+      "usage.getStatistics": async () => null,
+      "providers.getDeepSeekBalance": async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      "providers.getKimiBalance": async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      "approvals.listPending": listPending,
+      "events.hostsChanged": (callback: (hosts: unknown[]) => void) => { hostListeners.add(callback); return () => { hostListeners.delete(callback); }; },
+      ...settingsApiStub,
+      "events.agentStream": () => () => {},
+      execute: async () => ({ sessionId: visible.meta.id, agentRunId: "unused", status: "completed", events: [], contextSnapshot: null, contextState: null }),
+    }));
+
+    renderApp();
+    await screen.findByText("Removed workspace session");
+    await waitFor(() => expect(listPending).toHaveBeenCalledWith({ sessionId: "session-removed" }));
+    fireEvent.contextMenu(screen.getByRole("button", { name: "workspace" }), { clientX: 24, clientY: 60 });
+    await user.click(screen.getByRole("menuitem", { name: "从侧栏移除" }));
+    await waitFor(() => expect(screen.queryByText("Removed workspace session")).not.toBeInTheDocument());
+
+    listPending.mockClear();
+    const listCalls = listSessions.mock.calls.length;
+    act(() => { for (const listener of hostListeners) listener([]); });
+    await waitFor(() => expect(listSessions.mock.calls.length).toBeGreaterThan(listCalls));
+    await act(async () => { await Promise.resolve(); });
+    expect(listPending).not.toHaveBeenCalledWith({ sessionId: "session-removed" });
   });
 
   it("refreshes the composer review summary from workspace review state", async () => {
@@ -3278,7 +3334,7 @@ sessionId: input.sessionId,
     expect((screen.getByLabelText("消息输入框") as HTMLTextAreaElement).disabled).toBe(false);
     expect(getSessionMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
-  it('loads only the latest message page and prepends older messages', async () => {
+  it('loads only the latest message page, prepends older messages, and keeps them when a live event arrives', async () => {
     const latest = createEmptySessionRecord('paged');
     latest.meta.title = 'Paged session';
     latest.events = [{ id: 'v2-20', sessionId: 'paged', agentRunId: 'r2', schemaVersion: 2, timestamp: latest.meta.createdAt, type: 'user_message', payload: { content: 'Latest question' } }];
@@ -3299,9 +3355,11 @@ sessionId: input.sessionId,
     const earlierProjection = projectionPage(earlier, 0, null);
     const getSessionPage = vi.fn(async ({ beforeSeq }: { sessionId: string; beforeSeq?: number }) => beforeSeq === undefined ? latestProjection : earlierProjection);
     const listSessions = vi.fn(async () => []);
+    const live = new Set<(envelope: { event: unknown }) => void>();
     setupBridge(taskHostFixture({
       "app.getBootstrapState": async () => bootstrapState,
       "workspaces.list": async () => createWorkspaceRegistryFixture(latest.meta.createdAt),
+      "events.sessionLive": (listener: (envelope: { event: unknown }) => void) => { live.add(listener); return () => { live.delete(listener); }; },
       "sessions.listPage": async () => ({ items: [{ id: 'paged', title: 'Paged session', updatedAt: latest.meta.updatedAt, agentRunCount: 2 }], groups: [], indexing: false, failed: 0 }),
       "sessions.list": listSessions, getRecord: getSession,
       "sessions.create": projectRecord(async () => latest), "tasks.abort": async () => true, "approvals.submit": async () => ({ ok: true }), "sessions.pin": async () => ({ ok: true }),
@@ -3317,6 +3375,17 @@ sessionId: input.sessionId,
     await screen.findByText('Earlier question');
     expect(getSessionPage).toHaveBeenLastCalledWith({ sessionId: 'paged', beforeSeq: 10 });
     expect(screen.getByText('Latest question')).toBeInTheDocument();
+    // 早期页并入 store 之后再收到 live 的 journal 更新：接在窗口末尾，早期内容不丢（14 T10）。
+    const pageCalls = getSessionPage.mock.calls.length;
+    const liveMessage = { recordKind: 'event', seq: 21, type: 'user/message', eventVersion: 1, criticality: 'ignorable', time: latest.meta.createdAt, source: { ownerPluginId: '@actspace/core' },
+      data: { agentRunId: 'r3', messageId: 'v2-21', content: 'Live question' }, surface: { kind: 'append', node: { kind: 'user', messageId: 'v2-21', content: 'Live question' } },
+      provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
+    act(() => live.forEach(listener => listener({ event: { kind: 'journal-update', schemaVersion: 1, runtimeInstanceId: 'runtime-1', liveSeq: 1, throughJournalSeq: 21, sessionId: 'paged',
+      update: { sessionId: 'paged', throughJournalSeq: 21, event: liveMessage, values: {} } } })));
+    await screen.findByText('Live question');
+    expect(screen.getByText('Earlier question')).toBeInTheDocument();
+    expect(screen.getByText('Latest question')).toBeInTheDocument();
+    expect(getSessionPage).toHaveBeenCalledTimes(pageCalls);
   });
 
   it('ignores a slow page response after selecting a different session', async () => {
@@ -3504,6 +3573,7 @@ sessionId: input.sessionId,
   });
 
   it('rejects a stale history page after a background run completes', async () => {
+    // 陈旧页是 run 完成前发出的读取，修订号更旧：store 的 applyEnvelope 按修订拒绝它（14 T10），App 的页版本号是第二道防线。
     const fixture = setupBackgroundSessions();
     renderApp();
     await fixture.send('A durable question');
@@ -3545,15 +3615,21 @@ sessionId: input.sessionId,
     expect(screen.getByText('确认浏览器操作')).toBeInTheDocument();
   });
 
-  it('keeps a run pinned while more than three other histories are loaded', async () => {
+  it('keeps a running session resident while more than five other histories are viewed', async () => {
+    // 保留策略（14 T9）：运行中的会话不占 5 个名额；查看 6 个别的会话后再回到它，即使页请求一直不返回，历史和流式内容都还在。
     const fixture = setupBackgroundSessions();
-    for (const id of ['c', 'd', 'e']) fixture.records.set(id, { ...createEmptySessionRecord(id), meta: { ...createEmptySessionRecord(id).meta, title: `Cache ${id}` } });
+    const others = ['c', 'd', 'e', 'f', 'g', 'h'];
+    for (const id of others) fixture.records.set(id, { ...createEmptySessionRecord(id), meta: { ...createEmptySessionRecord(id).meta, title: `Cache ${id}` } });
+    const pinned = fixture.records.get('background-a')!;
+    fixture.records.set('background-a', { ...pinned, events: [{ id: 'v2-0', sessionId: 'background-a', agentRunId: 'earlier-run', schemaVersion: 2, timestamp: pinned.meta.createdAt, type: 'user_message', payload: { content: 'Durable earlier question' } }] });
     renderApp();
+    await screen.findByText('Durable earlier question');
     await fixture.send('Pinned live question');
     await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: 'Pinned reply' }));
-    for (const id of ['c', 'd', 'e']) await userEvent.click(screen.getByRole('button', { name: `Cache ${id}` }));
+    for (const id of others) await userEvent.click(screen.getByRole('button', { name: `Cache ${id}` }));
     overrideBridge({ "sessions.getPage": () => new Promise(() => {}) });
     await fixture.select('background-a');
+    expect(screen.getByText('Durable earlier question')).toBeInTheDocument();
     expect(screen.getByText('Pinned live question')).toBeInTheDocument();
     expect(screen.getByText('Pinned reply')).toBeInTheDocument();
     expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();

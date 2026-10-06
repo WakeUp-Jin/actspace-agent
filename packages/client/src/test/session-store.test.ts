@@ -19,7 +19,66 @@ function live(sessionId: string, liveSeq: number, kind: RuntimeV2LiveEvent["kind
   return { kind, schemaVersion: 1, runtimeInstanceId: "runtime-1", liveSeq, throughJournalSeq: 0, sessionId, message: "progress" };
 }
 
+function journalEvent(seq: number) {
+  return { recordKind: "event" as const, seq, type: "user/message", eventVersion: 1, criticality: "core" as const, time: "2026-10-06T00:00:00.000Z", source: { kind: "runtime" as const }, data: {}, surface: null, provenance: { emitter: "runtime" as const } };
+}
+
+/** One page of history: events [fromSeq, pageThrough], with the Session snapshot at `revision`. */
+function page(sessionId: string, revision: number, fromSeq: number, pageThrough: number) {
+  const base = envelope(sessionId, revision, null);
+  const events = Array.from({ length: pageThrough - fromSeq + 1 }, (_, index) => journalEvent(fromSeq + index));
+  return { ...base, window: { ...base.window, events, fromSeq, throughJournalSeq: pageThrough, beforeSeq: fromSeq > 0 ? fromSeq - 1 : null } } as unknown as Parameters<ClientSessionStore["applyEnvelope"]>[0];
+}
+
 describe("ClientSessionStore", () => {
+  it("evicts a Session's cell and overlay, but never the selected Session", () => {
+    const store = new ClientSessionStore();
+    store.applySnapshot(snapshot("session-1", 3), { runtimeInstanceId: "runtime-1" });
+    store.applyLiveEvent(live("session-1", 0));
+    store.select("session-2");
+    store.applySnapshot(snapshot("session-2", 1), { runtimeInstanceId: "runtime-1" });
+    let notifications = 0;
+    store.subscribe(() => { notifications += 1; });
+
+    expect(store.evict("session-1")).toBe(true);
+    expect(store.get("session-1")).toMatchObject({ snapshot: null, window: null, status: "idle", lastLiveSeq: -1 });
+    expect(store.getOverlay("session-1")).toBeNull();
+    expect(store.evict("session-2")).toBe(false);
+    expect(store.get("session-2").snapshot?.throughJournalSeq).toBe(1);
+    expect(store.cellIds()).toEqual(["session-2"]);
+    expect(store.peek("session-1")).toBeNull();
+    expect(store.peek("session-2")).toBe(store.get("session-2"));
+    expect(notifications).toBe(0);
+
+    // An evicted Session accepts live events from scratch again.
+    store.applySnapshot(snapshot("session-1", 3), { runtimeInstanceId: "runtime-1" });
+    expect(store.applyLiveEvent(live("session-1", 0))).toBe(true);
+  });
+
+  it("prepends an earlier history page in seq order, and keeps accepting live updates", () => {
+    const store = new ClientSessionStore();
+    expect(store.applyEnvelope(page("paged", 19, 10, 19))).toBe(true);
+    expect(store.applyEnvelope(page("paged", 19, 0, 9))).toBe(true);
+    const window = store.get("paged").window!;
+    expect(window.events.map(event => event.seq)).toEqual(Array.from({ length: 20 }, (_, seq) => seq));
+    expect(window).toMatchObject({ fromSeq: 0, throughJournalSeq: 19, beforeSeq: null });
+
+    expect(store.applyJournalUpdate({ sessionId: "paged", throughJournalSeq: 20, values: {}, event: journalEvent(20) })).toBe(true);
+    expect(store.get("paged").window!.events.map(event => event.seq).slice(-2)).toEqual([19, 20]);
+  });
+
+  it("keeps a live update that landed before an older earlier-page response", () => {
+    const store = new ClientSessionStore();
+    store.applyEnvelope(page("paged", 19, 10, 19));
+    store.applyJournalUpdate({ sessionId: "paged", throughJournalSeq: 20, values: {}, event: journalEvent(20) });
+    // The earlier page was requested at revision 19 and arrives after seq 20 was applied.
+    expect(store.applyEnvelope(page("paged", 19, 0, 9))).toBe(true);
+    const cell = store.get("paged");
+    expect(cell.window!.events.map(event => event.seq)).toEqual(Array.from({ length: 21 }, (_, seq) => seq));
+    expect(cell.window).toMatchObject({ fromSeq: 0, throughJournalSeq: 20, beforeSeq: null });
+    expect(cell.snapshot?.throughJournalSeq).toBe(20);
+  });
+
   it("coalesces a durable snapshot and its projections into one notification", () => {
     const store = new ClientSessionStore();
     let notifications = 0;

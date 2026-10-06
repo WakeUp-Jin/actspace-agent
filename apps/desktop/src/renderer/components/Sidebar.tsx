@@ -27,6 +27,7 @@ import {
 import type { MainAgentForm, SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import { IconButton } from "./ui/IconButton";
+import { useSessionActions } from "../session/session-actions-context";
 
 export type SidebarMode = "expanded" | "hidden";
 export type SidebarView = "chat" | "lab" | "settings" | "extensions";
@@ -861,19 +862,7 @@ export function Sidebar({
   view,
   busySessionIds,
   sessionStatuses,
-  onNewSession,
-  onAddWorkspace,
-  onSelectSession,
-  onTogglePin,
   onSelectView,
-  onRename,
-  onCopySessionId,
-  onCopyTranscript,
-  onFork,
-  onArchive,
-  onOpenWorkspace,
-  onArchiveWorkspace,
-  onRemoveWorkspace,
 }: {
   sessions: SessionListItem[];
   workspaces?: WorkspaceEntry[];
@@ -884,21 +873,13 @@ export function Sidebar({
   sessionStatuses?: Record<string, unknown>;
   /** 折叠按钮回调；现由 WorkbenchLayout 通过 WindowChromeBar 调用，Sidebar 内部不直接渲染 chrome row。 */
   onToggleMode?: () => void;
-  onNewSession?: (input?: NewSessionInput) => void;
-  onAddWorkspace?: () => void;
-  onSelectSession?: (sessionId: string) => void;
-  onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onSelectView?: (next: SidebarView) => void;
-  onRename?: (sessionId: string, title: string) => void;
-  onCopySessionId?: (sessionId: string) => void;
-  onCopyTranscript?: (sessionId: string) => void;
-  onFork?: (sessionId: string) => void;
-  /** Archive 占位回调；未传时按钮仅做视觉占位。 */
-  onArchive?: (sessionId: string) => void;
-  onOpenWorkspace?: (workspaceId: string) => void;
-  onArchiveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
-  onRemoveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
 }) {
+  // 会话 / 工作区操作来自 SessionActionsContext；未提供的操作只做视觉占位。
+  const {
+    onNewSession, onAddWorkspace, onSelectSession, onTogglePin, onRenameSession: onRename, onCopySessionId, onCopyTranscript,
+    onForkSession: onFork, onArchiveSession: onArchive, onOpenWorkspace, onArchiveWorkspace, onRemoveWorkspace,
+  } = useSessionActions();
   const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
   const [workspacesCollapsed, setWorkspacesCollapsed] = useState(false);
   const busyIds = busySessionIds ?? new Set<string>();

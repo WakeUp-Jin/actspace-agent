@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { ResponseAnnotationReference } from "@actspace/shared";
+import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared";
 
 export type ResponseAnnotationContextValue = {
   /** 当前会话的草稿批注，顺序即 Composer 卡片和回复圆点上的编号。 */
@@ -29,7 +29,10 @@ export function useResponseAnnotations(): ResponseAnnotationContextValue | null 
   return useContext(ResponseAnnotationContext);
 }
 
-/** 只有落盘后的回复（id 为 `v2-<journal seq>`）能被批注；流式中和刚结束还没刷新投影的回复 id 是 `turn:` 形态，main 不认。 */
-export function isAnnotatableMessageId(messageId: string): boolean {
-  return /^v2-\d+$/.test(messageId);
+/**
+ * 只有落盘后的回复能被批注：durable 块带来源 envelope 的 sourceSeq（14 T11/T12），id 是 main 认的 journal 形态；
+ * 流式中和刚结束还没刷新投影的 live 块没有 sourceSeq。
+ */
+export function annotatableMessageIds(blocks: readonly MessageBlock[]): ReadonlySet<string> {
+  return new Set(blocks.flatMap((block) => block.sourceSeq === undefined ? [] : [block.id]));
 }

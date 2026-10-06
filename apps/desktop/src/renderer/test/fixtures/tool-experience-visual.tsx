@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { MessageBlock, SessionEvent } from "@actspace/shared";
-import { ConversationView } from "../../components/ConversationView";
+import { TestConversationView } from "../helpers/workbench";
 import { RightPanel } from "../../components/RightPanel";
 import { RightPanelProvider, useRightPanel } from "../../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../../components/ui/Tooltip";
@@ -36,7 +36,7 @@ function Fixture() {
       <button onClick={() => openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId: "fixture" })}>Subagents</button>
     </nav>
     <div className="grid h-[calc(100vh-48px)] grid-cols-[minmax(0,1fr)_420px]">
-      <ConversationView messages={messages} contextSnapshot={null} sessionId="fixture" activeView={view} isStreaming onAbort={() => {}} />
+      <TestConversationView messages={messages} contextSnapshot={null} sessionId="fixture" activeView={view} isStreaming onAbort={() => {}} />
       <RightPanel sessionId="fixture" />
     </div>
   </div>;

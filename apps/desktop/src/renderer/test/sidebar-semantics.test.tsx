@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { SessionListItem } from "@actspace/shared";
-import { Sidebar } from "../components/Sidebar";
+import { TestSidebar } from "./helpers/workbench";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
 const WORKSPACE_ROOT = "/Users/me/projects/actspace-agent";
@@ -17,7 +17,7 @@ const SESSIONS: SessionListItem[] = ["s-idle", "s-running", "s-busy", "s-waiting
 function renderSidebar() {
   return render(
     <TooltipProvider delayDuration={0}>
-      <Sidebar
+      <TestSidebar
         sessions={SESSIONS}
         workspaces={[
           {

@@ -1,6 +1,6 @@
 # 13 Preload 与 Mock Bridge 验收交接
 
-- 主线提交：`refactor/desktop-frontend` @ `<squash 提交哈希>`
+- 主线提交：`refactor/desktop-frontend` @ `d86be81f`
 - 子分支：`refactor/desktop-fe-13`（`3de509c5` 起，共 32 个提交：T0–T11 按计划拆分的提交、一个处理复核发现的提交、一个收尾提交）
 - 状态：**可以交给验收**
 - 启动方式：

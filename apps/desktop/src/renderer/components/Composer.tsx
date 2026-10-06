@@ -1163,8 +1163,9 @@ export function Composer({
     void Promise.resolve(sendResult).then(() => { sentAttachments.forEach(revokeAttachmentPreview); }).catch((error: unknown) => {
       if (draftKey) writeDraft?.(draftKey, message);
       if (activeDraftKeyRef.current !== draftKey) return;
+      // 兜底：App 已经恢复过草稿（带格式化的错误和附件问题）时，不覆盖它。
       setMessage(current => current || message); setAttachments(current => current.length ? current : sentAttachments);
-      setSendError({ message: error instanceof Error ? error.message : "发送失败，草稿已保留" });
+      setSendError(current => current ?? { message: error instanceof Error ? error.message : "发送失败，草稿已保留" });
     }).finally(() => {
       sendingRef.current = false; setSending(false); setUploadProgress(null);
     });

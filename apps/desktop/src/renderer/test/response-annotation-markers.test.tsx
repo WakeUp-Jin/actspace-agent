@@ -6,7 +6,7 @@ import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared
 import { AssistantReply } from "../components/messages/AssistantReply";
 import { ResponseAnnotationCommentPopover } from "../components/messages/ResponseAnnotationCommentPopover";
 import { ResponseAnnotationHighlights } from "../components/messages/ResponseAnnotationHighlights";
-import { ResponseAnnotationContext, isAnnotatableMessageId } from "../components/messages/response-annotation-context";
+import { ResponseAnnotationContext, annotatableMessageIds } from "../components/messages/response-annotation-context";
 import { resolveAnnotationRange } from "../components/messages/response-annotation-text";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { createAnnotationContextValue, makeAnnotation, stubRangeRects } from "./fixtures/response-annotation-helpers";
@@ -254,10 +254,14 @@ describe("annotation highlights for late replies", () => {
   });
 });
 
-describe("isAnnotatableMessageId", () => {
-  it("accepts only persisted v2 reply ids", () => {
-    expect(isAnnotatableMessageId("v2-12")).toBe(true);
-    expect(isAnnotatableMessageId("turn:abc:assistant")).toBe(false);
-    expect(isAnnotatableMessageId("v2-")).toBe(false);
+describe("annotatableMessageIds", () => {
+  it("accepts only durable blocks, which carry their source journal seq", () => {
+    const createdAt = "2026-10-06T00:00:00.000Z";
+    const ids = annotatableMessageIds([
+      { kind: "assistant", id: "v2-12", content: "durable", createdAt, runId: "run-1", sourceSeq: 12 },
+      { kind: "assistant", id: "turn:run-2:assistant:0", content: "live", createdAt, runId: "run-2" },
+      { kind: "assistant", id: "v2-0", content: "seq zero", createdAt, sourceSeq: 0 },
+    ]);
+    expect([...ids]).toEqual(["v2-12", "v2-0"]);
   });
 });

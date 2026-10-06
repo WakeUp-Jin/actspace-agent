@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ClientSessionStore, type ClientLiveOverlay, type ClientSessionCell } from "@actspace/client/sessions";
 import { createDesktopSessionBridge, type DesktopSessionBridge } from "./desktop-session-bridge";
-import { eventsApi } from "../api/events";
+import { liveEvents } from "../api/live-events";
 import { sessionsApi } from "../api/sessions";
 
 export type SessionProjectionContextValue = {
@@ -39,7 +39,7 @@ export function SessionProjectionProvider({
     const unsubscribeStore = store.subscribe(() => setVersion((value) => value + 1));
     const bridge = createDesktopSessionBridge({
       getSessionProjectionSnapshot: sessionsApi.getProjectionSnapshot,
-      onSessionLiveEvent: eventsApi.sessionLive,
+      onSessionLiveEvent: liveEvents.subscribe,
     }, store);
     bridgeRef.current = bridge;
     bridge.start();
@@ -64,6 +64,7 @@ export function SessionProjectionProvider({
       store.select(sessionId);
       return;
     }
+    // 失败已由 bridge 写进 cell 的 status/error，会话视图据此显示错误和「重试」；这里只避免未处理的 rejection。
     void bridge.open(sessionId).catch(() => undefined);
   }, [ownsStore, sessionId, store]);
 

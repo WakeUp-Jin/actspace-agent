@@ -150,6 +150,8 @@ export type SessionEvent<TPayload = unknown> = {
   timestamp: string;
   schemaVersion: 2;
   payload: TPayload;
+  /** 投影来源的 Journal envelope seq；由多条 envelope 合成、或不来自 Journal 的事件没有。 */
+  sourceSeq?: number;
 };
 
 export type UserMessagePayload = {
@@ -671,6 +673,10 @@ export type MessageBlock = {
    * 则通过同一个 renderKey 复用 DOM，避免 turn 完成时重新播放入场动画。
    */
   renderKey?: string;
+  /** 产生这个块的 run：durable 块取 event.agentRunId，live 块取当前 run。合并 durable 与 live 时按它判断归属。 */
+  runId?: string;
+  /** durable 块对应事件的 sourceSeq；live 块和合成事件产生的块没有。 */
+  sourceSeq?: number;
 } & (
   | {
       kind: "user";

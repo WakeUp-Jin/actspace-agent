@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WorkbenchLayout } from "../components/WorkbenchLayout";
+import { TestWorkbenchLayout } from "./helpers/workbench";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 
 import { SessionProjectionProvider } from "../session";
@@ -19,7 +19,7 @@ function setViewportWidth(width: number) {
   });
 }
 
-type WorkbenchProps = Parameters<typeof WorkbenchLayout>[0];
+type WorkbenchProps = Parameters<typeof TestWorkbenchLayout>[0];
 
 const responsiveSessions: WorkbenchProps["sessions"] = [
   {
@@ -35,7 +35,7 @@ function WorkbenchFixture(overrides: Partial<WorkbenchProps> = {}) {
   return (
     <StrictMode>
       <RightPanelProvider>
-        <WorkbenchLayout
+        <TestWorkbenchLayout
           sessions={responsiveSessions}
           activeSessionId="session-responsive"
           title="Responsive layout"

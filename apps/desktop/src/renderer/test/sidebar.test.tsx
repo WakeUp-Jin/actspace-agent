@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ContextUsageSnapshot, SessionListItem, WorkspaceEntry } from "@actspace/shared";
-import { Sidebar } from "../components/Sidebar";
+import { TestSidebar } from "./helpers/workbench";
 import { WindowChromeBar } from "../components/WindowChromeBar";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
@@ -76,7 +76,7 @@ const WORKSPACES: WorkspaceEntry[] = [
   },
 ];
 
-function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
+function renderSidebar(overrides: Partial<Parameters<typeof TestSidebar>[0]> = {}) {
   const onNewSession = vi.fn();
   const onSelectSession = vi.fn();
   const onTogglePin = vi.fn();
@@ -92,7 +92,7 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
 
   const result = render(
     <TooltipProvider delayDuration={0}>
-      <Sidebar
+      <TestSidebar
         sessions={SESSIONS}
         workspaces={WORKSPACES}
         activeSessionId={null}
