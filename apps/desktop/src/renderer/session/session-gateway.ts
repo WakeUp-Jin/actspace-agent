@@ -2,7 +2,7 @@ import { formatChatAttachmentIssue, formatComposerReferenceIssue } from "@actspa
 import type { ComposerAttachment, MainAgentForm } from "@actspace/shared";
 import type { SubmitTaskInput, TaskConfiguration, TaskSubmissionFailure, TaskSubmissionResult } from "@actspace/shared/runtime-v2";
 import type { ComposerDraftRestore, ComposerSendOptions } from "../components/Composer";
-import type { NewSessionInput } from "../components/Sidebar";
+import type { NewSessionInput } from "./session-actions-context";
 import type { RunTargetReadiness } from "../target/readiness";
 import type { RunTarget } from "../target/run-target";
 import type { PendingSubmissionRecord } from "./pending-submission";

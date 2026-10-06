@@ -300,7 +300,7 @@ Usage Statistics 是第一块完整迁移样板，需满足：
 
 层级和动效不进 `@theme`，组件直接用 CSS 变量：`z-(--act-z-*)`、`duration-(--motion-*)`。
 
-`pnpm check:frontend-tokens`（`scripts/check-frontend-design-tokens.mjs`）扫描 renderer 组件：禁止 `text-[Npx]`、Tailwind 默认字号、`rounded-[…]`、`z-[N≥3]`、`duration-[…]` / `duration-N` 和旧冷色阴影，并确认组件引用的 `text-act-*`、`rounded-act-*`、`shadow-act-*`、`--act-*`、`--motion-*` 都在样式层有定义。例外按「文件 + 精确匹配串」登记在脚本的 `LITERAL_ALLOWLIST`。
+`pnpm check:frontend-tokens`（`scripts/check-frontend-design-tokens.mjs`）扫描 renderer 组件：禁止 `text-[Npx]`、Tailwind 默认字号、`rounded-[…]`、`z-[N≥3]`、`duration-[…]` / `duration-N` 和旧冷色阴影，并确认组件引用的 `text-act-*`、`rounded-act-*`、`shadow-act-*`、`--act-*`、`--motion-*` 都在样式层有定义。例外按「文件 + 精确匹配串」登记在脚本的 `LITERAL_ALLOWLIST`。2026-10-06 起它还检查原生 `<button>` 的逐文件基线，以及 `createPortal`、`role="dialog"` 只写在 `components/ui/`，见[基础组件封装规范](front-基础组件封装规范.md)「按钮收口与检查」。
 
 ## 决策记录
 

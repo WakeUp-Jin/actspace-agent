@@ -54,7 +54,8 @@
 
 ## 草稿与历史输入
 
-- 未发送的文字草稿按 `sessionId` 隔离，并由比 Conversation 页面生命周期更长的 Workbench 内存状态持有；进入设置、Usage 等页面，或在会话之间切换后返回时，恢复该会话自己的文字草稿。
+- 未发送的文字草稿和附件按 `sessionId` 隔离，存在比 Conversation 页面生命周期更长的 `SessionLocalStore` 里（`composerText`、`attachments`）；进入设置、Usage 等页面，或在会话之间切换后返回时，恢复该会话自己的文字和附件，附件不会带到另一个会话。
+- 图片附件预览的 blob URL 在附件发送成功、被移除或被恢复的草稿替换、所在会话被 evict（归档、删除、移除 Host 或工作区）时释放；离开会话页不释放。
 - 草稿只在当前应用运行期间保留，不写入 Session Journal，关闭或刷新应用后不保证恢复。发送开始后清空当前草稿；如果输入尚未持久化就发送失败，继续使用 Composer 的失败恢复机制回填文字和附件，且失败恢复必须校验原会话 ID，不得跨会话回填。
 - 历史输入来自当前会话已经持久化的用户文字消息，按时间从旧到新排列；不恢复消息当时的附件、模型、模式或 Skills，避免重新绑定已经过期的执行配置。
 - 普通输入框为空时，`ArrowUp` 从最近一条历史输入开始向前浏览；浏览期间 `ArrowDown` 向后移动，越过最新一条后恢复为空输入。
@@ -101,7 +102,7 @@ Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布
 | `followup` 多行或有附件 | stacked | Review strip → panel 内 `attachments? / skills? / input` 全宽 / `+ mode model … send` 贴底 → status row |
 | `initial` | stacked | selector row → panel 内 `attachments? / skills? / input` 全宽 / `+ mode model … send` 贴底 → optional Plan shortcut |
 
-首条消息发送后，ConversationView 进入消息流状态，并显示底部 followup composer。
+首条消息发送后，ConversationView 进入消息流状态，并显示底部 followup composer。两种 surface 是同一个 Composer：ConversationView 只挂载一次，切换时只换外层布局 class，不重新挂载，焦点、输入法状态和草稿都保留。
 
 ## Initial composer 结构
 

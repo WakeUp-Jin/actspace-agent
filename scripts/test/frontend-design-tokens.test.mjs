@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { checkCssBlocks, checkSource, checkTokenReferences, collectDefinedVariables, runCheck } from "../check-frontend-design-tokens.mjs";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {
+  checkCssBlocks,
+  checkNativeButtons,
+  checkSource,
+  checkTokenReferences,
+  checkUiOnly,
+  collectDefinedVariables,
+  collectNativeButtonCounts,
+  countNativeButtons,
+  loadNativeButtonBaseline,
+  runCheck,
+} from "../check-frontend-design-tokens.mjs";
 
 const rules = (relative, source) => checkSource(relative, source).map((violation) => `${violation.rule}:${violation.match}`);
 
@@ -116,6 +130,74 @@ test("CSS block rules report a selector that no longer exists", () => {
   assert.deepEqual(blocks("styles/b.css", ".box.is-streaming { max-height: 4px; overflow-y: auto; }"), ["bounded:找不到选择器 .box"]);
 });
 
-test("the current renderer passes the check", () => {
-  assert.deepEqual(runCheck(), []);
+const uiOnly = (relative, source) => checkUiOnly(relative, source).map((violation) => `${violation.rule}:${violation.match}`);
+
+test("createPortal is only allowed in components/ui/", () => {
+  const source = 'import { createPortal } from "react-dom";\nexport const A = () => createPortal(<div />, document.body);';
+  assert.deepEqual(uiOnly("components/settings/A.tsx", source), [
+    "create-portal-outside-ui:createPortal",
+    "create-portal-outside-ui:createPortal",
+  ]);
+  assert.deepEqual(uiOnly("components/ui/Popover.tsx", source), []);
+  assert.deepEqual(uiOnly("components/A.tsx", "// 以前在这里 createPortal，现在用 ui/Popover\nconst A = 1;"), []);
+  assert.deepEqual(uiOnly("components/A.tsx", "const createPortalLike = 1;"), []);
+});
+
+test('role="dialog" is only allowed in components/ui/, with exact file exceptions', () => {
+  assert.deepEqual(uiOnly("components/A.tsx", '<div role="dialog" aria-label="x" />'), ['role-dialog-outside-ui:role="dialog"']);
+  assert.deepEqual(uiOnly("components/A.tsx", "<div role={'dialog'} />"), ["role-dialog-outside-ui:role={'dialog'"]);
+  assert.deepEqual(uiOnly("components/A.tsx", 'const props = { role: "dialog" };'), ['role-dialog-outside-ui:role: "dialog"']);
+  assert.deepEqual(uiOnly("components/A.tsx", '<div role="alertdialog" /><div role="dialogue" />'), []);
+  assert.deepEqual(uiOnly("components/ui/Dialog.tsx", '<div role="dialog" />'), []);
+  assert.deepEqual(uiOnly("components/composer/ResponseAnnotationPill.tsx", '<div role="dialog" />'), []);
+  // 例外只放过登记的规则
+  assert.deepEqual(uiOnly("components/composer/ResponseAnnotationPill.tsx", "createPortal(x, y)"), ["create-portal-outside-ui:createPortal"]);
+});
+
+test("native buttons are counted per .tsx file outside components/ui/", () => {
+  assert.equal(countNativeButtons("components/A.tsx", '<button type="button" />\n<button\n  type="submit"\n/>\n<buttons /><button-group />'), 2);
+  assert.equal(countNativeButtons("components/A.tsx", "// <button> 以前在这里\n/* <button> */\nconst a = 1;"), 0);
+  assert.equal(countNativeButtons("components/ui/Button.tsx", "<button />"), 0);
+  assert.equal(countNativeButtons("components/a.ts", 'const html = "<button>";'), 0);
+});
+
+test("native buttons above the baseline fail, below it only suggest tightening", () => {
+  const baseline = { "components/A.tsx": 2, "components/B.tsx": 3, "components/Gone.tsx": 1 };
+  const result = checkNativeButtons(new Map([["components/A.tsx", 3], ["components/B.tsx", 1], ["components/New.tsx", 1]]), baseline);
+  assert.equal(result.errors.length, 2);
+  assert.match(result.errors[0], /^components\/A\.tsx 有 3 个原生 <button>，基线是 2/);
+  assert.match(result.errors[1], /^components\/New\.tsx 有 1 个原生 <button>，基线是 0/);
+  assert.equal(result.notices.length, 2);
+  assert.match(result.notices[0], /^components\/B\.tsx 原生 <button> 从 3 降到 1/);
+  assert.match(result.notices[1], /^components\/Gone\.tsx 已不存在/);
+  assert.deepEqual(checkNativeButtons(new Map([["components/A.tsx", 2]]), { "components/A.tsx": 2 }), { errors: [], notices: [] });
+});
+
+test("runCheck reports a portal, a dialog and an extra native button in a renderer tree", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "frontend-tokens-"));
+  try {
+    fs.mkdirSync(path.join(root, "styles"));
+    fs.writeFileSync(path.join(root, "styles/base.css"), ".tool-log-text-running { color: red; }\n.tool-log-text-running::after { display: none; }\n");
+    fs.writeFileSync(path.join(root, "styles/diff.css"), ".file-diff-content { max-height: 4px; overflow-y: auto; overflow-x: auto; }\n");
+    fs.mkdirSync(path.join(root, "components/ui"), { recursive: true });
+    fs.writeFileSync(path.join(root, "components/ui/Dialog.tsx"), 'createPortal(<div role="dialog"><button /></div>, document.body);');
+    fs.writeFileSync(path.join(root, "components/Panel.tsx"), '<div role="dialog"><button /><button /></div>;');
+    fs.mkdirSync(path.join(root, "test"));
+    fs.writeFileSync(path.join(root, "test/Panel.test.tsx"), "createPortal(<button />, document.body);");
+    const notices = [];
+    const problems = runCheck(root, { "components/Panel.tsx": 1 }, notices);
+    assert.deepEqual(problems.map((problem) => problem.split(" ")[0]), ["components/Panel.tsx:1", "components/Panel.tsx"]);
+    assert.match(problems[0], /role="dialog"/);
+    assert.match(problems[1], /有 2 个原生 <button>，基线是 1/);
+    assert.deepEqual(notices, []);
+    assert.deepEqual([...collectNativeButtonCounts(root)], [["components/Panel.tsx", 2]]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the current renderer passes the check and matches the native button baseline exactly", () => {
+  const notices = [];
+  assert.deepEqual(runCheck(undefined, loadNativeButtonBaseline(), notices), []);
+  assert.deepEqual(notices, []);
 });

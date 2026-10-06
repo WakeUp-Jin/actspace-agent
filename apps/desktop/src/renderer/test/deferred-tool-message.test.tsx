@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
-import { renderMessage } from "../components/ConversationView";
+import { renderMessage } from "../components/conversation/render-message";
 
 // 这里验证的是“按需加载工具详情”的交互；bridge 原始 page → MessageBlock[] 的投影由 api-sessions 测试覆盖。
 const getSessionToolDetail = vi.hoisted(() => vi.fn());

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { HostEndpoint } from "@actspace/shared/host-protocol";
 import { Button } from "../ui/Button";
+import { Select } from "../ui/Select";
 import { hostDirectory, useHostDirectory } from "../../target/host-directory";
 import { hostsApi } from "../../api/hosts";
 const stateNames = { connected: "已连接", connecting: "连接中", offline: "离线", revoked: "设备授权已撤销", incompatible: "连接不兼容" };
@@ -40,7 +41,7 @@ export function HostConnectionsSettings() {
     <form className="space-y-4 rounded-act-sm border border-line p-5" onSubmit={event => { event.preventDefault(); const endpoint: HostEndpoint = kind === "wss" ? { kind, url: address.trim() } : { kind, alias: address.trim(), port: Number(port) }; void perform(async () => { await hostsApi.add({ name, endpoint, code }); setCode(""); setName(""); setAddress(""); }); }}>
       <h3 className="font-medium">添加服务器</h3>
       <label className="block space-y-1 text-act-sm"><span>名称</span><input className={inputClass} value={name} onChange={event => setName(event.target.value)} required maxLength={128} placeholder="我的云端 Agent" /></label>
-      <label className="block space-y-1 text-act-sm"><span>连接方式</span><select className={inputClass} value={kind} onChange={event => { setKind(event.target.value as "wss" | "ssh"); setAddress(""); }}><option value="wss">WSS</option><option value="ssh">SSH 隧道</option></select></label>
+      <div className="space-y-1 text-act-sm"><span>连接方式</span><Select ariaLabel="连接方式" className="w-full" value={kind} onValueChange={next => { setKind(next as "wss" | "ssh"); setAddress(""); }} options={[{ value: "wss", label: "WSS" }, { value: "ssh", label: "SSH 隧道" }]} /></div>
       <label className="block space-y-1 text-act-sm"><span>{kind === "wss" ? "服务器地址" : "SSH 配置别名"}</span><input className={inputClass} value={address} onChange={event => setAddress(event.target.value)} required placeholder={kind === "wss" ? "wss://agent.example.com/rpc" : "my-server"} /></label>
       {kind === "ssh" && <><label className="block space-y-1 text-act-sm"><span>服务器上的 Host 端口</span><input className={inputClass} type="number" min={1} max={65535} value={port} onChange={event => setPort(event.target.value)} required /></label><p className="text-act-xs text-text-muted">使用系统 SSH 密钥和已验证的服务器指纹。首次连接前，请先在终端完成 SSH 连接验证。</p></>}
       <label className="block space-y-1 text-act-sm"><span>一次性配对码</span><input className={inputClass} type="password" autoComplete="off" value={code} onChange={event => setCode(event.target.value)} required maxLength={128} /></label>

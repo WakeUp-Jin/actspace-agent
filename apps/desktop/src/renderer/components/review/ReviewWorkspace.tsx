@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { AlertTriangle, CheckCircle2, GitPullRequestArrow, Loader2, RefreshCw } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { ReviewDiffCanvas } from "./ReviewDiffCanvas";
 import { ReviewFileTree } from "./ReviewFileTree";
 import { ReviewToolbar } from "./ReviewToolbar";
@@ -17,6 +18,7 @@ export function ReviewWorkspace({ workspaceRoot, sessionId, refreshKey, onReview
   const [dialog, setDialog] = useState<"git" | "pr" | null>(null);
   const [reviewWidth, setReviewWidth] = useState(0);
   const rootRef = useRef<HTMLElement>(null);
+  const gitTriggerRef = useRef<HTMLButtonElement>(null);
   const lastRefreshKey = useRef(refreshKey);
   const filteredFiles = useMemo(() => state.snapshot?.files.filter((file) => file.path.toLocaleLowerCase().includes(state.fileFilter.toLocaleLowerCase())) ?? [], [state.fileFilter, state.snapshot]);
   const displayedFiles = state.snapshot?.loadPolicy.mode === "single-file" && state.selectedFileId
@@ -99,6 +101,7 @@ export function ReviewWorkspace({ workspaceRoot, sessionId, refreshKey, onReview
         onCopyApply={() => void copyGitApplyCommand()}
         onCommitOrPush={() => setDialog("git")}
         onCreatePr={() => setDialog("pr")}
+        gitTriggerRef={gitTriggerRef}
       />
       {state.feedback ? <div className="flex min-h-8 shrink-0 items-center border-b border-line bg-surface-subtle px-3 text-act-xs text-text-muted" role="status">{state.feedback}</div> : null}
       {state.snapshot?.warnings?.some((warning) => warning.kind !== "capped") ? <div className="grid shrink-0 gap-1 border-b border-line bg-warning-soft px-3 py-2">{state.snapshot.warnings.filter((warning) => warning.kind !== "capped").map((warning, index) => <div key={`${warning.kind}-${index}`} className="flex items-start gap-2 text-act-xs text-text-muted"><AlertTriangle size={13} className="mt-0.5 shrink-0 text-on-warning" />{warning.filePath ? `${warning.filePath}: ` : ""}{warning.message}</div>)}</div> : null}
@@ -118,8 +121,8 @@ export function ReviewWorkspace({ workspaceRoot, sessionId, refreshKey, onReview
           </>
         )}
       </div>
-      {dialog === "git" ? <GitDialog workspaceRoot={workspaceRoot} onClose={() => setDialog(null)} onDone={() => { setDialog(null); refresh(); onReviewChanged?.(); }} /> : null}
-      {dialog === "pr" ? <PullRequestDialog workspaceRoot={workspaceRoot} onClose={() => setDialog(null)} /> : null}
+      {dialog === "git" ? <GitDialog workspaceRoot={workspaceRoot} returnFocus={gitTriggerRef} onClose={() => setDialog(null)} onDone={() => { setDialog(null); refresh(); onReviewChanged?.(); }} /> : null}
+      {dialog === "pr" ? <PullRequestDialog workspaceRoot={workspaceRoot} returnFocus={gitTriggerRef} onClose={() => setDialog(null)} /> : null}
     </section>
   );
 }
@@ -128,11 +131,11 @@ function Centered({ icon, title, message, action }: { icon: React.ReactNode; tit
   return <div className="grid min-h-0 min-w-0 flex-1 place-items-center p-8 text-center"><div className="grid max-w-[340px] gap-2"><div className="mx-auto text-text-faint">{icon}</div><h2 className="text-act-sm font-semibold text-text-main">{title}</h2><p className="text-act-xs leading-relaxed text-text-muted">{message}</p>{action}</div></div>;
 }
 
-function DialogShell({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
-  return <div className="fixed inset-0 z-(--act-z-overlay) grid place-items-center bg-overlay p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="w-full max-w-[460px] rounded-act-lg border border-line bg-surface-raised shadow-act-float" role="dialog" aria-modal="true" aria-label={title}><div className="border-b border-line px-4 py-3 text-act-md font-semibold text-text-main">{title}</div>{children}</div></div>;
+function DialogShell({ title, children, returnFocus, onClose }: { title: string; children: React.ReactNode; returnFocus: RefObject<HTMLElement | null>; onClose: () => void }) {
+  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent size="md" surface="raised" backdrop="overlay" returnFocus={returnFocus}><DialogTitle className="border-b border-line px-4 py-3 text-act-md font-semibold text-text-main">{title}</DialogTitle>{children}</DialogContent></Dialog>;
 }
 
-function GitDialog({ workspaceRoot, onClose, onDone }: { workspaceRoot?: string; onClose: () => void; onDone: () => void }) {
+function GitDialog({ workspaceRoot, returnFocus, onClose, onDone }: { workspaceRoot?: string; returnFocus: RefObject<HTMLElement | null>; onClose: () => void; onDone: () => void }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -144,12 +147,12 @@ function GitDialog({ workspaceRoot, onClose, onDone }: { workspaceRoot?: string;
     setBusy(false);
     if (result.ok) onDone(); else setError(result.message ?? "Git 操作失败。");
   };
-  return <DialogShell title="提交或推送" onClose={onClose}><div className="grid gap-3 p-4"><label className="grid gap-1 text-act-xs text-text-muted">提交说明<input autoFocus className="h-9 rounded-act-sm border border-line bg-surface px-2 text-act-sm text-text-main outline-none focus:border-focus-ring" value={message} onChange={(event) => setMessage(event.target.value)} /></label>{error ? <div className="text-act-xs text-danger">{error}</div> : null}<div className="flex justify-end gap-2"><button type="button" className="h-8 px-3 text-act-xs text-text-muted" onClick={onClose}>取消</button><button type="button" disabled={busy || !message.trim()} className="h-8 rounded-act-sm border border-line px-3 text-act-xs text-text-main disabled:opacity-40" onClick={() => void run(false)}>提交</button><button type="button" disabled={busy || !message.trim()} className="inline-flex h-8 items-center gap-1.5 rounded-act-sm bg-action px-3 text-act-xs font-medium text-on-action disabled:opacity-40" onClick={() => void run(true)}>{busy ? <Loader2 size={13} className="animate-spin" /> : null}提交并推送</button></div></div></DialogShell>;
+  return <DialogShell title="提交或推送" returnFocus={returnFocus} onClose={onClose}><div className="grid gap-3 p-4"><label className="grid gap-1 text-act-xs text-text-muted">提交说明<input autoFocus className="h-9 rounded-act-sm border border-line bg-surface px-2 text-act-sm text-text-main outline-none focus:border-focus-ring" value={message} onChange={(event) => setMessage(event.target.value)} /></label>{error ? <div className="text-act-xs text-danger">{error}</div> : null}<div className="flex justify-end gap-2"><button type="button" className="h-8 px-3 text-act-xs text-text-muted" onClick={onClose}>取消</button><button type="button" disabled={busy || !message.trim()} className="h-8 rounded-act-sm border border-line px-3 text-act-xs text-text-main disabled:opacity-40" onClick={() => void run(false)}>提交</button><button type="button" disabled={busy || !message.trim()} className="inline-flex h-8 items-center gap-1.5 rounded-act-sm bg-action px-3 text-act-xs font-medium text-on-action disabled:opacity-40" onClick={() => void run(true)}>{busy ? <Loader2 size={13} className="animate-spin" /> : null}提交并推送</button></div></div></DialogShell>;
 }
 
-function PullRequestDialog({ workspaceRoot, onClose }: { workspaceRoot?: string; onClose: () => void }) {
+function PullRequestDialog({ workspaceRoot, returnFocus, onClose }: { workspaceRoot?: string; returnFocus: RefObject<HTMLElement | null>; onClose: () => void }) {
   const [title, setTitle] = useState(""); const [body, setBody] = useState(""); const [baseBranch, setBaseBranch] = useState("main"); const [draft, setDraft] = useState(false); const [busy, setBusy] = useState(false); const [message, setMessage] = useState<string | null>(null);
   useEffect(() => { void reviewApi.getPullRequestCapability({ workspaceRoot }).then((result) => { if (result.ok) { if (result.capability.baseBranch) setBaseBranch(result.capability.baseBranch); if (!result.capability.enabled) setMessage(result.capability.message ?? "创建 PR 暂不可用。"); } }); }, [workspaceRoot]);
   const create = async () => { if (!title.trim()) return; setBusy(true); const result = await reviewApi.createPullRequest({ workspaceRoot, title: title.trim(), body, baseBranch, draft }); setBusy(false); if (result.ok === true) onClose(); else setMessage(result.message); };
-  return <DialogShell title="创建拉取请求" onClose={onClose}><div className="grid gap-3 p-4"><label className="grid gap-1 text-act-xs text-text-muted">标题<input autoFocus className="h-9 rounded-act-sm border border-line bg-surface px-2 text-act-sm text-text-main outline-none focus:border-focus-ring" value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="grid gap-1 text-act-xs text-text-muted">目标分支<input className="h-9 rounded-act-sm border border-line bg-surface px-2 text-act-sm text-text-main outline-none focus:border-focus-ring" value={baseBranch} onChange={(event) => setBaseBranch(event.target.value)} /></label><label className="grid gap-1 text-act-xs text-text-muted">说明<textarea className="min-h-24 resize-y rounded-act-sm border border-line bg-surface p-2 text-act-xs text-text-main outline-none focus:border-focus-ring" value={body} onChange={(event) => setBody(event.target.value)} /></label><label className="flex items-center gap-2 text-act-xs text-text-main"><input type="checkbox" checked={draft} onChange={(event) => setDraft(event.target.checked)} />创建为草稿</label>{message ? <div className="text-act-xs text-text-muted">{message}</div> : null}<div className="flex justify-end gap-2"><button type="button" className="h-8 px-3 text-act-xs text-text-muted" onClick={onClose}>取消</button><button type="button" disabled={busy || !title.trim()} className="inline-flex h-8 items-center gap-1.5 rounded-act-sm bg-action px-3 text-act-xs font-medium text-on-action disabled:opacity-40" onClick={() => void create()}>{busy ? <Loader2 size={13} className="animate-spin" /> : <GitPullRequestArrow size={13} />}创建 PR</button></div></div></DialogShell>;
+  return <DialogShell title="创建拉取请求" returnFocus={returnFocus} onClose={onClose}><div className="grid gap-3 p-4"><label className="grid gap-1 text-act-xs text-text-muted">标题<input autoFocus className="h-9 rounded-act-sm border border-line bg-surface px-2 text-act-sm text-text-main outline-none focus:border-focus-ring" value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="grid gap-1 text-act-xs text-text-muted">目标分支<input className="h-9 rounded-act-sm border border-line bg-surface px-2 text-act-sm text-text-main outline-none focus:border-focus-ring" value={baseBranch} onChange={(event) => setBaseBranch(event.target.value)} /></label><label className="grid gap-1 text-act-xs text-text-muted">说明<textarea className="min-h-24 resize-y rounded-act-sm border border-line bg-surface p-2 text-act-xs text-text-main outline-none focus:border-focus-ring" value={body} onChange={(event) => setBody(event.target.value)} /></label><label className="flex items-center gap-2 text-act-xs text-text-main"><input type="checkbox" checked={draft} onChange={(event) => setDraft(event.target.checked)} />创建为草稿</label>{message ? <div className="text-act-xs text-text-muted">{message}</div> : null}<div className="flex justify-end gap-2"><button type="button" className="h-8 px-3 text-act-xs text-text-muted" onClick={onClose}>取消</button><button type="button" disabled={busy || !title.trim()} className="inline-flex h-8 items-center gap-1.5 rounded-act-sm bg-action px-3 text-act-xs font-medium text-on-action disabled:opacity-40" onClick={() => void create()}>{busy ? <Loader2 size={13} className="animate-spin" /> : <GitPullRequestArrow size={13} />}创建 PR</button></div></div></DialogShell>;
 }

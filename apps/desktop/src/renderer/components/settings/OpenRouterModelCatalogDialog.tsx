@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, RefreshCw, Search, X } from "lucide-react";
 import type { CatalogModelView, ModelsCatalogListResult } from "@actspace/shared";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
+import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { modelsApi } from "../../api/models";
 
 const ROW_HEIGHT = 92;
@@ -27,8 +27,6 @@ export function OpenRouterModelCatalogDialog({
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const { dialogRef, trapTabKey } = useDialogFocusTrap();
 
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedQuery(query), 250); return () => window.clearTimeout(timer); }, [query]);
   useEffect(() => {
@@ -67,10 +65,10 @@ export function OpenRouterModelCatalogDialog({
   }, [models, scrollTop]);
 
   return (
-    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-(--act-z-modal) grid place-items-center bg-scrim px-5" role="dialog" aria-modal="true" aria-labelledby="catalog-title" onKeyDown={(event) => { if (event.key === "Escape") onClose(); else trapTabKey(event); }}>
-      <div className="flex max-h-[min(760px,calc(100vh-40px))] w-full max-w-[760px] flex-col overflow-hidden rounded-act-xl border border-line bg-surface shadow-act-float">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent size="xl" closeOnOutsideClick={false} className="flex max-h-[min(760px,calc(100vh-40px))] flex-col overflow-hidden">
         <header className="border-b border-line px-5 pb-4 pt-5">
-          <div className="flex items-start justify-between gap-4"><div><h2 id="catalog-title" className="text-act-lg font-semibold text-text-main">为 {providerLabel} 添加模型</h2><p className="mt-1 text-act-xs text-text-faint">目录模型只在手动添加后进入 Actspace；添加后仍可停用或删除。</p></div><button ref={closeButtonRef} type="button" aria-label="关闭模型目录" className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-surface-subtle" onClick={onClose}><X size={18} /></button></div>
+          <div className="flex items-start justify-between gap-4"><div><DialogTitle className="text-act-lg font-semibold text-text-main">为 {providerLabel} 添加模型</DialogTitle><p className="mt-1 text-act-xs text-text-faint">目录模型只在手动添加后进入 Actspace；添加后仍可停用或删除。</p></div><button type="button" aria-label="关闭模型目录" className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-surface-subtle" onClick={onClose}><X size={18} /></button></div>
           <div className="mt-4 flex gap-2"><label className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" size={16} /><span className="sr-only">搜索模型</span><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索模型 ID 或名称…" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle pl-9 pr-3 text-act-sm text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20" /></label><button type="button" className="inline-flex h-10 items-center gap-1.5 rounded-act-md border border-line px-3 text-act-xs font-semibold text-text-main hover:border-line-strong" onClick={() => void reload()} disabled={loading}><RefreshCw size={15} className={loading ? "animate-spin" : ""} />重新加载</button></div>
           <div className="mt-3 flex items-center justify-between text-act-xxs text-text-faint"><span>共 {models.length} 个模型 · {{ missing: "尚无缓存", fresh: "已更新", stale: "缓存已过期", offline: "离线缓存" }[result?.state ?? "missing"]}{result?.stale && result.state !== "stale" ? " · 缓存已过期" : ""}</span><span>{result?.fetchedAt ? new Date(result.fetchedAt).toLocaleString("zh-CN") : "尚无缓存"}</span></div>
           {error ? <p role="alert" className="mt-2 text-act-xs text-on-danger">{error}</p> : null}
@@ -84,8 +82,8 @@ export function OpenRouterModelCatalogDialog({
             {windowed.items.map((model, offset) => <CatalogRow key={model.apiModel} model={model} top={(windowed.start + offset) * ROW_HEIGHT} adding={adding === model.apiModel} onAdd={() => void add(model)} />)}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

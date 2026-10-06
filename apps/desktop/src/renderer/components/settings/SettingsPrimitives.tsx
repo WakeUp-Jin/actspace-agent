@@ -10,10 +10,12 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { Check, ChevronDown, ChevronRight, CircleAlert, Minus, Plus, RotateCcw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
-import { Button, buttonClass } from "../ui/Button";
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
+import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
+import { SELECT_TRIGGER_CLASS, Select, type SelectOption } from "../ui/Select";
 
 /**
  * 设置页通用展示原子组件。样式所有权：这些组件只负责"长什么样"，
@@ -456,14 +458,6 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-export function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="inline-grid h-6 min-w-6 place-items-center rounded-act-sm border border-b-2 border-line bg-surface px-1.5 font-sans text-act-xs font-medium text-text-main">
-      {children}
-    </kbd>
-  );
-}
-
 /* ---------------------------------------------------------------- 按钮与输入 */
 
 const INPUT_WIDTH = { sm: "w-[120px]", md: "w-[220px]", full: "w-full" } as const;
@@ -529,75 +523,11 @@ export function Toggle({
 
 /* ---------------------------------------------------------------- 浮层菜单 */
 
-/**
- * 以触发器定位的 portal 菜单。菜单渲染到 body 并 fixed 定位，
- * 避开 SettingGroup 的 overflow-hidden 裁切；Esc、外部点击、滚动、缩放时关闭。
- */
-function useAnchoredMenu<TMenu extends HTMLElement>() {
-  const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; right: number; minWidth: number } | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<TMenu>(null);
+// 下拉和菜单都挂到 body，不会被 SettingGroup 的 overflow-hidden 裁切；定位、键盘、Esc、外部点击交给 ui 原语。
 
-  const openMenu = () => {
-    const el = triggerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    setCoords({ top: rect.bottom + 6, right: window.innerWidth - rect.right, minWidth: rect.width });
-    setOpen(true);
-  };
+export type { SelectOption };
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    };
-    const onReflow = () => setOpen(false);
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onReflow);
-    window.addEventListener("scroll", onReflow, true);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onReflow);
-      window.removeEventListener("scroll", onReflow, true);
-    };
-  }, [open]);
-
-  return {
-    open,
-    close: () => setOpen(false),
-    toggle: () => (open ? setOpen(false) : openMenu()),
-    triggerRef,
-    menuRef,
-    style: coords ? { position: "fixed" as const, top: coords.top, right: coords.right, minWidth: coords.minWidth } : undefined,
-  };
-}
-
-const MENU_SURFACE = "z-(--act-z-popover) max-h-[280px] overflow-auto rounded-act-group border border-line bg-surface-raised p-1 shadow-act-popover";
-const MENU_ITEM = "flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-act-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45";
-
-const TRIGGER_BASE =
-  "flex h-[30px] items-center justify-between gap-2 rounded-act-sm border bg-surface pl-2.5 pr-2 text-act-sm text-text-main outline-none transition-colors max-[600px]:w-full";
-
-function triggerState(disabled: boolean, open: boolean) {
-  if (disabled) return "cursor-not-allowed border-line opacity-60";
-  if (open) return "cursor-pointer border-focus-ring ring-[3px] ring-focus-ring/15";
-  return "cursor-pointer border-line hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/15";
-}
-
-export type SelectOption = { value: string; label: string; disabled?: boolean; group?: string };
-
-/** 自定义下拉选择。选中项高亮并带勾选；options 带 group 时按组显示小标题。 */
+/** 单选下拉。选中项高亮并带勾选；options 带 group 时按组显示小标题。 */
 export function SettingsSelect({
   value,
   options,
@@ -615,88 +545,22 @@ export function SettingsSelect({
   size?: "default" | "sm";
   placeholder?: string;
 }) {
-  const menu = useAnchoredMenu<HTMLUListElement>();
-  const selected = options.find((option) => option.value === value);
-
-  useEffect(() => {
-    if (!menu.open) return;
-    const selectedEl = menu.menuRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')
-      ?? menu.menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)");
-    selectedEl?.focus();
-  }, [menu.open]);
-
-  const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLUListElement>) => {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    const items = Array.from(menu.menuRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []);
-    const index = items.indexOf(document.activeElement as HTMLButtonElement);
-    const next = event.key === "ArrowDown" ? Math.min(items.length - 1, index + 1) : Math.max(0, index - 1);
-    items[next]?.focus();
-  };
-
-  let lastGroup: string | undefined;
   return (
-    <>
-      <button
-        ref={menu.triggerRef}
-        type="button"
-        aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={menu.open}
-        disabled={disabled}
-        onClick={menu.toggle}
-        className={cx(TRIGGER_BASE, size === "sm" ? "min-w-[140px]" : "min-w-[216px]", "max-w-[300px]", triggerState(disabled, menu.open))}
-      >
-        <span className={cx("truncate", !selected && "text-text-subtle")}>{selected?.label ?? placeholder ?? value}</span>
-        <ChevronDown
-          size={14}
-          strokeWidth={1.9}
-          className={cx("shrink-0 text-text-faint transition-transform duration-(--motion-base)", menu.open && "rotate-180")}
-          aria-hidden="true"
-        />
-      </button>
-      {menu.open && menu.style
-        ? createPortal(
-            <ul ref={menu.menuRef} role="listbox" aria-label={ariaLabel} style={menu.style} className={MENU_SURFACE} onKeyDown={onMenuKeyDown}>
-              {options.map((option) => {
-                const isSelected = option.value === value;
-                const showGroup = option.group && option.group !== lastGroup;
-                lastGroup = option.group;
-                return (
-                  <li key={`${option.group ?? ""}:${option.value}`}>
-                    {showGroup ? <div className="px-2 pb-1 pt-2 text-act-xxs font-medium text-text-faint">{option.group}</div> : null}
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      disabled={option.disabled}
-                      onClick={() => {
-                        onChange(option.value);
-                        menu.close();
-                        menu.triggerRef.current?.focus();
-                      }}
-                      className={cx(
-                        MENU_ITEM,
-                        isSelected ? "bg-selected font-medium text-text-main" : "text-text-main hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none",
-                      )}
-                    >
-                      <Check size={14} strokeWidth={2.4} className={cx("shrink-0", !isSelected && "opacity-0")} aria-hidden="true" />
-                      <span className="truncate">{option.label}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>,
-            document.body,
-          )
-        : null}
-    </>
+    <Select
+      value={value}
+      options={options}
+      onValueChange={onChange}
+      disabled={disabled}
+      ariaLabel={ariaLabel}
+      placeholder={placeholder}
+      className={cx(size === "sm" ? "min-w-[140px]" : "min-w-[216px]", "max-w-[300px] max-[600px]:w-full")}
+    />
   );
 }
 
 /**
- * 多选下拉。复用 SettingsSelect 的 portal 定位与样式语汇，但菜单项是复选框、
- * 选择后不收起（便于连续勾选）。触发器展示已选标签拼接，空时显示 placeholder。
+ * 多选下拉。触发器和 SettingsSelect 一样，菜单项是复选框，勾选后不收起（便于连续勾选）。
+ * 触发器展示已选标签拼接，空时显示 placeholder。
  */
 export function MultiSelect({
   values,
@@ -713,60 +577,45 @@ export function MultiSelect({
   ariaLabel: string;
   placeholder?: string;
 }) {
-  const menu = useAnchoredMenu<HTMLUListElement>();
   const selectedLabels = options.filter((o) => values.includes(o.value)).map((o) => o.label);
   const toggle = (value: string) => {
     onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
   };
 
   return (
-    <>
-      <button
-        ref={menu.triggerRef}
-        type="button"
-        aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={menu.open}
-        disabled={disabled}
-        onClick={menu.toggle}
-        className={cx(TRIGGER_BASE, "min-w-[216px] max-w-[260px]", selectedLabels.length === 0 && "text-text-subtle", triggerState(disabled, menu.open))}
-      >
-        <span className="truncate">{selectedLabels.length === 0 ? placeholder : selectedLabels.join("、")}</span>
-        <ChevronDown
-          size={14}
-          strokeWidth={1.9}
-          className={cx("shrink-0 text-text-faint transition-transform duration-(--motion-base)", menu.open && "rotate-180")}
-          aria-hidden="true"
-        />
-      </button>
-      {menu.open && menu.style
-        ? createPortal(
-            <ul ref={menu.menuRef} role="listbox" aria-label={ariaLabel} aria-multiselectable="true" style={menu.style} className={MENU_SURFACE}>
-              {options.map((option) => {
-                const isSelected = values.includes(option.value);
-                return (
-                  <li key={option.value}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      disabled={option.disabled}
-                      onClick={() => toggle(option.value)}
-                      className={cx(MENU_ITEM, isSelected ? "bg-selected font-medium text-text-main" : "text-text-main hover:bg-hover-overlay")}
-                    >
-                      <span className={cx("grid h-[15px] w-[15px] shrink-0 place-items-center rounded-act-xs border border-line-strong", isSelected && "bg-surface")}>
-                        <Check size={11} strokeWidth={3} className={isSelected ? "" : "opacity-0"} aria-hidden="true" />
-                      </span>
-                      <span className="truncate">{option.label}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>,
-            document.body,
-          )
-        : null}
-    </>
+    <Menu>
+      <MenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          disabled={disabled}
+          className={cx(SELECT_TRIGGER_CLASS, "group min-w-[216px] max-w-[260px] max-[600px]:w-full")}
+        >
+          <span className={cx("truncate", selectedLabels.length === 0 && "text-text-subtle")}>
+            {selectedLabels.length === 0 ? placeholder : selectedLabels.join("、")}
+          </span>
+          <ChevronDown
+            size={14}
+            strokeWidth={1.9}
+            className="shrink-0 text-text-faint transition-transform duration-(--motion-base) group-data-[state=open]:rotate-180 motion-reduce:transition-none"
+            aria-hidden="true"
+          />
+        </button>
+      </MenuTrigger>
+      <MenuContent align="end" className="max-h-[min(280px,var(--radix-dropdown-menu-content-available-height))] min-w-(--radix-dropdown-menu-trigger-width)">
+        {options.map((option) => (
+          <MenuCheckboxItem
+            key={option.value}
+            checked={values.includes(option.value)}
+            disabled={option.disabled}
+            onCheckedChange={() => toggle(option.value)}
+            onSelect={(event) => event.preventDefault()}
+          >
+            <span className="truncate">{option.label}</span>
+          </MenuCheckboxItem>
+        ))}
+      </MenuContent>
+    </Menu>
   );
 }
 
@@ -784,47 +633,21 @@ export function SettingsMenuButton({
   items: SettingsMenuItem[];
   disabled?: boolean;
 }) {
-  const menu = useAnchoredMenu<HTMLDivElement>();
-  useEffect(() => {
-    if (menu.open) menu.menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
-  }, [menu.open]);
   return (
-    <>
-      <button
-        ref={menu.triggerRef}
-        type="button"
-        aria-label={ariaLabel}
-        aria-haspopup="menu"
-        aria-expanded={menu.open}
-        disabled={disabled}
-        onClick={menu.toggle}
-        className={buttonClass({ variant: "ghost" })}
-      >
-        {label}
-      </button>
-      {menu.open && menu.style
-        ? createPortal(
-            <div ref={menu.menuRef} role="menu" aria-label={ariaLabel} style={{ ...menu.style, minWidth: 140 }} className={MENU_SURFACE}>
-              {items.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  role="menuitem"
-                  disabled={item.disabled}
-                  onClick={() => {
-                    menu.close();
-                    item.onSelect();
-                  }}
-                  className={cx(MENU_ITEM, "hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none", item.danger ? "text-on-danger" : "text-text-main")}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
+    <Menu>
+      <MenuTrigger asChild>
+        <Button variant="ghost" aria-label={ariaLabel} disabled={disabled}>
+          {label}
+        </Button>
+      </MenuTrigger>
+      <MenuContent align="end" className="min-w-[140px]">
+        {items.map((item) => (
+          <MenuItem key={item.label} danger={item.danger} disabled={item.disabled} onSelect={item.onSelect}>
+            {item.label}
+          </MenuItem>
+        ))}
+      </MenuContent>
+    </Menu>
   );
 }
 
@@ -866,19 +689,14 @@ export function Stepper({
   return (
     <div className="inline-flex items-center gap-1.5">
       {defaultValue !== undefined ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label={`${ariaLabel}重置`}
-              onClick={() => onChange(defaultValue)}
-              className={cx("grid h-7 w-7 place-items-center rounded-act-sm text-text-faint transition-colors hover:text-text-main", !canReset && "invisible")}
-            >
-              <RotateCcw size={13} strokeWidth={2} aria-hidden="true" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>重置 {ariaLabel}</TooltipContent>
-        </Tooltip>
+        <IconButton
+          label={`${ariaLabel}重置`}
+          tooltip={`重置 ${ariaLabel}`}
+          onClick={() => onChange(defaultValue)}
+          className={cx(!canReset && "invisible")}
+        >
+          <RotateCcw size={13} strokeWidth={2} aria-hidden="true" />
+        </IconButton>
       ) : null}
       <div role="group" aria-label={ariaLabel} className={cx("inline-flex h-[30px] items-center rounded-act-sm border border-line bg-surface", disabled && "opacity-55")}>
         <Tooltip>
@@ -918,110 +736,6 @@ export function Stepper({
         </Tooltip>
       </div>
     </div>
-  );
-}
-
-export function NumberField({
-  value,
-  placeholder,
-  onCommit,
-  min,
-  max,
-  step,
-  disabled = false,
-  ariaLabel,
-  suffix,
-}: {
-  value: number | null;
-  placeholder: string;
-  onCommit: (value: number | null) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-  disabled?: boolean;
-  ariaLabel: string;
-  suffix?: string;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <SettingsInput
-        type="number"
-        aria-label={ariaLabel}
-        defaultValue={value ?? ""}
-        placeholder={placeholder}
-        min={min}
-        max={max}
-        step={step}
-        disabled={disabled}
-        width="sm"
-        numeric
-        onBlur={(event) => {
-          const raw = event.target.value.trim();
-          if (raw === "") {
-            onCommit(null);
-            return;
-          }
-          const parsed = Number(raw);
-          onCommit(Number.isFinite(parsed) ? parsed : null);
-        }}
-      />
-      {suffix ? <span className="text-act-xs text-text-faint">{suffix}</span> : null}
-    </div>
-  );
-}
-
-/**
- * 受控文本框，commit-on-blur（失焦 / 回车）才回调，未聚焦时随外部 value 同步。
- * 适合「即时生效」表单里的字符串字段（路径、glob、时区、HH:MM、说明）。
- */
-export function TextField({
-  value,
-  placeholder,
-  onCommit,
-  disabled = false,
-  ariaLabel,
-  mono = false,
-  className,
-}: {
-  value: string;
-  placeholder?: string;
-  onCommit: (value: string) => void;
-  disabled?: boolean;
-  ariaLabel: string;
-  mono?: boolean;
-  className?: string;
-}) {
-  const [draft, setDraft] = useState(value);
-  const focused = useRef(false);
-
-  useEffect(() => {
-    if (!focused.current) setDraft(value);
-  }, [value]);
-
-  const commit = () => {
-    focused.current = false;
-    if (draft !== value) onCommit(draft);
-  };
-
-  return (
-    <SettingsInput
-      type="text"
-      aria-label={ariaLabel}
-      value={draft}
-      placeholder={placeholder}
-      disabled={disabled}
-      mono={mono}
-      width={className ? undefined : "full"}
-      className={className}
-      onFocus={() => {
-        focused.current = true;
-      }}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") (event.target as HTMLInputElement).blur();
-      }}
-    />
   );
 }
 

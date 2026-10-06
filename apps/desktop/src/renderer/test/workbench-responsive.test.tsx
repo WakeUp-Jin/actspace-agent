@@ -187,6 +187,32 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.queryByTestId("compact-right-panel-overlay")).not.toBeInTheDocument();
   });
 
+  it("closes only an open popover on Escape, leaving the overlay right panel open", async () => {
+    const user = userEvent.setup();
+    renderWorkbench({
+      contextSnapshot: mockContextSnapshot,
+      messages: [{ kind: "user", id: "message-1", renderKey: "message-1", content: "你好", createdAt: "2026-10-06T00:00:00.000Z" }],
+    });
+    await user.click(screen.getByRole("button", { name: "打开面板" }));
+    const usage = screen.getAllByRole("button", { name: /^上下文用量 / })[0]!;
+
+    await user.click(usage);
+    expect(screen.getByRole("dialog", { name: "上下文用量" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("compact-right-panel-overlay")).toBeInTheDocument();
+
+    // 焦点不在浮层里（例如选区菜单）时，Esc 由 Radix 在 document 上处理，窗口上的 Esc 处理要跳过它。
+    await user.click(usage);
+    (document.activeElement as HTMLElement).blur();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("compact-right-panel-overlay")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByTestId("compact-right-panel-overlay")).not.toBeInTheDocument();
+  });
+
   it("keeps the regular SplitView panes at desktop widths", async () => {
     const user = userEvent.setup();
     setViewportWidth(1120);
@@ -413,6 +439,21 @@ describe("WorkbenchLayout narrow window behavior", () => {
 
     await user.click(screen.getByRole("button", { name: "收起会话侧栏" }));
     expect(screen.getByRole("separator", { name: "调整预览面板宽度" })).toHaveAttribute("aria-valuemax", "1488");
+  });
+
+  it("resizes the right panel from the keyboard and restores its default width on double click", async () => {
+    const user = userEvent.setup();
+    setViewportWidth(2048);
+    renderWorkbench();
+
+    await user.click(screen.getByRole("button", { name: "打开面板" }));
+    const separator = screen.getByRole("separator", { name: "调整预览面板宽度" });
+    separator.focus();
+    await user.keyboard("{End}");
+    expect(separator).toHaveAttribute("aria-valuenow", "1228");
+
+    await user.dblClick(separator);
+    expect(separator).toHaveAttribute("aria-valuenow", "390");
   });
 
   it("returns from Settings to chat without an analysis entry", async () => {

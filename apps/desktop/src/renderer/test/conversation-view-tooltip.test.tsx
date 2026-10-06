@@ -87,6 +87,30 @@ function renderConversation(inputMessages: MessageBlock[] = messages) {
 }
 
 describe("ConversationView tooltips", () => {
+  it("opens the turn ⋯ menu from the keyboard, copies the request id and returns focus (16 T16b)", async () => {
+    renderConversation();
+    const user = userEvent.setup();
+    const trigger = screen.getByRole("button", { name: "更多消息操作" });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: "分叉会话" })).toHaveAttribute("aria-disabled", "true");
+    expect(within(menu).queryByRole("menuitem", { name: "重新生成可视化" })).toBeNull();
+    await waitFor(() => expect(within(menu).getByRole("menuitem", { name: "复制消息" })).toHaveFocus());
+    await user.keyboard("{ArrowDown}{Enter}");
+
+    expect(await navigator.clipboard.readText()).toBe("assistant-1");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(trigger).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
+
   it("keeps Thinking open until the final reply finishes, then collapses Work and Thinking", () => {
     const thinking: MessageBlock = {
       kind: "thinking", id: "thinking-1", title: "Thinking...", content: "Long reasoning content",

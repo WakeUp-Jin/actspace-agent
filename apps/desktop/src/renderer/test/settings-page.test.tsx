@@ -764,7 +764,7 @@ describe("SettingsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "子 Agent" }));
     expect(screen.getByRole("heading", { name: "Explore", level: 3 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Explore 模型" })).toHaveTextContent("跟随会话模型");
+    expect(screen.getByRole("combobox", { name: "Explore 模型" })).toHaveTextContent("跟随会话模型");
     expect(screen.queryByRole("heading", { name: "扩展管理" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Skill 管理" })).not.toBeInTheDocument();
   });
@@ -775,7 +775,7 @@ describe("SettingsPage", () => {
     const updateTaskModels = vi.fn(async () => ({ taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: "deepseek:deepseek-v4-pro" } }));
     overrideBridge({ "models.updateTaskModels": updateTaskModels as never });
     renderSettingsPage({ onBack: () => {}, initialSection: "subagents" });
-    await userEvent.click(await screen.findByRole("button", { name: "Explore 模型" }));
+    await userEvent.click(await screen.findByRole("combobox", { name: "Explore 模型" }));
     await userEvent.click(await screen.findByRole("option", { name: "DeepSeek V4 Pro" }));
     await waitFor(() => expect(updateTaskModels).toHaveBeenCalledWith({ exploreModel: "deepseek:deepseek-v4-pro" }));
   });

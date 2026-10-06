@@ -30,7 +30,7 @@ const ACTIVE_SESSION_KEYS = {
 } satisfies Record<keyof ActiveSessionValue, true>;
 
 const COMPOSER_KEYS = {
-  draftKey: true, readDraft: true, writeDraft: true, readAnnotationDraft: true, writeAnnotationDraft: true, messageQueue: true,
+  draftKey: true, readDraft: true, writeDraft: true, readAttachmentDraft: true, writeAttachmentDraft: true, readAnnotationDraft: true, writeAnnotationDraft: true, messageQueue: true,
   composerNotice: true, defaultModelId: true, selectedModelId: true, onSelectedModelChange: true, composerMode: true,
   onComposerModeChange: true, selectedSkills: true, onSelectedSkillsChange: true, models: true, draftRestore: true,
 } satisfies Record<keyof ComposerContextValue, true>;

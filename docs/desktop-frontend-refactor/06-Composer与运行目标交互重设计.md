@@ -40,7 +40,7 @@
 
 | 问题 | 位置 | 修复 |
 | --- | --- | --- |
-| 切换会话时附件不清空，可能带到另一个会话（待真机验证） | `:765-771` 只恢复草稿文本；ConversationView 两处挂载 Composer 且无 `key`（`:1122`、`:1221`） | 单次挂载 + `key={draftKey}`；附件纳入草稿结构（02 的 `SessionLocalState.draft`） |
+| 切换会话时附件不清空，可能带到另一个会话（待真机验证） | `:765-771` 只恢复草稿文本；ConversationView 两处挂载 Composer 且无 `key`（`:1122`、`:1221`） | 单次挂载 + `key={draftKey}`；附件纳入草稿结构（02 的 `SessionLocalState.draft`）。**已在 16 T14 处理**：Composer 只挂一次但不用 key（重挂载会在新建页发出第一条时丢焦点），附件按会话存进 `SessionLocalState.attachments`，见 05 §7-8 |
 | 斜杠菜单 ↑↓ 在输入法组字时也会响应 | `:1381` | 统一判断 `event.nativeEvent.isComposing \|\| event.keyCode === 229` |
 | `Shift+Tab` 切 Plan 在组字时也会响应 | `:1370` | 同上 |
 | 6 个布尔手工互斥 | `:602-627` | 05 §2.3 的 `ComposerOverlay` 枚举 |
@@ -352,7 +352,7 @@ features/composer/
   composer-context.ts          ← ComposerContext（02 §3.3）
 ```
 
-- Composer 只在 ConversationView 挂载一次，`key={draftKey}`。
+- Composer 只在 ConversationView 挂载一次，`key={draftKey}`。（16 T14 已实施单次挂载，没有用 key，见 05 §7-8。）
 - 所有远端判断改为 `useRunTarget().capabilities`（03）。
 
 ## 8. 实施步骤
@@ -362,7 +362,7 @@ features/composer/
 | S0 | demo 评审，确认 §9 的问题 | — |
 | S1 | 新 token（composer border / shadow）+ panel class 替换（圆角用现有 `radius-xl`）；`+` 改 ghost | 无，可提前单独做 |
 | S2 | 队列托盘移到输入框上方 + 外观 + 文案；`⋯` 改用 Menu | 05 S1 |
-| S3 | Composer 单次挂载 + key；附件纳入草稿；IME 判断统一 | 02 S3 |
+| S3 | Composer 单次挂载 + key；附件纳入草稿；IME 判断统一（单次挂载和附件草稿已在 16 T14 完成，不用 key；IME 归 09） | 02 S3 |
 | S4 | `RunTargetRow` + `RunLocationMenu` + `ComposerStatusRow`；删除远端 `<select>` 与「即将推出」占位 | 03 S4、05 S1 |
 | S5 | `ModelPicker` 抽出，本地 / 远端统一 | 03 S6 |
 | S6 | `ComposerPalette`（搜索 + 下钻）；模式 chip `×` | 05 S1 |
@@ -394,7 +394,7 @@ S1 改动小、收益明显，可以在其它重构之前单独做。
 - 未就绪：§4.5 每种状态都有对应文案（组件测试）。
 - 键盘：`+` 面板搜索 → 下钻模型 → 选择，全程键盘可完成；运行位置菜单 → 子菜单 → 选择 Host，全程键盘可完成。
 - IME：中文输入法组字时 ↑↓、Shift+Tab、Enter 不触发 Composer 行为。
-- 切换会话：附件不串会话（新增测试）。
+- 切换会话：附件不串会话（新增测试）。16 T14 已加 `composer-attachment-drafts.test.tsx`。
 - 480px 窄窗：运行目标行可换行，菜单不被裁剪。
 
 ## 11. Cursor 输入框源码参考（2026-10-05）

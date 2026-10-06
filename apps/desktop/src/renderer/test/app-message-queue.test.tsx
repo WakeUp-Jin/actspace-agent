@@ -1,6 +1,6 @@
 import type { FixtureRunInput, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
 import type { TaskSnapshot, TaskCommand, SubmitTaskInput, TaskContentEnvelope } from "@actspace/shared/runtime-v2";
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type {
@@ -359,6 +359,24 @@ describe("App message queue", () => {
       expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
       expect(localStorage.getItem(KEY)).not.toBeNull();
       expect(fixture.submitTask).not.toHaveBeenCalled();
+    });
+
+    it("keeps the attachments the user added while the snapshot was being checked", async () => {
+      const fixture = setupQueueFixture();
+      overrideBridge({ "dialogs.getPathForFile": (file: File) => `/Users/test/${file.name}` });
+      seedRecord("sub-6", "old draft");
+      const releaseSnapshots = holdSnapshots(fixture);
+      renderApp(); await selectSession("queue-a", "Queue A");
+      fireEvent.drop(screen.getByLabelText("消息输入面板"), {
+        dataTransfer: { files: [new File(["report"], "report.pdf", { type: "application/pdf" })], types: ["Files"] },
+      });
+      expect(screen.getByLabelText("已附加的文件 report.pdf")).toBeInTheDocument();
+      await releaseSnapshots();
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+      expect(screen.getByLabelText("已附加的文件 report.pdf")).toBeInTheDocument();
+      expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
     });
 
     it("reuses the recorded submissionId when the restored draft is sent unchanged", async () => {

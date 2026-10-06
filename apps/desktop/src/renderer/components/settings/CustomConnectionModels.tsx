@@ -3,7 +3,7 @@ import { MoreHorizontal, Plus, RefreshCw } from "lucide-react";
 import { customModelDraftFromCatalog, type InstalledModelView, type ModelMutationResult, type SettingsV4ConnectionSettings } from "@actspace/shared";
 import { SettingEditor, SettingGroup, SettingTag, SettingsInput, SettingsMenuButton, Toggle, useSettingsSaveNotice } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { isKnownCatalogModel } from "./custom-connection-shared";
 import { modelsApi } from "../../api/models";
 import { settingsApi } from "../../api/settings";

@@ -28,7 +28,7 @@ describe("使用统计", () => {
   it("sends search to the full query and preserves status and search on pagination", async () => {
     const refresh = vi.fn(); const next = vi.fn();
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, rowsPage: { page: 1, pageSize: 10, totalRows: 21, totalPages: 3 } }} onRefresh={refresh} onRequestPageChange={next} />);
-    await userEvent.click(screen.getByRole("button", { name: "筛选状态" }));
+    await userEvent.click(screen.getByRole("combobox", { name: "筛选状态" }));
     await userEvent.click(screen.getByRole("option", { name: "失败" }));
     await userEvent.type(screen.getByLabelText("搜索使用记录"), "deepseek");
     await waitFor(() => expect(refresh).toHaveBeenLastCalledWith("month", 1, "error", "deepseek", undefined));

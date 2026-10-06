@@ -1,9 +1,6 @@
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as React from "react";
-
-function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
+import { cn } from "./cn";
 
 const TooltipProvider = TooltipPrimitive.Provider;
 const Tooltip = TooltipPrimitive.Root;

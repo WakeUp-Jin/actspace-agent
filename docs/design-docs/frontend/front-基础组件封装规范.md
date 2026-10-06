@@ -52,13 +52,15 @@ apps/desktop/src/renderer/components/ui/
 
 - `Button`
 - `IconButton`
-- `Tooltip`
-- `DropdownMenu`
+- `Tooltip`、`HoverCard`
+- `Menu`（DropdownMenu）、`ContextMenu`、`Select`
 - `Popover`
+- `Dialog`、`ConfirmDialog`
 - `Switch`
 - `Textarea`
 - `Tabs`
-- `Dialog`
+
+前七项已落地（见下文「弹层原语」），`Switch`、`Textarea`、`Tabs` 仍归 [`frontend-ui-components-foundation.md`](../../exec-plans/active/frontend-ui-components-foundation.md)。
 
 这些组件可以接收 `variant`、`size`、`className`、`children`、`disabled` 等通用属性，但不应接收 `modelId`、`sessionId`、`messageId`、`toolName` 这类业务字段。
 
@@ -142,19 +144,21 @@ apps/desktop/src/renderer/components/ui/
 components/ui/Button.tsx
 components/ui/IconButton.tsx
 components/ui/Tooltip.tsx
-components/ui/DropdownMenu.tsx
+components/ui/Menu.tsx
 ```
 
 导出名称与文件名保持一致。组合式 Radix wrapper 可以导出多个命名组件，例如：
 
 ```tsx
 export {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem
+  Menu,
+  MenuTrigger,
+  MenuContent,
+  MenuItem
 };
 ```
+
+Radix 的 DropdownMenu 在项目里叫 `Menu`（`ui/Menu.tsx`），与 `ContextMenu` 对称。
 
 如果某个组件需要 variant，优先使用清晰的字符串枚举，例如：
 
@@ -181,12 +185,89 @@ size?: "sm" | "md" | "lg" | "icon";
 
 | 形态 | 例子 | 归属 |
 |---|---|---|
-| 菜单项、列表行 | Composer 命令菜单项、模型列表项、消息操作菜单项 | `DropdownMenu` |
-| 下拉触发器 | Composer 模式 / 模型选择器、`SettingsSelect`、可视化回复文件选择器 | `DropdownMenu` / `Select` |
+| 菜单项、列表行 | Composer 命令菜单项、模型列表项 | `Menu`，随 09 迁移；消息操作菜单项已改为 `MenuItem`（2026-10-06） |
+| 下拉触发器 | Composer 模式 / 模型选择器、可视化回复文件选择器 | Composer 随 09 迁移；文件选择器见技术债。`SettingsSelect` 已改用 `ui/Select`（2026-10-06） |
 | 分段控件 | 右侧面板「预览 / 源码」切换 | `Tabs` / SegmentedControl |
 | 整块可点的卡片 | 子 Agent 卡片、任务输入卡、右侧面板启动器方块 | 业务组件自身 |
 | 与 36px 输入框同排的表单控件 | API Key 显隐切换、自定义连接模型行内操作 | 与 Input / Textarea 基础组件一起收口 |
 | 已封装的浮动按钮 | `ScrollToBottomButton`、会话轨迹刻度 | 业务组件自身 |
+
+## 弹层原语
+
+2026-10-06 起（Desktop 前端重构 16），弹层、菜单、对话框只有一套实现，都在 `components/ui/`，基于 Radix。业务组件不再自己 `createPortal`、不再自己声明 `role="dialog"`、不再为了关弹层监听 Escape 或 document 上的 mousedown。
+
+| 原语 | 文件 | 用于 |
+|---|---|---|
+| `Dialog`（`DialogContent` / `DialogHeader` / `DialogBody` / `DialogFooter`） | `Dialog.tsx` | 模态对话框。尺寸 `sm \| md \| lg \| xl \| full`，外观 `float`（设置、确认框）/ `raised`（Review、本地更新这类卡片），遮罩 `scrim` / `overlay` |
+| `ConfirmDialog` | `ConfirmDialog.tsx` | 破坏性操作的确认：默认焦点在「取消」，点遮罩不关，进行中不能关，错误留在弹窗里 |
+| `Popover` | `Popover.tsx` | 非模态浮层：内容里有输入框、按钮、说明文字，或者不是一列选项 |
+| `Menu` | `Menu.tsx` | 按钮打开的动作菜单（Item、CheckboxItem、RadioItem、Sub、Label、Separator、Shortcut） |
+| `ContextMenu` | `ContextMenu.tsx` | 右键菜单，与 Menu 同构 |
+| `Select` | `Select.tsx` | 单选下拉，替代原生 `<select>` 和自绘下拉 |
+| `Tooltip`、`HoverCard` | `Tooltip.tsx`、`HoverCard.tsx` | 悬停说明、悬停预览 |
+
+Menu、ContextMenu、Select 共用 `menu-styles.ts` 的外观：面板 `rounded-act-md` + `p-1` + `border-line` + `bg-surface-raised` + `shadow-act-popover`，菜单项 32px 高、`px-2`、`rounded-act-sm`。层级统一是 `--act-z-popover`，因为它们都 portal 到 body，可能出现在对话框之上。
+
+### 统一行为
+
+| 行为 | 规则 |
+|---|---|
+| Esc | 只关最上层，由 Radix 的 DismissableLayer 栈处理。原语的内容在 Esc 上 `stopPropagation`，外层组件自己的 Esc 处理（返回上一步、关右侧面板）不会再响应同一次按键 |
+| 点外面 | Popover、Menu、ContextMenu 关闭，那一下点击照常落到下面的元素上（Menu / ContextMenu 默认非模态）；Dialog 由 `closeOnOutsideClick` 决定 |
+| 打开时焦点 | 菜单：键盘打开时落在第一项；对话框：`initialFocus`，没有时是第一个可聚焦元素（`autoFocus` 优先）；Popover：浮层内第一个可聚焦元素 |
+| 关闭后焦点 | 回到触发器。没有 Trigger 的 Dialog / Popover（条件渲染、用 `PopoverAnchor` 定位）由 `OpenerCapture` 记下打开前的焦点并还回去；Popover 因点外面而关闭时不还，焦点留给用户新点的地方 |
+| 键盘 | 菜单 ↑↓、Home / End、Enter / 空格、→ 进子菜单、← 返回、字母跳转；ContextMenu 另支持 Shift+F10 / 菜单键 |
+| 定位 | `side` + `align` + `collisionPadding={8}`，空间不够时翻到另一侧；portal 到 body，不依赖祖先 `overflow-visible` |
+| 拖动区域 | 遮罩和浮层都是 `-webkit-app-region: no-drag`，盖在窗口标题栏上时点击不会变成拖动窗口 |
+
+业务组件里仍可以监听 Escape 的只有输入框或表单内的行为：取消重命名、取消录制快捷键、设置表单回到上一步、清除时间轴的拖选。另有两处不是弹层的：窄窗口下关侧栏和右侧面板的覆盖层（`workbench/use-panel-layout.ts`，已被浮层处理过的 Esc 不连带关）、子 Agent 记录面板（`messages/SubAgentTranscriptModal.tsx`，`role="region"`，疑似死代码，见技术债）。
+
+### 怎么选
+
+- **Menu**：内容是一列可执行的动作或选项，不含输入框。单选用 `MenuRadioItem`；需要保留右侧打勾外观时，用 `MenuItem` 加 `role="menuitemradio"` 和 `aria-checked`（PermissionModeControl 就是这样）。
+- **Select**：从一组值里选一个，触发器显示当前值。
+- **Popover**：浮层里有输入框（会和菜单的字母跳转冲突）、按钮、成段说明，或者结构不是一列选项。触发器已经是 `IconButton`（自带 Tooltip，不能再套 `PopoverTrigger`）时，用 `PopoverAnchor` 定位，开关由按钮的 `onClick` 控制，并在 `onInteractOutside` 里排除按钮本身。
+- **Dialog**：需要用户处理完才能回到背景的流程（表单、确认、全屏预览）：背景不可交互、Tab 不出对话框。只是「点开看一眼」的内容用 Popover。
+- 同一个元素同时有 Tooltip 和浮层时，浮层打开期间收起 Tooltip（`open={tooltipOpen && !popoverOpen}`），否则 Esc 先关掉的是 Tooltip。
+
+### 例外
+
+例外按「文件 + 规则」登记在检查脚本的 `UI_ONLY_ALLOWLIST`，现在只有一条：`composer/ResponseAnnotationPill.tsx` 保留 Radix HoverCard（悬停预览），卡片里有可操作的按钮，所以标成 `role="dialog"`（`docs/exec-runs/20261005-desktop-fe-00-overall/pauses.md` P2）。
+
+还没迁移的手写弹层（RightPanel 标签溢出菜单、ReplyHtmlRenderView 的文件列表、设置页 ModelMultiSelector、Composer 内的菜单）见 [技术债](../../exec-plans/tech-debt-tracker.md) 和 09。
+
+## 按钮收口与检查
+
+原生 `<button>` 分三类：
+
+1. 视觉上就是按钮 → `Button` / `IconButton`。
+2. 菜单项、下拉选项 → 原语内部（`MenuItem`、`Select` 的选项），业务组件不写 `<button>`。
+3. 纯点击区域（列表行、导航入口、单选卡片、开关、遮罩）→ 保留原生，但必须有 `type="button"` 和可见的 focus 样式（base.css 的全局 `button:focus-visible` 轮廓，或自己的 `focus-visible:*`；写了 `focus-visible:outline-none` 就要给替代样式）。
+
+以下情况也保留原生，不要为了凑数改成 `IconButton`：尺寸或默认透明度不在 IconButton 档位里、要靠 className 覆盖颜色才能维持外观的（如侧栏会话行的置顶 / 归档、回复下方的操作图标），以及嵌在带边框分组里的按钮（如 Stepper 的加减）。
+
+`pnpm check:frontend-tokens` 守三件事：
+
+- **原生按钮基线**：逐个 `.tsx` 数原生 `<button`（去掉注释；`components/ui/` 和 `test/` 不计），和 `scripts/native-button-baseline.json` 比。超过基线（包括基线里没有的新文件）就失败；低于基线时打印「可以收紧基线」的提示。
+- `createPortal` 只能出现在 `components/ui/`。
+- `role="dialog"`（也认 `role={'dialog'}`、`role: "dialog"`）只能出现在 `components/ui/`；`alertdialog` 不算。
+
+更新基线：
+
+```bash
+node scripts/check-frontend-design-tokens.mjs --update-native-button-baseline
+```
+
+它按当前代码重写整份基线。写回后在 diff 里逐行核对：数量下降的直接接受；新增或上升的，要在提交说明或执行记录里写清楚为什么不能用 `Button` / `IconButton`。`pnpm test:frontend-tokens` 要求当前代码和基线完全一致（没有可收紧的提示），所以按钮数下降后要顺手更新基线。
+
+## 大组件拆分的目录约定
+
+- 拆出的模块放在 `components/` 下按区域分的子目录，不新建 `features/`：`settings/sections/`（每个设置分区一个文件）、`settings/dialogs/`、`sidebar/`、`conversation/`、`workbench/`、`composer/`。
+- 原文件保留为区域入口（`SettingsPage.tsx`、`Sidebar.tsx`、`ConversationView.tsx`、`WorkbenchLayout.tsx`），只做布局和装配，目标 400 行以内。
+- 纯函数单独成 `.ts` 文件并有单测（`session-grouping.ts`、`session-status.ts`、`turns.ts`、`edited-files.ts`）；有状态的逻辑抽成 `use-*.ts` hook（`use-settings.ts`、`use-panel-layout.ts`、`use-session-history.ts`、`use-workspace-file-links.ts`）。
+- 区域内多个文件共用的样式常量放进该区域的 `styles.ts`；只在一个文件里用的留在原文件。
+- 拆出的模块不反向 import 区域入口；需要给外部用的类型由入口再导出。
+- 会话动作、当前会话、输入框、运行目标从 Context 读（`session/`、`target/`），不经入口逐层透传。
 
 ## 迁移顺序
 
@@ -196,7 +277,7 @@ size?: "sm" | "md" | "lg" | "icon";
 
 1. `Button` 和 `IconButton`：统一按钮尺寸、圆角、focus、disabled、icon-only 约定。（2026-09-26 已完成）
 2. `Tooltip`：为 icon-only 操作提供统一解释能力。
-3. `DropdownMenu`：替换 Composer mode/model 菜单和消息操作菜单的手写浮层逻辑。
+3. `DropdownMenu`：替换 Composer mode/model 菜单和消息操作菜单的手写浮层逻辑。（2026-10-06 由 Desktop 前端重构 16 完成，实现为 `ui/Menu`，同时落地 Popover、ContextMenu、Dialog、Select；Composer 内的菜单随 09 迁移）
 4. `Switch`：替换 model options 中的 Thinking toggle。
 5. `Textarea`：统一 composer 输入框的基础状态和可访问性。
 6. `Tabs`：替换右侧面板顶部 tab 的基础语义和状态。

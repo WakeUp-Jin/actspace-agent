@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useRef, useSyncExternalStore } from "react";
-import type { BashBackgroundStatus, ComposerMode, ResponseAnnotationReference } from "@actspace/shared";
+import type { BashBackgroundStatus, ComposerAttachment, ComposerMode, ResponseAnnotationReference } from "@actspace/shared";
 import type { ComposerDraftRestore, ComposerSendOptions } from "../components/Composer";
+import { revokeAttachmentPreviews } from "../components/composer/attachment-preview";
 import type { CompactionBlock } from "./live-runs/stream-blocks";
 import { EMPTY_MESSAGE_QUEUE, type SessionMessageQueue } from "./message-queue";
 
 // 按会话的本地状态（02 §3.1）：只存在于本窗口、没有 durable 事实源的那部分。
-// 归档 / 删除会话、移除 Host 时用 evict 释放；没有条目的会话读到 DEFAULT_SESSION_LOCAL_STATE。
+// 归档 / 删除会话、移除 Host 时用 evict 释放（连同草稿附件的预览 URL）；没有条目的会话读到 DEFAULT_SESSION_LOCAL_STATE。
 
 export type BashTaskUpdate = { status: BashBackgroundStatus; exitCode?: number | null };
 export type ComposerSessionState = { mode: ComposerMode; selectedSkills: string[] };
@@ -14,6 +15,8 @@ export type SessionLocalState = {
   /** 输入框里正在编辑的正文和回复批注（WorkbenchLayout 切换会话时读回）。 */
   composerText?: string;
   annotationDraft?: ResponseAnnotationReference[];
+  /** 输入框里还没发送的附件（16 T14，00 J4）。图片预览的 blob URL 在 evict 时释放。 */
+  attachments?: ComposerAttachment[];
   /** 发送失败后由 App 恢复到输入框的草稿（带错误和附件问题）。 */
   draft?: ComposerDraftRestore;
   composer?: ComposerSessionState;
@@ -48,6 +51,12 @@ export interface SessionLocalStore {
   ids(): string[];
 }
 
+/** 输入框里的附件和发送失败后待恢复的附件可能共用同一个预览 URL，重复释放无害。 */
+function releaseAttachmentPreviews(state: SessionLocalState | undefined): void {
+  revokeAttachmentPreviews(state?.attachments);
+  revokeAttachmentPreviews(state?.draft?.attachments);
+}
+
 export function createSessionLocalStore(): SessionLocalStore {
   const states = new Map<string, SessionLocalState>();
   const listeners = new Set<() => void>();
@@ -67,12 +76,14 @@ export function createSessionLocalStore(): SessionLocalStore {
       return () => { listeners.delete(listener); };
     },
     evict(sessionId) {
+      releaseAttachmentPreviews(states.get(sessionId));
       if (states.delete(sessionId)) notify();
     },
     evictWhere(predicate) {
       let changed = false;
       for (const sessionId of [...states.keys()]) {
         if (!predicate(sessionId)) continue;
+        releaseAttachmentPreviews(states.get(sessionId));
         states.delete(sessionId);
         changed = true;
       }

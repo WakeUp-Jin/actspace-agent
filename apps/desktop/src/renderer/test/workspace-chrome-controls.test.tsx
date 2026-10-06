@@ -171,6 +171,51 @@ describe("WorkspaceChromeControls", () => {
     expect(screen.getByRole("button", { name: "codex/add-branch-selector" })).toBeInTheDocument();
   });
 
+  it("closes the branch menu and the Environment popover one Escape at a time and returns focus", async () => {
+    installBridge();
+    const user = userEvent.setup();
+    renderControls();
+    const toggle = screen.getByRole("button", { name: "查看工作区环境" });
+    await user.click(toggle);
+    const branchButton = await screen.findByRole("button", { name: "main" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(branchButton);
+    const menu = await screen.findByRole("menu", { name: "分支" });
+    expect(within(menu).getByRole("searchbox", { name: "搜索分支" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu", { name: "分支" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "工作区环境" })).toBeInTheDocument();
+    await waitFor(() => expect(branchButton).toHaveFocus());
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "工作区环境" })).not.toBeInTheDocument();
+    await waitFor(() => expect(toggle).toHaveFocus());
+
+    await user.click(toggle);
+    await user.click(await screen.findByRole("button", { name: "main" }));
+    await screen.findByRole("menu", { name: "分支" });
+    await user.click(document.body);
+    expect(screen.queryByRole("menu", { name: "分支" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "工作区环境" })).not.toBeInTheDocument();
+    // 重新打开环境浮层时分支菜单不跟着打开。
+    await user.click(toggle);
+    await screen.findByRole("button", { name: "main" });
+    expect(screen.queryByRole("menu", { name: "分支" })).not.toBeInTheDocument();
+  });
+
+  it("reopens the Environment popover with the result after a commit", async () => {
+    installBridge();
+    const user = userEvent.setup();
+    renderControls();
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
+    await user.click(await screen.findByRole("button", { name: "提交或推送" }));
+    const dialog = await screen.findByRole("dialog", { name: "提交或推送" });
+    await user.click(within(dialog).getByRole("button", { name: "提交" }));
+    const popover = await screen.findByRole("dialog", { name: "工作区环境" });
+    expect(within(popover).getByText("已提交 abc1234。")).toBeInTheDocument();
+  });
+
   it("opens create and checkout from the branch list footer", async () => {
     installBridge();
     const user = userEvent.setup();
@@ -271,6 +316,51 @@ describe("WorkspaceChromeControls", () => {
       branchName: undefined,
     });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "提交或推送" })).not.toBeInTheDocument());
+  });
+
+  it("keeps Tab inside the Git panel, commits on Cmd+Enter, ignores Escape while busy and returns focus", async () => {
+    let finish!: () => void;
+    const bridge = installBridge({
+      "workspaces.commit": vi.fn(() => new Promise((resolve) => {
+        finish = () => resolve({ ok: true, action: "commit", phase: "commit", workspaceRoot: "/tmp/workspace", branch: "main", commitCreated: true, commitHash: "abc1234" });
+      })),
+    });
+    const user = userEvent.setup();
+    renderControls();
+
+    const toggle = screen.getByRole("button", { name: "查看工作区环境" });
+    await user.click(toggle);
+    await user.click(await screen.findByRole("button", { name: "提交或推送" }));
+    const dialog = await screen.findByRole("dialog", { name: "提交或推送" });
+    const message = within(dialog).getByRole("textbox", { name: "提交说明" });
+    expect(message).toHaveFocus();
+    await user.tab({ shift: true });
+    await user.tab({ shift: true });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    for (let index = 0; index < 6; index += 1) await user.tab();
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    await user.click(message);
+    await user.type(message, "ship it");
+    await user.keyboard("{Meta>}{Enter}{/Meta}");
+    expect(bridge["workspaces.commit"]).toHaveBeenCalledWith(expect.objectContaining({ message: "ship it" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "提交或推送" })).toBeInTheDocument();
+    finish();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "提交或推送" })).not.toBeInTheDocument());
+    await waitFor(() => expect(toggle).toHaveFocus());
+  });
+
+  it("closes the Git panel with Escape when idle", async () => {
+    installBridge();
+    const user = userEvent.setup();
+    renderControls();
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
+    await user.click(await screen.findByRole("button", { name: "提交或推送" }));
+    expect(await screen.findByRole("dialog", { name: "提交或推送" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "提交或推送" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "查看工作区环境" })).toHaveFocus());
   });
 
   it("asks for a remote before commit and push when multiple remotes exist", async () => {

@@ -23,3 +23,24 @@
 | C | 并入 `offline` | 取值集合不变，文案现成 | 「离线，前往设置重新连接」是错的：连接正常，重连没有用 |
 
 **建议**：A。状态点 tone 用黄点（pending），因为 draining 和 blocked 都需要等 Host 一侧处理。选定后，把这一条写进 15 的决策记录，并同步 06 §4.5 的表格。
+
+## P2 · 2026-10-06 · 16 T7：ResponseAnnotationPill 要不要从 HoverCard 改成 Popover
+
+**状态**：待用户确认。先按建议 A 执行（不改 Pill），不阻塞后续 T；用户选 B 或 C 时再单独补一个提交。
+
+**现象**：16 的组件表（:69）和决策记录（:131）把 `composer/ResponseAnnotationPill.tsx` 列为改用 `ui/Popover`。但它现在已经是 Radix HoverCard：鼠标悬停 100ms 打开、离开 120ms 关闭，点击也能开关，定位和 Esc 都由 Radix 处理，没有 createPortal，也没有手写定位。改成 Popover 会丢掉「悬停预览」，Radix Popover 只支持点击打开。
+
+**证据**：
+- `R/components/composer/ResponseAnnotationPill.tsx:59`：`<HoverCard open={open} openDelay={100} closeDelay={120} onOpenChange={changeOpen}>`。
+- 同文件的手写部分只有焦点相关的几处：Esc 后把焦点还给胶囊且不重新打开（`dismissedRef`），Tab 从胶囊进入卡片，卡片失焦时关闭。HoverCard 不管焦点，所以这几处要自己写。
+- 悬停预览是批注功能定稿时确认的交互（Composer 批注胶囊，悬停看全部批注、移到原文高亮）。
+
+**可选方案**：
+
+| 方案 | 做法 | 优点 | 缺点 |
+| --- | --- | --- | --- |
+| A（建议，已按此执行） | 不改，继续用 `ui/HoverCard`；在 16 的决策记录里更正这一行 | 悬停预览不变；已经是 Radix 原语，没有手写定位和点外关闭，T7 要清理的东西它本来就没有 | 和计划表不一致，需要改决策记录；焦点的那几处手写代码保留 |
+| B | 改成 `ui/Popover`，另写 pointerenter/leave 计时器模拟悬停打开 | 原语统一，焦点进出、Esc 还焦点交给 Popover | 要手写悬停延迟和「从胶囊移到卡片不关闭」的判断，比现在多；HoverCard 已经做好的事要重做一遍，回归风险高 |
+| C | 改成 `ui/Popover`，只保留点击打开 | 代码最少，焦点行为最规范 | 去掉了悬停预览，属于交互改动，和批注功能定稿的设计不符 |
+
+**建议**：A。选定后在 16 的决策记录写一行「ResponseAnnotationPill 保留 HoverCard（悬停预览），不改 Popover」，并更正组件表 :69。

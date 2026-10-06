@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComposerSendOptions } from "../components/Composer";
 import { MessageQueueTray, type MessageQueueControls } from "../components/composer/MessageQueueTray";
@@ -70,10 +70,30 @@ describe("MessageQueueTray", () => {
   it("only allows editing when the input is empty and moving up when not first", async () => {
     const queue = queueOf("first", "second");
     renderTray(queue, {}, false);
-    await userEvent.click(screen.getByRole("button", { name: "更多操作：排队消息 1" }));
-    expect(screen.getByRole("menuitem", { name: /编辑/ })).toBeDisabled();
-    expect(screen.getByRole("menuitem", { name: "上移" })).toBeDisabled();
+    const trigger = screen.getByRole("button", { name: "更多操作：排队消息 1" });
+    await userEvent.click(trigger);
+    expect(screen.getByRole("menuitem", { name: /编辑/ })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: /编辑/ })).toHaveTextContent("先清空输入框");
+    expect(screen.getByRole("menuitem", { name: "上移" })).toHaveAttribute("aria-disabled", "true");
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("edits or moves a queued message from its menu, also by keyboard", async () => {
+    const user = userEvent.setup();
+    const controls = renderTray(queueOf("first", "second"));
+    await user.click(screen.getByRole("button", { name: "更多操作：排队消息 2" }));
+    await user.click(screen.getByRole("menuitem", { name: "上移" }));
+    expect(controls.onMoveUp).toHaveBeenCalledWith("1");
+    expect(screen.queryByRole("menu")).toBeNull();
+
+    // 键盘打开时焦点落在第一项上，Enter 执行。
+    screen.getByRole("button", { name: "更多操作：排队消息 1" }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("menuitem", { name: "编辑" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(controls.onEdit).toHaveBeenCalledWith("0");
+    expect(controls.onMoveUp).toHaveBeenCalledTimes(1);
   });
 });

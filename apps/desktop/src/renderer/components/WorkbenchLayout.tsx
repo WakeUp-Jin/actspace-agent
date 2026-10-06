@@ -1,19 +1,18 @@
 import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
-import type { AppSettings, MessageBlock, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
-import type { PermissionMode } from "@actspace/shared/runtime-v2";
+import type { AppSettings, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
+import { FlaskConical } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActiveSession } from "../session/active-session-context";
 import { useSessionActions } from "../session/session-actions-context";
 import { useComposerContext } from "./composer/composer-context";
-import { Check, ChevronDown, FlaskConical, ShieldCheck } from "lucide-react";
 import { ConversationView } from "./ConversationView";
 import { PlaceholderView } from "./PlaceholderView";
 import { RightPanel } from "./RightPanel";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { useAgentEditSignals } from "./right-panel/useFileFreshness";
 import { RightPanelObjectMenu } from "./right-panel/RightPanelObjectMenu";
-import { Sidebar, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
+import { Sidebar, type SessionUiStatusKind, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
 import { WindowChromeBar } from "./WindowChromeBar";
 import type { SessionMainView } from "./SessionViewToggle";
@@ -26,77 +25,11 @@ import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../sess
 import { ExtensionsPage } from "./extensions/ExtensionsPage";
 import { SettingsPage } from "./settings/SettingsPage";
 import type { SettingsSectionId } from "./settings/SettingsNav";
-import { sessionsApi } from "../api/sessions";
 import { usageApi } from "../api/usage";
-
-type StoredWorkbenchLayout = {
-  leftMode?: SidebarMode | "rail";
-  leftWidth?: number;
-  rightWidth?: number;
-};
-
-const WORKBENCH_LAYOUT_STORAGE_KEY = "actspace.workbench.layout.v1";
-const LEFT_DEFAULT_WIDTH = 260;
-const LEFT_MIN_WIDTH = 200;
-const LEFT_MAX_WIDTH = 360;
-/** 拖拽左侧分隔条到该阈值以下时，sidebar 自动 snap 到 hidden 态（rail 模式已退役）。 */
-const LEFT_HIDE_SNAP_WIDTH = 148;
-const MAIN_MIN_WIDTH = 560;
-const RIGHT_DEFAULT_WIDTH = 390;
-const RIGHT_MIN_WIDTH = 320;
-/** 低于该宽度时，左右面板改为覆盖层，避免继续挤压主聊天区。 */
-const COMPACT_LAYOUT_MAX_WIDTH = 820;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getRightMaxWidth(containerWidth: number, displayedLeftWidth: number): number {
-  if (containerWidth <= 0) {
-    return RIGHT_DEFAULT_WIDTH;
-  }
-
-  return Math.max(RIGHT_MIN_WIDTH, containerWidth - displayedLeftWidth - MAIN_MIN_WIDTH);
-}
-
-type ResolvedLayout = {
-  leftMode: SidebarMode;
-  leftWidth: number;
-  rightWidth: number;
-};
-
-function loadStoredLayout(): ResolvedLayout {
-  if (typeof window === "undefined") {
-    return {
-      leftMode: "expanded",
-      leftWidth: LEFT_DEFAULT_WIDTH,
-      rightWidth: RIGHT_DEFAULT_WIDTH
-    };
-  }
-
-  try {
-    const stored = JSON.parse(window.localStorage.getItem(WORKBENCH_LAYOUT_STORAGE_KEY) ?? "{}") as StoredWorkbenchLayout;
-    // 老版本可能落了 leftMode: "rail"，rail 已退役，统一映射成 hidden。
-    const resolvedMode: SidebarMode =
-      stored.leftMode === "hidden" || stored.leftMode === "rail" ? "hidden" : "expanded";
-    const resolvedLeftWidth = clamp(stored.leftWidth ?? LEFT_DEFAULT_WIDTH, LEFT_MIN_WIDTH, LEFT_MAX_WIDTH);
-    const initialRightMaxWidth = getRightMaxWidth(
-      window.innerWidth,
-      resolvedMode === "hidden" ? 0 : resolvedLeftWidth,
-    );
-    return {
-      leftMode: resolvedMode,
-      leftWidth: resolvedLeftWidth,
-      rightWidth: clamp(stored.rightWidth ?? RIGHT_DEFAULT_WIDTH, RIGHT_MIN_WIDTH, initialRightMaxWidth)
-    };
-  } catch {
-    return {
-      leftMode: "expanded",
-      leftWidth: LEFT_DEFAULT_WIDTH,
-      rightWidth: RIGHT_DEFAULT_WIDTH
-    };
-  }
-}
+import { collectEditedFilePaths } from "./workbench/edited-files";
+import { PermissionModeControl } from "./workbench/PermissionModeControl";
+import { LEFT_MAX_WIDTH, LEFT_MIN_WIDTH, MAIN_MIN_WIDTH, RIGHT_MIN_WIDTH, usePanelLayout } from "./workbench/use-panel-layout";
+import { useSessionHistory } from "./workbench/use-session-history";
 
 export function WorkbenchLayout({
   sessions,
@@ -125,20 +58,16 @@ export function WorkbenchLayout({
   const { capabilities, selectedWorkspaceRoot } = useRunTargetContext();
   const reviewEnabled = capabilities.review.enabled;
   const terminalEnabled = capabilities.terminal.enabled;
-  const [storedLayout] = useState(loadStoredLayout);
-  const [containerWidth, setContainerWidth] = useState(() =>
-    typeof window === "undefined" ? 0 : window.innerWidth,
-  );
-  const [leftMode, setLeftMode] = useState<SidebarMode>(storedLayout.leftMode);
-  const [leftWidth, setLeftWidth] = useState(storedLayout.leftWidth);
-  const [rightWidth, setRightWidth] = useState(storedLayout.rightWidth);
-  const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
   const {
     isOpen: isRightPanelOpen,
     openPanel: openRightPanel,
     closePanel: closeRightPanel,
     openTab,
   } = useRightPanel();
+  const {
+    isCompactLayout, leftMode, isSidebarHidden, displayedLeftWidth, rightWidth, rightMaxWidth, compactSidebarOpen, setCompactSidebarOpen, chromeLeftMode,
+    handleContainerWidthChange, toggleSidebarMode, toggleRightPanel, resizeLeftPanel, keyResizeLeftPanel, resizeRightPanel, resetRightWidth,
+  } = usePanelLayout({ isOpen: isRightPanelOpen, openPanel: openRightPanel, closePanel: closeRightPanel });
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection?.cell ?? null;
   const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
@@ -164,12 +93,7 @@ export function WorkbenchLayout({
   const [usageActivitySnapshot, setUsageActivitySnapshot] = useState<UsageActivitySnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
-  const sessionHistoryRef = useRef<string[]>([]);
-  const sessionHistoryIndexRef = useRef(-1);
-  const suppressSessionHistoryRef = useRef(false);
-  const pendingSessionNavigationRef = useRef<string | null>(null);
-  const [sessionNavigationPending, setSessionNavigationPending] = useState(false);
-  const [, setSessionHistoryVersion] = useState(0);
+  const { canGoBack, canGoForward, navigateSessionHistory } = useSessionHistory(activeSessionId, onSelectSession);
   const reviewTabRefreshCounterRef = useRef(0);
 
   useEffect(() => {
@@ -185,199 +109,6 @@ export function WorkbenchLayout({
       return next;
     });
   }, [activeSessionId]);
-  const isCompactLayout = containerWidth > 0 && containerWidth <= COMPACT_LAYOUT_MAX_WIDTH;
-  const isSidebarHidden = leftMode === "hidden";
-  const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
-  const rightMaxWidth = getRightMaxWidth(containerWidth, displayedLeftWidth);
-
-  const handleContainerWidthChange = useCallback((width: number) => {
-    setContainerWidth(width);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.localStorage.setItem(
-      WORKBENCH_LAYOUT_STORAGE_KEY,
-      JSON.stringify({
-        leftMode,
-        leftWidth,
-        rightWidth
-      })
-    );
-  }, [leftMode, leftWidth, rightWidth]);
-
-  useEffect(() => {
-    if (!activeSessionId) return;
-
-    const history = sessionHistoryRef.current;
-    const currentIndex = sessionHistoryIndexRef.current;
-
-    if (currentIndex < 0 || history.length === 0) {
-      sessionHistoryRef.current = [activeSessionId];
-      sessionHistoryIndexRef.current = 0;
-      setSessionHistoryVersion((version) => version + 1);
-      return;
-    }
-
-    if (suppressSessionHistoryRef.current) {
-      suppressSessionHistoryRef.current = false;
-      if (pendingSessionNavigationRef.current === activeSessionId) {
-        pendingSessionNavigationRef.current = null;
-        setSessionNavigationPending(false);
-        return;
-      }
-    }
-
-    if (history[currentIndex] === activeSessionId) return;
-
-    sessionHistoryRef.current = [...history.slice(0, currentIndex + 1), activeSessionId];
-    sessionHistoryIndexRef.current = currentIndex + 1;
-    setSessionHistoryVersion((version) => version + 1);
-  }, [activeSessionId]);
-
-  const canGoBack = sessionHistoryIndexRef.current > 0 && !sessionNavigationPending;
-  const canGoForward =
-    sessionHistoryIndexRef.current >= 0 &&
-    sessionHistoryIndexRef.current < sessionHistoryRef.current.length - 1 &&
-    !sessionNavigationPending;
-
-  const navigateSessionHistory = useCallback(
-    (direction: -1 | 1) => {
-      if (sessionNavigationPending || !onSelectSession) return;
-
-      const nextIndex = sessionHistoryIndexRef.current + direction;
-      const targetSessionId = sessionHistoryRef.current[nextIndex];
-      if (!targetSessionId) return;
-
-      sessionHistoryIndexRef.current = nextIndex;
-      pendingSessionNavigationRef.current = targetSessionId;
-      suppressSessionHistoryRef.current = true;
-      setSessionNavigationPending(true);
-      void Promise.resolve()
-        .then(() => onSelectSession(targetSessionId))
-        .catch(() => {
-          if (pendingSessionNavigationRef.current === targetSessionId) {
-            pendingSessionNavigationRef.current = null;
-            suppressSessionHistoryRef.current = false;
-            sessionHistoryIndexRef.current -= direction;
-            setSessionNavigationPending(false);
-          }
-        });
-    },
-    [onSelectSession, sessionNavigationPending],
-  );
-
-  useEffect(() => {
-    if (containerWidth === 0) {
-      return;
-    }
-
-    if (isCompactLayout) {
-      return;
-    }
-
-    if (leftMode === "expanded" && containerWidth - leftWidth < MAIN_MIN_WIDTH) {
-      setLeftMode("hidden");
-      return;
-    }
-
-    if (!isRightPanelOpen) {
-      return;
-    }
-
-    const currentLeftWidth = isSidebarHidden ? 0 : leftWidth;
-    if (containerWidth - currentLeftWidth - RIGHT_MIN_WIDTH < MAIN_MIN_WIDTH) {
-      if (leftMode === "expanded") {
-        setLeftMode("hidden");
-        return;
-      }
-
-      closeRightPanel();
-      return;
-    }
-
-    const allowedRightWidth = Math.min(rightMaxWidth, containerWidth - currentLeftWidth - MAIN_MIN_WIDTH);
-    if (rightWidth > allowedRightWidth) {
-      setRightWidth(clamp(allowedRightWidth, RIGHT_MIN_WIDTH, rightMaxWidth));
-    }
-  }, [containerWidth, isCompactLayout, isRightPanelOpen, isSidebarHidden, leftMode, leftWidth, rightMaxWidth, rightWidth]);
-
-  useEffect(() => {
-    if (!isCompactLayout) {
-      setCompactSidebarOpen(false);
-    }
-  }, [isCompactLayout]);
-
-  useEffect(() => {
-    if (!isCompactLayout || (!compactSidebarOpen && !isRightPanelOpen)) {
-      return;
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape") {
-        return;
-      }
-      setCompactSidebarOpen(false);
-      closeRightPanel();
-    }
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [closeRightPanel, compactSidebarOpen, isCompactLayout, isRightPanelOpen]);
-
-  function toggleSidebarMode() {
-    if (isCompactLayout) {
-      setCompactSidebarOpen((open) => {
-        if (!open && isRightPanelOpen) {
-          closeRightPanel();
-        }
-        return !open;
-      });
-      return;
-    }
-
-    if (leftMode === "expanded") {
-      setLeftMode("hidden");
-      return;
-    }
-
-    setLeftMode("expanded");
-    if (isRightPanelOpen && containerWidth - leftWidth - rightWidth < MAIN_MIN_WIDTH) {
-      closeRightPanel();
-    }
-  }
-
-  function resizeLeftPanel(width: number) {
-    if (width <= LEFT_HIDE_SNAP_WIDTH) {
-      setLeftMode("hidden");
-      return;
-    }
-
-    setLeftMode("expanded");
-    setLeftWidth(clamp(width, LEFT_MIN_WIDTH, LEFT_MAX_WIDTH));
-  }
-
-  function toggleRightPanel() {
-    if (isRightPanelOpen) {
-      closeRightPanel();
-      return;
-    }
-
-    if (isCompactLayout) {
-      setCompactSidebarOpen(false);
-      openRightPanel();
-      return;
-    }
-
-    if (containerWidth > 0 && containerWidth - displayedLeftWidth - RIGHT_MIN_WIDTH < MAIN_MIN_WIDTH) {
-      setLeftMode("hidden");
-    }
-
-    openRightPanel();
-  }
 
   const openReviewTab = useCallback(() => {
     if (!reviewEnabled) return;
@@ -433,7 +164,6 @@ export function WorkbenchLayout({
 
   // UsageStatisticsPage requests its persisted range after mounting.
 
-
   const permissionControl = activeSessionId && composerMode !== "chat" ? (
     <PermissionModeControl
       sessionId={activeSessionId}
@@ -485,9 +215,6 @@ export function WorkbenchLayout({
   const currentSession = view === "chat"
     ? sessions.find((session) => session.id === activeSessionId) ?? null
     : null;
-  const chromeLeftMode: SidebarMode = isCompactLayout
-    ? compactSidebarOpen ? "expanded" : "hidden"
-    : leftMode;
   // 右侧文件 Tab 的新鲜度信号（见 `right-panel/useFileFreshness.ts`）：
   // ① Agent 本轮编辑过的文件路径 → 精确打过期标记；
   // ② turn 从「进行中」变为「结束」时递增一个 key → 触发一次 mtime 兜底重校验，
@@ -609,19 +336,11 @@ export function WorkbenchLayout({
         main={mainContent}
         minMainWidth={MAIN_MIN_WIDTH}
         onContainerWidthChange={handleContainerWidthChange}
-        onLeftKeyResize={(width) => {
-          if (isSidebarHidden && width > LEFT_HIDE_SNAP_WIDTH) {
-            setLeftMode("expanded");
-            setLeftWidth(LEFT_MIN_WIDTH);
-            return;
-          }
-
-          resizeLeftPanel(width);
-        }}
+        onLeftKeyResize={keyResizeLeftPanel}
         onLeftResize={resizeLeftPanel}
         onLeftSeparatorDoubleClick={toggleSidebarMode}
-        onRightResize={(width) => setRightWidth(clamp(width, RIGHT_MIN_WIDTH, rightMaxWidth))}
-        onRightSeparatorDoubleClick={() => setRightWidth(RIGHT_DEFAULT_WIDTH)}
+        onRightResize={resizeRightPanel}
+        onRightSeparatorDoubleClick={resetRightWidth}
         right={view === "chat" && isRightPanelOpen && !isCompactLayout ? rightPanel : undefined}
         rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
         rightSeparatorLabel="调整预览面板宽度"
@@ -656,91 +375,4 @@ export function WorkbenchLayout({
       ) : null}
     </>
   );
-}
-
-export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: { sessionId: string; mode: PermissionMode; disabled: boolean; onChanged: () => void | Promise<void> }) {
-  const [submitting, setSubmitting] = useState(false);
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    root.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
-    const outside = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
-  }, [open]);
-  useEffect(() => { setOpen(false); }, [sessionId]);
-  const update = async (next: PermissionMode) => {
-    if (disabled || submitting) return;
-    if (next === mode) { setOpen(false); trigger.current?.focus(); return; }
-    setSubmitting(true);
-    try {
-      const result = await sessionsApi.setPermissionMode({ sessionId, mode: next });
-      if (result.ok) {
-        setOpen(false);
-        await onChanged();
-      }
-    } finally {
-      setSubmitting(false);
-      trigger.current?.focus();
-    }
-  };
-  return <div ref={root} className="relative inline-flex" onBlur={(event) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-  }} onKeyDown={(event) => {
-    if (event.key === "Escape") { event.preventDefault(); setOpen(false); trigger.current?.focus(); }
-    if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-      event.preventDefault();
-      if (!open) { setOpen(true); return; }
-      const items = Array.from(root.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []);
-      const index = items.indexOf(document.activeElement as HTMLButtonElement);
-      const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
-      items[next]?.focus();
-    }
-  }}>
-    <button
-      ref={trigger}
-      type="button"
-      className="inline-flex h-7 items-center gap-1 rounded-act-sm border-0 bg-transparent px-1.5 text-act-xs text-text-muted hover:bg-surface-subtle hover:text-text-main disabled:cursor-not-allowed disabled:opacity-50"
-      aria-label="会话权限模式"
-      aria-haspopup="menu"
-      aria-expanded={open}
-      disabled={disabled || submitting}
-      title={`权限：${mode === "full-access" ? "完全权限" : "自动"}。完全权限仅扩大文件范围，Bash、删除和敏感文件仍按策略审批。`}
-      onClick={() => setOpen((value) => !value)}
-    >
-      <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
-      <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />
-    </button>
-    {open ? <div className="absolute bottom-[calc(100%+6px)] left-0 z-50 w-[144px] rounded-act-md border border-line bg-surface-raised p-1 shadow-act-popover" role="menu" aria-label="会话权限模式选项">
-      {(["default", "full-access"] as const).map((next) => {
-        const nextLabel = next === "full-access" ? "完全权限" : "自动";
-        return <button key={next} disabled={disabled || submitting} type="button" role="menuitemradio" aria-checked={mode === next} className="flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-act-xs text-text-main outline-none hover:bg-surface-subtle focus-visible:bg-selected disabled:opacity-50" onClick={() => void update(next)}>
-          <ShieldCheck size={14} className="shrink-0 text-text-muted" aria-hidden="true" />
-          <span className="min-w-0 flex-1">{nextLabel}</span>
-          {mode === next ? <Check size={14} className="shrink-0 text-text-main" aria-hidden="true" /> : null}
-        </button>;
-      })}
-    </div> : null}
-  </div>;
-}
-
-/**
- * 从消息流里收集 Agent 改过的文件路径。
- *
- * 只看已完成的编辑/写入块：`pending`（等审批）和 `running`（还在写）时磁盘内容尚未定型，
- * 这时就打过期标记会让提示条来回闪。优先用工作区相对路径，缺失时退回 `filePath`。
- */
-function collectEditedFilePaths(messages: MessageBlock[]): string[] {
-  const paths = new Set<string>();
-  for (const message of messages) {
-    if (message.kind !== "edit_diff" && message.kind !== "write_diff") continue;
-    if (message.status !== "completed") continue;
-    const path = message.outputRelativePath || message.filePath;
-    if (path) paths.add(path);
-  }
-  return [...paths];
 }

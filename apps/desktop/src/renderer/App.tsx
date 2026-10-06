@@ -374,12 +374,12 @@ export function App() {
   useEffect(() => { sweepExpiredPendingSubmissions(); }, []);
   // 14 S10：激活会话时，上次未确认的提交恢复为草稿（本地与远端会话相同）。先查任务快照：
   // 已有相同 submissionId 说明 Runtime 收到了，只清理记录；查询失败时降级为恢复草稿。永不自动重发。
-  // 正在发送、或输入框里已有用户输入时不恢复：前者会把正在发的内容放回去，后者会覆盖用户刚输入的内容。
+  // 正在发送、或输入框里已有用户输入（文字或附件）时不恢复：前者会把正在发的内容放回去，后者会覆盖用户刚输入的内容。
   useEffect(() => {
     const sessionId = selectedSessionId;
     const blocked = (id: string) => {
       const local = localStore.get(id);
-      return Boolean(local.draft || local.composerText?.trim() || sendsInFlightRef.current.get(id));
+      return Boolean(local.draft || local.composerText?.trim() || local.attachments?.length || sendsInFlightRef.current.get(id));
     };
     if (!sessionId || blocked(sessionId)) return;
     const record = readPendingSubmission(sessionId);

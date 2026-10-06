@@ -1,740 +1,50 @@
-import { openRemoteFile } from "../hooks/remoteArtifact";
 import { useRunTargetContext } from "../target/run-target-context";
-import { messageFlowKind } from "./messages/messageFlowStyles";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
-import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Button } from "./ui/Button";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, WheelEvent as ReactWheelEvent } from "react";
-import type { ComposerAttachment, ContextState, ContextUsageSnapshot, MessageBlock } from "@actspace/shared";
+import type { ComposerAttachment, ContextState, ContextUsageSnapshot } from "@actspace/shared";
 import { ResponseAnnotationContext, annotatableMessageIds } from "./messages/response-annotation-context";
 import { ResponseSelectionMenu } from "./messages/ResponseSelectionMenu";
 import { ResponseAnnotationCommentPopover } from "./messages/ResponseAnnotationCommentPopover";
 import { ResponseAnnotationHighlights } from "./messages/ResponseAnnotationHighlights";
-import { ResponseAnnotationPill } from "./composer/ResponseAnnotationPill";
 import { useResponseAnnotationState } from "./messages/useResponseAnnotationState";
-import { Composer, type ComposerReviewSummary } from "./Composer";
-import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
+import type { ComposerReviewSummary } from "./Composer";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
-import { AssistantReply } from "./messages/AssistantReply";
-import { AgentRunBlock } from "./messages/AgentRunBlock";
-import { BashRunBlock } from "./messages/BashRunBlock";
-import { BrowserApprovalBlock } from "./messages/BrowserApprovalBlock";
-import { CompactCommandBlock, CompactionRetryContext } from "./messages/CompactCommandBlock";
-import { DeleteFileBlock } from "./messages/DeleteFileBlock";
-import { FileDiffBlock } from "./messages/FileDiffBlock";
-import { TurnOutputArtifacts } from "./messages/TurnOutputArtifacts";
-import { ThinkingBlock } from "./messages/ThinkingBlock";
-import { TodoListBlock } from "./messages/TodoListBlock";
-import { ToolActivityGroup } from "./messages/ToolActivityGroup";
-import { ToolLogLine } from "./messages/ToolLogLine";
-import {
-  getToolLogRunningTextAttrs,
-  TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
-} from "./messages/toolLogStyles";
-import { USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "./messages/UserMessage";
+import { CompactionRetryContext } from "./messages/CompactCommandBlock";
 import type { SessionMainView } from "./SessionViewToggle";
 import { TrajectoryView } from "./TrajectoryView";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
-import { formatUsdCost } from "../usage-format";
 import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { useActiveSession } from "../session/active-session-context";
 import { useComposerContext } from "./composer/composer-context";
-import { readFailureTab, tabFromFile } from "./right-panel/workspaceFileTab";
-import { getSessionToolDetail } from "../api/sessions";
-import { visualizeApi } from "../api/visualize";
-import { workspacesApi } from "../api/workspaces";
-
-type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
-type AssistantMessageBlock = Extract<MessageBlock, { kind: "assistant" }>;
-type AgentMessageBlock = Extract<MessageBlock, { kind: "agent" }>;
-type ReadMessageBlock = Extract<MessageBlock, { kind: "read" }>;
-type TodoMessageBlock = Extract<MessageBlock, { kind: "todo" }>;
-
-type ConversationTurn = {
-  id: string;
-  user: UserMessageBlock | null;
-  messages: MessageBlock[];
-};
+import { ConversationComposerSlot } from "./conversation/ConversationComposerSlot";
+import type { AgentMessageBlock } from "./conversation/render-message";
+import { TurnNavigator, useTurnNavigator } from "./conversation/TurnNavigator";
+import { TurnView } from "./conversation/TurnView";
+import { createTurnNavigationItems, groupMessagesIntoTurns, userInputHistory } from "./conversation/turns";
+import { useWorkspaceFileLinks } from "./conversation/use-workspace-file-links";
 
 const CONVERSATION_SHELL_CLASS =
   "conversation-shell grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] bg-surface pt-[var(--window-chrome-strip-height)]";
-const MESSAGE_VIEWPORT_CLASS = "conversation-message-viewport relative min-h-0 min-w-0";
+const MESSAGE_VIEWPORT_CLASS = "conversation-message-viewport relative col-start-1 row-start-1 min-h-0 min-w-0";
 const MESSAGE_SCROLL_CLASS = "message-scroll h-full min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_SCROLL_INITIAL_CLASS =
   "message-scroll message-scroll-initial h-full min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_STACK_CLASS =
   "message-stack mx-auto flex min-w-0 w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col gap-7 pb-7";
+// Composer 只挂一处（16 T14）：空会话时这一格叠在消息区上、居中显示（滚动与留白和原来放在消息区里时相同）；
+// 有消息后回到底部一行。切换只换两层 div 的 class，Composer 不重新挂载，焦点和输入法状态都还在。
+const INITIAL_COMPOSER_SCROLL_CLASS =
+  "initial-composer-scroll relative col-start-1 row-start-1 h-full min-h-0 min-w-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
 const INITIAL_COMPOSER_STAGE_CLASS =
   "initial-composer-stage flex h-full min-h-[420px] items-center justify-center px-[var(--conversation-inline-padding)]";
-const MESSAGE_TURN_CLASS = "message-turn relative flex min-w-0 flex-col gap-0";
-const TURN_PROMPT_CLASS =
-  "turn-prompt sticky top-0 z-12 min-w-0 bg-[image:var(--act-gradient-surface-fade)] py-4";
-const TURN_PROMPT_CARD_CLASS =
-  "turn-prompt-card overflow-hidden rounded-act-lg border border-line bg-surface";
-const TURN_BODY_CLASS = "turn-body message-flow flex min-w-0 flex-col";
-const ASSISTANT_TURN_GROUP_CLASS = "group/assistant-turn min-w-0";
-const TURN_ACTIONS_CLASS =
-  "turn-actions mt-1 flex min-h-7 items-center justify-between gap-3 px-[var(--conversation-text-inset)] text-act-xs text-text-faint opacity-0 pointer-events-none transition-opacity duration-(--motion-base) ease-in-out group-hover/assistant-turn:pointer-events-auto group-hover/assistant-turn:opacity-100 group-focus-within/assistant-turn:pointer-events-auto group-focus-within/assistant-turn:opacity-100";
-const TURN_ACTIONS_RIGHT_CLASS = "flex items-center justify-end gap-0.5";
-const TURN_USAGE_META_CLASS = "flex min-w-0 items-center gap-1.5 tabular-nums";
+const COMPOSER_ZONE_CLASS = "composer-zone col-start-1 row-start-2 grid min-w-0 w-full gap-3 overflow-visible pb-5";
 // 距顶部小于该距离时预取更早消息，让用户上滑时历史已经接上，而不是撞到顶部再等。
 const EARLIER_PRELOAD_THRESHOLD_PX = 240;
-const TURN_ACTION_ANCHOR_CLASS = "turn-action-anchor relative flex-none";
-const TURN_ACTION_TRIGGER_CLASS =
-  "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-(--motion-base) ease-in-out hover:bg-hover-overlay hover:text-text-main hover:opacity-100 aria-disabled:cursor-default aria-expanded:bg-selected aria-expanded:text-text-main aria-expanded:opacity-100";
-const TURN_ACTION_MENU_CLASS =
-  "turn-action-menu absolute bottom-[30px] right-0 z-40 w-[178px] rounded-act-md border border-line bg-surface-raised/98 p-1.5 shadow-act-popover";
-const TURN_ACTION_MENU_BUTTON_CLASS =
-  "flex min-h-[34px] w-full items-center rounded-act-sm border-0 bg-transparent px-2.5 text-left text-act-md leading-5 font-semibold text-text-main transition-colors duration-(--motion-base) ease-in-out hover:bg-hover-overlay disabled:cursor-default disabled:text-text-faint";
-const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-act-sm leading-[1.4] text-text-faint";
-const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
-const MODEL_WAITING_DELAY_MS = 300;
 const SCROLL_BOTTOM_THRESHOLD_PX = 80;
-const TURN_RAIL_MIN_TURNS = 3;
-const TURN_RAIL_MIN_VIEWPORT_WIDTH_PX = 640;
-
-const MESSAGE_TIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-function formatMessageTime(timestamp: string): string {
-  const date = new Date(timestamp);
-  return Number.isNaN(date.getTime()) ? timestamp : MESSAGE_TIME_FORMATTER.format(date);
-}
-
-function isSafeWorkspaceRelativePath(filePath: string): boolean {
-  return filePath.length > 0
-    && filePath !== "."
-    && !filePath.startsWith("/")
-    && !/^[A-Za-z]:[\\/]/.test(filePath)
-    && !filePath.split(/[\\/]+/).includes("..");
-}
-
-const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
-  "read",
-  "search",
-  "grep",
-  "glob",
-  "web_search",
-  "media_analysis",
-  "image_generation",
-  "directory_list",
-  "delete",
-  "agent",
-  "tool",
-  "error",
-]);
-const DIFF_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["edit_diff", "write_diff"]);
-
-function copyWithSelection(value: string) {
-  const textArea = document.createElement("textarea");
-  textArea.value = value;
-  textArea.setAttribute("readonly", "");
-  textArea.style.position = "fixed";
-  textArea.style.top = "0";
-  textArea.style.left = "0";
-  textArea.style.opacity = "0";
-
-  document.body.appendChild(textArea);
-  textArea.focus();
-  textArea.select();
-  document.execCommand("copy");
-  textArea.remove();
-}
-
-async function copyToClipboard(value: string) {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(value);
-    } else {
-      copyWithSelection(value);
-    }
-  } catch {
-    copyWithSelection(value);
-  }
-}
-
-function DeferredToolMessage({ message, className, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile }: {
-  message: MessageBlock; className?: string; onOpenAgentTranscript?: (message: AgentMessageBlock) => void; replyCompleted: boolean; onOpenReadFile?: (message: ReadMessageBlock) => void; onOpenWorkspaceFile?: (path: string) => void;
-}) {
-  const [blocks, setBlocks] = useState<MessageBlock[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const load = async () => {
-    if (loading || !message.deferredToolDetail) return;
-    setLoading(true); setError(null);
-    try { setBlocks(await getSessionToolDetail(message.deferredToolDetail)); }
-    catch (e) { setError(e instanceof Error ? e.message : '工具详情加载失败'); }
-    finally { setLoading(false); }
-  };
-  const visible = blocks ?? [{ ...message, deferredToolDetail: undefined }];
-  return <div className={className} aria-busy={loading}>
-    {visible.map(block => renderMessage({ ...block, renderKey: block.id === message.id ? message.renderKey : block.renderKey }, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, blocks ? undefined : () => { void load(); }))}
-    {loading && <p role="status">正在加载工具详情…</p>}
-    {error && <p role="alert" className="text-act-xs leading-4 text-text-muted">{error}（收起后重新展开可重试）</p>}
-  </div>;
-}
-
-export function renderMessage(
-  message: MessageBlock,
-  className?: string,
-  onOpenAgentTranscript?: (message: AgentMessageBlock) => void,
-  replyCompleted = false,
-  onOpenReadFile?: (message: ReadMessageBlock) => void,
-  onOpenWorkspaceFile?: (path: string) => void,
-  onExpand?: () => void,
-) {
-  const renderKey = message.renderKey ?? message.id;
-  // Child-session cards already have a compact summary and their own detail panel.
-  if (message.deferredToolDetail && message.kind !== "agent") return <DeferredToolMessage key={renderKey} message={message} className={className} onOpenAgentTranscript={onOpenAgentTranscript} replyCompleted={replyCompleted} onOpenReadFile={onOpenReadFile} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
-
-  switch (message.kind) {
-    case "user":
-      return <UserMessage key={renderKey} message={message} />;
-    case "assistant":
-      return <AssistantReply key={renderKey} message={message} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
-    case "thinking":
-      return <ThinkingBlock key={renderKey} message={message} className={className} replyCompleted={replyCompleted} />;
-    case "agent":
-      return <AgentRunBlock key={renderKey} message={message} className={className} onOpenTranscript={onOpenAgentTranscript} />;
-    case "bash":
-      return <BashRunBlock key={renderKey} message={message} replyCompleted={replyCompleted} onExpand={onExpand} />;
-    case "context_compaction":
-      return <CompactCommandBlock key={renderKey} message={message} className={className} />;
-    case "workspace_preparation":
-      return <WorkspacePreparationBlock key={renderKey} message={message} />;
-    case "todo":
-      return <TodoListBlock key={renderKey} message={message} className={className} />;
-    case "read":
-    case "search":
-    case "grep":
-    case "glob":
-    case "web_search":
-    case "media_analysis":
-    case "image_generation":
-    case "directory_list":
-    case "delete":
-    case "tool":
-    case "error":
-      if (message.kind === "delete" && message.status === "pending") {
-        return <DeleteFileBlock key={renderKey} message={message} className={className} />;
-      }
-      if (message.kind === "tool" && message.toolName?.startsWith("browser_") && message.status === "pending") {
-        return <BrowserApprovalBlock key={renderKey} message={message} className={className} />;
-      }
-      return <ToolLogLine key={renderKey} message={message} className={className} onOpenFile={onOpenReadFile} onExpand={onExpand} />;
-    case "status":
-      if (message.id.endsWith(":model-wait") || message.id === "model-wait") {
-        return <ModelWaitingStatus key={renderKey} content={message.content} />;
-      }
-      return (
-        <div
-          key={renderKey}
-          className={`${TURN_STATUS_LINE_CLASS}${message.tone === "error" ? ` ${TURN_STATUS_LINE_ERROR_CLASS}` : ""}`}
-        >
-          {message.content}
-        </div>
-      );
-    case "edit_diff":
-    case "write_diff":
-      return <FileDiffBlock key={renderKey} message={message} className={className} onExpand={onExpand} />;
-  }
-}
-
-function WorkspacePreparationBlock({
-  message,
-}: {
-  message: Extract<MessageBlock, { kind: "workspace_preparation" }>;
-}) {
-  const completed = message.status === "completed";
-  return (
-    <details className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-act-md leading-5 text-text-muted" open={!completed}>
-      <summary className="flex cursor-pointer list-none items-center gap-2 text-text-main">
-        {completed ? <Check size={15} aria-hidden="true" /> : <Loader2 className="animate-spin" size={15} aria-hidden="true" />}
-        <span className="font-medium">{completed ? "已创建工作树" : "正在创建工作树"}</span>
-        {completed && message.durationMs !== undefined ? (
-          <span className="text-act-xs leading-4 text-text-faint">{Math.max(0, message.durationMs / 1000).toFixed(1)}s</span>
-        ) : null}
-      </summary>
-      <div className="mt-2 grid gap-1.5 border-t border-line pt-2 text-act-xs leading-5 text-text-faint">
-        <div className="flex items-center gap-1.5 text-text-muted">
-          <GitBranch size={13} aria-hidden="true" />
-          <span>{message.branch ?? `基于 ${message.baseBranch}`}</span>
-        </div>
-        {message.workspaceRoot ? <code className="break-all font-mono">{message.workspaceRoot}</code> : null}
-        {message.baseCommit ? <span>基准提交 {message.baseCommit.slice(0, 8)}</span> : null}
-        {completed ? <span>未自动运行本地环境配置。</span> : null}
-      </div>
-    </details>
-  );
-}
-
-function ModelWaitingStatus({ content }: { content: string }) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setVisible(true), MODEL_WAITING_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  if (!visible) {
-    return null;
-  }
-
-  return (
-    <div
-      className={`${TURN_STATUS_LINE_CLASS} px-[var(--conversation-text-inset)]`}
-      role="status"
-      aria-live="polite"
-    >
-      <span
-        className={TOOL_LOG_LINE_TEXT_RUNNING_CLASS}
-        {...getToolLogRunningTextAttrs(content)}
-      >
-        {content}
-      </span>
-    </div>
-  );
-}
-
-function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {
-  const turns: ConversationTurn[] = [];
-  let currentTurn: ConversationTurn | null = null;
-
-  for (const message of messages) {
-    if (message.kind === "user") {
-      currentTurn = {
-        id: message.renderKey ?? message.id,
-        user: message,
-        messages: []
-      };
-      turns.push(currentTurn);
-      continue;
-    }
-
-    if (message.kind === "context_compaction" || message.kind === "workspace_preparation") {
-      currentTurn = null;
-      turns.push({
-        id: message.renderKey ?? message.id,
-        user: null,
-        messages: [message],
-      });
-      continue;
-    }
-
-    if (!currentTurn) {
-      currentTurn = {
-        id: `turn-${message.renderKey ?? message.id}`,
-        user: null,
-        messages: []
-      };
-      turns.push(currentTurn);
-    }
-
-    currentTurn.messages.push(message);
-  }
-
-  return turns;
-}
-
-// 工具活动组：哪些消息算「过程行」（thinking + 工具 + diff），有它才把过程聚合成活动组。
-const WORK_TOOL_LIKE_KINDS = new Set<MessageBlock["kind"]>([
-  ...TOOL_LOG_MESSAGE_KINDS,
-  ...DIFF_MESSAGE_KINDS,
-  "thinking",
-  "bash",
-]);
-
-function hasToolLikeItem(messages: MessageBlock[]): boolean {
-  return messages.some((message) => WORK_TOOL_LIKE_KINDS.has(message.kind));
-}
-
-/**
- * 把一个 turn 的消息拆成「过程」和「最终回复」两段。
- *
- * 最终回复 = turn 末尾、后面不再跟任何工具/thinking 的连续 assistant 块。
- * 其余（thinking / 工具 / 工具间旁白 content）都归到过程段，统一收进一个 Worked for 活动组。
- */
-function splitTurnMessages(messages: MessageBlock[]): {
-  workItems: MessageBlock[];
-  finalReply: MessageBlock[];
-} {
-  let splitIndex = messages.length;
-  while (splitIndex > 0 && messages[splitIndex - 1].kind === "assistant") {
-    splitIndex -= 1;
-  }
-  return {
-    workItems: messages.slice(0, splitIndex),
-    finalReply: messages.slice(splitIndex),
-  };
-}
-
-function normalizeTurnPreviewText(content: string): string {
-  return content.replace(/\s+/g, " ").trim();
-}
-
-function createTurnNavigationItems(
-  turns: ConversationTurn[],
-  isStreaming: boolean,
-): ConversationTurnNavigationItem[] {
-  const userTurns = turns.filter((turn): turn is ConversationTurn & { user: UserMessageBlock } => Boolean(turn.user));
-
-  return userTurns.map((turn, index) => {
-    const finalReply = splitTurnMessages(turn.messages).finalReply
-      .filter((message): message is AssistantMessageBlock => message.kind === "assistant")
-      .map((message) => message.content)
-      .join("\n\n");
-
-    return {
-      id: turn.id,
-      input: normalizeTurnPreviewText(turn.user.content),
-      reply: finalReply ? normalizeTurnPreviewText(finalReply) : null,
-      pending: isStreaming && index === userTurns.length - 1,
-    };
-  });
-}
-
-function workDurationMs(workItems: MessageBlock[], finalReply: MessageBlock[]): number | undefined {
-  if (workItems.length === 0) return undefined;
-  const start = Date.parse(workItems[0].createdAt);
-  const endSource = finalReply[0]?.createdAt ?? workItems[workItems.length - 1].createdAt;
-  const end = Date.parse(endSource);
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return undefined;
-  return end - start;
-}
-
-type AgentTranscriptHandler = (message: AgentMessageBlock) => void;
-
-function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void, onOpenWorkspaceFile?: (path: string) => void) {
-  // Preserve message/usage data, but do not give empty assistant text a prose gap.
-  return messages.filter((message) => message.kind !== "assistant" || message.content.trim().length > 0).map((message) =>
-    <div key={message.renderKey ?? message.id} className="message-flow-item" data-flow-kind={messageFlowKind(message)}>
-      {renderMessage(message, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
-    </div>,
-  );
-}
-
-function renderProcessContent(
-  processItems: MessageBlock[],
-  isActive: boolean,
-  finalReply: MessageBlock[],
-  onOpenAgentTranscript?: AgentTranscriptHandler,
-  replyCompleted = false,
-  onOpenReadFile?: (message: ReadMessageBlock) => void,
-  onOpenWorkspaceFile?: (path: string) => void,
-  completeTurn = true,
-): ReactNode[] {
-  return [
-    <ToolActivityGroup key="work" running={isActive} durationMs={completeTurn ? workDurationMs(processItems, finalReply) : undefined}>
-      {renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
-    </ToolActivityGroup>,
-  ];
-}
-
-function getLatestTodoMessage(messages: MessageBlock[]): TodoMessageBlock | undefined {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.kind === "todo") return message;
-  }
-  return undefined;
-}
-
-function TurnPrompt({
-  turn,
-  onOpenAttachmentPreview,
-  sessionId,
-}: {
-  turn: ConversationTurn;
-  onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
-  sessionId?: string | null;
-}) {
-  if (!turn.user) return null;
-  const latestTodo = getLatestTodoMessage(turn.messages);
-
-  return (
-    <div className={TURN_PROMPT_CLASS}>
-      {turn.user.responseAnnotations?.length ? (
-        <div className={USER_ANNOTATIONS_ROW_CLASS}>
-          <ResponseAnnotationPill annotations={turn.user.responseAnnotations} variant="sent" />
-        </div>
-      ) : null}
-      <div className={TURN_PROMPT_CARD_CLASS}>
-        <UserMessage
-          message={turn.user}
-          onOpenAttachmentPreview={onOpenAttachmentPreview}
-          sessionId={sessionId}
-          variant="execution"
-        />
-        {latestTodo && (latestTodo.totalCount > 0 || latestTodo.status === "failed") ? (
-          <TodoListBlock message={latestTodo} attached />
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/**
- * 渲染一个 turn 的正文：含工具时把过程聚合进 ToolActivityGroup（执行中平铺 / 完成后 Worked for 折叠），
- * 最终回复始终留在折叠组外正常渲染；没有工具时回退到原来的平铺渲染。
- */
-function renderTurnBody(
-  turn: ConversationTurn,
-  isActive: boolean,
-  onOpenAgentTranscript?: AgentTranscriptHandler,
-  onOpenReadFile?: (message: ReadMessageBlock) => void,
-  onOpenWorkspaceFile?: (path: string) => void,
-) {
-  const { workItems, finalReply } = splitTurnMessages(turn.messages);
-  const replyCompleted = !isActive && finalReply.length > 0;
-  const attachTodoToPrompt = Boolean(turn.user);
-  const preparationItems = workItems.filter((message) => message.kind === "workspace_preparation");
-  const latestTodo = attachTodoToPrompt ? getLatestTodoMessage(workItems) : undefined;
-  const processItems = workItems.filter(
-    (message) => message.kind !== "workspace_preparation" && (!attachTodoToPrompt || message.kind !== "todo"),
-  );
-  const processContent = processItems.length === 0
-    ? null
-    : hasToolLikeItem(processItems)
-      ? renderProcessContent(processItems, isActive, finalReply, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, Boolean(turn.user))
-      : renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile);
-
-  if (!hasToolLikeItem(processItems) && !latestTodo) {
-    return renderMessageList(turn.messages, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile);
-  }
-
-  return (
-    <>
-      {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile) : null}
-      {processContent}
-      {finalReply.length > 0 ? <div className={`message-flow${processContent ? " message-flow-final" : ""}`}>{renderMessageList(finalReply, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile)}</div> : null}
-    </>
-  );
-}
-
-type VisualizeState = "idle" | "generating" | "ready" | "error";
-
-/** 从回复正文里抽一个简短标题，给可视化 Tab 用。剥掉常见 Markdown 记号，取首个非空行。 */
-function deriveVisualizeTitle(content: string): string {
-  const firstLine =
-    content
-      .split("\n")
-      .map((line) => line.trim())
-      .find((line) => line.length > 0) ?? "回复";
-  const stripped = firstLine.replace(/^#+\s*/, "").replace(/[*_`>#~]/g, "").trim() || "回复";
-  return `可视化 · ${stripped.length > 16 ? `${stripped.slice(0, 16)}…` : stripped}`;
-}
-
-function TurnActions({
-  assistantMessages,
-  sessionId,
-  completeTurn,
-}: {
-  assistantMessages: AssistantMessageBlock[];
-  sessionId: string | null;
-  completeTurn: boolean;
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [visualizeState, setVisualizeState] = useState<VisualizeState>("idle");
-  const [visualizeError, setVisualizeError] = useState<string | null>(null);
-  const visualizeHtmlRef = useRef<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const { openTab } = useRightPanel();
-  const latestAssistantMessage = assistantMessages[assistantMessages.length - 1];
-  const copyText = useMemo(
-    () => assistantMessages.map((message) => message.content).join("\n\n"),
-    [assistantMessages]
-  );
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [menuOpen]);
-
-  if (!latestAssistantMessage) {
-    return null;
-  }
-
-  const usageLabel = completeTurn && latestAssistantMessage.usage
-    ? `${latestAssistantMessage.usage.totalTokens.toLocaleString("zh-CN")} Token · ${formatUsdCost(latestAssistantMessage.usage.costUsd)}`
-    : null;
-
-  async function handleCopy(value: string) {
-    await copyToClipboard(value);
-    setMenuOpen(false);
-  }
-
-  const visualizeTabId = `viz:${latestAssistantMessage.id}`;
-
-  function focusVisualizeTab(html: string) {
-    openTab({
-      id: visualizeTabId,
-      kind: "html",
-      title: deriveVisualizeTitle(copyText),
-      html,
-      trust: "chat",
-    });
-  }
-
-  /**
-   * 可视化转换：成本敏感，绝不每次点击都调模型。
-   * - 本地已有结果（ready）且非重生成 → 直接聚焦 Tab，零 IPC。
-   * - 否则走 IPC；main 侧按 messageId+sourceHash 命中缓存即不调模型。
-   */
-  async function handleVisualize(regenerate: boolean) {
-    setMenuOpen(false);
-    if (visualizeState === "generating") {
-      return;
-    }
-    if (!regenerate && visualizeState === "ready" && visualizeHtmlRef.current) {
-      focusVisualizeTab(visualizeHtmlRef.current);
-      return;
-    }
-    if (!sessionId) {
-      setVisualizeState("error");
-      setVisualizeError("当前环境不支持可视化转换。");
-      return;
-    }
-
-    setVisualizeState("generating");
-    setVisualizeError(null);
-    try {
-      const result = await visualizeApi.convertReply({
-        sessionId,
-        messageId: latestAssistantMessage.id,
-        content: copyText,
-        regenerate,
-      });
-      visualizeHtmlRef.current = result.html;
-      setVisualizeState("ready");
-      focusVisualizeTab(result.html);
-    } catch (error) {
-      setVisualizeState("error");
-      setVisualizeError(error instanceof Error ? error.message : "可视化转换失败");
-    }
-  }
-
-  const visualizeLabel =
-    visualizeState === "ready"
-      ? "查看可视化（已生成）"
-      : visualizeState === "generating"
-        ? "正在生成可视化…"
-        : visualizeState === "error"
-          ? (visualizeError ?? "可视化失败，点击重试")
-          : "用主模型把这条回复转成可视化 HTML";
-
-  return (
-    <div className={TURN_ACTIONS_CLASS}>
-      <div
-        className={TURN_USAGE_META_CLASS}
-        aria-label={usageLabel ? `本轮消耗：${usageLabel}` : `回复时间：${formatMessageTime(latestAssistantMessage.createdAt)}`}
-      >
-        <span>{formatMessageTime(latestAssistantMessage.createdAt)}</span>
-        {usageLabel ? <span aria-hidden="true">·</span> : null}
-        {usageLabel ? <span>{usageLabel}</span> : null}
-      </div>
-      <div className={TURN_ACTIONS_RIGHT_CLASS}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className={TURN_ACTION_TRIGGER_CLASS}
-              type="button"
-              aria-label="复制回复"
-              onClick={() => void handleCopy(copyText)}
-            >
-              <Copy size={15} strokeWidth={2} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>复制回复</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className={TURN_ACTION_TRIGGER_CLASS}
-              type="button"
-              aria-label={visualizeState === "ready" ? "查看可视化" : "可视化这条回复"}
-              aria-disabled={visualizeState === "generating"}
-              onClick={() => void handleVisualize(false)}
-            >
-              {visualizeState === "generating" ? (
-                <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />
-              ) : visualizeState === "ready" ? (
-                <Eye size={16} strokeWidth={2} />
-              ) : (
-                <Wand2 size={16} strokeWidth={2} />
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{visualizeLabel}</TooltipContent>
-        </Tooltip>
-        <div className={TURN_ACTION_ANCHOR_CLASS} ref={menuRef}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className={TURN_ACTION_TRIGGER_CLASS}
-                type="button"
-                aria-label="更多消息操作"
-                aria-expanded={menuOpen}
-                aria-haspopup="menu"
-                onClick={() => setMenuOpen((isOpen) => !isOpen)}
-              >
-                <MoreHorizontal size={18} strokeWidth={2.2} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>更多操作</TooltipContent>
-          </Tooltip>
-          {menuOpen ? (
-            <div className={TURN_ACTION_MENU_CLASS} role="menu">
-              <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
-                分叉会话
-              </button>
-              <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(copyText)}>
-                复制消息
-              </button>
-              <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(latestAssistantMessage.id)}>
-                复制请求 ID
-              </button>
-              {visualizeState === "ready" || visualizeState === "error" ? (
-                <button
-                  className={TURN_ACTION_MENU_BUTTON_CLASS}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => void handleVisualize(true)}
-                >
-                  重新生成可视化
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function ConversationView({
   contextSnapshot,
@@ -760,18 +70,14 @@ export function ConversationView({
   activeView?: SessionMainView;
   permissionControl?: ReactNode;
 }) {
-  const { sessionId, messages, isStreaming, isAborting, isCompacting, sendScrollRequestId, composerFocusRequestId, onSend, onAbort, onRetryCompaction } = useActiveSession();
-  const {
-    messageQueue, composerNotice, defaultModelId, selectedModelId, onSelectedModelChange, composerMode, onComposerModeChange,
-    selectedSkills, onSelectedSkillsChange, models, draftRestore, draftKey, readDraft, writeDraft, readAnnotationDraft, writeAnnotationDraft,
-  } = useComposerContext();
+  const { sessionId, messages, isStreaming, isAborting, sendScrollRequestId, composerFocusRequestId, onAbort, onRetryCompaction } = useActiveSession();
+  const { draftRestore, draftKey, readAnnotationDraft, writeAnnotationDraft } = useComposerContext();
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
     ? sessionProjection.cell
     : null;
   const browse = useSessionBrowse();
-  const { target, workspaceOptions, selectedWorkspaceRoot, onSelectWorkspace, execution: executionContext } = useRunTargetContext();
-  const isRemoteTarget = target.kind === "remote";
+  const { target, selectedWorkspaceRoot } = useRunTargetContext();
   // 14 S9：App 读页失败用 browse.messageError；投影 cell 的打开 / refresh 失败（bridge 重试用完前也会先显示）用 cell 的 status/error。
   const projectionError = projectionCell?.status === "error" ? `会话同步失败：${projectionCell.error ?? "未知错误"}` : null;
   // 15 S2：key 损坏时不去读页，也不给「重试」。
@@ -791,12 +97,7 @@ export function ConversationView({
   const effectiveContextSnapshot = contextSnapshot
     ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
-  const inputHistory = useMemo(
-    () => messages
-      .filter((message): message is UserMessageBlock => message.kind === "user" && message.content.length > 0)
-      .map((message) => message.content),
-    [messages],
-  );
+  const inputHistory = useMemo(() => userInputHistory(messages), [messages]);
   const turnNavigationItems = useMemo(
     () => createTurnNavigationItems(turns, isStreaming),
     [isStreaming, turns],
@@ -813,7 +114,6 @@ export function ConversationView({
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const messageStackRef = useRef<HTMLDivElement | null>(null);
-  const turnElementsRef = useRef(new Map<string, HTMLElement>());
   // 可批注的回复随 messages 变化；经 ref 读取，canAnnotate 保持稳定，选区监听不随每次流式刷新重挂。
   const annotatableIdsRef = useRef<ReadonlySet<string>>(new Set());
   annotatableIdsRef.current = useMemo(() => annotatableMessageIds(messages), [messages]);
@@ -827,8 +127,8 @@ export function ConversationView({
   // 滚回接近底部时恢复（类似 Cursor 的聊天滚动）。
   const stickToBottomRef = useRef(true);
   const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
-  const [turnRailVisible, setTurnRailVisible] = useState(false);
-  const [activeTurnId, setActiveTurnId] = useState<string | null>(turnNavigationItems[0]?.id ?? null);
+  const turnNavigator = useTurnNavigator(turnNavigationItems);
+  const { sync: syncTurnNavigator, scrollToTurn } = turnNavigator;
   const openedSubagentRuns = useRef(new Set<string>());
   const { openTab } = useRightPanel();
   const openContextTab = () => openTab({ id: "context", kind: "context", title: "上下文" });
@@ -845,31 +145,7 @@ export function ConversationView({
   const openAgentTranscript = useCallback((message: AgentMessageBlock) => {
     if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, selected: message });
   }, [sessionId, openTab]);
-  const openReadFile = useCallback(async (message: ReadMessageBlock) => {
-    const workspaceRoot = selectedWorkspaceRoot?.trim();
-    const relativePath = message.filePath.trim();
-    if (isRemoteTarget && sessionId) {
-      try { await openRemoteFile(sessionId, relativePath, openTab); }
-      catch { openTab({ id: `remote-error:${sessionId}:${relativePath}`, kind: "text", title: relativePath.split("/").at(-1) || "远端文件", content: "远端文件读取失败，请确认连接后重试。" }); }
-      return;
-    }
-    if (!workspaceRoot || !isSafeWorkspaceRelativePath(relativePath)) return;
-    try {
-      openTab(tabFromFile(await workspacesApi.readFile({ workspaceRoot, relativePath })));
-    } catch {
-      const title = relativePath.split(/[\\/]/).pop() || relativePath;
-      openTab(readFailureTab(relativePath, title));
-    }
-  }, [isRemoteTarget, sessionId, openTab, selectedWorkspaceRoot]);
-  const openWorkspaceFile = useCallback((path: string) => {
-    const normalizedPath = path.replace(/^file:\/\//i, "").replace(/\\/g, "/");
-    const root = selectedWorkspaceRoot?.replace(/\\/g, "/").replace(/\/+$/, "");
-    const relativePath = normalizedPath.startsWith(`${root ?? ""}/`)
-      ? normalizedPath.slice((root ?? "").length + 1)
-      : normalizedPath;
-    if (!isSafeWorkspaceRelativePath(relativePath)) return;
-    void openReadFile({ filePath: relativePath } as ReadMessageBlock);
-  }, [openReadFile, selectedWorkspaceRoot]);
+  const { openReadFile, openWorkspaceFile } = useWorkspaceFileLinks();
   useEffect(() => {
     const turn = turns.at(-1);
     if (!sessionId || !isStreaming || !turn?.messages.some((message) => message.kind === "agent")) return;
@@ -888,38 +164,8 @@ export function ConversationView({
     const atBottom = !scrollable || distanceFromBottom < SCROLL_BOTTOM_THRESHOLD_PX;
     stickToBottomRef.current = atBottom;
     setIsAwayFromBottom(scrollable && !atBottom);
-    setTurnRailVisible(
-      scrollable &&
-      el.clientWidth >= TURN_RAIL_MIN_VIEWPORT_WIDTH_PX &&
-      turnNavigationItems.length >= TURN_RAIL_MIN_TURNS,
-    );
-
-    if (turnNavigationItems.length === 0) {
-      setActiveTurnId(null);
-      return;
-    }
-
-    if (atBottom) {
-      setActiveTurnId(turnNavigationItems[turnNavigationItems.length - 1].id);
-      return;
-    }
-
-    const viewportRect = el.getBoundingClientRect();
-    const readingLine = viewportRect.top + Math.min(el.clientHeight * 0.32, 180);
-    let nextActiveTurnId = turnNavigationItems[0].id;
-
-    for (const item of turnNavigationItems) {
-      const turnElement = turnElementsRef.current.get(item.id);
-      if (!turnElement) continue;
-      if (turnElement.getBoundingClientRect().top <= readingLine) {
-        nextActiveTurnId = item.id;
-        continue;
-      }
-      break;
-    }
-
-    setActiveTurnId(nextActiveTurnId);
-  }, [turnNavigationItems]);
+    syncTurnNavigator(el, scrollable, atBottom);
+  }, [syncTurnNavigator]);
 
   useLayoutEffect(() => {
     updateConversationViewportRef.current = updateConversationViewport;
@@ -963,22 +209,12 @@ export function ConversationView({
   }, []);
 
   const navigateToTurn = useCallback((turnId: string) => {
-    const turnElement = turnElementsRef.current.get(turnId);
-    if (!turnElement) return;
-    stickToBottomRef.current = false;
-    setIsAwayFromBottom(true);
-    setActiveTurnId(turnId);
-    turnElement.scrollIntoView({ block: "start" });
-    updateConversationViewport();
-  }, [updateConversationViewport]);
-
-  const setTurnElement = useCallback((turnId: string, element: HTMLElement | null) => {
-    if (element) {
-      turnElementsRef.current.set(turnId, element);
-      return;
-    }
-    turnElementsRef.current.delete(turnId);
-  }, []);
+    const scrolled = scrollToTurn(turnId, () => {
+      stickToBottomRef.current = false;
+      setIsAwayFromBottom(true);
+    });
+    if (scrolled) updateConversationViewport();
+  }, [scrollToTurn, updateConversationViewport]);
 
   useEffect(() => {
     if (sendScrollRequestId === 0) {
@@ -1034,12 +270,23 @@ export function ConversationView({
     return () => observer.disconnect();
   }, [messages, scrollToBottomIfStuck, updateConversationViewport]);
 
-
+  const composerSlotProps = {
+    contextSnapshot: effectiveContextSnapshot,
+    contextState,
+    onOpenAttachmentPreview: openAttachmentPreview,
+    onExpandContext: openContextTab,
+    responseAnnotations: annotations.drafts,
+    onResponseAnnotationsChange: annotations.setDrafts,
+    responseAnnotationNotice: annotations.notice,
+    inputHistory,
+    focusRequestId,
+    permissionControl,
+  };
 
   if (messages.length === 0 && (browse?.messageLoading || browse?.listLoading || sessionError)) {
     return <main className={CONVERSATION_SHELL_CLASS}><p role={sessionError ? 'alert' : 'status'} className="px-5 py-4 text-act-md leading-5 text-text-muted">
       {sessionError ?? (browse?.messageLoading ? '正在加载消息…' : '正在加载会话…')}
-      {sessionError && !locatorError && <button onClick={retrySession}>重试</button>}
+      {sessionError && !locatorError && <button type="button" onClick={retrySession}>重试</button>}
     </p></main>;
   }
   return (
@@ -1068,147 +315,56 @@ export function ConversationView({
             aria-label="会话消息"
           >
               {browse?.messageLoading && <p role="status" className="px-5 py-3 text-act-md leading-5 text-text-muted">正在加载消息…</p>}
-              {sessionError && <p role="alert" className="px-5 py-3 text-act-md leading-5 text-text-muted">{sessionError}{locatorError ? null : <> <button onClick={retrySession}>重试</button></>}</p>}
+              {sessionError && <p role="alert" className="px-5 py-3 text-act-md leading-5 text-text-muted">{sessionError}{locatorError ? null : <> <button type="button" onClick={retrySession}>重试</button></>}</p>}
               {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"><Loader2 className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
-              {browse?.earlierError && <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">{browse.earlierError} <button onClick={requestEarlier}>重试</button></p>}
-              {isInitialComposer ? (
-                <div className={INITIAL_COMPOSER_STAGE_CLASS}>
-                  <Composer
-                    contextSnapshot={effectiveContextSnapshot}
-                    contextState={contextState}
-                    isStreaming={isStreaming}
-                    isAborting={isAborting}
-                    isCompacting={isCompacting}
-                    messageQueue={messageQueue}
-                    statusNotice={composerNotice}
-                    onSend={onSend}
-                    onAbort={onAbort}
-                    surface="initial"
-                    defaultModelId={defaultModelId}
-                    selectedModelId={selectedModelId}
-                    onSelectedModelChange={onSelectedModelChange}
-                    mode={composerMode}
-                    onModeChange={onComposerModeChange}
-                    selectedSkills={selectedSkills}
-                    onSelectedSkillsChange={onSelectedSkillsChange}
-                    onOpenAttachmentPreview={openAttachmentPreview}
-                    onExpandContext={openContextTab}
-                    workspaceOptions={workspaceOptions}
-                    selectedWorkspaceRoot={selectedWorkspaceRoot}
-                    onSelectWorkspace={onSelectWorkspace}
-                    executionContext={executionContext}
-                    draftRestore={draftRestore}
-                    draftKey={draftKey}
-                    readDraft={readDraft}
-                    writeDraft={writeDraft}
-                    responseAnnotations={annotations.drafts}
-                    onResponseAnnotationsChange={annotations.setDrafts}
-                    responseAnnotationNotice={annotations.notice}
-                    inputHistory={inputHistory}
-                    focusRequestId={focusRequestId}
-                    models={models}
-                    sessionId={sessionId}
-                    permissionControl={permissionControl}
-                  />
-                </div>
-              ) : (
+              {browse?.earlierError && <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">{browse.earlierError} <button type="button" onClick={requestEarlier}>重试</button></p>}
+              {isInitialComposer ? null : (
                 <div ref={messageStackRef} className={MESSAGE_STACK_CLASS}>
                   {turns.map((turn, turnIndex) => (
-                    <section
-                      className={MESSAGE_TURN_CLASS}
+                    <TurnView
                       key={turn.id}
-                      ref={turn.user ? (element) => setTurnElement(turn.id, element) : undefined}
-                      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 240px" }}
-                      data-conversation-turn-id={turn.user ? turn.id : undefined}
-                    >
-                      <TurnPrompt turn={turn} onOpenAttachmentPreview={openAttachmentPreview} sessionId={sessionId} />
-                      <div className={ASSISTANT_TURN_GROUP_CLASS}>
-                        <div className={TURN_BODY_CLASS}>
-                          {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, openAgentTranscript, openReadFile, openWorkspaceFile)}
-                        </div>
-                        {splitTurnMessages(turn.messages).finalReply.length > 0
-                          && (!isStreaming || turnIndex !== turns.length - 1) ? (
-                          <TurnOutputArtifacts
-                            messages={turn.messages}
-                            sessionId={sessionId}
-                            workspaceRoot={selectedWorkspaceRoot}
-                          />
-                        ) : null}
-                        <TurnActions
-                          completeTurn={Boolean(turn.user)}
-                          sessionId={sessionId}
-                          assistantMessages={
-                            splitTurnMessages(turn.messages).finalReply.filter(
-                              (message): message is AssistantMessageBlock => message.kind === "assistant",
-                            )
-                          }
-                        />
-                      </div>
-                    </section>
+                      turn={turn}
+                      isActive={isStreaming && turnIndex === turns.length - 1}
+                      sessionId={sessionId}
+                      workspaceRoot={selectedWorkspaceRoot}
+                      setTurnElement={turnNavigator.setTurnElement}
+                      onOpenAttachmentPreview={openAttachmentPreview}
+                      onOpenAgentTranscript={openAgentTranscript}
+                      onOpenReadFile={openReadFile}
+                      onOpenWorkspaceFile={openWorkspaceFile}
+                    />
                   ))}
                   <div ref={bottomAnchorRef} aria-hidden="true" />
                 </div>
               )}
           </section>
 
-          {turnRailVisible ? (
-            <ConversationTurnRail
-              items={turnNavigationItems}
-              activeTurnId={activeTurnId}
-              onNavigate={navigateToTurn}
-            />
-          ) : null}
+          <TurnNavigator
+            items={turnNavigationItems}
+            visible={turnNavigator.railVisible}
+            activeTurnId={turnNavigator.activeTurnId}
+            onNavigate={navigateToTurn}
+          />
           {isAwayFromBottom ? <ScrollToBottomButton onClick={scrollToBottom} /> : null}
         </div>
         {activeView === "trajectory" ? <div className="flex h-full min-h-0 flex-col">
-          {isStreaming ? <div className="flex shrink-0 justify-end border-b border-line px-4 py-2"><button type="button" className="rounded-act-md border border-line px-3 py-1 text-act-xs text-text-main hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring" onClick={onAbort} disabled={isAborting}>{isAborting ? "正在停止…" : "停止"}</button></div> : null}
+          {isStreaming ? <div className="flex shrink-0 justify-end border-b border-line px-4 py-2"><Button size="xs" onClick={onAbort} disabled={isAborting}>{isAborting ? "正在停止…" : "停止"}</Button></div> : null}
           <div className="min-h-0 flex-1"><TrajectoryView /></div>
         </div> : null}
       </div>
       {/* 放在消息区之后：React 按树序挂 ref 并跑 layout effect，放前面时首帧拿不到 scrollContainerRef。 */}
       <ResponseAnnotationHighlights messages={messages} scrollContainerRef={scrollContainerRef} />
 
-      {resolvedSessionReady && !isInitialComposer ? (
-        <div className="composer-zone grid min-w-0 w-full gap-3 overflow-visible pb-5" style={activeView === "trajectory" ? { display: "none" } : undefined} aria-hidden={activeView === "trajectory"}>
-          <Composer
-            contextSnapshot={effectiveContextSnapshot}
-            contextState={contextState}
-            isStreaming={isStreaming}
-            isAborting={isAborting}
-            isCompacting={isCompacting}
-            messageQueue={messageQueue}
-            statusNotice={composerNotice}
-            onSend={onSend}
-            onAbort={onAbort}
-            surface="followup"
-            defaultModelId={defaultModelId}
-            selectedModelId={selectedModelId}
-            onSelectedModelChange={onSelectedModelChange}
-            mode={composerMode}
-            onModeChange={onComposerModeChange}
-            selectedSkills={selectedSkills}
-            onSelectedSkillsChange={onSelectedSkillsChange}
-            onOpenAttachmentPreview={openAttachmentPreview}
-            onExpandContext={openContextTab}
-            workspaceOptions={workspaceOptions}
-            selectedWorkspaceRoot={selectedWorkspaceRoot}
-            onSelectWorkspace={onSelectWorkspace}
-            executionContext={executionContext}
-            draftRestore={draftRestore}
-            draftKey={draftKey}
-            readDraft={readDraft}
-            writeDraft={writeDraft}
-            responseAnnotations={annotations.drafts}
-            onResponseAnnotationsChange={annotations.setDrafts}
-            responseAnnotationNotice={annotations.notice}
-            inputHistory={inputHistory}
-            focusRequestId={focusRequestId}
-            reviewSummary={reviewSummary}
-            onOpenReview={onOpenReview}
-            models={models}
-            sessionId={sessionId}
-            permissionControl={permissionControl}
-          />
+      {resolvedSessionReady ? (
+        <div className={isInitialComposer ? INITIAL_COMPOSER_SCROLL_CLASS : COMPOSER_ZONE_CLASS} style={activeView === "trajectory" ? { display: "none" } : undefined} aria-hidden={activeView === "trajectory"}>
+          <div className={isInitialComposer ? INITIAL_COMPOSER_STAGE_CLASS : "contents"}>
+            <ConversationComposerSlot
+              surface={isInitialComposer ? "initial" : "followup"}
+              {...composerSlotProps}
+              reviewSummary={isInitialComposer ? undefined : reviewSummary}
+              onOpenReview={isInitialComposer ? undefined : onOpenReview}
+            />
+          </div>
         </div>
       ) : null}
     </main>

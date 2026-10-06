@@ -19,7 +19,7 @@ import {
   useSingleEditor,
 } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ProviderLogo } from "./ProviderLogo";
 import { CustomConnectionModels } from "./CustomConnectionModels";
 import { CustomModelForm } from "./CustomModelForm";

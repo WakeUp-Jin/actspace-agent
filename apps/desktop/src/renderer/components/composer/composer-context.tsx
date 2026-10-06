@@ -1,13 +1,16 @@
 import { createContext, useCallback, useContext, useMemo } from "react";
-import type { ComposerMode, ModelSelectionId, ResponseAnnotationReference, UsableModelView } from "@actspace/shared";
+import type { ComposerAttachment, ComposerMode, ModelSelectionId, ResponseAnnotationReference, UsableModelView } from "@actspace/shared";
 import type { SessionLocalStore } from "../../session/session-local-store";
-import type { ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter } from "../Composer";
+import type { ComposerAttachmentDraftReader, ComposerAttachmentDraftWriter, ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter } from "../Composer";
 import type { MessageQueueControls } from "./MessageQueueTray";
 
 export type ComposerDrafts = {
   readonly draftKey: string;
   readonly readDraft: ComposerDraftReader;
   readonly writeDraft: ComposerDraftWriter;
+  /** 还没发送的附件也按 draftKey 存，切换会话时换出换入（16 T14）。 */
+  readonly readAttachmentDraft: ComposerAttachmentDraftReader;
+  readonly writeAttachmentDraft: ComposerAttachmentDraftWriter;
   /** 草稿回复批注按 draftKey 存在上层，切换会话、切到设置页再回来都不丢。 */
   readonly readAnnotationDraft: (draftKey: string) => ResponseAnnotationReference[];
   readonly writeAnnotationDraft: (draftKey: string, annotations: readonly ResponseAnnotationReference[]) => void;
@@ -33,6 +36,8 @@ export type ComposerContextValue = Partial<ComposerDrafts> & {
   readonly draftRestore?: ComposerDraftRestore | null;
 };
 
+const EMPTY_ATTACHMENTS: ComposerAttachment[] = [];
+
 export const ComposerContext = createContext<ComposerContextValue | null>(null);
 
 export function useComposerContext(): ComposerContextValue {
@@ -41,16 +46,25 @@ export function useComposerContext(): ComposerContextValue {
   return value;
 }
 
-/** 文字草稿和回复批注草稿按会话存在 SessionLocalStore 里，只存在内存里，归档时随会话一起释放。 */
+/** 文字、附件和回复批注草稿按会话存在 SessionLocalStore 里，只存在内存里，归档时随会话一起释放。 */
 export function useSessionDrafts(localStore: SessionLocalStore, sessionId: string | null): ComposerDrafts {
   const draftKey = sessionId ?? "__draft__";
   const readDraft = useCallback<ComposerDraftReader>((key) => localStore.get(key).composerText ?? "", [localStore]);
   const writeDraft = useCallback<ComposerDraftWriter>((key, text) => {
     localStore.update(key, (state) => (state.composerText ?? "") === text ? state : { ...state, composerText: text || undefined });
   }, [localStore]);
+  const readAttachmentDraft = useCallback<ComposerAttachmentDraftReader>((key) => localStore.get(key).attachments ?? EMPTY_ATTACHMENTS, [localStore]);
+  const writeAttachmentDraft = useCallback<ComposerAttachmentDraftWriter>((key, attachments) => {
+    localStore.update(key, (state) => (state.attachments ?? EMPTY_ATTACHMENTS) === attachments || (attachments.length === 0 && !state.attachments)
+      ? state
+      : { ...state, attachments: attachments.length ? attachments : undefined });
+  }, [localStore]);
   const readAnnotationDraft = useCallback((key: string) => localStore.get(key).annotationDraft ?? [], [localStore]);
   const writeAnnotationDraft = useCallback((key: string, annotations: readonly ResponseAnnotationReference[]) => {
     localStore.update(key, (state) => annotations.length === 0 && !state.annotationDraft ? state : { ...state, annotationDraft: annotations.length ? [...annotations] : undefined });
   }, [localStore]);
-  return useMemo(() => ({ draftKey, readDraft, writeDraft, readAnnotationDraft, writeAnnotationDraft }), [draftKey, readDraft, writeDraft, readAnnotationDraft, writeAnnotationDraft]);
+  return useMemo(
+    () => ({ draftKey, readDraft, writeDraft, readAttachmentDraft, writeAttachmentDraft, readAnnotationDraft, writeAnnotationDraft }),
+    [draftKey, readDraft, writeDraft, readAttachmentDraft, writeAttachmentDraft, readAnnotationDraft, writeAnnotationDraft],
+  );
 }

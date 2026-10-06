@@ -1,5 +1,13 @@
 import { createContext, useContext } from "react";
-import type { NewSessionInput } from "../components/Sidebar";
+import type { MainAgentForm } from "@actspace/shared";
+
+/** 新建会话时带上的位置和形态；侧栏工作区行上的「+」会填 Host 和工作区。 */
+export type NewSessionInput = {
+  hostId?: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
+  agentForm?: MainAgentForm;
+};
 
 /**
  * 会话与工作区的操作（14 S7，02 §3.3）：新建 / 选择 / 置顶 / 重命名 / 复制 / fork / 归档，以及工作区的打开 / 归档 / 移除。

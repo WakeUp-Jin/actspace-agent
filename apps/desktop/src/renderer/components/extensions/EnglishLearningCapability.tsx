@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BookOpen, ChevronDown, Square } from "lucide-react";
 import type { EnglishLearningState, SessionListItem } from "@actspace/shared";
 import { Toggle } from "../settings/SettingsPrimitives";
+import { Select } from "../ui/Select";
 import { englishLearningApi } from "../../api/english-learning";
 import { eventsApi } from "../../api/events";
 import { sessionsApi } from "../../api/sessions";
@@ -67,12 +68,10 @@ export function EnglishLearningCapability({ onConfigure }: { onConfigure?: () =>
         <Toggle ariaLabel="开启英语辅助学习" checked={state?.enabled ?? false} disabled={!state || !selected || busy} onChange={(enabled) => { setExpanded(true); void change(enabled); }} />
       </div>
       {(expanded || error) && <div id="english-learning-details" className="flex flex-col gap-4 border-t border-line px-4 py-4">
-        <label className="flex flex-col gap-2 text-act-xs text-text-muted">目标会话
-          <select aria-label="英语学习目标会话" value={selected} disabled={busy || !state} onChange={(event) => void change(state?.enabled ?? false, event.target.value)} className="h-9 min-w-0 rounded-act-md border border-line bg-surface px-3 text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">
-            {!sessions.length && <option value="">请先创建会话</option>}
-            {sessions.map((session) => <option key={session.id} value={session.id}>{session.title || "未命名会话"}</option>)}
-          </select>
-        </label>
+        <div className="flex flex-col gap-2 text-act-xs text-text-muted"><span>目标会话</span>
+          <Select ariaLabel="英语学习目标会话" value={selected} disabled={busy || !state} onValueChange={(next) => void change(state?.enabled ?? false, next)} className="w-full min-w-0"
+            options={sessions.length ? sessions.map((session) => ({ value: session.id, label: session.title || "未命名会话" })) : [{ value: "", label: "请先创建会话" }]} />
+        </div>
         <p role="status" className="text-act-xs text-text-faint">{!state ? "加载中…" : state.enabled ? `双语已开启 · ${SPEECH_STATUS_LABELS[state.speechStatus]}` : "已关闭 · 开启后从下一次模型请求生效"}{state && state.queuedSegments > 0 ? ` · 待播 ${state.queuedSegments} 段` : ""}</p>
         {state?.notice && <p className="text-act-xs text-text-faint">{state.notice}</p>}
         {state?.error && <p role="alert" className="text-act-xs text-on-danger">{state.error.message}</p>}

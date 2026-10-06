@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
@@ -35,14 +35,20 @@ describe("App session copy and fork actions", () => {
     expect(sourceSessionId).toBeTruthy();
 
     fireEvent.contextMenu(sourceRow as HTMLElement, { clientX: 120, clientY: 80 });
-    await user.click(screen.getByRole("menuitem", { name: "复制" }));
-    await user.click(screen.getByRole("menuitem", { name: "复制 ID" }));
+    // jsdom 里元素没有尺寸，指针移向子菜单会被当成离开；用键盘打开子菜单，再直接点子菜单项。
+    screen.getByRole("menuitem", { name: "复制" }).focus();
+    await user.keyboard("{ArrowRight}");
+    fireEvent.click(await screen.findByRole("menuitem", { name: "复制 ID" }));
     expect(writeText).toHaveBeenLastCalledWith(sourceSessionId);
+    // 等上一个菜单在 setTimeout(0) 里处理完关闭后的焦点，否则会把刚打开的菜单当成焦点移出而关掉。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 
     fireEvent.contextMenu(sourceRow as HTMLElement, { clientX: 120, clientY: 80 });
-    await user.click(screen.getByRole("menuitem", { name: "复制" }));
-    await user.click(screen.getByRole("menuitem", { name: "复制会话记录" }));
-    expect(writeText).toHaveBeenLastCalledWith("# New chat\n");
+    screen.getByRole("menuitem", { name: "复制" }).focus();
+    await user.keyboard("{ArrowRight}");
+    fireEvent.click(await screen.findByRole("menuitem", { name: "复制会话记录" }));
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith("# New chat\n"));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 
     fireEvent.contextMenu(sourceRow as HTMLElement, { clientX: 120, clientY: 80 });
     await user.click(screen.getByRole("menuitem", { name: "分叉" }));

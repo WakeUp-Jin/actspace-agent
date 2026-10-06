@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComposerAttachment, ResponseAnnotationReference, SkillCatalogItem, UsableModelView } from "@actspace/shared";
 import { mockContextSnapshot, mockContextState } from "./fixtures/workbenchFixture";
@@ -201,6 +201,23 @@ describe("Composer follow-up bar", () => {
     await waitFor(() => expect(writeDraft).toHaveBeenCalledWith("session-a", "message for A"));
     expect(screen.getByLabelText("消息输入框")).toHaveValue("");
     expect(screen.queryByText("A upload failed")).not.toBeInTheDocument();
+  });
+
+  it("closes its menus and the context popup when the session changes (16 review)", async () => {
+    // Composer 只挂一次（16 T14），换会话不再重挂；开着的菜单和上下文用量不能带到下一个会话。
+    const user = userEvent.setup();
+    const readDraft = () => "";
+    const view = (draftKey: string) => <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} draftKey={draftKey} readDraft={readDraft} writeDraft={vi.fn()} onSend={vi.fn()} /></TooltipProvider>;
+    const { rerender } = render(view("session-a"));
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    expect(screen.getByRole("menu", { name: "添加上下文或工具" })).toBeInTheDocument();
+    rerender(view("session-b"));
+    expect(screen.queryByRole("menu", { name: "添加上下文或工具" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^上下文用量/ }));
+    expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
+    rerender(view("session-a"));
+    expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
   });
 
   it("allows removing a rejected attachment and retrying the retained text", async () => {
@@ -890,6 +907,38 @@ describe("Composer follow-up bar", () => {
     await user.click(screen.getByRole("button", { name: "上下文用量 36%" }));
     expect(container.querySelector(".model-menu")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
+  });
+
+  it("keeps the context popup open for clicks inside it or the composer, and closes it on Escape or an outside click", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const outside = document.createElement("button");
+    outside.textContent = "外部";
+    document.body.append(outside);
+    const toggle = screen.getByRole("button", { name: "上下文用量 36%" });
+
+    await user.click(toggle);
+    const popup = screen.getByRole("dialog", { name: "上下文用量" });
+    expect(popup).toHaveFocus();
+    const bucket = popup.querySelector<HTMLButtonElement>(".context-bucket")!;
+    await user.click(bucket);
+    expect(bucket).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("textbox"));
+    expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
+
+    await user.click(bucket);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
+    await waitFor(() => expect(toggle).toHaveFocus());
+
+    await user.click(toggle);
+    expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
+    await user.click(outside);
+    expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
+    // 点外部关闭不还焦点。Radix 在 setTimeout(0) 里处理关闭后的焦点。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(outside).toHaveFocus();
+    outside.remove();
   });
 
   it("shows edit for deepseek-v4-flash and clicking it does not select another model", async () => {

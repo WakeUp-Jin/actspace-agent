@@ -83,6 +83,7 @@ import { describeReadiness } from "../target/readiness";
 import { skillsApi } from "../api/skills";
 import { tasksApi } from "../api/tasks";
 import { eventsApi } from "../api/events";
+import { revokeAttachmentPreview, revokeAttachmentPreviews } from "./composer/attachment-preview";
 
 export type ComposerSendOptions = {
   model: ModelSelectionId;
@@ -126,6 +127,8 @@ export type ComposerDraftRestore = {
 
 export type ComposerDraftReader = (draftKey: string) => string;
 export type ComposerDraftWriter = (draftKey: string, text: string) => void;
+export type ComposerAttachmentDraftReader = (draftKey: string) => ComposerAttachment[];
+export type ComposerAttachmentDraftWriter = (draftKey: string, attachments: ComposerAttachment[]) => void;
 export type ComposerReviewSummary = {
   status: "loading" | "changes" | "empty" | "notAvailable" | "noBaseline" | "partial" | "failed";
   additions?: number;
@@ -451,12 +454,6 @@ function attachmentFromDroppedFile(file: File): ComposerAttachment {
   };
 }
 
-function revokeAttachmentPreview(attachment: ComposerAttachment): void {
-  if (attachment.previewUrl?.startsWith("blob:") && typeof URL.revokeObjectURL === "function") {
-    URL.revokeObjectURL(attachment.previewUrl);
-  }
-}
-
 function dedupeAttachments(attachments: ComposerAttachment[]): ComposerAttachment[] {
   const seen = new Set<string>();
   const result: ComposerAttachment[] = [];
@@ -508,6 +505,8 @@ export function Composer({
   draftKey,
   readDraft,
   writeDraft,
+  readAttachmentDraft,
+  writeAttachmentDraft,
   inputHistory = [],
   focusRequestId = 0,
   reviewSummary,
@@ -552,6 +551,9 @@ export function Composer({
   draftKey?: string;
   readDraft?: ComposerDraftReader;
   writeDraft?: ComposerDraftWriter;
+  /** 附件草稿按 draftKey 读写；缺省时附件只存在组件里，切换 draftKey 也不换。 */
+  readAttachmentDraft?: ComposerAttachmentDraftReader;
+  writeAttachmentDraft?: ComposerAttachmentDraftWriter;
   inputHistory?: string[];
   focusRequestId?: number;
   reviewSummary?: ComposerReviewSummary | null;
@@ -623,8 +625,18 @@ export function Composer({
   const [modelRuntimeOptions, setModelRuntimeOptions] = useState<Partial<Record<ModelSelectionId, ComposerModelRuntimeOptions>>>({});
   const userPickedModelRef = useRef(false);
   const [contextOpen, setContextOpen] = useState(false);
-  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
-  const attachmentsRef = useRef<ComposerAttachment[]>([]);
+  const [attachments, setAttachmentState] = useState<ComposerAttachment[]>(() => draftKey && readAttachmentDraft ? readAttachmentDraft(draftKey) : []);
+  const attachmentsRef = useRef(attachments);
+  // 附件改动同时写回当前 draftKey 的草稿（16 T14）。ref 同步更新，连续两次改动不会基于旧值。
+  const setAttachments = (update: ComposerAttachment[] | ((current: ComposerAttachment[]) => ComposerAttachment[])) => {
+    const next = typeof update === "function" ? update(attachmentsRef.current) : update;
+    if (next === attachmentsRef.current) return;
+    attachmentsRef.current = next;
+    setAttachmentState(next);
+    if (draftKey) writeAttachmentDraft?.(draftKey, next);
+  };
+  const persistsAttachmentsRef = useRef(false);
+  persistsAttachmentsRef.current = Boolean(draftKey && writeAttachmentDraft);
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
   const [uploadProgress, setUploadProgress] = useState<import("@actspace/shared/host-protocol").HostUploadProgress | null>(null);
@@ -771,14 +783,32 @@ export function Composer({
     setSlashDismissed(false);
   }, [draftKey, readDraft]);
 
+  // Composer 只挂一次（16 T14），换会话不重挂：开着的菜单和上下文用量浮层收起，不带到下一个会话。
+  useEffect(() => {
+    closeFloatingPanels();
+    setSlashDismissed(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在换会话时收起
+  }, [draftKey]);
+
+  // 切换会话：换入新会话的附件草稿。上一个会话的附件已经写在它自己的草稿里，不释放。
+  useEffect(() => {
+    if (!draftKey || !readAttachmentDraft) return;
+    const next = readAttachmentDraft(draftKey);
+    if (next === attachmentsRef.current) return;
+    attachmentsRef.current = next;
+    setAttachmentState(next);
+    setAttachmentError(null);
+  }, [draftKey, readAttachmentDraft]);
+
   useEffect(() => {
     if (!draftRestore || draftRestore.sessionId !== draftKey) return;
     setMessage(draftRestore.text);
     if (draftKey) writeDraft?.(draftKey, draftRestore.text);
     historyIndexRef.current = null;
     setAttachments((current) => {
-      current.forEach(revokeAttachmentPreview);
-      return draftRestore.attachments ?? [];
+      const restored = draftRestore.attachments ?? [];
+      revokeAttachmentPreviews(current, restored);
+      return restored;
     });
     setAttachmentError(null);
     setSendError(draftRestore.error ? { message: draftRestore.error, issue: draftRestore.attachmentIssue } : null);
@@ -792,12 +822,9 @@ export function Composer({
     return () => window.cancelAnimationFrame(frame);
   }, [focusRequestId]);
 
-  useEffect(() => {
-    attachmentsRef.current = attachments;
-  }, [attachments]);
-
+  // 卸载时：附件存在草稿里的（切到设置页等）保留，等发送、移除或会话 evict 时再释放；只存在组件里的才在这里释放。
   useEffect(() => () => {
-    attachmentsRef.current.forEach(revokeAttachmentPreview);
+    if (!persistsAttachmentsRef.current) attachmentsRef.current.forEach(revokeAttachmentPreview);
   }, []);
 
   useLayoutEffect(() => {
@@ -1269,7 +1296,8 @@ export function Composer({
         setModelOptionsOpen(false);
       }
 
-      if (composerRef.current?.contains(event.target as Node)) {
+      // 浮层挂在 body 上（例如上下文用量），点浮层内部也算点在 Composer 里。
+      if (composerRef.current?.contains(event.target as Node) || (event.target as Element | null)?.closest?.("[data-composer-floating]")) {
         return;
       }
 
@@ -2439,6 +2467,7 @@ export function Composer({
     <footer className={getComposerWrapClass(surface)} ref={composerRef}>
       {contextOpen ? (
         <ContextPopup
+          anchorRef={composerRef}
           snapshot={effectiveContextSnapshot}
           contextState={contextState}
           onClose={() => setContextOpen(false)}

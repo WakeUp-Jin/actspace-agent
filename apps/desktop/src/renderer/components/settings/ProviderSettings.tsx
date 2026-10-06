@@ -29,7 +29,7 @@ import {
   type ProviderCatalogDefinition,
 } from "@actspace/shared";
 import { SectionShell, SettingGroup, SettingLinkRow, SettingRow, SettingSubhead, SettingTag, SettingsInput, StatusDot } from "./SettingsPrimitives";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ModelSettings } from "./ModelSettings";
 import { ProviderLogo } from "./ProviderLogo";
 import { CustomModelFields, customModelInputFromDraft, emptyCustomModelFormDraft } from "./CustomModelForm";

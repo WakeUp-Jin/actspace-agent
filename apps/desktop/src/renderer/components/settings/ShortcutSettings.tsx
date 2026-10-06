@@ -1,5 +1,5 @@
 import { RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DEFAULT_QUICK_OPEN_ACCELERATOR,
   type AppSettings,
@@ -9,8 +9,7 @@ import {
   type SessionListItem,
   type WorkspaceEntry,
 } from "@actspace/shared";
-import { Kbd, SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
-import { Button } from "../ui/Button";
+import { SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
 import { IconButton } from "../ui/IconButton";
 import { quickOpenApi } from "../../api/quick-open";
 import { sessionsApi } from "../../api/sessions";
@@ -261,4 +260,12 @@ function acceleratorKeys(formatted: string): Array<{ label: string; separator: b
   const modifiers = formatted.match(/^[⌘⌃⌥⇧]*/)?.[0] ?? "";
   const rest = formatted.slice(modifiers.length);
   return [...modifiers.split(""), ...(rest ? [rest] : [])].map((label) => ({ label, separator: false }));
+}
+
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="inline-grid h-6 min-w-6 place-items-center rounded-act-sm border border-b-2 border-line bg-surface px-1.5 font-sans text-act-xs font-medium text-text-main">
+      {children}
+    </kbd>
+  );
 }

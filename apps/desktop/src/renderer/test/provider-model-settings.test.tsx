@@ -640,7 +640,7 @@ describe("provider and model settings", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
     expect(screen.getByText("https://relay.example/v1/messages")).toBeInTheDocument();
     expect(screen.getByText("自动识别为 Bearer")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "认证方式" })).toHaveTextContent("自动");
+    expect(screen.getByRole("combobox", { name: "认证方式" })).toHaveTextContent("自动");
     await userEvent.click(screen.getByRole("button", { name: "编辑服务地址" }));
     await userEvent.clear(screen.getByLabelText("服务地址"));
     await userEvent.type(screen.getByLabelText("服务地址"), "https://relay2.example/v1");
@@ -665,9 +665,9 @@ describe("provider and model settings", () => {
     expect(screen.getByText("Anthropic 官方")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "编辑服务地址" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "编辑名称" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "认证方式" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "认证方式" })).not.toBeInTheDocument();
     expect(screen.getByText("按官方价格")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "计费方式" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "计费方式" })).not.toBeInTheDocument();
   });
 
   it("switches billing to reference pricing and steps the multiplier", async () => {
@@ -685,9 +685,9 @@ describe("provider and model settings", () => {
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: /Relay/ }));
     // 旧连接缺省按「逐个填写单价」。
-    expect(screen.getByRole("button", { name: "计费方式" })).toHaveTextContent("逐个填写单价");
+    expect(screen.getByRole("combobox", { name: "计费方式" })).toHaveTextContent("逐个填写单价");
     expect(screen.queryByRole("group", { name: "倍率" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "计费方式" }));
+    await userEvent.click(screen.getByRole("combobox", { name: "计费方式" }));
     await userEvent.click(screen.getByRole("option", { name: "按官方价折算" }));
     await waitFor(() => expect(updateCustomConnection).toHaveBeenCalledWith(expect.objectContaining({ billingMode: "reference" })));
     expect(await screen.findByRole("group", { name: "倍率" })).toHaveTextContent("× 1.00");
@@ -748,8 +748,8 @@ describe("provider and model settings", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Anthropic Relay/ }));
     expect(await screen.findByRole("switch", { name: "启用 Claude Sonnet 5" })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Claude Sonnet 5 更多操作" }));
-    expect(screen.getByRole("menuitem", { name: /删除/ })).toBeDisabled();
-    expect(screen.getByRole("menuitem", { name: "设为默认" })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: /删除/ })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "设为默认" })).toHaveAttribute("aria-disabled", "true");
     await userEvent.keyboard("{Escape}");
 
     await userEvent.click(screen.getByRole("button", { name: "Claude Opus Relay 更多操作" }));
@@ -978,7 +978,7 @@ describe("provider and model settings", () => {
     });
 
     render(<TaskModelDefaultsSection settings={settings} />);
-    await userEvent.click(await screen.findByRole("button", { name: "轻量任务模型" }));
+    await userEvent.click(await screen.findByRole("combobox", { name: "轻量任务模型" }));
     const listbox = await screen.findByRole("listbox", { name: "轻量任务模型" });
     expect(within(listbox).getByText("DeepSeek")).toBeInTheDocument();
     expect(within(listbox).getByText("OpenRouter")).toBeInTheDocument();
@@ -1003,6 +1003,37 @@ describe("provider and model settings", () => {
     render(<ModelSettings settings={settings} />);
     await userEvent.click(await screen.findByRole("switch", { name: `启用 ${installedModel.definition.label}` }));
     await waitFor(() => expect(updateModel).toHaveBeenCalledWith({ modelKey: installedModel.definition.key, enabled: false }));
+  });
+
+  it("switches a model's connection and call key from the row selects", async () => {
+    const updateModel = vi.fn(async () => ({ ok: true as const, model: installedModel }));
+    const model = { ...installedModel, settings: { ...installedModel.settings, credentialId: "gone" } };
+    setupBridge({
+      "models.listInstalled": async () => ({ models: [model] }),
+      "models.update": updateModel,
+      "settings.getV4": async () => ({ settings: { models: { connections: { "deepseek:default": { connectionId: "deepseek:default" }, "deepseek:relay": { connectionId: "deepseek:relay", displayName: "DeepSeek 中转" } } } } }) as never,
+    });
+    const lastConnection = { status: "untested" } as never;
+    const withKeys = { ...settings, providers: { ...settings.providers, deepseek: { ...settings.providers.deepseek, hasApiKey: true, additionalCredentials: [
+      { id: "k2", label: "备用 Key", pricingMultiplier: 1, lastConnection, hasApiKey: true },
+      { id: "k3", label: "过期 Key", pricingMultiplier: 1, lastConnection, hasApiKey: false },
+    ] } } };
+    render(<ModelSettings settings={withKeys} />);
+    const label = installedModel.definition.label;
+
+    const connection = await screen.findByRole("combobox", { name: `${label} 连接` });
+    expect(connection).toHaveTextContent("默认连接");
+    await userEvent.click(connection);
+    await userEvent.click(await screen.findByRole("option", { name: "DeepSeek 中转" }));
+    await waitFor(() => expect(updateModel).toHaveBeenCalledWith({ modelKey: installedModel.definition.key, connectionId: "deepseek:relay" }));
+
+    const key = screen.getByRole("combobox", { name: `${label} 调用 Key` });
+    expect(key).toHaveTextContent("已删除的 Key · 不可用");
+    await userEvent.click(key);
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["默认 Key", "已删除的 Key · 不可用", "备用 Key", "过期 Key（不可用）"]);
+    expect(screen.getByRole("option", { name: "过期 Key（不可用）" })).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(screen.getByRole("option", { name: "默认 Key" }));
+    await waitFor(() => expect(updateModel).toHaveBeenCalledWith({ modelKey: installedModel.definition.key, credentialId: null }));
   });
 
   it("uses a searchable multi-select for models inside provider details", async () => {
@@ -1067,6 +1098,9 @@ describe("provider and model settings", () => {
     });
     expect(screen.getByRole("button", { name: "已添加" })).toBeDisabled();
 
+    // 点遮罩不关闭：目录里可能有正在输入的搜索词。
+    await userEvent.click(document.querySelector<HTMLElement>("[data-state=open].fixed")!);
+    expect(onClose).not.toHaveBeenCalled();
     fireEvent.keyDown(screen.getByRole("dialog", { name: "为 OpenRouter 添加模型" }), { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
   });

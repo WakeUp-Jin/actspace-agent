@@ -51,7 +51,7 @@
 | 02 | [Renderer 状态层与会话数据流](02-Renderer状态层与会话数据流.md) | 拆 App.tsx、per-session store、正文单一事实源、类型化 identity、IPC 风暴 | 高 | `docs/design-docs/frontend/` + exec-plan |
 | 03 | [运行目标抽象：本机与远端](03-运行目标抽象-本机与远端.md) | `RunTarget` 模型、`host:` id 统一解码、30 处分支收口、`useRemoteTarget` 重写。**已按 15 实施** | 中 | 已合并进 `docs/design-docs/frontend/front-workspace-git-worktree-context.md`「运行目标」一节 |
 | 04 | [Preload 接口与 Mock Bridge](04-Preload接口与MockBridge.md) | 接口按域分组、必选类型、`satisfies` 对齐、注入式 mock bridge | 中 | `docs/design-docs/frontend/` |
-| 05 | [UI 基础组件与大组件拆分](05-UI基础组件与大组件拆分.md) | Popover / Menu / Dialog 原语、焦点陷阱、Esc 栈、拆 Settings / Sidebar / Conversation / Workbench | 中 | `front-基础组件封装规范.md` 合并 |
+| 05 | [UI 基础组件与大组件拆分](05-UI基础组件与大组件拆分.md) | Popover / Menu / Dialog 原语、焦点陷阱、Esc 栈、拆 Settings / Sidebar / Conversation / Workbench。**已按 16 实施**（Composer 归 09） | 中 | 已合并进 `docs/design-docs/frontend/front-基础组件封装规范.md` |
 | 06 | [Composer 与运行目标交互重设计](06-Composer与运行目标交互重设计.md) | 队列移到输入框上方、运行位置菜单、输入框外观、`+` 面板 | 中 | `front-聊天输入框规范.md`、`front-workspace-git-worktree-context.md` 改写 |
 | 07 | [冗余清理清单](07-冗余清理清单.md) | 已核实可删的文件、prop、分支、目录、channel | 低 | exec-plan 的第一阶段 |
 | 08 | [测试与验证整理](08-测试与验证整理.md) | 删死测试、改脆弱断言、补缺口、验证矩阵 | 低 | `docs/FRONTEND_VERIFICATION.md` 补充 |
@@ -105,11 +105,11 @@
 | P0 | 正文靠字符串前缀去重，改 id 格式即重复 / 丢消息 | 02 |
 | P0 | `sessionRecord` 两个写入者，可能冲掉已加载的早期历史 | 02 |
 | P1 | 约 10 个按会话 Map 只增不减 | 02 |
-| P1 | 切换会话时附件可能串会话（待真机验证） | 06 |
+| P1 | ~~切换会话时附件可能串会话（待真机验证）~~ 已在 16 处理：Composer 只挂一次，附件按会话存进 SessionLocalStore | 06 |
 | P1 | `useRemoteTarget` 返回值不稳定，`handleSend` / `executionContext` 每次重建 | 03 |
 | P1 | macOS 关窗后 pty 成孤儿；退出时 Browser Bridge / 更新服务未清理 | 01 |
 | P1 | ~~三套 IPC channel 并行注册，`projection-ipc` 18 个 handler 无调用方~~ 已在 10 处理：DESKTOP / DESKTOP_SHELL 两套已删除，只剩 FIXED | 01 |
-| P1 | 10+ 套弹层实现，Esc 一次关多层，多数对话框无焦点陷阱 | 05 |
+| P1 | ~~10+ 套弹层实现，Esc 一次关多层，多数对话框无焦点陷阱~~ 已在 16 处理：弹层统一用 `components/ui/` 的 Radix 原语；Composer 归 09，三处未迁移的手写弹层记在技术债 | 05 |
 | P2 | ~~LabPage / ExploreRunBlock / Sheet / terminal-ipc 等死代码~~ 已在 10 处理 | 07 |
 | P2 | ~~70KB 轨迹 fixture 被打进生产包~~ 已在 10 处理 | 07 |
 

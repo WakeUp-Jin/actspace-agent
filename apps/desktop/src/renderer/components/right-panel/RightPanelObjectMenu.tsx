@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import { Eye, FolderTree, GitBranch, MessageSquare, Plus, SquareTerminal } from "lucide-react";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { useRightPanel } from "./RightPanelContext";
 import { useOpenTerminal } from "./useOpenTerminal";
 import { preloadTerminalRenderView } from "./terminal-render-loader";
@@ -14,11 +14,6 @@ import { preloadTerminalRenderView } from "./terminal-render-loader";
  * - Context：完整只读上下文视图。
  */
 
-const MENU_CLASS =
-  "absolute right-0 top-[calc(100%+4px)] z-(--act-z-dropdown) w-[188px] rounded-act-md border border-line bg-surface-raised/98 p-1.5 shadow-act-popover [-webkit-app-region:no-drag]";
-const MENU_ITEM_CLASS =
-  "flex min-h-[34px] w-full items-center gap-2.5 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-act-sm font-medium text-text-main transition-colors hover:bg-hover-overlay [cursor:pointer]";
-
 export function RightPanelObjectMenu({
   sessionId,
   developmentEnabled = true,
@@ -30,106 +25,49 @@ export function RightPanelObjectMenu({
 }) {
   const { openFileTree, openTab } = useRightPanel();
   const { openTerminal, creatingTerminal } = useOpenTerminal(sessionId);
-  const [open, setOpen] = useState(false);
-  const anchorRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    function onPointerDown(event: PointerEvent) {
-      if (!anchorRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  const pick = (action: () => void) => {
-    action();
-    setOpen(false);
-  };
 
   return (
-    <div ref={anchorRef} className="relative flex items-center [-webkit-app-region:no-drag]">
-      <button
-        className="chrome-button"
-        type="button"
-        aria-label="新建右侧面板对象"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        title="新建对象"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Plus size={15} strokeWidth={1.8} />
-      </button>
-      {open ? (
-        <div className={MENU_CLASS} role="menu">
-          {developmentEnabled ? <><button
-            type="button"
-            role="menuitem"
-            className={MENU_ITEM_CLASS}
-            onClick={() => pick(openFileTree)}
-          >
-            <FolderTree size={15} strokeWidth={2} />
-            工作区文件
+    <div className="flex items-center [-webkit-app-region:no-drag]">
+      <Menu>
+        <MenuTrigger asChild>
+          <button className="chrome-button" type="button" aria-label="新建右侧面板对象" title="新建对象">
+            <Plus size={15} strokeWidth={1.8} />
           </button>
-          {onOpenReview ? (
-            <button
-              type="button"
-              role="menuitem"
-              className={MENU_ITEM_CLASS}
-              onClick={() => pick(onOpenReview)}
-            >
-              <GitBranch size={15} strokeWidth={2} />
-              Review
-            </button>
+        </MenuTrigger>
+        <MenuContent align="end" className="w-[188px]">
+          {developmentEnabled ? (
+            <>
+              <MenuItem onSelect={openFileTree}>
+                <FolderTree size={15} strokeWidth={2} />
+                工作区文件
+              </MenuItem>
+              {onOpenReview ? (
+                <MenuItem onSelect={onOpenReview}>
+                  <GitBranch size={15} strokeWidth={2} />
+                  Review
+                </MenuItem>
+              ) : null}
+              <MenuItem
+                disabled={!sessionId || creatingTerminal}
+                // 鼠标移上或键盘移到这一项时预加载终端视图。
+                onFocus={() => void preloadTerminalRenderView()}
+                onSelect={() => void openTerminal()}
+              >
+                <SquareTerminal size={15} strokeWidth={2} />
+                {creatingTerminal ? "正在启动…" : "终端"}
+              </MenuItem>
+            </>
           ) : null}
-          <button
-            type="button"
-            role="menuitem"
-            className={`${MENU_ITEM_CLASS} disabled:opacity-45 disabled:[cursor:not-allowed]`}
-            disabled={!sessionId || creatingTerminal}
-            onPointerEnter={() => void preloadTerminalRenderView()}
-            onFocus={() => void preloadTerminalRenderView()}
-            onClick={() => {
-              setOpen(false);
-              void openTerminal();
-            }}
-          >
-            <SquareTerminal size={15} strokeWidth={2} />
-            {creatingTerminal ? "正在启动…" : "终端"}
-          </button></> : null}
-          <button
-            type="button"
-            role="menuitem"
-            className={MENU_ITEM_CLASS}
-            onClick={() => pick(() => openTab({ id: "reply", kind: "replyHtml", title: "可视化回复", sessionId }))}
-          >
+          <MenuItem onSelect={() => openTab({ id: "reply", kind: "replyHtml", title: "可视化回复", sessionId })}>
             <MessageSquare size={15} strokeWidth={2} />
             可视化回复
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={MENU_ITEM_CLASS}
-            onClick={() => pick(() => openTab({ id: "context", kind: "context", title: "上下文" }))}
-          >
+          </MenuItem>
+          <MenuItem onSelect={() => openTab({ id: "context", kind: "context", title: "上下文" })}>
             <Eye size={15} strokeWidth={2} />
             上下文
-          </button>
-        </div>
-      ) : null}
+          </MenuItem>
+        </MenuContent>
+      </Menu>
     </div>
   );
 }

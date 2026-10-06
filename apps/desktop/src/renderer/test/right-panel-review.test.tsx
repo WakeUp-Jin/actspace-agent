@@ -40,13 +40,13 @@ describe("Review workbench", () => {
     await user.click(within(fileList).getByRole("button", { name: "隐藏文件列表" }));
     expect(screen.queryByRole("button", { name: "Run AI Review" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "审查选项" }));
-    expect(await screen.findByRole("button", { name: "刷新" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemcheckbox", { name: "自动换行" }).querySelector("svg")).toHaveClass("lucide-arrow-right-from-line");
-    expect(screen.getByRole("button", { name: "不加载完整文件" }).querySelector("svg")).toHaveClass("lucide-file");
-    expect(screen.getByRole("menuitemcheckbox", { name: "启用富预览" }).querySelector("svg")).toHaveClass("lucide-image");
-    expect(screen.getByRole("menuitemcheckbox", { name: "显示词级差异" }).querySelector("svg")).toHaveClass("lucide-file-diff");
-    expect(screen.getByRole("menuitemcheckbox", { name: "隐藏空白差异" }).querySelector("svg")).toHaveClass("lucide-eye");
-    expect(screen.getByRole("button", { name: "复制 git apply 命令" }).querySelector("svg")).toHaveClass("lucide-clipboard");
+    expect(await screen.findByRole("menuitem", { name: "刷新" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemcheckbox", { name: "自动换行" }).querySelector(".lucide-arrow-right-from-line")).not.toBeNull();
+    expect(screen.getByRole("menuitem", { name: "不加载完整文件" }).querySelector("svg")).toHaveClass("lucide-file");
+    expect(screen.getByRole("menuitemcheckbox", { name: "启用富预览" }).querySelector(".lucide-image")).not.toBeNull();
+    expect(screen.getByRole("menuitemcheckbox", { name: "显示词级差异" }).querySelector(".lucide-file-diff")).not.toBeNull();
+    expect(screen.getByRole("menuitemcheckbox", { name: "隐藏空白差异" }).querySelector(".lucide-eye")).not.toBeNull();
+    expect(screen.getByRole("menuitem", { name: "复制 git apply 命令" }).querySelector("svg")).toHaveClass("lucide-clipboard");
     expect(screen.getByRole("button", { name: "显示文件列表" }).querySelector("svg")).toHaveClass("lucide-folder");
   });
 
@@ -59,6 +59,8 @@ describe("Review workbench", () => {
     expect(screen.queryByText("-0")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "展开全部差异" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "跳转到文件" })).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(screen.getByRole("button", { name: "跳转到文件" }));
+    expect(screen.queryByPlaceholderText("跳转到文件…")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "显示文件列表" })).toHaveAttribute("aria-disabled", "true");
     expect(bridge["review.getSnapshot"]).toHaveBeenCalledTimes(1);
     rerender(<ReviewRenderView workspaceRoot="/tmp/workspace" refreshKey={2} />);
@@ -108,6 +110,7 @@ describe("Review workbench", () => {
     expect(bridge["review.listCommits"]).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", sessionId: "session-1" });
     expect(within(commits).queryByRole("textbox")).not.toBeInTheDocument();
     await user.click(within(commits).getByRole("menuitem", { name: /fix: keep commit history read-only/ }));
+    expect(screen.queryByRole("menu", { name: "最近提交" })).not.toBeInTheDocument();
     await waitFor(() => expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({
       selection: { kind: "commit", sha: "a".repeat(40) },
     })));
@@ -226,9 +229,83 @@ describe("Review workbench", () => {
     expect(await screen.findByText("return value.name;")).toBeInTheDocument();
     expect(bridge["review.getFileContents"]).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "审查选项" }));
-    await user.click(await screen.findByRole("button", { name: "加载完整文件" }));
+    await user.click(await screen.findByRole("menuitem", { name: "加载完整文件" }));
+    expect(screen.getByRole("menuitem", { name: "不加载完整文件" })).toBeInTheDocument();
     await waitFor(() => expect(bridge["review.getFileContents"]).toHaveBeenCalledTimes(1));
     expect(bridge["review.getFileContents"].mock.calls[0]?.[0].fileIds).toEqual(["app"]);
+  });
+
+  it("keeps the options menu open while toggling display settings and switches between toolbar popovers", async () => {
+    const user = userEvent.setup();
+    setupBridge(reviewBridge(dirtySnapshot()));
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+    expect(await screen.findByText("return value.name;")).toBeInTheDocument();
+
+    const options = screen.getByRole("button", { name: "审查选项" });
+    await user.click(options);
+    const wrap = await screen.findByRole("menuitemcheckbox", { name: "自动换行" });
+    const before = wrap.getAttribute("aria-checked");
+    await user.click(wrap);
+    expect(screen.getByRole("menuitemcheckbox", { name: "自动换行" })).toHaveAttribute("aria-checked", before === "true" ? "false" : "true");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(options).toHaveFocus());
+
+    // 范围弹层开着时点「跳转到文件」：范围关闭，跳转弹层打开并聚焦搜索框。
+    await user.click(screen.getByRole("button", { name: "审查范围" }));
+    expect(await screen.findByRole("menu", { name: "审查范围选项" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "跳转到文件" }));
+    await waitFor(() => expect(screen.queryByRole("menu", { name: "审查范围选项" })).not.toBeInTheDocument());
+    const search = screen.getByPlaceholderText("跳转到文件…");
+    expect(search).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByPlaceholderText("跳转到文件…")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "跳转到文件" })).toHaveFocus());
+
+    await user.click(screen.getByRole("button", { name: "跳转到文件" }));
+    const jump = screen.getByPlaceholderText("跳转到文件…").closest<HTMLElement>("[data-radix-popper-content-wrapper]")!;
+    await user.click(within(jump).getByRole("button", { name: "apps/desktop/src/renderer/App.tsx" }));
+    expect(screen.queryByPlaceholderText("跳转到文件…")).not.toBeInTheDocument();
+  });
+
+  it("disables copying the git apply command until a snapshot has loaded", async () => {
+    const user = userEvent.setup();
+    setupBridge({ ...reviewBridge(dirtySnapshot()), "review.getSnapshot": vi.fn(() => new Promise<never>(() => {})) });
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+    await user.click(screen.getByRole("button", { name: "审查选项" }));
+    expect(await screen.findByRole("menuitem", { name: "复制 git apply 命令" })).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("opens the commit and PR dialogs as modals that keep Tab inside and close on Escape", async () => {
+    const user = userEvent.setup();
+    setupBridge({ ...reviewBridge(dirtySnapshot()), "review.getPullRequestCapability": vi.fn(async () => ({ ok: true as const, capability: { enabled: true, baseBranch: "main" } })) });
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+    expect(await screen.findByText("return value.name;")).toBeInTheDocument();
+
+    const [gitButton] = screen.getAllByRole("button", { name: "提交或推送" });
+    await user.click(gitButton!);
+    await user.click(await screen.findByRole("menuitem", { name: "提交或推送" }));
+    const gitDialog = screen.getByRole("dialog", { name: "提交或推送" });
+    expect(within(gitDialog).getByRole("textbox", { name: "提交说明" })).toHaveFocus();
+    await user.tab();
+    expect(within(gitDialog).getByRole("button", { name: "取消" })).toHaveFocus();
+    await user.tab();
+    expect(within(gitDialog).getByRole("textbox", { name: "提交说明" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // 打开对话框的菜单项已经卸载，焦点回到「提交或推送」按钮。
+    await waitFor(() => expect(gitButton).toHaveFocus());
+
+    await user.click(gitButton!);
+    await user.click(await screen.findByRole("menuitem", { name: "创建 PR" }));
+    const prDialog = screen.getByRole("dialog", { name: "创建拉取请求" });
+    expect(within(prDialog).getByRole("textbox", { name: "标题" })).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(prDialog).toContainElement(document.activeElement as HTMLElement);
+    await user.click(within(prDialog).getByRole("button", { name: "取消" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(gitButton).toHaveFocus());
   });
 });
 

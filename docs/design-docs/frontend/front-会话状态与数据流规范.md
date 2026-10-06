@@ -102,6 +102,7 @@ mergeTranscript(
 type SessionLocalState = {
   composerText?: string;                       // 输入框正文（WorkbenchLayout 切会话时读回）
   annotationDraft?: ResponseAnnotationReference[];
+  attachments?: ComposerAttachment[];          // 输入框里还没发送的附件（16 T14）
   draft?: ComposerDraftRestore;                // 发送失败 / 未确认提交恢复到输入框的草稿
   composer?: ComposerSessionState;             // mode、selectedSkills
   compactionFailure?: CompactionBlock;
@@ -115,7 +116,7 @@ type SessionLocalState = {
 };
 ```
 
-- 接口：`get / update / subscribe / evict / evictWhere / ids`。`update` 的函数返回同一对象时不通知；`evict` 只在确实删除了条目时通知。
+- 接口：`get / update / subscribe / evict / evictWhere / ids`。`update` 的函数返回同一对象时不通知；`evict` 只在确实删除了条目时通知。`evict` / `evictWhere` 同时释放 `attachments` 和 `draft.attachments` 里图片预览的 blob URL。
 - 没有条目的会话和 `sessionId === null` 返回冻结的 `DEFAULT_SESSION_LOCAL_STATE`。
 - 读取：
   - 单个会话：`useSessionLocalState(store, sessionId, selector)`（App 自己是 Provider，用带 store 参数的版本）；组件里用 `useSessionLocal(sessionId, selector)`，缺 Provider 时抛错。

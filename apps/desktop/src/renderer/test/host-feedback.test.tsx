@@ -1,6 +1,7 @@
 import { encodeSessionLocator } from "@actspace/shared/session-locator";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { App } from "../App";
 import { HostConnectionsSettings } from "../components/settings/HostConnectionsSettings";
 import { Composer } from "../components/Composer";
@@ -37,6 +38,25 @@ it("keeps revoked device authorization distinct from a local keyring failure", a
   });
   render(<HostConnectionsSettings />);
   expect(await screen.findByRole("alert")).toHaveTextContent("设备授权已失效");
+});
+
+it("switches the new server form to an SSH tunnel and pairs with the alias and port", async () => {
+  const add = vi.fn(async () => ({}));
+  setupBridge({ "hosts.list": async () => [], "hosts.add": add, "events.hostsChanged": () => () => {} } as never);
+  render(<HostConnectionsSettings />);
+  const kind = screen.getByRole("combobox", { name: "连接方式" });
+  expect(kind).toHaveTextContent("WSS");
+  fireEvent.change(screen.getByLabelText("服务器地址"), { target: { value: "wss://typed.example" } });
+  await userEvent.click(kind);
+  await userEvent.click(await screen.findByRole("option", { name: "SSH 隧道" }));
+  expect(kind).toHaveTextContent("SSH 隧道");
+  expect(screen.getByLabelText("SSH 配置别名")).toHaveValue("");
+  fireEvent.change(screen.getByLabelText("名称"), { target: { value: "云端" } });
+  fireEvent.change(screen.getByLabelText("SSH 配置别名"), { target: { value: "my-server" } });
+  fireEvent.change(screen.getByLabelText("服务器上的 Host 端口"), { target: { value: "7000" } });
+  fireEvent.change(screen.getByLabelText("一次性配对码"), { target: { value: "123456" } });
+  await userEvent.click(screen.getByRole("button", { name: "配对并连接" }));
+  await waitFor(() => expect(add).toHaveBeenCalledWith({ name: "云端", endpoint: { kind: "ssh", alias: "my-server", port: 7000 }, code: "123456" }));
 });
 
 it.each([

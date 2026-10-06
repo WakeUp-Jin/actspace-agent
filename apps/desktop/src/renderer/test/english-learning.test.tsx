@@ -34,17 +34,21 @@ describe("English learning controls", () => {
     await user.click(toggle);
     expect(api["englishLearning.setTarget"]).toHaveBeenCalledWith({ enabled: true, sessionId: "new" });
     await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
-    expect(screen.queryByRole("option", { name: "Child" })).not.toBeInTheDocument();
+    const target = screen.getByRole("combobox", { name: "英语学习目标会话" });
+    expect(target).toHaveTextContent("New");
+    await user.click(target);
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["New", "Old"]);
     api["englishLearning.setTarget"].mockRejectedValueOnce(new Error("failed"));
-    await user.selectOptions(screen.getByLabelText("英语学习目标会话"), "old");
+    await user.click(screen.getByRole("option", { name: "Old" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("无法更改");
-    expect(screen.getByLabelText("英语学习目标会话")).toHaveValue("new");
+    expect(api["englishLearning.setTarget"]).toHaveBeenLastCalledWith({ enabled: true, sessionId: "old" });
+    expect(screen.getByRole("combobox", { name: "英语学习目标会话" })).toHaveTextContent("New");
   });
   it("saves speech preferences as they change and saves the key from its own editor", async () => {
     const api = bridge(); const user = userEvent.setup(); render(<SpeechSettingsSection />);
     const voice = screen.getByLabelText("语音音色");
     await waitFor(() => expect(voice).toBeEnabled());
-    const modelSelect = screen.getByRole("button", { name: "语音模型" });
+    const modelSelect = screen.getByRole("combobox", { name: "语音模型" });
     expect(modelSelect).toHaveTextContent("speech-2.8-turbo");
     await user.click(modelSelect);
     expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["speech-2.8-hd", "speech-2.8-turbo", "speech-2.6-hd", "speech-2.6-turbo", "speech-02-hd", "speech-02-turbo", "speech-01-hd", "speech-01-turbo"]);

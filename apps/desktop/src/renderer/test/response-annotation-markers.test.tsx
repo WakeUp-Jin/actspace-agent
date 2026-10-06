@@ -122,6 +122,7 @@ describe("comment popover", () => {
     render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={onClose} />);
     const popover = screen.getByRole("dialog", { name: "第 1 条批注的评论" });
     expect(popover).toHaveAttribute("data-anchored", "true");
+    expect(screen.getByRole("textbox", { name: "第 1 条批注的评论" })).toHaveFocus();
     await userEvent.type(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), "  说清楚一点  {Enter}");
     expect(current.drafts[0]).toMatchObject({ comment: "说清楚一点" });
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -153,6 +154,29 @@ describe("comment popover", () => {
     document.removeEventListener("keydown", outerKeyDown);
   });
 
+  it("leaves focus where onClose put it instead of returning it to the element focused before opening", async () => {
+    const before = document.createElement("button");
+    const composer = document.createElement("textarea");
+    document.body.append(before, composer);
+    before.focus();
+    const { unmount } = render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={() => composer.focus()} />);
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), { key: "Escape" });
+    // Radix 在 setTimeout(0) 里处理关闭后的焦点。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(composer).toHaveFocus();
+
+    // 点外部的非焦点元素：焦点随评论框一起丢失，也不回到打开前的元素。
+    unmount();
+    before.focus();
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={() => composer.focus()} />);
+    fireEvent.pointerDown(document.body);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(before).not.toHaveFocus();
+    before.remove();
+    composer.remove();
+  });
+
   it("saves typed text on an outside click without stealing focus", () => {
     const onClose = vi.fn();
     render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={onClose} />);
@@ -169,6 +193,7 @@ describe("comment popover", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("评论超过 2,000 个字符");
     expect(screen.getByRole("button", { name: "保存评论" })).toBeDisabled();
     fireEvent.pointerDown(screen.getByRole("button", { name: "回复外部" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(current.drafts[0]).toMatchObject({ comment: "原评论" });
   });
 

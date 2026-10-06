@@ -53,3 +53,24 @@ globalThis.ResizeObserver = ResizeObserverMock as typeof ResizeObserver;
 if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
+
+// Radix 的 Select、DropdownMenu、ContextMenu 在 pointerdown 时调用 hasPointerCapture / releasePointerCapture，
+// 并用 PointerEvent 区分鼠标与触摸。jsdom 没有这些，缺了会在打开时抛 TypeError。
+if (typeof window !== "undefined") {
+  if (typeof window.PointerEvent === "undefined") {
+    class PointerEventPolyfill extends MouseEvent {
+      readonly pointerId: number;
+      readonly pointerType: string;
+      constructor(type: string, init: PointerEventInit = {}) {
+        super(type, init);
+        this.pointerId = init.pointerId ?? 1;
+        this.pointerType = init.pointerType ?? "mouse";
+      }
+    }
+    window.PointerEvent = PointerEventPolyfill as unknown as typeof PointerEvent;
+  }
+  const proto = window.HTMLElement.prototype;
+  if (!proto.hasPointerCapture) proto.hasPointerCapture = () => false;
+  if (!proto.setPointerCapture) proto.setPointerCapture = () => {};
+  if (!proto.releasePointerCapture) proto.releasePointerCapture = () => {};
+}

@@ -41,10 +41,15 @@ const REPLIES = [
 let restoreRects: () => void;
 beforeEach(() => {
   restoreRects = stubRangeRects();
+  // jsdom 的视口尺寸是 0，Radix（floating-ui）按 documentElement 的 client 尺寸判断放不放得下。
+  Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: window.innerWidth });
+  Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: window.innerHeight });
 });
 afterEach(() => {
   clearSelection();
   restoreRects();
+  delete (document.documentElement as unknown as Record<string, unknown>).clientWidth;
+  delete (document.documentElement as unknown as Record<string, unknown>).clientHeight;
 });
 
 function setup(replies = REPLIES) {
@@ -58,7 +63,11 @@ describe("ResponseSelectionMenu", () => {
     const { onAddAnnotation } = setup();
     selectText(screen.getByTestId("v2-3"), "第二段");
     const add = await screen.findByRole("menuitem", { name: "添加到对话" });
-    expect(screen.getByRole("menu", { name: "回复选区操作" })).toHaveAttribute("data-placement", "below");
+    await waitFor(() => expect(screen.getByRole("menu", { name: "回复选区操作" })).toHaveAttribute("data-side", "bottom"));
+    // 选区最后一行（100–220, 200–218）的右下角，下移 6px。
+    expect(screen.getByRole("menu").parentElement!.style.transform).toBe("translate(220px, 224px)");
+    // 不抢焦点，键盘扩选不被打断。
+    expect(document.activeElement).toBe(document.body);
 
     await userEvent.click(add);
     expect(onAddAnnotation).toHaveBeenCalledWith(expect.objectContaining({
@@ -137,8 +146,9 @@ describe("ResponseSelectionMenu", () => {
     setup();
     selectText(screen.getByTestId("v2-3"), "第二段");
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveAttribute("data-placement", "above");
-    expect(menu.style.left).toBe("12px");
+    await waitFor(() => expect(menu).toHaveAttribute("data-side", "top"));
+    // Radix 把位置写在外层包装的 transform 上：选区在视口左侧之外，水平方向收进 12px 边距。
+    expect(menu.parentElement!.style.transform).toMatch(/^translate\(12px, /);
   });
 
   it("waits until the drag ends before offering the menu", async () => {
