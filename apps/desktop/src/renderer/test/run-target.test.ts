@@ -19,7 +19,7 @@ describe("capabilitiesOf", () => {
     expect(capabilities.branchSwitch.enabled).toBe(false);
     expect(capabilities.terminal.enabled).toBe(true);
     expect(capabilitiesOf(local, { gitStatus: "no_head" }).branchSwitch.enabled).toBe(true);
-    expect(capabilitiesOf(local, { gitStatus: "no_head" }).newWorktree.enabled).toBe(false);
+    expect(capabilitiesOf(local, { gitStatus: "no_head" }).newWorktree).toEqual({ enabled: false, reason: "需要先创建提交" });
   });
 
   it("treats a worktree session like the local machine", () => {

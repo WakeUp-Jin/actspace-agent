@@ -33,6 +33,8 @@
   --color-hover-overlay: var(--act-color-hover-overlay);
   --color-line: var(--act-color-border);
   --color-line-strong: var(--act-color-border-strong);
+  --color-composer: var(--act-color-composer-border);
+  --color-composer-focus: var(--act-color-composer-border-focus);
   --color-toggle-off: var(--act-color-toggle-off);
   --color-text-main: var(--act-color-text);
   --color-text-muted: var(--act-color-text-muted);
@@ -55,6 +57,7 @@
   --color-warning: var(--act-color-warning);
   --color-warning-soft: var(--act-color-warning-soft);
   --color-on-warning: var(--act-color-on-warning);
+  --color-on-warning-solid: var(--act-color-on-warning-solid);
   --color-danger: var(--act-color-danger);
   --color-danger-hover: var(--act-color-danger-hover);
   --color-success: var(--act-color-success);
@@ -115,4 +118,6 @@
   --shadow-act-soft: var(--act-shadow-soft);
   --shadow-act-popover: var(--act-shadow-popover);
   --shadow-act-float: var(--act-shadow-float);
+  --shadow-act-composer: var(--act-shadow-composer);
+  --shadow-act-composer-focus: var(--act-shadow-composer-focus);
 }

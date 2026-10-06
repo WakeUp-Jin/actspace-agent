@@ -1,6 +1,10 @@
 {
-  "components/Composer.tsx": 31,
+  "components/composer/ComposerAttachments.tsx": 4,
+  "components/composer/ComposerStatusRow.tsx": 1,
+  "components/composer/ModelPicker.tsx": 5,
   "components/composer/ResponseAnnotationPill.tsx": 2,
+  "components/composer/RunTargetRow.tsx": 1,
+  "components/composer/SlashMenu.tsx": 3,
   "components/ContextPopup.tsx": 4,
   "components/conversation/TurnActions.tsx": 3,
   "components/ConversationTurnRail.tsx": 1,

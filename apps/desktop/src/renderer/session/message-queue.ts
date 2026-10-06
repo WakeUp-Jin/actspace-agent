@@ -32,7 +32,7 @@ export type QueuedComposerMessage = {
 
 export type SessionMessageQueue = {
   items: readonly QueuedComposerMessage[];
-  /** 已插入当前回合、还没被 loop 读到的消息。 */
+  /** 已引导进当前回合、还没被 loop 读到的消息。 */
   steering: readonly QueuedComposerMessage[];
   /** 停止 / 失败后暂停，不自动发出，直到用户继续或手动发送。 */
   paused: boolean;

@@ -220,14 +220,14 @@ describe("App message queue", () => {
     await userEvent.click(screen.getByLabelText("加入队列"));
     await queueText("third");
 
-    expect(within(tray()!).getByText("2 条排队")).toBeInTheDocument();
+    expect(within(tray()!).getByRole("img", { name: /^2 条排队/ })).toBeInTheDocument();
     expect(within(tray()!).getByText("second")).toBeInTheDocument();
     expect(input.value).toBe("");
     expect(fixture.startExecution).toHaveBeenCalledTimes(1);
 
     await act(async () => fixture.finish("queue-a", "completed"));
     await waitFor(() => expect(fixture.sentTexts()).toEqual(["first question", "second"]));
-    expect(within(tray()!).getByText("1 条排队")).toBeInTheDocument();
+    expect(within(tray()!).getByRole("img", { name: /^1 条排队/ })).toBeInTheDocument();
 
     await act(async () => fixture.finish("queue-a", "completed"));
     await waitFor(() => expect(fixture.sentTexts()).toEqual(["first question", "second", "third"]));
@@ -398,11 +398,11 @@ describe("App message queue", () => {
     await act(async () => fixture.event("queue-a", { type: "assistant_text_delta", delta: "working on it" }));
     await queueText("also check tests");
 
-    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 插入" }));
+    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 引导" }));
     const steerInput = fixture.designateSupplement.mock.calls[0]![0];
     expect(steerInput).toMatchObject({ sessionId: "queue-a", op: "designate", runId: fixture.pending.get("queue-a")!.input.agentRunId });
     expect(await within(tray()!).findByText("下一步读取")).toBeInTheDocument();
-    expect(within(tray()!).getByText("1 条已插入")).toBeInTheDocument();
+    expect(within(tray()!).getByRole("img", { name: /1 条已引导/ })).toBeInTheDocument();
 
     await act(async () => fixture.event("queue-a", { type: "user_message_steered", turnId: "turn-1", messageId: steerInput.taskId }));
     expect(tray()).toBeNull();
@@ -420,7 +420,7 @@ describe("App message queue", () => {
     await startFirstRun(fixture);
     await queueText("steer me");
     await queueText("later");
-    await userEvent.click(within(tray()!).getAllByRole("button", { name: "↳ 插入" })[0]!);
+    await userEvent.click(within(tray()!).getAllByRole("button", { name: "↳ 引导" })[0]!);
     await within(tray()!).findByText("下一步读取");
 
     await userEvent.click(screen.getByLabelText("停止 Agent"));
@@ -440,8 +440,8 @@ describe("App message queue", () => {
     await startFirstRun(fixture);
     await queueText("too late");
 
-    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 插入" }));
-    await waitFor(() => expect(within(tray()!).getByText("1 条排队")).toBeInTheDocument());
+    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 引导" }));
+    await waitFor(() => expect(within(tray()!).getByRole("img", { name: /^1 条排队/ })).toBeInTheDocument());
     expect(within(tray()!).queryByText("下一步读取")).not.toBeInTheDocument();
   });
 
@@ -450,10 +450,10 @@ describe("App message queue", () => {
     renderApp();
     await startFirstRun(fixture);
     await queueText("changed my mind");
-    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 插入" }));
+    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 引导" }));
     await userEvent.click(await within(tray()!).findByRole("button", { name: "撤回" }));
 
-    await waitFor(() => expect(within(tray()!).getByText("1 条排队")).toBeInTheDocument());
+    await waitFor(() => expect(within(tray()!).getByRole("img", { name: /^1 条排队/ })).toBeInTheDocument());
     expect(fixture.clearDesignation).toHaveBeenCalledTimes(1);
   });
 
@@ -466,7 +466,7 @@ describe("App message queue", () => {
       type: "tool_approval_required", toolCallId: "tool-1", toolName: "bash", requestId: "approval-1", reason: "run command",
     }));
 
-    await waitFor(() => expect(within(tray()!).getByRole("button", { name: "↳ 插入" })).toBeDisabled());
+    await waitFor(() => expect(within(tray()!).getByRole("button", { name: "↳ 引导" })).toBeDisabled());
   });
 
   it("auto-sends a background session queue after its run completes", async () => {
@@ -490,7 +490,7 @@ describe("App message queue", () => {
     await userEvent.keyboard("{Enter}");
 
     expect(within(tray()!).getByText("命令")).toBeInTheDocument();
-    expect(within(tray()!).queryByRole("button", { name: "↳ 插入" })).not.toBeInTheDocument();
+    expect(within(tray()!).queryByRole("button", { name: "↳ 引导" })).not.toBeInTheDocument();
 
     await act(async () => fixture.finish("queue-a", "completed"));
     await waitFor(() => expect(fixture.executeCompaction).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "queue-a" })));

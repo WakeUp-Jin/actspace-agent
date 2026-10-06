@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ReactElement } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComposerAttachment, ResponseAnnotationReference, SkillCatalogItem, UsableModelView } from "@actspace/shared";
@@ -21,7 +22,10 @@ function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {})
   const onAbort = vi.fn();
   const onOpenAttachmentPreview = vi.fn();
 
-  const result = render(
+  // 与 App 相同：本机能力（新建工作树等）按 executionContext 的 Git 状态算。rerender 也包同一个 Provider，Composer 不会重新挂载。
+  const runTarget = legacyRunTarget({ executionContext: overrides.executionContext });
+  const withRunTarget = (ui: ReactElement) => <RunTargetContext.Provider value={runTarget}>{ui}</RunTargetContext.Provider>;
+  const result = render(withRunTarget(
     <TooltipProvider delayDuration={0}>
       <Composer
         contextSnapshot={mockContextSnapshot}
@@ -31,9 +35,9 @@ function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {})
         {...overrides}
       />
     </TooltipProvider>,
-  );
+  ));
 
-  return { onSend, onAbort, onOpenAttachmentPreview, ...result };
+  return { onSend, onAbort, onOpenAttachmentPreview, ...result, rerender: (ui: ReactElement) => result.rerender(withRunTarget(ui)) };
 }
 
 function createSkill(overrides: Partial<SkillCatalogItem> = {}): SkillCatalogItem {
@@ -187,6 +191,58 @@ describe("Composer follow-up bar", () => {
     await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("draft for B"));
   });
 
+  it("writes a restored draft back to its session", async () => {
+    const writeDraft = vi.fn();
+    renderComposer({ draftKey: "session-a", readDraft: () => "", writeDraft, draftRestore: { id: 1, sessionId: "session-a", text: "retry me", error: "failed" } });
+
+    await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("retry me"));
+    expect(writeDraft).toHaveBeenCalledWith("session-a", "retry me");
+  });
+
+  it("prefers the restored draft when the session and the restore arrive together", async () => {
+    const readDraft = (key: string) => key === "session-b" ? "stale draft for B" : "";
+    const readAttachmentDraft = () => [];
+    const photo: ComposerAttachment = { id: "photo", kind: "file", name: "notes.txt", path: "/tmp/notes.txt" };
+    const view = (draftKey: string, draftRestore?: Parameters<typeof Composer>[0]["draftRestore"]) => (
+      <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} draftKey={draftKey} readDraft={readDraft} writeDraft={vi.fn()} readAttachmentDraft={readAttachmentDraft} writeAttachmentDraft={vi.fn()} draftRestore={draftRestore} onSend={vi.fn()} /></TooltipProvider>
+    );
+    const { rerender } = renderComposer({ draftKey: "session-a", readDraft, readAttachmentDraft, writeAttachmentDraft: vi.fn() });
+
+    rerender(view("session-b", { id: 1, sessionId: "session-b", text: "restored B", error: "上传失败", attachments: [photo] }));
+
+    await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("restored B"));
+    expect(screen.getByLabelText("已附加的文件 notes.txt")).toBeInTheDocument();
+    expect(screen.getByText("上传失败")).toBeInTheDocument();
+  });
+
+  it("describes the rejected attachment with the send error", async () => {
+    renderComposer({
+      draftKey: "session-a",
+      draftRestore: {
+        id: 1,
+        sessionId: "session-a",
+        text: "keep this",
+        error: "文件太大",
+        attachmentIssue: { code: "text_too_large", attachmentId: "large" },
+        attachments: [{ id: "large", kind: "file", name: "big.txt", path: "/tmp/big.txt" }],
+      },
+    });
+
+    expect(await screen.findByLabelText("已附加的文件 big.txt")).toHaveAccessibleDescription("文件太大");
+  });
+
+  it("forgets the stacked layout when the session changes", async () => {
+    const drafts: Record<string, string> = { "session-a": "line 1\nline 2", "session-b": "hi" };
+    const readDraft = (key: string) => drafts[key] ?? "";
+    const writeDraft = vi.fn();
+    const view = (draftKey: string) => <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} draftKey={draftKey} readDraft={readDraft} writeDraft={writeDraft} onSend={vi.fn()} /></TooltipProvider>;
+    const { container, rerender } = renderComposer({ draftKey: "session-a", readDraft, writeDraft });
+    expect(container.querySelector("[data-layout]")).toHaveAttribute("data-layout", "stacked");
+
+    rerender(view("session-b"));
+    await waitFor(() => expect(container.querySelector("[data-layout]")).toHaveAttribute("data-layout", "inline"));
+  });
+
   it("does not leak an asynchronous send failure into the newly selected session", async () => {
     let rejectSend!: (error: Error) => void;
     const onSend = vi.fn(() => new Promise<void>((_resolve, reject) => { rejectSend = reject; }));
@@ -210,9 +266,9 @@ describe("Composer follow-up bar", () => {
     const view = (draftKey: string) => <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} draftKey={draftKey} readDraft={readDraft} writeDraft={vi.fn()} onSend={vi.fn()} /></TooltipProvider>;
     const { rerender } = render(view("session-a"));
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    expect(screen.getByRole("menu", { name: "添加上下文或工具" })).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: "添加上下文或工具" })).toBeInTheDocument();
     rerender(view("session-b"));
-    expect(screen.queryByRole("menu", { name: "添加上下文或工具" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox", { name: "添加上下文或工具" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^上下文用量/ }));
     expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
@@ -247,7 +303,7 @@ describe("Composer follow-up bar", () => {
     expect(reviewButton).toHaveTextContent("Review+4253-5");
     expect(reviewButton).toHaveClass("rounded-act-pill", "enabled:hover:bg-surface-subtle", "enabled:hover:border-line-strong");
     expect(reviewOverflowButton).toHaveClass("rounded-act-pill", "enabled:hover:bg-surface-subtle", "enabled:hover:border-line-strong");
-    expect(screen.getByPlaceholderText("继续补充…")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("继续追问…")).toBeInTheDocument();
     expect(screen.queryByText("main")).not.toBeInTheDocument();
     expect(screen.getByText("本机")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "上下文用量 36%" })).toBeInTheDocument();
@@ -293,7 +349,7 @@ describe("Composer follow-up bar", () => {
     renderComposer();
 
     expect(screen.queryByRole("button", { name: /Review/ })).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText("继续补充…")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("继续追问…")).toBeInTheDocument();
   });
 
   it("keeps selected images in the attachment area above the input bar", async () => {
@@ -314,7 +370,7 @@ describe("Composer follow-up bar", () => {
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await user.click(screen.getByRole("menuitem", { name: "图片" }));
+    await user.click(screen.getByRole("option", { name: "图片" }));
 
     const panel = screen.getByLabelText("消息输入面板");
     const attachmentList = within(panel).getByLabelText("已附加的文件");
@@ -334,8 +390,8 @@ describe("Composer follow-up bar", () => {
     expect(input).toHaveValue("");
   });
 
-  // 输入布局对齐 Cursor：单行内容 inline（同一行），内容折行自动切 stacked（控件行贴底），
-  // 删回单行再切回 inline；切换只改 grid-template-areas，textarea 不 remount。
+  // 输入布局对齐 Cursor：单行内容 inline（同一行），内容折行自动切 stacked（控件行贴底）；
+  // 进入 stacked 后删到一个字仍是 stacked，只有清空才回到 inline。切换只改 grid-template-areas，textarea 不 remount。
   it("switches between inline and stacked layout as content wraps", async () => {
     const user = userEvent.setup();
     renderComposer();
@@ -357,7 +413,20 @@ describe("Composer follow-up bar", () => {
 
     mockScrollHeight = 34;
     await user.clear(input);
-    await user.type(input, "short");
+    await user.type(input, "x");
+    expect(body.dataset.layout).toBe("inline");
+
+    mockScrollHeight = 74;
+    await user.type(input, "这段文字在单行里会折行");
+    expect(body.dataset.layout).toBe("stacked");
+
+    // 删到一个字：内容已经能放进一行，但仍保持 stacked，避免边输边删时来回跳。
+    mockScrollHeight = 34;
+    await user.type(input, "{Backspace}".repeat(11));
+    expect(input).toHaveValue("x");
+    expect(body.dataset.layout).toBe("stacked");
+
+    await user.type(input, "{Backspace}");
     expect(body.dataset.layout).toBe("inline");
 
     // 切换过程 textarea 是同一个 DOM 节点（不 remount）
@@ -376,7 +445,7 @@ describe("Composer follow-up bar", () => {
       // 同一个固定 inline 网格决定折行，不能随真实布局的判定结果变化。
       const measuredBody = this.parentElement!;
       if (this.style.width) return body.dataset.layout === "stacked" ? 34 : 74;
-      return /\[grid-template-areas:'plus_(?:mode_)?input_model(?:_context)?_send'\]/.test(measuredBody.className) ? 74 : 34;
+      return /\[grid-template-areas:'plus_(?:mode_)?input_send'\]/.test(measuredBody.className) ? 74 : 34;
     });
 
     await user.click(input);
@@ -413,6 +482,14 @@ describe("Composer follow-up bar", () => {
     expect(screen.getAllByLabelText("消息输入框")).toEqual([input]);
   });
 
+  // 新建页输入框始终多行（输入在上、控件行在下），空内容也不收成单行胶囊。
+  it("keeps the initial surface stacked even when empty", () => {
+    renderComposer({ surface: "initial" });
+
+    const body = screen.getByLabelText("消息输入面板").querySelector(".composer-body") as HTMLElement;
+    expect(body.dataset.layout).toBe("stacked");
+  });
+
   it("forces stacked layout when attachments exist", async () => {
     const user = userEvent.setup();
     const selectImages = vi.fn(async () => ({
@@ -429,8 +506,71 @@ describe("Composer follow-up bar", () => {
     expect(body.dataset.layout).toBe("inline");
 
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await user.click(screen.getByRole("menuitem", { name: "图片" }));
+    await user.click(screen.getByRole("option", { name: "图片" }));
 
+    expect(body.dataset.layout).toBe("stacked");
+  });
+
+  it("returns to inline once the last attachment is removed and the input is empty", async () => {
+    const user = userEvent.setup();
+    setupBridge({
+      "dialogs.selectImages": vi.fn(async () => ({
+        canceled: false,
+        attachments: [{ id: "att-1", kind: "image" as const, name: "notes.png", path: "/Users/test/notes.png" }],
+      })),
+    });
+    renderComposer();
+    const body = screen.getByLabelText("消息输入面板").querySelector(".composer-body") as HTMLElement;
+
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    await user.click(screen.getByRole("option", { name: "图片" }));
+    expect(body.dataset.layout).toBe("stacked");
+
+    await user.click(screen.getByRole("button", { name: /移除 notes\.png/ }));
+    expect(body.dataset.layout).toBe("inline");
+  });
+
+  it("stacks text with a line break even when every line is short", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const body = screen.getByLabelText("消息输入面板").querySelector(".composer-body") as HTMLElement;
+    const input = screen.getByLabelText("消息输入框");
+
+    await user.click(input);
+    await user.paste("a\nb");
+    expect(body.dataset.layout).toBe("stacked");
+  });
+
+  it("hides the model button in the inline layout but keeps it in the DOM", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const body = screen.getByLabelText("消息输入面板").querySelector(".composer-body") as HTMLElement;
+    const modelGroup = screen.getByRole("button", { name: /deepseek-flash/i }).parentElement!;
+
+    expect(body.dataset.layout).toBe("inline");
+    expect(body).toHaveClass("group/composer-body");
+    expect(modelGroup).toHaveClass("group-data-[layout=inline]/composer-body:hidden");
+    expect(body.className).not.toContain("_model_");
+
+    await user.click(screen.getByLabelText("消息输入框"));
+    await user.paste("a\nb");
+    expect(body.dataset.layout).toBe("stacked");
+    expect(body.className).toMatch(/'plus_(?:mode_)?model_\._send'/);
+  });
+
+  it("always stacks in a narrow window", () => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query: string) => ({
+      matches: query === "(max-width: 600px)",
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList);
+    renderComposer();
+    const body = screen.getByLabelText("消息输入面板").querySelector(".composer-body") as HTMLElement;
     expect(body.dataset.layout).toBe("stacked");
   });
 
@@ -439,8 +579,27 @@ describe("Composer follow-up bar", () => {
 
     // bg-accent 在默认调色板下回落为 action 反色，其它调色板取强调色（front-accent-palette.md）。
     const sendButton = screen.getByRole("button", { name: "输入消息后发送" });
-    expect(sendButton).toHaveClass("bg-accent", "text-on-accent", "rounded-act-pill");
+    expect(sendButton).toHaveClass("bg-accent", "text-on-accent", "rounded-act-pill", "size-7");
+    expect(sendButton).toHaveAttribute("data-mode", "agent");
     expect(sendButton.className).not.toContain("bg-operational");
+  });
+
+  it.each([
+    ["plan", "bg-warning", "text-on-warning-solid"],
+    ["chat", "bg-operational", "text-on-operational"],
+  ] as const)("colors the send button for %s mode", (mode, background, foreground) => {
+    renderComposer({ mode });
+    const sendButton = screen.getByRole("button", { name: "输入消息后发送" });
+    expect(sendButton).toHaveAttribute("data-mode", mode);
+    expect(sendButton).toHaveClass(background, foreground);
+    expect(sendButton.className).not.toContain("bg-accent");
+  });
+
+  it("keeps the stop button neutral in every mode", () => {
+    renderComposer({ mode: "plan", isStreaming: true, onAbort: vi.fn() });
+    const stopButton = screen.getByRole("button", { name: "停止 Agent" });
+    expect(stopButton).toHaveClass("bg-action");
+    expect(stopButton.className).not.toContain("bg-warning");
   });
 
   it("explains why sending is unavailable when no provider model can be used", async () => {
@@ -477,20 +636,22 @@ describe("Composer follow-up bar", () => {
     expect(input.style.height).toBe("96px");
   });
 
-  it("opens the Agent plus command menu with Agent, Plan, Image, and Skills", async () => {
+  it("opens the plus panel of a started Agent session with Plan, Image, Skills, and the model", async () => {
     const user = userEvent.setup();
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
 
-    const menu = screen.getByRole("menu", { name: "添加上下文或工具" });
-    expect(within(menu).getByRole("menuitem", { name: "Plan" })).toBeInTheDocument();
-    // 同一个 Session 可以切换三种模式。
-    expect(within(menu).getByRole("menuitem", { name: "Agent" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Chat" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "图片" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Skills" })).toBeInTheDocument();
-    expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|模型|Attach files/)).not.toBeInTheDocument();
+    // 已开始的 Agent 会话只列 Plan；默认的 Agent 不列。
+    const menu = screen.getByRole("listbox", { name: "添加上下文或工具" });
+    expect(within(menu).getByRole("option", { name: "Plan" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("option", { name: "Agent" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("option", { name: "Chat" })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("option", { name: "图片" })).toBeInTheDocument();
+    expect(within(menu).getByRole("option", { name: "Skills" })).toBeInTheDocument();
+    expect(within(menu).getByRole("option", { name: "模型" })).toHaveTextContent("deepseek-flash");
+    expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|Attach files/)).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "搜索" })).toHaveFocus();
   });
 
   it("opens the slash menu with Functions and workspace Skills", async () => {
@@ -602,7 +763,7 @@ describe("Composer follow-up bar", () => {
     const { onSend } = renderComposer({ selectedSkills: ["frontend-design"] });
 
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await user.click(screen.getByRole("menuitem", { name: "图片" }));
+    await user.click(screen.getByRole("option", { name: "图片" }));
     expect(screen.getByLabelText("已附加的图片 screenshot.png")).toBeInTheDocument();
 
     const input = screen.getByLabelText("消息输入框");
@@ -617,6 +778,18 @@ describe("Composer follow-up bar", () => {
     });
     expect(screen.getByLabelText("已附加的图片 screenshot.png")).toBeInTheDocument();
     expect(screen.getByLabelText("已选择的 Skill frontend-design")).toBeInTheDocument();
+  });
+
+  it("keeps /compact in the menu while no model is available", async () => {
+    const user = userEvent.setup();
+    setupBridge({ "skills.list": vi.fn(async () => ({ items: [], warnings: [] })) });
+    const { onSend } = renderComposer({ models: [] });
+
+    await user.type(screen.getByLabelText("消息输入框"), "/compact");
+    await user.keyboard("{Enter}");
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("斜杠命令")).toBeInTheDocument();
   });
 
   it("opens Context and Review from slash functions and binds a filtered Skill", async () => {
@@ -663,7 +836,7 @@ describe("Composer follow-up bar", () => {
 
     expect(screen.queryByRole("button", { name: /Agent 模式/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await user.click(screen.getByRole("menuitem", { name: "Plan" }));
+    await user.click(screen.getByRole("option", { name: "Plan" }));
     expect(onModeChange).toHaveBeenCalledWith("plan");
 
     rerender(
@@ -671,11 +844,69 @@ describe("Composer follow-up bar", () => {
         <Composer contextSnapshot={mockContextSnapshot} mode="plan" onModeChange={onModeChange} />
       </TooltipProvider>,
     );
-    const planPill = screen.getByRole("button", { name: "移除 Plan 模式" });
-    expect(planPill).toHaveClass("bg-warning-soft", "text-on-warning");
-    expect(screen.getByPlaceholderText("继续完善方案…")).toBeInTheDocument();
-    await user.click(planPill);
+    const exitPlan = screen.getByRole("button", { name: "退出 Plan 模式" });
+    const planChip = exitPlan.closest(".mode-chip") as HTMLElement;
+    expect(planChip).toHaveClass("bg-warning-soft", "text-on-warning");
+    // 名称区只是标签，不是按钮。
+    expect(within(planChip).getAllByRole("button")).toEqual([exitPlan]);
+    expect(planChip).toHaveTextContent("Plan");
+    expect(screen.getByPlaceholderText("描述要规划的改动…")).toBeInTheDocument();
+    await user.click(exitPlan);
     expect(onModeChange).toHaveBeenLastCalledWith("agent");
+    expect(screen.getByLabelText("消息输入框")).toHaveFocus();
+  });
+
+  it.each([
+    ["agent", "initial", false, "描述你要做的事，@ 引用文件，/ 调用命令"],
+    ["agent", "followup", false, "继续追问…"],
+    ["plan", "initial", false, "描述要规划的改动…"],
+    ["plan", "followup", false, "描述要规划的改动…"],
+    ["chat", "initial", false, "问点什么…"],
+    ["chat", "followup", false, "问点什么…"],
+    ["agent", "followup", true, "继续追问，运行中发送会进入队列…"],
+    ["chat", "followup", true, "继续追问，运行中发送会进入队列…"],
+  ] as const)("uses the final placeholder for %s on the %s surface (queueing: %s)", (mode, surface, queueing, text) => {
+    renderComposer({
+      mode,
+      surface,
+      ...(queueing
+        ? {
+            isStreaming: true,
+            messageQueue: {
+              queue: { paused: false, steering: [], items: [] },
+              running: true,
+              steerBlockedReason: null,
+              onSteer: vi.fn(), onUnsteer: vi.fn(), onRemove: vi.fn(), onMoveUp: vi.fn(), onEdit: vi.fn(), onResume: vi.fn(),
+            },
+          }
+        : {}),
+    });
+    expect(screen.getByRole("textbox", { name: "消息输入框" })).toHaveAttribute("placeholder", text);
+  });
+
+  it("returns to Agent when Backspace is pressed on the mode chip", async () => {
+    const user = userEvent.setup();
+    const onModeChange = vi.fn();
+    renderComposer({ mode: "chat", onModeChange });
+
+    const exitChat = screen.getByRole("button", { name: "退出 Chat 模式" });
+    expect(exitChat.closest(".mode-chip")).toHaveClass("bg-operational-soft", "text-operational");
+    exitChat.focus();
+    await user.keyboard("{Backspace}");
+    expect(onModeChange).toHaveBeenCalledWith("agent");
+  });
+
+  it("keeps the mode while a run is streaming", async () => {
+    const user = userEvent.setup();
+    const onModeChange = vi.fn();
+    renderComposer({ mode: "plan", onModeChange, isStreaming: true });
+
+    const exitPlan = screen.getByRole("button", { name: "退出 Plan 模式" });
+    expect(exitPlan).toBeDisabled();
+    fireEvent.keyDown(exitPlan, { key: "Backspace" });
+    expect(onModeChange).not.toHaveBeenCalled();
+    await user.click(exitPlan);
+    expect(onModeChange).not.toHaveBeenCalled();
   });
 
   it("lists enabled Skills, selects one, and keeps it visible as a pill", async () => {
@@ -702,10 +933,10 @@ describe("Composer follow-up bar", () => {
       onSelectedSkillsChange,
     });
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await user.click(screen.getByRole("menuitem", { name: "Skills" }));
-    const skillsMenu = await screen.findByRole("menu", { name: "Skills" });
-    expect(screen.queryByRole("menu", { name: "添加上下文或工具" })).not.toBeInTheDocument();
-    await user.click(within(skillsMenu).getByRole("menuitemcheckbox", { name: /frontend-design/i }));
+    await user.click(screen.getByRole("option", { name: "Skills" }));
+    const skillsMenu = await screen.findByRole("listbox", { name: "Skills" });
+    expect(screen.queryByRole("listbox", { name: "添加上下文或工具" })).not.toBeInTheDocument();
+    await user.click(await within(skillsMenu).findByRole("option", { name: /frontend-design/i }));
     expect(listSkills).toHaveBeenCalledWith({ workspaceRoot: "/work" });
     expect(onSelectedSkillsChange).toHaveBeenCalledWith(["frontend-design"]);
 
@@ -760,7 +991,7 @@ describe("Composer follow-up bar", () => {
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await user.click(screen.getByRole("menuitem", { name: "图片" }));
+    await user.click(screen.getByRole("option", { name: "图片" }));
 
     expect(selectImages).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText("已附加的图片 screenshot.png")).toBeInTheDocument();
@@ -782,7 +1013,7 @@ describe("Composer follow-up bar", () => {
     const { onOpenAttachmentPreview } = renderComposer();
 
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await user.click(screen.getByRole("menuitem", { name: "图片" }));
+    await user.click(screen.getByRole("option", { name: "图片" }));
     await user.click(screen.getByRole("button", { name: "预览附加图片 screenshot.png" }));
 
     expect(onOpenAttachmentPreview).toHaveBeenCalledWith(attachment);
@@ -837,7 +1068,7 @@ describe("Composer follow-up bar", () => {
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await user.click(screen.getByRole("menuitem", { name: "图片" }));
+    await user.click(screen.getByRole("option", { name: "图片" }));
 
     expect(screen.queryByLabelText("已附加的文件")).not.toBeInTheDocument();
   });
@@ -898,15 +1129,85 @@ describe("Composer follow-up bar", () => {
 
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
     expect(screen.queryByRole("listbox", { name: "斜杠命令" })).not.toBeInTheDocument();
-    expect(screen.getByRole("menu", { name: "添加上下文或工具" })).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: "添加上下文或工具" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
-    expect(screen.queryByRole("menu", { name: "添加上下文或工具" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox", { name: "添加上下文或工具" })).not.toBeInTheDocument();
     expect(screen.getAllByText("deepseek-flash").at(-1)!).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "上下文用量 36%" }));
-    expect(container.querySelector(".model-menu")).not.toBeInTheDocument();
+    expect(document.querySelector(".model-menu")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
+  });
+
+  it("toggles the initial selectors from their own buttons and closes them and the slash menu outside the composer", async () => {
+    // 09 T18：三个菜单都是 ui/Menu，点外面和 Esc 由 Radix 处理；Composer 只管同一时间只开一个、和斜杠菜单互斥。
+    const user = userEvent.setup();
+    renderComposer({
+      surface: "initial",
+      selectedWorkspaceRoot: "/work/actspace-agent",
+      workspaceOptions: [{ value: "/work/actspace-agent", label: "actspace-agent" }],
+      executionContext: { runLocation: "this_mac", selectedBranch: "main", gitContext: null },
+    });
+    const outside = document.createElement("button");
+    outside.textContent = "外部";
+    document.body.append(outside);
+    const workspace = screen.getByRole("button", { name: "选择工作区" });
+    const runtime = screen.getByRole("button", { name: "选择运行位置" });
+
+    const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    await user.click(workspace);
+    expect(screen.getByRole("menu", { name: "选择工作区" })).toBeInTheDocument();
+    await settle();
+    await user.click(runtime);
+    expect(screen.queryByRole("menu", { name: "选择工作区" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menu", { name: "选择运行位置" })).toBeInTheDocument();
+    expect(runtime).toHaveAttribute("aria-expanded", "true");
+    await settle();
+    await user.click(runtime);
+    expect(screen.queryByRole("menu", { name: "选择运行位置" })).not.toBeInTheDocument();
+
+    // 斜杠菜单开着时打开下拉：斜杠菜单收起。
+    await user.type(screen.getByLabelText("消息输入框"), "/");
+    expect(await screen.findByRole("listbox", { name: "斜杠命令" })).toBeInTheDocument();
+    await user.click(workspace);
+    expect(screen.queryByRole("listbox", { name: "斜杠命令" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menu", { name: "选择工作区" })).toBeInTheDocument();
+    await settle();
+    await user.click(outside);
+    expect(screen.queryByRole("menu", { name: "选择工作区" })).not.toBeInTheDocument();
+
+    // 斜杠菜单仍由 Composer 自己在点外面时收起。
+    await user.clear(screen.getByLabelText("消息输入框"));
+    await user.type(screen.getByLabelText("消息输入框"), "/");
+    expect(await screen.findByRole("listbox", { name: "斜杠命令" })).toBeInTheDocument();
+    await user.click(outside);
+    expect(screen.queryByRole("listbox", { name: "斜杠命令" })).not.toBeInTheDocument();
+
+    await user.click(workspace);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu", { name: "选择工作区" })).not.toBeInTheDocument();
+    expect(workspace).toHaveAttribute("aria-expanded", "false");
+    outside.remove();
+  });
+
+  it("switches between the plus panel and the model menu without the closing one taking focus back", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    expect(screen.getByRole("listbox", { name: "添加上下文或工具" })).toBeInTheDocument();
+    // 点模型按钮：模型菜单先打开，`+` 面板的点外关闭随后才到，不能把模型菜单一起关掉。
+    await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(screen.queryByRole("listbox", { name: "添加上下文或工具" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menu", { name: "模型" })).toBeInTheDocument();
+
+    // 反过来：模型菜单开着时点 `+`，模型菜单关闭时不把焦点抢回模型按钮，面板留着。
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(screen.queryByRole("menu", { name: "模型" })).not.toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: "添加上下文或工具" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "搜索" })).toHaveFocus();
   });
 
   it("keeps the context popup open for clicks inside it or the composer, and closes it on Escape or an outside click", async () => {
@@ -960,7 +1261,7 @@ describe("Composer follow-up bar", () => {
 
     await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
 
-    const menu = container.querySelector(".model-menu");
+    const menu = document.querySelector(".model-menu");
     const selectedEdit = screen.getByRole("button", { name: "编辑 deepseek-v4-flash 选项" });
     const selectedRow = selectedEdit.closest(".model-menu-row");
 
@@ -972,6 +1273,52 @@ describe("Composer follow-up bar", () => {
     if (!selectedRow) throw new Error("selected model row was not rendered");
     await user.hover(selectedRow);
     expect(selectedEdit).toHaveStyle({ opacity: "1" });
+  });
+
+  it("opens the model menu focused on search, closes on Escape back to the model button, and forgets the search", async () => {
+    const user = userEvent.setup();
+    renderComposer({ models: reasoningModels, defaultModelId: "deepseek:deepseek-v4-pro" });
+    const modelButton = screen.getByRole("button", { name: /deepseek-flash/i });
+
+    await user.click(modelButton);
+    expect(modelButton).toHaveAttribute("aria-expanded", "true");
+    const search = within(screen.getByRole("menu", { name: "模型" })).getByRole("searchbox", { name: "搜索模型" });
+    expect(search).toHaveFocus();
+    await user.keyboard("gpt");
+    await user.hover(within(screen.getByRole("menu", { name: "模型" })).getByText("GPT-5 High"));
+    await user.click(screen.getByRole("button", { name: "编辑 openrouter:openai/gpt-5 选项" }));
+    expect(document.querySelector(".model-options-menu")).toBeInTheDocument();
+    // 改搜索词会收起 Options（它贴着的那一行可能已经不在了）。
+    await user.type(search, "-");
+    expect(document.querySelector(".model-options-menu")).not.toBeInTheDocument();
+    await user.clear(search);
+    await user.hover(within(screen.getByRole("menu", { name: "模型" })).getByText("GPT-5 High"));
+    await user.click(screen.getByRole("button", { name: "编辑 openrouter:openai/gpt-5 选项" }));
+    expect(document.querySelector(".model-options-menu")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu", { name: "模型" })).not.toBeInTheDocument();
+    expect(document.querySelector(".model-options-menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(modelButton).toHaveFocus());
+
+    await user.click(modelButton);
+    expect(within(screen.getByRole("menu", { name: "模型" })).getByRole("searchbox", { name: "搜索模型" })).toHaveValue("");
+    expect(document.querySelector(".model-options-menu")).not.toBeInTheDocument();
+  });
+
+  it("closes the model menu on an outside click and after picking a model", async () => {
+    const user = userEvent.setup();
+    renderComposer({ models: reasoningModels, defaultModelId: "deepseek:deepseek-v4-pro" });
+    const modelButton = screen.getByRole("button", { name: /deepseek-flash/i });
+
+    await user.click(modelButton);
+    await user.click(screen.getByLabelText("消息输入框"));
+    expect(screen.queryByRole("menu", { name: "模型" })).not.toBeInTheDocument();
+
+    await user.click(modelButton);
+    await user.click(within(screen.getByRole("menu", { name: "模型" })).getByRole("button", { name: "GPT-5 High" }));
+    expect(screen.queryByRole("menu", { name: "模型" })).not.toBeInTheDocument();
+    expect(modelButton).toHaveTextContent("GPT-5 High");
   });
 
   it("filters usable models from the search field", async () => {
@@ -1028,6 +1375,16 @@ describe("Composer follow-up bar", () => {
     const menu = screen.getByRole("menu", { name: "模型" });
     expect(within(menu).getByRole("group", { name: "OpenRouter" })).toBeInTheDocument();
     expect(within(menu).getByRole("group", { name: "Team Relay" })).toBeInTheDocument();
+
+    // 搜索也匹配分组名和供应商 id。
+    const search = within(menu).getByRole("searchbox", { name: "搜索模型" });
+    await user.type(search, "team");
+    expect(within(menu).queryByRole("group", { name: "OpenRouter" })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("group", { name: "Team Relay" })).toBeInTheDocument();
+    await user.clear(search);
+    await user.type(search, "openrouter");
+    expect(within(menu).getByRole("group", { name: "OpenRouter" })).toBeInTheDocument();
+    expect(within(menu).getByRole("group", { name: "Team Relay" })).toBeInTheDocument();
   });
 
   it("sends a supported OpenRouter reasoning effort and animates both popovers", async () => {
@@ -1038,13 +1395,13 @@ describe("Composer follow-up bar", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /GPT-5 High/i }));
-    const menu = container.querySelector(".model-menu");
+    const menu = document.querySelector(".model-menu");
     expect(menu).toHaveClass("duration-(--motion-fast)");
 
     const modelMenu = screen.getByRole("menu", { name: "模型" });
     await user.hover(within(modelMenu).getByText("GPT-5 High"));
     await user.click(screen.getByRole("button", { name: "编辑 openrouter:openai/gpt-5 选项" }));
-    const options = container.querySelector(".model-options-menu");
+    const options = document.querySelector(".model-options-menu");
     expect(options).toHaveClass("duration-(--motion-fast)");
     expect(screen.getByRole("button", { name: "Auto" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "High" }));
@@ -1186,25 +1543,25 @@ describe("Composer follow-up bar", () => {
     expect(within(panel).queryByRole("button", { name: "Show context usage" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "选择工作区" }));
-    const workspaceMenu = screen.getByRole("menu", { name: "actspace-agent选项" });
-    expect(screen.getByLabelText("初始工作区与运行位置选择")).toHaveClass("overflow-visible");
-    expect(workspaceMenu).toHaveClass("top-[calc(100%_+_8px)]");
-    expect(within(workspaceMenu).getByRole("menuitem", { name: "wakeup-Jin-wiki" })).toBeInTheDocument();
-    expect(within(workspaceMenu).getByRole("menuitem", { name: "code-tool-work" })).toBeInTheDocument();
-    await user.click(within(workspaceMenu).getByRole("menuitem", { name: "code-tool-work" }));
+    const workspaceMenu = screen.getByRole("menu", { name: "选择工作区" });
+    expect(within(workspaceMenu).getByRole("menuitemradio", { name: /^wakeup-Jin-wiki/ })).toBeInTheDocument();
+    // 名称在第一行，路径是第二行的 faint 小字。
+    expect(within(workspaceMenu).getByRole("menuitemradio", { name: /^code-tool-work/ })).toHaveTextContent("/work/code-tool-work");
+    await user.click(within(workspaceMenu).getByRole("menuitemradio", { name: /^code-tool-work/ }));
     expect(onSelectWorkspace).toHaveBeenCalledWith("/work/code-tool-work");
     expect(onSend).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "选择分支" }));
-    const branchMenu = screen.getByRole("menu", { name: "分支选项" });
-    expect(branchMenu).toHaveClass("top-[calc(100%_+_8px)]");
-    expect(within(branchMenu).getByRole("menuitemradio", { name: "main" })).toBeInTheDocument();
+    const branchMenu = screen.getByRole("menu", { name: "选择分支" });
+    expect(within(branchMenu).getByRole("menuitemradio", { name: "main" })).toHaveAttribute("aria-checked", "true");
+    await user.keyboard("{Escape}");
 
     await user.click(screen.getByRole("button", { name: "选择运行位置" }));
-    const runtimeMenu = screen.getByRole("menu", { name: "运行位置选项" });
-    expect(runtimeMenu).toHaveClass("top-[calc(100%_+_8px)]");
-    expect(within(runtimeMenu).getByRole("menuitemradio", { name: "本机" })).toBeInTheDocument();
-    expect(within(runtimeMenu).getByRole("menuitemradio", { name: "新建工作树" })).toBeInTheDocument();
+    const runtimeMenu = screen.getByRole("menu", { name: "选择运行位置" });
+    expect(within(runtimeMenu).getByRole("menuitemradio", { name: "本机" })).toHaveAttribute("aria-checked", "true");
+    expect(within(runtimeMenu).getByRole("menuitemradio", { name: /^新建工作树/ })).toHaveTextContent("从 main 创建隔离分支");
+    expect(within(runtimeMenu).queryByText("即将推出")).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
 
     await user.type(screen.getByLabelText("消息输入框"), "start a new idea");
     await user.click(screen.getByRole("button", { name: "发送消息" }));
@@ -1240,9 +1597,10 @@ describe("Composer follow-up bar", () => {
     expect(screen.queryByText("No commits yet")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "选择运行位置" }));
-    const runtimeMenu = screen.getByRole("menu", { name: "运行位置选项" });
-    const worktreeEntry = within(runtimeMenu).getByRole("menuitem", { name: /新建工作树 需要先创建提交/i });
-    expect(worktreeEntry).toBeDisabled();
+    const runtimeMenu = screen.getByRole("menu", { name: "选择运行位置" });
+    const worktreeEntry = within(runtimeMenu).getByRole("menuitemradio", { name: /^新建工作树/ });
+    expect(worktreeEntry).toHaveAttribute("aria-disabled", "true");
+    expect(worktreeEntry).toHaveTextContent("需要先创建提交");
   });
 });
 
@@ -1340,17 +1698,78 @@ describe("Composer response annotation pill", () => {
   });
 });
 
-it("keeps a removed remote Host as the selected locked target", () => {
+it("shows no run-target selectors in a locked remote conversation", () => {
+  // 09 T18：对话中运行目标已锁定，不再显示运行位置和工作区的 select（T19 换成只读状态行）。
   const choices = { hosts: [], description: undefined, modelId: "fixture", selectHost: vi.fn(), selectWorkspace: vi.fn(), selectModel: vi.fn() };
   render(
     <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "removed", hostName: "removed", workspaceId: "workspace" }, targetLocked: true, readiness: { state: "removed" }, choices })}>
       <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={{ gitContext: null, runLocation: "this_mac" }} /></TooltipProvider>
     </RunTargetContext.Provider>,
   );
-  const location = screen.getByLabelText("会话运行位置") as HTMLSelectElement;
-  expect(location).toHaveValue("removed");
-  expect(location.selectedOptions[0].textContent).toContain("远端");
-  expect(location).toBeDisabled();
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "选择运行位置" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "选择工作区" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "这台机器已从列表移除" })).toHaveAttribute("aria-disabled", "true");
+});
+
+describe("Composer follow-up status row", () => {
+  // 09 T19：对话中运行目标已锁定，状态行只读：没有下拉，只有 context 入口和权限控件可点。
+  const devbox = { id: "dev", hostId: "dev", name: "dev-box", state: "connected" as const, endpoint: { kind: "wss" as const, url: "wss://dev" } };
+  const description = { state: "ready", workspaces: [{ id: "api", name: "api-server", path: "/srv/api-server" }], models: [], defaultModel: "m" };
+  const choices = { hosts: [devbox], description, modelId: "m", selectHost: vi.fn(), selectWorkspace: vi.fn(), selectModel: vi.fn() };
+  const permission = <button type="button" aria-haspopup="menu">请求批准</button>;
+
+  function popupTriggers(row: HTMLElement) {
+    return Array.from(row.querySelectorAll("button[aria-haspopup]")).map((button) => button.textContent);
+  }
+
+  it("shows branch and 本机 locally, read-only apart from the permission control and context usage", () => {
+    renderComposer({ surface: "followup", permissionControl: permission, executionContext: { gitContext: { status: "ready", workspaceRoot: "/work/repo", currentBranch: "main", branches: [{ name: "main", current: true }] }, selectedBranch: "main", runLocation: "this_mac" } });
+    const row = screen.getByLabelText("运行位置");
+    expect(row).toHaveTextContent(/^main·本机请求批准36%$/);
+    expect(popupTriggers(row)).toEqual(["请求批准"]);
+    expect(within(row).getAllByRole("button").map((button) => button.getAttribute("aria-label") ?? button.textContent)).toEqual(["请求批准", "上下文用量 36%"]);
+  });
+
+  it("shows 工作树 for a worktree session", () => {
+    renderComposer({ surface: "followup", executionContext: { gitContext: { status: "ready", workspaceRoot: "/work/repo", currentBranch: "actspace/92803054", branches: [] }, selectedBranch: "actspace/92803054", runLocation: "worktree" } });
+    expect(screen.getByLabelText("运行位置")).toHaveTextContent(/^actspace\/92803054·工作树36%$/);
+  });
+
+  it("shows the Host and workspace names remotely, with status and path in the Host tooltip", async () => {
+    const user = userEvent.setup();
+    render(
+      <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "dev", hostName: "dev-box", workspaceId: "api", workspaceName: "api-server" }, targetLocked: true, readiness: { state: "ready" }, choices })}>
+        <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" permissionControl={permission} executionContext={{ gitContext: null, runLocation: "this_mac" }} /></TooltipProvider>
+      </RunTargetContext.Provider>,
+    );
+    const row = screen.getByLabelText("运行位置");
+    expect(row).toHaveTextContent(/^dev-box·api-server请求批准36%$/);
+    expect(popupTriggers(row)).toEqual(["请求批准"]);
+    await user.hover(within(row).getByText("dev-box"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("已连接 · /srv/api-server");
+  });
+
+  it("replaces the workspace with the readiness label and shows — for context usage while the Host is connecting", () => {
+    render(
+      <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "dev", hostName: "dev-box", workspaceId: "api", workspaceName: "api-server" }, targetLocked: true, readiness: { state: "connecting" }, choices: { ...choices, hosts: [{ ...devbox, state: "connecting" as const }] } })}>
+        <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={{ gitContext: null, runLocation: "this_mac" }} /></TooltipProvider>
+      </RunTargetContext.Provider>,
+    );
+    const row = screen.getByLabelText("运行位置");
+    expect(row).toHaveTextContent(/^dev-box·连接中—$/);
+    expect(row.querySelector("[data-tone]")).toHaveAttribute("data-tone", "pending");
+    expect(within(row).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("keeps only context usage in a Chat conversation", () => {
+    renderComposer({ surface: "followup", mode: "chat", permissionControl: permission });
+    expect(screen.queryByLabelText("运行位置")).not.toBeInTheDocument();
+    const usage = screen.getByRole("button", { name: "上下文用量 36%" });
+    expect(usage.closest(".composer-status-row")).not.toBeNull();
+    expect(screen.queryByText("本机")).not.toBeInTheDocument();
+    expect(screen.queryByText("请求批准")).not.toBeInTheDocument();
+  });
 });
 
 describe("Composer on a remote run target", () => {
@@ -1368,7 +1787,26 @@ describe("Composer on a remote run target", () => {
     const user = userEvent.setup();
     renderRemote();
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    expect(within(screen.getByRole("menu", { name: "添加上下文或工具" })).getByRole("menuitem", { name: "图片与文件" })).toBeInTheDocument();
+    expect(within(screen.getByRole("listbox", { name: "添加上下文或工具" })).getByRole("option", { name: "图片与文件" })).toBeInTheDocument();
+  });
+
+  // 09 T13：远端模型也走 ModelPicker；Host 没连上时按钮禁用，描述没回来时显示「等待 Host 模型」。
+  it("shows the Host model button instead of a select, disabled until the Host is connected", () => {
+    const { unmount } = renderRemote();
+    expect(screen.queryByLabelText("远端模型")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "等待 Host 模型" })).toBeDisabled();
+    unmount();
+
+    const connected = { ...choices, hosts: [{ id: "server", hostId: "server", name: "Cloud", state: "connected" as const, endpoint: { kind: "wss" as const, url: "wss://cloud" } }] };
+    render(
+      <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "server", hostName: "Cloud" }, targetLocked: true, readiness: { state: "describing" }, choices: connected })}>
+        <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={{ gitContext: null, runLocation: "this_mac" }} /></TooltipProvider>
+      </RunTargetContext.Provider>,
+    );
+    const button = screen.getByRole("button", { name: "等待 Host 模型" });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(within(screen.getByRole("menu", { name: "模型" })).getByText("等待 Host 模型")).toBeInTheDocument();
   });
 
   it("hides the review strip", () => {
@@ -1395,7 +1833,45 @@ describe("Composer on a remote run target", () => {
     fireEvent.click(send);
     expect(onSend).not.toHaveBeenCalled();
     expect(screen.getByLabelText("消息输入框")).toHaveValue("hi");
-    expect(screen.getByText("Cloud · 离线")).toBeInTheDocument();
+    // 09 T19：状态行第二段换成 readiness 短文案，context 用量写「—」。
+    const status = screen.getByLabelText("运行位置");
+    expect(status).toHaveTextContent("Cloud·离线");
+    expect(within(status).getByLabelText("上下文用量暂不可用")).toHaveTextContent("—");
+  });
+
+  // 09 T16：发送按钮的禁用和 tooltip 都来自 readiness（06 §4.5 文案）。
+  it("shows the readiness reason in the send button tooltip", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderRemote({}, { state: "offline" });
+    const offline = screen.getByRole("button", { name: "Cloud 离线。前往设置重新连接" });
+    expect(offline).toHaveAttribute("aria-disabled", "true");
+    await user.hover(offline);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Cloud 离线。前往设置重新连接");
+    unmount();
+
+    renderRemote({}, { state: "describe-failed", error: "Error invoking remote method 'host:describe': Error: socket hang up" });
+    fireEvent.change(screen.getByLabelText("消息输入框"), { target: { value: "hi" } });
+    const failed = screen.getByRole("button", { name: "无法读取机器信息：socket hang up" });
+    expect(failed).toHaveAttribute("aria-disabled", "true");
+    await user.hover(failed);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("无法读取机器信息：socket hang up");
+  });
+
+  it("lets a running task be stopped while the Host is connected but not while it is unreachable", async () => {
+    const user = userEvent.setup();
+    const onAbort = vi.fn();
+    const { unmount } = renderRemote({ isStreaming: true, onAbort }, { state: "describing" });
+    fireEvent.click(screen.getByRole("button", { name: "停止 Agent" }));
+    expect(onAbort).toHaveBeenCalledTimes(1);
+    unmount();
+
+    renderRemote({ isStreaming: true, onAbort }, { state: "offline" });
+    const stop = screen.getByRole("button", { name: "Cloud 离线。前往设置重新连接" });
+    expect(stop).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(stop);
+    expect(onAbort).toHaveBeenCalledTimes(1);
+    await user.hover(stop);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Cloud 离线。前往设置重新连接");
   });
 
   it("pushes the execution configuration to a remote Session only when it is ready", async () => {

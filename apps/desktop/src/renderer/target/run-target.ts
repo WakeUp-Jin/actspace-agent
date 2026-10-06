@@ -38,7 +38,7 @@ export function capabilitiesOf(target: RunTarget, env: { readonly gitStatus?: Wo
     const gitReady = env.gitStatus === "ready";
     const gitHasBranch = gitReady || env.gitStatus === "no_head";
     return {
-      newWorktree: gitReady ? enabled : off("当前工作区不是可用的 Git 仓库"),
+      newWorktree: gitReady ? enabled : off(env.gitStatus === "no_head" ? "需要先创建提交" : "当前工作区不是可用的 Git 仓库"),
       branchSwitch: gitHasBranch ? enabled : off("当前工作区不是 Git 仓库"),
       localFileOpen: enabled,
       terminal: enabled,

@@ -1,6 +1,6 @@
 import { encodeSessionLocator } from "@actspace/shared/session-locator";
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../App";
 import { HostConnectionsSettings } from "../components/settings/HostConnectionsSettings";
@@ -90,7 +90,24 @@ it.each([
   expect(page.mock.calls.length).toBeGreaterThan(1);
 });
 
+// 09 T18：新建页的运行位置和远端工作区是文字按钮 + 菜单（不再是原生 select）。
+type User = ReturnType<typeof userEvent.setup>;
+
+async function pickHost(user: User, name: string) {
+  await user.click(await screen.findByRole("button", { name: "选择运行位置" }));
+  const remote = await screen.findByRole("menuitem", { name: /^远端机器/ });
+  remote.focus();
+  await user.keyboard("{ArrowRight}");
+  await user.click(within(screen.getByRole("menu", { name: /^远端机器/ })).getByRole("menuitemradio", { name: new RegExp(`^${name}`) }));
+}
+
+async function pickWorkspace(user: User, name: string) {
+  await user.click(screen.getByRole("button", { name: "选择工作区" }));
+  await user.click(within(screen.getByRole("menu", { name: "选择工作区" })).getByRole("menuitemradio", { name: new RegExp(`^${name}`) }));
+}
+
 it("switches workspace and model to the selected blocked Host's own description", async () => {
+  const user = userEvent.setup();
   const onSend = vi.fn();
   const hosts = ["ready", "blocked"].map(hostId => ({ id: hostId, hostId, name: hostId, state: "connected", endpoint: { kind: "wss", url: `wss://${hostId}.example/rpc` } }));
   setupBridge({
@@ -107,23 +124,40 @@ it("switches workspace and model to the selected blocked Host's own description"
     return <RunTargetContext.Provider value={runTarget}><Composer contextSnapshot={mockContextSnapshot} onSend={onSend} surface="initial" executionContext={{ gitContext: null, runLocation: "this_mac" }} /></RunTargetContext.Provider>;
   }
   render(<Harness />);
-  await screen.findByRole("option", { name: "ready" });
-  fireEvent.change(screen.getByLabelText("会话运行位置"), { target: { value: "ready" } });
-  await waitFor(() => expect(screen.getByLabelText("远端模型")).toHaveValue("ready/model"));
-  expect(screen.getByLabelText("远端工作区")).toHaveTextContent("ready workspace");
-  fireEvent.change(screen.getByLabelText("会话运行位置"), { target: { value: "blocked" } });
-  await waitFor(() => expect(screen.getByLabelText("远端模型")).toHaveValue("blocked/model"));
-  expect(screen.getByLabelText("远端模型")).not.toHaveTextContent("ready model");
-  expect(screen.getByLabelText("远端工作区")).toHaveTextContent("blocked workspace");
-  expect(screen.getByLabelText("远端工作区")).not.toHaveTextContent("ready workspace");
-  // 15 T7：Host 报告 blocked 时说明原因（host-unavailable），草稿照常编辑。
-  expect(screen.getByText("blocked 恢复上次的任务时出错，暂不接受新任务")).toBeInTheDocument();
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  await pickHost(user, "ready");
+  // 09 T13：远端模型和本机一样用模型按钮 + ModelPicker，分组以 Host 命名。
+  const modelButton = await screen.findByRole("button", { name: "ready model" });
+  expect(screen.queryByLabelText("远端模型")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "选择运行位置" })).toHaveTextContent("ready");
+  await waitFor(() => expect(screen.getByRole("button", { name: "选择工作区" })).toHaveTextContent("ready workspace"));
+  // 远端没有分支按钮。
+  expect(screen.queryByRole("button", { name: "选择分支" })).not.toBeInTheDocument();
+  await pickHost(user, "blocked");
+  await waitFor(() => expect(modelButton).toHaveTextContent("blocked model"));
+  await userEvent.click(modelButton);
+  const menu = screen.getByRole("menu", { name: "模型" });
+  const group = within(menu).getByRole("group", { name: "blocked" });
+  expect(within(group).getByRole("button", { name: "blocked model" })).toBeInTheDocument();
+  expect(within(menu).queryByText("ready model")).not.toBeInTheDocument();
+  expect(within(menu).queryByRole("button", { name: /^编辑 / })).not.toBeInTheDocument();
+  await userEvent.click(within(group).getByRole("button", { name: "blocked model" }));
+  expect(screen.queryByRole("menu", { name: "模型" })).not.toBeInTheDocument();
+  expect(localStorage.getItem("actspace:new-session-model:blocked")).toBe("blocked/model");
+  expect(screen.getByRole("button", { name: "选择工作区" })).toHaveTextContent("blocked workspace");
+  expect(screen.getByRole("button", { name: "选择工作区" })).not.toHaveTextContent("ready workspace");
+  // 15 T7：Host 报告 blocked 时说明原因（host-unavailable），草稿照常编辑。运行位置按钮带状态点和短文案。
+  const location = screen.getByRole("button", { name: "选择运行位置" });
+  expect(location).toHaveTextContent("blocked暂不接受任务");
+  expect(location.querySelector("[data-tone]")).toHaveAttribute("data-tone", "pending");
   fireEvent.change(screen.getByLabelText("消息输入框"), { target: { value: "keep this draft" } });
   expect(screen.getByLabelText("消息输入框")).toHaveValue("keep this draft");
   const send = screen.getByRole("button", { name: "blocked 恢复上次的任务时出错，暂不接受新任务" });
   expect(send).toHaveAttribute("aria-disabled", "true");
   fireEvent.click(send);
   expect(onSend).not.toHaveBeenCalled();
+  await user.hover(send);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("blocked 恢复上次的任务时出错，暂不接受新任务");
 });
 
 it("creates the first remote Session on the selected Host and records its workspace", async () => {
@@ -143,11 +177,12 @@ it("creates the first remote Session on the selected Host and records its worksp
     "review.getSnapshot": async () => ({ ok: false }), "visualize.list": async () => ({ items: [] }),
     "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
   });
+  const user = userEvent.setup();
   render(<App />);
-  await screen.findByRole("option", { name: "Cloud" });
-  fireEvent.change(screen.getByLabelText("会话运行位置"), { target: { value: "server" } });
-  await waitFor(() => expect(screen.getByLabelText("远端工作区")).toHaveTextContent("web"));
-  fireEvent.change(screen.getByLabelText("远端工作区"), { target: { value: "w2" } });
+  await pickHost(user, "Cloud");
+  await waitFor(() => expect(screen.getByRole("button", { name: "选择工作区" })).toHaveTextContent("api"));
+  await pickWorkspace(user, "web");
+  expect(screen.getByRole("button", { name: "选择工作区" })).toHaveTextContent("web");
   fireEvent.change(screen.getByLabelText("消息输入框"), { target: { value: "hello remote" } });
   await waitFor(() => expect(screen.getByRole("button", { name: "发送消息" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "发送消息" }));
@@ -170,4 +205,23 @@ it("reports a recorded workspace that no longer exists on the Host", async () =>
   const { result } = renderHook(() => useRunTarget({ sessionId: id, locked: true, local: {} }));
   await waitFor(() => expect(result.current.readiness).toEqual({ state: "workspace-missing", workspaceId: "deleted" }));
   remoteSessionPrefs.remove(id);
+});
+
+it("opens 设置 › 远端 Host from 连接远端机器… when no Host is configured", async () => {
+  // 09 T18：没有 Host 时运行位置菜单的第二项是「连接远端机器…」，点击进入设置的远端 Host 页。
+  setupBridge({
+    "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
+    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
+    "sessions.list": async () => [], "approvals.listPending": async () => [],
+    "hosts.list": async () => [], "events.hostsChanged": () => () => {}, "events.hostEvent": () => () => {}, "events.hostUploadProgress": () => () => {}, "hosts.activate": async () => {},
+    "events.sessionLive": () => () => {}, "events.agentStream": () => () => {},
+    "review.getSnapshot": async () => ({ ok: false }), "visualize.list": async () => ({ items: [] }),
+    "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
+  });
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(await screen.findByRole("button", { name: "选择运行位置" }));
+  expect(screen.queryByRole("menuitem", { name: /^远端机器/ })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("menuitem", { name: "连接远端机器…" }));
+  expect(await screen.findByRole("heading", { name: "Agent 服务器" })).toBeInTheDocument();
 });

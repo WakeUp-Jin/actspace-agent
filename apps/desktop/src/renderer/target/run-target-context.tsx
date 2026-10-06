@@ -5,7 +5,7 @@ import type { RunTargetState } from "./use-run-target";
 
 /**
  * 当前会话（或新建页）的运行目标，以及选择它的入口。WorkbenchLayout → ConversationView → Composer 不再逐层传。
- * `choices` 在没有 Provider 的组件测试里可以不给，这时 Composer 不显示远端的 select。
+ * `choices` 在没有 Provider 的组件测试里可以不给，这时 Composer 不显示远端的运行位置和工作区 select。
  */
 export type RunTargetValue = Omit<RunTargetState, "choices"> & {
   readonly choices?: RunTargetState["choices"];

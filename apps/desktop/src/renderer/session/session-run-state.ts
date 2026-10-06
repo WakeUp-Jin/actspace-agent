@@ -20,7 +20,7 @@ export type StreamingSegment =
   | { type: "tool"; toolCallId: string }
   | { type: "compaction"; agentRunId: string }
   | { type: "workspace_preparation"; agentRunId: string }
-  /** 运行中插入、已被 loop 读到的用户消息。 */
+  /** 运行中引导、已被 loop 读到的用户消息。 */
   | { type: "user_message"; block: Extract<MessageBlock, { kind: "user" }> };
 
 export type StreamingState = {

@@ -52,6 +52,14 @@ export function resolveReadiness({ target, directory, workspaceId, modelId }: Re
   return READY;
 }
 
+/** Host 本身连着（之后的状态只是还不能发新消息）。没连上时连停止也发不出去。 */
+export function hostReachable(readiness: RunTargetReadiness): boolean {
+  switch (readiness.state) {
+    case "connecting": case "offline": case "revoked": case "incompatible": case "removed": return false;
+    default: return true;
+  }
+}
+
 export type ReadinessTone = "pending" | "offline" | "error";
 
 export type ReadinessCopy = {

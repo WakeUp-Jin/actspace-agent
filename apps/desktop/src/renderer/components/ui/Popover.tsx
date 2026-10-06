@@ -34,10 +34,16 @@ const PopoverContent = React.forwardRef<React.ElementRef<typeof PopoverPrimitive
   // 由 OpenerCapture 记下打开前的焦点作为兜底；只在焦点随浮层一起丢失时还。点了外面关闭的不还，焦点留给用户新点的地方。
   const opener = React.useRef<HTMLElement | null>(null);
   const interactedOutside = React.useRef(false);
+  const content = React.useRef<HTMLDivElement | null>(null);
+  const setContent = React.useCallback((node: HTMLDivElement | null) => {
+    content.current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) ref.current = node;
+  }, [ref]);
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
-        ref={ref}
+        ref={setContent}
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn("z-(--act-z-popover) max-w-[calc(100vw-16px)] border border-line bg-surface-raised text-text-main shadow-act-popover outline-none [-webkit-app-region:no-drag]", RADIUS_CLASS[radius], className)}
@@ -54,10 +60,16 @@ const PopoverContent = React.forwardRef<React.ElementRef<typeof PopoverPrimitive
           onCloseAutoFocus?.(event);
           const outside = interactedOutside.current;
           interactedOutside.current = false;
-          if (event.defaultPrevented || outside || !opener.current?.isConnected) return;
-          // 关闭前焦点已经去了别处（例如调用方自己处理了外部点击），也不抢回来。
+          if (event.defaultPrevented || outside) return;
+          // Radix 在 setTimeout(0) 里还焦点。到这时焦点已经在浮层外的别处（例如调用方自己处理了外部点击，
+          // 或被另一个刚打开的浮层拿走），就不还给触发器：抢回来会让那个浮层因为焦点移出又关掉。
           const active = document.activeElement;
-          if (active && active !== document.body) return;
+          if (active && active !== document.body && !content.current?.contains(active)) {
+            event.preventDefault();
+            return;
+          }
+          // 焦点还在浮层里时交给 Radix 还给触发器；没有触发器时，只在焦点随浮层一起丢失时还给打开前的位置。
+          if (!opener.current?.isConnected || (active && active !== document.body)) return;
           event.preventDefault();
           opener.current.focus();
         }}

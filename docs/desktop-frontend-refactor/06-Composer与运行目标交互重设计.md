@@ -1,5 +1,6 @@
 # 06 Composer 与运行目标交互重设计
 
+> **实施状态：已按 09 实施（2026-10-06）。** 现行规范见 [聊天输入框规范](../design-docs/frontend/front-聊天输入框规范.md)（外观、单行 / 多行、`+` 面板、发送队列）和 [Workspace、Git Branch 与 Worktree 执行上下文规范](../design-docs/frontend/front-workspace-git-worktree-context.md)（运行位置菜单、只读状态行）。本文的行号指 2026-10-05 的代码；实施中的取舍见 [09 执行记录](../exec-runs/20261005-desktop-fe-09-composer/execution-process.md)。
 > 范围：`components/Composer.tsx`（2479 行）、`components/composer/MessageQueueTray.tsx`、ConversationView 中的 Composer 挂载、运行位置 / 远端选择 UI。
 > 目标：解决用户提出的三个体验问题：
 > 1. 消息队列要放在输入框**上方**（Codex 式），不要塞在输入框里面。

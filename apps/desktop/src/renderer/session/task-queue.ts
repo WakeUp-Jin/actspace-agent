@@ -16,7 +16,7 @@ export interface TaskQueueStore {
   rememberOptions(sessionId: string, submissionId: string, options: ComposerSendOptions): void;
   options(submissionId: string): ComposerSendOptions | undefined;
   forgetOptions(submissionId: string): void;
-  /** 插入的正文：loop 读到后用它在当前回合里显示用户消息。 */
+  /** 引导的正文：loop 读到后用它在当前回合里显示用户消息。 */
   rememberSteer(sessionId: string, messageId: string, item: QueuedComposerMessage): void;
   takeSteer(messageId: string): QueuedComposerMessage | undefined;
   evict(sessionId: string): void;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HostConnection } from "@actspace/shared/host-protocol";
-import { describeReadiness, resolveReadiness, summarizeError, type ReadinessInput, type RunTargetReadiness } from "../target/readiness";
+import { describeReadiness, hostReachable, resolveReadiness, summarizeError, type ReadinessInput, type RunTargetReadiness } from "../target/readiness";
 import type { HostDescription } from "../target/host-directory";
 import type { RunTarget } from "../target/run-target";
 
@@ -83,5 +83,14 @@ describe("describeReadiness", () => {
     expect(summarizeError("x".repeat(200))).toHaveLength(80);
     expect(summarizeError("HostDisconnectedError: Host connection lost")).toBe("Host connection lost");
     expect(summarizeError("")).toBe("未知错误");
+  });
+});
+
+describe("hostReachable", () => {
+  it("is false only while the Host itself is not connected", () => {
+    const states: RunTargetReadiness[] = [{ state: "connecting" }, { state: "offline" }, { state: "revoked" }, { state: "incompatible" }, { state: "removed" }];
+    for (const readiness of states) expect(hostReachable(readiness)).toBe(false);
+    const connected: RunTargetReadiness[] = [{ state: "ready" }, { state: "describing" }, { state: "describe-failed", error: "x" }, { state: "host-unavailable", hostState: "draining" }, { state: "workspace-missing" }, { state: "model-missing" }];
+    for (const readiness of connected) expect(hostReachable(readiness)).toBe(true);
   });
 });

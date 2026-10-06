@@ -38,9 +38,9 @@
 | 2026-10-06 | renderer / 死状态 | WorkbenchLayout 的 `usageSnapshot` 状态从未被写入（`setUsageSnapshot` 没有调用方），SettingsPage 收到的恒为 null。 | 先确认 SettingsPage 用量页的数据来源，再删掉这条 prop 链或接上数据。 |
 | 2026-10-06 | renderer / 疑似死代码 | `messages/SubAgentTranscriptModal.tsx` 的 `SubAgentTranscriptPanel` 在 renderer 里没有使用方，只有 `agent-run-block.test.tsx` 引用。 | 确认子 Agent 记录已由 `right-panel/SubagentsPanel.tsx` 取代后，连同测试删除。 |
 | 2026-10-06 | renderer / 死入口 | `ProviderKeyModal` 打不开：`SettingsPage` 传下去的 `onConnectProvider` 在 `settings/sections/` 里没有调用方（16 之前的 `ProvidersSection` 也只解构不调用）。 | 确认 Provider Key 是否已全部改由模型连接向导录入；是就删掉 `ProviderKeyModal` 和这条 prop，否则补上入口。 |
-| 2026-10-06 | renderer / 占位按钮 | Composer 的「更多审查操作」`⋯`（`review-overflow-button`）没有 `onClick`，点了没有反应，16 之前就是这样。 | 补上菜单内容（随 09 Composer 迁移一起定），或先隐藏。 |
+| 2026-10-06 | renderer / 占位按钮 | Composer 的「更多审查操作」`⋯`（`review-overflow-button`）没有 `onClick`，点了没有反应，16 之前就是这样。 | 补上菜单内容，或先隐藏。09（2026-10-07）只把它搬进 `composer/ReviewStrip.tsx`，行为未改。 |
 | 2026-10-06 | renderer / 窄窗 | 窗口最小宽度 480 时打开侧栏覆盖层，会话右键菜单的「复制」子菜单（208px）左右都放不下，翻到左侧后左边约 52px 出界。Radix 只翻转，不在水平方向挪。 | 子菜单加 `max-w-[calc(100vw-16px)]` 并允许文字截断，或窄窗下把两个复制项平铺到主菜单。 |
-| 2026-10-06 | renderer / Composer 跨会话状态 | Composer 不按会话重挂（16 之前两个有消息的会话之间也不重挂）：远端会话 A 发送中切到 B，B 的发送按钮也被 `sending` 禁用，直到 A 的请求结束；A 里选的模型运行时选项会带到 B。A 发送中切走、随后失败时，附件只靠 App 的恢复草稿（不带预览）找回，原来的预览 URL 不释放。 | 随 09：`sending` 按 `draftKey` 记；失败时把附件写回 A 的附件草稿，和 `draftRestore` 的顺序一起定。 |
+| 2026-10-06 | renderer / Composer 跨会话状态 | Composer 不按会话重挂（16 之前两个有消息的会话之间也不重挂）：远端会话 A 发送中切到 B，B 的发送按钮也被 `sending` 禁用，直到 A 的请求结束；A 里选的模型运行时选项会带到 B。A 发送中切走、随后失败时，附件只靠 App 的恢复草稿（不带预览）找回，原来的预览 URL 不释放。 | `sending` 按 `draftKey` 记；运行时选项按会话存；失败时把附件写回 A 的附件草稿，和 `draftRestore` 的顺序一起定。09（2026-10-07）只把这部分搬进 `composer/use-composer-send.ts`、`use-composer-model.ts`，行为未改，建议单独做一个「Composer 草稿按会话隔离」小计划。 |
 | 2026-10-06 | renderer / 嵌套交互 | `settings/CustomConnectionModels.tsx` 的模型行是 `div role="button"`，里面嵌了菜单按钮和开关，读屏会把整行读成按钮。检查脚本只数 `<button`，拦不住这类写法。 | 行本身改成非交互容器，点击区域收到标题上；或把行内控件挪出去。 |
 
 ## Desktop 安全遗留

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../components/ui/ContextMenu";
 import {
@@ -211,6 +212,40 @@ describe("Popover", () => {
     expect(outerKeyDown).not.toHaveBeenCalled();
     await settle();
     expect(screen.getByRole("button", { name: "详情" })).toHaveFocus();
+  });
+
+  it("does not pull focus back to its trigger when something else took focus after it closed", async () => {
+    const user = userEvent.setup();
+    // 浏览器里的顺序：A 被关掉（卸载），另一个浮层随即挂上并把焦点放进自己的输入框，
+    // 之后 Radix 才在 setTimeout(0) 里替 A 还焦点。这时不能把焦点抢回 A 的触发器。
+    function Switcher() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger>详情</PopoverTrigger>
+            <PopoverContent aria-label="详情浮层">
+              <button
+                type="button"
+                onClick={() => {
+                  flushSync(() => setOpen(false));
+                  document.getElementById("other-input")?.focus();
+                }}
+              >
+                换到另一个
+              </button>
+            </PopoverContent>
+          </Popover>
+          <input id="other-input" aria-label="另一个输入框" />
+        </>
+      );
+    }
+    render(<Switcher />);
+    await user.click(screen.getByRole("button", { name: "详情" }));
+    await user.click(screen.getByRole("button", { name: "换到另一个" }));
+    await settle();
+    expect(screen.queryByRole("dialog", { name: "详情浮层" })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "另一个输入框" })).toHaveFocus();
   });
 
   it("closes only the inner menu when Escape is pressed inside a popover", async () => {

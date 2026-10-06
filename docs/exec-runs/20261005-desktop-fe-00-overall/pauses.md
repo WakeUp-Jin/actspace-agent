@@ -26,7 +26,7 @@
 
 ## P2 · 2026-10-06 · 16 T7：ResponseAnnotationPill 要不要从 HoverCard 改成 Popover
 
-**状态**：待用户确认。先按建议 A 执行（不改 Pill），不阻塞后续 T；用户选 B 或 C 时再单独补一个提交。
+**状态**：已决定（2026-10-06，用户选方案 A）。已写进 16 的决策记录，并更正 16 组件表中 ResponseAnnotationPill 一行；实现即 16 T7 的现状，不需要再改代码。同时用户决定 16 T17 的三处按钮外观变化先保持现状，不改回。
 
 **现象**：16 的组件表（:69）和决策记录（:131）把 `composer/ResponseAnnotationPill.tsx` 列为改用 `ui/Popover`。但它现在已经是 Radix HoverCard：鼠标悬停 100ms 打开、离开 120ms 关闭，点击也能开关，定位和 Esc 都由 Radix 处理，没有 createPortal，也没有手写定位。改成 Popover 会丢掉「悬停预览」，Radix Popover 只支持点击打开。
 

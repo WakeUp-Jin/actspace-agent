@@ -39,7 +39,7 @@
 | D5 | 浏览器 mock 模式 | **保留**。从 App 内 40 处分支改成注入式 mock bridge |
 | D6 | LabPage | **删除**，功能已不存在（已在 10 删除；Lab 导航入口保留为占位页） |
 | D7 | UI 改动先出 demo | 输入框与远端连接的改动先给 HTML demo 确认，见 [`demo/composer-run-target-demo.html`](demo/composer-run-target-demo.html) |
-| D8 | 输入框 demo 第二轮确认（2026-10-05） | 按 demo 实施，06 §9 九项按 demo 默认值定稿；执行计划见 [09](../exec-plans/active/20261005-desktop-frontend-refactor/09-输入框优化执行计划.md)；2026-10-06 已批准，执行中 |
+| D8 | 输入框 demo 第二轮确认（2026-10-05） | 按 demo 实施，06 §9 九项按 demo 默认值定稿；执行计划见 [09](../exec-plans/active/20261005-desktop-frontend-refactor/09-输入框优化执行计划.md)；2026-10-06 已批准，2026-10-07 已实施（P1–P6） |
 | D9 | 执行方式（2026-10-05） | A1 按本文 §5 顺序；B1 每份设计文档一份任务级执行计划（10–17，加修订后的 09），由 [00 总执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/00-总执行计划.md) 统领，一起审一次；C2 settings-service 拆分纳入、排最后；C1（`applyToEnv`）、C3（协议）以后单独做；E 连续执行，只在设计偏差、修不好的测试、需要改协议时停下；J1 本轮不加主文档 CSP；J2 主线 `refactor/desktop-frontend` 加每份计划一个子分支，结束时 squash 成一个提交，不打 tag；J3 计划移进 `exec-plans/active/`；J4 附件随草稿保存 |
 | D10 | 验收（2026-10-05） | 每份计划一个 `acceptance-handoff.md`，按阶段填写，由 Codex 验收、用户转达反馈；子智能体只做探索和验收复核；不使用 computer use，用 CDP 做能做的检查 |
 
@@ -52,7 +52,7 @@
 | 03 | [运行目标抽象：本机与远端](03-运行目标抽象-本机与远端.md) | `RunTarget` 模型、`host:` id 统一解码、30 处分支收口、`useRemoteTarget` 重写。**已按 15 实施** | 中 | 已合并进 `docs/design-docs/frontend/front-workspace-git-worktree-context.md`「运行目标」一节 |
 | 04 | [Preload 接口与 Mock Bridge](04-Preload接口与MockBridge.md) | 接口按域分组、必选类型、`satisfies` 对齐、注入式 mock bridge | 中 | `docs/design-docs/frontend/` |
 | 05 | [UI 基础组件与大组件拆分](05-UI基础组件与大组件拆分.md) | Popover / Menu / Dialog 原语、焦点陷阱、Esc 栈、拆 Settings / Sidebar / Conversation / Workbench。**已按 16 实施**（Composer 归 09） | 中 | 已合并进 `docs/design-docs/frontend/front-基础组件封装规范.md` |
-| 06 | [Composer 与运行目标交互重设计](06-Composer与运行目标交互重设计.md) | 队列移到输入框上方、运行位置菜单、输入框外观、`+` 面板 | 中 | `front-聊天输入框规范.md`、`front-workspace-git-worktree-context.md` 改写 |
+| 06 | [Composer 与运行目标交互重设计](06-Composer与运行目标交互重设计.md) | 队列移到输入框上方、运行位置菜单、输入框外观、`+` 面板。**已按 09 实施** | 中 | 已合并进 `docs/design-docs/frontend/front-聊天输入框规范.md` 和 `front-workspace-git-worktree-context.md` |
 | 07 | [冗余清理清单](07-冗余清理清单.md) | 已核实可删的文件、prop、分支、目录、channel | 低 | exec-plan 的第一阶段 |
 | 08 | [测试与验证整理](08-测试与验证整理.md) | 删死测试、改脆弱断言、补缺口、验证矩阵 | 低 | `docs/FRONTEND_VERIFICATION.md` 补充 |
 | 00 | [总执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/00-总执行计划.md) | 顺序、每个任务 / 阶段 / 计划的流程、停止条件、分支与提交、验收交接模板、基线、CDP 方法、总进度 | — | `docs/exec-plans/active/20261005-desktop-frontend-refactor/` |

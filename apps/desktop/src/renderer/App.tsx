@@ -1152,8 +1152,8 @@ export function App() {
 
   const activeSessionId = selectedSessionId;
   const steerBlockedReason = isCompacting
-    ? "压缩中不能插入，完成后会自动发送"
-    : activeSessionId && approvalPendingSessionIds.has(activeSessionId) ? "等待审批时不能插入" : null;
+    ? "压缩中不能引导，完成后会自动发送"
+    : activeSessionId && approvalPendingSessionIds.has(activeSessionId) ? "等待审批时不能引导" : null;
   // 引用稳定，WorkbenchLayout / Composer 不随每次流式刷新重渲染队列托盘（14 T16）。
   const messageQueueControls = useMemo<MessageQueueControls>(() => ({
     queue: messageQueue,

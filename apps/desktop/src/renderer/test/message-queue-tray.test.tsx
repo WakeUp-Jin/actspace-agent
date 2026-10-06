@@ -45,22 +45,46 @@ describe("MessageQueueTray", () => {
     renderTray(queueOf("/compact", "normal"), { running: false });
     const tray = screen.getByRole("region", { name: "消息队列" });
     expect(within(tray).getByText("命令")).toBeInTheDocument();
-    expect(within(tray).queryByRole("button", { name: "↳ 插入" })).toBeNull();
-    expect(within(tray).getByText("即将发送")).toBeInTheDocument();
+    expect(within(tray).queryByRole("button", { name: "↳ 引导" })).toBeNull();
+    // 没有标题行：计数和发送时机在第一行图标的提示里。
+    expect(within(tray).getByRole("img", { name: "2 条排队，即将发送" })).toBeInTheDocument();
+    expect(within(tray).queryByText("即将发送")).toBeNull();
+  });
+
+  it("shows the counts in the first row icon tooltip", async () => {
+    const user = userEvent.setup();
+    renderTray(queueOf("first", "second"));
+    const tray = screen.getByRole("region", { name: "消息队列" });
+    expect(within(tray).queryByText(/条排队/)).toBeNull();
+    // 只有第一行的图标带提示，其余行的图标不进 Tab 顺序。
+    expect(within(tray).getAllByRole("img")).toHaveLength(1);
+    await user.hover(within(tray).getByRole("img", { name: "2 条排队，当前运行结束后依次发送" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("2 条排队，当前运行结束后依次发送");
+  });
+
+  it("caps the list at four rows and dims row actions until hover or focus", () => {
+    renderTray(queueOf("a", "b", "c", "d", "e"));
+    const list = screen.getByRole("list", { name: "排队的消息" });
+    expect(list).toHaveClass("max-h-[144px]", "overflow-y-auto");
+    const actions = screen.getByRole("button", { name: "删除排队消息 1" }).parentElement!;
+    expect(actions).toHaveClass("opacity-60", "group-hover/queue-row:opacity-100", "group-focus-within/queue-row:opacity-100");
   });
 
   it("disables steering with the blocking reason", async () => {
-    renderTray(queueOf("hold on"), { steerBlockedReason: "压缩中不能插入，完成后会自动发送" });
-    expect(screen.getByRole("button", { name: "↳ 插入" })).toBeDisabled();
+    renderTray(queueOf("hold on"), { steerBlockedReason: "压缩中不能引导，完成后会自动发送" });
+    expect(screen.getByRole("button", { name: "↳ 引导" })).toBeDisabled();
   });
 
-  it("shows steering rows first with withdraw, and the paused header with resume", async () => {
+  it("shows steering rows first with withdraw, and the paused row with resume at the bottom", async () => {
     let queue = queueOf("steered", "waiting");
     queue = { items: queue.items.slice(1), steering: queue.items.slice(0, 1), paused: true };
     const controls = renderTray(queue);
     const tray = screen.getByRole("region", { name: "消息队列" });
-    expect(within(tray).getByText("1 条排队 · 1 条已插入")).toBeInTheDocument();
+    expect(within(tray).getByRole("img", { name: "1 条排队 · 1 条已引导" })).toBeInTheDocument();
     expect(within(tray).getAllByRole("listitem")[0]).toHaveTextContent("steered下一步读取撤回");
+    const paused = within(tray).getByRole("status");
+    expect(paused).toHaveTextContent("已暂停");
+    expect(screen.getByRole("list", { name: "排队的消息" }).compareDocumentPosition(paused) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await userEvent.click(within(tray).getByRole("button", { name: "撤回" }));
     expect(controls.onUnsteer).toHaveBeenCalledWith(queue.steering[0]!.id);
     await userEvent.click(within(tray).getByRole("button", { name: "继续发送" }));

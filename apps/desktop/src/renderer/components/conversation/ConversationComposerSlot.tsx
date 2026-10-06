@@ -21,6 +21,7 @@ type ConversationComposerSlotProps = Pick<
   | "responseAnnotations"
   | "onResponseAnnotationsChange"
   | "responseAnnotationNotice"
+  | "onConnectHost"
 >;
 
 /**

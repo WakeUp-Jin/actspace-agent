@@ -2283,9 +2283,9 @@ sessionId: input.sessionId,
     renderApp();
 
     await userEvent.click(await screen.findByRole("button", { name: "选择工作区" }));
-    const workspaceMenu = await screen.findByRole("menu", { name: /选项$/ });
-    expect(within(workspaceMenu).getByRole("menuitem", { name: "Default workspace" })).toBeInTheDocument();
-    await userEvent.click(within(workspaceMenu).getByRole("menuitem", { name: "alt-workspace" }));
+    const workspaceMenu = await screen.findByRole("menu", { name: "选择工作区" });
+    expect(within(workspaceMenu).getByRole("menuitemradio", { name: /^Default workspace/ })).toBeInTheDocument();
+    await userEvent.click(within(workspaceMenu).getByRole("menuitemradio", { name: /^alt-workspace/ }));
 
     expect(setSessionWorkspace).not.toHaveBeenCalled();
 
@@ -2386,7 +2386,7 @@ sessionId: input.sessionId,
 
     const composer = await screen.findByLabelText("消息输入框");
     await userEvent.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await userEvent.click(screen.getByRole("menuitem", { name: "图片" }));
+    await userEvent.click(screen.getByRole("option", { name: "图片" }));
     expect(await screen.findByLabelText("已附加的图片 screenshot.png")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "预览附加图片 screenshot.png" }));
     expect(await screen.findByRole("img", { name: "预览图片" })).toHaveAttribute(

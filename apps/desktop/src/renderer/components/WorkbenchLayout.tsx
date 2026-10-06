@@ -124,6 +124,11 @@ export function WorkbenchLayout({
     onReviewChanged?.();
   }, [reviewEnabled, onReviewChanged, openTab, selectedWorkspaceRoot]);
 
+  const openHostSettings = useCallback(() => {
+    setSettingsSection("hosts");
+    setView("settings");
+  }, []);
+
   const handleSelectView = useCallback((next: SidebarView) => {
     setView(next);
     setCompactSidebarOpen(false);
@@ -207,6 +212,7 @@ export function WorkbenchLayout({
         onOpenReview={composerMode === "chat" || !reviewEnabled ? undefined : openReviewTab}
         activeView={sessionMainView}
         permissionControl={permissionControl}
+        onConnectHost={openHostSettings}
       />
     );
   }

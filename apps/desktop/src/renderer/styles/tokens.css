@@ -28,6 +28,9 @@
 
   --act-color-border: #deded9;
   --act-color-border-strong: #8c8c85;
+  /* Composer 输入框的低对比细边（09，06 §5.1）：比 border 更淡，靠阴影托起。 */
+  --act-color-composer-border: rgb(0 0 0 / 0.07);
+  --act-color-composer-border-focus: rgb(0 0 0 / 0.11);
   --act-color-meter-track: #e9e9e5;
   --act-color-toggle-off: #d3d3ce;
 
@@ -70,6 +73,8 @@
   --act-color-warning: #91600e;
   --act-color-warning-soft: #f7eedb;
   --act-color-on-warning: #7a500a;
+  /* 实心 warning 底上的字色（Plan 的发送按钮）。on-warning 是浅底上的深黄字，不能用在实心底上。 */
+  --act-color-on-warning-solid: #ffffff;
 
   --act-color-danger: #c74747;
   --act-color-danger-hover: #a93a3a;
@@ -174,7 +179,8 @@
    * 阴影：暖色基底 rgba(20, 21, 18)，与 Ink & Emerald 灰阶同源。
    * xs = 小按钮描边感；knob = Toggle 白色滑块；thumb = 附件缩略图；
    * soft = 大面积浮起（占位页、关机遮罩、Sheet）；popover = 菜单 / tooltip；float = dialog / 抽屉。
-   * 工作台常驻卡片（Composer、用户消息卡）不使用阴影，只靠 surface + hairline。
+   * 工作台常驻卡片（用户消息卡）不使用阴影，只靠 surface + hairline；Composer 例外，
+   * 用 composer / composer-focus 两档柔和阴影托起（09，06 §5.1、§9 #7）。
    */
   --act-shadow-xs: 0 1px 2px rgba(20, 21, 18, 0.06);
   --act-shadow-knob: 0 1px 3px rgba(20, 21, 18, 0.24);
@@ -182,6 +188,8 @@
   --act-shadow-soft: 0 18px 48px rgba(20, 21, 18, 0.08);
   --act-shadow-popover: 0 24px 64px rgba(20, 21, 18, 0.14);
   --act-shadow-float: 0 24px 64px rgba(20, 21, 18, 0.18);
+  --act-shadow-composer: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.06);
+  --act-shadow-composer-focus: 0 1px 2px rgb(0 0 0 / 0.05), 0 8px 28px -6px rgb(0 0 0 / 0.1);
 
   --act-scrollbar-thumb: rgba(171, 177, 186, 0.46);
   --act-scrollbar-thumb-hover: rgba(146, 153, 164, 0.56);
@@ -294,6 +302,8 @@
 
   --act-color-border: #353630;
   --act-color-border-strong: #787870;
+  --act-color-composer-border: rgb(255 255 255 / 0.07);
+  --act-color-composer-border-focus: rgb(255 255 255 / 0.12);
   --act-color-meter-track: #3a3b35;
   --act-color-toggle-off: #4a4b45;
 
@@ -319,6 +329,7 @@
   --act-color-warning: #d2a14d;
   --act-color-warning-soft: #3e321c;
   --act-color-on-warning: #e2ba6b;
+  --act-color-on-warning-solid: #181916;
 
   --act-color-danger: #e06b6b;
   --act-color-danger-hover: #ef8585;
@@ -398,6 +409,8 @@
   --act-shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.45);
   --act-shadow-popover: 0 24px 64px rgba(0, 0, 0, 0.55);
   --act-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --act-shadow-composer: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px -6px rgb(0 0 0 / 0.4);
+  --act-shadow-composer-focus: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 32px -6px rgb(0 0 0 / 0.55);
 
   --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
   --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
@@ -421,6 +434,8 @@
 
     --act-color-border: #353630;
     --act-color-border-strong: #787870;
+    --act-color-composer-border: rgb(255 255 255 / 0.07);
+    --act-color-composer-border-focus: rgb(255 255 255 / 0.12);
     --act-color-meter-track: #3a3b35;
     --act-color-toggle-off: #4a4b45;
 
@@ -446,6 +461,7 @@
     --act-color-warning: #d2a14d;
     --act-color-warning-soft: #3e321c;
     --act-color-on-warning: #e2ba6b;
+    --act-color-on-warning-solid: #181916;
 
     --act-color-danger: #e06b6b;
     --act-color-danger-hover: #ef8585;
@@ -525,6 +541,8 @@
     --act-shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.45);
     --act-shadow-popover: 0 24px 64px rgba(0, 0, 0, 0.55);
     --act-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.6);
+    --act-shadow-composer: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px -6px rgb(0 0 0 / 0.4);
+    --act-shadow-composer-focus: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 32px -6px rgb(0 0 0 / 0.55);
 
     --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
     --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);

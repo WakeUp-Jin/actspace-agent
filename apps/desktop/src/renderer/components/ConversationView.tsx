@@ -54,6 +54,7 @@ export function ConversationView({
   isSessionReady = true,
   reviewSummary,
   onOpenReview,
+  onConnectHost,
   activeView = "chat",
   permissionControl,
 }: {
@@ -67,6 +68,8 @@ export function ConversationView({
   isSessionReady?: boolean;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
+  /** 运行位置菜单的「连接远端机器…」：打开 设置 › 远端 Host。 */
+  onConnectHost?: () => void;
   activeView?: SessionMainView;
   permissionControl?: ReactNode;
 }) {
@@ -281,6 +284,7 @@ export function ConversationView({
     inputHistory,
     focusRequestId,
     permissionControl,
+    onConnectHost,
   };
 
   if (messages.length === 0 && (browse?.messageLoading || browse?.listLoading || sessionError)) {
