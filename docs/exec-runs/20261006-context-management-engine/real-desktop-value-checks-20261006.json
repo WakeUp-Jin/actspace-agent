@@ -1,0 +1,1713 @@
+{
+  "scope": "Real Electron; independently captured Context/LlmInput/prepared. Metadata only; no full prompts or credentials. Snapshot list includes historical fork copies.",
+  "requestCount": 35,
+  "conversionFailures": 0,
+  "stageCounts": {
+    "runtime-diagnostic": 9,
+    "context": 35,
+    "llm-input": 35,
+    "prepared": 35,
+    "compaction-context": 6,
+    "compaction-prepared": 5,
+    "compaction-applied": 5,
+    "history-host": 3
+  },
+  "requests": [
+    {
+      "requestId": "ec41ee6d-5212-4966-ab1a-b3fe4d58145d",
+      "sessionId": "d0e09872-8688-43ab-8ed9-230faf6abeef",
+      "turnId": "d552f294-7588-4504-883b-7ad1a2e45396",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 2
+      },
+      "tools": 18,
+      "cycle": 0,
+      "active": 0,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          3
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "e2ddad45-d705-4d47-8e0d-9b4955576705",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "aef737e9-0169-4c7f-8b9b-3d4476448a0b",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 2
+      },
+      "tools": 18,
+      "cycle": 0,
+      "active": 0,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          3
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "8d4c31b6-b90e-45dd-bea5-a1f2bf200c9d",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "aef737e9-0169-4c7f-8b9b-3d4476448a0b",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 3,
+        "assistant": 1,
+        "tool": 2
+      },
+      "tools": 18,
+      "cycle": 0,
+      "active": 1,
+      "sleeping": 0,
+      "readCounts": {
+        "file-001.txt": 2
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          3
+        ],
+        [
+          "navigation",
+          398
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "61cd1723-2412-445a-8edc-191fc1ebe80c",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "1a494d5b-27eb-41f6-a850-df1110d1fc8a",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 5,
+        "assistant": 2,
+        "tool": 2
+      },
+      "tools": 2,
+      "cycle": 0,
+      "active": 1,
+      "sleeping": 0,
+      "readCounts": {
+        "file-001.txt": 2
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          3
+        ],
+        [
+          "navigation",
+          398
+        ],
+        [
+          "runtime-state",
+          616
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "f7be023f-1341-4724-aed0-74c94b64c697",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "d2d5745a-d4e7-4507-a869-5735494fe003",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 7,
+        "assistant": 3,
+        "tool": 2
+      },
+      "tools": 10,
+      "cycle": 0,
+      "active": 1,
+      "sleeping": 0,
+      "readCounts": {
+        "file-001.txt": 2
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          3
+        ],
+        [
+          "navigation",
+          398
+        ],
+        [
+          "runtime-state",
+          616
+        ],
+        [
+          "runtime-state",
+          633
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "a2753e73-6f2a-4cf1-a7a9-9d1dafbf3ba3",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "6d8a0841-df44-45df-a29d-f27cc52c530c",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 9,
+        "assistant": 4,
+        "tool": 2
+      },
+      "tools": 18,
+      "cycle": 0,
+      "active": 1,
+      "sleeping": 0,
+      "readCounts": {
+        "file-001.txt": 2
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          3
+        ],
+        [
+          "navigation",
+          398
+        ],
+        [
+          "runtime-state",
+          616
+        ],
+        [
+          "runtime-state",
+          633
+        ],
+        [
+          "runtime-state",
+          650
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "72a565f7-6992-438d-9b70-f8928f6c074c",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "7a374316-8227-4750-9c9f-d808cc3dddc7",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 10,
+        "assistant": 5,
+        "tool": 2
+      },
+      "tools": 18,
+      "cycle": 0,
+      "active": 1,
+      "sleeping": 0,
+      "readCounts": {
+        "file-001.txt": 2
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          3
+        ],
+        [
+          "navigation",
+          398
+        ],
+        [
+          "runtime-state",
+          616
+        ],
+        [
+          "runtime-state",
+          633
+        ],
+        [
+          "runtime-state",
+          650
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "59d9b505-9067-4d3b-b9aa-d5038947aa94",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "7a374316-8227-4750-9c9f-d808cc3dddc7",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 11,
+        "assistant": 6,
+        "tool": 12
+      },
+      "tools": 18,
+      "cycle": 0,
+      "active": 3,
+      "sleeping": 0,
+      "readCounts": {
+        "file-001.txt": 2,
+        "manifest.txt": 9,
+        "file-002.txt": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          3
+        ],
+        [
+          "navigation",
+          398
+        ],
+        [
+          "runtime-state",
+          616
+        ],
+        [
+          "runtime-state",
+          633
+        ],
+        [
+          "runtime-state",
+          650
+        ],
+        [
+          "navigation",
+          1106
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "abacc992-9354-482c-afb7-aef7f76c936e",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "1e4895ea-3f7a-4a5f-a1be-850171857989",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 1
+      },
+      "tools": 18,
+      "cycle": 1,
+      "active": 3,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          1304
+        ],
+        [
+          "navigation",
+          1304
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "d539c7ff-6d5e-4882-a8e6-c4c535b8844d",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "cba5d8b7-a896-4e47-83bb-32d118c0f668",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 5,
+        "assistant": 2
+      },
+      "tools": 18,
+      "cycle": 1,
+      "active": 3,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          1304
+        ],
+        [
+          "navigation",
+          1304
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "f7f82a9e-fb10-4683-91d2-092d21f65526",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "eabf70f9-b4a3-40bc-8e77-91689e2744ab",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 1
+      },
+      "tools": 18,
+      "cycle": 2,
+      "active": 100,
+      "sleeping": 7,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          1344
+        ],
+        [
+          "navigation",
+          1344
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "03e41da2-a67a-4f4e-8403-80e706a26990",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "eabf70f9-b4a3-40bc-8e77-91689e2744ab",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 2,
+        "tool": 2
+      },
+      "tools": 18,
+      "cycle": 2,
+      "active": 100,
+      "sleeping": 7,
+      "readCounts": {
+        "file-106.txt": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          1344
+        ],
+        [
+          "navigation",
+          1344
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "188c70c3-81a5-40dd-b588-4a1efbd0d1e9",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "46236d56-44a9-46c6-87af-4cf49aa215f4",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 1
+      },
+      "tools": 18,
+      "cycle": 3,
+      "active": 2,
+      "sleeping": 106,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          1854
+        ],
+        [
+          "navigation",
+          1854
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "e8c75334-32bc-40eb-a776-990ea4a782f6",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "46236d56-44a9-46c6-87af-4cf49aa215f4",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 2,
+        "tool": 1
+      },
+      "tools": 18,
+      "cycle": 3,
+      "active": 2,
+      "sleeping": 106,
+      "readCounts": {
+        "file-001.txt": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          1854
+        ],
+        [
+          "navigation",
+          1854
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "17c74c24-a70e-48b1-8902-2a59548bef0b",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "018137b4-0379-428f-8007-af3ca23c0dba",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 5,
+        "assistant": 3,
+        "tool": 1
+      },
+      "tools": 18,
+      "cycle": 3,
+      "active": 2,
+      "sleeping": 106,
+      "readCounts": {
+        "file-001.txt": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          1854
+        ],
+        [
+          "navigation",
+          1854
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "3a59e7af-69a8-4572-b0e8-5725511a85b8",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "018137b4-0379-428f-8007-af3ca23c0dba",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 5,
+        "assistant": 4,
+        "tool": 2
+      },
+      "tools": 18,
+      "cycle": 3,
+      "active": 2,
+      "sleeping": 106,
+      "readCounts": {
+        "file-001.txt": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          1854
+        ],
+        [
+          "navigation",
+          1854
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "874d738b-60aa-476c-9632-1615819c91b6",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "e14eb67b-10e5-4390-9fce-8fef5f408754",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 6,
+        "assistant": 5,
+        "tool": 2
+      },
+      "tools": 18,
+      "cycle": 3,
+      "active": 2,
+      "sleeping": 106,
+      "readCounts": {
+        "file-001.txt": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          1854
+        ],
+        [
+          "navigation",
+          1854
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "8ea6dab0-d35d-4229-9ff8-95ebe1930996",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "e14eb67b-10e5-4390-9fce-8fef5f408754",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 7,
+        "assistant": 6,
+        "tool": 3
+      },
+      "tools": 18,
+      "cycle": 3,
+      "active": 3,
+      "sleeping": 106,
+      "readCounts": {
+        "file-001.txt": 1,
+        "journal.jsonl": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          1854
+        ],
+        [
+          "navigation",
+          1854
+        ],
+        [
+          "navigation",
+          2525
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "ed5ffc69-0193-46fe-8714-2c9412f53a3c",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "64da00a5-8e69-4135-a037-4a730c58ce97",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 8,
+        "assistant": 7,
+        "tool": 3
+      },
+      "tools": 18,
+      "cycle": 3,
+      "active": 3,
+      "sleeping": 106,
+      "readCounts": {
+        "file-001.txt": 1,
+        "journal.jsonl": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          1854
+        ],
+        [
+          "navigation",
+          1854
+        ],
+        [
+          "navigation",
+          2525
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "261e5db1-3495-40d7-b412-5f737da66be4",
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "turnId": "677bf307-6cc4-4c97-af32-74e9a71445dd",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 1
+      },
+      "tools": 18,
+      "cycle": 4,
+      "active": 3,
+      "sleeping": 107,
+      "readCounts": {
+        "2bab2cc1-f736-409c-85e6-843b1878f61f": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          2653
+        ],
+        [
+          "navigation",
+          2653
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "e96fbf89-caad-4e64-925f-e9ad6014c332",
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "turnId": "677bf307-6cc4-4c97-af32-74e9a71445dd",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 2,
+        "tool": 1
+      },
+      "tools": 18,
+      "cycle": 4,
+      "active": 3,
+      "sleeping": 107,
+      "readCounts": {
+        "2bab2cc1-f736-409c-85e6-843b1878f61f": 1,
+        "file-002.txt": 1
+      },
+      "supplements": [
+        [
+          "runtime-state",
+          2653
+        ],
+        [
+          "navigation",
+          2653
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "350a0f8b-1d56-4f55-b03a-ac2a935b430b",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "637382f7-b7f4-465a-94d6-193b94d428ad",
+      "attempt": 1,
+      "model": "deepseek-flash",
+      "contextWindow": 1000000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 1
+      },
+      "tools": 18,
+      "cycle": 4,
+      "active": 3,
+      "sleeping": 107,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          2653
+        ],
+        [
+          "navigation",
+          2653
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [],
+      "failures": []
+    },
+    {
+      "requestId": "66747568-a2c8-4d03-aab9-6427fc7ccf7e",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "58565478-9316-4242-86d0-b5b446dbc54f",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 5,
+        "assistant": 2
+      },
+      "tools": 18,
+      "cycle": 4,
+      "active": 3,
+      "sleeping": 107,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          2653
+        ],
+        [
+          "navigation",
+          2653
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "df28c99c-4796-4573-8fee-7f0b7aa22bee",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "2bade40a-43bc-4ef8-90ad-7b80448fe0e9",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 6,
+        "assistant": 3
+      },
+      "tools": 18,
+      "cycle": 4,
+      "active": 3,
+      "sleeping": 107,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          2653
+        ],
+        [
+          "navigation",
+          2653
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "c8233729-608a-4dd9-b953-bc013aa3cf9d",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "d1e33ba0-e35d-4e08-9d08-72c0acb9e9cf",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 7,
+        "assistant": 4
+      },
+      "tools": 18,
+      "cycle": 4,
+      "active": 3,
+      "sleeping": 107,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          2653
+        ],
+        [
+          "navigation",
+          2653
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety",
+        "host/workspace-instructions",
+        "core/selected-skills"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "8d36cbba-738c-45af-957a-e0368f626dc4",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "bf2e9691-d76f-4f5f-8503-48f2bc0a2f97",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 9,
+        "assistant": 5
+      },
+      "tools": 2,
+      "cycle": 4,
+      "active": 3,
+      "sleeping": 107,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          2653
+        ],
+        [
+          "navigation",
+          2653
+        ],
+        [
+          "runtime-state",
+          3056
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "f7af04e3-1251-4563-b705-7663ed2d295f",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "d426e455-5f16-4264-b796-49781cc3416c",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 10,
+        "assistant": 6
+      },
+      "tools": 2,
+      "cycle": 4,
+      "active": 3,
+      "sleeping": 107,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          2653
+        ],
+        [
+          "navigation",
+          2653
+        ],
+        [
+          "runtime-state",
+          3056
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "1d6ef55f-09bc-46ed-a22b-ef2e8c7835c9",
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "turnId": "454abfbe-764d-436e-a53c-2f78daaff820",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 11,
+        "assistant": 6
+      },
+      "tools": 2,
+      "cycle": 4,
+      "active": 3,
+      "sleeping": 107,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          2653
+        ],
+        [
+          "navigation",
+          2653
+        ],
+        [
+          "runtime-state",
+          3056
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "3b902df7-0221-4a2f-a530-d105edd79511",
+      "sessionId": "91c127aa-d287-4034-bd26-daa333e4187f",
+      "turnId": "a82d18e3-a10f-4485-a943-4ee8b11dd02c",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 2
+      },
+      "tools": 2,
+      "cycle": 0,
+      "active": 0,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          7
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "5375d2c4-2a8d-4885-989a-8baa6218206c",
+      "sessionId": "91c127aa-d287-4034-bd26-daa333e4187f",
+      "turnId": "92836ff5-bfc2-4691-aac6-1b3270f4b304",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 3,
+        "assistant": 1
+      },
+      "tools": 2,
+      "cycle": 0,
+      "active": 0,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          7
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "a769e4e1-8790-4803-8921-c57d0da56bfa",
+      "sessionId": "91c127aa-d287-4034-bd26-daa333e4187f",
+      "turnId": "44f10980-2da5-486a-b7ae-3006a3d6b8c7",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 2
+      },
+      "tools": 2,
+      "cycle": 0,
+      "active": 0,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          7
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "6059e87f-8290-48e2-9969-7c2d60666e15",
+      "sessionId": "d7505639-0b4e-40de-a5ac-e01ee78c9b84",
+      "turnId": "6043c67f-f50e-464e-9be0-2e10574a30d1",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 2
+      },
+      "tools": 2,
+      "cycle": 0,
+      "active": 0,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          4
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "18a2d0b9-392c-461a-82cb-8ad681243be6",
+      "sessionId": "d7505639-0b4e-40de-a5ac-e01ee78c9b84",
+      "turnId": "a192d218-9988-467f-a252-c4cea713bcff",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 3,
+        "assistant": 1
+      },
+      "tools": 2,
+      "cycle": 0,
+      "active": 0,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          4
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "b114bd5a-90c4-4099-9cd7-54574f99f2df",
+      "sessionId": "d7505639-0b4e-40de-a5ac-e01ee78c9b84",
+      "turnId": "621ff531-9846-400c-9df2-725fab1e6c6e",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 4,
+        "assistant": 2
+      },
+      "tools": 2,
+      "cycle": 0,
+      "active": 0,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          4
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    },
+    {
+      "requestId": "d497eed6-c1c9-4bc5-87b0-b0add16b8529",
+      "sessionId": "d7505639-0b4e-40de-a5ac-e01ee78c9b84",
+      "turnId": "8ad359b0-9922-4cc4-88f6-066d394a5927",
+      "attempt": 1,
+      "model": "kimi-k2.6",
+      "contextWindow": 256000,
+      "roles": {
+        "system": 1,
+        "user": 3,
+        "assistant": 1
+      },
+      "tools": 2,
+      "cycle": 1,
+      "active": 0,
+      "sleeping": 0,
+      "readCounts": {},
+      "supplements": [
+        [
+          "runtime-state",
+          530
+        ]
+      ],
+      "sections": [
+        "core/identity",
+        "core/safety"
+      ],
+      "prepareNormalizations": [
+        "Kimi non-reasoning capability: omitted reasoning=false"
+      ],
+      "failures": []
+    }
+  ],
+  "compactions": [
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "compactionId": "956cb9f0-e992-45cd-af65-eb8059a1d1c9",
+      "throughSeq": 1299,
+      "relevantFiles": true
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "compactionId": "ec6ff62d-5c6c-4208-a39f-8ac3cb497f9a",
+      "throughSeq": 1339,
+      "relevantFiles": true
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "compactionId": "060ae0c1-9610-4abf-8a27-408778871cbe",
+      "throughSeq": 1849,
+      "relevantFiles": true
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "compactionId": "f998720c-acf1-4186-b8d6-4f6bf2c698f6",
+      "throughSeq": 2648,
+      "relevantFiles": true
+    },
+    {
+      "sessionId": "d7505639-0b4e-40de-a5ac-e01ee78c9b84",
+      "compactionId": "465585a7-5f4b-4eb2-a5e7-0bfe7d30fec3",
+      "throughSeq": 525,
+      "relevantFiles": true
+    }
+  ],
+  "journalSnapshotChecks": [
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "e2ddad45-d705-4d47-8e0d-9b4955576705",
+      "seq": 10,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "8d4c31b6-b90e-45dd-bea5-a1f2bf200c9d",
+      "seq": 404,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "61cd1723-2412-445a-8edc-191fc1ebe80c",
+      "seq": 621,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "f7be023f-1341-4724-aed0-74c94b64c697",
+      "seq": 638,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "a2753e73-6f2a-4cf1-a7a9-9d1dafbf3ba3",
+      "seq": 655,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "72a565f7-6992-438d-9b70-f8928f6c074c",
+      "seq": 670,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "59d9b505-9067-4d3b-b9aa-d5038947aa94",
+      "seq": 1112,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "abacc992-9354-482c-afb7-aef7f76c936e",
+      "seq": 1310,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "d539c7ff-6d5e-4882-a8e6-c4c535b8844d",
+      "seq": 1325,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "f7f82a9e-fb10-4683-91d2-092d21f65526",
+      "seq": 1350,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "03e41da2-a67a-4f4e-8403-80e706a26990",
+      "seq": 1613,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "188c70c3-81a5-40dd-b588-4a1efbd0d1e9",
+      "seq": 1860,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "e8c75334-32bc-40eb-a776-990ea4a782f6",
+      "seq": 1993,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "17c74c24-a70e-48b1-8902-2a59548bef0b",
+      "seq": 2256,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "3a59e7af-69a8-4572-b0e8-5725511a85b8",
+      "seq": 2316,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "874d738b-60aa-476c-9632-1615819c91b6",
+      "seq": 2428,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "8ea6dab0-d35d-4229-9ff8-95ebe1930996",
+      "seq": 2531,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "ed5ffc69-0193-46fe-8714-2c9412f53a3c",
+      "seq": 2633,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "261e5db1-3495-40d7-b412-5f737da66be4",
+      "seq": 2663,
+      "failures": []
+    },
+    {
+      "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+      "requestId": "e96fbf89-caad-4e64-925f-e9ad6014c332",
+      "seq": 2851,
+      "failures": []
+    },
+    {
+      "sessionId": "d7505639-0b4e-40de-a5ac-e01ee78c9b84",
+      "requestId": "6059e87f-8290-48e2-9969-7c2d60666e15",
+      "seq": 11,
+      "failures": []
+    },
+    {
+      "sessionId": "d7505639-0b4e-40de-a5ac-e01ee78c9b84",
+      "requestId": "18a2d0b9-392c-461a-82cb-8ad681243be6",
+      "seq": 183,
+      "failures": []
+    },
+    {
+      "sessionId": "d7505639-0b4e-40de-a5ac-e01ee78c9b84",
+      "requestId": "b114bd5a-90c4-4099-9cd7-54574f99f2df",
+      "seq": 465,
+      "failures": []
+    },
+    {
+      "sessionId": "d7505639-0b4e-40de-a5ac-e01ee78c9b84",
+      "requestId": "d497eed6-c1c9-4bc5-87b0-b0add16b8529",
+      "seq": 535,
+      "failures": []
+    },
+    {
+      "sessionId": "91c127aa-d287-4034-bd26-daa333e4187f",
+      "requestId": "3b902df7-0221-4a2f-a530-d105edd79511",
+      "seq": 14,
+      "failures": []
+    },
+    {
+      "sessionId": "91c127aa-d287-4034-bd26-daa333e4187f",
+      "requestId": "5375d2c4-2a8d-4885-989a-8baa6218206c",
+      "seq": 172,
+      "failures": []
+    },
+    {
+      "sessionId": "91c127aa-d287-4034-bd26-daa333e4187f",
+      "requestId": "a769e4e1-8790-4803-8921-c57d0da56bfa",
+      "seq": 213,
+      "failures": []
+    },
+    {
+      "sessionId": "d0e09872-8688-43ab-8ed9-230faf6abeef",
+      "requestId": "ec41ee6d-5212-4966-ab1a-b3fe4d58145d",
+      "seq": 10,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "e2ddad45-d705-4d47-8e0d-9b4955576705",
+      "seq": 10,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "8d4c31b6-b90e-45dd-bea5-a1f2bf200c9d",
+      "seq": 404,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "61cd1723-2412-445a-8edc-191fc1ebe80c",
+      "seq": 621,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "f7be023f-1341-4724-aed0-74c94b64c697",
+      "seq": 638,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "a2753e73-6f2a-4cf1-a7a9-9d1dafbf3ba3",
+      "seq": 655,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "72a565f7-6992-438d-9b70-f8928f6c074c",
+      "seq": 670,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "59d9b505-9067-4d3b-b9aa-d5038947aa94",
+      "seq": 1112,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "abacc992-9354-482c-afb7-aef7f76c936e",
+      "seq": 1310,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "d539c7ff-6d5e-4882-a8e6-c4c535b8844d",
+      "seq": 1325,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "f7f82a9e-fb10-4683-91d2-092d21f65526",
+      "seq": 1350,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "03e41da2-a67a-4f4e-8403-80e706a26990",
+      "seq": 1613,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "188c70c3-81a5-40dd-b588-4a1efbd0d1e9",
+      "seq": 1860,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "e8c75334-32bc-40eb-a776-990ea4a782f6",
+      "seq": 1993,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "17c74c24-a70e-48b1-8902-2a59548bef0b",
+      "seq": 2256,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "3a59e7af-69a8-4572-b0e8-5725511a85b8",
+      "seq": 2316,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "874d738b-60aa-476c-9632-1615819c91b6",
+      "seq": 2428,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "8ea6dab0-d35d-4229-9ff8-95ebe1930996",
+      "seq": 2531,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "ed5ffc69-0193-46fe-8714-2c9412f53a3c",
+      "seq": 2633,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "350a0f8b-1d56-4f55-b03a-ac2a935b430b",
+      "seq": 2659,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "66747568-a2c8-4d03-aab9-6427fc7ccf7e",
+      "seq": 2709,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "df28c99c-4796-4573-8fee-7f0b7aa22bee",
+      "seq": 2794,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "c8233729-608a-4dd9-b953-bc013aa3cf9d",
+      "seq": 2999,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "8d36cbba-738c-45af-957a-e0368f626dc4",
+      "seq": 3061,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "f7af04e3-1251-4563-b705-7663ed2d295f",
+      "seq": 3657,
+      "failures": []
+    },
+    {
+      "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+      "requestId": "1d6ef55f-09bc-46ed-a22b-ef2e8c7835c9",
+      "seq": 6145,
+      "failures": []
+    }
+  ]
+}

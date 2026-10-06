@@ -1,3 +1,5 @@
+import { renderSystemPrompt } from "@actspace/context";
+export { renderSystemPrompt } from "@actspace/context";
 import { createHash } from "node:crypto";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { ContributorRegistry } from "./registry.js";
@@ -58,17 +60,6 @@ export class RequestAssembler {
   finalize(candidate: LogicalRequestCandidate, prepared: PreparedRequestMetadata, compositionDigest: string, hostCapabilityDigest: string): LogicalRequestSnapshot {
     return freezeRequest({ ...candidate, schemaVersion: 2, compositionDigest, hostCapabilityDigest, prepared }) as LogicalRequestSnapshot;
   }
-}
-
-export function renderSystemPrompt(systemSections: readonly RuntimeV2JsonValue[], modelFacts: readonly RuntimeV2JsonValue[]): string {
-  const sections = systemSections.map(renderSection).filter((section) => section.length > 0);
-  if (modelFacts.length > 0) sections.push(`<runtime_facts>\n${JSON.stringify(modelFacts)}\n</runtime_facts>`);
-  return sections.join("\n\n");
-}
-
-function renderSection(value: RuntimeV2JsonValue): string {
-  if (typeof value === "string") return value.trim();
-  return JSON.stringify(value);
 }
 
 export function digestJson(value: RuntimeV2JsonValue): string {

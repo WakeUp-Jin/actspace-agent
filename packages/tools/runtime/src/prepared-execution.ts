@@ -52,6 +52,7 @@ export type ToolPreparedEnvironment = {
   readonly agentScopeToken?: object;
   readonly resolveArtifact?: import("./executor.js").SessionArtifactResolver;
   readonly workspaceRoot: string;
+  readonly contextGeneration?: number;
   readonly permissionMode?: PermissionMode | (() => PermissionMode);
   readonly permissionModeExplicit?: boolean;
   readonly hostCapabilities: ReadonlySet<string>;
@@ -204,6 +205,7 @@ export class PreparedToolExecution {
       callId: this.callId,
       sessionId: this.input.sessionId,
       workspaceRoot: this.environment.workspaceRoot,
+      contextGeneration: this.environment.contextGeneration,
       permissionMode: this.#permissionMode(),
       admittedResources: this.#resources,
       agentRunId: this.input.agentRunId,

@@ -71,10 +71,10 @@ describe("Compaction", () => {
     for (let index = 0; index < 5; index += 1) {
       await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${index}` }, surface: { kind: "append", node: { kind: "user", messageId: `m-${index}`, content: `message-${index}` } } });
     }
-    const plugin = new CompactionPlugin({ ...DEFAULT_COMPACTION_POLICY, contextLimitTokens: 10, reserveTokens: 0, triggerRatio: 0.5 }, new DeterministicCompactionSummarizer());
+    const plugin = new CompactionPlugin({ ...DEFAULT_COMPACTION_POLICY, reserveTokens: 0, triggerRatio: 0.5 }, new DeterministicCompactionSummarizer());
     const started: number[] = [];
     const observer = { onStarted: ({ entryCount }: { entryCount: number }) => { started.push(entryCount); } };
-    expect(await plugin.maybeCompact(session, { inputTokens: 10, outputTokens: 0 }, observer)).toBe(true);
+    expect(await plugin.maybeCompact(session, { inputTokens: 10, outputTokens: 0, contextWindow: 10 }, observer)).toBe(true);
     await expect(plugin.compact(session, observer)).resolves.toBe(false);
     // Only the compaction that chose a region notifies; the skipped one stays silent.
     expect(started).toEqual([4]);
@@ -95,11 +95,11 @@ describe("Compaction", () => {
       await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${index}` }, surface: { kind: "append", node: { kind: "user", messageId: `m-${index}`, content: `message-${index}` } } });
     }
     let ratio = 0.95;
-    const plugin = new CompactionPlugin({ ...DEFAULT_COMPACTION_POLICY, contextLimitTokens: 100, reserveTokens: 0, minimumRegionEntries: 4 }, new DeterministicCompactionSummarizer())
+    const plugin = new CompactionPlugin({ ...DEFAULT_COMPACTION_POLICY, reserveTokens: 0, minimumRegionEntries: 4 }, new DeterministicCompactionSummarizer())
       .withTriggerRatio(() => ratio);
-    expect(await plugin.maybeCompact(session, { inputTokens: 80, outputTokens: 0 })).toBe(false);
+    expect(await plugin.maybeCompact(session, { inputTokens: 80, outputTokens: 0, contextWindow: 100 })).toBe(false);
     ratio = 0.5;
-    expect(await plugin.maybeCompact(session, { inputTokens: 80, outputTokens: 0 })).toBe(true);
+    expect(await plugin.maybeCompact(session, { inputTokens: 80, outputTokens: 0, contextWindow: 100 })).toBe(true);
     await session.close();
   });
 });

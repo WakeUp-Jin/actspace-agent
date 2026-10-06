@@ -1,6 +1,6 @@
 # ActSpace v2 Prompt 与 Context Contributor 公共契约
 
-> 状态：v2 公共契约基线。
+> 状态：2026-10-06 Context 来源接口已接入。本文保留所有权与持久化不变量；精确当前类型和来源接口以[Context 规范](../上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)及[插件拆分](../上下文管理引擎设计/上下文管理引擎的插件拆分和上下文的插件拆分.md)为准。
 >
 > 本文固定模型请求组装的所有权、输入来源、确定性顺序、生命周期和持久化边界。精确 TypeScript 类型名可以在 execution plan 中调整，但不得改变本文行为语义。
 >
@@ -8,7 +8,7 @@
 
 ## 1. 一句话结论
 
-ActSpace v2 不迁移旧的可变 `ContextManager`。模型请求由一次性的 `Request Assembly` 从 Session Surface、Prompt Contributors、Tool definitions、Agent Scope 和 Host facts 中确定性构造，并把模型实际可见的完整逻辑输入写入 Session request snapshot。
+ActSpace v2 不迁移旧的可变 `ContextManager`。模型请求由 `context.engine` 的 `getContext → toLlmInput` 从 Session Surface、Prompt Contributors、Tool definitions、Agent Scope 和 Host facts 中确定性构造，并把模型实际可见的完整逻辑输入写入 Session request snapshot。
 
 这意味着：
 
@@ -36,7 +36,7 @@ ActSpace v2 不迁移旧的可变 `ContextManager`。模型请求由一次性的
 |---|---|---|
 | Session Surface | user、assistant、tool result，以及 compaction replacement 后的当前模型历史 | 必须完全从 Journal 派生，不能被 Contributor 直接修改 |
 | Core Prompt | 产品身份、基础行为规则、不可绕过的安全边界 | 由 Base Profile 提供，普通插件不能删除 |
-| User / Workspace Instructions | 用户级指令、workspace 内 `AGENTS.md` 及同类项目规则 | 记录来源路径、内容摘要和最终渲染值 |
+| User / Workspace Instructions | 用户级指令、workspace 内 `AGENTS.md` （第一版仅此规则文件） | 记录来源路径、内容摘要和最终渲染值 |
 | Agent Descriptor | main、Agent、Explore 的 persona、mode、目标和工具限制 | 来自当前静态 Preset 与 Agent Scope |
 | Skills | Skill catalog 与本次已选择 Skill 的完整内容 | catalog 与 selected body 分开贡献，并记录版本或内容摘要 |
 | Workspace Facts | cwd、项目根、平台、时间等模型确实需要的稳定事实 | 由 Host 提供 snapshot，不把活对象传给 Contributor |
@@ -47,9 +47,9 @@ ActSpace v2 不迁移旧的可变 `ContextManager`。模型请求由一次性的
 
 Kairos handoff、tick state 和 autonomous Prompt 不迁移。旧 conversation 数组不作为输入来源；它被 Session Surface 完全替代。
 
-## 4. Contributor 的最小语义
+## 4. Context 来源及兼容 Contributor
 
-每项 Contributor 至少表达：
+当前公开来源为 `ContextSource { id, owner, order, criticality, fields, get }`；`get(context, contribute)` 接收冻结视图，只贡献声明字段，注册返回 disposer。每个 Agent 有独立 registry；英语学习等 Host 扩展按 Session/Agent scope 隔离。下表是 Prompt 包内部复用的旧 Contributor 语义，生产不再以旧 RequestAssembler 作为第二次汇总入口：
 
 | 字段语义 | 要求 |
 |---|---|
@@ -80,13 +80,13 @@ Contributor 不得：
 - `request-fact` 是用于审计、诊断和重放解释的动态事实，例如 `agentRunId`、Host invocation identity 与单次 request identity；它进入 snapshot 的 `facts`，但不进入 system prompt；
 - snapshot schema v2 同时保存 `facts` 和 `modelFacts`。读取 schema v1 时可将旧 `facts` 作为历史模型事实解释，不能修改已落盘 Journal。
 
-模式是同一形态的 `chat/plan/agent` 状态，不是固定 Chat 形态。当前 Loop 在自行创建 `user/message` 时附加 `runtime-context`，不按 Chat 排除；已由 TaskLedger 提交的消息不会重复追加或改写。Run 的实际模式/修订同时记录在 `turn/start` 与 `request/header`。renderer、标题与自然语言摘要过滤内部控制块。
+模式是同一形态的 `chat/plan/agent` 状态，不是固定 Chat 形态。当前由 runtime 来源保存独立 Context supplement，模型转换在安全尾部加入标记消息，不改写 TaskLedger 或 Loop 的 user/message。旧格式中的 runtime-context 继续兼容。Run 的实际模式/修订同时记录在 `turn/start` 与 `request/header`。renderer、标题与自然语言摘要过滤内部控制块。
 
 需要网络、文件或外部进程的动态能力应先由拥有它的 Service 产生受约束事实 snapshot，再由 Contributor 读取该 snapshot。Request Assembly 不是隐藏的工具执行器。
 
 ## 5. 确定性排序与冲突
 
-Contributor 的总顺序固定为：
+来源按 order、稳定 ID 排序；SystemSection 同样按 order、ID 排序。Prompt 包内的兼容 contributor 仍按以下顺序映射 section order：
 
 ```text
 composition layer
@@ -211,8 +211,10 @@ Compaction 只能：
 
 1. 从 Journal 与当前 Surface 选择待压缩区域；
 2. 生成摘要；
-3. 追加带 source provenance 的 Surface replacement 事件；
+3. 交给 ContextCompactionCoordinator 追加四条连续 core 事件，保留 source provenance；
 4. 让后续 Request Assembly 看到 replacement 后的 Surface。
+
+渐进式披露单独处理候选路径、索引和读取周期；候选先 flush、core 事务再 flush、最后 applied/flush。有效摘要之后的派生故障只补状态，不再次摘要。
 
 原始 Journal 不删除。压缩阈值、摘要 route 和缓存是实现策略，可以在 execution plan 中细化；append-only 与 replacement provenance 不是可选项。
 

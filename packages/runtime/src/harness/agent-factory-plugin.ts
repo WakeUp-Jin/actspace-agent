@@ -1,11 +1,13 @@
+import { ContextSourceRegistry, createDisclosureSource, type ProgressiveDisclosure, type ContextCompactionCoordinator } from "@actspace/context";
+import type { ContributorRegistry, PromptContributor } from "@actspace/prompt";
+import type { SourceFactory, PromptHostPort, PromptRuntimeService } from "@actspace/prompt";
+import type { ContextEngine, ContextEngineOptions } from "@actspace/context";
 import type { RunFactory } from "@actspace/agent-service";
 import { AgentLoop } from "@actspace/core-agent-loop";
 import type { AgentLoopAssembly } from "@actspace/core-agent-loop";
 import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset, activateMainAgentFormTools, allowedAgentModeTools } from "@actspace/core-agent";
 import type { AgentSubject } from "@actspace/core-agent";
 import { AgentScope, scopeContext } from "@actspace/core-scope";
-import { ContributorRegistry, RequestAssembler, emptyRuntimePromptSource } from "@actspace/prompt";
-import type { PromptContributor, PromptRuntimeService } from "@actspace/prompt";
 import type { LlmService } from "@actspace/llm-service";
 import type { ToolRuntime } from "@actspace/tools-runtime";
 import type { CompactionPlugin } from "@actspace/compaction";
@@ -35,7 +37,9 @@ export const inject = Object.freeze([
   "llm.service",
   "tools.runtime",
   "prompt.runtime",
-  "compaction.runtime",
+  "context.engine",
+  "context.source.system",
+  "context.source.conversation",
 ]);
 
 export function apply(ctx: CordisContext): AgentFactoryService {
@@ -45,14 +49,30 @@ export function apply(ctx: CordisContext): AgentFactoryService {
   const llm = requireService<LlmService>(ctx, "llm.service");
   const tools = requireService<ToolRuntime>(ctx, "tools.runtime");
   const prompt = requireService<PromptRuntimeService>(ctx, "prompt.runtime");
-  const compaction = requireService<CompactionPlugin>(ctx, "compaction.runtime");
+
+  const engine = requireService<{ compaction: ContextCompactionCoordinator; create(options: ContextEngineOptions): ContextEngine }>(ctx, "context.engine");
+  const getDisclosure = () => ctx.get?.("context.disclosure") as ProgressiveDisclosure | undefined;
   const activeSessions = new Map<string, import("@actspace/session-persistence").SessionHandle>();
+
+  const createSources = (scope: AgentScope, agent: import("@actspace/core-agent").AgentDescriptor, workspaceRoot: string) => {
+    const sources = new ContextSourceRegistry(["context-system", "context-conversation"]);
+    for (const kind of ["system", "rules", "skills", "runtime", "conversation", "tools"]) {
+      const factory = ctx.get?.(`context.source.${kind}`) as SourceFactory | undefined;
+      if (!factory && (kind === "system" || kind === "conversation")) throw new Error(`Required context source ${kind} is unavailable.`);
+      if (factory) scope.disposer.add(sources.register(factory.create({ scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt })));
+    }
+    if (getDisclosure()) scope.disposer.add(sources.register(createDisclosureSource()));
+    scope.disposer.add(() => sources.clear());
+    return sources;
+  };
+  const extensions = (sessionId: string, scopeId: string, kind: "main" | "subagent") => () => (ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions?.list(sessionId, scopeId, kind) ?? [];
 
   const toolEnvironmentFor = (session: import("@actspace/session-persistence").SessionHandle) => {
     activeSessions.set(session.header.sessionId, session);
     const configuredMode = host.toolEnvironment.permissionMode;
     return Object.freeze({
       ...host.toolEnvironment,
+      contextGeneration: session.journal.surface.replaceGeneration,
       workspaceRoot: resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot),
       permissionMode: () => host.toolEnvironment.permissionModeExplicit
         ? (typeof configuredMode === "function" ? configuredMode() : configuredMode ?? "default")
@@ -72,17 +92,14 @@ export function apply(ctx: CordisContext): AgentFactoryService {
     scope.disposer.add(sessions.registerExternal(session));
     scope.disposer.add(() => { activeSessions.delete(session.header.sessionId); });
     const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot);
-    const source = await prompt.resolveSource(workspaceRoot);
-    const contributors = new ContributorRegistry();
-    for (const contributor of prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills })) contributors.register(scope, contributor);
-    const assembler = new RequestAssembler({ registry: contributors, prepare: async () => ({ route: descriptor.routeId, model: descriptor.model, registrationId: "cordis-agent", adapterVersion: "cordis-agent", defaults: {}, retryPolicy: {}, contextWindow: null }) });
     const subject: AgentSubject = Object.freeze({ agentId: agentId ?? scope.agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
     const scopedToolEnvironment = descriptor.kind === "subagent"
       ? (activeSession: import("@actspace/session-persistence").SessionHandle) => ({ ...toolEnvironmentFor(activeSession), sessionGrantCapability: false, sessionGrants: [] })
       : toolEnvironmentFor;
     const binding = tools.bindAgentScope(session.header.sessionId, subject.agentId, () => new Set(allowedToolNames ?? []));
     scope.disposer.add(binding.dispose);
-    const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), assembler, llm, tools, toolEnvironment: scopedToolEnvironment, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
+    const disclosure = getDisclosure();
+    const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, descriptor.kind), observeContextToolResult: disclosure ? (session, event) => disclosure.observe(session, event) : undefined, createContextEngine: options => engine.create({ ...options, disclosure }), descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), llm, tools, toolEnvironment: scopedToolEnvironment, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction: engine.compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
     if (signal !== undefined) {
       const abort = () => loop.abort(typeof signal.reason === "string" ? signal.reason : "parent-abort");
       if (signal.aborted) abort(); else signal.addEventListener("abort", abort, { once: true });
@@ -112,17 +129,8 @@ export function apply(ctx: CordisContext): AgentFactoryService {
       const subject: AgentSubject = Object.freeze({ agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
       const inbox = new MainAgentInbox(session);
       const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot);
-      const contributors = new ContributorRegistry();
-      const assembler = new RequestAssembler({ registry: contributors, prepare: async () => ({ route: descriptor.routeId, model: descriptor.model, registrationId: "cordis-agent", adapterVersion: "cordis-agent", defaults: {}, retryPolicy: {}, contextWindow: null }) });
-      const activateModeContributors = createModeContributorActivation(scope, contributors, async key => {
-        const source = key === "chat"
-          ? { ...emptyRuntimePromptSource(), instructions: prompt.source.instructions.filter(instruction => instruction.id === "host/user-instructions") }
-          : await prompt.resolveSource(workspaceRoot);
-        return prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills, profile: key === "chat" ? "chat" : "agent" });
-      });
-      const initialMode = run.mode;
-      await activateModeContributors(initialMode);
-      const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, assembler, modeRuntime: async mode => { await activateModeContributors(mode); return { assembler, compaction: mode === "chat" ? compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8)) : compaction }; }, llm, tools, toolEnvironment: activeSession => {
+      const disclosure = getDisclosure();
+      const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, descriptor.kind), observeContextToolResult: disclosure ? (session, event) => disclosure.observe(session, event) : undefined, createContextEngine: options => engine.create({ ...options, disclosure }), descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, modeRuntime: async mode => { const compaction = ctx.get?.("compaction.runtime") as CompactionPlugin | undefined; return { compaction: mode === "chat" && compaction ? engine.compaction.withStrategy(compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))) : engine.compaction }; }, llm, tools, toolEnvironment: activeSession => {
         const environment = toolEnvironmentFor(activeSession);
         const broker = environment.approvalBroker;
         return !broker || !run.budget ? environment : { ...environment, approvalBroker: {

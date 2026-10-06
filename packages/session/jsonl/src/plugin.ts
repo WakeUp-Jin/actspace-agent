@@ -15,6 +15,7 @@ export class JsonlSessionStorageService extends Service {
     ctx.effect(() => () => this.storage.close(), "session.storage");
   }
   get identity() { return this.storage.identity; }
+  journalPath(sessionId: string) { return this.storage.journalPath(sessionId); }
   inspect(...args: Parameters<JsonlSessionStorage["inspect"]>) { return this.storage.inspect(...args); }
   listSessionIds() { return this.storage.listSessionIds(); }
   create(...args: Parameters<JsonlSessionStorage["create"]>) { return this.storage.create(...args); }

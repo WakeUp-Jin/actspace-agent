@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
+import { createCoreCodecRegistry, createSessionHeader, SessionError } from "@actspace/session-journal";
 import { SessionHandle } from "@actspace/session-persistence";
 import { manifest } from "../manifest.js";
 import { codecs } from "../codec.js";
@@ -24,11 +24,37 @@ describe("agent service plugin", () => {
 
 it("drains without reopening a Session whose ownership acquisition failed", async () => {
   let opens = 0;
-  const plugin = activate({ openSession: async () => { opens++; throw new Error("SESSION_WRITER_LOCKED"); }, harnessId: () => "main", readConfiguration: () => ({ mode: "plan" }), acquire: () => { throw new Error("must not acquire"); } });
+  const plugin = activate({ openSession: async () => { opens++; throw new SessionError("SESSION_WRITER_LOCKED", "SESSION_WRITER_LOCKED"); }, harnessId: () => "main", readConfiguration: () => ({ mode: "plan" }), acquire: () => { throw new Error("must not acquire"); } });
   const service = plugin.services["agent.service"];
   await expect(service.snapshot("foreign")).rejects.toThrow("SESSION_WRITER_LOCKED");
   service.beginDrain();
   await expect(service.waitForOwnedRuns()).resolves.toBeUndefined();
+  expect(opens).toBe(1);
+  await plugin.dispose();
+});
+
+it("retries a transient writer acquisition failure without duplicating concurrent managers", async () => {
+  const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
+  const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "retry", createdAt: "2026-10-06T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
+  let opens = 0;
+  const locked = new SessionError("SESSION_WRITER_LOCKED", "Previous writer lease has not expired");
+  const plugin = activate({ openSession: async () => { if (++opens === 1) throw locked; return session; }, harnessId: () => "main", readConfiguration: () => ({ mode: "plan" }), acquire: () => { throw new Error("must not acquire"); } });
+  const service = plugin.services["agent.service"];
+  const first = await Promise.allSettled([service.snapshot("retry"), service.snapshot("retry")]);
+  expect(first).toEqual([{ status: "rejected", reason: locked }, { status: "rejected", reason: locked }]);
+  expect(opens).toBe(1);
+  const [a, b] = await Promise.all([service.snapshot("retry"), service.snapshot("retry")]);
+  expect(a).toEqual(b); expect(a.tasks).toEqual([]); expect(opens).toBe(2);
+  await plugin.dispose(); await session.close();
+});
+
+it("keeps durability failures blocked on subsequent requests", async () => {
+  let opens = 0;
+  const error = new SessionError("SESSION_DURABILITY_FAILED", "Unconfirmed write");
+  const plugin = activate({ openSession: async () => { opens++; throw error; }, harnessId: () => "main", readConfiguration: () => ({ mode: "plan" }), acquire: () => { throw new Error("must not acquire"); } });
+  const service = plugin.services["agent.service"];
+  await expect(service.snapshot("broken")).rejects.toBe(error);
+  await expect(service.snapshot("broken")).rejects.toBe(error);
   expect(opens).toBe(1);
   await plugin.dispose();
 });

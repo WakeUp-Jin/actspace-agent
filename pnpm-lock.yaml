@@ -551,6 +551,12 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../llm/service
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session/journal
       '@actspace/shared':
         specifier: workspace:*
         version: link:../shared
@@ -760,6 +766,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@actspace/context':
+        specifier: workspace:*
+        version: link:../context
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -896,6 +905,12 @@ importers:
       '@actspace/core-scope':
         specifier: workspace:*
         version: link:../core/scope
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../llm/service
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session/journal
       '@actspace/shared':
         specifier: workspace:*
         version: link:../shared

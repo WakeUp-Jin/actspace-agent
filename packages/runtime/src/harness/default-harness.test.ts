@@ -1,3 +1,5 @@
+import { createContextHost } from "./context-host.js";
+import { codecs as contextCodecs } from "@actspace/context/codec";
 import { SessionStore } from "@actspace/session-persistence";
 import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
@@ -23,7 +25,7 @@ import { RuntimeSessionController } from "../session/session-controller.js";
 it("executes the default Loop from its fixed closure with Harness-owned policies", async () => {
   const directory = await mkdtemp(join(tmpdir(), "actspace-default-harness-"));
   const root = await createCordisRoot();
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec)); contextCodecs.forEach(codec => registry.register(codec));
   const sessions = new RuntimeSessionController({ dataRoot: directory, runtimeId: "fixed-default", registry, profileId: "test", manifestDigest: "test", plugins: [] }, new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot: directory, runtimeId: "fixed-default", registry })));
   const host = { hostKind: "cli-run" as const, capabilityCeiling: [], runtimeContract: "actspace.runtime.v2" as const, invocationId: "fixed-default" };
   const toolEnvironment = { workspaceRoot: directory, hostCapabilities: new Set<string>(), capabilitySet: { ids: [], has: () => false, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };
@@ -38,7 +40,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     "session.journal": { registry },
     "session.projection": {},
     "actspace.host.session": { dataRoot: directory, runtimeId: "test" },
-    "actspace.host.agent": { authorizeHarness: async (r: import("@actspace/harness-control").AuthorizationRequest) => ({ ...r, actor: "test-host", decisionId: "approved", expiresAt: Date.now() + 10000 }), disabledHarnessEntries: ["browser-tools"], host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
+    "actspace.host.agent": { authorizeHarness: async (r: import("@actspace/harness-control").AuthorizationRequest) => ({ ...r, actor: "test-host", decisionId: "approved", expiresAt: Date.now() + 10000 }), disabledHarnessEntries: ["browser-tools"], contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
     "actspace.host.prompt": { workspaceRoot: directory, resolveSource: async () => emptyRuntimePromptSource() },
     "actspace.host.llm": { credentials: { resolve: async () => ({}) }, routes: [{ routeId: "default", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async (input: { signal?: AbortSignal }) => (async function* () {
       if (holdRequest) {
@@ -63,6 +65,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     await app.submit("conversation", "one", "Hello"); await app.waitForIdle("conversation");
     const state = await app.snapshot("conversation");
     expect(failures).toEqual([]);
+    expect((await sessions.inspectEvents("conversation")).some(event => event.type === "plugin/actspace.context/state")).toBe(true);
     expect(state.runs).toHaveLength(1);
     expect(state.runs[0].state).toBe("completed");
     expect((await sessions.inspectEvents("conversation")).some(event => event.type === "assistant/message" && JSON.stringify(event.data).includes("fixed loop result"))).toBe(true);

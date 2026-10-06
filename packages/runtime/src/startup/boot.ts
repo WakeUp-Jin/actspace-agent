@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { RuntimeV2HostDescriptor, RuntimeV2BootManifest, RuntimeV2RuntimeState, RuntimeV2DiagnosticsSnapshot, RuntimeV2ShutdownResult } from "@actspace/shared/runtime-v2";
 import type { AgentLoopLiveEvent } from "@actspace/core-agent-loop";
-import { emptyRuntimePromptSource, type RuntimePromptSource } from "@actspace/prompt";
+import { PromptExtensionRegistry, emptyRuntimePromptSource, type RuntimePromptSource } from "@actspace/prompt";
 import { DiagnosticsCollector } from "../projection/diagnostics.js";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import type { DiagnosticInput } from "../projection/diagnostics.js";
@@ -25,6 +25,8 @@ import type { AgentRuntimeService } from "../harness/agent-runtime-plugin.js";
 import { HEADLESS_HOST_PORT_ID } from "@actspace/headless";
 import { RuntimeStateController } from "./runtime-state.js";
 import { settleWithinDeadline } from "./shutdown.js";
+
+import { createContextHost } from "../harness/context-host.js";
 
 let runtimeClaimed = false;
 
@@ -87,7 +89,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
   const hostServices = options.hostServices ?? createRuntimeHostServices({ descriptor: options.host, dataRoot: options.dataRoot, workspaceRoot: options.toolEnvironment.workspaceRoot, toolEnvironment: options.toolEnvironment });
   const cordisAdmission = options.cordis?.admission ?? await inspectCordisAdmission();
   const enabledPluginIds = new Set(composition.entries.filter(entry => entry.enabled && entry.state !== "skipped").map(entry => entry.pluginId));
-  const pluginCodecs: readonly EventCodec[] = await discoverPluginCodecs(composition.manifests.filter(manifest => enabledPluginIds.has(manifest.pluginId)), (specifier, manifest) =>
+  const pluginCodecs: readonly EventCodec[] = await discoverPluginCodecs(composition.manifests.filter(manifest => enabledPluginIds.has(manifest.pluginId) || (manifest.source.kind === "builtin" && manifest.pluginId === "actspace.context")), (specifier, manifest) =>
     manifest.source.kind === "builtin" ? loadBuiltinToolCodec(specifier, manifest) : (options.pluginCodecLoader ?? missingCodecLoader)(specifier, manifest));
   const pluginVersions = new Map(composition.entries.filter((entry) => entry.enabled && entry.state !== "skipped").map((entry) => [entry.pluginId, entry.pluginVersion]));
   const configRevision = createHash("sha256").update(JSON.stringify(composition.config)).digest("hex");
@@ -104,10 +106,11 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     plugins: [...pluginVersions].map(([id, version]) => ({ id, version })),
     rendererAllowlist: options.rendererAllowlist,
   } satisfies RuntimeSessionHostPort);
-  const promptPort = hostServices.services["actspace.host.prompt"] ?? Object.freeze({
+  const originalPromptPort = hostServices.services["actspace.host.prompt"] ?? Object.freeze({
     workspaceRoot: options.toolEnvironment.workspaceRoot,
     resolveSource: async (workspaceRoot: string) => typeof options.promptSource === "function" ? options.promptSource(workspaceRoot) : options.promptSource ?? emptyRuntimePromptSource(),
   });
+  const promptPort = Object.freeze({ ...(originalPromptPort as import("@actspace/prompt").PromptHostPort), extensions: (originalPromptPort as import("@actspace/prompt").PromptHostPort).extensions ?? new PromptExtensionRegistry() });
   let runtimeContext: CordisContext | undefined;
   const providedHostServices = Object.freeze({
     ...hostServices.services,
@@ -126,6 +129,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       onHarnessDiagnostic: (error: unknown) => diagnostics.record({ severity: "error", source: "boot", code: "HARNESS_RECOVERY_BLOCKED", message: error instanceof Error ? error.message : String(error) }),
       host: options.host,
       toolEnvironment: options.toolEnvironment,
+      contextDisclosure: createContextHost(() => runtimeContext?.get?.("session.runtime") as RuntimeSessionController | undefined, options.toolEnvironment),
       workspaceRoot: options.toolEnvironment.workspaceRoot,
       compositionDigest: composition.digest,
       hostCapabilityDigest: configRevision,

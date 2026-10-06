@@ -23,6 +23,7 @@ export class JsonlSessionStorage implements SessionStorage {
   #closed = false;
   readonly #opening = new Set<Promise<SessionStorageHandle>>();
   constructor(readonly options: JsonlStorageOptions) {}
+  journalPath(sessionId: string): string { return sessionFileLayout(this.options.dataRoot, sessionId).journalPath; }
 
   async inspect(sessionId: string): Promise<SessionStorageSnapshot> {
     this.#assertOpen();

@@ -78,6 +78,22 @@ it("blocks restoration when Host contracts change without silently using builtin
   expect(restored.inspect().blocked).toContain("fingerprint");
   await expect(restored.acquire("main")).rejects.toMatchObject({ code: "RECOVERY_BLOCKED" });
 });
+it("retries initial store ownership after the previous Host releases it", async () => {
+  const { control, options } = await setup();
+  const restored = new HarnessControl({ ...options, runtimeId: "next-host" }); controls.push(restored);
+  await restored.initialize();
+  expect(restored.inspect().blocked).toContain("owned by another Host");
+  await expect(restored.acquire("main")).rejects.toMatchObject({ code: "RECOVERY_BLOCKED" });
+  await control.close();
+  const leases = await Promise.all([restored.acquire("main"), restored.acquire("main")]);
+  expect(restored.inspect().blocked).toBe("");
+  expect(restored.inspect().history).toHaveLength(1);
+  for (const lease of leases) {
+    expect(lease.revision).toBe(1);
+    expect(lease.getService<{ read(): string }>("reader")!.read()).toBe("old");
+    await lease.release();
+  }
+});
 it("does not let a late authorization resurrect a discarded candidate", async () => {
   const { control, options, next, prepare } = await setup(); const c = await prepare(control, next);
   let approve!: () => void;

@@ -67,6 +67,7 @@ export type ToolExecutionContext = {
   readonly callId: string;
   readonly sessionId: string;
   readonly workspaceRoot: string;
+  readonly contextGeneration?: number;
   readonly permissionMode?: PermissionMode;
   readonly admittedResources?: readonly ToolResource[];
   readonly agentRunId: string;

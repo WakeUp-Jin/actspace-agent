@@ -11,6 +11,7 @@ declare module "@actspace/cordis-adapter" {
 }
 
 import type { SessionHandle } from "@actspace/session-persistence";
+import { SessionError } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { TaskReceipt, TaskSnapshot, RunRecord, TaskRecord } from "./contracts.js";
 import { SessionRunManager, type ExecutionConfiguration, type RunLease } from "./run-manager.js";
@@ -108,15 +109,21 @@ export class AgentService {
     if (this.#closed) return Promise.reject(new Error("Agent service is closed"));
     const existing = this.#sessions.get(sessionId);
     if (existing) return existing;
+    let acquired = false;
     const opening = (async () => {
       const session = await this.ports.openSession(sessionId);
+      acquired = true;
       if (session.header.sessionId !== sessionId) throw new Error("Session owner mismatch");
       const ledger = await TaskLedger.open(session);
       ledger.subscribe(snapshot => this.ports.onSnapshot?.(sessionId, snapshot));
       return new SessionRunManager({ ledger, canStart: () => !this.#draining, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), onFailure: error => this.ports.onFailure?.(sessionId, error) });
     })();
-    // Keep a failed opening cached: never bypass a recovery/durability failure by retrying in memory.
+    // Only an unacquired writer lease may be retried by the next request.
+    // Recovery and durability failures remain cached to protect accepted writes.
     this.#sessions.set(sessionId, opening);
+    void opening.catch(error => {
+      if (!acquired && error instanceof SessionError && error.code === "SESSION_WRITER_LOCKED" && this.#sessions.get(sessionId) === opening) this.#sessions.delete(sessionId);
+    });
     return opening;
   }
 }

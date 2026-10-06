@@ -6,9 +6,63 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" }, "./manifest": { "types": "./dist/manifest.d.ts", "import": "./dist/manifest.js", "default": "./dist/manifest.js" }, "./plugin": { "types": "./dist/plugin.d.ts", "import": "./dist/plugin.js", "default": "./dist/plugin.js" } },
-  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc --noEmit -p tsconfig.json", "test": "vitest run --globals --passWithNoTests" },
-  "dependencies": { "@actspace/cordis-adapter": "workspace:*", "@actspace/context": "workspace:*", "@actspace/core-agent": "workspace:*", "@actspace/core-scope": "workspace:*", "@actspace/shared": "workspace:*" },
-  "devDependencies": { "@types/node": "^24.0.3", "typescript": "^5.8.3", "vitest": "^3.2.4" }
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest.d.ts",
+      "import": "./dist/manifest.js",
+      "default": "./dist/manifest.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js",
+      "default": "./dist/plugin.js"
+    },
+    "./sources/system": {
+      "types": "./dist/context-sources/system.d.ts",
+      "import": "./dist/context-sources/system.js",
+      "default": "./dist/context-sources/system.js"
+    },
+    "./sources/rules": {
+      "types": "./dist/context-sources/rules.d.ts",
+      "import": "./dist/context-sources/rules.js",
+      "default": "./dist/context-sources/rules.js"
+    },
+    "./sources/skills": {
+      "types": "./dist/context-sources/skills.d.ts",
+      "import": "./dist/context-sources/skills.js",
+      "default": "./dist/context-sources/skills.js"
+    },
+    "./sources/runtime": {
+      "types": "./dist/context-sources/runtime.d.ts",
+      "import": "./dist/context-sources/runtime.js",
+      "default": "./dist/context-sources/runtime.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --globals --passWithNoTests"
+  },
+  "dependencies": {
+    "@actspace/cordis-adapter": "workspace:*",
+    "@actspace/context": "workspace:*",
+    "@actspace/core-agent": "workspace:*",
+    "@actspace/core-scope": "workspace:*",
+    "@actspace/shared": "workspace:*",
+    "@actspace/session-journal": "workspace:*",
+    "@actspace/llm-service": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
 }

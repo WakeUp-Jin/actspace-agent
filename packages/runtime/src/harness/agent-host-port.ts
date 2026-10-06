@@ -5,6 +5,7 @@ import type { ToolPreparedEnvironment } from "@actspace/tools-runtime";
 export const AGENT_RUNTIME_HOST_PORT_ID = "actspace.host.agent" as const;
 
 export type AgentRuntimeHostPort = {
+  readonly contextDisclosure?: import("@actspace/context").DisclosureHost;
   readonly authorizeHarness?: import("@actspace/harness-control").HarnessAuthorizer;
   readonly onHarnessDiagnostic?: (error: unknown) => void;
   readonly disabledHarnessEntries?: readonly string[];

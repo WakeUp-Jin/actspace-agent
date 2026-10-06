@@ -1,7 +1,7 @@
-import { ContextAssembler, ContextAssemblerService } from "./assembly.js";
+import { ContextCompactionCoordinator } from "./compaction.js";
+import { ContextEngine, type ContextEngineOptions } from "./engine.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 
 export function apply(ctx: CordisContext): void {
-  const assembler = new ContextAssemblerService(ctx as never);
-  ctx.provide?.("context.assembly.types", Object.freeze({ ContextAssembler, ContextAssemblerService, assembler }));
+  ctx.provide?.("context.engine", Object.freeze({ compaction: new ContextCompactionCoordinator(), create: (options: ContextEngineOptions) => new ContextEngine(options) }));
 }

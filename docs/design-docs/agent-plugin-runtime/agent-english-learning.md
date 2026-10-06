@@ -1,6 +1,6 @@
 # 英语辅助学习插件设计
 
-> 状态：插件、配置与固定 UI 已实现；Host/Harness 重构后发现 live Agent 绑定与空闲会话开启的接线限制，见第 5.1 节。早期自动化不证明当前生产入口可用；Electron 与真实 MiniMax 音频验收见[执行摘要](../../exec-runs/20260906-actspace-english-learning/execution-summary.md)。
+> 状态：插件、配置与固定 UI 已实现；2026-10-06 修复空闲会话开启与跨 Run 绑定，见第 5.1 节；本轮真实复验见[修复记录](../../exec-runs/20261006-context-acceptance-bugfix/execution-summary.md)。Electron 与真实 MiniMax 音频验收见[执行摘要](../../exec-runs/20260906-actspace-english-learning/execution-summary.md)。
 >
 > 日期：2026-09-06。执行入口：[英语辅助学习执行计划](../../exec-plans/completed/20260906-actspace-english-learning/README.md)。
 
@@ -8,20 +8,20 @@
 
 用户在「扩展 → 能力」开启「英语辅助学习」，选择一个会话后，该会话的后续模型请求加入双语输出规则：每段先英文、后简体中文；回答完成后默认只朗读英文。语音连接、模型、音色和语速在「设置 → 通用 → 语音播放」配置，首版使用 MiniMax。
 
-提示词注入与英文朗读由同一个插件控制。其他主会话、子 Agent、标题生成、压缩摘要及其他后台模型调用不受影响。目标产品行为是持续绑定一个会话；当前实现仍绑定 live Agent Scope，Run 结束会关闭能力，且空闲开启存在第 5.1 节所述接线限制。用户无需安装 Skill、配置 Hook 或复制提示词。
+提示词注入与英文朗读由同一个插件控制。其他主会话、子 Agent、标题生成、压缩摘要及其他后台模型调用不受影响。开启状态持续绑定一个 Session；主 Run 结束不关闭能力，后续主 Run 按 Session 身份继续获得来源。用户无需安装 Skill、配置 Hook 或复制提示词。
 
 首版范围：单目标会话、成功完成回答后的英文朗读、MiniMax 同步合成、macOS 播放、固定桌面端控制界面。暂不提供逐 token 朗读、多会话混播、中文朗读、自动翻译历史消息、语音输入、发音评分、词汇本、插件市场或通用 Hook 编辑器。
 
 ## 2. 当前实现证据
 
-以下入口已用于 2026-09-06 至 2026-09-07 的实现。独立插件位于 `packages/english-learning/`。
+以下入口按 2026-10-06 的 Context 与 Session 绑定实现校准。独立插件位于 `packages/english-learning/`。
 
 | 现有入口 | 可以复用的事实 |
 | --- | --- |
-| `packages/core/agent-loop/src/loop.ts` | 每次模型请求及上下文重建经过 `system-prompt/assemble`；候选包含 `sessionId`；成功轮次写入 `turn/end` |
+| `packages/core/agent-loop/src/loop.ts` | 每次模型请求通过 Context 来源注册表组装；请求包含 `sessionId`；成功轮次写入 `turn/end` |
 | `packages/prompt/src/assembler.ts`、`request-snapshot.ts` | 提示词分节、渲染文本、来源记录和请求快照有现成契约 |
-| `packages/core/scope/src/scope.ts` | `scopeContext` 使用真实 ScopeKey 注册监听并管理清理；父 Scope 可能收到子 Agent 事件 |
-| `packages/core/agent/src/registry.ts` | 可按已发布 Agent 获取实际 Scope 和 Session |
+| `packages/prompt/src/extensions.ts` | 扩展按 Session 与明确 main 身份筛选，保留精确 scope 注册能力 |
+| `packages/runtime/src/session/session-controller.ts` | 取得已打开的 Session，与单个 Run 生命周期解耦 |
 | `packages/runtime/src/session/session-plugin.ts` | `session/event` 携带事件 Envelope，Session ID 通过 dispatch carrier 传递 |
 | `packages/desktop-app/src/bundle.ts` | Desktop 应用 Bundle 可以组合独立插件 manifest |
 | `apps/desktop/src/renderer/components/extensions/CapabilitiesSection.tsx` | 已拆开 Browser Bridge 与英语辅助学习各自的可用性判断 |
@@ -64,7 +64,7 @@
 ```text
 扩展卡片 ── typed IPC ── Desktop 控制入口 ── 英语辅助学习插件
                                                 │
-目标 Agent Scope ── system-prompt/assemble ── 双语提示词
+目标 Session ── main Agent Context 来源 ── 双语提示词
                                                 │
 Session commit ── session/event ── 完成判断与英文提取
                                                 │
@@ -83,25 +83,17 @@ Session commit ── session/event ── 完成判断与英文提取
 
 ## 5. 会话级提示词注入
 
-### 5.1 绑定真实 Scope
+### 5.1 Session 目标与主 Agent 边界
 
-当前服务通过 `agent.registry` 查找目标 Session 的 live main Agent Handle，再使用其 `scope.scopeKey` 和 disposer 注册 `system-prompt/assemble`。Host/Harness 重构后，`resumeMainSession()` 只恢复 Session，不发布 Agent；Handle 仅在 RunFactory 创建到释放之间存在。因此当前 Desktop 的“resume 后 enableSession”接线不能保证空闲会话开启成功，缺少 Handle 时返回“目标会话尚未就绪”。这是现有实现限制，需要单独修复并做真实交互验收，不能把早期长期 Agent 的绑定流程继续当作已实现保证。
+`enableSession()` 从 `session.runtime.getOpen()` 取得已恢复的 Session，不依赖 `agent.registry` 中是否存在正在运行的 Handle。插件通过 `PromptExtensionRegistry.registerMainSession()` 注册会话来源；Harness 读取扩展时明确传入真实 descriptor.kind，只有相同 Session 且 kind=main 才能获取。原有精确 scope 注册仍可用于短生命周期扩展。子 Agent、其他会话及 utility 请求不获得这条来源。
 
-handler 同时核对候选的 `sessionId`、Agent subject 和当前绑定版本。父 Scope 监听可能接收到子 Agent 事件，因此只绑定 Scope 仍不足以排除子会话；必须显式比较目标 Session 和 live Agent 身份。禁止靠工作目录、会话标题或字符串 Scope ID 代替 ScopeKey。
+切换、关闭或 Runtime dispose 移除来源并清空完成追踪，停止语音队列。一次主 Run 的 scope dispose 不关闭 Session 目标。重新打开 Session 后，完成事件读取当前 `session.runtime` Handle 的 Journal，不依赖已释放的 Run 对象。归档、删除和应用重启继续遵循上面的产品行为。
 
-切换目标时采用串行控制操作，先验证新目标可以绑定，再原子替换逻辑绑定并使旧绑定失效。异步恢复结束后再次检查操作版本，防止较慢的旧开启请求覆盖新选择。绑定失败保留原有效状态并返回错误。Agent Scope 释放后将能力设为关闭并通知 UI，用户重新开启时重新获取 Handle，不复用旧 Scope。
+### 5.2 统一 Context 来源
 
-### 5.2 Waterfall 和快照一致性
+来源通过 `get(context, write)` 写入 `context.content.system.sections`，由引擎统一渲染为 LlmInput 和 request/context 快照；不再使用 continuation hook 修改组装候选。稳定节标识为 `english-learning/v1`，来源声明仅写 system，不能修改会话和管理状态。
 
-遵循现有 continuation ABI：调用 `await next()` 获得下游候选，在返回前检查绑定仍有效，再返回新的不可变候选。不可修改冻结对象，不在全局缓存的 `RuntimePromptSource` 上追加内容。
-
-注入同步维护三个字段：
-
-1. `systemSections`：以稳定节标识 `english-learning/v1` 添加格式规则。
-2. `renderedSystemPrompt`：使用 `@actspace/prompt` 的 `renderSystemPrompt` 从分节和原 facts 重新生成。
-3. `contributorProvenance`：记录 ownerPluginId、节标识和 prompt version，归属 plugin 层。
-
-其他字段、Agent subject 与其他插件贡献保留。重复处理同一候选时只替换本插件同标识节，不重复追加；关闭不删除历史请求快照里的规则。插件内部变换错误降级为未注入并发布诊断，不吞掉 `next()` 原有的下游错误。只有成功返回包含规则的候选，才登记当前绑定版本下的 `sessionId + turnId + stepId`，供朗读判定使用。
+回调检查当前绑定身份，记录实际注入的 turnId/stepId。只有该绑定中已注入且完成的回复允许英文提取和朗读。关闭不删历史快照，但后续请求不再获得该 system 节。
 
 ### 5.3 固定提示词正文
 
@@ -161,7 +153,7 @@ Provider 参数参考 [MiniMax 同步语音接口](https://platform.minimaxi.com
 - 网络单次超时 30 秒；检查 HTTP 状态和 `base_resp.status_code`，拒绝空音频或非法 hex。不自动重试，避免重复计费；用户可在修复后试听或等待下一回答。
 - 最多保留 20 个待播分段和 20,000 个待播 code points；单次回答全部分段按剩余容量原子准入，装不下则跳过整条并显示队列已满，不能静默截断朗读。
 - 去重记录按轮次结束及队列结算淘汰，最多保留 256 条终态消息标识；启用时记录已提交 seq 水位，禁止因去重淘汰而补播更早历史。
-- 切换、关闭、停止、设置变更、Scope dispose 和 Runtime shutdown 都递增绑定或播放版本，取消 AbortController 并使迟到结果失效；仅停止播放不撤销提示词绑定。
+- 切换、关闭、停止、设置变更和 Runtime shutdown 都递增绑定或播放版本，取消 AbortController 并使迟到结果失效；仅停止播放不撤销提示词绑定。
 - MiniMax 鉴权、余额、超时或播放错误清空当前语音队列并显示脱敏错误，双语规则继续有效。取消不显示为故障。
 - Host 只在自己的临时目录生成随机文件名，不使用外部 event ID 拼路径；播放完成/失败/取消后删除音频，启动时清理本能力遗留临时目录。
 - macOS 用 `spawn('afplay', [path])`，禁止 shell 拼接；关闭后等待子进程退出并有有界清理。非 macOS 保留双语能力，显示「当前平台暂不支持语音播放」。
@@ -208,6 +200,6 @@ Provider 参数参考 [MiniMax 同步语音接口](https://platform.minimaxi.com
 
 ## 12. 实现注意事项
 
-事件输入中的 Agent subject 与 `next()` 返回的 LogicalRequestCandidate 分开使用：前者验证作用域身份，后者进行不可变提示词变换。真实 AgentLoop 下游可能不在候选里保留 subject，不能从返回值推断事件来源。
+来源注册的 Session 身份与 Harness 传入的 descriptor.kind 共同决定可见范围。不要从工作区、标题或已有历史文本推断目标身份；也不要因为上一轮出现英语内容就认定下一轮仍注入规则，应检查本轮 Context system 与来源记录。
 
 MiniMax 凭据只经 Host 在 main 解析；API 错误、播放错误和 IPC 失败都使用受控文案。Desktop Bundle 声明插件，Loader YAML 与 trusted entries 同步；无 speech port 时插件保持 dormant。重启时不恢复 enabled。构建复制 prompt Markdown 到 dist，代码回退无需迁移 Journal。

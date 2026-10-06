@@ -108,3 +108,7 @@ runtime --(Host capability)--> browser-bridge
 - 当前 v2 模块边界优先维护在 `docs/design-docs/agent-plugin-runtime/` 与各领域 package 的公共 exports/manifest 中。
 - 存储、日志和可观测性边界优先维护在 `docs/design-docs/core-storage-and-observability.md`。
 - 只要架构变化会让文档过期，就在同一轮任务里同步更新相关文档。
+
+## Context 请求组织
+
+`context.engine` 统一六类来源，经 `Context → toLlmInput → LlmInput` 进入 LLM。压缩协调器与渐进式披露策略复用原 Session Journal，补充和状态是纯插件事件，不改变 Surface。详细边界见[Context 规范](design-docs/上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)。

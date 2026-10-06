@@ -39,15 +39,15 @@ async function readFileTool(
       const bytes = await readFile(filePath);
       const artifact = await context.createArtifact({ bytes, mediaType: mimeType });
       const summary = `Read image ${displayPath(filePath, workspaceRoot)} (${fileStat.size} bytes).`;
-      return { status: "completed", summary, modelOutput: [{ type: "text", text: summary }, { type: "artifact", artifact, label: "Image" }], artifacts: [artifact] };
+      return { status: "completed", summary, modelOutput: [{ type: "text", text: summary }, { type: "artifact", artifact, label: "Image" }], artifacts: [artifact], detail: [{ label: "actspace.context.file", value: { path: filePath, kind: "file", operation: "read" } }] };
     }
     const offset = integerArg(args, "offset", 1);
     const limit = integerArg(args, "limit", READ_FILE_DEFAULT_LIMIT);
-    const cacheKey = `${context.sessionId}\0${filePath}\0${offset}\0${limit}`;
+    const cacheKey = `${context.sessionId}\0${context.contextGeneration ?? 0}\0${filePath}\0${offset}\0${limit}`;
     const cached = cache.get(cacheKey);
     if (args.force !== true && cached?.size === fileStat.size && cached.mtimeMs === fileStat.mtimeMs) {
       const text = "File unchanged since the previous read of this exact path and range. Reuse the earlier numbered lines, or pass force=true.";
-      return completed(text);
+      return completed(text, undefined, { path: filePath, kind: "file", operation: "read" });
     }
     const raw = await readFile(filePath, "utf8");
     const lines = raw.split("\n");
@@ -56,7 +56,7 @@ async function readFileTool(
     let text = lines.slice(start, end).map((line, index) => `${String(start + index + 1).padStart(6)}|${line}`).join("\n");
     if (end < lines.length) text += `\n\n[Showing lines ${offset}-${end} of ${lines.length}. Use offset/limit to read more.]`;
     cache.set(cacheKey, { size: fileStat.size, mtimeMs: fileStat.mtimeMs });
-    return completed(text || "(empty file)", `Read ${displayPath(filePath, workspaceRoot)}`);
+    return completed(text || "(empty file)", `Read ${displayPath(filePath, workspaceRoot)}`, { path: filePath, kind: "file", operation: "read" });
   } catch (error) {
     return ioFailure("read file", pathArg, error);
   }
@@ -117,7 +117,7 @@ function isWithin(root: string, candidate: string): boolean {
 }
 
 function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeV2JsonValue): ToolBodyResult {
-  return { status: "completed", modelOutput: [{ type: "text", text }], summary, ...(detail === undefined ? {} : { detail: [{ label: "result", value: detail }] }) };
+  return { status: "completed", modelOutput: [{ type: "text", text }], summary, ...(detail === undefined ? {} : { detail: [{ label: "actspace.context.file", value: detail }] }) };
 }
 
 function failure(code: string, message: string, retryable = false): ToolBodyResult {

@@ -40,7 +40,7 @@ sessions-v2/<sessionId>/journal.jsonl
 
 ## Request Snapshot
 
-每次真实模型 dispatch 前，Prompt / Context 与 LLM service 共同形成 JSON-safe、deep-frozen snapshot：
+每次真实模型 dispatch 前，Context 的 `snapshotContext` 从实际 `LlmInput` 与 LLM PreparedCall 元数据形成 JSON-safe、deep-frozen snapshot：
 
 ```text
 sessionId
@@ -68,9 +68,9 @@ Snapshot 的作用是：
 - 为 Context、Trajectory 和故障恢复提供确定输入；
 - 在恢复时结合 request/terminal 关系识别未结束请求；dispatch 的外部效果边界仍由对应恢复契约解释，snapshot 自身不证明请求已发送。
 
-Snapshot 不得包含 API Key、Authorization、Cookie、proxy credential 或其他 secret-like 字段。`packages/prompt/src/request-snapshot.ts` 会拒绝非 JSON 值、非有限数字、过深对象和敏感字段名。
+Snapshot 不得包含 API Key、Authorization、Cookie、proxy credential 或其他 secret-like 字段。`packages/context/src/request-snapshot.ts` 会拒绝非 JSON 值、非有限数字、过深对象和敏感字段名。
 
-schema v2 中，`facts` 保留完整审计事实，`modelFacts` 只保存真正进入 system prompt 的稳定事实。动态 run/request/Host identity 可以出现在 `facts`，不得因此污染 `renderedSystemPrompt`。逐轮 Agent mode 由用户消息末尾的持久化 `runtime-context` 表达；Context 估算计入该块，但 UI 预览和 Compaction 自然语言摘要不展示它。
+schema v2 中，`facts` 保留完整审计事实，`modelFacts` 只保存真正进入 system prompt 的稳定事实。动态 run/request/Host identity 可以出现在 `facts`，不得因此污染 `renderedSystemPrompt`。新请求的 Agent mode、日期与时区由 Context runtime 来源保存为 surface:null 的补充事件，转换时插入完整工具批次后的模型消息；Context 估算计入最终消息，UI 不伪造用户气泡，Compaction 不把这类导航/运行补充当作用户要求。旧消息中已有的 runtime-context 仍兼容转换。
 
 ## Request Model Facts
 
@@ -235,7 +235,7 @@ Compaction 不删除 Journal 历史，而是为有效 Session Surface 追加 rep
 ## 代码事实入口
 
 - `packages/context/src/assembly.ts`：contributor 排序、required / optional 语义；
-- `packages/prompt/src/request-snapshot.ts`：snapshot 冻结与 secret-like 字段拒绝；
+- `packages/context/src/request-snapshot.ts`：snapshot 冻结与 secret-like 字段拒绝；
 - `packages/runtime/src/projection/durable-session.ts`：durable usage 聚合；
 - `packages/runtime/src/projection/durable-session.ts`：Host Context 与 Usage facts；`packages/client/src/sessions/selectors.ts`：Client Context 与 Usage projection；
 - `packages/compaction/src/plugin.ts`：Surface compaction transaction；

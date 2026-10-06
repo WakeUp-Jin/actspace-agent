@@ -1,6 +1,6 @@
 import { taskOperation } from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
-import { snapshotSessionJson, type SessionEventCandidateV1 } from "@actspace/session-journal";
+import { SessionError, snapshotSessionJson, type SessionEventCandidateV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { TaskError, type TaskSnapshot, type TaskRecord, type TaskReceipt, type HarnessIdentity, type RunOutcome } from "./contracts.js";
@@ -136,13 +136,19 @@ export class TaskLedger {
     }];
   }
   async #commit(events: readonly SessionEventCandidateV1[]): Promise<void> {
+    const previousSeq = this.session.lastSeq;
+    let appended = false;
     try {
       const accepted = await this.session.appendMany(events);
+      appended = true;
       const next = projectTasks(this.session.header.sessionId, this.session.journal.events);
       await this.session.flush(accepted.at(-1)!.seq);
       this.#snapshot = next;
       for (const listener of this.#listeners) { try { listener(next); } catch { /* observation cannot invalidate a durable commit */ } }
     } catch (cause) {
+      // Journal validation rolls the whole batch back. Rejected input is not a
+      // durability failure; retain the conservative block for every other error.
+      if (!appended && this.session.lastSeq === previousSeq && cause instanceof SessionError && cause.code === "INVALID_EVENT") throw cause;
       // The in-memory Journal may already contain accepted but undurable events.
       // Do not retry against it or report them through snapshots as committed.
       this.#failure = cause; this.#blocked = true;

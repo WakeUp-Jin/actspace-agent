@@ -1,0 +1,499 @@
+{
+  "generatedAt": "2026-10-06T13:46:57.505Z",
+  "results": [
+    {
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "requestId": "64c38593-d3c9-47d0-9db8-be2b258de44a",
+      "capacity": 1000000,
+      "cycle": 0,
+      "pathCount": 0,
+      "activeCount": 0,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "requestId": "c93284af-3744-43d3-a69c-f38f4c64fb32",
+      "capacity": 1000000,
+      "cycle": 0,
+      "pathCount": 0,
+      "activeCount": 0,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": true
+    },
+    {
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "requestId": "84d805ab-89a6-4f44-950a-2ead9c15bc09",
+      "capacity": 1000000,
+      "cycle": 0,
+      "pathCount": 0,
+      "activeCount": 0,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": true
+    },
+    {
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "requestId": "28b15cf6-54fb-41fd-99e0-b6899db02c6e",
+      "capacity": 1000000,
+      "cycle": 0,
+      "pathCount": 0,
+      "activeCount": 0,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "requestId": "d359130e-96a1-4691-9c25-321239f6b2e4",
+      "capacity": 1000000,
+      "cycle": 0,
+      "pathCount": 0,
+      "activeCount": 0,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "requestId": "f33093a3-1009-4a12-a525-2cfab2012572",
+      "capacity": 1000000,
+      "cycle": 0,
+      "pathCount": 1,
+      "activeCount": 1,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "requestId": "531900e8-66b0-42bc-bf01-c0370ff5a6f6",
+      "capacity": 1000000,
+      "cycle": 1,
+      "pathCount": 108,
+      "activeCount": 100,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "requestId": "9df32cda-6a09-48eb-b602-af62af76abf7",
+      "capacity": 1000000,
+      "cycle": 1,
+      "pathCount": 108,
+      "activeCount": 100,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "requestId": "8919b7d7-b01e-49ec-9b5d-c81e7412b94e",
+      "capacity": 1000000,
+      "cycle": 1,
+      "pathCount": 108,
+      "activeCount": 100,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "requestId": "029340e2-e7e6-42a4-98a4-ea36f34485ec",
+      "capacity": 1000000,
+      "cycle": 1,
+      "pathCount": 108,
+      "activeCount": 100,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "42c071ab-45ad-4e4b-a49c-13182577c162",
+      "requestId": "6de480c3-6cc2-4396-93fa-2f5b3c01cf3e",
+      "capacity": 1000000,
+      "cycle": 2,
+      "pathCount": 108,
+      "activeCount": 2,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "42c071ab-45ad-4e4b-a49c-13182577c162",
+      "requestId": "bfc4c307-1909-4968-8436-9a916bae6f5d",
+      "capacity": 1000000,
+      "cycle": 2,
+      "pathCount": 108,
+      "activeCount": 2,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "requestId": "26b74937-432d-4553-96cd-ba1203ea4e48",
+      "capacity": 256000,
+      "cycle": 0,
+      "pathCount": 0,
+      "activeCount": 0,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "requestId": "2bcbbf1a-924e-4556-8e9b-dc9ffea560a4",
+      "capacity": 256000,
+      "cycle": 0,
+      "pathCount": 0,
+      "activeCount": 0,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "requestId": "cb009b0e-30c5-4b2a-8d14-460786c85495",
+      "capacity": 256000,
+      "cycle": 0,
+      "pathCount": 0,
+      "activeCount": 0,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "requestId": "1c2d3931-42b5-4400-ae6a-9aa4fcd16f68",
+      "capacity": 256000,
+      "cycle": 1,
+      "pathCount": 1,
+      "activeCount": 1,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "requestId": "e7d62698-c9cf-4000-872a-bdf2be122e6e",
+      "capacity": 256000,
+      "cycle": 1,
+      "pathCount": 1,
+      "activeCount": 1,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "42c071ab-45ad-4e4b-a49c-13182577c162",
+      "requestId": "a51681d2-5782-4b47-9913-f95f7a71fadf",
+      "capacity": 1000000,
+      "cycle": 2,
+      "pathCount": 108,
+      "activeCount": 2,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    },
+    {
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "requestId": "1518d50c-58ca-4167-b54b-30488af42435",
+      "capacity": 1000000,
+      "cycle": 1,
+      "pathCount": 1,
+      "activeCount": 1,
+      "conversionMatches": true,
+      "statusIndependent": true,
+      "preparedMessagesMatch": true,
+      "preparedToolsMatch": true,
+      "activeFilesOnly": true,
+      "activeWithinLimit": true,
+      "navigationOutsideSystem": true,
+      "englishSystem": false
+    }
+  ],
+  "sessions": [
+    {
+      "sessionId": "42c071ab-45ad-4e4b-a49c-13182577c162",
+      "eventCount": 1777,
+      "requests": 9,
+      "compactions": 2,
+      "applied": [
+        {
+          "seq": 931,
+          "cycle": 0,
+          "activeCount": 100
+        },
+        {
+          "seq": 1576,
+          "cycle": 1,
+          "activeCount": 2
+        }
+      ],
+      "acceptBytes": 2856
+    },
+    {
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "eventCount": 1578,
+      "requests": 6,
+      "compactions": 2,
+      "applied": [
+        {
+          "seq": 931,
+          "cycle": 0,
+          "activeCount": 100
+        },
+        {
+          "seq": 1576,
+          "cycle": 1,
+          "activeCount": 2
+        }
+      ],
+      "acceptBytes": 2128
+    },
+    {
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "eventCount": 192,
+      "requests": 4,
+      "compactions": 0,
+      "applied": [],
+      "acceptBytes": 1094
+    },
+    {
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "eventCount": 480,
+      "requests": 6,
+      "compactions": 1,
+      "applied": [
+        {
+          "seq": 271,
+          "cycle": 0,
+          "activeCount": 1
+        }
+      ],
+      "acceptBytes": 1141480
+    }
+  ],
+  "budgets": [
+    {
+      "kind": "compaction-budget",
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "usage": {
+        "inputTokens": 5696,
+        "outputTokens": 40,
+        "contextWindow": 1000000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "usage": {
+        "inputTokens": 5982,
+        "outputTokens": 54,
+        "contextWindow": 1000000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "usage": {
+        "inputTokens": 6059,
+        "outputTokens": 46,
+        "contextWindow": 1000000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "usage": {
+        "inputTokens": 5906,
+        "outputTokens": 4,
+        "contextWindow": 1000000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "usage": {
+        "inputTokens": 13204,
+        "outputTokens": 11,
+        "contextWindow": 1000000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "usage": {
+        "inputTokens": 14093,
+        "outputTokens": 159,
+        "contextWindow": 1000000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "42c071ab-45ad-4e4b-a49c-13182577c162",
+      "usage": {
+        "inputTokens": 9568,
+        "outputTokens": 36,
+        "contextWindow": 1000000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "usage": {
+        "inputTokens": 491,
+        "outputTokens": 38,
+        "contextWindow": 256000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "usage": {
+        "inputTokens": 60535,
+        "outputTokens": 63,
+        "contextWindow": 256000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "usage": {
+        "inputTokens": 130579,
+        "outputTokens": 134,
+        "contextWindow": 256000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "usage": {
+        "inputTokens": 61009,
+        "outputTokens": 95,
+        "contextWindow": 256000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "usage": {
+        "inputTokens": 61048,
+        "outputTokens": 43,
+        "contextWindow": 256000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "42c071ab-45ad-4e4b-a49c-13182577c162",
+      "usage": {
+        "inputTokens": 9638,
+        "outputTokens": 13,
+        "contextWindow": 1000000
+      }
+    },
+    {
+      "kind": "compaction-budget",
+      "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+      "usage": {
+        "inputTokens": 61646,
+        "outputTokens": 35,
+        "contextWindow": 1000000
+      }
+    }
+  ]
+}

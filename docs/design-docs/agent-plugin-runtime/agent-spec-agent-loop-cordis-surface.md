@@ -1,12 +1,11 @@
 # Agent Loop Cordis 插入面与通知面
 
-状态：P5 当前源码契约，2026-10-04。模式、异常隔离和 scope 的共性规则见 [Cordis ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md)；本文只维护 Loop 边界。
+状态：当前源码契约，2026-10-06。模式、异常隔离和 scope 的共性规则见 [Cordis ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md)；本文只维护 Loop 边界。
 
-## 九个干预点
+## 八个干预点
 
 | 插入点 | 模式 | 阶段与结果 |
 | --- | --- | --- |
-| `system-prompt/assemble` | waterfall | request 构建前，包裹默认 prompt assembly |
 | `agent/pre-step` | waterfall | 接受、改写或跳过候选 step |
 | `agent/request` | waterfall | 请求提交前生成/修改 LLM call config |
 | `llm/stream` | waterfall | 包裹整个 Provider AsyncIterable，而非逐 chunk 观察 |
@@ -15,6 +14,8 @@
 | `tools/execute` | waterfall | checkpoint 后包裹 executor 执行入口 |
 | `tools/post-execute` | waterfall | body settle 后修饰输出；保留执行成败，异常记入 finalizerFailures 后继续清理 |
 | `agent/turn-stopping` | serial | 本轮停止前返回第一个继续/停止决策 |
+
+系统提示词、规则、Skill 和动态内容通过 Context 来源接口贡献；英语学习使用按 Session/Agent 隔离的 PromptExtensionRegistry。`system-prompt/assemble` 已移除，模型输入只有 Context 转换链路。
 
 干预结果最终通过 Session 的 request、assistant、tool、step 等事实体现。监听本身不另建持久化。工具安全细节见 [Tool Runtime ABI](agent-spec-tool-runtime-abi.md)。
 

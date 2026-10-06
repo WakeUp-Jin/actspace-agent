@@ -1,0 +1,67 @@
+{
+  "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+  "configuredRatio": 0.5,
+  "actualCapacity": 256000,
+  "threshold": 128000,
+  "budgets": [
+    {
+      "inputTokens": 491,
+      "outputTokens": 38,
+      "contextWindow": 256000,
+      "total": 529
+    },
+    {
+      "inputTokens": 60535,
+      "outputTokens": 63,
+      "contextWindow": 256000,
+      "total": 60598
+    },
+    {
+      "inputTokens": 130579,
+      "outputTokens": 134,
+      "contextWindow": 256000,
+      "total": 130713
+    },
+    {
+      "inputTokens": 61009,
+      "outputTokens": 95,
+      "contextWindow": 256000,
+      "total": 61104
+    },
+    {
+      "inputTokens": 61048,
+      "outputTokens": 43,
+      "contextWindow": 256000,
+      "total": 61091
+    }
+  ],
+  "taskContentBytes": 1141244,
+  "runFinishes": [
+    {
+      "seq": 51,
+      "outcome": "completed"
+    },
+    {
+      "seq": 123,
+      "outcome": "completed"
+    },
+    {
+      "seq": 272,
+      "outcome": "completed"
+    },
+    {
+      "seq": 378,
+      "outcome": "completed"
+    },
+    {
+      "seq": 430,
+      "outcome": "completed"
+    }
+  ],
+  "compactionEnds": [
+    {
+      "seq": 270,
+      "compactionId": "79afb9fd-a70e-4793-bce4-627ecdf71b6f"
+    }
+  ]
+}

@@ -1,6 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import { createCompactionTransaction } from "@actspace/session-journal";
+import { ContextCompactionCoordinator, type Context, type CompactionRegion, type ContextCompactionStrategy } from "@actspace/context";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { chooseCompactionRegion } from "./region.js";
 import type { CompactionPolicy, TokenUsage } from "./policy.js";
@@ -14,11 +12,11 @@ import { LlmCompactionSummarizer } from "./summarizer.js";
 
 export type CompactionPluginConfig = { readonly routeId?: string; readonly model?: string };
 /** Notified once a region is chosen and summarizing is about to start; skipped compactions never notify. */
-export type CompactionObserver = { readonly onStarted?: (info: { readonly entryCount: number }) => void };
+export type CompactionObserver = import("@actspace/context").CompactionObserver;
 
 /** Cordis owner for compaction policy and summarizer resources. */
 export class CompactionService extends Service {
-  static inject = Object.freeze(["llm.service"]);
+  static inject = Object.freeze(["llm.service", "context.engine"]);
   static Config = {
     "~standard": {
       version: 1,
@@ -50,10 +48,15 @@ export class CompactionService extends Service {
 
 export function apply(ctx: CordisContext, config: CompactionPluginConfig = {}): void {
   const service = new CompactionService(ctx as never, config);
+  const engine = ctx.get?.("context.engine") as { compaction: ContextCompactionCoordinator } | undefined;
+  if (!engine) throw new Error("Compaction requires context.engine.");
+  const remove = engine.compaction.register(service.runtime);
+  ctx.effect?.(() => remove);
   ctx.provide?.("compaction.surface", Object.freeze({ CompactionPlugin, CompactionService, service: service.runtime, runtime: service }));
 }
 
-export class CompactionPlugin {
+export class CompactionPlugin implements ContextCompactionStrategy {
+  private readonly coordinator = new ContextCompactionCoordinator();
   constructor(
     private readonly policy: CompactionPolicy,
     private readonly summarizer: CompactionSummarizer,
@@ -65,38 +68,22 @@ export class CompactionPlugin {
     return new CompactionPlugin(this.policy, this.summarizer, resolver);
   }
 
-  async maybeCompact(session: SessionHandle, usage: TokenUsage, observer?: CompactionObserver): Promise<boolean> {
+  shouldCompact(usage: TokenUsage): boolean {
     let resolved: number | undefined;
     try { resolved = this.triggerRatioResolver?.(); } catch { resolved = undefined; }
-    const triggerRatio = typeof resolved === "number" && Number.isFinite(resolved) && resolved > 0 && resolved <= 1
-      ? resolved
-      : this.policy.triggerRatio;
-    if (!shouldCompact(usage, { ...this.policy, triggerRatio })) return false;
-    return this.compact(session, observer);
+    const triggerRatio = typeof resolved === "number" && Number.isFinite(resolved) && resolved > 0 && resolved <= 1 ? resolved : this.policy.triggerRatio;
+    return shouldCompact(usage, { ...this.policy, triggerRatio });
   }
-
+  select(context: Context): CompactionRegion | null { return chooseCompactionRegion(context.content.conversation, this.policy); }
+  summarize(context: Context, region: CompactionRegion, signal?: AbortSignal) {
+    const summaryIds = (context.status.plugins["actspace.context.compaction"] as { summaryIds?: string[] } | undefined)?.summaryIds ?? [];
+    return this.summarizer.summarize(context.content.conversation.entries.slice(region.start, region.end), { sessionId: context.request.sessionId, turnId: context.request.turnId, summaryIds, signal });
+  }
+  // Compatibility for direct package callers; production uses the Harness engine coordinator.
+  async maybeCompact(session: SessionHandle, usage: TokenUsage, observer?: CompactionObserver): Promise<boolean> {
+    return this.shouldCompact(usage) ? this.compact(session, observer) : false;
+  }
   async compact(session: SessionHandle, observer?: CompactionObserver): Promise<boolean> {
-    const region = chooseCompactionRegion(session.journal.surface, this.policy);
-    if (region === null) return false;
-    const startedAt = Date.now();
-    try { observer?.onStarted?.({ entryCount: region.end - region.start }); } catch { /* Observers cannot change compaction. */ }
-    const entries = session.journal.surface.entries.slice(region.start, region.end);
-    await session.flush();
-    const summary = await this.summarizer.summarize(entries, { sessionId: session.header.sessionId });
-    const content: RuntimeV2JsonValue = summary.metadata === undefined ? summary.content : { text: summary.content, metadata: summary.metadata };
-    const transaction = createCompactionTransaction({
-      surface: session.journal.surface,
-      start: region.start,
-      end: region.end,
-      summary: { kind: "user", messageId: `compaction-${randomUUID()}`, content },
-      compactionId: randomUUID(),
-      contributorIds: ["core/compaction"],
-      summaryDigest: createHash("sha256").update(JSON.stringify(content)).digest("hex"),
-      // Journal timestamps measure transaction commit, not the preceding LLM call.
-      durationMs: Math.max(0, Date.now() - startedAt),
-    });
-    await session.appendMany(transaction);
-    await session.flush();
-    return true;
+    return this.coordinator.withStrategy(this).compact(session, observer);
   }
 }

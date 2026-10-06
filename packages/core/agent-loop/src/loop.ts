@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { RuntimeV2AgentMode, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
-import { readFileReferenceBlocks, readResponseExcerptBlocks, renderFileReferencesForModel, renderResponseExcerptForModel } from "@actspace/shared";
+import { ContextEngine, surfaceMessage, snapshotContext, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context";
+import { contextFromCandidate } from "@actspace/prompt";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
 import type { LlmService } from "@actspace/llm-service";
 import type { LlmStreamEvent } from "@actspace/llm-service";
@@ -15,7 +16,7 @@ import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tools-run
 import type { ToolRuntime } from "@actspace/tools-runtime";
 import type { ToolExecutionResult } from "@actspace/tools-runtime";
 import { allowedAgentModeTools, createAgentEventDispatcher, defaultAgentSubject, type AgentDescriptor, type AgentSubject, type AgentEventDispatcher } from "@actspace/core-agent";
-import type { CompactionPlugin } from "@actspace/compaction";
+import type { ContextCompactor } from "@actspace/context";
 import { AgentRuntimeError } from "@actspace/core-agent";
 import type { MainAgentInbox } from "@actspace/core-agent";
 import type { RunTurnResult } from "@actspace/core-agent";
@@ -61,8 +62,12 @@ export type AgentLoopOptions = {
   readonly session: SessionHandle;
   readonly inbox: MainAgentInbox;
   readonly inputSource?: LoopInputSource;
-  readonly assembler: RequestAssembler;
-  readonly modeRuntime?: (mode: RuntimeV2AgentMode) => Promise<{ readonly assembler: RequestAssembler; readonly compaction?: CompactionPlugin }>;
+  readonly observeContextToolResult?: (session: SessionHandle, event: import("@actspace/session-journal").SessionEventEnvelopeV1) => Promise<void>;
+  readonly contextSources?: ContextSourceRegistry;
+  readonly contextExtensions?: () => readonly ContextSource[];
+  readonly createContextEngine?: (options: ContextEngineOptions) => ContextEngine;
+  readonly assembler?: RequestAssembler;
+  readonly modeRuntime?: (mode: RuntimeV2AgentMode) => Promise<{ readonly assembler?: RequestAssembler; readonly compaction?: ContextCompactor }>;
   readonly llm: LlmService;
   readonly tools: ToolRuntime;
   readonly toolEnvironment: (session: SessionHandle) => Omit<ToolPreparedEnvironment, "journal">;
@@ -71,7 +76,7 @@ export type AgentLoopOptions = {
   readonly host: RuntimeV2HostDescriptor;
   readonly allowedToolNames?: ReadonlySet<string>;
   readonly toolScopeToken?: object;
-  readonly compaction?: CompactionPlugin;
+  readonly compaction?: ContextCompactor;
   readonly onLiveEvent?: (event: AgentLoopLiveEvent) => void;
   /** Real Cordis context used by the DSH-native assembly path. */
   readonly context?: CordisContext;
@@ -115,7 +120,7 @@ export class AgentLoop {
       if (turnEnvironment.permissionModeExplicit && currentPermissionMode(this.options.session.journal.events) !== configuredPermissionMode) {
         await this.options.session.append(core("permission/mode-set", { mode: configuredPermissionMode, changedAt: new Date().toISOString(), source: "host" }));
       }
-      const persistedContent = appendRuntimeContext(input.content, mode, modeRevision);
+      const persistedContent = this.options.contextSources ? input.content : appendRuntimeContext(input.content, mode, modeRevision);
       if (!hasUserMessage(this.options.session, messageId)) await this.options.session.append(core("user/message", { messageId, agentRunId, turnId }, { surface: { kind: "append", node: { kind: "user", messageId, content: persistedContent } } }));
       // 旧 journal 的插入记录不能进入新 Run；当前用户输入仅由 Host Task 管理。
       for (const item of this.options.inbox.pending()) if (item.source === "steer" || item.target === "next-turn") await this.options.inbox.discard(item.messageId, "stale-steer");
@@ -134,7 +139,7 @@ export class AgentLoop {
         const budgetSummary = this.options.descriptor.kind === "subagent" && stepCount === this.options.descriptor.maxSteps;
         const tools = budgetSummary ? [] : this.toolDefinitions(mode);
         const visibleToolNames = new Set(tools.map((tool) => tool.name));
-        let candidate = await assembler.assembleCandidate({
+        let candidate = await this.candidate(assembler, {
           sessionId: this.options.session.header.sessionId,
           turnId,
           stepId,
@@ -143,34 +148,42 @@ export class AgentLoop {
           hostFacts: { agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
           selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(configuration.selectedSkillIds ?? [])]),
         }, tools as unknown as RuntimeV2JsonValue[], { routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model });
-        const assembled = await this.waterfall("system-prompt/assemble", candidate);
-        if (isRecord(assembled)) candidate = assembled as typeof candidate;
         let requestId = randomUUID();
+        let converted = await this.contextInput(candidate, requestId, { cacheRetention: mode === "chat" ? "long" : "short", ...(configuration.thinkingEnabled === undefined ? {} : { reasoning: configuration.thinkingEnabled }), ...(configuration.reasoningEffort === undefined ? {} : { reasoningEffort: configuration.reasoningEffort }) }, { mode, selectedSkillIds: configuration.selectedSkillIds ?? [], budgetSummary });
+        let llmInput = converted.input;
+        visibleToolNames.clear();
+        for (const tool of llmInput.tools) visibleToolNames.add(tool.name);
         const requestMessages = Object.freeze([
-          ...(candidate.renderedSystemPrompt.length > 0 ? [{ role: "system" as const, content: candidate.renderedSystemPrompt }] : []),
-          ...await this.requestMessages(candidate.messages),
-          ...(budgetSummary ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
+          ...llmInput.messages,
+          ...(budgetSummary && !this.options.contextSources ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
         ]);
-        const requestPlan = await this.waterfall("agent/request", { requestId, turnId, stepId, routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model, messages: requestMessages, tools });
+        const requestPlan = await this.waterfall("agent/request", { requestId, turnId, stepId, routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model, messages: requestMessages, tools: llmInput.tools });
         const requestRecord: Readonly<Record<string, unknown>> = isRecord(requestPlan) ? requestPlan : {};
         const requestRouteId = typeof requestRecord.routeId === "string" ? requestRecord.routeId : this.options.descriptor.routeId;
         const requestModel = typeof requestRecord.model === "string" ? requestRecord.model : configuration.model ?? this.options.descriptor.model;
         let requestMessageList = Array.isArray(requestRecord.messages) ? requestRecord.messages as unknown as readonly LlmMessage[] : requestMessages;
+        if (this.options.contextSources && (requestRouteId !== llmInput.routeId || requestModel !== llmInput.model)) {
+          candidate = { ...candidate, requestOptions: { routeId: requestRouteId, model: requestModel } };
+          converted = await this.contextInput(candidate, requestId, llmInput.options, { mode, selectedSkillIds: configuration.selectedSkillIds ?? [], budgetSummary });
+          llmInput = converted.input;
+          requestMessageList = [...llmInput.messages.filter(message => message.role === "system"), ...requestMessageList.filter(message => message.role !== "system")];
+        }
         const prepared = await this.options.llm.prepareAsync({
           requestId,
           sessionId: this.options.session.header.sessionId,
           routeId: requestRouteId,
           model: requestModel,
           messages: requestMessageList,
-          tools: budgetSummary ? [] : Array.isArray(requestRecord.tools) ? requestRecord.tools as unknown as readonly LlmToolDefinition[] : tools,
-          options: { cacheRetention: mode === "chat" ? "long" : "short", ...(configuration.thinkingEnabled === undefined ? {} : { reasoning: configuration.thinkingEnabled }), ...(configuration.reasoningEffort === undefined ? {} : { reasoningEffort: configuration.reasoningEffort }) },
+          tools: budgetSummary ? [] : Array.isArray(requestRecord.tools) ? requestRecord.tools as unknown as readonly LlmToolDefinition[] : llmInput.tools,
+          options: llmInput.options,
           signal: controller.signal,
         });
         const retryPolicy = prepared.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY;
         const contextWindow = prepared.request.contextWindow ?? null;
         const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: prepared.registration.registrationId, adapterVersion: prepared.registration.adapter.adapterVersion, defaults: prepared.request.options as RuntimeV2JsonValue, retryPolicy: retryPolicySnapshot(retryPolicy) as unknown as RuntimeV2JsonValue, contextWindow };
-        const snapshot = assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+        const snapshot = this.options.contextSources ? snapshotContext(converted.context, { ...llmInput, messages: requestMessageList, tools: prepared.request.tools, routeId: prepared.request.routeId, model: prepared.request.model }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest) : assembler!.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
         try {
+          await converted.engine.bindRequest(converted.context);
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt: 1, agentMode: mode, agentModeRevision: modeRevision }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot }));
           await this.checkpoint("before-llm-dispatch");
@@ -211,7 +224,7 @@ export class AgentLoop {
           await this.options.session.append(core("llm/retry-started", { requestId: failedRequestId, retryId, attempt: attempt + 1 }));
           await this.checkpoint("before-llm-dispatch");
           attempt += 1;
-          candidate = await assembler.assembleCandidate({
+          candidate = await this.candidate(assembler, {
             sessionId: this.options.session.header.sessionId,
             turnId,
             stepId,
@@ -220,20 +233,20 @@ export class AgentLoop {
             hostFacts: { agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
             selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(configuration.selectedSkillIds ?? [])]),
           }, tools as unknown as RuntimeV2JsonValue[], { routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model });
-          const retryAssembled = await this.waterfall("system-prompt/assemble", candidate);
-          if (isRecord(retryAssembled)) candidate = retryAssembled as typeof candidate;
-          requestMessageList = Object.freeze([
-            ...(candidate.renderedSystemPrompt.length > 0 ? [{ role: "system" as const, content: candidate.renderedSystemPrompt }] : []),
-            ...await this.requestMessages(candidate.messages),
-            ...(budgetSummary ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
-          ]);
+          candidate = { ...candidate, requestOptions: { routeId: requestRouteId, model: requestModel } };
           requestId = randomUUID();
+          converted = await this.contextInput(candidate, requestId, llmInput.options, { mode, selectedSkillIds: configuration.selectedSkillIds ?? [], budgetSummary });
+          requestMessageList = Object.freeze([
+            ...converted.input.messages,
+            ...(budgetSummary && !this.options.contextSources ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
+          ]);
           activePrepared = await this.options.llm.prepareCapturedAsync(prepared.registration, {
             ...prepared.request,
             requestId,
             messages: requestMessageList,
           }, controller.signal, prepared.preparedAdapterCall);
-          const retrySnapshot = assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+          const retrySnapshot = this.options.contextSources ? snapshotContext(converted.context, { ...converted.input, messages: requestMessageList, tools: activePrepared.request.tools, routeId: activePrepared.request.routeId, model: activePrepared.request.model }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest) : assembler!.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+          await converted.engine.bindRequest(converted.context);
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow, attempt, agentMode: mode, agentModeRevision: modeRevision }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot: retrySnapshot }));
           await this.checkpoint("before-llm-dispatch");
@@ -252,7 +265,7 @@ export class AgentLoop {
           await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "completed", stepCount });
           await this.options.session.append(core("turn/end", { turnId, reason: "completed" }));
           await this.checkpoint("after-turn-settled");
-          const usage = compactionUsage(output.usage);
+          const usage = compactionUsage(output.usage, activePrepared.request.contextWindow ?? null);
           if (usage !== null && compaction !== undefined) await this.autoCompact(compaction, usage, { agentRunId, turnId });
           this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "completed" });
           this.notify("agent/status", { agentRunId, turnId, status: "completed" });
@@ -289,45 +302,35 @@ export class AgentLoop {
     } finally { this.#active = null; this.#resolveIdle?.(); this.#resolveIdle = null; this.#idle = null; }
   }
 
-  private async requestMessages(values: readonly RuntimeV2JsonValue[]): Promise<readonly LlmMessage[]> {
-    const paths = new Map<string, string>();
-    const resolveArtifact = this.options.toolEnvironment(this.options.session).resolveArtifact;
-    for (const value of values) {
-      if (!isRecord(value) || !Array.isArray(value.content)) continue;
-      for (const block of value.content) {
-        if (!isRecord(block) || block.type !== "artifact" || !isRecord(block.artifact)) continue;
-        const { artifactId, mediaType } = block.artifact;
-        if (typeof artifactId !== "string" || typeof mediaType !== "string" || mediaType.startsWith("image/") || paths.has(artifactId)) continue;
-        if (resolveArtifact) {
-          try {
-            const file = await resolveArtifact(this.options.session.header.sessionId, artifactId);
-            if (file.mediaType !== mediaType) throw new Error("Artifact media type mismatch.");
-            paths.set(artifactId, `Full output file: ${JSON.stringify(file.path)}. Use read_file with path and offset/limit, or grep with path and pattern. Do not rerun the command just to recover its output.`);
-          } catch { paths.set(artifactId, "Full output file is unavailable; retained output is partial."); }
-        }
-      }
+  private async candidate(assembler: RequestAssembler | undefined, input: Parameters<RequestAssembler["assembleCandidate"]>[0], tools: readonly RuntimeV2JsonValue[], requestOptions: RuntimeV2JsonValue): Promise<import("@actspace/prompt").LogicalRequestCandidate> {
+    if (!this.options.contextSources) {
+      if (!assembler) throw new Error("Agent Loop requires Context sources.");
+      return assembler.assembleCandidate(input, tools, requestOptions);
     }
-    const messages = values.map((value) => toMessage(value, paths));
-    const repaired: LlmMessage[] = [];
-    for (let index = 0; index < messages.length; index++) {
-      const message = messages[index]!;
-      repaired.push(message);
-      if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
-      const results = new Set<string>();
-      let next = index + 1;
-      while (messages[next]?.role === "tool") {
-        const result = messages[next++]!;
-        repaired.push(result);
-        if (result.callId) results.add(result.callId);
-      }
-      index = next - 1;
-      for (const block of message.content) {
-        if (block.type === "tool-call" && !results.has(block.callId)) {
-          repaired.push({ role: "tool", callId: block.callId, content: "No result was recorded for this tool call. Its outcome is unknown; do not assume it executed or succeeded." });
-        }
-      }
-    }
-    return repaired;
+    input.scope.assertActive();
+    return { sessionId: input.sessionId, turnId: input.turnId, stepId: input.stepId, messages: input.surface, tools, requestOptions,
+      systemSections: [], modelFacts: [], facts: [{ host: input.hostFacts }], renderedSystemPrompt: "", contributorProvenance: [] };
+  }
+
+  private async contextInput(candidate: import("@actspace/prompt").LogicalRequestCandidate, requestId: string, options: import("@actspace/llm-service").LlmRequestOptions, runtime: { mode: RuntimeV2AgentMode; selectedSkillIds: readonly string[]; budgetSummary: boolean }) {
+    const model = isRecord(candidate.requestOptions) && typeof candidate.requestOptions.model === "string" ? candidate.requestOptions.model : this.options.descriptor.model;
+    const request = { sessionId: candidate.sessionId, turnId: candidate.turnId, stepId: candidate.stepId, requestId,
+      routeId: isRecord(candidate.requestOptions) && typeof candidate.requestOptions.routeId === "string" ? candidate.requestOptions.routeId : this.options.descriptor.routeId, model, options };
+    const configuration: ContextEngineOptions = {
+      resolve: input => this.options.contextSources ? {
+        request: input,
+        content: { system: { sections: [], modelFacts: [] }, conversation: this.options.session.journal.surface, supplements: [], tools: candidate.tools as unknown as readonly LlmToolDefinition[] },
+        status: { throughJournalSeq: this.options.session.lastSeq, cycle: 0, paths: [], facts: candidate.facts, plugins: { "actspace.loop": { ...runtime, hostFacts: candidate.facts[0] ?? {} } } },
+      } : contextFromCandidate(input, candidate, this.options.session.journal.surface, this.options.session.lastSeq),
+      session: this.options.contextSources ? this.options.session : undefined,
+      sources: this.options.contextSources,
+      extensions: this.options.contextExtensions,
+      resolveArtifact: this.options.toolEnvironment(this.options.session).resolveArtifact,
+    };
+    const engine = this.options.createContextEngine?.(configuration) ?? new ContextEngine(configuration);
+    if (runtime.budgetSummary && this.options.contextSources) await engine.insert("actspace.context-conversation", `execution-budget:${candidate.stepId}`, "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete.", "request", candidate.turnId);
+    const context = await engine.getContext(request);
+    return { context, engine, input: await engine.toLlmInput(context) };
   }
 
   private toolDefinitions(mode: RuntimeV2AgentMode): readonly LlmToolDefinition[] {
@@ -342,7 +345,7 @@ export class AgentLoop {
       .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeV2JsonValue }));
   }
   /** The turn is already settled; a failed compaction is reported live and must not fail the turn. */
-  private async autoCompact(compaction: CompactionPlugin, usage: { inputTokens: number; outputTokens: number }, ids: { agentRunId: string; turnId: string }): Promise<void> {
+  private async autoCompact(compaction: ContextCompactor, usage: import("@actspace/context").CompactionUsage, ids: { agentRunId: string; turnId: string }): Promise<void> {
     let startedAt: number | null = null;
     let removedCount = 0;
     try {
@@ -424,6 +427,7 @@ export class AgentLoop {
         const data = { callId: result.callId, pluginId: result.pluginId, name: result.name, status: result.status, summary: result.summary, modelOutput: result.modelOutput, detail: result.detail, artifacts: result.artifacts, failure: result.failure ?? null, renderer: result.renderer ?? null } as unknown as RuntimeV2JsonValue;
         const surface = { surface: { kind: "append", node: { kind: "tool-result", messageId: `tool-${result.callId}`, callId: result.callId, content: result.modelOutput as unknown as RuntimeV2JsonValue, isError: result.status !== "completed" } } };
         const event = await this.options.session.append(core("tool/result", data, surface));
+        await this.options.observeContextToolResult?.(this.options.session, event);
         this.emitLive({ kind: "tool-finished", ...ids, callId: result.callId, name: result.name, result, resultEventId: `v2-${event.seq}` });
         this.notify("tools/result", data);
       },
@@ -467,55 +471,6 @@ function normalizeLlmFailure(error: unknown, attempt: number): LlmFailure {
 function failedStreamOutput(failure: LlmFailure): Awaited<ReturnType<typeof collectStream>> {
   return { messageId: randomUUID(), text: "", content: Object.freeze([]), toolCalls: Object.freeze([]), usage: {}, stopReason: null, failure, aborted: failure.kind === "abort", sawObservableDelta: false };
 }
-function surfaceMessage(node: import("@actspace/session-journal").SessionSurfaceNodeV1): RuntimeV2JsonValue {
-  if (node.kind === "user") return { role: "user", content: node.content };
-  if (node.kind === "assistant") return { role: "assistant", content: node.content };
-  return { role: "tool", callId: node.callId, content: node.content, isError: node.isError };
-}
-function toMessage(value: RuntimeV2JsonValue, paths: ReadonlyMap<string, string>): LlmMessage {
-  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
-    if (record.role === "user" || record.role === "assistant" || record.role === "tool") return { role: record.role, content: toLlmContent(record.content, paths), ...(record.role === "tool" && typeof record.callId === "string" ? { callId: record.callId } : {}) };
-  }
-  return { role: "user", content: typeof value === "string" ? value : JSON.stringify(value) ?? "null" };
-}
-function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<string, string>): string | readonly LlmContentBlock[] {
-  if (typeof value === "string") return value;
-  if (!Array.isArray(value)) return JSON.stringify(value ?? null) ?? "null";
-  // 同一条消息里的文件引用合并成一段，出现在第一个 file-reference 块的位置。
-  const fileReferences = readFileReferenceBlocks(value);
-  let fileReferencesRendered = false;
-  return value.flatMap((item): LlmContentBlock[] => {
-    if (item === null || typeof item !== "object" || Array.isArray(item)) return [{ type: "text", text: JSON.stringify(item) ?? "null" }];
-    const block = item as Readonly<Record<string, RuntimeV2JsonValue>>;
-    if (block.type === "text" && typeof block.text === "string") return [{ type: "text", text: block.text }];
-    if (block.type === "reasoning" && typeof block.text === "string") return [{ type: "reasoning", text: block.text, ...(typeof block.signature === "string" ? { signature: block.signature } : {}), ...(isRecord(block.replay) ? { replay: block.replay as never } : {}) }];
-    if (block.type === "tool-call" && typeof block.callId === "string" && typeof block.name === "string") return [{ type: "tool-call", callId: block.callId, name: block.name, arguments: typeof block.arguments === "string" ? block.arguments : JSON.stringify(block.arguments ?? {}) }];
-    if (block.type === "json") return [{ type: "text", text: JSON.stringify(block.value ?? null) }];
-    if (block.type === "runtime-context" && isRecord(block.context)) return [{ type: "text", text: `<runtime_context>${JSON.stringify(block.context)}</runtime_context>` }];
-    if (block.type === "file-reference") {
-      if (fileReferencesRendered || fileReferences.length === 0) return [];
-      fileReferencesRendered = true;
-      return [{ type: "text", text: renderFileReferencesForModel(fileReferences) }];
-    }
-    if (block.type === "response-excerpt") {
-      const [excerpt] = readResponseExcerptBlocks([block]);
-      return excerpt ? [{ type: "text", text: renderResponseExcerptForModel(excerpt) }] : [];
-    }
-    if (block.type === "artifact" && isRecord(block.artifact)) {
-      const { artifactId, mediaType } = block.artifact;
-      if (typeof artifactId === "string" && typeof mediaType === "string") {
-        if (mediaType.startsWith("image/")) return [{ type: "image", artifactId, mimeType: mediaType, ...(typeof block.label === "string" ? { alt: block.label } : {}) }];
-        if (typeof block.text === "string") {
-          const label = typeof block.label === "string" ? block.label : "File";
-          return [{ type: "text", text: `<attached_file name=${JSON.stringify(label)} media_type=${JSON.stringify(mediaType)}>\n${block.text}\n</attached_file>` }];
-        }
-        return [{ type: "text", text: `${typeof block.label === "string" ? block.label : "File"} (${mediaType}, artifactId=${artifactId}). ${paths.get(artifactId) ?? "File reference only; this Host cannot resolve its read path."}` }];
-      }
-    }
-    return [{ type: "text", text: JSON.stringify(block) }];
-  });
-}
 function parseArgs(value: string): RuntimeV2JsonValue { try { const parsed = JSON.parse(value); return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}; } catch { return {}; } }
 function appendRuntimeContext(content: RuntimeV2JsonValue, mode: RuntimeV2AgentMode, revision: number): RuntimeV2JsonValue {
   const block = { type: "runtime-context", context: { agentMode: mode, agentModeRevision: revision } } as const;
@@ -531,12 +486,15 @@ function currentAgentModeRevision(events: readonly { readonly type: string; read
   return 0;
 }
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> { return value !== null && typeof value === "object" && !Array.isArray(value); }
-function compactionUsage(value: RuntimeV2JsonValue): { inputTokens: number; outputTokens: number } | null {
+function compactionUsage(value: RuntimeV2JsonValue, contextWindow: number | null): import("@actspace/context").CompactionUsage | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
   const inputTokens = record.inputTokens; const outputTokens = record.outputTokens;
   if (typeof inputTokens !== "number" || typeof outputTokens !== "number") return null;
-  return { inputTokens, outputTokens };
+  const cacheRead = typeof record.cacheReadTokens === "number" ? record.cacheReadTokens : 0;
+  const cacheWrite = typeof record.cacheWriteTokens === "number" ? record.cacheWriteTokens : 0;
+  if (![inputTokens, outputTokens, cacheRead, cacheWrite].every(value => Number.isFinite(value) && value >= 0)) return null;
+  return { inputTokens: inputTokens + cacheRead + cacheWrite, outputTokens, contextWindow };
 }
 function hasUserMessage(session: SessionHandle, messageId: string): boolean {
   if (session.journal.events.some((event) => event.type === "user/message" && isRecord(event.data) && event.data.messageId === messageId)) return true;

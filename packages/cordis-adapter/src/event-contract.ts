@@ -1,5 +1,4 @@
 export type AgentLoopIntervention =
-  | "system-prompt/assemble"
   | "agent/pre-step"
   | "agent/request"
   | "llm/stream"
@@ -44,7 +43,6 @@ export interface DomainEvents {}
 declare module "@deepseek-ai/cordis" {
   interface Events extends DomainEvents {
     /** @mode waterfall */
-    "system-prompt/assemble": AgentWaterfallEventHandler;
     /** @mode waterfall */
     "agent/pre-step": AgentWaterfallEventHandler;
     /** @mode waterfall */

@@ -1,3 +1,13 @@
 export { manifest } from "./manifest.js";
 export { apply } from "./plugin.js";
 export * from "./assembly.js";
+export * from "./types.js";
+export * from "./engine.js";
+export { surfaceMessage } from "./conversion.js";
+export * from "./request-snapshot.js";
+export * from "./system.js";
+export * from "./registry.js";
+export * from "./supplements.js";
+export * from "./compaction.js";
+export { ProgressiveDisclosure, createDisclosureSource } from "./disclosure/plugin.js";
+export type { DisclosureHost } from "./disclosure/paths.js";

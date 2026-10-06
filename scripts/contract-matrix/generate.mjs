@@ -45,7 +45,6 @@ const SESSION_SURFACES = Object.freeze({
 });
 
 const LOOP_META = Object.freeze({
-  "system-prompt/assemble": { mode: "waterfall", scope: "agent", containment: "request-reject" },
   "agent/pre-step": { mode: "waterfall", scope: "agent", containment: "step-skip-or-rewrite" },
   "agent/request": { mode: "waterfall", scope: "agent", containment: "request-reject" },
   "llm/stream": { mode: "waterfall", scope: "agent", containment: "abort-or-replace" },

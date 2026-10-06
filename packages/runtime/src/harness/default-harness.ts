@@ -7,7 +7,7 @@ import type { HarnessMountRequest } from "@actspace/boot";
 import type { ResolvedComposition } from "@actspace/composition";
 
 const loopEvents: readonly HarnessContract[] = [
-  ...["system-prompt/assemble", "agent/pre-step", "agent/request", "llm/stream", "agent/request-error"].map(id => ({ id, version: 1, mode: "waterfall" as const })),
+  ...["agent/pre-step", "agent/request", "llm/stream", "agent/request-error"].map(id => ({ id, version: 1, mode: "waterfall" as const })),
   { id: "agent/turn-stopping", version: 1, mode: "serial" },
   ...["agent/session-start", "agent/status", "agent/error", "llm/chunk"].map(id => ({ id, version: 1, mode: "emit" as const })),
 ];

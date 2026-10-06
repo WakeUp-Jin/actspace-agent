@@ -1,11 +1,12 @@
+import { COMPACTION_SYSTEM, COMPACTION_TEMPLATE, PRIOR_SUMMARY_RULES } from "./prompts.js";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionSurfaceEntry } from "@actspace/session-journal";
 import type { LlmService } from "@actspace/llm-service";
 
-export type CompactionSummary = { readonly content: string; readonly metadata?: RuntimeV2JsonValue };
+export type CompactionSummary = { readonly content: string; readonly pathlist?: readonly string[]; readonly metadata?: RuntimeV2JsonValue };
 
 export interface CompactionSummarizer {
-  summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string }): Promise<CompactionSummary>;
+  summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string; readonly summaryIds?: readonly string[]; readonly signal?: AbortSignal }): Promise<CompactionSummary>;
 }
 
 export class DeterministicCompactionSummarizer implements CompactionSummarizer {
@@ -18,18 +19,21 @@ export class DeterministicCompactionSummarizer implements CompactionSummarizer {
 export class LlmCompactionSummarizer implements CompactionSummarizer {
   constructor(private readonly options: { readonly llm: LlmService; readonly routeId: string; readonly model: string }) {}
 
-  async summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string }): Promise<CompactionSummary> {
+  async summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string; readonly summaryIds?: readonly string[]; readonly signal?: AbortSignal }): Promise<CompactionSummary> {
     const requestId = `compaction:${context.sessionId}:${context.turnId ?? "between-turns"}`;
-    const prepared = this.options.llm.prepare({
+    const prior = entries.filter(entry => context.summaryIds?.includes(entry.node.messageId));
+    const conversation = entries.filter(entry => !context.summaryIds?.includes(entry.node.messageId));
+    const prepared = await this.options.llm.prepareAsync({
       requestId,
       routeId: this.options.routeId,
       model: this.options.model,
       messages: [
-        { role: "system", content: "Summarize the supplied Agent history faithfully. Preserve user requirements, decisions, file paths, errors, unfinished work, and tool outcomes. Do not invent facts." },
-        { role: "user", content: entries.map((entry) => `${entry.node.kind}: ${summaryText(entry.node.content)}`).join("\n") },
+        { role: "system", content: COMPACTION_SYSTEM },
+        { role: "user", content: `${prior.length ? `<prior-summary>\n${prior.map(entry => summaryText(entry.node.content)).join("\n")}\n</prior-summary>\n` : ""}<conversation>\n${conversation.map(entry => `${entry.node.kind}: ${summaryText(entry.node.content)}`).join("\n")}\n</conversation>\n${COMPACTION_TEMPLATE}${prior.length ? `\n${PRIOR_SUMMARY_RULES}` : ""}` },
       ],
       tools: [],
-      signal: new AbortController().signal,
+      sessionId: context.sessionId,
+      signal: context.signal ?? new AbortController().signal,
     });
     try {
       const stream = await prepared.dispatch(); let text = ""; let terminal = false;
@@ -53,7 +57,7 @@ function summaryText(value: RuntimeV2JsonValue): string {
 }
 
 function stripRuntimeContext(value: RuntimeV2JsonValue): RuntimeV2JsonValue {
-  if (typeof value === "string") return value.startsWith("<runtime_context>") ? "" : value;
+  if (typeof value === "string") return value;
   if (Array.isArray(value)) return value.flatMap((item) => isRuntimeContext(item) ? [] : [stripRuntimeContext(item)]);
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, stripRuntimeContext(child)]));
@@ -63,5 +67,5 @@ function isRuntimeContext(value: RuntimeV2JsonValue): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
   if (record.type === "runtime-context") return true;
-  return record.type === "text" && typeof record.text === "string" && record.text.startsWith("<runtime_context>");
+  return false;
 }

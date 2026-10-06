@@ -25,6 +25,10 @@
 
 ## 最近完成
 
+- [上下文真实验收问题修复](completed/20261006-context-acceptance-bugfix.md)：原7项确认问题及新增启动锁问题已修复；227项定向测试、真实Electron和19次转换值复验通过，边界见[执行摘要](../exec-runs/20261006-context-acceptance-bugfix/execution-summary.md)。
+
+- [上下文管理引擎](completed/20261006-context-management-engine/README.md)：P1–P4 实施完成，Context/来源/压缩/披露接线与自动化通过；首次桌面测试异步异常和真实模型未覆盖范围见[执行摘要](../exec-runs/20261006-context-management-engine/execution-summary.md)。
+
 - [Agent 重构最终清理与验收](completed/20261005-agent-refactor-final-closeout/README.md)：代码、文档、根目录清理与自动化完成，35/35 界面验收通过；两项产品缺陷修复复验，保护记录与范围限制见[摘要](../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。
 
 - [Agent 第二轮存储与代码清理](completed/20261004-agent-storage-and-cleanup/README.md)：实施完成；原剩余 UI 子项由 10-05 最终收尾逐项补验通过。

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CompactionPlugin } from "@actspace/compaction";
 import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
 import { runToolStreamFixture } from "../testing.js";
@@ -10,6 +10,14 @@ function stubCompaction(run: (onStarted: () => void) => Promise<boolean>): Compa
 }
 
 describe("auto compaction live events", () => {
+  it("passes actual capacity and disjoint cache usage exactly once", async () => {
+    const maybeCompact = vi.fn(async (_session: unknown, _usage: unknown) => false);
+    await runToolStreamFixture({ terminalOnly: true, contextWindow: 256_000,
+      usage: { ...usage, inputTokens: 100, cacheReadTokens: 200, cacheWriteTokens: 300, outputTokens: 50, reasoningTokens: 40 },
+      compaction: { maybeCompact } as unknown as CompactionPlugin,
+    });
+    expect(maybeCompact.mock.calls[0]?.[1]).toEqual({ inputTokens: 600, outputTokens: 50, contextWindow: 256_000 });
+  });
   it("reports start and finish before the run completes", async () => {
     const { events, result } = await runToolStreamFixture({
       terminalOnly: true, usage,

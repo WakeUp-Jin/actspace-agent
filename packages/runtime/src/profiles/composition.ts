@@ -1,3 +1,4 @@
+import { manifest as contextManifest } from "@actspace/context/manifest";
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
 import { composeRuntime, type ResolvedComposition } from "@actspace/composition";
 import type { Bundle, Patch, Profile } from "@actspace/bundle";
@@ -68,6 +69,7 @@ export const TOOL_PLUGIN_TRANSPORT = Object.freeze([
 ]);
 export async function loadBuiltinToolCodec(specifier: string, manifest: PluginManifest) {
   if (manifest.pluginId === agentServiceManifest.pluginId && specifier === "./codec.js") return import("@actspace/agent-service/codec");
+  if (manifest.pluginId === contextManifest.pluginId && specifier === "./codec.js") return import("@actspace/context/codec");
   const transport = TOOL_PLUGIN_TRANSPORT.find(item => item.manifest.pluginId === manifest.pluginId);
   if (!transport || !transport.manifest.codecs.some(codec => codec.module === specifier) || specifier !== "./codec.js") throw new Error(`No admitted builtin Codec for ${manifest.pluginId}/${specifier}.`);
   return import(`${transport.packageName}/codec`) as Promise<{ readonly codecs: readonly import("@actspace/session-journal").EventCodec[] }>;
@@ -78,7 +80,9 @@ export function toolTransportPatches(composition: ResolvedComposition) {
     return { id: item.id, disabled: !entry?.enabled || entry.state === "skipped" };
   });
 }
-const baseBundle: Bundle = Object.freeze({ id: BASE_BUNDLE.id, version: BASE_BUNDLE.version, manifests: Object.freeze([coreManifest, agentServiceManifest, todoManifest, filesystemreadManifest, filesystemsearchManifest, filesystemwriteManifest, shelltoolsManifest, webtoolsManifest, imagegenerationManifest, imageinspectionManifest]), provenance: "builtin:actspace.base" });
+// Admit the pure Context codecs on the Host; behavior lives only in the Harness.
+const contextCodecManifest: PluginManifest = Object.freeze({ ...contextManifest, behaviors: [], contributions: { services: [], events: contextManifest.contributions.events, contributions: [] } });
+const baseBundle: Bundle = Object.freeze({ id: BASE_BUNDLE.id, version: BASE_BUNDLE.version, manifests: Object.freeze([coreManifest, contextCodecManifest, agentServiceManifest, todoManifest, filesystemreadManifest, filesystemsearchManifest, filesystemwriteManifest, shelltoolsManifest, webtoolsManifest, imagegenerationManifest, imageinspectionManifest]), provenance: "builtin:actspace.base" });
 const browserManifest: PluginManifest = Object.freeze({ schemaVersion: 1, pluginId: pluginId("actspace.browser-tools"), version: "2.0.0", name: "ActSpace Browser Tools", runtimeContract: "actspace.runtime.v2", source: { kind: "builtin" as const, reference: "builtin:actspace.browser-tools" }, codecs: [], behaviors: [{ entryId: entryId("browser-tools"), module: "builtin:browser-tools", required: false, enabled: true, config: {}, host: { required: ["browser" as const], optional: [] }, frontend: null, provides: [serviceId("browser-tools")], injects: [serviceId("tools")] }], contributions: { services: ["browser-tools"], events: [], contributions: ["browser-tools"] } });
 const browserBundle: Bundle = Object.freeze({ id: "actspace.host.browser", version: "2.0.0", manifests: Object.freeze([browserManifest]), provenance: "builtin:actspace.host.browser" });
 const headlessBundle: Bundle = Object.freeze({ id: "actspace.headless", version: headlessManifest.version, manifests: Object.freeze([headlessManifest]), provenance: "@actspace/headless" });

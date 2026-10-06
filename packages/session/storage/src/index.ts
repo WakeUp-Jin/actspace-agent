@@ -23,6 +23,8 @@ export interface SessionStorageHandle {
 /** Host-owned physical storage. Business recovery and fork belong to SessionStore. */
 export interface SessionStorage {
   readonly identity: symbol;
+  /** Optional physical history reference; callers must still enforce read permissions. */
+  journalPath?(sessionId: string): string;
   inspect(sessionId: string): Promise<SessionStorageSnapshot>;
   listSessionIds(): Promise<readonly string[]>;
   create(header: SessionHeaderV1): Promise<SessionStorageHandle>;

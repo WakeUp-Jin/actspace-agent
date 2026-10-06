@@ -215,6 +215,7 @@ export class RuntimeSessionController {
     this.#external.set(id, session);
     return () => { if (this.#external.get(id) === session) this.#external.delete(id); };
   }
+  isEphemeral(sessionId: string): boolean { return this.#ephemeral.has(sessionId); }
   getOpen(sessionId: string): SessionHandle | undefined { return this.#open.get(sessionId) ?? this.#external.get(sessionId); }
   closeOpen(sessionId: string): void { this.#open.delete(sessionId); this.#ephemeral.delete(sessionId); this.#models.delete(sessionId); this.#changes.delete(sessionId); }
   snapshot(session: SessionHandle): RuntimeV2SessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }

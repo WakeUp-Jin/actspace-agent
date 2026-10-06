@@ -24,6 +24,8 @@ export class HarnessControl {
   async initialize(): Promise<void> {
     try {
       await this.#store.open();
+      const startupFailure = this.#blocked.get("*");
+      if (startupFailure instanceof HarnessControlError && startupFailure.code === "STORE_LOCKED") this.#blocked.delete("*");
       for (const id of new Set(this.#store.records.map(r => r.harnessId))) {
         const record = this.#store.latest(id)!;
         try {
@@ -148,6 +150,10 @@ export class HarnessControl {
     signal?.throwIfAborted();
     const pending = this.#exclusive(async () => {
       signal?.throwIfAborted();
+      // A failed initial lease owns no records or generation. Retry through the
+      // same gate; never bypass artifact, contract, or durability recovery errors.
+      const startupFailure = this.#blocked.get("*");
+      if (startupFailure instanceof HarnessControlError && startupFailure.code === "STORE_LOCKED") await this.initialize();
       const blocked = this.#blocked.get("*") ?? this.#blocked.get(harnessId);
       if (blocked) throw new HarnessControlError("RECOVERY_BLOCKED", "Harness execution is blocked", { cause: blocked });
       await this.#store.assertOwned();

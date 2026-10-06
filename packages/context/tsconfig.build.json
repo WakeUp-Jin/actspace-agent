@@ -10,6 +10,12 @@
       "path": "./../cordis-adapter/tsconfig.build.json"
     },
     {
+      "path": "./../llm/service/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/journal/tsconfig.build.json"
+    },
+    {
       "path": "./../shared/tsconfig.build.json"
     }
   ]

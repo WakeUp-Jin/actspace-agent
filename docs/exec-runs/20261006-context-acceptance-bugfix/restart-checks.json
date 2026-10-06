@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-10-06T13:47:20.138Z",
+  "child": {
+    "sessionId": "42c071ab-45ad-4e4b-a49c-13182577c162",
+    "requestId": "a51681d2-5782-4b47-9913-f95f7a71fadf",
+    "cycle": 2,
+    "pathCount": 108,
+    "activeCount": 2,
+    "positiveReads": [
+      {
+        "name": "file-002.txt",
+        "count": 1,
+        "visibility": "sleeping"
+      }
+    ],
+    "lastEvent": {
+      "seq": 1776,
+      "type": "plugin/actspace.agent-service/run",
+      "op": "finish",
+      "outcome": "completed"
+    }
+  },
+  "parent": {
+    "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+    "lastSeq": 1577,
+    "unchanged": true
+  },
+  "large": {
+    "sessionId": "ef9909bf-d761-4ce7-a9a3-efeb8bc39132",
+    "restoreAcceptSeq": 431,
+    "restoreAcceptCount": 1,
+    "lastEvent": {
+      "seq": 479,
+      "type": "plugin/actspace.agent-service/run",
+      "op": "finish",
+      "outcome": "completed"
+    },
+    "taskContentBytes": 1141480
+  },
+  "restoredTriggerRatio": 0.8
+}

@@ -1,16 +1,15 @@
 import type { AgentHandle } from "@actspace/core-agent";
-import { scopeContext } from "@actspace/core-scope";
 import { containNotification, type CordisContext } from "@actspace/cordis-adapter";
-import type { LogicalRequestCandidate } from "@actspace/prompt";
+import type { PromptHostPort } from "@actspace/prompt";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { EnglishLearningState } from "@actspace/shared";
 import { completedMessage, record } from "./completion.js";
 import { extractEnglish } from "./english-text.js";
-import { injectEnglishLearning } from "./prompt.js";
+import { ENGLISH_LEARNING_SECTION, PROMPT_ID, PLUGIN_ID } from "./prompt.js";
 import type { SpeechHostPort } from "./host-port.js";
 import { SpeechQueue } from "./queue.js";
 
-type Binding = { agent: AgentHandle; watermark: number; injected: Map<string, Set<string>>; remove: () => void };
+type Binding = { session: AgentHandle["session"]; watermark: number; injected: Map<string, Set<string>>; remove: () => void };
 export class EnglishLearningService {
   private binding: Binding | undefined;
   private closed = false;
@@ -37,42 +36,41 @@ export class EnglishLearningService {
   subscribe(listener: (state: EnglishLearningState) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
 
   async enableSession(sessionId: string): Promise<EnglishLearningState> {
-    const registry = this.ctx.get?.("agent.registry") as { list(): readonly AgentHandle[] };
-    const agent = registry.list().find((item) => item.session.header.sessionId === sessionId && item.descriptor.kind === "main");
-    if (!agent) throw new Error("目标会话尚未就绪。");
-    return this.enable(agent);
+    const sessions = this.ctx.get?.("session.runtime") as { getOpen(id: string): AgentHandle["session"] | undefined };
+    const session = sessions.getOpen(sessionId);
+    if (!session) throw new Error("目标会话尚未就绪。");
+    return this.bind(session);
   }
 
   async enable(agent: AgentHandle): Promise<EnglishLearningState> {
-    if (this.closed) throw new Error("英语辅助学习已停止。");
     if (agent.descriptor.kind !== "main" || agent.session.header.lineage !== null) throw new Error("请选择主会话。");
     agent.scope.assertActive();
-    const binding: Binding = { agent, watermark: agent.session.journal.lastSeq, injected: new Map(), remove: () => {} };
-    const scoped = scopeContext(this.ctx, agent.scope.scopeKey, agent.scope.disposer);
-    const remove = scoped.on?.("system-prompt/assemble", async (input: unknown, next: () => Promise<LogicalRequestCandidate>) => {
-      const candidate = await next();
-      const subject = record(record(input).agent);
-      if (this.binding !== binding || candidate.sessionId !== agent.session.header.sessionId || subject.agentId !== agent.agentId || subject.scopeId !== agent.scope.identity.scopeId) return candidate;
-      try {
-        const result = injectEnglishLearning(candidate);
-        let steps = binding.injected.get(candidate.turnId);
-        if (!steps) { steps = new Set(); binding.injected.set(candidate.turnId, steps); }
-        steps.add(candidate.stepId);
-        return result;
-      } catch {
-        this.update({ notice: "本次双语提示词未能注入，回答将按原方式继续。" });
-        return candidate;
-      }
-    });
-    if (typeof remove !== "function") throw new Error("会话提示词入口不可用。");
-    const cancelDispose = agent.scope.disposer.add(() => {
-      if (this.binding === binding) return this.disable().then(() => {});
-    });
-    binding.remove = () => { (remove as () => void)(); cancelDispose(); binding.injected.clear(); };
+    return this.bind(agent.session);
+  }
+
+  private async bind(session: AgentHandle["session"]): Promise<EnglishLearningState> {
+    if (this.closed) throw new Error("英语辅助学习已停止。");
+    if (session.header.lineage !== null) throw new Error("请选择主会话。");
+    const binding: Binding = { session, watermark: session.journal.lastSeq, injected: new Map(), remove: () => {} };
+    const extensions = (this.ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions;
+    if (!extensions) throw new Error("会话提示词入口不可用。");
     this.binding?.remove();
+    const remove = extensions.registerMainSession(session.header.sessionId, {
+      id: PROMPT_ID, owner: PLUGIN_ID, order: 100, criticality: "optional", fields: ["system"],
+      get: (context, write) => {
+        if (this.binding !== binding) return;
+        write({ system: { sections: [{ id: PROMPT_ID, owner: PLUGIN_ID, order: 5000, content: ENGLISH_LEARNING_SECTION }], modelFacts: [] } });
+        const { turnId, stepId } = context.request;
+        if (!turnId || !stepId) return;
+        let steps = binding.injected.get(turnId);
+        if (!steps) { steps = new Set(); binding.injected.set(turnId, steps); }
+        steps.add(stepId);
+      },
+    });
+    binding.remove = () => { remove(); binding.injected.clear(); };
     this.binding = binding;
     this.seen.clear();
-    this.update({ enabled: true, targetSessionId: agent.session.header.sessionId, promptStatus: "active" });
+    this.update({ enabled: true, targetSessionId: session.header.sessionId, promptStatus: "active" });
     await this.queue.stop();
     return this.getState();
   }
@@ -104,13 +102,14 @@ export class EnglishLearningService {
 
   private observe(sessionId: string | undefined, event: SessionEventEnvelopeV1): void {
     const binding = this.binding;
-    if (!binding || sessionId !== binding.agent.session.header.sessionId || event.type !== "turn/end" || event.seq <= binding.watermark) return;
+    if (!binding || sessionId !== binding.session.header.sessionId || event.type !== "turn/end" || event.seq <= binding.watermark) return;
     const turnId = record(event.data).turnId;
     if (typeof turnId !== "string") return;
     const injected = binding.injected.get(turnId);
     binding.injected.delete(turnId);
     if (!injected) return;
-    const message = completedMessage(binding.agent.session.journal.events, event);
+    const sessions = this.ctx.get?.("session.runtime") as { getOpen(id: string): AgentHandle["session"] | undefined } | undefined;
+    const message = completedMessage((sessions?.getOpen(sessionId) ?? binding.session).journal.events, event);
     if (!message || !injected.has(message.stepId)) return;
     const key = `${sessionId}:${turnId}:${message.messageId}`;
     if (this.seen.has(key)) return;

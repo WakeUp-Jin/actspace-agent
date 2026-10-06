@@ -1,0 +1,80 @@
+{
+  "generatedAt": "2026-10-06T12:58:37.799Z",
+  "sessions": [
+    {
+      "sessionId": "42c071ab-45ad-4e4b-a49c-13182577c162",
+      "lastSeq": 1752,
+      "cycle": 2,
+      "paths": 108,
+      "active": [
+        {
+          "file": "file-106.txt",
+          "readsInCycle": 0
+        },
+        {
+          "file": "journal.jsonl",
+          "historySessionId": "42c071ab-45ad-4e4b-a49c-13182577c162",
+          "readsInCycle": 0
+        }
+      ],
+      "readCounts": [
+        {
+          "file": "file-002.txt",
+          "readsInCycle": 1,
+          "visibility": "sleeping"
+        }
+      ],
+      "indexesAsFiles": 0,
+      "compactionSeqs": [
+        930,
+        1575
+      ],
+      "emptyFacts": [
+        {
+          "seq": 1172,
+          "sourceSeq": 1171
+        }
+      ]
+    },
+    {
+      "sessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+      "lastSeq": 1577,
+      "cycle": 2,
+      "paths": 108,
+      "active": [
+        {
+          "file": "journal.jsonl",
+          "historySessionId": "85ea5068-884b-4ba8-94bb-fc9949ff3961",
+          "readsInCycle": 0
+        },
+        {
+          "file": "file-106.txt",
+          "readsInCycle": 0
+        }
+      ],
+      "readCounts": [],
+      "indexesAsFiles": 0,
+      "compactionSeqs": [
+        930,
+        1575
+      ],
+      "emptyFacts": [
+        {
+          "seq": 1172,
+          "sourceSeq": 1171
+        }
+      ]
+    },
+    {
+      "sessionId": "b2091fd2-7ce3-468a-9ae8-8dfd4b0b8ec0",
+      "lastSeq": 191,
+      "cycle": 0,
+      "paths": 0,
+      "active": [],
+      "readCounts": [],
+      "indexesAsFiles": 0,
+      "compactionSeqs": [],
+      "emptyFacts": []
+    }
+  ]
+}

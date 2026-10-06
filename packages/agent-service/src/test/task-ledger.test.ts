@@ -25,6 +25,36 @@ const harness = { harnessId: "main", generationId: "generation-1", revision: 1 }
 function gate() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
 
 describe("durable content queue", () => {
+  it("does not poison the ledger when only the completed envelope exceeds the record limit", async () => {
+    const { ledger, session } = await fixture();
+    await expect(ledger.submit("near-limit", "x".repeat(1024 * 1024 - 250))).rejects.toMatchObject({ code: "INVALID_EVENT" });
+    expect(session.lastSeq).toBe(-1);
+    expect(ledger.blocked).toBe(false);
+    expect((await ledger.submit("valid", "ok")).task.state).toBe("pending");
+  });
+  it("recovers and continues when individually valid tasks exceed 1 MiB in aggregate", async () => {
+    const { ledger, session, store } = await fixture();
+    const content = { text: "x".repeat(600_000) };
+    await ledger.submit("large-a", content);
+    const second = await ledger.submit("large-b", content);
+    expect(ledger.blocked).toBe(false);
+    expect(Buffer.byteLength(JSON.stringify(ledger.snapshot()))).toBeGreaterThan(1024 * 1024);
+    expect(Object.isFrozen(ledger.snapshot().tasks[0]!.content)).toBe(true);
+    expect((await ledger.submit("large-b", content)).task.taskId).toBe(second.task.taskId);
+    const seq = session.lastSeq;
+    expect(() => ledger.submit("oversized", "x".repeat(1024 * 1024))).toThrow("1 MiB");
+    expect(session.lastSeq).toBe(seq);
+    expect(ledger.blocked).toBe(false);
+    await session.close();
+    const reopened = await store.open("tasks"); resources.push(() => reopened.close());
+    const recovered = await TaskLedger.open(reopened);
+    expect(recovered.snapshot().tasks).toHaveLength(2);
+    expect((await recovered.submit("large-b", content)).task.taskId).toBe(second.task.taskId);
+    await recovered.setPaused(false, recovered.snapshot().revision);
+    await recovered.start(recovered.snapshot().queue[0]!, "after-reopen", harness, {});
+    await recovered.finish("after-reopen", "completed");
+    expect((await recovered.submit("next", "ok")).task.state).toBe("pending");
+  });
   it("deduplicates concurrent submissions including object key order, after completion", async () => {
     const { ledger, session } = await fixture();
     const [a, b] = await Promise.all([ledger.submit("same", { a: 1, b: 2 }), ledger.submit("same", { b: 2, a: 1 })]);

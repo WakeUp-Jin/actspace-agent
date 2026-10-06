@@ -1,0 +1,24 @@
+[
+  {
+    "sessionId": "09bea104-e3ca-4a5a-b428-49fb8fff5c2e",
+    "originalSeq": 11686,
+    "newDerivedEvents": 1,
+    "cycle": 4,
+    "paths": 109,
+    "active": 3,
+    "indexesAsFiles": 0,
+    "restartChanged": false,
+    "restartAppended": 0
+  },
+  {
+    "sessionId": "95fd4c1c-5035-45ee-a58e-285a7f52cd8e",
+    "originalSeq": 2973,
+    "newDerivedEvents": 1,
+    "cycle": 4,
+    "paths": 110,
+    "active": 3,
+    "indexesAsFiles": 0,
+    "restartChanged": false,
+    "restartAppended": 0
+  }
+]

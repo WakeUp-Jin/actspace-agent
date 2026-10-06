@@ -26,7 +26,7 @@ async function writeFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>,
     const additions = countDiff(diff, "+");
     const deletions = countDiff(diff, "-");
     context.reportProgress({ message: `${created ? "Created" : "Updated"} ${path}`, additions, deletions });
-    return completed(`${diff}\n\nFile ${created ? "created" : "updated"}: ${path}`, `${created ? "Created" : "Updated"} ${path}`, { type: created ? "create" : "update", path, additions, deletions });
+    return completed(`${diff}\n\nFile ${created ? "created" : "updated"}: ${path}`, `${created ? "Created" : "Updated"} ${path}`, { type: created ? "create" : "update", path, additions, deletions }, filePath);
   } catch (error) {
     return ioFailure("write file", pathArg, error);
   }
@@ -53,7 +53,7 @@ async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, 
     const additions = countDiff(diff, "+");
     const deletions = countDiff(diff, "-");
     context.reportProgress({ message: `${exists ? "Updated" : "Created"} ${path}`, additions, deletions });
-    return completed(`${diff}\n\nFile ${exists ? "updated" : "created"}: ${path}`, `${exists ? "Updated" : "Created"} ${path}`, { type: exists ? "update" : "create", path, additions, deletions });
+    return completed(`${diff}\n\nFile ${exists ? "updated" : "created"}: ${path}`, `${exists ? "Updated" : "Created"} ${path}`, { type: exists ? "update" : "create", path, additions, deletions }, filePath);
   } catch (error) {
     return ioFailure("edit file", pathArg, error);
   }
@@ -136,8 +136,8 @@ async function writeTextAtomic(target: string, content: string): Promise<void> {
     throw error;
   }
 }
-function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeV2JsonValue): ToolBodyResult {
-  return { status: "completed", modelOutput: [{ type: "text", text }], summary, ...(detail === undefined ? {} : { detail: [{ label: "result", value: detail }] }) };
+function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeV2JsonValue, filePath?: string): ToolBodyResult {
+  return { status: "completed", modelOutput: [{ type: "text", text }], summary, ...(detail === undefined ? {} : { detail: [{ label: "result", value: detail }, ...(filePath ? [{ label: "actspace.context.file", value: { path: filePath, kind: "file", operation: "write" } }] : [])] }) };
 }
 
 function failure(code: string, message: string, retryable = false): ToolBodyResult {

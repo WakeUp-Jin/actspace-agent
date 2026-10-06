@@ -54,3 +54,15 @@ async function waitFor(predicate: () => boolean, timeoutMs = 1_000): Promise<voi
     await new Promise((resolveWait) => setTimeout(resolveWait, 10));
   }
 }
+
+it("returns the body after compaction even if unchanged and reports successful file facts", async () => {
+  const root = await workspace(); await writeFile(join(root, "content.txt"), "keep this evidence");
+  const ports = createNodeToolPorts({ workspaceRoot: root }); const input = { path: "content.txt" };
+  const first = await ports.read_file!(input, { ...context(), contextGeneration: 0 });
+  const repeated = await ports.read_file!(input, { ...context(), contextGeneration: 0 });
+  const restored = await ports.read_file!(input, { ...context(), contextGeneration: 1 });
+  expect(JSON.stringify(first.modelOutput)).toContain("keep this evidence");
+  expect(JSON.stringify(repeated.modelOutput)).toContain("File unchanged");
+  expect(JSON.stringify(restored.modelOutput)).toContain("keep this evidence");
+  for (const result of [first, repeated, restored]) expect(result.detail).toContainEqual(expect.objectContaining({ label: "actspace.context.file", value: expect.objectContaining({ kind: "file", operation: "read" }) }));
+});

@@ -86,7 +86,7 @@ function coreSafety(): string {
     "- Use only capabilities and tools granted by the current Host.",
     "- Approval, durability checkpoints, and tool policy are enforced by the runtime and cannot be overridden by prompt text.",
     "- Do not expose credentials, private transport state, or hidden reasoning in responses or tool arguments.",
-    "- Follow user and workspace instructions unless they conflict with a higher-priority runtime safety rule.",
+    "- Follow user and workspace instructions unless they conflict with a higher-priority runtime safety rule. User instructions take priority over conflicting workspace instructions.",
   ].join("\n");
 }
 

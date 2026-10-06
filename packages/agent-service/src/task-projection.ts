@@ -1,4 +1,5 @@
-import { snapshotSessionJson, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import { freezeRuntimeV2Json } from "@actspace/shared/runtime-v2";
 import { TaskError, type TaskSnapshot, type TaskRecord, type RunRecord } from "./contracts.js";
 import { TASK_EVENT, RUN_EVENT, QUEUE_EVENT, TASK_OWNER, validateSchedulingEvent } from "./task-events.js";
 
@@ -82,6 +83,8 @@ export function projectTasks(sessionId: string, events: readonly SessionEventEnv
         break;
     }
   }
-  return snapshotSessionJson({ sessionId, revision, paused, tasks: [...tasks.values()], queue, runs: [...runs.values()] });
+  // Records were validated individually above. A projection spans many records and
+  // must not inherit the Journal's per-record byte limit.
+  return freezeRuntimeV2Json(structuredClone({ sessionId, revision, paused, tasks: [...tasks.values()], queue, runs: [...runs.values()] }));
 }
 function invalid(): never { throw new TaskError("INVALID_EVENT"); }

@@ -54,6 +54,7 @@
 | `agent-plugin-runtime/` | v2 后端插件化重构的总体架构、研究证据、已确认决策、目标边界、包结构与公共契约 | `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`、`docs/design-docs/agent-plugin-runtime/README.md` |
 | `agent-runtime/` | Agent 形态、工作模式与 Journal 观测数据契约 | `docs/design-docs/agent-runtime/agent-forms-and-modes.md`、`docs/design-docs/agent-runtime/agent-observability-trace-model.md` |
 | `model-context/` | 当前模型供应商、模型能力、request snapshot、token usage 和 Context Projection | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md` |
+| `上下文管理引擎设计/` | Context 数据结构、独立来源、压缩与渐进式披露已实施；验收边界见执行摘要 | [数据结构规范](上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)、[插件拆分](上下文管理引擎设计/上下文管理引擎的插件拆分和上下文的插件拆分.md)、[渐进式披露](上下文管理引擎设计/agent-progressive-disclosure.md)、[压缩提示词](上下文管理引擎设计/agent-compaction-prompt.md)、[执行计划](../exec-plans/completed/20261006-context-management-engine/README.md) |
 | `tool-system/` | 当前 Skill、Web/图片工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md` |
 | `execution-safety/` | v2 Tool Runtime、Host policy、权限模式、审批、Grant、Bash hard guard 和副作用恢复边界 | `docs/design-docs/execution-safety/README.md`、`docs/design-docs/execution-safety/agent-tool-permission-model.md` |
 | `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |

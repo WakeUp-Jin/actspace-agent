@@ -35,7 +35,7 @@ it("counts header-like content as additions and deletions in write and edit prev
       : { path: "markers.txt", old_string: "--removed", new_string: "++added" };
     await expect(invoke(ports[name], args)).resolves.toMatchObject({
       status: "completed",
-      detail: [{ label: "result", value: { additions: 1, deletions: 1 } }],
+      detail: [expect.objectContaining({ label: "result", value: expect.objectContaining({ additions: 1, deletions: 1 }) }), expect.objectContaining({ label: "actspace.context.file", value: expect.objectContaining({ kind: "file", operation: "write" }) })],
     });
   }
 });
