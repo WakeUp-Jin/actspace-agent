@@ -1,6 +1,7 @@
 # 15 运行目标验收交接
 
-- 主线提交：`refactor/desktop-frontend` 上 15 的 squash 提交（哈希在 16 开始时补填）
+- 主线提交：`refactor/desktop-frontend` @ `856b776f`；验收反馈第 1 轮修复 `7154f57d`
+- 补记：squash 提交信息里写的「共 32 个提交」有误，子分支实际是 31 个（`06760433`..`006fe160`）
 - 子分支：`refactor/desktop-fe-15`（`06760433`..`3a879d32` 是 T0–T15 和复核修复，后面另有一个收尾提交）
 - 状态：**可以交给验收**
 - 启动方式：
@@ -42,7 +43,7 @@
 | mock：切换会话 | 同上 | 通过：本机会话只有本机 UI；切回远端会话后模型和工作区不变 | `mock-switch-to-local.png`、`mock-switch-back-remote.png` |
 | mock：未就绪文案 | `#devbox=blocked` / `draining` / `fail=devbox` | 通过：文案正确；发送禁用，点击无效；草稿保留；错误摘要去掉了 IPC 前缀和堆栈；console 无报错 | `mock-new-page-devbox-blocked.png`、`-draining.png`、`mock-new-page-fail-devbox.png` |
 | Electron：没有 Host | 空的临时数据目录 | 通过：只有「本机 Mac」，没有远端 select，console 无报错 | `electron-empty-hosts-new-page.png` |
-| Electron：git 三态 | 临时目录加进临时数据目录的工作区列表 | 无 HEAD 显示「master」，正常仓库显示当前分支，非仓库不显示分支控件。非仓库在中文系统下的状态是 `failed`，见「需要你判断」 | `electron-git-*.png` |
+| Electron：git 三态 | 临时目录加进临时数据目录的工作区列表 | 无 HEAD 显示「master」，正常仓库显示当前分支，非仓库不显示分支控件。非仓库在中文系统下的状态当时是 `failed`，已在验收反馈第 1 轮修复 | `electron-git-*.png` |
 | 范围复核 | Sonnet 只读子智能体 | 没有高、中严重度的确定缺陷；6 条存疑中 3 条属实，已修复（`3a879d32`），3 条不改并写明理由 | `execution-process.md`「复核处理」 |
 
 ### 请验收方执行
@@ -70,7 +71,7 @@
 
 ### 已知问题与未覆盖
 
-- **需要你判断：中文系统下「不是 Git 仓库」识别不出来**
+- **已修复（2026-10-06，方案 B，`7154f57d`）：中文系统下「不是 Git 仓库」识别不出来**。以下是当时的分析，保留备查。修复后 desktop 全量 1284 个用例全部通过，Electron 实测非仓库返回 `not_repository`。
   - 现象：`workspace-git-context-service` 用 `/not a git repository/i` 匹配 git 的错误输出。在中文系统下 git 输出「致命错误：不是 Git 仓库……」，结果是 `failed`，不是 `not_repository`。基线中唯一的失败用例就是这个原因，Electron 实测相同。
   - 影响：**目前用户看不到差别**。
     - renderer 对 `failed` 和 `not_repository` 的处理相同；
@@ -106,3 +107,4 @@
 
 | 轮次 | 日期 | 项 | 结果 | 现象 | 处理（提交） |
 | --- | --- | --- | --- | --- | --- |
+| 1 | 2026-10-06 | 中文系统下识别不出「不是 Git 仓库」（交接里列为待你判断） | 已修 | 见「已知问题与未覆盖」第一条，你选了方案 B | `7154f57d` |

@@ -602,3 +602,13 @@ Sonnet 只读子智能体对照基线复核整份 diff。没有发现高、中�
 - **history 补建**：00 §9 要求计划开始时建 history 文件，15 开始时漏了，收尾时按开始时间补建 `docs/histories/2026-10/20261006-1045-desktop-fe-15-run-target.md`。
 - 学习沉淀：命中「有陷阱」「可迁移」，写了 `docs/learnings/2026-10/20261006-cli-output-locale.md`。
 - 清理：停掉本次启动的 vite（5199）、headless Chrome（9333）和 Electron（9222）。
+
+### 验收反馈第 1 轮：中文系统下识别不出「不是 Git 仓库」
+
+- 2026-10-06 你选了方案 B。在主线 `refactor/desktop-frontend` 上提交 `7154f57d`（16 还没开始，不需要 rebase 子分支）。
+- 改法：`GitRunOptions` 增加可选 `env`，合并进子进程环境，`GIT_TERMINAL_PROMPT` 仍强制为 `0`；`getWorkspaceGitContext` 只在 `rev-parse --show-toplevel` 这一次传 `{ LC_ALL: "C" }`。
+- 测试：
+  - run-git 新增「env 合并且不能覆盖 `GIT_TERMINAL_PROMPT`」；
+  - git-context 新增「中文 locale 下非仓库仍判为 `not_repository`」（stub `LANG` / `LANGUAGE`，清空 `LC_ALL` / `LC_MESSAGES`），以及「只有那一次调用带 `LC_ALL=C`」。
+- 变异 4 个，全部有用例失败：不传 `LC_ALL`、`runGit` 不转发 env、run-git 不合并 env、env 放在 `GIT_TERMINAL_PROMPT` 之后。
+- 结果：desktop 全量测试文件 170 / 0 / 1，用例 1284 / 0 / 2，基线以来第一次没有失败用例；`check:ipc-channels`、`check:renderer-bridge` 通过；Electron 实测 `/tmp/fe15-nonrepo` 返回 `not_repository`。

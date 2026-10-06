@@ -90,9 +90,7 @@
 
 ## 已知风险和遗留事项
 
-- **需要你判断**：在中文系统下，git 的错误提示是中文，`workspace-git-context-service` 用英文正则判断「不是 Git 仓库」，判断不出来，结果是 `failed`。这就是基线中那个失败用例的原因。
-  - 目前用户看不到差别：renderer 对 `failed` 和 `not_repository` 的处理相同；main 里唯一区别对待两者的函数，生产代码不调用。
-  - 方案见交接文档。
+- **已修复（验收反馈第 1 轮，`7154f57d`）**：中文系统下 git 的报错是中文，git-context 原来判断不出「不是 Git 仓库」，结果是 `failed`。按你选的方案 B，只在判断仓库的那一次调用上固定 `LC_ALL=C`。修复后 desktop 全量测试没有失败用例。
 - **mock 预置会话的路径对不上**：mock 预置的远端会话，路径与 Host 的工作区对不上。这时文案是「选择一个远端工作区」，但 select 已锁定。基线同样如此，留给 09 的新菜单处理。
 - **取消归档后模型回到默认**：会话被 evict 时删除 prefs，这是决策记录里定的。因此取消归档后，会话的模型回到该 Host 新建页的选择，工作区能按路径找回。
 - **composer 偶发用例**：`composer.test.tsx`「opens a card listing selected text and comments」在全量满载时偶尔超时，与本计划无关。
