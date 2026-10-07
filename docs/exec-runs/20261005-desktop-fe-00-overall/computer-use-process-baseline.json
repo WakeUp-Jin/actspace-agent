@@ -1,0 +1,25 @@
+{
+  "app_pid": 40906,
+  "processes": [
+    {
+      "pid": 40906,
+      "ppid": 40876,
+      "command": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/MacOS/ActspaceDev-2067fa05"
+    },
+    {
+      "pid": 41017,
+      "ppid": 40906,
+      "command": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/Frameworks/Electron Helper (GPU).app/Contents/MacOS/Electron Helper (GPU)"
+    },
+    {
+      "pid": 41018,
+      "ppid": 40906,
+      "command": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper"
+    },
+    {
+      "pid": 41058,
+      "ppid": 40906,
+      "command": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/Frameworks/Electron Helper (Renderer).app/Contents/MacOS/Electron Helper (Renderer)"
+    }
+  ]
+}

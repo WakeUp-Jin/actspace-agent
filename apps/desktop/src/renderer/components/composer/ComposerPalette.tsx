@@ -1,12 +1,9 @@
-import { BookOpen, Check, ChevronLeft, ChevronRight, Image, ListTodo, Loader2, MessageCircle, Paperclip, Search, Sparkles, type LucideIcon } from "lucide-react";
+import { BookOpen, Check, ChevronLeft, ChevronRight, Image, ListTodo, Loader2, MessageCircle, Paperclip, Search, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { ComposerMode, SkillCatalogItem } from "@actspace/shared";
-import type { CatalogModel, ModelCatalog } from "../../target/use-model-catalog";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { Popover, PopoverAnchor, PopoverContent } from "../ui/Popover";
-import { filterModelGroups, ModelOptionsBody, modelListEmptyText, showModelDetail, type ModelPickerOptions } from "./ModelPicker";
-import { isModelEditable } from "./model-options";
 
 // `+` 面板（09 §3）：与输入框同宽，贴在输入框上方，空间不够时由 Radix 翻到下方。
 // 焦点一直留在搜索框里（组合框模式），↑↓ 移动的是 aria-activedescendant。
@@ -26,17 +23,16 @@ const ROW_TRAILING_CLASS = "ml-auto flex shrink-0 items-center gap-1.5 text-text
 const STATE_CLASS = "flex items-center gap-2 px-2 py-3 text-act-sm text-text-faint";
 
 type PaletteMode = Exclude<ComposerMode, "agent">;
-type PalettePage = "main" | "skills" | "models" | "model-options";
+type PalettePage = "main" | "skills";
 
 const MODE_ROWS: Record<PaletteMode, { label: string; description: string; icon: LucideIcon; iconClass: string }> = {
   plan: { label: "Plan", description: "先出计划，确认后再执行", icon: ListTodo, iconClass: "text-warning" },
   chat: { label: "Chat", description: "纯对话，不使用工具", icon: MessageCircle, iconClass: "text-operational" },
 };
 
-const LISTBOX_LABEL: Record<Exclude<PalettePage, "model-options">, string> = {
+const LISTBOX_LABEL: Record<PalettePage, string> = {
   main: "添加上下文或工具",
   skills: "Skills",
-  models: "模型",
 };
 
 /** 只列非默认模式：空会话列 Plan / Chat，已开始的 Agent 会话只列 Plan，当前模式不列。 */
@@ -68,13 +64,6 @@ export type ComposerPaletteProps = {
   attachment: { label: string; description?: string; icon: "files" | "images"; onSelect: () => void };
   /** Chat 不加载 Skills，不显示入口。 */
   skills: ComposerPaletteSkills | null;
-  models: {
-    catalog: ModelCatalog;
-    selectedModelId: string;
-    selectedLabel: string;
-    onSelect: (modelId: string) => void;
-    options?: ModelPickerOptions;
-  };
   /**
    * 被面板锚住的整个输入框面板。`+` 按钮在里面，自己用 open / onOpenChange 开关面板，
    * 不用 PopoverTrigger：同时有 PopoverAnchor 时，Radix 会在 Anchor 挂上后重挂一次触发器。
@@ -85,8 +74,8 @@ export type ComposerPaletteProps = {
 
 
 /**
- * Composer 的 `+` 面板：搜索、模式、文件入口、Skills ›、模型 ›。
- * Skills 和模型在同一张卡片里下钻，搜索框左侧的图标变成 ‹ 返回。斜杠菜单仍然独立。
+ * Composer 的 `+` 面板：搜索、模式、文件入口、Skills ›。
+ * Skills 在同一张卡片里下钻，搜索框左侧的图标变成 ‹ 返回。模型选择在输入框里的模型按钮，斜杠菜单仍然独立。
  */
 export function ComposerPalette({ open, onOpenChange, children, ...content }: ComposerPaletteProps) {
   return (
@@ -126,16 +115,13 @@ function ComposerPaletteContent({
   onSelectMode,
   attachment,
   skills,
-  models,
   close,
 }: Omit<ComposerPaletteProps, "open" | "onOpenChange" | "children"> & { close: () => void }) {
   const [page, setPage] = useState<PalettePage>("main");
   const [query, setQuery] = useState("");
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [entered, setEntered] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const backRef = useRef<HTMLButtonElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   // 下钻前所在的行，返回时回到这一行。
   const returnKeyRef = useRef<string | null>(null);
@@ -150,15 +136,10 @@ function ComposerPaletteContent({
   }, []);
 
   useEffect(() => {
-    if (page === "model-options") backRef.current?.focus();
-    else inputRef.current?.focus();
+    inputRef.current?.focus();
   }, [page]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
-  const editableSpec = (modelId: string) => {
-    const spec = models.options?.find(modelId);
-    return spec && isModelEditable(spec) ? spec : undefined;
-  };
 
   function goTo(next: PalettePage, fromKey: string | null) {
     returnKeyRef.current = fromKey;
@@ -168,12 +149,9 @@ function ComposerPaletteContent({
   }
 
   function goBack() {
-    const parent: PalettePage = page === "model-options" ? "models" : "main";
-    const returnKey = page === "model-options" ? `model:${editingModelId}` : page === "skills" ? "entry:skills" : "entry:models";
     setQuery("");
-    setActiveKey(returnKey);
-    setEditingModelId(null);
-    setPage(parent);
+    setActiveKey("entry:skills");
+    setPage("main");
   }
 
   function finish(action: () => void) {
@@ -181,46 +159,6 @@ function ComposerPaletteContent({
     close();
     action();
   }
-
-  function openOptions(modelId: string) {
-    setEditingModelId(modelId);
-    goTo("model-options", `model:${modelId}`);
-  }
-
-  const modelRow = (model: CatalogModel, description: string | undefined): PaletteRow => {
-    const selected = model.id === models.selectedModelId;
-    const editable = editableSpec(model.id);
-    return {
-      key: `model:${model.id}`,
-      label: model.label,
-      description,
-      icon: <Sparkles className="shrink-0 text-text-faint" size={14} strokeWidth={1.9} aria-hidden="true" />,
-      drill: editable ? () => openOptions(model.id) : undefined,
-      trailing: (
-        <>
-          {editable ? (
-            <Button
-              variant="ghost"
-              size="xs"
-              tabIndex={-1}
-              // 鼠标悬停或键盘移到这一行时才露出；键盘用 → 打开。
-              className="opacity-0 group-aria-selected/palette-row:opacity-100"
-              aria-label={`编辑 ${model.id} 选项`}
-              onClick={(event) => {
-                event.stopPropagation();
-                openOptions(model.id);
-              }}
-            >
-              编辑
-            </Button>
-          ) : null}
-          {selected ? <Check className="text-text-main" size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
-        </>
-      ),
-      checked: selected,
-      activate: () => finish(() => models.onSelect(model.id)),
-    };
-  };
 
   const skillRow = (skill: SkillCatalogItem): PaletteRow => {
     const checked = skills?.selected.includes(skill.name) ?? false;
@@ -276,30 +214,18 @@ function ComposerPaletteContent({
         trailing: <ChevronRight size={14} strokeWidth={2} aria-hidden="true" />,
         activate: () => goTo("skills", "entry:skills"),
       }] : []),
-      {
-        key: "entry:models",
-        label: "模型",
-        description: models.selectedLabel,
-        icon: <Sparkles className="shrink-0 text-text-faint" size={14} strokeWidth={1.9} aria-hidden="true" />,
-        drill: () => goTo("models", "entry:models"),
-        trailing: <ChevronRight size={14} strokeWidth={2} aria-hidden="true" />,
-        activate: () => goTo("models", "entry:models"),
-      },
     ].filter((row) => !normalizedQuery || matches(normalizedQuery, row.label, row.description));
     if (!normalizedQuery) {
       sections.push({ key: "modes", rows: modeRows }, { key: "entries", rows: entryRows });
     } else {
-      // 有搜索词时按组列出：模式、入口、Skills、模型（例如输入 son 直接出现 Sonnet）。
+      // 有搜索词时按组列出：模式、入口、Skills。
       const skillRows = (skills?.items ?? [])
         .filter((skill) => matches(normalizedQuery, skill.name, skill.description))
         .map(skillRow);
-      const modelRows = filterModelGroups(models.catalog, normalizedQuery)
-        .flatMap((group) => group.models.map((model) => modelRow(model, group.label)));
       sections.push(
         { key: "modes", label: "模式", rows: modeRows },
         { key: "entries", label: "添加", rows: entryRows },
         { key: "skills", label: "Skills", rows: skillRows },
-        { key: "models", label: "模型", rows: modelRows },
       );
       if (sections.every((section) => section.rows.length === 0)) emptyState = <div className={STATE_CLASS}>没有匹配的结果。</div>;
     }
@@ -324,16 +250,6 @@ function ComposerPaletteContent({
         emptyState = <div className={STATE_CLASS}>{skills.items.length === 0 ? "暂无已启用的 Skills" : "没有匹配的 Skills。"}</div>;
       }
     }
-  } else if (page === "models") {
-    const groups = filterModelGroups(models.catalog, normalizedQuery);
-    for (const group of groups) {
-      sections.push({
-        key: `group:${group.key}`,
-        label: group.label,
-        rows: group.models.map((model) => ({ ...modelRow(model, undefined), detail: showModelDetail(group, model) ? model.detail : undefined })),
-      });
-    }
-    if (groups.length === 0) emptyState = <div className={STATE_CLASS}>{modelListEmptyText(models.catalog)}</div>;
   }
 
   const visibleSections = sections.filter((section) => section.rows.length > 0);
@@ -379,8 +295,7 @@ function ComposerPaletteContent({
     }
   }
 
-  const editingSpec = editingModelId === null ? undefined : editableSpec(editingModelId);
-  const listLabel = page === "model-options" ? undefined : LISTBOX_LABEL[page];
+  const listLabel = LISTBOX_LABEL[page];
 
   return (
     <PopoverContent
@@ -415,85 +330,70 @@ function ComposerPaletteContent({
         onReturnFocus();
       }}
     >
-      {page === "model-options" ? (
-        <>
-          <div className={SEARCH_ROW_CLASS}>
-            <IconButton ref={backRef} className="-ml-1" label="返回" tooltip={false} size="xs" onClick={goBack}>
+        <div className={SEARCH_ROW_CLASS}>
+          {page === "main" ? (
+            <Search size={14} strokeWidth={2} aria-hidden="true" />
+          ) : (
+            <IconButton className="-ml-1" label="返回" tooltip={false} size="xs" tabIndex={-1} onClick={goBack}>
               <ChevronLeft size={15} strokeWidth={2} aria-hidden="true" />
             </IconButton>
-            <span className="truncate text-act-sm font-medium text-text-main">{editingSpec?.label ?? editingModelId} 选项</span>
-          </div>
-          <div className={SEPARATOR_CLASS} />
-          {editingSpec && models.options ? <ModelOptionsBody spec={editingSpec} options={models.options} showLabel={false} /> : null}
-        </>
-      ) : (
-        <>
-          <div className={SEARCH_ROW_CLASS}>
-            {page === "main" ? (
-              <Search size={14} strokeWidth={2} aria-hidden="true" />
-            ) : (
-              <IconButton className="-ml-1" label="返回" tooltip={false} size="xs" tabIndex={-1} onClick={goBack}>
-                <ChevronLeft size={15} strokeWidth={2} aria-hidden="true" />
-              </IconButton>
-            )}
-            <input
-              ref={inputRef}
-              className={SEARCH_INPUT_CLASS}
-              type="text"
-              role="combobox"
-              aria-expanded="true"
-              aria-controls={listboxId}
-              aria-activedescendant={activeRow ? rowId(activeRow) : undefined}
-              aria-autocomplete="list"
-              value={query}
-              placeholder={page === "main" ? "搜索 Skills、文件、模型…" : page === "skills" ? "搜索 Skills" : "搜索模型"}
-              aria-label={page === "main" ? "搜索" : page === "skills" ? "搜索 Skills" : "搜索模型"}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={handleSearchKeyDown}
-            />
-          </div>
-          <div className={LIST_CLASS} ref={listRef} id={listboxId} role="listbox" aria-label={listLabel}>
-            {visibleSections.map((section, index) => (
-              <div key={section.key} role="group" aria-label={section.label}>
-                {section.label ? (
-                  <div className={GROUP_LABEL_CLASS} aria-hidden="true">{section.label}</div>
-                ) : index > 0 ? (
-                  <div className={SEPARATOR_CLASS} role="separator" />
-                ) : null}
-                {section.rows.map((row) => (
-                  <div
-                    key={row.key}
-                    id={rowId(row)}
-                    className={ROW_CLASS}
-                    role="option"
-                    aria-label={row.label}
-                    aria-selected={row === activeRow}
-                    aria-disabled={row.disabled || undefined}
-                    aria-checked={row.checked}
-                    onPointerMove={() => {
-                      if (!row.disabled && activeKey !== row.key) setActiveKey(row.key);
-                    }}
-                    // 不让点击把焦点从搜索框拿走。
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      if (!row.disabled) row.activate();
-                    }}
-                  >
-                    {row.icon}
-                    <span className="flex min-w-0 items-baseline gap-2">
-                      <span className={ROW_LABEL_CLASS}>{row.label}</span>
-                      {row.description ? <span className={ROW_DESCRIPTION_CLASS}>{row.description}</span> : null}
-                      {row.detail ? <span className={`${ROW_DESCRIPTION_CLASS} font-mono`}>{row.detail}</span> : null}
-                    </span>
-                    {row.trailing ? <span className={ROW_TRAILING_CLASS}>{row.trailing}</span> : null}
-                  </div>
-                ))}
-              </div>
-            ))}
-            {emptyState}
-          </div>
-        </>
-      )}
+          )}
+          <input
+            ref={inputRef}
+            className={SEARCH_INPUT_CLASS}
+            type="text"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls={listboxId}
+            aria-activedescendant={activeRow ? rowId(activeRow) : undefined}
+            aria-autocomplete="list"
+            value={query}
+            placeholder={page === "main" ? "搜索 Skills、文件…" : "搜索 Skills"}
+            aria-label={page === "main" ? "搜索" : "搜索 Skills"}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={handleSearchKeyDown}
+          />
+        </div>
+        <div className={LIST_CLASS} ref={listRef} id={listboxId} role="listbox" aria-label={listLabel}>
+          {visibleSections.map((section, index) => (
+            <div key={section.key} role="group" aria-label={section.label}>
+              {section.label ? (
+                <div className={GROUP_LABEL_CLASS} aria-hidden="true">{section.label}</div>
+              ) : index > 0 ? (
+                <div className={SEPARATOR_CLASS} role="separator" />
+              ) : null}
+              {section.rows.map((row) => (
+                <div
+                  key={row.key}
+                  id={rowId(row)}
+                  className={ROW_CLASS}
+                  role="option"
+                  aria-label={row.label}
+                  aria-selected={row === activeRow}
+                  aria-disabled={row.disabled || undefined}
+                  aria-checked={row.checked}
+                  onPointerMove={() => {
+                    if (!row.disabled && activeKey !== row.key) setActiveKey(row.key);
+                  }}
+                  // 不让点击把焦点从搜索框拿走。
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    if (!row.disabled) row.activate();
+                  }}
+                >
+                  {row.icon}
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span className={ROW_LABEL_CLASS}>{row.label}</span>
+                    {row.description ? <span className={ROW_DESCRIPTION_CLASS}>{row.description}</span> : null}
+                    {row.detail ? <span className={`${ROW_DESCRIPTION_CLASS} font-mono`}>{row.detail}</span> : null}
+                  </span>
+                  {row.trailing ? <span className={ROW_TRAILING_CLASS}>{row.trailing}</span> : null}
+                </div>
+              ))}
+            </div>
+          ))}
+          {emptyState}
+        </div>
     </PopoverContent>
   );
 }

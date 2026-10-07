@@ -146,7 +146,7 @@ export function ComposerToolbar({ mode, isStreaming, paletteOpen, onTogglePalett
           </IconButton>
         </span>
       ) : null}
-      <div className={`${CONTROL_GROUP_CLASS} [grid-area:model] group-data-[layout=inline]/composer-body:hidden`}>
+      <div className={`${CONTROL_GROUP_CLASS} [grid-area:model]`}>
         <ModelPicker {...model} />
       </div>
       <div className="[grid-area:send] grid">

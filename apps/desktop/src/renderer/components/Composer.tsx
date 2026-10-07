@@ -367,13 +367,6 @@ export function Composer({
           onToggle: skills.toggle,
           onRetry: () => void skills.load(true),
         }}
-        models={{
-          catalog: model.catalog,
-          selectedModelId: model.catalogSelectedModelId,
-          selectedLabel: model.displayLabel,
-          onSelect: model.selectModel,
-          options: model.pickerOptions,
-        }}
       >
         <div
           className={getComposerPanelClass(surface, layout.layout, attachmentState.dragActive)}

@@ -445,7 +445,7 @@ describe("Composer follow-up bar", () => {
       // 同一个固定 inline 网格决定折行，不能随真实布局的判定结果变化。
       const measuredBody = this.parentElement!;
       if (this.style.width) return body.dataset.layout === "stacked" ? 34 : 74;
-      return /\[grid-template-areas:'plus_(?:mode_)?input_send'\]/.test(measuredBody.className) ? 74 : 34;
+      return /\[grid-template-areas:'plus_(?:mode_)?input_model_send'\]/.test(measuredBody.className) ? 74 : 34;
     });
 
     await user.click(input);
@@ -541,7 +541,7 @@ describe("Composer follow-up bar", () => {
     expect(body.dataset.layout).toBe("stacked");
   });
 
-  it("hides the model button in the inline layout but keeps it in the DOM", async () => {
+  it("keeps the model button next to send in the inline layout and moves it to the bottom row when stacked", async () => {
     const user = userEvent.setup();
     renderComposer();
     const body = screen.getByLabelText("消息输入面板").querySelector(".composer-body") as HTMLElement;
@@ -549,8 +549,9 @@ describe("Composer follow-up bar", () => {
 
     expect(body.dataset.layout).toBe("inline");
     expect(body).toHaveClass("group/composer-body");
-    expect(modelGroup).toHaveClass("group-data-[layout=inline]/composer-body:hidden");
-    expect(body.className).not.toContain("_model_");
+    expect(modelGroup).toHaveClass("[grid-area:model]");
+    expect(modelGroup.className).not.toContain("hidden");
+    expect(body.className).toMatch(/'plus_input_model_send'/);
 
     await user.click(screen.getByLabelText("消息输入框"));
     await user.paste("a\nb");
@@ -649,7 +650,7 @@ describe("Composer follow-up bar", () => {
     expect(within(menu).queryByRole("option", { name: "Chat" })).not.toBeInTheDocument();
     expect(within(menu).getByRole("option", { name: "图片" })).toBeInTheDocument();
     expect(within(menu).getByRole("option", { name: "Skills" })).toBeInTheDocument();
-    expect(within(menu).getByRole("option", { name: "模型" })).toHaveTextContent("deepseek-flash");
+    expect(within(menu).queryByRole("option", { name: "模型" })).not.toBeInTheDocument();
     expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|Attach files/)).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "搜索" })).toHaveFocus();
   });

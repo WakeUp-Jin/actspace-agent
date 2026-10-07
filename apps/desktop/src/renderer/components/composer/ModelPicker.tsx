@@ -97,7 +97,7 @@ function normalizeLabel(label: string): string {
 }
 
 /** 搜索匹配模型名、模型 id（本机的 id 以供应商 id 开头）、详情（本机是 API 模型名）和分组名；空分组去掉。 */
-export function filterModelGroups(catalog: ModelCatalog, query: string): ModelCatalogGroup[] {
+function filterModelGroups(catalog: ModelCatalog, query: string): ModelCatalogGroup[] {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   return catalog.groups
     .map((group) => ({
@@ -112,13 +112,13 @@ export function filterModelGroups(catalog: ModelCatalog, query: string): ModelCa
 }
 
 /** 列表为空时的提示：远端还没拿到模型时说明在等 Host。 */
-export function modelListEmptyText(catalog: ModelCatalog): string {
+function modelListEmptyText(catalog: ModelCatalog): string {
   const totalModels = catalog.groups.reduce((count, group) => count + group.models.length, 0);
   return totalModels === 0 && catalog.source === "host" ? "等待 Host 模型" : "没有匹配的模型。";
 }
 
 /** 同一分组里有同名模型时，第二行显示详情区分。 */
-export function showModelDetail(group: ModelCatalogGroup, spec: CatalogModel): boolean {
+function showModelDetail(group: ModelCatalogGroup, spec: CatalogModel): boolean {
   return Boolean(spec.detail) && group.models.filter((model) => normalizeLabel(model.label) === normalizeLabel(spec.label)).length > 1;
 }
 
@@ -305,13 +305,13 @@ function ModelPickerMenu({ catalog, selectedModelId, onSelect, options }: ModelL
   );
 }
 
-/** Options 的内容（Thinking、推理强度）：模型按钮浮层里贴行显示，`+` 面板里作为下钻页。 */
-export function ModelOptionsBody({ spec, options, showLabel = true }: { spec: ComposerModelOption; options: ModelPickerOptions; showLabel?: boolean }) {
+/** Options 的内容（Thinking、推理强度）：模型按钮浮层里贴行显示。 */
+function ModelOptionsBody({ spec, options }: { spec: ComposerModelOption; options: ModelPickerOptions }) {
   const current = currentModelRuntimeOptions(spec, options.values[spec.id]);
   const efforts = modelReasoningEfforts(spec);
   return (
     <>
-      {showLabel ? <div className={DROPDOWN_LABEL_CLASS}>选项</div> : null}
+      <div className={DROPDOWN_LABEL_CLASS}>选项</div>
       {spec.supportsThinkingToggle ? (
         <label className={OPTION_TOGGLE_ROW_CLASS}>
           <span className={OPTION_TOGGLE_LABEL_CLASS}>Thinking</span>

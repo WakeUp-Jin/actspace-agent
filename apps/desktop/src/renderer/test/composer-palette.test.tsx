@@ -2,31 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import type { ComposerMode, ModelSelectionId, SkillCatalogItem } from "@actspace/shared";
+import type { ComposerMode, SkillCatalogItem } from "@actspace/shared";
 import { Composer } from "../components/Composer";
 import { ComposerPalette, paletteModes, type ComposerPaletteProps } from "../components/composer/ComposerPalette";
-import type { ComposerModelOption } from "../components/composer/model-options";
 import { TooltipProvider } from "../components/ui/Tooltip";
-import type { ModelCatalog } from "../target/use-model-catalog";
 import { mockContextSnapshot } from "./fixtures/workbenchFixture";
-
-const catalog: ModelCatalog = {
-  source: "local-providers",
-  groups: [
-    { key: "anthropic:Anthropic", label: "Anthropic", models: [{ id: "anthropic/sonnet", label: "Sonnet 5.5" }, { id: "anthropic/opus", label: "Opus 5.5" }] },
-    { key: "deepseek:DeepSeek", label: "DeepSeek", models: [{ id: "deepseek/flash", label: "deepseek-flash" }] },
-  ],
-};
-
-const sonnetOption: ComposerModelOption = {
-  id: "anthropic/sonnet" as ModelSelectionId,
-  label: "Sonnet 5.5",
-  provider: "openrouter",
-  apiModel: "anthropic/claude-sonnet-5-5",
-  thinkingDefault: true,
-  supportsThinkingToggle: true,
-  reasoningMandatory: false,
-};
 
 function skill(name: string, description: string): SkillCatalogItem {
   return { name, description, scope: "project", source: "project", location: `/work/.skills/${name}`, directory: `/work/.skills/${name}`, status: "available", removable: true, enabledForAgent: true, shadowed: false };
@@ -39,9 +19,7 @@ function renderPalette(overrides: HarnessProps = {}) {
     onReturnFocus: vi.fn(),
     onSelectMode: vi.fn(),
     onSelectAttachment: vi.fn(),
-    onSelectModel: vi.fn(),
     onToggleSkill: vi.fn(),
-    onOptionsChange: vi.fn(),
   };
   function Harness() {
     const [open, setOpen] = useState(overrides.initiallyOpen ?? true);
@@ -63,13 +41,6 @@ function renderPalette(overrides: HarnessProps = {}) {
           onToggle: calls.onToggleSkill,
           onRetry: vi.fn(),
         } : overrides.skills}
-        models={overrides.models ?? {
-          catalog,
-          selectedModelId: "anthropic/opus",
-          selectedLabel: "Opus 5.5",
-          onSelect: calls.onSelectModel,
-          options: { find: (id) => (id === sonnetOption.id ? sonnetOption : undefined), values: {}, onChange: calls.onOptionsChange },
-        }}
       >
         <div>
           <textarea aria-label="消息输入框" />
@@ -103,34 +74,19 @@ describe("ComposerPalette", () => {
   it("opens on the main page with search focused and the first row active", () => {
     renderPalette();
     expect(search()).toHaveFocus();
-    expect(search()).toHaveAttribute("placeholder", "搜索 Skills、文件、模型…");
-    expect(optionNames("添加上下文或工具")).toEqual(["Plan", "Chat", "图片", "Skills", "模型"]);
-    expect(screen.getByRole("option", { name: "模型" })).toHaveTextContent("Opus 5.5");
+    expect(search()).toHaveAttribute("placeholder", "搜索 Skills、文件…");
+    // 模型在输入框里的模型按钮上选，不进 `+` 面板。
+    expect(optionNames("添加上下文或工具")).toEqual(["Plan", "Chat", "图片", "Skills"]);
     expect(activeOption()).toHaveAttribute("aria-label", "Plan");
     expect(activeOption()).toHaveAttribute("aria-selected", "true");
   });
 
   it("does not list Plan while in Plan, and shows no mode group in a started Chat session", () => {
     renderPalette({ mode: "plan", sessionStarted: true });
-    expect(optionNames("添加上下文或工具")).toEqual(["图片", "Skills", "模型"]);
+    expect(optionNames("添加上下文或工具")).toEqual(["图片", "Skills"]);
     cleanup();
     renderPalette({ mode: "chat", sessionStarted: true, skills: null, attachment: { label: "图片与文件", icon: "files", onSelect: vi.fn() } });
-    expect(optionNames("添加上下文或工具")).toEqual(["图片与文件", "模型"]);
-  });
-
-  it("shows a model row after typing a model name and selects it with Enter", async () => {
-    const user = userEvent.setup();
-    const calls = renderPalette();
-    await user.type(search(), "son");
-    const results = screen.getByRole("listbox", { name: "添加上下文或工具" });
-    const models = within(results).getByRole("group", { name: "模型" });
-    expect(within(models).getByRole("option", { name: "Sonnet 5.5" })).toHaveTextContent("Anthropic");
-    expect(within(results).queryByRole("option", { name: "Plan" })).not.toBeInTheDocument();
-    expect(activeOption()).toHaveAttribute("aria-label", "Sonnet 5.5");
-    await user.keyboard("{Enter}");
-    expect(calls.onSelectModel).toHaveBeenCalledWith("anthropic/sonnet");
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-    expect(calls.onReturnFocus).toHaveBeenCalledTimes(1);
+    expect(optionNames("添加上下文或工具")).toEqual(["图片与文件"]);
   });
 
   it("searches Skills from the main page and says when nothing matches", async () => {
@@ -150,7 +106,7 @@ describe("ComposerPalette", () => {
     expect(screen.getByRole("option", { name: "Plan" })).toHaveAttribute("aria-disabled", "true");
     expect(activeOption()).toHaveAttribute("aria-label", "图片");
     await user.keyboard("{ArrowUp}");
-    expect(activeOption()).toHaveAttribute("aria-label", "模型");
+    expect(activeOption()).toHaveAttribute("aria-label", "Skills");
     await user.keyboard("{ArrowDown}");
     expect(activeOption()).toHaveAttribute("aria-label", "图片");
     await user.keyboard("{ArrowDown}");
@@ -200,35 +156,15 @@ describe("ComposerPalette", () => {
   it("goes back one level on Escape and closes on the main page", async () => {
     const user = userEvent.setup();
     const calls = renderPalette();
-    await user.click(screen.getByRole("option", { name: "模型" }));
-    expect(optionNames("模型")).toEqual(["Sonnet 5.5", "Opus 5.5", "deepseek-flash"]);
-    expect(within(screen.getByRole("group", { name: "Anthropic" })).getAllByRole("option")).toHaveLength(2);
-    expect(screen.getByRole("option", { name: "Opus 5.5" })).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("option", { name: "Skills" }));
+    expect(optionNames("Skills")).toEqual(["frontend-design", "release"]);
     await user.keyboard("{Escape}");
     expect(screen.getByRole("listbox", { name: "添加上下文或工具" })).toBeInTheDocument();
-    expect(activeOption()).toHaveAttribute("aria-label", "模型");
+    expect(activeOption()).toHaveAttribute("aria-label", "Skills");
     expect(calls.onReturnFocus).not.toHaveBeenCalled();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(calls.onReturnFocus).toHaveBeenCalledTimes(1);
-  });
-
-  it("opens a model's options as a page and returns to the model list", async () => {
-    const user = userEvent.setup();
-    const calls = renderPalette();
-    await user.click(screen.getByRole("option", { name: "模型" }));
-    expect(screen.queryByRole("button", { name: "编辑 anthropic/opus 选项" })).not.toBeInTheDocument();
-    await user.keyboard("{ArrowRight}");
-    expect(screen.getByText("Sonnet 5.5 选项")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "返回" })).toHaveFocus();
-    await user.click(screen.getByRole("checkbox", { name: "anthropic/sonnet Thinking" }));
-    expect(calls.onOptionsChange).toHaveBeenCalledWith("anthropic/sonnet", expect.any(Function));
-    await user.keyboard("{Escape}");
-    expect(screen.getByRole("listbox", { name: "模型" })).toBeInTheDocument();
-    expect(search()).toHaveFocus();
-    expect(activeOption()).toHaveAttribute("aria-label", "Sonnet 5.5");
-    await user.click(screen.getByRole("button", { name: "编辑 anthropic/sonnet 选项" }));
-    expect(screen.getByText("Sonnet 5.5 选项")).toBeInTheDocument();
   });
 
   it("closes on an outside click without taking focus back, and the trigger toggles it", async () => {

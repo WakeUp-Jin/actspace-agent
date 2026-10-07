@@ -4,17 +4,17 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 
 export type ComposerLayout = "inline" | "stacked";
 
-// Composer 输入布局对齐 Cursor（09）：单行 inline 是「+ · 模式 · 输入 · 发送」，模型按钮隐藏（还在 DOM 里，
-// 由 body 的 data-layout 控制显隐）；多行 stacked 是输入全宽在上，下面一行「+ · 模式 · 模型 · 空 · 发送」。
+// Composer 输入布局对齐 Cursor（09）：单行 inline 是「+ · 模式 · 输入 · 模型 · 发送」，模型按钮贴在发送左边；
+// 多行 stacked 是输入全宽在上，下面一行「+ · 模式 · 模型 · 空 · 发送」。
 // 用同一个 grid 容器切换 grid-template-areas，DOM 结构不变——textarea 是同一节点，切换布局不 remount、不丢焦点光标。
 // Agent 不显示模式 chip，grid 里也不留 mode 列，免得空列多出一份间距。
 const COMPOSER_BODY_BASE_CLASS = "composer-body group/composer-body grid min-h-[46px] items-center gap-x-1 p-2";
 const COMPOSER_BODY_INLINE_CLASS =
-  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'plus_mode_input_send']`;
+  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] [grid-template-areas:'plus_mode_input_model_send']`;
 const COMPOSER_BODY_STACKED_CLASS =
   `${COMPOSER_BODY_BASE_CLASS} gap-y-1.5 pt-2.5 grid-cols-[auto_auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input_input'_'plus_mode_model_._send']`;
 const COMPOSER_BODY_AGENT_INLINE_CLASS =
-  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_minmax(0,1fr)_auto] [grid-template-areas:'plus_input_send']`;
+  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_minmax(0,1fr)_auto_auto] [grid-template-areas:'plus_input_model_send']`;
 const COMPOSER_BODY_AGENT_STACKED_CLASS =
   `${COMPOSER_BODY_BASE_CLASS} gap-y-1.5 pt-2.5 grid-cols-[auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
 // 输入区最高 200px，超出后在内部滚动；新建页最少 2 行。
@@ -91,7 +91,6 @@ export function useComposerLayout({ surface, mode, message, inputRef, hasExtras,
       let inlineContentHeight: number;
       let contentHeight: number;
       try {
-        // 模型按钮的显隐跟着 data-layout 走，量单行宽度时也要按单行把它藏起来。
         measurement.className = inlineBodyClass;
         measurement.dataset.layout = "inline";
         inlineContentHeight = measuredInput.scrollHeight;

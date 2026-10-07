@@ -39,7 +39,7 @@ describe("Chat presentation and attachment recovery", () => {
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
     // 只列非默认模式：Chat 是当前模式不列，回 Agent 走模式标签上的 ×。
     const menu = screen.getByRole("listbox", { name: "添加上下文或工具" });
-    expect(within(menu).getAllByRole("option").map((item) => item.getAttribute("aria-label"))).toEqual(["Plan", "图片与文件", "模型"]);
+    expect(within(menu).getAllByRole("option").map((item) => item.getAttribute("aria-label"))).toEqual(["Plan", "图片与文件"]);
     await user.click(within(menu).getByRole("option", { name: "Plan" }));
     expect(onModeChange).toHaveBeenCalledWith("plan");
     expect(screen.getByRole("textbox")).toHaveValue("草稿");
@@ -52,7 +52,7 @@ describe("Chat presentation and attachment recovery", () => {
     const user = userEvent.setup();
     render(composer({ surface: "followup" }));
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    expect(screen.getAllByRole("option").map((item) => item.getAttribute("aria-label"))).toEqual(["图片与文件", "模型"]);
+    expect(screen.getAllByRole("option").map((item) => item.getAttribute("aria-label"))).toEqual(["图片与文件"]);
     await user.click(screen.getByRole("option", { name: "图片与文件" }));
     expect(selectFiles).toHaveBeenCalled();
     expect(screen.queryByRole("listbox")).toBeNull();
@@ -62,7 +62,7 @@ describe("Chat presentation and attachment recovery", () => {
     render(<TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="initial" onModeChange={onModeChange} /></TooltipProvider>);
     expect(screen.queryByText("规划新想法")).toBeNull();
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    expect(screen.getAllByRole("option").map((item) => item.getAttribute("aria-label"))).toEqual(["Plan", "Chat", "图片", "Skills", "模型"]);
+    expect(screen.getAllByRole("option").map((item) => item.getAttribute("aria-label"))).toEqual(["Plan", "Chat", "图片", "Skills"]);
     await user.click(screen.getByRole("option", { name: "Chat" }));
     expect(onModeChange).toHaveBeenCalledWith("chat");
   });

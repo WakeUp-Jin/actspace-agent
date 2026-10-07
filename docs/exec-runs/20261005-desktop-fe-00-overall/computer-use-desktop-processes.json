@@ -1,0 +1,139 @@
+[
+  {
+    "utc": "2026-10-07T04:00:15.305532+00:00",
+    "app_pid": 40906,
+    "processes": [
+      {
+        "pid": 40906,
+        "ppid": 40876,
+        "comm": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/MacOS/ActspaceDev-2067fa05"
+      },
+      {
+        "pid": 41017,
+        "ppid": 40906,
+        "comm": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/Frameworks/Electron Helper (GPU).app/Contents/MacOS/Electron Helper (GPU)"
+      },
+      {
+        "pid": 41018,
+        "ppid": 40906,
+        "comm": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper"
+      },
+      {
+        "pid": 41058,
+        "ppid": 40906,
+        "comm": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/Frameworks/Electron Helper (Renderer).app/Contents/MacOS/Electron Helper (Renderer)"
+      },
+      {
+        "pid": 98382,
+        "ppid": 40906,
+        "comm": "/bin/zsh"
+      }
+    ],
+    "note": "Exact PID/PPID ancestry; comm only, no environment or command args."
+  },
+  {
+    "utc": "2026-10-07T04:03:35.969345+00:00",
+    "closed_terminal_pid": 98382,
+    "still_alive": false
+  },
+  {
+    "utc": "2026-10-07T05:57:39.774026+00:00",
+    "phase": "Second approval accepted, long fixture sleep tool running",
+    "comm_only_processes": [
+      {
+        "pid": 37355,
+        "ppid": 40906,
+        "comm": "/bin/zsh"
+      },
+      {
+        "pid": 37357,
+        "ppid": 37355,
+        "comm": "sleep"
+      },
+      {
+        "pid": 40906,
+        "ppid": 40876,
+        "comm": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/MacOS/ActspaceDev-2067fa05"
+      },
+      {
+        "pid": 5020,
+        "ppid": 40906,
+        "comm": "/bin/zsh"
+      }
+    ]
+  },
+  {
+    "utc": "2026-10-07T06:08:23.345704+00:00",
+    "phase": "Long fixture sleep naturally completed",
+    "tracked_pids": [
+      37355,
+      37357
+    ],
+    "remaining": [],
+    "both_cleaned_up": true
+  },
+  {
+    "utc": "2026-10-07T06:12:50.257296+00:00",
+    "phase": "Third tool approved for steer/stop acceptance",
+    "comm_only_processes": [
+      {
+        "pid": 55397,
+        "ppid": 40906,
+        "comm": "/bin/zsh"
+      },
+      {
+        "pid": 55399,
+        "ppid": 55397,
+        "comm": "sleep"
+      },
+      {
+        "pid": 5020,
+        "ppid": 40906,
+        "comm": "/bin/zsh"
+      }
+    ]
+  },
+  {
+    "utc": "2026-10-07T06:17:04.316491+00:00",
+    "phase": "Third task stopped through real desktop UI",
+    "tracked_pids": [
+      55397,
+      55399
+    ],
+    "remaining": [],
+    "both_cleaned_up": true
+  },
+  {
+    "utc": "2026-10-07T07:47:42.988692+00:00",
+    "app_pid": 40906,
+    "phase": "Services in progress; lifecycle not yet executed",
+    "processes": [
+      {
+        "pid": 40906,
+        "ppid": 40876,
+        "comm": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/MacOS/ActspaceDev-2067fa05"
+      },
+      {
+        "pid": 41017,
+        "ppid": 40906,
+        "comm": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/Frameworks/Electron Helper (GPU).app/Contents/MacOS/Electron Helper (GPU)"
+      },
+      {
+        "pid": 41018,
+        "ppid": 40906,
+        "comm": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper"
+      },
+      {
+        "pid": 41058,
+        "ppid": 40906,
+        "comm": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-electron-dev/2067fa05-39.8.10-v1/Actspace Dev actspace-agent-2067.app/Contents/Frameworks/Electron Helper (Renderer).app/Contents/MacOS/Electron Helper (Renderer)"
+      },
+      {
+        "pid": 5020,
+        "ppid": 40906,
+        "comm": "/bin/zsh"
+      }
+    ],
+    "note": "Actual app tree includes terminal shell5020. No git or Browser Bridge child in this snapshot; does not prove unexecuted shutdown."
+  }
+]
