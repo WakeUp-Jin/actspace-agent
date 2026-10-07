@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AppDataRoots } from "../agent-run";
+import type { GitRunner } from "../git/run-git";
 import {
   commitAndPushWorkspaceChanges,
   commitWorkspaceChanges,
@@ -339,5 +340,26 @@ describe("workspace environment service", () => {
 
     if (!gitAvailable) return;
     expect(result).toMatchObject({ ok: false, error: "no_remote", branch: "main" });
+  });
+
+  // 15 T13：run-git 把 startError 改成 { code, message } 后，git 缺失（ENOENT）和非仓库的判断不变。
+  it("treats a git start error with code ENOENT as Git being unavailable", async () => {
+    const roots = await makeRoots();
+    const missing: GitRunner = async () => ({ stdout: "", stderr: "", exitCode: null, timedOut: false, truncated: false, startError: { code: "ENOENT", message: "spawn git ENOENT" } });
+
+    const snapshot = await getWorkspaceEnvironment({}, roots, missing);
+    expect(snapshot.git).toMatchObject({ available: false, repository: false });
+    const created = await createWorkspaceBranch({ branchName: "feature" }, roots, missing);
+    expect(created).toMatchObject({ ok: false, error: "git_not_found" });
+  });
+
+  it("keeps Git available but not a repository for other start errors", async () => {
+    const roots = await makeRoots();
+    const denied: GitRunner = async () => ({ stdout: "", stderr: "", exitCode: null, timedOut: false, truncated: false, startError: { code: "EACCES", message: "spawn git EACCES" } });
+
+    const snapshot = await getWorkspaceEnvironment({}, roots, denied);
+    expect(snapshot.git).toMatchObject({ available: true, repository: false });
+    const created = await createWorkspaceBranch({ branchName: "feature" }, roots, denied);
+    expect(created).toMatchObject({ ok: false, error: "not_repository" });
   });
 });

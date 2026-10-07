@@ -7,20 +7,17 @@
  * - 无 preload（浏览器 mock）时整个按钮不渲染，而不是渲染一个点了报错的按钮。
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Loader2, SquareArrowOutUpRight } from "lucide-react";
 import type { WorkspaceOpenTool, WorkspaceOpenToolId } from "@actspace/shared";
+import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "../ui/Menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { OPEN_TOOL_LABELS, readStoredOpenTool, storeOpenTool, toolIcon } from "../workspace/workspaceOpenTool";
+import { workspacesApi } from "../../api/workspaces";
 
 const TRIGGER_CLASS =
   "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
-const MENU_CLASS =
-  "absolute right-0 top-[calc(100%+4px)] z-(--act-z-dropdown) min-w-[196px] overflow-hidden rounded-act-lg border border-line bg-surface-raised p-1.5 shadow-act-popover";
-const MENU_ITEM_CLASS =
-  "flex min-h-8 w-full items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2 text-left text-act-xs text-text-main transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:text-text-faint disabled:hover:bg-transparent [cursor:pointer] disabled:[cursor:default]";
-const MENU_HINT_CLASS = "px-2 py-1 text-act-xxs text-text-faint";
-const MENU_ERROR_CLASS = "border-t border-line px-2 pt-1.5 text-act-xxs leading-relaxed text-danger";
+const MENU_ERROR_CLASS = "mt-1 border-t border-line px-2 pt-1.5 pb-1 text-act-xxs leading-relaxed text-danger";
 
 export function OpenInAppMenu({
   workspaceRoot,
@@ -34,34 +31,9 @@ export function OpenInAppMenu({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preferred, setPreferred] = useState<WorkspaceOpenToolId>(readStoredOpenTool);
-  const anchorRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  const available = typeof window !== "undefined" && typeof window.actspace?.openWorkspaceInTool === "function";
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(event: PointerEvent) {
-      if (!anchorRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setOpen(false);
-      queueMicrotask(() => triggerRef.current?.focus());
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  if (!available) return null;
 
   const loadTools = async () => {
-    const api = window.actspace?.listWorkspaceOpenTools;
-    if (!api) return;
+    const api = workspacesApi.listOpenTools;
     try {
       setTools((await api()).tools);
     } catch {
@@ -71,8 +43,7 @@ export function OpenInAppMenu({
   };
 
   const openWith = async (toolId: WorkspaceOpenToolId) => {
-    const api = window.actspace?.openWorkspaceInTool;
-    if (!api) return;
+    const api = workspacesApi.openInTool;
     setBusy(true);
     setError(null);
     try {
@@ -96,55 +67,50 @@ export function OpenInAppMenu({
     : [{ id: preferred, label: OPEN_TOOL_LABELS[preferred], available: true }];
 
   return (
-    <div ref={anchorRef} className="relative flex items-center">
+    <Menu
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        setError(null);
+        if (next) void loadTools();
+      }}
+    >
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            ref={triggerRef}
-            type="button"
-            className={TRIGGER_CLASS}
-            aria-label="在外部应用中打开"
-            aria-haspopup="menu"
-            aria-expanded={open}
-            onClick={() => {
-              const next = !open;
-              setOpen(next);
-              setError(null);
-              if (next) void loadTools();
-            }}
-          >
-            {busy ? (
-              <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <SquareArrowOutUpRight size={14} strokeWidth={1.8} aria-hidden="true" />
-            )}
-          </button>
+          <MenuTrigger asChild>
+            <button type="button" className={TRIGGER_CLASS} aria-label="在外部应用中打开">
+              {busy ? (
+                <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <SquareArrowOutUpRight size={14} strokeWidth={1.8} aria-hidden="true" />
+              )}
+            </button>
+          </MenuTrigger>
         </TooltipTrigger>
         <TooltipContent>在外部应用中打开</TooltipContent>
       </Tooltip>
-      {open ? (
-        <div className={MENU_CLASS} role="menu" aria-label="打开方式">
-          <div className={MENU_HINT_CLASS}>打开 {relativePath}</div>
-          {listed.map((tool) => (
-            <button
-              key={tool.id}
-              type="button"
-              role="menuitem"
-              className={MENU_ITEM_CLASS}
-              disabled={!tool.available || busy}
-              onClick={() => void openWith(tool.id)}
-            >
-              {toolIcon(tool, 15)}
-              <span className="min-w-0 flex-1 truncate">{tool.label}</span>
-              {!tool.available ? <span className="text-act-xxs text-text-faint">未安装</span> : null}
-              {tool.id === preferred && tool.available ? (
-                <span className="text-act-xxs text-text-faint">上次</span>
-              ) : null}
-            </button>
-          ))}
-          {error ? <div className={MENU_ERROR_CLASS}>{error}</div> : null}
-        </div>
-      ) : null}
-    </div>
+      <MenuContent align="end" className="min-w-[196px] max-w-[320px]">
+        <MenuLabel className="truncate">打开 {relativePath}</MenuLabel>
+        {listed.map((tool) => (
+          <MenuItem
+            key={tool.id}
+            disabled={!tool.available || busy}
+            // 打开失败时菜单留着显示错误，成功后才关。
+            onSelect={(event) => {
+              event.preventDefault();
+              void openWith(tool.id);
+            }}
+          >
+            {toolIcon(tool, 15)}
+            <span className="min-w-0 flex-1 truncate">{tool.label}</span>
+            {!tool.available ? <span className="text-act-xxs text-text-faint">未安装</span> : null}
+            {tool.id === preferred && tool.available ? (
+              <span className="text-act-xxs text-text-faint">上次</span>
+            ) : null}
+          </MenuItem>
+        ))}
+        {error ? <div className={MENU_ERROR_CLASS} role="alert">{error}</div> : null}
+      </MenuContent>
+    </Menu>
   );
 }

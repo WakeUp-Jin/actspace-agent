@@ -22,9 +22,47 @@
 |---|---|---|---|
 | 2026-09-26 | renderer 间距 | 组件中仍有 `p-[7px]`、`gap-[9px]`、`py-[5px]` 等间距写死值，没有纳入 `check:frontend-tokens`。 | 先统计分布，决定是否收敛到 4px 网格或登记例外，再加检查规则。 |
 | 2026-09-26 | 内容边界 CSS | `styles/markdown.css`、`diff.css`、`tool-result.css`、`web-tool.css` 内部仍用 px 字号。 | 这些文件服务模型输出和第三方 DOM，改为 `var(--text-act-*)` 前需逐个对照渲染结果。 |
-| 2026-09-26 | 未迁移的按钮形态 | 菜单项（Composer 命令菜单、模型列表、消息操作菜单）、下拉触发器（模式 / 模型选择器、`SettingsSelect`）、分段控件（预览 / 源码切换）仍是各自的样式常量；Composer 附件删除按钮、Sidebar 会话行按钮等内联按钮未改为 `IconButton`。 | 随 `active/frontend-ui-components-foundation.md` 的 `DropdownMenu`、`Tabs` 落地一起迁移。 |
+| 2026-09-26 | 未迁移的按钮形态 | 菜单项（Composer 命令菜单、模型列表）、下拉触发器（Composer 模式 / 模型选择器）、分段控件（预览 / 源码切换）仍是各自的样式常量；Composer 附件删除按钮、Sidebar 会话行置顶 / 归档等内联按钮未改为 `IconButton`。2026-10-06：消息操作菜单和 `SettingsSelect` 已由 Desktop 前端重构 16 改用 `ui/Menu`、`ui/Select`；原生按钮数由 `check:frontend-tokens` 的基线守住，不再增加。 | Composer 的随 09 迁移；分段控件随 `active/frontend-ui-components-foundation.md` 的 `Tabs`。 |
 | 2026-09-26 | 设置表单内部 | `CustomConnectionModels` 行内操作、API Key 显隐切换等与 36px 输入框同排的控件，以及 `CustomModelForm`、连接状态块的「边框卡片」式分组仍是旧写法。 | 与 Input / Textarea 基础组件一起收口；分组样式需要用户决定是否改为内嵌分组。 |
 | 2026-09-26 | dialog 圆角 | 8 处 dialog 仍用 `rounded-act-xl`（18px），规范为 12px。 | 单独做一次 dialog 外观统一，与 `Dialog` 基础组件一起。 |
+
+## Desktop 前端组件遗留
+
+2026-10-06 Desktop 前端重构 16（UI 原语与组件拆分，`active/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md`）之后仍未处理的项，过程见 `docs/exec-runs/20261005-desktop-fe-16-ui-primitives/execution-process.md`：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-10-06 | renderer / 文件行数 | `RightPanel.tsx` 763 行、`settings/SettingsPrimitives.tsx` 783 行、`workspace/WorkspaceChromeControls.tsx` 662 行，超过 500 行。SettingsPrimitives 剩下的组件都被两个以上设置文件使用，再降要拆成多个文件。 | RightPanel 按标签栏、标签内容、溢出菜单拆；SettingsPrimitives 按行 / 表单控件 / 菜单拆成 `settings/primitives/`。 |
+| 2026-10-06 | renderer / 手写弹层 | 三处没有迁到 `components/ui/`：RightPanel 标签溢出菜单（菜单项里嵌「关闭标签」按钮）、`right-panel/ReplyHtmlRenderView.tsx` 的可视化文件列表、`settings/ModelSettings.tsx` 的 `ModelMultiSelector`（可搜索多选，document 监听，没有方向键）。它们仍自己监听 Escape 和外部点击。 | 溢出菜单要先改交互（关闭按钮挪出菜单项或改子菜单）再换 `ui/Menu`；文件列表换 `ui/Select`；多选换 `ui/Popover` + 列表，补方向键。 |
+| 2026-10-06 | renderer / 归档范围 | App 的 `handleArchiveWorkspace` 自己按 `workspaceId` / 路径挑要归档的会话，规则和侧栏分组（`sidebar/session-grouping.ts`）不完全相同：带本机工作区 id 的远端会话会被它算进去，侧栏却分在远端组；`workspaceId` 已不存在、路径却和某个工作区相同的会话，侧栏归进那个工作区，它却不算。边角情况下「归档全部」可用与否和实际归档的范围可能不一致。 | 改为复用 `session-grouping.ts` 的 `sessionGroupKey`，补一条对照测试。 |
+| 2026-10-06 | renderer / 死状态 | WorkbenchLayout 的 `usageSnapshot` 状态从未被写入（`setUsageSnapshot` 没有调用方），SettingsPage 收到的恒为 null。 | 先确认 SettingsPage 用量页的数据来源，再删掉这条 prop 链或接上数据。 |
+| 2026-10-06 | renderer / 疑似死代码 | `messages/SubAgentTranscriptModal.tsx` 的 `SubAgentTranscriptPanel` 在 renderer 里没有使用方，只有 `agent-run-block.test.tsx` 引用。 | 确认子 Agent 记录已由 `right-panel/SubagentsPanel.tsx` 取代后，连同测试删除。 |
+| 2026-10-06 | renderer / 死入口 | `ProviderKeyModal` 打不开：`SettingsPage` 传下去的 `onConnectProvider` 在 `settings/sections/` 里没有调用方（16 之前的 `ProvidersSection` 也只解构不调用）。 | 确认 Provider Key 是否已全部改由模型连接向导录入；是就删掉 `ProviderKeyModal` 和这条 prop，否则补上入口。 |
+| 2026-10-06 | renderer / 占位按钮 | Composer 的「更多审查操作」`⋯`（`review-overflow-button`）没有 `onClick`，点了没有反应，16 之前就是这样。 | 补上菜单内容，或先隐藏。09（2026-10-07）只把它搬进 `composer/ReviewStrip.tsx`，行为未改。 |
+| 2026-10-06 | renderer / 窄窗 | 窗口最小宽度 480 时打开侧栏覆盖层，会话右键菜单的「复制」子菜单（208px）左右都放不下，翻到左侧后左边约 52px 出界。Radix 只翻转，不在水平方向挪。 | 子菜单加 `max-w-[calc(100vw-16px)]` 并允许文字截断，或窄窗下把两个复制项平铺到主菜单。 |
+| 2026-10-06 | renderer / Composer 跨会话状态 | Composer 不按会话重挂（16 之前两个有消息的会话之间也不重挂）：远端会话 A 发送中切到 B，B 的发送按钮也被 `sending` 禁用，直到 A 的请求结束；A 里选的模型运行时选项会带到 B。A 发送中切走、随后失败时，附件只靠 App 的恢复草稿（不带预览）找回，原来的预览 URL 不释放。 | `sending` 按 `draftKey` 记；运行时选项按会话存；失败时把附件写回 A 的附件草稿，和 `draftRestore` 的顺序一起定。09（2026-10-07）只把这部分搬进 `composer/use-composer-send.ts`、`use-composer-model.ts`，行为未改，建议单独做一个「Composer 草稿按会话隔离」小计划。 |
+| 2026-10-06 | renderer / 嵌套交互 | `settings/CustomConnectionModels.tsx` 的模型行是 `div role="button"`，里面嵌了菜单按钮和开关，读屏会把整行读成按钮。检查脚本只数 `<button`，拦不住这类写法。 | 行本身改成非交互容器，点击区域收到标题上；或把行内控件挪出去。 |
+
+## Desktop 安全遗留
+
+2026-10-06 Desktop 前端重构 11（安全与 IPC，`active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md`）之后仍未处理的项：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-10-06 | main / 子进程环境（C1） | `settings-service` 的 `applyToEnv` 把搜索服务 Key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY` / `TINYFISH_API_KEY`）等写进 `process.env`。以下子进程继承完整环境：bash 工具（`packages/tools/shell-tools/src/node-ports.ts`）、`rg`（`packages/tools/filesystem-search/src/node-ports.ts`）、git / gh（`review-git-service`、`review-git-engine`、`review-git-worker`、`review-pr-service`、`workspace-environment-service`、`workspace-git-context-service`）、ssh（`remote-hosts/ssh.ts`）、Browser Bridge 命令、本地更新脚本。只有终端 pty 经 `sanitizeEnvironment` 过滤。 | 01 S7：工具配置改由 Runtime 配置端口注入，删除 `applyToEnv`；子进程改用环境变量白名单。需要单独设计。2026-10-07（17）：`applyToEnv` 已集中到 `apps/desktop/src/main/settings/env.ts`，调用点和次数不变，退役时只改这一处和 store 的转调。 |
+| 2026-10-06 | main / Browser Bridge 安装 | `installBrowserBridgeFromRepo`（`fixed-renderer-ipc.ts`）把 renderer 传来的 `repoRoot` 交给 `browser-bridge-service.buildAndInstall`，只校验扩展 manifest（名称、key、扩展 id）就在该目录执行 `build.sh`。renderer 被注入脚本时，可以让 main 在任意满足条件的目录里跑脚本。11 的复核发现，不在 11 范围内。 | 改为 main 弹系统对话框选择源码目录（与 `selectWorkspaceDirectory` 相同的做法），channel 不再接受路径参数。 |
+| 2026-10-06 | scripts / IPC 审计 | `check:ipc-channels` 只核对常量、注册和 preload 引用三者一致，不检查注册是否经过 `assertTrustedSender`；preload 只要出现 channel 字符串就算引用，不区分 invoke 和 on。 | 13 落地统一注册器和 IPC contract 后，由注册器强制 sender 校验，审计脚本改为以 contract 为来源并区分方向。 |
+| 2026-10-06 | renderer / 主文档 CSP | 主文档没有 CSP。实测严格策略会让 HTML 预览（srcdoc iframe 继承父策略）的内联脚本、样式和桥脚本失效，mermaid SVG 内的 `<style>` 被拦；应用本身启动、React style prop、highlight.js、`data:` 图片不受影响。结论见 `docs/exec-runs/20261005-desktop-fe-11-security-ipc/execution-process.md` 的 T9。 | 先把 HTML 预览改用自定义协议（例如 `actspace-preview://`）加载，使其不继承主文档策略；mermaid 样式改走 nonce / hash 或隔离渲染；之后由 main 用 `onHeadersReceived` 注入严格 CSP。 |
+
+## Desktop settings 遗留
+
+2026-10-07 Desktop 前端重构 17（settings-service 拆分，`active/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md`）的特征测试（T1，以及 T6 / T7 变异检查后补的用例）记下的现有行为。17 是纯搬迁，不改；测试按现状断言（`apps/desktop/src/main/test/settings-characterization.test.ts`）。
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-10-07 | main / settings 旧写入口 | 旧接口 `update` / `updateV2` 改 agent 字段时只改内存里的 v3 结构；写 v4 文件时，`toSettingsV4` 只在 v4 对应字段为空时才用它（`taskDefaults.temperature` / `maxOutputTokens` 为 null、`tools.disabledTools` 为空、`tools.bash.alwaysAsk` 为 false）。所以 v4 里已有值时，改动只留在内存和 env，重启或下一次 `updateNamespaceV4` 后回到文件里的旧值；`bashAlwaysAsk` 只能打开、关不掉。renderer 只在 v4 快照不可写时走这条回退（`useToolToggle.ts`、`ToolsSection.tsx`）。 | 旧入口同时写 v4 对应字段，或者删掉 renderer 的旧接口回退。 |
+| 2026-10-07 | main / settings 回滚 | `restoreFilesBestEffort` 先恢复 settings.json、再恢复 secrets.json，放在同一个 try 里：恢复 settings 失败时 secrets 不再恢复，磁盘上留着新 key，内存里是旧 key。另外（读代码所得，未写用例）：`writeSecretsFile` 在字节已经落盘后才失败（例如 rename 之后的 chmod）时，`secretsWritten` 还是 false，不会回滚，磁盘和内存同样不一致。 | 两个文件各自恢复；`writeSecretsFile` 一旦开始写就当作「可能已落盘」处理。 |
+| 2026-10-07 | main / settings v4 namespace 写入 | `updateNamespaceV4` 以及经它落盘的 custom connection 增改删、连接检测结果：写 settings.json 失败时只把内存恢复成写入前，不恢复文件。字节已经落盘后才报错时，磁盘上是新内容，内存是旧内容，直到下一次写入或重启（17 T7 补的特征测试 `v4 namespace updates` 照录）。 | 失败时也按内存重写一次 settings.json，或者和其他路径一样走 `restoreFilesBestEffort`。 |
 
 ## v1 历史债务记录
 

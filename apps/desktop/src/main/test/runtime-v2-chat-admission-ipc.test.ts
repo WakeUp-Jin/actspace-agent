@@ -7,6 +7,9 @@ vi.mock("electron", () => ({ dialog: {}, nativeImage: {}, nativeTheme: {}, ipcMa
   removeHandler: (channel: string) => handlers.delete(channel), on: vi.fn(), removeListener: vi.fn(),
 } }));
 import { registerFixedRendererIpc, type FixedRendererIpcOptions } from "../runtime-v2/fixed-renderer-ipc";
+import { trustedWindow } from "./ipc-sender-fixture";
+
+const trusted = trustedWindow();
 import { PendingApprovalRegistry } from "../approval-registry";
 afterEach(() => handlers.clear());
 it("returns a serializable rejection before starting a turn and identifies the selected attachment", async () => {
@@ -17,7 +20,7 @@ it("returns a serializable rejection before starting a turn and identifies the s
     registry: {
       taskCommand: async () => ({ snapshot: { tasks: [] } }), subscribe: () => () => {}, subscribeRendererStream: () => () => {}, inspectSession: async () => ({ agentMode: "chat" }), importChatAttachments, submitTask },
     settings: { subscribeV4Changes: () => () => {} },
-    getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
+    getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
   const input = { sessionId: "chat", submissionId: "run", userInput: "keep", attachments: [
     { id: "good", name: "good.txt", path: "/fixture/good.txt", kind: "file" },
@@ -25,13 +28,13 @@ it("returns a serializable rejection before starting a turn and identifies the s
   ] };
   try {
     const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask)!;
-    const result = await handler({ sender: { id: 7 } }, input);
+    const result = await handler(trusted.event, input);
     expect(JSON.parse(JSON.stringify(result))).toEqual({ status: "submission-failed", acknowledgement: "rejected", message: "附件校验失败，请检查后重试。", attachmentIssue: { code: "invalid_utf8", fileName: "bad.txt", attachmentId: "bad" } });
     expect(submitTask).not.toHaveBeenCalled();
     importChatAttachments.mockRejectedValueOnce(new ChatAttachmentValidationError({ code: "total_text_too_large", limit: 256000 }, undefined, [130000, 130000]));
-    expect(await handler({ sender: { id: 7 } }, input)).toMatchObject({ attachmentIssue: { textCharacterCounts: { good: 130000, bad: 130000 } } });
+    expect(await handler(trusted.event, input)).toMatchObject({ attachmentIssue: { textCharacterCounts: { good: 130000, bad: 130000 } } });
     importChatAttachments.mockRejectedValueOnce(new Error("store unavailable"));
-    expect(await handler({ sender: { id: 7 } }, input)).toMatchObject({ status: "submission-failed", acknowledgement: "rejected", message: expect.stringContaining("store unavailable") });
+    expect(await handler(trusted.event, input)).toMatchObject({ status: "submission-failed", acknowledgement: "rejected", message: expect.stringContaining("store unavailable") });
     expect(submitTask).not.toHaveBeenCalled();
   } finally { registration.dispose(); }
 });
@@ -49,7 +52,7 @@ it.each(["agent", "plan"])("rejects %s preparation failures but keeps admission 
       inspectSession: async () => ({ agentMode: mode }), importAttachment, rollbackImportedAttachments, submitTask,
     },
     settings: { subscribeV4Changes: () => () => {} },
-    getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
+    getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
   try {
     const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask)!;
@@ -57,13 +60,13 @@ it.each(["agent", "plan"])("rejects %s preparation failures but keeps admission 
       { id: "valid", name: "visible.png", path: "/fixture/visible.png", kind: "image" },
       { id: "large", name: "oversized.png", path: "/fixture/oversized.png", kind: "image" },
     ] };
-    expect(await handler({ sender: { id: 7 } }, input)).toMatchObject({
+    expect(await handler(trusted.event, input)).toMatchObject({
       status: "submission-failed", acknowledgement: "rejected", message: expect.stringContaining("20 MiB"),
     });
     expect(submitTask).not.toHaveBeenCalled();
     expect(rollbackImportedAttachments).toHaveBeenCalledExactlyOnceWith("session", ["valid"]);
     // A failure after the admission boundary may already have persisted the Task.
-    await expect(handler({ sender: { id: 7 } }, { ...input, attachments: [] })).rejects.toThrow("reply lost after admission");
+    await expect(handler(trusted.event, { ...input, attachments: [] })).rejects.toThrow("reply lost after admission");
     expect(submitTask).toHaveBeenCalledTimes(1);
   } finally { registration.dispose(); }
 });
@@ -79,14 +82,14 @@ it("recovers the accepted call preview and excludes approvals resolved while rea
     registry: {
       taskCommand: async () => ({ snapshot: { tasks: [] } }), subscribe: () => () => {}, subscribeRendererStream: () => () => {}, browseToolDetail },
     settings: { subscribeV4Changes: () => () => {} },
-    getMainWindow: () => ({ isDestroyed: () => false, webContents: { id: 7 } }),
+    getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
   try {
     const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listPendingApprovals)!;
-    expect(await handler({ sender: { id: 7 } }, { sessionId: "s" })).toEqual([expect.objectContaining({ recovery: expect.objectContaining({ agentRunId: "r", toolCallId: "c", preview: expect.objectContaining({ kind: "read", filePath: "/outside/fixture.txt" }) }) })]);
+    expect(await handler(trusted.event, { sessionId: "s" })).toEqual([expect.objectContaining({ recovery: expect.objectContaining({ agentRunId: "r", toolCallId: "c", preview: expect.objectContaining({ kind: "read", filePath: "/outside/fixture.txt" }) }) })]);
     let release!: (value: typeof detail) => void;
     browseToolDetail.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
-    const reading = handler({ sender: { id: 7 } }, { sessionId: "s" });
+    const reading = handler(trusted.event, { sessionId: "s" });
     approvals.decide("approval", "deny"); release(detail);
     expect(await reading).toEqual([]);
     await decision;

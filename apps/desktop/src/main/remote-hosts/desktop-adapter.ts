@@ -10,8 +10,17 @@ import type { SessionListItem, SessionListPage, SessionListPageInput } from "@ac
 import { HOST_IPC, isRecord, type SessionRef } from "@actspace/shared/host-protocol";
 import { RemoteSessionRouter, attachmentUploadSources, parseRemoteSessionKey, remoteSessionKey } from "./session-router";
 import { RemoteSessionCache } from "./session-cache";
+import { hasSessionLocatorPrefix } from "@actspace/shared/session-locator";
 import { desktopRemoteObservation, desktopRemotePage } from "./projection";
 import type { RemoteHostRegistry } from "./registry";
+/**
+ * renderer 看到的远端审批 id。格式沿用改造前的写法，已有的待审批项不受影响；
+ * 路由看事件和列表里单独的 `hostId`（15 T10），不再从 id 里拆。
+ */
+export function remoteApprovalId(hostId: string, requestId: string): string {
+  return `remote-approval:${hostId}:${requestId}`;
+}
+
 export class RemoteDesktopAdapter {
   readonly #router: RemoteSessionRouter;
   readonly #artifacts: RemoteArtifacts;
@@ -51,7 +60,7 @@ export class RemoteDesktopAdapter {
       else if (value.kind === "approvals" && Array.isArray(value.requests)) {
         if (isRecord(value.settled) && isRecord(value.settled.request) && isRecord(value.settled.decision)) {
           const request = value.settled.request;
-          this.#send(C.agentStream, { type: "tool_approval_resolved", sessionId: remoteSessionKey({ hostId, sessionId: String(request.sessionId) }), agentRunId: request.agentRunId, toolCallId: request.callId, requestId: `remote-approval:${hostId}:${request.requestId}`, decision: value.settled.decision.kind });
+          this.#send(C.agentStream, { type: "tool_approval_resolved", sessionId: remoteSessionKey({ hostId, sessionId: String(request.sessionId) }), agentRunId: request.agentRunId, toolCallId: request.callId, requestId: remoteApprovalId(hostId, String(request.requestId)), hostId, decision: value.settled.decision.kind });
         }
         this.#publishApprovals(hostId, value.requests as import("@actspace/shared/runtime-v2").ApprovalRequest[], typeof value.sessionId === "string" ? value.sessionId : undefined);
         this.#emitLive("", "runtime-live", "session-title-updated");
@@ -80,16 +89,16 @@ export class RemoteDesktopAdapter {
     if (ref && this.#activeKey === key && this.hosts.list().find(host => host.hostId === ref.hostId)?.state === "connected") await this.#observe(ref);
   }
   #publishApprovals(hostId: string, requests: readonly import("@actspace/shared/runtime-v2").ApprovalRequest[], scope?: string) {
-    const live = new Set(requests.map(request => `remote-approval:${hostId}:${request.requestId}`));
+    const live = new Set(requests.map(request => remoteApprovalId(hostId, request.requestId)));
     for (const [id, known] of this.#approvalRefs) {
       if (known.ref.hostId === hostId && (!scope || known.ref.sessionId === scope) && !live.has(id)) {
         this.#approvalRefs.delete(id); this.#emitLive(remoteSessionKey(known.ref), "runtime-live", "session-title-updated");
       }
     }
     for (const request of requests) {
-      const ref = { hostId, sessionId: request.sessionId }, requestId = `remote-approval:${hostId}:${request.requestId}`;
+      const ref = { hostId, sessionId: request.sessionId }, requestId = remoteApprovalId(hostId, request.requestId);
       this.#approvalRefs.set(requestId, { ref, requestId: request.requestId });
-      this.#send(C.agentStream, { type: "tool_approval_required", sessionId: remoteSessionKey(ref), agentRunId: request.agentRunId, toolCallId: request.callId, toolName: request.toolName, requestId, summary: JSON.stringify(request.resources), reason: request.reasons.join(", ") });
+      this.#send(C.agentStream, { type: "tool_approval_required", sessionId: remoteSessionKey(ref), agentRunId: request.agentRunId, toolCallId: request.callId, toolName: request.toolName, requestId, hostId, summary: JSON.stringify(request.resources), reason: request.reasons.join(", ") });
     }
   }
   #send(channel: string, value: unknown) { const window = this.getWindow(); if (window && !window.isDestroyed()) window.webContents.send(channel, value); }
@@ -152,6 +161,7 @@ export class RemoteDesktopAdapter {
   async decide(input: Record<string, unknown>): Promise<unknown> {
     const approval = this.#approvalRefs.get(String(input.requestId));
     if (!approval) throw new Error("Remote approval is no longer available; refresh the Session");
+    if (input.hostId !== undefined && input.hostId !== approval.ref.hostId) throw new Error("Remote approval belongs to another Host");
     await this.#router.call(approval.ref, "approvals.decide", { requestId: approval.requestId, kind: input.decision, ...(input.suggestionId ? { suggestionId: input.suggestionId } : {}) });
     this.#approvalRefs.delete(String(input.requestId)); return { ok: true };
   }
@@ -173,7 +183,7 @@ export class RemoteDesktopAdapter {
       const results = await Promise.all(this.hosts.list().filter(host => host.state === "connected").map(async host => {
         try {
           const requests = await this.hosts.call(host.hostId, "approvals.list", {}) as import("@actspace/shared/runtime-v2").ApprovalRequest[];
-          return requests.map(request => ({ requestId: `remote-approval:${host.hostId}:${request.requestId}`, toolName: request.toolName, summary: JSON.stringify(request.resources), reason: request.reasons.join(", "), createdAt: Date.parse(request.requestedAt), expiresAt: Date.parse(request.expiresAt), grantSuggestions: request.grantSuggestions, supportedLifetimes: request.supportedLifetimes }));
+          return requests.map(request => ({ requestId: remoteApprovalId(host.hostId, request.requestId), hostId: host.hostId, toolName: request.toolName, summary: JSON.stringify(request.resources), reason: request.reasons.join(", "), createdAt: Date.parse(request.requestedAt), expiresAt: Date.parse(request.expiresAt), grantSuggestions: request.grantSuggestions, supportedLifetimes: request.supportedLifetimes }));
         } catch { return []; }
       }));
       return [...local as unknown[], ...results.flat()];
@@ -194,7 +204,7 @@ export class RemoteDesktopAdapter {
         } catch { /* Retain the last displayed page while offline. */ }
         const value = await this.#cache.readPage(key);
         const items = value?.items ?? (await this.list()).filter(item => item.hostId === host.hostId);
-        return { items: items.map(item => ({ ...item, id: item.id.startsWith("host:") ? item.id : remoteSessionKey({ hostId: host.hostId, sessionId: item.id }), hostId: host.hostId, hostName: host.name, connectionState: host.state })), groups: (value?.groups ?? []).map(group => ({ ...group, hostId: host.hostId })) };
+        return { items: items.map(item => ({ ...item, id: hasSessionLocatorPrefix(item.id) ? item.id : remoteSessionKey({ hostId: host.hostId, sessionId: item.id }), hostId: host.hostId, hostName: host.name, connectionState: host.state })), groups: (value?.groups ?? []).map(group => ({ ...group, hostId: host.hostId })) };
       }));
       return { ...page, items: [...page.items, ...remote.flatMap(value => value.items)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)), groups: [...page.groups, ...remote.flatMap(value => value.groups)] };
     }
@@ -248,9 +258,9 @@ export class RemoteDesktopAdapter {
       case C.listPendingApprovals: {
         const requests = await call("approvals.list") as import("@actspace/shared/runtime-v2").ApprovalRequest[];
         return requests.map(request => {
-          const requestId = `remote-approval:${ref.hostId}:${request.requestId}`;
+          const requestId = remoteApprovalId(ref.hostId, request.requestId);
           this.#approvalRefs.set(requestId, { ref, requestId: request.requestId });
-          return { requestId, recovery: { agentRunId: request.agentRunId, toolCallId: request.callId, preview: toolPreview(request.toolName, undefined, { summary: JSON.stringify(request.resources) }, { args: {} }, undefined, sessionId, request.agentRunId, "running") }, toolName: request.toolName, summary: JSON.stringify(request.resources), reason: request.reasons.join(", "), createdAt: Date.parse(request.requestedAt), expiresAt: Date.parse(request.expiresAt), grantSuggestions: request.grantSuggestions, supportedLifetimes: request.supportedLifetimes };
+          return { requestId, hostId: ref.hostId, recovery: { agentRunId: request.agentRunId, toolCallId: request.callId, preview: toolPreview(request.toolName, undefined, { summary: JSON.stringify(request.resources) }, { args: {} }, undefined, sessionId, request.agentRunId, "running") }, toolName: request.toolName, summary: JSON.stringify(request.resources), reason: request.reasons.join(", "), createdAt: Date.parse(request.requestedAt), expiresAt: Date.parse(request.expiresAt), grantSuggestions: request.grantSuggestions, supportedLifetimes: request.supportedLifetimes };
         });
       }
       case C.abortAgentRun: await call("tasks.command", { op: "stop", runId: input.agentRunId }); return true;

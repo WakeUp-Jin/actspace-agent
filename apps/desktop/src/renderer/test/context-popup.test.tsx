@@ -25,21 +25,23 @@ function makeSnapshot(): ContextUsageSnapshot {
   };
 }
 
-function renderContextPopup(props: Parameters<typeof ContextPopup>[0]) {
+function renderContextPopup(props: Omit<Parameters<typeof ContextPopup>[0], "anchorRef">) {
+  const anchorRef = { current: document.body };
   return render(
     <TooltipProvider delayDuration={0}>
-      <ContextPopup {...props} />
+      <ContextPopup anchorRef={anchorRef} {...props} />
     </TooltipProvider>,
   );
 }
 
 describe("ContextPopup", () => {
   it("renders buckets from the snapshot and omits the footer", () => {
-    const { container } = renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
+    renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
 
     expect(screen.getByText("系统提示词")).toBeInTheDocument();
     expect(screen.getByText("工具")).toBeInTheDocument();
-    expect(container.querySelector(".context-meter")).toHaveClass("bg-[var(--act-color-meter-track)]");
+    // 浮层挂在 body 上，不在 render 的 container 里。
+    expect(document.querySelector(".context-meter")).toHaveClass("bg-[var(--act-color-meter-track)]");
     // 已移除的 footer 文案不应再出现。
     expect(screen.queryByText(/Total used/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Compressed/i)).not.toBeInTheDocument();
@@ -97,7 +99,7 @@ describe("ContextPopup", () => {
 
     rerender(
       <TooltipProvider delayDuration={0}>
-        <ContextPopup snapshot={makeSnapshot()} onClose={vi.fn()} onExpand={onExpand} />
+        <ContextPopup anchorRef={{ current: document.body }} snapshot={makeSnapshot()} onClose={vi.fn()} onExpand={onExpand} />
       </TooltipProvider>,
     );
     await user.click(screen.getByLabelText("查看完整上下文"));

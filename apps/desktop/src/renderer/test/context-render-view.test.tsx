@@ -1,16 +1,13 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ContextState } from "@actspace/shared";
 import { ContextRenderView } from "../components/right-panel/ContextRenderView";
 import { mockContextState } from "./fixtures/workbenchFixture";
 import { SessionProjectionProvider } from "../session";
+import { setupBridge } from "./helpers/bridge";
 
 describe("ContextRenderView", () => {
-  afterEach(() => {
-    delete (window as { actspace?: unknown }).actspace;
-  });
-
   it("groups entries into ordered sections with the registry labels", () => {
     render(<ContextRenderView contextState={mockContextState} />);
 
@@ -59,8 +56,8 @@ describe("ContextRenderView", () => {
   });
 
   it("does not present cumulative provider usage as context when no request estimate exists", async () => {
-    (window as { actspace?: unknown }).actspace = {
-      getSessionProjectionSnapshot: async () => ({
+    setupBridge({
+      "sessions.getProjectionSnapshot": async () => ({
         kind: "session-projection",
         schemaVersion: 1,
         sessionId: "session-1",
@@ -91,9 +88,8 @@ describe("ContextRenderView", () => {
           },
         },
       }),
-      onSessionLiveEvent: () => () => undefined,
-      describeContext: undefined,
-    };
+      "events.sessionLive": () => () => undefined,
+    });
 
     render(
       <SessionProjectionProvider sessionId="session-1">
@@ -125,7 +121,7 @@ describe("ContextRenderView", () => {
       entries: [{ ...base.entries[0], preview: "• bash — 运行 shell 命令" }],
     };
     const describeContext = vi.fn(async () => fresh);
-    (window as { actspace?: unknown }).actspace = { describeContext };
+    setupBridge({ "sessions.describeContext": describeContext });
 
     render(<ContextRenderView contextState={base} sessionId="s1" />);
 
@@ -147,7 +143,7 @@ describe("ContextRenderView", () => {
         { id: "context_systemPrompt", kind: "systemPrompt", title: "System prompt", estimatedTokens: 12, included: true, removable: false, preview: "你是 actspace 智能体" },
       ],
     };
-    (window as { actspace?: unknown }).actspace = { describeContext: async () => fresh };
+    setupBridge({ "sessions.describeContext": async () => fresh });
 
     render(<ContextRenderView contextState={null} sessionId="s2" />);
 

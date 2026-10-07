@@ -1,10 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi, afterEach } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { FileDiffBlock } from "../components/messages/FileDiffBlock";
+import { setupBridge } from "./helpers/bridge";
 
 function makeWriteBlock(
   partial: Partial<Extract<MessageBlock, { kind: "write_diff" }>>,
@@ -53,12 +52,10 @@ describe("FileDiffBlock running state", () => {
   });
 
   it("hides generation amounts when the existing display setting is disabled", async () => {
-    window.actspace = { getSettingsV4: async () => ({ settings: { tools: { showFileChangeStats: false } } }) } as unknown as Window["actspace"];
-    try {
-      render(<FileDiffBlock message={makeEditBlock({ status: "running", generationProgress: { phase: "generating", characters: 2400 } })} />);
-      expect(await screen.findByText("Edit index.ts · 正在生成")).toBeInTheDocument();
-      expect(screen.queryByText(/字符/)).toBeNull();
-    } finally { delete (window as unknown as { actspace?: unknown }).actspace; }
+    setupBridge({ "settings.getV4": async () => ({ settings: { tools: { showFileChangeStats: false } } }) });
+    render(<FileDiffBlock message={makeEditBlock({ status: "running", generationProgress: { phase: "generating", characters: 2400 } })} />);
+    expect(await screen.findByText("Edit index.ts · 正在生成")).toBeInTheDocument();
+    expect(screen.queryByText(/字符/)).toBeNull();
   });
 
   it("shows a single-line shimmer with generation status", () => {
@@ -135,15 +132,6 @@ describe("FileDiffBlock running state", () => {
 });
 
 describe("FileDiffBlock completed state", () => {
-  it("keeps expanded diff content in a bounded scroll area", () => {
-    const css = readFileSync(resolve(__dirname, "../styles/diff.css"), "utf-8");
-    const block = css.match(/\.file-diff-content\s*\{[^}]+\}/)?.[0] ?? "";
-
-    expect(block).toContain("max-height: 420px");
-    expect(block).toContain("overflow-y: auto");
-    expect(block).toContain("overflow-x: auto");
-  });
-
   it("omits zero change counters after a completed no-op", () => {
     render(<FileDiffBlock message={makeWriteBlock({ additions: 0, deletions: 0 })} />);
     expect(screen.queryByText(/\+0/)).toBeNull();
@@ -210,10 +198,6 @@ describe("FileDiffBlock failed / denied states", () => {
 });
 
 describe("FileDiffBlock approval state", () => {
-  afterEach(() => {
-    delete (window as unknown as { actspace?: unknown }).actspace;
-  });
-
   function makePendingEditBlock() {
     return makeEditBlock({
       status: "pending",
@@ -228,7 +212,7 @@ describe("FileDiffBlock approval state", () => {
 
   it("submits once when allowing an out-of-workspace edit", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
-    window.actspace = { submitApproval } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": submitApproval });
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
 
@@ -249,7 +233,7 @@ describe("FileDiffBlock approval state", () => {
 
   it("submits deny when skipping", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
-    window.actspace = { submitApproval } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": submitApproval });
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
 
@@ -264,16 +248,16 @@ describe("FileDiffBlock approval state", () => {
 
   it("submits only the exact Runtime suggestion id for Session scope", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
-    window.actspace = {
-      submitApproval,
-      listPendingApprovals: async () => [{
+    setupBridge({
+      "approvals.submit": submitApproval,
+      "approvals.listPending": async () => [{
         requestId: "approval-edit-1", toolName: "edit_file", summary: "Edit", reason: "Outside workspace", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
         grantSuggestions: [
           { suggestionId: "exact-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "exact", canonicalPath: "/Users/me/.agents/vocab.md" }, audience: { pluginId: "actspace.filesystem-write", permissionDomain: "filesystem-write", policyVersion: 1 }, label: "This file only" },
           { suggestionId: "tree-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "subtree", canonicalRoot: "/Users/me/.agents" }, audience: { pluginId: "actspace.filesystem-write", permissionDomain: "filesystem-write", policyVersion: 1 }, label: "This directory tree" },
         ],
       }],
-    } as unknown as Window["actspace"];
+    });
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
     const sessionButton = await screen.findByRole("button", { name: "本会话" });

@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import type { DesktopPerformanceSnapshot } from "@actspace/shared";
+import { eventsApi } from "../api/events";
+import { performanceApi } from "../api/performance";
+import { settingsApi } from "../api/settings";
 
 /** Local state isolates the two-second refresh from the conversation tree. */
 export function PerformancePanel({ compact = false }: { compact?: boolean }) {
@@ -12,26 +15,25 @@ export function PerformancePanel({ compact = false }: { compact?: boolean }) {
     const refresh = async () => {
       const current = ++revision;
       try {
-        const settings = await window.actspace?.getSettingsV4?.();
-        if (alive && revision === current) setEnabled(settings?.settings.general.performanceMonitoring === true);
+        const settings = await settingsApi.getV4();
+        if (alive && revision === current) setEnabled(settings.settings.general.performanceMonitoring === true);
       } catch { if (alive) setEnabled(false); }
     };
     void refresh();
-    const remove = window.actspace?.onSettingsChangedV4?.(() => { void refresh(); });
-    return () => { alive = false; remove?.(); };
+    const remove = eventsApi.settingsChanged(() => { void refresh(); });
+    return () => { alive = false; remove(); };
   }, []);
   useEffect(() => {
-    if (!enabled || !window.actspace?.samplePerformance || !window.actspace.setPerformanceActive) return;
+    if (!enabled) return;
     let generation = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const bridge = window.actspace;
     const cycle = async () => {
       const id = ++generation;
       clearTimeout(timer);
       setSample(null);
       setStale(false);
       const active = !document.hidden;
-      try { await bridge.setPerformanceActive!(active); }
+      try { await performanceApi.setActive(active); }
       catch { if (id === generation) setStale(true); return; }
       if (!active || id !== generation) return;
       const schedule = () => {
@@ -39,7 +41,7 @@ export function PerformancePanel({ compact = false }: { compact?: boolean }) {
           if (id !== generation) return;
           setStale(true);
           try {
-            const next = await bridge.samplePerformance!();
+            const next = await performanceApi.sample();
             if (id !== generation) return;
             setSample(next); setStale(false);
           } catch { if (id === generation) setStale(true); }
@@ -53,7 +55,7 @@ export function PerformancePanel({ compact = false }: { compact?: boolean }) {
     return () => {
       generation++; clearTimeout(timer);
       document.removeEventListener("visibilitychange", cycle);
-      void bridge.setPerformanceActive!(false).catch(() => undefined);
+      void performanceApi.setActive(false).catch(() => undefined);
     };
   }, [enabled]);
   if (!enabled) return null;

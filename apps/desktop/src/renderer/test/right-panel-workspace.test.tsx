@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { RightPanel } from "../components/RightPanel";
 import {
   RightPanelProvider,
@@ -8,12 +8,6 @@ import {
   workspaceFileTabId,
 } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
-
-const originalActspace = (window as { actspace?: unknown }).actspace;
-
-afterEach(() => {
-  (window as { actspace?: unknown }).actspace = originalActspace;
-});
 
 /** 测试用入口：从外部触发工作区浏览态的开关。 */
 function WorkspaceToggleProbe() {
@@ -61,29 +55,28 @@ function renderPanel() {
 describe("RightPanel 工作区浏览态", () => {
   it("纵向三段：开启后出现操作栏与树栏，折叠按钮只收起树栏、保留操作栏", async () => {
     const user = userEvent.setup();
-    // 无 IPC 桥：树栏渲染降级文案，便于断言树栏的出现/收起。
-    (window as { actspace?: unknown }).actspace = undefined;
+    // 默认 mock bridge 的目录为空；用过滤输入框断言树栏的出现/收起。
     renderPanel();
 
     expect(screen.getByText("对象")).toBeInTheDocument();
 
     // 未进入浏览态：没有操作栏（折叠按钮）也没有树栏。
     expect(screen.queryByRole("button", { name: "收起文件树" })).toBeNull();
-    expect(screen.queryByText("当前环境不支持文件浏览。")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "过滤文件名" })).toBeNull();
 
     // 进入浏览态：② 操作栏折叠按钮 + ③ 右侧树栏同时出现。
     await user.click(screen.getByRole("button", { name: "probe-toggle" }));
     expect(screen.getByText("文件")).toBeInTheDocument();
     const collapseBtn = screen.getByRole("button", { name: "收起文件树" });
     expect(collapseBtn).toBeInTheDocument();
-    expect(screen.getByText("当前环境不支持文件浏览。")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "过滤文件名" })).toBeInTheDocument();
 
     // 内容区是「文件预览区」：尚未选中文件时只显示占位。
     expect(screen.getByRole("heading", { name: "选择文件查看" })).toBeInTheDocument();
 
     // 折叠：树栏消失，操作栏（按钮翻转为「展开文件树」）仍在。
     await user.click(collapseBtn);
-    expect(screen.queryByText("当前环境不支持文件浏览。")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "过滤文件名" })).toBeNull();
     expect(screen.getByRole("button", { name: "展开文件树" })).toBeInTheDocument();
 
     // 再点 probe-toggle：退出浏览态，操作栏整体消失。
@@ -93,7 +86,6 @@ describe("RightPanel 工作区浏览态", () => {
 
   it("在 tab 栏点对象 Tab 打开它自己的整面板视图，而非工作区文件占位", async () => {
     const user = userEvent.setup();
-    (window as { actspace?: unknown }).actspace = undefined;
     renderPanel();
 
     // 先从启动页打开 Context，再进入工作区浏览态：对象 Tab 退居占位。
@@ -110,7 +102,6 @@ describe("RightPanel 工作区浏览态", () => {
 
   it("markdown 文件的预览/源码切换由操作栏承担，视图内不再自带控件", async () => {
     const user = userEvent.setup();
-    (window as { actspace?: unknown }).actspace = undefined;
     renderPanel();
 
     await user.click(screen.getByRole("button", { name: "probe-open-md" }));

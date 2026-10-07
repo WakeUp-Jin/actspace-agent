@@ -1,4 +1,3 @@
-import { execFile } from "node:child_process";
 import { randomInt } from "node:crypto";
 import { mkdir, rm, stat } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
@@ -9,23 +8,11 @@ import type {
   WorkspacePreparationPayload,
 } from "@actspace/shared";
 import type { AppDataRoots } from "./app-paths";
+import { isGitRunSuccess, runGitCommand, type GitRunResult, type GitRunner } from "./git/run-git";
 
 const GIT_TIMEOUT_MS = 10_000;
 const GIT_MAX_OUTPUT_CHARS = 1024 * 1024;
 const WORKTREE_ID_ATTEMPTS = 20;
-
-export type GitCommandResult = {
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-  timedOut: boolean;
-  startError?: string;
-};
-
-export type GitCommandRunner = (
-  args: string[],
-  options: { cwd: string; timeoutMs: number; maxOutputChars: number },
-) => Promise<GitCommandResult>;
 
 export type PrepareExecutionContextResult =
   | {
@@ -58,18 +45,19 @@ export type PreparedExecutionRollback =
 
 export async function getWorkspaceGitContext(
   workspaceRoot: string,
-  runner: GitCommandRunner = runGitCommand,
+  runner: GitRunner = runGitCommand,
 ): Promise<WorkspaceGitContext> {
   const resolvedRoot = resolve(workspaceRoot);
   if (!(await isDirectory(resolvedRoot))) {
     return contextFailure("failed", resolvedRoot, "Workspace folder was not found.");
   }
 
-  const repository = await runGit(runner, ["rev-parse", "--show-toplevel"], resolvedRoot);
+  // 按错误文字区分「不是仓库」，git 的提示会随系统语言翻译（中文系统是「致命错误：不是 Git 仓库」），所以这一次固定为英文。
+  const repository = await runGit(runner, ["rev-parse", "--show-toplevel"], resolvedRoot, { LC_ALL: "C" });
   if (isGitMissing(repository)) {
     return contextFailure("git_not_found", resolvedRoot, "Git is not available on this machine.");
   }
-  if (!isGitSuccess(repository)) {
+  if (!isGitRunSuccess(repository)) {
     const error = sanitizeGitError(repository);
     return /not a git repository/i.test(error)
       ? contextFailure("not_repository", resolvedRoot)
@@ -78,9 +66,9 @@ export async function getWorkspaceGitContext(
 
   const repositoryRoot = resolve(repository.stdout.trim());
   const branch = await runGit(runner, ["symbolic-ref", "--quiet", "--short", "HEAD"], repositoryRoot);
-  const currentBranch = isGitSuccess(branch) ? branch.stdout.trim() : undefined;
+  const currentBranch = isGitRunSuccess(branch) ? branch.stdout.trim() : undefined;
   const head = await runGit(runner, ["rev-parse", "--verify", "HEAD"], repositoryRoot);
-  if (!isGitSuccess(head)) {
+  if (!isGitRunSuccess(head)) {
     return {
       status: "no_head",
       workspaceRoot: resolvedRoot,
@@ -97,11 +85,11 @@ export async function getWorkspaceGitContext(
     ["for-each-ref", "--format=%(refname:short)", "refs/heads"],
     repositoryRoot,
   );
-  if (!isGitSuccess(refs)) {
+  if (!isGitRunSuccess(refs)) {
     return contextFailure("failed", resolvedRoot, sanitizeGitError(refs), repositoryRoot);
   }
   const worktrees = await runGit(runner, ["worktree", "list", "--porcelain"], repositoryRoot);
-  if (!isGitSuccess(worktrees)) {
+  if (!isGitRunSuccess(worktrees)) {
     return contextFailure("failed", resolvedRoot, sanitizeGitError(worktrees), repositoryRoot);
   }
 
@@ -130,7 +118,7 @@ export async function prepareExecutionContext(
   input: TurnExecutionContextInput,
   roots: AppDataRoots,
   options: {
-    runner?: GitCommandRunner;
+    runner?: GitRunner;
     now?: () => Date;
     createId?: () => string;
   } = {},
@@ -172,7 +160,7 @@ export async function prepareExecutionContext(
         return failed("branch_not_found", `Branch '${targetBranch}' was not found.`);
       }
       const switched = await runGit(runner, ["switch", targetBranch], gitContext.repositoryRoot!);
-      if (!isGitSuccess(switched)) {
+      if (!isGitRunSuccess(switched)) {
         return failed(
           isGitMissing(switched) ? "git_not_found" : "command_failed",
           isGitMissing(switched)
@@ -210,7 +198,7 @@ export async function prepareExecutionContext(
   }
 
   const baseCommitResult = await runGit(runner, ["rev-parse", `${baseBranch}^{commit}`], gitContext.repositoryRoot!);
-  if (!isGitSuccess(baseCommitResult)) {
+  if (!isGitRunSuccess(baseCommitResult)) {
     return failed(
       isGitMissing(baseCommitResult) ? "git_not_found" : "branch_not_found",
       isGitMissing(baseCommitResult)
@@ -235,7 +223,7 @@ export async function prepareExecutionContext(
     ["worktree", "add", "-b", generated.branch, generated.workspaceRoot, baseCommit],
     gitContext.repositoryRoot!,
   );
-  if (!isGitSuccess(created)) {
+  if (!isGitRunSuccess(created)) {
     await removeGeneratedWorktree(
       gitContext.repositoryRoot!,
       generated.parentRoot,
@@ -256,10 +244,10 @@ export async function prepareExecutionContext(
     runGit(runner, ["rev-parse", "--path-format=absolute", "--git-common-dir"], gitContext.repositoryRoot!),
   ]);
   if (
-    !isGitSuccess(createdBranch) ||
-    !isGitSuccess(createdCommit) ||
-    !isGitSuccess(createdCommonDir) ||
-    !isGitSuccess(sourceCommonDir) ||
+    !isGitRunSuccess(createdBranch) ||
+    !isGitRunSuccess(createdCommit) ||
+    !isGitRunSuccess(createdCommonDir) ||
+    !isGitRunSuccess(sourceCommonDir) ||
     createdBranch.stdout.trim() !== generated.branch ||
     createdCommit.stdout.trim() !== baseCommit ||
     resolve(createdCommonDir.stdout.trim()) !== resolve(sourceCommonDir.stdout.trim())
@@ -308,7 +296,7 @@ export async function prepareExecutionContext(
 
 export async function rollbackPreparedWorktree(
   worktree: SessionWorktreeContext,
-  runner: GitCommandRunner = runGitCommand,
+  runner: GitRunner = runGitCommand,
 ): Promise<void> {
   await removeGeneratedWorktree(
     worktree.sourceWorkspaceRoot,
@@ -321,7 +309,7 @@ export async function rollbackPreparedWorktree(
 
 export async function rollbackPreparedExecution(
   rollback: PreparedExecutionRollback | undefined,
-  runner: GitCommandRunner = runGitCommand,
+  runner: GitRunner = runGitCommand,
 ): Promise<void> {
   if (!rollback) return;
   if (rollback.kind === "worktree") {
@@ -335,7 +323,7 @@ async function createAvailableWorktreeTarget(
   repositoryRoot: string,
   dataRoot: string,
   repositoryName: string,
-  runner: GitCommandRunner,
+  runner: GitRunner,
   createId: (() => string) | undefined,
 ): Promise<
   | { ok: true; branch: string; parentRoot: string; workspaceRoot: string }
@@ -350,7 +338,7 @@ async function createAvailableWorktreeTarget(
     if (await pathExists(parentRoot)) continue;
     const ref = await runGit(runner, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], repositoryRoot);
     if (isGitMissing(ref)) return failed("git_not_found", "Git is not available on this machine.");
-    if (!isGitSuccess(ref)) return { ok: true, branch, parentRoot, workspaceRoot };
+    if (!isGitRunSuccess(ref)) return { ok: true, branch, parentRoot, workspaceRoot };
   }
   return failed("branch_conflict", "Could not allocate a unique worktree branch.");
 }
@@ -403,52 +391,15 @@ function failed(
   return { ok: false, code, message };
 }
 
-async function runGit(runner: GitCommandRunner, args: string[], cwd: string): Promise<GitCommandResult> {
-  return runner(args, { cwd, timeoutMs: GIT_TIMEOUT_MS, maxOutputChars: GIT_MAX_OUTPUT_CHARS });
+async function runGit(runner: GitRunner, args: string[], cwd: string, env?: Record<string, string>): Promise<GitRunResult> {
+  return runner(args, { cwd, timeoutMs: GIT_TIMEOUT_MS, maxOutputChars: GIT_MAX_OUTPUT_CHARS, ...(env ? { env } : {}) });
 }
 
-function runGitCommand(
-  args: string[],
-  options: { cwd: string; timeoutMs: number; maxOutputChars: number },
-): Promise<GitCommandResult> {
-  return new Promise((resolveResult) => {
-    execFile(
-      "git",
-      ["-C", options.cwd, ...args],
-      {
-        cwd: options.cwd,
-        timeout: options.timeoutMs,
-        maxBuffer: options.maxOutputChars,
-        windowsHide: true,
-        encoding: "utf8",
-      },
-      (error, stdout, stderr) => {
-        if (!error) {
-          resolveResult({ stdout: String(stdout ?? ""), stderr: String(stderr ?? ""), exitCode: 0, timedOut: false });
-          return;
-        }
-        const typed = error as NodeJS.ErrnoException & { code?: string | number; killed?: boolean };
-        resolveResult({
-          stdout: String(stdout ?? ""),
-          stderr: String(stderr ?? ""),
-          exitCode: typeof typed.code === "number" ? typed.code : null,
-          timedOut: typed.killed === true,
-          startError: typeof typed.code === "string" ? typed.message : undefined,
-        });
-      },
-    );
-  });
+function isGitMissing(result: GitRunResult): boolean {
+  return Boolean(result.startError && /ENOENT|not found|spawn git/i.test(result.startError.message));
 }
 
-function isGitSuccess(result: GitCommandResult): boolean {
-  return !result.startError && !result.timedOut && result.exitCode === 0;
-}
-
-function isGitMissing(result: GitCommandResult): boolean {
-  return Boolean(result.startError && /ENOENT|not found|spawn git/i.test(result.startError));
-}
-
-function sanitizeGitError(result: GitCommandResult): string {
+function sanitizeGitError(result: GitRunResult): string {
   if (result.timedOut) return "Git command timed out.";
   const message = result.stderr.trim() || result.stdout.trim();
   if (!message) return "Git command failed.";
@@ -481,7 +432,7 @@ async function removeGeneratedWorktree(
   parentRoot: string,
   workspaceRoot: string,
   branch: string,
-  runner: GitCommandRunner,
+  runner: GitRunner,
 ): Promise<void> {
   await runGit(runner, ["worktree", "remove", "--force", workspaceRoot], repositoryRoot).catch(() => undefined);
   await runGit(runner, ["branch", "-D", branch], repositoryRoot).catch(() => undefined);

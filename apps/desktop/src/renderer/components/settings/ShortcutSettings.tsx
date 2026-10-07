@@ -1,5 +1,5 @@
 import { RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DEFAULT_QUICK_OPEN_ACCELERATOR,
   type AppSettings,
@@ -9,9 +9,11 @@ import {
   type SessionListItem,
   type WorkspaceEntry,
 } from "@actspace/shared";
-import { Kbd, SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
-import { Button } from "../ui/Button";
+import { SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
 import { IconButton } from "../ui/IconButton";
+import { quickOpenApi } from "../../api/quick-open";
+import { sessionsApi } from "../../api/sessions";
+import { workspacesApi } from "../../api/workspaces";
 
 const FALLBACK_QUICK_OPEN_SETTINGS: QuickOpenShortcutSettings = {
   enabled: true,
@@ -72,9 +74,9 @@ export function ShortcutSettings({
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      window.actspace.getQuickOpenShortcutStatus?.() ?? Promise.resolve(null),
-      window.actspace.listWorkspaces?.() ?? Promise.resolve(null),
-      window.actspace.listSessions?.() ?? Promise.resolve([]),
+      quickOpenApi.getShortcutStatus(),
+      workspacesApi.list(),
+      sessionsApi.list(),
     ]).then(([nextStatus, registry, listedSessions]) => {
       if (cancelled) return;
       setStatus(nextStatus);
@@ -89,10 +91,10 @@ export function ShortcutSettings({
   }, []);
 
   const update = async (input: QuickOpenShortcutUpdateInput) => {
-    if (!window.actspace.updateQuickOpenShortcut || saving) return;
+    if (saving) return;
     setSaving(true);
     try {
-      const result = await window.actspace.updateQuickOpenShortcut(input);
+      const result = await quickOpenApi.updateShortcut(input);
       setStatus(result.status);
       onSettingsChange(result.settings);
     } catch (error) {
@@ -258,4 +260,12 @@ function acceleratorKeys(formatted: string): Array<{ label: string; separator: b
   const modifiers = formatted.match(/^[⌘⌃⌥⇧]*/)?.[0] ?? "";
   const rest = formatted.slice(modifiers.length);
   return [...modifiers.split(""), ...(rest ? [rest] : [])].map((label) => ({ label, separator: false }));
+}
+
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="inline-grid h-6 min-w-6 place-items-center rounded-act-sm border border-b-2 border-line bg-surface px-1.5 font-sans text-act-xs font-medium text-text-main">
+      {children}
+    </kbd>
+  );
 }

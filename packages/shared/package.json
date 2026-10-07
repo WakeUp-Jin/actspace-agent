@@ -51,6 +51,12 @@
       "require": "./dist/runtime-v2/desktop-ipc.js",
       "default": "./dist/runtime-v2/desktop-ipc.js"
     },
+    "./desktop-bridge": {
+      "types": "./dist/desktop-bridge/index.d.ts",
+      "import": "./dist/desktop-bridge/index.js",
+      "require": "./dist/desktop-bridge/index.js",
+      "default": "./dist/desktop-bridge/index.js"
+    },
     "./host-protocol": {
       "types": "./dist/host-protocol/index.d.ts",
       "import": "./dist/host-protocol/index.js",
@@ -62,6 +68,12 @@
       "import": "./dist/composer-reference-validation.js",
       "require": "./dist/composer-reference-validation.js",
       "default": "./dist/composer-reference-validation.js"
+    },
+    "./session-locator": {
+      "types": "./dist/session-locator.d.ts",
+      "import": "./dist/session-locator.js",
+      "require": "./dist/session-locator.js",
+      "default": "./dist/session-locator.js"
     },
     "./session-list-page": {
       "types": "./dist/session-list-page.d.ts",

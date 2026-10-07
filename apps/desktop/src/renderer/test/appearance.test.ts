@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { applyAppearance } from "../appearance/apply";
 import { loadAppearance, saveAppearance } from "../appearance/storage";
 import { DEFAULT_APPEARANCE, type AppearancePrefs } from "../appearance/types";
+import { setupBridge } from "./helpers/bridge";
 
 const STORAGE_KEY = "actspace.appearance.v1";
 
@@ -81,15 +82,11 @@ describe("appearance storage", () => {
 });
 
 describe("applyAppearance", () => {
-  afterEach(() => {
-    delete (window as { actspace?: unknown }).actspace;
-  });
-
   it("writes data-theme, css vars, maps UI font size to zoom, and compensates code size", () => {
     const root = document.createElement("div");
     const setUiZoom = vi.fn();
     const setNativeTheme = vi.fn();
-    (window as { actspace?: unknown }).actspace = { setUiZoom, setNativeTheme };
+    setupBridge({ "appearance.setUiZoom": setUiZoom, "appearance.setNativeTheme": setNativeTheme });
 
     // uiFontSize 21 / base 14 = zoom 1.5；代码 15px 预除以 1.5 = 10px，渲染后恰为 15px。
     applyAppearance(

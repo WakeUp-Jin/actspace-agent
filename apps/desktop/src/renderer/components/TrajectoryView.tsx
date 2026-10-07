@@ -5,7 +5,6 @@ import type { RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useOptionalSessionProjection } from '../session';
 import { buildTrajectorySnapshot, groupVirtualRows, searchTrajectory, type TrajectoryRecord, type TrajectoryTimeRange, type TrajectoryTimelineMode } from '../trajectory';
-import { loadTrajectoryFixtureFromUrl } from '../trajectory/fixtures';
 import { TrajectoryTimeline } from './trajectory/TrajectoryTimeline';
 import { TrajectoryDetails } from './trajectory/TrajectoryDetails';
 import { RoleBadge, roleOf } from './trajectory/presentation';
@@ -16,14 +15,21 @@ function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | undefin
   const [fixture, setFixture] = useState<RuntimeV2TrajectorySnapshot | null>(null);
   useEffect(() => {
     if (!import.meta.env.DEV && import.meta.env.MODE !== 'test') return;
-    const loaded = loadTrajectoryFixtureFromUrl();
-    setFixture(loaded);
-    // A fixture-only theme override makes both themes reviewable without IPC.
-    const theme = new URLSearchParams(window.location.search).get('trajectoryTheme');
-    if (!loaded || (theme !== 'light' && theme !== 'dark')) return;
-    const previous = document.documentElement.getAttribute('data-theme');
-    document.documentElement.setAttribute('data-theme', theme);
-    return () => { if (previous === null) document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', previous); };
+    let cancelled = false;
+    let restoreTheme: (() => void) | null = null;
+    // Fixtures load lazily so production bundles never include them.
+    void import('../trajectory/fixtures').then(({ loadTrajectoryFixtureFromUrl }) => {
+      const loaded = cancelled ? null : loadTrajectoryFixtureFromUrl();
+      if (!loaded) return;
+      setFixture(loaded);
+      // A fixture-only theme override makes both themes reviewable without IPC.
+      const theme = new URLSearchParams(window.location.search).get('trajectoryTheme');
+      if (theme !== 'light' && theme !== 'dark') return;
+      const previous = document.documentElement.getAttribute('data-theme');
+      document.documentElement.setAttribute('data-theme', theme);
+      restoreTheme = () => { if (previous === null) document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', previous); };
+    });
+    return () => { cancelled = true; restoreTheme?.(); };
   }, []);
   return { snapshot: fixture ?? (input !== undefined ? input : projected), isFixture: fixture !== null, projection };
 }

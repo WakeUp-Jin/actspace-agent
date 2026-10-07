@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MessageBlock, SessionEvent } from "@actspace/shared";
 import { AgentRunBlock } from "../components/messages/AgentRunBlock";
 import { SubAgentTranscriptPanel } from "../components/messages/SubAgentTranscriptModal";
+import { setupBridge } from "./helpers/bridge";
 
 const transcriptRef = {
   kind: "subagent_transcript" as const,
@@ -168,7 +169,6 @@ function makeAgentBlock(partial: Partial<Extract<MessageBlock, { kind: "agent" }
 
 afterEach(() => {
   vi.restoreAllMocks();
-  delete (window as { actspace?: unknown }).actspace;
 });
 
 describe("AgentRunBlock", () => {
@@ -254,8 +254,8 @@ describe("AgentRunBlock", () => {
 
   it("renders transcript events with the main message grammar", async () => {
     const user = userEvent.setup();
-    (window as unknown as { actspace: Partial<typeof window.actspace> }).actspace = {
-      getSubAgentTranscript: vi.fn(async () => [
+    setupBridge({
+      "sessions.getSubAgentTranscript": vi.fn(async () => [
         promptEvent,
         thinkingEvent,
         readCallEvent,
@@ -265,7 +265,7 @@ describe("AgentRunBlock", () => {
         usageEvent,
         reportEvent,
       ]),
-    };
+    });
 
     render(<SubAgentTranscriptPanel message={makeAgentBlock()} open={true} onClose={vi.fn()} />);
 
@@ -291,9 +291,9 @@ describe("AgentRunBlock", () => {
 
   it("falls back to transcript assistant output when Agent summary is missing", async () => {
     const user = userEvent.setup();
-    (window as unknown as { actspace: Partial<typeof window.actspace> }).actspace = {
-      getSubAgentTranscript: vi.fn(async () => [promptEvent, reportEvent]),
-    };
+    setupBridge({
+      "sessions.getSubAgentTranscript": vi.fn(async () => [promptEvent, reportEvent]),
+    });
 
     render(<SubAgentTranscriptPanel message={makeAgentBlock({ summary: undefined })} open={true} onClose={vi.fn()} />);
 
@@ -303,9 +303,9 @@ describe("AgentRunBlock", () => {
 
   it("toggles task input expansion without an internal scroll area", async () => {
     const user = userEvent.setup();
-    (window as unknown as { actspace: Partial<typeof window.actspace> }).actspace = {
-      getSubAgentTranscript: vi.fn(async () => [longPromptEvent, reportEvent]),
-    };
+    setupBridge({
+      "sessions.getSubAgentTranscript": vi.fn(async () => [longPromptEvent, reportEvent]),
+    });
 
     render(<SubAgentTranscriptPanel message={makeAgentBlock({ transcriptEvents: [longPromptEvent] })} open={true} onClose={vi.fn()} />);
 
@@ -331,9 +331,9 @@ describe("AgentRunBlock", () => {
 
   it("keeps the final output hidden while the SubAgent is still running", async () => {
     const user = userEvent.setup();
-    (window as unknown as { actspace: Partial<typeof window.actspace> }).actspace = {
-      getSubAgentTranscript: vi.fn(async () => [promptEvent, readCallEvent, reportEvent]),
-    };
+    setupBridge({
+      "sessions.getSubAgentTranscript": vi.fn(async () => [promptEvent, readCallEvent, reportEvent]),
+    });
 
     render(
       <SubAgentTranscriptPanel

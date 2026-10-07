@@ -48,6 +48,8 @@ export const currentTruthFiles = [
   "docs/design-docs/frontend/front-右侧面板与文件渲染规范.md",
   "docs/design-docs/frontend/front-workspace-git-worktree-context.md",
   "docs/design-docs/frontend/front-聊天输入框规范.md",
+  "docs/design-docs/frontend/front-preload-bridge与mock规范.md",
+  "docs/design-docs/frontend/front-会话状态与数据流规范.md",
 ];
 
 const forbiddenCurrentClaims = [

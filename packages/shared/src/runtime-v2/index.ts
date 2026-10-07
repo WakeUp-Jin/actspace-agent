@@ -20,7 +20,6 @@ export * from "./todo";
 export * from "./runtime";
 export * from "./permission";
 export * from "./desktop-ipc";
-export * from "./desktop-shell";
 export * from "./fixed-renderer";
 
 export * from "./tasks";

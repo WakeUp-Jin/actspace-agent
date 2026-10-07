@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import type { ResponseAnnotationReference } from "@actspace/shared";
-import { isAnnotatableMessageId, type ResponseAnnotationContextValue } from "../../components/messages/response-annotation-context";
+import type { ResponseAnnotationContextValue } from "../../components/messages/response-annotation-context";
 
 /** 在 root 内找到包含 needle 的文本节点，返回 needle 起点（或终点）对应的 DOM 位置。 */
 export function textPoint(root: Node, needle: string, edge: "start" | "end" = "start"): [Text, number] {
@@ -60,7 +60,7 @@ export function makeAnnotation(overrides: Partial<ResponseAnnotationReference> =
 export function createAnnotationContextValue(overrides: Partial<ResponseAnnotationContextValue> = {}): ResponseAnnotationContextValue {
   return {
     drafts: [],
-    canAnnotate: isAnnotatableMessageId,
+    canAnnotate: () => true,
     addDraft: vi.fn(),
     updateComment: vi.fn(),
     removeDraft: vi.fn(),

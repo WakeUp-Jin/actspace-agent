@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useRightPanel } from "./RightPanelContext";
 import { preloadTerminalRenderView } from "./terminal-render-loader";
 import { terminalDisplayTitle } from "./terminal-title";
+import { terminalApi } from "../../api/terminal";
 
 type PendingTerminalStart = { cancelled: boolean };
 
@@ -36,20 +37,8 @@ export function useOpenTerminal(sessionId: string | null) {
     });
     setCreatingTerminal(true);
     try {
-      if (!window.actspace.createTerminal) {
-        if (!pending.cancelled) {
-          openTab({
-            id: tabId,
-            kind: "terminalError",
-            title: "终端",
-            sessionId,
-            message: "当前桌面版本尚未加载终端桥接，请重启应用后重试。",
-          });
-        }
-        return false;
-      }
       const [createOutcome, moduleOutcome] = await Promise.allSettled([
-        window.actspace.createTerminal({ sessionId, cols: 80, rows: 24 }),
+        terminalApi.create({ sessionId, cols: 80, rows: 24 }),
         preloadTerminalRenderView(),
       ]);
       if (createOutcome.status === "rejected") throw createOutcome.reason;
@@ -68,11 +57,11 @@ export function useOpenTerminal(sessionId: string | null) {
       }
       const terminal = result.terminal;
       if (moduleOutcome.status === "rejected") {
-        await window.actspace.closeTerminal?.({ terminalId: terminal.id });
+        await terminalApi.close({ terminalId: terminal.id });
         throw moduleOutcome.reason;
       }
       if (pending.cancelled) {
-        await window.actspace.closeTerminal?.({ terminalId: terminal.id });
+        await terminalApi.close({ terminalId: terminal.id });
         return false;
       }
       openTab({

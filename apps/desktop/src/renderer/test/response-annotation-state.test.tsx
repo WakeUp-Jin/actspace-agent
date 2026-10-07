@@ -11,7 +11,7 @@ function setup(initial: { draftKey?: string; draftRestore?: ComposerDraftRestore
   const writeAnnotationDraft = vi.fn((key: string, list: readonly ResponseAnnotationReference[]) => { store.set(key, [...list]); });
   const scrollContainerRef = { current: null as HTMLElement | null };
   const hook = renderHook(
-    (props: { draftKey?: string; draftRestore?: ComposerDraftRestore | null }) => useResponseAnnotationState({ ...props, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef }),
+    (props: { draftKey?: string; draftRestore?: ComposerDraftRestore | null }) => useResponseAnnotationState({ ...props, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef, canAnnotate: () => true }),
     { initialProps: { draftKey: initial.draftKey ?? "s1", draftRestore: initial.draftRestore ?? null } },
   );
   return { ...hook, store, writeAnnotationDraft, scrollContainerRef };

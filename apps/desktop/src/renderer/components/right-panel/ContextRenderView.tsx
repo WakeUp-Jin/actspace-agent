@@ -11,6 +11,7 @@ import { selectRequestContextEstimate } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../../session";
 import { contextBucketLabel } from "../../context-labels";
 import { Button } from "../ui/Button";
+import { sessionsApi } from "../../api/sessions";
 
 /**
  * 右侧面板 Context 完整只读视图（见 `front-右侧面板与文件渲染规范.md`）。
@@ -249,13 +250,12 @@ export function ContextRenderView({
   useEffect(() => {
     let cancelled = false;
     setDescribed(null);
-    if (!sessionId || typeof window === "undefined" || !window.actspace?.describeContext) {
+    if (!sessionId) {
       setLoading(false);
       return;
     }
     setLoading(true);
-    window.actspace
-      .describeContext({ sessionId })
+    sessionsApi.describeContext({ sessionId })
       .then((fresh) => {
         if (!cancelled) setDescribed(fresh);
       })

@@ -4,6 +4,7 @@
  */
 import { codeFontStack, uiFontStack } from "./fonts";
 import { UI_FONT_SIZE_BASE, type AppearancePrefs } from "./types";
+import { appearanceApi } from "../api/appearance";
 
 export function applyAppearance(
   prefs: AppearancePrefs,
@@ -15,17 +16,12 @@ export function applyAppearance(
     root.setAttribute("data-theme", prefs.theme);
     root.setAttribute("data-accent", prefs.accentPalette);
   }
-  if (typeof window !== "undefined" && typeof window.actspace?.setNativeTheme === "function") {
-    window.actspace.setNativeTheme(prefs.theme);
-  }
+  appearanceApi.setNativeTheme(prefs.theme);
 
-  // 界面字号 → 整窗缩放比例（仅 Electron 暴露 setUiZoom 时真正生效）。
+  // 界面字号 → 整窗缩放比例（浏览器 mock 下 setUiZoom 为空实现）。
   const zoom = prefs.uiFontSize / UI_FONT_SIZE_BASE;
-  let appliedZoom = 1;
-  if (typeof window !== "undefined" && typeof window.actspace?.setUiZoom === "function") {
-    window.actspace.setUiZoom(zoom);
-    appliedZoom = zoom;
-  }
+  appearanceApi.setUiZoom(zoom);
+  const appliedZoom = zoom;
 
   if (root) {
     // --act-font-display 始终 = var(--act-font-ui)，故只改 ui 即可让界面 + 输出正文一起换。

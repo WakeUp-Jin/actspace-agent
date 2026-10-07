@@ -1,4 +1,3 @@
-import { execFile } from "node:child_process";
 import { realpath, stat } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import type {
@@ -13,25 +12,12 @@ import type {
   WorkspaceGitSwitchBranchInput,
 } from "@actspace/shared";
 import type { AppDataRoots } from "./app-paths";
+import { isGitRunSuccess, runGitCommand, type GitRunResult, type GitRunner } from "./git/run-git";
 
 const GIT_TIMEOUT_MS = 15_000;
 const GIT_PUSH_TIMEOUT_MS = 30_000;
 const GIT_MAX_OUTPUT_CHARS = 256 * 1024;
 const DEFAULT_COMMIT_MESSAGE = "Update workspace changes";
-
-export type WorkspaceGitCommandResult = {
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-  timedOut: boolean;
-  truncated: boolean;
-  startError?: string;
-};
-
-export type WorkspaceGitCommandRunner = (
-  args: string[],
-  options: { cwd: string; timeoutMs: number; maxOutputChars: number },
-) => Promise<WorkspaceGitCommandResult>;
 
 type ResolvedWorkspace =
   | { ok: true; workspaceRoot: string }
@@ -62,7 +48,7 @@ type PushTarget =
 export async function getWorkspaceEnvironment(
   input: WorkspaceEnvironmentGetInput,
   roots: AppDataRoots,
-  runner: WorkspaceGitCommandRunner = runGitCommand,
+  runner: GitRunner = runGitCommand,
 ): Promise<WorkspaceEnvironmentSnapshot> {
   const workspace = await resolveWorkspace(input.workspaceRoot, roots);
   if (workspace.ok === false) {
@@ -90,7 +76,7 @@ export async function getWorkspaceEnvironment(
 export async function createWorkspaceBranch(
   input: WorkspaceGitCreateBranchInput,
   roots: AppDataRoots,
-  runner: WorkspaceGitCommandRunner = runGitCommand,
+  runner: GitRunner = runGitCommand,
 ): Promise<WorkspaceGitMutationResult> {
   const workspace = await resolveWorkspace(input.workspaceRoot, roots);
   if (workspace.ok === false) {
@@ -111,12 +97,12 @@ export async function createWorkspaceBranch(
   }
 
   const validation = await runGit(runner, ["check-ref-format", "--branch", branchName], workspace.workspaceRoot);
-  if (!isSuccess(validation)) {
+  if (!isGitRunSuccess(validation)) {
     return mutationFailure("create_branch", "branch", workspace.workspaceRoot, "invalid_branch", "Branch name is not valid.");
   }
 
   const created = await runGit(runner, ["switch", "-c", branchName], workspace.workspaceRoot);
-  if (!isSuccess(created)) {
+  if (!isGitRunSuccess(created)) {
     return mutationFailure("create_branch", "branch", workspace.workspaceRoot, gitMissing(created) ? "git_not_found" : "command_failed", sanitizeGitError(created, workspace.workspaceRoot));
   }
 
@@ -132,7 +118,7 @@ export async function createWorkspaceBranch(
 export async function switchWorkspaceBranch(
   input: WorkspaceGitSwitchBranchInput,
   roots: AppDataRoots,
-  runner: WorkspaceGitCommandRunner = runGitCommand,
+  runner: GitRunner = runGitCommand,
 ): Promise<WorkspaceGitMutationResult> {
   const workspace = await resolveWorkspace(input.workspaceRoot, roots);
   if (workspace.ok === false) {
@@ -171,7 +157,7 @@ export async function switchWorkspaceBranch(
   }
 
   const switched = await runGit(runner, ["switch", "--", branchName], workspace.workspaceRoot);
-  if (!isSuccess(switched)) {
+  if (!isGitRunSuccess(switched)) {
     return mutationFailure(
       "switch_branch",
       "branch",
@@ -188,7 +174,7 @@ export async function switchWorkspaceBranch(
 export async function commitWorkspaceChanges(
   input: WorkspaceGitCommitInput,
   roots: AppDataRoots,
-  runner: WorkspaceGitCommandRunner = runGitCommand,
+  runner: GitRunner = runGitCommand,
 ): Promise<WorkspaceGitMutationResult> {
   const workspace = await resolveWorkspace(input.workspaceRoot, roots);
   if (workspace.ok === false) {
@@ -200,7 +186,7 @@ export async function commitWorkspaceChanges(
 export async function pushWorkspaceBranch(
   input: WorkspaceGitPushInput,
   roots: AppDataRoots,
-  runner: WorkspaceGitCommandRunner = runGitCommand,
+  runner: GitRunner = runGitCommand,
 ): Promise<WorkspaceGitMutationResult> {
   const workspace = await resolveWorkspace(input.workspaceRoot, roots);
   if (workspace.ok === false) {
@@ -221,7 +207,7 @@ export async function pushWorkspaceBranch(
 export async function commitAndPushWorkspaceChanges(
   input: WorkspaceGitCommitAndPushInput,
   roots: AppDataRoots,
-  runner: WorkspaceGitCommandRunner = runGitCommand,
+  runner: GitRunner = runGitCommand,
 ): Promise<WorkspaceGitMutationResult> {
   const workspace = await resolveWorkspace(input.workspaceRoot, roots);
   if (workspace.ok === false) {
@@ -263,7 +249,7 @@ async function commitChangesInWorkspace(
   workspaceRoot: string,
   input: WorkspaceGitCommitInput,
   action: "commit" | "commit_and_push",
-  runner: WorkspaceGitCommandRunner,
+  runner: GitRunner,
 ): Promise<WorkspaceGitMutationResult> {
   const message = input.message?.trim() || DEFAULT_COMMIT_MESSAGE;
   const includeUnstagedChanges = input.includeUnstagedChanges !== false;
@@ -289,7 +275,7 @@ async function commitChangesInWorkspace(
     ? ["status", "--porcelain=v1", "--", "."]
     : ["diff", "--cached", "--name-only", "--", "."];
   const status = await runGit(runner, statusArgs, workspaceRoot);
-  if (!isSuccess(status)) {
+  if (!isGitRunSuccess(status)) {
     return mutationFailure(action, "commit", workspaceRoot, gitMissing(status) ? "git_not_found" : "command_failed", sanitizeGitError(status, workspaceRoot));
   }
   if (!status.stdout.trim()) {
@@ -300,7 +286,7 @@ async function commitChangesInWorkspace(
   const commitBranch = branchName || state.branch!;
   if (branchName) {
     const created = await runGit(runner, ["switch", "-c", branchName], workspaceRoot);
-    if (!isSuccess(created)) {
+    if (!isGitRunSuccess(created)) {
       return mutationFailure(action, "branch", workspaceRoot, gitMissing(created) ? "git_not_found" : "command_failed", sanitizeGitError(created, workspaceRoot));
     }
     branchCreated = true;
@@ -308,7 +294,7 @@ async function commitChangesInWorkspace(
 
   if (includeUnstagedChanges) {
     const added = await runGit(runner, ["add", "-A", "--", "."], workspaceRoot);
-    if (!isSuccess(added)) {
+    if (!isGitRunSuccess(added)) {
       return mutationFailure(action, "commit", workspaceRoot, gitMissing(added) ? "git_not_found" : "command_failed", sanitizeGitError(added, workspaceRoot), {
         branch: commitBranch,
         branchCreated,
@@ -317,7 +303,7 @@ async function commitChangesInWorkspace(
   }
 
   const committed = await runGit(runner, ["commit", "-m", message], workspaceRoot);
-  if (!isSuccess(committed)) {
+  if (!isGitRunSuccess(committed)) {
     return mutationFailure(action, "commit", workspaceRoot, gitMissing(committed) ? "git_not_found" : "command_failed", sanitizeGitError(committed, workspaceRoot), {
       branch: commitBranch,
       branchCreated,
@@ -333,14 +319,14 @@ async function commitChangesInWorkspace(
     branch: commitBranch,
     branchCreated,
     commitCreated: true,
-    commitHash: isSuccess(hash) ? hash.stdout.trim() : undefined,
+    commitHash: isGitRunSuccess(hash) ? hash.stdout.trim() : undefined,
   };
 }
 
 async function resolvePushTarget(
   workspaceRoot: string,
   requestedRemote: string | undefined,
-  runner: WorkspaceGitCommandRunner,
+  runner: GitRunner,
   branchOverride?: string,
 ): Promise<PushTarget> {
   const state = await readGitRepositoryState(workspaceRoot, runner);
@@ -390,10 +376,10 @@ async function resolvePushTarget(
 async function validateBranchName(
   workspaceRoot: string,
   branchName: string,
-  runner: WorkspaceGitCommandRunner,
+  runner: GitRunner,
 ): Promise<{ ok: true } | { ok: false; error: "git_not_found" | "invalid_branch"; message: string }> {
   const validation = await runGit(runner, ["check-ref-format", "--branch", branchName], workspaceRoot);
-  if (isSuccess(validation)) return { ok: true };
+  if (isGitRunSuccess(validation)) return { ok: true };
   if (gitMissing(validation)) return { ok: false, error: "git_not_found", message: "Git is not available on this Mac." };
   return { ok: false, error: "invalid_branch", message: "Branch name is not valid." };
 }
@@ -402,11 +388,11 @@ async function pushResolvedTarget(
   workspaceRoot: string,
   target: Extract<PushTarget, { ok: true }>,
   action: "push" | "commit_and_push",
-  runner: WorkspaceGitCommandRunner,
+  runner: GitRunner,
 ): Promise<WorkspaceGitMutationResult> {
   const args = target.useUpstream ? ["push"] : ["push", "-u", target.remote!, target.branch];
   const pushed = await runGit(runner, args, workspaceRoot, GIT_PUSH_TIMEOUT_MS);
-  if (!isSuccess(pushed)) {
+  if (!isGitRunSuccess(pushed)) {
     return mutationFailure(action, "push", workspaceRoot, gitMissing(pushed) ? "git_not_found" : "command_failed", sanitizeGitError(pushed, workspaceRoot), {
       branch: target.branch,
       remote: target.remote,
@@ -426,13 +412,13 @@ async function pushResolvedTarget(
 
 async function readGitRepositoryState(
   workspaceRoot: string,
-  runner: WorkspaceGitCommandRunner,
+  runner: GitRunner,
 ): Promise<GitRepositoryState> {
   const repo = await runGit(runner, ["rev-parse", "--is-inside-work-tree"], workspaceRoot);
   if (gitMissing(repo)) {
     return emptyGitState(false);
   }
-  if (!isSuccess(repo) || repo.stdout.trim() !== "true") {
+  if (!isGitRunSuccess(repo) || repo.stdout.trim() !== "true") {
     return emptyGitState(true);
   }
 
@@ -448,7 +434,7 @@ async function readGitRepositoryState(
   ]);
 
   let locationKind: "this_mac" | "worktree" = "this_mac";
-  if (isSuccess(gitDirResult) && isSuccess(commonDirResult)) {
+  if (isGitRunSuccess(gitDirResult) && isGitRunSuccess(commonDirResult)) {
     const gitDir = resolve(workspaceRoot, gitDirResult.stdout.trim());
     const commonDir = resolve(workspaceRoot, commonDirResult.stdout.trim());
     try {
@@ -458,9 +444,9 @@ async function readGitRepositoryState(
     }
   }
 
-  const branch = isSuccess(branchResult) ? branchResult.stdout.trim() || undefined : undefined;
-  const checkedOutBranches = isSuccess(worktreesResult) ? parseWorktreeBranches(worktreesResult.stdout) : new Map<string, string>();
-  const branches = isSuccess(branchesResult)
+  const branch = isGitRunSuccess(branchResult) ? branchResult.stdout.trim() || undefined : undefined;
+  const checkedOutBranches = isGitRunSuccess(worktreesResult) ? parseWorktreeBranches(worktreesResult.stdout) : new Map<string, string>();
+  const branches = isGitRunSuccess(branchesResult)
     ? branchesResult.stdout
       .split(/\r?\n/)
       .map((name) => name.trim())
@@ -481,9 +467,9 @@ async function readGitRepositoryState(
     branch,
     branches,
     detached: !branch,
-    hasHead: isSuccess(headResult),
-    upstream: isSuccess(upstreamResult) ? upstreamResult.stdout.trim() || undefined : undefined,
-    remotes: isSuccess(remotesResult) ? remotesResult.stdout.split(/\r?\n/).map((item) => item.trim()).filter(Boolean) : [],
+    hasHead: isGitRunSuccess(headResult),
+    upstream: isGitRunSuccess(upstreamResult) ? upstreamResult.stdout.trim() || undefined : undefined,
+    remotes: isGitRunSuccess(remotesResult) ? remotesResult.stdout.split(/\r?\n/).map((item) => item.trim()).filter(Boolean) : [],
     locationKind,
   };
 }
@@ -540,59 +526,24 @@ function mutationFailure(
 }
 
 function runGit(
-  runner: WorkspaceGitCommandRunner,
+  runner: GitRunner,
   args: string[],
   cwd: string,
   timeoutMs = GIT_TIMEOUT_MS,
-): Promise<WorkspaceGitCommandResult> {
+): Promise<GitRunResult> {
   return runner(args, { cwd, timeoutMs, maxOutputChars: GIT_MAX_OUTPUT_CHARS });
 }
 
-function isSuccess(result: WorkspaceGitCommandResult): boolean {
-  return result.exitCode === 0 && !result.startError && !result.timedOut;
+function gitMissing(result: GitRunResult): boolean {
+  return result.startError?.code === "ENOENT" || /not found|is not recognized/i.test(result.startError?.code ?? "");
 }
 
-function gitMissing(result: WorkspaceGitCommandResult): boolean {
-  return result.startError === "ENOENT" || /not found|is not recognized/i.test(result.startError ?? "");
-}
-
-function sanitizeGitError(result: WorkspaceGitCommandResult, workspaceRoot: string): string {
+function sanitizeGitError(result: GitRunResult, workspaceRoot: string): string {
   if (result.timedOut) return "Git command timed out.";
   if (gitMissing(result)) return "Git is not available on this Mac.";
-  const raw = (result.stderr || result.stdout || result.startError || "Git command failed.").trim();
+  const raw = (result.stderr || result.stdout || result.startError?.code || "Git command failed.").trim();
   return raw
     .replaceAll(workspaceRoot, "<workspace>")
     .replace(/([a-z][a-z0-9+.-]*:\/\/)([^\s/@]+)@/gi, "$1<redacted>@")
     .slice(0, 1_200) || "Git command failed.";
-}
-
-function runGitCommand(
-  args: string[],
-  options: { cwd: string; timeoutMs: number; maxOutputChars: number },
-): Promise<WorkspaceGitCommandResult> {
-  return new Promise((resolveResult) => {
-    execFile(
-      "git",
-      args,
-      {
-        cwd: options.cwd,
-        timeout: options.timeoutMs,
-        maxBuffer: options.maxOutputChars,
-        windowsHide: true,
-        encoding: "utf8",
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-      },
-      (error, stdout, stderr) => {
-        const nodeError = error as NodeJS.ErrnoException & { code?: string | number; killed?: boolean } | null;
-        resolveResult({
-          stdout: String(stdout ?? "").slice(0, options.maxOutputChars),
-          stderr: String(stderr ?? "").slice(0, options.maxOutputChars),
-          exitCode: error ? (typeof nodeError?.code === "number" ? nodeError.code : null) : 0,
-          timedOut: Boolean(nodeError?.killed),
-          truncated: String(stdout ?? "").length > options.maxOutputChars || String(stderr ?? "").length > options.maxOutputChars,
-          startError: typeof nodeError?.code === "string" ? nodeError.code : undefined,
-        });
-      },
-    );
-  });
 }

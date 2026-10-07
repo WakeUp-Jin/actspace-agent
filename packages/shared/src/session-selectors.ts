@@ -415,7 +415,10 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
     return `turn:${event.agentRunId}:${slot}:${index}`;
   };
 
-  return events.flatMap((event): MessageBlock[] => {
+  // 每个分支产出的块都带上来源事件的 identity（runId / sourceSeq），供 renderer 合并 durable 与 live 时使用。
+  return events.flatMap((event) => blocksForEvent(event).map((block) => withIdentity(block, event)));
+
+  function blocksForEvent(event: SessionEvent): MessageBlock[] {
     switch (event.type) {
       case "user_message": {
         const payload = event.payload as UserMessagePayload;
@@ -537,7 +540,11 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
           withRenderKey(block, nextRenderKey(event, "workspace-preparation")),
         );
     }
-  });
+  }
+}
+
+function withIdentity(block: MessageBlock, event: SessionEvent): MessageBlock {
+  return { ...block, runId: event.agentRunId, ...(event.sourceSeq === undefined ? {} : { sourceSeq: event.sourceSeq }) };
 }
 
 export function getLatestContextSnapshot(events: SessionEvent[]): ContextUsageSnapshot | null {

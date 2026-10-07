@@ -1,5 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
+import { cn as cx } from "./cn";
 
 // 文字按钮的唯一实现。尺寸、圆角、focus、disabled、按下反馈都在这里定义；
 // 业务组件只选 variant / size / shape，className 只放布局类（margin、宽度、显隐），
@@ -9,9 +10,8 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "dang
 export type ButtonSize = "xs" | "sm" | "md";
 export type ButtonShape = "default" | "pill";
 
-export function cx(...parts: Array<string | false | null | undefined>): string {
-  return parts.filter(Boolean).join(" ");
-}
+// 旧名字，保留给已有的引用方；新代码从 ./cn 引入 cn。
+export { cn as cx } from "./cn";
 
 const BUTTON_BASE_CLASS =
   "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap border font-medium transition-[background-color,border-color,color,transform] duration-(--motion-fast) enabled:active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-50";

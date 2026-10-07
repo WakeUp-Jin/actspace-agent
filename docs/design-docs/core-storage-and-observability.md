@@ -150,6 +150,21 @@ Desktop fork 会将该前缀实际引用的附件与工具制品复制为子会�
 
 旧 `secrets.json` v1 只允许在 main 内完成全量解密校验后原子迁移。迁移失败时必须保留原文件并禁止用空状态覆盖。
 
+Main 侧实现位于 `apps/desktop/src/main/settings/`。`settings-service.ts` 只是再导出原有对外 API 的入口，调用方都从这里 import。
+
+- **`store.ts`**：`SettingsStore` 持有内存状态，负责：
+  - 读写 `settings.json` / `secrets.json`；
+  - legacy 凭据解密；
+  - 写入失败时的回滚（`restoreFilesBestEffort`）；
+  - 串行 mutation 队列；
+  - v4 变更通知。
+  这些只在 store 一处。
+- **`facades/`**：业务操作，都是以 store 为第一个参数的函数，分 `providers`、`custom-connections`、`media`、`search`、`general` 五组。`service.ts` 的 `SettingsService` 持有 store，公开方法只转调这些函数。
+- **纯函数模块**：`migrations.ts`（v1–v3 → v4，冻结）、`defaults.ts`、`sanitize.ts`、`custom-connection.ts`、`secrets-file.ts`、`atomic-io.ts`、`system-prompt-file.ts`。
+- **`env.ts`**：把搜索 key 和工具偏好写进 `process.env` 的唯一位置，见技术债「main / 子进程环境（C1）」。
+
+依赖方向是 service → facades → store → 纯函数，store 不反向依赖 facade。
+
 ### 设置中心 v4 的持久化边界（已确认，P0–P5 已实现）
 
 设置中心重构采用“UI 统一、存储所有权分层”的方案：

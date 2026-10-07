@@ -198,6 +198,27 @@ export class ClientSessionStore {
     return this.#cell(sessionId);
   }
 
+  /** The stored cell, or null when the Session holds none; unlike `get`, never fabricates an empty cell. */
+  peek(sessionId: string): ClientSessionCell | null {
+    return this.#cells.get(sessionId) ?? null;
+  }
+
+  /**
+   * Drop a Session's cell and live overlay; a later `get` returns an empty cell and the next open reloads it.
+   * Does not notify: callers evict only Sessions nobody is observing (never the selected one).
+   */
+  evict(sessionId: string): boolean {
+    if (sessionId === this.#selectedSessionId) return false;
+    this.#overlays.delete(sessionId);
+    this.#pendingEmits.delete(sessionId);
+    return this.#cells.delete(sessionId);
+  }
+
+  /** Session ids that currently hold a cell; for LRU bookkeeping and memory checks. */
+  cellIds(): string[] {
+    return [...this.#cells.keys()];
+  }
+
   getOverlay(sessionId: string): ClientLiveOverlay | null {
     return this.#overlays.get(sessionId) ?? null;
   }

@@ -48,7 +48,7 @@ Functions 使用固定顺序，不按字母排序。当前模式项显示勾选�
 
 ### Skills
 
-- 数据来源继续使用 `window.actspace.listSkills({ workspaceRoot })`，不新增 IPC、远端市场或推荐列表。
+- 数据来源继续使用 `skillsApi.list({ workspaceRoot })`（`renderer/api/skills`，契约成员 `skills.list`），不新增 IPC、远端市场或推荐列表。
 - 只展示 `enabledForAgent=true`、`shadowed=false`、`status=available` 的 Skill。
 - 项目级 Skill 排在用户级 Skill 之前，同一 scope 内按 name 升序。
 - 搜索匹配 Skill 的 name 和 description，大小写不敏感。
@@ -169,7 +169,7 @@ Slash 菜单延续 ActSpace Editor Design System 的 Ink & Emerald 方向，重�
 
 ### Electron 真实验证
 
-- 验证真实 `window.actspace.listSkills` 加载、workspace 切换后的 Skill 刷新和 Retry。
+- 验证真实 `skills.list` 加载、workspace 切换后的 Skill 刷新和 Retry。
 - 验证 `/compact` 走真实 IPC，但不要求调用付费模型或真实 provider；可以使用已有可控测试环境或由用户手动验收真实 provider 行为。
 - 自动化和浏览器 renderer 结果不能替代 Electron main / preload / IPC 验收。
 

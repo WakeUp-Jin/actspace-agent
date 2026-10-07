@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, LocalUpdateState, SessionListItem, SettingsV4Snapshot } from "@actspace/shared";
+import type { AppSettings, LocalUpdateState, SessionListItem, SettingsV4Snapshot, SettingsV4UpdateInput } from "@actspace/shared";
 import { SettingsPage } from "../components/settings/SettingsPage";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { overrideBridge, setupBridge } from "./helpers/bridge";
 
 function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
   const base: AppSettings = {
@@ -34,7 +35,6 @@ function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
   };
 }
 
-type ActspaceBridge = NonNullable<typeof window.actspace>;
 
 function makeLocalUpdateState(over: Partial<LocalUpdateState> = {}): LocalUpdateState {
   return {
@@ -65,6 +65,37 @@ const archivedSessions: SessionListItem[] = [
     archived: true,
   },
 ];
+
+/** 工具页走 v4 tools namespace：给定初始 tools 设置，返回 `settings.updateV4` 的 spy。 */
+function stubToolsV4(tools: Partial<SettingsV4Snapshot["settings"]["tools"]> = {}) {
+  const snapshot = {
+    version: 4 as const,
+    revision: "revision-1",
+    settings: {
+      version: 4 as const,
+      general: {
+        personalization: { displayName: "", responseStyle: "" },
+        agentInstructions: { systemPromptPath: "/tmp/main-agent.md" },
+        taskDefaults: { temperature: null, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 },
+        shortcuts: { quickOpen: { enabled: true, accelerator: "CommandOrControl+Shift+Space", target: { kind: "automatic" as const } } },
+      },
+      models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, explore: null } },
+      tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {}, ...tools },
+      media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const } },
+      skills: { disabled: [] },
+      subagents: { routes: {} },
+      activity: { usage: { range: "30d" as const, status: "all" as const, modelFilter: "", showDetails: false, activeTab: "requests" as const } },
+    },
+  } as SettingsV4Snapshot;
+  let current = snapshot;
+  const updateSettingsV4 = vi.fn(async (input?: SettingsV4UpdateInput) => {
+    const patch = input?.namespace === "tools" ? input.patch : {};
+    current = { ...current, revision: `${current.revision}+`, settings: { ...current.settings, tools: { ...current.settings.tools, ...patch } } };
+    return { ok: true as const, snapshot: current };
+  });
+  overrideBridge({ "settings.getV4": vi.fn(async () => current), "settings.updateV4": updateSettingsV4 });
+  return updateSettingsV4;
+}
 
 function renderSettingsPage(props: Parameters<typeof SettingsPage>[0] = { onBack: () => {} }) {
   return render(
@@ -196,38 +227,34 @@ describe("SettingsPage", () => {
         },
       }),
     }));
-    window.actspace = {
-      getSettings,
-      updateSettings,
-      readAgentSystemPrompt,
-      writeAgentSystemPrompt,
-      setProviderKey,
-      clearProviderKey,
-      testProviderConnection,
-      listProviders,
-      connectProvider,
-      updateProvider,
-      disconnectProvider,
-      removeProvider,
-      getProviderBalance,
-      listInstalledModels,
-      listUsableModels,
-      updateImageGeneration,
-      getLocalUpdateState,
-      selectLocalUpdateSource,
-      startLocalUpdate,
-      listSessions,
-      archiveSession,
-      listWorkspaces,
-      getQuickOpenShortcutStatus,
-      updateQuickOpenShortcut,
-      setUiZoom,
-      setNativeTheme,
-    } as unknown as ActspaceBridge;
-  });
-
-  afterEach(() => {
-    delete (window as { actspace?: ActspaceBridge }).actspace;
+    setupBridge({
+      "settings.get": getSettings,
+      "settings.update": updateSettings,
+      "settings.readSystemPrompt": readAgentSystemPrompt,
+      "settings.writeSystemPrompt": writeAgentSystemPrompt,
+      "providers.setKey": setProviderKey,
+      "providers.clearKey": clearProviderKey,
+      "providers.testConnection": testProviderConnection,
+      "providers.list": listProviders,
+      "providers.connect": connectProvider,
+      "providers.update": updateProvider,
+      "providers.disconnect": disconnectProvider,
+      "providers.remove": removeProvider,
+      "providers.getBalance": getProviderBalance,
+      "models.listInstalled": listInstalledModels,
+      "models.listUsable": listUsableModels,
+      "settings.updateImageGeneration": updateImageGeneration,
+      "updates.getState": getLocalUpdateState,
+      "updates.selectSource": selectLocalUpdateSource,
+      "updates.start": startLocalUpdate,
+      "sessions.list": listSessions,
+      "sessions.archive": archiveSession,
+      "workspaces.list": listWorkspaces,
+      "quickOpen.getShortcutStatus": getQuickOpenShortcutStatus,
+      "quickOpen.updateShortcut": updateQuickOpenShortcut,
+      "appearance.setUiZoom": setUiZoom,
+      "appearance.setNativeTheme": setNativeTheme,
+    });
   });
 
   it("loads settings and renders the general section by default", async () => {
@@ -291,8 +318,8 @@ describe("SettingsPage", () => {
     };
     const getSettingsV4 = vi.fn(async () => snapshot);
     const updateSettingsV4 = vi.fn(async () => ({ ok: true as const, snapshot: { ...snapshot, revision: "revision-2" } }));
-    window.actspace.getSettingsV4 = getSettingsV4;
-    window.actspace.updateSettingsV4 = updateSettingsV4;
+    overrideBridge({ "settings.getV4": getSettingsV4 });
+    overrideBridge({ "settings.updateV4": updateSettingsV4 });
 
     renderSettingsPage();
     await screen.findByRole("heading", { name: "通用", level: 2 });
@@ -331,8 +358,8 @@ describe("SettingsPage", () => {
       },
     } as SettingsV4Snapshot;
     const updateSettingsV4 = vi.fn(async () => ({ ok: true as const, snapshot: { ...snapshot, revision: "revision-2" } }));
-    window.actspace.getSettingsV4 = vi.fn(async () => snapshot);
-    window.actspace.updateSettingsV4 = updateSettingsV4;
+    overrideBridge({ "settings.getV4": vi.fn(async () => snapshot) });
+    overrideBridge({ "settings.updateV4": updateSettingsV4 });
 
     renderSettingsPage();
     const temperature = await screen.findByLabelText("默认温度");
@@ -364,18 +391,19 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("main", { name: "设置内容" })).toHaveClass("overflow-y-auto");
   });
 
-  it("toggling 执行前确认 calls updateSettings with bashAlwaysAsk", async () => {
+  it("toggling 执行前确认 writes bash.alwaysAsk into the v4 tools namespace", async () => {
+    const updateSettingsV4 = stubToolsV4();
     renderSettingsPage();
     await userEvent.click(await screen.findByRole("button", { name: "工具" }));
     const toggle = await screen.findByRole("switch", { name: "执行前确认" });
     await userEvent.click(toggle);
     await waitFor(() => {
-      expect(updateSettings).toHaveBeenCalledWith({ agent: { bashAlwaysAsk: true } });
+      expect(updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "tools", patch: { bash: { alwaysAsk: true } } }));
     });
   });
 
   it("disables 执行前确认 while the Bash tool is off", async () => {
-    getSettings.mockResolvedValueOnce(makeSettings({ agent: { ...makeSettings().agent, disabledTools: ["bash"] } }));
+    stubToolsV4({ disabledTools: ["bash"] });
     renderSettingsPage();
     await userEvent.click(await screen.findByRole("button", { name: "工具" }));
     expect(await screen.findByRole("switch", { name: "执行前确认" })).toBeDisabled();
@@ -620,6 +648,7 @@ describe("SettingsPage", () => {
   });
 
   it("disabling a tool writes it into disabledTools", async () => {
+    const updateSettingsV4 = stubToolsV4();
     renderSettingsPage();
     await screen.findByRole("heading", { name: "通用", level: 2 });
 
@@ -629,11 +658,12 @@ describe("SettingsPage", () => {
 
     await userEvent.click(readToggle);
     await waitFor(() => {
-      expect(updateSettings).toHaveBeenCalledWith({ agent: { disabledTools: ["read_file"] } });
+      expect(updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "tools", patch: { disabledTools: ["read_file"] } }));
     });
   });
 
   it("groups browser tools behind one master switch and collapsed advanced settings", async () => {
+    const updateSettingsV4 = stubToolsV4();
     renderSettingsPage();
     await screen.findByRole("heading", { name: "通用", level: 2 });
 
@@ -647,7 +677,7 @@ describe("SettingsPage", () => {
 
     await userEvent.click(screen.getByRole("switch", { name: "浏览器" }));
     await waitFor(() => {
-      expect(updateSettings).toHaveBeenCalledWith({ agent: { disabledTools: ["browser"] } });
+      expect(updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "tools", patch: { disabledTools: ["browser"] } }));
     });
     expect(screen.getByRole("switch", { name: "浏览器 CUA" })).toBeDisabled();
   });
@@ -734,7 +764,7 @@ describe("SettingsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "子 Agent" }));
     expect(screen.getByRole("heading", { name: "Explore", level: 3 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Explore 模型" })).toHaveTextContent("跟随会话模型");
+    expect(screen.getByRole("combobox", { name: "Explore 模型" })).toHaveTextContent("跟随会话模型");
     expect(screen.queryByRole("heading", { name: "扩展管理" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Skill 管理" })).not.toBeInTheDocument();
   });
@@ -743,9 +773,9 @@ describe("SettingsPage", () => {
     const usable = [{ key: "deepseek:deepseek-v4-pro", label: "DeepSeek V4 Pro", provider: "deepseek", apiModel: "deepseek-v4-pro", contextWindow: 128000, thinkingDefault: true, capabilities: {} }];
     listUsableModels.mockImplementation(async () => ({ models: usable }) as never);
     const updateTaskModels = vi.fn(async () => ({ taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: "deepseek:deepseek-v4-pro" } }));
-    window.actspace.updateTaskModels = updateTaskModels as never;
+    overrideBridge({ "models.updateTaskModels": updateTaskModels as never });
     renderSettingsPage({ onBack: () => {}, initialSection: "subagents" });
-    await userEvent.click(await screen.findByRole("button", { name: "Explore 模型" }));
+    await userEvent.click(await screen.findByRole("combobox", { name: "Explore 模型" }));
     await userEvent.click(await screen.findByRole("option", { name: "DeepSeek V4 Pro" }));
     await waitFor(() => expect(updateTaskModels).toHaveBeenCalledWith({ exploreModel: "deepseek:deepseek-v4-pro" }));
   });

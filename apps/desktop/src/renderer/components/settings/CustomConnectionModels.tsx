@@ -3,8 +3,10 @@ import { MoreHorizontal, Plus, RefreshCw } from "lucide-react";
 import { customModelDraftFromCatalog, type InstalledModelView, type ModelMutationResult, type SettingsV4ConnectionSettings } from "@actspace/shared";
 import { SettingEditor, SettingGroup, SettingTag, SettingsInput, SettingsMenuButton, Toggle, useSettingsSaveNotice } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { isKnownCatalogModel } from "./custom-connection-shared";
+import { modelsApi } from "../../api/models";
+import { settingsApi } from "../../api/settings";
 
 /**
  * 连接详情里的模型分组：刷新（从服务拉列表，新模型默认不启用）、行内添加、…菜单和启用开关。
@@ -33,19 +35,18 @@ export function CustomConnectionModels({ connection, onConnectionChange, onChang
   onConnectionChangeRef.current = onConnectionChange;
 
   const load = useCallback(async () => {
-    const [installed, snapshot] = await Promise.all([window.actspace.listInstalledModels?.(), window.actspace.getSettingsV4?.()]);
-    setModels((installed?.models ?? []).filter((model) => model.settings.connectionId === connection.connectionId));
-    const nextConnection = snapshot?.settings.models.connections[connection.connectionId];
+    const [installed, snapshot] = await Promise.all([modelsApi.listInstalled(), settingsApi.getV4()]);
+    setModels(installed.models.filter((model) => model.settings.connectionId === connection.connectionId));
+    const nextConnection = snapshot.settings.models.connections[connection.connectionId];
     if (nextConnection) onConnectionChangeRef.current(nextConnection);
   }, [connection.connectionId]);
 
   useEffect(() => { void load(); }, [load]);
 
-  const mutate = async (operation: () => Promise<ModelMutationResult | undefined>) => {
+  const mutate = async (operation: () => Promise<ModelMutationResult>) => {
     setError(null);
     try {
       const result = await operation();
-      if (!result) throw new Error("当前版本不支持这个操作。");
       if ("error" in result) throw new Error(result.error.message);
       await load();
       await onChanged?.();
@@ -54,7 +55,7 @@ export function CustomConnectionModels({ connection, onConnectionChange, onChang
     }
   };
 
-  const addModel = (apiModel: string, options: { enabled: boolean; label?: string }) => window.actspace.addCustomModel?.({
+  const addModel = (apiModel: string, options: { enabled: boolean; label?: string }) => modelsApi.addCustom({
     ...customModelDraftFromCatalog(apiModel),
     ...(options.label ? { label: options.label } : {}),
     enabled: options.enabled,
@@ -70,7 +71,6 @@ export function CustomConnectionModels({ connection, onConnectionChange, onChang
     setAddError(null);
     try {
       const result = await addModel(id, { enabled: true });
-      if (!result) throw new Error("当前版本不支持添加模型。");
       if ("error" in result) throw new Error(result.error.message);
       setAdding(false);
       setAddValue("");
@@ -85,12 +85,11 @@ export function CustomConnectionModels({ connection, onConnectionChange, onChang
   };
 
   const refresh = async () => {
-    if (!window.actspace.probeCustomConnection) return;
     setRefreshing(true);
     setError(null);
     setNotice(null);
     try {
-      const result = await window.actspace.probeCustomConnection({ kind: "saved", connectionId: connection.connectionId });
+      const result = await settingsApi.probeCustomConnection({ kind: "saved", connectionId: connection.connectionId });
       if (!result.ok) { setError(result.message); return; }
       if (!result.models) { setNotice("服务未提供模型列表，请手动添加"); return; }
       const existing = new Set(models.map((model) => model.definition.apiModel));
@@ -112,9 +111,9 @@ export function CustomConnectionModels({ connection, onConnectionChange, onChang
   };
 
   const setDefault = (model: InstalledModelView) => mutate(async () => {
-    const result = await window.actspace.setCustomConnectionDefaultModel?.({ connectionId: connection.connectionId, modelKey: model.definition.key });
+    const result = await modelsApi.setCustomConnectionDefault({ connectionId: connection.connectionId, modelKey: model.definition.key });
     // 默认模型必须可用，顺手启用。
-    if (result && !("error" in result) && !model.settings.enabled) return window.actspace.updateModel?.({ modelKey: model.definition.key, enabled: true });
+    if (!("error" in result) && !model.settings.enabled) return modelsApi.update({ modelKey: model.definition.key, enabled: true });
     return result;
   });
 
@@ -143,7 +142,7 @@ export function CustomConnectionModels({ connection, onConnectionChange, onChang
           onRemove={() => setRemoving(model)}
           onToggle={(enabled) => {
             setFresh((current) => { const next = new Set(current); next.delete(model.definition.key); return next; });
-            void mutate(() => window.actspace.updateModel?.({ modelKey: model.definition.key, enabled }) ?? Promise.resolve(undefined));
+            void mutate(() => modelsApi.update({ modelKey: model.definition.key, enabled }));
           }}
         />
       )) : <p className="px-4 py-5 text-center text-act-xs text-text-muted">这个连接还没有模型</p>}
@@ -155,8 +154,7 @@ export function CustomConnectionModels({ connection, onConnectionChange, onChang
           pendingLabel="删除中…"
           onCancel={() => setRemoving(null)}
           onConfirm={async () => {
-            const result = await window.actspace.removeModel?.({ modelKey: removing.definition.key });
-            if (!result) throw new Error("当前版本不支持删除模型。");
+            const result = await modelsApi.remove({ modelKey: removing.definition.key });
             if ("error" in result) throw new Error(result.error.message);
             setRemoving(null);
             await load();

@@ -6,6 +6,7 @@ import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared
 import { UserMessage } from "../components/messages/UserMessage";
 import { ResponseAnnotationContext } from "../components/messages/response-annotation-context";
 import { createAnnotationContextValue, makeAnnotation } from "./fixtures/response-annotation-helpers";
+import { setupBridge } from "./helpers/bridge";
 
 function makeUserBlock(content: string): Extract<MessageBlock, { kind: "user" }> {
   return {
@@ -17,7 +18,6 @@ function makeUserBlock(content: string): Extract<MessageBlock, { kind: "user" }>
 }
 
 const LONG_CONTENT = Array.from({ length: 200 }, (_, i) => `第 ${i} 行超长输入`).join("\n");
-const originalBridge = Object.getOwnPropertyDescriptor(window, "actspace");
 
 // jsdom 不做真实布局，scrollHeight 恒为 0；用原型 getter 模拟内容完整高度。
 function mockScrollHeight(value: number) {
@@ -29,8 +29,6 @@ function mockScrollHeight(value: number) {
 
 afterEach(() => {
   delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight;
-  if (originalBridge) Object.defineProperty(window, "actspace", originalBridge);
-  else Reflect.deleteProperty(window, "actspace");
 });
 
 describe("UserMessage", () => {
@@ -39,12 +37,12 @@ describe("UserMessage", () => {
     { name: "empty attachments", attachments: [] },
   ])("settles pure-text rendering with desktop IPC and $name", async ({ attachments }) => {
     const readSessionArtifact = vi.fn();
-    Object.defineProperty(window, "actspace", { configurable: true, value: { readSessionArtifact } });
+    setupBridge({ "sessions.readArtifact": readSessionArtifact });
     let commits = 0;
     const onRender = () => {
       commits += 1;
       // Stop the unfixed feedback loop so the regression fails without hanging the suite.
-      if (commits === 20) Object.defineProperty(window, "actspace", { configurable: true, value: {} });
+      if (commits === 20) setupBridge({});
     };
     render(
       <Profiler id="plain-message" onRender={onRender}>
@@ -154,10 +152,7 @@ describe("UserMessage", () => {
       dataUrl: "data:image/png;base64,persisted",
     }));
     const onOpenAttachmentPreview = vi.fn();
-    Object.defineProperty(window, "actspace", {
-      configurable: true,
-      value: { readSessionArtifact },
-    });
+    setupBridge({ "sessions.readArtifact": readSessionArtifact });
 
     const attachment = {
       id: "attachment-1",

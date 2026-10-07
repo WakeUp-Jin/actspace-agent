@@ -5,6 +5,10 @@ import type { MessageBlock, WorkspaceReadFileResult } from "@actspace/shared";
 import { useRightPanel, type RightPanelTab } from "../right-panel/RightPanelContext";
 import { tabFromFile } from "../right-panel/workspaceFileTab";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
+import { dialogsApi } from "../../api/dialogs";
+import { sessionsApi } from "../../api/sessions";
+import { workspacesApi } from "../../api/workspaces";
+import { useRunTargetContext } from "../../target/run-target-context";
 
 type TurnOutputArtifact = {
   id: string;
@@ -151,6 +155,8 @@ export function TurnOutputArtifacts({
 }) {
   const outputs = useMemo(() => collectTurnOutputArtifacts(messages), [messages]);
   const { openTab } = useRightPanel();
+  // 产物属于当前会话；远端会话的文件经 Host 读取和下载（15 T6）。
+  const isRemoteTarget = useRunTargetContext().target.kind === "remote";
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -161,11 +167,11 @@ export function TurnOutputArtifacts({
     setError(null);
     try {
       if (artifact.kind === "image") {
-        if (!sessionId || !window.actspace?.readSessionArtifact) {
+        if (!sessionId) {
           setError("当前环境不支持会话图片预览。");
           return;
         }
-        const result = await window.actspace.readSessionArtifact({
+        const result = await sessionsApi.readArtifact({
           sessionId,
           artifactPath: artifact.sourcePath,
         });
@@ -185,12 +191,12 @@ export function TurnOutputArtifacts({
         return;
       }
 
-      if (sessionId && await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab)) return;
-      if (!workspaceRoot || !artifact.workspaceRelativePath || !window.actspace?.readWorkspaceFile) {
+      if (isRemoteTarget && sessionId && await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab)) return;
+      if (!workspaceRoot || !artifact.workspaceRelativePath) {
         setError("该文件不在当前工作区内，暂时不能预览。");
         return;
       }
-      const result = await window.actspace.readWorkspaceFile({
+      const result = await workspacesApi.readFile({
         workspaceRoot,
         relativePath: artifact.workspaceRelativePath,
       });
@@ -207,9 +213,8 @@ export function TurnOutputArtifacts({
   }
 
   async function showContextMenu(artifact: TurnOutputArtifact) {
-    if (!window.actspace?.showArtifactContextMenu) return;
     setError(null);
-    if (artifact.kind === "file" && sessionId?.startsWith("host:")) {
+    if (artifact.kind === "file" && sessionId && isRemoteTarget) {
       try { await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab, true); }
       catch { setError("远端文件下载失败，请确认连接后重试。"); }
       return;
@@ -228,7 +233,7 @@ export function TurnOutputArtifacts({
     if (!input) return;
 
     try {
-      const result = await window.actspace.showArtifactContextMenu(input);
+      const result = await dialogsApi.showArtifactContextMenu(input);
       if (!result.shown) setError("无法打开 Artifact 菜单。");
     } catch {
       setError("无法打开 Artifact 菜单。");

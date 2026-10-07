@@ -1,0 +1,31 @@
+{
+  "version": 3,
+  "providers": {
+    "openrouter": {
+      "enabled": true,
+      "baseUrl": null,
+      "proxy": { "enabled": false, "url": null },
+      "lastConnection": { "status": "untested" },
+      "defaultPricingMultiplier": 1,
+      "additionalCredentials": []
+    }
+  },
+  "installedModels": {
+    "kimi:kimi-k2.6": { "enabled": true, "addedAt": "2026-08-01T00:00:00.000Z", "customLabel": "  Kimi main  " }
+  },
+  "customModels": {},
+  "taskModels": { "defaultChatModel": "deepseek:deepseek-flash", "utilityModel": "kimi:kimi-k2.6", "exploreModel": null },
+  "imageGeneration": { "baseUrl": "https://images.example/v3/", "model": "image-model-v3" },
+  "imageInspection": { "modelKey": "openrouter:openai/gpt-5.6-luna" },
+  "agent": {
+    "systemPromptPath": "v3-agent.md",
+    "temperature": null,
+    "maxTokens": 2048,
+    "disabledTools": [],
+    "bashAlwaysAsk": true
+  },
+  "skills": { "disabled": [] },
+  "shortcuts": {
+    "quickOpen": { "enabled": true, "accelerator": "CommandOrControl+Shift+Space", "target": { "kind": "automatic" } }
+  }
+}

@@ -4,11 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceListDirInput, WorkspaceListDirResult, WorkspaceReadFileResult } from "@actspace/shared";
 import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
 import { WorkspaceFileTree } from "../components/right-panel/WorkspaceFileTree";
-
-const originalActspace = (window as { actspace?: unknown }).actspace;
+import { setupBridge } from "./helpers/bridge";
 
 afterEach(() => {
-  (window as { actspace?: unknown }).actspace = originalActspace;
   vi.restoreAllMocks();
 });
 
@@ -32,11 +30,11 @@ function installBridge(overrides: {
   listWorkspaceDir?: (input: WorkspaceListDirInput) => Promise<WorkspaceListDirResult>;
   readWorkspaceFile?: () => Promise<WorkspaceReadFileResult>;
 }) {
-  (window as { actspace?: unknown }).actspace = {
-    listWorkspaceDir: overrides.listWorkspaceDir ?? (async () => ({ root: "/ws", relativePath: "", entries: [] })),
-    readWorkspaceFile:
+  setupBridge({
+    "workspaces.listDir": overrides.listWorkspaceDir ?? (async () => ({ root: "/ws", relativePath: "", entries: [] })),
+    "workspaces.readFile":
       overrides.readWorkspaceFile ?? (async () => ({ relativePath: "", renderKind: "text", size: 0, mtimeMs: 0, content: "" })),
-  };
+  });
 }
 
 describe("WorkspaceFileTree", () => {
@@ -105,9 +103,9 @@ describe("WorkspaceFileTree", () => {
     expect(readWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/ws-selected", relativePath: "main.ts" });
   });
 
-  it("degrades gracefully when the file IPC bridge is unavailable", async () => {
-    (window as { actspace?: unknown }).actspace = undefined;
-    renderTree();
-    expect(await screen.findByText("当前环境不支持文件浏览。")).toBeInTheDocument();
+  it("shows a read failure when listing the directory rejects", async () => {
+    installBridge({ listWorkspaceDir: async () => { throw new Error("ipc failed"); } });
+    renderTree("/ws");
+    expect(await screen.findByText("无法读取目录")).toBeInTheDocument();
   });
 });

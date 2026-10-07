@@ -185,10 +185,12 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
   - 左侧栏折叠 / 展开。
   - 搜索会话。
   - 右侧面板打开 / 关闭。
-- `apps/desktop/src/renderer/components/Sidebar.tsx`
+- `apps/desktop/src/renderer/components/sidebar/SessionRow.tsx`（2026-10-06 从 `Sidebar.tsx` 拆出）
   - Pin / Unpin。
   - Archive session。
-  - ~~Sort workspaces~~、~~Add workspace~~、~~New chat in workspace~~、分组折叠、会话状态：2026-09-26 已改为 `IconButton`。
+  - 会话状态：2026-09-26 已改为 `IconButton`。
+- `apps/desktop/src/renderer/components/Sidebar.tsx`、`sidebar/WorkspaceSection.tsx`
+  - ~~Sort workspaces~~、~~Add workspace~~、~~New chat in workspace~~、分组折叠：2026-09-26 已改为 `IconButton`。
 - `apps/desktop/src/renderer/components/RightPanel.tsx`
   - 展开 / 收起文件树。
   - 关闭 `{tab.title}`。

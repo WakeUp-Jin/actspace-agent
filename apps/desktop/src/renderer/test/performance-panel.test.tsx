@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PerformancePanel } from "../components/PerformancePanel";
+import { setupBridge } from "./helpers/bridge";
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 describe("performance monitor lifecycle", () => {
@@ -10,11 +11,11 @@ describe("performance monitor lifecycle", () => {
     let changed = () => {};
     const active = vi.fn().mockResolvedValue(undefined);
     const sample = vi.fn().mockResolvedValue({ sampledAt: Date.now(), mainDelayMs: 0, processes: [{ pid: 1, type: "Browser", cpuPercent: 1, workingSetKiB: 1024 }] });
-    window.actspace = {
-      getSettingsV4: vi.fn(async () => ({ settings: { general: { performanceMonitoring: enabled } } })),
-      onSettingsChangedV4: vi.fn(callback => { changed = callback; return () => {}; }),
-      setPerformanceActive: active, samplePerformance: sample,
-    } as unknown as Window["actspace"];
+    setupBridge({
+      "settings.getV4": vi.fn(async () => ({ settings: { general: { performanceMonitoring: enabled } } })),
+      "events.settingsChanged": vi.fn(callback => { changed = callback; return () => {}; }),
+      "performance.setActive": active, "performance.sample": sample,
+    });
     await act(async () => { render(<PerformancePanel />); });
     await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
     expect(sample).not.toHaveBeenCalled(); expect(active).not.toHaveBeenCalled();

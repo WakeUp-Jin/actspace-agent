@@ -14,6 +14,7 @@ import { ModelPricingFields, modelPricingFromDraft, pricingDraftFromModel, type 
 import { SettingGroup, SettingRow, SettingsInput, Toggle } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
 import { SetupFooter, SetupHeader, isOfficialAnthropic } from "./custom-connection-shared";
+import { modelsApi } from "../../api/models";
 
 export type CustomModelFormDraft = {
   apiModel: string;
@@ -102,8 +103,7 @@ export function CustomModelForm({ connection, model, onBack, onSaved }: { connec
       const input = customModelInputFromDraft(draft);
       // 关闭「手动修改」时能力回到目录值，推理回到自动匹配。
       const capability = override ? input : { ...input, ...customModelDraftFromCatalog(input.apiModel), label: input.label, enabled: input.enabled, pricing: input.pricing };
-      const result = await window.actspace.editCustomModel?.({ ...capability, modelKey: model.definition.key });
-      if (!result) throw new Error("当前版本不支持自定义模型管理。");
+      const result = await modelsApi.editCustom({ ...capability, modelKey: model.definition.key });
       if ("error" in result) throw new Error(result.error.message);
       await onSaved();
     } catch (nextError) {

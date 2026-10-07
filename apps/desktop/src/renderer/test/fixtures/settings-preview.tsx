@@ -4,6 +4,7 @@ import { SettingsPage } from "../../components/settings/SettingsPage";
 import type { SettingsSectionId } from "../../components/settings/SettingsNav";
 import { TooltipProvider } from "../../components/ui/Tooltip";
 import "../../styles/index.css";
+import { setupBridge, type BridgeOverrides } from "../helpers/bridge";
 
 const query = new URLSearchParams(location.search);
 document.documentElement.dataset.theme = query.get("theme") ?? "light";
@@ -71,13 +72,13 @@ const providerView = (provider: string, hasApiKey: boolean, installedModelCount:
   provider, hasApiKey, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount, enabledModelCount,
 });
 
-const bridge: Record<string, unknown> = {
-  getSettings: async () => settings,
-  getSettingsV4: async () => settingsV4,
-  updateSettings: async () => settings,
-  updateSettingsV4: async () => ({ ok: true, snapshot: settingsV4 }),
-  readAgentSystemPrompt: async () => ({ path: promptPath, content: "你是 ActSpace 的主 Agent。\n- 先理解需求，再动手修改。" }),
-  listProviders: async () => ({
+const bridge: BridgeOverrides = {
+  "settings.get": async () => settings,
+  "settings.getV4": async () => settingsV4,
+  "settings.update": async () => settings,
+  "settings.updateV4": async () => ({ ok: true, snapshot: settingsV4 }),
+  "settings.readSystemPrompt": async () => ({ path: promptPath, content: "你是 ActSpace 的主 Agent。\n- 先理解需求，再动手修改。" }),
+  "providers.list": async () => ({
     credentialStorage: { status: "ready" },
     providers: {
       deepseek: providerView("deepseek", true, 3, 2),
@@ -85,34 +86,28 @@ const bridge: Record<string, unknown> = {
       openrouter: providerView("openrouter", false, 0, 0),
     },
   }),
-  getProviderBalance: async ({ provider }: { provider: string }) => ({
+  "providers.getBalance": async ({ provider }: { provider: string }) => ({
     provider, isConfigured: true, isAvailable: true, generatedAt: "2026-09-25T08:00:00.000Z", displayBalance: { amount: "31.11", currency: "CNY" },
   }),
-  listInstalledModels: async () => ({ models: installedModels }),
-  listUsableModels: async () => ({ models: usableModels }),
-  getLocalUpdateState: async () => ({
+  "models.listInstalled": async () => ({ models: installedModels }),
+  "models.listUsable": async () => ({ models: usableModels }),
+  "updates.getState": async () => ({
     sourceRoot: "/Users/me/code/actspace-agent", sourceValid: true, appExecutablePath: "/Applications/Actspace.app/Contents/MacOS/Actspace",
     appIsPackaged: true, appPath: "/Applications/Actspace.app", installParent: "/Applications", canUpdate: true, logPath: "/tmp/update.log",
     running: false, progress: { phase: "idle", message: "尚未开始本地更新。" },
   }),
-  listSessions: async () => [
+  "sessions.list": async () => [
     { id: "a1", title: "重构设置中心导航", updatedAt: "2026-09-20T10:00:00.000Z", agentRunCount: 4, workspaceRoot: "/Users/me/code/actspace-agent", archived: true },
     { id: "a2", title: "排查使用统计费用估算", updatedAt: "2026-09-18T10:00:00.000Z", agentRunCount: 2, workspaceRoot: "/Users/me/code/actspace-agent", archived: true },
   ],
-  listWorkspaces: async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
-  getQuickOpenShortcutStatus: async () => ({ registered: true, accelerator: "CommandOrControl+Shift+Space" }),
-  getEnglishLearningState: async () => ({ revision: 1, hasApiKey: false, speechStatus: "idle", error: null }),
-  getSearchUsage: async () => ({ ok: false, error: "预览样例：不查询用量。" }),
+  "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
+  "quickOpen.getShortcutStatus": async () => ({ registered: true, accelerator: "CommandOrControl+Shift+Space" }),
+  "englishLearning.getState": async () => ({ revision: 1, hasApiKey: false, speechStatus: "idle", error: null }),
+  "settings.getSearchUsage": async () => ({ ok: false, error: "预览样例：不查询用量。" }),
 };
 
-// Any bridge method the fixture does not model resolves to an empty success so the page renders.
-window.actspace = new Proxy(bridge, {
-  get(target, prop: string) {
-    if (prop in target) return target[prop];
-    if (prop.startsWith("on")) return () => () => {};
-    return async () => ({ ok: true, models: [], items: [], entries: [] });
-  },
-}) as unknown as NonNullable<typeof window.actspace>;
+// 未建模的成员由 mock bridge 的默认 handler 兜底。
+setupBridge(bridge);
 
 const section = (query.get("section") ?? "general") as SettingsSectionId;
 // ?detail=DeepSeek opens that connection's detail route after the list loads.

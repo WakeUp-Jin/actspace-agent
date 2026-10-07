@@ -1,12 +1,13 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { loadTrajectoryFixture } from "../trajectory/fixtures";
 import { TrajectoryView } from "../components/TrajectoryView";
 import { SessionProjectionProvider } from "../session";
 import { projectionFixture } from "./projection-fixture";
 import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import { setupBridge } from "./helpers/bridge";
 
 const snapshot: RuntimeV2TrajectorySnapshot = {
   kind: "trajectory",
@@ -21,10 +22,6 @@ const snapshot: RuntimeV2TrajectorySnapshot = {
 };
 
 describe("TrajectoryView", () => {
-  afterEach(() => {
-    delete (window as { actspace?: unknown }).actspace;
-  });
-
   it("renders the Journal projection nodes with stable sequence identity", () => {
     render(<TrajectoryView snapshot={snapshot} />);
     expect(screen.getByTestId("trajectory-view")).toBeInTheDocument();
@@ -41,6 +38,21 @@ describe("TrajectoryView", () => {
     expect(screen.getByText(/暂无可展示的 Agent 轨迹/)).toBeInTheDocument();
   });
 
+  it("lazily loads the URL fixture and its theme override, restoring the theme on unmount", async () => {
+    const previousUrl = window.location.href;
+    window.history.replaceState(null, "", "?trajectoryFixture=complete&trajectoryTheme=dark");
+    try {
+      const view = render(<TrajectoryView snapshot={null} />);
+      await waitFor(() => expect(screen.queryByText(/暂无可展示的 Agent 轨迹/)).not.toBeInTheDocument());
+      expect(screen.getAllByRole("row").length).toBeGreaterThan(0);
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      view.unmount();
+      expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    } finally {
+      window.history.replaceState(null, "", previousUrl);
+    }
+  });
+
   it("reads the active Session trajectory directly from ClientSessionStore selectors", async () => {
     const events: SessionEventEnvelopeV1[] = snapshot.nodes.map(node => ({
       recordKind: "event",
@@ -55,10 +67,10 @@ describe("TrajectoryView", () => {
       provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
     }));
     const projection = projectionFixture("session-1", snapshot.throughJournalSeq, events);
-    (window as { actspace?: unknown }).actspace = {
-      getSessionProjectionSnapshot: async () => projection,
-      onSessionLiveEvent: () => () => undefined,
-    };
+    setupBridge({
+      "sessions.getProjectionSnapshot": async () => projection,
+      "events.sessionLive": () => () => undefined,
+    });
 
     render(
       <SessionProjectionProvider sessionId="session-1">

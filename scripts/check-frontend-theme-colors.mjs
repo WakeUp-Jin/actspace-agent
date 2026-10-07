@@ -67,16 +67,8 @@ const REQUIRED_THEME_TOKENS = [
 ];
 
 const LITERAL_ALLOWLIST = new Map([
-  [
-    "components/Composer.tsx",
-    [
-      /\[background:linear-gradient\(/,
-      /bg-\[rgba\(45,51,58,0\.86\)\]/,
-      /bg-\[rgba\(31,36,42,0\.94\)\]/,
-      /text-white/,
-      /bg-white/,
-    ],
-  ],
+  // 模型选项里 Thinking 开关的圆点（09 T12 从 Composer 搬来），与设置页开关一致。
+  ["components/composer/ModelPicker.tsx", [/bg-white/]],
   ["components/settings/SettingsPrimitives.tsx", [/bg-white/]],
 ]);
 

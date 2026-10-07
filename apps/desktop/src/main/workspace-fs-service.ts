@@ -11,7 +11,7 @@
  */
 
 import { open, readFile, readdir, stat } from "node:fs/promises";
-import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, extname, relative, resolve, sep } from "node:path";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import type {
   WorkspaceDirEntry,
@@ -24,6 +24,7 @@ import type {
   WorkspaceStatFileResult,
 } from "@actspace/shared";
 import type { AppDataRoots } from "./app-paths";
+import { isPathInside, realpathOfNearestExisting, realpathOrNull } from "./workspace-access";
 
 /** 一次性铺开会拖垮 UI 的大目录，直接从树里隐藏。 */
 const IGNORED_DIR_NAMES = new Set([
@@ -208,14 +209,17 @@ function normalizeRelative(relativePath: string | undefined): string {
     .replace(/\/+$/, "");
 }
 
-/** 把绝对路径解析回 root 内 POSIX 相对路径；越界返回 null。 */
-function toInsideRoot(root: string, relativePath: string): { abs: string; rel: string } | null {
-  const abs = resolve(root, relativePath);
-  const rel = relative(root, abs);
-  if (rel.startsWith("..") || isAbsolute(rel)) {
-    return null;
-  }
-  return { abs, rel: rel.split(sep).join("/") };
+/**
+ * 把相对路径解析成 root 内的绝对路径和 POSIX 相对路径；越界返回 null。
+ * root 先 realpath；目标对最近存在的祖先做 realpath，所以经由 symlink 指到 root 外的路径（存在与否）都算越界。
+ */
+async function toInsideRoot(root: string, relativePath: string): Promise<{ abs: string; rel: string } | null> {
+  const realRoot = (await realpathOrNull(root)) ?? resolve(root);
+  const lexical = resolve(realRoot, relativePath);
+  if (!isPathInside(realRoot, lexical)) return null;
+  const real = await realpathOfNearestExisting(lexical);
+  if (!isPathInside(realRoot, real)) return null;
+  return { abs: real, rel: relative(realRoot, lexical).split(sep).join("/") };
 }
 
 function renderKindOf(ext: string): WorkspaceFileRenderKind {
@@ -268,7 +272,7 @@ export async function listWorkspaceDir(
 ): Promise<WorkspaceListDirResult> {
   const root = resolveRoot(input, roots);
   const normalized = normalizeRelative(input.relativePath);
-  const inside = toInsideRoot(root, normalized);
+  const inside = await toInsideRoot(root, normalized);
   if (!inside) {
     return { root, relativePath: normalized, entries: [], error: "escapes_root" };
   }
@@ -327,7 +331,7 @@ export async function readWorkspaceFile(
 ): Promise<WorkspaceReadFileResult> {
   const root = resolveRoot(input, roots);
   const normalized = normalizeRelative(input.relativePath);
-  const inside = toInsideRoot(root, normalized);
+  const inside = await toInsideRoot(root, normalized);
   if (!inside) {
     return { relativePath: normalized, renderKind: "text", size: 0, mtimeMs: 0, error: "escapes_root" };
   }
@@ -415,7 +419,7 @@ export async function statWorkspaceFile(
 ): Promise<WorkspaceStatFileResult> {
   const root = resolveRoot(input, roots);
   const normalized = normalizeRelative(input.relativePath);
-  const inside = toInsideRoot(root, normalized);
+  const inside = await toInsideRoot(root, normalized);
   if (!inside) {
     return { relativePath: normalized, size: 0, mtimeMs: 0, error: "escapes_root" };
   }

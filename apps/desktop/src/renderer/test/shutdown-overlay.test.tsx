@@ -1,23 +1,18 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import type { AppShutdownNotice } from "@actspace/shared";
 import { ShutdownOverlay } from "../components/ShutdownOverlay";
-
-type ActspaceBridge = NonNullable<typeof window.actspace>;
+import { setupBridge } from "./helpers/bridge";
 
 describe("ShutdownOverlay", () => {
-  afterEach(() => {
-    delete (window as { actspace?: ActspaceBridge }).actspace;
-  });
-
   it("默认不渲染遮罩；收到 onShuttingDown 回调后出现", () => {
     let fire: ((notice: AppShutdownNotice) => void) | null = null;
-    window.actspace = {
-      onShuttingDown: (cb: (notice: AppShutdownNotice) => void) => {
+    setupBridge({
+      "events.shuttingDown": (cb: (notice: AppShutdownNotice) => void) => {
         fire = cb;
         return () => {};
       },
-    } as unknown as ActspaceBridge;
+    });
 
     render(<ShutdownOverlay />);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
@@ -32,12 +27,12 @@ describe("ShutdownOverlay", () => {
 
   it("本地更新退出时显示替换应用文案", () => {
     let fire: ((notice: AppShutdownNotice) => void) | null = null;
-    window.actspace = {
-      onShuttingDown: (cb: (notice: AppShutdownNotice) => void) => {
+    setupBridge({
+      "events.shuttingDown": (cb: (notice: AppShutdownNotice) => void) => {
         fire = cb;
         return () => {};
       },
-    } as unknown as ActspaceBridge;
+    });
 
     render(<ShutdownOverlay />);
 
@@ -56,11 +51,11 @@ describe("ShutdownOverlay", () => {
 
   it("卸载时调用取消订阅", () => {
     let offCalled = false;
-    window.actspace = {
-      onShuttingDown: () => () => {
+    setupBridge({
+      "events.shuttingDown": () => () => {
         offCalled = true;
       },
-    } as unknown as ActspaceBridge;
+    });
 
     const { unmount } = render(<ShutdownOverlay />);
     unmount();

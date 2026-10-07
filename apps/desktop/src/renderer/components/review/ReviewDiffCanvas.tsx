@@ -12,6 +12,7 @@ import type {
   ReviewMutation,
 } from "@actspace/shared";
 import type { ReviewDiffMode, ReviewFileRequestState } from "./review-store";
+import { workspacesApi } from "../../api/workspaces";
 
 type DiffRow =
   | { key: string; kind: "file"; file: ReviewFileSummary }
@@ -298,8 +299,8 @@ function ReviewImageDiff({ workspaceRoot, file }: { workspaceRoot?: string; file
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    if (file.status === "deleted" || !window.actspace?.readWorkspaceFile) return;
-    void window.actspace.readWorkspaceFile({ workspaceRoot, relativePath: file.path }).then((result) => {
+    if (file.status === "deleted") return;
+    void workspacesApi.readFile({ workspaceRoot, relativePath: file.path }).then((result) => {
       if (!active) return;
       if (result.error || !result.dataUrl) setError("当前图片预览不可用。");
       else setSrc(result.dataUrl);

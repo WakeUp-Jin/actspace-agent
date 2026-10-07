@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { MessageBlock } from "@actspace/shared";
-import { ConversationView } from "../components/ConversationView";
+import { TestConversationView } from "./helpers/workbench";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
@@ -93,7 +93,7 @@ function renderConversation(messages: MessageBlock[], isStreaming = false) {
   return render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider>
-        <ConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isStreaming={isStreaming} />
+        <TestConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isStreaming={isStreaming} />
       </RightPanelProvider>
     </TooltipProvider>,
   );
@@ -154,7 +154,7 @@ describe("ToolActivityGroup in ConversationView", () => {
       toolTurn[5],
     ];
     const view = (active: boolean) => <TooltipProvider><RightPanelProvider>
-      <ConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
+      <TestConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
     </RightPanelProvider></TooltipProvider>;
     const { rerender } = render(view(true));
     for (const name of ["Show result for Read package.json", "Grep ToolActivityGroup", "Searched web"]) {

@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import type { SessionRef, HostMethod } from "@actspace/shared/host-protocol";
 import type { RemoteHostRegistry } from "./registry";
+import { decodeSessionLocator, encodeSessionLocator } from "@actspace/shared/session-locator";
 export type AttachmentUploadSource = string | { artifactId: string };
 export function attachmentUploadSources(ref: SessionRef, attachments: unknown): AttachmentUploadSource[] {
   if (!Array.isArray(attachments)) return [];
@@ -17,17 +18,9 @@ export function attachmentUploadSources(ref: SessionRef, attachments: unknown): 
     return attachment.path;
   });
 }
-/** Transitional UI cache key; the wire always receives the original structured SessionRef. */
-export function remoteSessionKey(ref: SessionRef): string { return `host:${Buffer.from(JSON.stringify([ref.hostId, ref.sessionId])).toString("base64url")}`; }
-export function parseRemoteSessionKey(key: string): SessionRef | null {
-  if (!key.startsWith("host:")) return null;
-  try {
-    const value: unknown = JSON.parse(Buffer.from(key.slice(5), "base64url").toString("utf8"));
-    if (!Array.isArray(value) || value.length !== 2 || value.some(item => typeof item !== "string" || !item.length || item.length > 128)) throw new Error();
-    const ref = { hostId: value[0] as string, sessionId: value[1] as string };
-    if (remoteSessionKey(ref) !== key) throw new Error(); return ref;
-  } catch { throw new Error("Invalid remote SessionRef"); }
-}
+/** Transitional UI cache key; the wire always receives the original structured SessionRef. 编解码在 shared 的 session-locator。 */
+export function remoteSessionKey(ref: SessionRef): string { return encodeSessionLocator(ref); }
+export function parseRemoteSessionKey(key: string): SessionRef | null { return decodeSessionLocator(key); }
 export class RemoteSessionRouter {
   constructor(private readonly hosts: RemoteHostRegistry) {}
   call(ref: SessionRef, method: HostMethod, params: Readonly<Record<string, unknown>> = {}): Promise<unknown> { return this.hosts.call(ref.hostId, method, { ...params, sessionId: ref.sessionId }); }

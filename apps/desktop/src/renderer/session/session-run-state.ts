@@ -1,4 +1,4 @@
-import type { MessageBlock, RuntimeStreamEvent, SessionEvent, SessionRecord, ToolUiPreview } from "@actspace/shared";
+import type { MessageBlock, RuntimeStreamEvent, SessionEvent, ToolUiPreview } from "@actspace/shared";
 
 export type ToolEntry = {
   toolName: string;
@@ -20,7 +20,7 @@ export type StreamingSegment =
   | { type: "tool"; toolCallId: string }
   | { type: "compaction"; agentRunId: string }
   | { type: "workspace_preparation"; agentRunId: string }
-  /** 运行中插入、已被 loop 读到的用户消息。 */
+  /** 运行中引导、已被 loop 读到的用户消息。 */
   | { type: "user_message"; block: Extract<MessageBlock, { kind: "user" }> };
 
 export type StreamingState = {
@@ -54,6 +54,4 @@ export type SessionRunState = {
   state: StreamingState;
   userBlock: MessageBlock | null;
   aborting: boolean;
-  record: SessionRecord | null;
-  historyBefore: number | null;
 };

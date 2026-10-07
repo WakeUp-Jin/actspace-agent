@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { BashRunBlock } from "../components/messages/BashRunBlock";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { overrideBridge } from "./helpers/bridge";
 
 function renderBash(message: Extract<MessageBlock, { kind: "bash" }>) {
   return render(
@@ -204,32 +205,27 @@ describe("BashRunBlock tooltips", () => {
   });
 
   it("switches an approval card to not executed after deny", async () => {
-    const originalActspace = window.actspace;
     const submitApproval = vi.fn(async () => ({ ok: true }));
-    window.actspace = { ...originalActspace, submitApproval } as typeof window.actspace;
-    try {
-      renderBash({
-        id: "bash-approval-deny-1",
-        kind: "bash",
-        createdAt: "2026-07-25T00:00:00.000Z",
-        title: "Delete directory",
-        status: "pending",
-        command: "rm -rf user-management",
-        approvalRequestId: "approval-deny-1",
-        sandboxed: true,
-      });
+    overrideBridge({ "approvals.submit": submitApproval });
+    renderBash({
+      id: "bash-approval-deny-1",
+      kind: "bash",
+      createdAt: "2026-07-25T00:00:00.000Z",
+      title: "Delete directory",
+      status: "pending",
+      command: "rm -rf user-management",
+      approvalRequestId: "approval-deny-1",
+      sandboxed: true,
+    });
 
-      await userEvent.click(screen.getByRole("button", { name: "拒绝" }));
+    await userEvent.click(screen.getByRole("button", { name: "拒绝" }));
 
-      expect(await screen.findByText("未执行")).toBeInTheDocument();
-      expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
-      expect(submitApproval).toHaveBeenCalledWith({
-        requestId: "approval-deny-1",
-        decision: "deny",
-      });
-    } finally {
-      window.actspace = originalActspace;
-    }
+    expect(await screen.findByText("未执行")).toBeInTheDocument();
+    expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
+    expect(submitApproval).toHaveBeenCalledWith({
+      requestId: "approval-deny-1",
+      decision: "deny",
+    });
   });
 
   it("shows intent, command and cwd in the approval card with actions in the footer", () => {
@@ -261,25 +257,20 @@ describe("BashRunBlock tooltips", () => {
   });
 
   it("keeps the Bash approval actionable when the bridge rejects the decision", async () => {
-    const originalActspace = window.actspace;
     const submitApproval = vi.fn(async () => ({ ok: false, reason: "expired" }));
-    window.actspace = { ...originalActspace, submitApproval } as typeof window.actspace;
-    try {
-      renderBash({
-        id: "bash-approval-reject-1",
-        kind: "bash",
-        createdAt: "2026-06-02T00:00:00.000Z",
-        title: "Run Bash command: pnpm",
-        status: "pending",
-        command: "pnpm build",
-        approvalRequestId: "approval-reject-1",
-      });
+    overrideBridge({ "approvals.submit": submitApproval });
+    renderBash({
+      id: "bash-approval-reject-1",
+      kind: "bash",
+      createdAt: "2026-06-02T00:00:00.000Z",
+      title: "Run Bash command: pnpm",
+      status: "pending",
+      command: "pnpm build",
+      approvalRequestId: "approval-reject-1",
+    });
 
-      await userEvent.click(screen.getByRole("button", { name: "运行" }));
-      await waitFor(() => expect(screen.getByRole("button", { name: "运行" })).toBeEnabled());
-      expect(screen.getByText("Bash 命令")).toBeInTheDocument();
-    } finally {
-      window.actspace = originalActspace;
-    }
+    await userEvent.click(screen.getByRole("button", { name: "运行" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "运行" })).toBeEnabled());
+    expect(screen.getByText("Bash 命令")).toBeInTheDocument();
   });
 });

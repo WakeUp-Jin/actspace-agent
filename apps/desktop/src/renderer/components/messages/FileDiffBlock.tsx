@@ -10,6 +10,7 @@ import {
   TOOL_LOG_LINE_TEXT_CLASS,
   TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
 } from "./toolLogStyles";
+import { settingsApi } from "../../api/settings";
 
 type FileDiffMessage =
   | Extract<MessageBlock, { kind: "edit_diff" }>
@@ -125,8 +126,7 @@ export function FileDiffBlock({ message, className, onExpand }: { message: FileD
 
   useEffect(() => {
     let active = true;
-    if (typeof window === "undefined" || !window.actspace?.getSettingsV4) return;
-    void window.actspace.getSettingsV4().then((snapshot) => {
+    void settingsApi.getV4().then((snapshot) => {
       if (active) setShowFileChangeStats(snapshot.settings.tools.showFileChangeStats !== false);
     }).catch(() => undefined);
     return () => { active = false; };
