@@ -40,7 +40,7 @@ export type RunManagerOptions = {
   /** Host admission gate, checked before reserving a Run. */
   readonly canStart?: () => boolean;
   readonly ledger: TaskLedger;
-  readonly harnessId: string;
+  readonly harnessId: string | (() => string);
   readonly operationForTask?: (task: TaskRecord) => ((signal: AbortSignal) => Promise<RuntimeV2JsonValue | void>) | undefined;
   readonly runIdForTask?: (task: TaskRecord) => string | undefined;
   readonly acquire: (harnessId: string, signal?: AbortSignal) => RunLease | Promise<RunLease>;
@@ -169,7 +169,7 @@ export class SessionRunManager {
         return;
       }
       acquiring = true;
-      lease = await this.options.acquire(this.options.harnessId, signal);
+      lease = await this.options.acquire(typeof this.options.harnessId === "function" ? this.options.harnessId() : this.options.harnessId, signal);
       acquiring = false;
       signal.throwIfAborted();
       const configuration = snapshotSessionJson(await this.options.readConfiguration());

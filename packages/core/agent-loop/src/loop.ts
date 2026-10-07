@@ -337,7 +337,7 @@ export class AgentLoop {
     const available = this.options.tools.registry.listDefinitions();
     const modeTools = this.options.descriptor.kind === "subagent"
       ? new Set(available.map(definition => definition.name))
-      : allowedAgentModeTools(mode, available.map(definition => definition.name));
+      : allowedAgentModeTools(mode, available.map(definition => definition.name), available.filter(definition => definition.pluginId.startsWith("actspace.evolved.")).map(definition => definition.name));
     return available
       .filter((definition) => modeTools.has(definition.name)
         && (this.options.toolScopeToken === undefined || this.options.descriptor.kind === "subagent" || this.options.scope.tools.get(definition.name)?.value === definition.pluginId)

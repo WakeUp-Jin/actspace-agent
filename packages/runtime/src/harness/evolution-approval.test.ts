@@ -1,0 +1,20 @@
+import { expect, it } from "vitest";
+import { EvolutionApproval } from "./evolution-approval.js";
+import type { ToolExecutionContext } from "@actspace/tools-runtime";
+it("binds one-use authorization to the candidate and uses the Run-scoped approval broker", async () => {
+  const events: any[] = [];
+  const sessions = { getOpen: () => ({ append: async (e: unknown) => { events.push(e); }, flush: async () => {} }) };
+  const host = { toolEnvironment: { approvalBroker: { requestApproval: () => { throw new Error("unscoped broker used"); } } } };
+  const approval = new EvolutionApproval(host as never, sessions as never);
+  const candidate = { activationId: "change", candidateId: "candidate", harnessId: "local", executionDigest: "digest", expectedRevision: 0 };
+  const context = { sessionId: "s", agentRunId: "r", callId: "c", signal: new AbortController().signal, requestApproval: async (r: any) => ({ requestId: r.requestId, kind: "once", decidedAt: new Date().toISOString() }) } as unknown as ToolExecutionContext;
+  expect(await approval.authorize(candidate, { approved: true })).toBeNull();
+  const token = await approval.request({ phase: "activate", purpose: "Change tool", candidate }, context);
+  expect(await approval.authorize(candidate, token)).toMatchObject(candidate);
+  expect(await approval.authorize(candidate, token)).toBeNull();
+  expect(events.map(e => e.type)).toEqual(["permission/asked", "permission/decided"]);
+  await expect(approval.request({ phase: "initialize", purpose: "test", artifactId: "fixed" }, { ...context, requestApproval: async r => ({ requestId: r.requestId, kind: "deny", code: "user-denied", decidedAt: new Date().toISOString() }) })).rejects.toThrow("denied");
+  const cancel = new AbortController();
+  await expect(approval.request({ phase: "initialize", purpose: "test" }, { ...context, signal: cancel.signal, requestApproval: async () => { cancel.abort(); throw new Error("cancelled"); } })).rejects.toThrow("cancelled");
+  expect(events.at(-1).data).toMatchObject({ kind: "deny", code: "aborted" });
+});

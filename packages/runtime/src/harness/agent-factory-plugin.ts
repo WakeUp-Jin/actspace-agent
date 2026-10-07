@@ -120,10 +120,13 @@ export function apply(ctx: CordisContext): AgentFactoryService {
     const scope = run.scope.child(agentId);
     try {
       activateMainAgentFormTools(scope, tools);
+      for (const definition of tools.registry.listDefinitions()) {
+        if (definition.pluginId === "actspace.plugin-manager" || definition.pluginId.startsWith("actspace.evolved.")) scope.tools.register({ id: definition.name, owner: definition.pluginId, value: definition.pluginId });
+      }
       const binding = tools.bindAgentScope(session.header.sessionId, agentId, () => {
         const mode = run.mode;
         const names = scope.tools.entries().map(entry => entry.id);
-        return allowedAgentModeTools(mode, names);
+        return allowedAgentModeTools(mode, names, tools.registry.listDefinitions().filter(d => d.pluginId.startsWith("actspace.evolved.")).map(d => d.name));
       });
       scope.disposer.add(binding.dispose);
       const subject: AgentSubject = Object.freeze({ agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });

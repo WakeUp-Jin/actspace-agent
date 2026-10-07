@@ -24,10 +24,16 @@ export interface SelectionRecord {
   readonly timestamp: string;
 }
 export interface HarnessPatchRequest { readonly harnessId: string; readonly expectedRevision: number; readonly baseExecutionDigest: string; readonly patch: Patch; readonly artifactIds: readonly string[] }
+export interface HarnessBranchRequest extends HarnessPatchRequest {
+  readonly sourceHarnessId: string;
+  readonly sourceRevision: number;
+}
 export interface HarnessControlOptions {
   readonly context: CordisContext; readonly dataRoot: string; readonly artifactRoot: string;
   readonly runtimeId: string; readonly compatibility: HarnessCompatibilityHost;
   readonly sharedServices: readonly string[]; readonly builtin: () => Promise<HarnessMountRequest>;
+  /** Host opts into upgrading an untouched bootstrap; custom selections/branches are excluded. */
+  readonly upgradePristineBuiltin?: (current: SelectionRecord) => boolean;
   readonly authorize?: HarnessAuthorizer; readonly now?: () => number;
   readonly onDiagnostic?: (error: unknown) => void;
   /** @mode emit: called after durable selection and memory publication. */

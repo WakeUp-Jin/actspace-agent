@@ -12,14 +12,14 @@ export class ManagedRuns {
   readonly #settings = new Map<string, Omit<ExecutionConfiguration, "mode">>();
   readonly #states = new Map<string, TaskSnapshot>();
   #closed = false;
-  constructor(private readonly sessions: RuntimeSessionController, private readonly harnesses: { acquire(id: string, signal?: AbortSignal): Promise<HarnessLease> | HarnessLease }, onSnapshot?: (snapshot: TaskSnapshot) => void) {
+  constructor(private readonly sessions: RuntimeSessionController, private readonly harnesses: { acquire(id: string, signal?: AbortSignal): Promise<HarnessLease> | HarnessLease; acquireSession?(sessionId: string, signal?: AbortSignal): Promise<HarnessLease>; acquireVersion?(harnessId: string, generationId: string): Promise<HarnessLease> }, onSnapshot?: (snapshot: TaskSnapshot) => void) {
     this.service = new AgentService({
       openSession: async id => sessions.getOpen(id) ?? await sessions.resume(id),
       runIdForTask: (sessionId, task) => { const key = `${sessionId}/${task.submissionId}`; const id = this.#requestedRunIds.get(key); this.#requestedRunIds.delete(key); return id; },
       operationForTask: (session, task) => {
         if (taskOperation(task.content) !== "compact") return undefined;
         return async signal => {
-          const lease = await harnesses.acquire("main", signal);
+          const lease = await (harnesses.acquireSession?.(session.header.sessionId, signal) ?? harnesses.acquire("main", signal));
           try {
             signal.throwIfAborted();
             const compaction = lease.getService<{ compaction: import("@actspace/context").ContextCompactionCoordinator }>("context.engine")?.compaction;
@@ -28,13 +28,19 @@ export class ManagedRuns {
           } finally { await lease.release(); }
         };
       },
-      harnessId: () => "main", acquire: (id, signal) => harnesses.acquire(id, signal),
+      harnessId: session => session.header.sessionId, acquire: (id, signal) => harnesses.acquireSession?.(id, signal) ?? harnesses.acquire("main", signal),
       readConfiguration: session => ({ ...this.#settings.get(session.header.sessionId), mode: sessions.snapshot(session).agentMode ?? "agent" }),
       onSnapshot: (id, snapshot) => { this.#states.set(id, snapshot); onSnapshot?.(snapshot); },
     });
   }
-  async inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R): Promise<R> {
-    const lease = await this.harnesses.acquire("main");
+  async inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R, sessionId?: string): Promise<R> {
+    const active = sessionId ? this.#states.get(sessionId)?.runs.find(run => run.state === "running") : undefined;
+    const selected = () => sessionId ? this.harnesses.acquireSession?.(sessionId) ?? this.harnesses.acquire("main") : this.harnesses.acquire("main");
+    const lease = await (active && this.harnesses.acquireVersion ? this.harnesses.acquireVersion(active.harness.harnessId, active.harness.generationId).catch(error => {
+      // A Run may settle while this read waits behind the Control gate.
+      if (this.#states.get(sessionId!)?.runs.some(run => run.runId === active.runId && run.state === "running")) throw error;
+      return selected();
+    }) : selected());
     try { return inspect(lease.getService<T>(name)); } finally { await lease.release(); }
   }
 

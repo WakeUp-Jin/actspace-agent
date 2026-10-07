@@ -1,3 +1,4 @@
+import { officialSkillsRoot, OFFICIAL_SKILLS_VERSION } from "@actspace/official-skills";
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
@@ -10,6 +11,8 @@ export type SkillDiscoveryOptions = {
   readonly dataRoot?: string;
   readonly homeDir?: string;
   readonly roots?: readonly string[];
+  readonly officialRoot?: string | false;
+  readonly disabled?: readonly string[];
 };
 
 export async function discoverSkills(input: string | SkillDiscoveryOptions, roots: readonly string[] = DEFAULT_SKILL_ROOTS): Promise<SkillCatalog> {
@@ -24,8 +27,9 @@ export async function discoverSkills(input: string | SkillDiscoveryOptions, root
     scanRoots.push({ root: resolve(options.homeDir, ".agents/skills"), source: "agents-user" });
     scanRoots.push({ root: resolve(options.homeDir, ".claude/skills"), source: "claude-user" });
   }
+  if (options.officialRoot !== false) scanRoots.push({ root: options.officialRoot ?? officialSkillsRoot, source: `actspace-official@${OFFICIAL_SKILLS_VERSION}` });
   for (const { root, source } of scanRoots) await scanRoot(root, source, catalog, 0, { files: 0 });
-  return catalog;
+  return new SkillCatalog(catalog.list().filter(skill => !options.disabled?.includes(skill.id) && !options.disabled?.includes(skill.name)));
 }
 
 async function scanRoot(root: string, source: string, catalog: SkillCatalog, depth: number, state: { files: number }): Promise<void> {
@@ -44,10 +48,10 @@ async function scanRoot(root: string, source: string, catalog: SkillCatalog, dep
 
 async function parseSkill(path: string, source: string): Promise<SkillRecord | null> {
   const text = await readFile(path, "utf8");
-  const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (match === null) return null;
   const fields = new Map<string, string>();
-  for (const line of match[1].split("\n")) {
+  for (const line of match[1].split(/\r?\n/)) {
     const separator = line.indexOf(":");
     if (separator < 1) continue;
     fields.set(line.slice(0, separator).trim(), line.slice(separator + 1).trim().replace(/^['"]|['"]$/g, ""));

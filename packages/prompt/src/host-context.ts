@@ -23,6 +23,7 @@ export type PrepareRuntimePromptSourceOptions = {
   readonly dataRoot: string;
   readonly workspaceRoot: string;
   readonly homeDir?: string;
+  readonly disabledSkillIds?: readonly string[];
 };
 
 export async function prepareRuntimePromptSource(options: PrepareRuntimePromptSourceOptions): Promise<RuntimePromptSource> {
@@ -41,7 +42,7 @@ export async function prepareRuntimePromptSource(options: PrepareRuntimePromptSo
       warnings.push(`${source.id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  const skills = await discoverSkills({ workspaceRoot: options.workspaceRoot, dataRoot: options.dataRoot, homeDir: options.homeDir ?? homedir() });
+  const skills = await discoverSkills({ workspaceRoot: options.workspaceRoot, dataRoot: options.dataRoot, homeDir: options.homeDir ?? homedir(), disabled: options.disabledSkillIds });
   return Object.freeze({ instructions: Object.freeze(instructions), skills, warnings: Object.freeze(warnings) });
 }
 

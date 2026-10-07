@@ -71,7 +71,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     expect((await sessions.inspectEvents("conversation")).some(event => event.type === "assistant/message" && JSON.stringify(event.data).includes("fixed loop result"))).toBe(true);
     expect(agentRegistry.list()).toHaveLength(0);
     expect(harnesses.inspect().instances[0].users).toBe(0);
-    // Keep a parent generation pinned while a child independently selects the latest.
+    // Keep a parent generation pinned while its child inherits the same generation.
     const parentLease = await harnesses.acquire("main");
     const parentScope = parentLease.scope.child("parent-generation-one");
     // A second candidate must not duplicate the Host's history projection.
@@ -87,7 +87,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       expect(childResult).toMatchObject({ status: "completed", text: "fixed loop result" });
       const child = await sessions.resume(childResult.childSessionId);
       const childLedger = await TaskLedger.open(child);
-      expect(childLedger.snapshot().runs).toEqual([expect.objectContaining({ state: "completed", harness: expect.objectContaining({ revision: 2 }), result: { status: "completed", text: "fixed loop result" } })]);
+      expect(childLedger.snapshot().runs).toEqual([expect.objectContaining({ state: "completed", harness: expect.objectContaining({ revision: 1 }), result: { status: "completed", text: "fixed loop result" } })]);
       expect(childLedger.snapshot().tasks).toEqual([expect.objectContaining({ state: "completed" })]);
       expect(parentLease.revision).toBe(1);
       expect(harnesses.inspect().instances.find(item => item.generationId === parentLease.generationId)?.users).toBe(1);
@@ -106,6 +106,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       expect((await runs.service.snapshot("cancelled-conversation")).runs[0]).toMatchObject({ state: "cancelled", result: { reason: "aborted" } });
       expect(harnesses.inspect().instances.every(item => item.users === 0)).toBe(true);
     } finally { await runs.dispose(); }
+    holdRequest = false;
     // Replace the actual execution factory with an independently published Loop implementation.
     const current = harnesses.inspect().current!;
     const manifest = current.description.composition.manifests.find(m => m.behaviors.some(b => b.entryId === "agent-factory"))!;
@@ -127,8 +128,8 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       await app.submit("conversation", "alternative", "Continue existing history"); await app.waitForIdle("conversation");
       expect(failures).toEqual([]);
       expect((await app.snapshot("conversation")).runs.at(-1)).toMatchObject({ harness: { revision: 3 }, result: { implementation: "alternative", priorEvents: expect.any(Number) } });
-      const child = await runtime.subagents.invoke({ parentSession: sessions.getOpen("conversation")!, parentScope: oldParent.scope, parentCallId: "alternative-child", presetId: "actspace.explore", task: "Run latest Loop", parentVisibleToolIds: [], delegationDepth: 0 });
-      expect(child).toMatchObject({ status: "completed", text: "alternative child" });
+      const child = await runtime.subagents.invoke({ parentSession: sessions.getOpen("conversation")!, parentScope: oldParent.scope, parentCallId: "alternative-child", presetId: "actspace.explore", task: "Run parent Loop", parentVisibleToolIds: [], delegationDepth: 0 });
+      expect(child).toMatchObject({ status: "completed", text: "fixed loop result" });
       expect(oldParent.revision).toBe(2);
     } finally { await oldParent.release(); }
 

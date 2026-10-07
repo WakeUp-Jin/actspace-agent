@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.harness-hmr", version: "1", name: "Harness version coordinator", entry: { entryId: "harness.hmr", behavior: "@actspace/harness-hmr/plugin" }, host: { required: [], optional: [] }, frontend: null, injects: ["actspace.host.hmr"], contributions: { services: ["harness.hmr"], tools: [], prompts: [], events: [] } });

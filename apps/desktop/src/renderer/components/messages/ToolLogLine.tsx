@@ -43,6 +43,14 @@ function FileReadApprovalLine({ message, className }: { message: FileReadApprova
   );
 }
 
+function GenericToolApprovalLine({ message, className }: { message: Extract<MessageBlock, { kind: "tool" }>; className?: string }) {
+  const decision = useApprovalDecision(message.approvalRequestId);
+  return <ApprovalRow className={className} icon={<File size={14} strokeWidth={2} />}
+    verb="允许执行" target={<span>{message.title}</span>}
+    meta={<><span>{message.content}</span><ApprovalReason reason={message.approvalReason} /></>}
+    actions={<ApprovalActions state={decision} primaryLabel="允许" />} />;
+}
+
 const TOOL_LOG_LINE_TOOLTIP_CONTAINER_CLASS = "has-overflow-text max-w-full rounded-act-xs outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 const TOOL_LOG_LINE_TOOLTIP_OPEN_CLASS = "is-tooltip-open";
 const TOOL_LOG_TOOLTIP_CLASS =
@@ -245,6 +253,7 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
 }
 
 export function ToolLogLine({ message, className, onOpenFile, onExpand }: { onExpand?: () => void; message: ToolLogMessage; className?: string; onOpenFile?: (message: Extract<MessageBlock, { kind: "read" }>) => void }) {
+  if (message.kind === "tool" && message.status === "pending" && message.approvalRequestId) return <GenericToolApprovalLine message={message} className={className} />;
   if ((message.kind === "read" || message.kind === "grep" || message.kind === "glob") && message.status === "pending") return <FileReadApprovalLine message={message} className={className} />;
   if (message.kind === "read") {
     const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;

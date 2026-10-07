@@ -400,6 +400,17 @@ function getStreamingDeleteText(
 function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agentRunId?: string): MessageBlock {
   const blockId = agentRunId ? `turn:${agentRunId}:tool:${toolCallId}` : `streaming-tool-${toolCallId}`;
 
+  // Previews without a dedicated approval component must retain an actionable fallback.
+  if (tool.approvalPending && !["bash", "read", "grep", "glob", "delete", "write", "edit_diff"].includes(tool.preview?.kind ?? "")) {
+    return {
+      kind: "tool", id: blockId, toolName: tool.toolName,
+      title: tool.approvalSummary ?? tool.toolName,
+      content: tool.preview?.kind === "directory_list" ? tool.preview.path : tool.approvalReason ?? "等待审批",
+      createdAt: now, status: "pending", approvalRequestId: tool.approvalRequestId,
+      approvalReason: tool.approvalReason, approvalScope: tool.approvalScope,
+    };
+  }
+
   if (tool.preview?.kind === "bash") {
     return {
       kind: "bash",

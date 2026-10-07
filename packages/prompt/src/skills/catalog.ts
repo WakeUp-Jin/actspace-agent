@@ -10,6 +10,8 @@ export type SkillRecord = {
 export class SkillCatalog {
   readonly #skills = new Map<string, SkillRecord>();
 
+  constructor(skills: readonly SkillRecord[] = []) { for (const skill of skills) this.add(skill); }
+
   add(skill: SkillRecord): void {
     if (this.#skills.has(skill.id)) return;
     this.#skills.set(skill.id, Object.freeze(skill));

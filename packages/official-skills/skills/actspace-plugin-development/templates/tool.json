@@ -1,0 +1,14 @@
+{
+  "name": "custom_tool",
+  "description": "Return a JSON value. Customize this tool for the user request.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {}
+    },
+    "required": [
+      "value"
+    ],
+    "additionalProperties": false
+  }
+}

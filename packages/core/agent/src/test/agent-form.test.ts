@@ -50,3 +50,9 @@ describe("main Agent form", () => {
     expect(mainAgentFormComposition([{ id: "unrelated.host-plugin", version: "1.0.0" }]).digest).toBe(required.digest);
   });
 });
+
+it("admits approved evolved tools only in Agent mode", () => {
+  for (const mode of ["chat", "plan"] as const) expect([...allowedAgentModeTools(mode, ["custom_echo", "plugin_manager"], ["custom_echo"])]).toEqual([]);
+  expect([...allowedAgentModeTools("agent", ["custom_echo", "plugin_manager"], ["custom_echo"])]).toEqual(["plugin_manager", "custom_echo"]);
+  expect([...allowedAgentModeTools("agent", ["unknown"])]).toEqual([]);
+});

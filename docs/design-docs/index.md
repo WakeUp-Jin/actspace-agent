@@ -49,6 +49,9 @@
 
 ## 一级专题目录
 
+- [自进化的方案设计](自进化的方案设计/README.md)：V1 用户显式修改、下一条消息使用新版本，新增官方 Skill 内容集合；V2 失败触发与沙箱评估。含局部版本派生和 Actor 引用边界，功能实施尚未批准。
+- [会话内自进化与 Actor 扩展边界](自进化的方案设计/04-会话内自进化与Actor扩展边界.md)：早期可行性分析；自动续跑已移出当前计划，最新决策见专题导航；只预留 Actor 能力版本接口，不实施 Actor。
+
 | 目录 | 内容边界 | 入口或代表文档 |
 |---|---|---|
 | `agent-plugin-runtime/` | v2 后端插件化重构的总体架构、研究证据、已确认决策、目标边界、包结构与公共契约 | `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`、`docs/design-docs/agent-plugin-runtime/README.md` |

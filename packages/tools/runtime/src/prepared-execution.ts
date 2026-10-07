@@ -223,6 +223,7 @@ export class PreparedToolExecution {
         pluginId: this.pluginId,
         name: this.name,
       }),
+      ...(this.environment.approvalBroker === undefined ? {} : { requestApproval: this.environment.approvalBroker.requestApproval.bind(this.environment.approvalBroker) }),
       ...(this.environment.notifyAgent === undefined ? {} : { notifyAgent: this.environment.notifyAgent }),
       createArtifact: (input) => this.environment.createArtifact({
         ...input,

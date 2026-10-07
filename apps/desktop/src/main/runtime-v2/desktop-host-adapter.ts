@@ -18,6 +18,7 @@ export type DesktopRuntimeV2BootOptions = {
   readonly models: DesktopRuntimeV2ModelPort;
   readonly approvals: DesktopRuntimeV2ApprovalPort;
   readonly browser: DesktopRuntimeV2BrowserPort;
+  readonly disabledSkillIds?: () => readonly string[];
   readonly chatCompactionTriggerRatio: () => number;
   readonly invocationId: string;
   readonly onToolProgress?: (update: {
@@ -111,7 +112,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       [options.module.PROMPT_HOST_PORT_ID]: Object.freeze({
         workspaceRoot: options.roots.workspaceRoot,
         resolveUserSource: () => options.module.prepareUserPromptSource(options.roots.dataRoot),
-        resolveSource: (workspaceRoot: string) => options.module.prepareRuntimePromptSource({ dataRoot: options.roots.dataRoot, workspaceRoot }),
+        resolveSource: (workspaceRoot: string) => options.module.prepareRuntimePromptSource({ dataRoot: options.roots.dataRoot, workspaceRoot, disabledSkillIds: options.disabledSkillIds?.() }),
       }),
       [options.module.BROWSER_TOOLS_HOST_PORT_ID]: browser,
     }),

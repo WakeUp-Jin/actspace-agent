@@ -58,8 +58,9 @@ export function SkillsSection({
     void refresh();
   }, [refresh]);
 
-  const toggleAgent = async (name: string, enabled: boolean) => {
+  const toggleAgent = async (name: string, enabled: boolean, legacyName: string) => {
     const disabled = new Set(settings.skills.disabled);
+    disabled.delete(legacyName);
     if (enabled) disabled.delete(name);
     else disabled.add(name);
     setSaving(true);
@@ -158,7 +159,7 @@ export function SkillsSection({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-act-sm font-medium text-text-main">{item.name}</span>
                     <span className="inline-flex items-center rounded-full bg-surface-subtle px-2 py-0.5 text-act-xxs font-medium text-text-faint">
-                      {item.scope === "project" ? "项目" : "用户"} · {SOURCE_LABELS[item.source] ?? item.source}
+                      {item.scope === "project" ? "项目" : item.scope === "official" ? "官方" : "用户"} · {SOURCE_LABELS[item.source] ?? item.source}
                     </span>
                     {item.status === "warning" ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-act-xxs font-medium text-on-danger">
@@ -186,9 +187,9 @@ export function SkillsSection({
               <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 text-act-xs text-text-muted">
                   <Toggle
-                    checked={!settings.skills.disabled.includes(item.name)}
+                    checked={!settings.skills.disabled.includes(item.id ?? item.name) && !settings.skills.disabled.includes(item.name)}
                     disabled={saving}
-                    onChange={(next) => void toggleAgent(item.name, next)}
+                    onChange={(next) => void toggleAgent(item.id ?? item.name, next, item.name)}
                     ariaLabel={`主 Agent 使用 ${item.name}`}
                   />
                   主 Agent

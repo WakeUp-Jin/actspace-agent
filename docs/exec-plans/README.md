@@ -25,6 +25,8 @@
 
 ## 最近完成
 
+- [Harness 自进化 V1](completed/20261007-harness-evolution-v1.md)：官方 Skill、Manager/HMR、会话局部版本与次消息生效已实现；自动化和制品验证通过，真实模型与桌面覆盖见[摘要](../exec-runs/20261007-harness-evolution-v1/execution-summary.md)。
+
 - [上下文真实验收问题修复](completed/20261006-context-acceptance-bugfix.md)：原7项确认问题及新增启动锁问题已修复；227项定向测试、真实Electron和19次转换值复验通过，边界见[执行摘要](../exec-runs/20261006-context-acceptance-bugfix/execution-summary.md)。
 
 - [上下文管理引擎](completed/20261006-context-management-engine/README.md)：P1–P4 实施完成，Context/来源/压缩/披露接线与自动化通过；首次桌面测试异步异常和真实模型未覆盖范围见[执行摘要](../exec-runs/20261006-context-management-engine/execution-summary.md)。

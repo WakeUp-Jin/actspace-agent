@@ -116,7 +116,7 @@ export class AgentService {
       if (session.header.sessionId !== sessionId) throw new Error("Session owner mismatch");
       const ledger = await TaskLedger.open(session);
       ledger.subscribe(snapshot => this.ports.onSnapshot?.(sessionId, snapshot));
-      return new SessionRunManager({ ledger, canStart: () => !this.#draining, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), onFailure: error => this.ports.onFailure?.(sessionId, error) });
+      return new SessionRunManager({ ledger, canStart: () => !this.#draining, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: () => this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), onFailure: error => this.ports.onFailure?.(sessionId, error) });
     })();
     // Only an unacquired writer lease may be retried by the next request.
     // Recovery and durability failures remain cached to protect accepted writes.

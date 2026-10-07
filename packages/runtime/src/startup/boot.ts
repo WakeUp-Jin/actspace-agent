@@ -126,6 +126,18 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
       disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...(options.host.capabilityCeiling.includes("browser") ? [] : ["browser-tools"])],
       authorizeHarness: options.authorizeHarness,
+      evolution: {
+        inspect: (context: import("@actspace/tools-runtime").ToolExecutionContext) => {
+          const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
+          if (!runtime?.evolution) throw new Error("Evolution service is not ready");
+          return runtime.evolution.inspect(context);
+        },
+        execute: (args: Readonly<Record<string, unknown>>, context: import("@actspace/tools-runtime").ToolExecutionContext) => {
+          const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
+          if (!runtime?.evolution) throw new Error("Evolution service is not ready");
+          return runtime.evolution.execute(args, context);
+        },
+      },
       onHarnessDiagnostic: (error: unknown) => diagnostics.record({ severity: "error", source: "boot", code: "HARNESS_RECOVERY_BLOCKED", message: error instanceof Error ? error.message : String(error) }),
       host: options.host,
       toolEnvironment: options.toolEnvironment,

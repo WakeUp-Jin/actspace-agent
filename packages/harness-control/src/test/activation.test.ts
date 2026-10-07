@@ -168,3 +168,33 @@ it("keeps the current implementation usable when candidate initialization fails"
   expect(control.inspect().current?.revision).toBe(1); expect(control.inspect().candidates).toHaveLength(0);
   await lease.release();
 });
+it("prepares first branches without publishing and rechecks their source during commit", async () => {
+  const { control, next, prepare } = await setup();
+  const source = control.inspect().current!;
+  const branch = await control.prepareBranch({ harnessId: "local", expectedRevision: 0, sourceHarnessId: "main", sourceRevision: source.revision, baseExecutionDigest: source.executionDigest, artifactIds: [next.artifactId], patch: { id: "branch", provenance: "test", operations: [{ id: "replace", kind: "replace", target: "old", artifactId: next.artifactId, manifestEntryId: "new" }] } });
+  expect(control.inspect("local").current).toBeUndefined();
+  expect(control.inspect().current).toEqual(source);
+  const main = await prepare(control, next); await control.activate("main-change", main.candidateId);
+  await expect(control.activate("stale-branch", branch.candidateId)).rejects.toMatchObject({ code: "BASELINE_CONFLICT" });
+  expect(control.inspect("local").current).toBeUndefined(); await control.discard(branch.candidateId);
+});
+it("allows the Host to upgrade only an untouched builtin while retaining its history", async () => {
+  const { control, options, next } = await setup();
+  const original = control.inspect().current!; await control.close();
+  const composition = composeRuntime({ profile: { id: "main", runtimeContract: "actspace.runtime.v2", orderedBundleIds: ["base"] }, bundles: [{ id: "base", version: "2", provenance: "test", manifests: [next.manifest.plugin] }], hostCapabilities: [] });
+  const upgradedOptions = { ...options, upgradePristineBuiltin: () => true, builtin: async () => ({ composition, artifacts: new Map([["new", next]]), sharedServices: [] }) };
+  const upgraded = new HarnessControl(upgradedOptions); controls.push(upgraded); await upgraded.initialize();
+  expect(upgraded.inspect().history[0]).toEqual(original);
+  expect(upgraded.inspect().current).toMatchObject({ revision: 2, authorization: { decisionId: "trusted-builtin-upgrade" } });
+  const lease = await upgraded.acquire("main"); expect(lease.getService<{ read(): string }>("reader")!.read()).toBe("new"); await lease.release();
+  await upgraded.close();
+  const restarted = new HarnessControl(upgradedOptions); controls.push(restarted); await restarted.initialize();
+  expect(restarted.inspect().history).toHaveLength(2);
+});
+it("never replaces a user-selected Harness through the pristine builtin upgrade path", async () => {
+  const { control, options, next, prepare } = await setup();
+  const candidate = await prepare(control, next); await control.activate("user-selected", candidate.candidateId); const chosen = control.inspect().current!; await control.close();
+  const upgrade = vi.fn(() => true);
+  const restored = new HarnessControl({ ...options, upgradePristineBuiltin: upgrade }); controls.push(restored); await restored.initialize();
+  expect(upgrade).not.toHaveBeenCalled(); expect(restored.inspect().current).toEqual(chosen);
+});

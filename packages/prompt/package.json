@@ -58,7 +58,8 @@
     "@actspace/core-scope": "workspace:*",
     "@actspace/shared": "workspace:*",
     "@actspace/session-journal": "workspace:*",
-    "@actspace/llm-service": "workspace:*"
+    "@actspace/llm-service": "workspace:*",
+    "@actspace/official-skills": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

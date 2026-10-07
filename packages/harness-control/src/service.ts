@@ -3,11 +3,11 @@ import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { HarnessGenerations, type HarnessCandidate, type HarnessLease, type HarnessMountRequest } from "@actspace/boot";
 import { resolveHarnessPatch, harnessOptionalFallbacks } from "@actspace/composition";
-import { HarnessControlError, type AuthorizationRequest, type HarnessControlOptions, type HarnessPatchRequest, type SelectionDescription, type SelectionRecord } from "./contracts.js";
+import { HarnessControlError, type AuthorizationRequest, type HarnessControlOptions, type HarnessPatchRequest, type HarnessBranchRequest, type SelectionDescription, type SelectionRecord } from "./contracts.js";
 import { checkAuthorization } from "./authorization.js";
 import { describeMount, loadArtifact, validateCandidate } from "./candidate.js";
 import { SelectionStore, selectionHash } from "./selection-store.js";
-type Candidate = { readonly handle: HarnessCandidate; readonly description: SelectionDescription };
+type Candidate = { readonly handle: HarnessCandidate; readonly description: SelectionDescription; readonly source?: { harnessId: string; revision: number; digest: string } };
 /** Host-owned coordinator. The raw generation manager never escapes this boundary. */
 export class HarnessControl {
   readonly #manager: HarnessGenerations;
@@ -35,6 +35,18 @@ export class HarnessControl {
           if (candidate.executionDigest !== record.executionDigest) { await this.#manager.discard(candidate); throw new Error("Recovered execution digest differs"); }
           this.#manager.restore(candidate, record.revision);
         } catch (error) { this.#blocked.set(id, error); this.#diagnostic(error); }
+      }
+      const pristine = this.#store.latest("main");
+      if (pristine && this.#store.records.length === 1 && pristine.authorization.decisionId === "trusted-bootstrap" && this.options.upgradePristineBuiltin?.(structuredClone(pristine))) {
+        // This is a Host application upgrade, never a model-requested authorization bypass.
+        const request = this.#bindHost(await this.options.builtin());
+        await validateCandidate(request, this.options.compatibility, this.options.sharedServices);
+        const handle = await this.#manager.prepare("main", pristine.revision, request);
+        const record = this.#record(`builtin-upgrade:${randomUUID()}`, "builtin-upgrade", { handle, description: describeMount(request) }, { actor: "Host", decisionId: "trusted-builtin-upgrade" });
+        await this.#store.append(record);
+        if (this.#manager.inspect().some(r => r.harnessId === "main" && r.state === "current")) this.#manager.activate(handle);
+        else this.#manager.restore(handle, record.revision);
+        this.#blocked.delete("main");
       }
       if (!this.#store.latest("main")) {
         const request = this.#bindHost(await this.options.builtin());
@@ -73,9 +85,24 @@ export class HarnessControl {
     const selected = all.filter(a => composition.entries.some(e => e.artifactId === a.artifactId));
     return this.#prepare(input.harnessId, input.expectedRevision, { composition, artifacts: new Map(selected.map(a => [a.manifest.plugin.pluginId, a])), sharedServices: current.description.sharedServices });
   }
-  async prepareRollback(harnessId: string, expectedRevision: number, historicalDigest: string) {
+  /** Prepare a new branch without publishing it or mutating the source selection. */
+  async prepareBranch(input: HarnessBranchRequest) {
+    this.#assertOpen();
+    input = structuredClone(input);
+    if (input.expectedRevision !== 0 || this.#baseline(input.harnessId, 0)) throw new HarnessControlError("BASELINE_CONFLICT", "Branch already exists");
+    const source = this.#baseline(input.sourceHarnessId, input.sourceRevision);
+    if (!source || source.executionDigest !== input.baseExecutionDigest) throw new HarnessControlError("BASELINE_CONFLICT", "Source selection changed");
+    const all = await Promise.all([...new Set([...source.description.artifactIds, ...input.artifactIds])].map(id => loadArtifact(this.options.artifactRoot, id)));
+    const composition = resolveHarnessPatch(source.description.composition, input.patch, all);
+    const selected = all.filter(a => composition.entries.some(e => e.artifactId === a.artifactId));
+    const prepared = await this.#prepare(input.harnessId, 0, { composition, artifacts: new Map(selected.map(a => [a.manifest.plugin.pluginId, a])), sharedServices: source.description.sharedServices });
+    const candidate = this.#candidate(prepared.candidateId);
+    this.#candidates.set(prepared.candidateId, { ...candidate, source: { harnessId: input.sourceHarnessId, revision: input.sourceRevision, digest: input.baseExecutionDigest } });
+    return prepared;
+  }
+  async prepareRollback(harnessId: string, expectedRevision: number, historicalDigest: string, source?: { harnessId: string; revision: number }) {
     this.#baseline(harnessId, expectedRevision);
-    const old = [...this.#store.records].reverse().find(r => r.harnessId === harnessId && r.executionDigest === historicalDigest);
+    const old = [...this.#store.records].reverse().find(r => r.harnessId === (source?.harnessId ?? harnessId) && r.executionDigest === historicalDigest && (!source || r.revision === source.revision));
     if (!old) throw new HarnessControlError("CANDIDATE_NOT_READY", "Historical composition not found");
     return this.#prepare(harnessId, expectedRevision, await this.#load(old.description));
   }
@@ -111,6 +138,10 @@ export class HarnessControl {
         return structuredClone(repeated);
       }
       this.#candidate(candidateId);
+      if (candidate.source) {
+        const source = this.#baseline(candidate.source.harnessId, candidate.source.revision);
+        if (source?.executionDigest !== candidate.source.digest) throw new HarnessControlError("BASELINE_CONFLICT", "Source selection changed");
+      }
       this.#baseline(request.harnessId, request.expectedRevision);
       checkAuthorization(request, decision, this.options.now?.() ?? Date.now());
       const record = this.#record(activationId, requestDigest, candidate, decision);
@@ -146,7 +177,7 @@ export class HarnessControl {
       }
     }
   }
-  async acquire(harnessId: string, signal?: AbortSignal): Promise<HarnessLease> {
+  async acquire(harnessId: string, signal?: AbortSignal, generationId?: string): Promise<HarnessLease> {
     signal?.throwIfAborted();
     const pending = this.#exclusive(async () => {
       signal?.throwIfAborted();
@@ -158,7 +189,7 @@ export class HarnessControl {
       if (blocked) throw new HarnessControlError("RECOVERY_BLOCKED", "Harness execution is blocked", { cause: blocked });
       await this.#store.assertOwned();
       signal?.throwIfAborted();
-      return this.#manager.acquire(harnessId);
+      return this.#manager.acquire(harnessId, generationId);
     });
     if (!signal) return pending;
     return new Promise<HarnessLease>((resolve, reject) => {
@@ -170,6 +201,10 @@ export class HarnessControl {
         else resolve(lease);
       }, reject).finally(() => signal.removeEventListener("abort", abort));
     });
+  }
+  acquireForScope(scope: HarnessLease["scope"], signal?: AbortSignal): Promise<HarnessLease> {
+    const identity = this.#manager.identityForScope(scope);
+    return this.acquire(identity.harnessId, signal, identity.generationId);
   }
   close(): Promise<void> {
     if (this.#close) return this.#close;

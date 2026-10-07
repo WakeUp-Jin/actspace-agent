@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../bundle/tsconfig.build.json"
+    },
+    {
+      "path": "./../cordis-adapter/tsconfig.build.json"
+    },
+    {
+      "path": "./../harness-control/tsconfig.build.json"
+    },
+    {
+      "path": "./../harness-hmr/tsconfig.build.json"
+    },
+    {
+      "path": "./../official-skills/tsconfig.build.json"
+    },
+    {
+      "path": "./../shared/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/runtime/tsconfig.build.json"
+    }
+  ]
+}

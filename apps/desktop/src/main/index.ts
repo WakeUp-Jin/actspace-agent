@@ -213,6 +213,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     models: modelRuntimeService,
     approvals: approvalRegistry,
     browser: browserBridgeService,
+    disabledSkillIds: () => settingsService?.get().skills.disabled ?? [],
     chatCompactionTriggerRatio: () => settingsService?.getV4().settings.general.taskDefaults.chatCompactionTriggerRatio ?? 0.8,
     log: (message, details) => void logMain(message, details),
   });

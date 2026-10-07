@@ -1174,7 +1174,7 @@ export function Composer({
       executeSlashFunction(result.item);
       return;
     }
-    toggleSkill(result.item.name);
+    toggleSkill(result.item.id ?? result.item.name);
     finishSlashSelection();
   }
 
@@ -1537,15 +1537,15 @@ export function Composer({
             className={COMMAND_MENU_ROW_CLASS}
             type="button"
             role="menuitemcheckbox"
-            aria-checked={selectedSkills.includes(skill.name)}
+            aria-checked={selectedSkills.includes(skill.id ?? skill.name)}
             key={`${skill.scope}:${skill.name}`}
-            onClick={() => toggleSkill(skill.name)}
+            onClick={() => toggleSkill(skill.id ?? skill.name)}
           >
             <BookOpen className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={1.9} aria-hidden="true" />
             <span className={COMMAND_MENU_ROW_LABEL_CLASS}>{skill.name}</span>
             <span className={COMMAND_MENU_ROW_DESCRIPTION_CLASS}>{skill.description || "暂无说明"}</span>
             <span className={SKILL_SCOPE_CLASS}>{skill.scope}</span>
-            {selectedSkills.includes(skill.name) ? <Check className="shrink-0 text-text-muted" size={15} strokeWidth={2.2} aria-hidden="true" /> : null}
+            {selectedSkills.includes(skill.id ?? skill.name) ? <Check className="shrink-0 text-text-muted" size={15} strokeWidth={2.2} aria-hidden="true" /> : null}
           </button>
         ))}
       </div>
@@ -1634,7 +1634,7 @@ export function Composer({
             ) : filteredSlashSkills.length > 0 ? filteredSlashSkills.map((skill) => {
               const optionId = composerSlashSkillOptionId(skill.name);
               const isActive = activeSlashOptionId === optionId;
-              const isSelected = selectedSkills.includes(skill.name);
+              const isSelected = selectedSkills.includes(skill.id ?? skill.name);
               return (
                 <button
                   className={`${SLASH_SKILL_OPTION_CLASS}${isActive ? ` ${SLASH_OPTION_ACTIVE_CLASS}` : ""}`}

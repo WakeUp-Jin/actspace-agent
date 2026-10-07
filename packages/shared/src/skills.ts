@@ -1,6 +1,7 @@
-export type SkillCatalogScope = "project" | "user";
+export type SkillCatalogScope = "project" | "user" | "official";
 
 export interface SkillCatalogItem {
+  id?: string;
   name: string;
   description: string;
   scope: SkillCatalogScope;

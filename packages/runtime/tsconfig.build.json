@@ -52,6 +52,9 @@
       "path": "./../harness-control/tsconfig.build.json"
     },
     {
+      "path": "./../harness-hmr/tsconfig.build.json"
+    },
+    {
       "path": "./../headless/tsconfig.build.json"
     },
     {
@@ -59,6 +62,12 @@
     },
     {
       "path": "./../llm/service/tsconfig.build.json"
+    },
+    {
+      "path": "./../official-skills/tsconfig.build.json"
+    },
+    {
+      "path": "./../plugin-manager/tsconfig.build.json"
     },
     {
       "path": "./../prompt/tsconfig.build.json"

@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.plugin-manager", version: "1", name: "Plugin Manager", entry: { entryId: "tools.plugin-manager", behavior: "@actspace/plugin-manager/plugin" }, host: { required: ["process"], optional: [] }, frontend: null, injects: ["tools.runtime", "actspace.host.agent"], contributions: { services: ["tools.plugin-manager"], tools: ["plugin_manager", "harness_inspect"], prompts: [], events: [] } });

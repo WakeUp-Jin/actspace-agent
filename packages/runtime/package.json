@@ -93,7 +93,10 @@
     "@actspace/tools-image-generation": "workspace:*",
     "@actspace/tools-image-inspection": "workspace:*",
     "@actspace/agent-service": "workspace:*",
-    "@actspace/harness-control": "workspace:*"
+    "@actspace/harness-control": "workspace:*",
+    "@actspace/official-skills": "workspace:*",
+    "@actspace/plugin-manager": "workspace:*",
+    "@actspace/harness-hmr": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

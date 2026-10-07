@@ -32,6 +32,7 @@ export type DesktopRuntimeV2RegistryOptions = {
   readonly models: DesktopRuntimeV2ModelPort;
   readonly approvals: DesktopRuntimeV2ApprovalPort;
   readonly browser: DesktopRuntimeV2BrowserPort;
+  readonly disabledSkillIds?: () => readonly string[];
   readonly chatCompactionTriggerRatio?: () => number;
   readonly loadModule?: () => Promise<RuntimeV2Module>;
   readonly log?: (message: string, details?: Record<string, unknown>) => void;
@@ -521,6 +522,7 @@ export class DesktopRuntimeV2Registry {
         models: this.options.models,
         approvals: this.options.approvals,
         browser: this.options.browser,
+        disabledSkillIds: this.options.disabledSkillIds,
         chatCompactionTriggerRatio: this.options.chatCompactionTriggerRatio ?? (() => 0.8),
         speech: this.options.speech,
         invocationId: randomUUID(),

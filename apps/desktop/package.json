@@ -70,7 +70,8 @@
     "@actspace/tools-web-tools": "workspace:*",
     "@actspace/tools-image-generation": "workspace:*",
     "@actspace/tools-image-inspection": "workspace:*",
-    "@actspace/agent-host": "workspace:*"
+    "@actspace/agent-host": "workspace:*",
+    "@actspace/official-skills": "workspace:*"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",

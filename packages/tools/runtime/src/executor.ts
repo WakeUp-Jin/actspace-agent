@@ -1,4 +1,5 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { ApprovalBroker } from "@actspace/tools-approval";
 import type { ToolFailure } from "./errors.js";
 
 import type { ToolResource } from "./permission/types.js";
@@ -76,6 +77,8 @@ export type ToolExecutionContext = {
   readonly signal: AbortSignal;
   readonly capabilities: ToolCapabilitySet;
   readonly reportProgress: (update: ToolProgressUpdate) => void;
+  /** Nested management approvals use the same Run budget pause as normal tool approvals. */
+  readonly requestApproval?: ApprovalBroker["requestApproval"];
   readonly notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>;
   readonly createArtifact: (input: { readonly bytes: Uint8Array; readonly mediaType: string }) => Promise<ToolArtifactRef>;
   readonly defer: (finalizer: () => Promise<void>) => void;

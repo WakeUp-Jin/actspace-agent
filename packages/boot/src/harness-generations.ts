@@ -87,9 +87,10 @@ export class HarnessGenerations {
     this.#current.set(candidate.harnessId, { record, revision });
   }
 
-  acquire(harnessId: string): HarnessLease {
+  acquire(harnessId: string, generationId?: string): HarnessLease {
     this.#assertOpen(harnessId);
-    const selection = this.#current.get(harnessId);
+    const pinned = generationId ? [...this.#records].find(r => r.candidate.harnessId === harnessId && r.candidate.generationId === generationId && (r.state === "current" || (r.state === "retired" && r.users > 0))) : undefined;
+    const selection = generationId ? (pinned ? { record: pinned, revision: pinned.candidate.expectedRevision + 1 } : undefined) : this.#current.get(harnessId);
     if (!selection) throw new HarnessError("NO_CURRENT", harnessId, "No active Harness composition");
     const { record, revision } = selection;
     const scope = record.mount.scope.child(`lease:${randomUUID()}`);
@@ -107,6 +108,15 @@ export class HarnessGenerations {
         if (errors.length) throw new AggregateError(errors, "Harness lease cleanup failed");
       })(),
     });
+  }
+
+  identityForScope(scope: AgentScope): { harnessId: string; generationId: string } {
+    scope.assertActive();
+    for (let cursor: AgentScope | undefined = scope; cursor; cursor = cursor.parent) {
+      const record = [...this.#records].find(r => r.mount.scope === cursor && r.users > 0 && (r.state === "current" || r.state === "retired"));
+      if (record) return { harnessId: record.candidate.harnessId, generationId: record.candidate.generationId };
+    }
+    throw new Error("Parent scope has no live Harness lease");
   }
 
   discard(candidate: HarnessCandidate): Promise<void> {

@@ -1,14 +1,16 @@
+import { officialSkillsRoot, OFFICIAL_SKILLS_VERSION } from "@actspace/official-skills";
 import { cp, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import type { SkillInstallResult, SkillListResult, SkillUninstallResult } from "@actspace/shared";
 
 type SkillCandidate = {
+  readonly id: string;
   readonly name: string;
   readonly description: string;
   readonly source: string;
   readonly location: string;
   readonly directory: string;
-  readonly scope: "project" | "user";
+  readonly scope: "project" | "user" | "official";
 };
 
 export async function listFixedRendererSkills(input: {
@@ -22,8 +24,10 @@ export async function listFixedRendererSkills(input: {
     { path: join(input.workspaceRoot, ".agents", "skills"), source: ".agents/skills", scope: "project" as const },
     { path: join(input.workspaceRoot, ".claude", "skills"), source: ".claude/skills", scope: "project" as const },
     { path: join(input.dataRoot, "skills"), source: "actspace-userData", scope: "user" as const },
+    { path: join(input.dataRoot, ".actspace", "skills"), source: "actspace-userData-legacy", scope: "user" as const },
     { path: join(input.homeDir, ".agents", "skills"), source: "agents-user", scope: "user" as const },
     { path: join(input.homeDir, ".claude", "skills"), source: "claude-user", scope: "user" as const },
+    { path: officialSkillsRoot, source: `actspace-official@${OFFICIAL_SKILLS_VERSION}`, scope: "official" as const },
   ];
   const managedRoot = `${resolve(input.dataRoot, "skills")}${sep}`;
   const disabled = new Set(input.disabled);
@@ -33,13 +37,13 @@ export async function listFixedRendererSkills(input: {
   for (const root of roots) {
     const candidates = await scanSkills(root.path, root.source, root.scope, warnings);
     for (const candidate of candidates) {
-      const shadowed = seen.has(candidate.name);
-      seen.add(candidate.name);
+      const shadowed = seen.has(candidate.id);
+      seen.add(candidate.id);
       items.push({
         ...candidate,
         status: "available",
         removable: `${resolve(candidate.directory)}${sep}`.startsWith(managedRoot),
-        enabledForAgent: !disabled.has(candidate.name),
+        enabledForAgent: !disabled.has(candidate.id) && !disabled.has(candidate.name),
         shadowed,
       });
     }
@@ -74,7 +78,7 @@ export async function uninstallFixedRendererSkill(dataRoot: string, directory: s
   }
 }
 
-async function scanSkills(root: string, source: string, scope: "project" | "user", warnings: string[]): Promise<SkillCandidate[]> {
+async function scanSkills(root: string, source: string, scope: "project" | "user" | "official", warnings: string[]): Promise<SkillCandidate[]> {
   const items: SkillCandidate[] = [];
   await walk(root, 0, async (path) => {
     const skill = await readSkill(path, source, scope).catch((error: unknown) => {
@@ -101,7 +105,7 @@ async function walk(root: string, depth: number, visit: (path: string) => Promis
   }
 }
 
-async function readSkill(path: string, source: string, scope: "project" | "user"): Promise<SkillCandidate | null> {
+async function readSkill(path: string, source: string, scope: "project" | "user" | "official"): Promise<SkillCandidate | null> {
   const text = await readFile(path, "utf8");
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   if (match === null) return null;
@@ -112,10 +116,11 @@ async function readSkill(path: string, source: string, scope: "project" | "user"
     fields.set(line.slice(0, separator).trim(), line.slice(separator + 1).trim().replace(/^['"]|['"]$/g, ""));
   }
   const directory = dirname(path);
-  const name = fields.get("name") ?? basename(directory);
+  const id = fields.get("id") ?? fields.get("name") ?? basename(directory);
+  const name = fields.get("name") ?? id;
   const description = fields.get("description") ?? "";
-  if (!name || !description || !(await stat(path)).isFile()) return null;
-  return { name, description, source, location: path, directory, scope };
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(id) || !description || description.length > 1024 || !(await stat(path)).isFile()) return null;
+  return { id, name, description, source, location: path, directory, scope };
 }
 
 function isInside(root: string, target: string): boolean {

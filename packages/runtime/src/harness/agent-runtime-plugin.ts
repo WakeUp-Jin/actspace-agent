@@ -1,3 +1,6 @@
+import { PluginManager } from "@actspace/plugin-manager";
+import { HarnessHmr } from "@actspace/harness-hmr";
+import { EvolutionApproval } from "./evolution-approval.js";
 import { join } from "node:path";
 import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 import { HarnessControl } from "@actspace/harness-control";
@@ -18,18 +21,21 @@ export class AgentRuntimeService {
   readonly runs: ManagedRuns;
   readonly subagents: OneShotSubagentProvider;
   harnesses!: HarnessControl;
+  hmr!: HarnessHmr;
+  evolution!: PluginManager;
   readonly registry: AgentRegistry;
   constructor(ctx: CordisContext) {
     const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
     const sessions = get<RuntimeSessionController>(ctx, "session.runtime");
     this.registry = get(ctx, "agent.registry");
-    this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal) }, snapshot => { emitNotification(ctx, "agent/tasks-updated", snapshot); });
+    this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal), acquireSession: (id, signal) => this.hmr.acquire(id, signal), acquireVersion: (id, generationId) => this.harnesses.acquire(id, undefined, generationId) }, snapshot => { emitNotification(ctx, "agent/tasks-updated", snapshot); });
     this.subagents = new OneShotSubagentProvider({
       store: sessions.store, presets: createBuiltInPresets(["read_file", "list_directory", "grep", "glob"]),
       manifestDigest: host.compositionDigest, plugins: host.plugins,
       createLoop: () => { throw new Error("A child Run requires a Harness lease"); },
-      acquireRun: async (preset, signal) => {
-        const lease = await this.harnesses.acquire("main", signal);
+      acquireRun: async (preset, signal, invocation) => {
+        if (!invocation) throw new Error("Child Run requires its parent invocation");
+        const lease = await this.harnesses.acquireForScope(invocation.parentScope, signal);
         const factory = lease.getService<AgentFactoryService>("actspace.agent.factory");
         if (!factory) { void lease.release(); throw new Error("Harness has no child factory"); }
         let ledger: TaskLedger | undefined;
@@ -52,22 +58,42 @@ export class AgentRuntimeService {
     const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
     const sessionHost = get<RuntimeSessionHostPort>(ctx, "actspace.host.session");
     const sharedModules = await defaultHarnessSharedModules();
+    const sessions = get<RuntimeSessionController>(ctx, "session.runtime");
+    const approval = new EvolutionApproval(host, sessions);
     this.harnesses = new HarnessControl({ context: ctx, dataRoot: sessionHost.dataRoot,
       artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), runtimeId: sessionHost.runtimeId,
       builtin: () => prepareDefaultHarnessArtifact({ artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), hostCapabilities: host.host.capabilityCeiling, disabledEntries: host.disabledHarnessEntries ?? [] }), sharedServices: DEFAULT_HARNESS_SHARED_SERVICES,
       compatibility: { capabilities: host.host.capabilityCeiling, requiredServices: [{ id: "agent.run-factory", version: 1 }, { id: "actspace.agent.factory", version: 1 }], services: DEFAULT_HARNESS_SHARED_SERVICES.map(id => ({ id, version: 1 })), events: [],
         sharedModules, codecArtifacts: [] },
-      authorize: host.authorizeHarness,
+      upgradePristineBuiltin: record => record.description.composition.entries.every(entry => entry.pluginId === "actspace.default-harness")
+        && !record.description.composition.entries.some(entry => entry.entryId === "plugin-manager"),
+      authorize: approval.authorize,
       onSelection: record => { emitNotification(ctx, "harness/selection-updated", record); },
       onDiagnostic: error => { host.onHarnessDiagnostic?.(error); },
     });
     await this.harnesses.initialize();
     ctx.provide?.("harness.control", this.harnesses);
+    this.hmr = new HarnessHmr({ dataRoot: sessionHost.dataRoot, control: this.harnesses });
+    this.evolution = new PluginManager({ dataRoot: sessionHost.dataRoot, artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), control: this.harnesses, hmr: this.hmr,
+      source: async context => {
+        const state = await this.runs.service.snapshot(context.sessionId);
+        const run = state.runs.find(r => r.runId === context.agentRunId && r.state === "running");
+        if (!run) throw new Error("Evolution requires the calling active Run");
+        const record = this.harnesses.inspect(run.harness.harnessId).history.find(r => r.revision === run.harness.revision);
+        if (!record) throw new Error("Calling Run version is unavailable");
+        return record;
+      },
+      authorize: (request, context) => approval.request(request, context),
+    });
+    ctx.provide?.("harness.hmr", this.hmr);
+    ctx.provide?.("harness.plugin-manager", this.evolution);
   }
   async dispose(): Promise<void> {
     this.runs.quiesce();
     await this.subagents.dispose();
     await this.runs.dispose();
+    await this.evolution?.close();
+    await this.hmr?.close();
     await this.harnesses?.close();
   }
 }

@@ -7,7 +7,7 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
 
 afterEach(() => { delete (window as { actspace?: unknown }).actspace; window.localStorage.clear(); });
-function fixture(ordinary = false) {
+function fixture(ordinary = false, pendingTool?: { name: string; preview: NonNullable<PendingApprovalInfo["recovery"]>["preview"] }) {
   window.localStorage.clear();
   const now = new Date().toISOString();
   const record: SessionRecord = { meta: { schemaVersion: 2, id: "reloaded", title: "Recover approvals", createdAt: now, updatedAt: now, agentRunCount: 1, workspaceRoot: "/tmp/workspace" }, events: [
@@ -15,6 +15,7 @@ function fixture(ordinary = false) {
   ] };
   let pending: PendingApprovalInfo[] = [{ requestId: "live-approval", toolName: "read_file", reason: "outside workspace", summary: "Read fixture", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
     recovery: { agentRunId: "live-run", toolCallId: "live-call", preview: { kind: "read", filePath: "/tmp/fixture.txt", displayText: "Read fixture" } } }];
+  if (pendingTool) pending = pending.map(item => ({ ...item, toolName: pendingTool.name, recovery: { ...item.recovery!, preview: pendingTool.preview } }));
   if (ordinary) pending = [];
   let listener: (event: RuntimeStreamEvent) => void = () => {};
   let liveListener: (event: unknown) => void = () => {};
@@ -110,3 +111,17 @@ it("restores the approval card after a remote observation resets an existing run
   await userEvent.click(reject);
   expect(f.decide).toHaveBeenCalledWith({ requestId: "live-approval", decision: "deny" });
 });
+
+for (const tool of [
+  { name: "list_directory", preview: { kind: "directory_list" as const, path: "/outside/templates", displayText: "Listed templates" } },
+  { name: "plugin_manager", preview: { kind: "generic" as const, title: "plugin_manager", content: "Prepare candidate" } },
+]) {
+  it(`restores an actionable approval for ${tool.name} after reload`, async () => {
+    const f = fixture(false, tool);
+    await userEvent.click(await screen.findByRole("button", { name: "允许" }));
+    expect(f.decide).toHaveBeenCalledWith({ requestId: "live-approval", decision: "once" });
+    f.clear();
+    f.emit({ type: "agent_run_finished" });
+    await waitFor(() => expect(screen.queryByRole("button", { name: "允许" })).not.toBeInTheDocument());
+  });
+}

@@ -22,6 +22,9 @@
       "path": "./../llm/service/tsconfig.build.json"
     },
     {
+      "path": "./../official-skills/tsconfig.build.json"
+    },
+    {
       "path": "./../session/journal/tsconfig.build.json"
     },
     {

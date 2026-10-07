@@ -13,11 +13,13 @@ export const DEFAULT_HARNESS_ENTRIES = [
   ["todo-tools", ["tools.todo"], ["tools.runtime", "session.runtime"]],
   ["browser-tools", ["tools.browser"], ["tools.runtime"]],
   ["subagent-tools", ["tools.subagents"], ["tools.runtime", "agent.registry", "actspace.host.subagents"]],
+  ["plugin-manager", ["tools.plugin-manager"], ["tools.runtime", "actspace.host.agent"]],
   ["agent-factory", ["actspace.agent.factory", "agent.run-factory"], ["actspace.host.agent", "agent.registry", "session.runtime", "session.checkpoint", "llm.service", "tools.runtime", "prompt.runtime", "context.engine", "context.source.system", "context.source.conversation"]],
 ] as const;
 
 export function defaultHarnessEntrySource(id: string): string {
   const special: Record<string, string> = { "agent-factory": "harness:factory", "todo-tools": "harness:todo", "subagent-tools": "./dist/harness/harness-subagent-tools.js", "context-engine": "@actspace/context/plugin", "prompt-runtime": "@actspace/prompt/plugin", "compaction-runtime": "@actspace/compaction/plugin" };
+  if (id === "plugin-manager") return "@actspace/plugin-manager/plugin";
   if (id === "context-disclosure") return "@actspace/context/disclosure";
   if (["context-system", "context-rules", "context-skills", "context-runtime"].includes(id)) return `@actspace/prompt/sources/${id.slice(8)}`;
   if (["context-conversation", "context-tools"].includes(id)) return `@actspace/context/sources/${id.slice(8)}`;

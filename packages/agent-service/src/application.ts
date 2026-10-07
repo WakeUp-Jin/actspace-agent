@@ -44,7 +44,7 @@ export type ApplicationSessionService = {
 
 export type ApplicationRunService = {
   readonly service: import("./service.js").AgentService;
-  inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R): R | Promise<R>;
+  inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R, sessionId?: string): R | Promise<R>;
   configuration(sessionId: string): import("@actspace/shared/runtime-v2").TaskConfiguration;
   configure(sessionId: string, configuration: import("@actspace/shared/runtime-v2").TaskConfiguration): void;
   initialize(sessionId: string): Promise<void>;
@@ -97,7 +97,7 @@ export class AgentApplication implements AgentApplicationContract {
     const agentRuntime = required<AgentRuntimeService>(ctx, "agent.runtime");
     this.#runs = agentRuntime.runs;
     this.#subagents = agentRuntime.subagents;
-    this.#hasRunningBackgroundTask = (sessionId) => this.#runs.inspectCapability<{ readonly hasRunningBackgroundTask?: (sessionId: string) => boolean }, boolean>("tools.shell-tools", service => service?.hasRunningBackgroundTask?.(sessionId) ?? false);
+    this.#hasRunningBackgroundTask = (sessionId) => this.#runs.inspectCapability<{ readonly hasRunningBackgroundTask?: (sessionId: string) => boolean }, boolean>("tools.shell-tools", service => service?.hasRunningBackgroundTask?.(sessionId) ?? false, sessionId);
     this.#manifestDigest = (ctx.get?.("actspace.host.session") as { readonly manifestDigest?: string } | undefined)?.manifestDigest ?? "desktop-app";
   }
 

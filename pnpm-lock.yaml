@@ -104,6 +104,9 @@ importers:
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../../packages/llm/service
+      '@actspace/official-skills':
+        specifier: workspace:*
+        version: link:../../packages/official-skills
       '@actspace/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -810,6 +813,28 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/harness-hmr:
+    dependencies:
+      '@actspace/boot':
+        specifier: workspace:*
+        version: link:../boot
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/harness-control':
+        specifier: workspace:*
+        version: link:../harness-control
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/headless:
     dependencies:
       '@actspace/agent-service':
@@ -891,6 +916,52 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/official-skills:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/plugin-manager:
+    dependencies:
+      '@actspace/bundle':
+        specifier: workspace:*
+        version: link:../bundle
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/harness-control':
+        specifier: workspace:*
+        version: link:../harness-control
+      '@actspace/harness-hmr':
+        specifier: workspace:*
+        version: link:../harness-hmr
+      '@actspace/official-skills':
+        specifier: workspace:*
+        version: link:../official-skills
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../tools/runtime
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/prompt:
     dependencies:
       '@actspace/context':
@@ -908,6 +979,9 @@ importers:
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../llm/service
+      '@actspace/official-skills':
+        specifier: workspace:*
+        version: link:../official-skills
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../session/journal
@@ -972,6 +1046,9 @@ importers:
       '@actspace/harness-control':
         specifier: workspace:*
         version: link:../harness-control
+      '@actspace/harness-hmr':
+        specifier: workspace:*
+        version: link:../harness-hmr
       '@actspace/headless':
         specifier: workspace:*
         version: link:../headless
@@ -981,6 +1058,12 @@ importers:
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../llm/service
+      '@actspace/official-skills':
+        specifier: workspace:*
+        version: link:../official-skills
+      '@actspace/plugin-manager':
+        specifier: workspace:*
+        version: link:../plugin-manager
       '@actspace/prompt':
         specifier: workspace:*
         version: link:../prompt
