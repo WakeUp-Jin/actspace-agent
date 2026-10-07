@@ -99,6 +99,20 @@ describe("TerminalSessionService", () => {
     });
   });
 
+  it("closes only the terminals owned by the closed window", async () => {
+    const { service, backends } = setup();
+    const ownedA = await service.create("session-1", 7, 80, 24);
+    const ownedB = await service.create("session-1", 7, 80, 24);
+    const other = await service.create("session-1", 8, 80, 24);
+    expect([ownedA, ownedB, other].every((result) => result.ok)).toBe(true);
+
+    await service.closeOwner(7);
+
+    expect(backends.map((backend) => backend.killed)).toEqual([true, true, false]);
+    expect(service.list("session-1", 7)).toEqual([]);
+    expect(service.list("session-1", 8)).toHaveLength(1);
+  });
+
   it("enforces the per-session limit and keeps detached replay bounded", async () => {
     const { service, events, backends } = setup();
     const created = [];

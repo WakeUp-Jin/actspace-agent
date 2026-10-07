@@ -1,6 +1,6 @@
 import { Download, Maximize, Minus, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { IconButton } from "../ui/IconButton";
 import {
   instantiateMermaidSvg,
@@ -12,7 +12,6 @@ import {
 const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
 const ZOOM_MAX = 5;
 const VIEWPORT_PADDING = 48;
-const FOCUSABLE = 'button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Fit never upscales: small diagrams open at 100%, large ones shrink to the viewport. */
 export function fitZoom(viewport: { width: number; height: number }, diagram: { width: number; height: number }): number {
@@ -47,7 +46,6 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
   const [instanceId] = useState(nextMermaidInstanceId);
   const [fit, setFit] = useState(1);
   const [zoom, setZoom] = useState(1);
-  const panelRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const anchorRef = useRef<ZoomAnchor | null>(null);
@@ -92,39 +90,12 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
     resetToFit();
   }, [resetToFit]);
 
-  useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    closeRef.current?.focus();
-    return () => previouslyFocused?.focus?.();
-  }, []);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-        return;
-      }
-      if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomTo(stepZoom(zoomRef.current, 1, fit)); return; }
-      if (event.key === "-" || event.key === "_") { event.preventDefault(); zoomTo(stepZoom(zoomRef.current, -1, fit)); return; }
-      if (event.key === "0") { event.preventDefault(); resetToFit(); return; }
-      if (event.key !== "Tab" || !panelRef.current) return;
-      const focusables = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !panelRef.current.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [fit, onClose, resetToFit, zoomTo]);
+  // Esc、Tab 循环、焦点归还由 Dialog 负责；焦点始终在对话框内，缩放快捷键挂在对话框上即可。
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomTo(stepZoom(zoomRef.current, 1, fit)); return; }
+    if (event.key === "-" || event.key === "_") { event.preventDefault(); zoomTo(stepZoom(zoomRef.current, -1, fit)); return; }
+    if (event.key === "0") { event.preventDefault(); resetToFit(); }
+  };
 
   // React's wheel listener is passive; Ctrl/⌘ + wheel must preventDefault to stop page zoom.
   useEffect(() => {
@@ -164,16 +135,17 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
   const width = Math.max(1, result.width * zoom);
   const height = Math.max(1, result.height * zoom);
 
-  return createPortal(
-    <div className="fixed inset-0 z-(--act-z-modal)">
-      <div aria-hidden="true" className="absolute inset-0 bg-overlay backdrop-blur-[1px]" onClick={onClose} />
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Mermaid 图表预览"
-        className="absolute inset-4 flex flex-col overflow-hidden rounded-act-xl border border-line bg-surface shadow-act-float sm:inset-8"
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        size="full"
+        backdrop="overlay"
+        overlayClassName="backdrop-blur-[1px]"
+        initialFocus={closeRef}
+        className="flex flex-col overflow-hidden"
+        onKeyDown={onKeyDown}
       >
+        <DialogTitle className="sr-only">Mermaid 图表预览</DialogTitle>
         <header className="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
           <div className="min-w-0 truncate pl-1 text-act-sm font-semibold text-text-main">
             Mermaid 图表
@@ -220,8 +192,7 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
             dangerouslySetInnerHTML={{ __html: instantiateMermaidSvg(result, instanceId) }}
           />
         </div>
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   );
 }

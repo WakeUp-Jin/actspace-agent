@@ -5,6 +5,8 @@ import { RotateCcw } from "lucide-react";
 import { TERMINAL_LIMITS, type TerminalSessionSnapshot } from "@actspace/shared";
 import { readTerminalTheme } from "./terminal-theme";
 import "@xterm/xterm/css/xterm.css";
+import { eventsApi } from "../../api/events";
+import { terminalApi } from "../../api/terminal";
 
 function readFont() {
   const style = getComputedStyle(document.documentElement);
@@ -77,7 +79,7 @@ export function TerminalRenderView({
       try {
         fitAddon.fit();
         sizeRef.current = { cols: terminal.cols, rows: terminal.rows };
-        void window.actspace.resizeTerminal?.({ terminalId, cols: terminal.cols, rows: terminal.rows });
+        void terminalApi.resize({ terminalId, cols: terminal.cols, rows: terminal.rows });
       } catch {
         // The panel can become zero-sized during a compact-layout transition; the next observer tick retries.
       }
@@ -89,7 +91,7 @@ export function TerminalRenderView({
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleResize);
     observer?.observe(host);
 
-    const unsubscribe = window.actspace.onTerminalEvent?.((event) => {
+    const unsubscribe = eventsApi.terminal((event) => {
       const eventTerminalId = event.type === "attached" ? event.terminal.id : event.terminalId;
       if (eventTerminalId !== terminalId) return;
       if (event.type === "attached") {
@@ -101,7 +103,7 @@ export function TerminalRenderView({
         terminal.write(event.data);
       } else if (event.type === "data") {
         terminal.write(event.data, () => {
-          void window.actspace.ackTerminal?.({ terminalId, bytes: event.bytes });
+          void terminalApi.ack({ terminalId, bytes: event.bytes });
         });
       } else if (event.type === "exit") {
         setStatus("exited");
@@ -118,7 +120,7 @@ export function TerminalRenderView({
     const inputDisposable = terminal.onData((data) => {
       if (!runningRef.current) return;
       for (const chunk of splitTerminalInput(data)) {
-        void window.actspace.writeTerminal?.({ terminalId, data: chunk });
+        void terminalApi.write({ terminalId, data: chunk });
       }
     });
     terminal.attachCustomKeyEventHandler((event) => {
@@ -131,7 +133,7 @@ export function TerminalRenderView({
         void navigator.clipboard.readText().then((data) => {
           if (data && runningRef.current) {
             for (const chunk of splitTerminalInput(data)) {
-              void window.actspace.writeTerminal?.({ terminalId, data: chunk });
+              void terminalApi.write({ terminalId, data: chunk });
             }
           }
         });
@@ -154,13 +156,7 @@ export function TerminalRenderView({
     requestAnimationFrame(() => {
       if (disposed) return;
       try { fitAddon.fit(); } catch { /* measured on the next ResizeObserver tick */ }
-      const attach = window.actspace.attachTerminal;
-      if (!attach) {
-        setStatus("error");
-        setMessage("当前桌面版本尚未加载终端桥接。");
-        return;
-      }
-      void attach({ terminalId, cols: terminal.cols, rows: terminal.rows }).then((result) => {
+      void terminalApi.attach({ terminalId, cols: terminal.cols, rows: terminal.rows }).then((result) => {
         if (result.ok === false) {
           setStatus("error");
           setMessage(result.error.message);
@@ -179,21 +175,21 @@ export function TerminalRenderView({
       colorScheme?.removeEventListener?.("change", applyAppearance);
       unsubscribe();
       inputDisposable.dispose();
-      void window.actspace.detachTerminal?.({ terminalId });
+      void terminalApi.detach({ terminalId });
       terminal.dispose();
     };
   }, [terminalId]);
 
   const restart = async () => {
-    if (restarting || !window.actspace.createTerminal) return;
+    if (restarting) return;
     setRestarting(true);
     try {
-      const closed = await window.actspace.closeTerminal?.({ terminalId });
-      if (closed && closed.ok === false) {
+      const closed = await terminalApi.close({ terminalId });
+      if (closed.ok === false) {
         setMessage(closed.error.message);
         return;
       }
-      const created = await window.actspace.createTerminal({ sessionId, ...sizeRef.current });
+      const created = await terminalApi.create({ sessionId, ...sizeRef.current });
       if (created.ok === false) {
         setMessage(created.error.message);
         return;

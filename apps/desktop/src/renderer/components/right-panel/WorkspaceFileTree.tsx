@@ -17,6 +17,7 @@ import type { WorkspaceDirEntry } from "@actspace/shared";
 import { useRightPanel, workspaceFileTabId } from "./RightPanelContext";
 import { readFailureTab, tabFromFile } from "./workspaceFileTab";
 import { IconButton } from "../ui/IconButton";
+import { workspacesApi } from "../../api/workspaces";
 
 /**
  * 右侧面板的工作区文件树 rail（见 `front-右侧面板与文件渲染规范.md`）。
@@ -88,11 +89,7 @@ function DirView({
 
   useEffect(() => {
     let cancelled = false;
-    const api = typeof window !== "undefined" ? window.actspace?.listWorkspaceDir : undefined;
-    if (!api) {
-      setStatus("error");
-      return;
-    }
+    const api = workspacesApi.listDir;
     // 命中缓存就不再打 IPC：收起 / 展开树栏、来回切 Tab 都不该重新拉一遍目录。
     if (dirCache.has(relativePath)) {
       setStatus("ready");
@@ -222,8 +219,8 @@ function EntryRow({
   const isActive = activeTabId === workspaceFileTabId(entry.relativePath);
 
   const openFile = async () => {
-    const api = typeof window !== "undefined" ? window.actspace?.readWorkspaceFile : undefined;
-    if (!api || opening) return;
+    const api = workspacesApi.readFile;
+    if (opening) return;
     setOpening(true);
     try {
       openTab(tabFromFile(await api({ workspaceRoot, relativePath: entry.relativePath })));
@@ -254,7 +251,6 @@ function EntryRow({
 
 export function WorkspaceFileTree({ workspaceRoot }: { workspaceRoot?: string }) {
   const { refreshFileTree, syncFileTreeRoot } = useRightPanel();
-  const available = typeof window !== "undefined" && typeof window.actspace?.listWorkspaceDir === "function";
   const [filter, setFilter] = useState("");
 
   // 换 workspace 后旧的展开层级和缓存都属于另一个根，留着只会显示不存在的路径。
@@ -262,16 +258,6 @@ export function WorkspaceFileTree({ workspaceRoot }: { workspaceRoot?: string })
   useEffect(() => {
     syncFileTreeRoot(workspaceRoot);
   }, [workspaceRoot, syncFileTreeRoot]);
-
-  if (!available) {
-    return (
-      <div className={RAIL_CLASS}>
-        <div className={RAIL_BODY_CLASS}>
-          <div className={STATE_CLASS}>当前环境不支持文件浏览。</div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={RAIL_CLASS}>

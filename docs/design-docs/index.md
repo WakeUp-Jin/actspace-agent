@@ -89,9 +89,10 @@
 ### 前端
 
 1. `frontend/README.md`
-2. `frontend/front-全局视觉语言规范.md`
-3. `frontend/front-主题与配色规范.md`
-4. 再进入具体工作台区域、组件或页面规范
+2. `frontend/front-新功能开发清单.md`：新增或改动前端功能前必读
+3. `frontend/front-全局视觉语言规范.md`
+4. `frontend/front-主题与配色规范.md`
+5. 再进入具体工作台区域、组件或页面规范
 
 ### 官网与公开内容
 

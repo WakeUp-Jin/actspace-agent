@@ -104,8 +104,8 @@ export type RuntimeStreamEvent =
       event: SessionEvent;
       preview: AgentToolPreview;
     }
-  | { type: "tool_approval_required"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session"; executionEnvironment?: "sandbox" | "real" }
-  | { type: "tool_approval_resolved"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; requestId: string; decision: string; approvalScope?: "browser_session" }
+  | { type: "tool_approval_required"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; toolName: string; requestId: string; /** 远端审批所在的 Host；本机审批没有。 */ hostId?: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session"; executionEnvironment?: "sandbox" | "real" }
+  | { type: "tool_approval_resolved"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; requestId: string; hostId?: string; decision: string; approvalScope?: "browser_session" }
   | {
       /** LLM 调用命中可重试错误、agent loop 正在退避重试；renderer 据此清掉半截 streaming 内容并显示重试提示 */
       type: "llm_retry";
@@ -150,6 +150,8 @@ export type SessionEvent<TPayload = unknown> = {
   timestamp: string;
   schemaVersion: 2;
   payload: TPayload;
+  /** 投影来源的 Journal envelope seq；由多条 envelope 合成、或不来自 Journal 的事件没有。 */
+  sourceSeq?: number;
 };
 
 export type UserMessagePayload = {
@@ -671,6 +673,10 @@ export type MessageBlock = {
    * 则通过同一个 renderKey 复用 DOM，避免 turn 完成时重新播放入场动画。
    */
   renderKey?: string;
+  /** 产生这个块的 run：durable 块取 event.agentRunId，live 块取当前 run。合并 durable 与 live 时按它判断归属。 */
+  runId?: string;
+  /** durable 块对应事件的 sourceSeq；live 块和合成事件产生的块没有。 */
+  sourceSeq?: number;
 } & (
   | {
       kind: "user";

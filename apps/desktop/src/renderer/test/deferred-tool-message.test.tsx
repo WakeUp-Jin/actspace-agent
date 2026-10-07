@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
-import { renderMessage } from "../components/ConversationView";
+import { renderMessage } from "../components/conversation/render-message";
 
-const original = window.actspace;
-afterEach(() => { window.actspace = original; });
+// 这里验证的是“按需加载工具详情”的交互；bridge 原始 page → MessageBlock[] 的投影由 api-sessions 测试覆盖。
+const getSessionToolDetail = vi.hoisted(() => vi.fn());
+vi.mock("../api/sessions", async (importOriginal) => ({ ...await importOriginal<typeof import("../api/sessions")>(), getSessionToolDetail }));
+beforeEach(() => { getSessionToolDetail.mockReset(); });
 const deferredToolDetail = { sessionId: "parent", callId: "call" };
 
 it("renders a persisted generic tool without toolName instead of crashing", () => {
@@ -19,7 +21,7 @@ it("renders a persisted generic tool without toolName instead of crashing", () =
 it.each(["agent", "explore"] as const)("renders deferred %s as a directly usable child-session card", (agentKind) => {
   const load = vi.fn();
   const open = vi.fn();
-  window.actspace = { ...original, getSessionToolDetail: load };
+  getSessionToolDetail.mockImplementation(load);
   const message: MessageBlock = {
     kind: "agent", id: "child", createdAt: "now", description: "检查工作区",
     subagentType: "explore", agentKind, status: "completed", summary: "检查完成", displayText: "检查工作区",
@@ -42,7 +44,7 @@ it("keeps the tool identity visible while loading details on demand and retrying
   };
   const full: MessageBlock = { ...message, renderKey: undefined, resultPreview: ["src/styles/main.css", "src/styles/theme.css"], deferredToolDetail: undefined };
   const load = vi.fn().mockRejectedValueOnce(new Error("读取失败")).mockResolvedValueOnce([full]);
-  window.actspace = { ...original, getSessionToolDetail: load };
+  getSessionToolDetail.mockImplementation(load);
   render(<>{renderMessage(message)}</>);
   expect(screen.getByRole("button", { name: "Glob **/*.css in ." })).toBeVisible();
   expect(screen.queryByText("展开完整工具结果")).not.toBeInTheDocument();
@@ -59,7 +61,7 @@ it("keeps the tool identity visible while loading details on demand and retrying
 
 it("expands an existing preview with no explicit status without fetching", () => {
   const load = vi.fn();
-  window.actspace = { ...original, getSessionToolDetail: load };
+  getSessionToolDetail.mockImplementation(load);
   render(<>{renderMessage({ kind: "glob", id: "small", createdAt: "now", pattern: "*.css", scope: ".", resultCount: 1, displayText: "Glob *.css in .", resultPreview: ["main.css"] })}</>);
   fireEvent.click(screen.getByRole("button", { name: "Glob *.css in ." }));
   expect(screen.getByText("main.css")).toBeVisible();
@@ -69,7 +71,7 @@ it("expands an existing preview with no explicit status without fetching", () =>
 it("loads web tool content through its existing toggle and preserves expansion", async () => {
   const message: MessageBlock = { kind: "web_search", id: "web", createdAt: "now", mode: "query", query: "docs", displayText: "Search docs", deferredToolDetail };
   const load = vi.fn().mockResolvedValue([{ ...message, deferredToolDetail: undefined, contentPreview: "Loaded search result" }]);
-  window.actspace = { ...original, getSessionToolDetail: load };
+  getSessionToolDetail.mockImplementation(load);
   render(<>{renderMessage(message)}</>);
   fireEvent.click(screen.getByRole("button", { name: "Search docs" }));
   expect(await screen.findByText("Loaded search result")).toBeVisible();
@@ -83,7 +85,7 @@ it("keeps Read file navigation separate from loading its result", async () => {
   const message: MessageBlock = { kind: "read", id: "read", createdAt: "now", filePath: "README.md", displayText: "Read README.md", deferredToolDetail };
   const load = vi.fn().mockResolvedValue([{ ...message, deferredToolDetail: undefined, resultPreview: ["# Read result"] }]);
   const openFile = vi.fn();
-  window.actspace = { ...original, getSessionToolDetail: load };
+  getSessionToolDetail.mockImplementation(load);
   render(<>{renderMessage(message, undefined, undefined, false, openFile)}</>);
   fireEvent.click(screen.getByRole("button", { name: "Read README.md" }));
   expect(openFile).toHaveBeenCalledTimes(1);

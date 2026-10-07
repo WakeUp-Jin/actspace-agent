@@ -29,7 +29,7 @@ import {
   type ProviderCatalogDefinition,
 } from "@actspace/shared";
 import { SectionShell, SettingGroup, SettingLinkRow, SettingRow, SettingSubhead, SettingTag, SettingsInput, StatusDot } from "./SettingsPrimitives";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ModelSettings } from "./ModelSettings";
 import { ProviderLogo } from "./ProviderLogo";
 import { CustomModelFields, customModelInputFromDraft, emptyCustomModelFormDraft } from "./CustomModelForm";
@@ -40,6 +40,9 @@ import { ConnectionStatusDot, hostOf, isOfficialAnthropic, protocolLabel, protoc
 import { Toggle } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
+import { modelsApi } from "../../api/models";
+import { providersApi } from "../../api/providers";
+import { settingsApi } from "../../api/settings";
 
 const PROVIDERS = PROVIDER_DEFINITIONS;
 
@@ -70,11 +73,10 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const loadBalance = useCallback(async (provider: BalanceProviderId) => {
-    if (!window.actspace?.getProviderBalance) return;
     setBalanceLoading((current) => ({ ...current, [provider]: true }));
     setBalanceErrors((current) => ({ ...current, [provider]: undefined }));
     try {
-      const balance = await window.actspace.getProviderBalance({ provider });
+      const balance = await providersApi.getBalance({ provider });
       setBalances((current) => ({ ...current, [provider]: balance }));
     } catch (error) {
       setBalanceErrors((current) => ({
@@ -87,15 +89,12 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
   }, []);
 
   const load = useCallback(async () => {
-    if (!window.actspace?.listProviders) return;
     try {
-      const result = await window.actspace.listProviders();
+      const result = await providersApi.list();
       setProviders(result.providers);
       setCredentialStorage(result.credentialStorage ?? { status: "ready" });
-      if (window.actspace.getSettingsV4) {
-        const v4 = await window.actspace.getSettingsV4();
-        setCustomConnections(Object.values(v4.settings.models.connections).filter((connection) => connection.connectionId !== `${connection.providerId}:default`));
-      }
+      const v4 = await settingsApi.getV4();
+      setCustomConnections(Object.values(v4.settings.models.connections).filter((connection) => connection.connectionId !== `${connection.providerId}:default`));
       // Balances are remote detail data; they must not hold up the local connection list.
       for (const provider of PROVIDERS) {
         if (provider.supportsBalance && result.providers[provider.id]?.hasApiKey === true) {
@@ -114,11 +113,10 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
   }, [detailProvider, providers]);
 
   const test = async (provider: LlmProviderId) => {
-    if (!window.actspace.testProvider) return;
     setBusy(provider);
     setMessage(null);
     try {
-      const result = await window.actspace.testProvider({ provider });
+      const result = await providersApi.test({ provider });
       setMessage(result.message);
       await load();
       await onChanged?.();
@@ -128,10 +126,9 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
   };
 
   const remove = async (provider: LlmProviderId): Promise<string | null> => {
-    if (!window.actspace.removeProvider) return "当前版本不支持移除服务商。";
     setBusy(provider);
     try {
-      const result = await window.actspace.removeProvider({ provider });
+      const result = await providersApi.remove({ provider });
       if (!result.ok) return "error" in result ? result.error.message : "服务商移除失败。";
       await load();
       await onChanged?.();
@@ -159,17 +156,14 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
     return () => window.clearInterval(timer);
   }, [connectedBalanceKey, loadBalance, loaded]);
 
-  if (!window.actspace?.listProviders) {
-    return <SectionShell title="模型连接" description="仅桌面端可配置模型连接。"><div /></SectionShell>;
-  }
 
   const openSavedConnection = async (connectionId: string, autoTest: boolean) => {
     setCustomFlow(null);
     setAdding(null);
     await load();
     await onChanged?.();
-    const snapshot = await window.actspace.getSettingsV4?.();
-    const connection = snapshot?.settings.models.connections[connectionId];
+    const snapshot = await settingsApi.getV4();
+    const connection = snapshot.settings.models.connections[connectionId];
     if (connection) setCustomDetail({ connection, autoTest });
   };
 
@@ -183,8 +177,7 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
         onChanged={async () => { await load(); await onChanged?.(); }}
         onBack={() => setCustomDetail(null)}
         onRemove={async () => {
-          if (!window.actspace.removeCustomConnection) throw new Error("当前版本不支持删除连接。");
-          await window.actspace.removeCustomConnection({ connectionId: customDetail.connection.connectionId });
+          await settingsApi.removeCustomConnection({ connectionId: customDetail.connection.connectionId });
           setCustomDetail(null);
           await load();
           await onChanged?.();
@@ -230,11 +223,9 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
           testing={busy === detailProvider}
           testMessage={message}
           onRefreshModels={async () => {
-            if (window.actspace.reloadModelCatalog) {
-              const result = await window.actspace.reloadModelCatalog({ provider: detailProvider });
-              if (!result.error) await onChanged?.();
-              return result;
-            }
+            const result = await modelsApi.reloadCatalog({ provider: detailProvider });
+            if (!result.error) await onChanged?.();
+            return result;
           }}
           onChanged={onChanged}
           isDefault={getDefaultProviderId(settings?.taskModels?.defaultChatModel) === detailProvider}
@@ -423,9 +414,8 @@ function CustomConnectionSetup({ catalog, onBack, onSaved }: { catalog: Provider
   const save = async () => {
     setSaving(true); setError(null);
     try {
-      if (!window.actspace.createCustomConnection) throw new Error("当前版本不支持创建连接。");
       const initialModel = customModelInputFromDraft(modelDraft);
-      await window.actspace.createCustomConnection({ providerId: catalog.runtimeProviderId ?? "openrouter", connectionId: connectionId || undefined, displayName, apiKey: apiKey.trim(), baseUrl, defaultModel: initialModel.apiModel, initialModel, catalogId: catalog.id, protocol, promptCacheMode, proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl.trim() : null } });
+      await settingsApi.createCustomConnection({ providerId: catalog.runtimeProviderId ?? "openrouter", connectionId: connectionId || undefined, displayName, apiKey: apiKey.trim(), baseUrl, defaultModel: initialModel.apiModel, initialModel, catalogId: catalog.id, protocol, promptCacheMode, proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl.trim() : null } });
       await onSaved();
     } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "保存失败。"); }
     finally { setSaving(false); }
@@ -486,7 +476,7 @@ function ProviderDetailRoute({
   onTest: () => void;
   testing?: boolean;
   testMessage?: string | null;
-  onRefreshModels: () => Promise<ModelsCatalogListResult | undefined>;
+  onRefreshModels: () => Promise<ModelsCatalogListResult>;
   onChanged?: () => void | Promise<void>;
   isDefault: boolean;
   onEdit: () => void;
@@ -501,7 +491,6 @@ function ProviderDetailRoute({
     setRefreshing(true); setCatalogStatus(null);
     try {
       const result = await onRefreshModels();
-      if (!result) throw new Error("unavailable");
       setCatalogStatus({ error: Boolean(result.error), text: result.error ? `更新失败，保留本地目录：${result.error.message}` : `已更新 ${result.models.length} 个模型 · ${result.fetchedAt ? new Date(result.fetchedAt).toLocaleString("zh-CN") : "本地目录"}` });
       if (!result.error) setModelRevision((value) => value + 1);
     } catch { setCatalogStatus({ error: true, text: "更新失败，已保留本地目录。请检查连接后重试。" }); }
@@ -799,21 +788,21 @@ function ProviderConnectionForm({
         ? undefined
         : nextProxy;
       const result = hasDefaultKey || (configured && !apiKey.trim())
-        ? await window.actspace.updateProvider?.({
+        ? await providersApi.update({
             provider,
             ...(apiKey.trim() && { apiKey: apiKey.trim() }),
             ...(provider === "openrouter" && managementKey.trim() && { managementKey: managementKey.trim() }),
             baseUrl: baseUrl || null,
             ...(updateProxy && { proxy: updateProxy }),
           })
-        : await window.actspace.connectProvider?.({
+        : await providersApi.connect({
             provider,
             apiKey,
             ...(provider === "openrouter" && { managementKey: managementKey.trim() || null }),
             baseUrl: baseUrl || null,
             proxy: nextProxy,
           });
-      if (!result || !result.ok) { setError(result && "error" in result ? result.error.message : "保存失败。"); return; }
+      if (!result.ok) { setError("error" in result ? result.error.message : "保存失败。"); return; }
       await onSaved();
     } catch { setError("保存失败，请稍后重试。"); }
     finally { setSaving(false); }

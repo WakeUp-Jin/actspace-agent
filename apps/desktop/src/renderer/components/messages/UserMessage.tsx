@@ -2,6 +2,7 @@ import { FileText } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
 import { ResponseAnnotationPill } from "../composer/ResponseAnnotationPill";
+import { sessionsApi } from "../../api/sessions";
 
 const USER_MESSAGE_CLASS = "message-row user-message flex flex-col items-stretch animate-[rise-in_260ms_ease_both]";
 // 已发送的回复批注胶囊：贴在它所属的用户消息上方，右对齐。execution 变体由 TurnPrompt 放在卡片外面。
@@ -107,12 +108,12 @@ export function UserMessage({
   const cardClass = variant === "execution" ? USER_EXECUTION_CARD_CLASS : USER_CARD_CLASS;
 
   useEffect(() => {
-    if (!sessionId || !window.actspace?.readSessionArtifact) return;
+    if (!sessionId) return;
     const pendingImages = attachments.filter((attachment) => attachment.kind === "image" && !attachment.previewUrl);
     if (pendingImages.length === 0) return;
     let active = true;
     void Promise.all(pendingImages.map(async (attachment) => {
-      const result = await window.actspace.readSessionArtifact({ sessionId, artifactPath: attachment.path ?? attachment.id });
+      const result = await sessionsApi.readArtifact({ sessionId, artifactPath: attachment.path ?? attachment.id });
       return result.dataUrl ? [attachment.id, result.dataUrl] as const : null;
     })).then((entries) => {
       if (!active) return;

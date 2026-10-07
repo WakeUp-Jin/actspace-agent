@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { IconButton } from "../ui/IconButton";
 import { createMessageBlocks, type MessageBlock } from "@actspace/shared";
 import { AgentAvatar, AgentStatus } from "../messages/AgentIdentity";
-import { renderMessage } from "../ConversationView";
+import { renderMessage } from "../conversation/render-message";
+import { sessionsApi } from "../../api/sessions";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 const buttonClass = "w-full rounded-act-md px-3 py-3 text-left hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring";
@@ -19,8 +21,8 @@ export function SubagentsPanel({ sessionId, selected }: { sessionId: string | nu
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
       try {
-        const items = await window.actspace?.getSubagents?.({ sessionId: sessionId! });
-        if (!disposed && items) { setAgents(items.filter((item): item is AgentMessage => item.kind === "agent")); setError(undefined); }
+        const items = await sessionsApi.getSubagents({ sessionId: sessionId! });
+        if (!disposed) { setAgents(items.filter((item): item is AgentMessage => item.kind === "agent")); setError(undefined); }
       } catch { if (!disposed) setError("无法加载子智能体，请稍后重试。"); }
       finally { if (!disposed) timer = setTimeout(refresh, 1000); }
     }
@@ -39,8 +41,8 @@ export function SubagentsPanel({ sessionId, selected }: { sessionId: string | nu
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
       try {
-        const events = await window.actspace?.getSubAgentTranscript?.({ transcriptRef: ref });
-        if (!disposed && events) { setMessages(createMessageBlocks(events)); setError(undefined); }
+        const events = await sessionsApi.getSubAgentTranscript({ transcriptRef: ref });
+        if (!disposed) { setMessages(createMessageBlocks(events)); setError(undefined); }
       } catch { if (!disposed) setError("执行记录暂不可用，正在重试。"); }
       finally { if (!disposed && active?.status === "running") timer = setTimeout(refresh, 750); }
     }
@@ -50,7 +52,7 @@ export function SubagentsPanel({ sessionId, selected }: { sessionId: string | nu
   if (!sessionId) return <p className="p-5 text-act-sm text-text-muted">选择会话查看子 Agent。</p>;
   if (active) return <section className="flex h-full min-h-0 flex-col" aria-label="子 Agent 详情">
     <header className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3">
-      <button type="button" aria-label="返回子 Agent 列表" className="rounded-act-md p-1.5 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring" onClick={() => setSelection(undefined)}><ArrowLeft size={16} /></button>
+      <IconButton label="返回子 Agent 列表" tooltip="返回" onClick={() => setSelection(undefined)}><ArrowLeft size={16} /></IconButton>
       <AgentAvatar message={active} size={28} />
       <div className="min-w-0 flex-1"><h2 className="m-0 truncate text-act-sm font-medium" title={active.description}>{active.description}</h2><p className="m-0 mt-1 flex items-center gap-2 text-act-xs text-text-muted"><span>{kindLabel(active)}</span><span aria-hidden="true">·</span><AgentStatus status={active.status} /></p></div>
     </header>

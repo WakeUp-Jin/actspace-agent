@@ -5,6 +5,8 @@ import type { AppSettings, BootstrapState, SessionRecord, WorkspaceListResult } 
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
+import { setupBridge } from "./helpers/bridge";
+import { projectRecord } from "./helpers/session-records";
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
   dataRoot: "/tmp/actspace",
@@ -36,12 +38,11 @@ const defaultSettings: AppSettings = {
 };
 
 const settingsApiStub = {
-  getSessionPage: async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(await window.actspace.getSession({ sessionId })),
-  getSettings: async () => defaultSettings,
-  taskCommand: async (input: { sessionId: string }) => ({ snapshot: { sessionId: input.sessionId, revision: 0, paused: false, tasks: [], queue: [], runs: [] } }),
-  getReviewSnapshot: async () => ({ ok: false, code: "not_available", message: "No changes" }),
-  listVisualizations: async () => ({ items: [] }),
-  setUiZoom: () => {}, setNativeTheme: () => {}, onShuttingDown: () => () => {},
+  "settings.get": async () => defaultSettings,
+  "tasks.command": async (input: { sessionId: string }) => ({ snapshot: { sessionId: input.sessionId, revision: 0, paused: false, tasks: [], queue: [], runs: [] } }),
+  "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
+  "visualize.list": async () => ({ items: [] }),
+  "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
 };
 function createWorkspaceRegistryFixture(createdAt: string): WorkspaceListResult {
   return { version: 1, defaultWorkspaceId: "default", items: [{ id: "default", kind: "default", label: "workspace", path: "/tmp/workspace", order: 0, createdAt, updatedAt: createdAt }] };
@@ -74,7 +75,7 @@ function renderApp() {
 }
 
 
-afterEach(() => { delete (window as { actspace?: unknown }).actspace; window.localStorage.clear(); });
+afterEach(() => { window.localStorage.clear(); });
 it("restores a rejected Chat draft without a phantom message, failed turn, or workspace controls", async () => {
   window.localStorage.clear();
   const record = createEmptySessionRecord("chat-rejection");
@@ -83,16 +84,16 @@ it("restores a rejected Chat draft without a phantom message, failed turn, or wo
   record.meta.workspaceRoot = "/tmp/workspace";
   const attachment = { id: "bad", kind: "file" as const, name: "bad.txt", path: "/fixture/bad.txt" };
   const submitTask = vi.fn(async (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => ({ status: "submission-failed" as const, acknowledgement: "rejected" as const, message: "附件校验失败", attachmentIssue: { code: "invalid_utf8" as const, fileName: "bad.txt", attachmentId: "bad" } }));
-  window.actspace = {
+  setupBridge({
     ...settingsApiStub,
-    getBootstrapState: async () => bootstrapState,
-    listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt),
-    listSessions: async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", agentMode: "chat", workspaceRoot: "/tmp/workspace" }],
-    getSession: async () => record, createSession: async () => record,
-    listPendingApprovals: async () => [], onAgentStream: () => () => {},
-    selectFiles: async () => ({ canceled: false, attachments: [attachment] }),
-    submitTask,
-  } as unknown as typeof window.actspace;
+    "app.getBootstrapState": async () => bootstrapState,
+    "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt),
+    "sessions.list": async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", agentMode: "chat", workspaceRoot: "/tmp/workspace" }],
+    "sessions.get": projectRecord(async () => record), "sessions.getPage": projectRecord(async () => record), "sessions.create": projectRecord(async () => record),
+    "approvals.listPending": async () => [], "events.agentStream": () => () => {},
+    "dialogs.selectFiles": async () => ({ canceled: false, attachments: [attachment] }),
+    "tasks.submit": submitTask,
+  });
   const user = userEvent.setup(); renderApp();
   await screen.findByText("Chat");
   expect(screen.queryByLabelText("初始工作区与运行位置选择")).toBeNull();
@@ -118,15 +119,15 @@ it("restores the draft with a readable message when references are rejected", as
   record.meta.agentForm = "chat";
   record.meta.workspaceRoot = "/tmp/workspace";
   const submitTask = vi.fn(async (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => ({ status: "submission-failed" as const, acknowledgement: "rejected" as const, message: "引用失效", referenceIssue: { code: "annotation_source_missing" as const, kind: "annotation" as const, index: 0 } }));
-  window.actspace = {
+  setupBridge({
     ...settingsApiStub,
-    getBootstrapState: async () => bootstrapState,
-    listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt),
-    listSessions: async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", workspaceRoot: "/tmp/workspace" }],
-    getSession: async () => record, createSession: async () => record,
-    listPendingApprovals: async () => [], onAgentStream: () => () => {},
-    submitTask,
-  } as unknown as typeof window.actspace;
+    "app.getBootstrapState": async () => bootstrapState,
+    "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt),
+    "sessions.list": async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", workspaceRoot: "/tmp/workspace" }],
+    "sessions.get": projectRecord(async () => record), "sessions.getPage": projectRecord(async () => record), "sessions.create": projectRecord(async () => record),
+    "approvals.listPending": async () => [], "events.agentStream": () => () => {},
+    "tasks.submit": submitTask,
+  });
   renderApp();
   await screen.findByText("Chat");
   fireEvent.change(screen.getByRole("textbox"), { target: { value: "引用那段话" } });

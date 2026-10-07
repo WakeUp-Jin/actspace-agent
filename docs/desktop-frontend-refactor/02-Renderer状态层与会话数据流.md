@@ -4,6 +4,7 @@
 > 目标：App 只做装配；会话数据只有一个事实源；按会话的本地状态集中管理并能回收。
 > 依赖：04（preload 分组）先做更顺；03（运行目标）在本文档 S4 之后做。
 > 迁移去向：`docs/design-docs/frontend/front-会话状态与数据流规范.md`（新建）+ exec-plan。
+> **实施状态：已按 14 实施（2026-10-06）。** 现行规范见 [会话状态与数据流规范](../design-docs/frontend/front-会话状态与数据流规范.md)。§1–§2 是实施前（2026-10-05）的现状记录，行号均指当时的 App.tsx；§3–§6 与实际实施的出入见 §7。
 
 ## 1. 现状
 
@@ -289,3 +290,22 @@ function selectTranscript(cell: SessionCell, live: LiveRunState | undefined, loc
 1. 本地会话「已提交未确认」的消息：**跨重启恢复**，作为草稿回到输入框，不自动重发；恢复前先查 durable 记录确认 Runtime 是否已收到，已收到则只清理残留记录。
 2. 投影是否带 `runId` / `journalSeq`：数据已在 envelope 中，只是没有成为 `MessageBlock` 字段。**方案一**：新增可选字段 `runId`、`sourceSeq`（见 §3），不改协议。
 3. 状态库：**不引入**，用 `useSyncExternalStore` + 小 store。
+
+## 7. 实施后的更正（2026-10-06，计划 14）
+
+以下各条以 [会话状态与数据流规范](../design-docs/frontend/front-会话状态与数据流规范.md) 为准。
+
+1. **§1.2 / P1-1 的「有 delete」不准确**：表中标「有」的几个 Map 只是在单次操作里删掉一项，没有任何一个做会话级清理。另有两份按会话的内存 Map 没有列出：`WorkbenchLayout` 的 `composerDraftsRef`（输入框正文）和 `annotationDraftsRef`（回复批注草稿），已并入 `SessionLocalStore` 的 `composerText` / `annotationDraft`。
+2. **P0-1 的「task snapshot 事件已存在」不准确**：`task-queue-updated` 只是信号，收到后仍要调一次 `tasks.command({ op: "snapshot" })`。补齐方式也与方案不同：不是「只补齐活动会话 + busy 会话」，而是每个会话 id 只补齐一次（含启动时的整个列表和分页新增的 id），以保住侧栏的后台审批徽标；Host 重连时其后台会话重新补齐一次。
+3. **§3 目录**：没有新建 `features/` 和 `app/App.tsx`。`App.tsx` 留在 `R/App.tsx`（测试都从 `../App` 导入），新模块放在 `R/session/`，Provider 装配在 `R/app/providers.tsx`。`session-list.ts` 没有拆出，列表与分页仍在 App。
+4. **§3.1 状态形状**：实际字段多了 `composerText`、`annotationDraft`、`messageQueue`、`pageVersion`、`approvalVersion`，`composer` 改为可选；`pendingSubmission` 不在 store 里，单独由 `R/session/pending-submission.ts` 用 `localStorage` 管理。另有 `ids()`、`useSessionLocalIds`。页 / 审批请求的版本号改为全局递增（evict 后按会话计数会撞号）。
+5. **P0-2 / §3.2 identity**：没有引入 `BlockIdentity` 联合类型，按方案一只在 `MessageBlock` / `SessionEvent` 上加可选字段 `runId`、`sourceSeq`。`sourceSeq` 标识来源 envelope，同一 envelope 投影出的多个块共用，不是唯一键。函数是 `mergeTranscript(durable, live, local)`，输入是 record 的块 / events 而不是 cell。
+6. **§3.2 合并规则方向**：不是「durable 出现 run 完成后 live 整组让位」，而是「正在流式的 run 由 live 显示，durable 里同一 runId 的块隐藏；run 结束、live 卸下后 durable 接手」。恢复的 run 只隐藏 live 已有的工具块。steer、workspace-preparation 没有 durable 对应物，保持原显示行为。
+7. **P0-3 / S4 的分页接口**：`ClientSessionStore` 没有 `loadEarlier`，也不需要新增 `prependPage`——`applyEnvelope` 本身就能前插相邻的早期页。早期历史由 `R/session/session-pages.ts` 的 `loadEarlier(store, sessionId)` 读页后交给 store。`useSessionCell` 显式接收 store（App 在 Provider 之上）。store 新增的是 `evict`、`cellIds`、`peek`。
+8. **cell 上限**：§3 没有提到。删除 `pageCacheRef`（上限 3）后由 cell 充当缓存，加了 LRU：当前会话和运行中的会话常驻，其余保留最近查看的 5 个。
+9. **§3.3 Context**：本计划只做了 `ActiveSessionContext`、`ComposerContext`、`SessionActionsContext`；`RunTargetContext` 在计划 15。prop 数 < 10、App.tsx < 400 行在 15 结束时验收；14 结束时 App.tsx 约 1550 行，WorkbenchLayout 13 个 prop、ConversationView 14 个。
+10. **S8 订阅合并**：本计划只合并了 `events.sessionLive`（`R/api/live-events.ts` 的 `liveEvents`）；Host 变化的订阅合并在计划 15。
+11. **P1-8**：App 仍向 `SessionProjectionProvider` 传入 store，`bridge.open` 不由 App 调用，bridge 只负责 live 订阅和 refresh（失败退避重试）；cell 的错误态现在由 `ConversationView` 显示。
+12. **§6 第 1 条「先查 durable 记录」**：durable user_message 的投影不带 submissionId，判定依据改为任务快照的 `tasks[].submissionId`；查询失败时降级为恢复草稿。另加 7 天过期清理。
+13. **evict 范围**：归档会话、归档工作区、移除工作区三处调用；移除 Host 时不 evict（其会话以「离线」继续显示），也没有「删除会话」入口。
+

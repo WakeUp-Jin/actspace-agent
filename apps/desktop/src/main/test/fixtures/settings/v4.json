@@ -1,0 +1,158 @@
+{
+  "version": 4,
+  "general": {
+    "performanceMonitoring": true,
+    "englishLearning": {
+      "lastSessionId": null
+    },
+    "personalization": {
+      "displayName": "Fixture User",
+      "responseStyle": "concise"
+    },
+    "agentInstructions": {
+      "systemPromptPath": "v4-agent.md"
+    },
+    "taskDefaults": {
+      "temperature": 1.2,
+      "maxOutputTokens": 2048,
+      "chatCompactionTriggerRatio": 0.8
+    },
+    "shortcuts": {
+      "quickOpen": {
+        "enabled": true,
+        "accelerator": "CommandOrControl+Shift+Space",
+        "target": {
+          "kind": "automatic"
+        }
+      }
+    }
+  },
+  "models": {
+    "connections": {
+      "deepseek:default": {
+        "connectionId": "deepseek:default",
+        "providerId": "deepseek",
+        "enabled": true,
+        "baseUrl": null,
+        "proxy": {
+          "enabled": false,
+          "url": null
+        },
+        "lastConnection": {
+          "status": "untested"
+        },
+        "defaultPricingMultiplier": 1,
+        "additionalCredentials": []
+      },
+      "kimi:default": {
+        "connectionId": "kimi:default",
+        "providerId": "kimi",
+        "enabled": false,
+        "baseUrl": null,
+        "proxy": {
+          "enabled": false,
+          "url": null
+        },
+        "lastConnection": {
+          "status": "untested"
+        },
+        "defaultPricingMultiplier": 1,
+        "additionalCredentials": []
+      },
+      "openrouter:default": {
+        "connectionId": "openrouter:default",
+        "providerId": "openrouter",
+        "enabled": true,
+        "baseUrl": null,
+        "proxy": {
+          "enabled": false,
+          "url": null
+        },
+        "lastConnection": {
+          "status": "untested"
+        },
+        "defaultPricingMultiplier": 1,
+        "additionalCredentials": []
+      }
+    },
+    "definitions": {},
+    "installed": {
+      "deepseek:deepseek-flash": {
+        "connectionId": "deepseek:default",
+        "enabled": true,
+        "addedAt": "2026-07-24T00:00:00.000Z"
+      },
+      "kimi:kimi-k2.6": {
+        "connectionId": "kimi:default",
+        "enabled": true,
+        "addedAt": "2026-08-01T00:00:00.000Z",
+        "customLabel": "Kimi main"
+      },
+      "kimi:kimi-k2.7-code": {
+        "connectionId": "kimi:default",
+        "enabled": true,
+        "addedAt": "2026-07-24T00:00:00.000Z"
+      }
+    },
+    "taskBindings": {
+      "defaultChat": "deepseek:deepseek-flash",
+      "utility": "kimi:kimi-k2.6",
+      "explore": "kimi:kimi-k2.7-code"
+    }
+  },
+  "tools": {
+    "disabledTools": [
+      "web_fetch"
+    ],
+    "bash": {
+      "alwaysAsk": false
+    },
+    "showFileChangeStats": true,
+    "searchProviders": {
+      "zhipu": {
+        "enabled": true
+      },
+      "tavily": {
+        "enabled": true
+      },
+      "tinyfish": {
+        "enabled": true
+      },
+      "exa": {
+        "enabled": false
+      }
+    }
+  },
+  "media": {
+    "speech": {
+      "provider": "minimax",
+      "model": "speech-2.8-turbo",
+      "voiceId": "English_Insightful_Speaker",
+      "speed": 1.25
+    },
+    "imageGeneration": {
+      "baseUrl": "https://images.example/v4",
+      "model": "image-model-v4"
+    },
+    "imageInspection": {
+      "modelKey": "openrouter:openai/gpt-5.6-luna"
+    }
+  },
+  "skills": {
+    "disabled": [
+      "pptx"
+    ]
+  },
+  "subagents": {
+    "routes": {}
+  },
+  "activity": {
+    "usage": {
+      "range": "30d",
+      "status": "all",
+      "modelFilter": "",
+      "showDetails": false,
+      "activeTab": "requests"
+    }
+  }
+}

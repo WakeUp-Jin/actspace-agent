@@ -3,6 +3,7 @@ import { Search, Unplug } from "lucide-react";
 import type { AppSettings, SettingsUpdateInput } from "@actspace/shared";
 import { CapabilitiesSection } from "./CapabilitiesSection";
 import { SkillsSection } from "./SkillsSection";
+import { settingsApi } from "../../api/settings";
 
 const TABS = [
   { id: "capabilities", label: "能力" },
@@ -21,11 +22,7 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
   useEffect(() => {
     let canceled = false;
     setError(null);
-    if (!window.actspace?.getSettings) {
-      setError("Skill 管理仅在桌面端可用。");
-      return;
-    }
-    void window.actspace.getSettings().then((next) => {
+    void settingsApi.get().then((next) => {
       if (!canceled) setSettings(next);
     }).catch(() => {
       if (!canceled) setError("读取 Skills 设置失败，请重试。");
@@ -34,7 +31,7 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
   }, [reload]);
 
   const updateSkills = async (input: SettingsUpdateInput) => {
-    const next = await window.actspace.updateSettings(input);
+    const next = await settingsApi.update(input);
     setSettings(next);
     onSettingsChange?.(next);
   };
@@ -89,7 +86,7 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
             {error ? (
               <div role="alert" className="flex items-center gap-3 py-8 text-act-sm text-text-faint">
                 {error}
-                {window.actspace?.getSettings ? <button type="button" className="text-text-main underline" onClick={() => setReload((value) => value + 1)}>重试</button> : null}
+                <button type="button" className="text-text-main underline" onClick={() => setReload((value) => value + 1)}>重试</button>
               </div>
             ) : settings ? <SkillsSection settings={settings} onUpdate={updateSkills} query={queries.skills} />
               : <p role="status" className="py-8 text-act-sm text-text-faint">加载 Skills 中…</p>}

@@ -11,7 +11,7 @@ import { join } from "node:path";
 import type { AppDataRoots } from "./app-paths";
 import { homedir } from "node:os";
 import { resolveActSpaceDataRoot } from "@actspace/shared";
-import { RUNTIME_V2_DESKTOP_CHANNELS, RUNTIME_V2_FIXED_RENDERER_CHANNELS, type RuntimeV2ApprovalRequest } from "@actspace/shared/runtime-v2";
+import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import type { RuntimeStreamEvent } from "@actspace/shared";
 import { resolveAppDataRoots } from "./app-paths";
 import { PendingApprovalRegistry } from "./approval-registry";
@@ -20,16 +20,16 @@ import { SettingsService, type SecretCrypto } from "./settings-service";
 import { ModelStoreService } from "./model-store-service";
 import { ModelRuntimeService } from "./model-runtime-service";
 import { DesktopRuntimeV2Registry } from "./runtime-v2/runtime-registry";
-import { registerRuntimeV2Ipc } from "./runtime-v2/projection-ipc";
 import { registerRuntimeV2DesktopShell } from "./runtime-v2/desktop-shell-ipc";
 import { TerminalSessionService } from "./terminal/terminal-session-service";
 import { createNodePtyBackend } from "./terminal/node-pty-terminal-backend";
-import { RUNTIME_V2_DESKTOP_SHELL_CHANNELS } from "@actspace/shared/runtime-v2";
 import { ProviderNetworkService } from "./runtime-v2/provider-network-service";
 import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { RuntimeV2OpenRouterCatalogService } from "./runtime-v2/openrouter-catalog-service";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
 import { LocalUpdateService } from "./local-update-service";
+import { attachWindowLifecycle, installProcessErrorLogging } from "./main-lifecycle";
+import { attachNavigationGuards, blockWebviewAttachment, createAppUrlMatcher, createMainWindowOptions } from "./window-security";
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const APP_ID = process.env.ACTSPACE_DEV_APP_ID?.trim() || "com.actspace.desktop";
@@ -39,7 +39,6 @@ let startupLogPath: string | undefined;
 let mainWindow: BrowserWindow | undefined;
 let runtimeV2Registry: DesktopRuntimeV2Registry | undefined;
 let disposePerformanceIpc: (() => void) | undefined;
-let disposeRuntimeV2Ipc: (() => void) | undefined;
 let disposeEnglishLearningIpc: (() => void) | undefined;
 let speechPlayback: DesktopSpeechPlayback | undefined;
 let disposeRuntimeV2DesktopShell: (() => void) | undefined;
@@ -61,11 +60,17 @@ let browserConnectionTimer: NodeJS.Timeout | undefined;
 let localUpdateService: LocalUpdateService | undefined;
 let shuttingDown = false;
 
+blockWebviewAttachment(app);
+
+installProcessErrorLogging((message, details) => {
+  // 日志目录还没准备好时，错误只能写到 stderr。
+  if (startupLogPath) void logMain(message, details);
+  else process.stderr.write(formatLogLine(message, details));
+});
+
 const approvalRegistry = new PendingApprovalRegistry({
   onApprovalRequired: (request, sessionId, agentRunId) => {
-    const dto: RuntimeV2ApprovalRequest = Object.freeze({ requestId: request.id, sessionId, agentRunId, toolName: request.toolName, summary: request.summary, reasons: request.reason.split("\n").filter(Boolean), resources: Array.isArray(request.args.resources) ? request.args.resources as RuntimeV2ApprovalRequest["resources"] : [], grantSuggestions: request.grantSuggestions ?? [], supportedLifetimes: request.supportedLifetimes ?? (["once"] as const), risk: request.riskLevel ?? "medium", createdAt: request.createdAt });
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send(RUNTIME_V2_DESKTOP_CHANNELS.approvalRequired, dto);
       const event: RuntimeStreamEvent = {
         type: "tool_approval_required",
         sessionId,
@@ -128,9 +133,13 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
 }
 
 async function logMain(message: string, details?: Record<string, unknown>): Promise<void> {
-  const line = `${JSON.stringify({ at: new Date().toISOString(), message, ...(details ? { details } : {}) })}\n`;
+  const line = formatLogLine(message, details);
   if (startupLogPath) await appendFile(startupLogPath, line, "utf8").catch(() => undefined);
   if (process.env.ACTSPACE_LOG_STDERR === "1") process.stderr.write(line);
+}
+
+function formatLogLine(message: string, details?: Record<string, unknown>): string {
+  return `${JSON.stringify({ at: new Date().toISOString(), message, ...(details ? { details } : {}) })}\n`;
 }
 
 function getMainWindow(): BrowserWindow | undefined {
@@ -138,24 +147,20 @@ function getMainWindow(): BrowserWindow | undefined {
 }
 
 async function createMainWindow(): Promise<BrowserWindow> {
-  const win = new BrowserWindow({
-    width: 1440,
-    height: 960,
-    minWidth: 480,
-    minHeight: 760,
+  const indexHtmlPath = join(__dirname, "..", "..", "dist", "index.html");
+  const win = new BrowserWindow(createMainWindowOptions({
+    preload: join(__dirname, "..", "preload", "index.bundle.js"),
     title: APP_DISPLAY_NAME,
-    titleBarStyle: "hidden",
-    trafficLightPosition: { x: 16, y: 16 },
-    webPreferences: {
-      preload: join(__dirname, "..", "preload", "index.bundle.js"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+  }));
   mainWindow = win;
+  attachNavigationGuards(win, createAppUrlMatcher({ devServerUrl: DEV_SERVER_URL, indexHtmlPath }));
+  attachWindowLifecycle(win, {
+    onClosed: () => { if (mainWindow === win) mainWindow = undefined; },
+    closeOwnedTerminals: async (ownerId) => { await terminalSessionService?.closeOwner(ownerId); },
+    log: (message, details) => void logMain(message, details),
+  });
   if (DEV_SERVER_URL) await win.loadURL(DEV_SERVER_URL);
-  else await win.loadFile(join(__dirname, "..", "..", "dist", "index.html"));
-  win.on("closed", () => { if (mainWindow === win) mainWindow = undefined; });
+  else await win.loadFile(indexHtmlPath);
   return win;
 }
 
@@ -233,20 +238,18 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
       sendEvent: (ownerId, event) => {
         const owner = webContents.fromId(ownerId);
         if (owner && !owner.isDestroyed()) {
-          owner.send(RUNTIME_V2_DESKTOP_SHELL_CHANNELS.terminalEvent, event);
           owner.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalEvent, event);
         }
       },
       log: (message, details) => void logMain(message, details),
     });
   }
-  disposeRuntimeV2Ipc = registerRuntimeV2Ipc({ registry: runtimeV2Registry, settings: settingsService, models: modelStore, providerNetwork: providerNetworkService, quickOpen: quickOpenShortcutController, catalog: openRouterCatalogService, deepSeekCatalog: deepSeekCatalogService, kimiCatalog: kimiCatalogService, approvals: approvalRegistry, getMainWindow }).dispose;
   disposeRuntimeV2DesktopShell = registerRuntimeV2DesktopShell({
     roots,
     getMainWindow,
+    listSessions: async () => runtimeV2Registry?.listSessions() ?? [],
     terminal: terminalSessionService,
     terminalAvailable: terminalNativeAvailable,
-    terminalUnavailableReason: terminalNativeAvailable ? null : "node-pty is not installed in this build.",
   }).dispose;
   await runtimeV2Registry.boot();
   const syncBrowser = async () => {
@@ -343,11 +346,13 @@ app.on("before-quit", (event) => {
     } catch (error) {
       await logMain("v2 shutdown incomplete", { error: error instanceof Error ? error.message : String(error) });
     } finally {
+      // 两者都是同步、不抛错的清理；放在 finally 里，前面的异步清理失败时也照样执行。
+      browserBridgeService?.dispose();
+      localUpdateService?.dispose();
       disposePerformanceIpc?.();
       disposeEnglishLearningIpc?.();
       await speechPlayback?.dispose();
       clearTimeout(timeout);
-      disposeRuntimeV2Ipc?.();
       disposeRuntimeV2DesktopShell?.();
       fixedRendererIpc?.dispose();
       app.exit(0);

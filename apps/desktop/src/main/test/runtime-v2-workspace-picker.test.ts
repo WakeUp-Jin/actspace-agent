@@ -25,6 +25,9 @@ vi.mock("electron", () => ({
 }));
 
 import { registerFixedRendererIpc, type FixedRendererIpcOptions } from "../runtime-v2/fixed-renderer-ipc";
+import { trustedWindow } from "./ipc-sender-fixture";
+
+const trusted = trustedWindow();
 
 afterEach(() => { handlers.clear(); vi.clearAllMocks(); });
 
@@ -34,7 +37,7 @@ describe("workspace directory picker IPC contract", () => {
     [{ canceled: true, filePaths: [] }, { canceled: true }],
     [{ canceled: false, filePaths: [] }, { canceled: true }],
   ])("returns the renderer contract for %j", async (dialogResult, expected) => {
-    const mainWindow = { isDestroyed: () => false, webContents: { id: 7 } };
+    const mainWindow = trusted.window;
     const registration = registerFixedRendererIpc({
       roots: { dataRoot: "/tmp/picker-test", workspaceRoot: "/work", defaultWorkspaceRoot: "/work" },
       registry: { subscribe: () => () => undefined, subscribeRendererStream: () => () => undefined },
@@ -44,7 +47,7 @@ describe("workspace directory picker IPC contract", () => {
     try {
       showOpenDialog.mockResolvedValueOnce(dialogResult);
       const result = await handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory)!(
-        { sender: { id: 7 } },
+        trusted.event,
       ) as SelectWorkspaceDirectoryResult;
       expect(result).toEqual(expected);
       expect(showOpenDialog).toHaveBeenCalledWith(mainWindow, { properties: ["openDirectory"] });
@@ -66,7 +69,7 @@ describe("workspace admission from the native picker", () => {
     }
     const roots = { dataRoot, workspaceRoot: join(dataRoot, "default"), defaultWorkspaceRoot: join(dataRoot, "default") };
     const registryOptions = { ...roots, fallbackWorkspaceRoot: roots.workspaceRoot };
-    const mainWindow = { isDestroyed: () => false, webContents: { id: 7 } };
+    const mainWindow = trusted.window;
     const registration = registerFixedRendererIpc({
       roots,
       registry: { subscribe: () => () => undefined, subscribeRendererStream: () => () => undefined },
@@ -83,7 +86,7 @@ describe("workspace admission from the native picker", () => {
     try {
       showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [workspaceRoot] });
       await handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory)!(
-        { sender: { id: 7 } }, { registerWorkspace },
+        trusted.event, { registerWorkspace },
       );
       const registry = await readWorkspaceRegistry(registryOptions);
       expect(registry.items.some((item) => item.path === workspaceRoot)).toBe(registerWorkspace);
@@ -100,12 +103,118 @@ describe("workspace admission from the native picker", () => {
         .toEqual({ ok: false, error: "workspaceRoot is not registered" });
       showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [join(dataRoot, "canceled")] });
       await handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory)!(
-        { sender: { id: 7 } }, { registerWorkspace: true },
+        trusted.event, { registerWorkspace: true },
       );
       expect((await readWorkspaceRegistry(registryOptions)).items.map((item) => item.path))
         .toEqual(registry.items.map((item) => item.path));
     } finally {
       review.dispose();
+      registration.dispose();
+      await rm(dataRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("renderer-supplied workspace roots", () => {
+  async function setup() {
+    const dataRoot = await mkdtemp(join(tmpdir(), "workspace-access-ipc-"));
+    const defaultRoot = join(dataRoot, "default");
+    const outside = join(dataRoot, "outside");
+    await mkdir(defaultRoot);
+    await mkdir(outside);
+    const roots = { dataRoot, workspaceRoot: defaultRoot, defaultWorkspaceRoot: defaultRoot };
+    const createSession = vi.fn(async (_id: unknown, workspaceRoot: string) => ({ sessionId: "s1", workspaceRoot }));
+    const registration = registerFixedRendererIpc({
+      roots,
+      registry: {
+        subscribe: () => () => undefined,
+        subscribeRendererStream: () => () => undefined,
+        listSessions: async () => [],
+        createSession,
+        readSessionProjection: async () => ({ meta: { id: "s1" } }),
+      },
+      settings: { subscribeV4Changes: () => () => undefined },
+      getMainWindow: () => trusted.window,
+    } as unknown as FixedRendererIpcOptions);
+    const call = (channel: string, input: unknown) => handlers.get(channel)!(trusted.event, input);
+    return { dataRoot, defaultRoot, outside, createSession, registration, call };
+  }
+
+  it("createSession only accepts registered workspace roots", async () => {
+    const { dataRoot, defaultRoot, outside, createSession, registration, call } = await setup();
+    try {
+      await expect(call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, { workspaceRoot: outside })).rejects.toThrow("not registered");
+      expect(createSession).not.toHaveBeenCalled();
+      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, { workspaceRoot: defaultRoot });
+      expect(createSession).toHaveBeenCalledWith(undefined, defaultRoot, undefined);
+    } finally {
+      registration.dispose();
+      await rm(dataRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("createWorkspaceFolder needs a registered parent or one the user just picked", async () => {
+    const { dataRoot, outside, registration, call } = await setup();
+    try {
+      const rejected = await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "made" });
+      expect(rejected).toEqual({ ok: false, error: "workspace_not_registered" });
+      expect(await readdir(outside)).toEqual([]);
+
+      showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [outside] });
+      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
+      const created = await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "made" });
+      expect(created).toMatchObject({ ok: true, workspaceRoot: join(outside, "made") });
+
+      // 选过的目录建成功后作废。
+      const again = await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "second" });
+      expect(again).toEqual({ ok: false, error: "workspace_not_registered" });
+      expect(await readdir(outside)).toEqual(["made"]);
+    } finally {
+      registration.dispose();
+      await rm(dataRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the picked parent after a failed create and only honours the latest pick", async () => {
+    const { dataRoot, outside, registration, call } = await setup();
+    const other = join(dataRoot, "other");
+    await mkdir(other);
+    try {
+      showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [outside] });
+      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
+      const badName = await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "a/b" });
+      expect(badName).toMatchObject({ ok: false });
+      expect(badName).not.toEqual({ ok: false, error: "workspace_not_registered" });
+      // 名字不合法不会作废这次选择，换个名字可以重试。
+      expect(await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "made" }))
+        .toMatchObject({ ok: true, workspaceRoot: join(outside, "made") });
+
+      // 后一次选择覆盖前一次。
+      showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [outside] });
+      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
+      showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [other] });
+      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
+      expect(await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "second" }))
+        .toEqual({ ok: false, error: "workspace_not_registered" });
+      expect(await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: other, name: "made" }))
+        .toMatchObject({ ok: true, workspaceRoot: join(other, "made") });
+      expect(await readdir(outside)).toEqual(["made"]);
+    } finally {
+      registration.dispose();
+      await rm(dataRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects git context, skills and context menus for unregistered roots", async () => {
+    const { dataRoot, outside, registration, call } = await setup();
+    try {
+      await expect(call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getWorkspaceGitContext, { workspaceRoot: "/" })).rejects.toThrow("workspace_not_registered");
+      await expect(call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSkills, { workspaceRoot: outside })).rejects.toThrow("workspace_not_registered");
+      await writeFile(join(outside, "a.txt"), "a");
+      expect(await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.showArtifactContextMenu, {
+        kind: "workspace_file", workspaceRoot: outside, relativePath: "a.txt",
+      })).toEqual({ shown: false, error: "invalid_target" });
+    } finally {
       registration.dispose();
       await rm(dataRoot, { recursive: true, force: true });
     }

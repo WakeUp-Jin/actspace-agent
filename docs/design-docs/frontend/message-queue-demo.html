@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- 已废弃（2026-10-06）：这份 demo 把队列画在输入框内部，与现行设计相反。现行规范见 front-聊天输入框规范.md「发送队列」和 front-中间消息区规范.md「消息队列与运行中引导」；设计稿见 docs/desktop-frontend-refactor/demo/composer-run-target-demo.html。 -->
 <html lang="zh-CN">
 <meta charset="utf-8">
 <title>消息队列 Demo</title>
@@ -154,6 +155,7 @@ aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 </style>
 
 <div class="page">
+  <p style="margin:0 0 16px;padding:8px 12px;border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-size:13px">已废弃（2026-10-06）：队列已移到输入框上方，现行规范见 <code>front-聊天输入框规范.md</code>「发送队列」。本页仅作历史记录。</p>
   <header class="head">
     <div>
       <h1>消息队列与运行中插入</h1>

@@ -131,6 +131,8 @@ export function ResponseAnnotationPill({
                         tooltip="编辑"
                         size="xs"
                         onClick={() => {
+                          // 和 Escape 一样记为主动关闭：悬停留下的打开计时器晚到时不会把卡片重新打开。
+                          dismissedRef.current = true;
                           setOpen(false);
                           context?.editAnnotation(annotation.annotationId);
                         }}
@@ -164,6 +166,7 @@ export function ResponseAnnotationPill({
                       onPointerEnter={activate}
                       onFocus={activate}
                       onClick={() => {
+                        dismissedRef.current = true;
                         setOpen(false);
                         context?.locateAnnotation(annotation);
                       }}

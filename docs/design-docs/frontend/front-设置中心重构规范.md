@@ -751,6 +751,8 @@ Usage UI
 ### ActSpace 当前实现
 
 - [`SettingsPage.tsx`](../../../apps/desktop/src/renderer/components/settings/SettingsPage.tsx)
+- [`use-settings.ts`](../../../apps/desktop/src/renderer/components/settings/use-settings.ts)（设置的加载与保存）
+- [`sections/`](../../../apps/desktop/src/renderer/components/settings/sections/)（通用、外观、工具、子 Agent、归档会话、更新等各分区）
 - [`SettingsNav.tsx`](../../../apps/desktop/src/renderer/components/settings/SettingsNav.tsx)
 - [`SettingsPrimitives.tsx`](../../../apps/desktop/src/renderer/components/settings/SettingsPrimitives.tsx)
 - [`ProviderSettings.tsx`](../../../apps/desktop/src/renderer/components/settings/ProviderSettings.tsx)

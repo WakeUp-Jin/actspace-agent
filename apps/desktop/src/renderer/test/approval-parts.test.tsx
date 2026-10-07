@@ -1,12 +1,18 @@
-import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
 import {
   ApprovalReason,
   compactApprovalDir,
   getApprovalReasonChips,
   splitApprovalPath,
   submitApprovalDecision,
+  useApprovalDecision,
 } from "../components/messages/ApprovalParts";
+import { legacyRunTarget } from "./helpers/workbench";
+import { RunTargetContext } from "../target/run-target-context";
+import type { RunTarget } from "../target/run-target";
+import { setupBridge } from "./helpers/bridge";
 
 describe("approval path formatting", () => {
   it("splits the base name from its directory", () => {
@@ -40,17 +46,55 @@ describe("approval reason mapping", () => {
 });
 
 describe("submitApprovalDecision", () => {
-  afterEach(() => {
-    delete (window as unknown as { actspace?: unknown }).actspace;
-  });
-
   it("returns false when the bridge rejects or is missing", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     expect(await submitApprovalDecision({ requestId: "r1", decision: "once" })).toBe(false);
-    window.actspace = { submitApproval: vi.fn(async () => ({ ok: false, reason: "expired" })) } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": vi.fn(async () => ({ ok: false, reason: "expired" })) });
     expect(await submitApprovalDecision({ requestId: "r1", decision: "deny" })).toBe(false);
-    window.actspace = { submitApproval: vi.fn(async () => ({ ok: true })) } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": vi.fn(async () => ({ ok: true })) });
     expect(await submitApprovalDecision({ requestId: "r1", decision: "once" })).toBe(true);
     warn.mockRestore();
+  });
+});
+
+describe("useApprovalDecision on a remote Session", () => {
+  // 15 T11：远端审批的 Host 取自会话的运行目标，提交时带 hostId；不再从 requestId 里拆。
+  const remote: RunTarget = { kind: "remote", hostId: "h:with:colons", hostName: "Cloud" };
+  const wrapper = (target: RunTarget) => ({ children }: { children: ReactNode }) => (
+    <RunTargetContext.Provider value={legacyRunTarget({ runTarget: target })}>{children}</RunTargetContext.Provider>
+  );
+  function bridge(state: "connected" | "offline") {
+    const submit = vi.fn(async () => ({ ok: true }));
+    setupBridge({
+      "approvals.submit": submit,
+      "hosts.list": async () => [{ id: "h:with:colons", hostId: "h:with:colons", name: "Cloud", state, endpoint: { kind: "wss", url: "wss://cloud" } }],
+      "events.hostsChanged": () => () => {}, "events.hostEvent": () => () => {},
+    });
+    return submit;
+  }
+
+  it("submits with the Session's hostId whatever the requestId looks like", async () => {
+    const submit = bridge("connected");
+    const { result } = renderHook(() => useApprovalDecision("opaque-id"), { wrapper: wrapper(remote) });
+    await waitFor(() => expect(result.current.disabled).toBe(false));
+    await act(() => result.current.decide("once"));
+    expect(submit).toHaveBeenCalledWith({ requestId: "opaque-id", hostId: "h:with:colons", decision: "once" });
+  });
+
+  it("disables the decision while the Session's Host is offline", async () => {
+    const submit = bridge("offline");
+    const { result } = renderHook(() => useApprovalDecision("opaque-id"), { wrapper: wrapper(remote) });
+    await act(async () => {});
+    expect(result.current.disabled).toBe(true);
+    await act(() => result.current.decide("once"));
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("submits a local approval without a hostId", async () => {
+    const submit = bridge("offline");
+    const { result } = renderHook(() => useApprovalDecision("local-r1"), { wrapper: wrapper({ kind: "local" }) });
+    expect(result.current.disabled).toBe(false);
+    await act(() => result.current.decide("deny"));
+    expect(submit).toHaveBeenCalledWith({ requestId: "local-r1", decision: "deny" });
   });
 });

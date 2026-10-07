@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, vi } from "vitest";
+import { vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
-import { ConversationView } from "../components/ConversationView";
+import { TestConversationView } from "./helpers/workbench";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { setupBridge } from "./helpers/bridge";
 
 const messages: MessageBlock[] = [
   {
@@ -79,17 +80,37 @@ function renderConversation(inputMessages: MessageBlock[] = messages) {
   return render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider>
-        <ConversationView messages={inputMessages} contextSnapshot={null} sessionId="session-1" />
+        <TestConversationView messages={inputMessages} contextSnapshot={null} sessionId="session-1" />
       </RightPanelProvider>
     </TooltipProvider>,
   );
 }
 
-afterEach(() => {
-  delete (window as unknown as { actspace?: unknown }).actspace;
-});
-
 describe("ConversationView tooltips", () => {
+  it("opens the turn ⋯ menu from the keyboard, copies the request id and returns focus (16 T16b)", async () => {
+    renderConversation();
+    const user = userEvent.setup();
+    const trigger = screen.getByRole("button", { name: "更多消息操作" });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: "分叉会话" })).toHaveAttribute("aria-disabled", "true");
+    expect(within(menu).queryByRole("menuitem", { name: "重新生成可视化" })).toBeNull();
+    await waitFor(() => expect(within(menu).getByRole("menuitem", { name: "复制消息" })).toHaveFocus());
+    await user.keyboard("{ArrowDown}{Enter}");
+
+    expect(await navigator.clipboard.readText()).toBe("assistant-1");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(trigger).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
+
   it("keeps Thinking open until the final reply finishes, then collapses Work and Thinking", () => {
     const thinking: MessageBlock = {
       kind: "thinking", id: "thinking-1", title: "Thinking...", content: "Long reasoning content",
@@ -97,7 +118,7 @@ describe("ConversationView tooltips", () => {
     };
     const view = (active: boolean, blocks: MessageBlock[]) => (
       <TooltipProvider><RightPanelProvider>
-        <ConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
+        <TestConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
       </RightPanelProvider></TooltipProvider>
     );
     const { rerender } = render(view(true, [messages[0], thinking]));
@@ -274,10 +295,7 @@ describe("ConversationView tooltips", () => {
       sourceHash: "hash",
       cached: false,
     }));
-    Object.defineProperty(window, "actspace", {
-      configurable: true,
-      value: { visualizeReply },
-    });
+    setupBridge({ "visualize.convertReply": visualizeReply });
     renderConversation([
       {
         kind: "user",
@@ -332,7 +350,7 @@ describe("ConversationView tooltips", () => {
 it("hides the trajectory composer without losing the draft and keeps Stop available", async () => {
   const abort = vi.fn();
   const draft = { id: 1, sessionId: "draft-test", text: "initial draft", attachments: [{ id: "att", kind: "file" as const, name: "notes.txt", path: "/fixture/notes.txt" }] };
-  const view = (activeView: "chat" | "trajectory") => <TooltipProvider><RightPanelProvider><ConversationView messages={messages} contextSnapshot={null} activeView={activeView} draftKey="draft-test" draftRestore={draft} selectedModelId="deepseek-v4-flash" isStreaming onAbort={abort} /></RightPanelProvider></TooltipProvider>;
+  const view = (activeView: "chat" | "trajectory") => <TooltipProvider><RightPanelProvider><TestConversationView messages={messages} contextSnapshot={null} activeView={activeView} draftKey="draft-test" draftRestore={draft} selectedModelId="deepseek-v4-flash" isStreaming onAbort={abort} /></RightPanelProvider></TooltipProvider>;
   const rendered = render(view("chat"));
   const input = rendered.container.querySelector("textarea")!;
   const model = screen.getByRole("button", { name: "deepseek-flash" });
@@ -351,7 +369,7 @@ it("hides the trajectory composer without losing the draft and keeps Stop availa
 
 it("shows and resumes accepted tasks even before the first conversation turn exists", async () => {
   const resume = vi.fn();
-  render(<TooltipProvider><RightPanelProvider><ConversationView messages={[]} contextSnapshot={null} sessionId="recovered" isSessionReady
+  render(<TooltipProvider><RightPanelProvider><TestConversationView messages={[]} contextSnapshot={null} sessionId="recovered" isSessionReady
     messageQueue={{ queue: { paused: true, steering: [], items: [{ id: "pending", kind: "message", text: "Accepted before startup failure", options: {} }] }, running: false, steerBlockedReason: null,
       onSteer: vi.fn(), onUnsteer: vi.fn(), onRemove: vi.fn(), onMoveUp: vi.fn(), onEdit: vi.fn(), onResume: resume }}
   /></RightPanelProvider></TooltipProvider>);

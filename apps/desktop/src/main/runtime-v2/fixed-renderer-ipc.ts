@@ -1,12 +1,13 @@
 import { validateRunReferences as validateSharedRunReferences } from "@actspace/shared/composer-reference-validation";
-import { parseRemoteSessionKey } from "../remote-hosts/session-router";
 import type { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
+import { createSessionGateway } from "../session-gateway";
 import { paginateSessionSummaries } from "./session-list-page";
 import { UsageSourceCache } from "./usage-source-cache";
 import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
-import { dialog, ipcMain, nativeImage, nativeTheme, shell, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
+import { resolve as resolvePath } from "node:path";
+import { dialog, nativeImage, nativeTheme, shell, type BrowserWindow } from "electron";
 import { spawn } from "node:child_process";
 import {
   PROVIDER_IDS,
@@ -22,6 +23,9 @@ import {
   type BootstrapState,
   type ComposerAttachment,
   type PendingApprovalInfo,
+  type ModelMutationResult,
+  type ProviderBalanceSnapshot,
+  type ProviderCredentialOperationResult,
   type ProviderOperationResult,
   type ProviderTestResult,
   type SessionListItem,
@@ -44,9 +48,12 @@ import {
   type RuntimeV2SessionListItem,
   type RuntimeV2SessionSnapshot,
   type RuntimeV2DesktopSessionProjection,
+  type TaskSubmissionResult,
 } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2UpdateCustomConnectionInput } from "@actspace/shared/runtime-v2";
 import type { AppDataRoots } from "../app-paths";
+import { createIpcRegistrar, type IpcRegistrar } from "../ipc/registry";
+import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
 import type { PendingApprovalRegistry } from "../approval-registry";
 import { showArtifactContextMenu, showResolvedArtifactContextMenu } from "../artifact-context-menu-service";
 import { importComposerImage } from "../composer-attachment-service";
@@ -57,7 +64,8 @@ import type { ModelStoreService, ModelStoreResult } from "../model-store-service
 import type { BrowserBridgeService } from "../browser-bridge-service";
 import type { QuickOpenShortcutController } from "../quick-open-shortcut-controller";
 import type { SettingsService } from "../settings-service";
-import { createWorkspaceFolder, resolveWorkspaceSelection, resolveRegisteredWorkspaceSelection, setWorkspaceHidden, type WorkspaceRegistryOptions } from "../workspace-registry-service";
+import { createWorkspaceFolder, resolveWorkspaceSelection, setWorkspaceHidden } from "../workspace-registry-service";
+import { createWorkspaceAccessDeps, registeredWorkspaceRoot, resolveWorkspaceAccess, workspaceRegistryOptions, WORKSPACE_NOT_REGISTERED } from "../workspace-access";
 import { getWorkspaceGitContext } from "../workspace-git-context-service";
 import { openWorkspaceInIde } from "../workspace-ide-service";
 import { initializeGitRepository } from "../review-git-service";
@@ -106,29 +114,16 @@ export type FixedRendererIpcRegistration = {
 };
 
 export function registerFixedRendererIpc(options: FixedRendererIpcOptions): FixedRendererIpcRegistration {
-  const channels: string[] = [];
   let pendingQuickOpen = false;
   let unsubscribeSettingsV4 = () => undefined;
-  const handle = <T extends unknown[], R>(
-    channel: string,
-    listener: (event: IpcMainInvokeEvent, ...args: T) => R | Promise<R>,
-  ): void => {
-    ipcMain.handle(channel, async (event, ...args) => {
-      assertTrustedSender(event, options.getMainWindow());
-      const input = args[0] && typeof args[0] === "object" ? args[0] as Record<string, unknown> : {};
-      if (options.remote) {
-        if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession && input.hostId) return options.remote.create(input);
-        if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval && typeof input.requestId === "string" && input.requestId.startsWith("remote-approval:")) return options.remote.decide(input);
-        const ref = typeof input.sessionId === "string" ? parseRemoteSessionKey(input.sessionId) : null;
-        if (ref) return options.remote.handle(channel, input, ref);
-      }
-      const result = await listener(event, ...(args as T));
-      return options.remote ? options.remote.mergeList(channel, input, result) : result;
-    });
-    channels.push(channel);
-  };
+  const ipc = createIpcRegistrar({
+    getWindow: options.getMainWindow,
+    untrustedMessage: "Runtime v2 fixed renderer IPC rejected an untrusted sender.",
+    // 本机 / 远端分流见 session-gateway（15 T9）。
+    middleware: createSessionGateway(options.remote),
+  });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.bootstrapState, (): BootstrapState => ({
+  ipc.handle(contract.app.getBootstrapState, (): BootstrapState => ({
     appVersion: process.env.npm_package_version ?? "0.1.0",
     dataRoot: options.roots.dataRoot,
     sessionRoot: options.roots.sessionRoot,
@@ -137,28 +132,28 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     workspaceRoot: options.roots.workspaceRoot,
   }));
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessionPage, async (_event, input: import("@actspace/shared").SessionListPageInput = {}) => {
+  ipc.handle(contract.sessions.listPage, async (input = {}) => {
     if (input.hostId) return { items: [], groups: [], indexing: false, failed: 0 };
     const result = await options.registry.browseSessions();
     return paginateSessionSummaries(result, input);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionToolDetail, (_event, input: { sessionId: string; callId: string }) => options.registry.browseToolDetail(input.sessionId, input.callId));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPage, (_event, input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) => options.registry.readSessionProjection(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessions, async (_event, input: { archived?: boolean } = {}) => {
+  ipc.handle(contract.sessions.getToolDetail, (input) => options.registry.browseToolDetail(input.sessionId, input.callId));
+  ipc.handle(contract.sessions.getPage, (input) => options.registry.readSessionProjection(input));
+  ipc.handle(contract.sessions.list, async (input = {}) => {
     const items = await options.registry.listSessions();
     const selected = items.filter((item) => item.metadata.archived === (input.archived === true));
     return Promise.all(selected.map((item) => toSessionListItem(item, options.registry)));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSession, async (_event, input: { sessionId: string }) => {
+  ipc.handle(contract.sessions.get, async (input) => {
     try {
       return await options.registry.readSessionProjection({ sessionId: input.sessionId, afterSeq: -1, includeToolDetails: true });
     } catch {
       return null;
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionProjectionSnapshot, (_event, input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) => options.registry.readSessionProjection(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionObservation, (_event, input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) => options.registry.readSessionObservation(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPreview, async (_event, input: { sessionId: string }) => {
+  ipc.handle(contract.sessions.getProjectionSnapshot, (input) => options.registry.readSessionProjection(input));
+  ipc.handle(contract.sessions.getObservation, (input) => options.registry.readSessionObservation(input));
+  ipc.handle(contract.sessions.getPreview, async (input) => {
     try {
       const snapshot = await options.registry.inspectSession(input.sessionId);
       const journal = await options.registry.inspectSessionEvents(input.sessionId);
@@ -171,14 +166,15 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       return null;
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, async (_event, input: { title?: string; workspaceRoot?: string; agentForm?: import("@actspace/shared/runtime-v2").MainAgentForm } = {}) => {
-    let snapshot = await options.registry.createSession(undefined, input.workspaceRoot ?? options.roots.workspaceRoot, input.agentForm);
+  ipc.handle(contract.sessions.create, async (input = {}) => {
+    const workspaceRoot = await registeredWorkspaceRoot(workspaceRegistryOptions(options.roots), input.workspaceRoot ?? options.roots.workspaceRoot);
+    let snapshot = await options.registry.createSession(undefined, workspaceRoot, input.agentForm);
     if (input.title?.trim()) {
       snapshot = await options.registry.updateSessionMetadata({ sessionId: snapshot.sessionId, title: input.title.trim() });
     }
     return options.registry.readSessionProjection({ sessionId: snapshot.sessionId });
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.forkSession, async (_event, input: { sessionId: string }) => {
+  ipc.handle(contract.sessions.fork, async (input) => {
     const parent = await options.registry.inspectSession(input.sessionId);
     const forked = await options.registry.forkSession({
       parentSessionId: input.sessionId,
@@ -187,22 +183,22 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     });
     return options.registry.readSessionProjection({ sessionId: forked.sessionId });
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.pinSession, async (_event, input: { sessionId: string; pinned: boolean }) => {
+  ipc.handle(contract.sessions.pin, async (input) => {
     await options.registry.updateSessionMetadata(input);
     return { ok: true };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.renameSession, async (_event, input: { sessionId: string; title: string }) => {
+  ipc.handle(contract.sessions.rename, async (input) => {
     await options.registry.updateSessionMetadata({ sessionId: input.sessionId, title: input.title.trim() || "New chat" });
     return { ok: true };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionWorkspace, async (_event, input: { sessionId: string; workspaceRoot?: string }) => {
+  ipc.handle(contract.sessions.setWorkspace, async (input) => {
     const snapshot = await options.registry.inspectSession(input.sessionId);
     const next = await registeredWorkspaceRoot(workspaceRegistryOptions(options.roots), input.workspaceRoot);
     if (snapshot.workspaceRoot === next) return { ok: true };
     await options.registry.updateSessionWorkspace(input.sessionId, next);
     return { ok: true };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionPermissionMode, async (_event, input: { sessionId: string; mode: "default" | "full-access" }) => {
+  ipc.handle(contract.sessions.setPermissionMode, async (input) => {
     if (input.mode !== "default" && input.mode !== "full-access") return { ok: false, error: "invalid_permission_mode" };
     try {
       const snapshot = await options.registry.updateSessionPermissionMode(input.sessionId, input.mode);
@@ -211,7 +207,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionAgentMode, async (_event, input: import("@actspace/shared").SessionAgentModeInput) => {
+  ipc.handle(contract.sessions.setAgentMode, async (input) => {
     try {
       const snapshot = await options.registry.updateSessionAgentMode(input.sessionId, input.mode, input.expectedRevision);
       return { ok: true, mode: snapshot.agentMode, revision: snapshot.agentModeRevision };
@@ -219,7 +215,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.revokeSessionGrant, async (_event, input: { sessionId: string; grantId: string }) => {
+  ipc.handle(contract.sessions.revokeGrant, async (input) => {
     if (!input.sessionId || !input.grantId) return { ok: false, error: "invalid_grant_revoke" };
     try {
       await options.registry.revokeSessionGrant(input.sessionId, input.grantId);
@@ -228,11 +224,11 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.archiveSession, async (_event, input: { sessionId: string; archived: boolean }) => {
+  ipc.handle(contract.sessions.archive, async (input) => {
     await options.registry.updateSessionMetadata(input);
     return { ok: true };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.archiveSessions, async (_event, input: { sessionIds: string[] }) => {
+  ipc.handle(contract.sessions.archiveMany, async (input) => {
     const archivedSessionIds: string[] = [];
     const failedSessionIds: string[] = [];
     for (const sessionId of new Set(input.sessionIds)) {
@@ -246,13 +242,13 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return { ok: failedSessionIds.length === 0, archivedSessionIds, failedSessionIds };
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.taskCommand, async (_event, input: import("@actspace/shared/runtime-v2").TaskCommand) => options.registry.taskCommand(input));
+  ipc.handle(contract.tasks.command, async (input) => options.registry.taskCommand(input));
   // Serialize duplicate preparation too: importing the same attachment twice must not change content identity.
   const submissions = new Map<string, Promise<unknown>>();
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask, async (_event, input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => {
+  ipc.handle(contract.tasks.submit, async (input) => {
     const key = `${input.sessionId}/${input.submissionId}`;
     const previous = submissions.get(key) ?? Promise.resolve();
-    const attempt = previous.catch(() => undefined).then(async () => {
+    const attempt = previous.catch(() => undefined).then(async (): Promise<TaskSubmissionResult> => {
       const original = { userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [] };
       const { snapshot } = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
       const existing = snapshot.tasks.find(task => task.submissionId === input.submissionId);
@@ -287,7 +283,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     try { return await attempt; } finally { if (submissions.get(key) === attempt) submissions.delete(key); }
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.abortAgentRun, async (_event, input: { sessionId: string; agentRunId: string }) => {
+  ipc.handle(contract.tasks.abort, async (input) => {
     options.approvals.abortAgentRun(input.sessionId, input.agentRunId);
     const state = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
     if (!state.snapshot.runs.some(run => run.runId === input.agentRunId && run.state === "running")) return false;
@@ -308,33 +304,31 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     if (target !== undefined && !target.isDestroyed()) target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
   });
 
-  registerFixedRendererSettings(options, handle);
+  registerFixedRendererSettings(options, ipc);
   unsubscribeSettingsV4 = options.settings.subscribeV4Changes((notification: SettingsV4ChangedNotification) => {
     const target = options.getMainWindow();
     if (target !== undefined && !target.isDestroyed()) {
       target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.settingsChangedV4, notification);
     }
   });
-  registerFixedRendererHostCapabilities(options, handle);
+  registerFixedRendererHostCapabilities(options, ipc);
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.quickOpenConsume, () => {
+  ipc.handle(contract.quickOpen.consume, () => {
     if (!pendingQuickOpen) return null;
     pendingQuickOpen = false;
     return { requestedAt: new Date().toISOString() };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.quickOpenStatus, () => options.quickOpen.getStatus());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.quickOpenUpdate, async (_event, input: { enabled?: boolean; accelerator?: string }) => {
+  ipc.handle(contract.quickOpen.getShortcutStatus, () => options.quickOpen.getStatus());
+  ipc.handle(contract.quickOpen.updateShortcut, async (input) => {
     const current = options.settings.get().shortcuts!.quickOpen;
     const next = { ...current, ...input, accelerator: input.accelerator?.trim() || current.accelerator };
     const result = await options.quickOpen.update(current, next, () => options.settings.updateQuickOpenShortcut(next));
     return result.ok ? result : { ...result, settings: options.settings.get() };
   });
 
-  const themeListener = (event: Electron.IpcMainEvent, mode: unknown) => {
-    if (!isTrustedSender(event.sender.id, options.getMainWindow())) return;
+  ipc.on(contract.appearance.setNativeTheme, (mode) => {
     if (mode === "light" || mode === "dark" || mode === "system") nativeTheme.themeSource = mode;
-  };
-  ipcMain.on(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setNativeTheme, themeListener);
+  });
 
   return {
     dispose: () => {
@@ -342,8 +336,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       usageSourceCaches.delete(options.registry);
       unsubscribeRendererStream();
       unsubscribeSettingsV4();
-      ipcMain.removeListener(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setNativeTheme, themeListener);
-      for (const channel of channels) ipcMain.removeHandler(channel);
+      ipc.dispose();
     },
     requestQuickOpen: () => {
       pendingQuickOpen = true;
@@ -355,15 +348,10 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   };
 }
 
-type Handle = <T extends unknown[], R>(
-  channel: string,
-  listener: (event: IpcMainInvokeEvent, ...args: T) => R | Promise<R>,
-) => void;
-
-function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle: Handle): void {
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSettings, (): AppSettings => options.settings.get());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSettingsV4, (): SettingsV4Snapshot => options.settings.getV4());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateSettingsV4, async (_event, input: SettingsV4UpdateInput): Promise<SettingsV4UpdateResult> => {
+function registerFixedRendererSettings(options: FixedRendererIpcOptions, ipc: IpcRegistrar): void {
+  ipc.handle(contract.settings.get, (): AppSettings => options.settings.get());
+  ipc.handle(contract.settings.getV4, (): SettingsV4Snapshot => options.settings.getV4());
+  ipc.handle(contract.settings.updateV4, async (input): Promise<SettingsV4UpdateResult> => {
     try {
       return { ok: true, snapshot: await options.settings.updateNamespaceV4(input) };
     } catch (error) {
@@ -374,28 +362,28 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
       throw error;
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createCustomConnection, (_event, input: CustomConnectionInput) => options.settings.createCustomConnection(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeCustomConnection, (_event, input: { connectionId: string }) => options.settings.removeCustomConnection(input.connectionId));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateCustomConnection, (_event, input: RuntimeV2UpdateCustomConnectionInput) => options.settings.updateCustomConnection(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.testCustomConnection, async (_event, input: CustomConnectionTestInput) => {
+  ipc.handle(contract.settings.createCustomConnection, (input) => options.settings.createCustomConnection(input));
+  ipc.handle(contract.settings.removeCustomConnection, (input) => options.settings.removeCustomConnection(input.connectionId));
+  ipc.handle(contract.settings.updateCustomConnection, (input) => options.settings.updateCustomConnection(input));
+  ipc.handle(contract.settings.testCustomConnection, async (input) => {
     const runtime = options.settings.getCustomConnectionRuntimeConfig(input.connectionId);
     if ("code" in runtime) return { ok: false, message: runtime.message, checkedAt: new Date().toISOString(), errorKind: "invalid_request" as const };
     const result = await options.providerNetwork.testCustomConnection(runtime);
     await options.settings.markCustomConnectionResult(input.connectionId, result);
     return result;
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.probeCustomConnection, (_event, input: CustomConnectionProbeInput) => probeCustomConnection(options.settings, options.providerNetwork, input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateSettings, (_event, input: Parameters<SettingsService["update"]>[0]) => options.settings.update(input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setProviderKey, (_event, input: Parameters<SettingsService["setProviderKey"]>[0] extends never ? never : { provider: Parameters<SettingsService["setProviderKey"]>[0]; apiKey: string }) => options.settings.setProviderKey(input.provider, input.apiKey));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.clearProviderKey, (_event, input: { provider: Parameters<SettingsService["clearProviderKey"]>[0] }) => options.settings.clearProviderKey(input.provider));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateImageGeneration, async (_event, input: Parameters<SettingsService["updateImageGeneration"]>[0]) => {
+  ipc.handle(contract.settings.probeCustomConnection, (input) => probeCustomConnection(options.settings, options.providerNetwork, input));
+  ipc.handle(contract.settings.update, (input) => options.settings.update(input));
+  ipc.handle(contract.providers.setKey, (input) => options.settings.setProviderKey(input.provider, input.apiKey));
+  ipc.handle(contract.providers.clearKey, (input) => options.settings.clearProviderKey(input.provider));
+  ipc.handle(contract.settings.updateImageGeneration, async (input) => {
     try {
       return { ok: true, settings: await options.settings.updateImageGeneration(input) };
     } catch (error) {
       return { ok: false, error: safeErrorMessage(error) };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.testProviderConnection, async (_event, input: { provider: (typeof PROVIDER_IDS)[number] }) => {
+  ipc.handle(contract.providers.testConnection, async (input) => {
     if (!isProviderId(input?.provider)) return { ok: false, message: "未知服务商。" };
     const runtime = options.settings.getProviderRuntimeConfig(input.provider);
     if ("code" in runtime) return { ok: false, message: runtime.message };
@@ -403,15 +391,15 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
     await options.settings.markProviderConnectionResult(input.provider, result);
     return { ok: result.ok, message: result.message };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSearchUsage, () => options.settings.getSearchUsage());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readAgentSystemPrompt, () => options.settings.readAgentSystemPrompt());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.writeAgentSystemPrompt, (_event, input: { content?: unknown }) => options.settings.writeAgentSystemPrompt(typeof input?.content === "string" ? input.content : ""));
+  ipc.handle(contract.settings.getSearchUsage, () => options.settings.getSearchUsage());
+  ipc.handle(contract.settings.readSystemPrompt, () => options.settings.readAgentSystemPrompt());
+  ipc.handle(contract.settings.writeSystemPrompt, (input) => options.settings.writeAgentSystemPrompt(typeof input?.content === "string" ? input.content : ""));
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listProviders, () => ({
+  ipc.handle(contract.providers.list, () => ({
     providers: options.settings.getV2().providers,
     credentialStorage: options.settings.getCredentialStorageView(),
   }));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.connectProvider, async (_event, input: Parameters<SettingsService["updateProviderConnection"]>[0] & { apiKey?: string; managementKey?: string }): Promise<ProviderOperationResult> => {
+  ipc.handle(contract.providers.connect, async (input): Promise<ProviderOperationResult> => {
     if (!isProviderId(input?.provider)) return providerFailure("invalid_provider", "未知服务商。");
     try {
       await options.settings.updateProviderConnection({ ...input, enabled: true });
@@ -420,7 +408,7 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
       return providerFailure("write_failed", safeErrorMessage(error));
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateProvider, async (_event, input: Parameters<SettingsService["updateProviderConnection"]>[0]): Promise<ProviderOperationResult> => {
+  ipc.handle(contract.providers.update, async (input): Promise<ProviderOperationResult> => {
     if (!isProviderId(input?.provider)) return providerFailure("invalid_provider", "未知服务商。");
     try {
       await options.settings.updateProviderConnection(input);
@@ -429,7 +417,7 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
       return providerFailure("write_failed", safeErrorMessage(error));
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.testProvider, async (_event, input: { provider: (typeof PROVIDER_IDS)[number] }): Promise<ProviderTestResult> => {
+  ipc.handle(contract.providers.test, async (input): Promise<ProviderTestResult> => {
     if (!isProviderId(input?.provider)) return {
       ok: false,
       provider: emptyProviderView(),
@@ -451,7 +439,7 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
       ? { ok: true, provider: options.settings.getV2().providers[input.provider], message: result.message, checkedAt: result.checkedAt }
       : { ok: false, provider: options.settings.getV2().providers[input.provider], message: result.message, checkedAt: result.checkedAt, errorKind: result.errorKind ?? "network", ...(result.statusCode ? { statusCode: result.statusCode } : {}) };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.disconnectProvider, async (_event, input: { provider: (typeof PROVIDER_IDS)[number] }): Promise<ProviderOperationResult> => {
+  ipc.handle(contract.providers.disconnect, async (input): Promise<ProviderOperationResult> => {
     if (!isProviderId(input?.provider)) return providerFailure("invalid_provider", "未知服务商。");
     try {
       await options.settings.updateProviderConnection({ provider: input.provider, apiKey: null, ...(input.provider === "openrouter" ? { managementKey: null } : {}) });
@@ -460,7 +448,7 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
       return providerFailure("write_failed", safeErrorMessage(error));
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeProvider, async (_event, input: { provider: (typeof PROVIDER_IDS)[number] }): Promise<ProviderOperationResult> => {
+  ipc.handle(contract.providers.remove, async (input): Promise<ProviderOperationResult> => {
     if (!isProviderId(input?.provider)) return providerFailure("invalid_provider", "未知服务商。");
     try {
       await options.settings.removeProvider(input.provider);
@@ -470,7 +458,7 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
     }
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.addProviderCredential, async (_event, input: Parameters<SettingsService["addProviderCredential"]>[0]) => {
+  ipc.handle(contract.providers.addCredential, async (input): Promise<ProviderCredentialOperationResult> => {
     try {
       await options.settings.addProviderCredential(input);
       return { ok: true, provider: options.settings.getV2().providers[input.provider] };
@@ -478,13 +466,13 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
       return { ok: false, error: { code: "write_failed", message: safeErrorMessage(error) } };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateProviderCredential, async (_event, input: { provider: (typeof PROVIDER_IDS)[number]; credentialId: string; label: string; pricingMultiplier?: number }) => {
+  ipc.handle(contract.providers.updateCredential, async (input): Promise<ProviderCredentialOperationResult> => {
     const result = await options.settings.updateProviderCredential(input.provider, input.credentialId, input.label, input.pricingMultiplier);
     return "code" in result
       ? { ok: false, error: { code: result.code, message: result.message, references: result.references } }
       : { ok: true, provider: options.settings.getV2().providers[input.provider] };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.testProviderCredential, async (_event, input: { provider: (typeof PROVIDER_IDS)[number]; credentialId: string }) => {
+  ipc.handle(contract.providers.testCredential, async (input): Promise<ProviderCredentialOperationResult> => {
     const runtime = options.settings.getProviderRuntimeConfigForCredential(input.provider, input.credentialId);
     if ("code" in runtime) return { ok: false, error: { code: "credential_not_found", message: runtime.message } };
     const probe = await options.providerNetwork.testConnection(runtime);
@@ -494,65 +482,69 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
       ? { ok: true, provider: options.settings.getV2().providers[input.provider] }
       : { ok: false, error: { code: "connection_failed", message: probe.message, errorKind: probe.errorKind } };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeProviderCredential, async (_event, input: { provider: (typeof PROVIDER_IDS)[number]; credentialId: string }) => {
+  ipc.handle(contract.providers.removeCredential, async (input): Promise<ProviderCredentialOperationResult> => {
     const result = await options.settings.removeProviderCredential(input.provider, input.credentialId);
     return "code" in result
       ? { ok: false, error: { code: result.code, message: result.message, references: result.references } }
       : { ok: true, provider: options.settings.getV2().providers[input.provider] };
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getProviderBalance, (_event, input: { provider: "deepseek" | "kimi" | "openrouter" }) => providerBalance(options, input.provider));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getDeepSeekBalance, () => providerBalance(options, "deepseek"));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getKimiBalance, () => providerBalance(options, "kimi"));
+  ipc.handle(contract.providers.getBalance, (input) => providerBalance(options, input.provider));
+  ipc.handle(contract.providers.getDeepSeekBalance, () => providerBalance(options, "deepseek"));
+  ipc.handle(contract.providers.getKimiBalance, () => providerBalance(options, "kimi"));
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listInstalledModels, () => ({ models: options.models.listInstalledModels() }));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listUsableModels, (_event, input: { purpose?: "chat" | "utility" | "explore" | "vision" }) => ({ models: options.modelRuntime.listUsableModels(input?.purpose ?? "chat") }));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getPricingCatalog, () => options.pricingCatalog?.status() ?? null);
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshPricingCatalog, (_event, input: { force?: boolean } = {}) => options.pricingCatalog?.refresh(input.force === true) ?? null);
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listModelCatalog, (_event, input: { provider?: string; query?: string } = {}) => {
-    const { provider, catalog } = selectModelCatalog(input.provider, options.catalog, options.deepSeekCatalog, options.kimiCatalog);
-    return { provider, ...catalog.list(input.query) };
+  ipc.handle(contract.models.listInstalled, () => ({ models: options.models.listInstalledModels() }));
+  ipc.handle(contract.models.listUsable, (input) => ({ models: options.modelRuntime.listUsableModels(input?.purpose ?? "chat") }));
+  ipc.handle(contract.models.getPricingCatalog, () => options.pricingCatalog?.status() ?? null);
+  ipc.handle(contract.models.refreshPricingCatalog, (input = {}) => options.pricingCatalog?.refresh(input.force === true) ?? null);
+  ipc.handle(contract.models.listCatalog, (input) => {
+    const { provider, catalog } = selectModelCatalog(input?.provider, options.catalog, options.deepSeekCatalog, options.kimiCatalog);
+    return { provider, ...catalog.list(input?.query) };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reloadModelCatalog, async (_event, input: { provider?: string; query?: string } = {}) => {
-    const { provider, catalog } = selectModelCatalog(input.provider, options.catalog, options.deepSeekCatalog, options.kimiCatalog);
+  ipc.handle(contract.models.reloadCatalog, async (input) => {
+    const { provider, catalog } = selectModelCatalog(input?.provider, options.catalog, options.deepSeekCatalog, options.kimiCatalog);
     const runtime = options.settings.getProviderRuntimeConfig(provider);
     if ("code" in runtime) return { provider, ...catalog.list(), error: { code: runtime.code, message: runtime.message } };
     const result = await catalog.reload(runtime);
     if (!result.error && result.state === "fresh") await options.models.refreshInstalledCatalogModels(provider);
     return { provider, ...result };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.addModel, async (_event, input: { provider: string; apiModel: string }) => {
+  ipc.handle(contract.models.add, async (input): Promise<ModelMutationResult> => {
     if ((input?.provider !== "openrouter" && input?.provider !== "deepseek" && input?.provider !== "kimi") || typeof input.apiModel !== "string") return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
     return toModelMutationResult(await options.models.addCatalogModel(input.provider, input.apiModel));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.addCustomModel, async (_event, input: import("@actspace/shared").ModelsAddCustomInput) => {
+  ipc.handle(contract.models.addCustom, async (input) => {
     return toModelMutationResult(await options.models.addCustomModel(input));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.editCustomModel, async (_event, input: import("@actspace/shared").ModelsEditCustomInput) => {
+  ipc.handle(contract.models.editCustom, async (input) => {
     return toModelMutationResult(await options.models.editCustomModel(input));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setCustomConnectionDefaultModel, async (_event, input: import("@actspace/shared").ModelsSetCustomDefaultInput) => {
+  ipc.handle(contract.models.setCustomConnectionDefault, async (input) => {
     return toModelMutationResult(await options.models.setCustomConnectionDefaultModel(input));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateModel, async (_event, input: import("@actspace/shared").ModelsUpdateInput) => {
+  ipc.handle(contract.models.update, async (input): Promise<ModelMutationResult> => {
     const key = normalizeModelKey(input?.modelKey);
     if (!key) return { ok: false, error: { code: "invalid_model", message: "模型标识无效。" } };
     return toModelMutationResult(await options.models.updateModelSettings(key, input));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeModel, async (_event, input: { modelKey: string }) => {
+  ipc.handle(contract.models.remove, async (input): Promise<ModelMutationResult> => {
     const key = normalizeModelKey(input?.modelKey);
     if (!key) return { ok: false, error: { code: "invalid_model", message: "模型标识无效。" } };
     return toModelMutationResult(await options.models.removeModel(key));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateTaskModels, async (_event, input: Parameters<SettingsService["updateV2"]>[0]["taskModels"]) => {
+  ipc.handle(contract.models.updateTaskModels, async (input) => {
     const next = await options.settings.updateV2({ taskModels: input });
     return { taskModels: next.taskModels };
   });
 }
 
-function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, handle: Handle): void {
+function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, ipc: IpcRegistrar): void {
   const registryOptions = workspaceRegistryOptions(options.roots);
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectFiles, async (_event, input: { remote?: boolean } = {}) => {
+  const workspaceAccess = createWorkspaceAccessDeps(registryOptions, () => options.registry.listSessions());
+  // 「新建文件夹工作区」的父目录来自系统对话框，不在 registry 里。只认用户最近一次在对话框里选的目录，
+  // 不接受 renderer 自己拼的路径；建成功后作废，名字不合法或目录已存在时可以换个名字重试。
+  let pickedParentDirectory: string | null = null;
+  ipc.handle(contract.dialogs.selectFiles, async (input = {}) => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), {
       properties: ["openFile", "multiSelections"],
       filters: input.remote === true ? [{ name: "Files", extensions: ["*"] }] : [{ name: "Chat attachments", extensions: ["png", "jpg", "jpeg", "webp", "gif", "txt", "md", "markdown", "json", "csv"] }],
@@ -569,7 +561,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     }));
     return { canceled: result.canceled, attachments };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectImages, async () => {
+  ipc.handle(contract.dialogs.selectImages, async () => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), {
       properties: ["openFile", "multiSelections"],
       filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
@@ -583,20 +575,36 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     })));
     return { canceled: result.canceled, attachments: images };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.importComposerImage, (_event, input: Parameters<typeof importComposerImage>[0]) => importComposerImage(input, options.roots.tmpRoot, imagePreviewDataUrl));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, async (_event, input: import("@actspace/shared").SelectWorkspaceDirectoryInput = {}): Promise<SelectWorkspaceDirectoryResult> => {
+  ipc.handle(contract.dialogs.importComposerImage, (input) => importComposerImage(input, options.roots.tmpRoot, imagePreviewDataUrl));
+  ipc.handle(contract.dialogs.selectWorkspaceDirectory, async (input = {}): Promise<SelectWorkspaceDirectoryResult> => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), { properties: ["openDirectory"] });
     if (result.canceled || !result.filePaths[0]) return { canceled: true };
-    if (!input.registerWorkspace) return { canceled: false, workspaceRoot: result.filePaths[0] };
+    if (!input.registerWorkspace) {
+      pickedParentDirectory = resolvePath(result.filePaths[0]);
+      return { canceled: false, workspaceRoot: result.filePaths[0] };
+    }
     const resolved = await resolveWorkspaceSelection(registryOptions, { workspaceRoot: result.filePaths[0] });
     if (resolved.ok === false) throw new Error(resolved.error);
     return { canceled: false, workspaceRoot: resolved.workspaceRoot };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.openWorkspaceInIde, (_event, input: { workspaceId: string }) => openWorkspaceInIde(registryOptions, input.workspaceId));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setWorkspaceVisibility, (_event, input: { workspaceId: string; hidden: boolean }) => setWorkspaceHidden(registryOptions, input.workspaceId, input.hidden));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getWorkspaceGitContext, async (_event, input: { workspaceRoot?: string }) => getWorkspaceGitContext(input?.workspaceRoot ?? options.roots.workspaceRoot));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, (_event, input: { parentRoot: string; name: string }) => createWorkspaceFolder(registryOptions, input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readSessionArtifact, async (_event, input: { sessionId: string; artifactPath: string }) => {
+  ipc.handle(contract.workspaces.openInIde, (input) => openWorkspaceInIde(registryOptions, input.workspaceId));
+  ipc.handle(contract.workspaces.setVisibility, (input) => setWorkspaceHidden(registryOptions, input.workspaceId, input.hidden));
+  ipc.handle(contract.workspaces.getGitContext, async (input) => getWorkspaceGitContext(
+    await resolveWorkspaceAccess({ workspaceRoot: input?.workspaceRoot ?? options.roots.workspaceRoot }, workspaceAccess),
+  ));
+  ipc.handle(contract.workspaces.createFolder, async (input) => {
+    const parent = typeof input?.parentRoot === "string" && input.parentRoot.trim() ? resolvePath(input.parentRoot.trim()) : "";
+    if (!parent) return { ok: false as const, error: WORKSPACE_NOT_REGISTERED };
+    const picked = parent === pickedParentDirectory;
+    if (!picked) {
+      const registered = await resolveWorkspaceAccess({ workspaceRoot: parent }, workspaceAccess).then(() => true, () => false);
+      if (!registered) return { ok: false as const, error: WORKSPACE_NOT_REGISTERED };
+    }
+    const created = await createWorkspaceFolder(registryOptions, input);
+    if (picked && created.ok) pickedParentDirectory = null;
+    return created;
+  });
+  ipc.handle(contract.sessions.readArtifact, async (input) => {
     try {
       const artifact = await options.registry.resolveArtifact(input.sessionId, input.artifactPath);
       if (!isSupportedSessionImageMime(artifact.mediaType)) {
@@ -616,8 +624,13 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       return { name: "", relativePath: "", size: 0, error: "not_found" as const };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.showArtifactContextMenu, async (_event, input: ArtifactContextMenuInput) => {
-    if (input.kind === "workspace_file") return showArtifactContextMenu(input, options.roots, options.getMainWindow());
+  ipc.handle(contract.dialogs.showArtifactContextMenu, async (input) => {
+    if (input.kind === "workspace_file") {
+      const workspaceRoot = await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot ?? options.roots.defaultWorkspaceRoot }, workspaceAccess)
+        .catch(() => null);
+      if (!workspaceRoot) return { shown: false, error: "invalid_target" as const };
+      return showArtifactContextMenu({ ...input, workspaceRoot }, options.roots, options.getMainWindow());
+    }
     try {
       const artifact = await options.registry.resolveArtifact(input.sessionId, input.artifactPath);
       if (!isSupportedSessionImageMime(artifact.mediaType) || artifact.bytes.byteLength > 25 * 1024 * 1024) {
@@ -633,42 +646,42 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       return { shown: false, error: "invalid_target" as const };
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.initGitRepository, async (_event, input: { workspaceRoot?: string } = {}) => {
+  ipc.handle(contract.review.initGit, async (input = {}) => {
     const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
     return initializeGitRepository({ ...input, workspaceRoot }, options.roots);
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getWorkspaceEnvironment, async (_event, input: { workspaceRoot?: string } = {}) => {
+  ipc.handle(contract.workspaces.getEnvironment, async (input = {}) => {
     const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
     return getWorkspaceEnvironment({ ...input, workspaceRoot }, options.roots);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceBranch, async (_event, input: Parameters<typeof createWorkspaceBranch>[0]) => {
+  ipc.handle(contract.workspaces.createBranch, async (input) => {
     const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
     return createWorkspaceBranch({ ...input, workspaceRoot }, options.roots);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.switchWorkspaceBranch, async (_event, input: Parameters<typeof switchWorkspaceBranch>[0]) => {
+  ipc.handle(contract.workspaces.switchBranch, async (input) => {
     const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
     return switchWorkspaceBranch({ ...input, workspaceRoot }, options.roots);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.commitWorkspaceChanges, async (_event, input: Parameters<typeof commitWorkspaceChanges>[0]) => {
+  ipc.handle(contract.workspaces.commit, async (input) => {
     const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
     return commitWorkspaceChanges({ ...input, workspaceRoot }, options.roots);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.pushWorkspaceBranch, async (_event, input: Parameters<typeof pushWorkspaceBranch>[0]) => {
+  ipc.handle(contract.workspaces.push, async (input) => {
     const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
     return pushWorkspaceBranch({ ...input, workspaceRoot }, options.roots);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.commitAndPushWorkspaceChanges, async (_event, input: Parameters<typeof commitAndPushWorkspaceChanges>[0]) => {
+  ipc.handle(contract.workspaces.commitAndPush, async (input) => {
     const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
     return commitAndPushWorkspaceChanges({ ...input, workspaceRoot }, options.roots);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaceOpenTools, () => listWorkspaceOpenTools());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.openWorkspaceInTool, async (_event, input: Parameters<typeof openWorkspaceInTool>[0]) => {
+  ipc.handle(contract.workspaces.listOpenTools, () => listWorkspaceOpenTools());
+  ipc.handle(contract.workspaces.openInTool, async (input) => {
     const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
     return openWorkspaceInTool({ ...input, workspaceRoot }, options.roots);
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listPendingApprovals, async (_event, input: { sessionId?: string } = {}): Promise<PendingApprovalInfo[]> => {
+  ipc.handle(contract.approvals.listPending, async (input = {}): Promise<PendingApprovalInfo[]> => {
     const pending = await Promise.all(options.approvals.listPending(input.sessionId).map(async (request): Promise<PendingApprovalInfo> => {
       // Broker args are resource summaries, not tool arguments. Read the
       // accepted call for a faithful path/command preview after renderer reload.
@@ -699,15 +712,15 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     const live = new Set(options.approvals.listPending(input.sessionId).map(request => request.id));
     return pending.filter(request => live.has(request.requestId));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval, (_event, input: import("@actspace/shared").ApprovalDecideInput) => options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined));
+  ipc.handle(contract.approvals.submit, (input) => options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined));
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getBrowserBridgeStatus, () => options.browserBridge.getStatus());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.connectBrowserBridge, () => options.browserBridge.connect());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.useBrowserSourceExtension, (_event, repoRoot: string | null) => options.browserBridge.useSourceExtension(repoRoot));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.prepareBrowserBridgeUpdate, () => options.browserBridge.prepareUpdate());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.disconnectBrowserBridge, () => options.browserBridge.disconnect());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectBrowserBridgeInstance, (_event, instanceId: string) => options.browserBridge.selectInstance(instanceId));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.openBrowserExtensions, async () => {
+  ipc.handle(contract.browserBridge.getStatus, () => options.browserBridge.getStatus());
+  ipc.handle(contract.browserBridge.connect, () => options.browserBridge.connect());
+  ipc.handle(contract.browserBridge.useSourceExtension, (repoRoot) => options.browserBridge.useSourceExtension(repoRoot));
+  ipc.handle(contract.browserBridge.prepareUpdate, () => options.browserBridge.prepareUpdate());
+  ipc.handle(contract.browserBridge.disconnect, () => options.browserBridge.disconnect());
+  ipc.handle(contract.browserBridge.selectInstance, (instanceId) => options.browserBridge.selectInstance(instanceId));
+  ipc.handle(contract.browserBridge.openExtensions, async () => {
     if (process.platform === "darwin") {
       return new Promise<{ ok: boolean; error?: string }>((resolve) => {
         const child = spawn("open", ["-a", "Google Chrome", "chrome://extensions"], { stdio: "ignore" });
@@ -717,37 +730,37 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     }
     return { ok: false, error: "请在 Chrome 地址栏打开 chrome://extensions。" };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.revealBrowserExtensionDirectory, async () => {
+  ipc.handle(contract.browserBridge.revealExtensionDirectory, async () => {
     const status = await options.browserBridge.getStatus();
     if (!status.extensionDir || !status.installed) return { ok: false, error: "请先准备扩展组件。" };
     shell.showItemInFolder(status.extensionDir);
     return { ok: true };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.installBrowserBridgeFromRepo, (_event, input: { repoRoot: string }) => options.browserBridge.buildAndInstall(input.repoRoot));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.installBrowserBridgeNativeHost, () => options.browserBridge.installNativeHost());
+  ipc.handle(contract.browserBridge.installFromRepo, (input) => options.browserBridge.buildAndInstall(input.repoRoot));
+  ipc.handle(contract.browserBridge.installNativeHost, () => options.browserBridge.installNativeHost());
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSkills, (_event, input: { workspaceRoot?: string } = {}) => listFixedRendererSkills({
+  ipc.handle(contract.skills.list, async (input = {}) => listFixedRendererSkills({
     dataRoot: options.roots.dataRoot,
-    workspaceRoot: input.workspaceRoot ?? options.roots.workspaceRoot,
+    workspaceRoot: input.workspaceRoot ? await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot }, workspaceAccess) : options.roots.workspaceRoot,
     homeDir: homedir(),
     disabled: options.settings.get().skills.disabled,
   }));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.installSkill, async () => {
+  ipc.handle(contract.skills.install, async () => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), { title: "选择 Skill 目录（需包含 SKILL.md）", properties: ["openDirectory"] });
     if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
     return installFixedRendererSkill(options.roots.dataRoot, result.filePaths[0]);
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.uninstallSkill, (_event, input: { directory: string }) => uninstallFixedRendererSkill(options.roots.dataRoot, input.directory));
+  ipc.handle(contract.skills.uninstall, (input) => uninstallFixedRendererSkill(options.roots.dataRoot, input.directory));
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getLocalUpdateState, () => options.localUpdate.getState());
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectLocalUpdateSource, async () => {
+  ipc.handle(contract.updates.getState, () => options.localUpdate.getState());
+  ipc.handle(contract.updates.selectSource, async () => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), { title: "选择 actspace 源码目录", properties: ["openDirectory"] });
     if (result.canceled || !result.filePaths[0]) return { canceled: true, state: await options.localUpdate.getState() };
     return { canceled: false, state: await options.localUpdate.setSourceRoot(result.filePaths[0]) };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.startLocalUpdate, () => options.localUpdate.start());
+  ipc.handle(contract.updates.start, () => options.localUpdate.start());
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.describeContext, async (_event, input: { sessionId: string }) => {
+  ipc.handle(contract.sessions.describeContext, async (input) => {
     try {
       const snapshot = await options.registry.inspectSession(input.sessionId);
       return projectContextState(snapshot, await options.registry.inspectSessionEvents(input.sessionId));
@@ -755,19 +768,19 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       return null;
     }
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageStatistics, (_event, input: UsageStatisticsGetInput) => createUsageStatistics(options.registry, options.roots.dataRoot, input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageActivity, (_event, input: UsageStatisticsGetInput) => createUsageActivity(options.registry, options.roots.dataRoot, input));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSubagents, async (_event, input: { sessionId: string }) => {
+  ipc.handle(contract.usage.getStatistics, (input) => createUsageStatistics(options.registry, options.roots.dataRoot, input));
+  ipc.handle(contract.usage.getActivity, (input) => createUsageActivity(options.registry, options.roots.dataRoot, input));
+  ipc.handle(contract.sessions.getSubagents, async (input) => {
     return projectSubagentList(await options.registry.inspectSession(input.sessionId), await options.registry.inspectSessionEvents(input.sessionId));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSubAgentTranscript, async (_event, input: { transcriptRef: { runId: string } }) => {
+  ipc.handle(contract.sessions.getSubAgentTranscript, async (input) => {
     const snapshot = await options.registry.inspectSession(input.transcriptRef.runId);
     const journal = await options.registry.inspectSessionEvents(input.transcriptRef.runId);
     return projectSubagentTranscript(snapshot, journal);
   });
 
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.visualizeReply, (_event, input: Parameters<typeof visualizeReplyV2>[0]) => visualizeReplyV2(input, options.roots, options.registry));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listVisualizations, (_event, input: { sessionId: string }) => listVisualizationsV2(input.sessionId, options.roots, options.registry));
+  ipc.handle(contract.visualize.convertReply, (input) => visualizeReplyV2(input, options.roots, options.registry));
+  ipc.handle(contract.visualize.list, (input) => listVisualizationsV2(input.sessionId, options.roots, options.registry));
 }
 
 async function toSessionListItem(item: RuntimeV2SessionListItem, registry: DesktopRuntimeV2Registry): Promise<SessionListItem> {
@@ -848,29 +861,15 @@ async function toRunContent(
   return { content: blocks, importedArtifactIds };
 }
 
-function workspaceRegistryOptions(roots: AppDataRoots): WorkspaceRegistryOptions {
-  return {
-    dataRoot: roots.dataRoot,
-    defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
-    fallbackWorkspaceRoot: roots.workspaceRoot,
-  };
-}
-
-async function registeredWorkspaceRoot(options: WorkspaceRegistryOptions, requested?: string): Promise<string> {
-  const resolved = await resolveRegisteredWorkspaceSelection(options, { workspaceRoot: requested ?? options.defaultWorkspaceRoot });
-  if (resolved.ok === false) throw new Error(resolved.error);
-  return resolved.workspaceRoot;
-}
-
-async function providerBalance(options: FixedRendererIpcOptions, provider: "deepseek" | "kimi" | "openrouter") {
+async function providerBalance<P extends "deepseek" | "kimi" | "openrouter">(options: FixedRendererIpcOptions, provider: P): Promise<ProviderBalanceSnapshot & { provider: P }> {
   const runtime = provider === "openrouter"
     ? options.settings.getOpenRouterManagementRuntimeConfig()
     : options.settings.getProviderRuntimeConfig(provider);
   if ("code" in runtime) {
-    if (runtime.code === "api_key_missing") return options.providerNetwork.getBalance(provider, undefined);
+    if (runtime.code === "api_key_missing") return options.providerNetwork.getBalance(provider, undefined) as Promise<ProviderBalanceSnapshot & { provider: P }>;
     throw new Error(runtime.message);
   }
-  return options.providerNetwork.getBalance(provider, runtime);
+  return options.providerNetwork.getBalance(provider, runtime) as Promise<ProviderBalanceSnapshot & { provider: P }>;
 }
 
 function providerFailure(code: "invalid_provider" | "write_failed", message: string): ProviderOperationResult {
@@ -890,7 +889,10 @@ function emptyProviderView(): AppSettings["providers"]["deepseek"] {
   };
 }
 
-function toModelMutationResult(result: ModelStoreResult) {
+/** model-store 的引用只会是任务模型槽位名；渲染层契约按槽位联合声明（旧 preload 以断言收窄）。 */
+type ModelMutationReferences = NonNullable<Extract<ModelMutationResult, { ok: false }>["error"]["references"]>;
+
+function toModelMutationResult(result: ModelStoreResult): ModelMutationResult {
   if (result.ok === true) return { ok: true as const, ...(result.model ? { model: result.model } : {}) };
   const code = result.code === "model_not_found" || result.code === "model_not_installed"
     ? "model_missing"
@@ -903,7 +905,7 @@ function toModelMutationResult(result: ModelStoreResult) {
           : result.code === "invalid_model" || result.code === "invalid_provider"
             ? "invalid_model"
             : result.code;
-  return { ok: false as const, error: { code, message: result.message, ...(result.references ? { references: result.references } : {}) } };
+  return { ok: false as const, error: { code, message: result.message, ...(result.references ? { references: result.references as ModelMutationReferences } : {}) } };
 }
 
 async function createUsageStatistics(
@@ -945,10 +947,3 @@ function safeErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function isTrustedSender(senderId: number, mainWindow: BrowserWindow | undefined): boolean {
-  return mainWindow !== undefined && !mainWindow.isDestroyed() && senderId === mainWindow.webContents.id;
-}
-
-function assertTrustedSender(event: IpcMainInvokeEvent, mainWindow: BrowserWindow | undefined): void {
-  if (!isTrustedSender(event.sender.id, mainWindow)) throw new Error("Runtime v2 fixed renderer IPC rejected an untrusted sender.");
-}

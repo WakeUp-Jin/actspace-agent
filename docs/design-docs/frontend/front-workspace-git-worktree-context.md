@@ -1,16 +1,18 @@
 # Workspace、Git Branch 与 Worktree 执行上下文规范
 
+> 2026-10-06：09 输入框优化实施后改写「Initial Composer 信息架构」「运行位置菜单」「Follow-up 状态行」，删除 Cloud / Remote SSH 占位。设计稿 `docs/desktop-frontend-refactor/demo/composer-run-target-demo.html`。
+>
 > 2026-09-09 文案更新：日常界面展示名称以[中文文案规范](front-desktop-chinese-ui.md)为准；保留 Chat、Plan、Thinking、Effort 和工具执行展示。本文英文名称仍可用于指代内部概念，协议与行为不变。
 
 ## 定位
 
-初始 Composer 顶部的 `Workspace -> Branch -> Run on` 不是三个互不相关的装饰性下拉框，而是一组连续的执行上下文选择器。它需要在用户发送首条消息前回答三个问题：
+初始 Composer 顶部的 `工作区 → 分支 → 运行位置`（Workspace → Branch → Run on） 不是三个互不相关的装饰性下拉框，而是一组连续的执行上下文选择器。它需要在用户发送首条消息前回答三个问题：
 
 1. Agent 服务哪个长期项目。
 2. Git 操作以哪个分支为当前或起始基线。
 3. Agent 在原目录还是隔离 worktree 中运行。
 
-本规范定义首版 Workspace、Git branch、`This Mac` 和 `New Worktree` 的产品语义、视觉结构、状态模型、持久化边界与失败恢复。本文保留本机 Git/worktree 的首版范围。2026-10-03 起，远端 Host 已通过独立运行位置选择器和设置连接页提供 WSS/SSH 接入，详见[Host 指南](../agent-plugin-runtime/agent-host-guide.md)；Cloud 占位不是远端能力的状态说明。
+本规范定义 Workspace、Git branch、本机（`This Mac`）、新建工作树（`New Worktree`）和远端机器的产品语义、视觉结构、状态模型、持久化边界与失败恢复。远端 Host 的接入（WSS / SSH、配对）见[Host 指南](../agent-plugin-runtime/agent-host-guide.md)，运行位置菜单里的远端机器子菜单列出已配置的 Host。
 
 ## 设计目标
 
@@ -54,7 +56,7 @@ Branch 在两种运行位置下含义不同：
 - `This Mac`：目标检出分支。用户首次发送时才执行安全切换。
 - `New Worktree`：创建 worktree 的 base branch。ActSpace 会从该分支当前提交创建新的任务分支。
 
-界面必须通过当前 Run on 状态和辅助文案区分这两种语义，不新增第四个常驻选择器。
+界面必须通过当前运行位置和辅助文案区分这两种语义，不新增第四个常驻选择器。
 
 Composer 初始选择器与后续状态行共用分支标签：有已知分支时显示分支名；仅 `ready` 且有 `detachedCommit` 时显示“分离的 HEAD”。非 Git、读取失败、Git 不可用或尚未加载时，不把分支缺失当作 detached HEAD。会话锁定本身不是分支证据；已知 worktree 分支在 Git context 缺省时仍可展示。
 
@@ -78,54 +80,42 @@ type SessionWorktreeContext = {
 
 ## Initial Composer 信息架构
 
-上下文选择行固定按以下顺序排列：
+运行目标行固定按以下顺序排列，三个都是无边框文字按钮（高 28px、`text-act-md text-text-muted`，hover / 打开时 `text-text-main bg-hover-overlay`，`rounded-act-sm`，12px chevron）：
 
 ```text
-Workspace  ->  Branch  ->  Run on
+📁 actspace-agent ⌄     ⑂ main ⌄     💻 本机 ⌄
+📁 actspace-agent ⌄     ⑂ main ⌄     ⑂ 新建工作树 ⌄
+📁 api-server ⌄                      🖥 dev-box ⌄  ● 连接中
 ```
 
-示例：
-
-```text
-actspace-agent   main   This Mac
-```
-
-或：
-
-```text
-actspace-agent   main   New Worktree
-```
-
+- 远端时没有分支按钮；工作区按钮列这台 Host 上的工作区；运行位置按钮显示 Server 图标和 Host 名，Host 没就绪时在右侧显示状态点和 readiness 短文案（见「运行目标 · readiness」）。
+- Chat 不用工作区和分支：本机 Chat 不显示这一行，远端 Chat 只显示运行位置。
 - 使用 Lucide 线性图标和现有语义颜色 token。
 - Workspace chrome 的 Environment 入口使用 `Bookmark`，与 Workspace 文件夹入口和层级树入口保持语义区分。
 - 普通选中态只使用中性灰阶和勾选，不使用 operational green。
-- 选择器最小点击区保持桌面端舒适尺寸；键盘 focus 必须清晰可见。
-- 三个菜单互斥；打开一个菜单时关闭其它 Composer 浮层。
-- 窗口不超过 `600px` 时，选择器允许自然换行；承载 popover 的行必须保持 `overflow: visible`，不能用滚动容器裁剪弹层。
+- 三个菜单是 `ui/Menu`（Radix DropdownMenu），互斥；打开一个时关闭其它 Composer 浮层。键盘 ↑↓ 移动、→ 进子菜单、← 返回、首字母跳转、Esc 只关当前一层并把焦点还给按钮。
+- 行可换行；菜单 portal 到 body，不会被行裁剪。
 - 会话已经产生首条用户消息后，不再显示这组可编辑选择器；follow-up 状态行改为只读事实展示。
 
 ## Workspace 菜单
 
 ### 结构
 
-首版保持紧凑：
-
 ```text
-Recents
-  current workspace
-  recent workspace
-  recent workspace
+最近使用
+  📁 actspace-agent            ✓
+     ~/code/actspace-agent
+  📁 wiki
+     ~/notes/wiki
 -------------------------
-Use Existing...
-New Folder...
+使用已有文件夹…
+新建文件夹
 ```
 
-- `Recents` 首版最多展示 5 个长期 Workspace。
-- 当前项同时使用勾选与 accessible selected state，不只依赖颜色。
-- 主文本显示目录名；可用第二行或 tooltip 显示缩略后的路径。
-- 长路径使用中间或开头缩略，但必须能通过 tooltip 获取完整值。
-- Recents 为空时显示说明性空态，并保留两个创建入口。
-- 当前首版不提供 Workspace 搜索、重命名、移除、排序和 Cloud Repo。
+- 「最近使用」最多展示 5 个长期 Workspace，每行是名称加 faint 小字的路径（第二行）；当前项打勾并是 `menuitemradio` 的 checked 状态，不只依赖颜色。
+- 「新建文件夹」不关菜单，原地换成名称输入框和「创建」；输入框里的按键不触发菜单的首字母跳转。
+- 远端时菜单标题是「{Host} 上的工作区」，列 Host 描述里的工作区（名称 + 路径）；描述没读到时写「等待 Host 工作区」，读到但为空时写「这台机器上还没有工作区」。没有「使用已有文件夹 / 新建文件夹」。
+- 当前不提供 Workspace 搜索、重命名、移除、排序和 Cloud Repo。
 
 ### Use Existing
 
@@ -146,7 +136,7 @@ New Folder...
 ### 可见性
 
 - Workspace 是有效 Git repository 且存在 `HEAD` 时显示。
-- 非 Git Workspace 隐藏 Branch 入口，Workspace 与 Run on 仍保留。
+- 非 Git Workspace 隐藏 Branch 入口，Workspace 与运行位置仍保留。
 - Git 可执行文件缺失、目录不可访问或 Git 检查失败时，不伪装成非 Git；显示可恢复错误状态和重试入口。
 
 ### 菜单内容
@@ -171,27 +161,26 @@ New Folder...
 - 创建时再次解析 commit，避免用户打开菜单后 repository 状态变化造成陈旧基线。
 - 新 worktree 使用独立任务分支，不直接检出 base branch。
 
-## Run on 菜单
-
-入口文案统一从 `Local` 改为 `This Mac`。
+## 运行位置菜单
 
 ```text
-Run on
-
-Cloud                         Coming soon
-This Mac                      selected
-Remote SSH                    Coming soon
--------------------------
-New Worktree
+💻 本机                         ✓
+🖥 远端机器           dev-box   ›   ┐
+-------------------------          │  ● dev-box               ✓
+⑂ 新建工作树                        │  ○ home-nas         离线
+   从 main 创建隔离分支              │  ● old-mac   需要重新配对
+                                    │  ──────────────
+                                    └  ＋ 连接新机器…
 ```
 
-- `This Mac` 为默认值。
-- 下图的 `Cloud` / `Remote SSH` 为早期本机菜单占位。现行远端会话使用独立 Host 选择器，创建后绑定 Host/工作区；不得把该历史占位解释为远端连接尚未实现。
-- `New Worktree` 仅在 Workspace 是带有效 `HEAD` 的 Git repository 时可用。
-- Git repository 尚无首次提交时，Branch 仍只显示 symbolic branch 名称（例如 `main`）；`This Mac` 可以直接运行，`New Worktree` 保持禁用并在入口显示 `Requires commit`。
+- 主菜单 240px：本机 ／ 远端机器 ›（右侧写当前 Host 名）／ 分隔 ／ 新建工作树（第二行说明）。本机为默认值。
+- **远端机器子菜单** 260px（窄窗下按可用宽度收窄），hover 或 → 打开。Host 行依次是状态点（connected 绿点、连接中黄点闪烁、离线空心圈、需要重新配对 / 版本不兼容红点）、名称、右侧状态文字（只在非 connected 时显示）、当前 ✓；底部「＋ 连接新机器…」打开 设置 › Agent 服务器。Host 达到 5 台时顶部有「搜索机器」：打开即聚焦，字母和 ← 只给搜索框，↓ 进入列表，没有结果时写「没有匹配的机器」。
+- **没有 Host** 时第二项是「连接远端机器…」，点击打开 设置 › Agent 服务器。
+- 不可用的 Host 也能选中：草稿照常编辑，发送按 readiness 禁用并在 tooltip 说明原因。选「本机」会同时离开远端 Host。
+- **新建工作树** 读 `capabilities.newWorktree`：Workspace 是带有效 `HEAD` 的 Git repository 时可用，第二行写「从 {branch} 创建隔离分支」；Git repository 尚无首次提交时禁用并写「需要先创建提交」（Branch 仍只显示 symbolic branch 名称，本机可以直接运行）；非 Git Workspace 禁用并写「当前工作区不是可用的 Git 仓库」；远端禁用并写「远端机器暂不支持」。禁用项保留在菜单里，帮助用户理解能力边界。
 - ActSpace 不为启用 Worktree 自动创建首次提交，也不使用 `git worktree add --orphan` 复制当前 Index；后者会得到独立的空 Index，不代表当前 staged workspace。
-- 非 Git Workspace 中保留禁用项并显示 `Requires Git`，帮助用户理解能力边界。
-- 菜单标题、disabled state、选中状态和二级说明都必须被屏幕阅读器正确宣布。
+- 没有「云端 / 远程 SSH · 即将推出」占位：远端机器就是已配置的 Host（WSS 或 SSH 接入）。
+- 选中状态、disabled 及其原因、子菜单都必须被屏幕阅读器正确宣布（`menuitemradio` + `aria-checked`、`aria-disabled`、`aria-haspopup`）。
 
 ## New Worktree 创建流程
 
@@ -280,22 +269,98 @@ type WorkspacePreparationPayload = {
 
 ## Follow-up 状态行
 
-普通目录：
-
 ```text
-main   This Mac
+⑂ main · 💻 本机                               [权限]   ◔ 42%
+⑂ actspace/92803054 · ⑂ 工作树                 [权限]   ◔ 42%
+🖥 dev-box · 📁 api-server                      [权限]   ◔ 42%
+🖥 dev-box · ● 连接中                           [权限]       —
 ```
 
-Worktree 会话：
-
-```text
-actspace/92803054   Worktree
-```
-
-- Branch 和运行位置都是只读会话事实。
-- `Worktree` hover / focus tooltip 显示原 Workspace、完整 worktree 路径和 base branch。
+- 分支、运行位置、Host 和工作区都是只读会话事实：没有 `⌄`，不是按钮。可点的只有权限控件和 context 用量。
+- `工作树` hover / focus 显示原 Workspace 和 base branch。
+- 远端：Host 名可聚焦，hover / focus 用 tooltip 显示连接状态和工作区路径。Host 没就绪且有 readiness 短文案时，第二段换成状态点 + 文案，context 用量显示 `—`（不可点）。
+- Chat 会话的状态行只有 context 用量。
 - 状态不能只靠图标或颜色表达。
-- V1 不允许在已有 turn 的会话中切换 Workspace、branch 或运行位置；用户需要创建新会话。
+- 不允许在已有 turn 的会话中切换 Workspace、branch、运行位置或 Host；用户需要创建新会话。
+
+## 运行目标（本机与远端）
+
+> 2026-10-06 按[计划 15](../../exec-plans/active/20261005-desktop-frontend-refactor/15-运行目标执行计划.md)实施，设计来源是 [03 运行目标抽象](../../desktop-frontend-refactor/03-运行目标抽象-本机与远端.md)。代码在 `apps/desktop/src/renderer/target/`。
+
+上文的 Workspace、Branch、Worktree 都是本机运行目标的属性。远端 Host 是另一种运行目标。组件不再判断 `hostId` 或 `host:` 前缀，只读下面几个值。
+
+### 会话定位（locator）
+
+- 远端会话的 key 是 `host:` 加 `base64url(JSON.stringify([hostId, sessionId]))`。编码和解码只有一份，在 `packages/shared/src/session-locator.ts`（`encodeSessionLocator` / `decodeSessionLocator`），main 和 renderer 共用。
+- 解码是严格的：不以 `host:` 开头时返回 null（本机会话）。以 `host:` 开头但形状、类型、长度（不超过 128）或 round-trip 任何一项不符，就抛 `InvalidSessionLocatorError`。
+- renderer 用 `locateSession(key)`，返回 `local`、`remote { hostId, sessionId }` 或 `invalid { key }`。它不抛错，以免渲染时白屏。损坏的 key 不按本机处理，本机专属能力都不能用在它身上（`isLocalSession` 对它返回 false）。
+
+### RunTarget 与 capabilities
+
+```ts
+type RunTarget =
+  | { kind: "local"; workspaceRoot?: string; branch?: string; worktree?: SessionWorktreeContext }
+  | { kind: "remote"; hostId: string; hostName: string; workspaceId?: string; workspaceName?: string }
+  | { kind: "invalid"; key: string };
+```
+
+- `useRunTarget({ sessionId, sessionWorkspacePath, locked, local })` 得出当前会话或新建页的 `target`、`capabilities`、`readiness` 和 `choices`。App 经 `RunTargetContext` 交给 WorkbenchLayout、ConversationView 和 Composer，不再逐层传。
+- 已有会话的目标由会话决定，不能再改（`locked`）。新建页的 Host 和远端工作区是 `useRunTarget` 内的本地选择，换 Host 时远端工作区回到该 Host 的第一个。
+- `capabilitiesOf(target, { gitStatus })` 是唯一的能力表。每项都是 `{ enabled, reason? }`，禁用时 `reason` 说明原因：
+
+| 能力 | 本机 | 远端 | 损坏的 key |
+| --- | --- | --- | --- |
+| `newWorktree` | Git 状态为 ready 时可用，否则「当前工作区不是可用的 Git 仓库」 | 「远端机器暂不支持」 | 「会话标识损坏」 |
+| `branchSwitch` | Git 状态为 ready 或 no_head 时可用 | 同上 | 同上 |
+| `localFileOpen` | 可用 | 同上（打开文件改为经 Host 下载） | 同上 |
+| `terminal` | 可用 | 同上 | 同上 |
+| `review` | 可用 | 同上 | 同上 |
+| `attachments` | 只收图片 | 图片和文件都收（经 Host 上传） | 都不收 |
+
+- 远端支持某项能力时，只改这张表。
+
+### readiness
+
+`ready` 当且仅当可以发送。其余状态都附带原因，界面不再只显示「未就绪」：
+
+| 状态 | 含义 |
+| --- | --- |
+| `connecting` | Host 列表还没读到，或 Host 正在连接 |
+| `offline` / `revoked` / `incompatible` | 直接对应 Host 的连接状态 |
+| `removed` | 会话属于已删除的 Host，或会话 key 损坏 |
+| `describing` / `describe-failed` | 已连接，正在读取或未能读取 `host.describe` |
+| `host-unavailable` | Host 报告 `draining`（正在停止）或 `blocked`（恢复上次的任务时出错），暂不接受新任务 |
+| `workspace-missing` / `model-missing` | 会话记下的工作区或模型在 Host 上已不存在 |
+
+- 判断顺序和文案见 `readiness.ts` 的 `resolveReadiness` / `describeReadiness`，文案以 [06 §4.5](../../desktop-frontend-refactor/06-Composer与运行目标交互重设计.md) 为准。
+- 未就绪时草稿照常编辑，发送按钮 disabled，tooltip 和状态行显示原因。
+
+### HostDirectory
+
+- `target/host-directory.ts` 的 `hostDirectory` 是整个窗口唯一的 Host 列表和 Host 事件订阅。第一个使用者出现时开始订阅，最后一个离开时释放。
+- 快照包含 `hosts`、`descriptions`、`describeErrors`、`describing`、`loaded`、`listError`。Host 变为已连接时自动 describe，失败原因记在 `describeErrors`，readiness 据此显示 `describe-failed`。
+- `onHostsChanged` 和 `onHostRemoved` 供侧栏刷新、重连补齐和 Host 移除时的清理使用。Host 移除后，它的会话仍留在侧栏，显示为「远端 · 未连接」；本地状态被释放。
+
+### 远端会话的本地记录
+
+Host 协议不返回会话的 `workspaceId`，本轮也不改协议。renderer 在本地记录：
+
+- `localStorage["actspace:remote-session-prefs"]`：`{ [sessionKey]: { workspaceId?, modelId?, recordedAt } }`。
+  - 建远端会话时，写入所选的工作区和模型。
+  - 没有记录的旧会话，按会话 meta 里的路径反查一次并写回，之后不再反查。
+  - 会话被 evict 时删除对应条目。
+- `localStorage["actspace:new-session-model:<hostId>"]`：新建页在这台 Host 上上次选的模型。
+- 记录的模型在 Host 上已没有时，回落为 Host 的默认模型。
+- 旧的 `actspace:remote-models` 在启动时迁移一次：会话条目进 prefs，`new:<hostId>` 进新建页记录，不覆盖已有记录，然后删除旧 key。
+
+### 发送与审批
+
+- renderer 的 `R/session/session-gateway.ts` 负责建会话（按 `target.kind` 带 `hostId` 和工作区）、pending 记录、configure 和 submit。远端目标没有 ready 时，它拒绝发送。
+- main 的 `M/session-gateway.ts` 是 fixed IPC 的中间件，负责远端分流：
+  - 带 `hostId` 的建会话和审批决定交给远端；
+  - 能解出远端 key 的请求交给远端；
+  - 其余请求先走本地，再合并远端的列表结果。
+- 审批事件和 pending 列表带 `hostId`，由 main 的 desktop-adapter 拼出。renderer 提交审批决定时，从当前会话的 RunTarget 取 `hostId`，不解析审批 id。
 
 ## Session 与存储边界
 
@@ -339,8 +404,8 @@ type SessionMeta = {
 
 ## 可访问性与键盘交互
 
-- 选择器使用 button + menu/listbox 语义，包含 `aria-expanded`、`aria-haspopup` 和 selected state。
-- 打开菜单后焦点进入搜索框或当前项；Escape 关闭并回到触发按钮。
+- 选择器使用 button + menu 语义（`ui/Menu`），包含 `aria-expanded`、`aria-haspopup` 和 `menuitemradio` 的 checked 状态。
+- 打开菜单后焦点进入菜单（Host 搜索框出现时进入搜索框）；Escape 只关当前一层并回到触发按钮。
 - 上下方向键移动选项，Enter 选择；disabled 项跳过且说明原因。
 - 异步 Git 检查和 worktree 创建使用 `aria-live="polite"`；失败使用 `role="alert"`。
 - 完整路径不能只依赖 hover，键盘 focus 时也能通过 tooltip 或说明读取。
@@ -350,19 +415,19 @@ type SessionMeta = {
 
 - 菜单使用现有 `surface-raised`、`border`、`shadow-act-popover` 和文本 token，不新增硬编码颜色。
 - 普通 completed 状态使用 muted / faint；running 才使用 operational green；失败使用 danger 语义且配合文字。
-- Popover 首版宽度：Workspace `240px`，Branch `300px`，Run on `240px`。
+- 菜单宽度：Workspace `260px`（远端 `280px`），Branch `300px`，运行位置 `240px`，远端机器子菜单 `260px`。
 - 菜单高度受 viewport 限制；Recents 和 branches 超出后在菜单内部滚动。
-- 初始 Composer 的三个菜单固定从触发按钮下方展开；不能复用 follow-up Composer 向上展开的菜单定位。
-- 480px 窄窗下 popover 不得超出 viewport；必要时对齐到 Composer 内容区边缘。
+- 初始 Composer 的三个菜单默认从触发按钮下方展开，碰撞时由 Radix 翻转或平移。
+- 480px 窄窗下菜单不得超出 viewport；远端机器子菜单两侧都放不下时按可用宽度收窄。
 - hover、focus、pressed 不改变控件尺寸，不造成上下文行抖动。
 
 ## 验收矩阵
 
 | 场景 | 预期结果 |
 | --- | --- |
-| 普通 Git Workspace | 显示 Workspace、当前 branch、This Mac |
-| Git Workspace 尚无首次提交 | Branch 只显示 symbolic branch 名称；This Mac 可运行；New Worktree 禁用并显示 Requires commit |
-| 非 Git Workspace | 隐藏 Branch；New Worktree 禁用并说明 Requires Git |
+| 普通 Git Workspace | 显示 Workspace、当前 branch、本机 |
+| Git Workspace 尚无首次提交 | Branch 只显示 symbolic branch 名称；本机可运行；新建工作树禁用并显示「需要先创建提交」 |
+| 非 Git Workspace | 隐藏 Branch；新建工作树禁用并说明「当前工作区不是可用的 Git 仓库」 |
 | Git 缺失或检查失败 | 显示可恢复错误，不伪装成非 Git |
 | 选择其它 branch 后取消 | 磁盘不发生变化 |
 | This Mac 首次发送并成功切换 | Session 和状态行显示真实 branch |
@@ -370,17 +435,22 @@ type SessionMeta = {
 | New Worktree 首次发送成功 | 创建独立 branch/path，展示 Created worktree，再启动 Agent |
 | Worktree 创建冲突 | 不覆盖已有内容，保留输入并给出重试路径 |
 | 重启恢复 Worktree Session | 状态行与 Created worktree 事件保持一致 |
-| 480px 窄窗 | 选择行按需换行，三个入口和弹窗仍可操作 |
+| 480px 窄窗 | 选择行按需换行，三个入口、菜单和远端机器子菜单都在窗口内 |
+| 选远端 Host | 分支按钮消失；工作区列 Host 工作区；Host 未就绪时运行位置按钮带状态点和文案，发送禁用并说明原因 |
+| 没有 Host | 运行位置菜单第二项为「连接远端机器…」，打开 设置 › Agent 服务器 |
+| 对话中 | 状态行没有下拉；无法从任何入口切换机器 |
 | 浅色 / 深色 | 边框、选中、disabled、running、error 均可辨认 |
 
 ## 已确认决策
 
 - 2026-07-29：Workspace 菜单首版只保留 Recents、Use Existing 和 New Folder。
 - 2026-07-29：非 Git 项目不显示 Branch 选择器。
-- 2026-07-29：`Local` 统一改为 `This Mac`；Cloud 和 Remote SSH 只做禁用占位。
+- 2026-07-29：`Local` 统一改为 `This Mac`（界面文案「本机」）；Cloud 和 Remote SSH 只做禁用占位（2026-10-06 由 09 删除，换成「远端机器 ›」）。
 - 2026-07-29：Worktree 在首次发送时延迟创建，不在选择菜单时立即落盘。
 - 2026-07-29：自动分支使用 `actspace/<8位数字>`，不复用其它产品命名空间。
 - 2026-07-29：ActSpace worktree 不进入 Workspace Recents；Session 保留原 Workspace 身份和独立 execution root。
 - 2026-07-29：Worktree V1 不自动清理，不自动复制原目录未提交内容或环境。
-- 2026-07-29：初始执行上下文菜单使用独立的向下展开定位，选择器行保持 overflow visible；Workspace Recents 首版限制为 5 项。
+- 2026-07-29：初始执行上下文菜单使用独立的向下展开定位，选择器行保持 overflow visible；Workspace Recents 首版限制为 5 项。（2026-10-06：菜单换成 `ui/Menu`，portal 到 body，不再依赖 overflow visible。）
 - 2026-07-29：Workspace registry 的读取修复与路径注册按事务串行执行，每次原子写使用唯一临时文件，避免并发 rename 竞争和丢失更新。
+- 2026-10-06：运行目标统一为 `RunTarget` + `capabilities` + `readiness`（计划 15）；远端会话的 `workspaceId` 和模型由 renderer 本地记录，不改 Host 协议；远端会话禁用新建工作树并说明原因。
+- 2026-10-06：09 输入框优化：运行目标行改为三个无边框文字按钮和 `ui/Menu`；运行位置菜单为「本机 / 远端机器 › / 新建工作树」，Host ≥ 5 台时子菜单带搜索，无 Host 时为「连接远端机器…」；不可用的 Host 可选、发送按 readiness 禁用；对话中状态行只读。

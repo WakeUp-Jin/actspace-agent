@@ -1,24 +1,22 @@
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
 import type { TerminalSessionSnapshot } from "@actspace/shared";
 import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
 import { useOpenTerminal } from "../components/right-panel/useOpenTerminal";
+import { setupBridge } from "./helpers/bridge";
 
 vi.mock("../components/right-panel/terminal-render-loader", () => ({
   preloadTerminalRenderView: vi.fn(async () => ({})),
 }));
-
-const originalBridge = window.actspace;
-afterEach(() => { window.actspace = originalBridge; });
 
 it("shows the same default title after creation and restore without changing host data", async () => {
   const terminal: TerminalSessionSnapshot = {
     id: "terminal-1", sessionId: "session-1", title: "Terminal 1", shellName: "zsh",
     status: "running", createdAt: "2026-09-08T00:00:00.000Z",
   } as TerminalSessionSnapshot;
-  window.actspace = {
-    createTerminal: vi.fn(async () => ({ ok: true, terminal })),
-  } as unknown as Window["actspace"];
+  setupBridge({
+    "terminal.create": vi.fn(async () => ({ ok: true, terminal })),
+  });
   const { result } = renderHook(() => ({ panel: useRightPanel(), start: useOpenTerminal("session-1") }), {
     wrapper: RightPanelProvider,
   });

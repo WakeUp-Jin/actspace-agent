@@ -23,6 +23,7 @@ import {
 } from "./SettingsPrimitives";
 import { useToolToggle } from "./useToolToggle";
 import { Button } from "../ui/Button";
+import { settingsApi } from "../../api/settings";
 
 const WEB_SEARCH_TOOL = "web_search";
 
@@ -223,13 +224,12 @@ function TavilyUsage({ hasApiKey }: { hasApiKey: boolean }) {
   const [usage, setUsage] = useState<SearchUsageResult | null>(null);
 
   useEffect(() => {
-    if (!hasApiKey || typeof window === "undefined" || !window.actspace?.getSearchUsage) {
+    if (!hasApiKey) {
       setUsage(null);
       return;
     }
     let cancelled = false;
-    window.actspace
-      .getSearchUsage()
+    settingsApi.getSearchUsage()
       .then((result) => {
         if (!cancelled) setUsage(result);
       })

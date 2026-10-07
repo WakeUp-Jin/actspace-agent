@@ -1,0 +1,175 @@
+{
+  "files": {
+    "prompts/main-agent.md": "You are ActSpace's main agent. Follow the active tool and safety policies.",
+    "settings.json": {
+      "version": 4,
+      "general": {
+        "performanceMonitoring": false,
+        "englishLearning": {
+          "lastSessionId": null
+        },
+        "personalization": {
+          "displayName": "",
+          "responseStyle": ""
+        },
+        "agentInstructions": {
+          "systemPromptPath": "<root>/prompts/main-agent.md"
+        },
+        "taskDefaults": {
+          "temperature": 0.9,
+          "maxOutputTokens": 1000,
+          "chatCompactionTriggerRatio": 0.8
+        },
+        "shortcuts": {
+          "quickOpen": {
+            "enabled": true,
+            "accelerator": "CommandOrControl+Shift+Space",
+            "target": {
+              "kind": "automatic"
+            }
+          }
+        }
+      },
+      "models": {
+        "connections": {
+          "deepseek:default": {
+            "connectionId": "deepseek:default",
+            "providerId": "deepseek",
+            "enabled": true,
+            "baseUrl": null,
+            "proxy": {
+              "enabled": false,
+              "url": null
+            },
+            "lastConnection": {
+              "status": "untested"
+            },
+            "defaultPricingMultiplier": 1,
+            "additionalCredentials": []
+          },
+          "kimi:default": {
+            "connectionId": "kimi:default",
+            "providerId": "kimi",
+            "enabled": true,
+            "baseUrl": null,
+            "proxy": {
+              "enabled": false,
+              "url": null
+            },
+            "lastConnection": {
+              "status": "untested"
+            },
+            "defaultPricingMultiplier": 1,
+            "additionalCredentials": []
+          },
+          "openrouter:default": {
+            "connectionId": "openrouter:default",
+            "providerId": "openrouter",
+            "enabled": true,
+            "baseUrl": null,
+            "proxy": {
+              "enabled": false,
+              "url": null
+            },
+            "lastConnection": {
+              "status": "untested"
+            },
+            "defaultPricingMultiplier": 1,
+            "additionalCredentials": []
+          }
+        },
+        "definitions": {},
+        "installed": {
+          "deepseek:deepseek-flash": {
+            "connectionId": "deepseek:default",
+            "enabled": true,
+            "addedAt": "2026-07-24T00:00:00.000Z"
+          },
+          "kimi:kimi-k2.6": {
+            "connectionId": "kimi:default",
+            "enabled": true,
+            "addedAt": "2026-07-24T00:00:00.000Z"
+          },
+          "kimi:kimi-k2.7-code": {
+            "connectionId": "kimi:default",
+            "enabled": true,
+            "addedAt": "2026-07-24T00:00:00.000Z"
+          }
+        },
+        "taskBindings": {
+          "defaultChat": null,
+          "utility": null,
+          "explore": null
+        }
+      },
+      "tools": {
+        "disabledTools": [
+          "bash",
+          "web_fetch"
+        ],
+        "bash": {
+          "alwaysAsk": true
+        },
+        "showFileChangeStats": true,
+        "searchProviders": {
+          "zhipu": {
+            "enabled": true
+          },
+          "tavily": {
+            "enabled": true
+          },
+          "tinyfish": {
+            "enabled": true
+          },
+          "exa": {
+            "enabled": true
+          }
+        }
+      },
+      "media": {
+        "speech": {
+          "provider": "minimax",
+          "model": "speech-2.8-turbo",
+          "voiceId": "English_Insightful_Speaker",
+          "speed": 1
+        },
+        "imageGeneration": {
+          "baseUrl": "https://images.env.example/v1",
+          "model": "env-image-model"
+        },
+        "imageInspection": {
+          "modelKey": "openrouter:openai/gpt-5.6-luna"
+        }
+      },
+      "skills": {
+        "disabled": []
+      },
+      "subagents": {
+        "routes": {}
+      },
+      "activity": {
+        "usage": {
+          "range": "30d",
+          "status": "all",
+          "modelFilter": "",
+          "showDetails": false,
+          "activeTab": "requests"
+        }
+      }
+    }
+  },
+  "env": {
+    "DEEPSEEK_API_KEY": null,
+    "KIMI_API_KEY": null,
+    "ZHIPU_API_KEY": null,
+    "TAVILY_API_KEY": null,
+    "TINYFISH_API_KEY": null,
+    "EXA_API_KEY": null,
+    "IMAGE_GENERATION_BASE_URL": "https://images.env.example/v1",
+    "IMAGE_GENERATION_MODEL": "env-image-model",
+    "ACTSPACE_DISABLED_TOOLS": "bash,web_fetch",
+    "ACTSPACE_BASH_ALWAYS_ASK": "1",
+    "LLM_TEMPERATURE": "0.9",
+    "LLM_MAX_TOKENS": "1000"
+  }
+}

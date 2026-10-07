@@ -1,17 +1,17 @@
 import { ListOrdered, MoreHorizontal, Trash2 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import type { ReactNode } from "react";
 import type { QueuedComposerMessage, SessionMessageQueue } from "../../session/message-queue";
 import { Button, cx } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 
 /** 上层（App）持有队列；托盘只负责展示和转发操作。 */
 export type MessageQueueControls = {
   queue: SessionMessageQueue;
-  /** 当前会话有运行中的回合：显示「插入」。 */
+  /** 当前会话有运行中的回合：显示「引导」。 */
   running: boolean;
-  /** 正在压缩 / 等待审批时不能插入，给出原因。 */
+  /** 正在压缩 / 等待审批时不能引导，给出原因。 */
   steerBlockedReason: string | null;
   onSteer: (id: string) => void;
   onUnsteer: (id: string) => void;
@@ -21,17 +21,17 @@ export type MessageQueueControls = {
   onResume: () => void;
 };
 
-const TRAY_CLASS = "composer-message-queue mx-3 mt-3 min-w-0 rounded-act-md border border-line bg-surface-subtle";
-const TRAY_HEADER_CLASS = "flex min-h-9 items-center gap-2 pl-3 pr-1 text-act-xs text-text-muted";
-const TRAY_LIST_CLASS = "max-h-[156px] overflow-y-auto border-t border-line px-1 pb-0.5";
-const ROW_CLASS = "flex min-h-9 items-center gap-1 py-[3px] pl-2 text-act-sm [&+&]:border-t [&+&]:border-line";
+// 托盘在输入框外面、紧贴其上方（09）：与输入框同一套细边，不加阴影；和输入框之间 6px（外层 grid 间距 8px，这里收 2px）。
+const TRAY_CLASS = "composer-message-queue -mb-0.5 min-w-0 rounded-act-lg border border-composer bg-surface";
+// 最多露出 4 行（每行 36px），再多在托盘里滚动，不把输入框往下推。
+const TRAY_LIST_CLASS = "max-h-[144px] overflow-y-auto px-1";
+const ROW_CLASS = "group/queue-row flex min-h-9 items-center gap-1 pl-2 text-act-sm [&+&]:border-t [&+&]:border-line";
+const ROW_LEAD_CLASS = "inline-grid size-5 shrink-0 place-items-center rounded-act-sm text-text-faint";
+// 动作按钮平时淡一些，悬停或键盘进入这一行时变实。
+const ROW_ACTIONS_CLASS =
+  "flex shrink-0 items-center gap-0.5 opacity-60 transition-opacity duration-(--motion-fast) group-hover/queue-row:opacity-100 group-focus-within/queue-row:opacity-100";
 const META_CLASS = "shrink-0 whitespace-nowrap px-1 text-act-xs text-text-faint max-[560px]:hidden";
-const MENU_CLASS =
-  "composer-message-queue-menu fixed z-(--act-z-dropdown) w-40 rounded-act-md border border-line bg-surface-raised p-1 text-act-sm text-text-main shadow-act-popover";
-const MENU_ITEM_CLASS =
-  "flex h-8 w-full items-center justify-between gap-2 rounded-act-sm px-2 text-left text-text-main transition-[background,color] duration-(--motion-fast) hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:text-text-faint disabled:hover:bg-transparent";
-const MENU_WIDTH = 160;
-
+const PAUSED_ROW_CLASS = "flex min-h-9 items-center gap-2 border-t border-line pl-3 pr-1 text-act-xs text-text-main";
 const STEER_TIP = "让 Agent 在下一步看到这条消息";
 
 function metaText(item: QueuedComposerMessage): string | null {
@@ -49,84 +49,36 @@ function rowText(item: QueuedComposerMessage): string {
 
 /**
  * Composer 顶部的消息队列托盘：运行中发送的消息在这里排队，当前运行结束后依次发出；
- * 「↳ 插入」把一条送进正在运行的回合。已插入、还没被读到的消息排在最上面，可以撤回。
+ * 「↳ 引导」把一条送进正在运行的回合。已引导、还没被读到的消息排在最上面，可以撤回。
  */
 export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQueueControls; inputEmpty: boolean }) {
   const { queue, running, steerBlockedReason } = controls;
-  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const anchorsRef = useRef(new Map<string, HTMLButtonElement>());
-
-  const menuItem = menu ? queue.items.find((item) => item.id === menu.id) : undefined;
-  useEffect(() => {
-    if (menu && !menuItem) setMenu(null);
-  }, [menu, menuItem]);
-
-  useEffect(() => {
-    if (!menu) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target) || anchorsRef.current.get(menu.id)?.contains(target)) return;
-      setMenu(null);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      anchorsRef.current.get(menu.id)?.focus();
-      setMenu(null);
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown, true);
-    };
-  }, [menu]);
-
-  // 菜单放不下时翻到按钮上方。
-  useLayoutEffect(() => {
-    const element = menuRef.current;
-    if (!menu || !element) return;
-    const anchor = anchorsRef.current.get(menu.id)?.getBoundingClientRect();
-    if (!anchor) return;
-    const height = element.offsetHeight;
-    const below = anchor.bottom + 4;
-    const y = below + height > window.innerHeight ? Math.max(8, anchor.top - 4 - height) : below;
-    if (y !== menu.y) setMenu({ ...menu, y });
-    element.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
-  }, [menu]);
-
   if (queue.items.length === 0 && queue.steering.length === 0) return null;
 
   const counts = [
     queue.items.length > 0 ? `${queue.items.length} 条排队` : null,
-    queue.steering.length > 0 ? `${queue.steering.length} 条已插入` : null,
+    queue.steering.length > 0 ? `${queue.steering.length} 条已引导` : null,
   ].filter(Boolean).join(" · ");
-  const hint = queue.paused
-    ? "已暂停"
-    : queue.items.length === 0
-      ? ""
-      : running ? "当前运行结束后依次发送" : "即将发送";
-
-  const openMenu = (id: string) => {
-    if (menu?.id === id) {
-      setMenu(null);
-      return;
-    }
-    const anchor = anchorsRef.current.get(id)?.getBoundingClientRect();
-    if (!anchor) return;
-    setMenu({
-      id,
-      x: Math.max(8, Math.min(anchor.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8)),
-      y: anchor.bottom + 4,
-    });
+  // 原来的标题行去掉了，计数和发送时机放进第一行图标的提示里。
+  const hint = queue.paused || queue.items.length === 0 ? null : running ? "当前运行结束后依次发送" : "即将发送";
+  const summary = hint ? `${counts}，${hint}` : counts;
+  const renderLead = (index: number, icon: ReactNode) => {
+    if (index !== 0) return <span className={ROW_LEAD_CLASS} aria-hidden="true">{icon}</span>;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className={ROW_LEAD_CLASS} tabIndex={0} role="img" aria-label={summary}>{icon}</span>
+        </TooltipTrigger>
+        <TooltipContent>{summary}</TooltipContent>
+      </Tooltip>
+    );
   };
 
   const renderSteerButton = (item: QueuedComposerMessage) => {
     if (!running || item.kind !== "message") return null;
     const button = (
       <Button variant="ghost" size="xs" disabled={steerBlockedReason !== null} onClick={() => controls.onSteer(item.id)}>
-        ↳ 插入
+        ↳ 引导
       </Button>
     );
     return (
@@ -142,24 +94,14 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
 
   return (
     <section className={TRAY_CLASS} aria-label="消息队列">
-      <div className={TRAY_HEADER_CLASS}>
-        <ListOrdered size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
-        <span className="shrink-0 font-medium text-text-main">{counts}</span>
-        <span className={cx("min-w-0 flex-1 truncate max-[560px]:hidden", queue.paused ? "text-text-main" : "text-text-faint")} role="status">
-          {hint}
-        </span>
-        {queue.paused ? (
-          <Button variant="ghost" size="xs" className="ml-auto" onClick={controls.onResume}>继续发送</Button>
-        ) : null}
-      </div>
       <ul className={TRAY_LIST_CLASS} aria-label="排队的消息">
-        {queue.steering.map((item) => (
+        {queue.steering.map((item, index) => (
           <li className={ROW_CLASS} key={item.id} data-state="steering">
+            {renderLead(index, <i className="size-1.5 rounded-act-pill bg-operational motion-safe:animate-pulse" />)}
             <span className="min-w-0 flex-1 truncate text-text-muted" title={item.text}>{rowText(item)}</span>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-1 text-act-xs text-operational" tabIndex={0}>
-                  <i className="size-1.5 rounded-act-pill bg-operational motion-safe:animate-pulse" aria-hidden="true" />
+                <span className="inline-flex shrink-0 whitespace-nowrap px-1 text-act-xs text-operational" tabIndex={0}>
                   下一步读取
                 </span>
               </TooltipTrigger>
@@ -177,6 +119,7 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
           const meta = metaText(item);
           return (
             <li className={ROW_CLASS} key={item.id} data-state="queued">
+              {renderLead(queue.steering.length + index, <ListOrdered size={14} />)}
               <span
                 className={cx("min-w-0 flex-1 truncate text-text-main", item.kind === "compact" && "font-mono text-act-xs")}
                 title={item.text}
@@ -184,57 +127,35 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
                 {rowText(item)}
               </span>
               {meta ? <span className={META_CLASS}>{meta}</span> : null}
-              {renderSteerButton(item)}
-              <IconButton label={`删除排队消息 ${index + 1}`} tooltip="删除" size="xs" onClick={() => controls.onRemove(item.id)}>
-                <Trash2 size={13} strokeWidth={2} aria-hidden="true" />
-              </IconButton>
-              <IconButton
-                ref={(element) => {
-                  if (element) anchorsRef.current.set(item.id, element);
-                  else anchorsRef.current.delete(item.id);
-                }}
-                label={`更多操作：排队消息 ${index + 1}`}
-                tooltip="更多"
-                size="xs"
-                aria-haspopup="menu"
-                aria-expanded={menu?.id === item.id}
-                onClick={() => openMenu(item.id)}
-              >
-                <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
-              </IconButton>
+              <span className={ROW_ACTIONS_CLASS}>
+                {renderSteerButton(item)}
+                <IconButton label={`删除排队消息 ${index + 1}`} tooltip="删除" size="xs" onClick={() => controls.onRemove(item.id)}>
+                  <Trash2 size={13} strokeWidth={2} aria-hidden="true" />
+                </IconButton>
+                <Menu>
+                  <MenuTrigger asChild>
+                    <IconButton label={`更多操作：排队消息 ${index + 1}`} tooltip="更多" size="xs">
+                      <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
+                    </IconButton>
+                  </MenuTrigger>
+                  <MenuContent align="end" className="w-40">
+                    <MenuItem disabled={!inputEmpty} onSelect={() => controls.onEdit(item.id)}>
+                      编辑
+                      {inputEmpty ? null : <small className="ml-auto text-act-xxs text-text-faint">先清空输入框</small>}
+                    </MenuItem>
+                    <MenuItem disabled={index === 0} onSelect={() => controls.onMoveUp(item.id)}>上移</MenuItem>
+                  </MenuContent>
+                </Menu>
+              </span>
             </li>
           );
         })}
       </ul>
-      {menu && menuItem && typeof document !== "undefined" ? createPortal(
-        <div ref={menuRef} className={MENU_CLASS} role="menu" aria-label="排队消息操作" style={{ left: menu.x, top: menu.y }}>
-          <button
-            className={MENU_ITEM_CLASS}
-            type="button"
-            role="menuitem"
-            disabled={!inputEmpty}
-            onClick={() => {
-              setMenu(null);
-              controls.onEdit(menuItem.id);
-            }}
-          >
-            编辑
-            {inputEmpty ? null : <small className="text-act-xxs text-text-faint">先清空输入框</small>}
-          </button>
-          <button
-            className={MENU_ITEM_CLASS}
-            type="button"
-            role="menuitem"
-            disabled={queue.items[0]?.id === menuItem.id}
-            onClick={() => {
-              setMenu(null);
-              controls.onMoveUp(menuItem.id);
-            }}
-          >
-            上移
-          </button>
-        </div>,
-        document.body,
+      {queue.paused ? (
+        <div className={PAUSED_ROW_CLASS}>
+          <span className="min-w-0 flex-1 truncate" role="status">已暂停</span>
+          <Button variant="ghost" size="xs" onClick={controls.onResume}>继续发送</Button>
+        </div>
       ) : null}
     </section>
   );

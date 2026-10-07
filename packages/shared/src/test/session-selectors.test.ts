@@ -83,6 +83,7 @@ describe("session selectors", () => {
       kind: "todo",
       id: "todo-new",
       renderKey: "turn:run-todo:todo",
+      runId: "run-todo",
       todos: [expect.objectContaining({ id: "todo-1", status: "completed" })],
       totalCount: 1,
       completedCount: 1,
@@ -119,6 +120,7 @@ describe("session selectors", () => {
       kind: "workspace_preparation",
       id: "prep-1",
       renderKey: "turn:turn-1:workspace-preparation:0",
+      runId: "turn-1",
       status: "completed",
       sourceWorkspaceRoot: "/work/source",
       workspaceRoot: "/work/worktree",
@@ -328,6 +330,7 @@ describe("session selectors", () => {
         kind: "thinking",
         id: "thinking-readable",
         renderKey: "turn:turn-thinking:thinking:0",
+        runId: "turn-thinking",
         title: "Thinking",
         content: "I should inspect the workspace.",
         createdAt: "2026-07-28T04:10:00.000Z",
@@ -402,6 +405,21 @@ describe("session selectors", () => {
     });
   });
 
+  it("stamps every block with its event's runId, and sourceSeq only when the event has one", () => {
+    const base = { sessionId: "session-identity", agentRunId: "run-identity", timestamp: "2026-10-06T00:00:00.000Z", schemaVersion: 2 as const };
+    const blocks = createMessageBlocks([
+      { ...base, id: "user-1", type: "user_message", sourceSeq: 7, payload: { content: "question" } },
+      { ...base, id: "assistant-1", type: "assistant_message", payload: { content: "answer" } },
+      { ...base, id: "stopped-1", type: "agent_run_aborted", sourceSeq: 9, payload: { reason: "user" } },
+    ]);
+    expect(blocks.map((block) => [block.id, block.runId, block.sourceSeq])).toEqual([
+      ["user-1", "run-identity", 7],
+      ["assistant-1", "run-identity", undefined],
+      ["stopped-1", "run-identity", 9],
+    ]);
+    expect("sourceSeq" in blocks[1]!).toBe(false);
+  });
+
   it("restores an aborted turn as a persisted Stopped status", () => {
     const blocks = createMessageBlocks([{
       id: "evt-aborted",
@@ -417,6 +435,7 @@ describe("session selectors", () => {
       kind: "status",
       id: "evt-aborted",
       renderKey: "turn:turn-aborted:status:0",
+      runId: "turn-aborted",
       content: "Stopped",
       createdAt: "2026-07-17T07:00:00.000Z",
       tone: "muted",
@@ -447,6 +466,7 @@ describe("session selectors", () => {
         kind: "delete",
         id: "evt-delete",
         renderKey: "turn:turn-delete:tool:tool-delete-1",
+        runId: "turn-delete",
         filePath: "notes.md",
         outputPath: "/workspace/notes.md",
         outputRelativePath: "notes.md",
@@ -615,6 +635,7 @@ describe("session selectors", () => {
         kind: "agent",
         id: "evt_agent_result",
         renderKey: "turn:turn-1:tool:toolu-agent-1",
+        runId: "turn-1",
         description: "Explore tool rendering",
         status: "completed",
         subagentType: "explore",

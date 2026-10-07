@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { MessageBlock, SessionEvent } from "@actspace/shared";
-import { ConversationView } from "../../components/ConversationView";
+import { TestConversationView } from "../helpers/workbench";
 import { RightPanel } from "../../components/RightPanel";
 import { RightPanelProvider, useRightPanel } from "../../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../../components/ui/Tooltip";
 import "../../styles/index.css";
+import { setupBridge } from "../helpers/bridge";
 
 const now = "2026-09-06T12:00:00Z";
 const agents: MessageBlock[] = [
@@ -21,7 +22,7 @@ const events: SessionEvent[] = [
   { id: "read", sessionId: "a", agentRunId: "run", schemaVersion: 2, timestamp: now, type: "tool_result", payload: { toolCallId: "r", status: "running", uiPreview: { kind: "read", filePath: "src/renderer/App.tsx", displayText: "Read src/renderer/App.tsx" } } },
 ];
 // Explicit fixture bridge; never loaded by the production renderer.
-window.actspace = { getSubagents: async () => agents, getSubAgentTranscript: async () => events } as unknown as typeof window.actspace;
+setupBridge({ "sessions.getSubagents": async () => agents, "sessions.getSubAgentTranscript": async () => events });
 function Fixture() {
   const [view, setView] = useState<"chat" | "trajectory">("chat");
   const [theme, setTheme] = useState("light");
@@ -35,7 +36,7 @@ function Fixture() {
       <button onClick={() => openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId: "fixture" })}>Subagents</button>
     </nav>
     <div className="grid h-[calc(100vh-48px)] grid-cols-[minmax(0,1fr)_420px]">
-      <ConversationView messages={messages} contextSnapshot={null} sessionId="fixture" activeView={view} isStreaming onAbort={() => {}} />
+      <TestConversationView messages={messages} contextSnapshot={null} sessionId="fixture" activeView={view} isStreaming onAbort={() => {}} />
       <RightPanel sessionId="fixture" />
     </div>
   </div>;

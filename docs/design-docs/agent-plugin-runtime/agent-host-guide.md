@@ -38,7 +38,7 @@ node apps/cli/dist/cli.js host revoke --config /absolute/path/host.json --device
 
 重复添加已连接的 Host 会在消费配对码前按 HostId 拒绝。连接变化会刷新会话列表与标签；移除后当前已显示会话仍绑定原远端，位置显示“远端 · 未连接”。这些修复的工程证据与交互复验门禁见 [B1–B6 修复记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-4-bug-fixes.md)。
 
-新会话选择运行位置与 Host 发布的工作区、模型；会话创建后归属固定。统一列表显示本地及远端会话，服务器标签用于区分。远端不提供本机 Terminal、Git Review 或本机浏览器转发。
+新会话选择运行位置与 Host 发布的工作区、模型；会话创建后归属固定。统一列表显示本地及远端会话，服务器标签用于区分。远端不提供本机 Terminal、Git Review 或本机浏览器转发。Desktop 侧的运行目标、能力表、未就绪原因和远端会话的本地记录见[执行上下文规范](../frontend/front-workspace-git-worktree-context.md)「运行目标（本机与远端）」一节。
 
 ## 文件与断线
 

@@ -1,0 +1,96 @@
+[
+  {
+    "utc": "2026-10-07T02:40:12.671435+00:00",
+    "head": "d5f1bf3eb1f51346789349d57a06f17c18d64cd9",
+    "dirty_files": {
+      "apps/desktop/src/renderer/components/Composer.tsx": "0c80e930feacfff7b43c960b6ac1ab0e9fc553294841edba7f33f81b22e4b1cb",
+      "apps/desktop/src/renderer/components/composer/ComposerInput.tsx": "4e702e75a2d615bc9c47959c4a395a0ed5856a7361fd9fde5679868ab44ac3b5",
+      "apps/desktop/src/renderer/components/composer/ComposerPalette.tsx": "6bf533f21fdc1fa5e012cacfc942bb926cef6a14d7eae9461d8246143d541c2a",
+      "apps/desktop/src/renderer/components/composer/ComposerToolbar.tsx": "78e25375e3d65346b06ca984b8a2111aa48c1afdbf8dec27b4d58553eb4d7948",
+      "apps/desktop/src/renderer/components/composer/ModelPicker.tsx": "10fc79fc3c2fd8ef8ec398629251f3ddcd83c7f8fe67fd1c83f12fae8c42668d",
+      "apps/desktop/src/renderer/test/chat-presentation-recovery.test.tsx": "00ade3b8dcfc3819db78826e8cf3ece6494198b4e64ed33b28ee3d68a9b465ab",
+      "apps/desktop/src/renderer/test/composer-palette.test.tsx": "2e6bd0fcfea8ed898910b06c1125bbd75a3eec32a44550ee3f3dc01c29c0215d",
+      "apps/desktop/src/renderer/test/composer.test.tsx": "7381a2c6aed7c948f0059828de511866a2ff4bfbff3bb1c48339b7316b214217"
+    },
+    "note": "Other concurrent work expanded Composer changes during acceptance; acceptance did not edit product source."
+  },
+  {
+    "utc": "2026-10-07T03:22:54.663146+00:00",
+    "head": "d5f1bf3eb1f51346789349d57a06f17c18d64cd9",
+    "scope": "User correction: existing real Electron only.",
+    "dirty_files": {
+      "apps/desktop/src/renderer/components/Composer.tsx": "0c80e930feacfff7b43c960b6ac1ab0e9fc553294841edba7f33f81b22e4b1cb",
+      "apps/desktop/src/renderer/components/composer/ComposerInput.tsx": "4e702e75a2d615bc9c47959c4a395a0ed5856a7361fd9fde5679868ab44ac3b5",
+      "apps/desktop/src/renderer/components/composer/ComposerPalette.tsx": "6bf533f21fdc1fa5e012cacfc942bb926cef6a14d7eae9461d8246143d541c2a",
+      "apps/desktop/src/renderer/components/composer/ComposerToolbar.tsx": "78e25375e3d65346b06ca984b8a2111aa48c1afdbf8dec27b4d58553eb4d7948",
+      "apps/desktop/src/renderer/components/composer/ModelPicker.tsx": "10fc79fc3c2fd8ef8ec398629251f3ddcd83c7f8fe67fd1c83f12fae8c42668d",
+      "apps/desktop/src/renderer/test/chat-presentation-recovery.test.tsx": "00ade3b8dcfc3819db78826e8cf3ece6494198b4e64ed33b28ee3d68a9b465ab",
+      "apps/desktop/src/renderer/test/composer-palette.test.tsx": "2e6bd0fcfea8ed898910b06c1125bbd75a3eec32a44550ee3f3dc01c29c0215d",
+      "apps/desktop/src/renderer/test/composer.test.tsx": "7381a2c6aed7c948f0059828de511866a2ff4bfbff3bb1c48339b7316b214217"
+    }
+  },
+  {
+    "utc": "2026-10-07T04:51:16.240372+00:00",
+    "head": "d5f1bf3eb1f51346789349d57a06f17c18d64cd9",
+    "phase": "Real desktop Review / next sidebar and settings",
+    "dirty_files": {
+      "apps/desktop/src/renderer/components/Composer.tsx": "0c80e930feacfff7b43c960b6ac1ab0e9fc553294841edba7f33f81b22e4b1cb",
+      "apps/desktop/src/renderer/components/composer/ComposerInput.tsx": "4e702e75a2d615bc9c47959c4a395a0ed5856a7361fd9fde5679868ab44ac3b5",
+      "apps/desktop/src/renderer/components/composer/ComposerPalette.tsx": "6bf533f21fdc1fa5e012cacfc942bb926cef6a14d7eae9461d8246143d541c2a",
+      "apps/desktop/src/renderer/components/composer/ComposerToolbar.tsx": "78e25375e3d65346b06ca984b8a2111aa48c1afdbf8dec27b4d58553eb4d7948",
+      "apps/desktop/src/renderer/components/composer/ModelPicker.tsx": "10fc79fc3c2fd8ef8ec398629251f3ddcd83c7f8fe67fd1c83f12fae8c42668d",
+      "apps/desktop/src/renderer/test/chat-presentation-recovery.test.tsx": "00ade3b8dcfc3819db78826e8cf3ece6494198b4e64ed33b28ee3d68a9b465ab",
+      "apps/desktop/src/renderer/test/composer-palette.test.tsx": "2e6bd0fcfea8ed898910b06c1125bbd75a3eec32a44550ee3f3dc01c29c0215d",
+      "apps/desktop/src/renderer/test/composer.test.tsx": "7381a2c6aed7c948f0059828de511866a2ff4bfbff3bb1c48339b7316b214217"
+    },
+    "changed_since_previous": []
+  },
+  {
+    "utc": "2026-10-07T07:39:54.894442+00:00",
+    "head": "d5f1bf3eb1f51346789349d57a06f17c18d64cd9",
+    "phase": "Real desktop custom connection and services",
+    "dirty_files": {
+      "apps/desktop/src/renderer/components/Composer.tsx": "0c80e930feacfff7b43c960b6ac1ab0e9fc553294841edba7f33f81b22e4b1cb",
+      "apps/desktop/src/renderer/components/composer/ComposerInput.tsx": "4e702e75a2d615bc9c47959c4a395a0ed5856a7361fd9fde5679868ab44ac3b5",
+      "apps/desktop/src/renderer/components/composer/ComposerPalette.tsx": "6bf533f21fdc1fa5e012cacfc942bb926cef6a14d7eae9461d8246143d541c2a",
+      "apps/desktop/src/renderer/components/composer/ComposerToolbar.tsx": "78e25375e3d65346b06ca984b8a2111aa48c1afdbf8dec27b4d58553eb4d7948",
+      "apps/desktop/src/renderer/components/composer/ModelPicker.tsx": "10fc79fc3c2fd8ef8ec398629251f3ddcd83c7f8fe67fd1c83f12fae8c42668d",
+      "apps/desktop/src/renderer/test/chat-presentation-recovery.test.tsx": "00ade3b8dcfc3819db78826e8cf3ece6494198b4e64ed33b28ee3d68a9b465ab",
+      "apps/desktop/src/renderer/test/composer-palette.test.tsx": "2e6bd0fcfea8ed898910b06c1125bbd75a3eec32a44550ee3f3dc01c29c0215d",
+      "apps/desktop/src/renderer/test/composer.test.tsx": "7381a2c6aed7c948f0059828de511866a2ff4bfbff3bb1c48339b7316b214217"
+    },
+    "changed_since_previous": []
+  },
+  {
+    "utc": "2026-10-07T08:54:11.572415+00:00",
+    "head": "d5f1bf3eb1f51346789349d57a06f17c18d64cd9",
+    "phase": "Real desktop native Apple IME acceptance",
+    "dirty_files": {
+      "apps/desktop/src/renderer/components/Composer.tsx": "0c80e930feacfff7b43c960b6ac1ab0e9fc553294841edba7f33f81b22e4b1cb",
+      "apps/desktop/src/renderer/components/composer/ComposerInput.tsx": "4e702e75a2d615bc9c47959c4a395a0ed5856a7361fd9fde5679868ab44ac3b5",
+      "apps/desktop/src/renderer/components/composer/ComposerPalette.tsx": "6bf533f21fdc1fa5e012cacfc942bb926cef6a14d7eae9461d8246143d541c2a",
+      "apps/desktop/src/renderer/components/composer/ComposerToolbar.tsx": "78e25375e3d65346b06ca984b8a2111aa48c1afdbf8dec27b4d58553eb4d7948",
+      "apps/desktop/src/renderer/components/composer/ModelPicker.tsx": "10fc79fc3c2fd8ef8ec398629251f3ddcd83c7f8fe67fd1c83f12fae8c42668d",
+      "apps/desktop/src/renderer/test/chat-presentation-recovery.test.tsx": "00ade3b8dcfc3819db78826e8cf3ece6494198b4e64ed33b28ee3d68a9b465ab",
+      "apps/desktop/src/renderer/test/composer-palette.test.tsx": "2e6bd0fcfea8ed898910b06c1125bbd75a3eec32a44550ee3f3dc01c29c0215d",
+      "apps/desktop/src/renderer/test/composer.test.tsx": "7381a2c6aed7c948f0059828de511866a2ff4bfbff3bb1c48339b7316b214217"
+    },
+    "changed_since_previous": []
+  },
+  {
+    "utc": "2026-10-07T09:34:15.755763+00:00",
+    "head": "d5f1bf3eb1f51346789349d57a06f17c18d64cd9",
+    "phase": "Real Electron image drag, OS System theme, native 480 window acceptance",
+    "dirty_files": {
+      "apps/desktop/src/renderer/components/Composer.tsx": "0c80e930feacfff7b43c960b6ac1ab0e9fc553294841edba7f33f81b22e4b1cb",
+      "apps/desktop/src/renderer/components/composer/ComposerInput.tsx": "4e702e75a2d615bc9c47959c4a395a0ed5856a7361fd9fde5679868ab44ac3b5",
+      "apps/desktop/src/renderer/components/composer/ComposerPalette.tsx": "6bf533f21fdc1fa5e012cacfc942bb926cef6a14d7eae9461d8246143d541c2a",
+      "apps/desktop/src/renderer/components/composer/ComposerToolbar.tsx": "78e25375e3d65346b06ca984b8a2111aa48c1afdbf8dec27b4d58553eb4d7948",
+      "apps/desktop/src/renderer/components/composer/ModelPicker.tsx": "10fc79fc3c2fd8ef8ec398629251f3ddcd83c7f8fe67fd1c83f12fae8c42668d",
+      "apps/desktop/src/renderer/test/chat-presentation-recovery.test.tsx": "00ade3b8dcfc3819db78826e8cf3ece6494198b4e64ed33b28ee3d68a9b465ab",
+      "apps/desktop/src/renderer/test/composer-palette.test.tsx": "2e6bd0fcfea8ed898910b06c1125bbd75a3eec32a44550ee3f3dc01c29c0215d",
+      "apps/desktop/src/renderer/test/composer.test.tsx": "7381a2c6aed7c948f0059828de511866a2ff4bfbff3bb1c48339b7316b214217"
+    },
+    "changed_since_previous": []
+  }
+]

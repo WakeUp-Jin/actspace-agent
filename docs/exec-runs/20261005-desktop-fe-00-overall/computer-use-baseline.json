@@ -1,0 +1,15 @@
+{
+  "head": "f1a28c2f62cef2231b9935aeaeb1fa88e6333a0e",
+  "source_sha256": {
+    "AGENTS.md": "3d5a20127fa7c220f55a85ec02b8b314050761be4f587d90c4044130adbb443d",
+    "apps/desktop/src/renderer/components/composer/ComposerInput.tsx": "4e702e75a2d615bc9c47959c4a395a0ed5856a7361fd9fde5679868ab44ac3b5",
+    "apps/desktop/src/renderer/components/composer/ComposerToolbar.tsx": "78e25375e3d65346b06ca984b8a2111aa48c1afdbf8dec27b4d58553eb4d7948",
+    "docs/design-docs/frontend/README.md": "cb7fd3c3c6a50fbb64cace2e42e0ea7abb93b3b67121b059397337103258fc3b",
+    "docs/design-docs/index.md": "16b09e48d5f0e47b235b01ac259af3ec1bef433b18f66ddb9027bf0adbd12a72"
+  },
+  "status": " M AGENTS.md\n M apps/desktop/src/renderer/components/Composer.tsx\n M apps/desktop/src/renderer/components/composer/ComposerInput.tsx\n M apps/desktop/src/renderer/components/composer/ComposerPalette.tsx\n M apps/desktop/src/renderer/components/composer/ComposerToolbar.tsx\n M apps/desktop/src/renderer/components/composer/ModelPicker.tsx\n M docs/FRONTEND.md\n M docs/FRONTEND_VERIFICATION.md\n M docs/design-docs/frontend/README.md\n M \"docs/design-docs/frontend/front-preload-bridge\\344\\270\\216mock\\350\\247\\204\\350\\214\\203.md\"\n M \"docs/design-docs/frontend/front-\\345\\237\\272\\347\\241\\200\\347\\273\\204\\344\\273\\266\\345\\260\\201\\350\\243\\205\\350\\247\\204\\350\\214\\203.md\"\n M docs/design-docs/index.md\n M package.json\n M scripts/check-current-docs.mjs\n?? \"docs/design-docs/frontend/front-\\346\\226\\260\\345\\212\\237\\350\\203\\275\\345\\274\\200\\345\\217\\221\\346\\270\\205\\345\\215\\225.md\"\n?? docs/exec-runs/20261005-desktop-fe-00-overall/computer-use-acceptance-plan.md\n",
+  "app_name": "Actspace Dev actspace-agent-2067",
+  "app_id": "com.actspace.desktop.dev.w2067fa05",
+  "app_pid_at_start": 40906,
+  "dev_server": "http://127.0.0.1:5173/"
+}

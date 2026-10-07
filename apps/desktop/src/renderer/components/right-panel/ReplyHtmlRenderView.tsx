@@ -3,6 +3,7 @@ import { ChevronDown, Files, RotateCw } from "lucide-react";
 import type { SessionVisualizationItem } from "@actspace/shared";
 import { HtmlRenderView } from "./HtmlRenderView";
 import { IconButton } from "../ui/IconButton";
+import { visualizeApi } from "../../api/visualize";
 
 /**
  * 右侧面板「Reply」视图。
@@ -40,7 +41,7 @@ export function ReplyHtmlRenderView({ sessionId }: { sessionId: string | null })
   const toolbarRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
-    if (typeof window === "undefined" || !window.actspace?.listVisualizations || !sessionId) {
+    if (!sessionId) {
       setItems([]);
       setStatus("ready");
       return;
@@ -48,7 +49,7 @@ export function ReplyHtmlRenderView({ sessionId }: { sessionId: string | null })
     setStatus("loading");
     setError(null);
     try {
-      const result = await window.actspace.listVisualizations({ sessionId });
+      const result = await visualizeApi.list({ sessionId });
       setItems(result.items);
       setStatus("ready");
     } catch (err) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { COMPOSER_REFERENCE_LIMITS, responseAnnotationKey, type ResponseAnnotationReference } from "@actspace/shared";
 import type { ComposerDraftRestore } from "../Composer";
-import { isAnnotatableMessageId, type ResponseAnnotationContextValue } from "./response-annotation-context";
+import type { ResponseAnnotationContextValue } from "./response-annotation-context";
 import { resolveAnnotationRange } from "./response-annotation-text";
 
 const EMPTY: ResponseAnnotationReference[] = [];
@@ -27,12 +27,14 @@ export function useResponseAnnotationState({
   readAnnotationDraft,
   writeAnnotationDraft,
   scrollContainerRef,
+  canAnnotate,
 }: {
   draftKey?: string;
   draftRestore?: ComposerDraftRestore | null;
   readAnnotationDraft?: (draftKey: string) => ResponseAnnotationReference[];
   writeAnnotationDraft?: (draftKey: string, annotations: readonly ResponseAnnotationReference[]) => void;
   scrollContainerRef: RefObject<HTMLElement | null>;
+  canAnnotate: (assistantMessageId: string) => boolean;
 }) {
   const readDraft = useCallback(() => (draftKey && readAnnotationDraft ? readAnnotationDraft(draftKey) : EMPTY), [draftKey, readAnnotationDraft]);
   const [drafts, setDraftState] = useState<ResponseAnnotationReference[]>(readDraft);
@@ -127,7 +129,7 @@ export function useResponseAnnotationState({
 
   const contextValue = useMemo<ResponseAnnotationContextValue>(() => ({
     drafts,
-    canAnnotate: isAnnotatableMessageId,
+    canAnnotate,
     addDraft,
     updateComment,
     removeDraft,
@@ -138,7 +140,7 @@ export function useResponseAnnotationState({
     resolveRange,
     locateAnnotation,
     editAnnotation,
-  }), [activeAnnotationId, addDraft, drafts, editAnnotation, editingAnnotationId, locateAnnotation, removeDraft, resolveRange, updateComment]);
+  }), [activeAnnotationId, addDraft, canAnnotate, drafts, editAnnotation, editingAnnotationId, locateAnnotation, removeDraft, resolveRange, updateComment]);
 
   return { contextValue, drafts, setDrafts, notice };
 }

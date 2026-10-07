@@ -2,7 +2,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared";
-import { ConversationView } from "../../components/ConversationView";
+import { TestConversationView } from "../helpers/workbench";
 import { RightPanelProvider } from "../../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../../components/ui/Tooltip";
 import "../../styles/index.css";
@@ -76,10 +76,10 @@ const messages: MessageBlock[] = [
 function Preview() {
   return <TooltipProvider><RightPanelProvider>
     <div className="flex h-screen flex-col bg-app-bg text-text-main">
-      <ConversationView messages={messages} contextSnapshot={null} sessionId="visual-fixture" draftKey="visual-fixture"
+      <TestConversationView messages={messages} contextSnapshot={null} sessionId="visual-fixture" draftKey="visual-fixture"
         isStreaming={false} composerPhase="active" composerMode={params.get("mode") === "chat" ? "chat" : "agent"}
         readAnnotationDraft={() => drafts} writeAnnotationDraft={() => {}}
-        executionContext={{ locked: true, runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
+        executionContext={{ runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
     </div>
   </RightPanelProvider></TooltipProvider>;
 }

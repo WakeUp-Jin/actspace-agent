@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ContextUsageSnapshot, SessionListItem, WorkspaceEntry } from "@actspace/shared";
-import { Sidebar } from "../components/Sidebar";
+import { TestSidebar } from "./helpers/workbench";
 import { WindowChromeBar } from "../components/WindowChromeBar";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { setupBridge } from "./helpers/bridge";
 
 function makeSession(partial: Partial<SessionListItem> & Pick<SessionListItem, "id" | "title">): SessionListItem {
   return {
@@ -76,7 +77,7 @@ const WORKSPACES: WorkspaceEntry[] = [
   },
 ];
 
-function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
+function renderSidebar(overrides: Partial<Parameters<typeof TestSidebar>[0]> = {}) {
   const onNewSession = vi.fn();
   const onSelectSession = vi.fn();
   const onTogglePin = vi.fn();
@@ -92,7 +93,7 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
 
   const result = render(
     <TooltipProvider delayDuration={0}>
-      <Sidebar
+      <TestSidebar
         sessions={SESSIONS}
         workspaces={WORKSPACES}
         activeSessionId={null}
@@ -180,12 +181,33 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(onRemoveWorkspace).toHaveBeenCalledWith("ws-actspace", "/Users/me/projects/actspace-agent");
   });
 
-  it("keeps a keyboard context-menu entry point", () => {
-    renderSidebar();
+  it("keeps a keyboard context-menu entry point and returns focus to the workspace label", async () => {
+    const user = userEvent.setup();
+    const { onOpenWorkspace } = renderSidebar();
     const workspaceLabel = screen.getByRole("button", { name: "actspace-agent" });
 
     fireEvent.keyDown(workspaceLabel, { key: "F10", shiftKey: true });
     expect(screen.getByRole("menu", { name: "工作区操作： actspace-agent" })).toBeInTheDocument();
+    expect(workspaceLabel).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(workspaceLabel).toHaveFocus());
+
+    workspaceLabel.focus();
+    await user.keyboard("{ContextMenu}");
+    // 键盘打开时焦点落在第一项上。
+    expect(screen.getByRole("menuitem", { name: "在 IDE 中打开" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(onOpenWorkspace).toHaveBeenCalledWith("ws-actspace");
+    await waitFor(() => expect(workspaceLabel).toHaveFocus());
+
+    // 点外面关闭的不还焦点。
+    const outside = screen.getByRole("button", { name: "收起 actspace-agent" });
+    fireEvent.contextMenu(workspaceLabel, { clientX: 24, clientY: 60 });
+    await user.click(outside);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(workspaceLabel).not.toHaveFocus();
   });
 
   it("keeps the chevron dedicated to collapse and disables default workspace removal", async () => {
@@ -197,7 +219,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.queryByRole("menu", { name: "工作区操作： actspace-agent" })).not.toBeInTheDocument();
 
     fireEvent.contextMenu(screen.getByRole("button", { name: "Default workspace" }), { clientX: 24, clientY: 60 });
-    expect(screen.getByRole("menuitem", { name: "从侧栏移除" })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: "从侧栏移除" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it("keeps the session list on vertical scrolling only", () => {
@@ -262,6 +284,77 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(onRename).toHaveBeenCalledWith("s-actspace-1", "重命名后的会话");
   });
 
+  it("opens the session menu with Shift+F10 and keeps focus in the rename input", async () => {
+    const user = userEvent.setup();
+    const { onRename } = renderSidebar();
+    const title = screen.getByRole("button", { name: /^工具定义格式和命名规范/ });
+    title.focus();
+    expect(await screen.findByRole("tooltip")).toBeInTheDocument();
+
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    screen.getByRole("menu", { name: "会话操作： 工具定义格式和命名规范" });
+    // 菜单开着时不叠一层会话标题提示。
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "置顶" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(title).toHaveFocus());
+
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("menuitem", { name: "重命名" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    const input = screen.getByRole("textbox", { name: "重命名会话 工具定义格式和命名规范" });
+    // Radix 在 setTimeout(0) 里处理菜单关闭后的焦点，不能把焦点从输入框拿走。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(input).toHaveFocus();
+    await user.keyboard("{Control>}a{/Control}键盘改名{Enter}");
+    expect(onRename).toHaveBeenCalledWith("s-actspace-1", "键盘改名");
+  });
+
+  it("returns focus to the session title after a keyboard rename ends, but not after a blur commit", async () => {
+    const user = userEvent.setup();
+    const { onRename } = renderSidebar();
+    const startRename = async () => {
+      screen.getByRole("button", { name: /^工具定义格式和命名规范/ }).focus();
+      await user.keyboard("{Shift>}{F10}{/Shift}{ArrowDown}{Enter}");
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      return screen.getByRole("textbox", { name: "重命名会话 工具定义格式和命名规范" });
+    };
+
+    expect(await startRename()).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("textbox", { name: /^重命名会话/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^工具定义格式和命名规范/ })).toHaveFocus();
+    expect(onRename).not.toHaveBeenCalled();
+
+    await startRename();
+    await user.keyboard("{Control>}a{/Control}回车改名{Enter}");
+    expect(onRename).toHaveBeenCalledWith("s-actspace-1", "回车改名");
+    expect(screen.getByRole("button", { name: /^工具定义格式和命名规范/ })).toHaveFocus();
+
+    // 点别处失焦提交：焦点留在新点的地方。
+    await startRename();
+    await user.click(screen.getByRole("button", { name: "扩展" }));
+    expect(screen.queryByRole("textbox", { name: /^重命名会话/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^工具定义格式和命名规范/ })).not.toHaveFocus();
+  });
+
+  it("keeps focus in the rename input when the menu was opened from a row action button", async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    const row = screen.getByText("工具定义格式和命名规范").closest(".session-row") as HTMLElement;
+    // 行内操作按钮在改名后仍然在，菜单关闭时不能把焦点还给它（否则输入框失焦，改名直接提交）。
+    const action = row.querySelector<HTMLButtonElement>(".session-row-actions button")!;
+    action.focus();
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    await user.keyboard("{ArrowDown}{Enter}");
+    const input = screen.getByRole("textbox", { name: "重命名会话 工具定义格式和命名规范" });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(input).toHaveFocus();
+    expect(action).toBeInTheDocument();
+  });
+
   it("opens the Copy submenu and invokes Copy ID / Copy Transcript", async () => {
     const user = userEvent.setup();
     const { onCopySessionId, onCopyTranscript } = renderSidebar();
@@ -270,12 +363,18 @@ describe("Sidebar (cursor-aligned layout)", () => {
 
     fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
     await user.click(screen.getByRole("menuitem", { name: "复制" }));
-    await user.click(screen.getByRole("menuitem", { name: "复制 ID" }));
+    // 子菜单由 Radix 用 aria-labelledby 关联到「复制」。
+    const submenu = await screen.findByRole("menu", { name: "复制" });
+    // jsdom 里元素没有尺寸，Radix 判断不出指针正移向子菜单；子菜单项用键盘选。
+    await user.keyboard("{ArrowRight}");
+    expect(within(submenu).getByRole("menuitem", { name: "复制 ID" })).toHaveFocus();
+    await user.keyboard("{Enter}");
     expect(onCopySessionId).toHaveBeenCalledWith("s-actspace-1");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
     fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
     await user.hover(screen.getByRole("menuitem", { name: "复制" }));
-    await user.click(screen.getByRole("menuitem", { name: "复制会话记录" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "复制会话记录" }));
     expect(onCopyTranscript).toHaveBeenCalledWith("s-actspace-1");
   });
 
@@ -292,7 +391,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     const busyRow = screen.getByText("工具定义格式和命名规范").closest(".session-row");
     fireEvent.contextMenu(busyRow as HTMLElement, { clientX: 120, clientY: 80 });
     const fork = screen.getByRole("menuitem", { name: "分叉" });
-    expect(fork).toBeDisabled();
+    expect(fork).toHaveAttribute("aria-disabled", "true");
     await user.click(fork);
     expect(busy.onFork).not.toHaveBeenCalled();
   });
@@ -304,11 +403,56 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(activeArchive).toBeDisabled();
     await userEvent.click(activeArchive);
 
+    const row = screen.getByText("工具定义格式和命名规范").closest(".session-row");
+    fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
+    const menuArchive = screen.getByRole("menuitem", { name: "归档" });
+    expect(menuArchive).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(menuArchive);
     expect(onArchive).not.toHaveBeenCalled();
   });
 
+  it("does not show the title tooltip while the row's menu is open", async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    const row = screen.getByText("工具定义格式和命名规范").closest(".session-row") as HTMLElement;
+    fireEvent.contextMenu(row, { clientX: 120, clientY: 80 });
+    // 指针移进菜单再回到行上：菜单没关，提示也不弹。
+    await user.hover(screen.getByRole("menuitem", { name: "置顶" }));
+    await user.hover(row);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await user.unhover(row);
+    await user.hover(row);
+    expect(await screen.findByRole("tooltip", {}, { timeout: 1000 })).toBeInTheDocument();
+  });
+
+  it("labels the pin item by the session's current pinned state", () => {
+    renderSidebar();
+    const pinnedRow = screen.getAllByText("Bash 工具开发与权限调度")[0]!.closest(".session-row");
+    fireEvent.contextMenu(pinnedRow as HTMLElement, { clientX: 120, clientY: 80 });
+    expect(screen.getByRole("menuitem", { name: "取消置顶" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "置顶" })).not.toBeInTheDocument();
+  });
+
+  it("switches back to the chat view when selecting a pinned or workspace session", async () => {
+    const user = userEvent.setup();
+    const { onSelectSession, onSelectView } = renderSidebar({ view: "settings" });
+
+    await user.click(screen.getByRole("button", { name: /^Bash 工具开发与权限调度/ }));
+    expect(onSelectView).toHaveBeenLastCalledWith("chat");
+    expect(onSelectSession).toHaveBeenLastCalledWith("s-pinned-1");
+
+    onSelectView.mockClear();
+    await user.click(screen.getByRole("button", { name: /^README file improvement/ }));
+    expect(onSelectView).toHaveBeenLastCalledWith("chat");
+    expect(onSelectSession).toHaveBeenLastCalledWith("s-harness-1");
+  });
+
   it("creates an Agent session directly from the workspace folder +", async () => {
-    const { onNewSession } = renderSidebar();
+    const { onNewSession, onSelectView } = renderSidebar({ view: "extensions" });
 
     const addButtons = screen.getAllByRole("button", { name: "在工作区中新建会话" });
     expect(addButtons.length).toBeGreaterThanOrEqual(2); // actspace-agent + agent-harness-dev
@@ -316,6 +460,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
 
     expect(screen.queryByRole("menu", { name: /选择会话形态/ })).not.toBeInTheDocument();
     expect(onNewSession).toHaveBeenCalledWith(expect.objectContaining({ agentForm: "agent" }));
+    expect(onSelectView).toHaveBeenCalledWith("chat");
   });
 
   it("shows See more when a workspace has more than 10 sessions and loads the next batch on click", async () => {
@@ -363,6 +508,96 @@ describe("Sidebar (cursor-aligned layout)", () => {
 
     expect(screen.getByText("工具定义格式和命名规范")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "会话状态： 空闲" })).toBeInTheDocument();
+  });
+
+  it("shows the session status explanation in a popover that toggles, closes outside and on Esc (16 T16b)", async () => {
+    const onSelectSession = vi.fn();
+    renderSidebar({ onSelectSession });
+    const user = userEvent.setup();
+    const [statusButton] = screen.getAllByRole("button", { name: "会话状态： 空闲" });
+
+    await user.click(statusButton!);
+    const popover = await screen.findByRole("dialog", { name: "会话状态：空闲" });
+    expect(popover).toHaveTextContent("空闲");
+    expect(onSelectSession).not.toHaveBeenCalled();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
+    expect(statusButton).toHaveFocus();
+
+    await user.click(statusButton!);
+    expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
+    // 再点一次按钮是关闭，不会先被当成点外面关掉、再被 onClick 打开。
+    await user.click(statusButton!);
+    expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
+
+    await user.click(statusButton!);
+    expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
+    await user.click(document.body);
+    expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
+
+    // 触屏上 Radix 在按下时就判定「点外面」；按钮本身不算外面，所以点一下按钮仍是关闭，而不是关了又开。
+    await user.click(statusButton!);
+    expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
+    await user.pointer([{ keys: "[TouchA]", target: statusButton! }]);
+    expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
+  });
+
+  it("does not bring back the row tooltip after the status popover closes with the pointer elsewhere", async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    const row = screen.getByText("工具定义格式和命名规范").closest(".session-row") as HTMLElement;
+    await user.hover(row);
+    expect(await screen.findByRole("tooltip", {}, { timeout: 1000 })).toBeInTheDocument();
+
+    const statusButton = within(row).getByRole("button", { name: "会话状态： 空闲" });
+    await user.click(statusButton);
+    expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
+    // 说明开着时指针离开了这一行（去点别处），说明关闭后行的悬停提示不应该再冒出来。
+    await user.click(document.body);
+    expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("does not bring back the focus tooltip after a keyboard-opened menu or popover is dismissed elsewhere", async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    const row = screen.getByText("工具定义格式和命名规范").closest(".session-row") as HTMLElement;
+    const title = screen.getByRole("button", { name: /^工具定义格式和命名规范/ });
+
+    // 键盘打开右键菜单（没有 pointerdown 替我们关提示），再点别处关掉菜单。
+    title.focus();
+    expect(await screen.findByRole("tooltip")).toBeInTheDocument();
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    await user.click(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    // 悬停出提示后用键盘打开状态说明，说明开着时指针离开这一行，再点别处关掉说明。
+    await user.hover(row);
+    expect(await screen.findByRole("tooltip", {}, { timeout: 1000 })).toBeInTheDocument();
+    within(row).getByRole("button", { name: "会话状态： 空闲" }).focus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
+    await user.unhover(row);
+    await user.click(document.body);
+    expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    // 键盘打开状态说明，同样点别处关掉。
+    const statusButton = within(row).getByRole("button", { name: "会话状态： 空闲" });
+    title.focus();
+    expect(await screen.findByRole("tooltip")).toBeInTheDocument();
+    statusButton.focus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
+    await user.click(document.body);
+    expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("collapses Pinned section when its label is clicked", async () => {
@@ -434,6 +669,41 @@ describe("Sidebar (cursor-aligned layout)", () => {
     await user.click(screen.getByRole("menuitem", { name: "重命名" }));
     expect(screen.getByRole("textbox", { name: "重命名会话 工具定义格式和命名规范" })).toBeInTheDocument();
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("disables Archive all while any session of the workspace is busy, pinned ones included", () => {
+    const archiveAll = (workspace: string) => {
+      fireEvent.contextMenu(screen.getByRole("button", { name: workspace }), { clientX: 24, clientY: 60 });
+      const item = screen.getByRole("menuitem", { name: "归档全部" });
+      const disabled = item.getAttribute("aria-disabled") === "true";
+      fireEvent.keyDown(item, { key: "Escape" });
+      return disabled;
+    };
+
+    const { rerender } = renderSidebar({ busySessionIds: new Set(["s-pinned-1"]) });
+    expect(archiveAll("actspace-agent")).toBe(true);
+    expect(archiveAll("agent-harness-dev")).toBe(false);
+    expect(archiveAll("Default workspace")).toBe(true);
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <TestSidebar sessions={SESSIONS} workspaces={WORKSPACES} activeSessionId={null} mode="expanded" view="chat" onArchiveWorkspace={vi.fn()} sessionStatuses={{ "s-harness-1": "waiting_approval" }} />
+      </TooltipProvider>,
+    );
+    expect(archiveAll("actspace-agent")).toBe(false);
+    expect(archiveAll("agent-harness-dev")).toBe(true);
+  });
+
+  it("labels a remote workspace group with the host name from the host directory", async () => {
+    setupBridge({
+      "hosts.list": async () => [{ id: "c1", hostId: "h1", name: "新名", endpoint: { kind: "wss", url: "wss://example.test" }, state: "connected" }] as never,
+    });
+    renderSidebar({
+      sessions: [makeSession({ id: "remote", title: "Remote", hostId: "h1", hostName: "旧名", connectionState: "connected", workspaceRoot: "/srv/app" })],
+    });
+
+    expect(screen.getByRole("button", { name: "旧名 · app" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "新名 · app" })).toBeInTheDocument();
   });
 
   it("renders nothing when mode is hidden", () => {

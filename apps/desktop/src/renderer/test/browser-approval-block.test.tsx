@@ -1,8 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { BrowserApprovalBlock } from "../components/messages/BrowserApprovalBlock";
+import { setupBridge } from "./helpers/bridge";
 
 function makeMessage(): Extract<MessageBlock, { kind: "tool" }> {
   return {
@@ -19,13 +20,9 @@ function makeMessage(): Extract<MessageBlock, { kind: "tool" }> {
 }
 
 describe("BrowserApprovalBlock", () => {
-  afterEach(() => {
-    delete (window as unknown as { actspace?: unknown }).actspace;
-  });
-
   it("approves only the displayed browser action", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
-    window.actspace = { submitApproval } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": submitApproval });
     render(<BrowserApprovalBlock message={makeMessage()} />);
 
     expect(screen.getByText("确认浏览器操作")).toBeInTheDocument();
@@ -43,7 +40,7 @@ describe("BrowserApprovalBlock", () => {
 
   it("denies the current action", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
-    window.actspace = { submitApproval } as unknown as Window["actspace"];
+    setupBridge({ "approvals.submit": submitApproval });
     render(<BrowserApprovalBlock message={makeMessage()} />);
 
     await userEvent.click(screen.getByRole("button", { name: "拒绝" }));
@@ -55,9 +52,9 @@ describe("BrowserApprovalBlock", () => {
   });
 
   it("keeps the card actionable when submitting fails", async () => {
-    window.actspace = {
-      submitApproval: vi.fn(async () => ({ ok: false, reason: "expired" })),
-    } as unknown as Window["actspace"];
+    setupBridge({
+      "approvals.submit": vi.fn(async () => ({ ok: false, reason: "expired" })),
+    });
     render(<BrowserApprovalBlock message={makeMessage()} />);
 
     await userEvent.click(screen.getByRole("button", { name: "允许这次" }));

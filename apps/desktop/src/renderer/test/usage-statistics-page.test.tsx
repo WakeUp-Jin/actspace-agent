@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
 import { mockUsageActivity } from "./fixtures/usageStatisticsFixture";
 import type { SettingsV4Snapshot, UsageActivitySnapshot } from "@actspace/shared";
+import { overrideBridge } from "./helpers/bridge";
 
 const data: UsageActivitySnapshot = { ...mockUsageActivity, costSummary: { costUsd: 0.123456, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 }, rows: mockUsageActivity.rows.map((row) => row.costUsd === null ? row : { ...row, costAmount: row.costUsd, costCurrency: "USD", costBasis: "estimated" }) };
 describe("使用统计", () => {
@@ -27,7 +28,7 @@ describe("使用统计", () => {
   it("sends search to the full query and preserves status and search on pagination", async () => {
     const refresh = vi.fn(); const next = vi.fn();
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, rowsPage: { page: 1, pageSize: 10, totalRows: 21, totalPages: 3 } }} onRefresh={refresh} onRequestPageChange={next} />);
-    await userEvent.click(screen.getByRole("button", { name: "筛选状态" }));
+    await userEvent.click(screen.getByRole("combobox", { name: "筛选状态" }));
     await userEvent.click(screen.getByRole("option", { name: "失败" }));
     await userEvent.type(screen.getByLabelText("搜索使用记录"), "deepseek");
     await waitFor(() => expect(refresh).toHaveBeenLastCalledWith("month", 1, "error", "deepseek", undefined));
@@ -43,7 +44,7 @@ describe("使用统计", () => {
   });
   it("removes pricing UI and never reads or refreshes the catalog on entry", () => {
     const get = vi.fn(); const refresh = vi.fn();
-    window.actspace = { ...window.actspace, getPricingCatalog: get, refreshPricingCatalog: refresh };
+    overrideBridge({ "models.getPricingCatalog": get, "models.refreshPricingCatalog": refresh });
     const saved = { settings: { activity: { usage: { range: "30d", status: "all", modelFilter: "", showDetails: true, activeTab: "pricing" } } } } as unknown as SettingsV4Snapshot;
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={data} settingsV4={saved} />);
     expect(screen.getByRole("tab", { name: /请求日志/ })).toHaveAttribute("aria-selected", "true");

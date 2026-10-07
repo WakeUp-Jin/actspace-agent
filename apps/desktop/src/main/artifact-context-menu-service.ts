@@ -1,9 +1,10 @@
 import { clipboard, Menu, nativeImage, shell, type BrowserWindow, type MenuItemConstructorOptions } from "electron";
 import { readFile, realpath, stat } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
-import { spawn } from "node:child_process";
+import { resolve } from "node:path";
 import type { ArtifactContextMenuInput, ArtifactContextMenuResult } from "@actspace/shared";
 import type { AppDataRoots } from "./app-paths";
+import { isPathInside } from "./workspace-access";
+import { openInCursor } from "./platform-actions";
 
 export type ResolvedArtifactContextTarget = {
   path: string;
@@ -14,22 +15,17 @@ export type ResolvedArtifactContextTarget = {
 
 const MAX_COPY_TEXT_BYTES = 2 * 1024 * 1024;
 
-function isInside(root: string, target: string): boolean {
-  const pathFromRoot = relative(root, target);
-  return pathFromRoot === "" || (!pathFromRoot.startsWith("..") && !isAbsolute(pathFromRoot));
-}
-
 async function resolveWorkspaceTarget(
   input: Extract<ArtifactContextMenuInput, { kind: "workspace_file" }>,
   roots: AppDataRoots,
 ): Promise<ResolvedArtifactContextTarget | null> {
   const root = resolve(input.workspaceRoot ?? roots.defaultWorkspaceRoot);
   const requestedPath = resolve(root, input.relativePath);
-  if (!isInside(root, requestedPath)) return null;
+  if (!isPathInside(root, requestedPath)) return null;
 
   try {
     const [realRoot, realPath] = await Promise.all([realpath(root), realpath(requestedPath)]);
-    if (!isInside(realRoot, realPath)) return null;
+    if (!isPathInside(realRoot, realPath)) return null;
     const fileStat = await stat(realPath);
     if (!fileStat.isFile()) return null;
     return { path: realPath, kind: input.kind, size: fileStat.size };
@@ -46,18 +42,6 @@ export async function resolveArtifactContextTarget(
     return resolveWorkspaceTarget(input, roots);
   }
   return null;
-}
-
-function openInCursor(targetPath: string): void {
-  if (process.platform === "darwin") {
-    const child = spawn("/usr/bin/open", ["-a", "Cursor", targetPath], {
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-    return;
-  }
-  void shell.openExternal(`cursor://file${encodeURI(targetPath)}`);
 }
 
 function runMenuAction(label: string, action: () => void | Promise<void>): void {

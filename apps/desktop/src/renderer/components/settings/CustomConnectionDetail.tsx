@@ -19,7 +19,7 @@ import {
   useSingleEditor,
 } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ProviderLogo } from "./ProviderLogo";
 import { CustomConnectionModels } from "./CustomConnectionModels";
 import { CustomModelForm } from "./CustomModelForm";
@@ -36,6 +36,7 @@ import {
   protocolLabel,
   protocolLogoKey,
 } from "./custom-connection-shared";
+import { settingsApi } from "../../api/settings";
 
 type EditorId = "name" | "url" | "key" | "proxy";
 
@@ -79,17 +80,17 @@ export function CustomConnectionDetail({ connection, autoTest = false, onConnect
   const proxy = connection.proxy ?? { enabled: false, url: null };
 
   const refresh = async () => {
-    const snapshot = await window.actspace.getSettingsV4?.();
-    const next = snapshot?.settings.models.connections[connection.connectionId];
+    const snapshot = await settingsApi.getV4();
+    const next = snapshot.settings.models.connections[connection.connectionId];
     if (next) onConnectionChange(next);
     return next ?? connection;
   };
 
   const test = async (current: SettingsV4ConnectionSettings = connection) => {
-    if (!window.actspace.testCustomConnection || !current.defaultModel) return;
+    if (!current.defaultModel) return;
     setTesting(true);
     try {
-      await window.actspace.testCustomConnection({ connectionId: current.connectionId });
+      await settingsApi.testCustomConnection({ connectionId: current.connectionId });
     } catch {
       // 结果已经写进 lastConnection；调用本身失败时保留原状态。
     } finally {
@@ -109,8 +110,7 @@ export function CustomConnectionDetail({ connection, autoTest = false, onConnect
 
   /** 以当前连接为底，合并一处改动后保存；返回新连接。 */
   const update = async (patch: Partial<RuntimeV2UpdateCustomConnectionInput>): Promise<SettingsV4ConnectionSettings> => {
-    if (!window.actspace.updateCustomConnection) throw new Error("当前版本不支持编辑连接。");
-    const snapshot = await window.actspace.updateCustomConnection({
+    const snapshot = await settingsApi.updateCustomConnection({
       providerId: connection.providerId,
       connectionId: connection.connectionId,
       protocol,

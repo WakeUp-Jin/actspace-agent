@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ExtensionsPage } from "../components/extensions/ExtensionsPage";
 import { extensionsSettings, extensionSkills, extensionBrowserStatus } from "./fixtures/extensionsFixture";
+import { setupBridge } from "./helpers/bridge";
 
 describe("ExtensionsPage", () => {
   const updateSettings = vi.fn();
@@ -17,15 +18,14 @@ describe("ExtensionsPage", () => {
     listSkills.mockResolvedValue({ items: extensionSkills, warnings: [] });
     installSkill.mockResolvedValue({ ok: true, name: "new-skill" });
     uninstallSkill.mockResolvedValue({ ok: true });
-    window.actspace = {
-      getSettings: vi.fn(async () => extensionsSettings()), updateSettings,
-      listSkills, installSkill, uninstallSkill,
-      getBrowserBridgeStatus: vi.fn(async () => extensionBrowserStatus),
-    } as unknown as typeof window.actspace;
+    setupBridge({
+      "settings.get": vi.fn(async () => extensionsSettings()), "settings.update": updateSettings,
+      "skills.list": listSkills, "skills.install": installSkill, "skills.uninstall": uninstallSkill,
+      "browserBridge.getStatus": vi.fn(async () => extensionBrowserStatus),
+    });
   });
 
   afterEach(() => {
-    delete (window as { actspace?: typeof window.actspace }).actspace;
     vi.restoreAllMocks();
   });
 

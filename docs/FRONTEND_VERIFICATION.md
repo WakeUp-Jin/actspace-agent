@@ -55,7 +55,7 @@ pnpm build
 http://127.0.0.1:5173/
 ```
 
-浏览器验证只加载 renderer，不代表完整桌面产品。没有 Electron preload 时，页面不应该白屏；它应该显示真实空态、明确的开发提示，或只在测试/显式 demo harness 中使用 mock bridge。
+浏览器验证只加载 renderer，不代表完整桌面产品。开发模式（`pnpm --filter @actspace/desktop dev:renderer`）下没有 Electron preload 时，renderer 注入完整的 mock bridge，场景用 `?mock=<场景>` 选择（默认 `empty`），见下文「浏览器 mock 场景」。生产构建没有 bridge 时显示「无法连接桌面服务」致命页，不渲染 App。bridge 与 mock 的约定见 [Preload bridge 与 Mock 规范](design-docs/frontend/front-preload-bridge与mock规范.md)。
 
 浏览器 renderer 验证不能用运行时假业务数据证明产品状态。稳定样例数据应放在测试、Story 或显式 demo 边界内。
 
@@ -74,6 +74,20 @@ http://127.0.0.1:5173/
 - IPC 是否可用。
 - 本地会话是否真实落盘。
 - 文件读取、附件、持久化、恢复是否正常。
+
+#### 浏览器 mock 场景
+
+目标地址：`http://127.0.0.1:5173/?mock=<场景>`。如果端口被占用，可以用 `VITE_DEV_PORT=<端口> pnpm --filter @actspace/desktop dev:renderer` 换端口。
+
+| `?mock=` | 种子数据 | 适合验证 | 不覆盖 |
+| --- | --- | --- | --- |
+| `empty`（默认） | 没有会话，只有默认工作区 | 首次启动空态、新建会话、Composer 各形态、设置页、浅色 / 深色、窄窗 | 任何已有历史的状态 |
+| `streaming` | 两个会话。打开「检查 bridge 调用方」后约 300ms 开始逐段输出，停在运行态 | 「生成中」界面、流式中切换会话再切回、运行中发送进入队列 / 引导 / 撤回 | 回复完成后的工具调用细节 |
+| `long-session` | 一个 40 轮问答的长会话（含代码块），外加一个短会话 | 长列表滚动、分组、早期历史加载 | 真实分页边界（mock 一次返回全部消息） |
+| `approval-pending` | 一个会话停在高风险 `bash` 命令（`rm -rf …`）的审批上 | 审批卡片、允许 / 拒绝、刷新后经 `approvals.listPending` 恢复 | 真实工具执行结果 |
+| `remote-host` | 三台 Host：devbox 已连接、GPU 服务器离线、旧笔记本已撤销；本机 / devbox / GPU 各一个会话 | 侧栏 Host 分组与离线标记、运行位置菜单、Host 删除 / 重连后的列表 | `hosts.call`（`host.describe`、`files.reference`）、`hosts.preview` / `download` 在 mock 中未实现，会 reject；因此 Host 工作区和模型显示为「等待 Host …」，远端读文件和下载产物只能由单测和真实 Host 覆盖 |
+
+mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`，包括终端创建、新建工作树和 Git 写操作。界面上看到的报错属于 mock 的边界，不是缺陷。如需新增场景，按规范 §7 处理，并同步更新本表。
 
 ### 3. Electron 真实验证
 
@@ -133,6 +147,35 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 | IPC、preload、session、本地文件 | `pnpm typecheck`、`pnpm build`、Electron 真实验证 | Computer Use 操作或用户截图 |
 | 构建脚本、workspace、Electron 配置 | `pnpm typecheck`、`pnpm build`、`pnpm dev` | 检查 `dist-electron/main/index.js` 是否生成 |
 | 设计文档或图片更新 | 文档链接检查 | 对照设计图人工确认 |
+
+## Desktop 前端重构期间的验证矩阵
+
+来源：[08 测试与验证整理 §5](desktop-frontend-refactor/08-测试与验证整理.md)。每个阶段完成后按此表验证。「浏览器 mock」指上文的 mock 场景；「Electron」指真实桌面窗口，无 Computer Use 时用 CDP（`--remote-debugging-port`，临时 `ACTSPACE_DATA_DIR`），具体做法见 [00 总执行计划 §8](exec-plans/active/20261005-desktop-frontend-refactor/00-总执行计划.md)。
+
+| 场景 | 单测 | 浏览器 mock | Electron |
+| --- | --- | --- | --- |
+| 新建本机会话 → 发送 → 流式 → 完成 | app-streaming | `?mock=streaming` | ✓（需要模型 key） |
+| 流式中切换会话再切回 | transcript* | `?mock=streaming` | ✓ |
+| 流式中刷新窗口恢复 | app-approval-recovery | — | ✓ |
+| 加载早期历史后收到新消息 | app-earlier-history* | `?mock=long-session` | ✓ |
+| 运行中发送 → 进入队列 → 引导 → 撤回 → 删除 | app-message-queue | `?mock=streaming` | ✓ |
+| 审批弹出 → 允许 / 拒绝 / 重启后恢复 | app-approval-recovery | `?mock=approval-pending` | ✓ |
+| 新建远端会话（connected / offline / revoked） | run-target-readiness* | `?mock=remote-host`（只看状态显示） | 需要真实 Host |
+| 远端会话中读文件、下载产物 | remoteArtifact | —（mock 未实现 `hosts.call` / `preview` / `download`） | 需要真实 Host |
+| Host 删除后历史会话显示 | app-remote-host-refresh | `?mock=remote-host` | ✓ |
+| 新建工作树（Git / 无提交 / 非 Git） | run-location-menu* | `?mock=empty`（只看菜单） | ✓ |
+| Composer：inline ↔ stacked、`+` 面板、模型、模式 chip | composer-* | ✓ | ✓ |
+| 中文输入法 | composer-ime* | — | ✓（必须真机） |
+| 外链点击不导航主窗口 | window-security（window-navigation* 补全） | — | ✓（系统浏览器是否打开需真机） |
+| macOS 关窗再打开，无孤儿 pty | — | — | ✓（`ps` 核对） |
+| 退出后无残留子进程 | — | — | ✓ |
+| CSP 开启后 mermaid / 高亮 / HTML 预览 / xterm 正常 | — | — | 本轮不加主文档 CSP（11 J1=A），暂不适用 |
+| 浅色 / 深色、480px 窄窗 | — | ✓ | ✓ |
+| 键盘走查（`+` 面板、运行位置菜单、Settings 对话框） | ui-layering* | ✓ | ✓ |
+
+单测列带 `*` 的文件尚未落地，由 08 §4 列出、在后续计划（14 状态层、09 输入框等）中补齐；落地后去掉 `*`。
+
+相关自动检查：`pnpm check:ipc-channels`（IPC 以契约为准）、`pnpm check:renderer-bridge`（renderer 只经 `api/<域>` 访问 bridge）、`pnpm check:frontend-tokens`、`pnpm check:frontend-theme`。其中 `check:renderer-bridge`、`check:ipc-channels` 和这些检查脚本自己的测试（`test:renderer-bridge`、`test:ipc-channels`、`test:frontend-tokens`）已包含在 `pnpm test` 里；`check:frontend-tokens`、`check:frontend-theme` 由 CI 的仓库卫生检查（`scripts/check-repo-hygiene.sh`）运行。
 
 ## 计划与收尾写法
 

@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
+  MultiSelect,
   SettingEditor,
   SettingLinkRow,
   SettingRow,
+  SettingsMenuButton,
   SettingsSaveNoticeProvider,
   SettingsSelect,
   Toggle,
@@ -70,11 +73,47 @@ describe("SettingsPrimitives", () => {
         ]}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "默认会话模型" }));
+    await userEvent.click(screen.getByRole("combobox", { name: "默认会话模型" }));
     expect(screen.getByText("Moonshot")).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "模型 B" })).toBeDisabled();
+    expect(screen.getByRole("option", { name: "模型 B" })).toHaveAttribute("aria-disabled", "true");
     await userEvent.click(screen.getByRole("option", { name: "模型 C" }));
     expect(onChange).toHaveBeenCalledWith("c");
+  });
+
+  it("MultiSelect toggles options and stays open until Escape", async () => {
+    const onChange = vi.fn();
+    function Fixture() {
+      const [values, setValues] = useState<string[]>(["a"]);
+      return <MultiSelect ariaLabel="搜索来源" values={values} onChange={(next) => { onChange(next); setValues(next); }}
+        options={[{ value: "a", label: "网页" }, { value: "b", label: "新闻" }, { value: "c", label: "论文", disabled: true }]} />;
+    }
+    render(<Fixture />);
+    const trigger = screen.getByRole("button", { name: "搜索来源" });
+    expect(trigger).toHaveTextContent("网页");
+    await userEvent.click(trigger);
+    expect(screen.getByRole("menuitemcheckbox", { name: "网页" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemcheckbox", { name: "论文" })).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "新闻" }));
+    expect(onChange).toHaveBeenLastCalledWith(["a", "b"]);
+    await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "网页" }));
+    expect(onChange).toHaveBeenLastCalledWith(["b"]);
+    expect(screen.getByRole("menu", { name: "搜索来源" })).toBeInTheDocument();
+    expect(trigger).toHaveTextContent("新闻");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("SettingsMenuButton runs the chosen action and skips disabled items", async () => {
+    const remove = vi.fn(); const rename = vi.fn();
+    render(<SettingsMenuButton label="管理" ariaLabel="管理连接" items={[{ label: "重命名", onSelect: rename, disabled: true }, { label: "删除", onSelect: remove, danger: true }]} />);
+    await userEvent.click(screen.getByRole("button", { name: "管理连接" }));
+    expect(screen.getByRole("menuitem", { name: "重命名" })).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(screen.getByRole("menuitem", { name: "重命名" }));
+    expect(rename).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("menuitem", { name: "删除" }));
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
   it("save notice shows 已保存 in a status region", async () => {

@@ -472,8 +472,9 @@ export type QuickOpenShortcutUpdateResult =
   | { ok: true; settings: AppSettings; status: QuickOpenShortcutStatus }
   | { ok: false; settings: AppSettings; status: QuickOpenShortcutStatus; error: string };
 
+/** main 在快捷键触发后记录的待消费请求；渲染层只判断有无。 */
 export type QuickOpenRequest = {
-  requestId: string;
+  requestedAt: string;
 };
 
 export type AgentSystemPromptFile = {

@@ -127,6 +127,20 @@ describe("MarkdownProse Mermaid fences", () => {
     await userEvent.keyboard("-");
     expect(within(dialog).getByText("100%")).toBeInTheDocument();
 
+    // 16 T4：Tab / Shift+Tab 在对话框内循环，不跑到后面的页面上。
+    for (let i = 0; i < 8; i += 1) {
+      await userEvent.tab();
+      expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    }
+    await userEvent.tab({ shift: true });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    // 键盘聚焦的按钮会显示 Tooltip，它是最上层：第一下 Esc 只关 Tooltip，第二下才关对话框。
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Mermaid 图表预览" })).toBeInTheDocument();
+
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(expand).toHaveFocus();

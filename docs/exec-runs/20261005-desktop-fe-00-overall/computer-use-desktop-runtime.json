@@ -1,0 +1,364 @@
+{
+  "sessions": [
+    {
+      "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "record_count": 20,
+      "event_type_counts": {
+        "plugin/actspace.agent-service/task": 2,
+        "plugin/actspace.agent-service/run": 2,
+        "user/message": 1,
+        "turn/start": 1,
+        "step/start": 1,
+        "plugin/actspace.context/state": 2,
+        "plugin/actspace.context/supplement": 1,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title-set": 1,
+        "assistant/chunk": 3,
+        "assistant/message": 1,
+        "step/end": 1,
+        "turn/end": 1
+      },
+      "request_models": [
+        "deepseek-flash"
+      ]
+    }
+  ],
+  "review_fixture": {
+    "workspace": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/git-workspace",
+    "modification_utc": "2026-10-07T04:25:44.415515+00:00",
+    "observed_at_utc": "2026-10-07T04:40:50.582750+00:00",
+    "numstat": "1\t0\tsample.txt",
+    "ui_result": "No automatic update while Review stayed open; selecting unstaged afterwards showed sample.txt +1 and exact marker. Scope reload is separate from failed automatic update."
+  },
+  "clipboard_acceptance": {
+    "copy_session_id": {
+      "expected_fixture_session": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "exact_match": true,
+      "raw_clipboard_recorded": false
+    },
+    "copy_session_record": {
+      "contains_fixture_prompt": true,
+      "contains_fixture_reply": true,
+      "not_empty": true,
+      "raw_clipboard_recorded": false
+    }
+  },
+  "run_observations": [
+    {
+      "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "observed_at_utc": "2026-10-07T05:41:52.714600+00:00",
+      "record_count": 578,
+      "event_type_counts": {
+        "plugin/actspace.agent-service/task": 4,
+        "plugin/actspace.agent-service/run": 3,
+        "user/message": 2,
+        "turn/start": 2,
+        "step/start": 2,
+        "plugin/actspace.context/state": 2,
+        "plugin/actspace.context/supplement": 1,
+        "request/header": 2,
+        "request/context": 2,
+        "session/title-set": 2,
+        "assistant/chunk": 543,
+        "assistant/message": 2,
+        "step/end": 1,
+        "turn/end": 1,
+        "agent/mode-set": 2,
+        "session/pinned-set": 4,
+        "tool/call": 1,
+        "permission/asked": 1
+      },
+      "recent_event_types": [
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/message",
+        "tool/call",
+        "permission/asked"
+      ]
+    },
+    {
+      "utc": "2026-10-07T05:59:46.768523+00:00",
+      "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "phase": "Second approval accepted",
+      "event_counts": {
+        "user/message": 3,
+        "turn/start": 3,
+        "turn/end": 2,
+        "tool/call": 2,
+        "permission/asked": 2,
+        "permission/decided": 2,
+        "tool/result": 1
+      }
+    },
+    {
+      "utc": "2026-10-07T06:29:43.321625+00:00",
+      "phase": "Real long reply switching/reload",
+      "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "event_counts": {
+        "user/message": 11,
+        "turn/start": 11,
+        "turn/end": 10,
+        "assistant/chunk": 14872,
+        "assistant/message": 12,
+        "tool/call": 3,
+        "tool/result": 3
+      },
+      "last_event_types": [
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk",
+        "assistant/chunk"
+      ]
+    },
+    {
+      "utc": "2026-10-07T07:43:00.272102+00:00",
+      "phase": "Custom connection real request pending UI completion",
+      "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "event_counts": {
+        "user/message": 13,
+        "turn/end": 12
+      },
+      "latest_request_model": "claude-haiku-4-5-20251001",
+      "layer": "runtime support only; actual UI outcome reported separately"
+    },
+    {
+      "utc": "2026-10-07T08:16:40.454107+00:00",
+      "phase": "Real search request completed, UI outcome separately checked",
+      "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "event_counts": {
+        "user/message": 14,
+        "turn/end": 14
+      },
+      "recent_tool_status": [
+        {
+          "tool": "web_search",
+          "status": "completed"
+        },
+        {
+          "tool": "web_fetch",
+          "status": "completed"
+        }
+      ],
+      "layer": "runtime support only, no output/provider inferred"
+    },
+    {
+      "utc": "2026-10-07T08:23:15.961446+00:00",
+      "phase": "Search providers before and after actual zhipu UI disconnect",
+      "layer": "runtime actual tool result Providers line only, not model narration",
+      "source_format": "packages/tools/web-tools/src/node-ports.ts format Providers line",
+      "before_disconnect": {
+        "time": "2026-10-07T08:15:24.359Z",
+        "tool": "web_search",
+        "status": "completed",
+        "providers": [
+          "tavily",
+          "zhipu"
+        ]
+      },
+      "after_disconnect": {
+        "time": "2026-10-07T08:21:20.063Z",
+        "tool": "web_search",
+        "status": "completed",
+        "providers": [
+          "tavily",
+          "zhipu"
+        ]
+      },
+      "raw_search_or_secrets_recorded": false
+    },
+    {
+      "utc": "2026-10-07T09:39:21.109150+00:00",
+      "phase": "Pre Git routes idle acceptance session sample",
+      "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "event_counts": {
+        "user/message": 17,
+        "turn/start": 17,
+        "turn/end": 17,
+        "tool/call": 9,
+        "tool/result": 9
+      },
+      "layer": "read-only runtime support, not UI pagination evidence"
+    }
+  ],
+  "png_clipboard_preparation": {
+    "utc": "2026-10-07T07:20:25.654581+00:00",
+    "source": "dedicated fixture sample-image.png",
+    "native_clipboard_type": "PNGf",
+    "bytes": 78069,
+    "ui_paste_result": "Actual native Cmd+V produced image.png preview/remove in B, preserved English draft and input focus; evidence b-pasted-png.png. IME and drag remain separate.",
+    "business_state_injected": false
+  },
+  "ime_input_source_premise": {
+    "utc": "2026-10-07T07:57:14.562390+00:00",
+    "layer": "native OS input source preparation only; candidate interaction owned by Sol",
+    "current_source_before_optional_preparation": "com.bytedance.inputmethod.doubaoime.pinyin",
+    "available_apple_pinyin": "com.apple.inputmethod.SCIM.ITABC",
+    "selection_changed": true,
+    "actual_candidate_observed": true,
+    "selected_source": "com.apple.inputmethod.SCIM.ITABC",
+    "selection_result": 0,
+    "selection_utc": "2026-10-07T08:48:49.854333+00:00",
+    "restoration_pending": false,
+    "candidate_evidence": "screenshots/computer-use/desktop/ime-ni-candidates.png",
+    "candidate_observation": "Real native Apple Pinyin ni underline and candidates 你/尼 etc in actual Electron B; parent viewed screenshot; per-key checks continuing",
+    "restored_source": "com.bytedance.inputmethod.doubaoime.pinyin",
+    "restore_result": 0,
+    "restore_utc": "2026-10-07T09:04:46.824552+00:00"
+  },
+  "settings_restoration": [
+    {
+      "utc": "2026-10-07T08:13:04.463674+00:00",
+      "scope": "existing custom connection display name",
+      "original": "cheaprouter.cc",
+      "acceptance_value": "cheaprouter.cc [acceptance]",
+      "actual_ui_save_observed": true,
+      "secret_baseurl_model_changed": false,
+      "restart_retention_verified": false,
+      "restored": false
+    },
+    {
+      "utc": "2026-10-07T08:19:53.951512+00:00",
+      "scope": "search service credential",
+      "provider": "zhipu",
+      "original_ui_connected": true,
+      "acceptance_ui_connected": false,
+      "actual_disconnect_observed": true,
+      "restore_method": "after final normal quit, merge only baseline encrypted zhipu credential into current secrets, restart UI confirm connected",
+      "restored": false
+    },
+    {
+      "utc": "2026-10-07T09:23:33.927126+00:00",
+      "scope": "app appearance mode",
+      "original_ui_mode": "light",
+      "acceptance_ui_mode": "dark",
+      "actual_ui_change_observed": true,
+      "system_os_dark_baseline": false,
+      "restart_retention_verified": false,
+      "restored": false,
+      "layer": "Sol actual native app theme UI; no business state injection"
+    }
+  ],
+  "observation_capabilities": [
+    {
+      "utc": "2026-10-07T08:15:00.839658+00:00",
+      "native_accessibility_trusted": true,
+      "native_post_events_allowed": true,
+      "native_ax_traversal_observed_seconds": 0.879,
+      "native_ax_elements_in_current_settings_scene": 321,
+      "usage": "Sol may use read-only native AX and real OS mouse/keyboard or AXPress fallback for CUA gaps, with actual screenshot verification. No DOM events or business state injection."
+    }
+  ],
+  "credential_presence_after_disconnect": {
+    "utc": "2026-10-07T08:29:07.985091+00:00",
+    "zhipu_present": false,
+    "tavily_present": true,
+    "layer": "read-only current secrets key presence only; no values"
+  },
+  "english_speech_pid_sample": {
+    "sample_duration_seconds": 20,
+    "app_pid": 40906,
+    "observations": [],
+    "actually_heard": false,
+    "layer": "read-only PID support only"
+  },
+  "saved_speech_preview_pid_sample": {
+    "sample_duration_seconds": 30,
+    "app_pid": 40906,
+    "observations": [],
+    "actually_heard": false,
+    "layer": "read-only PID support only, actual UI preview result separately"
+  },
+  "english_learning_restoration": {
+    "utc": "2026-10-07T08:47:51.273926+00:00",
+    "lastSessionId_matches_original": true,
+    "native_ui_confirmed_by_sol": true,
+    "verification_layer": "actual native UI off restored; persisted lastSessionId whitelist matches original, no enabled field inferred",
+    "actual_ui_enabled": false,
+    "enabled_persisted_field_observed": false
+  },
+  "system_appearance_acceptance": {
+    "utc": "2026-10-07T09:31:21.926883+00:00",
+    "baseline_dark_mode": false,
+    "actual_os_changed_to_dark": true,
+    "native_app_system_follow_dark_observed_by_sol": true,
+    "actual_os_restored_to_dark_mode": false,
+    "restore_command_result": false,
+    "app_follow_light_verification_pending": false,
+    "evidence": "screenshots/computer-use/desktop/composer-480-system.png",
+    "layer": "native OS preparation and restoration; app UI owned by Sol",
+    "native_app_follow_light_observed_by_sol": true
+  },
+  "agent_instructions_restore_preparation": {
+    "utc": "2026-10-07T09:38:23.687946+00:00",
+    "private_original_backup_available": true,
+    "original_bytes": 1464,
+    "baseline_equals_current_before_test": true,
+    "raw_prompt_recorded_in_repo": false,
+    "ui_edit_test_pending": true,
+    "restoration_pending": false
+  },
+  "ascii_path_input_source_preparation": {
+    "utc": "2026-10-07T09:41:42.568448+00:00",
+    "original_source": "com.bytedance.inputmethod.doubaoime.pinyin",
+    "selected_source": "com.apple.keylayout.ABC",
+    "selection_result": 0,
+    "restoration_pending": true,
+    "layer": "OS prerequisite for actual system path typing only, no app state injection"
+  },
+  "worktree_first_send": {
+    "utc": "2026-10-07T09:52:39.503519+00:00",
+    "session_id": "a92b153d-19fb-4243-bed6-0f06dd2e83b2",
+    "session_cwd": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/git-workspace",
+    "fixture_git_worktree_count_after_first_send": 1,
+    "new_worktree_created": false,
+    "actual_ui_followup_state": "main · 本机",
+    "actual_unique_reply": "WORKTREE-READY",
+    "layer": "actual native UI result plus runtime session header/git worktree list support; no source diagnosis"
+  },
+  "first_send_recording": {
+    "duration_seconds": 19.998333333333335,
+    "video_size": [
+      2880,
+      1700
+    ],
+    "nominal_fps": 57.152374,
+    "path": "screenshots/computer-use/desktop/first-worktree-send.mov",
+    "transfer_between_agents_missed_send_transition": true,
+    "passed_no_flash": false
+  },
+  "new_folder_acceptance": {
+    "utc": "2026-10-07T09:55:08.843510+00:00",
+    "path": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/folder-parent/desktop-created-1007",
+    "actual_directory_exists": true,
+    "layer": "OS fixture directory support only, actual picker/UI owned by Sol"
+  },
+  "branch_creation_acceptance": {
+    "utc": "2026-10-07T09:57:20.175742+00:00",
+    "branch": "codex/acceptance-new",
+    "exists_in_fixture": true,
+    "current_branch_restored": "main",
+    "layer": "fixture git support, actual creation/switch UI owned by Sol"
+  },
+  "keyboard_tool_rechecks": [
+    {
+      "item": "R21",
+      "candidate": "CU-B04",
+      "original_method": "CUA Return focused cancel did not close",
+      "independent_method": "native AX focus verified by SystemEvents, CG VK36 Return",
+      "independent_actual_ui_result": "dialog closed; focus returned to submit-or-push trigger",
+      "candidate_withdrawn": true,
+      "source_fix_performed": false,
+      "evidence": "screenshots/computer-use/desktop/git-cancel-independent-return.png"
+    }
+  ]
+}

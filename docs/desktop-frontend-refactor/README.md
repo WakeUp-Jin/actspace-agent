@@ -37,10 +37,10 @@
 | D4 | `+` 面板范围 | 认可方案：Cursor 式统一面板（搜索、模式、文件、Skills、模型）；MCP 未实现不放；搜索里的「对话」暂无数据源不放 |
 | D4+ | 输入框外观 | 边框线太重，改为低对比细边 + 柔和阴影（Cursor 式），聚焦时加深阴影而不是加深边框 |
 | D5 | 浏览器 mock 模式 | **保留**。从 App 内 40 处分支改成注入式 mock bridge |
-| D6 | LabPage | **删除**，功能已不存在 |
+| D6 | LabPage | **删除**，功能已不存在（已在 10 删除；Lab 导航入口保留为占位页） |
 | D7 | UI 改动先出 demo | 输入框与远端连接的改动先给 HTML demo 确认，见 [`demo/composer-run-target-demo.html`](demo/composer-run-target-demo.html) |
-| D8 | 输入框 demo 第二轮确认（2026-10-05） | 按 demo 实施，06 §9 九项按 demo 默认值定稿；执行计划见 [09](09-输入框优化执行计划.md)，**待批准后动代码** |
-| D9 | 执行方式（2026-10-05） | A1 按本文 §5 顺序；B1 每份设计文档一份任务级执行计划（10–17，加修订后的 09），由 [00 总执行计划](00-总执行计划.md) 统领，一起审一次；C2 settings-service 拆分纳入、排最后；C1（`applyToEnv`）、C3（协议）以后单独做；E 连续执行，只在设计偏差、修不好的测试、需要改协议时停下；J1 本轮不加主文档 CSP；J2 主线 `refactor/desktop-frontend` 加每份计划一个子分支，结束时 squash 成一个提交，不打 tag；J3 计划移进 `exec-plans/active/`；J4 附件随草稿保存 |
+| D8 | 输入框 demo 第二轮确认（2026-10-05） | 按 demo 实施，06 §9 九项按 demo 默认值定稿；执行计划见 [09](../exec-plans/active/20261005-desktop-frontend-refactor/09-输入框优化执行计划.md)；2026-10-06 已批准，2026-10-07 已实施（P1–P6） |
+| D9 | 执行方式（2026-10-05） | A1 按本文 §5 顺序；B1 每份设计文档一份任务级执行计划（10–17，加修订后的 09），由 [00 总执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/00-总执行计划.md) 统领，一起审一次；C2 settings-service 拆分纳入、排最后；C1（`applyToEnv`）、C3（协议）以后单独做；E 连续执行，只在设计偏差、修不好的测试、需要改协议时停下；J1 本轮不加主文档 CSP；J2 主线 `refactor/desktop-frontend` 加每份计划一个子分支，结束时 squash 成一个提交，不打 tag；J3 计划移进 `exec-plans/active/`；J4 附件随草稿保存 |
 | D10 | 验收（2026-10-05） | 每份计划一个 `acceptance-handoff.md`，按阶段填写，由 Codex 验收、用户转达反馈；子智能体只做探索和验收复核；不使用 computer use，用 CDP 做能做的检查 |
 
 ## 4. 文档索引
@@ -49,27 +49,27 @@
 | --- | --- | --- | --- | --- |
 | 01 | [安全与 IPC 收口](01-安全与IPC收口.md) | workspace root 校验、sender 校验、导航 / CSP、openExternal、IPC 去重、生命周期 | 高 | `docs/exec-plans/active/` + `docs/SECURITY.md` 补条款 |
 | 02 | [Renderer 状态层与会话数据流](02-Renderer状态层与会话数据流.md) | 拆 App.tsx、per-session store、正文单一事实源、类型化 identity、IPC 风暴 | 高 | `docs/design-docs/frontend/` + exec-plan |
-| 03 | [运行目标抽象：本机与远端](03-运行目标抽象-本机与远端.md) | `RunTarget` 模型、`host:` id 统一解码、30 处分支收口、`useRemoteTarget` 重写 | 中 | `docs/design-docs/frontend/front-workspace-git-worktree-context.md` 合并 |
+| 03 | [运行目标抽象：本机与远端](03-运行目标抽象-本机与远端.md) | `RunTarget` 模型、`host:` id 统一解码、30 处分支收口、`useRemoteTarget` 重写。**已按 15 实施** | 中 | 已合并进 `docs/design-docs/frontend/front-workspace-git-worktree-context.md`「运行目标」一节 |
 | 04 | [Preload 接口与 Mock Bridge](04-Preload接口与MockBridge.md) | 接口按域分组、必选类型、`satisfies` 对齐、注入式 mock bridge | 中 | `docs/design-docs/frontend/` |
-| 05 | [UI 基础组件与大组件拆分](05-UI基础组件与大组件拆分.md) | Popover / Menu / Dialog 原语、焦点陷阱、Esc 栈、拆 Settings / Sidebar / Conversation / Workbench | 中 | `front-基础组件封装规范.md` 合并 |
-| 06 | [Composer 与运行目标交互重设计](06-Composer与运行目标交互重设计.md) | 队列移到输入框上方、运行位置菜单、输入框外观、`+` 面板 | 中 | `front-聊天输入框规范.md`、`front-workspace-git-worktree-context.md` 改写 |
+| 05 | [UI 基础组件与大组件拆分](05-UI基础组件与大组件拆分.md) | Popover / Menu / Dialog 原语、焦点陷阱、Esc 栈、拆 Settings / Sidebar / Conversation / Workbench。**已按 16 实施**（Composer 归 09） | 中 | 已合并进 `docs/design-docs/frontend/front-基础组件封装规范.md` |
+| 06 | [Composer 与运行目标交互重设计](06-Composer与运行目标交互重设计.md) | 队列移到输入框上方、运行位置菜单、输入框外观、`+` 面板。**已按 09 实施** | 中 | 已合并进 `docs/design-docs/frontend/front-聊天输入框规范.md` 和 `front-workspace-git-worktree-context.md` |
 | 07 | [冗余清理清单](07-冗余清理清单.md) | 已核实可删的文件、prop、分支、目录、channel | 低 | exec-plan 的第一阶段 |
 | 08 | [测试与验证整理](08-测试与验证整理.md) | 删死测试、改脆弱断言、补缺口、验证矩阵 | 低 | `docs/FRONTEND_VERIFICATION.md` 补充 |
-| 00 | [总执行计划](00-总执行计划.md) | 顺序、每个任务 / 阶段 / 计划的流程、停止条件、分支与提交、验收交接模板、基线、CDP 方法、总进度 | — | `docs/exec-plans/active/`（S0-5） |
-| 09 | [输入框优化执行计划（含发送队列）](09-输入框优化执行计划.md) | 按已确认 demo 实施：外观 / 布局、发送队列托盘、`+` 面板与 ModelPicker、运行位置菜单与只读状态行、Composer 剩余拆分；建立在 15、16 之上；T1–T30 | 中 | `docs/exec-plans/active/` |
-| 10 | [冗余清理执行计划](10-冗余清理执行计划.md) | 07 R1–R10、B1；08 §2；T0–T12 | 低 | `docs/exec-plans/active/` |
-| 11 | [安全与 IPC 执行计划](11-安全与IPC执行计划.md) | 01 S1–S5、channel 审计脚本、C1 核实；J1 CSP 已定为 A（本轮不加）；T0–T10 | 高 | `docs/exec-plans/active/` |
-| 12 | [测试整理执行计划](12-测试整理执行计划.md) | 08 §3.1–3.2：读源码的测试改成 token 规则或语义断言；T1–T8 | 低 | `docs/exec-plans/active/` |
-| 13 | [Preload 与 Mock Bridge 执行计划](13-Preload与MockBridge执行计划.md) | 04、01 S6、08 §3.3 / §5：契约、注册器、`R/api/*`、注入式 mock、`setupBridge`；T0–T11 | 中 | `docs/exec-plans/active/` |
-| 14 | [状态层执行计划](14-状态层执行计划.md) | 02：SessionLocalStore、durable 单一事实源、类型化 identity、live-run store、Context、pending submission；T0–T21 | 高 | `docs/exec-plans/active/` |
-| 15 | [运行目标执行计划](15-运行目标执行计划.md) | 03、01 S9：session locator、HostDirectory、RunTarget / readiness、gateway、审批 hostId、run-git；T0–T15 | 中 | `docs/exec-plans/active/` |
-| 16 | [UI 原语与组件拆分执行计划](16-UI原语与组件拆分执行计划.md) | 05：Radix 原语、对话框和菜单迁移、四个大组件拆分、Composer 单次挂载、按钮基线；T0–T18 | 中 | `docs/exec-plans/active/` |
-| 17 | [settings-service 拆分执行计划](17-settings-service拆分执行计划.md) | 01 S8：先补特征测试，再纯搬迁到 `main/settings/`；T0–T8 | 中 | `docs/exec-plans/active/` |
+| 00 | [总执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/00-总执行计划.md) | 顺序、每个任务 / 阶段 / 计划的流程、停止条件、分支与提交、验收交接模板、基线、CDP 方法、总进度 | — | `docs/exec-plans/active/20261005-desktop-frontend-refactor/` |
+| 09 | [输入框优化执行计划（含发送队列）](../exec-plans/active/20261005-desktop-frontend-refactor/09-输入框优化执行计划.md) | 按已确认 demo 实施：外观 / 布局、发送队列托盘、`+` 面板与 ModelPicker、运行位置菜单与只读状态行、Composer 剩余拆分；建立在 15、16 之上；T1–T30 | 中 | `docs/exec-plans/active/` |
+| 10 | [冗余清理执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/10-冗余清理执行计划.md) | 07 R1–R10、B1；08 §2；T0–T12 | 低 | `docs/exec-plans/active/` |
+| 11 | [安全与 IPC 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md) | 01 S1–S5、channel 审计脚本、C1 核实；J1 CSP 已定为 A（本轮不加）；T0–T10 | 高 | `docs/exec-plans/active/` |
+| 12 | [测试整理执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/12-测试整理执行计划.md) | 08 §3.1–3.2：读源码的测试改成 token 规则或语义断言；T1–T8 | 低 | `docs/exec-plans/active/` |
+| 13 | [Preload 与 Mock Bridge 执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/13-Preload与MockBridge执行计划.md) | 04、01 S6、08 §3.3 / §5：契约、注册器、`R/api/*`、注入式 mock、`setupBridge`；T0–T11 | 中 | `docs/exec-plans/active/` |
+| 14 | [状态层执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/14-状态层执行计划.md) | 02：SessionLocalStore、durable 单一事实源、类型化 identity、live-run store、Context、pending submission；T0–T21 | 高 | `docs/exec-plans/active/` |
+| 15 | [运行目标执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/15-运行目标执行计划.md) | 03、01 S9：session locator、HostDirectory、RunTarget / readiness、gateway、审批 hostId、run-git；T0–T15 | 中 | `docs/exec-plans/active/` |
+| 16 | [UI 原语与组件拆分执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md) | 05：Radix 原语、对话框和菜单迁移、四个大组件拆分、Composer 单次挂载、按钮基线；T0–T18 | 中 | `docs/exec-plans/active/` |
+| 17 | [settings-service 拆分执行计划](../exec-plans/active/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md) | 01 S8：先补特征测试，再纯搬迁到 `main/settings/`；T0–T8 | 中 | `docs/exec-plans/active/` |
 | demo | [composer-run-target-demo.html](demo/composer-run-target-demo.html) | 输入框、队列、运行位置菜单、`+` 面板的可交互 demo | — | `docs/design-docs/frontend/` |
 
 ## 5. 执行顺序与依赖
 
-**执行计划的顺序（2026-10-05 定稿，详见 [00](00-总执行计划.md)）**：10 → 11 → 12 → 13 → 14 → 15 → 16 → 09 → 17，严格串行。下面是设计阶段的依赖分析，保留作为理由。
+**执行计划的顺序（2026-10-05 定稿，详见 [00](../exec-plans/active/20261005-desktop-frontend-refactor/00-总执行计划.md)）**：10 → 11 → 12 → 13 → 14 → 15 → 16 → 09 → 17，严格串行。下面是设计阶段的依赖分析，保留作为理由。
 
 ```text
 阶段 A（可并行，低冲突）
@@ -105,13 +105,13 @@
 | P0 | 正文靠字符串前缀去重，改 id 格式即重复 / 丢消息 | 02 |
 | P0 | `sessionRecord` 两个写入者，可能冲掉已加载的早期历史 | 02 |
 | P1 | 约 10 个按会话 Map 只增不减 | 02 |
-| P1 | 切换会话时附件可能串会话（待真机验证） | 06 |
+| P1 | ~~切换会话时附件可能串会话（待真机验证）~~ 已在 16 处理：Composer 只挂一次，附件按会话存进 SessionLocalStore | 06 |
 | P1 | `useRemoteTarget` 返回值不稳定，`handleSend` / `executionContext` 每次重建 | 03 |
 | P1 | macOS 关窗后 pty 成孤儿；退出时 Browser Bridge / 更新服务未清理 | 01 |
-| P1 | 三套 IPC channel 并行注册，`projection-ipc` 18 个 handler 无调用方 | 01 |
-| P1 | 10+ 套弹层实现，Esc 一次关多层，多数对话框无焦点陷阱 | 05 |
-| P2 | LabPage / ExploreRunBlock / Sheet / terminal-ipc 等死代码 | 07 |
-| P2 | 70KB 轨迹 fixture 被打进生产包 | 07 |
+| P1 | ~~三套 IPC channel 并行注册，`projection-ipc` 18 个 handler 无调用方~~ 已在 10 处理：DESKTOP / DESKTOP_SHELL 两套已删除，只剩 FIXED | 01 |
+| P1 | ~~10+ 套弹层实现，Esc 一次关多层，多数对话框无焦点陷阱~~ 已在 16 处理：弹层统一用 `components/ui/` 的 Radix 原语；Composer 归 09，三处未迁移的手写弹层记在技术债 | 05 |
+| P2 | ~~LabPage / ExploreRunBlock / Sheet / terminal-ipc 等死代码~~ 已在 10 处理 | 07 |
+| P2 | ~~70KB 轨迹 fixture 被打进生产包~~ 已在 10 处理 | 07 |
 
 ## 7. 本轮不做
 

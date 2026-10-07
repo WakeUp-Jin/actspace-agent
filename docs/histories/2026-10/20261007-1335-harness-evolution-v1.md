@@ -55,3 +55,7 @@
 使用 gpt-6.1-sol 操作真实 Electron，应用内 deepseek-flash 自主读取 Skill、创建工作区、编写源码、构建、prepare/apply，并在下一条用户消息调用新工具；输入 a,b,a,c,b 返回 a,b,c。发现目录列表和通用工具的待审批状态没有可操作 UI，修复 App 投影与 ToolLogLine 通用审批，复用既有审批组件；无有效 requestId 的历史消息保持普通展示。新增两条恢复审批回归，修复前失败、修复后通过。Renderer 广域测试 669 通过、1 既有跳过、1 历史兼容失败；修复后相关两个文件 15 项复验通过，最终类型检查通过。真实模型测试使用隔离工作区与数据，未变更生产配置。
 
 独立会话 inspect 确认仍为 main 且不包含局部去重工具；最终 renderer 构建通过（既有 chunk 提示）。
+
+### 提交与主线集成
+
+用户授权提交并合入 main。功能提交 `62aed823`；与主线前端重构集成时保留新的 App/Composer 拆分结构，将通用待审批转换迁移到 `session/live-runs/stream-blocks.ts`，稳定 Skill ID 选择迁移到 ComposerPalette/SlashMenu，审批测试兼容新 Bridge。合并后 Runtime 依赖闭包与 Client 构建、Desktop typecheck、Renderer 构建、123 项定向桌面测试、文档与包边界检查通过。首次测试使用了旧 Client dist，重建后复验通过；没有据此修改产品逻辑。此前真实模型验收针对功能分支，合并后的组合未重复 Computer Use。

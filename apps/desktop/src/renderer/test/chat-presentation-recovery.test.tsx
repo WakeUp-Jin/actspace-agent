@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Composer } from "../components/Composer";
 import { RightPanel } from "../components/RightPanel";
@@ -8,8 +8,8 @@ import { RightPanelProvider } from "../components/right-panel/RightPanelContext"
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { mockContextSnapshot } from "./fixtures/workbenchFixture";
 import { formatChatAttachmentIssue } from "@actspace/shared";
+import { setupBridge } from "./helpers/bridge";
 
-afterEach(() => { delete (window as { actspace?: unknown }).actspace; });
 const attachments = [
   { id: "good", kind: "file" as const, name: "good.txt", path: "/fixture/good.txt" },
   { id: "bad", kind: "file" as const, name: "bad.txt", path: "/fixture/bad.txt" },
@@ -34,40 +34,45 @@ describe("Chat presentation and attachment recovery", () => {
     const user = userEvent.setup(); const onModeChange = vi.fn();
     const image = { id: "img", kind: "image" as const, name: "shot.png", path: "/fixture/shot.png" };
     render(composer({ surface: "initial", onModeChange, draftKey: "chat", draftRestore: { id: 3, sessionId: "chat", text: "草稿", attachments: [attachments[0], image] } }));
+    // 恢复草稿后下一帧聚焦输入框；焦点移出会关掉面板，先等它落定。
+    await waitFor(() => expect(screen.getByRole("textbox")).toHaveFocus());
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    const menu = screen.getByRole("menu", { name: "添加上下文或工具" });
-    expect(within(menu).getAllByRole("menuitem").map((item) => item.getAttribute("aria-label"))).toEqual(["Agent", "Plan", "Chat", "图片与文件"]);
-    await user.click(within(menu).getByRole("menuitem", { name: "Agent" }));
-    expect(onModeChange).toHaveBeenCalledWith("agent");
+    // 只列非默认模式：Chat 是当前模式不列，回 Agent 走模式标签上的 ×。
+    const menu = screen.getByRole("listbox", { name: "添加上下文或工具" });
+    expect(within(menu).getAllByRole("option").map((item) => item.getAttribute("aria-label"))).toEqual(["Plan", "图片与文件"]);
+    await user.click(within(menu).getByRole("option", { name: "Plan" }));
+    expect(onModeChange).toHaveBeenCalledWith("plan");
     expect(screen.getByRole("textbox")).toHaveValue("草稿");
     expect(screen.getByLabelText("已附加的文件 good.txt")).toBeVisible();
     expect(screen.getByLabelText("已附加的图片 shot.png")).toBeVisible();
   });
-  it("keeps the mode menu available after Chat messages", async () => {
+  it("hides the mode group after Chat messages and still offers files", async () => {
     const selectFiles = vi.fn(async () => ({ canceled: true, attachments: [] }));
-    (window as { actspace?: unknown }).actspace = { selectFiles };
+    setupBridge({ "dialogs.selectFiles": selectFiles });
     const user = userEvent.setup();
     render(composer({ surface: "followup" }));
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    expect(screen.getByRole("menuitem", { name: "Plan" })).toBeVisible();
-    await user.click(screen.getByRole("menuitem", { name: "图片与文件" }));
+    expect(screen.getAllByRole("option").map((item) => item.getAttribute("aria-label"))).toEqual(["图片与文件"]);
+    await user.click(screen.getByRole("option", { name: "图片与文件" }));
     expect(selectFiles).toHaveBeenCalled();
-    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
-  it("offers every mode from an empty Agent session and drops the plan-idea chip", async () => {
+  it("offers Plan and Chat from an empty Agent session and drops the plan-idea chip", async () => {
     const user = userEvent.setup(); const onModeChange = vi.fn();
     render(<TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="initial" onModeChange={onModeChange} /></TooltipProvider>);
     expect(screen.queryByText("规划新想法")).toBeNull();
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    expect(screen.getByRole("menuitem", { name: "Agent" })).toBeVisible();
-    await user.click(screen.getByRole("menuitem", { name: "Chat" }));
+    expect(screen.getAllByRole("option").map((item) => item.getAttribute("aria-label"))).toEqual(["Plan", "Chat", "图片", "Skills"]);
+    await user.click(screen.getByRole("option", { name: "Chat" }));
     expect(onModeChange).toHaveBeenCalledWith("chat");
   });
-  it("moves Chat context usage into the composer toolbar instead of a status row", () => {
+  it("shows Chat context usage alone in the status row below the composer", () => {
     const { container } = render(composer({ surface: "followup" }));
     const usage = screen.getByRole("button", { name: /上下文用量/ });
-    expect(screen.getByLabelText("输入框工具栏")).toContainElement(usage);
-    expect(container.querySelector(".composer-status-row")).toBeNull();
+    expect(screen.getByLabelText("输入框工具栏")).not.toContainElement(usage);
+    const row = container.querySelector(".composer-status-row") as HTMLElement;
+    expect(row).toContainElement(usage);
+    expect(within(row).getAllByRole("button")).toEqual([usage]);
   });
   it("retains all draft content and clears only the removed file's error", async () => {
     const user = userEvent.setup(); const onSend = vi.fn();

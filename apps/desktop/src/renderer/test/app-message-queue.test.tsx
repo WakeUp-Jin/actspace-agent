@@ -1,6 +1,6 @@
 import type { FixtureRunInput, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
 import type { TaskSnapshot, TaskCommand, SubmitTaskInput, TaskContentEnvelope } from "@actspace/shared/runtime-v2";
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type {
@@ -14,6 +14,13 @@ import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
+import { overrideBridge, setupBridge } from "./helpers/bridge";
+import { projectRecord } from "./helpers/session-records";
+import { transcriptShadow } from "./helpers/transcript-shadow";
+
+// 14 T15：每次 durable / live 合并都与旧实现对照，不一致就让用例失败（见 helpers/transcript-shadow.ts）。
+vi.mock("../session/transcript", async (importOriginal) => (await import("./helpers/transcript-shadow")).shadowTranscript(await importOriginal()));
+afterEach(() => { expect(transcriptShadow.mismatches.splice(0)).toEqual([]); });
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
@@ -96,27 +103,27 @@ function setupQueueFixture() {
   const clearDesignation = vi.fn(async (_input: Extract<TaskCommand, { op: "designate" }>) => {});
   const abort = vi.fn(async () => true);
 
-  window.actspace = {
-    taskCommand, submitTask,
-    onSessionLiveEvent: (callback: any) => { live.add(callback); return () => live.delete(callback); },
-    getBootstrapState: async () => bootstrapState,
-    getSettings: async () => ({ version: 1, defaultModelId: null, providers: {}, searchProviders: {}, agent: {}, skills: { disabled: [] } }),
-    listSessions: async () => [...records.values()].map((record) => ({
+  setupBridge({
+    "tasks.command": taskCommand, "tasks.submit": submitTask,
+    "events.sessionLive": (callback: any) => { live.add(callback); return () => live.delete(callback); },
+    "app.getBootstrapState": async () => bootstrapState,
+    "settings.get": async () => ({ version: 1, defaultModelId: null, providers: {}, searchProviders: {}, agent: {}, skills: { disabled: [] } }),
+    "sessions.list": async () => [...records.values()].map((record) => ({
       id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: record.meta.agentRunCount,
     })),
-    getSession: async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null,
-    getSessionPage: async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
-    createSession: async () => records.get("queue-a")!,
-    abortAgentRun: abort,
-    listPendingApprovals: async () => [],
-    getUsageStatistics: async () => null,
-    describeContext: async () => null,
-    getReviewSnapshot: async () => ({ ok: false, reason: "not_git_repository" }),
-    setUiZoom: () => {},
-    setNativeTheme: () => {},
-    onShuttingDown: () => () => {},
-    onAgentStream: (callback: typeof emit) => { emit = callback; return () => {}; },
-  } as unknown as Window["actspace"];
+    "sessions.get": projectRecord(async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null),
+    "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
+    "sessions.create": projectRecord(async () => records.get("queue-a")!),
+    "tasks.abort": abort,
+    "approvals.listPending": async () => [],
+    "usage.getStatistics": async () => null,
+    "sessions.describeContext": async () => null,
+    "review.getSnapshot": async () => ({ ok: false, reason: "not_git_repository" }),
+    "appearance.setUiZoom": () => {},
+    "appearance.setNativeTheme": () => {},
+    "events.shuttingDown": () => () => {},
+    "events.agentStream": (callback: typeof emit) => { emit = callback; return () => {}; },
+  });
 
   const event = (sessionId: string, value: Record<string, unknown>) => {
     if (value.type === "user_message_steered") {
@@ -142,7 +149,8 @@ function setupQueueFixture() {
     schedule(sessionId);
   };
   const sentTexts = () => startExecution.mock.calls.map(([input]) => input.userInput);
-  return { records, pending, startExecution, submitTask, executeCompaction, designateSupplement, clearDesignation, abort, event, finish, sentTexts, nextSeq: () => ++seq };
+  const seedTasks = (id: string, tasks: TaskSnapshot["tasks"]) => { states.set(id, { ...state(id), tasks }); };
+  return { records, pending, startExecution, submitTask, taskCommand, seedTasks, executeCompaction, designateSupplement, clearDesignation, abort, event, finish, sentTexts, nextSeq: () => ++seq };
 }
 
 function renderApp() {
@@ -178,10 +186,6 @@ async function queueText(text: string) {
 const tray = () => screen.queryByRole("region", { name: "消息队列" });
 
 describe("App message queue", () => {
-  afterEach(() => {
-    delete (window as unknown as { actspace?: unknown }).actspace;
-  });
-
   it("hydrates an active task without duplicating its persisted user message", async () => {
     const fixture = setupQueueFixture();
     const record = fixture.records.get("queue-a")!;
@@ -194,7 +198,7 @@ describe("App message queue", () => {
         content: { kind: "composer-task", original: { userInput: text }, prepared: text } }],
       runs: [{ runId: "recovered-run", taskId: "accepted-task", state: "running", result: null, configuration: {}, harness: { harnessId: "main", generationId: "fixture", revision: 1 } }],
     };
-    window.actspace.taskCommand = vi.fn(async () => ({ snapshot }));
+    overrideBridge({ "tasks.command": vi.fn(async () => ({ snapshot })) });
     renderApp();
     await selectSession("queue-a", "Queue A");
     await screen.findByLabelText("停止 Agent");
@@ -216,14 +220,14 @@ describe("App message queue", () => {
     await userEvent.click(screen.getByLabelText("加入队列"));
     await queueText("third");
 
-    expect(within(tray()!).getByText("2 条排队")).toBeInTheDocument();
+    expect(within(tray()!).getByRole("img", { name: /^2 条排队/ })).toBeInTheDocument();
     expect(within(tray()!).getByText("second")).toBeInTheDocument();
     expect(input.value).toBe("");
     expect(fixture.startExecution).toHaveBeenCalledTimes(1);
 
     await act(async () => fixture.finish("queue-a", "completed"));
     await waitFor(() => expect(fixture.sentTexts()).toEqual(["first question", "second"]));
-    expect(within(tray()!).getByText("1 条排队")).toBeInTheDocument();
+    expect(within(tray()!).getByRole("img", { name: /^1 条排队/ })).toBeInTheDocument();
 
     await act(async () => fixture.finish("queue-a", "completed"));
     await waitFor(() => expect(fixture.sentTexts()).toEqual(["first question", "second", "third"]));
@@ -255,8 +259,136 @@ describe("App message queue", () => {
     await screen.findByText("单个文件不能超过 20 MiB。");
     expect(fixture.submitTask).toHaveBeenCalledTimes(2);
     expect(screen.getByLabelText("消息输入框")).toHaveValue("oversized draft");
-    expect(sessionStorage.getItem("actspace:pending-submission:queue-a")).toBeNull();
+    expect(localStorage.getItem("actspace:pending-submission:queue-a")).toBeNull();
     expect(screen.queryByText("提交结果尚未确认，正在用同一标识核对。")).not.toBeInTheDocument();
+  });
+
+  describe("pending submission recovery (14 T20)", () => {
+    const KEY = "actspace:pending-submission:queue-a";
+    const unknown = { status: "submission-failed", acknowledgement: "unknown" } as never;
+    const seedRecord = (id: string, text: string) => localStorage.setItem(KEY, JSON.stringify({
+      content: JSON.stringify({ sessionId: "queue-a", userInput: text }), id, createdAt: new Date().toISOString(), draft: { sessionId: "queue-a", text },
+    }));
+
+    it("restores an unconfirmed local submission as a draft after remount without resending it", async () => {
+      const fixture = setupQueueFixture();
+      const view = renderApp(); await startFirstRun(fixture);
+      fixture.submitTask.mockResolvedValueOnce(unknown).mockResolvedValueOnce(unknown);
+      await queueText("maybe sent");
+      await screen.findByText("提交尚未确认，再次发送将核对同一次提交。");
+      const record = JSON.parse(localStorage.getItem(KEY)!);
+      expect(record.draft.text).toBe("maybe sent");
+      view.unmount();
+      fixture.submitTask.mockClear();
+
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("maybe sent"));
+      expect(screen.getByText("上次提交尚未确认，再次发送将核对同一次提交。")).toBeInTheDocument();
+      expect(fixture.taskCommand).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "queue-a", op: "snapshot" }));
+      expect(fixture.submitTask).not.toHaveBeenCalled();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
+    });
+
+    it("only clears the record when the task snapshot already holds the same submission", async () => {
+      const fixture = setupQueueFixture();
+      fixture.seedTasks("queue-a", [{ taskId: "sub-1", submissionId: "sub-1", content: { kind: "composer-task", original: { userInput: "landed" }, prepared: "landed" }, acceptedSeq: 1, state: "completed", targetRunId: null, runId: null, continuationOf: null }] as TaskSnapshot["tasks"]);
+      seedRecord("sub-1", "landed");
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+      expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
+      expect(fixture.submitTask).not.toHaveBeenCalled();
+    });
+
+    it("falls back to restoring the draft when the snapshot cannot be read", async () => {
+      const fixture = setupQueueFixture();
+      seedRecord("sub-2", "offline draft");
+      const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      fixture.taskCommand.mockRejectedValue(new Error("IPC 断开"));
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("offline draft"));
+      expect(error).toHaveBeenCalledWith("Failed to check pending submission", expect.any(Error));
+      expect(fixture.submitTask).not.toHaveBeenCalled();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
+      error.mockRestore();
+    });
+
+    // 复核发现：恢复要等一次快照查询。期间用户开始发送或已经输入了内容，都不能再把记录恢复进输入框。
+    const holdSnapshots = (fixture: ReturnType<typeof setupQueueFixture>) => {
+      const original = fixture.taskCommand.getMockImplementation()!;
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      fixture.taskCommand.mockImplementation(async (input: TaskCommand) => {
+        if (input.op === "snapshot") await gate;
+        return original(input);
+      });
+      return () => act(async () => { release(); await Promise.resolve(); });
+    };
+
+    it("does not restore the record while the same content is being sent", async () => {
+      const fixture = setupQueueFixture();
+      seedRecord("sub-4", "in flight");
+      const releaseSnapshots = holdSnapshots(fixture);
+      const submit = fixture.submitTask.getMockImplementation()!;
+      let releaseSubmit!: () => void;
+      const submitGate = new Promise<void>((resolve) => { releaseSubmit = resolve; });
+      fixture.submitTask.mockImplementationOnce(async (input: SubmitTaskInput) => { await submitGate; return submit(input); });
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await userEvent.type(screen.getByLabelText("消息输入框"), "in flight");
+      await userEvent.click(screen.getByLabelText("发送消息"));
+      await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledTimes(1));
+      expect(fixture.submitTask.mock.calls[0]![0].submissionId).toBe("sub-4");
+      await releaseSnapshots();
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+      await act(async () => { releaseSubmit(); await Promise.resolve(); });
+      await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+      expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
+    });
+
+    it("keeps what the user typed while the snapshot was being checked", async () => {
+      const fixture = setupQueueFixture();
+      seedRecord("sub-5", "old draft");
+      const releaseSnapshots = holdSnapshots(fixture);
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await userEvent.type(screen.getByLabelText("消息输入框"), "my own words");
+      await releaseSnapshots();
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("my own words");
+      expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
+      expect(fixture.submitTask).not.toHaveBeenCalled();
+    });
+
+    it("keeps the attachments the user added while the snapshot was being checked", async () => {
+      const fixture = setupQueueFixture();
+      overrideBridge({ "dialogs.getPathForFile": (file: File) => `/Users/test/${file.name}` });
+      seedRecord("sub-6", "old draft");
+      const releaseSnapshots = holdSnapshots(fixture);
+      renderApp(); await selectSession("queue-a", "Queue A");
+      fireEvent.drop(screen.getByLabelText("消息输入面板"), {
+        dataTransfer: { files: [new File(["report"], "report.pdf", { type: "application/pdf" })], types: ["Files"] },
+      });
+      expect(screen.getByLabelText("已附加的文件 report.pdf")).toBeInTheDocument();
+      await releaseSnapshots();
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+      expect(screen.getByLabelText("已附加的文件 report.pdf")).toBeInTheDocument();
+      expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
+    });
+
+    it("reuses the recorded submissionId when the restored draft is sent unchanged", async () => {
+      const fixture = setupQueueFixture();
+      seedRecord("sub-3", "send again");
+      renderApp(); await selectSession("queue-a", "Queue A");
+      await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("send again"));
+      await userEvent.click(screen.getByLabelText("发送消息"));
+      await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledTimes(1));
+      expect(fixture.submitTask.mock.calls[0]![0].submissionId).toBe("sub-3");
+      await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
+    });
   });
 
   it("steers a queued message into the running turn and shows it where it was read", async () => {
@@ -266,11 +398,11 @@ describe("App message queue", () => {
     await act(async () => fixture.event("queue-a", { type: "assistant_text_delta", delta: "working on it" }));
     await queueText("also check tests");
 
-    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 插入" }));
+    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 引导" }));
     const steerInput = fixture.designateSupplement.mock.calls[0]![0];
     expect(steerInput).toMatchObject({ sessionId: "queue-a", op: "designate", runId: fixture.pending.get("queue-a")!.input.agentRunId });
     expect(await within(tray()!).findByText("下一步读取")).toBeInTheDocument();
-    expect(within(tray()!).getByText("1 条已插入")).toBeInTheDocument();
+    expect(within(tray()!).getByRole("img", { name: /1 条已引导/ })).toBeInTheDocument();
 
     await act(async () => fixture.event("queue-a", { type: "user_message_steered", turnId: "turn-1", messageId: steerInput.taskId }));
     expect(tray()).toBeNull();
@@ -288,7 +420,7 @@ describe("App message queue", () => {
     await startFirstRun(fixture);
     await queueText("steer me");
     await queueText("later");
-    await userEvent.click(within(tray()!).getAllByRole("button", { name: "↳ 插入" })[0]!);
+    await userEvent.click(within(tray()!).getAllByRole("button", { name: "↳ 引导" })[0]!);
     await within(tray()!).findByText("下一步读取");
 
     await userEvent.click(screen.getByLabelText("停止 Agent"));
@@ -308,8 +440,8 @@ describe("App message queue", () => {
     await startFirstRun(fixture);
     await queueText("too late");
 
-    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 插入" }));
-    await waitFor(() => expect(within(tray()!).getByText("1 条排队")).toBeInTheDocument());
+    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 引导" }));
+    await waitFor(() => expect(within(tray()!).getByRole("img", { name: /^1 条排队/ })).toBeInTheDocument());
     expect(within(tray()!).queryByText("下一步读取")).not.toBeInTheDocument();
   });
 
@@ -318,10 +450,10 @@ describe("App message queue", () => {
     renderApp();
     await startFirstRun(fixture);
     await queueText("changed my mind");
-    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 插入" }));
+    await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 引导" }));
     await userEvent.click(await within(tray()!).findByRole("button", { name: "撤回" }));
 
-    await waitFor(() => expect(within(tray()!).getByText("1 条排队")).toBeInTheDocument());
+    await waitFor(() => expect(within(tray()!).getByRole("img", { name: /^1 条排队/ })).toBeInTheDocument());
     expect(fixture.clearDesignation).toHaveBeenCalledTimes(1);
   });
 
@@ -334,7 +466,7 @@ describe("App message queue", () => {
       type: "tool_approval_required", toolCallId: "tool-1", toolName: "bash", requestId: "approval-1", reason: "run command",
     }));
 
-    await waitFor(() => expect(within(tray()!).getByRole("button", { name: "↳ 插入" })).toBeDisabled());
+    await waitFor(() => expect(within(tray()!).getByRole("button", { name: "↳ 引导" })).toBeDisabled());
   });
 
   it("auto-sends a background session queue after its run completes", async () => {
@@ -358,7 +490,7 @@ describe("App message queue", () => {
     await userEvent.keyboard("{Enter}");
 
     expect(within(tray()!).getByText("命令")).toBeInTheDocument();
-    expect(within(tray()!).queryByRole("button", { name: "↳ 插入" })).not.toBeInTheDocument();
+    expect(within(tray()!).queryByRole("button", { name: "↳ 引导" })).not.toBeInTheDocument();
 
     await act(async () => fixture.finish("queue-a", "completed"));
     await waitFor(() => expect(fixture.executeCompaction).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "queue-a" })));

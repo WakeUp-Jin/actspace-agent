@@ -6,7 +6,7 @@ import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared
 import { AssistantReply } from "../components/messages/AssistantReply";
 import { ResponseAnnotationCommentPopover } from "../components/messages/ResponseAnnotationCommentPopover";
 import { ResponseAnnotationHighlights } from "../components/messages/ResponseAnnotationHighlights";
-import { ResponseAnnotationContext, isAnnotatableMessageId } from "../components/messages/response-annotation-context";
+import { ResponseAnnotationContext, annotatableMessageIds } from "../components/messages/response-annotation-context";
 import { resolveAnnotationRange } from "../components/messages/response-annotation-text";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { createAnnotationContextValue, makeAnnotation, stubRangeRects } from "./fixtures/response-annotation-helpers";
@@ -122,6 +122,7 @@ describe("comment popover", () => {
     render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={onClose} />);
     const popover = screen.getByRole("dialog", { name: "第 1 条批注的评论" });
     expect(popover).toHaveAttribute("data-anchored", "true");
+    expect(screen.getByRole("textbox", { name: "第 1 条批注的评论" })).toHaveFocus();
     await userEvent.type(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), "  说清楚一点  {Enter}");
     expect(current.drafts[0]).toMatchObject({ comment: "说清楚一点" });
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -153,6 +154,29 @@ describe("comment popover", () => {
     document.removeEventListener("keydown", outerKeyDown);
   });
 
+  it("leaves focus where onClose put it instead of returning it to the element focused before opening", async () => {
+    const before = document.createElement("button");
+    const composer = document.createElement("textarea");
+    document.body.append(before, composer);
+    before.focus();
+    const { unmount } = render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={() => composer.focus()} />);
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), { key: "Escape" });
+    // Radix 在 setTimeout(0) 里处理关闭后的焦点。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(composer).toHaveFocus();
+
+    // 点外部的非焦点元素：焦点随评论框一起丢失，也不回到打开前的元素。
+    unmount();
+    before.focus();
+    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={() => composer.focus()} />);
+    fireEvent.pointerDown(document.body);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(before).not.toHaveFocus();
+    before.remove();
+    composer.remove();
+  });
+
   it("saves typed text on an outside click without stealing focus", () => {
     const onClose = vi.fn();
     render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={onClose} />);
@@ -169,6 +193,7 @@ describe("comment popover", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("评论超过 2,000 个字符");
     expect(screen.getByRole("button", { name: "保存评论" })).toBeDisabled();
     fireEvent.pointerDown(screen.getByRole("button", { name: "回复外部" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(current.drafts[0]).toMatchObject({ comment: "原评论" });
   });
 
@@ -254,10 +279,14 @@ describe("annotation highlights for late replies", () => {
   });
 });
 
-describe("isAnnotatableMessageId", () => {
-  it("accepts only persisted v2 reply ids", () => {
-    expect(isAnnotatableMessageId("v2-12")).toBe(true);
-    expect(isAnnotatableMessageId("turn:abc:assistant")).toBe(false);
-    expect(isAnnotatableMessageId("v2-")).toBe(false);
+describe("annotatableMessageIds", () => {
+  it("accepts only durable blocks, which carry their source journal seq", () => {
+    const createdAt = "2026-10-06T00:00:00.000Z";
+    const ids = annotatableMessageIds([
+      { kind: "assistant", id: "v2-12", content: "durable", createdAt, runId: "run-1", sourceSeq: 12 },
+      { kind: "assistant", id: "turn:run-2:assistant:0", content: "live", createdAt, runId: "run-2" },
+      { kind: "assistant", id: "v2-0", content: "seq zero", createdAt, sourceSeq: 0 },
+    ]);
+    expect([...ids]).toEqual(["v2-12", "v2-0"]);
   });
 });

@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ClientSessionStore, type ClientLiveOverlay, type ClientSessionCell } from "@actspace/client/sessions";
 import { createDesktopSessionBridge, type DesktopSessionBridge } from "./desktop-session-bridge";
+import { liveEvents } from "../api/live-events";
+import { sessionsApi } from "../api/sessions";
 
 export type SessionProjectionContextValue = {
   readonly sessionId: string | null;
@@ -35,13 +37,9 @@ export function SessionProjectionProvider({
 
   useEffect(() => {
     const unsubscribeStore = store.subscribe(() => setVersion((value) => value + 1));
-    const api = typeof window === "undefined" ? undefined : window.actspace;
-    if (!api?.getSessionProjectionSnapshot || !api.onSessionLiveEvent) {
-      return unsubscribeStore;
-    }
     const bridge = createDesktopSessionBridge({
-      getSessionProjectionSnapshot: api.getSessionProjectionSnapshot,
-      onSessionLiveEvent: api.onSessionLiveEvent,
+      getSessionProjectionSnapshot: sessionsApi.getProjectionSnapshot,
+      onSessionLiveEvent: liveEvents.subscribe,
     }, store);
     bridgeRef.current = bridge;
     bridge.start();
@@ -66,6 +64,7 @@ export function SessionProjectionProvider({
       store.select(sessionId);
       return;
     }
+    // 失败已由 bridge 写进 cell 的 status/error，会话视图据此显示错误和「重试」；这里只避免未处理的 rejection。
     void bridge.open(sessionId).catch(() => undefined);
   }, [ownsStore, sessionId, store]);
 
@@ -78,12 +77,6 @@ export function SessionProjectionProvider({
   }), [sessionId, store, version]);
 
   return <SessionProjectionContext.Provider value={value}>{children}</SessionProjectionContext.Provider>;
-}
-
-export function useSessionProjection(): SessionProjectionContextValue {
-  const value = useContext(SessionProjectionContext);
-  if (value === null) throw new Error("useSessionProjection must be used within a SessionProjectionProvider");
-  return value;
 }
 
 /** Optional form for isolated renderer component tests and non-chat surfaces. */

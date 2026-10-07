@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "defaultModelId": "kimi-k2.6",
+  "agent": {
+    "systemPrompt": "Legacy v1 prompt kept for the migration fixture.",
+    "systemPromptPath": "legacy-agent.md",
+    "temperature": 0.4,
+    "maxTokens": 4096.7,
+    "disabledTools": ["bash", 42, "web_fetch"],
+    "bashAlwaysAsk": true,
+    "exploreModelId": "deepseek-v4-pro"
+  },
+  "skills": { "disabled": ["pdf", "pdf", "docx"] }
+}

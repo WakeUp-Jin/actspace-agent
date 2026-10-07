@@ -3,7 +3,7 @@ import type { AppSettings, SettingsUpdateInput, SettingsV4NamespacePatch, Settin
 import { useSettingsSaveNotice } from "./SettingsPrimitives";
 
 function settingsV4Writable(settingsV4?: SettingsV4Snapshot | null): boolean {
-  return Boolean(settingsV4 && typeof window !== "undefined" && window.actspace?.getSettingsV4 && window.actspace?.updateSettingsV4);
+  return Boolean(settingsV4);
 }
 
 /**

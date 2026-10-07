@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
-import type { HostConnection, HostEndpoint } from "@actspace/shared/host-protocol";
+import { useState } from "react";
+import type { HostEndpoint } from "@actspace/shared/host-protocol";
 import { Button } from "../ui/Button";
+import { Select } from "../ui/Select";
+import { hostDirectory, useHostDirectory } from "../../target/host-directory";
+import { hostsApi } from "../../api/hosts";
 const stateNames = { connected: "已连接", connecting: "连接中", offline: "离线", revoked: "设备授权已撤销", incompatible: "连接不兼容" };
 const inputClass = "w-full rounded-act-sm border border-line bg-surface px-3 py-2 text-text-main focus:outline-none focus:ring-2 focus:ring-focus-ring/30";
 function connectionError(error: unknown): string {
@@ -18,19 +21,14 @@ function connectionError(error: unknown): string {
   return "连接未成功，请检查服务器地址、网络和服务器运行状态后重试。";
 }
 export function HostConnectionsSettings() {
-  const [hosts, setHosts] = useState<HostConnection[]>([]);
+  const hosts = useHostDirectory((snapshot) => snapshot.hosts);
+  const listError = useHostDirectory((snapshot) => snapshot.listError);
   const [name, setName] = useState(""); const [kind, setKind] = useState<"wss" | "ssh">("wss");
   const [address, setAddress] = useState(""); const [port, setPort] = useState("4317"); const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    const bridge = window.actspaceHosts; if (!bridge) return;
-    let live = true;
-    void bridge.list().then(value => { if (live) setHosts(value); }, error => { if (live) setError(connectionError(error)); });
-    const unsubscribe = bridge.onChanged(setHosts); return () => { live = false; unsubscribe(); };
-  }, []);
   const perform = async (operation: () => Promise<unknown>) => {
     setBusy(true); setError(null);
-    try { await operation(); setHosts(await window.actspaceHosts!.list()); } catch (error) { setError(connectionError(error)); }
+    try { await operation(); await hostDirectory.refresh(); } catch (error) { setError(connectionError(error)); }
     finally { setBusy(false); }
   };
   return <div className="mx-auto max-w-2xl space-y-6 px-8 py-7 text-text-main">
@@ -38,18 +36,18 @@ export function HostConnectionsSettings() {
     <ul className="space-y-3">{hosts.map(host => <li key={host.id} className="rounded-act-sm border border-line bg-surface p-4">
       <div className="flex items-start justify-between gap-3"><div><div className="font-medium">{host.name}</div><div className="mt-1 break-all text-act-xs text-text-muted">{host.endpoint.kind === "wss" ? host.endpoint.url : `SSH · ${host.endpoint.alias}:${host.endpoint.port}`}</div></div><span className={host.state === "connected" ? "text-operational text-act-xs" : "text-text-muted text-act-xs"}>{stateNames[host.state]}</span></div>
       {host.error && <p className="mt-2 text-act-sm text-danger" role="status">{connectionError(host.error)}</p>}
-      <div className="mt-3 flex gap-2"><Button disabled={busy || host.state === "connecting"} onClick={() => void perform(() => window.actspaceHosts!.reconnect(host.id))}>重新连接</Button><Button disabled={busy} onClick={() => void perform(() => window.actspaceHosts!.remove(host.id))}>移除连接</Button></div>
+      <div className="mt-3 flex gap-2"><Button disabled={busy || host.state === "connecting"} onClick={() => void perform(() => hostsApi.reconnect(host.id))}>重新连接</Button><Button disabled={busy} onClick={() => void perform(() => hostsApi.remove(host.id))}>移除连接</Button></div>
     </li>)}</ul>
-    <form className="space-y-4 rounded-act-sm border border-line p-5" onSubmit={event => { event.preventDefault(); const endpoint: HostEndpoint = kind === "wss" ? { kind, url: address.trim() } : { kind, alias: address.trim(), port: Number(port) }; void perform(async () => { await window.actspaceHosts!.add({ name, endpoint, code }); setCode(""); setName(""); setAddress(""); }); }}>
+    <form className="space-y-4 rounded-act-sm border border-line p-5" onSubmit={event => { event.preventDefault(); const endpoint: HostEndpoint = kind === "wss" ? { kind, url: address.trim() } : { kind, alias: address.trim(), port: Number(port) }; void perform(async () => { await hostsApi.add({ name, endpoint, code }); setCode(""); setName(""); setAddress(""); }); }}>
       <h3 className="font-medium">添加服务器</h3>
       <label className="block space-y-1 text-act-sm"><span>名称</span><input className={inputClass} value={name} onChange={event => setName(event.target.value)} required maxLength={128} placeholder="我的云端 Agent" /></label>
-      <label className="block space-y-1 text-act-sm"><span>连接方式</span><select className={inputClass} value={kind} onChange={event => { setKind(event.target.value as "wss" | "ssh"); setAddress(""); }}><option value="wss">WSS</option><option value="ssh">SSH 隧道</option></select></label>
+      <div className="space-y-1 text-act-sm"><span>连接方式</span><Select ariaLabel="连接方式" className="w-full" value={kind} onValueChange={next => { setKind(next as "wss" | "ssh"); setAddress(""); }} options={[{ value: "wss", label: "WSS" }, { value: "ssh", label: "SSH 隧道" }]} /></div>
       <label className="block space-y-1 text-act-sm"><span>{kind === "wss" ? "服务器地址" : "SSH 配置别名"}</span><input className={inputClass} value={address} onChange={event => setAddress(event.target.value)} required placeholder={kind === "wss" ? "wss://agent.example.com/rpc" : "my-server"} /></label>
       {kind === "ssh" && <><label className="block space-y-1 text-act-sm"><span>服务器上的 Host 端口</span><input className={inputClass} type="number" min={1} max={65535} value={port} onChange={event => setPort(event.target.value)} required /></label><p className="text-act-xs text-text-muted">使用系统 SSH 密钥和已验证的服务器指纹。首次连接前，请先在终端完成 SSH 连接验证。</p></>}
       <label className="block space-y-1 text-act-sm"><span>一次性配对码</span><input className={inputClass} type="password" autoComplete="off" value={code} onChange={event => setCode(event.target.value)} required maxLength={128} /></label>
       <p className="text-act-xs text-text-muted">在服务器运行 host pair 命令获取配对码。配对后，此设备可自动重连。</p>
-      {error && <p role="alert" className="text-act-sm text-danger">{error}</p>}
-      <Button type="submit" disabled={busy || !window.actspaceHosts}>{busy ? "正在连接…" : "配对并连接"}</Button>
+      {(error ?? (listError ? connectionError(listError) : null)) && <p role="alert" className="text-act-sm text-danger">{error ?? connectionError(listError)}</p>}
+      <Button type="submit" disabled={busy}>{busy ? "正在连接…" : "配对并连接"}</Button>
     </form>
   </div>;
 }

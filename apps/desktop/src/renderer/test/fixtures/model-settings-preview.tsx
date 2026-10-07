@@ -6,6 +6,7 @@ import { ProviderSettings } from "../../components/settings/ProviderSettings";
 import { PageShell } from "../../components/settings/SettingsPrimitives";
 import { TooltipProvider } from "../../components/ui/Tooltip";
 import "../../styles/index.css";
+import { setupBridge } from "../helpers/bridge";
 
 const query = new URLSearchParams(location.search);
 document.documentElement.dataset.theme = query.get("theme") ?? "light";
@@ -76,8 +77,8 @@ const snapshot = () => ({ revision: 1, settings: { models: { connections: { ...c
 const ok = <T,>(value: T) => ({ ok: true as const, ...value });
 const failAuth = { ok: false, errorKind: "auth" as const, statusCode: 401, message: "请检查 API Key 是否正确。", checkedAt: now(), models: null };
 
-window.actspace = {
-  listProviders: async () => {
+setupBridge({
+  "providers.list": async () => {
     if (query.get("loading") === "1") await new Promise(() => {});
     return {
     providers: Object.fromEntries(["deepseek", "kimi", "openrouter"].map((id) => [id, {
@@ -87,10 +88,10 @@ window.actspace = {
     };
   },
   // Fixture saves always fail visibly; this preview cannot persist credentials.
-  connectProvider: async () => ({ ok: false, error: { message: "预览样例：不会保存凭据。" } }),
-  updateProvider: async () => ({ ok: false, error: { message: "预览样例：不会保存凭据。" } }),
-  getSettingsV4: async () => snapshot(),
-  probeCustomConnection: async (input: { kind: "draft"; protocol: string; baseUrl: string; authMode: string } | { kind: "saved"; connectionId: string }) => {
+  "providers.connect": async () => ({ ok: false, error: { message: "预览样例：不会保存凭据。" } }),
+  "providers.update": async () => ({ ok: false, error: { message: "预览样例：不会保存凭据。" } }),
+  "settings.getV4": async () => snapshot(),
+  "settings.probeCustomConnection": async (input: { kind: "draft"; protocol: string; baseUrl: string; authMode: string } | { kind: "saved"; connectionId: string }) => {
     await wait(700);
     const draft = input.kind === "draft" ? input : { ...connections[input.connectionId]!, kind: "saved" as const, authMode: connections[input.connectionId]!.authMode ?? "x-api-key" };
     if (scenario === "badkey") return failAuth;
@@ -101,8 +102,8 @@ window.actspace = {
     const resolvedAuth = scenario === "bearer" || draft.authMode === "bearer" ? "bearer" : "x-api-key";
     return { ok: true, message: "ok", checkedAt: now(), resolvedAuth, models: scenario === "nolist" ? null : RELAY_MODELS.map((id) => ({ id })) };
   },
-  createCustomConnection: async (input: CustomConnectionInput) => { await wait(300); createConnection(input); return snapshot(); },
-  updateCustomConnection: async (input: Partial<CustomConnectionInput> & { connectionId: string }) => {
+  "settings.createCustomConnection": async (input: CustomConnectionInput) => { await wait(300); createConnection(input); return snapshot(); },
+  "settings.updateCustomConnection": async (input: Partial<CustomConnectionInput> & { connectionId: string }) => {
     const current = connections[input.connectionId]!;
     connections[input.connectionId] = {
       ...current,
@@ -116,7 +117,7 @@ window.actspace = {
     };
     return snapshot();
   },
-  testCustomConnection: async ({ connectionId }: { connectionId: string }) => {
+  "settings.testCustomConnection": async ({ connectionId }: { connectionId: string }) => {
     await wait(700);
     const connection = connections[connectionId]!;
     const failed = scenario === "badkey" || (scenario === "bearer" && connection.authMode === "x-api-key");
@@ -124,32 +125,32 @@ window.actspace = {
     if (!failed && connection.authMode === "auto") connection.resolvedAuth = scenario === "bearer" ? "bearer" : "x-api-key";
     return failed ? { ok: false, message: connection.lastConnection.message, checkedAt: now(), errorKind: "auth" } : { ok: true, message: "ok", checkedAt: now() };
   },
-  removeCustomConnection: async ({ connectionId }: { connectionId: string }) => { delete connections[connectionId]; return snapshot(); },
-  listInstalledModels: async () => ({ models: [...models] }),
-  addCustomModel: async (input: CustomModelDraftInput & { connectionId: string; setAsConnectionDefault: boolean }) => {
+  "settings.removeCustomConnection": async ({ connectionId }: { connectionId: string }) => { delete connections[connectionId]; return snapshot(); },
+  "models.listInstalled": async () => ({ models: [...models] }),
+  "models.addCustom": async (input: CustomModelDraftInput & { connectionId: string; setAsConnectionDefault: boolean }) => {
     installModel(input.connectionId, connections[input.connectionId]?.protocol, input);
     if (input.setAsConnectionDefault) connections[input.connectionId]!.defaultModel = input.apiModel;
     return ok({ model: models.at(-1) });
   },
-  editCustomModel: async (input: Omit<CustomModelDraftInput, "apiModel"> & { modelKey: string }) => {
+  "models.editCustom": async (input: Omit<CustomModelDraftInput, "apiModel"> & { modelKey: string }) => {
     const model = models.find((item) => item.definition.key === input.modelKey)!;
     model.definition = { ...model.definition, label: input.label ?? model.definition.apiModel, contextWindow: input.contextWindow ?? undefined, maxTokens: input.maxTokens ?? undefined, reasoningConfig: input.reasoningConfig, pricing: input.pricing ?? undefined } as InstalledModelView["definition"];
     return ok({ model });
   },
-  updateModel: async ({ modelKey, enabled }: { modelKey: string; enabled: boolean }) => {
-    const model = models.find((item) => item.definition.key === modelKey)!;
-    model.settings = { ...model.settings, enabled };
+  "models.update": async (input) => {
+    const model = models.find((item) => item.definition.key === input?.modelKey)!;
+    model.settings = { ...model.settings, enabled: input?.enabled ?? model.settings.enabled };
     return ok({ model });
   },
-  removeModel: async ({ modelKey }: { modelKey: string }) => {
+  "models.remove": async ({ modelKey }: { modelKey: string }) => {
     models.splice(models.findIndex((item) => item.definition.key === modelKey), 1);
     return ok({});
   },
-  setCustomConnectionDefaultModel: async ({ connectionId, modelKey }: { connectionId: string; modelKey: string }) => {
+  "models.setCustomConnectionDefault": async ({ connectionId, modelKey }: { connectionId: string; modelKey: string }) => {
     connections[connectionId]!.defaultModel = models.find((item) => item.definition.key === modelKey)!.definition.apiModel;
     return ok({});
   },
-} as unknown as NonNullable<typeof window.actspace>;
+});
 
 createRoot(document.getElementById("root")!).render(
   <TooltipProvider delayDuration={350}>

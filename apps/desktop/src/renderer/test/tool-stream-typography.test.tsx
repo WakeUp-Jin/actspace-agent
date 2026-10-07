@@ -6,6 +6,7 @@ import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { BashRunBlock } from "../components/messages/BashRunBlock";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { messageFlowKind } from "../components/messages/messageFlowStyles";
+import { setupBridge } from "./helpers/bridge";
 
 const base = { id: "fixture", createdAt: "2026-09-16T00:00:00.000Z" };
 
@@ -38,16 +39,16 @@ describe("tool stream presentation preserves behavior", () => {
 
   it("offers deny, exact Session and once choices for pending reads", async () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
-    window.actspace = {
-      submitApproval,
-      listPendingApprovals: async () => [{
+    setupBridge({
+      "approvals.submit": submitApproval,
+      "approvals.listPending": async () => [{
         requestId: "approval-read-1", toolName: "read_file", summary: "Read", reason: "Outside workspace", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
         grantSuggestions: [
           { suggestionId: "exact-read", lifetime: "session", action: "file.read", access: "read", selector: { kind: "exact", canonicalPath: "/tmp/shared/a.md" }, audience: { pluginId: "actspace.filesystem-read", permissionDomain: "filesystem-read", policyVersion: 1 }, label: "This file only" },
           { suggestionId: "tree-read", lifetime: "session", action: "file.read", access: "read", selector: { kind: "subtree", canonicalRoot: "/tmp/shared" }, audience: { pluginId: "actspace.filesystem-read", permissionDomain: "filesystem-read", policyVersion: 1 }, label: "This directory tree" },
         ],
       }],
-    } as unknown as Window["actspace"];
+    });
     render(<ToolLogLine message={{ ...base, kind: "read", status: "pending", filePath: "/tmp/shared/a.md", displayText: "Read", approvalRequestId: "approval-read-1", reason: "The requested file is outside the workspace." }} />);
     expect(screen.getByText("读取")).toBeInTheDocument();
     expect(screen.getByText("a.md")).toHaveClass("text-text-main");

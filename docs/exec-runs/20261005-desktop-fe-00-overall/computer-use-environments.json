@@ -1,0 +1,33 @@
+{
+  "root": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf",
+  "data": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/data",
+  "non_git": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/non-git",
+  "no_head": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/no-head",
+  "git_workspace": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/git-workspace",
+  "folder_parent": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/folder-parent",
+  "downloads": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/downloads",
+  "image": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/git-workspace/sample-image.png",
+  "markdown": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/git-workspace/preview.md",
+  "system_input_source_baseline": {
+    "enabled_readonly": [
+      "ABC",
+      "com.apple.inputmethod.SCIM.ITABC"
+    ],
+    "selected_preference": "com.bytedance.inputmethod.doubaoime.pinyin",
+    "validation": "Preference observation only. Real composition candidates and keyboard behavior remain unverified."
+  },
+  "voiceover_baseline": "defaults voiceOverOn absent; actual UI state must be observed before changing/restoring",
+  "isolated_main_workspace": "/Users/wakeup-jin/.codex/worktrees/desktop-fe-acceptance/actspace-agent",
+  "isolated_main_head": "d5f1bf3eb1f51346789349d57a06f17c18d64cd9",
+  "interruption": "Old Electron PID40906 still running; no switch to temporary data performed.",
+  "current_execution_scope": "Existing real Electron only; browser and isolated-checkout launch canceled by user correction.",
+  "active_app_id": "com.actspace.desktop.dev.w2067fa05",
+  "active_app_pid": 40906,
+  "git_local_upstream": {
+    "bare_repository": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/git-upstream.git",
+    "branch": "main",
+    "upstream": "acceptance-local/main",
+    "baseline_commit": "56a2cd3",
+    "scope": "Dedicated fixture bare clone and local fetch only; no online remote or push."
+  }
+}

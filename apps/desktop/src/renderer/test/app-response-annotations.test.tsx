@@ -8,6 +8,8 @@ import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
 import { clearSelection, selectText, stubRangeRects } from "./fixtures/response-annotation-helpers";
+import { setupBridge } from "./helpers/bridge";
+import { projectRecord } from "./helpers/session-records";
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
@@ -47,22 +49,22 @@ function createAnsweredSession(sessionId: string): SessionRecord {
 function installBridge(runAgent: (input: FixtureRunInput) => Promise<unknown>, prepare = false) {
   const records = new Map(Object.keys(TITLES).map((id) => [id, createAnsweredSession(id)] as const));
   const execute = vi.fn(runAgent);
-  window.actspace = taskHostFixture({
-    getBootstrapState: async () => bootstrapState,
-    getSettings: async () => defaultSettings,
-    getSessionPage: async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
-    getReviewSnapshot: async () => ({ ok: false, code: "not_available", message: "No changes" }),
-    listVisualizations: async () => ({ items: [] }),
-    setUiZoom: () => {}, setNativeTheme: () => {}, onShuttingDown: () => () => {},
-    listWorkspaces: async (): Promise<WorkspaceListResult> => ({ version: 1, defaultWorkspaceId: "default", items: [{ id: "default", kind: "default", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: "2026-09-28T00:00:00.000Z", updatedAt: "2026-09-28T00:00:00.000Z" }] }),
-    listSessions: async () => [...records.values()].map((record) => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 1, agentForm: "chat", workspaceRoot: "/tmp/workspace" })),
-    getSession: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
-    createSession: async () => records.get("annotated-a"),
-    listPendingApprovals: async () => [],
-    onAgentStream: () => () => {},
+  setupBridge(taskHostFixture({
+    "app.getBootstrapState": async () => bootstrapState,
+    "settings.get": async () => defaultSettings,
+    "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
+    "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
+    "visualize.list": async () => ({ items: [] }),
+    "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
+    "workspaces.list": async (): Promise<WorkspaceListResult> => ({ version: 1, defaultWorkspaceId: "default", items: [{ id: "default", kind: "default", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: "2026-09-28T00:00:00.000Z", updatedAt: "2026-09-28T00:00:00.000Z" }] }),
+    "sessions.list": async () => [...records.values()].map((record) => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 1, agentForm: "chat", workspaceRoot: "/tmp/workspace" })),
+    getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
+    "sessions.create": projectRecord(async () => records.get("annotated-a")),
+    "approvals.listPending": async () => [],
+    "events.agentStream": () => () => {},
     execute: prepare ? undefined : execute as (input: FixtureRunInput) => Promise<import("@actspace/shared").AgentRunResult>,
     prepare: prepare ? runAgent : undefined,
-  });
+  }));
   return execute;
 }
 
@@ -119,7 +121,6 @@ beforeEach(() => {
 afterEach(() => {
   clearSelection();
   restoreRects();
-  delete (window as { actspace?: unknown }).actspace;
   window.localStorage.clear();
 });
 

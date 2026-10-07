@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { Boxes, Check, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
 import { PROVIDER_IDS, PROVIDER_REGISTRY, type AppSettings, type InstalledModelView, type ModelKey, type ProviderSettingsView, type LlmProviderId } from "@actspace/shared";
 import { SectionShell, Toggle } from "./SettingsPrimitives";
+import { Select } from "../ui/Select";
 import { OpenRouterModelCatalogDialog } from "./OpenRouterModelCatalogDialog";
+import { modelsApi } from "../../api/models";
+import { settingsApi } from "../../api/settings";
 
 export function ModelSettings({ settings, onChanged, embedded = false, embeddedPlain = false, providerFilter, connectionFilter }: { settings: AppSettings; onChanged?: () => void | Promise<void>; embedded?: boolean; embeddedPlain?: boolean; providerFilter?: LlmProviderId; connectionFilter?: string }) {
   const [installed, setInstalled] = useState<InstalledModelView[]>([]);
@@ -16,33 +19,29 @@ export function ModelSettings({ settings, onChanged, embedded = false, embeddedP
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    if (!window.actspace.listInstalledModels) return;
     const [installedResult] = await Promise.all([
-      window.actspace.listInstalledModels(),
+      modelsApi.listInstalled(),
     ]);
     setInstalled(installedResult.models);
   };
-  useEffect(() => { void load(); void window.actspace.refreshPricingCatalog?.({ force: false }).catch(() => undefined); }, []);
-  useEffect(() => { void window.actspace.getSettingsV4?.().then((snapshot) => { if (snapshot) setConnections(Object.values(snapshot.settings.models.connections).map((connection) => ({ id: connection.connectionId, label: connection.displayName ?? connection.connectionId }))); }); }, []);
+  useEffect(() => { void load(); void modelsApi.refreshPricingCatalog({ force: false }).catch(() => undefined); }, []);
+  useEffect(() => { void settingsApi.getV4().then((snapshot) => { setConnections(Object.values(snapshot.settings.models.connections).map((connection) => ({ id: connection.connectionId, label: connection.displayName ?? connection.connectionId }))); }); }, []);
 
   const toggleModel = async (modelKey: ModelKey, enabled: boolean) => {
-    if (!window.actspace.updateModel) return;
-    const result = await window.actspace.updateModel({ modelKey, enabled });
+    const result = await modelsApi.update({ modelKey, enabled });
     if ("error" in result) setError(result.error.message);
     await load(); await onChanged?.();
   };
 
   const removeModel = async (modelKey: ModelKey) => {
-    if (!window.actspace.removeModel) return;
-    const result = await window.actspace.removeModel({ modelKey });
+    const result = await modelsApi.remove({ modelKey });
     if ("error" in result) setError(`${result.error.message}${result.error.references?.length ? `（${result.error.references.join("、")}）` : ""}`);
     await load(); await onChanged?.();
   };
 
   const updateCredential = async (modelKey: ModelKey, credentialId: string | null) => {
-    if (!window.actspace.updateModel) return;
     setError(null);
-    const result = await window.actspace.updateModel({ modelKey, credentialId });
+    const result = await modelsApi.update({ modelKey, credentialId });
     if ("error" in result) setError(result.error.message);
     await load(); await onChanged?.();
   };
@@ -52,13 +51,11 @@ export function ModelSettings({ settings, onChanged, embedded = false, embeddedP
     await onChanged?.();
   };
 
-  if (!window.actspace?.listInstalledModels) return <SectionShell title="模型" description="仅桌面端可管理模型。"><div /></SectionShell>;
-
   const saveReasoning = async () => {
-    if (!reasoningModel || !window.actspace.updateModel) return;
+    if (!reasoningModel) return;
     setSavingReasoning(true); setError(null);
     try {
-      const result = await window.actspace.updateModel({ modelKey: reasoningModel.definition.key, reasoningConfig });
+      const result = await modelsApi.update({ modelKey: reasoningModel.definition.key, reasoningConfig });
       if ("error" in result) { setError(result.error.message); return; }
       setReasoningModel(null); await load(); await onChanged?.();
     } catch (e) { setError(e instanceof Error ? e.message : "保存失败。"); }
@@ -74,7 +71,7 @@ export function ModelSettings({ settings, onChanged, embedded = false, embeddedP
               ? model.settings.connectionId === connectionFilter
               : !providerFilter || !model.settings.connectionId || model.settings.connectionId === `${provider}:default`));
             if (!models.length) return null;
-              return <section key={provider}>{embeddedPlain ? null : <div className="mb-2 flex items-center gap-2 text-act-sm font-medium text-text-main"><Boxes size={15} />{PROVIDER_REGISTRY[provider].label}<span className="text-act-xxs font-normal text-text-faint">{models.filter((model) => model.settings.enabled).length} / {models.length} 启用</span></div>}{embedded ? <ModelMultiSelector models={models} onChange={async (keys) => { const enabled = new Set(keys); await Promise.all(models.map((model) => toggleModel(model.definition.key, enabled.has(model.definition.key)))); }} onReasoning={(model) => { setReasoningModel(model); setReasoningConfig(model.definition.reasoningConfig ?? { mode: "auto" }); setError(null); }} /> : <div className="divide-y divide-line/70 overflow-hidden rounded-act-lg bg-surface-subtle">{models.map((model) => <ModelRow key={model.definition.key} model={model} provider={settings.providers[provider]} connections={connections.filter((connection) => connection.id.endsWith(":default") || connection.id.startsWith(`${provider}:`) || connection.id === model.settings.connectionId)} onToggle={toggleModel} onRemove={removeModel} onCredentialChange={updateCredential} onConnectionChange={async (key, connectionId) => { if (!window.actspace.updateModel) return; await window.actspace.updateModel({ modelKey: key, connectionId }); await load(); await onChanged?.(); }} onReasoning={model.definition.source === "custom" ? () => { setReasoningModel(model); setReasoningConfig(model.definition.reasoningConfig ?? { mode: "auto" }); setError(null); } : undefined} />)}</div>}</section>;
+              return <section key={provider}>{embeddedPlain ? null : <div className="mb-2 flex items-center gap-2 text-act-sm font-medium text-text-main"><Boxes size={15} />{PROVIDER_REGISTRY[provider].label}<span className="text-act-xxs font-normal text-text-faint">{models.filter((model) => model.settings.enabled).length} / {models.length} 启用</span></div>}{embedded ? <ModelMultiSelector models={models} onChange={async (keys) => { const enabled = new Set(keys); await Promise.all(models.map((model) => toggleModel(model.definition.key, enabled.has(model.definition.key)))); }} onReasoning={(model) => { setReasoningModel(model); setReasoningConfig(model.definition.reasoningConfig ?? { mode: "auto" }); setError(null); }} /> : <div className="divide-y divide-line/70 overflow-hidden rounded-act-lg bg-surface-subtle">{models.map((model) => <ModelRow key={model.definition.key} model={model} provider={settings.providers[provider]} connections={connections.filter((connection) => connection.id.endsWith(":default") || connection.id.startsWith(`${provider}:`) || connection.id === model.settings.connectionId)} onToggle={toggleModel} onRemove={removeModel} onCredentialChange={updateCredential} onConnectionChange={async (key, connectionId) => { await modelsApi.update({ modelKey: key, connectionId }); await load(); await onChanged?.(); }} onReasoning={model.definition.source === "custom" ? () => { setReasoningModel(model); setReasoningConfig(model.definition.reasoningConfig ?? { mode: "auto" }); setError(null); } : undefined} />)}</div>}</section>;
           })}
         </div>
       </>;
@@ -116,5 +113,5 @@ function ModelRow({ model, provider, connections, onToggle, onRemove, onCredenti
   const removable = model.definition.source === "provider-catalog" || model.definition.source === "custom";
   const credentials = provider?.additionalCredentials ?? [];
   const selectedCredential = credentials.find((credential) => credential.id === model.settings.credentialId);
-  return <div className="flex min-h-[68px] items-center justify-between gap-4 px-3.5 py-3"><div className="min-w-0 flex-1"><div className="truncate text-act-sm font-medium text-text-main">{model.settings.customLabel ?? model.definition.label}</div><div className="mt-1 truncate font-mono text-act-xxs text-text-faint">{model.definition.apiModel}</div><div className="mt-1 text-act-xxs text-text-muted">{model.definition.contextWindow ? `${Math.round(model.definition.contextWindow / 1000)}K 上下文` : "上下文容量未知"} · {model.definition.family ?? model.definition.source} · {model.definition.capabilities.toolUse}</div>{connections.length > 0 ? <label className="mt-2 flex max-w-[340px] items-center gap-2"><span className="shrink-0 text-act-xxs font-medium text-text-muted">连接</span><select aria-label={`${model.definition.label} 连接`} value={model.settings.connectionId ?? `${model.definition.provider}:default`} onChange={(event) => onConnectionChange(model.definition.key, event.target.value)} className="h-8 min-w-0 flex-1 rounded-act-md border border-line bg-surface px-2 text-act-xxs text-text-main"><option value={`${model.definition.provider}:default`}>默认连接</option>{connections.filter((connection) => connection.id !== `${model.definition.provider}:default`).map((connection) => <option key={connection.id} value={connection.id}>{connection.label}</option>)}</select></label> : null}{credentials.length > 0 ? <label className="mt-2 flex max-w-[340px] items-center gap-2"><span className="shrink-0 text-act-xxs font-medium text-text-muted">调用 Key</span><select aria-label={`${model.definition.label} 调用 Key`} value={model.settings.credentialId ?? ""} onChange={(event) => onCredentialChange(model.definition.key, event.target.value || null)} className="h-8 min-w-0 flex-1 rounded-act-md border border-line bg-surface px-2 text-act-xxs text-text-main"><option value="" disabled={!provider?.hasApiKey}>默认 Key{provider?.hasApiKey ? "" : "（不可用）"}</option>{model.settings.credentialId && !selectedCredential ? <option value={model.settings.credentialId} disabled>已删除的 Key · 不可用</option> : null}{credentials.map((credential) => <option key={credential.id} value={credential.id} disabled={!credential.hasApiKey}>{credential.label}{credential.hasApiKey ? "" : "（不可用）"}</option>)}</select></label> : null}</div><div className="flex shrink-0 items-center gap-2">{onReasoning ? <button type="button" aria-label={`配置推理能力：${model.definition.label}`} className="text-act-xxs text-text-muted hover:text-action" onClick={onReasoning}>配置推理</button> : null}{removable ? <button type="button" aria-label={`删除 ${model.definition.label}`} className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-danger-soft hover:text-on-danger" onClick={() => onRemove(model.definition.key)}><Trash2 size={16} /></button> : null}<Toggle checked={model.settings.enabled} onChange={(enabled) => onToggle(model.definition.key, enabled)} ariaLabel={`启用 ${model.definition.label}`} /></div></div>;
+  return <div className="flex min-h-[68px] items-center justify-between gap-4 px-3.5 py-3"><div className="min-w-0 flex-1"><div className="truncate text-act-sm font-medium text-text-main">{model.settings.customLabel ?? model.definition.label}</div><div className="mt-1 truncate font-mono text-act-xxs text-text-faint">{model.definition.apiModel}</div><div className="mt-1 text-act-xxs text-text-muted">{model.definition.contextWindow ? `${Math.round(model.definition.contextWindow / 1000)}K 上下文` : "上下文容量未知"} · {model.definition.family ?? model.definition.source} · {model.definition.capabilities.toolUse}</div>{connections.length > 0 ? <div className="mt-2 flex max-w-[340px] items-center gap-2"><span className="shrink-0 text-act-xxs font-medium text-text-muted">连接</span><Select ariaLabel={`${model.definition.label} 连接`} value={model.settings.connectionId ?? `${model.definition.provider}:default`} onValueChange={(value) => onConnectionChange(model.definition.key, value)} className="min-w-0 flex-1" options={[{ value: `${model.definition.provider}:default`, label: "默认连接" }, ...connections.filter((connection) => connection.id !== `${model.definition.provider}:default`).map((connection) => ({ value: connection.id, label: connection.label }))]} /></div> : null}{credentials.length > 0 ? <div className="mt-2 flex max-w-[340px] items-center gap-2"><span className="shrink-0 text-act-xxs font-medium text-text-muted">调用 Key</span><Select ariaLabel={`${model.definition.label} 调用 Key`} value={model.settings.credentialId ?? ""} onValueChange={(value) => onCredentialChange(model.definition.key, value || null)} className="min-w-0 flex-1" options={[{ value: "", label: `默认 Key${provider?.hasApiKey ? "" : "（不可用）"}`, disabled: !provider?.hasApiKey }, ...(model.settings.credentialId && !selectedCredential ? [{ value: model.settings.credentialId, label: "已删除的 Key · 不可用", disabled: true }] : []), ...credentials.map((credential) => ({ value: credential.id, label: `${credential.label}${credential.hasApiKey ? "" : "（不可用）"}`, disabled: !credential.hasApiKey }))]} /></div> : null}</div><div className="flex shrink-0 items-center gap-2">{onReasoning ? <button type="button" aria-label={`配置推理能力：${model.definition.label}`} className="text-act-xxs text-text-muted hover:text-action" onClick={onReasoning}>配置推理</button> : null}{removable ? <button type="button" aria-label={`删除 ${model.definition.label}`} className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-danger-soft hover:text-on-danger" onClick={() => onRemove(model.definition.key)}><Trash2 size={16} /></button> : null}<Toggle checked={model.settings.enabled} onChange={(enabled) => onToggle(model.definition.key, enabled)} ariaLabel={`启用 ${model.definition.label}`} /></div></div>;
 }

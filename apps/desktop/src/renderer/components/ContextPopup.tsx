@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import { Eye, X } from "lucide-react";
 import type { ContextState, ContextUsageSnapshot } from "@actspace/shared";
 import { getContextBucketDisplay } from "@actspace/shared";
 import { contextBucketLabel } from "../context-labels";
 import { selectRequestContextEstimate } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
+import { Popover, PopoverAnchor, PopoverContent } from "./ui/Popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
-const CONTEXT_POPOVER_CLASS =
-  "context-popover absolute bottom-[calc(100%_+_10px)] left-0 right-0 z-20 w-auto rounded-2xl border border-line bg-surface-raised px-3.5 pb-3.5 pt-[13px] text-text-main shadow-act-popover";
+const CONTEXT_POPOVER_GAP_PX = 10;
+const CONTEXT_POPOVER_CLASS = "context-popover w-(--radix-popper-anchor-width) px-3.5 pb-3.5 pt-[13px]";
 const CONTEXT_ROW_CLASS = "flex items-center justify-between gap-3.5";
 const CONTEXT_CLOSE_CLASS =
   "grid h-6 w-6 place-items-center rounded-full border-0 bg-surface-subtle text-text-muted transition-colors hover:bg-[var(--act-color-hover-overlay)]";
@@ -21,12 +22,19 @@ const CONTEXT_BUCKET_CLASS =
 const BUCKET_SWATCH_CLASS = "bucket-swatch h-[13px] w-[13px] rounded-[3px]";
 const CONTEXT_BUCKET_VALUE_CLASS = "font-semibold text-text-main";
 
+/**
+ * Composer 上方的上下文用量浮层，和 Composer 等宽。点 Composer 自身不关闭（开关按钮在 Composer 里），
+ * 点其他地方、Esc、关闭按钮关闭。
+ */
 export function ContextPopup({
+  anchorRef,
   snapshot,
   contextState,
   onClose,
   onExpand
 }: {
+  /** Composer 外框：浮层贴在它上方、与它同宽。 */
+  anchorRef: RefObject<HTMLElement | null>;
   snapshot: ContextUsageSnapshot | null;
   contextState?: ContextState | null;
   onClose: () => void;
@@ -69,89 +77,109 @@ export function ContextPopup({
       : `${Math.floor(safeSnapshot.percentUsed)}`;
 
   return (
-    <div className={CONTEXT_POPOVER_CLASS} role="dialog" aria-label="上下文用量">
-      <header className={`context-popover-header ${CONTEXT_ROW_CLASS}`}>
-        <strong>上下文</strong>
-        <div className="flex items-center gap-1.5">
-          {onExpand ? (
+    <Popover open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <PopoverAnchor virtualRef={anchorRef as RefObject<HTMLElement>} />
+      <PopoverContent
+        className={CONTEXT_POPOVER_CLASS}
+        aria-label="上下文用量"
+        data-composer-floating=""
+        side="top"
+        align="start"
+        sideOffset={CONTEXT_POPOVER_GAP_PX}
+        avoidCollisions={false}
+        radius="2xl"
+        // 焦点放在浮层本身：落到第一个按钮上会立刻弹出它的 Tooltip。
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          (event.currentTarget as HTMLElement).focus();
+        }}
+        onInteractOutside={(event) => {
+          if (anchorRef.current?.contains(event.target as Node | null)) event.preventDefault();
+        }}
+      >
+        <header className={`context-popover-header ${CONTEXT_ROW_CLASS}`}>
+          <strong>上下文</strong>
+          <div className="flex items-center gap-1.5">
+            {onExpand ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={CONTEXT_CLOSE_CLASS}
+                    type="button"
+                    onClick={onExpand}
+                    aria-label="查看完整上下文"
+                  >
+                    <Eye size={15} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>查看完整上下文</TooltipContent>
+              </Tooltip>
+            ) : null}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
-                  className={CONTEXT_CLOSE_CLASS}
-                  type="button"
-                  onClick={onExpand}
-                  aria-label="查看完整上下文"
-                >
-                  <Eye size={15} strokeWidth={2} aria-hidden="true" />
+                <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="关闭上下文">
+                  <X size={15} strokeWidth={2.2} aria-hidden="true" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>查看完整上下文</TooltipContent>
+              <TooltipContent>关闭上下文用量</TooltipContent>
             </Tooltip>
-          ) : null}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="关闭上下文">
-                <X size={15} strokeWidth={2.2} aria-hidden="true" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>关闭上下文用量</TooltipContent>
-          </Tooltip>
+          </div>
+        </header>
+        <div className={CONTEXT_SUMMARY_CLASS}>
+          <span>{percentLabel}% 已用</span>
+          <span>
+            ~{formatTokenCount(safeSnapshot.totalTokens)} / {formatTokenCount(safeSnapshot.maxTokens)} Token
+          </span>
         </div>
-      </header>
-      <div className={CONTEXT_SUMMARY_CLASS}>
-        <span>{percentLabel}% 已用</span>
-        <span>
-          ~{formatTokenCount(safeSnapshot.totalTokens)} / {formatTokenCount(safeSnapshot.maxTokens)} Token
-        </span>
-      </div>
-      <div className={CONTEXT_METER_CLASS}>
-        {safeSnapshot.buckets.map((bucket) => {
-          const key = bucket.key ?? bucket.name ?? "conversation";
-          const display = getContextBucketDisplay(key);
-          // 段宽相对「上下文总容量(maxTokens)」而非「已用总量」，未用部分留作灰色轨道。
-          const width =
-            safeSnapshot.maxTokens > 0 ? `${(bucket.tokens / safeSnapshot.maxTokens) * 100}%` : "0%";
-          const dimmed = selectedKey !== null && selectedKey !== key;
-          return (
-            <button
-              key={key}
-              type="button"
-              className="h-full border-0 p-0 transition-opacity"
-              style={{
-                width,
-                background: `var(${display.colorVar})`,
-                opacity: dimmed ? 0.3 : 1
-              }}
-              aria-pressed={selectedKey === key}
-              aria-label={`${contextBucketLabel(key)} ${formatTokenCount(bucket.tokens)} Token`}
-              onClick={() => toggleSelected(key)}
-            />
-          );
-        })}
-      </div>
-      <div className={CONTEXT_BUCKETS_CLASS}>
-        {safeSnapshot.buckets.map((bucket) => {
-          const key = bucket.key ?? bucket.name ?? "conversation";
-          const display = getContextBucketDisplay(key);
-          const selected = selectedKey === key;
-          const dimmed = selectedKey !== null && !selected;
-          return (
-            <button
-              type="button"
-              className={`${CONTEXT_BUCKET_CLASS} ${selected ? "bg-[var(--act-color-hover-overlay)]" : "hover:bg-[var(--act-color-hover-overlay)]"}`}
-              style={{ opacity: dimmed ? 0.45 : 1 }}
-              key={key}
-              aria-pressed={selected}
-              onClick={() => toggleSelected(key)}
-            >
-              <span className={BUCKET_SWATCH_CLASS} style={{ background: `var(${display.colorVar})` }} />
-              <span className="truncate">{contextBucketLabel(key)}</span>
-              <strong className={CONTEXT_BUCKET_VALUE_CLASS}>{formatTokenCount(bucket.tokens)}</strong>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+        <div className={CONTEXT_METER_CLASS}>
+          {safeSnapshot.buckets.map((bucket) => {
+            const key = bucket.key ?? bucket.name ?? "conversation";
+            const display = getContextBucketDisplay(key);
+            // 段宽相对「上下文总容量(maxTokens)」而非「已用总量」，未用部分留作灰色轨道。
+            const width =
+              safeSnapshot.maxTokens > 0 ? `${(bucket.tokens / safeSnapshot.maxTokens) * 100}%` : "0%";
+            const dimmed = selectedKey !== null && selectedKey !== key;
+            return (
+              <button
+                key={key}
+                type="button"
+                className="h-full border-0 p-0 transition-opacity"
+                style={{
+                  width,
+                  background: `var(${display.colorVar})`,
+                  opacity: dimmed ? 0.3 : 1
+                }}
+                aria-pressed={selectedKey === key}
+                aria-label={`${contextBucketLabel(key)} ${formatTokenCount(bucket.tokens)} Token`}
+                onClick={() => toggleSelected(key)}
+              />
+            );
+          })}
+        </div>
+        <div className={CONTEXT_BUCKETS_CLASS}>
+          {safeSnapshot.buckets.map((bucket) => {
+            const key = bucket.key ?? bucket.name ?? "conversation";
+            const display = getContextBucketDisplay(key);
+            const selected = selectedKey === key;
+            const dimmed = selectedKey !== null && !selected;
+            return (
+              <button
+                type="button"
+                className={`${CONTEXT_BUCKET_CLASS} ${selected ? "bg-[var(--act-color-hover-overlay)]" : "hover:bg-[var(--act-color-hover-overlay)]"}`}
+                style={{ opacity: dimmed ? 0.45 : 1 }}
+                key={key}
+                aria-pressed={selected}
+                onClick={() => toggleSelected(key)}
+              >
+                <span className={BUCKET_SWATCH_CLASS} style={{ background: `var(${display.colorVar})` }} />
+                <span className="truncate">{contextBucketLabel(key)}</span>
+                <strong className={CONTEXT_BUCKET_VALUE_CLASS}>{formatTokenCount(bucket.tokens)}</strong>
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

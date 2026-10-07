@@ -186,7 +186,7 @@ apps/desktop/src/renderer/components/messages/mermaid-preview.tsx
 
 apps/desktop/src/renderer/appearance/types.ts
 apps/desktop/src/renderer/appearance/storage.ts
-apps/desktop/src/renderer/components/settings/SettingsPage.tsx
+apps/desktop/src/renderer/components/settings/sections/AppearanceSection.tsx
   mermaidTheme preference and Appearance settings row
 
 apps/desktop/src/renderer/test/

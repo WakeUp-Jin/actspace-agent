@@ -251,4 +251,31 @@ describe("BrowserBridgeService", () => {
     expect(first.lastError).toContain("doctor failed");
     expect(calls).toEqual(["doctor"]);
   });
+
+  it("dispose kills in-flight abb commands, is idempotent and rejects later commands", async () => {
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-browser-bridge-data-"));
+    const sourceRoot = await mkdtemp(join(tmpdir(), "actspace-browser-bridge-source-"));
+    tempDirs.push(dataRoot, sourceRoot);
+    const pidFile = join(sourceRoot, "help.pid");
+    const source = join(sourceRoot, "abb-hang");
+    await writeFile(source, `#!/bin/sh\necho $$ > '${pidFile}'\nexec sleep 30\n`, "utf8");
+    await chmod(source, 0o755);
+
+    const service = new BrowserBridgeService({ dataRoot });
+    const pending = service.installFromFile(source);
+    const pid = await vi.waitFor(async () => {
+      const text = (await readFile(pidFile, "utf8")).trim();
+      expect(text).toMatch(/^\d+$/);
+      return Number(text);
+    }, { timeout: 5_000 });
+
+    service.dispose();
+    service.dispose();
+
+    expect((await pending).ok).toBe(false);
+    expect(() => process.kill(pid, 0)).toThrow();
+    const later = await service.installFromFile(source);
+    expect(later).toMatchObject({ ok: false });
+    expect(later.error).toContain("Browser Bridge 已关闭");
+  });
 });

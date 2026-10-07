@@ -2,10 +2,10 @@ import { useRef } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ResponseAnnotationReference } from "@actspace/shared";
+import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared";
 import { MarkdownProse } from "../components/messages/MarkdownProse";
 import { ResponseSelectionMenu } from "../components/messages/ResponseSelectionMenu";
-import { isAnnotatableMessageId } from "../components/messages/response-annotation-context";
+import { annotatableMessageIds } from "../components/messages/response-annotation-context";
 import { clearSelection, selectText, stubRangeRects } from "./fixtures/response-annotation-helpers";
 
 function Reply({ id, content }: { id: string; content: string }) {
@@ -18,12 +18,17 @@ function Reply({ id, content }: { id: string; content: string }) {
   );
 }
 
-function Harness({ onAddAnnotation, replies }: { onAddAnnotation: (annotation: ResponseAnnotationReference) => void; replies: { id: string; content: string }[] }) {
+type ReplyFixture = { id: string; content: string; live?: boolean };
+
+function Harness({ onAddAnnotation, replies }: { onAddAnnotation: (annotation: ResponseAnnotationReference) => void; replies: ReplyFixture[] }) {
   const scrollRef = useRef<HTMLElement | null>(null);
+  // 和 ConversationView 一样按块判断：durable 回复带 sourceSeq，live 回复没有。
+  const blocks: MessageBlock[] = replies.map((reply, index) => ({ kind: "assistant", id: reply.id, content: reply.content, createdAt: "2026-10-06T00:00:00.000Z", ...(reply.live ? {} : { sourceSeq: index }) }));
+  const annotatable = annotatableMessageIds(blocks);
   return (
     <section ref={scrollRef} data-testid="scroller">
       {replies.map((reply) => <Reply key={reply.id} {...reply} />)}
-      <ResponseSelectionMenu scrollContainerRef={scrollRef} canAnnotate={isAnnotatableMessageId} onAddAnnotation={onAddAnnotation} />
+      <ResponseSelectionMenu scrollContainerRef={scrollRef} canAnnotate={(id) => annotatable.has(id)} onAddAnnotation={onAddAnnotation} />
     </section>
   );
 }
@@ -36,10 +41,15 @@ const REPLIES = [
 let restoreRects: () => void;
 beforeEach(() => {
   restoreRects = stubRangeRects();
+  // jsdom 的视口尺寸是 0，Radix（floating-ui）按 documentElement 的 client 尺寸判断放不放得下。
+  Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: window.innerWidth });
+  Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: window.innerHeight });
 });
 afterEach(() => {
   clearSelection();
   restoreRects();
+  delete (document.documentElement as unknown as Record<string, unknown>).clientWidth;
+  delete (document.documentElement as unknown as Record<string, unknown>).clientHeight;
 });
 
 function setup(replies = REPLIES) {
@@ -53,7 +63,11 @@ describe("ResponseSelectionMenu", () => {
     const { onAddAnnotation } = setup();
     selectText(screen.getByTestId("v2-3"), "第二段");
     const add = await screen.findByRole("menuitem", { name: "添加到对话" });
-    expect(screen.getByRole("menu", { name: "回复选区操作" })).toHaveAttribute("data-placement", "below");
+    await waitFor(() => expect(screen.getByRole("menu", { name: "回复选区操作" })).toHaveAttribute("data-side", "bottom"));
+    // 选区最后一行（100–220, 200–218）的右下角，下移 6px。
+    expect(screen.getByRole("menu").parentElement!.style.transform).toBe("translate(220px, 224px)");
+    // 不抢焦点，键盘扩选不被打断。
+    expect(document.activeElement).toBe(document.body);
 
     await userEvent.click(add);
     expect(onAddAnnotation).toHaveBeenCalledWith(expect.objectContaining({
@@ -77,7 +91,7 @@ describe("ResponseSelectionMenu", () => {
   });
 
   it.each([
-    ["a streaming reply whose id is still turn-scoped", [{ id: "turn:run-1:assistant:0", content: "流式中的回复" }], "流式中的回复"],
+    ["a streaming reply that has no durable sourceSeq yet", [{ id: "turn:run-1:assistant:0", content: "流式中的回复", live: true }], "流式中的回复"],
   ])("does not offer the menu for %s", async (_name, replies, text) => {
     setup(replies);
     selectText(screen.getByTestId(replies[0]!.id), text);
@@ -132,8 +146,9 @@ describe("ResponseSelectionMenu", () => {
     setup();
     selectText(screen.getByTestId("v2-3"), "第二段");
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveAttribute("data-placement", "above");
-    expect(menu.style.left).toBe("12px");
+    await waitFor(() => expect(menu).toHaveAttribute("data-side", "top"));
+    // Radix 把位置写在外层包装的 transform 上：选区在视口左侧之外，水平方向收进 12px 边距。
+    expect(menu.parentElement!.style.transform).toMatch(/^translate\(12px, /);
   });
 
   it("waits until the drag ends before offering the menu", async () => {
