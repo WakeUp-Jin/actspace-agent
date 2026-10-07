@@ -1,0 +1,499 @@
+{
+  "views": {
+    "get": {
+      "version": 2,
+      "defaultModelId": "deepseek-v4-flash",
+      "providers": {
+        "deepseek": {
+          "hasApiKey": false,
+          "enabled": true,
+          "baseUrl": null,
+          "proxy": {
+            "enabled": false,
+            "url": null
+          },
+          "lastConnection": {
+            "status": "untested"
+          },
+          "installedModelCount": 1,
+          "enabledModelCount": 1,
+          "defaultPricingMultiplier": 1,
+          "additionalCredentials": []
+        },
+        "kimi": {
+          "hasApiKey": false,
+          "enabled": true,
+          "baseUrl": null,
+          "proxy": {
+            "enabled": false,
+            "url": null
+          },
+          "lastConnection": {
+            "status": "untested"
+          },
+          "installedModelCount": 2,
+          "enabledModelCount": 2,
+          "defaultPricingMultiplier": 1,
+          "additionalCredentials": []
+        },
+        "openrouter": {
+          "hasApiKey": false,
+          "hasManagementKey": false,
+          "enabled": true,
+          "baseUrl": null,
+          "proxy": {
+            "enabled": false,
+            "url": null
+          },
+          "lastConnection": {
+            "status": "untested"
+          },
+          "installedModelCount": 0,
+          "enabledModelCount": 0,
+          "defaultPricingMultiplier": 1,
+          "additionalCredentials": []
+        }
+      },
+      "installedModels": {
+        "deepseek:deepseek-flash": {
+          "enabled": true,
+          "addedAt": "2026-07-24T00:00:00.000Z"
+        },
+        "kimi:kimi-k2.6": {
+          "enabled": true,
+          "addedAt": "2026-08-01T00:00:00.000Z",
+          "customLabel": "Kimi main"
+        },
+        "kimi:kimi-k2.7-code": {
+          "enabled": true,
+          "addedAt": "2026-07-24T00:00:00.000Z"
+        }
+      },
+      "customModels": {},
+      "taskModels": {
+        "defaultChatModel": "deepseek:deepseek-flash",
+        "utilityModel": "kimi:kimi-k2.6",
+        "exploreModel": null
+      },
+      "searchProviders": {
+        "zhipu": {
+          "hasApiKey": false
+        },
+        "tavily": {
+          "hasApiKey": false
+        },
+        "tinyfish": {
+          "hasApiKey": false
+        },
+        "exa": {
+          "hasApiKey": false
+        }
+      },
+      "imageGeneration": {
+        "hasApiKey": false,
+        "baseUrl": "https://images.example/v3",
+        "model": "image-model-v3"
+      },
+      "imageInspection": {
+        "modelKey": "openrouter:openai/gpt-5.6-luna"
+      },
+      "agent": {
+        "systemPromptPath": "<root>/prompts/v3-agent.md",
+        "temperature": null,
+        "maxTokens": 2048,
+        "disabledTools": [],
+        "bashAlwaysAsk": true,
+        "exploreModelId": null
+      },
+      "skills": {
+        "disabled": []
+      },
+      "shortcuts": {
+        "quickOpen": {
+          "enabled": true,
+          "accelerator": "CommandOrControl+Shift+Space",
+          "target": {
+            "kind": "automatic"
+          }
+        }
+      }
+    },
+    "v4": {
+      "version": 4,
+      "revision": "<revision>",
+      "settings": {
+        "version": 4,
+        "general": {
+          "performanceMonitoring": false,
+          "englishLearning": {
+            "lastSessionId": null
+          },
+          "personalization": {
+            "displayName": "",
+            "responseStyle": ""
+          },
+          "agentInstructions": {
+            "systemPromptPath": "<root>/prompts/v3-agent.md"
+          },
+          "taskDefaults": {
+            "temperature": null,
+            "maxOutputTokens": 2048,
+            "chatCompactionTriggerRatio": 0.8
+          },
+          "shortcuts": {
+            "quickOpen": {
+              "enabled": true,
+              "accelerator": "CommandOrControl+Shift+Space",
+              "target": {
+                "kind": "automatic"
+              }
+            }
+          }
+        },
+        "models": {
+          "connections": {
+            "deepseek:default": {
+              "connectionId": "deepseek:default",
+              "providerId": "deepseek",
+              "enabled": true,
+              "baseUrl": null,
+              "proxy": {
+                "enabled": false,
+                "url": null
+              },
+              "lastConnection": {
+                "status": "untested"
+              },
+              "defaultPricingMultiplier": 1,
+              "additionalCredentials": []
+            },
+            "kimi:default": {
+              "connectionId": "kimi:default",
+              "providerId": "kimi",
+              "enabled": true,
+              "baseUrl": null,
+              "proxy": {
+                "enabled": false,
+                "url": null
+              },
+              "lastConnection": {
+                "status": "untested"
+              },
+              "defaultPricingMultiplier": 1,
+              "additionalCredentials": []
+            },
+            "openrouter:default": {
+              "connectionId": "openrouter:default",
+              "providerId": "openrouter",
+              "enabled": true,
+              "baseUrl": null,
+              "proxy": {
+                "enabled": false,
+                "url": null
+              },
+              "lastConnection": {
+                "status": "untested"
+              },
+              "defaultPricingMultiplier": 1,
+              "additionalCredentials": []
+            }
+          },
+          "definitions": {},
+          "installed": {
+            "deepseek:deepseek-flash": {
+              "connectionId": "deepseek:default",
+              "enabled": true,
+              "addedAt": "2026-07-24T00:00:00.000Z"
+            },
+            "kimi:kimi-k2.6": {
+              "connectionId": "kimi:default",
+              "enabled": true,
+              "addedAt": "2026-08-01T00:00:00.000Z",
+              "customLabel": "Kimi main"
+            },
+            "kimi:kimi-k2.7-code": {
+              "connectionId": "kimi:default",
+              "enabled": true,
+              "addedAt": "2026-07-24T00:00:00.000Z"
+            }
+          },
+          "taskBindings": {
+            "defaultChat": "deepseek:deepseek-flash",
+            "utility": "kimi:kimi-k2.6",
+            "explore": null
+          }
+        },
+        "tools": {
+          "disabledTools": [],
+          "bash": {
+            "alwaysAsk": true
+          },
+          "showFileChangeStats": true,
+          "searchProviders": {
+            "zhipu": {
+              "enabled": true
+            },
+            "tavily": {
+              "enabled": true
+            },
+            "tinyfish": {
+              "enabled": true
+            },
+            "exa": {
+              "enabled": true
+            }
+          }
+        },
+        "media": {
+          "speech": {
+            "provider": "minimax",
+            "model": "speech-2.8-turbo",
+            "voiceId": "English_Insightful_Speaker",
+            "speed": 1
+          },
+          "imageGeneration": {
+            "baseUrl": "https://images.example/v3",
+            "model": "image-model-v3"
+          },
+          "imageInspection": {
+            "modelKey": "openrouter:openai/gpt-5.6-luna"
+          }
+        },
+        "skills": {
+          "disabled": []
+        },
+        "subagents": {
+          "routes": {}
+        },
+        "activity": {
+          "usage": {
+            "range": "30d",
+            "status": "all",
+            "modelFilter": "",
+            "showDetails": false,
+            "activeTab": "requests"
+          }
+        }
+      }
+    },
+    "lastLoadError": null,
+    "credentialStorage": {
+      "status": "ready"
+    }
+  },
+  "files": {
+    "prompts/v3-agent.md": "You are ActSpace's main agent. Follow the active tool and safety policies.",
+    "settings.json": {
+      "version": 4,
+      "general": {
+        "performanceMonitoring": false,
+        "englishLearning": {
+          "lastSessionId": null
+        },
+        "personalization": {
+          "displayName": "",
+          "responseStyle": ""
+        },
+        "agentInstructions": {
+          "systemPromptPath": "<root>/prompts/v3-agent.md"
+        },
+        "taskDefaults": {
+          "temperature": null,
+          "maxOutputTokens": 2048,
+          "chatCompactionTriggerRatio": 0.8
+        },
+        "shortcuts": {
+          "quickOpen": {
+            "enabled": true,
+            "accelerator": "CommandOrControl+Shift+Space",
+            "target": {
+              "kind": "automatic"
+            }
+          }
+        }
+      },
+      "models": {
+        "connections": {
+          "deepseek:default": {
+            "connectionId": "deepseek:default",
+            "providerId": "deepseek",
+            "enabled": true,
+            "baseUrl": null,
+            "proxy": {
+              "enabled": false,
+              "url": null
+            },
+            "lastConnection": {
+              "status": "untested"
+            },
+            "defaultPricingMultiplier": 1,
+            "additionalCredentials": []
+          },
+          "kimi:default": {
+            "connectionId": "kimi:default",
+            "providerId": "kimi",
+            "enabled": true,
+            "baseUrl": null,
+            "proxy": {
+              "enabled": false,
+              "url": null
+            },
+            "lastConnection": {
+              "status": "untested"
+            },
+            "defaultPricingMultiplier": 1,
+            "additionalCredentials": []
+          },
+          "openrouter:default": {
+            "connectionId": "openrouter:default",
+            "providerId": "openrouter",
+            "enabled": true,
+            "baseUrl": null,
+            "proxy": {
+              "enabled": false,
+              "url": null
+            },
+            "lastConnection": {
+              "status": "untested"
+            },
+            "defaultPricingMultiplier": 1,
+            "additionalCredentials": []
+          }
+        },
+        "definitions": {},
+        "installed": {
+          "deepseek:deepseek-flash": {
+            "connectionId": "deepseek:default",
+            "enabled": true,
+            "addedAt": "2026-07-24T00:00:00.000Z"
+          },
+          "kimi:kimi-k2.6": {
+            "connectionId": "kimi:default",
+            "enabled": true,
+            "addedAt": "2026-08-01T00:00:00.000Z",
+            "customLabel": "Kimi main"
+          },
+          "kimi:kimi-k2.7-code": {
+            "connectionId": "kimi:default",
+            "enabled": true,
+            "addedAt": "2026-07-24T00:00:00.000Z"
+          }
+        },
+        "taskBindings": {
+          "defaultChat": "deepseek:deepseek-flash",
+          "utility": "kimi:kimi-k2.6",
+          "explore": null
+        }
+      },
+      "tools": {
+        "disabledTools": [],
+        "bash": {
+          "alwaysAsk": true
+        },
+        "showFileChangeStats": true,
+        "searchProviders": {
+          "zhipu": {
+            "enabled": true
+          },
+          "tavily": {
+            "enabled": true
+          },
+          "tinyfish": {
+            "enabled": true
+          },
+          "exa": {
+            "enabled": true
+          }
+        }
+      },
+      "media": {
+        "speech": {
+          "provider": "minimax",
+          "model": "speech-2.8-turbo",
+          "voiceId": "English_Insightful_Speaker",
+          "speed": 1
+        },
+        "imageGeneration": {
+          "baseUrl": "https://images.example/v3",
+          "model": "image-model-v3"
+        },
+        "imageInspection": {
+          "modelKey": "openrouter:openai/gpt-5.6-luna"
+        }
+      },
+      "skills": {
+        "disabled": []
+      },
+      "subagents": {
+        "routes": {}
+      },
+      "activity": {
+        "usage": {
+          "range": "30d",
+          "status": "all",
+          "modelFilter": "",
+          "showDetails": false,
+          "activeTab": "requests"
+        }
+      }
+    },
+    "settings.v3.backup.json": {
+      "version": 3,
+      "providers": {
+        "openrouter": {
+          "enabled": true,
+          "baseUrl": null,
+          "proxy": {
+            "enabled": false,
+            "url": null
+          },
+          "lastConnection": {
+            "status": "untested"
+          },
+          "defaultPricingMultiplier": 1,
+          "additionalCredentials": []
+        }
+      },
+      "installedModels": {
+        "kimi:kimi-k2.6": {
+          "enabled": true,
+          "addedAt": "2026-08-01T00:00:00.000Z",
+          "customLabel": "  Kimi main  "
+        }
+      },
+      "customModels": {},
+      "taskModels": {
+        "defaultChatModel": "deepseek:deepseek-flash",
+        "utilityModel": "kimi:kimi-k2.6",
+        "exploreModel": null
+      },
+      "imageGeneration": {
+        "baseUrl": "https://images.example/v3/",
+        "model": "image-model-v3"
+      },
+      "imageInspection": {
+        "modelKey": "openrouter:openai/gpt-5.6-luna"
+      },
+      "agent": {
+        "systemPromptPath": "v3-agent.md",
+        "temperature": null,
+        "maxTokens": 2048,
+        "disabledTools": [],
+        "bashAlwaysAsk": true
+      },
+      "skills": {
+        "disabled": []
+      },
+      "shortcuts": {
+        "quickOpen": {
+          "enabled": true,
+          "accelerator": "CommandOrControl+Shift+Space",
+          "target": {
+            "kind": "automatic"
+          }
+        }
+      }
+    },
+    "settings.v3.backup.sha256": "15f3b71cffdefff23fc49f5f9067be59a03b3b76691b665e967d39b061e92c60\n"
+  }
+}

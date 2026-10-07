@@ -73,7 +73,7 @@ runtime --(Host capability)--> browser-bridge
 - `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`：v2 当前架构总图，解释启动、单次任务、Session、Host、Cordis 和 Agent Core 的关系。
 - `docs/design-docs/agent-plugin-runtime/README.md`：v2 后端插件化架构入口，汇总设计证据、决策、公共契约和执行记录。
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter 的服务商连接、模型目录、服务商级代理、协议服务和任务模型选择；历史 DuckCoding 设计文档仅用于变更追溯。图片生成仍可独立使用 DuckCoding 的 OpenAI-compatible Images API。
-- `docs/design-docs/core-storage-and-observability.md`：`sessions-v2/<id>/journal.jsonl`、Session-owned artifact、Runtime Projection、Electron `userData`、workspace root 和本地排障日志边界。
+- `docs/design-docs/core-storage-and-observability.md`：`sessions-v2/<id>/journal.jsonl`、Session-owned artifact、Runtime Projection、Electron `userData`、workspace root 和本地排障日志边界；也记录 Desktop main 侧 settings / secrets 的模块划分（`apps/desktop/src/main/settings/`）。
 - `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范，定义六种 scope、upstream Branch、结构化 diff、Review Options、Git mutation 和右侧 Tab 边界。
 - `docs/design-docs/collaboration/agent-members.md`：未来 Team / Room 产品设计中的持久 Agent Member；不代表当前 v2 已实现对应 Runtime。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：v2 Journal usage、request snapshot、Context Projection 与成本统计边界。

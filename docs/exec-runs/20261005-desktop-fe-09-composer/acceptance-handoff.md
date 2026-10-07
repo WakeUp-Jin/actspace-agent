@@ -1,8 +1,8 @@
 # 09 输入框优化验收交接
 
-- 主线提交：（收尾时填写）
+- 主线提交：`cd325f96`（`refactor/desktop-frontend`）
 - 子分支：`refactor/desktop-fe-09`（从 `4ba97aaf` 开始，每个 T 一个提交）
-- 状态：**可以交给验收**（2026-10-07，P1–P6 完成）。P4 有两项需要你判断（见 P4「需要你判断的事项」）
+- 状态：**可以交给验收**（2026-10-07，P1–P6 完成）。P4 的两项判断已由用户拍板（2026-10-07：都维持现状）
 - 启动方式：
   - 浏览器 mock：在 `apps/desktop` 下运行 `pnpm dev:renderer`，打开 `/?mock=empty`（新建页）、`/?mock=long-session`（空闲的会话，可以切模式）、`/?mock=streaming`（运行中）。
   - Electron：先 `pnpm --filter @actspace/shared build`、`pnpm --filter @actspace/desktop build`，再在 `apps/desktop` 下运行 `ACTSPACE_DATA_DIR=$(mktemp -d) node_modules/electron/dist/Electron.app/Contents/MacOS/Electron dist-electron/main/index.js`。
@@ -152,6 +152,8 @@
 | P4-5 | 配 5 台以上 Host，打开远端机器子菜单，用中文输入法搜索 | 焦点在搜索框，组字时不触发菜单跳转；↓ 进入列表 | 真实输入法 |
 
 ### 需要你判断的事项
+
+> 2026-10-07 用户拍板：第 1 项选 **A**（维持现状，本机 Chat 新建页不显示运行目标行）；第 2 项选 **A**（禁用并写原因）。两项都不改代码，规范已与现状一致。
 
 1. **新建 Chat 会话时的运行目标行**（T18）
    - 现状：本机 Chat 不显示这一行；远端 Chat 只显示「运行位置」一个按钮。

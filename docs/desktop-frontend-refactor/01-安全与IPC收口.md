@@ -185,6 +185,14 @@ if (window && (event.sender !== window.webContents || event.senderFrame !== wind
 
 ### P1-4 `settings-service.ts` 是 2637 行的 god object
 
+> **已在 17 执行**（2026-10-07，[17 计划](../exec-plans/active/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md)、[执行记录](../exec-runs/20261005-desktop-fe-17-settings-split/execution-process.md)）。实际结构和下表有三处不同：
+>
+> - `settings-store` 和 `secrets-store` 合并为 `store.ts` 加 `secrets-file.ts`；
+> - provider CRUD 分成 `facades/` 下五组；
+> - `validateCustomConnection`、`resolveAuthScheme`、sanitize 留在 main（`settings/custom-connection.ts`、`settings/sanitize.ts`），没有移进 `@actspace/shared`，等有复用需求再做。
+>
+> 下文是拆分前的分析，保留原样。
+
 当前职责（按代码区域）：
 
 1. 持久化与多代迁移：`migrateV1Settings`、`mergePersistedSettingsV3`、`legacySettingsFromV4` 等（约 `1500-2100`），备份写入（`2540-2600`）。

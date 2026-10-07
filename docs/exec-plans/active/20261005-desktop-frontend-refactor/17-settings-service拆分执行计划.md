@@ -153,7 +153,7 @@ pnpm --filter @actspace/desktop build
 
 ## 进度记录
 
-- [ ] T0–T8
+- [x] T0–T8（2026-10-07 完成；T7 分 5 个提交；另有复核与 Electron 检查。执行记录见下文「执行文档」）
 
 ## 执行模式
 
