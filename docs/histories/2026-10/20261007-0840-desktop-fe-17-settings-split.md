@@ -5,7 +5,7 @@
 - Agent：Claude Code 主智能体；只读复核子智能体用 Sonnet 5.5。
 - Base Model：Claude Opus 5.5。
 - Runtime：Claude Code CLI，本机仓库；分支 `refactor/desktop-fe-17`。
-- 状态：完成（2026-10-07），待验收。子分支 `refactor/desktop-fe-17`（`ec7dca02`..`ba34df68`，14 个提交），squash 到 `refactor/desktop-frontend`。
+- 状态：完成（2026-10-07），待验收。子分支 `refactor/desktop-fe-17`（`ec7dca02`..`6f869aa6`，15 个提交），squash 到 `refactor/desktop-frontend` 为 `fcdc0de5`。
 
 ### 用户诉求
 

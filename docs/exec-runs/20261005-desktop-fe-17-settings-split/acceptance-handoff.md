@@ -1,7 +1,7 @@
 # 17 settings-service 拆分验收交接
 
-- 主线提交：（squash 后补填）（`refactor/desktop-frontend`）
-- 子分支：`refactor/desktop-fe-17`（`ec7dca02`..`ba34df68`，共 14 个提交，每个 T 一个提交；T7 分 5 个提交，另有一个复核与 Electron 检查的提交）
+- 主线提交：`fcdc0de5`（`refactor/desktop-frontend`）
+- 子分支：`refactor/desktop-fe-17`（`ec7dca02`..`6f869aa6`，共 15 个提交，每个 T 一个提交；T7 分 5 个提交，另有复核与 Electron 检查、收尾各一个提交）
 - 状态：**可以交给验收**（2026-10-07）。没有需要你判断的事项。
 - 启动方式：
   - `pnpm --filter @actspace/shared build`，然后 `pnpm --filter @actspace/desktop build`。
