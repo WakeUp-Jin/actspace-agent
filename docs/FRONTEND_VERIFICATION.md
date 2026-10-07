@@ -175,7 +175,7 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 
 单测列带 `*` 的文件尚未落地，由 08 §4 列出、在后续计划（14 状态层、09 输入框等）中补齐；落地后去掉 `*`。
 
-相关自动检查：`pnpm check:ipc-channels`（IPC 以契约为准）、`pnpm check:renderer-bridge`（renderer 只经 `api/<域>` 访问 bridge）、`pnpm check:frontend-tokens`、`pnpm check:frontend-theme`。
+相关自动检查：`pnpm check:ipc-channels`（IPC 以契约为准）、`pnpm check:renderer-bridge`（renderer 只经 `api/<域>` 访问 bridge）、`pnpm check:frontend-tokens`、`pnpm check:frontend-theme`。其中 `check:renderer-bridge`、`check:ipc-channels` 和这些检查脚本自己的测试（`test:renderer-bridge`、`test:ipc-channels`、`test:frontend-tokens`）已包含在 `pnpm test` 里；`check:frontend-tokens`、`check:frontend-theme` 由 CI 的仓库卫生检查（`scripts/check-repo-hygiene.sh`）运行。
 
 ## 计划与收尾写法
 

@@ -264,6 +264,7 @@ node scripts/check-frontend-design-tokens.mjs --update-native-button-baseline
 
 - 拆出的模块放在 `components/` 下按区域分的子目录，不新建 `features/`：`settings/sections/`（每个设置分区一个文件）、`settings/dialogs/`、`sidebar/`、`conversation/`、`workbench/`、`composer/`。
 - 原文件保留为区域入口（`SettingsPage.tsx`、`Sidebar.tsx`、`ConversationView.tsx`、`WorkbenchLayout.tsx`），只做布局和装配，目标 400 行以内。
+- 任何单个文件超过 500 行就要拆。当前超过的 3 个文件记在 [技术债](../../exec-plans/tech-debt-tracker.md)「renderer / 文件行数」；这条没有自动检查，写代码和评审时核对。
 - 纯函数单独成 `.ts` 文件并有单测（`session-grouping.ts`、`session-status.ts`、`turns.ts`、`edited-files.ts`）；有状态的逻辑抽成 `use-*.ts` hook（`use-settings.ts`、`use-panel-layout.ts`、`use-session-history.ts`、`use-workspace-file-links.ts`）。
 - 区域内多个文件共用的样式常量放进该区域的 `styles.ts`；只在一个文件里用的留在原文件。
 - 拆出的模块不反向 import 区域入口；需要给外部用的类型由入口再导出。

@@ -40,14 +40,17 @@
 
 ## 必读顺序
 
-1. `docs/design-docs/frontend/front-全局视觉语言规范.md`
-2. `docs/design-docs/frontend/front-主题与配色规范.md`
-3. `docs/design-docs/frontend/front-tailwind-style-architecture.md`
-4. `docs/design-docs/frontend/front-基础组件封装规范.md`
-5. 根据任务进入具体区域或页面规范
+1. `docs/design-docs/frontend/front-新功能开发清单.md`：新增或改动功能前先读，一页列出全部规则和对应的检查命令
+2. `docs/design-docs/frontend/front-全局视觉语言规范.md`
+3. `docs/design-docs/frontend/front-主题与配色规范.md`
+4. `docs/design-docs/frontend/front-tailwind-style-architecture.md`
+5. `docs/design-docs/frontend/front-基础组件封装规范.md`
+6. 涉及会话数据时读 `front-会话状态与数据流规范.md`；涉及调用 main / IPC / mock 时读 `front-preload-bridge与mock规范.md`
+7. 根据任务进入具体区域或页面规范
 
 ## 文档列表
 
+- `docs/design-docs/frontend/front-新功能开发清单.md`：新功能开发清单。样式、组件与弹层、文件拆分（单文件超过 500 行要拆）、状态归属、IPC、安全、测试、验收和提交前命令，每条一行并链到详细规范。
 - `docs/design-docs/frontend/front-全局视觉语言规范.md`：字体、颜色、间距、圆角、阴影和动效 token。
 - `docs/design-docs/frontend/front-主题与配色规范.md`：浅色、深色、跟随系统三态主题和颜色硬约束。
 - `docs/design-docs/frontend/front-tailwind-style-architecture.md`：Tailwind v4 样式架构和迁移策略。

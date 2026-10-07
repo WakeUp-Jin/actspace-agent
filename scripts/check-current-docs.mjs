@@ -45,6 +45,7 @@ export const currentTruthFiles = [
   "docs/design-docs/agent-plugin-runtime/agent-spec-profile-bundle-patch-layering.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-prompt-context-contributors.md",
   "docs/design-docs/frontend/README.md",
+  "docs/design-docs/frontend/front-新功能开发清单.md",
   "docs/design-docs/frontend/front-右侧面板与文件渲染规范.md",
   "docs/design-docs/frontend/front-workspace-git-worktree-context.md",
   "docs/design-docs/frontend/front-聊天输入框规范.md",

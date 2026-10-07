@@ -67,6 +67,8 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
 
 不要在 preload 里加方法、做投影或写业务判断。需要转换返回值时，放在 `renderer/api/<域>.ts` 里，参考 `api/sessions.ts` 的投影函数。
 
+新能力涉及打开外部链接、新开窗口或工作区路径时，还要遵守 [SECURITY](../../SECURITY.md) 的「外部打开白名单」「导航防护」「工作区访问入口」。
+
 ## 5. Guard 约定
 
 - 注册器的处理顺序：sender 校验（`assertTrustedSender`）→ guard → middleware → handler。

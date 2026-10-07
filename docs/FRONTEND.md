@@ -1,5 +1,7 @@
 # 前端协作说明
 
+新增或改动前端功能前，先读 [`front-新功能开发清单.md`](design-docs/frontend/front-新功能开发清单.md)。它用一页列出样式、组件与弹层、文件拆分、状态归属、调用 main、安全、测试和验收的规则，每条链到详细规范和对应的检查命令。下面的内容是各专题的入口。
+
 前端相关的编码规范、Skill 推荐和团队约定已迁移到 [`docs/coding-standards/`](coding-standards/README.md)。
 
 如需添加前端特定的团队约定，请在 [`docs/coding-standards/team/`](coding-standards/team/README.md) 下创建对应文件。
@@ -25,6 +27,9 @@
 其中已经包含：
 
 - 全局字体、颜色、间距、圆角、阴影和动效 token
+- 基础组件、按钮收口和弹层原语（[`front-基础组件封装规范.md`](design-docs/frontend/front-基础组件封装规范.md)）
+- 会话数据的归属与数据流（[`front-会话状态与数据流规范.md`](design-docs/frontend/front-会话状态与数据流规范.md)）
+- `window.actspace` 契约、renderer `api/<域>`、新增 IPC 步骤和 mock bridge（[`front-preload-bridge与mock规范.md`](design-docs/frontend/front-preload-bridge与mock规范.md)）
 - 左侧会话栏
 - 中间消息区语法
 - Composer 与 Context popup
