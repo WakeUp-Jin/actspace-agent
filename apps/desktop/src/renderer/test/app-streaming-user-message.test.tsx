@@ -638,8 +638,8 @@ describe("App streaming user message", () => {
     renderApp();
     await screen.findByRole("button", { name: "查看会话详情： New chat" });
     await userEvent.click(screen.getByRole("button", { name: "新建会话" }));
-    await waitFor(() => expect(createSession).toHaveBeenCalled());
-    expect(createSession.mock.calls[0]).toEqual([{}]);
+    expect(createSession).not.toHaveBeenCalled();
+    await userEvent.click(within(document.querySelector('[data-session-id="title-session"]') as HTMLElement).getByRole("button", { name: "New chat" }));
     record = { ...record, meta: { ...record.meta, title: "项目架构分析" } };
     act(() => listeners.forEach(listener => listener({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } })));
     await screen.findByRole("button", { name: "查看会话详情： 项目架构分析" });
@@ -2195,9 +2195,8 @@ sessionId: input.sessionId,
     await waitFor(() => {
       expect(selectWorkspaceDirectory).toHaveBeenCalledTimes(1);
       expect(selectWorkspaceDirectory).toHaveBeenCalledWith({ registerWorkspace: true });
-      expect(createSession).toHaveBeenCalledWith({
-        workspaceRoot: "/tmp/new-workspace",
-      });
+      expect(createSession).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "选择工作区" })).toHaveTextContent("new-workspace");
     });
   });
 

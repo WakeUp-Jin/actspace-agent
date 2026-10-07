@@ -66,5 +66,13 @@ browser-bridge/skill/scripts/abb
 plugins/fs-watch/target/
 
 # Misc generated artifacts
+# Local execution evidence; keep text reports tracked.
+/docs/exec-runs/**/*.[pP][nN][gG]
+/docs/exec-runs/**/*.[jJ][pP][gG]
+/docs/exec-runs/**/*.[jJ][pP][eE][gG]
+/docs/exec-runs/**/*.[wW][eE][bB][pP]
+/docs/exec-runs/**/*.[gG][iI][fF]
+/docs/exec-runs/**/*.[sS][vV][gG]
+/docs/exec-runs/**/*.[aA][vV][iI][fF]
 *.swp
 *.swo

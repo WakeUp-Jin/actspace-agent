@@ -33,11 +33,13 @@ import { registerRuntimeV2DesktopShell } from "../runtime-v2/desktop-shell-ipc";
 import { trustedWindow } from "./ipc-sender-fixture";
 
 describe("runtime v2 desktop shell IPC", () => {
-  it("invalidates the cached Review after a real external write and stops notifications on dispose", async () => {
+  it.each([false, true])("invalidates real external writes and disposes watches (Session-only root: %s)", async (sessionOnly) => {
     handlers.clear();
     const root = await mkdtemp(join(tmpdir(), "review-external-write-"));
     const workspace = join(root, "workspace");
     await mkdir(workspace);
+    const registeredRoot = sessionOnly ? join(root, "registered") : workspace;
+    await mkdir(registeredRoot, { recursive: true });
     const git = (args: string[]) => promisify(execFile)("git", args, { cwd: workspace });
     await git(["init", "-b", "main"]);
     await writeFile(join(workspace, "sample.txt"), "before\n");
@@ -50,9 +52,9 @@ describe("runtime v2 desktop shell IPC", () => {
     const trusted = trustedWindow();
     const send = vi.spyOn(trusted.window.webContents, "send");
     const registration = registerRuntimeV2DesktopShell({
-      roots: { dataRoot: root, sessionRoot: join(root, "sessions-v2"), logRoot: join(root, "logs"), tmpRoot: join(root, "tmp"), defaultWorkspaceRoot: workspace, workspaceRoot: workspace },
+      roots: { dataRoot: root, sessionRoot: join(root, "sessions-v2"), logRoot: join(root, "logs"), tmpRoot: join(root, "tmp"), defaultWorkspaceRoot: registeredRoot, workspaceRoot: registeredRoot },
       getMainWindow: () => trusted.window as never,
-      listSessions: async () => [],
+      listSessions: async () => sessionOnly ? [{ workspaceRoot: workspace }] : [],
     });
     const snapshot = () => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot)!(trusted.event, { workspaceRoot: workspace, selection: { kind: "uncommitted" } }) as Promise<{ ok: boolean; snapshot: { generation: number; files: { path: string }[] } }>;
     try {

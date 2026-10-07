@@ -851,7 +851,7 @@ export function App() {
       const created = projectChatWindow(projection);
       if (selectionRequest === messageRequestRef.current) {
         setActiveSessionId(created.meta.id);
-        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.worktree?.sourceWorkspaceRoot ?? created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
       }
       const refreshed = await readSidebarSessions();
       setSessions(refreshed);
@@ -1020,18 +1020,14 @@ export function App() {
   }, [liveRuns]);
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
-    if (!targetChoices.hosts.length && !input.hostId) {
-      patchLocal(DRAFT_COMPOSER_KEY, { composer: DEFAULT_COMPOSER_STATE });
-      const created = await createSessionForInput(input);
-      if (created) patchLocal(created.meta.id, { composer: { ...DEFAULT_COMPOSER_STATE, mode: created.meta.agentMode ?? "agent" } });
-      return;
-    }
+    // Create only on first send, after workspace / branch / worktree selection.
     setActiveSessionId(null);
     patchLocal(DRAFT_COMPOSER_KEY, { composer: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" } });
     targetChoices.selectHost(input.hostId ?? null);
     if (input.workspaceId) targetChoices.selectWorkspace(input.workspaceId);
     if (input.workspaceRoot) setSelectedWorkspaceRoot(input.workspaceRoot);
-  }, [targetChoices.hosts.length, targetChoices.selectHost, targetChoices.selectWorkspace, setActiveSessionId, createSessionForInput, patchLocal]);
+    else if (input.workspaceId) setSelectedWorkspaceRoot(workspaceRegistry?.items.find(item => item.id === input.workspaceId)?.path ?? null);
+  }, [targetChoices.selectHost, targetChoices.selectWorkspace, setActiveSessionId, workspaceRegistry, patchLocal]);
 
   const handleAddWorkspace = useCallback(async () => {
     try {

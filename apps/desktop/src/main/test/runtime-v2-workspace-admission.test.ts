@@ -9,6 +9,38 @@ vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntimeV2 }));
 import { DesktopRuntimeV2Registry, type DesktopRuntimeV2RegistryOptions } from "../runtime-v2/runtime-registry";
 
 describe("runtime workspace admission", () => {
+  it("binds and restores generated worktrees without adding their directories to Recents", async () => {
+    const dataRoot = await mkdtemp(join(tmpdir(), "runtime-worktree-"));
+    const sourceWorkspaceRoot = join(dataRoot, "source");
+    const workspaceRoot = join(dataRoot, "generated");
+    await mkdir(sourceWorkspaceRoot);
+    await mkdir(workspaceRoot);
+    const roots = { dataRoot, workspaceRoot: sourceWorkspaceRoot, defaultWorkspaceRoot: sourceWorkspaceRoot };
+    const worktree = { kind: "worktree" as const, sourceWorkspaceRoot, workspaceRoot, baseBranch: "main", branch: "actspace/test", baseCommit: "abc", createdAt: "2026-10-07T00:00:00Z" };
+    let sessions: any[] = [];
+    const app = {
+      listSessions: async () => sessions,
+      subscribeSessionProjection: () => () => {},
+      createMainSession: vi.fn(async (_id, cwd, _form, binding) => {
+        const session = { sessionId: "tree", workspaceRoot: cwd, worktree: binding, metadata: {}, updatedAt: worktree.createdAt, throughJournalSeq: 0 };
+        sessions = [session]; return session;
+      }),
+    };
+    bootDesktopRuntimeV2.mockResolvedValue({ profile: { context: { get: (name: string) => name === "desktop.app" ? app : undefined }, getState: () => ({ runtimeInstanceId: "test" }), shutdown: vi.fn() } });
+    const options = { roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions;
+    const runtime = new DesktopRuntimeV2Registry(options);
+    const restarted = new DesktopRuntimeV2Registry(options);
+    try {
+      await runtime.boot();
+      await runtime.createSession(undefined, workspaceRoot, "agent", worktree);
+      expect(app.createMainSession).toHaveBeenCalledWith(undefined, workspaceRoot, "agent", worktree);
+      await runtime.dispose();
+      await restarted.boot();
+      const registry = await readWorkspaceRegistry({ ...roots, fallbackWorkspaceRoot: sourceWorkspaceRoot });
+      expect(registry.items.map(item => item.path)).toEqual([sourceWorkspaceRoot]);
+    } finally { await runtime.dispose(); await restarted.dispose(); await rm(dataRoot, { recursive: true, force: true }); }
+  });
+
   it.each([true, false])("restores existing roots and admits new roots without initializing Git (existing=%s)", async (existing) => {
     const dataRoot = await mkdtemp(join(tmpdir(), "runtime-workspaces-"));
     const oldRoot = join(dataRoot, "old");

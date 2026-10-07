@@ -10,3 +10,21 @@
 - B08：Desktop搜索端口创建时读取一次`searchCredentials`；后续搜索闭包复用该对象，与同会话断开后仍有provider的实测相符。将以实际fetch请求回归确认。
 - B12：`runLocation`仅进入Composer展示；`ensureSession`、`createSessionForInput`和main建会话请求未传递工作树意图。既有`prepareExecutionContext`已提供真实Git创建与回滚能力，优先复用。
 - 尚未改产品代码，接下来先建立失败回归。
+
+## 实施与首轮回归
+
+- B03/B08先运行失败回归：外部写文件后没有watch通知；同端口断开智谱后fetch仍调用两个provider。接入Review根目录/Git元数据监听、按调用读取最新搜索凭据后通过。
+- B12 renderer失败回归确认建会话时遗漏runLocation/branch；接入既有Git准备/回滚服务，Session header新增可选worktree事实，经Runtime快照、全局列表和client投影回UI。旧journal无该字段仍兼容，fork保留绑定。
+- B12额外检查发现无远端Host时新建按钮提前创建本机会话；统一延迟至首次发送，防止最终选择被提前绑定覆盖。首次发送只对已有同一会话执行setWorkspace，新建工作树返回目录不会被旧闭包写回。
+- 首轮定向Desktop 19/19、Runtime投影与冷重开19/19通过；依赖、Electron、renderer构建通过。Desktop全量首轮1673通过/2失败/2跳过，两处为新增guard覆盖表及createSession参数断言，已更新并继续回归。
+- 工作期间检测到外部提交fdce701a收录此前已写变更；本智能体未执行git提交/暂存/推送，继续保留其上后续修复与验证记录。
+
+## 补充边界与最终工程检查
+
+- 新增App“本机新建按钮→工作树选择→首发”回归，明确首发前不调用create、首发携带选择、返回worktree后不调用旧目录setWorkspace。相关旧测试调整为延迟创建语义。
+- 补测linked-worktree独立index、共同refs、lock过滤、异步安装期间dispose；Journal旧header、绑定cwd校验和fork继承通过。
+- 工作树目录不写长期registry；启动恢复保留worktree元数据，按sourceWorkspaceRoot恢复原工作区；Review复用session-root授权，在无registry记录时也可读取并监听工作树。专项admission/Review回归通过。
+- 完整Desktop第二轮1677通过/2跳过；补充上述用例后再跑最终全量。shared163、client23、journal12、agent-service32通过；新增journal header1通过；Runtime19通过。
+- 最终Desktop typecheck通过；build:deps:dev、build:electron、build:renderer通过。renderer沿用现有CSS highlight解析和较大chunk警告，无构建错误。
+- IPC channel、renderer bridge、package boundaries、check:docs、diff whitespace通过。
+- 真实Electron由同工作区pnpm dev:log启动，子智能体校正主进程身份后执行；浏览器mock测试仅作为自动回归，不替代Computer Use证据。

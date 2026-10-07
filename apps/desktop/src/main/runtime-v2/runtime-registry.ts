@@ -157,11 +157,11 @@ export class DesktopRuntimeV2Registry {
     try {
       const app = this.requireApp();
       const resolved = await resolveWorkspaceSelection(this.workspaceRegistryOptions(), {
-        workspaceRoot: workspaceRoot ?? this.options.roots.workspaceRoot,
+        workspaceRoot: worktree?.sourceWorkspaceRoot ?? workspaceRoot ?? this.options.roots.workspaceRoot,
       });
       if (resolved.ok === false) throw new Error(resolved.error);
       const snapshot = worktree
-        ? await app.createMainSession(sessionId, resolved.workspaceRoot, agentForm, worktree)
+        ? await app.createMainSession(sessionId, worktree.workspaceRoot, agentForm, worktree)
         : agentForm === undefined
         ? await app.createMainSession(sessionId, resolved.workspaceRoot)
         : await app.createMainSession(sessionId, resolved.workspaceRoot, agentForm);
@@ -558,6 +558,7 @@ export class DesktopRuntimeV2Registry {
           updatedAt: session.updatedAt,
           agentRunCount: session.completedTurnCount ?? 0,
           workspaceRoot: session.workspaceRoot ?? undefined,
+          ...(session.worktree ? { worktree: session.worktree } : {}),
         })),
       });
       this.#stopSessionRevisions = this.requireApp().subscribeSessionProjection(update => {

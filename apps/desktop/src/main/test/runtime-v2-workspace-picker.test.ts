@@ -146,7 +146,7 @@ describe("renderer-supplied workspace roots", () => {
       await expect(call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, { workspaceRoot: outside })).rejects.toThrow("not registered");
       expect(createSession).not.toHaveBeenCalled();
       await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, { workspaceRoot: defaultRoot });
-      expect(createSession).toHaveBeenCalledWith(undefined, defaultRoot, undefined);
+      expect(createSession).toHaveBeenCalledWith(undefined, defaultRoot, undefined, undefined);
     } finally {
       registration.dispose();
       await rm(dataRoot, { recursive: true, force: true });

@@ -5,6 +5,7 @@ import { IPC_INPUT_GUARDS } from "../ipc/guards";
 type Case = { spec: InvokeSpec<unknown, unknown>; valid: unknown[]; invalid: unknown[] };
 
 const CASES: Record<string, Case> = {
+  "sessions.create": { spec: contract.sessions.create, valid: [undefined, {}, { runLocation: "worktree", branch: "main", agentForm: "agent" }], invalid: [null, { runLocation: "invalid" }, { branch: [] }, { agentForm: "plan" }, { hostId: "host", runLocation: "worktree" }] },
   "workspaces.readFile": { spec: contract.workspaces.readFile, valid: [{ relativePath: "a.ts" }, { workspaceRoot: "/w", relativePath: "a.ts" }], invalid: [undefined, { workspaceRoot: "/w" }, { relativePath: 1 }] },
   "workspaces.statFile": { spec: contract.workspaces.statFile, valid: [{ workspaceRoot: null, relativePath: "a.ts" }], invalid: [{ relativePath: ["a"] }] },
   "workspaces.listDir": { spec: contract.workspaces.listDir, valid: [{}, { workspaceRoot: "/w", relativePath: "" }], invalid: [null, { relativePath: 0 }] },

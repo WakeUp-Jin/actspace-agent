@@ -204,7 +204,7 @@ type SessionWorktreeContext = {
 
 当前 renderer 在 Task 接纳前经 `setSessionWorkspace` 设置空闲会话的工作区，再通过 `submitTask` 提交内容；模式和模型配置分别经会话模式接口与 Task configuration 管理。
 
-本机 `New Worktree` 选择器和 Git 服务仍有对应代码，但当前 `App.handleSend` 的 Task payload 不携带 `runLocation` / `baseBranch`，不能把下面的创建与恢复目标视为已完成的端到端行为。重新接通时必须在 Task 启动前完成目录准备和 Journal 事实写入；不能恢复旧 `run-turn` / ContextManager 编排。
+2026-10-07 B12修复将新建页的 `runLocation` / `branch` 经 `sessions.create` 传给主进程：先准备真实Git目录，再以该cwd建立Session，最后提交Task。新建按钮在首次发送前只保留选择，不提前绑定本机会话。工作树事实写入Journal header的可选 `worktree` 字段，经Runtime快照、全局列表与client投影恢复；旧header无该字段仍按普通目录读取。创建失败保留输入，回滚本次准备资源，不提交Task；已有工作树会话禁止变更执行根。真实桌面结果见[修复执行摘要](../../exec-runs/20261007-desktop-acceptance-b03-b08-b12/execution-summary.md)。
 
 ### 原目录未提交内容
 
@@ -226,6 +226,8 @@ Worktree 基于 commit 创建，原目录中的以下内容不会自动进入新
 - 失败不能启动 Agent，也不能把不完整 worktree 写成 Session execution root。
 
 ## Created Worktree 消息展示
+
+以下过程块仍是展示目标。本轮B12完成目录创建、持久绑定与状态行恢复，未新增独立的准备事件或过程块。
 
 Worktree 创建成功后，在当前 turn 的用户消息之后、Thinking 或工具过程之前显示一条可展开系统过程块：
 

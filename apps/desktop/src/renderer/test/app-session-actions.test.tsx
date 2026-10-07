@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
+import { setupBridge } from "./helpers/bridge";
+import { createMockSession } from "../mock/mock-db";
 
 // 会话由 setup 默认安装的 mock bridge 内存表提供（原 App 内的本地会话逻辑已移到 `mock/mock-db`）。
 
@@ -23,8 +25,9 @@ describe("App session copy and fork actions", () => {
       value: { writeText },
     });
 
+    const bridge = setupBridge();
+    createMockSession(bridge.db);
     render(<App />);
-    await user.click(screen.getByRole("button", { name: "新建会话" }));
 
     let sourceRow: HTMLElement | null = null;
     await waitFor(() => {

@@ -1,6 +1,7 @@
 import type { BrowserWindow } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import type { ReviewWorkspaceInput } from "@actspace/shared";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
@@ -35,12 +36,21 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     ...input,
     workspaceRoot: await resolveWorkspaceAccess({ workspaceRoot: input?.workspaceRoot ?? options.roots.defaultWorkspaceRoot }, workspaceAccess),
   });
+  const resolveWorkspace = async (input: ReviewWorkspaceInput) => {
+    const registered = await resolveReviewWorkspace(registryOptions, input);
+    if (registered.ok || !input.workspaceRoot) return registered;
+    // Persisted Session roots authorize generated worktrees without adding them to Recents.
+    try {
+      const workspaceRoot = await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot }, workspaceAccess);
+      return { ok: true as const, workspace: { workspaceRoot, workspaceId: `session-root:${createHash("sha256").update(workspaceRoot).digest("hex")}` } };
+    } catch { return registered; }
+  };
   const reviewWorker = new ReviewGitWorkerClient(join(__dirname, "..", "review-git-worker.js"));
   const reviewEngine = new ReviewGitEngine({ runner: reviewWorker.runGit, patchParser: reviewWorker.parsePatches, objectLoader: reviewWorker.loadGitObjects });
   const reviewWatcher = new ReviewWorkspaceWatcher();
   const review = new ReviewCoordinator({
     resolveWorkspace: async (input) => {
-      const resolved = await resolveReviewWorkspace(registryOptions, input);
+      const resolved = await resolveWorkspace(input);
       if (resolved.ok) {
         const { workspaceId, workspaceRoot } = resolved.workspace;
         await reviewWatcher.ensure(workspaceId, workspaceRoot, () => review.scheduleInvalidation(workspaceId));
@@ -82,7 +92,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   ipc.handle(contract.review.applyMutation, (input) => review.applyMutation(input));
   ipc.handle(contract.review.setFileViewed, (input) => review.setFileViewed(input));
   ipc.handle(contract.review.listBranches, async (input) => {
-    const resolved = await resolveReviewWorkspace(registryOptions, input);
+    const resolved = await resolveWorkspace(input);
     if (resolved.ok === false) return { ok: false as const, code: "invalid_workspace" as const, message: resolved.message };
     try {
       return { ok: true as const, branches: await reviewEngine.listBranches(resolved.workspace) };
@@ -91,7 +101,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     }
   });
   ipc.handle(contract.review.listCommits, async (input) => {
-    const resolved = await resolveReviewWorkspace(registryOptions, input);
+    const resolved = await resolveWorkspace(input);
     if (resolved.ok === false) return { ok: false as const, code: "invalid_workspace" as const, message: resolved.message };
     try {
       return { ok: true as const, commits: await reviewEngine.listCommits(resolved.workspace) };
@@ -114,12 +124,12 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     }
   });
   ipc.handle(contract.review.getPullRequestCapability, async (input) => {
-    const resolved = await resolveReviewWorkspace(registryOptions, input);
+    const resolved = await resolveWorkspace(input);
     if (resolved.ok === false) return { ok: false as const, code: "invalid_workspace" as const, message: resolved.message };
     return reviewPullRequests.getCapability(resolved.workspace.workspaceRoot, input.baseBranch);
   });
   ipc.handle(contract.review.createPullRequest, async (input) => {
-    const resolved = await resolveReviewWorkspace(registryOptions, input);
+    const resolved = await resolveWorkspace(input);
     if (resolved.ok === false) return { ok: false as const, code: "invalid_workspace" as const, message: resolved.message };
     const result = await reviewPullRequests.create({
       workspaceRoot: resolved.workspace.workspaceRoot,
