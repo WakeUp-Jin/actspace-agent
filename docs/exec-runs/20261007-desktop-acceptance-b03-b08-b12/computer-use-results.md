@@ -47,3 +47,12 @@
 ## 执行记录
 
 准备完成。主智能体通知三个构建与定向测试通过，允许正常 Quit；退出前只读核旧PID9196已不存在、nativeAX仅root/CG无窗口，未向其它Electron发送操作。等待父确认现有实例或同dev:log新PID，重新CUA绑定。B12明确从主新建按钮进入，不能用归档工作区fallback空会话。
+
+
+### B03/B08 现场建立
+
+实际 main PID38849（38896 是 network Helper，已只读身份纠正）；window21307/bounds15,33,1440×856。CUA正常重绑一次63s，之后标准nativeAX/截图<1s。
+
+首个系统目录选择后未核最终标签便首发，短无工具会话实际落产品目录，不能计fixture前提；没有执行工具或修改产品，其唯一标题桌面重测 B03 B08待精确归档。纠正后再次主新建→已有文件夹，系统Open返回后实际截图明确git-workspace/main/本机，才首发FIXTURE-RETEST-READY；实际持久会话Fixture B03 B08 retest位于git-workspace。
+
+B03-1通过：Review未提交范围初态同时sample-image.png与sample.txt旧+1行，准确旧文本。证据 [初态](screenshots/review-open-initial.png)、[首发前fixture](screenshots/fixture-selected-before-send.png)。通知父追加本轮marker，保持同一面板/范围不刷新。

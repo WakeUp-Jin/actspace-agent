@@ -11,4 +11,12 @@
 
 ## 验证记录
 
-工程测试、真实桌面证据和配置恢复结果随实施回填。
+- 最终完整Desktop：1680通过、2跳过（208个测试文件，1个文件跳过）。
+- shared163、client23、session-journal12、agent-service32通过；新增header兼容/fork1通过；Runtime投影/冷重开19通过。
+- Desktop typecheck、依赖构建、Electron构建、renderer构建通过。
+- IPC channel、renderer bridge、包边界、文档检查、diff whitespace通过。
+- [真实桌面逐项复验](computer-use-results.md)仍在执行；自动测试不等同于真实模型和UI链路已通过。
+
+## 实现边界
+
+工作树的执行目录、分支、持久绑定和状态行已经接线；设计文档中的独立“Created worktree”过程块仍属于后续展示目标，本轮未新增。B13及其它候选不在本次修复范围。

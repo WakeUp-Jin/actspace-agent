@@ -35,7 +35,7 @@
 
 ### 验证与剩余门禁
 
-- 完整Desktop：1677通过、2跳过；受影响shared/client/journal/agent-service包：230通过；Runtime投影及冷重开19通过。
+- 完整Desktop：1680通过、2跳过；受影响shared/client/journal/agent-service包：230通过；Runtime投影及冷重开19通过。
 - 独立新增linked-worktree监听1项、header兼容/fork1项通过；IPC channel、renderer bridge、包边界检查通过。
 - 构建与typecheck、真实Electron复验及恢复结果以[执行摘要](../../exec-runs/20261007-desktop-acceptance-b03-b08-b12/execution-summary.md)为准；此记录在复验中持续更新。
 - 其它验收问题仍只记录，未纳入修复。主智能体未暂存、提交或推送；工作期间外部提交收录了一部分变更，后续以当前工作区继续验证。
