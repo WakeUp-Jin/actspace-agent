@@ -135,5 +135,37 @@
       }
     ],
     "note": "Actual app tree includes terminal shell5020. No git or Browser Bridge child in this snapshot; does not prove unexecuted shutdown."
+  },
+  {
+    "utc": "2026-10-07T10:06:37.100366+00:00",
+    "phase": "Queue Tab/hover actual fixture task",
+    "comm_only_processes": [
+      {
+        "pid": 5020,
+        "ppid": 40906,
+        "comm": "/bin/zsh"
+      }
+    ]
+  },
+  {
+    "utc": "2026-10-07T10:15:45.293626+00:00",
+    "phase": "Actual queue pagination fixture sleep180 approved",
+    "comm_only_processes": [
+      {
+        "pid": 82460,
+        "ppid": 40906,
+        "comm": "/bin/zsh"
+      },
+      {
+        "pid": 82462,
+        "ppid": 82460,
+        "comm": "sleep"
+      },
+      {
+        "pid": 5020,
+        "ppid": 40906,
+        "comm": "/bin/zsh"
+      }
+    ]
   }
 ]

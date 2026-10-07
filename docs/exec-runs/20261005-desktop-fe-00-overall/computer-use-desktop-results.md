@@ -118,3 +118,7 @@
 | 09-P4-4 | 不通过（已有文档接线缺口） | 新建页正常Git main→新建工作树目标→短请求WORKTREE-READY真实首发/正常回复结束。进入持久会话后实际状态仍main · 本机，未显示新工作树。 | 保留worktree首发/结束截图；UI验收现象，原因不定位；不扩大至R19 |
 | 11-A3 | 通过 | 新建页工作区菜单→新建文件夹，实际输入desktop-created-1007名称不触发菜单字母导航；创建后系统选择folder-parent作为父目录，实际工作区标签新名称。 | 新folder截图；父只读确认folder-parent/desktop-created-1007真实存在且为空 |
 | R11 | 通过（后续补齐分支比较） | Review→审查范围→分支→main → acceptance-local/main，面板准确标签与暂无变更。未提交sample.txt不混入分支已提交范围。前文真实初始提交历史差异已覆盖。 | review-branch-menu.png、review-local-upstream-result.png；fixture本地bare tracking同初始commit，无线上访问 |
+
+| R21 独立键盘补验 | 通过；撤销CU-B04产品候选 | 同一提交对话框空说明/提交disabled，AXFocused取消按钮后独立CG VK36 Return实际关闭，焦点回提交或推送。 | git-cancel-independent-return.png；原CUA Return未关保留历史工具路径，独立系统Return成功，不再列产品Bug |
+| 09-P3-2 Effort | 通过（UI/真实prepared请求参数子项）；旧两级路线版本差异 | Thinking保持true，独立模型按钮→编辑选项→Low实际选中，再真实发送安全sleep180任务。父仅白名单读取该轮request/context prepared.defaults.reasoning=true/reasoningEffort=low，之前high。 | queue-tab-task-start.png；prepared请求参数不等价provider wire抓包。Thinking已改/恢复见前文，最终Effort恢复原High |
+| 09-P2-3 当前补验 | 执行中；前台冲突尝试不计产品失败 | A第18轮安全sleep180待审批时四条PAGE续问真实入队；首图标AXImage含4条数量。CG hover/Tab尝试期间OS前台先VS Code后QQ，未确认Electron前台，未落到目标不计通过/失败。随后标准AXPress批准真实任务。 | queue-tab-four.png；删除误合成其它窗口截图，后续物理动作前核frontmost，只在40906时发送 |

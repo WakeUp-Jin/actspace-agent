@@ -188,6 +188,21 @@
         "tool/result": 9
       },
       "layer": "read-only runtime support, not UI pagination evidence"
+    },
+    {
+      "utc": "2026-10-07T10:06:37.051467+00:00",
+      "phase": "Real queue Tab/hover task started",
+      "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "counts": {
+        "user/message": 18,
+        "turn/start": 18,
+        "turn/end": 17
+      },
+      "request_time": "2026-10-07T10:05:30.067Z",
+      "request_model": "deepseek-flash",
+      "prepared_reasoning": true,
+      "prepared_reasoning_effort": "low",
+      "layer": "actual prepared request snapshot whitelist, not provider wire"
     }
   ],
   "png_clipboard_preparation": {
@@ -246,6 +261,16 @@
       "restart_retention_verified": false,
       "restored": false,
       "layer": "Sol actual native app theme UI; no business state injection"
+    },
+    {
+      "utc": "2026-10-07T10:07:11.391703+00:00",
+      "scope": "composer model runtime effort",
+      "model": "deepseek-flash",
+      "original_prepared_effort": "high",
+      "acceptance_prepared_effort": "low",
+      "actual_request_time": "2026-10-07T10:05:30.067Z",
+      "restored": false,
+      "restore_method": "Sol actual native UI restores High; next actual prepared request can verify if one occurs, not otherwise infer"
     }
   ],
   "observation_capabilities": [
@@ -304,16 +329,23 @@
     "original_bytes": 1464,
     "baseline_equals_current_before_test": true,
     "raw_prompt_recorded_in_repo": false,
-    "ui_edit_test_pending": true,
-    "restoration_pending": false
+    "ui_edit_test_pending": false,
+    "restoration_pending": false,
+    "actual_ui_append_save_reopen_marker_confirmed": true,
+    "actual_ui_marker_removed_saved": true,
+    "baseline_equals_current_after_restore": true,
+    "restoration_utc": "2026-10-07T10:15:22.210405+00:00"
   },
   "ascii_path_input_source_preparation": {
     "utc": "2026-10-07T09:41:42.568448+00:00",
     "original_source": "com.bytedance.inputmethod.doubaoime.pinyin",
     "selected_source": "com.apple.keylayout.ABC",
     "selection_result": 0,
-    "restoration_pending": true,
-    "layer": "OS prerequisite for actual system path typing only, no app state injection"
+    "restoration_pending": false,
+    "layer": "OS prerequisite for actual system path typing only, no app state injection",
+    "restored_source": "com.bytedance.inputmethod.doubaoime.pinyin",
+    "restore_result": 0,
+    "restore_utc": "2026-10-07T10:08:03.149399+00:00"
   },
   "worktree_first_send": {
     "utc": "2026-10-07T09:52:39.503519+00:00",
@@ -360,5 +392,16 @@
       "source_fix_performed": false,
       "evidence": "screenshots/computer-use/desktop/git-cancel-independent-return.png"
     }
-  ]
+  ],
+  "foreground_interference": {
+    "utc": "2026-10-07T10:13:29.504488+00:00",
+    "actual_native_frontmost_changed_during_queue_test": true,
+    "observed_other_app_names": [
+      "Visual Studio Code",
+      "QQ"
+    ],
+    "stale_coordinates_or_keys_not_counted_as_app_failures": true,
+    "policy": "AXPress known app controls may continue; real physical keys only after explicit target activation and current frontmost PID confirmation; stop on new user switch",
+    "layer": "tool interaction boundary only; no user application contents recorded"
+  }
 }
