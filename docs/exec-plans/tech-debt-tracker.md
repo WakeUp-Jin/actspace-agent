@@ -56,7 +56,7 @@
 
 ## Desktop settings 遗留
 
-2026-10-07 Desktop 前端重构 17（settings-service 拆分，`active/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md`）的特征测试（T1，以及 T6 / T7 变异检查后补的用例）记下的现有行为。17 是纯搬迁，不改；测试按现状断言（`apps/desktop/src/main/test/settings-characterization.test.ts`）。
+2026-10-07 Desktop 前端重构 17（settings-service 拆分，`active/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md`）的特征测试（T1，以及 T6 / T7 变异检查后补的用例）记下的现有行为。17 是纯搬迁，不改；测试按现状断言（`apps/desktop/src/main/test/settings-characterization.test.ts`）。三行已立项：[Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md)。
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
