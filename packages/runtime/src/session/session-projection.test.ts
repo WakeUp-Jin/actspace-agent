@@ -53,6 +53,20 @@ describe("history window slimming", () => {
 });
 
 describe("production Session projections", () => {
+  it("persists a new worktree binding through cold reopen and sidebar projection", async () => {
+    const f = await fixture(0);
+    const worktree = { kind: "worktree" as const, sourceWorkspaceRoot: "/repo", workspaceRoot: "/worktrees/new", baseBranch: "main", branch: "codex/new", baseCommit: "abc", createdAt: "2026-10-07T00:00:00Z" };
+    const writer = f.controller();
+    const session = await writer.create("worktree", worktree.workspaceRoot, "agent", worktree);
+    expect(writer.snapshot(session).worktree).toEqual(worktree);
+    await session.flush();
+    await writer.closeAll();
+    const reader = f.controller();
+    expect((await reader.inspect("worktree")).worktree).toEqual(worktree);
+    expect((await reader.list()).find(item => item.sessionId === "worktree")?.worktree).toEqual(worktree);
+    await reader.closeAll();
+  });
+
   it("rebuilds Todo contributions from the selected storage after controller restart", async () => {
     const f = await fixture(0);
     const registry = createCoreCodecRegistry(todoCodecs);

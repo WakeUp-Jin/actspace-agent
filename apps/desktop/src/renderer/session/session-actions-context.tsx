@@ -3,6 +3,8 @@ import type { MainAgentForm } from "@actspace/shared";
 
 /** 新建会话时带上的位置和形态；侧栏工作区行上的「+」会填 Host 和工作区。 */
 export type NewSessionInput = {
+  runLocation?: import("@actspace/shared").SessionRunLocation;
+  branch?: string;
   hostId?: string;
   workspaceId?: string;
   workspaceRoot?: string;

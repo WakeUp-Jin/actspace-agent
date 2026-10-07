@@ -830,6 +830,9 @@ export type WorkspaceVisibilityResult = {
 };
 
 export type SessionCreateInput = {
+  runLocation?: SessionRunLocation;
+  /** Local checkout target, or the base branch of a new worktree. */
+  branch?: string;
   /** Remote ownership is fixed when the Session is created. */
   hostId?: string;
   title?: string;

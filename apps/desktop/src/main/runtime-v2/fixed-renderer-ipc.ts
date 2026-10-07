@@ -5,6 +5,7 @@ import { paginateSessionSummaries } from "./session-list-page";
 import { UsageSourceCache } from "./usage-source-cache";
 import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
+import { prepareExecutionContext, rollbackPreparedExecution } from "../workspace-git-context-service";
 import { homedir } from "node:os";
 import { resolve as resolvePath } from "node:path";
 import { dialog, nativeImage, nativeTheme, shell, type BrowserWindow } from "electron";
@@ -168,7 +169,17 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
   ipc.handle(contract.sessions.create, async (input = {}) => {
     const workspaceRoot = await registeredWorkspaceRoot(workspaceRegistryOptions(options.roots), input.workspaceRoot ?? options.roots.workspaceRoot);
-    let snapshot = await options.registry.createSession(undefined, workspaceRoot, input.agentForm);
+    const prepared = input.runLocation ? await prepareExecutionContext({
+      sourceWorkspaceRoot: workspaceRoot, runLocation: input.runLocation, branch: input.branch,
+    }, options.roots) : { ok: true as const, workspaceRoot };
+    if (prepared.ok === false) throw new Error(prepared.message);
+    let snapshot: RuntimeV2SessionSnapshot;
+    try {
+      snapshot = await options.registry.createSession(undefined, prepared.workspaceRoot, input.agentForm, "worktree" in prepared ? prepared.worktree : undefined);
+    } catch (error) {
+      await rollbackPreparedExecution("rollback" in prepared ? prepared.rollback : undefined);
+      throw error;
+    }
     if (input.title?.trim()) {
       snapshot = await options.registry.updateSessionMetadata({ sessionId: snapshot.sessionId, title: input.title.trim() });
     }
@@ -946,4 +957,3 @@ function isSupportedSessionImageMime(value: string): value is "image/png" | "ima
 function safeErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
-

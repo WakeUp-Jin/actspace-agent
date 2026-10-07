@@ -5,15 +5,15 @@ export function paginateSessionSummaries(result: RuntimeV2BrowseList, input: Ses
   const grouped = new Map<string, SessionListItem[]>();
   const sorted = [...result.items].filter(s => !s.metadata.archived).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
   for (const item of sorted) {
-    const key = JSON.stringify([item.workspaceRoot ?? '', item.metadata.pinned]);
+    const key = JSON.stringify([item.worktree?.sourceWorkspaceRoot ?? item.workspaceRoot ?? '', item.metadata.pinned]);
     const group = grouped.get(key) ?? [];
-    group.push({ id: item.sessionId, title: item.metadata.title ?? 'New chat', updatedAt: item.updatedAt, workspaceRoot: item.workspaceRoot ?? undefined, pinned: item.metadata.pinned, archived: false, accessState: item.accessState, isChildSession: item.lineage !== null, agentRunCount: item.completedTurnCount ?? 0 });
+    group.push({ id: item.sessionId, title: item.metadata.title ?? 'New chat', updatedAt: item.updatedAt, workspaceRoot: item.workspaceRoot ?? undefined, ...(item.worktree ? { worktree: item.worktree } : {}), pinned: item.metadata.pinned, archived: false, accessState: item.accessState, isChildSession: item.lineage !== null, agentRunCount: item.completedTurnCount ?? 0 });
     grouped.set(key, group);
   }
   const groups: SessionListPage['groups'] = [];
   const items: SessionListItem[] = [];
   for (const group of grouped.values()) {
-    const workspaceRoot = group[0]!.workspaceRoot ?? '';
+    const workspaceRoot = group[0]!.worktree?.sourceWorkspaceRoot ?? group[0]!.workspaceRoot ?? '';
     const pinned = group[0]!.pinned === true;
     if (input.workspaceRoot !== undefined && workspaceRoot !== input.workspaceRoot) continue;
     if (input.pinned !== undefined && pinned !== input.pinned) continue;

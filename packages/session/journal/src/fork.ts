@@ -41,6 +41,7 @@ export function createSessionForkSeed(options: {
     sessionId: options.newSessionId,
     createdAt: options.createdAt,
     ...(options.parentHeader.cwd === undefined ? {} : { cwd: options.parentHeader.cwd }),
+    ...(options.parentHeader.worktree ? { worktree: options.parentHeader.worktree } : {}),
     lineage: {
       parentSessionId: options.parentHeader.sessionId,
       parentBoundarySeq: options.boundarySeq,

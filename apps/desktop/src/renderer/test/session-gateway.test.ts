@@ -32,6 +32,12 @@ function deps(patch: Partial<SessionGatewayDeps> = {}) {
 }
 
 describe("ensureSession", () => {
+  it("passes a new local worktree and its base branch to session creation", async () => {
+    const { value } = deps();
+    await createSessionGateway(value).ensureSession(null, { ...local, runLocation: "worktree", branch: "feature/base" }, options);
+    expect(value.createSession).toHaveBeenCalledWith({ workspaceRoot: "/repo", agentForm: "agent", runLocation: "worktree", branch: "feature/base" });
+  });
+
   it("keeps an existing Session", async () => {
     const { value } = deps();
     await expect(createSessionGateway(value).ensureSession("existing", local, options)).resolves.toBe("existing");

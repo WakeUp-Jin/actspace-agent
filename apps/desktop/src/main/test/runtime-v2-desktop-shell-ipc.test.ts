@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { ReviewGitEngine } from "../review-git-engine";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 
 const { handlers, removeHandler } = vi.hoisted(() => {
@@ -30,6 +33,50 @@ import { registerRuntimeV2DesktopShell } from "../runtime-v2/desktop-shell-ipc";
 import { trustedWindow } from "./ipc-sender-fixture";
 
 describe("runtime v2 desktop shell IPC", () => {
+  it("invalidates the cached Review after a real external write and stops notifications on dispose", async () => {
+    handlers.clear();
+    const root = await mkdtemp(join(tmpdir(), "review-external-write-"));
+    const workspace = join(root, "workspace");
+    await mkdir(workspace);
+    const git = (args: string[]) => promisify(execFile)("git", args, { cwd: workspace });
+    await git(["init", "-b", "main"]);
+    await writeFile(join(workspace, "sample.txt"), "before\n");
+    await git(["add", "."]);
+    await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixture"]);
+    // Exercise the real Git snapshot below the IPC boundary, without a worker fixture.
+    const realEngine = new ReviewGitEngine();
+    const realSnapshot = realEngine.getSnapshot.bind(realEngine);
+    const snapshotSpy = vi.spyOn(ReviewGitEngine.prototype, "getSnapshot").mockImplementation(realSnapshot);
+    const trusted = trustedWindow();
+    const send = vi.spyOn(trusted.window.webContents, "send");
+    const registration = registerRuntimeV2DesktopShell({
+      roots: { dataRoot: root, sessionRoot: join(root, "sessions-v2"), logRoot: join(root, "logs"), tmpRoot: join(root, "tmp"), defaultWorkspaceRoot: workspace, workspaceRoot: workspace },
+      getMainWindow: () => trusted.window as never,
+      listSessions: async () => [],
+    });
+    const snapshot = () => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot)!(trusted.event, { workspaceRoot: workspace, selection: { kind: "uncommitted" } }) as Promise<{ ok: boolean; snapshot: { generation: number; files: { path: string }[] } }>;
+    try {
+      const before = await snapshot();
+      expect(before.snapshot.files).toEqual([]);
+      await writeFile(join(workspace, "sample.txt"), "before\nafter\n");
+      await vi.waitFor(() => expect(send).toHaveBeenCalledWith(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reviewChanged, expect.objectContaining({ reason: "watch" })), { timeout: 2500 });
+      const after = await snapshot();
+      expect(after.snapshot.generation).toBeGreaterThan(before.snapshot.generation);
+      expect(after.snapshot.files.map(file => file.path)).toContain("sample.txt");
+      const count = send.mock.calls.length;
+      await snapshot();
+      await new Promise(resolve => setTimeout(resolve, 250));
+      expect(send).toHaveBeenCalledTimes(count);
+      registration.dispose();
+      await writeFile(join(workspace, "sample.txt"), "after dispose\n");
+      await new Promise(resolve => setTimeout(resolve, 250));
+      expect(send).toHaveBeenCalledTimes(count);
+    } finally {
+      registration.dispose();
+      snapshotSpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
   it("keeps Workspace and Review active while Terminal is unavailable", () => {
     handlers.clear();
     removeHandler.mockClear();

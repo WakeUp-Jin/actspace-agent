@@ -203,6 +203,15 @@
       "prepared_reasoning": true,
       "prepared_reasoning_effort": "low",
       "layer": "actual prepared request snapshot whitelist, not provider wire"
+    },
+    {
+      "utc": "2026-10-07T10:19:19.294774+00:00",
+      "phase": "Actual history pagination premise ready",
+      "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+      "user_messages": 22,
+      "turn_ends": 22,
+      "current_history_page_turn_limit": 20,
+      "layer": "read-only runtime/source premise only; UI reload/load-earlier/new-message still required"
     }
   ],
   "png_clipboard_preparation": {
@@ -238,8 +247,10 @@
       "acceptance_value": "cheaprouter.cc [acceptance]",
       "actual_ui_save_observed": true,
       "secret_baseurl_model_changed": false,
-      "restart_retention_verified": false,
-      "restored": false
+      "restart_retention_verified": true,
+      "restored": true,
+      "new_value_retained": true,
+      "restore_method": "actual child native UI restoration after retention screenshots"
     },
     {
       "utc": "2026-10-07T08:19:53.951512+00:00",
@@ -248,19 +259,23 @@
       "original_ui_connected": true,
       "acceptance_ui_connected": false,
       "actual_disconnect_observed": true,
-      "restore_method": "after final normal quit, merge only baseline encrypted zhipu credential into current secrets, restart UI confirm connected",
-      "restored": false
+      "restore_method": "afteractualquit mergeonlyoriginalencryptedentry then actualnativeUI2of4connected",
+      "restored": true,
+      "ui_connected_after_restore": true
     },
     {
       "utc": "2026-10-07T09:23:33.927126+00:00",
       "scope": "app appearance mode",
       "original_ui_mode": "light",
-      "acceptance_ui_mode": "dark",
+      "acceptance_ui_mode": "system",
       "actual_ui_change_observed": true,
       "system_os_dark_baseline": false,
-      "restart_retention_verified": false,
-      "restored": false,
-      "layer": "Sol actual native app theme UI; no business state injection"
+      "restart_retention_verified": true,
+      "restored": true,
+      "layer": "Sol actual native app theme UI; no business state injection",
+      "actual_system_flip_verified": true,
+      "new_value_retained": true,
+      "restore_method": "actual child native UI restoration after retention screenshots"
     },
     {
       "utc": "2026-10-07T10:07:11.391703+00:00",
@@ -269,8 +284,79 @@
       "original_prepared_effort": "high",
       "acceptance_prepared_effort": "low",
       "actual_request_time": "2026-10-07T10:05:30.067Z",
-      "restored": false,
-      "restore_method": "Sol actual native UI restores High; next actual prepared request can verify if one occurs, not otherwise infer"
+      "restored": true,
+      "restore_method": "Sol actual native UI restores High; next actual prepared request can verify if one occurs, not otherwise infer",
+      "restore_source": "child actual Deepseek model options AXPress High and checkmark screenshot",
+      "restoration_utc": "2026-10-07T11:54:43.898328+00:00",
+      "new_provider_request_after_restore_observed": true,
+      "restoration_followup_prepared_defaults": {
+        "reasoning": true,
+        "reasoningEffort": "high"
+      },
+      "restoration_followup_request_time": "2026-10-07T12:49:31.738Z",
+      "restoration_followup_session_id": "a4b5694f-a5c6-4419-a8f0-597241bb9810",
+      "wire_payload_verified": false
+    },
+    {
+      "scope": "default conversation model binding",
+      "original": "deepseek:deepseek-flash",
+      "acceptance_value": "openrouter:connection/custom-60efa1a2-cb31-4438-98e5-f38f93124e5f/claude-haiku-4-5-20251001",
+      "actual_ui_change_observed": true,
+      "runtime_real_reply_observed": true,
+      "restart_retention_verified": true,
+      "restored": true,
+      "restore_method": "actual child native UI restoration after retention screenshots",
+      "new_value_retained": true
+    },
+    {
+      "utc": "2026-10-07T11:23:35.424418+00:00",
+      "scope": "tools.disabledTools",
+      "original": [],
+      "acceptance_value": [
+        "write_file"
+      ],
+      "layer": "persisted allowlisted field after child actual UI toggle; parent did not mutate settings",
+      "restart_retention_verified": true,
+      "restored": true,
+      "restore_method": "actual child native UI restoration after retention screenshots",
+      "new_value_retained": true
+    },
+    {
+      "utc": "2026-10-07T11:24:29.608201+00:00",
+      "scope": "general.shortcuts.quickOpen.accelerator",
+      "original": "CommandOrControl+Shift+Space",
+      "acceptance_value": "CommandOrControl+Shift+K",
+      "actual_ui_change_observed": true,
+      "target_changed": false,
+      "restart_retention_verified": true,
+      "restored": true,
+      "restore_method": "normal restart itself returned original Space; native UI confirms original target/shortcut",
+      "persisted_whitelist_last_observation": "CommandOrControl+Shift+Space",
+      "ui_vs_persisted_mismatch_observed": true,
+      "product_bug_confirmed": true,
+      "new_value_retained": false,
+      "associated_bug": "CU-B13",
+      "confirmation_layer": "Actual changed shortcut UI, leave and reopen, genuine Quit, same-main restart returned original accelerator; persistence failure only, cause uninvestigated"
+    },
+    {
+      "utc": "2026-10-07T12:18:03.224131+00:00",
+      "scope": "general.shortcuts.quickOpen.target",
+      "original": {
+        "kind": "session",
+        "sessionId": "session-msaa01v0-mxag4q"
+      },
+      "acceptance_ui_value": "自动选择第一个项目",
+      "acceptance_persisted_value": {
+        "kind": "session",
+        "sessionId": "session-msaa01v0-mxag4q"
+      },
+      "actual_ui_change_reopen_checkmark_upwards_menu_observed": true,
+      "restored": true,
+      "restore_method": "Actual normal Quit; persisted original target already matches baseline so no settings write; same-main pnpm dev:log restart and child genuine native UI confirms original removed-session fallback",
+      "all_other_current_settings_preserved": true,
+      "restoration_utc": "2026-10-07T13:06:13.023488+00:00",
+      "file_write_needed": false,
+      "native_ui_verified": true
     }
   ],
   "observation_capabilities": [
@@ -391,6 +477,30 @@
       "candidate_withdrawn": true,
       "source_fix_performed": false,
       "evidence": "screenshots/computer-use/desktop/git-cancel-independent-return.png"
+    },
+    {
+      "utc": "2026-10-07T11:34:01.466354+00:00",
+      "associated_candidate": "CU-B06",
+      "scene": "real image config Dialog",
+      "foreground_pid_confirmed_by_child": 40906,
+      "focused_control": "更换Key",
+      "independent_cg_escape_dialog_remained_open": true,
+      "tool_effect_fully_excluded": false,
+      "subsequent_cua_state": "Computer Use not active, normal rebind/observe in progress",
+      "credentials_changed": false,
+      "no_product_fixes": true
+    },
+    {
+      "utc": "2026-10-07T11:43:37.398742+00:00",
+      "associated_candidate": "CU-B07",
+      "scene": "actual Mermaid full preview fresh reopen",
+      "focused_control": "关闭预览",
+      "independent_cg_escape_remained_open": true,
+      "actual_mouse_close_worked": true,
+      "actual_after_close_focus": "放大查看",
+      "tool_effect_fully_excluded": false,
+      "repeated_path_stopped": true,
+      "repairs_performed": false
     }
   ],
   "foreground_interference": {
@@ -403,5 +513,684 @@
     "stale_coordinates_or_keys_not_counted_as_app_failures": true,
     "policy": "AXPress known app controls may continue; real physical keys only after explicit target activation and current frontmost PID confirmation; stop on new user switch",
     "layer": "tool interaction boundary only; no user application contents recorded"
+  },
+  "actual_compaction_events": {
+    "utc": "2026-10-07T10:25:24.850051+00:00",
+    "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+    "events_metadata_only": [
+      {
+        "time": "2026-10-07T10:25:01.846Z",
+        "type": "compaction/start",
+        "data_keys": [
+          "compactionId",
+          "start",
+          "end"
+        ]
+      },
+      {
+        "time": "2026-10-07T10:25:01.963Z",
+        "type": "compaction/summary",
+        "data_keys": [
+          "compactionId",
+          "summaryDigest"
+        ]
+      },
+      {
+        "time": "2026-10-07T10:25:02.143Z",
+        "type": "compaction/end",
+        "data_keys": [
+          "compactionId",
+          "summaryDigest",
+          "durationMs"
+        ]
+      }
+    ],
+    "summary_content_recorded": false,
+    "layer": "actual runtime event support only; queue disabled/automatic resume requires native UI evidence"
+  },
+  "pagination_runtime_premise": {
+    "utc": "2026-10-07T10:29:47.067273+00:00",
+    "current_real_turn_count": 23,
+    "history_page_turn_limit": 20,
+    "actual_ui_navigation_first_turn_after_reload": 4,
+    "manual_earlier_load_verified": false,
+    "note": "23-turn full UI after compact is history-preservation/new-append evidence; independent page load still requires actual top/load action",
+    "independent_actual_earlier_ui_load": {
+      "observed_at_utc": "2026-10-07T10:35:22.623002+00:00",
+      "source": "Sol reported Reload actual first old turn4 then confirmed foreground CG scroll then fresh UI first old turn1 and unique1-23; runtime counts only supplementary",
+      "older_ui_load_verified_by_child": true,
+      "new_message_after_this_load_pending": false,
+      "new_message_after_load_ui_unique_confirmed_by_child": true,
+      "actual_new_turn_number": 24,
+      "actual_ui_terminal_idle": true
+    },
+    "metadata_counts_after_append": {
+      "user_message": 24,
+      "turn_end": 24,
+      "count_layer": "journal type counts; content/UI uniqueness verified by child"
+    }
+  },
+  "settings_model_persistence_before_restart": {
+    "observed_at_utc": "2026-10-07T10:33:46.719749+00:00",
+    "taskDefaults": {
+      "temperature": null,
+      "maxOutputTokens": null,
+      "chatCompactionTriggerRatio": 0.8
+    },
+    "disabledTools": [
+      "write_file"
+    ],
+    "source": "settings.json allowlisted fields; UI change performed by Computer Use child; restart retention not yet verified",
+    "taskBindings": {
+      "defaultChat": "openrouter:connection/custom-60efa1a2-cb31-4438-98e5-f38f93124e5f/claude-haiku-4-5-20251001",
+      "utility": "deepseek:deepseek-flash",
+      "explore": "deepseek:deepseek-flash"
+    },
+    "quickOpen": {
+      "enabled": true,
+      "accelerator": "CommandOrControl+Shift+Space",
+      "target": {
+        "kind": "session",
+        "sessionId": "session-msaa01v0-mxag4q"
+      }
+    },
+    "shortcut_ui_observed": "CommandOrControl+Shift+K",
+    "shortcut_persisted_observed": "CommandOrControl+Shift+Space"
+  },
+  "normal_quit_restoration_premise": {
+    "utc": "2026-10-07T10:36:22.822182+00:00",
+    "baseline_zhipu_encrypted_entry_present": true,
+    "current_zhipu_encrypted_entry_absent": true,
+    "quick_target_current_equals_baseline": true,
+    "secrets_private_backup_mode": "0o600",
+    "secret_content_printed": false,
+    "normal_quit_not_yet_executed": true
+  },
+  "first_send_recording_actual_transition": {
+    "utc": "2026-10-07T10:46:40.816967+00:00",
+    "video": "screenshots/computer-use/desktop/memory01-first-send.mov",
+    "duration_seconds": 12.056666666666667,
+    "dimensions": [
+      3104,
+      1924
+    ],
+    "recording_method": "child same batch native Electron-window screencapture then standard AXSend; not parent-delay sample",
+    "sampled_frames_seconds": [
+      0,
+      0.2,
+      0.4,
+      0.6,
+      0.8,
+      1,
+      1.5,
+      2,
+      3,
+      4,
+      6,
+      8,
+      10,
+      11.5
+    ],
+    "visual_observation": "new-page centered composer remains visible through draft-to-running transition, then bottom composer; unique MEM-01 reply by6s; no disappearance/flash observed in sampled frames",
+    "supplementary_full_video_scan": {
+      "decoded_frames": 689,
+      "decoded_to_completion": true,
+      "region_pixels": [
+        2360,
+        860,
+        2660,
+        1730
+      ],
+      "dark_sample_grid_step_pixels": 4,
+      "minimum_dark_sample_count": 141,
+      "frames_without_dark_samples": 0,
+      "meaning": "only visual action-region nonblank auxiliary; not DOM identity or focus proof"
+    },
+    "focus_boundary": "AXSend can focus actual Send button; use earlier real keyboard first-send focus observation as distinct subcase; do not infer focus from video",
+    "product_source_modified": false
+  },
+  "voiceover_os_process_baseline": {
+    "utc": "2026-10-07T10:58:11.483474+00:00",
+    "processes": [],
+    "method": "comm-only OS process presence; not audible speech proof",
+    "restore_requirement": "if enabled for acceptance, restore prior OS state"
+  },
+  "acceptance_resume_checkpoint": {
+    "utc": "2026-10-07T11:02:09.321770+00:00",
+    "active_child": "/root/computer_use",
+    "model": "gpt-6.1-sol",
+    "scope": "real user pnpm dev:log Electron only; acceptance and records, no repairs",
+    "active_stage": "pickerfilterGoTodialogpathConfirmstillrestrictedunderABC;cancelbackA,originalDoubaorestoredTIS0;R20wholeuncoveredimageactualsuccessretained/Hostabsent;childnowPaletteLeftTabmutual+realdeletevideo/Chatcontext thenfinaltargetrestoreviaactualQuit/restart+acceptancearchive",
+    "memory_ui_sampling": "DevTools MoreTabs Memory visually seen, AX absent; real GC not yet captured",
+    "current_first_send_video": "Memory01 captures transition; current keyboard caret/focus subcase still pending; old first-send source version cannot be merged as current pass",
+    "later_required_routes": [
+      "remaining settings/VoiceOver/narrow/menu/keyboard checks by original IDs",
+      "14-A6 acceptance folder real session then removal and title refresh",
+      "R09 fork/archive and R14 fixture workspace archive all",
+      "11-A2 close window then Dock reopen with old shell cleanup",
+      "11-A4 actual CmdQ after terminal and Git operation; comm-only child cleanup",
+      "same current main workspace pnpm dev:log restart retention checks and restore values"
+    ],
+    "restore_pending": [
+      "defaultChat Haiku to deepseek-flash via UI",
+      "one tool switch if changed to its original via UI",
+      "custom connection display name acceptance suffix to original via UI",
+      "app System theme to original Light via UI",
+      "Deepseek Effort Low to original High via UI",
+      "after normal quit merge only missing encrypted zhipu baseline entry, restart UI connected confirmation",
+      "quickOpen target baseline only if changed and cannot reselect old removed session via UI"
+    ],
+    "already_restored": [
+      "OS dark false",
+      "OS input source Doubao",
+      "Agent Instructions exact original bytes",
+      "English learning original off and target"
+    ],
+    "do_not_finish_turn_while_executable_checks_remain": true,
+    "last_update_utc": "2026-10-07T12:43:43.980626+00:00",
+    "remaining_primary_table_in_progress_ids": [
+      "09-P1-1",
+      "09-P6-1",
+      "R08",
+      "V02",
+      "V03",
+      "V04"
+    ]
+  },
+  "memory_lifecycle_observation": {
+    "ui_completed_archived_count_reported_by_child": 15,
+    "fourth_reply_model_refusal_completed": true,
+    "helper_marker_only_wait_corrected": true,
+    "not_a_product_stall": true,
+    "actual_manual_gc_samples": [],
+    "manual_gc_uncovered": true,
+    "all15_lifecycle_subcases_passed": true,
+    "whole_14_A5_result": "uncovered; heap trend not observed",
+    "completion_utc": "2026-10-07T11:09:29.090733+00:00",
+    "metadata_auxiliary_after15": {
+      "utc": "2026-10-07T11:10:16.234750+00:00",
+      "matching_fixture_session_count": 17,
+      "sessions_allowlist": [
+        {
+          "sessionId": "fa2007b4-b592-42ff-af47-0f64f783fa1e",
+          "createdAt": "2026-10-07T11:08:20.046Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "a50a8dfd-53a0-4b07-b6af-b5b21dd5cb7a",
+          "createdAt": "2026-10-07T11:07:59.832Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "cad2691a-a2b5-46b1-9a39-31384fe84d20",
+          "createdAt": "2026-10-07T10:41:47.313Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "d28cb781-d167-4181-b47a-97be118c1f53",
+          "createdAt": "2026-10-07T11:05:08.345Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "186ec9e4-0b20-4439-95b3-fbc539cd69ca",
+          "createdAt": "2026-10-07T11:06:20.618Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "a146b65c-963c-48e8-a623-6503586ae90a",
+          "createdAt": "2026-10-07T11:08:13.804Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "f7489785-e02a-4e5f-9d6f-25d6882bcdb3",
+          "createdAt": "2026-10-07T10:45:13.451Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "5f9181fc-e028-4a37-bded-66dae8145f4d",
+          "createdAt": "2026-10-07T11:06:35.308Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "440f6e64-b8b3-4488-af03-fcdcd0a510e9",
+          "createdAt": "2026-10-07T11:05:00.548Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "38b0bed0-db06-4c5b-8a3c-9470be114388",
+          "createdAt": "2026-10-07T10:47:53.389Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "57edb5e1-8d95-450e-ae25-753121f6c00a",
+          "createdAt": "2026-10-07T10:47:45.264Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "5db0c56f-ee16-4deb-aac0-cc658377b72c",
+          "createdAt": "2026-10-07T11:08:06.951Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "a92b153d-19fb-4243-bed6-0f06dd2e83b2",
+          "createdAt": "2026-10-07T03:33:33.362Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+          "createdAt": "2026-10-07T03:26:11.540Z",
+          "user_message_count": 24,
+          "turn_end_count": 24
+        },
+        {
+          "sessionId": "4832a6f3-2131-4841-a7fe-78f78d440063",
+          "createdAt": "2026-10-07T11:05:13.682Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "a118c6bb-ca09-4b38-a604-de6ef1b3b7ff",
+          "createdAt": "2026-10-07T10:53:53.379Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        },
+        {
+          "sessionId": "3ec346c1-f850-4b01-967a-5b170fc84537",
+          "createdAt": "2026-10-07T11:06:07.378Z",
+          "user_message_count": 1,
+          "turn_end_count": 1
+        }
+      ],
+      "layer": "cwd-selected journal metadata counts only; UI actual archive and own titles verified by child; not heap sample"
+    }
+  },
+  "memory11_keyboard_submit_observation": {
+    "utc": "2026-10-07T11:07:39.467234+00:00",
+    "foreground_pid_confirmed_by_child": 40906,
+    "actual_os_click_caret_visible": true,
+    "focused_ax_role": "AXTextArea",
+    "actual_cg_return_sent": true,
+    "draft_remained_not_submitted": true,
+    "tool_input_source_effect_not_excluded": true,
+    "product_bug_confirmed": false,
+    "repeated_path_stopped": true,
+    "remaining_lifecycle_uses_standard_ui_ax_send": true
+  },
+  "removed_acceptance_folder_session_metadata": {
+    "utc": "2026-10-07T11:17:20.119386+00:00",
+    "sessions": [
+      {
+        "sessionId": "88672708-7460-4170-b938-7c8bd726c33f",
+        "createdAt": "2026-10-07T11:09:27.570Z",
+        "cwd_fixture_match": true,
+        "user/message": 1,
+        "turn/end": 1
+      }
+    ],
+    "layer": "persisted journal metadata support only; actual removal and post-refresh state verified by child",
+    "actual_ui_remove_confirmed_by_child": true,
+    "actual_other_acceptance_title_refresh": "桌面验收 A 1007 refresh",
+    "after_refresh_workspace_and_session_ax_matches": 0,
+    "after_refresh_no_residual_badge_observed": true,
+    "background_approval_queue_ipc_observed": false,
+    "whole_item": "uncovered background branch; UI branch passed"
+  },
+  "fork_metadata_support": {
+    "utc": "2026-10-07T11:20:32.420863+00:00",
+    "recent_fixture_sessions": [
+      {
+        "sessionId": "fa2007b4-b592-42ff-af47-0f64f783fa1e",
+        "createdAt": "2026-10-07T11:08:20.046Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "a50a8dfd-53a0-4b07-b6af-b5b21dd5cb7a",
+        "createdAt": "2026-10-07T11:07:59.832Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "d28cb781-d167-4181-b47a-97be118c1f53",
+        "createdAt": "2026-10-07T11:05:08.345Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "186ec9e4-0b20-4439-95b3-fbc539cd69ca",
+        "createdAt": "2026-10-07T11:06:20.618Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "a146b65c-963c-48e8-a623-6503586ae90a",
+        "createdAt": "2026-10-07T11:08:13.804Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "5f9181fc-e028-4a37-bded-66dae8145f4d",
+        "createdAt": "2026-10-07T11:06:35.308Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "440f6e64-b8b3-4488-af03-fcdcd0a510e9",
+        "createdAt": "2026-10-07T11:05:00.548Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "5db0c56f-ee16-4deb-aac0-cc658377b72c",
+        "createdAt": "2026-10-07T11:08:06.951Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "4832a6f3-2131-4841-a7fe-78f78d440063",
+        "createdAt": "2026-10-07T11:05:13.682Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "3ec346c1-f850-4b01-967a-5b170fc84537",
+        "createdAt": "2026-10-07T11:06:07.378Z",
+        "lineage": null
+      },
+      {
+        "sessionId": "a3b749db-356f-48ec-a49b-a0df5ca1d0a2",
+        "createdAt": "2026-10-07T11:17:57.033Z",
+        "lineage": {
+          "parentSessionId": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+          "parentBoundarySeq": 24910,
+          "origin": "fork",
+          "delegationDepth": 0
+        }
+      }
+    ],
+    "layer": "journal header lineage whitelist only; actual fork history/archive confirmed by child",
+    "child_actual_new_fork_name": "桌面验收 fork 1007",
+    "actual_correct_history_ui_observed": true,
+    "actual_ui_archived_after_return_to_original": true,
+    "actual_ui_fork_removed": true,
+    "original_acceptance_session_current_title": "桌面验收 A 1007 refresh"
+  },
+  "numeric_hover_actual_acceptance": {
+    "utc": "2026-10-07T11:30:17.578052+00:00",
+    "original_interface_font_size": 14,
+    "temporary_size": 15,
+    "actual_os_hover_gray_background_tooltip": true,
+    "actual_reset_restored_original": 14,
+    "source": "child real native UI report; no parent settings mutation"
+  },
+  "voiceover_attempt_observation": {
+    "utc": "2026-10-07T11:36:39.665939+00:00",
+    "child_actual_cg_cmd_f5_attempted": true,
+    "voiceover_processes_after_attempt": [],
+    "actual_audio_or_caption_observed": false,
+    "child_transient_frontmost": "loginwindow PID176",
+    "parent_systemevents_query": "error contained loginwindow176; no stable frontmost",
+    "parent_nsworkspace_immediately_after": {
+      "pid": 40906,
+      "name": "Actspace Dev actspace-agent-2067",
+      "bundle": "com.actspace.desktop.dev.w2067fa05"
+    },
+    "lock_screen_inference_confirmed": false,
+    "physical_key_events_stopped_on_uncertain_foreground": true,
+    "whole16A2_result": "uncovered; not product failure",
+    "os_voiceover_original_off_still_off": true
+  },
+  "subagent_detail_actual_acceptance": {
+    "utc": "2026-10-07T11:41:20.950660+00:00",
+    "actual_real_explore_request": true,
+    "actual_detail_read_fixture_file_and_summary_visible": true,
+    "actual_detail_return_button_clear": true,
+    "actual_click_back_restored_list": true,
+    "observation": "Parent Explore DURABILITY_BLOCKED failed / main reply failure, child detail shows Read sample.txt and summary; recorded UI result discrepancy; no source diagnosis",
+    "product_bug_confirmed": false,
+    "repairs_performed": false
+  },
+  "final_queue_actual_hover": {
+    "utc": "2026-10-07T11:46:07.821465+00:00",
+    "queued_count": 2,
+    "actual_icon_cg_hover_tooltip": "2条排队，当前运行结束后依次发送",
+    "running_placeholder_visible": true,
+    "physical_full_tab_path_verified": false,
+    "foreground_change_cg_skipped": true,
+    "task_pids": [
+      64451,
+      64453
+    ],
+    "actual_physical_tab_row_actions_visible": true,
+    "actual_tab_focused": "↳引导",
+    "actual_steer_tooltip_visible": true,
+    "actual_icon_tab_focus_full_path_verified": false,
+    "whole_09_P2_3": "uncovered icon tab branch; hover and row entry passed",
+    "narrow_running_queue_blocked_by_terminal_then_task_completed": true,
+    "repeat_sleep_for_missing_branch": false
+  },
+  "narrow_current_location_menus": {
+    "actual_os_window_size": [
+      480,
+      760
+    ],
+    "workspace_branch_location_all_visible_uncropped": true,
+    "mutual_close_old_when_next_trigger_clicked": true,
+    "actual_main_local_values_correct": true,
+    "real_host_submenu_uncovered": true,
+    "restored_os_window_size": [
+      1440,
+      850
+    ],
+    "source": "child real UI/screenshots, no DOMstate"
+  },
+  "actual_fixture_workspace_archive_all": {
+    "actual_child_menu_executed": true,
+    "actual_all_fixture_sidebar_objects_matches_after": 0,
+    "other_user_workspaces_operated": false
+  },
+  "actual_window_close_dock_reopen": {
+    "utc": "2026-10-07T11:56:47.598071+00:00",
+    "old_window_id": 15182,
+    "actual_native_close_windows_after": 0,
+    "old_terminal_shell5020_cleaned": true,
+    "main_pid_stayed": 40906,
+    "actual_dock_unique_item_pressed": "Actspace Dev actspace-agent-2067",
+    "after_reopen_windows_count": 1,
+    "actual_new_page_input_usable": true,
+    "old_terminal_auto_restored": false,
+    "new_window_id": 20043,
+    "new_window_bounds": [
+      15,
+      33,
+      1440,
+      863
+    ],
+    "ordinary_open_used_to_replace_dock": false
+  },
+  "actual_pre_quit_values": {
+    "utc": "2026-10-07T12:05:15.236155+00:00",
+    "models_taskBindings": {
+      "defaultChat": "openrouter:connection/custom-60efa1a2-cb31-4438-98e5-f38f93124e5f/claude-haiku-4-5-20251001",
+      "utility": "deepseek:deepseek-flash",
+      "explore": "deepseek:deepseek-flash"
+    },
+    "disabledTools": [
+      "write_file"
+    ],
+    "quickOpen": {
+      "enabled": true,
+      "accelerator": "CommandOrControl+Shift+Space",
+      "target": {
+        "kind": "session",
+        "sessionId": "session-msaa01v0-mxag4q"
+      }
+    },
+    "zhipu_encrypted_entry_present": false,
+    "layer": "allowlisted settings and credential presence only; UI states verified by child; no values mutated by parent"
+  },
+  "zhipu_encrypted_restoration_after_actual_quit": {
+    "utc": "2026-10-07T12:06:52.301895+00:00",
+    "actual_app_fully_quit": true,
+    "only_missing_zhipu_entry_restored": true,
+    "all_other_current_values_preserved": true,
+    "restored_zhipu_matches_encrypted_original": true,
+    "secrets_mode": "0o600",
+    "plaintext_secret_read_or_printed": false,
+    "restart_ui_connected_confirmation_pending": false
+  },
+  "same_main_devlog_relaunch": {
+    "utc": "2026-10-07T12:07:47.661302+00:00",
+    "command": "pnpm dev:log",
+    "workspace": "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
+    "head": "d7eb04315a31bba0da258408314f1762fe5bae87",
+    "new_actual_electron_pid": 82922,
+    "bundle": "com.actspace.desktop.dev.w2067fa05",
+    "same_data_directory": "/Users/wakeup-jin/Library/Application Support/ActSpace",
+    "isolated_browser_or_data_dir_used": false,
+    "settings_retention_ui_verification_pending": false,
+    "product_code_fixes": false
+  },
+  "actual_restart_ui_retention_observations": {
+    "utc": "2026-10-07T12:10:49.104898+00:00",
+    "actual_pid": 82922,
+    "actual_window_id": 20069,
+    "defaultChat_haiku_retained_by_child_ui": true,
+    "shortcut_before_quit_ui": "CommandOrControl+Shift+K",
+    "shortcut_after_restart_ui": "CommandOrControl+Shift+Space",
+    "shortcut_new_value_retained": false,
+    "shortcut_original_restored_automatically": true,
+    "system_tooloff_name_retention_checks_pending": false,
+    "source": "actual native UI not merely settings read",
+    "system_retained_by_child_ui": true,
+    "write_file_off_retained_by_child_ui": true,
+    "custom_name_acceptance_retained_by_child_ui": true,
+    "model_tool_appearance_connectionname_original_ui_restored": true,
+    "zhipu_ui_connected_2of4": true
+  },
+  "after_restart_allowlisted_restoration_checks": {
+    "utc": "2026-10-07T12:15:10.501511+00:00",
+    "defaultChat_restored": true,
+    "tools_restored": true,
+    "quickOpen_restored": true,
+    "zhipu_restored_original_ciphertext": true,
+    "prompt_exact_restored": true,
+    "source": "actualUI restoration by child plus whitelist persisted comparison; no blanketsettingsbackup overwrite"
+  },
+  "correct_annotation_hover_observation": {
+    "actual_new_annotation_created_saved": true,
+    "source_text_wrong_hover_target_corrected": true,
+    "actual_composer_pill_cg_hover_attempted": true,
+    "actual_hover_card_visible": false,
+    "foreground_tool_factor_not_excluded": true,
+    "actual_pill_click_text_comment_correct": true,
+    "actual_comment_edit_save_closed": true,
+    "acceptance_annotations_cleared": true,
+    "whole_R17": "uncovered hover branch; list/edit/focus subcases pass",
+    "repairs": false
+  },
+  "ascii_picker_filter_preparation": {
+    "utc": "2026-10-07T12:40:07.980283+00:00",
+    "original_input_source": "com.bytedance.inputmethod.doubaoime.pinyin",
+    "temporary_input_source": "com.apple.keylayout.ABC",
+    "tis_select_status": 0,
+    "purpose": "actual system OpenDialog fixture path navigation and image filter, no credential entry",
+    "restoration_pending": false,
+    "restored_input_source": "com.bytedance.inputmethod.doubaoime.pinyin",
+    "restoration_status": 0,
+    "restoration_utc": "2026-10-07T12:40:50.363704+00:00",
+    "actual_filter_result": "uncovered; native system GoTo did not confirm, child cancelled back to app; previous successful image selection remains distinct evidence"
+  },
+  "final_target_restoration_after_actual_quit": {
+    "utc": "2026-10-07T12:59:28.019821+00:00",
+    "actual_quit_observed": true,
+    "original_target_already_persisted": true,
+    "target_file_write_needed": false,
+    "only_target_field_restored": false,
+    "other_settings_preserved": true,
+    "ui_verification_pending": false
+  },
+  "final_same_main_devlog_relaunch": {
+    "utc": "2026-10-07T13:00:08.168750+00:00",
+    "command": "pnpm dev:log",
+    "workspace": "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
+    "head": "d7eb04315a31bba0da258408314f1762fe5bae87",
+    "new_actual_electron_pid": 9196,
+    "bundle": "com.actspace.desktop.dev.w2067fa05",
+    "same_data_directory": "/Users/wakeup-jin/Library/Application Support/ActSpace",
+    "settings_file_write_during_final_target_restoration": false,
+    "native_ui_final_restore_pending": false,
+    "product_fixes": false
+  },
+  "final_chat_context_actual_acceptance": {
+    "session_id": "a4b5694f-a5c6-4419-a8f0-597241bb9810",
+    "session_title": "Desktop Chat 验收",
+    "turn_start": "2026-10-07T12:49:31.639Z",
+    "turn_end": "2026-10-07T12:49:32.613Z",
+    "turn_end_reason": "completed",
+    "actual_ui_only_context_row": true,
+    "actual_mode_name_click_inert": true,
+    "archive_precondition_corrected": "selected session cannot archive; navigate away before archiving exact acceptance session",
+    "whole_V03_pass": false,
+    "source": "child genuine native desktop interaction plus journal white fields; no source-only pass"
+  },
+  "final_allowlisted_restoration_support": {
+    "utc": "2026-10-07T13:05:14.020620+00:00",
+    "general_personalization_exact_baseline": true,
+    "general_shortcuts_exact_baseline": true,
+    "general_englishLearning_exact_baseline": true,
+    "tools_exact_baseline": true,
+    "model_taskBindings_exact_baseline": true,
+    "connection_display_names_exact_baseline": true,
+    "zhipu_present_and_exact_original_ciphertext": true,
+    "secrets_file_mode": "0600",
+    "prompt_bytes_exact_baseline": true,
+    "os_dark_mode": false,
+    "os_input_source": "com.bytedance.inputmethod.doubaoime.pinyin",
+    "voiceover_processes": [],
+    "source": "read-only baseline comparisons and native OS queries; no field values or secrets dumped"
+  },
+  "final_exact_acceptance_session_archives": {
+    "sessions": [
+      {
+        "session_id": "19311285-1aef-4be2-a44a-bf6c42f463a1",
+        "archived": true,
+        "time": "2026-10-07T13:02:18.794Z"
+      },
+      {
+        "session_id": "a4b5694f-a5c6-4419-a8f0-597241bb9810",
+        "archived": true,
+        "time": "2026-10-07T13:02:39.328Z"
+      }
+    ],
+    "layer": "child actual UI archive plus journal white auxiliary fields; no runtime state mutation"
+  },
+  "final_actual_ui_restoration": {
+    "utc": "2026-10-07T13:06:13.023488+00:00",
+    "app_pid": 9196,
+    "window_id": 20739,
+    "bounds": [
+      15,
+      33,
+      1440,
+      853
+    ],
+    "default_utility_explore_models": "deepseek-flash",
+    "quickOpen_enabled": true,
+    "quickOpen_accelerator": "CommandOrControl+Shift+Space",
+    "quickOpen_original_session_fallback_verified": true,
+    "actual_acceptance_titles_remaining": 0,
+    "actual_new_page_message_box_usable": true,
+    "app_left_running": true,
+    "evidence": [
+      "screenshots/computer-use/desktop/final-baseline-restored-general.png",
+      "screenshots/computer-use/desktop/final-baseline-restored-shortcut.png",
+      "screenshots/computer-use/desktop/final-usable-app-test-objects-archived.png"
+    ],
+    "layer": "genuine native desktop interaction by gpt-6.1-sol; no product fix"
   }
 }

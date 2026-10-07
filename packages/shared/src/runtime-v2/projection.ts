@@ -39,7 +39,7 @@ export type RuntimeV2GlobalSessionSummary = {
   readonly summaryVersion: number;
   readonly createdAt: string;
   readonly updatedAt: string;
-  readonly workspaceRoot: string | null;
+  readonly workspaceRoot: string | null; readonly worktree?: import("../session").SessionWorktreeContext;
   readonly profileId: string;
   readonly agentForm: import("./runtime").MainAgentForm;
   readonly agentFormId?: import("./runtime").AgentFormId;
@@ -346,7 +346,7 @@ export type RuntimeV2SessionSnapshot = {
   readonly sessionId: string;
   readonly createdAt: string;
   readonly updatedAt: string;
-  readonly workspaceRoot: string | null;
+  readonly workspaceRoot: string | null; readonly worktree?: import("../session").SessionWorktreeContext;
   readonly agentForm: import("./runtime").MainAgentForm;
   readonly agentFormId?: import("./runtime").AgentFormId;
   readonly agentMode?: import("./runtime").RuntimeV2AgentMode;

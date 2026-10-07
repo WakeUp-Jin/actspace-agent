@@ -151,7 +151,7 @@ export class DesktopRuntimeV2Registry {
   completeText(input: Parameters<DesktopAppServiceContract["completeText"]>[0]) { return this.requireApp().completeText(input); }
   async exportSession(sessionId: string) { return Object.freeze({ sessionId, jsonl: await this.requireApp().exportSession(sessionId) }); }
 
-  async createSession(sessionId?: string, workspaceRoot?: string, agentForm?: import("@actspace/shared/runtime-v2").MainAgentForm) {
+  async createSession(sessionId?: string, workspaceRoot?: string, agentForm?: import("@actspace/shared/runtime-v2").MainAgentForm, worktree?: import("@actspace/shared").SessionWorktreeContext) {
     this.assertAdmission();
     this.#admittedWork++;
     try {
@@ -160,7 +160,9 @@ export class DesktopRuntimeV2Registry {
         workspaceRoot: workspaceRoot ?? this.options.roots.workspaceRoot,
       });
       if (resolved.ok === false) throw new Error(resolved.error);
-      const snapshot = agentForm === undefined
+      const snapshot = worktree
+        ? await app.createMainSession(sessionId, resolved.workspaceRoot, agentForm, worktree)
+        : agentForm === undefined
         ? await app.createMainSession(sessionId, resolved.workspaceRoot)
         : await app.createMainSession(sessionId, resolved.workspaceRoot, agentForm);
       this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-created");

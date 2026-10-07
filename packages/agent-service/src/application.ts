@@ -29,7 +29,7 @@ export type ApplicationSessionService = {
       readonly createdWith: SessionHandle["header"]["createdWith"];
     }): Promise<SessionHandle>;
   };
-  create(sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm): Promise<SessionHandle>;
+  create(sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm, worktree?: import("@actspace/shared").SessionWorktreeContext): Promise<SessionHandle>;
   resume(sessionId: string): Promise<SessionHandle>;
   snapshot(session: SessionHandle): RuntimeV2SessionSnapshot;
   inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot>;
@@ -71,7 +71,7 @@ export type AgentApplicationContract = {
   readonly inspectSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly inspectSessionEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]>;
   readonly exportSession: (sessionId: string) => Promise<string>;
-  readonly createMainSession: (sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm) => Promise<RuntimeV2SessionSnapshot>;
+  readonly createMainSession: (sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm, worktree?: import("@actspace/shared").SessionWorktreeContext) => Promise<RuntimeV2SessionSnapshot>;
   readonly resumeMainSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly forkMainSession: (parentSessionId: string, boundarySeq: number, newSessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly abortRun: (sessionId: string, reason?: string) => boolean;
@@ -150,8 +150,8 @@ export class AgentApplication implements AgentApplicationContract {
   inspectSessionEvents(sessionId: string) { return this.#sessions.inspectEvents(sessionId); }
   exportSession(sessionId: string) { return this.#sessions.export(sessionId); }
 
-  async createMainSession(sessionId?: string, workspaceRoot?: string, agentForm: MainAgentForm = "agent"): Promise<RuntimeV2SessionSnapshot> {
-    const session = await this.#sessions.create(sessionId, workspaceRoot, agentForm);
+  async createMainSession(sessionId?: string, workspaceRoot?: string, agentForm: MainAgentForm = "agent", worktree?: import("@actspace/shared").SessionWorktreeContext): Promise<RuntimeV2SessionSnapshot> {
+    const session = await this.#sessions.create(sessionId, workspaceRoot, agentForm, worktree);
     await this.#runs.initialize(session.header.sessionId);
     return this.#sessions.snapshot(session);
   }
@@ -223,6 +223,7 @@ export class AgentApplication implements AgentApplicationContract {
     if (!next) throw new Error("workspaceRoot must not be empty.");
     return this.#runs.service.exclusive(sessionId, async () => {
       const session = await this.#sessions.resume(sessionId);
+      if (session.header.worktree && next !== session.header.worktree.workspaceRoot) throw new Error("A worktree Session cannot change workspace.");
       await session.append(core("session/workspace-set", { workspaceRoot: next }));
       await session.flush();
       return this.#sessions.snapshot(session);

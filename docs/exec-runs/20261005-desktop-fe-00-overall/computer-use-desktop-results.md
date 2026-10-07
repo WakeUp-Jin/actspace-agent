@@ -122,3 +122,102 @@
 | R21 独立键盘补验 | 通过；撤销CU-B04产品候选 | 同一提交对话框空说明/提交disabled，AXFocused取消按钮后独立CG VK36 Return实际关闭，焦点回提交或推送。 | git-cancel-independent-return.png；原CUA Return未关保留历史工具路径，独立系统Return成功，不再列产品Bug |
 | 09-P3-2 Effort | 通过（UI/真实prepared请求参数子项）；旧两级路线版本差异 | Thinking保持true，独立模型按钮→编辑选项→Low实际选中，再真实发送安全sleep180任务。父仅白名单读取该轮request/context prepared.defaults.reasoning=true/reasoningEffort=low，之前high。 | queue-tab-task-start.png；prepared请求参数不等价provider wire抓包。Thinking已改/恢复见前文，最终Effort恢复原High |
 | 09-P2-3 当前补验 | 执行中；前台冲突尝试不计产品失败 | A第18轮安全sleep180待审批时四条PAGE续问真实入队；首图标AXImage含4条数量。CG hover/Tab尝试期间OS前台先VS Code后QQ，未确认Electron前台，未落到目标不计通过/失败。随后标准AXPress批准真实任务。 | queue-tab-four.png；删除误合成其它窗口截图，后续物理动作前核frontmost，只在40906时发送 |
+
+
+### 后续分页、压缩及新版现场（main d7eb043）
+
+| 编号 | 结果 | 实际操作与现象 | 证据与边界 |
+|---|---|---|---|
+| R25 | 通过 | 通用 Agent Instructions 打开真实主prompt编辑器，只在末尾追加无指令验收注释，保存复开确认marker，再只删该注释保存。父白名单哈希确认原文逐字节恢复。 | agent-instructions-editor；标准原生AX编辑UI，不覆盖产品源码，不展示Key |
+| 16-A7 停止视觉 | 通过子项；重置hover/子Agent返回仍待 | 真实sleep180 Running时切执行轨迹，停止按钮为明确可见的原生风格按钮；返回对话，不点击停止，该任务自然结束。 | trajectory-running-stop-fresh.png；只此子项 |
+| V01 | 20轮重载边界通过子项；早页加载/追加尚待 | A实际22轮后独立CmdR，UI加载消息，再显示第3轮为首条，符合最近20轮边界。四条PAGE续问已实际看到尾部唯一回复。 | pagination相关截图；运行时22user/22end仅辅证，不代替早页UI |
+| R16 | 基本压缩通过；期间队列禁用/结束续发未覆盖 | 实际输入/compact，选择真实Slash compact项目，UI正在压缩上下文；6秒后“上下文已压缩 · 63条消息 · 6s”。压缩期仅填入followup，尚未成功发送，不能冒充期间队列。 | compact-start.png；main d7eb043，相比此前证据Composer版本改变 |
+
+| V01 后续独立补齐 | 通过 | 独立Reload后第23轮样本首导航为旧第4轮（最近20轮）；确认40906前台后真实滚屏，未发送/未再压缩，fresh原生CUA AX恢复第1–23轮，每轮唯一。真实点击首轮显示唯一原始prompt/reply。随后真实再发PAGE-AFTER-LOAD第24轮，唯一prompt/reply正常追加并空闲。 | pagination-first-independent.png、devtools-tabs-menu.png（第24轮）；只原生UI，不以journal计数冒充 |
+| 14-A5 | 执行中；Memory采样当前未覆盖 | 应用标准View→ToggleDevTools实际打开Console。MoreTabs菜单视觉有Memory，但40906 AX无该菜单标签；原生坐标点击遇用户前台切走安全skip，键盘Down/Return未选到Memory。CUA实际Close关闭后继续15真实fixture新建/发送/归档。 | devtools截图；不以Console/RSS替JS堆，无调试根因/执行Console脚本。第一轮录屏仅专属窗口15182。 |
+| 17-A2 待重启值 | 即时保存通过；重启待 | 默认会话模型deepseek-flash→claude-haiku-4-5-20251001，Select保存，后fixture新建页及真实请求使用该型号。父仅读盘确认绑定custom Haiku；最后重启验证后UI恢复。 | memory01-ready.png；工具开关仍待实际改 |
+
+### Memory 生命周期第 1–5 轮 checkpoint（当前 main d7eb043）
+
+| 编号 | 结果 | 实际操作与现象 | 证据与边界 |
+|---|---|---|---|
+| 14-A5 生命周期 | 5/15 真实新建、发送、结束、归档已完成；继续执行 | 均侧栏 git-workspace 专属新建入口，唯一 MEM-01 至 MEM-05 prompt，真实发送按钮→唯一完成回复/停止消失→切 A→按当次实际完整标题归档→侧栏目标移除。MEM-04 回复 I can't discuss that.，属于真实完成样本。 | memory01-first-send.mov、memory01/02/03/05-end.png、memory-current-stall.png（实际 MEM04 完成）；原验收 helper 只等待 marker 过窄，纠正为唯一 prompt+回复控件+空闲，不列产品 Bug/性能失败。未注入 session/业务 state。 |
+| 16-A4 当前版键盘补验 | 焦点/转场部分未覆盖 | MEM05 标准 AXFocus 后系统读焦点消息 AXTextArea，确认前台后独立 CG Return；前后焦点仍消息框，但窗口保留完整草稿，未形成消息。随后用户切前台即停止 CG，再 AXPress 发送完成。 | memory05-keyboard-firstsend.png、memory05-firstsend-settled.png；不能把 AXFocus 当真实 caret，不判产品 Bug。Memory01 视频仅证明当前版实际可见转场不闪，AXSend 焦点不替键盘首发焦点。 |
+| 14-A5 Memory 手动 GC | 未覆盖（第 5 轮后仍未取值） | 真实 View→Toggle Developer Tools 打开 Console→More Tabs 视觉 Memory。纯视觉坐标菜单出现有延迟，独立 CG 点击时多次 frontmost 已变，安全跳过；没有实际进入 Memory/GC/堆值。 | memory-menu-stable.png、devtools-current-five.png；不以 Console 线索或 RSS 代替 JS 堆趋势。后 10/15 轮若入口可达再补。 |
+
+| 14-A5 第 15 轮完成 | 生命周期子项通过；GC 堆趋势未覆盖 | MEM-01 至 MEM-15 全部通过真实侧栏 fixture 新建→标准原生输入/发送→唯一自有 prompt+完成回复/空闲→切 A→按当次实际标题归档→侧栏移除。第 8 轮自动标题晚于回复出现，等实际标题后才归档，不操作泛 New chat 用户会话。 | memory01–15-end 实际截图（MEM04见memory-current-stall）；15轮全部UI完成。第5/10/15轮未取得有效Memory/手动GC样本，不能宣称JS堆不增长，14-A5整项仍未覆盖。 |
+| 16-A4 MEM11独立物理补验 | 当前键盘首发转场焦点未覆盖，具体现象保留 | fresh原生AX消息框360,452,w452,h54，正常置前40906→CG click550,480→CG Return；截图有真实caret、完整草稿、发送箭头启用，AX焦点消息输入框；未实际submit。随后AX发送完成第11轮。 | memory11-key-firstsend.png；工具/豆包输入源影响未排除，不用此候选定产品根因，不反复。 |
+
+### 状态释放与侧栏后续 checkpoint
+
+| 编号 | 结果 | 实际操作与现象 | 证据与边界 |
+|---|---|---|---|
+| 14-A6 | UI路径通过；后台无残留请求未覆盖 | desktop-created-1007真实新建/首发Reply FOLDER-GC only/唯一回复结束；其工作区菜单从侧栏移除→folder与FOLDER-GC AX matched0；精确A会话AXShowMenu→重命名为桌面验收 A 1007 refresh并Return保存→两者仍matched0、侧栏无其审批/队列徽标。 | folder-gc-session-complete、folder-gc-after-remove、folder-after-other-rename；父仅读metadata确认folder session88672708…1user/1end。后台审批/队列调用无IPC观察，不以界面消失声称后台绝无请求。 |
+| R09 分叉/归档 | 通过（补齐整项） | A refresh真实会话菜单分叉→第二同名会话出现/切入，原PAGE/compact末尾内容正确；依据当前选中分叉位置468与精确标题标准AXShowMenu→改名桌面验收 fork 1007，当前header更新；切原A后按唯一fork标题归档，侧栏目标移除。前文置顶/取消/重命名/复制ID/记录已实际覆盖。 | session-fork-created.png；父仅读lineage确认a3b749db…parent19311285…originfork。误CUA坐标曾打开New chat菜单，精确菜单Description识别后仅Esc关闭，未改用户会话。 |
+
+### 设置持久化待测值与辅助能力 checkpoint（main d7eb043）
+
+| 编号 | 结果 | 实际操作与现象 | 证据与边界 |
+|---|---|---|---|
+| 17-A2 工具开关 | 即时保存通过；正常重启待 | 工具页写入文件由开改关，显示5/6与已保存；父白名单disabledTools=['write_file']，原[]。保留到最终重启后UI恢复。 | tools-writefile-off-persist.png；默认Haiku同样待重启 |
+| 13-A5 快捷键 | 即时UI通过；磁盘/重启尚待 | 通用录制快速唤起快捷键→实际⌘⇧K，显示已生效；离开至外观再回通用仍K，无第二保存按钮。原⌘⇧Space，enabled及原已移除会话target均未改。父白名单文件仍原快捷键，分层保留差异。 | quick-shortcut-temp-saved.png、quick-shortcut-reopen.png；不定位原因、不凭UI推断落盘 |
+| 16-A7 数值重置hover | 通过子项 | 外观界面字号14→15，标准AX读真实重置坐标后实际CG hover：灰底且tooltip“重置 界面字号”；AXPress重置恢复14。 | numeric-reset-target-hover.png；停止视觉已前文覆盖，子Agent详情返回仍待 |
+| 16-A6 独立Esc补验 | 不通过候选保留，工具影响仍未排除 | fresh图片配置Dialog、焦点更换Key、前台40906，独立CG Esc未关闭；截图/AX仍Dialog。正常CUA重新绑定后点取消实际关闭。第一层未由本次CG关闭，未拼第二Esc完整通过。 | settings-independent-esc1-settled.png；不展示Key、不定位根因，CU-B06原第二Esc历史现象仍保留 |
+| 16-A2 / 09-P3-5 | 未覆盖（实际读屏输出缺前提） | 通用现场实际CG CmdF5尝试系统VoiceOver；未观察字幕/听觉输出，进程只读未见VoiceOver。CUA快捷尝试被user-changed guard挡住未发出。随后前台读取涉及loginwindow，停止物理动作，不绕guard。 | voiceover-attempt-after.png；普通AX名称不替读屏，未声称听见/朗读通过。OS原始VoiceOver关闭基线，后续可达再补 |
+
+| 09-P1-3 | 通过 | 同一fixture新建草稿实际选Plan/Chat，保持MODE-COLOR-DRAFT使箭头启用；System浅色和深色分别观察：Plan黄色chip/黄底发送、浅色白箭头及深色黑箭头均清晰；Chat绿色chip/绿色发送箭头清晰。未发送模式草稿，最后清空并退出Chat。 | plan-light-chip-arrow.png、plan-dark-chip-arrow.png、chat-dark-chip-arrow.png、chat-light-chip-arrow.png；System已恢复作为重启待测值。 |
+| 09-P5-2 | 部分通过/差异与缺前提明确 | 当前两份规范对照实际已走UI：常显独立模型与不进+符合当前并发版本；长输入200px内滚、480尺寸stacked、Agent/Plan/Chat chip、三Git状态与原因、本机位置/main标签均已真实观察。旧handoff的+模型两级路线属于版本差异；ShiftTab工具路径候选仍待独立复核；Host空缺真实远端，+翻转分支真实桌面minHeight760未触发。 | 对应前文逐项截图；非静态测试代替通过，不把旧路线差异直接当新回归。 |
+
+| 16-A7 后续详情返回 | 通过（补齐整项） | A真实请求Explore只读fixture sample.txt，实际子Agent列表生成记录；点击该记录详情可见真实读文件/摘要，左箭头返回按钮清晰，点击后准确回单记录列表。停止视觉、数值重置hover分别已覆盖，三处齐备。 | subagent-running.png、subagent-detail-back.png、subagent-back-list.png；并未静态设置页替详情。 |
+| CU-OBS 子Agent状态 | 记录现象，不定位 | 同一次主任务卡显示Explore·DURABILITY_BLOCKED/失败，主回复声明未成功读取；子Agent详情却含Read sample.txt及短摘要，列表标失败。 | 同三图；不根据摘要推真实执行成功、不修复或调查引入版本。 |
+
+| R23 独立Esc复核 | 不通过候选保留；鼠标关闭/回焦通过 | 原第13轮实际Mermaid图表AXScrollToVisible→放大查看，fresh预览/关闭预览焦点与前台40906下独立CG Esc仍不关；之后AXPress关闭预览实际收层，焦点回放大查看。 | mermaid-independent-esc-settled.png；CU-B07现象进一步保留，但系统输入工具因素未排除，不定位产品原因、不反复。 |
+
+| 09-P2-3 后续真实补验 | hover/进入行按钮通过；计数Tab焦点未覆盖 | 新safe sleep180批准运行，实际两条FOCUS-QUEUE排队；首计数图标CG hover显示“2条排队，当前运行结束后依次发送”。AXFocus计数为前提，正常置前真实Tab后焦点↳引导，行按钮显现/描边与tooltip“让Agent在下一步看到这条消息”；后ShiftTab未观察回计数，不能冒充计数Tab路径。 | queue-count-hover.png、queue-row-key-focus-actions.png；中途前台变化CG安全skip，不当产品Bug。任务自然结束不追认剩余焦点。 |
+| 09-P4-3 480本机菜单 | 通过子项；Host部分未覆盖 | 实际AXSize480×760，新建fixture页分别打开工作区/分支/运行位置菜单，三菜单均完整在窗口内；切另触发器旧菜单收，main本机选中正确，无Host时连接远端机器…可见。 | workspace-menu-480.png、branch-menu-480.png、location-menu-480.png；Host为空，真实Host子菜单缺前提；窗口随后恢复1440×850。 |
+| V04 480运行队列 | 未覆盖此分支 | sleep180实际运行期480resize时右侧终端浮层占满窄窗；收右面板后任务已自然完成，未捕获窄窗运行队列布局。 | queue-480-running.png仅终端，不计队列通过；不重复长任务。 |
+
+| 09-P3-2 原值恢复 | 完成 | A的deepseek选项实际点击High，截图checkmark在High/Thinking开；原High已恢复。新建页原先High不等价A原值，故单独在A执行。 | effort-high-restored.png；并未发送额外模型请求。 |
+| R14 | 通过 | git-workspace精确AXShowMenu并核菜单来源→归档全部；settled侧栏fixture组、A refresh、WORKTREE-READY及其空验收草稿会话全部移除，精确matched0。自动回产品仓库新建空页，未发送/修改产品会话。 | workspace-archive-all-menu.png、workspace-archive-all-after.png；仅验收工作区对象，归档可恢复。 |
+
+| 11-A2 | 通过 | 标准窗口AXCloseButton实际关窗，窗口数0；父comm-only核旧终端5020消失而40906仍存活。系统Dock实际唯一Actspace应用AXDockItem→AXPress重开，同40906新窗口20043显示正常空页/输入可用，无旧PTY自动恢复。 | dock-reopen-window.png；重开窗口bounds15,33,1440×863，后续只用新window。 |
+| 11-A4 退出准备 | 已建立新清理现场，尚待正常Quit | 归档页精确自身A唯一标签与同Y唯一恢复按钮恢复验收A，打开该fixture会话右面板新建终端；不恢复其它用户历史对象。 | dock-reopen-a-restored.png；旧R14归档事实保留，验收A最后再次归档。 |
+| 11-A4 before-Q | 新退出现场完成 | 新窗口20043中精确恢复验收A，新建终端1，再点击Review真实显示fixture图片变更；应用菜单实际存在Quit Electron，AXActions含AXPress/AXPick。通知父取PID树后执行该真实菜单，不使用kill。 | before-quit-review-terminal.png；配置待重启值System、默认custom Haiku、write_file关闭、cheaprouter.cc [acceptance]、UI快捷⌘⇧K；Effort原High已恢复。 |
+| 11-A4 正常退出首尝试 | 尚未退出，继续真实菜单入口 | 隐藏菜单树唯一Quit Electron AXPress返回success，但fresh ps仍40906/77945存在，窗口仍在；不以action success冒充退出。 | before-quit-review-terminal.png；随后打开实际应用菜单再尝试，不SIGTERM。 |
+| 11-A4 菜单Quit终态 | 通过当前有进程分支 | 同一次Quit Electron AXPress后异步关闭：首秒进程仍在，后freshAX仅root/窗口消失，ps40906/77945均空。父核完整helper树。 | 不以AXPress返回值替退出；Review短Git已结束、Bridge未活动，未构造长驻Git/Bridge样本。 |
+
+### 正常重启持久化与恢复（新PID82922/window20069）
+
+| 编号 | 结果 | 实际操作与现象 | 证据与边界 |
+|---|---|---|---|
+| 17-A2 | 通过 | 同main同目录pnpm dev:log正常重启，默认Haiku仍选中，工具写入文件仍关闭/5of6。随后UI默认模型Select选deepseek-flash、工具写入文件开恢复原值。 | restart-general-persistence.png、restart-tool-persistence.png；父读盘仅辅证。 |
+| 17-A3 | 通过（补齐重启） | 自定义连接cheaprouter.cc [acceptance]重启后仍名称/可用，之前检测/真实Haiku回复已覆盖；UI编辑名称→cheaprouter.cc保存恢复。 | restart-connection-persistence.png；不改Key/BaseURL/模型。 |
+| 13-A5 | 不通过 CU-B13 | 外观System/工具write_file关闭在重启后保留；快捷退出前UI录制⌘⇧K已生效且复开仍K，重启后却回⌘⇧Space已生效。原target/enable未动。 | restart-theme-persistence.png、restart-shortcut-persistence.png与此前quick-shortcut-temp-saved/reopen；不诊断原因。 |
+| 原值恢复 | UI已执行；最终核对续 | 默认deepseek-flash、write_file开、主题浅色、连接原名cheaprouter.cc已UI恢复；快捷/原已移除会话target自动恢复基线。父只恢复zhipu单条密文，UI搜索智谱已连接/2of4，其他secret保留。 | restart-search-restored.png；Thinking1/EffortHigh、字体14/code13、OS浅色/豆包、英语off/原target、R25prompt原文均前文已恢复。 |
+| 16-A5 后续底部Select | 通过（补齐） | 快速唤起原指定已移除会话，实际改自动选择第一个项目，重新打开当前checkmark自动；当前布局更低，Select实际上翻且完整可见。物理Esc前台其它app安全skip，不计失败；之前代表位置Esc已覆盖。 | quick-target-change-menu.png、quick-target-changed-reopen-up.png；原target最后正常退出后父仅必要时恢复，重启UI核原占位。 |
+| R17 当前版补验 | 点击卡/编辑/清理通过；hover仍未覆盖 | 真实双击自有回复词Automated→添加到对话→评论保存；精准胶囊1条批注CGhover已发但截图未见卡，不能把事件发出当通过。实际点击胶囊展开卡，选文Automated与评论Desktop hover acceptance准确，编辑Desktop hover edited保存收层后清批注/草稿。 | annotation-capsule-hover.png、annotation-capsule-click.png；前台/OS事件因素未完全排除，不诊断。错误source标记hover不计要求结果。 |
+| R20 图片筛选补验 | 未覆盖筛选分支；既有选图片成功保留 | 实际+图片打开OS选择器；GoTofolder标准AXPathSet fixture路径、CG Return及原生AXConfirm均未完成目录进入，临时ABC后一次仍未完成，取消回应用，父恢复豆包。 | picker-file-types-abc.png；不据静态filter宣称通过，不重试系统限制。 |
+| V02 补验 | 互斥通过；Left/Tab仍未覆盖 | 实际Skills子面板→模型搜索（Skills收）→Context（模型收）；Left在搜索combo前提未返回，Tab另一前台safe skip，不当产品失败。 | palette-left-tab-before.png、palette-mutual-context.png；旧模型两级路线版本差异仍单列。 |
+| 09-P1-1 当前版视频补验 | 删除与缩高部分通过；逐字删空完整路线未覆盖 | 标准UI1431字长稿200px内滚，实际物理click/Backspace后1430字。CmdA未有效选区，随后标准原生AXSelectedTextRange保留最后1字符→Backspace，实际缩34px/caret；最后Backspace后安全AX仍1字符，未冒充空；UI清草稿恢复。 | delete-video-long-before.png、delete-video-one-after.png、delete-one-char-shrink.png；录制尝试三个Popen PID返回，但磁盘实际未生成mov，不能作为视频证据；批量选区删除不代替原逐字节奏/全路线，瞬时视频未实际落盘，不能解析或据此判通过。 |
+
+
+### 最后可执行分支与收束（PID82922）
+
+| 编号 | 结果 | 实际操作与现象 | 证据与边界 |
+|---|---|---|---|
+| V03 持久Chat后续 | 通过子项；整项未覆盖 | fixture专属新Chat实际首发唯一CHAT-CONTEXT-READY完成；后续只显示Context<1%，无workspace/分支/本机目标。实际Context打开/收起正常；精确Chat名称物理点击后仍Chat且无选择菜单，名称不可点符合当前规范。 | chat-followup-context.png、chat-context-open.png、chat-name-click-unchanged.png。模式chip与正确×Backspace此前已覆盖；所有模式运行中placeholder未逐一取得现场，整项不拼通过。会话a4b5694f-a5c6-4419-a8f0-597241bb9810，仅验收fixture。 |
+| R08 最终边界 | 整项未覆盖 | 已实见idle/pending/running；当前A先前failed轮后已有成功轮，不能拿其旧失败当当前失败状态点。未构造删除用户Key/清空模型前提。 | 早期通用配置状态点截图为显示补充；真实failed-session及对应未配置分支无充分实际样本，留未覆盖。 |
+| 验收对象归档准备 | 未归档，重启后继续 | 当前选中Chat/A行实际归档菜单disabled、描述当前会话无法归档，AXPress不改变。父只读规范补充当前选中行本应禁止归档，故不列Bug；后续先空新建页再精确未选中验收对象归档。 | final-chat-archive-state.png、final-a-archive-disabled.png；未动用户历史对象。 |
+| 最终正常Quit | 已实际退出 | 唯一Quit Electron菜单AXPress后fresh ps82922/82959/82960/83033全部消失，nativeAX仅root，已通知父同dev:log正常重启。 | 不用SIGTERM。原quickOpen磁盘整体与baseline一致，父无必要时不写字段；重启仍需UI核原已移除会话target。 |
+
+
+### 最终恢复核对与现场清理完成（PID9196/window20739）
+
+| 项目 | 终态 | 实际操作与证据 |
+|---|---|---|
+| 正常重启 | 完成 | 同main同目录dev:log重启后CUA重新绑定，真实窗口20739，bounds15,33,1440×853；不沿用旧窗口坐标。 |
+| 精确归档 | 完成 | 先点击新建会话回空页，未选中A refresh/Chat各AXShowMenu→唯一归档。异步完成后精确标题matched0。父journal仅辅证对应19311285…与a4b5694f…已archived，未操作用户历史对象。当前选中行禁止归档是正常前提，前一disabled观察不列Bug。 |
+| 最后快捷目标恢复 | 完成 | 通用页真实截图显示快速唤起开、⌘⇧Space已生效、打开目标指定会话、默认会话已移除的会话（将自动降级）；临时UI automatic已恢复。父确认磁盘始终baseline，此次没有改写settings字段。 | 
+| 默认模型与最终可用应用 | 完成 | 通用页默认/轻量/Explore均deepseek-flash；返回应用后空新建页消息输入框可见，A/Chat精确标题均matched0，应用保持运行未发送产品repo请求。 |
+
+证据：final-baseline-restored-general.png、final-baseline-restored-shortcut.png、final-usable-app-test-objects-archived.png。此前defaultChat、tools、外观Light、连接原名、搜索zhipu、快捷与target、Thinking/Effort、prompt、英语开关/target、字体、OS外观/输入源均已恢复；读屏未启用。本轮仅验收记录，不修复、不定位根因、不提交或推送。不存在的long-input影片不列证据，所有实际键盘/焦点/瞬时未覆盖保留边界。

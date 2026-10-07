@@ -42,6 +42,15 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   [contract.workspaces.openInIde, shape({ workspaceId: "string" }, "Invalid workspace")],
   [contract.workspaces.setVisibility, shape({ workspaceId: "string", hidden: "boolean" }, "Invalid workspace visibility")],
   [contract.workspaces.getGitContext, optionalShape({ workspaceRoot: "string?" }, "Invalid workspace")],
+  [contract.sessions.create, (input) => {
+    const invalid = optionalShape({ hostId: "string?", workspaceId: "string?", workspaceRoot: "string?", title: "string?", branch: "string?" }, "Invalid session creation")(input);
+    if (invalid || input === undefined) return invalid;
+    const value = input as Record<string, unknown>;
+    if (value.runLocation !== undefined && value.runLocation !== "this_mac" && value.runLocation !== "worktree") return "Invalid run location";
+    if (value.agentForm !== undefined && value.agentForm !== "agent" && value.agentForm !== "chat") return "Invalid agent form";
+    if (value.hostId && value.runLocation === "worktree") return "Remote worktree creation is not supported";
+    return null;
+  }],
   [contract.sessions.setWorkspace, shape({ sessionId: "string", workspaceId: "string?", workspaceRoot: "string?" }, "Invalid session workspace")],
   [contract.dialogs.selectWorkspaceDirectory, optionalShape({ registerWorkspace: "boolean?" }, "Invalid directory request")],
   // 终端

@@ -43,6 +43,7 @@ export type SessionHeaderV1 = {
   readonly sessionId: string;
   readonly createdAt: string;
   readonly cwd?: string;
+  readonly worktree?: import("@actspace/shared").SessionWorktreeContext;
   readonly lineage: SessionLineageV1 | null;
   readonly createdWith: SessionCreatedWithV1;
 };
@@ -84,6 +85,12 @@ export function validateSessionHeader(value: unknown, expectedSessionId?: string
   }
   requireTimestamp(value.createdAt, "createdAt");
   if (value.cwd !== undefined) requireString(value.cwd, "cwd");
+  if (value.worktree !== undefined) {
+    if (!isRecord(value.worktree) || value.worktree.kind !== "worktree") throw invalidHeader("Invalid worktree binding.");
+    for (const key of ["sourceWorkspaceRoot", "workspaceRoot", "baseBranch", "branch", "baseCommit"]) requireString(value.worktree[key], `worktree.${key}`);
+    requireTimestamp(value.worktree.createdAt, "worktree.createdAt");
+    if (value.worktree.workspaceRoot !== value.cwd) throw invalidHeader("Worktree must match Session cwd.");
+  }
   if (value.lineage !== null) validateLineage(value.lineage);
   if (!isRecord(value.createdWith)) throw invalidHeader("createdWith must be an object.");
   requireString(value.createdWith.profileId, "createdWith.profileId");

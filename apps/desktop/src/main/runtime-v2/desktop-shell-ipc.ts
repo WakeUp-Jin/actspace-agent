@@ -16,6 +16,7 @@ import { ReviewGitEngine } from "../review-git-engine";
 import { ReviewGitWorkerClient } from "../review-git-worker-client";
 import { ReviewViewStateService } from "../review-view-state-service";
 import { ReviewPullRequestService } from "../review-pr-service";
+import { ReviewWorkspaceWatcher } from "../review-workspace-watcher";
 import type { TerminalSessionService } from "../terminal/terminal-session-service";
 
 type ShellOptions = {
@@ -36,8 +37,16 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   });
   const reviewWorker = new ReviewGitWorkerClient(join(__dirname, "..", "review-git-worker.js"));
   const reviewEngine = new ReviewGitEngine({ runner: reviewWorker.runGit, patchParser: reviewWorker.parsePatches, objectLoader: reviewWorker.loadGitObjects });
+  const reviewWatcher = new ReviewWorkspaceWatcher();
   const review = new ReviewCoordinator({
-    resolveWorkspace: async (input) => resolveReviewWorkspace(registryOptions, input),
+    resolveWorkspace: async (input) => {
+      const resolved = await resolveReviewWorkspace(registryOptions, input);
+      if (resolved.ok) {
+        const { workspaceId, workspaceRoot } = resolved.workspace;
+        await reviewWatcher.ensure(workspaceId, workspaceRoot, () => review.scheduleInvalidation(workspaceId));
+      }
+      return resolved;
+    },
     queryProvider: reviewEngine,
     mutationProvider: reviewEngine,
     viewState: new ReviewViewStateService({ filePath: join(options.roots.dataRoot, "review", "view-state.json") }),
@@ -136,6 +145,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   return {
     dispose: () => {
       ipc.dispose();
+      reviewWatcher.dispose();
       unsubscribeReview();
       review.dispose();
       reviewWorker.dispose();

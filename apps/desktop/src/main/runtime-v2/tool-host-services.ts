@@ -14,7 +14,10 @@ export function createDesktopToolHostServices(options: { readonly workspaceRoot:
     [FILESYSTEM_SEARCH_HOST_PORT_ID]: { createPorts: () => createFilesystemsearch(options) },
     [FILESYSTEM_WRITE_HOST_PORT_ID]: { createPorts: () => createFilesystemwrite(options) },
     [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: () => createShelltools(options) },
-    [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({ credentials: options.modelRuntime.getToolEnvironment().searchCredentials }) },
+    [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({
+      // Ports live as long as the Harness; each search must observe settings changes.
+      get credentials() { return options.modelRuntime.getToolEnvironment().searchCredentials; },
+    }) },
     [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => ({ generate_image: (...args: Parameters<NonNullable<import("@actspace/tools-image-generation").ToolPorts["generate_image"]>>) => createImagegeneration({ generation: options.modelRuntime.getToolEnvironment().imageGeneration }).generate_image!(...args) }) },
     [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmService) => {
       const inspection = options.modelRuntime.resolveImageInspectionModel();

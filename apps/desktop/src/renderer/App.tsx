@@ -844,6 +844,8 @@ export function App() {
         ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
         ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
         ...(input.agentForm ? { agentForm: input.agentForm } : {}),
+        ...(input.runLocation ? { runLocation: input.runLocation } : {}),
+        ...(input.branch ? { branch: input.branch } : {}),
       });
       sessionStore.applyEnvelope(projection);
       const created = projectChatWindow(projection);
@@ -857,6 +859,7 @@ export function App() {
       return created;
     } catch (error) {
       console.error("Failed to create session", error);
+      if (input.runLocation) throw error;
       return null;
     }
   }, [bootstrapState?.workspaceRoot, refreshWorkspaces]);
@@ -925,11 +928,12 @@ export function App() {
     const visibleSessionId = await sessionGateway.ensureSession(activeSessionIdRef.current, {
       target: runTarget.target, readiness: runTarget.readiness,
       remoteWorkspaceId: runTarget.target.kind === "remote" ? runTarget.target.workspaceId : undefined, remoteModelId: targetChoices.modelId, localWorkspaceRoot: selectedWorkspaceRoot,
+      runLocation, branch: selectedBranch ?? undefined,
     }, options);
     const sessionId = visibleSessionId;
     patchLocal(sessionId, { composer: { mode: options.mode, selectedSkills: options.selectedSkills } });
     // Keep workspace changes on the idle Session boundary before task admission.
-    if (isLocalSession(sessionId) && !liveRuns.has(sessionId) && !sessionRecord?.meta.worktree && selectedWorkspaceRoot &&
+    if (sessionRecord?.meta.id === sessionId && isLocalSession(sessionId) && !liveRuns.has(sessionId) && !sessionRecord.meta.worktree && selectedWorkspaceRoot &&
         selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot)) {
       const result = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
       if (!result.ok) throw new Error(result.error ?? "无法更新会话工作区");
@@ -956,7 +960,7 @@ export function App() {
       await taskCommand({ op: "resume", sessionId: visibleSessionId, revision: snapshot.revision });
     }
     return;
-  }, [sessionGateway, runTarget, targetChoices, sessionRecord, selectedWorkspaceRoot, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, liveRuns, refreshTaskQueue, reportSessionFailure, patchLocal]);
+  }, [sessionGateway, runTarget, targetChoices, sessionRecord, selectedWorkspaceRoot, runLocation, selectedBranch, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, liveRuns, refreshTaskQueue, reportSessionFailure, patchLocal]);
 
   useEffect(() => {
     return hostDirectory.onHostsChanged(hosts => {

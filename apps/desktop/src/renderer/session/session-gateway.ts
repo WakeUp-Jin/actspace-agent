@@ -16,6 +16,8 @@ export type SendTarget = {
   readonly remoteModelId?: string;
   /** 本机：新建页选的工作区。 */
   readonly localWorkspaceRoot?: string | null;
+  readonly runLocation?: import("@actspace/shared").SessionRunLocation;
+  readonly branch?: string;
 };
 
 export type SessionGatewayDeps = {
@@ -71,7 +73,7 @@ export function createSessionGateway(deps: SessionGatewayDeps): SessionGateway {
       const remote = target.kind === "remote";
       const created = await deps.createSession(remote
         ? { hostId: target.hostId, ...(send.remoteWorkspaceId ? { workspaceId: send.remoteWorkspaceId } : {}), agentForm: agentForm(options) }
-        : { ...(send.localWorkspaceRoot ? { workspaceRoot: send.localWorkspaceRoot } : {}), agentForm: agentForm(options) });
+        : { ...(send.localWorkspaceRoot ? { workspaceRoot: send.localWorkspaceRoot } : {}), ...(send.runLocation ? { runLocation: send.runLocation } : {}), ...(send.branch ? { branch: send.branch } : {}), agentForm: agentForm(options) });
       if (!created) throw new Error(remote ? "Unable to create remote Session" : "Unable to create Session");
       if (remote) {
         deps.recordRemoteSession(created.meta.id, {

@@ -66,6 +66,7 @@ export function projectChatSession(
       agentMode: snapshot.agentMode,
       agentModeRevision: snapshot.agentModeRevision,
       workspaceRoot: snapshot.workspaceRoot ?? fallbackWorkspaceRoot,
+      ...(snapshot.worktree ? { worktree: snapshot.worktree } : {}),
       pinned: snapshot.metadata.pinned,
       archived: snapshot.metadata.archived,
     },

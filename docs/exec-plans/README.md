@@ -15,6 +15,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [Desktop 验收问题 B03 / B08 / B12 修复](active/20261007-desktop-acceptance-b03-b08-b12.md) | 用户已批准；依次补失败回归、修复 Review 监听/搜索凭据/工作树首发，再真实 Electron 定向复验。 |
 | [多智能体协作（Space）前端演示](active/20261007-multi-agent-collab-frontend-demo.md) | 2026-10-07 立项，分支 `feat/multi-agent-collab-fe`；只做前端、数据全 mock。下一步由用户拍板设计文档 §10 的 Q1–Q8，再开工 T1–T11。 |
 | [Desktop 前端重构](active/20261005-desktop-frontend-refactor/00-总执行计划.md) | 9 份计划（10–16、09、17）已全部执行，2026-10-07 合入 main；下一步按各计划的 `acceptance-handoff.md` 验收，通过后移入 completed。设计文档在 `docs/desktop-frontend-refactor/`，进度见 00 §11。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
