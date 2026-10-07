@@ -214,7 +214,7 @@ export function App() {
       const key = JSON.stringify([group.hostId ?? "local", group.workspaceRoot, group.pinned]);
       let hasMore = group.hasMore;
       for (let page = 1; page < (loadedListPages.current.get(key) ?? 1) && hasMore; page++) {
-        const after = items.filter(s => s.hostId === group.hostId && (s.workspaceRoot ?? '') === group.workspaceRoot && !!s.pinned === group.pinned).at(-1)?.id;
+        const after = items.filter(s => s.hostId === group.hostId && (s.worktree?.sourceWorkspaceRoot ?? s.workspaceRoot ?? '') === group.workspaceRoot && !!s.pinned === group.pinned).at(-1)?.id;
         const next = await sessionsApi.listPage({ hostId: group.hostId, workspaceRoot: group.workspaceRoot, pinned: group.pinned, after });
         items.push(...next.items); hasMore = next.groups[0]?.hasMore ?? false;
       }

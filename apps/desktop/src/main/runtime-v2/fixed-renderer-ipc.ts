@@ -807,6 +807,7 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
     agentMode: item.agentMode,
     agentModeRevision: item.agentModeRevision,
     workspaceRoot: item.workspaceRoot ?? undefined,
+    ...(item.worktree ? { worktree: item.worktree } : {}),
     pinned: item.metadata.pinned,
     archived: item.metadata.archived,
   };

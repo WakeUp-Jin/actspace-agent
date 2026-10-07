@@ -1,0 +1,41 @@
+{
+  "kind": "read-only runtime evidence; not a substitute for Computer Use",
+  "b03": {
+    "marker": "B03-FIX-20261007-2244",
+    "appendUtc": "2026-10-07T14:46:49.300111+00:00",
+    "removeUtc": "2026-10-07T14:48:02.907364+00:00",
+    "bytesBefore": 85,
+    "bytesDuring": 107,
+    "bytesRestored": 85
+  },
+  "b08": {
+    "sessionId": "3618e60e-f8b0-4435-a3b5-c6ffa7409b1e",
+    "baseline": {
+      "journalSeq": 74,
+      "tool": "web_search",
+      "status": "completed",
+      "time": "2026-10-07T14:48:53.953Z",
+      "providers": [
+        "tavily",
+        "zhipu"
+      ]
+    },
+    "afterDisconnect": {
+      "journalSeq": 381,
+      "type": "tool/result",
+      "time": "2026-10-07T14:56:46.688Z",
+      "providers": [
+        "tavily"
+      ],
+      "zhipuCredentialEntryPresent": false
+    },
+    "credentialRestoration": {
+      "zhipuRestoredFromPrivateBaseline": true,
+      "otherEntriesUnchanged": true,
+      "fileMode": "0600"
+    }
+  },
+  "b12": {
+    "status": "pending native verification"
+  }
+}

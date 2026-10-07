@@ -28,3 +28,10 @@
 - 最终Desktop typecheck通过；build:deps:dev、build:electron、build:renderer通过。renderer沿用现有CSS highlight解析和较大chunk警告，无构建错误。
 - IPC channel、renderer bridge、package boundaries、check:docs、diff whitespace通过。
 - 真实Electron由同工作区pnpm dev:log启动，子智能体校正主进程身份后执行；浏览器mock测试仅作为自动回归，不替代Computer Use证据。
+
+## 真实桌面复验与补充检查
+
+- 最终全量Desktop：1680通过、2跳过。收尾补齐兼容sessions.list的worktree字段，以及侧栏翻页游标按来源工作区分组；定向5项与Desktop typecheck通过。
+- B03：原生Review打开不操作时，外部追加唯一marker后sample.txt从+1自动变+2，准确展示marker；恢复字节数85。恢复时面板已切走，返回后显示+1，仅自动出现的正向过程有连续证据。
+- B08：同一真实会话3618e60e-f8b0-4435-a3b5-c6ffa7409b1e，断开前工具结果seq74为tavily,zhipu；设置断开后、不重启，seq381实际web_search完成且Providers只有tavily。凭据仅检查字段是否存在，不输出值。
+- 工作期间外部提交9bf30f06再次收录代码/文档并调整截图忽略；未撤销这些外部改动，也未自行执行提交。

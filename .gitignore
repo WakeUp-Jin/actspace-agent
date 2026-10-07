@@ -74,5 +74,9 @@ plugins/fs-watch/target/
 /docs/exec-runs/**/*.[gG][iI][fF]
 /docs/exec-runs/**/*.[sS][vV][gG]
 /docs/exec-runs/**/*.[aA][vV][iI][fF]
+/docs/exec-runs/**/*.[mM][oO][vV]
+/docs/exec-runs/**/*.[mM][pP]4
+/docs/exec-runs/**/*.[wW][eE][bB][mM]
+/docs/exec-runs/**/*.[mM]4[vV]
 *.swp
 *.swo

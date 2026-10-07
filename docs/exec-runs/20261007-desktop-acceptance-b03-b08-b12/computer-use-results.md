@@ -56,3 +56,17 @@
 首个系统目录选择后未核最终标签便首发，短无工具会话实际落产品目录，不能计fixture前提；没有执行工具或修改产品，其唯一标题桌面重测 B03 B08待精确归档。纠正后再次主新建→已有文件夹，系统Open返回后实际截图明确git-workspace/main/本机，才首发FIXTURE-RETEST-READY；实际持久会话Fixture B03 B08 retest位于git-workspace。
 
 B03-1通过：Review未提交范围初态同时sample-image.png与sample.txt旧+1行，准确旧文本。证据 [初态](screenshots/review-open-initial.png)、[首发前fixture](screenshots/fixture-selected-before-send.png)。通知父追加本轮marker，保持同一面板/范围不刷新。
+
+
+### B03 新增自动更新与 B08 同端口前提
+
+- B03-2通过：父UTC14:46:49.300111仅追加22bytes标记B03-FIX-20261007-2244；期间本agent没有UI动作。真实同Review未提交范围立即准确新增第3行，sample.txt/Composer计数+1→+2，安全AX marker matched1。[自动新增](screenshots/review-auto-marker.png)。
+- B03-3恢复观察：父UTC14:48:02.907364仅移除该marker107→85bytes；此间本agent误提前进设置再返回，故删除后实际+1/marker消失只能作为恢复终态，不能冒称全程同面板可见。[恢复终态](screenshots/review-before-marker-remove.png)。追加路径真实自动刷新满足B03核心失败复验，不借删除路径补虚假覆盖。
+- 专属fixture会话ID3618e60e-f8b0-4435-a3b5-c6ffa7409b1e；首轮误用产品会话33f64e46-6abc-474c-b3d7-ccbf5698ddf2实际是上轮遗留空会话，本轮仅追加无工具marker，未创建/修改产品文件。精确清理时另记来源。
+- B08-1通过：实际UI智谱/Tavily2of4连接，[原连接](screenshots/search-connected-baseline.png)。同会话真实web_search基线完成，[工具日志](screenshots/search-baseline-tools.png)。父仅安全journal seq74 modelOutput Providers行确认tavily,zhipu，UTC14:48:53.953，不用模型回复Provider note替准确工具结果。
+- B08-2执行中：实际管理智谱→断开，UI1of4/智谱连接按钮，[已断开](screenshots/zhipu-now-disconnected.png)。仍同实例同会话，随后不同上海博物馆query真实发送，等待工具结果；未重启/未换session。
+
+
+B08-2/3通过：同3618e60e…第三轮真实Web search completed for 上海博物馆 开放时间 官方 公告，Worked6s，完整回复与空闲现场正常。[完成](screenshots/search-after-disconnect-complete.png)、[展开真实结果](screenshots/search-after-disconnect-tool-output.png)。父安全journal seq381 tool/result Providers只有tavily，磁盘zhipu条目已不存在，seq386模型复述不作调用；与同端口断开前seq74 tavily,zhipu相比确认即时生效。未重启/换session。恢复仍待下一正常重启UI核。
+
+为最新B12构建，实际Quit Electron标准菜单AXPress退出38849，fresh ps38849/38895/38896/38927全消失、nativeAX仅root。父随后只恢复zhipu原加密条目并正常同dev:log启动。本轮未改其它设置。B03删除回退期间切走，明确未完整覆盖持续观察，正向自动更新通过证据独立保留。
