@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-/* Space 工作台 demo
-   左栏：普通会话列表 + Actor 名册入口 + Space
-   中栏：标签页（第一个是协调 Agent，其余是 Space 里的 Actor）；名册页和一对一对话也在这里
-   右栏：Actor / 库 / 记忆
+/* Space 工作台 demo（2026-10-07 按桌面端现有左栏、输入框、右栏改版）
+   左栏：新建会话 → 新建 Space → 扩展 → Actor 名册 → Space 列表 → 已置顶 → 工作区，样式和桌面端现有左栏一致
+   中栏：标签页（第一个是协调 Agent，其余是 Space 里的 Actor）；名册页和一对一对话也在这里；输入框是现有 Composer
+   右栏：现有右栏的标签体系。协调 Agent 标签页下是 Actor / 库 / 记忆 / 文件 / 终端；Actor 标签页和一对一对话下和普通会话一样
    颜色沿用 Ink & Emerald token：翡翠绿只用于工作中与成功，琥珀只用于等你决定，红只用于出错。
    头像：Space 与协调 Agent 用 Space 图；成熟 Actor 用桌面端现有九张角色图；Space 里生成的 Actor 用五色小球，按 id 固定分配颜色。 */
 
@@ -23,6 +23,11 @@
   --shadow-card: 0 1px 2px rgba(20, 21, 18, .06);
   /* 星空：深色是星点，浅色换成极淡的点阵 */
   --stars-o: 0; --grid-o: 1; --grid-dot: rgba(32, 32, 30, .16); --spark: #3b4a9c;
+  /* 现有 Composer 的边框与阴影；对话内容宽 880px */
+  --composer-line: rgb(0 0 0 / .07); --composer-line-focus: rgb(0 0 0 / .11);
+  --shadow-composer: 0 1px 2px rgb(0 0 0 / .04), 0 4px 16px -4px rgb(0 0 0 / .06);
+  --shadow-composer-focus: 0 1px 2px rgb(0 0 0 / .05), 0 8px 28px -6px rgb(0 0 0 / .1);
+  --cw: 880px;
   --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   --mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
   --ease: cubic-bezier(.22, .61, .36, 1);
@@ -39,6 +44,9 @@
     --shadow-pop: 0 24px 64px rgba(0, 0, 0, .5);
     --shadow-card: 0 1px 2px rgba(0, 0, 0, .4);
     --stars-o: 1; --grid-o: 0; --spark: #eef1ff;
+    --composer-line: rgb(255 255 255 / .07); --composer-line-focus: rgb(255 255 255 / .12);
+    --shadow-composer: 0 1px 2px rgb(0 0 0 / .3), 0 6px 20px -6px rgb(0 0 0 / .4);
+    --shadow-composer-focus: 0 1px 2px rgb(0 0 0 / .35), 0 10px 32px -6px rgb(0 0 0 / .55);
     color-scheme: dark;
   }
 }
@@ -53,6 +61,9 @@
   --shadow-pop: 0 24px 64px rgba(0, 0, 0, .5);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, .4);
   --stars-o: 1; --grid-o: 0; --spark: #eef1ff;
+  --composer-line: rgb(255 255 255 / .07); --composer-line-focus: rgb(255 255 255 / .12);
+  --shadow-composer: 0 1px 2px rgb(0 0 0 / .3), 0 6px 20px -6px rgb(0 0 0 / .4);
+  --shadow-composer-focus: 0 1px 2px rgb(0 0 0 / .35), 0 10px 32px -6px rgb(0 0 0 / .55);
   color-scheme: dark;
 }
 
@@ -108,34 +119,60 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 
 /* ---------- 骨架 ---------- */
 .app { position: relative; display: grid; grid-template-columns: 260px minmax(0, 1fr) 0px; height: 100%; overflow: hidden; transition: grid-template-columns .26s var(--ease); }
-.app.rp-open { grid-template-columns: 260px minmax(0, 1fr) clamp(340px, 30%, 440px); }
+.app.rp-open { grid-template-columns: 260px minmax(0, 1fr) 390px; }
 .sb { grid-column: 1; grid-row: 1; } .main { grid-column: 2; grid-row: 1; } .rp { grid-column: 3; grid-row: 1; }
 .sb-scrim { display: none; position: absolute; inset: 0; background: var(--overlay); z-index: 19; }
-/* 名册页和一对一对话不需要右栏 */
-.app.solo [data-act="toggle-rp"] { display: none !important; }
-.app.view-roster .dock { display: none; }
+/* 名册页不需要右栏和输入框；一对一对话和普通会话一样有右栏 */
+.app.view-roster .dock, .app.view-roster .chrome-right { display: none; }
 .app.solo .pills, .app.solo .tray { display: none; }
 
-/* ---------- 左栏 ---------- */
+/* ---------- 左栏：和桌面端现有左栏一致 ---------- */
 .sb { background: var(--sidebar); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-.sb-chrome { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 10px; flex: none; }
-.lights { display: flex; gap: 7px; margin-right: auto; padding-left: 2px; }
+.sb-chrome { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 8px 0 14px; flex: none; }
+.lights { display: flex; gap: 7px; margin-right: 22px; }
 .lights i { width: 12px; height: 12px; border-radius: 99px; background: var(--line); cursor: default; }
+.cb { width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); flex: none; }
+.cb:hover { background: var(--hover); color: var(--text); }
+.cb svg.i { width: 15px; height: 15px; stroke-width: 1.8; }
+.cb[aria-pressed="true"], .cb[aria-expanded="true"] { color: var(--text); background: var(--hover); }
+.cb.off { opacity: .45; }
 .ib { width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); flex: none; position: relative; }
 .ib:hover { background: var(--hover); color: var(--text); }
 
-.sb-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2px 8px 12px; display: flex; flex-direction: column; gap: 18px; min-height: 0; }
-.sec { display: flex; flex-direction: column; gap: 1px; }
-.sec-head { display: flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 8px; font-size: 11px; font-weight: 600; color: var(--faint); letter-spacing: .04em; }
-.sec-head .ib { width: 22px; height: 22px; margin-left: auto; }
-.sec-head .grow { margin-right: auto; }
-.row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 30px; padding: 5px 8px; border-radius: 6px; width: 100%; color: var(--text); }
-.row:hover { background: var(--hover); }
-.row[aria-current="true"] { background: var(--selected); }
-.row .ico { color: var(--muted); display: flex; justify-content: center; }
-.row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.row .name.plain { font-weight: 400; color: var(--muted); }
+.sb-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 8px 10px 10px; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.pa-group { display: flex; flex-direction: column; gap: 1px; }
+.pa { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 0 10px; border-radius: 8px; width: 100%; font-size: 13px; font-weight: 500; color: var(--muted); }
+.pa:hover { background: var(--hover); color: var(--text); }
+.pa[aria-current="true"] { background: var(--selected); color: var(--text); font-weight: 600; }
+.pa svg.i { width: 14px; height: 14px; stroke-width: 1.9; }
+.pa .kbd, .pa .cnt { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--faint); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.pa .stack { width: 14px; }
+.sec { display: flex; flex-direction: column; gap: 2px; }
+.sec-head { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 2px 0 8px; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--faint); }
+.sec-head .acts { margin-left: auto; display: flex; gap: 4px; opacity: 0; transition: opacity .12s ease; }
+.sec-head:hover .acts, .sec-head:focus-within .acts { opacity: 1; }
+.sec-head .ib { width: 22px; height: 22px; color: var(--faint); }
+.sec-head .ib svg.i { width: 13px; height: 13px; stroke-width: 1.9; }
+.demo-tag { height: 16px; padding: 0 5px; border-radius: 4px; background: var(--info-soft); color: var(--info); font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; }
+/* Space 行 */
+.row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px; border-radius: 8px; width: 100%; color: var(--muted); }
+.row:hover { background: var(--hover); color: var(--text); }
+.row[aria-current="true"] { background: var(--selected); color: var(--text); }
+.row .ico { display: flex; justify-content: center; }
+.row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-size: 13px; }
 .row .right { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 工作区与会话行 */
+.ws-row { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 8px; align-items: center; min-height: 26px; padding: 0 8px; border-radius: 6px; font-size: 13px; color: var(--muted); width: 100%; }
+.ws-row:hover { color: var(--text); }
+.ws-row svg.i { width: 13px; height: 13px; }
+.srow { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 36px; padding: 0 8px; border-radius: 8px; width: 100%; color: var(--muted); }
+.srow:hover { background: var(--hover); color: var(--text); }
+.srow[aria-current="true"] { background: var(--selected); color: var(--text); }
+.srow .t { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow .tm { font-size: 11px; color: var(--faint); min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+.srow .mk { display: flex; justify-content: center; }
+.srow .mk i { width: 6px; height: 6px; border-radius: 99px; background: var(--op); }
+.av14 { width: 14px; height: 14px; border-radius: 4px; }
 .stack { display: flex; }
 .stack .av { box-shadow: 0 0 0 1.5px var(--sidebar); }
 .stack .av + .av { margin-left: -6px; }
@@ -143,14 +180,23 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 .badge-warn { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--warn-soft); color: var(--warn); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
 .unread-dot { width: 6px; height: 6px; border-radius: 99px; background: var(--info); flex: none; }
 
-.sb-foot { flex: none; border-top: 1px solid var(--line); padding: 6px 8px; display: flex; align-items: center; gap: 2px; }
-.theme-btn { padding: 4px 8px; border-radius: 5px; font-size: 12px; color: var(--faint); }
+.sb-foot { flex: none; padding: 6px 8px 10px 10px; display: flex; align-items: center; gap: 2px; }
+.sb-foot .pa { width: auto; flex: 1; }
+.theme-btn { padding: 4px 7px; border-radius: 5px; font-size: 11px; color: var(--faint); }
 .theme-btn:hover { background: var(--hover); color: var(--text); }
 .theme-btn[aria-pressed="true"] { background: var(--selected); color: var(--text); }
 
 /* ---------- 中栏 ---------- */
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
-.tabbar { height: 44px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 2px; padding: 0 8px; min-width: 0; flex: none; }
+.tabbar { height: 44px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 2px; padding: 0 8px; min-width: 0; flex: none; transition: padding .26s var(--ease); }
+/* 右栏收起时，右上角的开关落在标签栏里，给它留位置 */
+.app:not(.rp-open) .tabbar { padding-right: 46px; }
+.app.view-roster .tabbar { padding-right: 8px; }
+/* 开发中演示：常驻一行 */
+.demo-note { flex: none; display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 16px; border-bottom: 1px solid var(--line); background: var(--info-soft); font-size: 12px; color: var(--muted); }
+.demo-note svg.i { width: 14px; height: 14px; color: var(--info); }
+.demo-note b { color: var(--text); font-weight: 500; }
+.demo-note .link-btn { margin-left: auto; }
 .tab-strip { display: flex; align-items: center; gap: 2px; min-width: 0; margin-right: auto; position: relative; }
 .tab-lead { flex: none; display: flex; padding: 4px 0 4px 3px; }
 .tabs { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 4px 3px; }
@@ -184,7 +230,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 .tab .x:hover { background: var(--hover); color: var(--text); }
 
 .flow { flex: 1; overflow-y: auto; min-height: 0; position: relative; }
-.column { max-width: 720px; margin: 0 auto; padding: 22px 20px 8px; display: flex; flex-direction: column; gap: 14px; }
+.column { max-width: calc(var(--cw) + 64px); margin: 0 auto; padding: 22px 32px 8px; display: flex; flex-direction: column; gap: 14px; }
 
 .user-msg { align-self: flex-end; max-width: 88%; border: 1px solid var(--line); border-radius: 12px 12px 4px 12px; background: var(--surface); padding: 9px 14px; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; box-shadow: var(--shadow-card); }
 .coord-msg { font-size: 14px; line-height: 1.66; }
@@ -307,9 +353,9 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 @keyframes card-new { 0% { border-color: var(--op); box-shadow: 0 0 0 3px var(--op-soft); } 100% { border-color: var(--line); box-shadow: none; } }
 .cards .none { grid-column: 1 / -1; padding: 40px 0; text-align: center; color: var(--faint); }
 
-/* 输入区 */
-.dock { flex: none; padding: 0 20px 16px; display: flex; flex-direction: column; gap: 0; }
-.tray { margin: 0 auto; width: 100%; max-width: 680px; border: 1px solid color-mix(in srgb, var(--warn) 25%, var(--line)); border-radius: 12px; background: var(--warn-soft); overflow: hidden; max-height: 0; opacity: 0; border-width: 0; transition: max-height .26s var(--ease), opacity .18s var(--ease), padding .26s var(--ease), margin .26s var(--ease); padding: 0 14px; }
+/* 输入区：托盘 → 胶囊 → 现有 Composer → 状态行 */
+.dock { flex: none; padding: 0 32px 14px; display: flex; flex-direction: column; gap: 0; }
+.tray { margin: 0 auto; width: 100%; max-width: var(--cw); border: 1px solid color-mix(in srgb, var(--warn) 25%, var(--line)); border-radius: 12px; background: var(--warn-soft); overflow: hidden; max-height: 0; opacity: 0; border-width: 0; transition: max-height .26s var(--ease), opacity .18s var(--ease), padding .26s var(--ease), margin .26s var(--ease); padding: 0 14px; }
 .tray.open { border-width: 1px; max-height: 160px; opacity: 1; padding: 10px 12px 10px 12px; margin-bottom: 8px; }
 .tray-row { display: flex; align-items: center; gap: 10px; }
 .tray .grow { flex: 1; min-width: 0; }
@@ -325,7 +371,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 .btn.ghost:hover { background: var(--hover); color: var(--text); }
 .btn.nav { width: 26px; padding: 0; justify-content: center; }
 
-.pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 680px; margin: 0 auto; padding: 0 0 8px; width: 100%; }
+.pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: var(--cw); margin: 0 auto; padding: 0 0 8px; width: 100%; }
 .pill { height: 26px; padding: 0 10px; border-radius: 99px; background: var(--subtle); font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; transition: background .14s var(--ease), color .14s var(--ease), transform .14s var(--ease); }
 .pill:hover { background: var(--hover); color: var(--text); }
 .pill.warn { background: var(--warn-soft); color: var(--warn); font-weight: 500; }
@@ -333,16 +379,38 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 .pill[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--line-strong); }
 @keyframes nudge { 50% { transform: translateY(-2px); } }
 
-.composer { max-width: 680px; margin: 0 auto; width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 9px 9px 7px 14px; display: flex; flex-direction: column; gap: 6px; transition: border-color .14s var(--ease); }
-.composer:focus-within { border-color: var(--line-strong); }
-.composer textarea { border: 0; outline: none; background: none; resize: none; width: 100%; min-height: 22px; max-height: 140px; line-height: 1.55; font-size: 14px; padding: 0; }
-.composer textarea::placeholder { color: var(--faint); }
-.composer-bar { display: flex; align-items: center; gap: 8px; }
-.composer-bar .who { margin-right: auto; font-size: 12px; color: var(--faint); white-space: nowrap; }
+/* 现有 Composer：单行是胶囊形 [+ | 输入 | 发送]；多行变 18px 圆角，第二行是 + · 模型 · 发送 */
+.composer { max-width: var(--cw); margin: 0 auto; width: 100%; border: 1px solid var(--composer-line); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-composer); display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; align-items: center; column-gap: 4px; padding: 8px; min-height: 46px; transition: border-color .12s ease, box-shadow .12s ease; }
+.composer:focus-within { border-color: var(--composer-line-focus); box-shadow: var(--shadow-composer-focus); }
+.composer textarea { border: 0; outline: none; background: none; resize: none; width: 100%; min-height: 34px; max-height: 200px; line-height: 20px; font-size: 16px; padding: 7px 6px; display: block; }
+.composer textarea::placeholder { color: var(--subtle-text); }
+.composer.stacked { border-radius: 18px; grid-template-columns: 28px auto minmax(0, 1fr) 28px; row-gap: 4px; }
+.composer.stacked textarea { grid-column: 1 / -1; grid-row: 1; }
+.composer.stacked .cplus { grid-row: 2; grid-column: 1; }
+.composer.stacked .model { display: inline-flex; grid-row: 2; grid-column: 2; }
+.composer.stacked .send { grid-row: 2; grid-column: 4; }
+.cplus { width: 28px; height: 28px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; color: var(--faint); }
+.cplus:hover { background: var(--hover); color: var(--text); }
+.cplus svg.i { width: 17px; height: 17px; stroke-width: 2.1; }
+.model { display: none; align-items: center; gap: 4px; height: 32px; padding: 0 6px; border-radius: 99px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.model:hover { color: var(--text); }
 .send { width: 28px; height: 28px; border-radius: 99px; background: var(--action); color: var(--on-action); display: inline-flex; align-items: center; justify-content: center; flex: none; transition: transform .12s var(--ease), opacity .12s ease; }
 .send:hover { background: var(--action-hover); }
+.send svg.i { width: 15px; height: 15px; stroke-width: 2.4; }
 .send:active { transform: scale(.94); }
 .send:disabled { opacity: .35; cursor: default; }
+.status-row { max-width: var(--cw); width: 100%; margin: 6px auto 0; min-height: 28px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--faint); }
+.status-row .facts { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.status-row .f { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.status-row .f > span { overflow: hidden; text-overflow: ellipsis; }
+.status-row .f svg.i { width: 14px; height: 14px; stroke-width: 2; color: var(--subtle-text); }
+.status-row .sep { opacity: .6; }
+.perm { height: 28px; padding: 0 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--faint); }
+.perm:hover { background: var(--hover); color: var(--text); }
+.perm svg.i { width: 14px; height: 14px; }
+.pct { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 4px; border-radius: 6px; color: var(--faint); flex: none; font-variant-numeric: tabular-nums; }
+button.pct:hover { background: var(--hover); color: var(--text); }
+.ctx-ring { width: 15px; height: 15px; border-radius: 99px; background: conic-gradient(var(--muted) calc(var(--p) * 1%), var(--line) 0); -webkit-mask: radial-gradient(circle, transparent 4.5px, #000 5px); mask: radial-gradient(circle, transparent 4.5px, #000 5px); }
 
 /* 状态点：只出现在胶囊和标签页 */
 .dot { width: 7px; height: 7px; border-radius: 99px; display: inline-block; flex: none; }
@@ -353,16 +421,81 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 .dot.fail { background: var(--danger); }
 @keyframes pulse { 50% { opacity: .4; } }
 
-/* ---------- 右栏 ---------- */
-.rp { border-left: 1px solid var(--line); background: var(--sidebar); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+/* ---------- 右栏：沿用桌面端现有右栏（标签行 + 内容 / 启动页） ---------- */
+.rp { border-left: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .app:not(.rp-open) .rp { border-left-color: transparent; }
-.rp-head { height: 44px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 10px; border-bottom: 1px solid var(--line); }
-.seg { display: inline-flex; gap: 2px; position: relative; }
-.seg .seg-ind { position: absolute; top: 0; height: 28px; border-radius: 6px; background: var(--selected); transition: transform .22s var(--ease), width .22s var(--ease); }
-.rp-tab { height: 28px; padding: 0 11px; border-radius: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; position: relative; z-index: 1; transition: color .16s var(--ease); }
-.rp-tab:hover { color: var(--text); }
-.rp-tab[aria-selected="true"] { color: var(--text); font-weight: 600; }
+.rp-tabs { min-height: 44px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 72px 0 10px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.rp-tabs::-webkit-scrollbar { display: none; }
+.rp-tabs .empty-lbl { font-size: 13px; font-weight: 500; color: var(--muted); padding: 0 8px; white-space: nowrap; }
+.rtab { height: 30px; border-radius: 8px; padding: 0 6px 0 10px; display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); white-space: nowrap; flex: none; cursor: pointer; }
+.rtab .lbl { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.rtab:hover { background: var(--hover); color: var(--text); }
+.rtab[aria-selected="true"] { background: var(--subtle); color: var(--text); font-weight: 500; }
+.rtab .x { width: 16px; height: 16px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; color: var(--faint); opacity: 0; }
+.rtab:hover .x { opacity: 1; }
+.rtab .x:hover { background: var(--line); color: var(--text); }
 .rp-body { flex: 1; overflow-y: auto; min-height: 0; padding: 10px 10px 18px; }
+.rp-body.flush { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* 窗口右上角：新建对象 + 开合右栏，和现有标题栏一致 */
+.chrome-right { position: absolute; top: 11px; right: 12px; z-index: 26; display: flex; gap: 4px; }
+.obj-menu { position: absolute; top: 38px; right: 12px; z-index: 31; width: 188px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); box-shadow: var(--shadow-pop); animation: drop .16s var(--ease) both; }
+.obj-menu button { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 8px; border-radius: 6px; font-size: 13px; color: var(--text); }
+.obj-menu button:hover { background: var(--hover); }
+.obj-menu svg.i { width: 15px; height: 15px; stroke-width: 1.9; color: var(--muted); }
+/* 启动页 */
+.launcher { flex: 1; display: flex; flex-direction: column; gap: 1px; padding: 10px; background: var(--surface); overflow-y: auto; }
+.launcher .cap { margin: 2px 0 6px; padding: 0 8px; font-size: 12px; color: var(--faint); line-height: 1.6; }
+.launcher .cap b { color: var(--muted); font-weight: 500; }
+/* 启动页（Space 和普通会话共用，2026-10-07 改）：白底列表，行样式和右栏列表一致，切换标签页时不再整块换底色、换布局 */
+.lt { display: grid; grid-template-columns: 16px auto minmax(0, 1fr); align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 7px; width: 100%; font-size: 13px; font-weight: 500; color: var(--text); }
+.lt svg.i { width: 15px; height: 15px; stroke-width: 1.8; color: var(--faint); }
+.lt small { font-size: 12px; font-weight: 400; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lt:hover { background: var(--hover); }
+.lt:hover svg.i { color: var(--muted); }
+/* 文件树 */
+.ft-head { flex: none; display: flex; align-items: center; gap: 4px; padding: 6px 6px; border-bottom: 1px solid var(--line); }
+.ft-filter { flex: 1; display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: 6px; color: var(--faint); }
+.ft-filter:hover, .ft-filter:focus-within { background: var(--subtle); }
+.ft-filter input { border: 0; outline: 0; background: none; font-size: 12px; width: 100%; }
+.ft-filter svg.i { width: 12px; height: 12px; }
+.ft-head .ib { width: 24px; height: 24px; } .ft-head .ib svg.i { width: 13px; height: 13px; }
+.ft-body { flex: 1; overflow-y: auto; padding: 4px 0; }
+.ft-row { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 8px 4px 0; font-size: 12px; line-height: 16px; color: var(--muted); }
+.ft-row:hover { background: var(--hover); color: var(--text); }
+.ft-row[aria-current="true"] { background: var(--selected); color: var(--text); font-weight: 600; }
+.ft-row svg.i.chev { width: 13px; height: 13px; transition: transform .14s var(--ease); }
+.ft-row.open svg.i.chev { transform: rotate(90deg); }
+.ft-row .sp13 { width: 13px; flex: none; }
+.ft-row svg.i.t { width: 14px; height: 14px; color: var(--faint); }
+.ft-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ft-row.root { color: var(--text); font-weight: 500; }
+.ft-bar { flex: none; display: flex; align-items: center; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--faint); min-width: 0; white-space: nowrap; overflow: hidden; }
+.ft-bar b { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.ft-bar svg.i { width: 12px; height: 12px; }
+.code { margin: 0; padding: 10px 0; font-family: var(--mono); font-size: 12px; line-height: 1.7; counter-reset: ln; overflow: auto; flex: 1; }
+.code .l { display: block; padding-right: 14px; white-space: pre; }
+.code .l::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 34px; margin-right: 14px; text-align: right; color: var(--subtle-text); }
+/* 终端 */
+.term { flex: 1; overflow-y: auto; padding: 10px 12px; font-family: var(--mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.term .p { color: var(--op); }
+.term .dim { color: var(--faint); }
+.term .cur { display: inline-block; width: 7px; height: 15px; background: var(--text); vertical-align: -3px; animation: blink 1s step-end infinite; }
+.term-foot { flex: none; min-height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 10px; border-top: 1px solid var(--line); background: var(--subtle); font-size: 11px; color: var(--faint); }
+.term-foot .ib { width: 22px; height: 22px; margin-left: auto; } .term-foot .ib svg.i { width: 12px; height: 12px; }
+/* Review、上下文 */
+.rv-sum { display: flex; align-items: center; gap: 8px; padding: 2px 6px 10px; font-size: 12px; color: var(--faint); }
+.rv-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; width: 100%; padding: 7px 8px; border-radius: 7px; font-size: 12px; }
+.rv-row:hover { background: var(--hover); }
+.rv-row .nm { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-row svg.i { color: var(--faint); }
+.ctx-total { display: flex; align-items: baseline; gap: 8px; padding: 4px 6px 12px; }
+.ctx-total .n { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ctx-total small { font-size: 12px; color: var(--faint); }
+.ctx-bar { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--subtle); margin: 0 6px 12px; gap: 2px; }
+.ctx-bar i { display: block; height: 100%; }
+.ctx-row { display: flex; align-items: center; gap: 8px; padding: 6px; font-size: 13px; }
+.ctx-row .sw { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.ctx-row .v { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .group { margin-bottom: 6px; }
 .group-head { display: flex; align-items: center; gap: 6px; width: 100%; height: 30px; padding: 0 10px 0 6px; border-radius: 7px; background: var(--subtle); font-size: 12px; font-weight: 500; color: var(--muted); transition: background .14s var(--ease); }
@@ -453,7 +586,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 /* ---------- 窄屏 ---------- */
 @media (max-width: 1180px) {
   .app, .app.rp-open { grid-template-columns: 0px minmax(0, 1fr) 0px; }
-  .app.rp-open { grid-template-columns: 0px minmax(0, 1fr) minmax(340px, 1fr); }
+  .app.rp-open { grid-template-columns: 0px minmax(0, 1fr) minmax(320px, 1fr); }
   .sb { position: absolute; top: 0; bottom: 0; left: 0; width: 260px; z-index: 20; transform: translateX(-101%); transition: transform .24s var(--ease); }
   .app.sb-open .sb { transform: none; box-shadow: var(--shadow-pop); }
   .app.sb-open .sb-scrim { display: block; }
@@ -461,9 +594,12 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 }
 @media (max-width: 900px) {
   .app.rp-open { grid-template-columns: 0px minmax(0, 1fr) 0px; }
-  .rp { position: absolute; inset: 0; z-index: 16; border-left: 0; }
+  /* 绝对定位的网格子项以所在网格区域为包含块，要跨满整行才能盖住中栏 */
+  .rp { position: absolute; inset: 0; z-index: 16; border-left: 0; grid-column: 1 / -1; }
+  .app:not(.rp-open) .rp { display: none; }
   .column { padding-inline: 14px; }
   .dock { padding: 0 14px 12px; }
+  .status-row { padding-inline: 6px; }
   .agent-head { padding-inline: 14px; }
   .roster { padding-inline: 16px; }
 }
@@ -476,32 +612,33 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
   <aside class="sb" id="sb">
     <div class="sb-chrome">
       <div class="lights"><i></i><i></i><i></i></div>
-      <button type="button" class="ib only-narrow" data-act="back-main" title="收起列表" aria-label="收起列表"><svg class="i sm" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg></button>
-      <button type="button" class="ib" data-act="new-chat" title="新会话" aria-label="新会话"><svg class="i sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-      <button type="button" class="ib" data-act="search" title="搜索" aria-label="搜索"><svg class="i sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+      <button type="button" class="cb only-wide" data-act="noop-chrome" title="收起左栏" aria-label="收起左栏"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+      <button type="button" class="cb only-narrow" data-act="back-main" title="收起左栏" aria-label="收起左栏"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+      <button type="button" class="cb off" data-act="noop-chrome" title="后退" aria-label="后退"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+      <button type="button" class="cb off" data-act="noop-chrome" title="前进" aria-label="前进"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
     </div>
     <div class="sb-scroll" id="sbScroll"></div>
     <div class="sb-foot">
-      <button type="button" class="theme-btn" data-act="theme" data-v="system">跟随系统</button>
-      <button type="button" class="theme-btn" data-act="theme" data-v="light">浅色</button>
-      <button type="button" class="theme-btn" data-act="theme" data-v="dark">深色</button>
+      <button type="button" class="pa" data-act="settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span>设置</span></button>
+      <button type="button" class="theme-btn" data-act="theme" data-v="system" title="跟随系统">系统</button>
+      <button type="button" class="theme-btn" data-act="theme" data-v="light" title="浅色">浅</button>
+      <button type="button" class="theme-btn" data-act="theme" data-v="dark" title="深色">深</button>
     </div>
   </aside>
   <div class="sb-scrim" data-act="back-main"></div>
 
   <main class="main">
     <div class="tabbar">
-      <button type="button" class="ib only-narrow" data-act="open-sb" title="会话列表" aria-label="会话列表"><svg class="i sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></button>
-      <button type="button" class="ib only-narrow" data-act="toggle-rp" title="概览" aria-label="概览"><svg class="i sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></button>
+      <button type="button" class="ib only-narrow" data-act="open-sb" title="会话列表" aria-label="会话列表"><svg class="i sm" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
       <div class="tab-strip" id="tabStrip">
         <div class="tab-lead" id="tabLead"></div>
         <div class="tabs" id="tabs" role="tablist"></div>
         <button type="button" class="ib" id="tabMore" data-act="tab-more" title="全部标签" aria-label="全部标签" aria-expanded="false" hidden><svg class="i sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
         <div class="tab-menu" id="tabMenu" hidden></div>
       </div>
-      <button type="button" class="ib only-wide" data-act="toggle-rp" title="概览" aria-label="概览"><svg class="i sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></button>
       <button type="button" class="ib" data-act="help" title="演示说明" aria-label="演示说明"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.4-3 4"/><path d="M12 17.5h.01"/></svg></button>
     </div>
+    <div class="demo-note" role="note"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span><b>开发中演示</b> · 数据是模拟的，操作不会真正执行</span><button type="button" class="link-btn" data-act="reset-demo">重置演示</button></div>
     <div class="flow" id="flow"></div>
     <div class="dock">
       <div class="tray" id="tray" aria-live="polite">
@@ -512,28 +649,25 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
         </div>
       </div>
       <div class="pills" id="pills"></div>
-      <div class="composer">
+      <div class="composer" id="composer">
+        <button type="button" class="cplus" data-act="composer-plus" title="添加" aria-label="添加"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
         <textarea id="input" rows="1" placeholder="接下来做什么？" aria-label="消息"></textarea>
-        <div class="composer-bar">
-          <span class="who">Sonnet 5</span>
-          <button type="button" class="send" id="send" data-act="send" aria-label="发送"><svg class="i sm" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
-        </div>
+        <button type="button" class="model" data-act="model">Sonnet 5<svg class="i xs" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+        <button type="button" class="send" id="send" data-act="send" aria-label="发送"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button>
       </div>
+      <div class="status-row" id="statusRow"></div>
     </div>
   </main>
 
-  <section class="rp" id="rp" aria-label="概览">
-    <div class="rp-head">
-      <div class="seg" id="seg">
-        <span class="seg-ind" id="segInd"></span>
-        <button type="button" class="rp-tab" data-act="rp-tab" data-v="agents">Actor</button>
-        <button type="button" class="rp-tab" data-act="rp-tab" data-v="lib">库</button>
-        <button type="button" class="rp-tab" data-act="rp-tab" data-v="mem">记忆</button>
-      </div>
-      <button type="button" class="ib" data-act="toggle-rp" title="收起" aria-label="收起概览" style="margin-left:auto"><svg class="i sm" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-    </div>
+  <section class="rp" id="rp" aria-label="右栏">
+    <div class="rp-tabs" id="rpTabs" role="tablist"></div>
     <div class="rp-body" id="rpBody"></div>
   </section>
+  <div class="chrome-right">
+    <button type="button" class="cb" id="objBtn" data-act="obj-menu" title="新建对象" aria-label="新建对象" aria-expanded="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button type="button" class="cb" id="rpBtn" data-act="toggle-rp" title="开合右栏" aria-label="开合右栏"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg></button>
+  </div>
+  <div class="obj-menu" id="objMenu" hidden></div>
 </div>
 <div id="modalRoot"></div>
 <div id="toastRoot"></div>
@@ -560,7 +694,19 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
     lib: '<path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"/>',
     brain: '<path d="M12 5a3 3 0 0 0-6 0v.5A2.5 2.5 0 0 0 4 8a2.5 2.5 0 0 0 1 4.5V14a3 3 0 0 0 3 3h4z"/><path d="M12 5a3 3 0 0 1 6 0v.5A2.5 2.5 0 0 1 20 8a2.5 2.5 0 0 1-1 4.5V14a3 3 0 0 1-3 3h-4z"/>',
     trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
-    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    squarePen: '<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.4 2.6a1 1 0 0 1 3 3l-9 9a2 2 0 0 1-.85.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.85z"/>',
+    gridPlus: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M17.5 14v7M14 17.5h7"/>',
+    blocks: '<rect width="7" height="7" x="14" y="3" rx="1"/><path d="M10 21V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H3"/>',
+    folderTree: '<path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/>',
+    terminal: '<path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2"/>',
+    eye: '<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
+    fork: '<circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/>',
+    laptop: '<path d="M18 5a2 2 0 0 1 2 2v8.5a2 2 0 0 0 .2.9l1.07 2.13a1 1 0 0 1-.9 1.45H3.63a1 1 0 0 1-.9-1.45L3.8 16.4a2 2 0 0 0 .2-.9V7a2 2 0 0 1 2-2z"/><path d="M20.05 16H3.95"/>',
+    shieldCheck: '<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+    rotate: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+    refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+    bot: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/>'
   };
   const ic = (n, cls = 'sm') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[n] || ''}</svg>`;
   const STATUS = { wait: '等你决定', fail: '出错', run: '工作中', result: '有结果', idle: '空闲' };
@@ -696,7 +842,9 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
       spaceId: 'sp1',
       actors, spaces: [sp1, sp2],
       tab: 'coord', tabMenu: false,
-      rpOpen: true, rpTab: 'agents',
+      // 右栏：每个上下文（协调 Agent、某个 Actor、一对一对话）各自记住打开的标签
+      rpOpen: true, rpCtx: {}, objMenu: false,
+      ftOpen: new Set(['payments-api', 'payments-api/src', 'payments-api/src/quote', 'checkout-web', 'checkout-web/src', 'checkout-web/src/hooks']), ftQ: '', ftSel: null,
       collapsed: {},
       trayOpen: false, trayIdx: 0,
       chatWith: null, chats: {}, recent: [],
@@ -732,6 +880,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
   const plainOf = text => text.replace(/\[\[(\w+)\]\]/g, (_, id) => nameOf(id));
 
   /* ============ 左栏 ============ */
+  // 顺序和桌面端一致：新建会话 → 新建 Space → 扩展 → Actor 名册 → Space 列表 → 已置顶 → 工作区
   function renderSidebar() {
     const mature = Object.keys(S.actors).filter(id => !S.actors[id].nascent);
     const spaces = S.spaces.map(s => {
@@ -742,25 +891,36 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
         <span class="right">${wait > 0 ? `<span class="badge-warn" title="${wait} 个 Actor 等你决定">${wait}</span>` : ''}</span>
       </button>`;
     }).join('');
-    const chats = S.recent.map(id => `<button type="button" class="row" data-act="open-chat" data-id="${id}" aria-current="${S.view === 'chat' && S.chatWith === id}">
-      <span class="ico">${av(id, 18)}</span><span class="name">${esc(nameOf(id))}</span><span class="right">刚刚</span></button>`).join('');
+    // 一对一对话就是普通会话，出现在工作区的会话列表里
+    const solo = S.recent.map(id => `<button type="button" class="srow" data-act="open-chat" data-id="${id}" aria-current="${S.view === 'chat' && S.chatWith === id}">
+      <span class="mk">${av(id, 14)}</span><span class="t">${esc(nameOf(id))}</span><span class="tm">刚刚</span></button>`).join('');
+    const session = (title, tm, running) => `<button type="button" class="srow" data-act="noop-chat"><span class="mk">${running ? '<i title="运行中"></i>' : ''}</span><span class="t">${esc(title)}</span><span class="tm">${tm}</span></button>`;
+    const ws = name => `<button type="button" class="ws-row" data-act="noop-ws">${ic('folder')}<span>${name}</span></button>`;
     $('sbScroll').innerHTML = `
-      <div class="sec">
-        <button type="button" class="row" data-act="go-roster" aria-current="${S.view === 'roster'}">
-          <span class="ico"><span class="stack"><span class="av av12"><img src="${COMPANION(3)}" alt=""></span><span class="av av12"><img src="${COMPANION(8)}" alt=""></span></span></span>
-          <span class="name">Actor 名册</span><span class="right">${mature.length}</span>
+      <div class="pa-group">
+        <button type="button" class="pa" data-act="new-chat">${ic('squarePen')}<span>新建会话</span><span class="kbd">⌘N</span></button>
+        <button type="button" class="pa" data-act="new-space">${ic('gridPlus')}<span>新建 Space</span></button>
+        <button type="button" class="pa" data-act="extensions">${ic('blocks')}<span>扩展</span></button>
+        <button type="button" class="pa" data-act="go-roster" aria-current="${S.view === 'roster'}">
+          <span class="stack"><span class="av av12"><img src="${COMPANION(3)}" alt=""></span><span class="av av12"><img src="${COMPANION(8)}" alt=""></span></span>
+          <span>Actor 名册</span><span class="cnt">${mature.length}</span>
         </button>
       </div>
       <div class="sec">
-        <div class="sec-head"><span class="grow">SPACE</span><button type="button" class="ib" data-act="new-space" title="新建 Space" aria-label="新建 Space">${ic('plus')}</button></div>
+        <div class="sec-head"><span>Space</span><span class="demo-tag" title="开发中演示，数据是模拟的">演示</span><span class="acts"><button type="button" class="ib" data-act="new-space" title="新建 Space" aria-label="新建 Space">${ic('plus')}</button></span></div>
         ${spaces}
       </div>
       <div class="sec">
-        <div class="sec-head"><span class="grow">最近</span></div>
-        ${chats}
-        <button type="button" class="row" data-act="noop-chat"><span class="ico">${ic('chat')}</span><span class="name plain">修复登录页的样式抖动</span><span class="right"><span class="unread-dot"></span></span></button>
-        <button type="button" class="row" data-act="noop-chat"><span class="ico">${ic('chat')}</span><span class="name plain">给设置页加搜索</span><span class="right">昨天</span></button>
-        <button type="button" class="row" data-act="noop-chat"><span class="ico">${ic('chat')}</span><span class="name plain">排查 CI 偶发失败</span><span class="right">周一</span></button>
+        <div class="sec-head"><span>已置顶</span></div>
+        ${session('修复登录页的样式抖动', '5m', true)}
+      </div>
+      <div class="sec">
+        <div class="sec-head"><span>工作区</span><span class="acts"><button type="button" class="ib" data-act="noop-ws" title="添加工作区" aria-label="添加工作区">${ic('plus')}</button></span></div>
+        ${ws('payments-api')}
+        ${solo}
+        ${session('排查 CI 偶发失败', '3h')}
+        ${ws('checkout-web')}
+        ${session('给设置页加搜索', '1d')}
       </div>`;
   }
 
@@ -1035,57 +1195,320 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
   }
 
   /* ============ 右栏 ============ */
-  function renderRight() {
-    if (!S.rpOpen || S.view !== 'space') return;
+  // 沿用桌面端现有右栏的标签体系，只是协调 Agent 换一组标签
+  const KIND = {
+    agents: { label: 'Actor', icon: 'users', desc: 'Space 里每个 Actor 在做什么' },
+    lib: { label: '库', icon: 'lib', desc: 'Actor 产出和你放进去的文件' },
+    mem: { label: '记忆', icon: 'brain', desc: '指令和 Space 记忆' },
+    files: { label: '文件', menu: '工作区文件', icon: 'folderTree', desc: '浏览工作目录' },
+    term: { label: '终端', icon: 'terminal', desc: '在这个目录里开终端' },
+    sub: { label: '子 Agent', icon: 'bot', desc: '这次对话派出的一次性助手' },
+    review: { label: 'Review', icon: 'branch', desc: '这次的改动' },
+    ctx: { label: '上下文', icon: 'eye', desc: '上下文用了多少' },
+    viz: { label: '可视化回复', icon: 'chat', desc: '图表、页面形式的回复' },
+    file: { label: '文件', icon: 'file' }
+  };
+  // 协调 Agent：Actor / 库 / 记忆，加上只给你用的文件和终端；没有可视化回复、上下文、Review、子 Agent
+  const COORD_KINDS = ['agents', 'lib', 'mem', 'files', 'term'];
+  // Actor 标签页和一对一对话：和普通会话完全一样（启动页磁贴与「+」菜单的顺序照搬现有右栏）
+  const SESSION_TILES = ['sub', 'files', 'review', 'ctx', 'term', 'viz'];
+  const SESSION_MENU = ['files', 'review', 'term', 'viz', 'ctx'];
+  const isCoord = () => S.view === 'space' && S.tab === 'coord';
+  const ctxKey = () => S.view === 'chat' ? 'chat:' + S.chatWith : S.view === 'space' ? S.spaceId + ':' + S.tab : null;
+  function rpCtx() {
+    const k = ctxKey();
+    if (!k) return null;
+    if (!S.rpCtx[k]) S.rpCtx[k] = isCoord()
+      ? { tabs: [{ id: 'agents', kind: 'agents' }, { id: 'lib', kind: 'lib' }, { id: 'mem', kind: 'mem' }], active: 'agents' }
+      : S.view === 'space' ? actorDefaults(member(S.tab))
+      : { tabs: [{ id: 'files', kind: 'files' }], active: 'files' };
+    return S.rpCtx[k];
+  }
+  // 切到 Actor 时右栏直接有内容，不落到空启动页：有改动开 Review，没有就开文件；都带上终端
+  function actorDefaults(m) {
+    const first = m && m.transcript.some(b => b.diff) ? 'review' : 'files';
+    return { tabs: [{ id: first, kind: first }, { id: 'term', kind: 'term' }], active: first };
+  }
+  function openKind(kind, extra) {
+    const x = rpCtx();
+    if (!x) return;
+    const id = extra && extra.path ? 'file:' + extra.path : kind;
+    if (!x.tabs.some(t => t.id === id)) x.tabs.push({ id, kind, ...extra });
+    x.active = id;
+    S.rpOpen = true;
+  }
+  function closeRpTab(id) {
+    const x = rpCtx();
+    const i = x ? x.tabs.findIndex(t => t.id === id) : -1;
+    if (i < 0) return;
+    x.tabs.splice(i, 1);
+    if (x.active === id) x.active = (x.tabs[i - 1] || x.tabs[0] || {}).id || null;
+  }
+  // 当前上下文在哪个目录：协调 Agent 看 Space 的相关目录，Actor 看自己的目录或工作树
+  function scope() {
+    if (S.view === 'chat') return { roots: ['payments-api'], dir: 'payments-api', branch: 'main' };
     const c = cur();
-    document.querySelectorAll('.rp-tab').forEach(t => t.setAttribute('aria-selected', t.dataset.v === S.rpTab));
-    const idx = ['agents', 'lib', 'mem'].indexOf(S.rpTab);
-    const btns = document.querySelectorAll('.rp-tab');
-    const b = btns[idx];
-    if (b) { const ind = $('segInd'); ind.style.width = b.offsetWidth + 'px'; ind.style.transform = `translateX(${b.offsetLeft - btns[0].offsetLeft}px)`; }
+    if (S.tab === 'coord') { const roots = c.dirs.length ? c.dirs : ['checkout-web']; return { roots, dir: roots[0], coord: true }; }
+    const m = member(S.tab);
+    return { roots: [m.dir], dir: m.dir, branch: m.tree || 'main', tree: m.tree, m };
+  }
 
-    if (S.rpTab === 'agents') {
-      $('rpBody').innerHTML = ORDER.map(st => {
-        const list = c.members.filter(m => m.status === st);
-        if (!list.length) return '';
-        const closed = !!S.collapsed[st];
-        return `<div class="group${closed ? ' closed' : ''}" data-group="${st}">
-          <button type="button" class="group-head" data-act="toggle-group" data-v="${st}" aria-expanded="${!closed}">
-            <span class="chev">${ic('chev', 'xs')}</span><span>${STATUS[st]}</span><span class="n">${list.length}</span>
-          </button>
-          <div class="group-body"><div class="group-inner">${list.map(agentRow).join('')}</div></div>
-        </div>`;
-      }).join('') || `<div class="empty">${ic('users')}<div>这个 Space 还没有成员。</div></div>`;
-    } else if (S.rpTab === 'lib') {
-      const arts = c.library.filter(f => f.kind === 'artifact');
-      const added = c.library.filter(f => f.kind === 'added');
-      const row = f => `<button type="button" class="lrow" data-act="lib-open" data-id="${f.id}">
-        <span class="ico">${ic(f.kind === 'artifact' ? 'file' : 'book')}</span>
-        <span class="nm">${esc(f.name)}${f.src ? `<small>来自 ${esc(f.src)}</small>` : ''}</span>
-        <span class="dt">${esc(f.date)}</span></button>`;
-      $('rpBody').innerHTML = `
-        <div class="lib-bar"><span class="grow" style="font-size:12px;color:var(--faint)">${c.library.length} 个文件</span><button type="button" class="btn ghost" data-act="lib-add">${ic('plus', 'xs')} 添加</button></div>
-        ${arts.length ? `<div class="lib-folder">${ic('file', 'xs')} Actor 产出</div>${arts.map(row).join('')}` : ''}
-        ${added.length ? `<div class="lib-folder">${ic('book', 'xs')} 你放进去的</div>${added.map(row).join('')}` : ''}
-        ${c.library.length ? '' : `<div class="empty">${ic('lib')}<div>库还是空的。</div></div>`}
-        <div class="hint">库就是 <code>spaces/&lt;id&gt;/library/</code> 这个真实目录。Actor 的产出写进 <code>artifacts/</code>，代码本身不会复制进来。</div>`;
-    } else {
-      const rows = c.memory.map(m => `<div class="mitem">
-        <div class="body"><p>${esc(m.t)}</p><small>${esc(m.src)}</small></div>
-        <div class="acts"><button type="button" class="ib" data-act="mem-forget" data-id="${m.id}" title="忘记">${ic('trash', 'xs')}</button></div>
-      </div>`).join('');
-      $('rpBody').innerHTML = `
-        <div class="mem-sec">
-          <h4>${ic('book', 'xs')} 指令 <small>每个 Actor 开工前都会读</small></h4>
-          <div class="instr${c.instructions ? '' : ' empty'}">${c.instructions ? esc(c.instructions) : '还没写指令。'}</div>
-          <div style="margin-top:8px"><button type="button" class="btn ghost" data-act="edit-instr">${ic('pencil', 'xs')} 编辑</button></div>
-        </div>
-        <div class="mem-sec">
-          <h4>${ic('brain', 'xs')} Space 记忆 <small>${c.memory.length} 条</small></h4>
-          <p class="desc">只有协调 Agent 会写。Actor 自己的记忆跟着 Actor 走，在它的标签页里看。</p>
-          ${rows || `<div class="empty">${ic('brain')}<div>还没有记忆。</div></div>`}
-        </div>`;
+  let rpSig = '';
+  function renderRight() {
+    const on = S.rpOpen && S.view !== 'roster';
+    $('objBtn').hidden = !on;
+    $('rpBtn').setAttribute('aria-pressed', String(on));
+    if (!on) { rpSig = ''; return; }
+    const x = rpCtx(), sc = scope();
+    const tab = x.tabs.find(t => t.id === x.active);
+    const kind = tab ? tab.kind : 'launcher';
+    $('rpTabs').innerHTML = x.tabs.length
+      ? x.tabs.map(t => `<div class="rtab" role="tab" data-act="rp-pick" data-id="${esc(t.id)}" aria-selected="${t.id === x.active}" title="${esc(t.path || KIND[t.kind].label)}"><span class="lbl">${esc(t.label || KIND[t.kind].label)}</span><button type="button" class="x" data-act="rp-close" data-id="${esc(t.id)}" aria-label="关闭">${ic('x', 'xs')}</button></div>`).join('')
+      : '<span class="empty-lbl">对象</span>';
+    // 文件树、终端这类不随对话变化的内容，没变就不重绘，免得流式输出时打断过滤框输入
+    const sig = [ctxKey(), x.active, x.tabs.length, [...S.ftOpen].join(), S.ftSel, sc.m ? sc.m.status + sc.m.transcript.length : ''].join('|');
+    if (sig === rpSig && !['agents', 'lib', 'mem', 'review', 'ctx'].includes(kind)) return;
+    rpSig = sig;
+    const body = $('rpBody'), c = cur();
+    body.className = 'rp-body' + (['launcher', 'files', 'file', 'term'].includes(kind) ? ' flush' : '');
+    body.innerHTML =
+      kind === 'launcher' ? renderLauncher()
+      : kind === 'agents' ? renderAgents(c)
+      : kind === 'lib' ? renderLib(c)
+      : kind === 'mem' ? renderMem(c)
+      : kind === 'files' ? renderFiles(sc)
+      : kind === 'file' ? renderFile(tab)
+      : kind === 'term' ? renderTerm(sc)
+      : kind === 'review' ? renderReview(sc)
+      : kind === 'ctx' ? renderUsage(sc)
+      : kind === 'sub' ? `<div class="empty">${ic('bot')}<div>这次对话还没有子 Agent。<br>子 Agent 是一次性的只读助手，和 Space 里的 Actor 是两回事。</div></div>`
+      : `<div class="empty">${ic('chat')}<div>还没有可视化回复。</div></div>`;
+  }
+  function renderObjMenu() {
+    const menu = $('objMenu');
+    const open = S.objMenu && S.rpOpen && S.view !== 'roster';
+    menu.hidden = !open;
+    $('objBtn').setAttribute('aria-expanded', String(!!open));
+    if (!open) { menu.innerHTML = ''; return; }
+    const kinds = isCoord() ? COORD_KINDS : SESSION_MENU;
+    menu.innerHTML = kinds.map(k => `<button type="button" data-act="rp-open" data-v="${k}">${ic(KIND[k].icon)}<span>${KIND[k].menu || KIND[k].label}</span></button>`).join('');
+  }
+  function renderLauncher() {
+    const coord = isCoord();
+    const kinds = coord ? COORD_KINDS : SESSION_TILES;
+    const cap = coord
+      ? '协调 Agent 的右栏：<b>Actor、库、记忆</b>，再加只给你用的<b>文件</b>和<b>终端</b>。'
+      : '和打开一个普通会话时的右栏一样。';
+    return `<div class="launcher"><p class="cap">${cap}</p>${kinds.map(k => `<button type="button" class="lt" data-act="rp-open" data-v="${k}">${ic(KIND[k].icon)}<span>${KIND[k].label}</span><small>${KIND[k].desc}</small></button>`).join('')}</div>`;
+  }
+
+  function renderAgents(c) {
+    return ORDER.map(st => {
+      const list = c.members.filter(m => m.status === st);
+      if (!list.length) return '';
+      const closed = !!S.collapsed[st];
+      return `<div class="group${closed ? ' closed' : ''}" data-group="${st}">
+        <button type="button" class="group-head" data-act="toggle-group" data-v="${st}" aria-expanded="${!closed}">
+          <span class="chev">${ic('chev', 'xs')}</span><span>${STATUS[st]}</span><span class="n">${list.length}</span>
+        </button>
+        <div class="group-body"><div class="group-inner">${list.map(agentRow).join('')}</div></div>
+      </div>`;
+    }).join('') || `<div class="empty">${ic('users')}<div>这个 Space 还没有成员。</div></div>`;
+  }
+  function renderLib(c) {
+    const arts = c.library.filter(f => f.kind === 'artifact');
+    const added = c.library.filter(f => f.kind === 'added');
+    const row = f => `<button type="button" class="lrow" data-act="lib-open" data-id="${f.id}">
+      <span class="ico">${ic(f.kind === 'artifact' ? 'file' : 'book')}</span>
+      <span class="nm">${esc(f.name)}${f.src ? `<small>来自 ${esc(f.src)}</small>` : ''}</span>
+      <span class="dt">${esc(f.date)}</span></button>`;
+    return `
+      <div class="lib-bar"><span class="grow" style="font-size:12px;color:var(--faint)">${c.library.length} 个文件</span><button type="button" class="btn ghost" data-act="lib-add">${ic('plus', 'xs')} 添加</button></div>
+      ${arts.length ? `<div class="lib-folder">${ic('file', 'xs')} Actor 产出</div>${arts.map(row).join('')}` : ''}
+      ${added.length ? `<div class="lib-folder">${ic('book', 'xs')} 你放进去的</div>${added.map(row).join('')}` : ''}
+      ${c.library.length ? '' : `<div class="empty">${ic('lib')}<div>库还是空的。</div></div>`}
+      <div class="hint">库就是 <code>spaces/&lt;id&gt;/library/</code> 这个真实目录。Actor 的产出写进 <code>artifacts/</code>，代码本身不会复制进来。</div>`;
+  }
+  function renderMem(c) {
+    const rows = c.memory.map(m => `<div class="mitem">
+      <div class="body"><p>${esc(m.t)}</p><small>${esc(m.src)}</small></div>
+      <div class="acts"><button type="button" class="ib" data-act="mem-forget" data-id="${m.id}" title="忘记">${ic('trash', 'xs')}</button></div>
+    </div>`).join('');
+    return `
+      <div class="mem-sec">
+        <h4>${ic('book', 'xs')} 指令 <small>每个 Actor 开工前都会读</small></h4>
+        <div class="instr${c.instructions ? '' : ' empty'}">${c.instructions ? esc(c.instructions) : '还没写指令。'}</div>
+        <div style="margin-top:8px"><button type="button" class="btn ghost" data-act="edit-instr">${ic('pencil', 'xs')} 编辑</button></div>
+      </div>
+      <div class="mem-sec">
+        <h4>${ic('brain', 'xs')} Space 记忆 <small>${c.memory.length} 条</small></h4>
+        <p class="desc">只有协调 Agent 会写。Actor 自己的记忆跟着 Actor 走，在它的标签页里看。</p>
+        ${rows || `<div class="empty">${ic('brain')}<div>还没有记忆。</div></div>`}
+      </div>`;
+  }
+
+  /* ---------- 文件 ---------- */
+  const FS = {
+    'payments-api': [
+      { n: 'load', c: [{ n: 'baseline.js' }, { n: 'quote.js' }] },
+      { n: 'migrations', c: [{ n: '20261002_quote_sku_idx.sql' }] },
+      { n: 'src', c: [{ n: 'quote', c: [{ n: 'service.ts' }, { n: 'service.test.ts' }] }, { n: 'index.ts' }] },
+      { n: 'package.json' }, { n: 'README.md' }
+    ],
+    'checkout-web': [
+      { n: 'src', c: [{ n: 'hooks', c: [{ n: 'useQuote.ts' }, { n: 'useQuote.test.ts' }] }, { n: 'pages', c: [{ n: 'Checkout.tsx' }] }] },
+      { n: 'package.json' }
+    ]
+  };
+  const CODE = {
+    'service.ts': [
+      "import { db } from '../db';",
+      "import type { Quote, QuoteItem } from './types';",
+      '',
+      'export async function quote(items: QuoteItem[], region: string): Promise<Quote> {',
+      '  // 一次按 SKU 批量查价格，替代逐个查询',
+      '  const skus = items.map((it) => it.sku);',
+      '  const prices = await db.priceTable.findMany({',
+      '    where: { sku: { in: skus }, region },',
+      '  });',
+      '  const bySku = new Map(prices.map((p) => [p.sku, p]));',
+      '  const lines = items.map((it) => ({',
+      '    sku: it.sku,',
+      '    qty: it.qty,',
+      '    unit: bySku.get(it.sku)?.amount ?? 0,',
+      '  }));',
+      '  return { region, lines, total: lines.reduce((s, l) => s + l.unit * l.qty, 0) };',
+      '}'
+    ],
+    'useQuote.ts': [
+      "import { useEffect, useState } from 'react';",
+      "import { fetchQuote, type Quote } from '../api';",
+      '',
+      'const TTL = 30_000;',
+      'const cache = new Map<string, { at: number; value: Quote }>();',
+      '',
+      'export function useQuote(cartKey: string) {',
+      '  const [quote, setQuote] = useState<Quote | null>(null);',
+      '  useEffect(() => {',
+      '    const hit = cache.get(cartKey);',
+      '    if (hit && Date.now() - hit.at < TTL) return setQuote(hit.value);',
+      '    fetchQuote(cartKey).then((value) => {',
+      '      cache.set(cartKey, { at: Date.now(), value });',
+      '      setQuote(value);',
+      '    });',
+      '  }, [cartKey]);',
+      '  return quote;',
+      '}'
+    ],
+    '20261002_quote_sku_idx.sql': [
+      '-- quote 按 (sku, region) 批量查价格',
+      'CREATE INDEX CONCURRENTLY IF NOT EXISTS price_table_sku_region_idx',
+      '  ON price_table (sku, region);'
+    ],
+    'quote.js': [
+      "import http from 'k6/http';",
+      "import { check } from 'k6';",
+      '',
+      'export const options = {',
+      '  vus: 20,',
+      "  duration: '2m',",
+      "  thresholds: { 'http_req_duration{name:quote}': ['p(75)<200'] },",
+      '};',
+      '',
+      'export default function () {',
+      "  const res = http.post(`${__ENV.BASE}/checkout/quote`, JSON.stringify({ items: [{ sku: 'A1', qty: 2 }] }), {",
+      "    headers: { 'Content-Type': 'application/json' },",
+      "    tags: { name: 'quote' },",
+      '  });',
+      "  check(res, { 'status 200': (r) => r.status === 200 });",
+      '}'
+    ]
+  };
+  function ftRows(sc) {
+    const rows = [];
+    const dirRow = (p, name, depth, root) => `<button type="button" class="ft-row${S.ftOpen.has(p) ? ' open' : ''}${root ? ' root' : ''}" style="padding-left:${10 + depth * 12}px" data-act="ft-dir" data-v="${esc(p)}">${ic('right', 'chev')}${ic('folder', 't')}<span class="nm">${esc(name)}</span></button>`;
+    const fileRow = (p, name, depth) => `<button type="button" class="ft-row" style="padding-left:${10 + depth * 12}px" data-act="ft-file" data-v="${esc(p)}" aria-current="${S.ftSel === p}"><span class="sp13"></span>${ic('file', 't')}<span class="nm">${esc(name)}</span></button>`;
+    const walk = (nodes, base, depth) => nodes.forEach(nd => {
+      const p = base + '/' + nd.n;
+      if (!nd.c) { rows.push(fileRow(p, nd.n, depth)); return; }
+      rows.push(dirRow(p, nd.n, depth));
+      if (S.ftOpen.has(p)) walk(nd.c, p, depth + 1);
+    });
+    const flat = (nodes, base) => nodes.flatMap(nd => nd.c ? flat(nd.c, base + '/' + nd.n) : [base + '/' + nd.n]);
+    const q = S.ftQ.trim().toLowerCase();
+    sc.roots.forEach(r => {
+      if (q) { flat(FS[r] || [], r).filter(p => p.toLowerCase().includes(q)).forEach(p => rows.push(fileRow(p, p, 0))); return; }
+      rows.push(dirRow(r, r, 0, true));
+      if (S.ftOpen.has(r)) walk(FS[r] || [], r, 1);
+    });
+    return rows.join('') || `<div class="empty">没有匹配「${esc(S.ftQ)}」的文件</div>`;
+  }
+  function renderFiles(sc) {
+    return `<div class="ft-head"><label class="ft-filter">${ic('search')}<input id="ftq" placeholder="过滤文件…" value="${esc(S.ftQ)}" aria-label="过滤文件"></label><button type="button" class="ib" data-act="ft-refresh" title="刷新" aria-label="刷新">${ic('refresh')}</button></div>
+      <div class="ft-body" id="ftBody">${ftRows(sc)}</div>`;
+  }
+  function renderFile(t) {
+    const parts = t.path.split('/');
+    const lines = CODE[parts[parts.length - 1]] || ['// ' + t.path, '// 演示里只放了几份示例文件的内容'];
+    return `<div class="ft-bar">${parts.map((x, i) => i === parts.length - 1 ? `<b>${esc(x)}</b>` : `<span>${esc(x)}</span>${ic('right', 'xs')}`).join('')}</div>
+      <pre class="code">${lines.map(l => `<span class="l">${esc(l) || ' '}</span>`).join('')}</pre>`;
+  }
+  // 终端：协调 Agent 不执行命令，这里只给你用；Actor 下能看到它跑过的命令
+  function renderTerm(sc) {
+    let out;
+    if (sc.coord) out = '<span class="dim">Space 终端 · 只给你用，协调 Agent 不会在这里执行命令</span>\n';
+    else if (!sc.m) out = '';
+    else {
+      const runs = sc.m.transcript.filter(b => b.k1 === '运行');
+      out = runs.length
+        ? runs.map(b => { const [cmd, res] = b.t.split(' · '); return `<span class="p">$</span> ${esc(cmd)}\n${res ? `<span class="dim">${esc(res)}</span>\n` : ''}`; }).join('')
+        : `<span class="dim">${esc(nameOf(sc.m.id))} 还没有运行过命令</span>\n`;
+      if (sc.m.status === 'wait' && sc.m.approval) out += `<span class="dim"># 等你批准：${esc(sc.m.approval.cmd)}</span>\n`;
     }
+    return `<div class="term">${out}<span class="p">~/${esc(sc.dir)} $</span> <span class="cur"></span></div>
+      <div class="term-foot">${ic('folder', 'xs')}<span>${esc(sc.dir)}</span><span>·</span><span>${sc.tree ? '工作树 ' + esc(sc.tree) : '本机'}</span><button type="button" class="ib" data-act="term-restart" title="重启终端" aria-label="重启终端">${ic('rotate')}</button></div>`;
+  }
+  function renderReview(sc) {
+    const files = sc.m ? sc.m.transcript.filter(b => b.diff) : [];
+    if (!files.length) return `<div class="empty">${ic('branch')}<div>这次还没有改动。</div></div>`;
+    const add = files.reduce((s, b) => s + b.diff[0], 0), del = files.reduce((s, b) => s + b.diff[1], 0);
+    const diff = (a, d) => `<span class="diff"><span class="a">+${a}</span> <span class="d">−${d}</span></span>`;
+    return `<div class="rv-sum">${ic(sc.tree ? 'fork' : 'branch', 'xs')}<span>${esc(sc.branch)} · ${files.length} 个文件</span>${diff(add, del)}</div>
+      ${files.map(b => `<button type="button" class="rv-row" data-act="ft-file" data-v="${esc(sc.dir + '/' + b.t)}">${ic('file', 'xs')}<span class="nm">${esc(b.t)}</span>${diff(b.diff[0], b.diff[1])}</button>`).join('')}`;
+  }
+  function usage(sc) {
+    const c = S.view === 'space' ? cur() : null;
+    const n = sc.m ? sc.m.transcript.length : sc.coord ? c.msgs.length : (S.chats[S.chatWith] || []).length;
+    const parts = [
+      { n: '系统提示', v: sc.coord ? 4.8 : 6.2, c: 'var(--line-strong)' },
+      { n: c ? 'Space 指令与记忆' : '自己的记忆', v: c ? 1.6 + c.memory.length * .4 : 2.4, c: 'var(--info)' },
+      { n: '对话', v: 2 + n * 2.4, c: 'var(--op)' },
+      { n: '工具结果', v: sc.m ? sc.m.transcript.filter(b => b.k === 'line').length * 3.1 : sc.coord ? 3.2 : 0, c: 'var(--warn)' }
+    ];
+    const total = parts.reduce((s, x) => s + x.v, 0);
+    return { parts, total, max: 200, pct: Math.round(total / 200 * 100) };
+  }
+  function renderUsage(sc) {
+    const u = usage(sc);
+    return `<div class="ctx-total"><span class="n">${u.total.toFixed(1)}k</span><small>共 ${u.max}k · 用了 ${u.pct}%</small></div>
+      <div class="ctx-bar">${u.parts.map(x => `<i style="width:${(x.v / u.max * 100).toFixed(2)}%;background:${x.c}"></i>`).join('')}</div>
+      ${u.parts.map(x => `<div class="ctx-row"><span class="sw" style="background:${x.c}"></span>${x.n}<span class="v">${x.v.toFixed(1)}k</span></div>`).join('')}`;
+  }
+
+  /* ============ 输入框下方的状态行 ============ */
+  // 和现有 Composer 一样：左边是事实（分支 · 本机/工作树 · 权限），右边是上下文圆环
+  function renderStatus() {
+    if (S.view === 'roster') return;
+    const sc = scope();
+    const f = (icon, t) => `<span class="f">${ic(icon)}<span>${esc(t)}</span></span>`;
+    const facts = sc.coord
+      ? [f('folder', sc.roots.join(', ')), f('eye', '只读，交事给 Actor')]
+      : [f(sc.tree ? 'fork' : 'branch', sc.branch), sc.tree ? f('fork', '工作树') : f('laptop', '本机'),
+        `<button type="button" class="perm" data-act="perm">${ic('shieldCheck')}<span>自动</span>${ic('chev', 'xs')}</button>`];
+    const u = usage(sc);
+    const ring = `<span class="ctx-ring" style="--p:${u.pct}"></span>${u.pct}%`;
+    $('statusRow').innerHTML = `<div class="facts">${facts.join('<span class="sep">·</span>')}</div>`
+      + (sc.coord ? `<span class="pct" title="上下文已用 ${u.pct}%">${ring}</span>` : `<button type="button" class="pct" data-act="rp-open" data-v="ctx" title="上下文已用 ${u.pct}%，点开看明细">${ring}</button>`);
   }
 
   // 一行：头像 + 名字 + 说明 + 待办进度（有 todo 时）+ 时间（有时）
@@ -1118,7 +1541,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
   /* ============ 渲染总入口 ============ */
   function render() {
     const app = $('app');
-    app.classList.toggle('rp-open', S.rpOpen && S.view === 'space');
+    app.classList.toggle('rp-open', S.rpOpen && S.view !== 'roster');
     app.classList.toggle('solo', S.view !== 'space');
     app.classList.toggle('view-roster', S.view === 'roster');
     renderSidebar();
@@ -1127,6 +1550,8 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
     renderPills();
     renderTray();
     renderRight();
+    renderObjMenu();
+    renderStatus();
     const ph = S.view === 'chat' ? `和${nameOf(S.chatWith)}说…` : S.tab === 'coord' ? '接下来做什么？' : `对${nameOf(S.tab)}说…`;
     $('input').placeholder = ph;
     document.querySelectorAll('.theme-btn').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.theme));
@@ -1168,9 +1593,9 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
     }, 26);
   }
   function scheduleApproval() {
-    const sid = S.spaceId;
+    const sid = S.spaceId, s0 = S;
     setTimeout(() => {
-      if (S.spaceId !== sid) return;
+      if (S !== s0 || S.spaceId !== sid) return;
       const c = cur();
       const target = c.members.find(m => m.status === 'run' && !m.approval);
       if (!target) return;
@@ -1191,7 +1616,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
     const el = $('input');
     const text = el.value.trim();
     if (!text) return;
-    el.value = ''; el.style.height = 'auto'; $('send').disabled = true;
+    el.value = ''; el.style.height = 'auto'; $('send').disabled = true; $('composer').classList.remove('stacked');
     if (S.view === 'chat') return sendSolo(text);
     if (S.view !== 'space') return;
     const c = cur();
@@ -1208,9 +1633,9 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
     const idx = c.msgs.length - 1;
     S.tab = 'coord';
     render();
-    const sid = c.id;
+    const sid = c.id, s0 = S;
     setTimeout(() => {
-      if (S.spaceId !== sid) return;
+      if (S !== s0 || S.spaceId !== sid) return;
       streamReply(c.msgs, idx, () => {
         const before = captureRows();
         const lit = [nid];
@@ -1239,7 +1664,8 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
     const idx = list.length - 1;
     S.stream = true;
     render();
-    setTimeout(() => { if (S.view === 'chat' && S.chatWith === id) streamReply(list, idx); }, 700);
+    const s0 = S;
+    setTimeout(() => { if (S === s0 && S.view === 'chat' && S.chatWith === id) streamReply(list, idx); }, 700);
   }
 
   function closeTab(id) {
@@ -1286,9 +1712,9 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
     render();
     // 看过「有结果」之后，它滑到「空闲」
     if (m.status === 'result') {
-      const sid = S.spaceId;
+      const sid = S.spaceId, s0 = S;
       setTimeout(() => {
-        if (S.spaceId !== sid || m.status !== 'result') return;
+        if (S !== s0 || S.spaceId !== sid || m.status !== 'result') return;
         const before = captureRows();
         m.status = 'idle'; m.last = m.task; m.task = null;
         render();
@@ -1303,7 +1729,9 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
     const card = btn.closest('.keep');
     if (!msg || !card) return;
     card.classList.add('growing');
+    const s0 = S;
     setTimeout(() => {
+      if (S !== s0) return;
       const a = actor(id);
       a.nascent = false; a.img = a.growImg; a.abilities = ['环境检查', '健康探测']; a.memN = 1; a.last = '刚刚长成'; a.spaces = 1;
       msg.state = 'kept';
@@ -1342,12 +1770,14 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
       <p style="margin:0;font-size:13px;line-height:1.65;color:var(--muted)">Space 把几个 Actor 聚在一起解决一个问题。你只和协调 Agent 说话，它把事交给合适的 Actor；每个 Actor 在中间开成一个标签页。</p>
       <ol class="steps">
         <li>在输入框发一句话，协调 Agent 会交给<b>空闲的 Actor</b>；名册里没有合适的，就<b>新起一个</b>（小球头像，头部写着「归属 Space」）。</li>
-        <li>右栏被交到事的那一行会<b>亮一下</b>，头像外出现翡翠绿光环：工作中。</li>
+        <li>右栏「Actor」里被交到事的那一行会<b>亮一下</b>，头像外出现翡翠绿光环：工作中。</li>
         <li>几秒后有 Actor 要跑命令，<b>琥珀色胶囊</b>亮起。点它展开托盘，就地运行或拒绝。</li>
         <li>点右栏「有结果」里的<b>性能分析</b>，看过之后它会滑到「空闲」。</li>
         <li>协调 Agent 问要不要留下「环境巡检」，点<b>留下</b>，看它长成。</li>
-        <li>左栏「Actor 名册」看所有 Actor；「结算页重构」是刚建好、还没开始的 Space。</li>
+        <li><b>右栏跟着标签页走</b>：协调 Agent 下是 Actor / 库 / 记忆，右上角「+」还能加文件和终端；切到某个 Actor 或一对一对话，右栏就和普通会话一样，从启动页打开文件、Review、上下文、终端。</li>
+        <li>左栏顺序和桌面端一致：主操作是新建会话、新建 Space、扩展、Actor 名册，下面是 Space 列表；和 Actor 的一对一对话出现在「工作区」的会话里。</li>
       </ol>
+      <p style="margin:0;font-size:12px;color:var(--faint)">数据都是模拟的，刷新或点顶部「重置演示」回到初始状态。</p>
       <div class="modal-foot"><button type="button" class="btn primary" data-act="close-modal">知道了</button></div>`);
   }
 
@@ -1355,6 +1785,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
   document.addEventListener('click', e => {
     // 点菜单外面就收起
     if (S.tabMenu && !e.target.closest('#tabMenu, #tabMore')) { S.tabMenu = false; updateTabOverflow(); }
+    if (S.objMenu && !e.target.closest('#objMenu, #objBtn')) { S.objMenu = false; renderObjMenu(); }
     const t = e.target.closest('[data-act]');
     if (!t) return;
     const act = t.dataset.act, id = t.dataset.id, v = t.dataset.v;
@@ -1374,10 +1805,15 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
       case 'tm-close': closeTab(id); break;
       case 'tm-close-others': cur().openTabs = S.tab === 'coord' ? [] : [S.tab]; S.tabMenu = false; render(); break;
       case 'open-agent': openAgentTab(id); break;
-      case 'toggle-rp': S.rpOpen = !S.rpOpen; render(); break;
+      case 'toggle-rp': S.rpOpen = !S.rpOpen; S.objMenu = false; render(); break;
       case 'open-sb': $('app').classList.add('sb-open'); break;
       case 'back-main': $('app').classList.remove('sb-open'); break;
-      case 'rp-tab': S.rpTab = v; renderRight(); break;
+      case 'obj-menu': S.objMenu = !S.objMenu; renderObjMenu(); break;
+      case 'rp-open': S.objMenu = false; openKind(v); render(); break;
+      case 'rp-pick': rpCtx().active = id; renderRight(); break;
+      case 'rp-close': e.stopPropagation(); closeRpTab(id); renderRight(); break;
+      case 'ft-dir': if (S.ftOpen.has(v)) S.ftOpen.delete(v); else S.ftOpen.add(v); renderRight(); break;
+      case 'ft-file': S.ftSel = v; openKind('file', { path: v, label: v.split('/').pop() }); renderRight(); break;
       case 'toggle-group': {
         const g = t.closest('.group');
         S.collapsed[v] = !S.collapsed[v];
@@ -1386,7 +1822,7 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
         break;
       }
       case 'pill-wait': S.trayOpen = !S.trayOpen; renderTray(); renderPills(); break;
-      case 'pill-other': S.rpOpen = true; S.rpTab = 'agents'; render(); break;
+      case 'pill-other': S.tab = 'coord'; openKind('agents'); render(); break;
       case 'tray-prev': S.trayIdx = (S.trayIdx - 1 + trayList().length) % trayList().length; renderTray(); break;
       case 'tray-next': S.trayIdx = (S.trayIdx + 1) % trayList().length; renderTray(); break;
       case 'tray-view': S.trayOpen = false; openAgentTab(id); break;
@@ -1420,7 +1856,25 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
       case 'pick-crew': t.setAttribute('aria-pressed', String(t.getAttribute('aria-pressed') !== 'true')); break;
       case 'new-chat': toast('演示里只做 Space 和 Actor，普通会话不展开'); break;
       case 'noop-chat': toast('演示里普通会话不展开'); break;
-      case 'search': toast('演示里省略搜索'); break;
+      case 'extensions': toast('演示里不展开扩展页'); break;
+      case 'settings': toast('演示里不展开设置页'); break;
+      case 'noop-chrome': toast('演示里省略：窗口按钮'); break;
+      case 'noop-ws': toast('演示里普通工作区不展开'); break;
+      case 'composer-plus': toast('演示里省略：添加附件'); break;
+      case 'model': toast('演示里省略：切换模型'); break;
+      case 'perm': toast('演示里省略：切换权限'); break;
+      case 'ft-refresh': toast('演示里的文件树是固定的'); break;
+      case 'term-restart': toast('演示里省略：重启终端'); break;
+      case 'reset-demo': {
+        clearInterval(S.timer);
+        const theme = S.theme;
+        S = seed(); S.theme = theme; window.__S = S;
+        rpSig = ''; shownTab = null;
+        $('input').value = ''; $('input').style.height = 'auto'; $('send').disabled = true; $('composer').classList.remove('stacked');
+        closeModal(); render();
+        toast('演示已重置');
+        break;
+      }
       case 'lib-add': toast('演示里省略：从磁盘添加文件'); break;
       case 'lib-open': toast('演示里省略：预览文件'); break;
       case 'edit-instr': toast('演示里省略：编辑指令'); break;
@@ -1455,15 +1909,21 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
   document.addEventListener('input', e => {
     if (e.target.id === 'input') {
       const el = e.target;
+      const comp = $('composer');
+      // 现有 Composer：超过一行就从胶囊形切到上下两行，清空前不切回去
       el.style.height = 'auto';
-      el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+      const multi = el.value.includes('\n') || el.scrollHeight > 40;
+      comp.classList.toggle('stacked', !!el.value && (multi || comp.classList.contains('stacked')));
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 200) + 'px';
       $('send').disabled = !el.value.trim();
     }
+    if (e.target.id === 'ftq') { S.ftQ = e.target.value; $('ftBody').innerHTML = ftRows(scope()); }
     if (e.target.id === 'rq') { S.q = e.target.value; renderCards(); }
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.id === 'input' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
-    if (e.key === 'Escape') { closeModal(); $('app').classList.remove('sb-open'); if (S.tabMenu) { S.tabMenu = false; updateTabOverflow(); } }
+    if (e.key === 'Escape') { S.objMenu = false; renderObjMenu(); closeModal(); $('app').classList.remove('sb-open'); if (S.tabMenu) { S.tabMenu = false; updateTabOverflow(); } }
   });
 
   /* ============ 星空：生成两层星点 ============ */
@@ -1489,13 +1949,18 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
   if (h.get('space')) S.spaceId = h.get('space');
   if (h.get('tab')) { S.tab = h.get('tab'); cur().openTabs = h.get('tab').split(','); S.tab = cur().openTabs.at(-1); }
   if (h.get('tray')) S.trayOpen = true;
-  if (h.get('rp')) S.rpTab = h.get('rp');
   if (h.get('view')) S.view = h.get('view');
   if (h.get('chat')) { S.view = 'chat'; S.chatWith = h.get('chat'); S.recent = [S.chatWith]; }
   if (h.get('theme')) { S.theme = h.get('theme'); document.documentElement.setAttribute('data-theme', S.theme); }
+  // #rp=files 之类：打开当前上下文的某个右栏标签；#rp=off 收起右栏；#obj=1 展开「+」菜单
+  if (h.get('rp')) {
+    if (h.get('rp') === 'off') S.rpOpen = false;
+    else if (h.get('rp') === 'empty') { const x = rpCtx(); x.tabs = []; x.active = null; }
+    else openKind(h.get('rp'));
+  }
+  if (h.get('obj')) S.objMenu = true;
   render();
   $('send').disabled = true;
-  window.addEventListener('resize', () => { if (S.rpOpen && S.rpTab) renderRight(); });
   // 标签栏变宽变窄（窗口缩放、右栏开合）时，重新判断放不放得下，并让当前标签留在视野里
   new ResizeObserver(() => { revealTab(S.tab); updateTabOverflow(); }).observe($('tabs'));
   // 标签栏：滚轮横向滚动，不显示滚动条

@@ -11,9 +11,12 @@ import { groupSessionsByWorkspace, sessionsByGroupKey } from "./sidebar/session-
 import { SessionList } from "./sidebar/SessionList";
 import { WorkspaceSection } from "./sidebar/WorkspaceSection";
 import { NAV_SECTION_ACTIONS_CLASS, NAV_SECTION_CLASS, NAV_SECTION_LABEL_BASE_CLASS, NAV_SECTION_TITLE_CLASS } from "./sidebar/styles";
+import { ActorRosterAction, NewSpaceAction, SpaceSidebarSection, SpaceSoloChatRows } from "./space/SpaceSidebarSection";
+import { SPACE_DEMO_ENABLED } from "./space/space-demo-enabled";
 
 export type SidebarMode = "expanded" | "hidden";
-export type SidebarView = "chat" | "lab" | "settings" | "extensions";
+/** "space"：Space 演示区（协调 Agent、Actor 名册、一对一对话），具体页面由 Space 的 store 决定。 */
+export type SidebarView = "chat" | "lab" | "settings" | "extensions" | "space";
 export type { NewSessionInput } from "../session/session-actions-context";
 export type { SessionUiStatusKind } from "./sidebar/session-status";
 
@@ -84,6 +87,7 @@ export function Sidebar({
   busySessionIds,
   sessionStatuses,
   onSelectView,
+  onNewSpace,
 }: {
   sessions: SessionListItem[];
   workspaces?: WorkspaceEntry[];
@@ -95,6 +99,8 @@ export function Sidebar({
   /** 折叠按钮回调；现由 WorkbenchLayout 通过 WindowChromeBar 调用，Sidebar 内部不直接渲染 chrome row。 */
   onToggleMode?: () => void;
   onSelectView?: (next: SidebarView) => void;
+  /** 打开「新建 Space」弹窗；只在开发构建的 Space 演示里用到。 */
+  onNewSpace?: () => void;
 }) {
   // 会话 / 工作区操作来自 SessionActionsContext；未提供的操作只做视觉占位。
   // 子组件各自读需要的会话操作；这里只用新建、选择（先切回聊天视图）和添加工作区。
@@ -134,6 +140,11 @@ export function Sidebar({
     onSelectSession?.(sessionId);
   };
 
+  const newSpace = SPACE_DEMO_ENABLED ? onNewSpace : undefined;
+  const enterSpace = () => onSelectView?.("space");
+  // 在 Space 演示里时，普通会话不显示选中态，免得和一对一对话行同时亮着。
+  const highlightedSessionId = view === "space" ? null : activeSessionId;
+
   return (
     <aside className={SIDEBAR_CLASS}>
       <div className={SIDEBAR_PRIMARY_ACTIONS_CLASS}>
@@ -148,6 +159,9 @@ export function Sidebar({
             <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">⌘N</span>
           </button>
         </div>
+        {newSpace ? (
+          <NewSpaceAction className={SIDEBAR_PRIMARY_ACTION_CLASS} labelClassName={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS} onNewSpace={newSpace} />
+        ) : null}
         <button
           className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "extensions" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
           type="button"
@@ -157,11 +171,20 @@ export function Sidebar({
           <Blocks size={14} strokeWidth={1.9} />
           <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>扩展</span>
         </button>
+        {newSpace ? (
+          <ActorRosterAction
+            className={SIDEBAR_PRIMARY_ACTION_CLASS}
+            labelClassName={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}
+            inSpace={view === "space"}
+            onEnter={enterSpace}
+          />
+        ) : null}
       </div>
 
       <nav className={SESSION_NAV_CLASS} aria-label="会话">
         {browse?.listLoading && <p role="status" className="px-2 text-act-xs leading-4 text-text-muted">正在加载会话…</p>}
         {browse?.listError && <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">{browse.listError} <button type="button" onClick={browse.retryList}>重试</button></p>}
+        {newSpace ? <SpaceSidebarSection inSpace={view === "space"} onEnter={enterSpace} onNewSpace={newSpace} /> : null}
         {pinnedSessions.length > 0 ? (
           <section className={`nav-section ${NAV_SECTION_CLASS}`}>
             <NavSectionHeader
@@ -172,7 +195,7 @@ export function Sidebar({
             {pinnedCollapsed ? null : (
               <SessionList
                 sessions={pinnedSessions}
-                activeSessionId={activeSessionId}
+                activeSessionId={highlightedSessionId}
                 busySessionIds={busySessionIds}
                 sessionStatuses={sessionStatuses}
                 onSelectSession={handleSelectChatSession}
@@ -213,6 +236,7 @@ export function Sidebar({
             }
           />
 
+          {newSpace && !workspacesCollapsed ? <SpaceSoloChatRows inSpace={view === "space"} onEnter={enterSpace} /> : null}
           {workspacesCollapsed
             ? null
             : workspaceGroups.map((group) => (
@@ -221,7 +245,7 @@ export function Sidebar({
                   group={group}
                   allSessions={workspaceGroupSessions.get(group.key) ?? []}
                   workspaces={workspaces}
-                  activeSessionId={activeSessionId}
+                  activeSessionId={highlightedSessionId}
                   busySessionIds={busySessionIds}
                   sessionStatuses={sessionStatuses}
                   onSelectSession={handleSelectChatSession}

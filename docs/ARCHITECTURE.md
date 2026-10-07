@@ -75,7 +75,7 @@ runtime --(Host capability)--> browser-bridge
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter 的服务商连接、模型目录、服务商级代理、协议服务和任务模型选择；历史 DuckCoding 设计文档仅用于变更追溯。图片生成仍可独立使用 DuckCoding 的 OpenAI-compatible Images API。
 - `docs/design-docs/core-storage-and-observability.md`：`sessions-v2/<id>/journal.jsonl`、Session-owned artifact、Runtime Projection、Electron `userData`、workspace root 和本地排障日志边界；也记录 Desktop main 侧 settings / secrets 的模块划分（`apps/desktop/src/main/settings/`）。
 - `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范，定义六种 scope、upstream Branch、结构化 diff、Review Options、Git mutation 和右侧 Tab 边界。
-- `docs/design-docs/collaboration/agent-members.md`：未来 Team / Room 产品设计中的持久 Agent Member；不代表当前 v2 已实现对应 Runtime。
+- `docs/design-docs/多智能体协作/README.md`：多智能体协作（Space、Actor 名册）产品与前端设计；当前只有前端演示计划，不代表已实现对应 Runtime。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：v2 Journal usage、request snapshot、Context Projection 与成本统计边界。
 - `docs/design-docs/agent-plugin-runtime/agent-testing.md`：v2 package lifecycle、Session golden、Runtime、Host 与外部人工门禁的测试分层。
 - `docs/design-docs/tool-system/agent-skill-loading.md`：Agent Skill 设计与加载规范，约束 `.actspace/skills`、`.agents/skills`、`.claude/skills` 的发现优先级、catalog 注入和 `read_file` 读取边界。

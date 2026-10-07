@@ -51,6 +51,8 @@ export type WindowChromeBarProps = {
   onToggleSessionView?: () => void;
   /** 渲染在右侧折叠按钮左侧的额外控件（如「+ 新建对象」菜单）。 */
   rightLeading?: ReactNode;
+  /** 替换中间栏的标题区（如 Space 的标签栏）。里面的可点元素要自己声明 no-drag。 */
+  center?: ReactNode;
 };
 
 export function WindowChromeBar({
@@ -73,6 +75,7 @@ export function WindowChromeBar({
   sessionView,
   onToggleSessionView,
   rightLeading,
+  center,
 }: WindowChromeBarProps) {
   const isLeftHidden = leftMode === "hidden";
   const useDesktopPaneWidths = !compactLayout;
@@ -130,14 +133,18 @@ export function WindowChromeBar({
       </div>
       <div className="chrome-center">
         <div className="chrome-center-title">
-          {sessionView && onToggleSessionView ? (
-            <SessionViewToggle view={sessionView} onToggle={onToggleSessionView} />
-          ) : null}
-          <ChromeTitle
-            title={title}
-            currentSession={currentSession ?? null}
-            getSessionPreview={getSessionPreview}
-          />
+          {center ?? (
+            <>
+              {sessionView && onToggleSessionView ? (
+                <SessionViewToggle view={sessionView} onToggle={onToggleSessionView} />
+              ) : null}
+              <ChromeTitle
+                title={title}
+                currentSession={currentSession ?? null}
+                getSessionPreview={getSessionPreview}
+              />
+            </>
+          )}
         </div>
         {centerTrailing ? <div className="chrome-center-actions">{centerTrailing}</div> : null}
       </div>

@@ -1,0 +1,394 @@
+/*
+ * Space 工作台全局样式（只放必须写成全局 CSS 的：@property、伪元素、keyframes）。
+ * 由 index.css 以 layer(components) 引入；颜色与时长全部走 tokens.css 的 --act-space-* / --act-color-*。
+ * 组件里直接在 className 上使用下面的 class 名。
+ *
+ * 星空（放在 position: relative 的容器里，容器自己要 overflow: hidden 或由 .space-sky 裁切）
+ *   .space-sky           铺满父容器的星空外壳（absolute inset-0、不拦截鼠标、边缘径向渐隐）。
+ *   .space-sky-stars     放在 .space-sky 里的空 div：两层星点漂移（200s / 300s）+ 闪烁（7s）。深色可见，浅色透明。
+ *   .space-sky-grid      放在 .space-sky 里的空 div：点阵。浅色可见，深色透明。
+ *
+ * 头像
+ *   .space-avatar-working  加在“头像容器”上（需 position: relative，容器圆角约 28%）：工作中翡翠绿光环，2.4s 一圈。
+ *                          光环画在 ::after 上，头像尺寸 ≥ 36px 时再加 .space-avatar-working-lg 让环更粗。
+ *   .space-avatar-working-sm  18px 及以下小头像用的更贴身光环。
+ *   .space-pop             头像 / 角色图弹出（0.5s，回弹）。
+ *   .space-float           成员头像上下浮动（5s，无限循环）。
+ *
+ * 留下新起的 Actor（KeepActorCard，由容器切换状态 class）
+ *   .space-grow            容器：加上 .space-growing 开始动画，加上 .space-kept 表示已定格在结果。
+ *   .space-grow-from       子元素：小球。growing 时 0.45s 缩小淡出；kept 后隐藏。
+ *   .space-grow-to         子元素：角色图。growing 时 0.5s 弹出（延迟 0.42s）；kept 后显示；其余时候隐藏。
+ *   .space-spark           子元素（absolute，放在容器中心，需 position: relative 的 .space-grow）：星尘点。
+ *                          行内设置 style={{ "--i": 序号, "--x": "px", "--y": "px" }}，growing 时 0.6s 聚拢到中心，逐个延迟 28ms。
+ *   .space-ball-shrink     不用容器状态、直接给小球单独触发：0.45s 缩小淡出（forwards）。
+ *
+ * 名册卡片
+ *   .space-card-fresh      新加入名册的卡片：翡翠绿描边淡去（1.8s）。需要卡片本身有 border。
+ *
+ * 右栏行（Actor 行）
+ *   .space-row-flip        给行加上：transform 过渡 0.3s，供 FLIP 在 JS 里设置 transform 后回落。
+ *   .space-row-fresh       新行从下方 5px 淡入（0.24s）。
+ *   .space-row-lit         行点亮：翡翠绿底 + 内描边 1.5s 淡去（交到事时）。
+ *
+ * 其他
+ *   .space-pill-flash      琥珀胶囊上下跳两次（新审批）。
+ *   .space-typing          “正在输入”三个跳动点：<span class="space-typing"><i/><i/><i/></span>。
+ *   .space-caret           流式输出末尾的闪烁光标（2px 宽的竖条，行内块）。
+ *
+ * 全部动画在 prefers-reduced-motion: reduce 时关闭。
+ */
+
+@property --act-space-ring-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* ---------- 星空 ---------- */
+.space-sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse 70% 62% at 50% 46%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 62% at 50% 46%, #000 30%, transparent 100%);
+}
+
+.space-sky-stars {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.space-sky-stars::before,
+.space-sky-stars::after {
+  content: "";
+  position: absolute;
+  inset: -800px;
+  opacity: var(--act-space-sky-stars-opacity);
+  background-repeat: repeat;
+}
+
+.space-sky-stars::before {
+  background-image:
+      radial-gradient(1.6px 1.6px at 78px 338px, color-mix(in srgb, var(--act-space-star) 54%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 278px 190px, color-mix(in srgb, var(--act-space-star) 39%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 263px 19px, color-mix(in srgb, var(--act-space-star) 38%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 36px 47px, color-mix(in srgb, var(--act-space-star) 61%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 429px 64px, color-mix(in srgb, var(--act-space-star) 60%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 326px 492px, color-mix(in srgb, var(--act-space-star) 48%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 206px 507px, color-mix(in srgb, var(--act-space-star) 69%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 446px 150px, color-mix(in srgb, var(--act-space-star) 37%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 61px 160px, color-mix(in srgb, var(--act-space-star) 43%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 93px 302px, color-mix(in srgb, var(--act-space-star) 83%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 193px 284px, color-mix(in srgb, var(--act-space-star) 73%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 30px 107px, color-mix(in srgb, var(--act-space-star) 38%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 222px 163px, color-mix(in srgb, var(--act-space-star) 75%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 235px 155px, color-mix(in srgb, var(--act-space-star) 70%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 363px 126px, color-mix(in srgb, var(--act-space-star) 82%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 273px 455px, color-mix(in srgb, var(--act-space-star) 69%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 149px 509px, color-mix(in srgb, var(--act-space-star) 78%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 217px 393px, color-mix(in srgb, var(--act-space-star) 42%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 254px 20px, color-mix(in srgb, var(--act-space-star) 44%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 397px 297px, color-mix(in srgb, var(--act-space-star) 75%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 163px 361px, color-mix(in srgb, var(--act-space-star) 87%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 301px 237px, color-mix(in srgb, var(--act-space-star) 70%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 491px 246px, color-mix(in srgb, var(--act-space-star) 85%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 31px 364px, color-mix(in srgb, var(--act-space-star) 74%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 516px 427px, color-mix(in srgb, var(--act-space-star) 73%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 200px 347px, color-mix(in srgb, var(--act-space-star) 52%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 240px 87px, color-mix(in srgb, var(--act-space-star) 36%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 30px 399px, color-mix(in srgb, var(--act-space-star) 42%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 128px 203px, color-mix(in srgb, var(--act-space-star) 42%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 41px 233px, color-mix(in srgb, var(--act-space-star) 87%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 459px 426px, color-mix(in srgb, var(--act-space-star) 67%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 144px 215px, color-mix(in srgb, var(--act-space-star) 86%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 459px 498px, color-mix(in srgb, var(--act-space-star) 56%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 91px 120px, color-mix(in srgb, var(--act-space-star) 44%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 252px 306px, color-mix(in srgb, var(--act-space-star) 49%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 2px 217px, color-mix(in srgb, var(--act-space-star) 50%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 294px 495px, color-mix(in srgb, var(--act-space-star) 57%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 268px 321px, color-mix(in srgb, var(--act-space-star) 76%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 28px 467px, color-mix(in srgb, var(--act-space-star) 75%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 454px 414px, color-mix(in srgb, var(--act-space-star) 81%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 207px 53px, color-mix(in srgb, var(--act-space-star) 58%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 32px 35px, color-mix(in srgb, var(--act-space-star) 73%, transparent), transparent);
+  background-size: 520px 520px;
+  animation: space-drift-a var(--act-space-sky-drift-a) linear infinite;
+}
+
+.space-sky-stars::after {
+  background-image:
+      radial-gradient(2.6px 2.6px at 123px 258px, color-mix(in srgb, var(--act-space-star) 47%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 0px 114px, color-mix(in srgb, var(--act-space-star) 38%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 276px 19px, color-mix(in srgb, var(--act-space-star) 41%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 466px 112px, color-mix(in srgb, var(--act-space-star) 87%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 264px 276px, color-mix(in srgb, var(--act-space-star) 50%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 645px 754px, color-mix(in srgb, var(--act-space-star) 42%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 367px 65px, color-mix(in srgb, var(--act-space-star) 62%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 260px 201px, color-mix(in srgb, var(--act-space-star) 41%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 122px 17px, color-mix(in srgb, var(--act-space-star) 84%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 401px 111px, color-mix(in srgb, var(--act-space-star) 92%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 20px 401px, color-mix(in srgb, var(--act-space-star) 67%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 656px 529px, color-mix(in srgb, var(--act-space-star) 93%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 278px 126px, color-mix(in srgb, var(--act-space-star) 50%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 404px 592px, color-mix(in srgb, var(--act-space-star) 81%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 169px 616px, color-mix(in srgb, var(--act-space-star) 54%, transparent), transparent),
+      radial-gradient(2.6px 2.6px at 647px 612px, color-mix(in srgb, var(--act-space-star) 94%, transparent), transparent);
+  background-size: 760px 760px;
+  animation:
+    space-drift-b var(--act-space-sky-drift-b) linear infinite,
+    space-twinkle var(--act-space-sky-twinkle-duration) ease-in-out infinite;
+}
+
+.space-sky-grid {
+  position: absolute;
+  inset: 0;
+  opacity: var(--act-space-sky-grid-opacity);
+  background-image: radial-gradient(circle at 1px 1px, var(--act-space-grid-dot) 1px, transparent 1.6px);
+  background-size: 20px 20px;
+}
+
+@keyframes space-drift-a {
+  to { transform: translate(520px, 520px); }
+}
+
+@keyframes space-drift-b {
+  to { transform: translate(-760px, 760px); }
+}
+
+@keyframes space-twinkle {
+  50% { opacity: calc(var(--act-space-sky-stars-opacity) * 0.45); }
+}
+
+/* ---------- 头像 ---------- */
+.space-avatar-working::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9px;
+  padding: 1.5px;
+  background: conic-gradient(from var(--act-space-ring-angle), transparent 0 50%, var(--act-color-operational) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: space-ring-spin var(--act-space-ring-duration) linear infinite;
+}
+
+.space-avatar-working-sm::after {
+  inset: -2.5px;
+  border-radius: 7px;
+}
+
+.space-avatar-working-lg::after {
+  inset: -3.5px;
+  border-radius: 13px;
+  padding: 2px;
+}
+
+@keyframes space-ring-spin {
+  to { --act-space-ring-angle: 360deg; }
+}
+
+.space-pop {
+  animation: space-avatar-pop 0.5s var(--act-space-pop-ease) both;
+}
+
+@keyframes space-avatar-pop {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.space-float {
+  animation: space-float var(--act-space-float-duration) ease-in-out infinite;
+}
+
+@keyframes space-float {
+  50% { transform: translateY(-4px); }
+}
+
+/* ---------- 留下新起的 Actor ---------- */
+.space-grow {
+  position: relative;
+}
+
+.space-grow-to {
+  opacity: 0;
+}
+
+.space-grow.space-kept .space-grow-from {
+  opacity: 0;
+}
+
+.space-grow.space-kept .space-grow-to {
+  opacity: 1;
+}
+
+.space-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px;
+  border-radius: 99px;
+  background: var(--act-space-spark);
+  box-shadow: 0 0 6px var(--act-space-spark);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.space-grow.space-growing .space-grow-from {
+  animation: space-ball-shrink 0.45s var(--ease-standard) forwards;
+}
+
+.space-grow.space-growing .space-spark {
+  animation: space-spark-converge 0.6s var(--ease-standard) forwards;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+
+.space-grow.space-growing .space-grow-to {
+  animation: space-grow-in 0.5s var(--act-space-pop-ease) 0.42s forwards;
+}
+
+.space-ball-shrink {
+  animation: space-ball-shrink 0.45s var(--ease-standard) forwards;
+}
+
+@keyframes space-ball-shrink {
+  to { transform: scale(0.5); opacity: 0; filter: blur(1px); }
+}
+
+@keyframes space-spark-converge {
+  0% { transform: translate(var(--x, 0px), var(--y, 0px)); opacity: 0; }
+  35% { opacity: 1; }
+  100% { transform: none; opacity: 0; }
+}
+
+@keyframes space-grow-in {
+  from { transform: scale(0.3); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+/* ---------- 名册卡片 ---------- */
+.space-card-fresh {
+  animation: space-card-fresh 1.8s var(--ease-standard);
+}
+
+@keyframes space-card-fresh {
+  0% {
+    border-color: var(--act-color-operational);
+    box-shadow: 0 0 0 3px var(--act-color-operational-soft);
+  }
+  100% {
+    border-color: var(--act-color-border);
+    box-shadow: none;
+  }
+}
+
+/* ---------- 右栏行 ---------- */
+.space-row-flip {
+  transition: transform 0.3s var(--ease-standard);
+}
+
+.space-row-fresh {
+  animation: space-row-rise 0.24s var(--ease-standard) both;
+}
+
+.space-row-lit {
+  animation: space-row-lit 1.5s var(--ease-standard);
+}
+
+@keyframes space-row-rise {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes space-row-lit {
+  0% {
+    background: color-mix(in srgb, var(--act-color-operational) 20%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--act-color-operational) 45%, transparent);
+  }
+  100% {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px transparent;
+  }
+}
+
+/* ---------- 胶囊 / 输入中 / 光标 ---------- */
+.space-pill-flash {
+  animation: space-pill-nudge 0.5s var(--ease-standard) 2;
+}
+
+@keyframes space-pill-nudge {
+  50% { transform: translateY(-2px); }
+}
+
+.space-typing {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  height: 22px;
+}
+
+.space-typing > i {
+  width: 5px;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--act-color-text-faint);
+  animation: space-bounce 1.1s var(--ease-standard) infinite;
+}
+
+.space-typing > i:nth-child(2) { animation-delay: 0.14s; }
+.space-typing > i:nth-child(3) { animation-delay: 0.28s; }
+
+@keyframes space-bounce {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+.space-caret {
+  display: inline-block;
+  width: 2px;
+  height: 15px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--act-color-text);
+  animation: space-blink 1s step-end infinite;
+}
+
+@keyframes space-blink {
+  50% { opacity: 0; }
+}
+
+/* ---------- 减少动效 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .space-sky-stars::before,
+  .space-sky-stars::after,
+  .space-avatar-working::after,
+  .space-pop,
+  .space-float,
+  .space-grow.space-growing .space-grow-from,
+  .space-grow.space-growing .space-spark,
+  .space-grow.space-growing .space-grow-to,
+  .space-ball-shrink,
+  .space-card-fresh,
+  .space-row-fresh,
+  .space-row-lit,
+  .space-pill-flash,
+  .space-typing > i,
+  .space-caret {
+    animation: none;
+  }
+
+  .space-row-flip {
+    transition: none;
+  }
+
+  /* 动画关闭后保持终态：留下 Actor 直接显示角色图，光环退化为静态半圈 */
+  .space-grow.space-growing .space-grow-from { opacity: 0; }
+  .space-grow.space-growing .space-grow-to { opacity: 1; }
+  .space-caret { opacity: 1; }
+}

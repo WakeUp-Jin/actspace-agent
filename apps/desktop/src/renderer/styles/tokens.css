@@ -261,6 +261,20 @@
   --motion-slow: 220ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
+  /* Space 工作台（space.css）：星空 / 点阵 / 星尘。浅色换成极淡点阵，深色是星点。 */
+  --act-space-star: transparent;
+  --act-space-grid-dot: rgba(32, 32, 30, 0.16);
+  --act-space-spark: #3b4a9c;
+  --act-space-sky-stars-opacity: 0;
+  --act-space-sky-grid-opacity: 1;
+  /* Space 动效时长：没有对应 --motion-* 档位的慢动画 */
+  --act-space-ring-duration: 2.4s;
+  --act-space-sky-drift-a: 200s;
+  --act-space-sky-drift-b: 300s;
+  --act-space-sky-twinkle-duration: 7s;
+  --act-space-float-duration: 5s;
+  --act-space-pop-ease: cubic-bezier(0.3, 1.5, 0.4, 1);
+
   --window-chrome-strip-height: 44px;
   --window-chrome-left-padding: 86px;
   --window-chrome-control-size: 22px;
@@ -416,6 +430,12 @@
   --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
   --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
   --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
+
+  --act-space-star: #eef1ff;
+  --act-space-grid-dot: rgba(238, 241, 255, 0.12);
+  --act-space-spark: #eef1ff;
+  --act-space-sky-stars-opacity: 1;
+  --act-space-sky-grid-opacity: 0;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -548,6 +568,12 @@
     --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
     --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
     --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
+
+    --act-space-star: #eef1ff;
+    --act-space-grid-dot: rgba(238, 241, 255, 0.12);
+    --act-space-spark: #eef1ff;
+    --act-space-sky-stars-opacity: 1;
+    --act-space-sky-grid-opacity: 0;
   }
 }
 

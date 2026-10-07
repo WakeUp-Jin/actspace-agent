@@ -11,7 +11,7 @@
 - [英语辅助学习插件设计](../agent-plugin-runtime/agent-english-learning.md)：提示词与 MiniMax 朗读设计；当前 live Agent 绑定存在接线限制，详见正文。
 - [Agent 工具流式渲染修复设计](front-agent-tool-stream-rendering.md)：已实施，定义工具事件链与实时/历史预览对齐；体验调整见后续计划。
 
-本目录汇总 `actspace` 桌面端 renderer 的视觉语言、主题、工程样式、基础组件、工作台区域、页面规范和设计原型。Markdown 规范与主要 HTML 原型位于本层；Space 原型的配套图片集中在 `assets/`。
+本目录汇总 `actspace` 桌面端 renderer 的视觉语言、主题、工程样式、基础组件、工作台区域、页面规范和设计原型。Markdown 规范与主要 HTML 原型位于本层；Space（多智能体协作）的设计、demo 与素材已移到 [`../多智能体协作/`](../多智能体协作/README.md)。
 
 当前产品级设计系统名称为 **ActSpace Editor Design System**，内部视觉方向为 **Ink & Emerald / 墨色与翡翠绿**。总纲见仓库根目录 `DESIGN.md`。
 
@@ -62,7 +62,7 @@
 - `docs/design-docs/frontend/front-environment-and-git-actions.md`：顶部 Environment、编辑器选择、本地分支创建、Commit 和 Push 工作流。
 - `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范；右侧 Review Tab、六种 scope、upstream Branch、Review Options 与 Git actions 都以此为准。
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`：会话、Pinned 和 Workspaces 分区。
-- `docs/design-docs/frontend/front-space-工作台设计.md`：Space（类 Claude Projects）前端设计稿：协调 Agent + 工作 Agent、中间标签栏、右栏概览（Agents / 库 / 记忆）、状态胶囊与三层审批；待 demo 评审后定稿。
+- `docs/design-docs/多智能体协作/front-space-工作台设计.md`：Space 工作台（Actor 模型）前端设计定稿；协调 Agent + Actor 标签页、右栏 Actor / 库 / 记忆、胶囊与三层审批、Actor 名册。
 - `docs/design-docs/frontend/front-中间消息区规范.md`：消息语法、工具流和执行状态。
 - `docs/design-docs/frontend/front-聊天输入框规范.md`：Composer、模型、附件、Context 和发送。
 - `docs/design-docs/frontend/front-composer-slash-command.md`：Composer 内 `/` 快捷菜单的 Functions / Skills 分组、命令语义、键盘交互和验证边界。
@@ -76,7 +76,7 @@
 
 ## HTML 原型
 
-- `space-demo.html`：2026-10-03 Space 工作台交互 demo（左栏会话列表、中间协调 Agent / 工作 Agent 标签页、右栏 Agents / 库 / 记忆、状态胶囊与审批托盘；浅深双主题）。
+- Space 工作台 demo 已移到 [`../多智能体协作/space-demo.html`](../多智能体协作/space-demo.html)。
 - `settings-redesign-demo.html`：2026-09-25 设置中心视觉重设计定稿 demo（内嵌分组 + 翡翠绿开关 + 独立「搜索」页 + 使用统计微调）；右下角调节面板只用于方案对比。
 
 ## 资产约定

@@ -89,6 +89,20 @@ http://127.0.0.1:5173/
 
 mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`，包括终端创建、新建工作树和 Git 写操作。界面上看到的报错属于 mock 的边界，不是缺陷。如需新增场景，按规范 §7 处理，并同步更新本表。
 
+#### Space 多 Actor 协作演示（只在开发构建出现）
+
+Space 是纯前端演示，数据来自 `components/space/model/` 的内存 store，不走 bridge，任何 `?mock=` 场景下都能打开；打包版看不到入口（`SPACE_DEMO_ENABLED = import.meta.env.DEV`）。设计见 [front-space-工作台设计.md](design-docs/多智能体协作/front-space-工作台设计.md)。走查步骤：
+
+1. 左栏「Space」分区点「支付链路提速」：中栏是协调 Agent，标题栏中间是 Space 标签栏，右栏默认 Actor / 库 / 记忆。
+2. 点消息里的引用胶囊（如「后端」）打开 Actor 标签：右栏换成 Review + 终端（有改动）或文件 + 终端。
+3. 点琥珀胶囊「等你决定」展开审批托盘，「运行」/「拒绝」后托盘收起，右栏分组行跟着移动。
+4. 协调 Agent 里对「环境巡检」点「留下」：星尘动画后左栏「Actor 名册」数量加一。
+5. 「Actor 名册」：右栏和右栏开关都隐藏；搜索；点卡片进入一对一对话，工作区列表里出现这条对话。
+6. 「新建 Space」弹窗创建后直接进入新 Space（空 Space 显示星空和成员头像）。
+7. 标签栏右侧「?」看演示说明；提示条「重置演示」回到初始状态。浅色、深色、480px 窄窗各看一遍。
+
+单测：`space-*.test.ts(x)`。
+
 ### 3. Electron 真实验证
 
 适用范围：
