@@ -30,6 +30,14 @@ import { collectEditedFilePaths } from "./workbench/edited-files";
 import { PermissionModeControl } from "./workbench/PermissionModeControl";
 import { LEFT_MAX_WIDTH, LEFT_MIN_WIDTH, MAIN_MIN_WIDTH, RIGHT_MIN_WIDTH, usePanelLayout } from "./workbench/use-panel-layout";
 import { useSessionHistory } from "./workbench/use-session-history";
+import { SPACE_DEMO_ENABLED } from "./space/space-demo-enabled";
+import { SpaceWorkbench } from "./space/SpaceWorkbench";
+import { SpaceRightPanel } from "./space/SpaceRightPanel";
+import { SpaceObjectMenu } from "./space/panel/SpaceObjectMenu";
+import { SpaceTabBar } from "./space/tabs/SpaceTabBar";
+import { NewSpaceDialog } from "./space/dialogs/NewSpaceDialog";
+import { SpaceDemoHelpButton } from "./space/dialogs/SpaceDemoHelpDialog";
+import { useSpacePanelBinding } from "./space/use-space-panel-binding";
 
 export function WorkbenchLayout({
   sessions,
@@ -64,10 +72,24 @@ export function WorkbenchLayout({
     closePanel: closeRightPanel,
     openTab,
   } = useRightPanel();
+  const [view, setView] = useState<SidebarView>("chat");
+  // 所有 Space 分支都挂在 SPACE_DEMO_ENABLED 上：生产构建里它是常量 false，演示代码整块删掉。
+  const isSpace = SPACE_DEMO_ENABLED && view === "space";
+  // Space 演示的右栏开关记在它自己的 store 里（按上下文分别记标签，名册页没有右栏）。
+  const {
+    available: spacePanelAvailable,
+    isOpen: spacePanelOpen,
+    setOpen: setSpacePanelOpen,
+    openPanel: openSpacePanel,
+    closePanel: closeSpacePanel,
+  } = useSpacePanelBinding();
+  const [newSpaceOpen, setNewSpaceOpen] = useState(false);
   const {
     isCompactLayout, leftMode, isSidebarHidden, displayedLeftWidth, rightWidth, rightMaxWidth, compactSidebarOpen, setCompactSidebarOpen, chromeLeftMode,
     handleContainerWidthChange, toggleSidebarMode, toggleRightPanel, resizeLeftPanel, keyResizeLeftPanel, resizeRightPanel, resetRightWidth,
-  } = usePanelLayout({ isOpen: isRightPanelOpen, openPanel: openRightPanel, closePanel: closeRightPanel });
+  } = usePanelLayout(isSpace
+    ? { isOpen: spacePanelOpen, openPanel: openSpacePanel, closePanel: closeSpacePanel }
+    : { isOpen: isRightPanelOpen, openPanel: openRightPanel, closePanel: closeRightPanel });
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection?.cell ?? null;
   const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
@@ -84,7 +106,6 @@ export function WorkbenchLayout({
   const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
   const permissionMode = projectionCell?.snapshot?.permissionMode ?? "default";
   const effectiveIsSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
-  const [view, setView] = useState<SidebarView>("chat");
   const sessionViewByIdRef = useRef(new Map<string, SessionMainView>());
   const [sessionMainView, setSessionMainView] = useState<SessionMainView>("chat");
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
@@ -132,7 +153,9 @@ export function WorkbenchLayout({
   const handleSelectView = useCallback((next: SidebarView) => {
     setView(next);
     setCompactSidebarOpen(false);
-  }, []);
+    // 窄窗口里右栏是浮层，进 Space 时先收起，免得一进来就盖住对话。
+    if (next === "space" && isCompactLayout) setSpacePanelOpen(false);
+  }, [isCompactLayout, setSpacePanelOpen]);
 
   const usageLoadSequence = useRef(0);
   const loadUsageStatistics = useCallback(async (
@@ -179,7 +202,9 @@ export function WorkbenchLayout({
   ) : null;
 
   let mainContent;
-  if (view === "extensions") {
+  if (isSpace) {
+    mainContent = <SpaceWorkbench />;
+  } else if (view === "extensions") {
     mainContent = (
       <div className="h-full min-h-0 pt-[var(--window-chrome-strip-height)]">
         <ExtensionsPage onSettingsChange={onSettingsChange} onConfigureSpeech={() => { setSettingsSection("general"); setFocusSpeech(true); setView("settings"); }} />
@@ -217,7 +242,7 @@ export function WorkbenchLayout({
     );
   }
 
-  const chromeTitle = view === "extensions" ? "扩展" : view === "lab" ? "Lab" : title;
+  const chromeTitle = view === "extensions" ? "扩展" : view === "lab" ? "Lab" : isSpace ? "Space" : title;
   const currentSession = view === "chat"
     ? sessions.find((session) => session.id === activeSessionId) ?? null
     : null;
@@ -274,9 +299,10 @@ export function WorkbenchLayout({
       sessionStatuses={sessionStatuses}
       onToggleMode={toggleSidebarMode}
       onSelectView={handleSelectView}
+      onNewSpace={SPACE_DEMO_ENABLED ? () => setNewSpaceOpen(true) : undefined}
     />
   );
-  const rightPanel = (
+  const rightPanel = isSpace ? <SpaceRightPanel /> : (
     <RightPanel
       developmentEnabled={composerMode !== "chat" && terminalEnabled}
       contextState={effectiveContextState}
@@ -296,11 +322,15 @@ export function WorkbenchLayout({
     />
   );
 
+  // 有右栏的视图：普通会话，以及 Space 演示里除名册以外的页面。
+  const hasRightPanel = view === "chat" || (isSpace && spacePanelAvailable);
+  const rightPanelShown = view === "chat" ? isRightPanelOpen : hasRightPanel && spacePanelOpen;
+
   return (
     <>
       <WindowChromeBar
         leftMode={chromeLeftMode}
-        rightOpen={view === "chat" && isRightPanelOpen}
+        rightOpen={rightPanelShown}
         title={chromeTitle}
         leftPaneWidth={displayedLeftWidth}
         rightPaneWidth={rightWidth}
@@ -311,12 +341,13 @@ export function WorkbenchLayout({
         canGoForward={view === "chat" && canGoForward}
         onGoBack={() => navigateSessionHistory(-1)}
         onGoForward={() => navigateSessionHistory(1)}
-        showRightToggle={view === "chat"}
+        showRightToggle={hasRightPanel}
         currentSession={currentSession}
         getSessionPreview={view === "chat" ? getSessionPreview : undefined}
         sessionView={view === "chat" ? sessionMainView : undefined}
         onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
-        centerTrailing={view === "chat" ? <>
+        center={isSpace ? <SpaceTabBar /> : undefined}
+        centerTrailing={isSpace ? <SpaceDemoHelpButton /> : view === "chat" ? <>
           {reviewEnabled && composerMode !== "chat" && selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
         </> : undefined}
         rightLeading={
@@ -330,7 +361,7 @@ export function WorkbenchLayout({
                 />
               ) : null}
             </>
-          ) : undefined
+          ) : isSpace && rightPanelShown ? <SpaceObjectMenu /> : undefined
         }
       />
       <SplitView
@@ -347,7 +378,7 @@ export function WorkbenchLayout({
         onLeftSeparatorDoubleClick={toggleSidebarMode}
         onRightResize={resizeRightPanel}
         onRightSeparatorDoubleClick={resetRightWidth}
-        right={view === "chat" && isRightPanelOpen && !isCompactLayout ? rightPanel : undefined}
+        right={rightPanelShown && !isCompactLayout ? rightPanel : undefined}
         rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
         rightSeparatorLabel="调整预览面板宽度"
         rightWidth={rightWidth}
@@ -366,19 +397,20 @@ export function WorkbenchLayout({
           </div>
         </div>
       ) : null}
-      {isCompactLayout && view === "chat" && isRightPanelOpen ? (
+      {isCompactLayout && rightPanelShown ? (
         <div className="fixed inset-0 z-(--act-z-drawer)" data-testid="compact-right-panel-overlay">
           <button
             type="button"
             className="absolute inset-0 border-0 bg-overlay"
             aria-label="关闭右侧面板浮层"
-            onClick={closeRightPanel}
+            onClick={isSpace ? closeSpacePanel : closeRightPanel}
           />
           <div className="absolute inset-y-0 right-0 w-[min(100%,640px)] overflow-hidden bg-surface shadow-act-float">
             {rightPanel}
           </div>
         </div>
       ) : null}
+      {SPACE_DEMO_ENABLED ? <NewSpaceDialog open={newSpaceOpen} onOpenChange={setNewSpaceOpen} onCreated={() => handleSelectView("space")} /> : null}
     </>
   );
 }

@@ -8,3 +8,4 @@
 @import "./diff.css" layer(components);
 @import "./web-tool.css" layer(components);
 @import "./tool-result.css" layer(components);
+@import "./space.css" layer(components);

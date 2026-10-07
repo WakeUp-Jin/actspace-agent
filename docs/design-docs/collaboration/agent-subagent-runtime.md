@@ -143,7 +143,7 @@ outcome-unknown
 - continuable Subagent；
 - 多层递归委托；
 - 运行期自定义 Preset；
-- Team / Room 长期成员 Runtime；
+- 长期协作成员 Runtime（见 `多智能体协作/` 的 Space 设计）；
 - 独立 transcript sidecar。
 
 ## 验收

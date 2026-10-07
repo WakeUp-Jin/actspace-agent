@@ -113,6 +113,10 @@ export type ComposerProps = {
   onOpenReview?: () => void;
   models?: UsableModelView[];
   permissionControl?: ReactNode;
+  /** 替换默认的输入框占位文字（Space 演示按协调 Agent / Actor 区分）。 */
+  placeholder?: string;
+  /** 替换默认的状态行（分支 · 位置 · 权限 · 上下文）；只在 followup 输入区出现。 */
+  statusRow?: ReactNode;
   /** 当前会话的草稿回复批注；由上层按会话持有，发送后通过 onResponseAnnotationsChange 清空。 */
   responseAnnotations?: readonly ResponseAnnotationReference[];
   onResponseAnnotationsChange?: (next: ResponseAnnotationReference[]) => void;

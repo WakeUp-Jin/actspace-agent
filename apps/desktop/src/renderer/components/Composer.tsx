@@ -66,7 +66,7 @@ function getComposerPanelClass(surface: ComposerSurface, layout: ComposerLayout,
 }
 
 export function Composer({
-  surface = "followup", sessionId, contextSnapshot, contextState, statusNotice = null, permissionControl,
+  surface = "followup", sessionId, contextSnapshot, contextState, statusNotice = null, permissionControl, placeholder, statusRow,
   isStreaming = false, isAborting = false, isCompacting = false, messageQueue, onSend, onAbort,
   models, defaultModelId, selectedModelId: controlledSelectedModelId, onSelectedModelChange,
   mode = "agent", onModeChange, selectedSkills = [], onSelectedSkillsChange,
@@ -266,7 +266,7 @@ export function Composer({
       <ComposerInput
         inputRef={inputRef}
         surface={surface}
-        placeholder={composerPlaceholder(mode, surface, isStreaming && Boolean(messageQueue))}
+        placeholder={placeholder ?? composerPlaceholder(mode, surface, isStreaming && Boolean(messageQueue))}
         value={message}
         disabled={inputLocked}
         slash={{ open: slash.open, menuId: SLASH_MENU_ID, activeOptionId: slash.activeOptionId }}
@@ -420,6 +420,7 @@ export function Composer({
 
   function renderComposerStatusRow() {
     if (surface !== "followup") return null;
+    if (statusRow !== undefined) return statusRow;
     return (
       <ComposerStatusRow
         form={isChatForm ? "chat" : "agent"}
