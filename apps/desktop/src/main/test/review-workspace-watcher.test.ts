@@ -51,3 +51,34 @@ it("watches linked-worktree index and common refs, ignores lock noise, and close
     await rm(root, { recursive: true, force: true });
   }
 });
+
+it("reports checkout files as ignore candidates and forces refresh for ignore rules and Git metadata", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "review-watch-paths-"));
+  const watcher = new ReviewWorkspaceWatcher();
+  const changed = vi.fn<(path?: string) => void>();
+  try {
+    const git = (args: string[]) => promisify(execFile)("git", args, { cwd: repo });
+    await git(["init", "-b", "main"]);
+    await mkdir(join(repo, "dist"));
+    await watcher.ensure("repo", repo, changed);
+    await writeFile(join(repo, "dist", "out.js"), "built\n");
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledWith("dist/out.js"));
+    expect(changed.mock.calls.every(([path]) => typeof path === "string")).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    changed.mockClear();
+    await writeFile(join(repo, ".gitignore"), "dist/\n");
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledWith());
+    await new Promise(resolve => setTimeout(resolve, 150));
+    changed.mockClear();
+    await writeFile(join(repo, "dist", ".gitignore"), "*\n");
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledWith());
+    await new Promise(resolve => setTimeout(resolve, 150));
+    changed.mockClear();
+    await writeFile(join(repo, "tracked.txt"), "x\n");
+    await git(["add", "tracked.txt"]);
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledWith());
+  } finally {
+    watcher.dispose();
+    await rm(repo, { recursive: true, force: true });
+  }
+});

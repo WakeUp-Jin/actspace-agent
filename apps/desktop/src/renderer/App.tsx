@@ -44,7 +44,6 @@ import type {
   ModelId,
   ModelKey,
   UsableModelView,
-  ReviewGetSnapshotResult,
   SessionEvent,
   SessionRunLocation,
   SessionListItem,
@@ -54,6 +53,7 @@ import type {
   WorkspaceListResult,
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
+import { useReviewSummary } from "./components/review/use-review-summary";
 import { AppProviders } from "./app/providers";
 import { clearPendingSubmission, readPendingSubmission, sweepExpiredPendingSubmissions, writePendingSubmission } from "./session/pending-submission";
 import { createSessionGateway } from "./session/session-gateway";
@@ -61,7 +61,7 @@ import { ClientSessionStore, selectChatSession, projectChatWindow } from "@actsp
 import { getSession, sessionsApi } from "./api/sessions";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
-import type { ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
+import type { ComposerExecutionContext, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import { resolveQuickOpenTarget } from "./quick-open-routing";
 import { appApi } from "./api/app";
@@ -71,7 +71,6 @@ import { eventsApi } from "./api/events";
 import { liveEvents } from "./api/live-events";
 import { modelsApi } from "./api/models";
 import { quickOpenApi } from "./api/quick-open";
-import { reviewApi } from "./api/review";
 import { settingsApi } from "./api/settings";
 import { tasksApi } from "./api/tasks";
 import { workspacesApi } from "./api/workspaces";
@@ -147,20 +146,6 @@ function createWorkspaceOptionsFromRegistry(items: WorkspaceEntry[]): ComposerWo
     label: workspace.label,
     workspaceId: workspace.id,
   }));
-}
-
-function reviewResultToSummary(result: ReviewGetSnapshotResult): ComposerReviewSummary {
-  if (result.ok === false) {
-    return {
-      status: result.code === "not_a_repository" ? "notAvailable" : "failed",
-      reason: result.code,
-    };
-  }
-  return {
-    status: result.snapshot.status === "ready" ? "changes" : result.snapshot.status,
-    additions: result.snapshot.totals.additions,
-    deletions: result.snapshot.totals.deletions,
-  };
 }
 
 function copyWithSelection(value: string): void {
@@ -251,7 +236,6 @@ export function App() {
   const [workspaceGitContext, setWorkspaceGitContext] = useState<WorkspaceGitContext | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<string | undefined>(undefined);
   const [runLocation, setRunLocation] = useState<SessionRunLocation>("this_mac");
-  const [reviewSummary, setReviewSummary] = useState<ComposerReviewSummary | null>(null);
   const busySessionIds = useBusySessionIds(liveRuns);
   const modeChangePendingRef = useRef(new Set<string>());
   // 页 / 审批请求的版本号全局递增，各会话在 store 里只记最近一次的值：evict 之后重新计数也不会和在途的旧请求撞号。
@@ -306,7 +290,6 @@ export function App() {
     if (sessionId) pendingEvictionsRef.current.delete(sessionId);
     setSelectedSessionId(sessionId);
   }, []);
-  const reviewRefreshRequestIdRef = useRef(0);
   const userPickedChatModelRef = useRef(false);
 
   const refreshWorkspaces = useCallback(async () => {
@@ -409,30 +392,12 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [composerNotice]);
 
-  const refreshReviewSummary = useCallback(async (workspaceRoot?: string | null) => {
-    const resolvedWorkspaceRoot = normalizeWorkspaceRoot(
-      workspaceRoot ?? sessionRecord?.meta.worktree?.workspaceRoot ?? selectedWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
-    );
-    const requestId = ++reviewRefreshRequestIdRef.current;
-    setReviewSummary({ status: "loading" });
-
-    try {
-      const result = await reviewApi.getSnapshot({
-        workspaceRoot: resolvedWorkspaceRoot ?? undefined,
-        sessionId: sessionRecord?.meta.id,
-        selection: { kind: "uncommitted" },
-      });
-      if (requestId !== reviewRefreshRequestIdRef.current) return;
-      setReviewSummary(reviewResultToSummary(result));
-    } catch (error) {
-      console.error("Failed to refresh Review summary", error);
-      if (requestId !== reviewRefreshRequestIdRef.current) return;
-      setReviewSummary({
-        status: "failed",
-        reason: "command_failed",
-      });
-    }
-  }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessionRecord?.meta.worktree?.workspaceRoot]);
+  const { reviewSummary, refreshReviewSummary } = useReviewSummary({
+    workspaceRoot: normalizeWorkspaceRoot(
+      sessionRecord?.meta.worktree?.workspaceRoot ?? selectedWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+    ),
+    sessionId: sessionRecord?.meta.id ?? null,
+  });
 
   const refreshPendingApprovalStatuses = useCallback(async (sessionIds: string[]) => {
     const uniqueSessionIds = [...new Set(sessionIds.filter(Boolean))];
@@ -591,16 +556,6 @@ export function App() {
     cellRetention.retain(new Set(selectedSessionId ? [...busySessionIds, selectedSessionId] : busySessionIds));
     if (selectedSessionId) cellRetention.viewed(selectedSessionId);
   }, [cellRetention, busySessionIds, selectedSessionId]);
-
-  useEffect(() => {
-    void refreshReviewSummary();
-  }, [refreshReviewSummary]);
-
-  useEffect(() => {
-    return eventsApi.reviewChanged(() => {
-      void refreshReviewSummary();
-    });
-  }, [refreshReviewSummary]);
 
   useEffect(() => {
     Promise.all([

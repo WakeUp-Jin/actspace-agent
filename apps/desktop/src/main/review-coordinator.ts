@@ -20,6 +20,7 @@ import type {
   ReviewSnapshot,
   ReviewWorkspaceInput,
 } from "@actspace/shared";
+import type { ReviewWatchPathFilter } from "./review-ignore-filter";
 import { reviewSelectionKey, type ReviewViewStateService } from "./review-view-state-service";
 
 export type ResolvedReviewWorkspace = {
@@ -59,8 +60,13 @@ export type ReviewCoordinatorOptions = {
   queryProvider: ReviewQueryProvider;
   mutationProvider?: ReviewMutationProvider;
   viewState?: ReviewViewStateService;
+  /** watch 合并窗口内只有这些路径变化时，用它排除被 Git 忽略的构建产物、依赖目录。 */
+  filterWatchPaths?: ReviewWatchPathFilter;
   debounceMs?: number;
 };
+
+/** 单个窗口内最多核对的路径数；超过就直接刷新，不把巨量路径塞给 Git。 */
+const MAX_FILTERED_WATCH_PATHS = 2_000;
 
 type WorkspaceReviewState = {
   generation: number;
@@ -71,15 +77,21 @@ type WorkspaceReviewState = {
   abortController: AbortController;
   debounceTimer?: ReturnType<typeof setTimeout>;
   debounceReason?: ReviewChangeNotification["reason"];
+  /** 窗口内有无法按路径判断的变化（Git 元数据、`.gitignore`、未知文件名等），必须刷新。 */
+  debounceForced: boolean;
+  debouncePaths: Set<string>;
+  debounceRoot?: string;
 };
 
 export class ReviewCoordinator {
   private readonly states = new Map<string, WorkspaceReviewState>();
   private readonly listeners = new Set<(notification: ReviewChangeNotification) => void>();
   private readonly debounceMs: number;
+  private disposed = false;
 
   constructor(private readonly options: ReviewCoordinatorOptions) {
-    this.debounceMs = Math.max(0, options.debounceMs ?? 150);
+    // 固定窗口：持续构建时每个根最多约每秒两次通知；手动刷新和 mutation 不走这里，仍即时生效。
+    this.debounceMs = Math.max(0, options.debounceMs ?? 500);
   }
 
   async getSnapshot(input: ReviewGetSnapshotInput): Promise<ReviewGetSnapshotResult> {
@@ -268,15 +280,44 @@ export class ReviewCoordinator {
     return this.invalidateResolved(workspaceId, reason);
   }
 
-  scheduleInvalidation(workspaceId: string, reason: ReviewChangeNotification["reason"] = "watch"): void {
+  /**
+   * 合并一个窗口内的文件变化。带 `change` 的事件只是工作区里某个路径变了，窗口结束时先排除被
+   * Git 忽略的路径；不带 `change` 的事件一律刷新。
+   */
+  scheduleInvalidation(
+    workspaceId: string,
+    reason: ReviewChangeNotification["reason"] = "watch",
+    change?: { workspaceRoot: string; path: string },
+  ): void {
+    if (this.disposed) return;
     const state = this.stateFor(workspaceId);
     state.debounceReason = reason;
+    if (!change || !this.options.filterWatchPaths || state.debouncePaths.size >= MAX_FILTERED_WATCH_PATHS) {
+      state.debounceForced = true;
+      state.debouncePaths.clear();
+    } else if (!state.debounceForced) {
+      state.debouncePaths.add(change.path);
+      state.debounceRoot = change.workspaceRoot;
+    }
     if (state.debounceTimer) return;
     state.debounceTimer = setTimeout(() => {
       state.debounceTimer = undefined;
       const nextReason = state.debounceReason ?? reason;
+      const forced = state.debounceForced;
+      const paths = [...state.debouncePaths];
+      const root = state.debounceRoot;
       state.debounceReason = undefined;
-      this.invalidateResolved(workspaceId, nextReason);
+      state.debounceForced = false;
+      state.debouncePaths.clear();
+      state.debounceRoot = undefined;
+      const filter = this.options.filterWatchPaths;
+      if (forced || !filter || !root) {
+        this.invalidateResolved(workspaceId, nextReason);
+        return;
+      }
+      void filter({ workspaceRoot: root, paths }).catch(() => true).then((relevant) => {
+        if (relevant && !this.disposed) this.invalidateResolved(workspaceId, nextReason);
+      });
     }, this.debounceMs);
   }
 
@@ -286,6 +327,7 @@ export class ReviewCoordinator {
   }
 
   dispose(): void {
+    this.disposed = true;
     for (const state of this.states.values()) {
       if (state.debounceTimer) clearTimeout(state.debounceTimer);
       state.abortController.abort();
@@ -327,7 +369,7 @@ export class ReviewCoordinator {
   private stateFor(workspaceId: string): WorkspaceReviewState {
     let state = this.states.get(workspaceId);
     if (!state) {
-      state = { generation: 1, snapshots: new Map(), snapshotsById: new Map(), fileDiffs: new Map(), fileContents: new Map(), abortController: new AbortController() };
+      state = { generation: 1, snapshots: new Map(), snapshotsById: new Map(), fileDiffs: new Map(), fileContents: new Map(), abortController: new AbortController(), debounceForced: false, debouncePaths: new Set() };
       this.states.set(workspaceId, state);
     }
     return state;

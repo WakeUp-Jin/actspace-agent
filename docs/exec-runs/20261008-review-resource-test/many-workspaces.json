@@ -1,0 +1,28 @@
+{
+  "roots": 30,
+  "totalSubdirectories": 3000,
+  "setupAndSettleMs": 4015.045958999999,
+  "before": {
+    "rss": 71024640,
+    "heapTotal": 9535488,
+    "heapUsed": 6470840,
+    "external": 1974781,
+    "arrayBuffers": 24827
+  },
+  "held": {
+    "rss": 66240512,
+    "heapTotal": 8486912,
+    "heapUsed": 6529720,
+    "external": 1972189,
+    "arrayBuffers": 24827
+  },
+  "after": {
+    "rss": 65519616,
+    "heapTotal": 8486912,
+    "heapUsed": 6477712,
+    "external": 1966189,
+    "arrayBuffers": 24827
+  },
+  "watcherCount": 30,
+  "remainingRoots": 0
+}

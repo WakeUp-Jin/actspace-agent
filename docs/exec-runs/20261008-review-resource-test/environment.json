@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-08",
+  "timezone": "Asia/Shanghai",
+  "os": "macOS 26.3",
+  "ramGiB": 16,
+  "logicalCPUs": 10,
+  "node": "v22.22.2",
+  "mainPid": 69765,
+  "fixture": "/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-review-resources-g3hqxth0",
+  "cpuTimeControl": {
+    "noWatch": {
+      "elapsedSeconds": 34.34,
+      "userSeconds": 0.6,
+      "systemSeconds": 1.83
+    },
+    "watchAndQuery": {
+      "elapsedSeconds": 34.35,
+      "userSeconds": 3.22,
+      "systemSeconds": 15.25
+    }
+  },
+  "sourceSha256": "dfcc4a020da7799292ea4fbe5aed6db7954cc84f5fc96e7473eb7d0357d0fb76"
+}

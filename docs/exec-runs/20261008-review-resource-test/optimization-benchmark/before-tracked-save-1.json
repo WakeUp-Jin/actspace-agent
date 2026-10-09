@@ -1,0 +1,18 @@
+{
+  "mode": "before",
+  "workload": "tracked-save",
+  "elapsedMs": 20058.54325,
+  "nodeCpuPercent": 1.6122307386405041,
+  "writes": 20,
+  "events": 20,
+  "notifications": 20,
+  "queries": 20,
+  "failures": 0,
+  "engineGitCommands": 100,
+  "filterGitCommands": 0,
+  "saveToSnapshotMs": {
+    "median": 240.54733300000044,
+    "max": 249.49645800000144,
+    "samples": 20
+  }
+}

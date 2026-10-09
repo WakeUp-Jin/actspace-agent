@@ -1,0 +1,168 @@
+[
+  {
+    "workload": "ignored-churn",
+    "mode": "before",
+    "cpuSecondsPerRound": [
+      19.53,
+      20.73,
+      20.18
+    ],
+    "medianCpuSeconds": 20.18,
+    "notifications": [
+      124,
+      124,
+      124
+    ],
+    "engineGitCommands": [
+      620,
+      620,
+      620
+    ],
+    "filterGitCommands": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "workload": "ignored-churn",
+    "mode": "after",
+    "cpuSecondsPerRound": [
+      3.81,
+      3.6799999999999997,
+      3.34
+    ],
+    "medianCpuSeconds": 3.6799999999999997,
+    "notifications": [
+      0,
+      0,
+      0
+    ],
+    "engineGitCommands": [
+      0,
+      0,
+      0
+    ],
+    "filterGitCommands": [
+      40,
+      40,
+      40
+    ]
+  },
+  {
+    "workload": "tracked-churn",
+    "mode": "before",
+    "cpuSecondsPerRound": [
+      19.61,
+      19.93,
+      19.89
+    ],
+    "medianCpuSeconds": 19.89,
+    "notifications": [
+      126,
+      125,
+      126
+    ],
+    "engineGitCommands": [
+      624,
+      617,
+      623
+    ],
+    "filterGitCommands": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "workload": "tracked-churn",
+    "mode": "after",
+    "cpuSecondsPerRound": [
+      9.98,
+      9.58,
+      10.48
+    ],
+    "medianCpuSeconds": 9.98,
+    "notifications": [
+      40,
+      40,
+      40
+    ],
+    "engineGitCommands": [
+      200,
+      198,
+      200
+    ],
+    "filterGitCommands": [
+      40,
+      40,
+      40
+    ]
+  },
+  {
+    "workload": "tracked-save",
+    "mode": "before",
+    "cpuSecondsPerRound": [
+      3.79,
+      3.7,
+      3.91
+    ],
+    "medianCpuSeconds": 3.79,
+    "notifications": [
+      20,
+      20,
+      20
+    ],
+    "engineGitCommands": [
+      100,
+      100,
+      100
+    ],
+    "filterGitCommands": [
+      0,
+      0,
+      0
+    ],
+    "saveToSnapshotMedianMaxMs": [
+      241,
+      249,
+      236,
+      256,
+      232,
+      243
+    ]
+  },
+  {
+    "workload": "tracked-save",
+    "mode": "after",
+    "cpuSecondsPerRound": [
+      3.87,
+      3.83,
+      3.67
+    ],
+    "medianCpuSeconds": 3.83,
+    "notifications": [
+      20,
+      20,
+      20
+    ],
+    "engineGitCommands": [
+      100,
+      100,
+      100
+    ],
+    "filterGitCommands": [
+      20,
+      20,
+      20
+    ],
+    "saveToSnapshotMedianMaxMs": [
+      596,
+      614,
+      591,
+      613,
+      589,
+      967
+    ]
+  }
+]

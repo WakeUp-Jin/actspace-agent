@@ -164,6 +164,94 @@ describe("ReviewCoordinator", () => {
     vi.useRealTimers();
   });
 
+  it("uses a fixed window so continuous events still notify about twice per second and the last one arrives", async () => {
+    vi.useFakeTimers();
+    const coordinator = new ReviewCoordinator({
+      resolveWorkspace: async () => ({ ok: true, workspace: { workspaceId: "workspace-1", workspaceRoot: "/workspace" } }),
+      queryProvider: { getSnapshot: vi.fn(), getFileDiffs: vi.fn(), getFileContents: vi.fn() },
+    });
+    const notifications: number[] = [];
+    coordinator.subscribe((notification) => notifications.push(notification.generation));
+    for (let elapsed = 0; elapsed < 2_000; elapsed += 50) {
+      coordinator.scheduleInvalidation("workspace-1", "watch");
+      await vi.advanceTimersByTimeAsync(50);
+    }
+    expect(notifications).toEqual([2, 3, 4, 5]);
+    coordinator.scheduleInvalidation("workspace-1", "watch");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(notifications).toEqual([2, 3, 4, 5, 6]);
+    coordinator.scheduleInvalidation("workspace-2", "watch");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(notifications).toEqual([2, 3, 4, 5, 6, 2]);
+    coordinator.dispose();
+    vi.useRealTimers();
+  });
+
+  it("drops a watch window whose paths are all ignored by Git and keeps windows with real changes", async () => {
+    vi.useFakeTimers();
+    const filterWatchPaths = vi.fn(async ({ paths }: { workspaceRoot: string; paths: string[] }) => paths.some((path) => !path.startsWith("dist/")));
+    const coordinator = new ReviewCoordinator({
+      resolveWorkspace: async () => ({ ok: true, workspace: { workspaceId: "workspace-1", workspaceRoot: "/workspace" } }),
+      queryProvider: { getSnapshot: vi.fn(), getFileDiffs: vi.fn(), getFileContents: vi.fn() },
+      filterWatchPaths,
+      debounceMs: 20,
+    });
+    const notifications: number[] = [];
+    coordinator.subscribe((notification) => notifications.push(notification.generation));
+
+    for (let index = 0; index < 50; index += 1) coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: `dist/${index % 5}.js` });
+    await vi.advanceTimersByTimeAsync(25);
+    expect(filterWatchPaths).toHaveBeenCalledTimes(1);
+    expect(filterWatchPaths.mock.calls[0]![0].paths).toHaveLength(5);
+    expect(notifications).toEqual([]);
+
+    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "dist/0.js" });
+    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "src/a.ts" });
+    await vi.advanceTimersByTimeAsync(25);
+    expect(notifications).toEqual([2]);
+
+    filterWatchPaths.mockClear();
+    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "dist/0.js" });
+    coordinator.scheduleInvalidation("workspace-1", "watch");
+    await vi.advanceTimersByTimeAsync(25);
+    expect(filterWatchPaths).not.toHaveBeenCalled();
+    expect(notifications).toEqual([2, 3]);
+
+    filterWatchPaths.mockRejectedValueOnce(new Error("git failed"));
+    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "dist/0.js" });
+    await vi.advanceTimersByTimeAsync(25);
+    expect(notifications).toEqual([2, 3, 4]);
+
+    let release: (relevant: boolean) => void = () => undefined;
+    filterWatchPaths.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "src/a.ts" });
+    await vi.advanceTimersByTimeAsync(25);
+    coordinator.dispose();
+    release(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(notifications).toEqual([2, 3, 4]);
+    vi.useRealTimers();
+  });
+
+  it("refreshes without asking Git when a window collects too many paths", async () => {
+    vi.useFakeTimers();
+    const filterWatchPaths = vi.fn(async () => false);
+    const coordinator = new ReviewCoordinator({
+      resolveWorkspace: async () => ({ ok: true, workspace: { workspaceId: "workspace-1", workspaceRoot: "/workspace" } }),
+      queryProvider: { getSnapshot: vi.fn(), getFileDiffs: vi.fn(), getFileContents: vi.fn() },
+      filterWatchPaths,
+      debounceMs: 20,
+    });
+    const notifications: number[] = [];
+    coordinator.subscribe((notification) => notifications.push(notification.generation));
+    for (let index = 0; index < 2_001; index += 1) coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: `dist/${index}.js` });
+    await vi.advanceTimersByTimeAsync(25);
+    expect(filterWatchPaths).not.toHaveBeenCalled();
+    expect(notifications).toEqual([2]);
+    coordinator.dispose();
+    vi.useRealTimers();
+  });
+
   it("deduplicates overlapping batch requests for the same file", async () => {
     const { coordinator, getFileDiffs } = setup();
     const loaded = await coordinator.getSnapshot({ workspaceId: "workspace-1", selection: { kind: "unstaged" } });

@@ -1,0 +1,10 @@
+{
+  "hiddenTestIds": [
+    "ws_large_repo_naisks",
+    "ws_dist_1aoou8"
+  ],
+  "hidden": true,
+  "otherEntriesUnchanged": true,
+  "defaultWorkspaceUnchanged": true,
+  "restorationMethod": "existing compiled workspace-registry setWorkspaceHidden; not a UI verification"
+}

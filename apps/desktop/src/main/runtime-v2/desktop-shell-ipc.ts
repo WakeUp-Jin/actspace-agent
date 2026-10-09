@@ -18,6 +18,7 @@ import { ReviewGitWorkerClient } from "../review-git-worker-client";
 import { ReviewViewStateService } from "../review-view-state-service";
 import { ReviewPullRequestService } from "../review-pr-service";
 import { ReviewWorkspaceWatcher } from "../review-workspace-watcher";
+import { createReviewIgnoredPathFilter } from "../review-ignore-filter";
 import type { TerminalSessionService } from "../terminal/terminal-session-service";
 
 type ShellOptions = {
@@ -53,12 +54,13 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
       const resolved = await resolveWorkspace(input);
       if (resolved.ok) {
         const { workspaceId, workspaceRoot } = resolved.workspace;
-        await reviewWatcher.ensure(workspaceId, workspaceRoot, () => review.scheduleInvalidation(workspaceId));
+        await reviewWatcher.ensure(workspaceId, workspaceRoot, (path) => review.scheduleInvalidation(workspaceId, "watch", path === undefined ? undefined : { workspaceRoot, path }));
       }
       return resolved;
     },
     queryProvider: reviewEngine,
     mutationProvider: reviewEngine,
+    filterWatchPaths: createReviewIgnoredPathFilter(reviewWorker.runGit),
     viewState: new ReviewViewStateService({ filePath: join(options.roots.dataRoot, "review", "view-state.json") }),
   });
   const reviewPullRequests = new ReviewPullRequestService();

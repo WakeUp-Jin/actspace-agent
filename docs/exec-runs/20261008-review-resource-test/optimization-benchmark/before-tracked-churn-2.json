@@ -1,0 +1,13 @@
+{
+  "mode": "before",
+  "workload": "tracked-churn",
+  "elapsedMs": 20047.348833999997,
+  "nodeCpuPercent": 13.224027884943224,
+  "writes": 7600,
+  "events": 7789,
+  "notifications": 125,
+  "queries": 125,
+  "failures": 0,
+  "engineGitCommands": 617,
+  "filterGitCommands": 0
+}

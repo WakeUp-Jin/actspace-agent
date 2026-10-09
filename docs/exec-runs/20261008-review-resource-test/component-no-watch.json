@@ -1,0 +1,66 @@
+[
+  {
+    "mode": "no-watch",
+    "before": {
+      "rss": 56295424,
+      "heapTotal": 10584064,
+      "heapUsed": 5517368,
+      "external": 1957575,
+      "arrayBuffers": 16619
+    },
+    "after": {
+      "rss": 51707904,
+      "heapTotal": 10846208,
+      "heapUsed": 6765952,
+      "external": 2168336,
+      "arrayBuffers": 228059
+    },
+    "released": {
+      "rss": 55115776,
+      "heapTotal": 7962624,
+      "heapUsed": 5743760,
+      "external": 2168336,
+      "arrayBuffers": 24827
+    },
+    "peakRssMiB": 53.734375,
+    "eventLoopP99Ms": 21.807103,
+    "phases": [
+      {
+        "name": "idle",
+        "elapsedMs": 5026.045458,
+        "cpuPercent": 0.5793023609377789,
+        "events": 0,
+        "notifications": 0,
+        "gitCommands": 0,
+        "queries": 0,
+        "failures": 0,
+        "writes": 0,
+        "rssMiB": 46.359375
+      },
+      {
+        "name": "ignored-build-churn",
+        "elapsedMs": 20000.097416,
+        "cpuPercent": 11.393389505078398,
+        "events": 0,
+        "notifications": 0,
+        "gitCommands": 0,
+        "queries": 0,
+        "failures": 0,
+        "writes": 7600,
+        "rssMiB": 50.359375
+      },
+      {
+        "name": "recovery",
+        "elapsedMs": 5033.022374999997,
+        "cpuPercent": 0.5651872350358867,
+        "events": 0,
+        "notifications": 0,
+        "gitCommands": 0,
+        "queries": 0,
+        "failures": 0,
+        "writes": 0,
+        "rssMiB": 49.09375
+      }
+    ]
+  }
+]

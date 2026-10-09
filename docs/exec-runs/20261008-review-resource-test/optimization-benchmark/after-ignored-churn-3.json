@@ -1,0 +1,13 @@
+{
+  "mode": "after",
+  "workload": "ignored-churn",
+  "elapsedMs": 20033.578458,
+  "nodeCpuPercent": 13.636135979037281,
+  "writes": 7560,
+  "events": 7727,
+  "notifications": 0,
+  "queries": 0,
+  "failures": 0,
+  "engineGitCommands": 0,
+  "filterGitCommands": 40
+}

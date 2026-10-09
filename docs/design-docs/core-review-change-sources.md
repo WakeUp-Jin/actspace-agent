@@ -12,6 +12,8 @@
 
 - 共享契约：`packages/shared/src/review.ts`。
 - 查询、缓存与失效：`apps/desktop/src/main/review-coordinator.ts`。
+- 外部变更监听与 Git 忽略过滤：`apps/desktop/src/main/review-workspace-watcher.ts`、`apps/desktop/src/main/review-ignore-filter.ts`。
+- Composer 顶部 Review 摘要：`apps/desktop/src/renderer/components/review/use-review-summary.ts`。
 - Git 查询与 mutation：`apps/desktop/src/main/review-git-engine.ts`。
 - Last Turn：`review-git-engine.ts` 保留 `loadLastTurn` / `loadLastTurnFileDiff` 注入端口，但当前 `desktop-shell-ipc.ts` 未注入，查询返回 unavailable；不能把六种 scope 的目标契约当作六种均已接通。
 - PR capability：`apps/desktop/src/main/review-pr-service.ts`。
@@ -160,6 +162,14 @@ type ReviewSnapshot = {
 ### Refresh
 
 增加 generation、清空 snapshot/file-diff cache，并重新执行当前 selection。Refresh 不 fetch remote。
+
+### 外部变更自动刷新
+
+- 进入过 Review 的已授权工作区安装递归文件监听，包含 linked worktree 的外置 Git 目录和共同 refs；`.lock` 等 Git 中间文件不算变化。
+- Coordinator 用 500ms 固定窗口合并事件：窗口由第一个事件开启、不顺延，持续变化时每个工作区最多约每秒两次通知，停止后最后一批变化一定会通知。Refresh 和 mutation 不经过这个窗口，仍即时增加 generation。
+- 窗口内只有工作区文件变化时，先用一次 `git check-ignore -z --stdin` 核对；全部被 Git 忽略（构建产物、依赖目录等）就不增加 generation。已跟踪文件即使匹配忽略规则也不会被判为忽略。
+- 以下情况一律刷新、不做过滤：Git 元数据、任意 `.gitignore`、事件没有文件名、单个窗口超过 2,000 条路径、`check-ignore` 失败或超时（如非仓库、子模块）。宁可多刷新一次，也不漏掉真实变更。
+- Renderer 只处理与自身 snapshot `workspaceId` 一致的通知；工作树可能使用 session-root 身份，不能由路径推算。Composer 摘要在首个快照返回前只为在途请求记一次补查，同一目标最多一个请求在途，结果不变时不更新界面。
 
 ### Enable word wrap
 
