@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
 import type { SettingsV4NamespacePatch, SettingsV4Snapshot, UsageActivityAggregate, UsageActivityKind, UsageActivitySnapshot, UsageCostSummary, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
@@ -13,6 +14,8 @@ type Props = {
   snapshot: UsageStatisticsSnapshot | null;
   activitySnapshot?: UsageActivitySnapshot | null;
   isLoading?: boolean;
+  progress?: import("@actspace/shared").UsageQueryProgress | null;
+  onCancel?: () => void;
   error?: string | null;
   onRefresh?: (range: Range, page?: number, status?: Status, search?: string, kind?: UsageActivityKind) => void;
   onRequestPageChange?: (page: number, range: Range, status?: Status, search?: string, kind?: UsageActivityKind) => void;
@@ -34,7 +37,7 @@ const number = (value: number | null | undefined) => value == null ? "—" : val
 const summaryCostFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const money = (summary?: UsageCostSummary) => !summary || summary.knownCostRequestCount === 0 ? "费用未知" : Number.isFinite(summary.costUsd) ? summaryCostFormatter.format(summary.costUsd) : "—";
 
-export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, onRefresh, onRequestPageChange, settingsV4, onUpdateNamespace }: Props) {
+export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, progress, onCancel, onRefresh, onRequestPageChange, settingsV4, onUpdateNamespace }: Props) {
   const saved = settingsV4?.settings.activity.usage;
   const [range, setRange] = useState<Range>(saved?.range === "24h" ? "day" : saved?.range === "7d" ? "week" : saved?.range === "all" ? "total" : "month");
   const [tab, setTab] = useState<Tab>(saved?.activeTab === "pricing" ? "requests" : saved?.activeTab ?? "requests");
@@ -68,6 +71,9 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
         <div className="inline-flex rounded-act-md border border-line/60 bg-surface-subtle p-0.5" role="tablist" aria-label="统计时间范围">{ranges.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={range === value} className={`h-6 rounded-act-sm px-3 text-act-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30 ${range === value ? "bg-surface font-medium text-text-main shadow-act-xs" : "text-text-muted hover:text-text-main"}`} onClick={() => setRange(value)}>{label}</button>)}</div>
         <Tooltip><TooltipTrigger asChild><button type="button" className={button} aria-label="刷新使用统计" disabled={isLoading} onClick={() => onRefresh?.(range, page?.page ?? 1, queryStatus, search, kind)}><RefreshCw size={15} className={isLoading ? "animate-spin motion-reduce:animate-none" : ""} /></button></TooltipTrigger><TooltipContent>刷新使用统计</TooltipContent></Tooltip>
       </div>
+      {isLoading && progress ? <div className="flex items-center justify-between gap-3 text-act-xs text-text-muted" role="status"><span>{({ queued: "等待查询", checking: "检查使用记录", syncing: "正在同步使用记录", rebuilding: "正在重建统计索引", querying: "正在查询", fallback: "正在从会话记录读取", cancelled: "正在取消" } as const)[progress.phase]} · {progress.completedSessions}/{progress.totalSessions} 个会话 · 已读取 {number(progress.eventsRead)} 条记录</span><Button size="sm" variant="ghost" onClick={onCancel} disabled={progress.phase === "cancelled"}>取消查询</Button></div> : null}
+      {data?.readModel?.failedSources ? <p role="status" className="text-act-sm text-warning">有 {number(data.readModel.failedSources)} 个会话暂时无法读取，当前统计不包含这些会话。可刷新重试。</p> : null}
+      {data?.readModel?.status === "fallback" ? <p role="status" className="text-act-sm text-warning">统计索引暂不可用，当前结果从会话记录读取。可刷新重试。</p> : null}
       {error ? <div role="alert" className="flex items-center justify-between rounded-act-md bg-danger-soft px-3 py-2 text-act-xs text-on-danger"><span>{error}</span><button className={button} onClick={() => onRefresh?.(range, 1, queryStatus, search, kind)}>重试</button></div> : null}
       {isLoading && !data ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-act-sm text-text-faint">正在读取使用记录…</div> : <section aria-label="使用概览" className="-mt-5 grid grid-cols-4 gap-2.5 max-[800px]:grid-cols-2 max-[400px]:grid-cols-1">
         <Metric label="请求数" value={number(summary?.requestCount)} detail="模型调用" />

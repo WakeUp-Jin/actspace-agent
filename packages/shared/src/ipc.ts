@@ -436,6 +436,8 @@ export type SessionListItem = {
   /** Runtime session admission facts used by optional session capabilities. */
   accessState?: "read-write" | "degraded" | "browse-only" | "corrupt";
   isChildSession?: boolean;
+  /** Query-only hint. False avoids recovering inactive background history for badges. */
+  hasPendingTasks?: boolean;
   id: string;
   title: string;
   updatedAt: string;
@@ -455,8 +457,8 @@ export type SessionListItem = {
   archived?: boolean;
 };
 
-export type SessionListPageInput = { hostId?: string; workspaceRoot?: string; pinned?: boolean; after?: string };
-export type SessionListPage = { items: SessionListItem[]; groups: { hostId?: string; workspaceRoot: string; pinned: boolean; hasMore: boolean }[]; indexing: boolean; failed: number };
+export type SessionListPageInput = { hostId?: string; workspaceRoot?: string; pinned?: boolean; after?: string; search?: string; limit?: number };
+export type SessionListPage = { nextCursor?: string; items: SessionListItem[]; groups: { hostId?: string; workspaceRoot: string; pinned: boolean; hasMore: boolean }[]; indexing: boolean; failed: number; readModel?: UsageReadModelInfo };
 
 export type SessionListInput = {
   /** 缺省为 false：普通会话列表只返回未归档会话。 */
@@ -940,7 +942,11 @@ export type UsageStatisticsRange = "day" | "week" | "month" | "total";
 export type UsageStatisticsScope = "session" | "global";
 
 export type UsageStatisticsGetInput = {
+  requestId?: string;
   search?: string;
+  /** Exact activity filters, combined with kind/status/search. */
+  model?: string;
+  providerId?: string;
   kind?: UsageActivityKind;
   /** 仅当 scope==="session" 时必填；scope==="global" 时忽略。 */
   sessionId?: string;
@@ -1038,6 +1044,10 @@ export type UsageStatisticsRequestRow = {
 
 export type UsageStatisticsRequestRowsPageInput = {
   page?: number;
+  /** Optional bounded page size for large ledgers; renderer values are clamped by Main. */
+  limit?: number;
+  /** Opaque cursor returned by the previous page. */
+  cursor?: string;
 };
 
 export type UsageStatisticsRequestRowsPage = {
@@ -1045,9 +1055,26 @@ export type UsageStatisticsRequestRowsPage = {
   pageSize: number;
   totalRows: number;
   totalPages: number;
+  nextCursor?: string | null;
+};
+
+export type UsageQueryProgress = {
+  requestId: string;
+  phase: "queued" | "checking" | "syncing" | "rebuilding" | "querying" | "fallback" | "cancelled";
+  completedSessions: number;
+  totalSessions: number;
+  eventsRead: number;
+};
+
+export type UsageReadModelInfo = {
+  readonly source: "sqlite" | "session";
+  readonly status: "ready" | "fallback";
+  readonly failedSources?: number;
+  readonly reason?: string;
 };
 
 export type UsageStatisticsSnapshot = {
+  readModel?: UsageReadModelInfo;
   /** "session"=单会话；"global"=跨所有 session 的全部历史。 */
   scope: UsageStatisticsScope;
   /** 仅 scope==="session" 时为对应 session id；global 时为 null。 */
@@ -1151,6 +1178,7 @@ export type UsageActivityRowsPage = {
   pageSize: number;
   totalRows: number;
   totalPages: number;
+  nextCursor?: string | null;
 };
 
 export type UsageCostSummary = {
@@ -1171,6 +1199,7 @@ export type UsageActivityAggregate = {
   costSummary: UsageCostSummary;
 };
 export type UsageActivitySnapshot = {
+  readModel?: UsageReadModelInfo;
   /** Counts for the selected time window before text/status filtering. */
   tabCounts?: { requests: number; providers: number; models: number; tools: number };
   costSummary?: UsageCostSummary;
@@ -1183,7 +1212,9 @@ export type UsageActivitySnapshot = {
   range: UsageStatisticsRange;
   generatedAt: string;
   sourceCount: number;
+  /** Bounded diagnostic sample, not a recovery or freshness authority. */
   sourceWatermarks: UsageActivitySourceWatermark[];
+  sourceWatermarksTruncated?: boolean;
   summary: UsageActivitySummary;
   /** Current page, sorted newest activity first. */
   rows: UsageActivityRow[];

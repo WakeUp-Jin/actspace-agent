@@ -18,9 +18,18 @@ export async function repairSubagentPublications(options: {
   readonly store: SessionStore;
   readonly parent: SessionHandle;
 }): Promise<{ readonly repairedLinks: number; readonly repairedToolResults: number }> {
+  // Recovery can only accept a child with a persisted request in this parent.
+  // Ordinary Sessions must not inspect every historical transcript on open.
+  if (!options.parent.journal.events.some(event => event.type === "delegation/requested")) return Object.freeze({ repairedLinks: 0, repairedToolResults: 0 });
   const terminals: Array<{ readonly inspection: SessionInspection; readonly event: SessionEventEnvelopeV1; readonly data: ChildTerminalData }> = [];
   for (const sessionId of await options.store.listSessionIds()) {
     if (sessionId === options.parent.header.sessionId) continue;
+    // Optional provider descriptors are only a prefilter. Matching children
+    // still undergo the original complete inspection before any recovery write.
+    if (options.store.storage.querySource) {
+      const source = await options.store.storage.querySource(sessionId).catch(() => null);
+      if (source && (source.header.lineage?.origin !== "delegation" || source.header.lineage.parentSessionId !== options.parent.header.sessionId)) continue;
+    }
     const inspection = await options.store.inspect(sessionId).catch(() => null);
     if (inspection?.header?.lineage?.origin !== "delegation" || inspection.header.lineage.parentSessionId !== options.parent.header.sessionId) continue;
     if (inspection.validation === null || inspection.integrity !== "complete" || (inspection.accessState !== "read-write" && inspection.accessState !== "degraded")) continue;

@@ -793,3 +793,8 @@ Usage UI
 「通用 → 语音播放」管理 MiniMax 中国站语音配置：固定 MiniMax 服务、8 个语音模型版本下拉选择、音色、语速、API Key 保存/清除、试听和停止。普通配置写入 `media.speech`，Key 进入 main-only secret store，不在配置读回中回显。保存失败保留输入；试听使用已保存配置。
 
 学习模式开关与会话选择位于「扩展 → 能力 → 英语辅助学习」，不放在全局语音配置中。首次选择最新可用主会话，后续优先最近选择；enabled 不持久保存。没有 Key 时仍可启用选定会话的中英对照，停止播放只取消音频。卡片的「语音配置」导航在设置内容加载后滚动到对应分组。详见[插件设计](../agent-plugin-runtime/agent-english-learning.md)。
+
+
+## 使用统计查询读模型（实施中）
+
+使用统计沿用 typed Usage IPC，内部接入 SQLite Worker 和按需 Session 增量读取。数据来自受控 Session fallback 时，页面独立显示提示；索引/重建失败且超出 fallback 预算时显示读取错误，不能显示成空结果。进度、取消和大数据流畅度尚待完整验收，见[SQLite 设计与状态](../筛选存储改版V2-增加SQLite/README.md)。

@@ -6,6 +6,7 @@ import type { SessionStorage, SessionStorageHandle, SessionStorageSnapshot } fro
 import { inspectJsonlSession } from "./jsonl-reader.js";
 import { JsonlSessionWriter, encodeRows, type JsonlWriterHooks } from "./jsonl-writer.js";
 import { sessionFileLayout } from "./layout.js";
+import { JsonlQueryReader } from "./query-reader.js";
 import { SessionWriterLease, type AcquireWriterLeaseOptions } from "./writer-lease.js";
 
 export interface JsonlStorageOptions {
@@ -21,6 +22,19 @@ export class JsonlSessionStorage implements SessionStorage {
   readonly identity = Symbol("jsonl-session-storage");
   readonly #handles = new Set<SessionStorageHandle>();
   #closed = false;
+  #queryReader?: JsonlQueryReader;
+  querySources(sessionIds: readonly string[]) {
+    this.#assertOpen();
+    return (this.#queryReader ??= new JsonlQueryReader()).sources(sessionIds.map(sessionId => ({ sessionId, path: this.journalPath(sessionId) })));
+  }
+  querySource(sessionId: string) {
+    this.#assertOpen();
+    return (this.#queryReader ??= new JsonlQueryReader()).source(this.journalPath(sessionId), sessionId);
+  }
+  readEventBatch(sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) {
+    this.#assertOpen();
+    return (this.#queryReader ??= new JsonlQueryReader()).read(this.journalPath(sessionId), sessionId, input);
+  }
   readonly #opening = new Set<Promise<SessionStorageHandle>>();
   constructor(readonly options: JsonlStorageOptions) {}
   journalPath(sessionId: string): string { return sessionFileLayout(this.options.dataRoot, sessionId).journalPath; }
@@ -88,6 +102,7 @@ export class JsonlSessionStorage implements SessionStorage {
 
   async close(): Promise<void> {
     this.#closed = true;
+    await this.#queryReader?.close();
     await Promise.allSettled([...this.#opening]);
     const results = await Promise.allSettled([...this.#handles].map(handle => handle.close()));
     const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");

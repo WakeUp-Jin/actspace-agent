@@ -17,6 +17,11 @@ function remote(): SessionGatewayRemote & { [K in keyof SessionGatewayRemote]: R
 }
 
 describe("createSessionGateway", () => {
+  it("keeps local history search scoped to the local SQLite index", async () => {
+    const adapter = remote(), next = vi.fn(async () => "local-search");
+    await expect(createSessionGateway(adapter)({ channel: C.listSessionPage, input: { search: "needle" }, event }, next)).resolves.toBe("local-search");
+    expect(adapter.mergeList).not.toHaveBeenCalled();
+  });
   it("creates a Session on the Host when the input names one", async () => {
     const adapter = remote(), next = vi.fn(async () => "local");
     const input = { hostId: "server", workspaceId: "w1" };

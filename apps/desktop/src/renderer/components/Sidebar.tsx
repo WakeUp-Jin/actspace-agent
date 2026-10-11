@@ -1,3 +1,4 @@
+import { SessionSearch } from "./sidebar/SessionSearch";
 import { PerformancePanel } from "./PerformancePanel";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { useCallback, useMemo, useState } from "react";
@@ -7,7 +8,7 @@ import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { IconButton } from "./ui/IconButton";
 import { useSessionActions, type NewSessionInput } from "../session/session-actions-context";
 import { useHostDirectory, type HostDirectorySnapshot } from "../target/host-directory";
-import { groupSessionsByWorkspace, sessionsByGroupKey } from "./sidebar/session-grouping";
+import { DEFAULT_WORKSPACE_KEY, workspaceLabelFromRoot, groupSessionsByWorkspace, sessionsByGroupKey } from "./sidebar/session-grouping";
 import { SessionList } from "./sidebar/SessionList";
 import { WorkspaceSection } from "./sidebar/WorkspaceSection";
 import { NAV_SECTION_ACTIONS_CLASS, NAV_SECTION_CLASS, NAV_SECTION_LABEL_BASE_CLASS, NAV_SECTION_TITLE_CLASS } from "./sidebar/styles";
@@ -120,8 +121,15 @@ export function Sidebar({
   const browse = useSessionBrowse();
   const hostNameOf = useCallback((hostId: string) => hosts.find((host) => host.hostId === hostId)?.name, [hosts]);
   const workspaceGroups = useMemo(
-    () => groupSessionsByWorkspace(unpinnedSessions, workspaces, hostNameOf),
-    [unpinnedSessions, workspaces, hostNameOf],
+    () => {
+      const groups = groupSessionsByWorkspace(unpinnedSessions, workspaces, hostNameOf);
+      for (const descriptor of browse?.groups ?? []) {
+        if (descriptor.pinned || groups.some(group => group.hostId === descriptor.hostId && (group.workspaceRoot ?? '') === descriptor.workspaceRoot)) continue;
+        groups.push({ key: descriptor.hostId ? JSON.stringify([descriptor.hostId, descriptor.workspaceRoot]) : descriptor.workspaceRoot || DEFAULT_WORKSPACE_KEY, hostId: descriptor.hostId, workspaceRoot: descriptor.workspaceRoot || undefined, label: descriptor.hostId ? `${hostNameOf(descriptor.hostId) ?? descriptor.hostId} · ${workspaceLabelFromRoot(descriptor.workspaceRoot)}` : workspaceLabelFromRoot(descriptor.workspaceRoot), sessions: [] });
+      }
+      return groups;
+    },
+    [unpinnedSessions, workspaces, hostNameOf, browse?.groups],
   );
   // 「归档全部」会连置顶的会话一起归档，所以判断是否可用时看全部会话。
   const workspaceGroupSessions = useMemo(() => sessionsByGroupKey(sessions, workspaces), [sessions, workspaces]);
@@ -181,11 +189,12 @@ export function Sidebar({
         ) : null}
       </div>
 
+      <SessionSearch onSelect={handleSelectChatSession} />
       <nav className={SESSION_NAV_CLASS} aria-label="会话">
         {browse?.listLoading && <p role="status" className="px-2 text-act-xs leading-4 text-text-muted">正在加载会话…</p>}
         {browse?.listError && <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">{browse.listError} <button type="button" onClick={browse.retryList}>重试</button></p>}
         {newSpace ? <SpaceSidebarSection inSpace={view === "space"} onEnter={enterSpace} onNewSpace={newSpace} /> : null}
-        {pinnedSessions.length > 0 ? (
+        {(pinnedSessions.length > 0 || browse?.groups.some(group => group.pinned && group.hasMore)) ? (
           <section className={`nav-section ${NAV_SECTION_CLASS}`}>
             <NavSectionHeader
               label="已置顶"

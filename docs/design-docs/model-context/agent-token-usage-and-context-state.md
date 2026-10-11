@@ -151,7 +151,7 @@ sessions-v2/<sessionId>/journal.jsonl
 ```
 
 - `activity.usage` 由 Main Settings Authority 通过 typed IPC 读写，跨窗口和重启恢复；它不能被解释为计费数据，也不能改变历史聚合结果。
-- Usage 明细继续由 Journal Projection 提供，当前通过 typed `usage-activity:get` IPC 返回事件级快照。当前不引入独立 SQLite 事实库；如果未来增加 `runtime-v2/usage-read-model.sqlite`，它只能是可删除、可重建的查询缓存。
+- Usage 明细继续由 Journal Projection 提供，当前通过 typed `usage-activity:get` IPC 返回事件级快照。正在实施的 `runtime-v2/usage-read-model.sqlite` 是可删除、可重建的查询读模型。Main 通过 Provider 有界读取，SQLite Worker 按需同步并查询；Agent Loop 和轨迹详情仍读取 Session，实施及验收状态见[SQLite 专题](../筛选存储改版V2-增加SQLite/README.md)。
 - 清理或重建 Usage 派生数据不得删除 Session Journal、会话历史、设置或凭据。
 - 页面筛选状态可以改变查询参数，但不能回写 Journal 中的 usage，也不能用 Context estimate 修正 provider usage。
 

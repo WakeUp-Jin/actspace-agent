@@ -37,7 +37,7 @@ Desktop 以这个 canonical root 作为 Electron `userData`，并解析以下根
 
 ## 存储接口与当前 JSONL 实现
 
-Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；创建、读写、列表、恢复、fork 和投影缓存经同一后端。JSONL 的目录、writer lease、fsync 和物理修复归 `@actspace/session-jsonl`。独立内存实现验证契约可替换；SQLite/MySQL 尚未实现，不能由接口存在推导为已支持。详见[存储规范](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
+Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；创建、读写、列表、恢复、fork 和投影缓存经同一后端。JSONL 的目录、writer lease、fsync 和物理修复归 `@actspace/session-jsonl`。独立内存实现验证契约可替换；SQLite/MySQL 作为 Session 事实存储后端尚未实现。正在接入的 `runtime-v2/usage-read-model.sqlite` 仅为 Usage/历史查询派生索引，通过 Provider 的有界事件读取同步，不能据此推导为已支持 SQLite Session 后端；状态见[SQLite 专题](筛选存储改版V2-增加SQLite/README.md)。详见[存储规范](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
 
 下列是默认 JSONL 后端的物理布局，不是所有后端必须使用的公共格式：
 

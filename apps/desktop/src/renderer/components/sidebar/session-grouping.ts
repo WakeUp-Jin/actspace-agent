@@ -35,14 +35,14 @@ export function sessionWorkspaceRoot(session: SessionListItem, workspaces: Works
 function matchSessionWorkspace(session: SessionListItem, workspaces: WorkspaceEntry[]): WorkspaceEntry | undefined {
   if (session.hostId) return undefined;
   return workspaces.find((workspace) => workspace.id === session.workspaceId) ??
-    workspaces.find((workspace) => session.workspaceRoot && workspace.path === session.workspaceRoot) ??
-    (session.workspaceRoot ? undefined : workspaces.find((workspace) => workspace.kind === "default"));
+    workspaces.find((workspace) => (session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot) && workspace.path === (session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot)) ??
+    ((session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot) ? undefined : workspaces.find((workspace) => workspace.kind === "default"));
 }
 
 /** 侧栏分组的 key：远端按 Host + 路径；本机按匹配到的工作区 id，其次会话自带的 id，最后按路径。 */
 function sessionGroupKey(session: SessionListItem, matchedWorkspace: WorkspaceEntry | undefined): string {
-  if (session.hostId) return JSON.stringify([session.hostId, session.workspaceRoot]);
-  return matchedWorkspace?.id ?? session.workspaceId ?? workspaceKey(session.workspaceRoot);
+  if (session.hostId) return JSON.stringify([session.hostId, (session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot)]);
+  return matchedWorkspace?.id ?? session.workspaceId ?? workspaceKey((session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot));
 }
 
 /** 远端分组标签里的 Host 名：优先 HostDirectory 里的当前名称，其次会话记录的名称，最后用 hostId。 */
@@ -50,7 +50,7 @@ export type HostNameLookup = (hostId: string) => string | undefined;
 
 function remoteGroupLabel(hostId: string, session: SessionListItem, hostNameOf?: HostNameLookup): string {
   const hostName = hostNameOf?.(hostId) ?? session.hostName ?? hostId;
-  return `${hostName} · ${workspaceLabelFromRoot(session.workspaceRoot)}`;
+  return `${hostName} · ${workspaceLabelFromRoot((session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot))}`;
 }
 
 export function groupSessionsByWorkspace(
@@ -76,9 +76,9 @@ export function groupSessionsByWorkspace(
       groups.set(key, {
         key,
         hostId: session.hostId,
-        label: session.hostId ? remoteGroupLabel(session.hostId, session, hostNameOf) : matchedWorkspace?.label ?? workspaceLabelFromRoot(session.workspaceRoot),
+        label: session.hostId ? remoteGroupLabel(session.hostId, session, hostNameOf) : matchedWorkspace?.label ?? workspaceLabelFromRoot((session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot)),
         workspaceId: matchedWorkspace?.id ?? session.workspaceId,
-        workspaceRoot: matchedWorkspace?.path ?? session.workspaceRoot,
+        workspaceRoot: matchedWorkspace?.path ?? (session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot),
         sessions: [],
       });
     }

@@ -31,7 +31,36 @@ const artifactRef = shape({ hostId: "string", sessionId: "string", artifactId: "
 /** 握手和配对只能由 main 自己发起，renderer 不能通过 `hosts.call` 调用。 */
 const MAIN_ONLY_HOST_METHODS: readonly string[] = ["host.hello", "auth.pair", "auth.resume"];
 
+const usageRequestId: IpcGuard = input => !isRecord(input) || typeof input.requestId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(input.requestId) ? "Invalid Usage request id" : null;
+const usageInput: IpcGuard = input => {
+  if (!isRecord(input)) return "Invalid Usage query";
+  if (input.requestId !== undefined && usageRequestId(input)) return "Invalid Usage request id";
+  for (const [field, values] of Object.entries({ range: ["day","week","month","total"], scope: ["global","session"], kind: ["llm_request","tool_invocation"], status: ["all","success","error","aborted","running","unknown"] })) if (input[field] !== undefined && (typeof input[field] !== "string" || !values.includes(input[field] as string))) return `Invalid Usage ${field}`;
+  if (input.sessionId !== undefined && (typeof input.sessionId !== "string" || input.sessionId.length > 128)) return "Invalid Usage Session";
+  if (input.search !== undefined && (typeof input.search !== "string" || input.search.length > 300)) return "Usage search exceeds 300 characters";
+  for (const field of ["model", "providerId"]) if (input[field] !== undefined && (typeof input[field] !== "string" || (input[field] as string).length > 300)) return `Invalid Usage ${field}`;
+  if (input.requestRowsPage !== undefined) {
+    if (!isRecord(input.requestRowsPage)) return "Invalid Usage page";
+    const page = input.requestRowsPage;
+    for (const field of ["limit","page"]) if (page[field] !== undefined && (typeof page[field] !== "number" || !Number.isSafeInteger(page[field]) || Number(page[field]) < 1)) return "Invalid Usage page number";
+    if (page.cursor !== undefined && (typeof page.cursor !== "string" || page.cursor.length > 2048)) return "Invalid Usage cursor";
+  }
+  return null;
+};
+
 const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> = [
+  [contract.sessions.listPage, input => {
+    if (input === undefined) return null;
+    if (check(input, { hostId: "string?", workspaceRoot: "string?", pinned: "boolean?", after: "string?", search: "string?" }, "Invalid Session query")) return "Invalid Session query";
+    const value = input as Record<string, unknown>;
+    if (typeof value.search === "string" && value.search.length > 300) return "Session search exceeds 300 characters";
+    if (value.limit !== undefined && (!Number.isSafeInteger(value.limit) || Number(value.limit) < 1 || Number(value.limit) > 500)) return "Invalid Session limit";
+    return null;
+  }],
+  [contract.usage.getActivity, usageInput],
+  [contract.usage.getStatistics, usageInput],
+  [contract.usage.getStatus, usageRequestId],
+  [contract.usage.cancel, usageRequestId],
   // 工作区文件读取
   [contract.workspaces.readFile, shape({ workspaceRoot: "string?", relativePath: "string" }, "Invalid workspace file")],
   [contract.workspaces.statFile, shape({ workspaceRoot: "string?", relativePath: "string" }, "Invalid workspace file")],

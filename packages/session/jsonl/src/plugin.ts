@@ -17,6 +17,9 @@ export class JsonlSessionStorageService extends Service {
   get identity() { return this.storage.identity; }
   journalPath(sessionId: string) { return this.storage.journalPath(sessionId); }
   inspect(...args: Parameters<JsonlSessionStorage["inspect"]>) { return this.storage.inspect(...args); }
+  querySource(...args: Parameters<JsonlSessionStorage["querySource"]>) { return this.storage.querySource(...args); }
+  querySources(...args: Parameters<JsonlSessionStorage["querySources"]>) { return this.storage.querySources(...args); }
+  readEventBatch(...args: Parameters<JsonlSessionStorage["readEventBatch"]>) { return this.storage.readEventBatch(...args); }
   listSessionIds() { return this.storage.listSessionIds(); }
   create(...args: Parameters<JsonlSessionStorage["create"]>) { return this.storage.create(...args); }
   open(...args: Parameters<JsonlSessionStorage["open"]>) { return this.storage.open(...args); }

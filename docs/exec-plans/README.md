@@ -23,10 +23,13 @@
 | [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；DropdownMenu（及 Popover、Dialog、Select、ContextMenu）由 Desktop 前端重构 16 接手；剩 Switch、Textarea、Tabs 及对应迁移。 |
+| [使用统计 SQLite / Worker 统一验收与缺陷修复](active/20261011-usage-sqlite-acceptance.md) | 待执行：用户暂停验收与修复，等其他任务完成后统一处理；包含 U-01–U-10、S/M/L/XL、内存/事件循环和真实界面逐点验收。下一步由用户恢复验收，再冻结最终集成版本。 |
 
 六个早期后端计划已移出执行导航，短页仅保留历史链接。独有目标与未完成项见[结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)，当前验证见本轮清理摘要。
 
 ## 最近完成
+
+- [使用统计 SQLite 读模型与 Worker 实现](completed/20261011-usage-sqlite-read-model.md)：代码收口，保留未修缺陷和未通过性能门禁；统一验收由上方独立 active 计划接管，不能据此视为验收通过。
 
 - [Desktop 验收问题 B03 / B08 / B12 修复](completed/20261007-desktop-acceptance-b03-b08-b12.md)：Review自动更新、搜索凭据即时生效、工作树首发与持久绑定已修复；真实Electron连续更新、同会话断开搜索和工作树冷重启复验通过。
 

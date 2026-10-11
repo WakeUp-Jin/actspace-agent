@@ -1,3 +1,4 @@
+import { readSessionWorkspaceFacts } from "./session-workspace-facts";
 import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-learning";
 import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearningTargetInput, type EnglishLearningState } from "@actspace/shared";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
@@ -141,12 +142,14 @@ export class DesktopRuntimeV2Registry {
   }
 
   browseSessions() { return this.requireApp().browseSessions(); }
+  sessionQuerySources(): ReturnType<DesktopAppServiceContract["sessionQuerySources"]> { return this.requireApp().sessionQuerySources(); }
   globalSessionSummaries() { return this.requireApp().globalSessionSummaries(); }
   readSessionProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.requireApp().readSessionProjection(input); }
   readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.requireApp().readSessionObservation(input); }
   browseToolDetail(sessionId: string, callId: string) { return this.requireApp().browseToolDetail(sessionId, callId); }
   listSessions() { return this.requireApp().listSessions(); }
   inspectSession(sessionId: string) { return this.requireApp().inspectSession(sessionId); }
+  readSessionEventBatch(sessionId: string, input: Parameters<DesktopAppServiceContract["readSessionEventBatch"]>[1]): ReturnType<DesktopAppServiceContract["readSessionEventBatch"]> { return this.requireApp().readSessionEventBatch(sessionId, input); }
   inspectSessionEvents(sessionId: string) { return this.requireApp().inspectSessionEvents(sessionId); }
   completeText(input: Parameters<DesktopAppServiceContract["completeText"]>[0]) { return this.requireApp().completeText(input); }
   async exportSession(sessionId: string) { return Object.freeze({ sessionId, jsonl: await this.requireApp().exportSession(sessionId) }); }
@@ -552,14 +555,7 @@ export class DesktopRuntimeV2Registry {
       // Restore admission from persisted session facts before the desktop starts serving them.
       await readWorkspaceRegistry({
         ...this.workspaceRegistryOptions(),
-        sessions: (await this.requireApp().listSessions()).map((session) => ({
-          id: session.sessionId,
-          title: session.metadata.title ?? "New chat",
-          updatedAt: session.updatedAt,
-          agentRunCount: session.completedTurnCount ?? 0,
-          workspaceRoot: session.workspaceRoot ?? undefined,
-          ...(session.worktree ? { worktree: session.worktree } : {}),
-        })),
+        sessions: await readSessionWorkspaceFacts(this.requireApp(), sessionId => this.options.log?.("Skipped unreadable Session workspace facts", { sessionId })),
       });
       this.#stopSessionRevisions = this.requireApp().subscribeSessionProjection(update => {
         this.#emit({ kind: "journal-update", sessionId: update.sessionId, throughJournalSeq: update.throughJournalSeq, update, ...(update.event.type === "session/title-set" ? { message: "session-title-updated" } : {}) });

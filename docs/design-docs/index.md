@@ -21,6 +21,7 @@
 
 - [外观强调色](frontend/front-accent-palette.md)：已实施，Electron 验收待做；5 个调色板只驱动发送按钮、开关、焦点、链接与文字选中，默认零变化。
 - [使用统计页面更新](frontend/front-usage-statistics-refresh.md)与[本地模型目录及使用费用](model-context/agent-model-catalog-and-usage-cost.md)：已实施，实机门禁见执行摘要；统一设置视觉，修正费用来源，定义随包目录、缓存和按需刷新。
+- [存储改版 V2：增加 SQLite 查询读模型](筛选存储改版V2-增加SQLite/README.md)：Session JSONL 继续作为唯一事实源，SQLite 负责使用统计、历史搜索和过去会话查询；Worker 边界见[单独说明](筛选存储改版V2-增加SQLite/worker.md)。
 - [英语辅助学习插件设计](agent-plugin-runtime/agent-english-learning.md)：提示词与朗读功能保留；当前 live Agent 绑定存在接线限制，详见正文。
 - [Agent 工具流式渲染修复设计](frontend/front-agent-tool-stream-rendering.md)：已实施的跨 Core、Tools、Desktop 事件链修复设计。
 

@@ -36,6 +36,8 @@ export type ApplicationSessionService = {
   inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]>;
   list(): Promise<readonly RuntimeV2SessionListItem[]>;
   browseSessions(): Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
+  querySources?(): Promise<import("@actspace/session-storage").SessionQueryCatalog | null>;
+  readEventBatch?(sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput): Promise<import("@actspace/session-storage").SessionEventBatch>;
   globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]>;
   browseToolDetail(sessionId: string, callId: string): Promise<DesktopBrowsePage>;
   export(sessionId: string): Promise<string>;
@@ -66,9 +68,11 @@ export type AgentApplicationContract = {
   readonly subscribeSessionProjection: ApplicationSessionService["subscribeProjection"];
   readonly listSessions: () => Promise<readonly RuntimeV2SessionListItem[]>;
   readonly browseSessions: () => Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
+  readonly sessionQuerySources: () => Promise<import("@actspace/session-storage").SessionQueryCatalog | null>;
   readonly globalSessionSummaries: () => Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]>;
   readonly browseToolDetail: (sessionId: string, callId: string) => Promise<DesktopBrowsePage>;
   readonly inspectSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
+  readonly readSessionEventBatch: (sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) => Promise<import("@actspace/session-storage").SessionEventBatch>;
   readonly inspectSessionEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]>;
   readonly exportSession: (sessionId: string) => Promise<string>;
   readonly createMainSession: (sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm, worktree?: import("@actspace/shared").SessionWorktreeContext) => Promise<RuntimeV2SessionSnapshot>;
@@ -144,9 +148,17 @@ export class AgentApplication implements AgentApplicationContract {
   readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.#sessions.readObservation(input); }
   subscribeSessionProjection(listener: (update: import("@actspace/shared/runtime-v2").RuntimeV2SessionUpdate) => void) { return this.#sessions.subscribeProjection(listener); }
   browseSessions() { return this.#sessions.browseSessions(); }
+  async sessionQuerySources() {
+    if (!this.#sessions.querySources) return null;
+    return this.#sessions.querySources();
+  }
   globalSessionSummaries() { return this.#sessions.globalSessionSummaries(); }
   browseToolDetail(sessionId: string, callId: string) { return this.#sessions.browseToolDetail(sessionId, callId); }
   inspectSession(sessionId: string) { return this.#sessions.inspect(sessionId); }
+  async readSessionEventBatch(sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) {
+    if (!this.#sessions.readEventBatch) throw new Error("Session provider does not support bounded query reads.");
+    return this.#sessions.readEventBatch(sessionId, input);
+  }
   inspectSessionEvents(sessionId: string) { return this.#sessions.inspectEvents(sessionId); }
   exportSession(sessionId: string) { return this.#sessions.export(sessionId); }
 

@@ -158,6 +158,26 @@ export function WorkbenchLayout({
   }, [isCompactLayout, setSpacePanelOpen]);
 
   const usageLoadSequence = useRef(0);
+  const usageRequest = useRef<string>();
+  const usageCursors = useRef(new Map<string, string>());
+  const [usageProgress, setUsageProgress] = useState<import("@actspace/shared").UsageQueryProgress | null>(null);
+  const cancelUsage = useCallback(() => {
+    const requestId = usageRequest.current;
+    if (!requestId) return;
+    usageRequest.current = undefined;
+    usageLoadSequence.current++;
+    setUsageLoading(false);
+    setUsageProgress(null);
+    setUsageError("查询已取消，可刷新重试。");
+    void usageApi.cancel({ requestId }).catch(error => setUsageError(error instanceof Error ? error.message : "取消查询失败。"));
+  }, []);
+  useEffect(() => {
+    if (view !== "settings" || settingsSection !== "usage") cancelUsage();
+    return () => {
+      const requestId = usageRequest.current;
+      if (requestId) void usageApi.cancel({ requestId }).catch(error => console.warn("Usage cancellation during page cleanup failed", error));
+    };
+  }, [view, settingsSection, cancelUsage]);
   const loadUsageStatistics = useCallback(async (
     range: UsageStatisticsSnapshot["range"] = "month",
     requestRowsPage = 1,
@@ -165,28 +185,46 @@ export function WorkbenchLayout({
     search = "",
     kind?: import("@actspace/shared").UsageActivityKind,
   ) => {
+    if (usageRequest.current) void usageApi.cancel({ requestId: usageRequest.current }).catch(error => console.warn("Superseded Usage cancellation failed", error));
+    const requestId = crypto.randomUUID();
+    usageRequest.current = requestId;
     const sequence = ++usageLoadSequence.current;
+    const cursorKey = JSON.stringify([range, status, search, kind, requestRowsPage]);
+    let polling = false;
+    const poll = setInterval(() => {
+      if (polling) return;
+      polling = true;
+      void usageApi.getStatus({ requestId }).then(progress => { if (sequence === usageLoadSequence.current) setUsageProgress(progress); })
+        .catch(error => { if (sequence === usageLoadSequence.current) setUsageError(error instanceof Error ? error.message : "读取查询进度失败。"); })
+        .finally(() => { polling = false; });
+    }, 300);
     setUsageLoading(true);
     setUsageError(null);
     try {
       // 不传 sessionId 即走 main 的 global 路径，聚合所有 Session 历史。
       const input = {
+        requestId,
         range,
         search,
         kind,
         scope: "global",
         ...(status === "all" ? {} : { status }),
-        requestRowsPage: { page: requestRowsPage },
+        requestRowsPage: { page: requestRowsPage, cursor: usageCursors.current.get(cursorKey) },
       } as const;
       const activitySnapshot = await usageApi.getActivity(input);
       if (sequence !== usageLoadSequence.current) return;
       setUsageActivitySnapshot(activitySnapshot);
+      if (activitySnapshot?.rowsPage.nextCursor) {
+        if (usageCursors.current.size >= 64) usageCursors.current.clear();
+        usageCursors.current.set(JSON.stringify([range, status, search, kind, requestRowsPage + 1]), activitySnapshot.rowsPage.nextCursor);
+      }
     } catch (error) {
       if (sequence !== usageLoadSequence.current) return;
       console.error("Failed to load usage statistics", error);
       setUsageError(error instanceof Error ? error.message : "使用统计加载失败，请重试。");
     } finally {
-      if (sequence === usageLoadSequence.current) setUsageLoading(false);
+      clearInterval(poll);
+      if (sequence === usageLoadSequence.current) { setUsageLoading(false); setUsageProgress(null); usageRequest.current = undefined; }
     }
   }, []);
 
@@ -275,6 +313,8 @@ export function WorkbenchLayout({
         onArchivedSessionsChange={onArchivedSessionsChange}
         usageSnapshot={usageSnapshot}
         usageActivitySnapshot={usageActivitySnapshot}
+        usageProgress={usageProgress}
+        onUsageCancel={cancelUsage}
         usageLoading={usageLoading}
         usageError={usageError}
         onUsageRefresh={(nextRange, requestRowsPage, status, search, kind) => {

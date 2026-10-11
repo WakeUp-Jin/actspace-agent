@@ -19,6 +19,9 @@
       "path": "./../session/persistence/tsconfig.build.json"
     },
     {
+      "path": "./../session/storage/tsconfig.build.json"
+    },
+    {
       "path": "./../shared/tsconfig.build.json"
     }
   ]

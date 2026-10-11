@@ -119,6 +119,8 @@ export const desktopBridgeContract = {
     readArtifact: invoke<S.SessionArtifactReadInput, S.SessionArtifactReadResult>(CH.readSessionArtifact),
   },
   usage: {
+    getStatus: invoke<{ requestId: string }, S.UsageQueryProgress | null>(CH.getUsageQueryStatus),
+    cancel: invoke<{ requestId: string }, void>(CH.cancelUsageQuery),
     getStatistics: invoke<S.UsageStatisticsGetInput, S.UsageStatisticsSnapshot | null>(CH.getUsageStatistics),
     getActivity: invoke<S.UsageStatisticsGetInput, S.UsageActivitySnapshot | null>(CH.getUsageActivity),
   },

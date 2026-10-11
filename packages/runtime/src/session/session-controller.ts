@@ -175,6 +175,34 @@ export class RuntimeSessionController {
     items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
     return { items, indexing: false, failed };
   }
+  async querySources(): Promise<import("@actspace/session-storage").SessionQueryCatalog | null> {
+    const read = this.store.storage.querySource?.bind(this.store.storage);
+    if (!read || !this.store.storage.readEventBatch) return null;
+    const result: import("@actspace/session-storage").SessionQuerySource[] = [];
+    const ids = await this.store.listSessionIds();
+    const failedSessionIds: string[] = [];
+    const digest = this.options.registry.digest;
+    for (let offset = 0; offset < ids.length; offset += 128) {
+      const batch = ids.slice(offset, offset + 128);
+      let sources: readonly import("@actspace/session-storage").SessionQuerySource[];
+      try { sources = this.store.storage.querySources ? await this.store.storage.querySources(batch) : await Promise.all(batch.map(read)); }
+      catch {
+        // Batch acceleration must retain the original per-Session fault isolation.
+        const settled = await Promise.allSettled(batch.map(read));
+        sources = settled.flatMap((item, index) => {
+          if (item.status === "fulfilled") return [item.value];
+          failedSessionIds.push(batch[index]!); return [];
+        });
+      }
+      for (const source of sources) {
+        const id = source.header.sessionId;
+        const live = this.#open.get(id) ?? this.#external.get(id);
+        const throughSeq = live ? Math.min(source.throughSeq, live.durableSeq ?? -1) : source.throughSeq;
+        result.push({ ...source, throughSeq, codecSetDigest: digest, stamp: `${source.stamp}:${throughSeq}:${digest}` });
+      }
+    }
+    return { sources: result, failedSessionIds };
+  }
   async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
   constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; projectionService?: SessionProjectionService; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void> }, store: SessionStore) { this.store = store; this.#cache = new SessionProjectionCache({ storage: store.storage, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService).projections }); this.#globalIndex = new GlobalSessionIndex(); }
   private onEvent(sessionId: string): (event: SessionEventEnvelopeV1) => void | Promise<void> {
@@ -199,7 +227,9 @@ export class RuntimeSessionController {
     await this.options.onFlush?.(sessionId, throughSeq);
     if (!this.#ephemeral.has(sessionId)) {
       await this.#cache.read(sessionId).catch(() => undefined);
-      await this.ensureGlobalIndex();
+      // Global summaries are a lazy read cache. A flush must not initialize
+      // every historical Session merely to refresh an unused cache.
+      if (!this.#globalIndexReady) return;
       const live = this.#open.get(sessionId);
       const model = live ? this.liveModel(live) : undefined;
       if (live && model) this.#globalIndex.replace(this.summary(model.snapshot(live.journal.validation.accessState), this.options.profileId));
@@ -221,6 +251,17 @@ export class RuntimeSessionController {
   snapshot(session: SessionHandle): RuntimeV2SessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }
   async inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot> { return (await this.readModel(sessionId)).snapshot; }
   async recoveryAccess(sessionId: string): Promise<SessionRecoveryAccess> { const open = this.#open.get(sessionId); if (open !== undefined) return open.durabilityState === "blocked" ? "read-only" : "read-write"; return classifySessionRecoveryAccess(await this.store.inspect(sessionId)); }
+  async readEventBatch(sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) {
+    if (!this.store.storage.readEventBatch) throw new Error("Session provider does not support bounded query reads.");
+    const batch = await this.store.storage.readEventBatch(sessionId, input);
+    const events = batch.events.flatMap(event => {
+      if (input.eventTypes && !input.eventTypes.includes(event.type)) return [];
+      const resolved = this.options.registry.resolve(event);
+      if (resolved.kind === "unknown-required" || resolved.kind === "unsupported-required") throw new Error("Session requires an unavailable codec; query index cannot interpret its facts.");
+      return resolved.kind === "known" ? [{ ...event, data: resolved.data }] : [];
+    });
+    return { ...batch, events };
+  }
   async inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]> { const open = this.#open.get(sessionId); if (open !== undefined) return open.journal.events; const inspection = await this.store.inspect(sessionId); if (inspection.header === null || inspection.validation === null) throw new Error(`Session ${sessionId} is corrupt.`); return inspection.events; }
   async list(): Promise<readonly RuntimeV2SessionListItem[]> { return (await this.browseSessions()).items; }
   async export(sessionId: string): Promise<string> { const open = this.#open.get(sessionId); if (open !== undefined && this.#ephemeral.has(sessionId)) return [open.header, ...open.journal.events].map((record) => JSON.stringify(record)).join("\n") + "\n"; const inspection = await this.store.inspect(sessionId); if (inspection.header === null) throw new Error(`Session ${sessionId} has no header.`); return [inspection.header, ...inspection.events].map((record) => JSON.stringify(record)).join("\n") + "\n"; }
