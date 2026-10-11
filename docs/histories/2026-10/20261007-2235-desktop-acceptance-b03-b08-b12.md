@@ -40,3 +40,5 @@
 - 构建与typecheck、真实Electron复验及恢复结果以[执行摘要](../../exec-runs/20261007-desktop-acceptance-b03-b08-b12/execution-summary.md)为准；此记录在复验中持续更新。
 - 其它验收问题仍只记录，未纳入修复。主智能体未暂存、提交或推送；工作期间外部提交收录了一部分变更，后续以当前工作区继续验证。
 - 命中“可迁移、陷阱、模式”，补充[长生命周期工具端口与实时配置](../../learnings/2026-10/live-configuration-in-long-lived-ports.md)。
+
+- 真实Electron：B03连续外部新增/撤销均自动刷新；B08同会话断开后仅Tavily、原配置恢复2/4；B12真实创建与切换、正常冷重启后的工具cwd/branch一致，均通过。逐项截图与恢复范围见执行摘要。
