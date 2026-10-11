@@ -6,7 +6,16 @@
     "removeUtc": "2026-10-07T14:48:02.907364+00:00",
     "bytesBefore": 85,
     "bytesDuring": 107,
-    "bytesRestored": 85
+    "bytesRestored": 85,
+    "roundtrip": {
+      "marker": "B03-ROUNDTRIP-20261007",
+      "appendUtc": "2026-10-07T15:20:28.815527+00:00",
+      "bytesBefore": 85,
+      "bytesDuring": 108,
+      "removeUtc": "2026-10-07T15:23:49.726887+00:00",
+      "bytesRestored": 85,
+      "nativeContinuousObservation": "added and removed automatically in unchanged Review panel"
+    }
   },
   "b08": {
     "sessionId": "3618e60e-f8b0-4435-a3b5-c6ffa7409b1e",
@@ -27,15 +36,45 @@
       "providers": [
         "tavily"
       ],
-      "zhipuCredentialEntryPresent": false
+      "zhipuCredentialEntryPresent": false,
+      "status": "completed"
     },
     "credentialRestoration": {
       "zhipuRestoredFromPrivateBaseline": true,
       "otherEntriesUnchanged": true,
-      "fileMode": "0600"
+      "fileMode": "0600",
+      "nativeUiConnectedProviders": 2
     }
   },
   "b12": {
-    "status": "pending native verification"
+    "sessionId": "56149031-44dd-4907-b1fe-90e65e08af6d",
+    "createdAt": "2026-10-07T15:10:06.350Z",
+    "cwd": "/Users/wakeup-jin/Library/Application Support/ActSpace/worktrees/41969623/git-workspace",
+    "worktree": {
+      "kind": "worktree",
+      "sourceWorkspaceRoot": "/private/var/folders/h6/wv0phjfx6pb36n57tb4d9sww0000gn/T/actspace-fe-acceptance-9omqvkkf/git-workspace",
+      "workspaceRoot": "/Users/wakeup-jin/Library/Application Support/ActSpace/worktrees/41969623/git-workspace",
+      "baseBranch": "codex/acceptance-alt",
+      "branch": "actspace/41969623",
+      "baseCommit": "56a2cd385617e3fc7014a1dfe2f23cbe700b0063",
+      "createdAt": "2026-10-07T15:10:06.349Z"
+    },
+    "firstTool": {
+      "seq": 89,
+      "name": "bash",
+      "status": "completed",
+      "time": "2026-10-07T15:10:28.646Z"
+    },
+    "originalBranch": "main",
+    "worktreeHead": "56a2cd385617e3fc7014a1dfe2f23cbe700b0063",
+    "restartVerification": {
+      "mainPid": 69765,
+      "journalSeq": 681,
+      "time": "2026-10-07T15:31:37.831Z",
+      "status": "completed",
+      "cwdUnchanged": true,
+      "branch": "actspace/41969623"
+    },
+    "generatedWorktreeRegisteredAsWorkspace": false
   }
 }

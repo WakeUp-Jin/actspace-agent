@@ -1,6 +1,6 @@
 # B03 / B08 / B12 — 执行过程
 
-- 关联计划：[修复计划](../../exec-plans/active/20261007-desktop-acceptance-b03-b08-b12.md)
+- 关联计划：[修复计划](../../exec-plans/completed/20261007-desktop-acceptance-b03-b08-b12.md)
 - 执行模式：交互；用户已批准三项方案。
 - 初始基线：main d7eb0431；已有未提交内容均为上一阶段验收产物，保留。
 
@@ -35,3 +35,13 @@
 - B03：原生Review打开不操作时，外部追加唯一marker后sample.txt从+1自动变+2，准确展示marker；恢复字节数85。恢复时面板已切走，返回后显示+1，仅自动出现的正向过程有连续证据。
 - B08：同一真实会话3618e60e-f8b0-4435-a3b5-c6ffa7409b1e，断开前工具结果seq74为tavily,zhipu；设置断开后、不重启，seq381实际web_search完成且Providers只有tavily。凭据仅检查字段是否存在，不输出值。
 - 工作期间外部提交9bf30f06再次收录代码/文档并调整截图忽略；未撤销这些外部改动，也未自行执行提交。
+
+- B08恢复：正常Quit后仅合并本轮私密备份中的zhipu加密条目，断言其它条目未变；重启主进程62138，真实设置再次显示智谱/Tavily 2/4。
+- B12首发：UI明确fixture/codex/acceptance-alt/新建工作树，Session56149031-44dd-4907-b1fe-90e65e08af6d创建成功。真实bash结果seq89的pwd为ActSpace/worktrees/41969623/git-workspace，分支actspace/41969623；header持久化相同cwd、来源、baseBranch与baseCommit。原fixture仍main；generated worktree没有进入长期workspace registry。冷重启绑定仍待随后复验。
+
+- B03补齐连续回退：同Review面板无操作，UTC15:20:28追加B03-ROUNDTRIP-20261007后+1→+2；UTC15:23:49仅移除后+2→+1，旧文本和图片保留，85→108→85字节。先前未连续观察的子项经独立第二轮完成，不追认旧截图。
+- B12切换另一会话再返回，仍显示actspace/41969623·工作树；进入最后正常退出/冷恢复验证。
+
+- B12正常Quit后以同dev:log冷启动main69765，同Session真实bash seq681（UTC15:31:37.831）再次pwd/branch，仍worktrees/41969623/git-workspace与actspace/41969623，exit0。冷恢复核心门禁通过。
+
+- 最终收尾：原生菜单精准归档56149031、3618、33f64三个验收对象；保留新建fixture工作树，不删除既有资源。真实UI确认Light、默认DeepSeek、搜索智谱/Tavily2/4、原连接名称，主进程69765留在可用空新建页。

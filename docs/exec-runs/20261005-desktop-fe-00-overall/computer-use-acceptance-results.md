@@ -328,3 +328,15 @@
 - 从空新建页对未选中的精确验收A与Desktop Chat验收归档，实际侧栏两个标题均消失，journal archived=true辅助一致；当前选中会话禁止归档为正常约定，没有新增Bug。原用户历史会话未用于归档清理。
 - 应用保持运行，真实空新建页消息框可用：[最终现场](screenshots/computer-use/desktop/final-usable-app-test-objects-archived.png)、[模型原值](screenshots/computer-use/desktop/final-baseline-restored-general.png)、[快捷原值](screenshots/computer-use/desktop/final-baseline-restored-shortcut.png)。
 - 本轮报告、截图和运行时辅助记录已保存；没有产品源码变更、修复、提交或推送。后续仅在满足未覆盖项前提后定向补验，修复属于另一个阶段。
+
+## 2026-10-07 授权修复后定向复验
+
+以下为后续修复结果，不改写上面原验收时的失败事实与覆盖统计。
+
+| 原问题 / 项目 | 修复后结果 | 现象与依据 |
+|---|---|---|
+| CU-B03 / 10-A3 | 通过 | 同一真实Review面板无刷新、无切范围，外部追加与移除文本均自动更新，旧变更保留。 |
+| CU-B08 / 17-A5 | 通过 | 同一会话不重启，真实搜索断开前tavily,zhipu，断开后仅tavily且成功；原凭据单条恢复并UI确认2/4。 |
+| CU-B12 / 09-P4-4 | 通过 | 选择codex/acceptance-alt与新建工作树，首发实际cwd在新工作树；切换返回及正常重启后同会话bash仍在同目录/分支，原目录main不变。 |
+
+[逐项真实桌面记录](../20261007-desktop-acceptance-b03-b08-b12/computer-use-results.md) · [执行摘要与边界](../20261007-desktop-acceptance-b03-b08-b12/execution-summary.md)。独立Created worktree过程块未新增，其它原问题仍保留原状态。
