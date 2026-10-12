@@ -1,6 +1,6 @@
 # Boot 与 Harness 组合生命周期
 
-现有 boot/config 入口继续负责默认应用启动。新增 Harness 模块是独立导出能力，目前尚未接入 Desktop、Headless 或真实 Run。
+现有 boot/config 入口继续负责默认应用启动。Harness 模块已作为独立导出能力接入 Runtime 的启动链路，并由 Harness Control 与 HMR 复用；Desktop、Headless 和真实 Run 仍通过各自的 Runtime/Host 入口消费，不由本包直接持有产品运行状态。
 
 ## 装配与选择
 

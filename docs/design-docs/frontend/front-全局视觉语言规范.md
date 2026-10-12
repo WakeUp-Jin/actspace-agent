@@ -268,8 +268,8 @@ portal 到 body 的菜单放 popover 层，保证在 dialog 里打开的下拉�
 
 文字按钮用 `components/ui/Button.tsx`，纯图标按钮用 `components/ui/IconButton.tsx`，不再在业务组件里写按钮样式常量。
 
-- `Button`：`variant` = `primary`（ink action，每个区域最多一个）/ `secondary`（surface + 描边）/ `ghost`（无底）/ `danger`（描边，设置里的删除入口）/ `danger-solid`（确认框里的破坏性主操作）；`size` = `xs` 26px（审批行）/ `sm` 28px（设置、审批卡、面板，默认）/ `md` 32px（对话框底部、表单提交）；`shape="pill"` 用于胶囊按钮。
-- `IconButton`：`label` 必填，同时作为 `aria-label` 和默认 Tooltip；`size` = `xs` 22 / `sm` 28 / `md` 32 / `lg` 36；`shape` = `square` / `round`；`variant` = `ghost`（默认）/ `soft` / `secondary` / `primary`。
+- `Button`：`variant` = `primary`（ink action，每个区域最多一个）/ `accent`（跟随外观强调色，默认调色板下与 primary 一致；工具审批主按钮）/ `secondary`（surface + 描边）/ `tonal`（无描边浅灰底，审批卡“本会话允许”）/ `ghost`（无底）/ `danger`（描边，设置里的删除入口）/ `danger-solid`（确认框里的破坏性主操作）；`size` = `xs` 26px（审批卡）/ `sm` 28px（设置、面板，默认）/ `md` 32px（对话框底部、表单提交）；`shape="pill"` 用于胶囊按钮。
+- `IconButton`：`label` 必填，同时作为 `aria-label` 和默认 Tooltip；`size` = `xs` 22 / `sm` 28 / `md` 32 / `lg` 36；`shape` = `square` / `round`；`variant` = `ghost`（默认）/ `soft` / `secondary` / `primary` / `accent`。
 - focus 统一为 2px `focus-ring` 描边（offset 1px）；disabled 半透明；按下 `scale-[0.97]`。
 - 调用处的 `className` 只放布局和显隐类（margin、宽度、`opacity-0 group-hover:opacity-100`），不覆盖字号、圆角、颜色。
 

@@ -478,3 +478,39 @@ describe("production Agent scope admission", () => {
     binding.dispose();
   });
 });
+
+
+describe("process Session Grant execution", () => {
+  it("issues, reuses and audits a prefix, but asks for other or complex commands and after revocation", async () => {
+    const runtime = new ToolRuntime();
+    const grants: SessionGrant[] = [];
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    let calls = 0;
+    runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { calls++; return success(); } }, permission: {
+      grantAudience: { pluginId: "plugin.test", permissionDomain: "bash", policyVersion: 1 },
+      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: "/workspace/sub", workspaceRoot: "/workspace", noSandbox: false, dynamic: false,
+        ...(String(args.value).startsWith("pnpm ") && !String(args.value).includes("&&") ? { argv: String(args.value).split(" "), grantPrefix: ["pnpm"] } : {}) }],
+      evaluate: args => args.value === "blocked" ? { kind: "deny", code: "POLICY_DENIED", reason: "blocked" } : { kind: "ask", risk: "high", reason: "run", reusable: true },
+      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: "/workspace" }, label: "pnpm" }],
+    } });
+    const trustedGrantAudiences = new Set(["plugin.test\u0000bash\u00001"]);
+    const options = { sessionGrants: grants, sessionGrantCapability: true, trustedGrantAudiences, permissionRecords: records };
+    const broker: ApprovalBroker = { async requestApproval(request) {
+      expect(request.grantSuggestions).toHaveLength(1);
+      return { requestId: request.requestId, kind: "session", suggestionId: request.grantSuggestions[0]!.suggestionId, decidedAt: new Date().toISOString() };
+    } };
+    const run = (id: string, value: string, env = environment([], options)) => runtime.executeBatch([call(id, { value })], env);
+    expect((await run("first", "pnpm test", environment([], { ...options, approvalBroker: broker })))[0]?.status).toBe("completed");
+    expect((await run("second", "pnpm build"))[0]?.status).toBe("completed");
+    expect(records.filter(row => row.type === "permission/grant-used").map(row => row.data.callId)).toEqual(["first", "second"]);
+    for (const value of ["git status", "pnpm test && rm x", "blocked"]) expect((await run(value, value))[0]?.status).toBe("denied");
+    const auditEnv = environment([], options);
+    const auditFailure = { ...auditEnv, journal: { ...auditEnv.journal, recordPermission: async () => { throw new Error("audit unavailable"); } } };
+    expect((await run("audit-failure", "pnpm test", auditFailure))[0]?.status).toBe("failed");
+    const checkpointEnv = environment([], options);
+    expect((await run("revoked-during-checkpoint", "pnpm test", { ...checkpointEnv, journal: { ...checkpointEnv.journal, checkpointBeforeBody: async () => { grants.splice(0); } } }))[0]?.failure?.code).toBe("GRANT_REVOKED");
+    grants.splice(0);
+    expect((await run("revoked", "pnpm test"))[0]?.status).toBe("denied");
+    expect(calls).toBe(2);
+  });
+});

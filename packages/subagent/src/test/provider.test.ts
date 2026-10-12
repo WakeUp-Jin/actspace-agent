@@ -2,7 +2,7 @@ import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCoreCodecRegistry } from "@actspace/session-journal";
 import { applySessionRecovery, SessionStore } from "@actspace/session-persistence";
 import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
@@ -23,6 +23,15 @@ async function fixture() {
 }
 
 describe("one-shot Subagent provider", () => {
+  it("does not scan historical Sessions when a parent has no delegation requests", async () => {
+    const { store, parent, parentScope } = await fixture();
+    const list = vi.spyOn(store, "listSessionIds");
+    const inspect = vi.spyOn(store, "inspect");
+    await expect(repairSubagentPublications({ store, parent })).resolves.toEqual({ repairedLinks: 0, repairedToolResults: 0 });
+    expect(list).not.toHaveBeenCalled();
+    expect(inspect).not.toHaveBeenCalled();
+    await parent.close(); await parentScope.dispose(); await store.storage.close();
+  });
   it("uses one provider for Agent and Explore with child lineage and one parent link", async () => {
     const { store, parent, parentScope } = await fixture(); const links: string[] = [];
     const presets = createBuiltInPresets(["read_file", "write_file", "grep"]);

@@ -83,8 +83,10 @@ http://127.0.0.1:5173/
 | --- | --- | --- | --- |
 | `empty`（默认） | 没有会话，只有默认工作区 | 首次启动空态、新建会话、Composer 各形态、设置页、浅色 / 深色、窄窗 | 任何已有历史的状态 |
 | `streaming` | 两个会话。打开「检查 bridge 调用方」后约 300ms 开始逐段输出，停在运行态 | 「生成中」界面、流式中切换会话再切回、运行中发送进入队列 / 引导 / 撤回 | 回复完成后的工具调用细节 |
-| `long-session` | 一个 40 轮问答的长会话（含代码块），外加一个短会话 | 长列表滚动、分组、早期历史加载 | 真实分页边界（mock 一次返回全部消息） |
+| `long-session` | 一个 40 轮问答的长会话（含代码块），外加一个短会话 | 长列表滚动、分组、早期历史加载；右侧 Context 面板（任何有会话的场景都返回完整 mock 数据，见 `mock/context-panel-fixture.ts`），会话行跳轨迹 | 真实分页边界（mock 一次返回全部消息） |
+| `context-pagination` | 长会话、620 个额外工具条目，初始历史失败，重试后同步完成；有明细及原文分页 | Context 错误/重试、条件刷新、加载更多、全文分段及主题/窄窗 | 不证明真实 SQLite、Loop 或后端权限 |
 | `approval-pending` | 一个会话停在高风险 `bash` 命令（`rm -rf …`）的审批上 | 审批卡片、允许 / 拒绝、刷新后经 `approvals.listPending` 恢复 | 真实工具执行结果 |
+| `approval-prefix` | pnpm test 待审批，含正式 command_prefix 建议 | 三按钮、会话授权文案和主题布局 | 真实授权复用、持久化与工具执行 |
 | `remote-host` | 三台 Host：devbox 已连接、GPU 服务器离线、旧笔记本已撤销；本机 / devbox / GPU 各一个会话 | 侧栏 Host 分组与离线标记、运行位置菜单、Host 删除 / 重连后的列表 | `hosts.call`（`host.describe`、`files.reference`）、`hosts.preview` / `download` 在 mock 中未实现，会 reject；因此 Host 工作区和模型显示为「等待 Host …」，远端读文件和下载产物只能由单测和真实 Host 覆盖 |
 
 mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`，包括终端创建、新建工作树和 Git 写操作。界面上看到的报错属于 mock 的边界，不是缺陷。如需新增场景，按规范 §7 处理，并同步更新本表。
@@ -164,7 +166,7 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 
 ## Desktop 前端重构期间的验证矩阵
 
-来源：[08 测试与验证整理 §5](desktop-frontend-refactor/08-测试与验证整理.md)。每个阶段完成后按此表验证。「浏览器 mock」指上文的 mock 场景；「Electron」指真实桌面窗口，无 Computer Use 时用 CDP（`--remote-debugging-port`，临时 `ACTSPACE_DATA_DIR`），具体做法见 [00 总执行计划 §8](exec-plans/active/20261005-desktop-frontend-refactor/00-总执行计划.md)。
+来源：[08 测试与验证整理 §5](desktop-frontend-refactor/08-测试与验证整理.md)。每个阶段完成后按此表验证。「浏览器 mock」指上文的 mock 场景；「Electron」指真实桌面窗口，无 Computer Use 时用 CDP（`--remote-debugging-port`，临时 `ACTSPACE_DATA_DIR`），具体做法见 [00 总执行计划 §8](exec-plans/completed/20261005-desktop-frontend-refactor/00-总执行计划.md)。
 
 | 场景 | 单测 | 浏览器 mock | Electron |
 | --- | --- | --- | --- |

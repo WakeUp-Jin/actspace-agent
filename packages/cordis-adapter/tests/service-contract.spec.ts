@@ -10,7 +10,7 @@ import {
   defineBuiltinPluginManifest,
   validatePluginManifest,
 } from "../src/index.js";
-import { createServiceLifecycleFixtures, SERVICE_FIXTURE_IDS } from "../../test-support/src/service-fixtures.js";
+import { createServiceLifecycleFixtures, SERVICE_FIXTURE_IDS } from "./fixtures/service-fixtures.js";
 
 describe("Cordis Service ABI", () => {
   it("describes real Cordis services without a second provider registry", () => {

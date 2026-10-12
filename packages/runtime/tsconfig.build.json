@@ -19,13 +19,34 @@
       "path": "./../bundle/tsconfig.build.json"
     },
     {
-      "path": "./../compaction/tsconfig.build.json"
-    },
-    {
       "path": "./../composition/tsconfig.build.json"
     },
     {
-      "path": "./../context/tsconfig.build.json"
+      "path": "./../context/compaction/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/conversation/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/disclosure/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/engine/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/rules/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/runtime/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/skills/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/system/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/tools/tsconfig.build.json"
     },
     {
       "path": "./../cordis-adapter/tsconfig.build.json"

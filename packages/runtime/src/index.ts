@@ -56,3 +56,5 @@ export type { ResolvedComposition } from "@actspace/composition";
 export type { BootDiagnostic } from "@actspace/diagnostics";
 
 export type { AgentLoopLiveEvent } from "@actspace/core-agent-loop";
+
+export { readPersistedContextManifest } from "@actspace/context-engine";

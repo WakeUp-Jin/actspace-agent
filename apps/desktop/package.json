@@ -76,7 +76,8 @@
     "@actspace/tools-image-generation": "workspace:*",
     "@actspace/tools-image-inspection": "workspace:*",
     "@actspace/agent-host": "workspace:*",
-    "@actspace/official-skills": "workspace:*"
+    "@actspace/official-skills": "workspace:*",
+    "@actspace/session-storage": "workspace:*"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",

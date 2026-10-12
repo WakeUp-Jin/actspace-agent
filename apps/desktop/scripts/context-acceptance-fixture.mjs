@@ -1,0 +1,24 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { createRequire } from 'node:module';
+import { createServer } from 'node:http';
+import { startAgentProvider } from '../../../scripts/test/fixtures/agent-provider.mjs';
+const rootArg=process.argv.find(arg=>arg.startsWith('--root='))?.slice(7);
+if(!rootArg||!rootArg.startsWith('/tmp/actspace-context-'))throw new Error('Pass a new isolated /tmp/actspace-context-* root.');
+const root=resolve(rootArg),workspace=join(root,'workspace'),data=join(root,'desktop-data');
+await mkdir(root);await mkdir(workspace);await mkdir(data);
+await writeFile(join(workspace,'README.md'),'Synthetic Context / SQLite acceptance workspace.\n');
+const provider=await startAgentProvider({logPath:join(root,'provider-requests.jsonl')});
+const require=createRequire(import.meta.url);const {build}=require('esbuild');const seed=join(root,'seed.cjs');
+await build({entryPoints:[resolve('scripts/acceptance/agent-refactor/seed-settings.ts')],outfile:seed,bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
+await require(seed).seedSettings(data,provider.baseUrl);
+// Seed the registry before boot: the application's normal fallback is Downloads.
+const now = new Date().toISOString();
+await writeFile(join(data, 'workspaces.json'), JSON.stringify({ version: 1, defaultWorkspaceId: 'default', items: [{ id: 'default', kind: 'default', label: 'Isolated acceptance workspace', path: workspace, order: 0, hidden: false, createdAt: now, updatedAt: now }] }, null, 2) + '\n');
+const skill=join(data,'skills','context-acceptance');await mkdir(skill,{recursive:true});
+await writeFile(join(skill,'SKILL.md'),'---\nname: context-acceptance\ndescription: A synthetic skill for Context acceptance.\n---\nUse only inside the isolated acceptance workspace.\n');
+const control=createServer((req,res)=>{const action=req.url.slice(1);if(req.method!=='POST'||!['hold','release','summary-error','summary-ok','summary-hold','summary-release','title-hold','title-release','retry-next-run'].includes(action)){res.writeHead(400);res.end();return;}provider.control(action);res.end('ok');});
+await new Promise(r=>control.listen(0,'127.0.0.1',r));
+const state={root,workspace,data,providerUrl:provider.baseUrl,controlUrl:`http://127.0.0.1:${control.address().port}`,pid:process.pid};
+await writeFile(join(root,'fixture.json'),JSON.stringify(state,null,2)+'\n');console.log(JSON.stringify(state));
+let stopping=false;const stop=async()=>{if(stopping)return;stopping=true;control.close();await provider.close();};process.once('SIGTERM',stop);process.once('SIGINT',stop);

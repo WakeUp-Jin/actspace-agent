@@ -10,7 +10,7 @@
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply 和 HTML 沙箱安全。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。Terminal 在面板中的 Tab 语义由本文约束，PTY、会话生命周期、背压、进程清理与打包边界见 `front-右侧终端与会话生命周期规范.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 面板、Reply 和 HTML 沙箱安全。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。Terminal 在面板中的 Tab 语义由本文约束，PTY、会话生命周期、背压、进程清理与打包边界见 `front-右侧终端与会话生命周期规范.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -34,7 +34,7 @@
 - `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
 - `Terminal`：创建或聚焦绑定当前会话 workspace / worktree 的交互式 shell；详见 `front-右侧终端与会话生命周期规范.md`。
 - `Review`：打开当前 workspace 的 Review，并创建/聚焦稳定的右侧 Review Tab。
-- `Context`：打开主 Agent 当前会话的完整只读上下文 Tab。
+- `Context`：打开主 Agent 当前会话的 Context 面板 Tab（占用、明细、趋势和事件，只读）。
 - `Reply`：打开当前会话生成过的可视化回复聚合视图；HTML 是当前内部渲染格式，不进入入口名称。
 
 布局与状态规则：
@@ -65,7 +65,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `CSV`：表格预览。2026-07-30 实现（`CsvRenderView`）。
 - `Text`：纯文本或代码文件查看（`CodeRenderView`，见「代码视图能力」）。
 - `Review`：完整代码审阅工作台入口；支持 Git-first scope 与 `Last Turn` Agent 视角，具体契约见 `docs/design-docs/core-review-change-sources.md`。
-- `Context`：完整只读上下文视图；见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。
+- `Context`：Context 面板；见本文「Context 面板」一节。
 - `Reply`：当前会话已生成的可视化回复浏览器（见下文）；内部当前由 HTML 产物承载。
 - `Terminal`：用户交互式 shell；Tab 只保存 terminalId / sessionId / title，不保存 PTY、xterm 实例或输出缓冲。
 
@@ -328,42 +328,96 @@ main 侧服务规则：
 
 V1 不做写 / 删 / 重命名、`.gitignore` 解析、快速打开、多 root 和 PDF 预览。
 
-## Context 完整只读视图
+## Context 面板
 
-Context Tab 展示主聊天 Agent 当前会话喂给模型的完整上下文。它是只读的独立对象视图，数据来自当前 Runtime request snapshot，视觉语言使用竖色条段头、可折叠分区和源文件 chip。
+> 状态：2026-10-11 定稿。视觉以 [context-panel-demo.html](context-panel-demo.html) 为准（demo 顶部的调节条只用于方案对比，不进入产品），后端数据形状以 [Context 面板后端数据需求](front-Context面板后端数据需求.md) 为准。
 
-入口：
+Context Tab 回答三个问题：现在占了多少、由哪些条目组成、是怎么变成这样的。它只看占用，不负责读原文：会话里每条消息和工具输入输出的原文在轨迹视图里读，面板只给跳转。面板只读，参考 dsh-context 的信息结构。
 
-- Composer 的 Context 弹窗右上角放展开 / 详情图标按钮。
-- 点击后打开右侧 Context Tab。
-- V1 只读，不使用 Edit / Pencil 图标。
+### 入口
 
-数据来源：
+入口和之前一样：Composer 的 Context 弹层右上角「查看完整上下文」、对象启动页、「+ 新建对象」菜单，三者都打开或聚焦同一个 `context` Tab。
 
-- v2 Runtime 在每次真实模型请求前形成 request snapshot，Session Journal 持久化足够的请求、usage 与 contributor 事实。
-- Desktop main 通过固定 Projection 从 Journal 派生 Context 视图；renderer 不读取 sidecar，也不自行拼接上下文。
-- 分区顺序来自 Prompt / Context Contributor 的稳定排序，并保留来源、裁剪与 compaction 标记。
-- 当前没有 `context-state.json`，也没有 v1 `context:describe` 双真相回退；无法从 Journal 派生时显示明确空态或不可用状态。
+### 五个区块
 
-分区顺序：
+自上而下排列，宽度跟随右侧面板，360px 时仍需可读。
 
-1. System prompt
-2. Tools
-3. Rules
-4. Skills
-5. Summarized conversation
-6. Conversation
-7. 未来 MCP / Subagents / Recent files
+1. **当前上下文**
+   - 标题行右侧显示模型名。
+   - 主数字为「≈ 已用 / 上限 tokens」和已用百分比。
+   - 分段条按上限缩放，每段一个分类，未用部分是灰色轨道。有自动压缩阈值时，在阈值位置画一条刻度并标「自动压缩 ≈N」。
+   - 下方是双列图例：色块、分类名、≈token、占已用百分比。点图例聚焦该分类，分段条和明细里其他分类变淡，再点一次取消。
+   - 上限未知时不显示百分比和压缩刻度，分段条改按已用总量缩放。
+2. **会话统计**
+   - 2×3 格：轮次、步数、压缩次数、缓存命中率、累计 Token、费用。
+   - 缓存命中率 = 缓存读 ÷（缓存读 + 未命中输入），累计 Token = 全部请求的输入 + 输出 + 缓存读写，两格都带 `?` 说明口径。
+   - `costUsd` 为 null 时隐藏费用格，不自行估算。没有用量数据时，缓存和累计两格显示「—」。
+3. **上下文明细**
+   - 头部有一个对比开关，用 `ui/Select`，两个选项：「对比上次请求（第 N 轮 · 步 M）」和「不对比」。还没发过请求时没有可对比的基准，开关禁用。
+   - 头部下面一行显示 ≈ 估算总量、上次请求的实际输入（服务商返回，有才显示）和条目总数，再下面是一条迷你色条。
+   - 分类按 `CONTEXT_BUCKET_REGISTRY` 顺序排列。分类行显示：色块、名称、N 项、项数增减、token 增减、≈token、占比。
+   - 打开时默认展开「工具」和「会话内容」两类。每类先显示 12 项，底部「再显示 20 项（共 N）」。
+   - **非会话分类**：
+     - 超过 3 项时出现搜索框和排序（按大小 / 按名称）。「工具」分类另有来源 chip，例如内置、MCP 服务名。
+     - 条目行显示：标题、来源、新增 / 已移除标记、单条 token 增减、占本类的小进度条、≈token。
+     - 点条目行展开预览：顶部一行写占本类和占全部的比例，下面是预览原文加「复制」。
+     - 对比模式下，上次请求里有、本次没有的条目以删除线列在本类末尾。
+   - **会话内容**：只列清单，不展开原文。
+     - 每行显示：类型标签（用户 / 助手 / 工具调用 / 工具结果，思考段标「助手 · 思考」）、标题、新增标记、占比条、≈token。
+     - 没有搜索框和排序，固定最新在前。保留类型 chip（可多选，带数量）。
+     - 整行点击跳到轨迹里的对应记录，悬停时行尾出现 ↗。
+     - chip 行右侧放「在轨迹中打开 ↗」，只选中一个类型时文字变成「在轨迹中打开最新<类型>」。
+     - 条目没有子类型时（过渡数据源）不显示类型 chip；没有轨迹身份时这一行不可点。
+4. **上下文趋势**
+   - 每次请求一根柱：柱高是估算总量，柱内按分类分段。
+   - 压缩发生的那次请求之前画分隔，轴上写「✂ 压缩 −N」。
+   - 悬停柱子时，在图表上方显示一行说明：第 N 轮 · 步 M、≈估算、实际输入。不为每根柱子挂 Tooltip。
+   - 柱子太多放不下时横向滚动，打开时滚到最右（最新）。
+5. **上下文事件**
+   - 按时间倒序列出注入、压缩、工具集变化、模型切换、模式切换。
+   - 每行显示：类型标签、描述、轮次 / 步数位置、token 增减（增绿减红；模型切换这类没有增减的留空）。
 
-视觉与交互：
+### 数据来源
 
-- 分区头使用 `--act-context-*` 同色竖线 + 分区名 + 条目数 / token。
-- 展开内容是主题感知 `bg-surface` 白底卡片 + `border-line` 细边，不整行染色。
-- entry 正文默认夹 3 行；超过阈值提供「展开全文 / 收起」。
-- Conversation 默认折叠，V1 最多展示 20 条，导出使用 renderer Blob 下载 `.md` / `.json`。
-- 空 bucket 保留分区头，让用户知道有哪些上下文类型；展开后按状态显示「正在重建」「暂无法生成」「暂未使用」等文案。
+- 面板主数据走 `sessions.describeContextPanel({ sessionId })`，返回 `ContextPanelView`，类型定义在 `packages/shared/src/context-panel.ts`，形状与后端数据需求 §2 一致。这个查询由 Context 引擎 V2 的后端实现。实现之前，main 一律返回 `null`。
+- 返回 `null` 时，renderer 用现有数据拼一个过渡视图：
+  - ① 来自 `sessions.describeContext` 的 `ContextState`。
+  - ② 来自会话 projection 的 `activity` 和 `usage`，这部分已经是真实数据。
+  - ③ 只有当前条目：没有对比，会话内容没有子类型，也没有轨迹身份。
+  - ④⑤ 不显示，面板底部用一行说明：「趋势和事件需要后端数据，暂未提供」。
+- 浏览器 mock 的 `describeContextPanel` 返回完整数据，包括对比、趋势和事件，用来验收完整界面。
+- 会话 projection 的 `throughJournalSeq` 变化时重新拉取，返回结果按 `throughJournalSeq` 丢弃比当前旧的。拉取失败时面板顶部显示中文失败说明和「重试」，已显示的数据保留；原始技术错误放在可展开的「错误详情」中并允许换行，不能让 IPC 通道名前缀挤掉可操作的说明。
+- 非会话条目的「展开全文」查询（`sessions.readContextEntry`）等后端提供，本期展开的内容就是 `preview`。
 
-V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 token 占比可视化。逐条全文只在内存 / IPC 传输，不持久化。
+### 跳到轨迹
+
+- 会话行和「在轨迹中打开」调用 `revealInTrajectory(target)`。它由 `WorkbenchLayout` 通过 Context 提供，作用是把中间区域切到轨迹视图，用的是和标题栏「查看执行轨迹」按钮同一份按会话记忆的状态。右侧面板保持打开。
+- 目标与轨迹记录的对应关系：
+
+| 面板目标 | 轨迹记录 |
+| --- | --- |
+| `{ callId }`（工具调用 / 工具结果） | `kind === "tool"` 且 `callId` 相同 |
+| `{ messageId }`（用户 / 助手 / 思考） | `messageId` 相同 |
+| `{ latest: "user" \| "assistant" }` | 最后一条该 kind 的记录 |
+| `{ latest: "tool-call" \| "tool-result" }` | 最后一条 `kind === "tool"` 的记录 |
+| `{ latest: null }` | 最后一条可见记录 |
+
+- 轨迹视图收到目标后，复用现有的选中逻辑：展开所在 Turn 和 Call，滚动到该记录并选中，右侧详情随之打开。
+- 找不到目标时，轨迹顶部显示一行可关闭的说明：「没有在已加载的轨迹里找到这条记录」。如果还有更早的历史没加载，说明里补一句可点「Load earlier history」。
+
+### Composer 弹层对齐
+
+- 弹层与面板共用 `R/context-format.ts` 的格式函数：token 统一用「≈」加 K / M，百分比不足 1% 时写「<1%」。
+- 分类行补上占已用的百分比。
+- 压缩次数从 projection 的 `activity.compactionCount` 接入，原来写死为 0。
+
+### 不做
+
+- 编辑上下文：pin、移除、包含 / 排除。
+- 历史请求原文浏览与切换。
+- 文件活动、耗时统计。
+- 子 Agent 的 Context。
+- 导出：旧视图的「导出 .md / .json」随这次重做去掉。会话原文已改到轨迹里看，导出出来的东西不完整；需要时再在明细头部加回。
 
 ## 消息可视化转换（Markdown -> HTML）
 

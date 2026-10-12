@@ -6,13 +6,12 @@ import {
   type QuickOpenShortcutSettings,
   type QuickOpenShortcutStatus,
   type QuickOpenShortcutUpdateInput,
-  type SessionListItem,
   type WorkspaceEntry,
 } from "@actspace/shared";
 import { SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
 import { IconButton } from "../ui/IconButton";
 import { quickOpenApi } from "../../api/quick-open";
-import { sessionsApi } from "../../api/sessions";
+import { SessionSearch } from "../sidebar/SessionSearch";
 import { workspacesApi } from "../../api/workspaces";
 
 const FALLBACK_QUICK_OPEN_SETTINGS: QuickOpenShortcutSettings = {
@@ -62,7 +61,8 @@ export function ShortcutSettings({
   const quickOpen = getQuickOpenSettings(settings);
   const [status, setStatus] = useState<QuickOpenShortcutStatus | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceEntry[]>([]);
-  const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const [choosingSession, setChoosingSession] = useState(false);
+  const [chosenTitle, setChosenTitle] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [saving, setSaving] = useState(false);
   const recorderRef = useRef<HTMLButtonElement>(null);
@@ -76,12 +76,10 @@ export function ShortcutSettings({
     void Promise.all([
       quickOpenApi.getShortcutStatus(),
       workspacesApi.list(),
-      sessionsApi.list(),
-    ]).then(([nextStatus, registry, listedSessions]) => {
+    ]).then(([nextStatus, registry]) => {
       if (cancelled) return;
       setStatus(nextStatus);
       setWorkspaces(registry?.items.filter((workspace) => !workspace.hidden) ?? []);
-      setSessions(listedSessions);
     }).catch((error: unknown) => {
       if (!cancelled) console.error("Failed to load shortcut settings context", error);
     });
@@ -91,15 +89,17 @@ export function ShortcutSettings({
   }, []);
 
   const update = async (input: QuickOpenShortcutUpdateInput) => {
-    if (saving) return;
+    if (saving) return false;
     setSaving(true);
     try {
       const result = await quickOpenApi.updateShortcut(input);
-      setStatus(result.status);
+      setStatus(result.ok === true ? result.status : { ...result.status, error: result.error });
       onSettingsChange(result.settings);
+      return result.ok;
     } catch (error) {
       console.error("Failed to update quick open shortcut", error);
       setStatus({ registered: false, accelerator: quickOpen.accelerator, error: "快捷键设置保存失败。" });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -112,16 +112,8 @@ export function ShortcutSettings({
     })),
     [workspaces],
   );
-  const sessionOptions = useMemo(() => sessions.map((session) => {
-    const workspace = workspaces.find((item) => item.id === session.workspaceId || item.path === session.workspaceRoot);
-    return {
-      value: session.id,
-      label: workspace ? `${session.title} · ${workspace.label}` : session.title,
-    };
-  }), [sessions, workspaces]);
   const targetKind = quickOpen.target.kind;
   const selectedWorkspaceId = quickOpen.target.kind === "workspace" ? quickOpen.target.workspaceId : "";
-  const selectedSessionId = quickOpen.target.kind === "session" ? quickOpen.target.sessionId : "";
   const targetOptions = [
     { value: "automatic", label: "自动选择第一个项目" },
     { value: "workspace", label: "指定工作区" },
@@ -197,19 +189,20 @@ export function ShortcutSettings({
           description="目标不可用时回到第一个项目；没有项目时打开空白会话。"
           control={
             <SettingsSelect
-              value={targetKind}
+              value={choosingSession ? "session" : targetKind}
               options={targetOptions}
               disabled={dependentDisabled || saving}
               ariaLabel="快速唤起打开目标"
               onChange={(kind) => {
+                if (kind !== "session") setChoosingSession(false);
                 if (kind === "workspace" && projectOptions[0]) void update({ target: { kind, workspaceId: projectOptions[0].value } });
-                else if (kind === "session" && sessionOptions[0]) void update({ target: { kind, sessionId: sessionOptions[0].value } });
+                else if (kind === "session") setChoosingSession(true);
                 else void update({ target: { kind: "automatic" } });
               }}
             />
           }
         />
-        {targetKind === "workspace" ? (
+        {targetKind === "workspace" && !choosingSession ? (
           <SettingRow
             indent
             disabled={dependentDisabled}
@@ -227,22 +220,17 @@ export function ShortcutSettings({
             }
           />
         ) : null}
-        {targetKind === "session" ? (
+        {targetKind === "session" || choosingSession ? (
           <SettingRow
             indent
             disabled={dependentDisabled}
             title="默认会话"
-            control={
-              <SettingsSelect
-                value={selectedSessionId}
-                options={sessionOptions.some((option) => option.value === selectedSessionId)
-                  ? sessionOptions
-                  : [{ value: selectedSessionId, label: "已移除的会话（将自动降级）" }, ...sessionOptions]}
-                disabled={dependentDisabled || saving || sessionOptions.length === 0}
-                ariaLabel="快速唤起默认会话"
-                onChange={(sessionId) => void update({ target: { kind: "session", sessionId } })}
-              />
-            }
+            description={chosenTitle ?? (targetKind === "session" ? "已保存指定会话，可搜索标题或消息片段更换。" : "选择会话后保存打开目标。")}
+            control={<SessionSearch buttonLabel="选择快速唤起会话" disabled={dependentDisabled || saving} onSelect={(sessionId, title) => {
+              void update({ target: { kind: "session", sessionId } }).then(saved => {
+                if (saved) { setChosenTitle(title ?? null); setChoosingSession(false); }
+              });
+            }} />}
           />
         ) : null}
       </SettingGroup>

@@ -2907,8 +2907,8 @@ sessionId: input.sessionId,
     await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByText("notes.md")).toBeInTheDocument();
-    expect(screen.getByText("notes.md").closest("article")).toHaveClass("approval-row");
-    expect(screen.queryByRole("button", { name: "本会话" })).toBeNull();
+    expect(screen.getByText("notes.md").closest("article")).toHaveClass("approval");
+    expect(screen.queryByRole("button", { name: "本会话允许" })).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "删除" }));
 

@@ -18,6 +18,7 @@ export function createSessionGateway(remote: SessionGatewayRemote | undefined): 
   return async ({ channel, input: raw }, next) => {
     if (!remote) return next();
     const input = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+    if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessionPage && typeof input.search === "string" && input.search.trim()) return next();
     if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession && input.hostId) return remote.create(input);
     // 审批按 hostId 路由（15 T10/T11），不看 requestId 的格式。
     if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval && isHostId(input.hostId)) return remote.decide(input);

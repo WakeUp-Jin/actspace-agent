@@ -110,7 +110,7 @@ export const ACTSPACE_SERVICE_DEFINITIONS: Readonly<Record<string, ServiceDefini
   sessionProjection: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.sessionProjection, owner: "@actspace/session-projection", scope: "session", required: false, description: "Read-only Session projection builder.", publicSurface: ["createRegistry", "registerContributor", "applyContributors"] }),
   llmRuntime: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.llmRuntime, owner: "@actspace/llm-service", description: "LLM route, provider and request lease owner.", publicSurface: ["complete", "stream", "models"] }),
   systemPrompt: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.systemPrompt, owner: "@actspace/prompt", description: "System prompt and contributor registry owner.", publicSurface: ["register", "assemble"] }),
-  contextEngine: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.contextEngine, owner: "@actspace/context", description: "Context sources, conversion and compaction coordinator.", publicSurface: ["create", "compaction"] }),
+  contextEngine: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.contextEngine, owner: "@actspace/context-engine", description: "Context sources, conversion, lifecycle and read-only projection.", publicSurface: ["create", "compaction", "getProjection"] }),
   toolsRuntime: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.toolsRuntime, owner: "@actspace/tools-runtime", scope: "agent", description: "Tool policy, approval, scheduler and result event owner.", publicSurface: ["prepare", "execute", "dispose"] }),
   filesystemRead: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.filesystemRead, owner: "@actspace/tools-filesystem-read", scope: "agent", description: "filesystem-read contributions.", publicSurface: ["definitions", "registrations"] }),
   filesystemSearch: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.filesystemSearch, owner: "@actspace/tools-filesystem-search", scope: "agent", description: "filesystem-search contributions.", publicSurface: ["definitions", "registrations"] }),
@@ -123,7 +123,7 @@ export const ACTSPACE_SERVICE_DEFINITIONS: Readonly<Record<string, ServiceDefini
   browserTools: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.browserTools, owner: "@actspace/browser-tools", scope: "agent", required: false, description: "Browser Bridge tool contributions.", publicSurface: ["definitions", "registrations"] }),
   agentRegistry: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.agentRegistry, owner: "@actspace/core-agent", scope: "root", description: "Live Agent identity, scope and registration owner.", publicSurface: ["register", "lookup", "dispose"] }),
   agentLoop: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.agentLoop, owner: "@actspace/core-agent-loop", scope: "agent", description: "Turn and step driver with Cordis intervention points.", publicSurface: ["followup", "abort", "waitForIdle"] }),
-  compaction: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.compaction, owner: "@actspace/compaction", scope: "session", required: false, description: "Optional compaction policy and summarizer provider.", publicSurface: ["maybeCompact", "compact"] }),
+  compaction: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.compaction, owner: "@actspace/context-compaction", scope: "session", required: false, description: "Optional compaction policy and summarizer provider.", publicSurface: ["maybeCompact", "compact"] }),
   agentRuntime: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.agentRuntime, owner: "@actspace/runtime", scope: "root", description: "Host execution and Harness lifetime owner.", publicSurface: ["runs", "subagents", "harnesses", "dispose"] }),
 });
 
@@ -144,7 +144,7 @@ export const ACTSPACE_SERVICE_ROLE_METADATA: readonly ServiceRoleMetadata[] = Ob
   serviceRole("sessionProjection", "@actspace/session-projection", "session.projection:default", ["session.runtime", "runtime.projection"]),
   serviceRole("llmRuntime", "@actspace/llm-service", "llm.service:default", ["agent.loop", "compaction.runtime"]),
   serviceRole("systemPrompt", "@actspace/prompt", "prompt.runtime:default", ["context.engine", "agent.loop"]),
-  serviceRole("contextEngine", "@actspace/context", "context.engine:default", ["agent.loop", "compaction.runtime"]),
+  serviceRole("contextEngine", "@actspace/context-engine", "context.engine:default", ["agent.loop", "compaction.runtime"]),
   serviceRole("toolsRuntime", "@actspace/tools-runtime", "tools.runtime:default", ["agent.loop", "subagent.one-shot"]),
   serviceRole("filesystemRead", "@actspace/tools-filesystem-read", "tools.filesystem-read:default", ["tools.runtime"]),
   serviceRole("filesystemSearch", "@actspace/tools-filesystem-search", "tools.filesystem-search:default", ["tools.runtime"]),
@@ -157,7 +157,7 @@ export const ACTSPACE_SERVICE_ROLE_METADATA: readonly ServiceRoleMetadata[] = Ob
   serviceRole("browserTools", "@actspace/browser-tools", "tools.browser:default", ["tools.runtime"]),
   serviceRole("agentRegistry", "@actspace/core-agent", "agent.registry:default", ["agent.loop", "agent.runtime", "subagent.one-shot"]),
   serviceRole("agentLoop", "@actspace/core-agent-loop", "agent.loop:default", ["agent.runtime", "headless.runner"]),
-  serviceRole("compaction", "@actspace/compaction", "compaction.runtime:default", ["agent.loop", "agent.runtime"]),
+  serviceRole("compaction", "@actspace/context-compaction", "compaction.runtime:default", ["agent.loop", "agent.runtime"]),
   serviceRole("agentRuntime", "@actspace/runtime", "agent.runtime:default", ["host.application", "desktop.app", "headless.runner"]),
 ]);
 

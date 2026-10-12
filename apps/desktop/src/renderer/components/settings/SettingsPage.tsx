@@ -43,6 +43,8 @@ export function SettingsPage({
   onArchivedSessionsChange,
   usageSnapshot,
   usageActivitySnapshot,
+  usageProgress,
+  onUsageCancel,
   usageLoading,
   usageError,
   onUsageRefresh,
@@ -60,6 +62,8 @@ export function SettingsPage({
   onArchivedSessionsChange?: () => void;
   usageSnapshot?: UsageStatisticsSnapshot | null;
   usageActivitySnapshot?: UsageActivitySnapshot | null;
+  usageProgress?: import("@actspace/shared").UsageQueryProgress | null;
+  onUsageCancel?: () => void;
   usageLoading?: boolean;
   usageError?: string | null;
   onUsageRefresh?: (range: UsageStatisticsSnapshot["range"], requestRowsPage?: number, status?: SettingsV4Snapshot["settings"]["activity"]["usage"]["status"], search?: string, kind?: import("@actspace/shared").UsageActivityKind) => void;
@@ -124,6 +128,8 @@ export function SettingsPage({
               onReplaceSettings={replaceSettings}
               usageSnapshot={usageSnapshot}
               usageActivitySnapshot={usageActivitySnapshot}
+              usageProgress={usageProgress}
+              onUsageCancel={onUsageCancel}
               usageLoading={usageLoading}
               usageError={usageError}
               onUsageRefresh={onUsageRefresh}
@@ -204,6 +210,8 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
         <UsageStatisticsPage
           snapshot={rest.usageSnapshot ?? null}
           activitySnapshot={rest.usageActivitySnapshot ?? null}
+          progress={rest.usageProgress}
+          onCancel={rest.onUsageCancel}
           isLoading={rest.usageLoading}
           error={rest.usageError}
           onRefresh={rest.onUsageRefresh}

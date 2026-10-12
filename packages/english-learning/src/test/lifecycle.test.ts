@@ -1,4 +1,4 @@
-import { ContextEngine, ContextSourceRegistry } from "@actspace/context";
+import { ContextEngine, ContextSourceRegistry } from "@actspace/context-engine";
 import { describe, expect, it, vi } from "vitest";
 import { createCordisRoot, emitNotification } from "@actspace/cordis-adapter";
 import { AgentScope } from "@actspace/core-scope";

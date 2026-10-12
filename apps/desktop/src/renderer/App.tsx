@@ -525,7 +525,9 @@ export function App() {
     refreshPendingApprovalStatuses(fresh).catch((error: unknown) => {
       console.error("Failed to refresh pending approval statuses", error);
     });
-    for (const id of fresh) void refreshTaskQueue(id).catch(reportSessionFailure(id, QUEUE_REFRESH_FAILED));
+    // Closed history with no pending tasks needs no write-lease/recovery merely
+    // to show a sidebar row. Selection and live updates still read the Session.
+    for (const id of fresh) if (visibleSessions.find(session => session.id === id)?.hasPendingTasks !== false) void refreshTaskQueue(id).catch(reportSessionFailure(id, QUEUE_REFRESH_FAILED));
   }, [knownHosts, refreshPendingApprovalStatuses, refreshTaskQueue, reportSessionFailure, visibleSessions]);
 
   // 归档 / 移除后释放会话的本地状态，并让它重新出现时重新补齐。当前会话不释放；运行中的会话等 run 结束。
@@ -657,6 +659,7 @@ export function App() {
 
   const loadMoreSessions = useCallback(async (input: import("@actspace/shared").SessionListPageInput) => {
     const page = await sessionsApi.listPage(input);
+    setListError(page.readModel?.status === "fallback" ? "查询索引暂不可用，已从会话文件读取" : page.failed ? `${page.failed} 个会话暂时无法读取，可重试` : null);
     const key = JSON.stringify([input.hostId ?? "local", input.workspaceRoot ?? "", input.pinned === true]);
     loadedListPages.current.set(key, (loadedListPages.current.get(key) ?? 1) + 1);
     setSessions(current => { const byId = new Map(current.map(s => [s.id, s])); for (const s of page.items) byId.set(s.id, s); return [...byId.values()]; });
@@ -667,6 +670,7 @@ export function App() {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     async function bootstrapSession() {
+      const selectionRequest = messageRequestRef.current;
       setListLoading(true); setListError(null);
       const [page, registry] = await Promise.all([
         sessionsApi.listPage(),
@@ -678,11 +682,12 @@ export function App() {
       setBrowseGroups(page.groups);
       setListLoading(page.indexing);
       if (page.failed) setListError(`${page.failed} 个会话暂时无法读取，可重试`);
+      else if (page.readModel?.status === "fallback") setListError("查询索引暂不可用，已从会话文件读取");
       if (registry) setWorkspaceRegistry(registry);
       if (page.indexing) {
         timer = setTimeout(() => { void bootstrapSession().catch(handleBootstrapError); }, 500);
       }
-      if (activeSessionIdRef.current) { setSessionBootstrapComplete(true); return; }
+      if (activeSessionIdRef.current || selectionRequest !== messageRequestRef.current) { setSessionBootstrapComplete(true); return; }
       if (page.indexing) return;
 
       const hiddenWorkspaceIds = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id));
@@ -808,9 +813,10 @@ export function App() {
         setActiveSessionId(created.meta.id);
         setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.worktree?.sourceWorkspaceRoot ?? created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
       }
-      const refreshed = await readSidebarSessions();
-      setSessions(refreshed);
-      await refreshWorkspaces();
+      // A cold catalog is optional navigation data, not a dependency of the
+      // first task in the newly created durable Session.
+      void readSidebarSessions().then(setSessions).catch(console.error);
+      void refreshWorkspaces().catch(console.error);
       return created;
     } catch (error) {
       console.error("Failed to create session", error);
@@ -977,6 +983,7 @@ export function App() {
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
     // Create only on first send, after workspace / branch / worktree selection.
     setActiveSessionId(null);
+    setSessionBootstrapComplete(true);
     patchLocal(DRAFT_COMPOSER_KEY, { composer: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" } });
     targetChoices.selectHost(input.hostId ?? null);
     if (input.workspaceId) targetChoices.selectWorkspace(input.workspaceId);

@@ -99,7 +99,9 @@ type SearchWorkspaceFilesResult =
 
 **停止点**：PB.2 完成后停下来确认。若真实 Electron 中文输入法、光标或焦点有不可接受的问题，按「回退」处理，不进入 PB.3。
 
-### PB.3 文件搜索 IPC
+### PB.3 文件搜索 IPC（待实施；以下路径是计划产物，不代表当前源码）
+
+本节保留未来 PB.3 的目标文件与通道名。PB 尚未实施，下面的 `workspace-file-search-service.ts`、IPC 通道和测试路径不能作为现行代码入口；当前实现仍以本节顶部的计划状态和现有源码为准。
 
 - `packages/shared/src/ipc.ts`：新增上面三个类型。
 - `packages/shared/src/runtime-v2/fixed-renderer.ts`：新增通道 `searchWorkspaceFiles: "runtime-v2:fixed-renderer:search-workspace-files"`。

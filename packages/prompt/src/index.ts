@@ -13,4 +13,4 @@ export * from "./skills/contributor.js";
 export * from "./skills/discovery.js";
 export { contextFromCandidate } from "./context-bridge.js";
 export * from "./extensions.js";
-export type { SourceFactory, SourceOptions } from "./context-sources/shared.js";
+export type { SourceFactory, SourceOptions } from "./context-source-support.js";

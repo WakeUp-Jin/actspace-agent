@@ -42,6 +42,23 @@ describe("使用统计", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("读取失败");
     expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
   });
+  it("shows Session fallback separately from an empty result", () => {
+    render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, readModel: { source: "session", status: "fallback" } }} />);
+    expect(screen.getByRole("status")).toHaveTextContent("当前结果从会话记录读取");
+    expect(screen.getByRole("table", { name: "请求日志" })).toBeInTheDocument();
+  });
+  it("makes incomplete statistics explicit when some Sessions cannot be read", () => {
+    render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, readModel: { source: "sqlite", status: "ready", failedSources: 2 } }} />);
+    expect(screen.getByRole("status")).toHaveTextContent("2 个会话暂时无法读取");
+    expect(screen.getByRole("status")).toHaveTextContent("当前统计不包含这些会话");
+  });
+  it("shows synchronization progress and cancels the active query", async () => {
+    const cancel = vi.fn();
+    render(<UsageStatisticsPage snapshot={null} isLoading progress={{ requestId: "q", phase: "syncing", completedSessions: 2, totalSessions: 8, eventsRead: 256 }} onCancel={cancel} />);
+    expect(screen.getAllByRole("status")[0]).toHaveTextContent("256");
+    await userEvent.click(screen.getByRole("button", { name: "取消查询" }));
+    expect(cancel).toHaveBeenCalledOnce();
+  });
   it("removes pricing UI and never reads or refreshes the catalog on entry", () => {
     const get = vi.fn(); const refresh = vi.fn();
     overrideBridge({ "models.getPricingCatalog": get, "models.refreshPricingCatalog": refresh });

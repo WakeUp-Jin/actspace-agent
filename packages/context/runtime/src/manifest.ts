@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.context-runtime", version: "0.1.0", name: "ActSpace Context runtime", entry: { entryId: "context.runtime", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["actspace.host.prompt"], contributions: { services: ["context.source.runtime"], tools: [], prompts: [], events: [] } });

@@ -1,10 +1,36 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { App } from "../App";
-import { setupBridge } from "./helpers/bridge";
+import { setupBridge, overrideBridge } from "./helpers/bridge";
 import { createMockSession, sessionProjection } from "../mock/mock-db";
 import type { SessionCreateInput } from "@actspace/shared";
+
+it("can send a new Session while the historical catalog is rebuilding, without a late list stealing selection", async () => {
+  const user = userEvent.setup();
+  let finishList!: (value: unknown) => void;
+  const list = new Promise(resolve => { finishList = resolve; });
+  const create = vi.fn(async (input: SessionCreateInput) => sessionProjection(createMockSession(bridge.db, input)));
+  const bridge = setupBridge({ "sessions.listPage": () => list, "sessions.create": create });
+  const submit = vi.fn(async (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => ({
+    task: { taskId: input.submissionId, submissionId: input.submissionId, content: { kind: "composer-task", original: input.userInput, prepared: input.userInput }, acceptedSeq: 1, state: "pending" as const, targetRunId: null, runId: null, continuationOf: null },
+    revision: 1, durableSeq: 1,
+  }));
+  overrideBridge({ "tasks.submit": submit });
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "新建会话" }));
+  const input = await screen.findByRole("textbox", { name: /消息|输入/ });
+  await user.type(input, "Start while history rebuilds");
+  await user.click(screen.getByLabelText("发送消息"));
+  await waitFor(() => expect(create).toHaveBeenCalledOnce());
+  await waitFor(() => expect(submit).toHaveBeenCalledWith(expect.objectContaining({ userInput: "Start while history rebuilds" })));
+  await act(async () => finishList({ items: [], groups: [], indexing: false, failed: 0 }));
+  await user.type(screen.getByRole("textbox", { name: /消息|输入/ }), "Continue this Session");
+  await user.click(screen.getByLabelText("发送消息"));
+  await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+  expect(submit.mock.calls[1][0].sessionId).toBe(submit.mock.calls[0][0].sessionId);
+  expect(create).toHaveBeenCalledOnce();
+});
 
 it("defers local creation until first send and preserves the returned worktree cwd", async () => {
   const user = userEvent.setup();

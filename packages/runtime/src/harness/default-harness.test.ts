@@ -1,5 +1,5 @@
 import { createContextHost } from "./context-host.js";
-import { codecs as contextCodecs } from "@actspace/context/codec";
+import { codecs as contextCodecs } from "@actspace/context-engine/codec";
 import { SessionStore } from "@actspace/session-persistence";
 import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";

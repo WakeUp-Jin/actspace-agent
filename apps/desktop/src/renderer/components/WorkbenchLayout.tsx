@@ -30,6 +30,7 @@ import { collectEditedFilePaths } from "./workbench/edited-files";
 import { PermissionModeControl } from "./workbench/PermissionModeControl";
 import { LEFT_MAX_WIDTH, LEFT_MIN_WIDTH, MAIN_MIN_WIDTH, RIGHT_MIN_WIDTH, usePanelLayout } from "./workbench/use-panel-layout";
 import { useSessionHistory } from "./workbench/use-session-history";
+import { useCurrentContext } from "./workbench/use-current-context";
 import { SPACE_DEMO_ENABLED } from "./space/space-demo-enabled";
 import { SpaceWorkbench } from "./space/SpaceWorkbench";
 import { SpaceRightPanel } from "./space/SpaceRightPanel";
@@ -38,6 +39,7 @@ import { SpaceTabBar } from "./space/tabs/SpaceTabBar";
 import { NewSpaceDialog } from "./space/dialogs/NewSpaceDialog";
 import { SpaceDemoHelpButton } from "./space/dialogs/SpaceDemoHelpDialog";
 import { useSpacePanelBinding } from "./space/use-space-panel-binding";
+import { TrajectoryNavigationProvider } from "./trajectory/TrajectoryNavigation";
 
 export function WorkbenchLayout({
   sessions,
@@ -100,12 +102,13 @@ export function WorkbenchLayout({
     : null;
   // The fixed request-context projection shares the popup's complete bucket estimate.
   const liveContextState = projectedContextEstimate?.contextState;
+  const currentContextState = useCurrentContext(activeSessionId, projectionCell?.snapshot?.throughJournalSeq, view === "chat");
   const useLiveContext = liveContextState && (!contextState || (liveContextState.throughJournalSeq ?? -1) > (contextState.throughJournalSeq ?? -1));
-  const effectiveContextState = useLiveContext ? liveContextState : contextState;
+  const effectiveContextState = currentContextState ?? (useLiveContext ? liveContextState : contextState);
   const effectiveContextSnapshot = useLiveContext ? projectedContextSnapshot : contextSnapshot ?? projectedContextSnapshot;
   const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
   const permissionMode = projectionCell?.snapshot?.permissionMode ?? "default";
-  const effectiveIsSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
+  const effectiveIsSessionReady = (projectedComposer != null && projectedComposer.phase !== "blank") || isSessionReady || projectionSessionReady;
   const sessionViewByIdRef = useRef(new Map<string, SessionMainView>());
   const [sessionMainView, setSessionMainView] = useState<SessionMainView>("chat");
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
@@ -129,6 +132,12 @@ export function WorkbenchLayout({
       }
       return next;
     });
+  }, [activeSessionId]);
+
+  // Context 面板「跳到轨迹」：切到轨迹视图，和标题栏按钮共用按会话记忆的状态。
+  const showSessionTrajectory = useCallback(() => {
+    setSessionMainView("trajectory");
+    if (activeSessionId) sessionViewByIdRef.current.set(activeSessionId, "trajectory");
   }, [activeSessionId]);
 
   const openReviewTab = useCallback(() => {
@@ -158,6 +167,26 @@ export function WorkbenchLayout({
   }, [isCompactLayout, setSpacePanelOpen]);
 
   const usageLoadSequence = useRef(0);
+  const usageRequest = useRef<string>();
+  const usageCursors = useRef(new Map<string, string>());
+  const [usageProgress, setUsageProgress] = useState<import("@actspace/shared").UsageQueryProgress | null>(null);
+  const cancelUsage = useCallback(() => {
+    const requestId = usageRequest.current;
+    if (!requestId) return;
+    usageRequest.current = undefined;
+    usageLoadSequence.current++;
+    setUsageLoading(false);
+    setUsageProgress(null);
+    setUsageError("查询已取消，可刷新重试。");
+    void usageApi.cancel({ requestId }).catch(error => setUsageError(error instanceof Error ? error.message : "取消查询失败。"));
+  }, []);
+  useEffect(() => {
+    if (view !== "settings" || settingsSection !== "usage") cancelUsage();
+    return () => {
+      const requestId = usageRequest.current;
+      if (requestId) void usageApi.cancel({ requestId }).catch(error => console.warn("Usage cancellation during page cleanup failed", error));
+    };
+  }, [view, settingsSection, cancelUsage]);
   const loadUsageStatistics = useCallback(async (
     range: UsageStatisticsSnapshot["range"] = "month",
     requestRowsPage = 1,
@@ -165,28 +194,46 @@ export function WorkbenchLayout({
     search = "",
     kind?: import("@actspace/shared").UsageActivityKind,
   ) => {
+    if (usageRequest.current) void usageApi.cancel({ requestId: usageRequest.current }).catch(error => console.warn("Superseded Usage cancellation failed", error));
+    const requestId = crypto.randomUUID();
+    usageRequest.current = requestId;
     const sequence = ++usageLoadSequence.current;
+    const cursorKey = JSON.stringify([range, status, search, kind, requestRowsPage]);
+    let polling = false;
+    const poll = setInterval(() => {
+      if (polling) return;
+      polling = true;
+      void usageApi.getStatus({ requestId }).then(progress => { if (sequence === usageLoadSequence.current) setUsageProgress(progress); })
+        .catch(error => { if (sequence === usageLoadSequence.current) setUsageError(error instanceof Error ? error.message : "读取查询进度失败。"); })
+        .finally(() => { polling = false; });
+    }, 300);
     setUsageLoading(true);
     setUsageError(null);
     try {
       // 不传 sessionId 即走 main 的 global 路径，聚合所有 Session 历史。
       const input = {
+        requestId,
         range,
         search,
         kind,
         scope: "global",
         ...(status === "all" ? {} : { status }),
-        requestRowsPage: { page: requestRowsPage },
+        requestRowsPage: { page: requestRowsPage, cursor: usageCursors.current.get(cursorKey) },
       } as const;
       const activitySnapshot = await usageApi.getActivity(input);
       if (sequence !== usageLoadSequence.current) return;
       setUsageActivitySnapshot(activitySnapshot);
+      if (activitySnapshot?.rowsPage.nextCursor) {
+        if (usageCursors.current.size >= 64) usageCursors.current.clear();
+        usageCursors.current.set(JSON.stringify([range, status, search, kind, requestRowsPage + 1]), activitySnapshot.rowsPage.nextCursor);
+      }
     } catch (error) {
       if (sequence !== usageLoadSequence.current) return;
       console.error("Failed to load usage statistics", error);
       setUsageError(error instanceof Error ? error.message : "使用统计加载失败，请重试。");
     } finally {
-      if (sequence === usageLoadSequence.current) setUsageLoading(false);
+      clearInterval(poll);
+      if (sequence === usageLoadSequence.current) { setUsageLoading(false); setUsageProgress(null); usageRequest.current = undefined; }
     }
   }, []);
 
@@ -275,6 +322,8 @@ export function WorkbenchLayout({
         onArchivedSessionsChange={onArchivedSessionsChange}
         usageSnapshot={usageSnapshot}
         usageActivitySnapshot={usageActivitySnapshot}
+        usageProgress={usageProgress}
+        onUsageCancel={cancelUsage}
         usageLoading={usageLoading}
         usageError={usageError}
         onUsageRefresh={(nextRange, requestRowsPage, status, search, kind) => {
@@ -306,7 +355,6 @@ export function WorkbenchLayout({
     <RightPanel
       developmentEnabled={composerMode !== "chat" && terminalEnabled}
       contextState={effectiveContextState}
-      contextSnapshot={effectiveContextSnapshot}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
       sessionId={activeSessionId}
       workspaceRoot={selectedWorkspaceRoot ?? undefined}
@@ -327,7 +375,7 @@ export function WorkbenchLayout({
   const rightPanelShown = view === "chat" ? isRightPanelOpen : hasRightPanel && spacePanelOpen;
 
   return (
-    <>
+    <TrajectoryNavigationProvider onShowTrajectory={showSessionTrajectory}>
       <WindowChromeBar
         leftMode={chromeLeftMode}
         rightOpen={rightPanelShown}
@@ -411,6 +459,6 @@ export function WorkbenchLayout({
         </div>
       ) : null}
       {SPACE_DEMO_ENABLED ? <NewSpaceDialog open={newSpaceOpen} onOpenChange={setNewSpaceOpen} onCreated={() => handleSelectView("space")} /> : null}
-    </>
+    </TrajectoryNavigationProvider>
   );
 }

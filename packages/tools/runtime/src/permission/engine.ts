@@ -26,7 +26,7 @@ export function combinePermissionDecisions(global: GlobalBoundaryDecision, tool:
   if (global.kind === "deny") return global;
   if (tool.kind === "deny") return tool;
   const reasons: PermissionReason[] = global.kind === "ask" ? [...global.reasons] : [];
-  if (tool.kind === "ask") reasons.push({ code: "TOOL_APPROVAL_REQUIRED", message: tool.reason, risk: tool.risk, reusable: false });
+  if (tool.kind === "ask") reasons.push({ code: "TOOL_APPROVAL_REQUIRED", message: tool.reason, risk: tool.risk, reusable: tool.reusable === true });
   if (reasons.length === 0) return { kind: "allow" };
   return { kind: "ask", reasons: Object.freeze(reasons) };
 }

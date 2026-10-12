@@ -1,8 +1,8 @@
+import { ContextPanelService } from "./context-panel-service";
 import { validateRunReferences as validateSharedRunReferences } from "@actspace/shared/composer-reference-validation";
 import type { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
 import { createSessionGateway } from "../session-gateway";
-import { paginateSessionSummaries } from "./session-list-page";
-import { UsageSourceCache } from "./usage-source-cache";
+import { UsageReadModelService } from "./usage-read-model";
 import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
 import { prepareExecutionContext, rollbackPreparedExecution } from "../workspace-git-context-service";
@@ -42,6 +42,7 @@ import {
   type CustomConnectionInput,
   type CustomConnectionTestInput,
   type CustomConnectionProbeInput,
+  projectManagedContextState,
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
@@ -83,8 +84,6 @@ import {
   projectChatEvents,
   projectSubagentTranscript,
   projectSubagentList,
-  projectIndexedUsageActivity,
-  projectIndexedUsageStatistics,
   toolPreview,
 } from "@actspace/client/sessions";
 import { listVisualizationsV2, visualizeReplyV2 } from "./fixed-renderer-visualization";
@@ -115,6 +114,9 @@ export type FixedRendererIpcRegistration = {
 };
 
 export function registerFixedRendererIpc(options: FixedRendererIpcOptions): FixedRendererIpcRegistration {
+  const readModel = usageReadModels.get(options.registry) ?? new UsageReadModelService(options.registry, options.roots.dataRoot);
+  usageReadModels.set(options.registry, readModel);
+  const contextPanel = new ContextPanelService(options.registry, readModel);
   let pendingQuickOpen = false;
   let unsubscribeSettingsV4 = () => undefined;
   const ipc = createIpcRegistrar({
@@ -135,8 +137,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
 
   ipc.handle(contract.sessions.listPage, async (input = {}) => {
     if (input.hostId) return { items: [], groups: [], indexing: false, failed: 0 };
-    const result = await options.registry.browseSessions();
-    return paginateSessionSummaries(result, input);
+    const service = usageReadModels.get(options.registry) ?? new UsageReadModelService(options.registry, options.roots.dataRoot);
+    usageReadModels.set(options.registry, service);
+    return service.getSessionPage(input);
   });
   ipc.handle(contract.sessions.getToolDetail, (input) => options.registry.browseToolDetail(input.sessionId, input.callId));
   ipc.handle(contract.sessions.getPage, (input) => options.registry.readSessionProjection(input));
@@ -303,7 +306,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   const unsubscribeLive = options.registry.subscribe((envelope) => {
-    if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update") usageSourceCaches.get(options.registry)?.invalidate();
+    if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update") usageReadModels.get(options.registry)?.invalidate();
     const target = options.getMainWindow();
     if (target === undefined || target.isDestroyed()) return;
     target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, envelope);
@@ -322,7 +325,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.settingsChangedV4, notification);
     }
   });
-  registerFixedRendererHostCapabilities(options, ipc);
+  registerFixedRendererHostCapabilities(options, ipc, contextPanel);
 
   ipc.handle(contract.quickOpen.consume, () => {
     if (!pendingQuickOpen) return null;
@@ -344,7 +347,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   return {
     dispose: () => {
       unsubscribeLive();
-      usageSourceCaches.delete(options.registry);
+      void usageReadModels.get(options.registry)?.dispose();
+      usageReadModels.delete(options.registry);
       unsubscribeRendererStream();
       unsubscribeSettingsV4();
       ipc.dispose();
@@ -549,7 +553,7 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, ipc: Ip
   });
 }
 
-function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, ipc: IpcRegistrar): void {
+function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, ipc: IpcRegistrar, contextPanel: ContextPanelService): void {
   const registryOptions = workspaceRegistryOptions(options.roots);
   const workspaceAccess = createWorkspaceAccessDeps(registryOptions, () => options.registry.listSessions());
   // 「新建文件夹工作区」的父目录来自系统对话框，不在 registry 里。只认用户最近一次在对话框里选的目录，
@@ -771,14 +775,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.updates.start, () => options.localUpdate.start());
 
-  ipc.handle(contract.sessions.describeContext, async (input) => {
-    try {
-      const snapshot = await options.registry.inspectSession(input.sessionId);
-      return projectContextState(snapshot, await options.registry.inspectSessionEvents(input.sessionId));
-    } catch {
-      return null;
-    }
-  });
+  ipc.handle(contract.sessions.describeContext, input => contextPanel.describeComposer(input.sessionId));
+  ipc.handle(contract.usage.getStatus, input => usageReadModels.get(options.registry)?.getStatus(input.requestId) ?? null);
+  ipc.handle(contract.usage.cancel, input => usageReadModels.get(options.registry)?.cancel(input.requestId));
+  ipc.handle(contract.sessions.describeContextPanel, input => contextPanel.describe(input));
+  ipc.handle(contract.sessions.listContextEntries, input => contextPanel.listEntries(input));
+  ipc.handle(contract.sessions.readContextEntry, input => contextPanel.readEntry(input));
   ipc.handle(contract.usage.getStatistics, (input) => createUsageStatistics(options.registry, options.roots.dataRoot, input));
   ipc.handle(contract.usage.getActivity, (input) => createUsageActivity(options.registry, options.roots.dataRoot, input));
   ipc.handle(contract.sessions.getSubagents, async (input) => {
@@ -925,17 +927,17 @@ async function createUsageStatistics(
   dataRoot: string,
   input: UsageStatisticsGetInput,
 ): Promise<UsageStatisticsSnapshot | null> {
-  let cache = usageSourceCaches.get(registry);
-  if (!cache) { cache = new UsageSourceCache(registry, dataRoot); usageSourceCaches.set(registry, cache); }
-  return projectIndexedUsageStatistics(await cache.read(), input);
+  const service = usageReadModels.get(registry) ?? new UsageReadModelService(registry, dataRoot);
+  usageReadModels.set(registry, service);
+  return service.getStatistics(input);
 }
 
-const usageSourceCaches = new WeakMap<DesktopRuntimeV2Registry, UsageSourceCache>();
+const usageReadModels = new WeakMap<DesktopRuntimeV2Registry, UsageReadModelService>();
 
 async function createUsageActivity(registry: DesktopRuntimeV2Registry, dataRoot: string, input: UsageStatisticsGetInput): Promise<UsageActivitySnapshot | null> {
-  let cache = usageSourceCaches.get(registry);
-  if (!cache) { cache = new UsageSourceCache(registry, dataRoot); usageSourceCaches.set(registry, cache); }
-  return projectIndexedUsageActivity(await cache.read(), { ...input, search: input.search?.slice(0, 300) });
+  const service = usageReadModels.get(registry) ?? new UsageReadModelService(registry, dataRoot);
+  usageReadModels.set(registry, service);
+  return service.getActivity({ ...input, search: input.search?.slice(0, 300) });
 }
 
 async function imagePreviewDataUrl(path: string): Promise<string | undefined> {

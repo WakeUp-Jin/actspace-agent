@@ -1,3 +1,4 @@
+import { readSessionWorkspaceFacts } from "./session-workspace-facts";
 import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-learning";
 import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearningTargetInput, type EnglishLearningState } from "@actspace/shared";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
@@ -43,6 +44,7 @@ export class DesktopRuntimeV2Registry {
   readonly #rendererStream = new FixedRendererStreamAdapter((sessionId) => this.#streamWorkspaces.get(sessionId));
   readonly #listeners = new Set<(event: RuntimeV2DesktopLiveEnvelope) => void>();
   #profile: BootedRuntimeProfile | undefined;
+  #workspaceDiscovery?: { controller: AbortController; task: Promise<void> };
   #bootPromise: Promise<void> | undefined;
   #switchPromise: Promise<boolean> | undefined;
   #reconfiguring = false;
@@ -141,13 +143,18 @@ export class DesktopRuntimeV2Registry {
   }
 
   browseSessions() { return this.requireApp().browseSessions(); }
+  sessionQuerySource(sessionId: string) { return this.requireApp().sessionQuerySource(sessionId); }
+  sessionQuerySources(): ReturnType<DesktopAppServiceContract["sessionQuerySources"]> { return this.requireApp().sessionQuerySources(); }
   globalSessionSummaries() { return this.requireApp().globalSessionSummaries(); }
   readSessionProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.requireApp().readSessionProjection(input); }
   readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.requireApp().readSessionObservation(input); }
   browseToolDetail(sessionId: string, callId: string) { return this.requireApp().browseToolDetail(sessionId, callId); }
   listSessions() { return this.requireApp().listSessions(); }
   inspectSession(sessionId: string) { return this.requireApp().inspectSession(sessionId); }
+  readSessionEventBatch(sessionId: string, input: Parameters<DesktopAppServiceContract["readSessionEventBatch"]>[1]): ReturnType<DesktopAppServiceContract["readSessionEventBatch"]> { return this.requireApp().readSessionEventBatch(sessionId, input); }
   inspectSessionEvents(sessionId: string) { return this.requireApp().inspectSessionEvents(sessionId); }
+  readContextEntryText(sessionId: string, scope: string, key: string, revision: number, generation: string) { return this.requireApp().readContextEntryText(sessionId, scope, key, revision, generation); }
+  readContextProjection(sessionId: string, logicalAgentScopeId?: string) { return this.requireApp().readContextProjection(sessionId, logicalAgentScopeId); }
   completeText(input: Parameters<DesktopAppServiceContract["completeText"]>[0]) { return this.requireApp().completeText(input); }
   async exportSession(sessionId: string) { return Object.freeze({ sessionId, jsonl: await this.requireApp().exportSession(sessionId) }); }
 
@@ -432,6 +439,9 @@ export class DesktopRuntimeV2Registry {
     this.#stopSessionRevisions = undefined;
     this.#stopLearningNotifications?.();
     this.#stopLearningNotifications = undefined;
+    this.#workspaceDiscovery?.controller.abort();
+    await this.#workspaceDiscovery?.task;
+    this.#workspaceDiscovery = undefined;
     const profile = this.#profile;
     if (profile === undefined) return;
     this.learningOperation++;
@@ -549,18 +559,19 @@ export class DesktopRuntimeV2Registry {
       }
       this.#browserSocketPath = booted.browserReady ? this.options.browser?.socketPath : undefined;
       this.options.browser?.setRuntimeReady?.(this.#browserReady);
-      // Restore admission from persisted session facts before the desktop starts serving them.
-      await readWorkspaceRegistry({
-        ...this.workspaceRegistryOptions(),
-        sessions: (await this.requireApp().listSessions()).map((session) => ({
-          id: session.sessionId,
-          title: session.metadata.title ?? "New chat",
-          updatedAt: session.updatedAt,
-          agentRunCount: session.completedTurnCount ?? 0,
-          workspaceRoot: session.workspaceRoot ?? undefined,
-          ...(session.worktree ? { worktree: session.worktree } : {}),
-        })),
-      });
+      // Startup only waits for registered workspaces. Discovery never grants
+      // tool authority: Agent factories resolve workspace from their own Session.
+      await readWorkspaceRegistry(this.workspaceRegistryOptions());
+      const controller = new AbortController();
+      const discoveryApp = this.requireApp();
+      const task = new Promise<void>(resolve => setImmediate(resolve)).then(async () => {
+        if (controller.signal.aborted) return;
+        await readSessionWorkspaceFacts(discoveryApp, sessionId => this.options.log?.("Skipped unreadable Session workspace facts", { sessionId }), {
+          signal: controller.signal,
+          onSession: async session => { if (!controller.signal.aborted) await readWorkspaceRegistry({ ...this.workspaceRegistryOptions(), sessions: [session] }); },
+        });
+      }).catch(error => { if (!controller.signal.aborted) this.options.log?.("Workspace discovery failed", { error: String(error) }); });
+      this.#workspaceDiscovery = { controller, task };
       this.#stopSessionRevisions = this.requireApp().subscribeSessionProjection(update => {
         this.#emit({ kind: "journal-update", sessionId: update.sessionId, throughJournalSeq: update.throughJournalSeq, update, ...(update.event.type === "session/title-set" ? { message: "session-title-updated" } : {}) });
       });

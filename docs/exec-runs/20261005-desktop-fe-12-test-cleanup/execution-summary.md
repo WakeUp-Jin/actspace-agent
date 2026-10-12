@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/12-测试整理执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/12-测试整理执行计划.md`
 - **执行过程**：`docs/exec-runs/20261005-desktop-fe-12-test-cleanup/execution-process.md`
 - **执行模式**：交互，连续执行
 - **执行结果**：完成（T0–T8 全部完成，另有一个处理只读复核发现的提交）。本计划只改测试、检查脚本和两个 `data-state` 属性，没有用户可感知的变化，验收只需回归冒烟

@@ -27,6 +27,7 @@ export * from "./browser-bridge";
 export * from "./skills";
 export * from "./settings";
 export * from "./context-buckets";
+export * from "./context-panel";
 export * from "./data-root";
 export * from "./session";
 export * from "./session-transcript";

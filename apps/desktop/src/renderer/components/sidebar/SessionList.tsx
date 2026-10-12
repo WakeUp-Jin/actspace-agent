@@ -20,6 +20,7 @@ type SessionListProps = {
   /** 由 Sidebar 包一层（先切回聊天视图），所以不直接读 SessionActionsContext。 */
   onSelectSession: (sessionId: string) => void;
   groupKey: string;
+  group?: { hostId?: string; workspaceRoot?: string };
   workspaces?: WorkspaceEntry[];
 };
 
@@ -31,6 +32,7 @@ export function SessionList({
   sessionStatuses,
   onSelectSession,
   groupKey,
+  group,
   workspaces = [],
 }: SessionListProps) {
   const { onTogglePin, onRenameSession: onRename, onCopySessionId, onCopyTranscript, onForkSession: onFork, onArchiveSession: onArchive } = useSessionActions();
@@ -38,7 +40,7 @@ export function SessionList({
   const [limit, setLimit] = useState(SESSION_VISIBLE_LIMIT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const remoteGroups = browse?.groups.filter(g => groupKey === 'pinned' ? g.pinned : !g.pinned && g.hostId === sessions[0]?.hostId && g.workspaceRoot === (sessions[0]?.workspaceRoot ?? '')) ?? [];
+  const remoteGroups = browse?.groups.filter(g => groupKey === 'pinned' ? g.pinned : !g.pinned && g.hostId === (group?.hostId ?? sessions[0]?.hostId) && g.workspaceRoot === (group?.workspaceRoot ?? sessions[0]?.worktree?.sourceWorkspaceRoot ?? sessions[0]?.workspaceRoot ?? '')) ?? [];
   const remoteMore = remoteGroups.some(g => g.hasMore);
   const hasOverflow = browse ? remoteMore : sessions.length > limit;
   const visibleSessions = browse ? sessions : sessions.slice(0, limit);
@@ -48,7 +50,7 @@ export function SessionList({
     setLoading(true); setError(null);
     try {
       for (const group of remoteGroups.filter(g => g.hasMore)) {
-        const last = [...sessions].filter(s => s.hostId === group.hostId && (s.workspaceRoot ?? '') === group.workspaceRoot).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)).at(-1);
+        const last = [...sessions].filter(s => s.hostId === group.hostId && (s.worktree?.sourceWorkspaceRoot ?? s.workspaceRoot ?? '') === group.workspaceRoot).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)).at(-1);
         await browse.loadMore({ hostId: group.hostId, workspaceRoot: group.workspaceRoot, pinned: group.pinned, after: last?.id });
       }
     } catch (e) { setError(e instanceof Error ? e.message : '会话加载失败'); }

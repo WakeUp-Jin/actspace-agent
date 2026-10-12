@@ -13,6 +13,8 @@ export type SectionProps = {
   onReplaceSettings: (settings: AppSettings) => void;
   usageSnapshot?: UsageStatisticsSnapshot | null;
   usageActivitySnapshot?: UsageActivitySnapshot | null;
+  usageProgress?: import("@actspace/shared").UsageQueryProgress | null;
+  onUsageCancel?: () => void;
   usageLoading?: boolean;
   usageError?: string | null;
   onUsageRefresh?: (range: UsageStatisticsSnapshot["range"], requestRowsPage?: number, status?: SettingsV4Snapshot["settings"]["activity"]["usage"]["status"], search?: string, kind?: import("@actspace/shared").UsageActivityKind) => void;

@@ -304,6 +304,8 @@ export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal:
   });
 }
 
+type UsageSession = Pick<RuntimeV2SessionSnapshot, "sessionId" | "throughJournalSeq" | "workspaceRoot" | "metadata">;
+
 type ActivityRequestState = {
   requestId: string;
   agentRunId: string;
@@ -324,7 +326,7 @@ type ActivityRequestState = {
 
 const activityRowsCache = new WeakMap<readonly SessionEventEnvelopeV1[], { revision: number; sessionId: string; rows: UsageActivityRow[] }>();
 
-export function projectSessionUsageActivities(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): UsageActivityRow[] {
+export function projectSessionUsageActivities(snapshot: UsageSession, journal: readonly SessionEventEnvelopeV1[]): UsageActivityRow[] {
   const cached = activityRowsCache.get(journal);
   if (cached?.revision === snapshot.throughJournalSeq && cached.sessionId === snapshot.sessionId) return cached.rows;
   const runByTurn = new Map<string, string>();
@@ -431,7 +433,7 @@ export function projectSessionUsageActivities(snapshot: RuntimeV2SessionSnapshot
   return rows;
 }
 
-function activityRowForRequest(snapshot: RuntimeV2SessionSnapshot, state: ActivityRequestState): UsageActivityRow {
+function activityRowForRequest(snapshot: UsageSession, state: ActivityRequestState): UsageActivityRow {
   const terminal = state.assistant && Object.keys(record(record(state.assistant.data).usage)).length ? state.assistant : state.stepEnd ?? state.assistant;
   const terminalData = terminal ? record(terminal.data) : {};
   const usage = record(terminalData.usage ?? record(state.retry?.data).usage);
@@ -468,7 +470,7 @@ function activityRowForRequest(snapshot: RuntimeV2SessionSnapshot, state: Activi
   };
 }
 
-function activityRowForTool(snapshot: RuntimeV2SessionSnapshot, call: SessionEventEnvelopeV1, terminal: SessionEventEnvelopeV1 | undefined, runByTurn: Map<string, string>): UsageActivityRow {
+function activityRowForTool(snapshot: UsageSession, call: SessionEventEnvelopeV1, terminal: SessionEventEnvelopeV1 | undefined, runByTurn: Map<string, string>): UsageActivityRow {
   const callData = record(call.data);
   const terminalData = terminal ? record(terminal.data) : {};
   const callId = string(callData.callId) ?? string(callData.toolCallId) ?? `call-${call.seq}`;

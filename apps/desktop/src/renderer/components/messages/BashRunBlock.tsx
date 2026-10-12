@@ -2,7 +2,8 @@ import { ChevronDown, ChevronRight, MoreHorizontal, TerminalSquare } from "lucid
 import { useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
-import { ApprovalActions, ApprovalCard, ApprovalReason, useApprovalDecision } from "./ApprovalParts";
+import { ApprovalActions, ApprovalCard, getCommandPrefixGrant, useApprovalDecision, useCommandPrefixGrantSuggestion } from "./ApprovalParts";
+import { getShellCommandHeads, tokenizeShellCommand, type ShellTokenKind } from "./shell-highlight";
 import { TOOL_LOG_LINE_TEXT_RUNNING_CLASS, getToolLogRunningTextAttrs } from "./toolLogStyles";
 
 type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
@@ -23,9 +24,18 @@ const BASH_OUTPUT_TEXT_CLASS =
 const BASH_PROMPT_CLASS = "bash-prompt text-text-faint";
 const BASH_INTENT_COMMENT_CLASS =
   "bash-intent-comment font-mono text-[length:var(--act-font-mono-size,13px)] italic leading-[1.55] text-text-faint";
-const BASH_APPROVAL_INTENT_CLASS = "min-w-0 truncate text-text-main";
+const BASH_APPROVAL_INTENT_CLASS = "min-w-0 truncate text-text-muted";
+const BASH_APPROVAL_HEADS_CLASS = "bash-approval-heads min-w-0 shrink-[2] truncate";
+// act-code-hl 提供随主题翻转的语法色（markdown.css）；命令名用红橙、连接符用蓝，接近终端里的常见配色。
 const BASH_APPROVAL_COMMAND_CLASS =
-  "bash-approval-command m-0 whitespace-pre-wrap rounded-act-sm bg-surface-subtle px-3 py-2 font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.55] text-text-main [overflow-wrap:anywhere]";
+  "bash-approval-command act-code-hl m-0 max-h-[168px] overflow-auto whitespace-pre-wrap px-3 pt-2.5 pb-0.5 font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.6] text-text-main [overflow-wrap:anywhere]";
+const SHELL_TOKEN_CLASS: Record<ShellTokenKind, string | undefined> = {
+  command: "text-(--md-hl-variable)",
+  operator: "text-(--md-hl-function)",
+  string: "text-(--md-hl-string)",
+  flag: "text-text-muted",
+  text: undefined,
+};
 
 export function BashRunBlock({ message, replyCompleted = false, onExpand }: { message: BashMessage; replyCompleted?: boolean; onExpand?: () => void }) {
   if (message.status === "pending") {
@@ -137,6 +147,7 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
 
 function BashApprovalBlock({ message }: { message: BashMessage }) {
   const decision = useApprovalDecision(message.approvalRequestId);
+  const suggestion = useCommandPrefixGrantSuggestion(message.approvalRequestId);
 
   if (decision.resolved) {
     const denied = decision.resolved === "deny";
@@ -153,23 +164,50 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
     );
   }
 
+  const heads = getShellCommandHeads(message.command).join(", ");
   return (
     <ApprovalCard
       icon={<TerminalSquare size={14} strokeWidth={2} />}
-      verb="运行"
-      target={<span className={BASH_APPROVAL_INTENT_CLASS} title={message.intent}>{message.intent || "Bash 命令"}</span>}
-      meta={<>
-        <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} />
-        <ApprovalReason reason={message.reason} />
+      target={<>
+        <span className={BASH_APPROVAL_INTENT_CLASS} title={message.intent}>{message.intent || "Bash 命令"}</span>
+        {heads ? <span className={BASH_APPROVAL_HEADS_CLASS}>{heads}</span> : null}
       </>}
-      footerMeta={message.cwd ? <span title={message.cwd}>cwd <code className="font-mono">{message.cwd}</code></span> : null}
-      actions={<ApprovalActions state={decision} primaryLabel="运行" size="card" />}
+      divided
+      footerMeta={<BashApprovalEnvironment sandboxed={message.sandboxed} cwd={message.cwd} />}
+      actions={<ApprovalActions
+        state={decision}
+        primaryLabel="运行"
+        suggestion={suggestion}
+        sessionDetail={suggestion ? getCommandPrefixGrant(suggestion) ?? undefined : undefined}
+      />}
     >
       <pre className={BASH_APPROVAL_COMMAND_CLASS}>
-        <span className={BASH_PROMPT_CLASS}>$ </span>{message.command}
+        <span className={`${BASH_PROMPT_CLASS} select-none`}>$ </span>
+        {tokenizeShellCommand(message.command).map((token, index) => {
+          const className = SHELL_TOKEN_CLASS[token.kind];
+          return className ? <span key={index} className={className}>{token.text}</span> : token.text;
+        })}
       </pre>
     </ApprovalCard>
   );
+}
+
+/** 底部左侧：执行环境（沙盒 / 真实环境），模型显式指定了工作目录时再跟上 cwd。 */
+function BashApprovalEnvironment({ sandboxed, cwd }: Pick<BashMessage, "sandboxed" | "cwd">) {
+  const showCwd = Boolean(cwd && cwd !== "." && cwd !== "./");
+  if (sandboxed === undefined && !showCwd) return null;
+  return <>
+    {sandboxed === undefined ? null : (
+      <span
+        className="bash-approval-environment flex-none"
+        title={sandboxed ? "命令在沙盒内运行" : "命令会在沙盒外运行，可以访问整台电脑的文件和网络"}
+      >
+        {sandboxed ? "沙盒" : "真实环境"}
+      </span>
+    )}
+    {sandboxed !== undefined && showCwd ? <span aria-hidden="true">·</span> : null}
+    {showCwd ? <code className="min-w-0 truncate font-mono" title={cwd}>{cwd}</code> : null}
+  </>;
 }
 
 function getExecutionSummary(message: BashMessage): string {

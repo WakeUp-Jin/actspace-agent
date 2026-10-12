@@ -181,8 +181,9 @@ apps/desktop/src/renderer/components/messages/MermaidDiagramBlock.tsx
 apps/desktop/src/renderer/components/messages/mermaid-renderer.ts
   lazy renderer adapter, source policy, fixed security config, theme registry
 
-apps/desktop/src/renderer/components/messages/mermaid-preview.tsx
-  only if expanded preview has enough behavior to justify a separate component
+apps/desktop/src/renderer/components/messages/MermaidPreviewDialog.tsx
+  expanded preview dialog; the test fixture keeps its separate
+  `apps/desktop/src/renderer/test/fixtures/mermaid-preview.tsx` name
 
 apps/desktop/src/renderer/appearance/types.ts
 apps/desktop/src/renderer/appearance/storage.ts

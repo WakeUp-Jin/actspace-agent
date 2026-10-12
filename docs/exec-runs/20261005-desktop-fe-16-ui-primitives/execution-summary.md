@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md`
 - **执行过程**：`docs/exec-runs/20261005-desktop-fe-16-ui-primitives/execution-process.md`
 - **现行规范**：`docs/design-docs/frontend/front-基础组件封装规范.md`「弹层原语」「按钮收口与检查」「大组件拆分的目录约定」
 - **执行模式**：交互，连续执行

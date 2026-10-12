@@ -25,25 +25,10 @@
       "import": "./dist/plugin.js",
       "default": "./dist/plugin.js"
     },
-    "./sources/system": {
-      "types": "./dist/context-sources/system.d.ts",
-      "import": "./dist/context-sources/system.js",
-      "default": "./dist/context-sources/system.js"
-    },
-    "./sources/rules": {
-      "types": "./dist/context-sources/rules.d.ts",
-      "import": "./dist/context-sources/rules.js",
-      "default": "./dist/context-sources/rules.js"
-    },
-    "./sources/skills": {
-      "types": "./dist/context-sources/skills.d.ts",
-      "import": "./dist/context-sources/skills.js",
-      "default": "./dist/context-sources/skills.js"
-    },
-    "./sources/runtime": {
-      "types": "./dist/context-sources/runtime.d.ts",
-      "import": "./dist/context-sources/runtime.js",
-      "default": "./dist/context-sources/runtime.js"
+    "./source-support": {
+      "types": "./dist/context-source-support.d.ts",
+      "import": "./dist/context-source-support.js",
+      "default": "./dist/context-source-support.js"
     }
   },
   "scripts": {
@@ -53,7 +38,7 @@
   },
   "dependencies": {
     "@actspace/cordis-adapter": "workspace:*",
-    "@actspace/context": "workspace:*",
+    "@actspace/context-engine": "workspace:*",
     "@actspace/core-agent": "workspace:*",
     "@actspace/core-scope": "workspace:*",
     "@actspace/shared": "workspace:*",

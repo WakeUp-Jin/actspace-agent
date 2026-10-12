@@ -6,7 +6,7 @@ export const AGENT_RUNTIME_HOST_PORT_ID = "actspace.host.agent" as const;
 
 export type AgentRuntimeHostPort = {
   readonly evolution?: import("@actspace/plugin-manager").PluginManagerPort;
-  readonly contextDisclosure?: import("@actspace/context").DisclosureHost;
+  readonly contextDisclosure?: import("@actspace/context-disclosure").DisclosureHost;
   readonly authorizeHarness?: import("@actspace/harness-control").HarnessAuthorizer;
   readonly onHarnessDiagnostic?: (error: unknown) => void;
   readonly disabledHarnessEntries?: readonly string[];

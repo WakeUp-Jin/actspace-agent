@@ -1,11 +1,12 @@
 import { CustomModelReasoningFields } from "./CustomModelReasoningFields";
 import type { CustomModelReasoning } from "@actspace/shared";
-import { useEffect, useRef, useState } from "react";
-import { Boxes, Check, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Boxes, Plus, Trash2 } from "lucide-react";
 import { PROVIDER_IDS, PROVIDER_REGISTRY, type AppSettings, type InstalledModelView, type ModelKey, type ProviderSettingsView, type LlmProviderId } from "@actspace/shared";
 import { SectionShell, Toggle } from "./SettingsPrimitives";
 import { Select } from "../ui/Select";
 import { OpenRouterModelCatalogDialog } from "./OpenRouterModelCatalogDialog";
+import { ModelMultiSelector } from "./ModelMultiSelector";
 import { modelsApi } from "../../api/models";
 import { settingsApi } from "../../api/settings";
 
@@ -65,7 +66,8 @@ export function ModelSettings({ settings, onChanged, embedded = false, embeddedP
     {reasoningModel ? <div className="grid gap-3 py-3"><h4 className="text-act-sm font-semibold text-text-main">{reasoningModel.definition.label}</h4><CustomModelReasoningFields apiModel={reasoningModel.definition.apiModel} value={reasoningConfig} onChange={setReasoningConfig} /><div className="flex justify-end gap-3"><button type="button" disabled={savingReasoning} onClick={() => setReasoningModel(null)}>取消推理配置</button><button type="button" disabled={savingReasoning} onClick={() => void saveReasoning()}>保存推理配置</button></div></div> : null}
         {!embeddedPlain ? <div className="flex items-center justify-between gap-4"><div><p className="text-act-xs text-text-faint">停用后会立即从输入框与任务模型候选中移除。</p></div>{!embedded ? <div className="flex flex-wrap justify-end gap-2"><button type="button" className="inline-flex h-9 items-center gap-1.5 rounded-act-md border border-line bg-surface px-3 text-act-xs font-semibold text-text-main transition-colors hover:border-line-strong hover:bg-hover-overlay active:scale-[0.98]" onClick={() => setCatalogOpen(true)}><Plus size={15} />从 OpenRouter 添加</button></div> : null}</div> : null}
         {error ? <p role="alert" className="mt-3 text-act-xs text-on-danger">{error}</p> : null}
-        <div className={embeddedPlain ? "grid gap-5" : "mt-3 grid gap-5"}>
+        {/* minmax(0,1fr)：grid 子项默认 min-width:auto，单行截断的内容会把轨道撑宽。 */}
+        <div className={embeddedPlain ? "grid grid-cols-[minmax(0,1fr)] gap-5" : "mt-3 grid grid-cols-[minmax(0,1fr)] gap-5"}>
           {PROVIDER_IDS.filter((provider) => !providerFilter || provider === providerFilter).map((provider) => {
             const models = installed.filter((model) => model.definition.provider === provider && (connectionFilter
               ? model.settings.connectionId === connectionFilter
@@ -87,26 +89,6 @@ export function ModelSettings({ settings, onChanged, embedded = false, embeddedP
       ) : null}
     </>
   );
-}
-
-function ModelMultiSelector({ models, onChange, onReasoning }: { models: InstalledModelView[]; onChange: (keys: ModelKey[]) => void | Promise<void>; onReasoning?: (model: InstalledModelView) => void }) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const ref = useRef<HTMLDivElement | null>(null);
-  const enabled = models.filter((model) => model.settings.enabled).map((model) => model.definition.key);
-  const filtered = models.filter((model) => `${model.definition.label} ${model.definition.apiModel}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false); };
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => { document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("keydown", onKeyDown); };
-  }, [open]);
-  const labels = enabled.map((key) => models.find((model) => model.definition.key === key)?.settings.customLabel ?? models.find((model) => model.definition.key === key)?.definition.label ?? key);
-  const allVisible = filtered.length > 0 && filtered.every((model) => enabled.includes(model.definition.key));
-  const toggle = (key: ModelKey) => { const next = enabled.includes(key) ? enabled.filter((item) => item !== key) : [...enabled, key]; void onChange(next); };
-  return <div ref={ref} className="relative"><button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label="选择启用模型" onClick={() => setOpen((value) => !value)} className="flex h-10 w-full items-center justify-between gap-3 rounded-act-md border border-line bg-surface px-3 text-left text-act-sm text-text-main hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"><span className="min-w-0 truncate">{labels.length ? labels.join(", ") : "选择模型"}</span><ChevronDown size={15} className="shrink-0 text-text-faint" aria-hidden="true" /></button>{open ? <div role="listbox" aria-label="启用模型" className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-act-md border border-line bg-surface shadow-act-float"><label className="relative block border-b border-line"><Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" /><input autoFocus aria-label="搜索模型" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索模型" className="h-9 w-full bg-transparent pl-9 pr-3 text-act-xs text-text-main outline-none placeholder:text-text-faint" /></label><button type="button" role="option" aria-selected={allVisible} onClick={() => { const next = allVisible ? enabled.filter((key) => !filtered.some((model) => model.definition.key === key)) : Array.from(new Set([...enabled, ...filtered.map((model) => model.definition.key)])); void onChange(next); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-act-xs font-semibold text-text-main hover:bg-hover-overlay"><span className={`grid h-5 w-5 place-items-center rounded-act-sm border ${allVisible ? "border-action bg-action text-surface" : "border-line"}`}>{allVisible ? <Check size={13} aria-hidden="true" /> : null}</span>全部启用</button><div className="max-h-56 overflow-y-auto border-t border-line">{filtered.map((model) => { const checked = enabled.includes(model.definition.key); return <div key={model.definition.key} className="flex items-center gap-2"><button type="button" role="option" aria-selected={checked} onClick={() => toggle(model.definition.key)} className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-act-xs text-text-main hover:bg-hover-overlay"><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-act-sm border ${checked ? "border-action bg-action text-surface" : "border-line"}`}>{checked ? <Check size={13} aria-hidden="true" /> : null}</span><span className="min-w-0 truncate">{model.settings.customLabel ?? model.definition.label}</span></button>{model.definition.source === "custom" && onReasoning ? <button type="button" aria-label={`配置推理能力：${model.definition.label}`} className="mr-2 shrink-0 text-act-xxs text-text-muted hover:text-action" onClick={() => onReasoning(model)}>配置推理</button> : null}</div>; })}</div></div> : null}</div>;
 }
 
 function ModelRow({ model, provider, connections, onToggle, onRemove, onCredentialChange, onConnectionChange, onReasoning }: { model: InstalledModelView; provider?: ProviderSettingsView; connections: Array<{ id: string; label: string }>; onToggle: (key: ModelKey, enabled: boolean) => void; onRemove: (key: ModelKey) => void; onCredentialChange: (key: ModelKey, credentialId: string | null) => void; onConnectionChange: (key: ModelKey, connectionId: string | null) => void; onReasoning?: () => void }) {

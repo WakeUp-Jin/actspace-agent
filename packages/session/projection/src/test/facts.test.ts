@@ -44,3 +44,19 @@ describe("Session facts", () => {
     expect(registry.snapshot(header.sessionId).values.sessionGrants).toEqual([]);
   });
 });
+
+
+it("restores a process grant and replays its revocation", () => {
+  const { header, journal } = fixture();
+  const grant = { schemaVersion: 1, grantId: "bash-g", sessionId: header.sessionId, agentId: "main:todos", audience: { pluginId: "actspace.shell-tools", permissionDomain: "bash", policyVersion: 1 }, action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: "/workspace" }, sourceRequestId: "r", sourceCallId: "c", sourceToolName: "bash", issuedAt: "2026-10-11T00:00:00Z" };
+  journal.append({ type: "permission/grant-added", eventVersion: 1, source, data: grant, surface: null });
+  const reload = () => {
+    const replay = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal.events });
+    const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value);
+    registry.sync(header.sessionId, replay.events);
+    return registry.snapshot(header.sessionId).values.sessionGrants;
+  };
+  expect(reload()).toEqual([grant]);
+  journal.append({ type: "permission/grant-revoked", eventVersion: 1, source, data: { schemaVersion: 1, grantId: "bash-g", sessionId: header.sessionId, agentId: "main:todos", revokedAt: "2026-10-11T01:00:00Z" }, surface: null });
+  expect(reload()).toEqual([]);
+});

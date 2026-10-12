@@ -1,5 +1,5 @@
-import { renderSystemPrompt } from "@actspace/context";
-export { renderSystemPrompt } from "@actspace/context";
+import { renderSystemPrompt } from "@actspace/context-engine";
+export { renderSystemPrompt } from "@actspace/context-engine";
 import { createHash } from "node:crypto";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { ContributorRegistry } from "./registry.js";

@@ -244,9 +244,11 @@ describe("BashRunBlock tooltips", () => {
     });
 
     const card = screen.getByRole("article");
-    expect(card).toHaveClass("approval-card");
-    expect(card.querySelector(".approval-card-head")).toHaveTextContent("运行构建桌面端");
-    expect(screen.getByText("pnpm build", { exact: false })).toHaveClass("bash-approval-command");
+    expect(card).toHaveClass("approval");
+    expect(card.querySelector(".approval-card-head")).toHaveTextContent("构建桌面端pnpm");
+    expect(card.querySelector(".bash-approval-command")).toHaveTextContent("$ pnpm build");
+    // 命令名单独着色。
+    expect(screen.getByText("pnpm", { selector: ".bash-approval-command span" })).toHaveClass("text-(--md-hl-variable)");
     expect(screen.getByText("/workspace/actspace-agent")).toBeInTheDocument();
     const footer = card.querySelector(".approval-card-footer");
     expect(footer).toContainElement(screen.getByRole("button", { name: "运行" }));

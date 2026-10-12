@@ -106,4 +106,4 @@ ActSpace 的非敏感模型配置继续写入 `<userData>/settings.json`：
 - `packages/prompt/src/request-snapshot.ts`
 - `packages/runtime/src/projection/durable-session.ts` 与 `packages/client/src/sessions/selectors.ts`
 - `apps/desktop/src/renderer/components/ContextPopup.tsx`
-- `apps/desktop/src/renderer/components/right-panel/ContextRenderView.tsx`
+- `apps/desktop/src/renderer/components/right-panel/context/ContextPanel.tsx`（2026-10-11 取代 `ContextRenderView.tsx`）

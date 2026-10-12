@@ -1,3 +1,4 @@
+import { formatShare } from "../../context-format";
 import { Folder, GitBranch, GitFork, Laptop, Server } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import type { ContextUsageSnapshot, SessionRunLocation } from "@actspace/shared";
@@ -23,7 +24,7 @@ export function contextUsageDisplay(snapshot: ContextUsageSnapshot | null) {
     : ringPercent >= 75
       ? "var(--act-color-warning)"
       : "var(--act-color-text-faint)";
-  const percentLabel = snapshot && snapshot.maxTokens > 0 && snapshot.totalTokens > 0 && percent < 1 ? "<1" : `${Math.floor(percent)}`;
+  const percentLabel = formatShare(snapshot?.totalTokens ?? 0, snapshot?.maxTokens ?? 0);
   return { percentLabel, ringPercent, ringColor };
 }
 
@@ -68,7 +69,7 @@ export function ComposerStatusRow({ form, target, notReady, host, remoteDescript
     <span className={USAGE_CLASS} aria-label="上下文用量暂不可用">—</span>
   ) : (
     // 原生 button（从 Composer 搬来）：状态行里的纯文字 + 圆环入口，没有 Button 的边框、内边距和字重。
-    <button className={USAGE_CLASS} type="button" aria-label={`上下文用量 ${display.percentLabel}%`} aria-expanded={context.open} onClick={context.onToggle}>
+    <button className={USAGE_CLASS} type="button" aria-label={`上下文用量 ${display.percentLabel}`} aria-expanded={context.open} onClick={context.onToggle}>
       <span
         className={USAGE_DOT_CLASS}
         aria-hidden="true"
@@ -78,7 +79,7 @@ export function ComposerStatusRow({ form, target, notReady, host, remoteDescript
           mask: USAGE_DOT_MASK,
         }}
       />
-      <span>{display.percentLabel}%</span>
+      <span>{display.percentLabel}</span>
     </button>
   );
 

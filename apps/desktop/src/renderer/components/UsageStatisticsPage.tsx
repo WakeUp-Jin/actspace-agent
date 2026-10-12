@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useEffect, useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
 import type { SettingsV4NamespacePatch, SettingsV4Snapshot, UsageActivityAggregate, UsageActivityKind, UsageActivitySnapshot, UsageCostSummary, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
@@ -13,6 +14,8 @@ type Props = {
   snapshot: UsageStatisticsSnapshot | null;
   activitySnapshot?: UsageActivitySnapshot | null;
   isLoading?: boolean;
+  progress?: import("@actspace/shared").UsageQueryProgress | null;
+  onCancel?: () => void;
   error?: string | null;
   onRefresh?: (range: Range, page?: number, status?: Status, search?: string, kind?: UsageActivityKind) => void;
   onRequestPageChange?: (page: number, range: Range, status?: Status, search?: string, kind?: UsageActivityKind) => void;
@@ -34,7 +37,8 @@ const number = (value: number | null | undefined) => value == null ? "—" : val
 const summaryCostFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const money = (summary?: UsageCostSummary) => !summary || summary.knownCostRequestCount === 0 ? "费用未知" : Number.isFinite(summary.costUsd) ? summaryCostFormatter.format(summary.costUsd) : "—";
 
-export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, onRefresh, onRequestPageChange, settingsV4, onUpdateNamespace }: Props) {
+export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, progress, onCancel, onRefresh, onRequestPageChange, settingsV4, onUpdateNamespace }: Props) {
+  const errorSummary = error?.startsWith("Error invoking remote method ") ? "使用统计读取失败，请重试。" : error;
   const saved = settingsV4?.settings.activity.usage;
   const [range, setRange] = useState<Range>(saved?.range === "24h" ? "day" : saved?.range === "7d" ? "week" : saved?.range === "all" ? "total" : "month");
   const [tab, setTab] = useState<Tab>(saved?.activeTab === "pricing" ? "requests" : saved?.activeTab ?? "requests");
@@ -68,7 +72,19 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
         <div className="inline-flex rounded-act-md border border-line/60 bg-surface-subtle p-0.5" role="tablist" aria-label="统计时间范围">{ranges.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={range === value} className={`h-6 rounded-act-sm px-3 text-act-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30 ${range === value ? "bg-surface font-medium text-text-main shadow-act-xs" : "text-text-muted hover:text-text-main"}`} onClick={() => setRange(value)}>{label}</button>)}</div>
         <Tooltip><TooltipTrigger asChild><button type="button" className={button} aria-label="刷新使用统计" disabled={isLoading} onClick={() => onRefresh?.(range, page?.page ?? 1, queryStatus, search, kind)}><RefreshCw size={15} className={isLoading ? "animate-spin motion-reduce:animate-none" : ""} /></button></TooltipTrigger><TooltipContent>刷新使用统计</TooltipContent></Tooltip>
       </div>
-      {error ? <div role="alert" className="flex items-center justify-between rounded-act-md bg-danger-soft px-3 py-2 text-act-xs text-on-danger"><span>{error}</span><button className={button} onClick={() => onRefresh?.(range, 1, queryStatus, search, kind)}>重试</button></div> : null}
+      {isLoading && progress ? <div className="flex items-center justify-between gap-3 text-act-xs text-text-muted" role="status"><span>{({ queued: "等待查询", checking: "检查使用记录", syncing: "正在同步使用记录", rebuilding: "正在重建统计索引", querying: "正在查询", fallback: "正在从会话记录读取", cancelled: "正在取消" } as const)[progress.phase]} · {progress.completedSessions}/{progress.totalSessions} 个会话 · 已读取 {number(progress.eventsRead)} 条记录</span><Button size="sm" variant="ghost" onClick={onCancel} disabled={progress.phase === "cancelled"}>取消查询</Button></div> : null}
+      {data?.readModel?.failedSources ? <p role="status" className="text-act-sm text-warning">有 {number(data.readModel.failedSources)} 个会话暂时无法读取，当前统计不包含这些会话。可刷新重试。</p> : null}
+      {data?.readModel?.status === "fallback" ? <p role="status" className="text-act-sm text-warning">统计索引暂不可用，当前结果从会话记录读取。可刷新重试。</p> : null}
+      {error ? <div role="alert" className="flex items-start gap-2 rounded-act-md bg-danger-soft px-3 py-2 text-act-xs text-on-danger">
+        <div className="min-w-0 flex-1">
+          <p className="m-0 whitespace-pre-wrap break-all">{errorSummary}</p>
+          {error !== errorSummary ? <details className="mt-1">
+            <summary className="cursor-pointer focus-visible:outline-2 focus-visible:outline-focus-ring">错误详情</summary>
+            <p className="m-0 mt-1 whitespace-pre-wrap break-all">{error}</p>
+          </details> : null}
+        </div>
+        <button className={`${button} shrink-0 whitespace-nowrap`} onClick={() => onRefresh?.(range, 1, queryStatus, search, kind)}>重试</button>
+      </div> : null}
       {isLoading && !data ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-act-sm text-text-faint">正在读取使用记录…</div> : <section aria-label="使用概览" className="-mt-5 grid grid-cols-4 gap-2.5 max-[800px]:grid-cols-2 max-[400px]:grid-cols-1">
         <Metric label="请求数" value={number(summary?.requestCount)} detail="模型调用" />
         <Metric label="Token 用量" value={number(summary?.totalTokens)} detail={`输入 ${number(summary?.inputTokens)} · 输出 ${number(summary?.outputTokens)}`} />
@@ -86,7 +102,11 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
           {tab === "requests" ? <label className="ml-auto flex h-[30px] shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-act-xs text-text-muted">显示明细<Toggle ariaLabel="显示明细" checked={details} onChange={setDetails} /></label> : null}
         </div>
         {tab === "providers" || tab === "models" || tab === "tools" ? <AggregateTable rows={data?.aggregates?.[tab] ?? []} tools={tab === "tools"} search={search} pending={Boolean(isLoading || error)} /> : !details ? <div className="flex items-center justify-between gap-3 rounded-act-md border border-line px-4 py-4 text-act-sm text-text-muted"><span>当前仅显示汇总，开启详细记录查看模型和工具调用。</span><button className={button} onClick={() => setDetails(true)}>显示记录</button></div> : <>
-          <div className={tableFrame}>
+          <div className={tableFrame} onFocusCapture={(event) => {
+            // Native focus scrolling may leave a partially visible trigger
+            // clipped when Shift+Tab moves back across a narrow table.
+            (event.target as HTMLElement).closest("td")?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+          }}>
             <table aria-label="请求日志" className="w-full min-w-[800px] table-fixed text-act-sm leading-5">
               <colgroup><col className="w-[125px]" /><col className="w-[55px]" /><col /><col className="w-[130px]" /><col className="w-[80px]" /><col className="w-[95px]" /><col className="w-[75px]" /><col className="w-[65px]" /></colgroup>
               <thead className={tableHead}><tr><th className={cell}>时间</th><th className={cell}>类型</th><th className={cell}>对象</th><th className={cell}>会话</th><th className={numberCell}>Token</th><th className={numberCell}>费用</th><th className={numberCell}>耗时</th><th className={cell}>状态</th></tr></thead>

@@ -21,6 +21,7 @@ import {
 } from "./mock-db";
 import { emitLiveMessage, type MockClock } from "./clock";
 import { MOCK_REPLY, playReply, type ReplyPlayback } from "./stream-player";
+import { mockContextPanelView, mockContextState } from "./context-panel-fixture";
 
 /** 按域覆盖 mock 实现；未覆盖的成员用默认实现，默认也没有的成员调用时 reject。 */
 export type MockHandlers = { [D in keyof DesktopBridge]?: Partial<DesktopBridge[D]> };
@@ -30,6 +31,7 @@ const SYSTEM_PROMPT = "你是 ActSpace 的主 Agent。\n- 先理解需求，再�
 /** 分页视图建立在 `sessions.list` 之上：测试只覆盖 `sessions.list` 时，侧栏分页读到的是同一份数据。 */
 async function listPage(clock: MockClock, input: SessionListPageInput): Promise<SessionListPage> {
   const items = (await clock.bridge.sessions.list({})).filter((item) =>
+    (!input.search || (!item.hostId && item.title.toLowerCase().includes(input.search.toLowerCase()))) &&
     (input.hostId === undefined || item.hostId === input.hostId) &&
     (input.workspaceRoot === undefined || item.workspaceRoot === input.workspaceRoot) &&
     (input.pinned === undefined || Boolean(item.pinned) === input.pinned));
@@ -168,9 +170,10 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         for (const sessionId of sessionIds) requireSession(db, sessionId).archived = true;
         return { ok: true, archivedSessionIds: sessionIds, failedSessionIds: [] };
       },
-      describeContext: async () => null,
+      describeContext: async ({ sessionId }) => db.sessions.has(sessionId) ? mockContextState(mockContextPanelView(sessionId, db.sessions.get(sessionId))) : null,
+      describeContextPanel: async ({ sessionId, release }) => release ? null : mockContextPanelView(sessionId, db.sessions.get(sessionId)),
     },
-    usage: { getStatistics: async () => null, getActivity: async () => null },
+    usage: { getStatus: async () => null, cancel: async () => undefined, getStatistics: async () => null, getActivity: async () => null },
     // 浏览器里没有 pty：列表为空，其余操作在 UI 上不会出现（终端入口只在开发功能开启时显示）。
     terminal: { list: async () => ({ terminals: [] }) },
     settings: {

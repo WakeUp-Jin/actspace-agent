@@ -112,8 +112,9 @@ export function ConversationView({
     ? "active"
     : requestedComposerPhase ?? (durableMessageCount === 0 ? "blank" : "active");
   const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
-  const resolvedSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
-  const isInitialComposer = !browse?.messageLoading && !sessionError && !browse?.listLoading && resolvedSessionReady && resolvedComposerPhase === "blank" && !isStreaming;
+  const resolvedSessionReady = (projectedComposer != null && projectedComposer.phase !== "blank") || isSessionReady || projectionSessionReady;
+  const waitingForInitialList = browse?.listLoading && !resolvedSessionReady;
+  const isInitialComposer = !browse?.messageLoading && !sessionError && !waitingForInitialList && resolvedSessionReady && resolvedComposerPhase === "blank" && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const messageStackRef = useRef<HTMLDivElement | null>(null);
@@ -287,7 +288,7 @@ export function ConversationView({
     onConnectHost,
   };
 
-  if (messages.length === 0 && (browse?.messageLoading || browse?.listLoading || sessionError)) {
+  if (messages.length === 0 && (browse?.messageLoading || waitingForInitialList || sessionError)) {
     return <main className={CONVERSATION_SHELL_CLASS}><p role={sessionError ? 'alert' : 'status'} className="px-5 py-4 text-act-md leading-5 text-text-muted">
       {sessionError ?? (browse?.messageLoading ? '正在加载消息…' : '正在加载会话…')}
       {sessionError && !locatorError && <button type="button" onClick={retrySession}>重试</button>}

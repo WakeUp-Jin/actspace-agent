@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.context-conversation", version: "0.1.0", name: "ActSpace Context Conversation", entry: { entryId: "context.conversation", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: [], contributions: { services: ["context.source.conversation"], tools: [], prompts: [], events: [] } });

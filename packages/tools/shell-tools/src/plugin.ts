@@ -1,3 +1,6 @@
+import { realpath } from "node:fs/promises";
+import { analyzeCommandPrefixGrant } from "./command-prefix.js";
+import { isPathWithin } from "@actspace/tools-runtime";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { getBashHardRejectReason } from "./command-rules.js";
@@ -46,16 +49,26 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
 function permissionContract(name: ToolName): ToolPermissionContract {
   if (name !== "bash") return { extractResources: () => [], evaluate: () => ({ kind: "allow" as const }) };
   const contract: ToolPermissionContract = {
-    extractResources: (args, context) => {
+    grantAudience: { pluginId: SHELL_TOOLS_PLUGIN_ID, permissionDomain: "bash", policyVersion: 1 },
+    extractResources: async (args, context) => {
       const command = typeof args.command === "string" ? args.command : "";
-      return [{ kind: "process" as const, access: "execute" as const, commandDigest: createHash("sha256").update(command).digest("hex"), cwd: typeof args.cwd === "string" ? resolve(context.workspaceRoot, args.cwd) : context.workspaceRoot, dynamic: false }];
+      const workspaceRoot = await realpath(context.workspaceRoot);
+      const cwd = await realpath(resolve(context.workspaceRoot, typeof args.cwd === "string" ? args.cwd : "."));
+      const noSandbox = Array.isArray(args.requiredPermissions) && args.requiredPermissions.includes("no_sandbox");
+      const analysis = !noSandbox && isPathWithin(workspaceRoot, cwd) ? analyzeCommandPrefixGrant(command) : undefined;
+      return [{ kind: "process" as const, access: "execute" as const, commandDigest: createHash("sha256").update(command).digest("hex"), cwd, workspaceRoot, noSandbox, dynamic: false, ...(analysis ? { argv: analysis.argv, grantPrefix: analysis.prefix } : {}) }];
     },
-    evaluate: (args, _resources, context) => {
+    evaluate: (args, resources, context) => {
       const command = typeof args.command === "string" ? args.command : "";
       const cwd = typeof args.cwd === "string" ? resolve(context.workspaceRoot, args.cwd) : context.workspaceRoot;
       const reason = getBashHardRejectReason(command, cwd, context.workspaceRoot);
-      return reason ? { kind: "deny" as const, code: "BASH_COMMAND_DENIED", reason } : { kind: "ask" as const, reason: "Allow Bash to run this command once?", risk: "high" as const };
+      return reason ? { kind: "deny" as const, code: "BASH_COMMAND_DENIED", reason } : { kind: "ask" as const, reason: "Allow Bash to run this command once?", risk: "high" as const, reusable: resources.some(resource => resource.kind === "process" && resource.grantPrefix !== undefined) };
     },
+    suggestGrants: (_args, resources) => resources.flatMap(resource => resource.kind === "process" && resource.grantPrefix && resource.workspaceRoot && resource.noSandbox === false ? [{
+      action: "process.execute" as const, access: "execute" as const,
+      selector: { kind: "command_prefix" as const, prefix: resource.grantPrefix, cwdRoot: resource.workspaceRoot },
+      label: `允许当前会话在当前工作区内运行符合规则的 ${resource.grantPrefix.join(" ")} 命令，包括项目脚本；执行环境沿用现有设置`,
+    }] : []),
   };
   return Object.freeze(contract);
 }

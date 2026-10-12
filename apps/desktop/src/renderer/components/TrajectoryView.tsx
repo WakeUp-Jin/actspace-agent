@@ -4,10 +4,12 @@ import { selectTrajectory } from '@actspace/client/sessions';
 import type { RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useOptionalSessionProjection } from '../session';
-import { buildTrajectorySnapshot, groupVirtualRows, searchTrajectory, type TrajectoryRecord, type TrajectoryTimeRange, type TrajectoryTimelineMode } from '../trajectory';
+import { buildTrajectorySnapshot, findRevealRecord, groupVirtualRows, searchTrajectory, type TrajectoryRecord, type TrajectoryTimeRange, type TrajectoryTimelineMode } from '../trajectory';
 import { TrajectoryTimeline } from './trajectory/TrajectoryTimeline';
 import { TrajectoryDetails } from './trajectory/TrajectoryDetails';
+import { useTrajectoryNavigation } from './trajectory/TrajectoryNavigation';
 import { RoleBadge, roleOf } from './trajectory/presentation';
+import { IconButton } from './ui/IconButton';
 
 function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | undefined) {
   const projection = useOptionalSessionProjection();
@@ -100,6 +102,23 @@ export function TrajectoryView({ snapshot }: { snapshot?: RuntimeV2TrajectorySna
     setFocusId(record.id);
   };
   const select = (record: TrajectoryRecord) => { setSelectedId(record.id); focus(record); };
+  // 从 Context 面板等处跳进来：记录就绪后定位并选中；找不到时在顶部留一行说明。
+  const navigation = useTrajectoryNavigation();
+  const pendingReveal = navigation?.pending ?? null;
+  const [revealMissed, setRevealMissed] = useState(false);
+  const selectRef = useRef(select);
+  selectRef.current = select;
+  useEffect(() => {
+    if (!pendingReveal || !runtime) return;
+    const record = findRevealRecord(runtime.records, pendingReveal.target);
+    if (record) {
+      setQuery(''); setRange(null); setRevealMissed(false);
+      selectRef.current(record);
+    } else {
+      setRevealMissed(true);
+    }
+    navigation?.consume(pendingReveal.seq);
+  }, [pendingReveal, runtime, navigation]);
   const navigateRelated = (record: TrajectoryRecord) => {
     if (matches && !matches.has(record.id)) setQuery('');
     if (focusIds && !focusIds.has(record.id)) setRange(null);
@@ -118,6 +137,10 @@ export function TrajectoryView({ snapshot }: { snapshot?: RuntimeV2TrajectorySna
     </div>
     {initialError && <p role="alert" className="px-4 text-act-xs leading-4 text-text-muted">{initialError} <button onClick={() => { if (bridge && selectedSession) void bridge.open(selectedSession).catch(() => undefined); }}>重试</button></p>}
     {initialLoading && !runtime && <p role="status" className="px-4 text-act-xs leading-4 text-text-muted">正在加载轨迹…</p>}
+    {revealMissed && <div role="status" className="flex shrink-0 items-center gap-2 border-b border-line bg-surface-subtle px-3 py-1.5 text-act-xs text-text-muted">
+      <span className="min-w-0 flex-1">没有在已加载的轨迹里找到这条记录。{historyStart > 0 || remoteHistory?.previousFromSeq != null ? '它可能在更早的历史里，可以点下方的「Load earlier history」后再试。' : ''}</span>
+      <IconButton label="关闭说明" size="xs" onClick={() => setRevealMissed(false)}><X size={12} /></IconButton>
+    </div>}
     {!runtime || !runtime.records.length ? <p className="m-0 px-4 py-4 text-act-xs text-text-muted">{!runtime ? source.projection?.cell?.status === 'loading' ? '正在加载轨迹…' : source.projection?.cell?.error ?? '当前 Session 暂无可展示的 Agent 轨迹。' : '当前 Session 尚未产生可展示的 Agent Loop 事件。'}</p> : <>
       <TrajectoryTimeline runtime={runtime} selectedId={selectedId} matches={matches} range={range} onRange={setRange} onSelect={select} onFocus={focus} />
       <div className="relative flex min-h-0 flex-1">

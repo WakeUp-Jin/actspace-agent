@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.context-rules", version: "0.1.0", name: "ActSpace Context rules", entry: { entryId: "context.rules", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["actspace.host.prompt"], contributions: { services: ["context.source.rules"], tools: [], prompts: [], events: [] } });

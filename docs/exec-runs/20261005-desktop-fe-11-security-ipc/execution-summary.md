@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md`
 - **执行过程**：`docs/exec-runs/20261005-desktop-fe-11-security-ipc/execution-process.md`
 - **执行模式**：交互，连续执行
 - **执行结果**：完成（T0–T10 全部完成，另有一个处理只读复核发现的提交；Dock 重开、真实外链、新建文件夹对话框等需要人工操作的项交给验收）

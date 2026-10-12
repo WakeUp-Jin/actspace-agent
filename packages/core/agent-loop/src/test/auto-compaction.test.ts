@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CompactionPlugin } from "@actspace/compaction";
+import type { CompactionPlugin } from "@actspace/context-compaction";
 import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
 import { runToolStreamFixture } from "../testing.js";
 

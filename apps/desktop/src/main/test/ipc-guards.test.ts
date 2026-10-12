@@ -5,6 +5,14 @@ import { IPC_INPUT_GUARDS } from "../ipc/guards";
 type Case = { spec: InvokeSpec<unknown, unknown>; valid: unknown[]; invalid: unknown[] };
 
 const CASES: Record<string, Case> = {
+  "sessions.describeContextPanel": { spec: contract.sessions.describeContextPanel, valid: [{ sessionId: "s" }, { sessionId: "s", consumerId: "c", release: true }], invalid: [null, { sessionId: 2 }, { sessionId: "s", retry: "yes" }] },
+  "sessions.listContextEntries": { spec: contract.sessions.listContextEntries, valid: [{ sessionId: "s", revision: "r", limit: 200 }], invalid: [{ sessionId: "s" }, { sessionId: "s", revision: "r", limit: Infinity }] },
+  "sessions.readContextEntry": { spec: contract.sessions.readContextEntry, valid: [{ sessionId: "s", revision: "r", key: "k", offset: 0 }], invalid: [{ sessionId: "s", revision: "r", path: "/etc/passwd" }, { sessionId: "s", revision: "r", key: "k", offset: "1" }] },
+  "sessions.listPage": { spec: contract.sessions.listPage, valid: [undefined, {}, { search: "hello", limit: 50 }], invalid: [{ search: "x".repeat(301) }, { limit: 501 }, { pinned: "true" }] },
+  "usage.getActivity": { spec: contract.usage.getActivity, valid: [{}, { model: "alpha", providerId: "provider" }, { range: "total", requestRowsPage: { page: 1, limit: 500, cursor: "abc" } }], invalid: [null, { model: ["alpha"] }, { providerId: "x".repeat(301) }, { search: "x".repeat(301) }, { requestRowsPage: { page: -1 } }, { requestId: "../x" }] },
+  "usage.getStatistics": { spec: contract.usage.getStatistics, valid: [{}, { scope: "global", status: "error" }], invalid: [[], { range: "year" }, { requestRowsPage: { limit: Infinity } }] },
+  "usage.getStatus": { spec: contract.usage.getStatus, valid: [{ requestId: "q-123" }], invalid: [{}, { requestId: "" }, { requestId: 1 }] },
+  "usage.cancel": { spec: contract.usage.cancel, valid: [{ requestId: "q-123" }], invalid: [undefined, { requestId: "a b" }] },
   "sessions.create": { spec: contract.sessions.create, valid: [undefined, {}, { runLocation: "worktree", branch: "main", agentForm: "agent" }], invalid: [null, { runLocation: "invalid" }, { branch: [] }, { agentForm: "plan" }, { hostId: "host", runLocation: "worktree" }] },
   "workspaces.readFile": { spec: contract.workspaces.readFile, valid: [{ relativePath: "a.ts" }, { workspaceRoot: "/w", relativePath: "a.ts" }], invalid: [undefined, { workspaceRoot: "/w" }, { relativePath: 1 }] },
   "workspaces.statFile": { spec: contract.workspaces.statFile, valid: [{ workspaceRoot: null, relativePath: "a.ts" }], invalid: [{ relativePath: ["a"] }] },

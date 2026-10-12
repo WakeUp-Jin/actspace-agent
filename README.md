@@ -110,7 +110,7 @@ Host capability -> browser-bridge
 - `packages/agent-host` / `client` / `agent-service`：进程与认证接入、客户端连接、内容队列与统一任务调度。
 - `packages/harness-control`：组合准备、授权、启用与恢复；Run 固定当前组合，后续 Run 可采用新组合。
 - `packages/session/storage` / `jsonl` / `persistence`：存储中性契约、文件实现与 Session 业务语义，保留未来数据库接入边界。
-- `packages/core`、`packages/session`、`packages/llm`、`packages/context`、`packages/prompt`、`packages/tools`、`packages/subagent`、`packages/compaction`：领域 package 与真实 Plugin Entry。
+- `packages/core`、`packages/session`、`packages/llm`、`packages/context/*`、`packages/prompt`、`packages/tools`、`packages/subagent`：领域 package 与真实 Plugin Entry；`packages/context/engine` 是上下文管理引擎，其余同级目录是按类型拆分的 Context 插件包。
 - `packages/shared`：跨进程和 Host-facing 公共契约。
 - `browser-bridge`：独立 Go / Chrome Extension Host capability，不属于 pnpm workspace plugin 目录。
 

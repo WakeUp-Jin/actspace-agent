@@ -216,7 +216,7 @@ describe("FileDiffBlock approval state", () => {
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
 
-    expect(screen.getByRole("article")).toHaveClass("approval-row");
+    expect(screen.getByRole("article")).toHaveClass("approval");
     expect(screen.getByText("编辑")).toBeInTheDocument();
     expect(screen.getByText("vocab.md")).toBeInTheDocument();
     // 未识别的原因不丢失，收进原因图标的 title。
@@ -260,7 +260,7 @@ describe("FileDiffBlock approval state", () => {
     });
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
-    const sessionButton = await screen.findByRole("button", { name: "本会话" });
+    const sessionButton = await screen.findByRole("button", { name: "本会话允许" });
     expect(sessionButton).toHaveAttribute("title", "This file only");
     expect(screen.queryByText("This directory tree")).toBeNull();
     await userEvent.click(sessionButton);

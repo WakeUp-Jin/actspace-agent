@@ -287,7 +287,7 @@ type WorkspacePreparationPayload = {
 
 ## 运行目标（本机与远端）
 
-> 2026-10-06 按[计划 15](../../exec-plans/active/20261005-desktop-frontend-refactor/15-运行目标执行计划.md)实施，设计来源是 [03 运行目标抽象](../../desktop-frontend-refactor/03-运行目标抽象-本机与远端.md)。代码在 `apps/desktop/src/renderer/target/`。
+> 2026-10-06 按[计划 15](../../exec-plans/completed/20261005-desktop-frontend-refactor/15-运行目标执行计划.md)实施，设计来源是 [03 运行目标抽象](../../desktop-frontend-refactor/03-运行目标抽象-本机与远端.md)。代码在 `apps/desktop/src/renderer/target/`。
 
 上文的 Workspace、Branch、Worktree 都是本机运行目标的属性。远端 Host 是另一种运行目标。组件不再判断 `hostId` 或 `host:` 前缀，只读下面几个值。
 

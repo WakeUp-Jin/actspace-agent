@@ -159,6 +159,7 @@ export function WorkspaceSection({
           sessionStatuses={sessionStatuses}
           onSelectSession={onSelectSession}
           groupKey={group.key}
+          group={group}
           workspaces={workspaces}
         />
       )}

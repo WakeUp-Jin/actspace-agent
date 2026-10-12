@@ -51,8 +51,9 @@ ActSpace 支持：
 | 键盘焦点、输入框 focus、分割线拖动 | `focus-ring` | 中性墨灰 |
 | 普通链接 | `link` | info |
 | 文字选中 | `--act-color-selection` | 中性 20% |
+| 工具审批主按钮（2026-10-11） | `Button variant="accent"` | action 反色 |
 
-- 其它位置不得消费 accent：普通主按钮、导航 / 列表选中、状态点、进度条、审批条、数据色、用户消息卡都不随强调色变化。
+- 其它位置不得消费 accent：普通主按钮、导航 / 列表选中、状态点、进度条、审批卡边框与删除按钮、数据色、用户消息卡都不随强调色变化。
 - 新增调色板 = `appearance/accents.ts` 一行 + `tokens.css` 一个 `:root[data-accent]` 块 + 一个 `--act-preview-accent-*` 色样；`pnpm check:frontend-theme` 校验一一对应与 4.5:1 对比度。
 
 ### Semantic

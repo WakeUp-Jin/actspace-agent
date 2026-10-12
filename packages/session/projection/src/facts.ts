@@ -1,5 +1,5 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { type FileGrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
+import { isCommandPrefixSelector, type GrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
 import { SessionProjectionRegistry } from "./registry.js";
 
 export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;
@@ -121,12 +121,14 @@ function grantFromData(data: Data): SessionGrant | null {
   const audience = record(data.audience);
   const selector = record(data.selector);
   if (data.schemaVersion !== 1 || !isText(data.grantId) || !isText(data.sessionId) || !isText(data.agentId) || !isText(data.sourceRequestId) || !isText(data.sourceCallId) || !isText(data.sourceToolName) || !isText(data.issuedAt)) return null;
-  if ((data.action !== "file.read" && data.action !== "file.write") || (data.access !== "read" && data.access !== "write")) return null;
-  if ((data.action === "file.read") !== (data.access === "read")) return null;
+  const process = data.action === "process.execute";
+  if (!process && data.action !== "file.read" && data.action !== "file.write") return null;
+  if (data.access !== (process ? "execute" : data.action === "file.read" ? "read" : "write")) return null;
   if (!isText(audience.pluginId) || !isText(audience.permissionDomain) || !Number.isSafeInteger(audience.policyVersion)) return null;
-  let parsedSelector: FileGrantSelector;
-  if (selector.kind === "exact" && isText(selector.canonicalPath)) parsedSelector = { kind: "exact", canonicalPath: selector.canonicalPath };
-  else if (selector.kind === "subtree" && isText(selector.canonicalRoot)) parsedSelector = { kind: "subtree", canonicalRoot: selector.canonicalRoot };
+  let parsedSelector: GrantSelector;
+  if (process && isCommandPrefixSelector(selector)) parsedSelector = selector;
+  else if (!process && selector.kind === "exact" && isText(selector.canonicalPath)) parsedSelector = { kind: "exact", canonicalPath: selector.canonicalPath };
+  else if (!process && selector.kind === "subtree" && isText(selector.canonicalRoot)) parsedSelector = { kind: "subtree", canonicalRoot: selector.canonicalRoot };
   else return null;
   return { schemaVersion: 1, grantId: data.grantId, sessionId: data.sessionId, agentId: data.agentId, audience: { pluginId: audience.pluginId, permissionDomain: audience.permissionDomain, policyVersion: audience.policyVersion as number }, action: data.action as GrantAction, access: data.access as GrantAccess, selector: parsedSelector, sourceRequestId: data.sourceRequestId, sourceCallId: data.sourceCallId, sourceToolName: data.sourceToolName, issuedAt: data.issuedAt, ...(isText(data.expiresAt) ? { expiresAt: data.expiresAt } : {}) };
 }

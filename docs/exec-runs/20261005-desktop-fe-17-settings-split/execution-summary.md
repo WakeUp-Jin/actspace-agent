@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md`
 - **执行过程**：`docs/exec-runs/20261005-desktop-fe-17-settings-split/execution-process.md`
 - **现行文档**：`docs/design-docs/core-storage-and-observability.md`「设置与凭据」
 - **执行模式**：交互，连续执行

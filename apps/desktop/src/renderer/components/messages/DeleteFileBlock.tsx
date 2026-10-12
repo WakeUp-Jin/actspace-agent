@@ -1,6 +1,5 @@
-import { Trash2 } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
-import { ApprovalActions, ApprovalPath, ApprovalReason, ApprovalRow, useApprovalDecision } from "./ApprovalParts";
+import { ApprovalActions, ApprovalCard, ApprovalPath, ApprovalReason, useApprovalDecision } from "./ApprovalParts";
 import { ToolLogLine } from "./ToolLogLine";
 
 type DeleteMessage = Extract<MessageBlock, { kind: "delete" }>;
@@ -24,10 +23,8 @@ export function DeleteFileBlock({ message, className }: { message: DeleteMessage
   }
 
   return (
-    <ApprovalRow
+    <ApprovalCard
       className={className}
-      tone="danger"
-      icon={<Trash2 size={14} strokeWidth={2} />}
       verb="删除"
       target={<ApprovalPath path={message.filePath} />}
       meta={<ApprovalReason reason={message.reason} />}

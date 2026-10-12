@@ -25,6 +25,8 @@ Host Cordis 树装配：`session.journal` → `session.storage` → `session.sto
 - Provider：`identity`、`inspect(sessionId)`、`listSessionIds()`、`create(header)`、`open(sessionId, access)`、`discard(handle)`、`close()`。
 - 会话 Handle：`header`、`access`、`read()`、`append(events)`、`flush()`、`assertOwned()`、`close()`。
 - 快照：`revision`、`header`、`events`、`integrity`、可选 `problem`。
+- 可选轻量描述：`querySource` / `querySources` 返回必要 Header 字段、完整前缀 seq 与 Provider 不透明 stamp；Runtime 对打开的 Session 额外以 durableSeq 限定。此能力不返回完整语义 snapshot。Runtime 对调用者返回 `{ sources, failedSessionIds }`，逐会话隔离不可读描述符，并附加独立 codecSetDigest；Provider 未实现查询加速时返回 null，由目录调用者走原 Session 路径。
+- 可选查询加速：`readEventBatch(sessionId, { cursor?, throughSeq })`，返回有界 `events`、不透明 `cursor` 与 `done`；不参与恢复、写入或 flush，cursor 只能由同一 Provider/Session 解释。
 
 `inspect` 一次返回快照和 revision，不另造一次 stat 后再 read 的公共时序。revision 是不透明值，只能在同一 Provider identity、同一 Session 下比较；调用者不得解释为文件偏移或数据库版本号。
 
@@ -54,7 +56,7 @@ SessionStore 读取父快照，计算合法 fork 种子，预留子会话的 wri
 
 缓存最多保留 3 份完整事件快照，并按序列化字符估算的 16 MiB 预算淘汰；这是保留缓存预算，不是读取过程峰值内存上限。
 
-当前冷读实现读取完整一致快照；revision 未变时复用语义投影。旧磁盘 checkpoint 和全局列表缓存不再作为当前真源，全局列表从当前 Provider 重建。此实现简化了后端边界，但不承诺大历史冷读性能与旧文件索引相同；后续优化应在该契约内测量，不能让通用层重新绕过 Provider 读文件。
+Session 详情冷读仍读取完整一致快照；revision 未变时复用语义投影。Usage 派生索引使用新增的有界 `readEventBatch`，JSONL Provider 负责在独立 Worker 中解析并校验连续前缀；Main 与通用 Runtime 不解释物理 cursor。旧磁盘 checkpoint 和全局列表缓存不再作为当前真源，全局列表从当前 Provider 重建。此实现简化了后端边界，但不承诺大历史冷读性能与旧文件索引相同；后续优化应在该契约内测量，不能让通用层重新绕过 Provider 读文件。
 
 ## 6. 替换与验证边界
 

@@ -9,6 +9,7 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
   let summaryError = false;
   let titleHold = false;
   let summaryHold = false;
+  let retryNextRun = false;
   const server = createServer(async (request, response) => {
     try {
       if (request.method === "GET") {
@@ -21,9 +22,14 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
       const body = JSON.parse(raw);
       const messages = body.messages ?? [];
       const system = JSON.stringify(messages.filter(item => item.role === "system" || item.role === "developer"));
-      const isSummary = system.includes("Summarize the supplied Agent history faithfully");
+      const isSummary = !body.tools?.length && (
+        system.includes("Summarize the supplied Agent history faithfully") ||
+        system.includes("You are a context summarization agent.")
+      );
       const isTitle = /title|标题/i.test(system) && !body.tools?.length && !isSummary;
-      const lastUser = messages.findLastIndex(item => item.role === "user");
+      // Runtime supplements are user-role messages too. Choose the human task
+      // so a fresh runtime-state block does not suppress the fixture scenario.
+      const lastUser = messages.findLastIndex(item => item.role === "user" && !JSON.stringify(item.content ?? "").includes("<runtime_context "));
       const content = JSON.stringify(messages[lastUser]?.content ?? "");
       const toolResults = messages.slice(lastUser + 1).filter(item => item.role === "tool");
       const entry = { id: initialRequestId + requests.length + 1, model: body.model, isSummary, isTitle, content, toolResults: toolResults.length,
@@ -31,9 +37,11 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
       requests.push(entry);
       if (logPath) await appendFile(logPath, JSON.stringify(entry) + "\n");
       onRequest?.(entry);
+      const retryThisRun = retryNextRun && !isSummary && !isTitle;
+      if (retryThisRun) retryNextRun = false;
       const status = scenario === "terminal-error" || (isSummary && summaryError) ? 400
         : scenario === "persistent-error" || scenario === "retry-wait" ? 503
-        : scenario === "retry-once" && requests.length === 1 ? 429 : 200;
+        : retryThisRun || (scenario === "retry-once" && requests.length === 1) ? 429 : 200;
       if (status !== 200) {
         response.writeHead(status, { "content-type": "application/json", "retry-after": scenario === "retry-wait" ? "30" : "0" });
         response.end(JSON.stringify({ error: { message: `${status} fixture ${scenario}`, type: "fixture_error", code: "fixture_failure" } }));
@@ -87,6 +95,7 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
       else if (action === "summary-ok") summaryError = false;
       else if (action === "title-hold") titleHold = true;
       else if (action === "summary-hold") summaryHold = true;
+      else if (action === "retry-next-run") retryNextRun = true;
       else throw new Error(`Unknown provider action: ${action}`);
     },
     async close() { for (const release of waiting.keys()) release(); server.closeAllConnections(); await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); },

@@ -30,12 +30,14 @@ describe("DeleteFileBlock", () => {
     render(<DeleteFileBlock message={makeDeleteBlock()} />);
 
     const row = screen.getByRole("article");
-    expect(row).toHaveClass("approval-row", "border-danger/35");
+    expect(row).toHaveClass("approval");
+    expect(screen.getByText("等待确认")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "删除" })).toHaveClass("bg-danger");
     expect(screen.getByText("notes.md")).toBeInTheDocument();
     // 通用删除提示不重复展示，也不提供会话级授权。
     expect(screen.queryByText(/destructive file operation/)).toBeNull();
     expect(screen.queryByLabelText("审批原因")).toBeNull();
-    expect(screen.queryByRole("button", { name: "本会话" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "本会话允许" })).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "删除" }));
 
@@ -76,7 +78,7 @@ describe("DeleteFileBlock", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "删除" })).toBeEnabled();
     });
-    expect(screen.getByRole("article")).toHaveClass("approval-row");
+    expect(screen.getByRole("article")).toHaveClass("approval");
     expect(screen.queryByText("Delete notes.md")).toBeNull();
   });
 });

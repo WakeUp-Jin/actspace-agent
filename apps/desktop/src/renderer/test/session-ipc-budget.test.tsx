@@ -72,6 +72,15 @@ function renderApp() {
 }
 
 describe("session IPC budget", () => {
+  it("catalog rows without pending tasks do not recover background history", async () => {
+    const items = Array.from({ length: 20 }, (_, index) => ({ ...listItem(index), hasPendingTasks: false }));
+    const c = install({ items, page: ({ sessionId }) => recordProjectionFixture(eventsRecord(sessionId, [])) });
+    renderApp();
+    await waitFor(() => expect(document.querySelectorAll(".session-row")).toHaveLength(20));
+    await settle();
+    expect(c.counts.listPending).toBeGreaterThanOrEqual(20);
+    expect(c.counts.taskCommand).toBeLessThanOrEqual(3);
+  });
   it("100 sessions: mount, then rename one title", { timeout: 30_000 }, async () => {
     const items = Array.from({ length: 100 }, (_, index) => listItem(index));
     const c = install({ items, page: ({ sessionId }) => recordProjectionFixture(eventsRecord(sessionId, [message(sessionId, 0, "user_message", `hello ${sessionId}`)])) });

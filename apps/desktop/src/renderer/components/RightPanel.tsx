@@ -9,9 +9,9 @@ import {
   MessageSquare,
   SquareTerminal,
 } from "lucide-react";
-import type { ContextState, ContextUsageSnapshot, TerminalSessionSnapshot } from "@actspace/shared";
+import type { ContextState, TerminalSessionSnapshot } from "@actspace/shared";
 import { CodeRenderView } from "./right-panel/CodeRenderView";
-import { ContextRenderView } from "./right-panel/ContextRenderView";
+import { ContextPanel } from "./right-panel/context/ContextPanel";
 import { CsvRenderView } from "./right-panel/CsvRenderView";
 import { HtmlRenderView } from "./right-panel/HtmlRenderView";
 import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
@@ -42,7 +42,6 @@ const RIGHT_PANEL_TEXT_CLASS = "m-0 text-act-sm text-text-muted";
 export function RightPanel({
   developmentEnabled = true,
   contextState,
-  contextSnapshot,
   contextRevision,
   sessionId,
   workspaceRoot,
@@ -53,7 +52,6 @@ export function RightPanel({
 }: {
   developmentEnabled?: boolean;
   contextState?: ContextState | null;
-  contextSnapshot?: ContextUsageSnapshot | null;
   contextRevision?: number;
   sessionId?: string | null;
   workspaceRoot?: string;
@@ -100,7 +98,6 @@ export function RightPanel({
               tab={!developmentEnabled && activeTab && isDevelopmentTab(activeTab) ? null : activeTab}
               developmentEnabled={developmentEnabled}
               contextState={contextState}
-              contextSnapshot={contextSnapshot}
               contextRevision={contextRevision}
               sessionId={sessionId}
               workspaceRoot={workspaceRoot}
@@ -212,7 +209,6 @@ function RightPanelBody({
   developmentEnabled,
   tab,
   contextState,
-  contextSnapshot,
   contextRevision,
   sessionId,
   workspaceRoot,
@@ -223,7 +219,6 @@ function RightPanelBody({
   developmentEnabled: boolean;
   tab: RightPanelTab | null;
   contextState?: ContextState | null;
-  contextSnapshot?: ContextUsageSnapshot | null;
   contextRevision?: number;
   sessionId?: string | null;
   workspaceRoot?: string;
@@ -305,7 +300,7 @@ function RightPanelBody({
     return <CodeRenderView content={tab.content} language={tab.language} />;
   }
 
-  return <ContextRenderView contextState={contextState} contextSnapshot={contextSnapshot} contextRevision={contextRevision} sessionId={sessionId} />;
+  return <ContextPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} contextState={contextState} contextRevision={contextRevision} />;
 }
 
 /**

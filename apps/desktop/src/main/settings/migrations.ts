@@ -86,6 +86,9 @@ export function metadataFromSettingsV4(settings: SettingsV4): SettingsV4Metadata
 
 export function toSettingsV4(settings: PersistedSettingsV3, metadata: SettingsV4Metadata): SettingsV4 {
   const general = cloneJson(metadata.general);
+  // Quick Open still mutates through the legacy facade. Persist the same
+  // shortcut state returned to callers, rather than stale v4 metadata.
+  general.shortcuts = cloneJson(settings.shortcuts);
   if (!general.agentInstructions.systemPromptPath) general.agentInstructions.systemPromptPath = settings.agent.systemPromptPath;
   if (general.taskDefaults.temperature === null && settings.agent.temperature !== null) general.taskDefaults.temperature = settings.agent.temperature;
   if (general.taskDefaults.maxOutputTokens === null && settings.agent.maxTokens !== null) general.taskDefaults.maxOutputTokens = settings.agent.maxTokens;

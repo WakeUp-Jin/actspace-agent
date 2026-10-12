@@ -1,9 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { loadTrajectoryFixture } from "../trajectory/fixtures";
+import type { TrajectoryRevealTarget } from "../trajectory";
 import { TrajectoryView } from "../components/TrajectoryView";
+import { TrajectoryNavigationProvider, useTrajectoryNavigation } from "../components/trajectory/TrajectoryNavigation";
+import { TooltipProvider } from "../components/ui/Tooltip";
 import { SessionProjectionProvider } from "../session";
 import { projectionFixture } from "./projection-fixture";
 import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
@@ -164,4 +167,33 @@ describe("TrajectoryView", () => {
     expect(screen.getAllByRole("row")[0]).toHaveTextContent("USER");
   }, 15_000);
 
+  it("selects the record a Context panel reveal points at and opens its details", async () => {
+    const onShowTrajectory = vi.fn();
+    render(<TooltipProvider><TrajectoryNavigationProvider onShowTrajectory={onShowTrajectory}>
+      <RevealTrigger target={{ callId: "call-1" }} />
+      <TrajectoryView snapshot={snapshot} />
+    </TrajectoryNavigationProvider></TooltipProvider>);
+
+    await userEvent.click(screen.getByRole("button", { name: "reveal" }));
+    expect(onShowTrajectory).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getAllByRole("row").find((row) => row.getAttribute("data-event-seq") === "1")).toHaveAttribute("data-selected", "true"));
+    expect(screen.getByRole("button", { name: "Close event details" })).toBeInTheDocument();
+  });
+
+  it("explains a reveal that does not match any loaded record", async () => {
+    render(<TooltipProvider><TrajectoryNavigationProvider onShowTrajectory={() => undefined}>
+      <RevealTrigger target={{ callId: "missing" }} />
+      <TrajectoryView snapshot={snapshot} />
+    </TrajectoryNavigationProvider></TooltipProvider>);
+
+    await userEvent.click(screen.getByRole("button", { name: "reveal" }));
+    expect(await screen.findByText(/没有在已加载的轨迹里找到这条记录/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "关闭说明" }));
+    expect(screen.queryByText(/没有在已加载的轨迹里找到这条记录/)).not.toBeInTheDocument();
+  });
 });
+
+function RevealTrigger({ target }: { target: TrajectoryRevealTarget }) {
+  const navigation = useTrajectoryNavigation();
+  return <button type="button" onClick={() => navigation?.revealInTrajectory(target)}>reveal</button>;
+}

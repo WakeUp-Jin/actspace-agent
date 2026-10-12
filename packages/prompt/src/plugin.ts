@@ -1,4 +1,4 @@
-import type { ContextRequest } from "@actspace/context";
+import type { ContextRequest } from "@actspace/context-engine";
 import type { PromptExtensionRegistry } from "./extensions.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { createCoreContributors } from "./core-contributors.js";

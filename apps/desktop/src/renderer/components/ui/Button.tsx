@@ -6,7 +6,7 @@ import { cn as cx } from "./cn";
 // 业务组件只选 variant / size / shape，className 只放布局类（margin、宽度、显隐），
 // 不要再传字号、圆角、颜色——同一属性出现两个 utility 时，生效的是 Tailwind 生成顺序而不是书写顺序。
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-solid";
+export type ButtonVariant = "primary" | "accent" | "secondary" | "tonal" | "ghost" | "danger" | "danger-solid";
 export type ButtonSize = "xs" | "sm" | "md";
 export type ButtonShape = "default" | "pill";
 
@@ -16,10 +16,14 @@ export { cn as cx } from "./cn";
 const BUTTON_BASE_CLASS =
   "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap border font-medium transition-[background-color,border-color,color,transform] duration-(--motion-fast) enabled:active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-50";
 
-// primary 用主题反色 ink action，每个区域最多一个；danger 描边用于设置里的删除入口，danger-solid 用于必须确认的破坏性主操作。
+// primary 用主题反色 ink action，每个区域最多一个；accent 跟随「外观 → 强调色」，只用于发送类主操作（工具审批的允许 / 运行）；
+// tonal 是无描边的浅灰底，用于主操作旁的次要确认（审批的「本会话允许」）；
+// danger 描边用于设置里的删除入口，danger-solid 用于必须确认的破坏性主操作。
 export const BUTTON_VARIANT_CLASS: Record<ButtonVariant, string> = {
   primary: "border-transparent bg-action text-on-action enabled:hover:bg-action-hover",
+  accent: "border-transparent bg-accent text-on-accent enabled:hover:bg-accent-hover",
   secondary: "border-line bg-surface text-text-main enabled:hover:border-line-strong enabled:hover:bg-surface-subtle",
+  tonal: "border-transparent bg-text-main/7 text-text-main enabled:hover:bg-text-main/11",
   ghost: "border-transparent bg-transparent text-text-muted enabled:hover:bg-hover-overlay enabled:hover:text-text-main",
   danger: "border-line bg-surface text-on-danger enabled:hover:border-danger/50 enabled:hover:bg-danger-soft",
   "danger-solid": "border-transparent bg-danger text-on-danger-solid enabled:hover:bg-danger-hover",
