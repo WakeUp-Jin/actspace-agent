@@ -22,7 +22,7 @@ export class ManagedRuns {
           const lease = await (harnesses.acquireSession?.(session.header.sessionId, signal) ?? harnesses.acquire("main", signal));
           try {
             signal.throwIfAborted();
-            const compaction = lease.getService<{ compaction: import("@actspace/context").ContextCompactionCoordinator }>("context.engine")?.compaction;
+            const compaction = lease.getService<{ compaction: import("@actspace/context-engine").ContextCompactionCoordinator }>("context.engine")?.compaction;
             if (!compaction) throw new Error("Harness does not provide compaction");
             return { compacted: await compaction.compact(session, { signal }) };
           } finally { await lease.release(); }

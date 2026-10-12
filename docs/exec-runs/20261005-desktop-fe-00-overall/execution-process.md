@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/00-总执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/00-总执行计划.md`
 - **执行模式**：交互，连续执行（00 §3、§4）
 - **开始时间**：2026-10-06 00:00
 - **结束时间**：—
@@ -17,7 +17,7 @@
 - **S0-2**：创建主线分支 `refactor/desktop-frontend`。
 - **S0-3**：重跑基线，与 00 §7 一致，详见 `baseline.md`。
 - **S0-4**：保存 `tools/cdp-capture.mjs`，实测截图、eval、按键、窄窗、控制台收集均可用，见 `baseline.md`「CDP」。
-- **S0-5**：`git mv` 把 00、09–17 移到 `docs/exec-plans/active/20261005-desktop-frontend-refactor/`。
+- **S0-5**：`git mv` 把 00、09–17 移到 `docs/exec-plans/completed/20261005-desktop-frontend-refactor/`。
   - 修正相对链接：移走的计划中指向 01–08、README、demo 的链接加 `../../../desktop-frontend-refactor/` 前缀；01、06、README 中指向计划的链接改到新位置。逐个解析后断链为 0。
   - 状态改为「已批准 / 执行中」。
   - `docs/exec-plans/README.md` 登记；`active/frontend-ui-components-foundation.md` 标注 DropdownMenu 由 16 接手。

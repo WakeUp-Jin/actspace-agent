@@ -1,3 +1,4 @@
+import { ContextPanelService } from "./context-panel-service";
 import { validateRunReferences as validateSharedRunReferences } from "@actspace/shared/composer-reference-validation";
 import type { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
 import { createSessionGateway } from "../session-gateway";
@@ -41,6 +42,7 @@ import {
   type CustomConnectionInput,
   type CustomConnectionTestInput,
   type CustomConnectionProbeInput,
+  projectManagedContextState,
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
@@ -112,6 +114,9 @@ export type FixedRendererIpcRegistration = {
 };
 
 export function registerFixedRendererIpc(options: FixedRendererIpcOptions): FixedRendererIpcRegistration {
+  const readModel = usageReadModels.get(options.registry) ?? new UsageReadModelService(options.registry, options.roots.dataRoot);
+  usageReadModels.set(options.registry, readModel);
+  const contextPanel = new ContextPanelService(options.registry, readModel);
   let pendingQuickOpen = false;
   let unsubscribeSettingsV4 = () => undefined;
   const ipc = createIpcRegistrar({
@@ -320,7 +325,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.settingsChangedV4, notification);
     }
   });
-  registerFixedRendererHostCapabilities(options, ipc);
+  registerFixedRendererHostCapabilities(options, ipc, contextPanel);
 
   ipc.handle(contract.quickOpen.consume, () => {
     if (!pendingQuickOpen) return null;
@@ -548,7 +553,7 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, ipc: Ip
   });
 }
 
-function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, ipc: IpcRegistrar): void {
+function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, ipc: IpcRegistrar, contextPanel: ContextPanelService): void {
   const registryOptions = workspaceRegistryOptions(options.roots);
   const workspaceAccess = createWorkspaceAccessDeps(registryOptions, () => options.registry.listSessions());
   // 「新建文件夹工作区」的父目录来自系统对话框，不在 registry 里。只认用户最近一次在对话框里选的目录，
@@ -770,16 +775,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.updates.start, () => options.localUpdate.start());
 
-  ipc.handle(contract.sessions.describeContext, async (input) => {
-    try {
-      const snapshot = await options.registry.inspectSession(input.sessionId);
-      return projectContextState(snapshot, await options.registry.inspectSessionEvents(input.sessionId));
-    } catch {
-      return null;
-    }
-  });
+  ipc.handle(contract.sessions.describeContext, input => contextPanel.describeComposer(input.sessionId));
   ipc.handle(contract.usage.getStatus, input => usageReadModels.get(options.registry)?.getStatus(input.requestId) ?? null);
   ipc.handle(contract.usage.cancel, input => usageReadModels.get(options.registry)?.cancel(input.requestId));
+  ipc.handle(contract.sessions.describeContextPanel, input => contextPanel.describe(input));
+  ipc.handle(contract.sessions.listContextEntries, input => contextPanel.listEntries(input));
+  ipc.handle(contract.sessions.readContextEntry, input => contextPanel.readEntry(input));
   ipc.handle(contract.usage.getStatistics, (input) => createUsageStatistics(options.registry, options.roots.dataRoot, input));
   ipc.handle(contract.usage.getActivity, (input) => createUsageActivity(options.registry, options.roots.dataRoot, input));
   ipc.handle(contract.sessions.getSubagents, async (input) => {

@@ -18,7 +18,7 @@ export function createUsageRollups(db: DatabaseSync): void {
     const oldBucket = bucket.replaceAll("new.", "old.");
     db.exec(`
       CREATE TABLE IF NOT EXISTS ${table}(session_id TEXT NOT NULL,agent_run_id TEXT NOT NULL,started_at TEXT NOT NULL,kind TEXT NOT NULL,metric_count INTEGER NOT NULL,PRIMARY KEY(started_at,session_id,agent_run_id,kind)) STRICT;
-      CREATE TRIGGER IF NOT EXISTS ${table}_insert AFTER INSERT ON usage_activity BEGIN
+      CREATE TRIGGER IF NOT EXISTS ${table}_insert AFTER INSERT ON usage_activity WHEN (SELECT batching FROM usage_write_mode)=0 BEGIN
         INSERT INTO ${table} VALUES(new.session_id,new.agent_run_id,${bucket},new.kind,1) ON CONFLICT DO UPDATE SET metric_count=metric_count+1;
       END;
       CREATE TRIGGER IF NOT EXISTS ${table}_delete AFTER DELETE ON usage_activity BEGIN
@@ -45,7 +45,7 @@ export function createUsageRollups(db: DatabaseSync): void {
       CREATE TRIGGER IF NOT EXISTS ${table}_search_delete AFTER DELETE ON ${table} BEGIN
         DELETE FROM ${table}_search WHERE rowid=old.rowid;
       END;
-      CREATE TRIGGER IF NOT EXISTS ${table}_insert AFTER INSERT ON usage_activity BEGIN
+      CREATE TRIGGER IF NOT EXISTS ${table}_insert AFTER INSERT ON usage_activity WHEN (SELECT batching FROM usage_write_mode)=0 BEGIN
         INSERT INTO ${table}(${fields.join(",")}) VALUES(${newKey},${bucket},${[...dimensions,...measures].map(name => `new.${name}`).join(",")},1)
         ON CONFLICT(group_key) DO UPDATE SET metric_count=metric_count+1,${measures.map(name => `${name}=CASE WHEN ${name} IS NULL AND excluded.${name} IS NULL THEN NULL ELSE COALESCE(${name},0)+COALESCE(excluded.${name},0) END`).join(",")};
       END;
@@ -115,7 +115,10 @@ export function searchMetricsSource(db: DatabaseSync, where: string, args: (stri
   const cached = searchCache.get(db);
   if (cached?.key === key && cached.changes === changes) return "usage_query_rollups";
   db.exec("DROP TABLE IF EXISTS temp.usage_query_rollups");
-  prepare(db, `CREATE TEMP TABLE usage_query_rollups AS SELECT a.session_id,a.search_key,'' AS group_key,MAX(a.started_at) AS started_at,${dimensions.map(name => `a.${name}`).join(",")},${measures.map(name => `SUM(a.${name}) AS ${name}`).join(",")},COUNT(*) AS metric_count FROM usage_activity a ${where} GROUP BY a.session_id,a.search_key,${dimensions.map(name => `a.${name}`).join(",")},a.cost_amount IS NULL,a.cost_usd IS NULL`).run(...args);
+  // Force the two indexed candidate sets before aggregation. SQLite otherwise
+  // may choose a full activity scan for the OR across dimension/title matches.
+  const candidates = where.replace("(a.search_key IN (SELECT search_key FROM search_documents WHERE search_documents MATCH ?) OR a.session_id IN (SELECT session_id FROM session_search WHERE session_search MATCH ?))", "(a.rowid IN (SELECT rowid FROM usage_activity INDEXED BY usage_activity_search_idx WHERE search_key IN (SELECT search_key FROM search_documents WHERE search_documents MATCH ?) UNION SELECT rowid FROM usage_activity INDEXED BY usage_activity_session_idx WHERE session_id IN (SELECT session_id FROM session_search WHERE session_search MATCH ?)))");
+  prepare(db, `CREATE TEMP TABLE usage_query_rollups AS SELECT a.session_id,a.search_key,'' AS group_key,MAX(a.started_at) AS started_at,${dimensions.map(name => `a.${name}`).join(",")},${measures.map(name => `SUM(a.${name}) AS ${name}`).join(",")},COUNT(*) AS metric_count FROM usage_activity a ${candidates} GROUP BY a.session_id,a.search_key,${dimensions.map(name => `a.${name}`).join(",")},a.cost_amount IS NULL,a.cost_usd IS NULL`).run(...args);
   searchCache.set(db, { key, changes: Number((prepare(db, "SELECT total_changes() AS n").get() as { n: number }).n) });
   return "usage_query_rollups";
 }

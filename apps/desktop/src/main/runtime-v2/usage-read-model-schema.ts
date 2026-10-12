@@ -1,4 +1,6 @@
-import { prepare } from "./usage-sql";
+import { enableUsageBatchWrites } from "./usage-batch-write";
+import { createContextHistorySchema } from "./context-history-projection";
+import { createSyncSchema } from "./read-model-sync";
 import { createUsageJournalSchema } from "./usage-journal-projection";
 import { createUsageRollups } from "./usage-rollups";
 import type { DatabaseSync } from "node:sqlite";
@@ -7,7 +9,9 @@ import type { DatabaseSync } from "node:sqlite";
 export function createReadModelSchema(db: DatabaseSync): void {
   db.exec(`
     PRAGMA application_id = 0x41555332;
-    PRAGMA user_version = 8;
+    PRAGMA user_version = 9;
+    CREATE TABLE IF NOT EXISTS usage_write_mode(batching INTEGER NOT NULL) STRICT;
+    INSERT INTO usage_write_mode SELECT 0 WHERE NOT EXISTS(SELECT 1 FROM usage_write_mode);
     CREATE TABLE IF NOT EXISTS session_catalog (
       session_id TEXT PRIMARY KEY,
       title TEXT,
@@ -79,7 +83,7 @@ export function createReadModelSchema(db: DatabaseSync): void {
     CREATE TRIGGER IF NOT EXISTS usage_dimensions_search_delete AFTER DELETE ON usage_search_dimensions BEGIN
       DELETE FROM search_documents WHERE rowid=old.rowid;
     END;
-    CREATE TRIGGER IF NOT EXISTS usage_dimensions_insert AFTER INSERT ON usage_activity BEGIN
+    CREATE TRIGGER IF NOT EXISTS usage_dimensions_insert AFTER INSERT ON usage_activity WHEN (SELECT batching FROM usage_write_mode)=0 BEGIN
       INSERT INTO usage_search_dimensions VALUES(new.search_key,COALESCE(new.model,'')||' '||COALESCE(new.provider_id,'')||' '||COALESCE(new.connection_id,'')||' '||COALESCE(new.tool_name,''),1) ON CONFLICT(search_key) DO UPDATE SET ref_count=ref_count+1;
     END;
     CREATE TRIGGER IF NOT EXISTS usage_dimensions_delete AFTER DELETE ON usage_activity BEGIN
@@ -90,13 +94,10 @@ export function createReadModelSchema(db: DatabaseSync): void {
     CREATE VIRTUAL TABLE IF NOT EXISTS session_search USING fts5(session_id UNINDEXED, content);
     CREATE TABLE IF NOT EXISTS index_state (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
   `);
-  const columns = prepare(db, "PRAGMA table_info(usage_activity)").all() as { name: string }[];
-  if (!columns.some(column => column.name === "workspace_root")) db.exec("ALTER TABLE usage_activity ADD COLUMN workspace_root TEXT");
-  if (!columns.some(column => column.name === "duration_ms")) db.exec("ALTER TABLE usage_activity ADD COLUMN duration_ms REAL");
-  const catalogColumns = prepare(db, "PRAGMA table_info(session_catalog)").all() as { name: string }[];
-  const catalogMigrations: Record<string, string> = { created_at: "TEXT", workspace_root: "TEXT", worktree_json: "TEXT", pinned: "INTEGER NOT NULL DEFAULT 0", archived: "INTEGER NOT NULL DEFAULT 0", access_state: "TEXT NOT NULL DEFAULT 'read-write'", is_child_session: "INTEGER NOT NULL DEFAULT 0", agent_run_count: "INTEGER NOT NULL DEFAULT 0", agent_form: "TEXT", agent_mode: "TEXT", agent_mode_revision: "INTEGER" };
-  for (const [name, definition] of Object.entries(catalogMigrations)) if (!catalogColumns.some(column => column.name === name)) db.exec(`ALTER TABLE session_catalog ADD COLUMN ${name} ${definition}`);
   db.exec("CREATE INDEX IF NOT EXISTS session_catalog_page_idx ON session_catalog(archived, COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,''), pinned, updated_at DESC,session_id ASC)");
   createUsageJournalSchema(db);
   createUsageRollups(db);
+  createSyncSchema(db);
+  createContextHistorySchema(db);
+  enableUsageBatchWrites(db);
 }

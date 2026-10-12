@@ -179,9 +179,10 @@ Bash 是命令执行工具，包含正常执行态和审核 pending 态。
 
 ### 审核态
 
-- 审核态使用「工具审批」小节的卡片形态：头行显示终端图标、“运行”、intent（缺省“Bash 命令”）和环境标签。
-- 主体显示 `$ command`；通用审批提示不展示，未知原因收进 Info 图标的 tooltip。
-- 底部左侧显示 `cwd`，右侧显示“拒绝”“运行”。
+- 审核态使用「工具审批」小节的卡片形态：头行显示终端图标、intent（缺省“Bash 命令”）和淡色的命令名摘要（如 `git, tail`），下方一条分割线。
+- 主体显示带简单着色的 `$ command`（`shell-highlight.ts`：命令名、连接符、引号字符串、参数各一色，取 `.act-code-hl` 的主题变量），过长时在卡内滚动。
+- 不显示原因托盘：Bash 目前没有模型给出的真实原因，通用审批提示不展示，未知原因收进 Info 图标的 tooltip。
+- 底部左侧显示执行环境（“沙盒”/“真实环境”），cwd 只在不是工作区根目录时跟在后面；右侧显示“拒绝”“运行”。
 - 审核通过后，同一条工具调用应转换为 running/success/failed 展示，而不是生成一个割裂的新块。
 
 ### 状态
@@ -352,13 +353,14 @@ Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接
 
 ## 工具审批
 
-设计稿：`approval-card-redesign.html`（B 方向为定稿）。共享部件在 `components/messages/ApprovalParts.tsx`。
+设计稿：`approval-card-redesign.html`（D 方向 · Cursor 式为定稿，2026-10-11；B 方向为上一版）。共享部件在 `components/messages/ApprovalParts.tsx` 的 `ApprovalCard` / `ApprovalActions`。
 
-### 两种形态
+### 统一卡片
 
-- **一行审批条**（read、grep、glob、edit_diff、write_diff、delete）：图标 · 动词 · 目标 · 标签，按钮在行尾。和工具日志行同一节奏，不加标题栏。
-- **卡片**（bash、browser）：头行写动作与标签，中间是命令或能力说明，按钮放在底部右侧。先读内容再决定，按钮位置跟着阅读顺序。
-- 容器是 `bg-surface` 加一圈 `border-warning/30`；删除用 `border-danger/35`。不使用灰色标题栏、分隔线和 `Reason:` 行。
+- 所有审批（read、grep、glob、edit_diff、write_diff、delete、bash、browser、通用工具）都用同一张卡：上方一行淡色“等待确认”，下面是 `bg-surface` + `border-line` + `shadow-act-xs` 的圆角卡。
+- 头行：可选图标 · 动词（muted）· 目标（faint），按钮在行尾；Bash 例外，按钮放在命令下方的底栏。
+- 不使用彩色边框、彩色托盘、`Reason:` 行；危险程度只由主按钮颜色表达。
+- 只在需要补充说明时，卡片外包一层 `bg-surface-subtle` 托盘，说明文字写在卡下方（目前只有浏览器操作）。
 
 ### 目标与动词
 
@@ -368,19 +370,21 @@ Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接
 | grep / glob | 搜索 / 匹配 | `pattern 于 scope` | 允许 |
 | edit_diff | 编辑 | 路径 + `+N -M` | 应用 |
 | write_diff | 写入 | 路径 + `+N` | 写入 |
-| delete | 删除 | 路径 | 删除（danger） |
-| bash | 运行 | intent | 运行 |
-| browser | 确认浏览器操作 | 本次工具标题 + “仅这次” | 允许这次 |
+| delete | 删除 | 路径 | 删除（danger-solid） |
+| bash | intent | 命令名摘要 | 运行 |
+| browser | 确认浏览器操作 | 本次工具标题 | 允许这次 |
 
-- 路径：目录淡色、过长时中段折叠为 `…`，文件名加重且优先保留；`title` 为完整路径。
-- 编辑与写入默认不展示 diff；`+N -M` 可点击，在审批条下方展开 diff。
+- 路径：目录淡色、过长时中段折叠为 `…`，文件名优先保留；`title` 为完整路径。
+- 编辑与写入默认不展示 diff；`+N -M` 后跟一个淡色箭头（收起朝右、展开朝下），整组是一个按钮，点开在卡内展开 diff，`aria-expanded` 表达状态。
 
 ### 按钮与原因
 
-- 按钮固定三层：拒绝（ghost）→ 本会话（描边，仅在有精确路径授权建议时出现，`title` 为建议说明）→ 工具动词（实心）。
+- 按钮全部是 xs 胶囊：拒绝（ghost）→ 本会话允许（tonal，仅在有授权建议时出现，`title` 为建议说明）→ 主按钮（`accent`，跟随外观强调色；删除用 `danger-solid`）。
+- Bash 的“本会话允许”在后端给出 `selector.kind === "command_prefix"` 的建议时显示，并在按钮里带上前缀（如 `本会话允许 pnpm`）；后端契约见 `docs/exec-plans/active/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md`，未落地前不出现。
 - 提交中：被点按钮前出现旋转图标，所有按钮禁用；Bridge 返回 `ok: false` 时恢复可点。
-- 原因只用标签表达：“工作区外”（warning）、“敏感文件”（danger）；通用审批提示不展示；未知原因收进 Info 图标 tooltip，不丢信息。
-- 不做键盘快捷键和 Bash 命令前缀授权按钮，等对应能力落地再加。
+- “工作区外”“敏感文件”和通用审批提示都不展示；未知原因收进 Info 图标 tooltip，不丢信息。
+- 不做键盘快捷键：Enter 与 Composer 发送冲突，按钮上也不显示快捷键提示。
+- 工具日志行在授权后不再追加“本会话已授权”。
 
 ## 当前阶段重点
 
@@ -406,3 +410,7 @@ Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接
 ## 会话浏览加载
 
 列表和长会话的按需读取、真实分页、加载/重试状态与索引边界，见[会话浏览按需加载](front-progressive-session-loading.md)。
+
+### Bash 前缀建议的数据来源
+
+「本会话允许 pnpm」只在后端返回正式 `process.execute` / `command_prefix` 建议时显示，前端不得从命令文本推导授权。建议与 requestId 绑定，切换审批或读取失败时不沿用旧建议。提示文案说明授权包含项目脚本、执行环境沿用现有设置；同一持久化会话的符合规则调用可复用，复杂语法和显式 no_sandbox 仍走单次审批或既有拒绝规则。

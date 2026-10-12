@@ -1,6 +1,6 @@
 # SQLite 使用统计验收矩阵
 
-状态：用户要求暂停验收与修复，等待其他任务完成后按[统一验收计划](../../exec-plans/active/20261011-usage-sqlite-acceptance.md)继续。真实UI报告见[Electron验收](electron-acceptance.md)，问题见[问题清单](acceptance-bugs.md)，历史测试与版本边界见[执行摘要](execution-summary.md)。通过项只表示表内明确范围。
+状态：用户要求暂停验收与修复，等待其他任务完成后按[统一验收计划](../../exec-plans/completed/20261011-usage-sqlite-acceptance.md)继续。真实UI报告见[Electron验收](electron-acceptance.md)，问题见[问题清单](acceptance-bugs.md)，历史测试与版本边界见[执行摘要](execution-summary.md)。通过项只表示表内明确范围。
 
 ## 工程与数据正确性
 

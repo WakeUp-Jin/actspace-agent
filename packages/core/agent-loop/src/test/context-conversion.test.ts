@@ -45,7 +45,7 @@ it("keeps a rejected batch's multiple tool results paired in the next input", as
 });
 
 it("reselects the model prompt when a request intervention changes the model", async () => {
-  const { ContextSourceRegistry } = await import("@actspace/context");
+  const { ContextSourceRegistry } = await import("@actspace/context-engine");
   const sources = new ContextSourceRegistry();
   sources.register({ id: "model", owner: "model", order: 0, fields: ["system"], criticality: "required", get: (context, write) => write({ system: { sections: [{ id: "model", owner: "model", order: 0, content: `Prompt for ${context.request.model}` }], modelFacts: [] } }) });
   let messages: readonly LlmMessage[] = [];
@@ -57,4 +57,7 @@ it("reselects the model prompt when a request intervention changes the model", a
   const snapshot = (run.journal.find(event => event.type === "request/context")!.data as any).snapshot;
   expect(snapshot.renderedSystemPrompt).toBe("Prompt for selected-model");
   expect(snapshot.prepared.model).toBe("selected-model");
+  expect(snapshot.contextModel.label).toBe("selected-model");
+  expect(snapshot.contextManifest.comparable).toBe(true);
+  expect(snapshot.contextManifest.entries.every((entry: any) => !entry.preview)).toBe(true);
 });

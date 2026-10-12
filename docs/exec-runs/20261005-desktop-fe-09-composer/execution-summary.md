@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/09-输入框优化执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/09-输入框优化执行计划.md`
 - **执行过程**：`docs/exec-runs/20261005-desktop-fe-09-composer/execution-process.md`
 - **验收交接**：`docs/exec-runs/20261005-desktop-fe-09-composer/acceptance-handoff.md`（按 P1–P6 分节，各节有「请验收方执行」）
 - **现行规范**：

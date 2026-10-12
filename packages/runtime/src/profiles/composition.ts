@@ -1,4 +1,4 @@
-import { manifest as contextManifest } from "@actspace/context/manifest";
+import { manifest as contextManifest } from "@actspace/context-engine/manifest";
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
 import { composeRuntime, type ResolvedComposition } from "@actspace/composition";
 import type { Bundle, Patch, Profile } from "@actspace/bundle";
@@ -69,7 +69,7 @@ export const TOOL_PLUGIN_TRANSPORT = Object.freeze([
 ]);
 export async function loadBuiltinToolCodec(specifier: string, manifest: PluginManifest) {
   if (manifest.pluginId === agentServiceManifest.pluginId && specifier === "./codec.js") return import("@actspace/agent-service/codec");
-  if (manifest.pluginId === contextManifest.pluginId && specifier === "./codec.js") return import("@actspace/context/codec");
+  if (manifest.pluginId === contextManifest.pluginId && specifier === "./codec.js") return import("@actspace/context-engine/codec");
   const transport = TOOL_PLUGIN_TRANSPORT.find(item => item.manifest.pluginId === manifest.pluginId);
   if (!transport || !transport.manifest.codecs.some(codec => codec.module === specifier) || specifier !== "./codec.js") throw new Error(`No admitted builtin Codec for ${manifest.pluginId}/${specifier}.`);
   return import(`${transport.packageName}/codec`) as Promise<{ readonly codecs: readonly import("@actspace/session-journal").EventCodec[] }>;

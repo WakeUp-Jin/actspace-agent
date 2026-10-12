@@ -30,6 +30,7 @@ import { collectEditedFilePaths } from "./workbench/edited-files";
 import { PermissionModeControl } from "./workbench/PermissionModeControl";
 import { LEFT_MAX_WIDTH, LEFT_MIN_WIDTH, MAIN_MIN_WIDTH, RIGHT_MIN_WIDTH, usePanelLayout } from "./workbench/use-panel-layout";
 import { useSessionHistory } from "./workbench/use-session-history";
+import { useCurrentContext } from "./workbench/use-current-context";
 import { SPACE_DEMO_ENABLED } from "./space/space-demo-enabled";
 import { SpaceWorkbench } from "./space/SpaceWorkbench";
 import { SpaceRightPanel } from "./space/SpaceRightPanel";
@@ -38,6 +39,7 @@ import { SpaceTabBar } from "./space/tabs/SpaceTabBar";
 import { NewSpaceDialog } from "./space/dialogs/NewSpaceDialog";
 import { SpaceDemoHelpButton } from "./space/dialogs/SpaceDemoHelpDialog";
 import { useSpacePanelBinding } from "./space/use-space-panel-binding";
+import { TrajectoryNavigationProvider } from "./trajectory/TrajectoryNavigation";
 
 export function WorkbenchLayout({
   sessions,
@@ -100,12 +102,13 @@ export function WorkbenchLayout({
     : null;
   // The fixed request-context projection shares the popup's complete bucket estimate.
   const liveContextState = projectedContextEstimate?.contextState;
+  const currentContextState = useCurrentContext(activeSessionId, projectionCell?.snapshot?.throughJournalSeq, view === "chat");
   const useLiveContext = liveContextState && (!contextState || (liveContextState.throughJournalSeq ?? -1) > (contextState.throughJournalSeq ?? -1));
-  const effectiveContextState = useLiveContext ? liveContextState : contextState;
+  const effectiveContextState = currentContextState ?? (useLiveContext ? liveContextState : contextState);
   const effectiveContextSnapshot = useLiveContext ? projectedContextSnapshot : contextSnapshot ?? projectedContextSnapshot;
   const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
   const permissionMode = projectionCell?.snapshot?.permissionMode ?? "default";
-  const effectiveIsSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
+  const effectiveIsSessionReady = (projectedComposer != null && projectedComposer.phase !== "blank") || isSessionReady || projectionSessionReady;
   const sessionViewByIdRef = useRef(new Map<string, SessionMainView>());
   const [sessionMainView, setSessionMainView] = useState<SessionMainView>("chat");
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
@@ -129,6 +132,12 @@ export function WorkbenchLayout({
       }
       return next;
     });
+  }, [activeSessionId]);
+
+  // Context 面板「跳到轨迹」：切到轨迹视图，和标题栏按钮共用按会话记忆的状态。
+  const showSessionTrajectory = useCallback(() => {
+    setSessionMainView("trajectory");
+    if (activeSessionId) sessionViewByIdRef.current.set(activeSessionId, "trajectory");
   }, [activeSessionId]);
 
   const openReviewTab = useCallback(() => {
@@ -346,7 +355,6 @@ export function WorkbenchLayout({
     <RightPanel
       developmentEnabled={composerMode !== "chat" && terminalEnabled}
       contextState={effectiveContextState}
-      contextSnapshot={effectiveContextSnapshot}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
       sessionId={activeSessionId}
       workspaceRoot={selectedWorkspaceRoot ?? undefined}
@@ -367,7 +375,7 @@ export function WorkbenchLayout({
   const rightPanelShown = view === "chat" ? isRightPanelOpen : hasRightPanel && spacePanelOpen;
 
   return (
-    <>
+    <TrajectoryNavigationProvider onShowTrajectory={showSessionTrajectory}>
       <WindowChromeBar
         leftMode={chromeLeftMode}
         rightOpen={rightPanelShown}
@@ -451,6 +459,6 @@ export function WorkbenchLayout({
         </div>
       ) : null}
       {SPACE_DEMO_ENABLED ? <NewSpaceDialog open={newSpaceOpen} onOpenChange={setNewSpaceOpen} onCreated={() => handleSelectView("space")} /> : null}
-    </>
+    </TrajectoryNavigationProvider>
   );
 }

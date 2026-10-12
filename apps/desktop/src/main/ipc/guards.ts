@@ -7,7 +7,7 @@ import { HOST_METHODS, isRecord } from "@actspace/shared/host-protocol";
  */
 export type IpcGuard = (input: unknown) => string | null;
 
-type Field = "string" | "string?" | "boolean" | "boolean?" | "number" | "record";
+type Field = "string" | "string?" | "boolean" | "boolean?" | "number" | "number?" | "record";
 
 function check(input: unknown, fields: Readonly<Record<string, Field>>, reason: string): string | null {
   if (!isRecord(input)) return reason;
@@ -25,6 +25,15 @@ function check(input: unknown, fields: Readonly<Record<string, Field>>, reason: 
 }
 
 const shape = (fields: Readonly<Record<string, Field>>, reason: string): IpcGuard => (input) => check(input, fields, reason);
+const contextShape = (fields: Readonly<Record<string, Field>>, reason: string): IpcGuard => input => {
+  const invalid = check(input, fields, reason);
+  if (invalid || !isRecord(input)) return invalid ?? reason;
+  for (const [key, limit] of Object.entries({ sessionId: 128, consumerId: 256, versionToken: 256, revision: 256, cursor: 1024, key: 2048, bucket: 64 })) {
+    const value = input[key];
+    if (typeof value === "string" && (value.length === 0 || value.length > limit)) return reason;
+  }
+  return null;
+};
 const optionalShape = (fields: Readonly<Record<string, Field>>, reason: string): IpcGuard => (input) => input === undefined ? null : check(input, fields, reason);
 const connectionId: IpcGuard = (input) => typeof input === "string" ? null : "Invalid connection id";
 const artifactRef = shape({ hostId: "string", sessionId: "string", artifactId: "string" }, "Invalid artifact reference");
@@ -80,6 +89,9 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
     if (value.hostId && value.runLocation === "worktree") return "Remote worktree creation is not supported";
     return null;
   }],
+  [contract.sessions.describeContextPanel, contextShape({ sessionId: "string", versionToken: "string?", consumerId: "string?", release: "boolean?", retry: "boolean?" }, "Invalid Context panel query")],
+  [contract.sessions.listContextEntries, contextShape({ sessionId: "string", revision: "string", cursor: "string?", bucket: "string?", limit: "number?" }, "Invalid Context entries query")],
+  [contract.sessions.readContextEntry, contextShape({ sessionId: "string", revision: "string", key: "string", offset: "number?" }, "Invalid Context entry query")],
   [contract.sessions.setWorkspace, shape({ sessionId: "string", workspaceId: "string?", workspaceRoot: "string?" }, "Invalid session workspace")],
   [contract.dialogs.selectWorkspaceDirectory, optionalShape({ registerWorkspace: "boolean?" }, "Invalid directory request")],
   // 终端

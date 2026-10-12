@@ -65,11 +65,12 @@
 | 普通链接（Markdown 链接、链接式按钮） | info 蓝 | 强调色 |
 | 文字选中 | 中性灰 20% | 强调色约 25% 透明度 |
 | 分割线拖动中 / 键盘聚焦 | 同焦点框 | 强调色 |
+| 工具审批主按钮（`Button variant="accent"`，2026-10-11） | action 墨色反色 | 强调色填充 + 反色文字 |
 
 明确不变：
 
 - 普通主按钮（`Button` / `IconButton` 的 `primary`）、导航与列表选中、Sidebar。
-- 运行中、成功、警告、危险、信息等语义色；状态点、进度条、审批条。
+- 运行中、成功、警告、危险、信息等语义色；状态点、进度条；审批卡的边框与删除审批的 danger 按钮。
 - 图表、Context bucket、diff、Analysis 数据色。
 - 用户消息卡不加淡色底：它与 Composer 对齐、靠 surface + hairline 区分，大面积彩色底会破坏阅读流里的克制感。
 - Electron 原生 chrome（交通灯、系统菜单）。

@@ -51,12 +51,13 @@ describe("tool stream presentation preserves behavior", () => {
     });
     render(<ToolLogLine message={{ ...base, kind: "read", status: "pending", filePath: "/tmp/shared/a.md", displayText: "Read", approvalRequestId: "approval-read-1", reason: "The requested file is outside the workspace." }} />);
     expect(screen.getByText("读取")).toBeInTheDocument();
-    expect(screen.getByText("a.md")).toHaveClass("text-text-main");
-    expect(screen.getByText("工作区外")).toBeInTheDocument();
+    expect(screen.getByText("a.md")).toHaveClass("text-text-muted");
+    // 工作区外不再做标签，绝对路径本身已经说明。
+    expect(screen.queryByText("工作区外")).toBeNull();
     expect(screen.queryByText(/outside the workspace/)).toBeNull();
     expect(screen.getByRole("button", { name: "拒绝" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "允许" })).toBeInTheDocument();
-    const sessionButton = await screen.findByRole("button", { name: "本会话" });
+    const sessionButton = await screen.findByRole("button", { name: "本会话允许" });
     expect(screen.queryByText("This directory tree")).toBeNull();
     await userEvent.click(sessionButton);
     expect(submitApproval).toHaveBeenCalledWith({ requestId: "approval-read-1", decision: "session", suggestionId: "exact-read" });
@@ -68,7 +69,7 @@ describe("tool stream presentation preserves behavior", () => {
     expect(screen.getByText("TODO|FIXME")).toBeInTheDocument();
     expect(screen.getByText("于")).toBeInTheDocument();
     expect(screen.getByText("src")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "本会话" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "本会话允许" })).toBeNull();
   });
 
   it("shows compact Bash commands while retaining old diagnostic titles and output", async () => {

@@ -1,3 +1,7 @@
+import type { ContextHistoryResult } from "./context-history-query";
+import type { ContextHistoryState } from "./context-history-projection";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { ReadModelScheduler } from "./read-model-scheduler";
 import type { UsageQueryProgress, SessionListPage, SessionListPageInput, UsageActivitySnapshot, UsageStatisticsGetInput, UsageStatisticsSnapshot } from "@actspace/shared";
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
@@ -8,6 +12,7 @@ import type { RuntimeV2GlobalSessionSummary } from "@actspace/shared/runtime-v2"
 type QuerySource = import("@actspace/session-storage").SessionQuerySource;
 type Summary = Omit<RuntimeV2GlobalSessionSummary, "usage"> & { querySource?: QuerySource };
 type Reader = {
+  sessionQuerySource?(sessionId: string): Promise<QuerySource | null>;
   sessionQuerySources?(): Promise<import("@actspace/session-storage").SessionQueryCatalog | null>;
   globalSessionSummaries(): Promise<readonly RuntimeV2GlobalSessionSummary[]>;
   readSessionEventBatch?(id: string, input: { cursor?: string; throughSeq: number }): Promise<{ events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]; cursor: string; done: boolean }>;
@@ -33,8 +38,9 @@ type CatalogRow = {
   agentModeRevision?: number;
   querySource?: QuerySource;
 };
-type SourceState = { revision: number | null; cursor?: string; stamp?: string; codecSetDigest?: string };
-type WorkerResult = UsageActivitySnapshot | UsageStatisticsSnapshot | SessionListPage | SourceState | null;
+type QueryScope = { requestId?: string; foreground: boolean; summaries?: readonly Summary[]; syncTotal?: number; lightweightSources: boolean; partialInventory: boolean; failedSessionIds: Set<string>; cancelled?: boolean };
+type SourceState = { building?: boolean; revision: number | null; cursor?: string; stamp?: string; codecSetDigest?: string };
+type WorkerResult = ContextHistoryResult | ContextHistoryState | UsageActivitySnapshot | UsageStatisticsSnapshot | SessionListPage | SourceState | null;
 type WorkerReply = { id: string; heartbeat: true } | { id: string; ok: true; result?: WorkerResult } | { id: string; ok: false; error: string };
 type Pending = { timer: ReturnType<typeof setTimeout>; resolve: (result: WorkerResult) => void; reject: (error: Error) => void };
 
@@ -53,20 +59,105 @@ export class UsageReadModelService {
   #worker: Worker | undefined;
   #workerStart: Promise<Worker> | undefined;
   #workerStopping: Promise<unknown> | undefined;
-  #summaries: readonly Summary[] | undefined;
   #catalogFingerprints: Map<string, string> | undefined;
   #disposed = false;
-  #operations: Promise<unknown> = Promise.resolve();
   #requests = new Map<string, UsageQueryProgress>();
-  #currentRequest?: string;
   #queued = 0;
-  #syncTotal: number | undefined;
-  #lightweightSources = false;
-  #failedSessionIds = new Set<string>();
+  #scope = new AsyncLocalStorage<QueryScope>();
+  #scheduler = new ReadModelScheduler();
+  #catalogLock: Promise<unknown> = Promise.resolve();
+  #fallbackLock: Promise<void> = Promise.resolve();
+  #syncJobs = new Map<string, { key: string; waiters: Set<QueryScope>; task: Promise<void> }>();
+  #initializing?: Promise<void>;
+  #activeSqlRequest?: string;
+  #contextHistory = new Map<string, { key: string; result: ContextHistoryResult | null; fallback?: boolean; indexedThroughSeq?: number; error?: string; task?: Promise<void>; consumers: Map<string, number> }>();
+  get #currentRequest() { return this.#scope.getStore()?.requestId; }
+  set #currentRequest(value: string | undefined) { this.#scope.getStore()!.requestId = value; }
+  get #summaries() { return this.#scope.getStore()!.summaries; }
+  set #summaries(value: readonly Summary[] | undefined) { this.#scope.getStore()!.summaries = value; }
+  get #syncTotal() { return this.#scope.getStore()!.syncTotal; }
+  set #syncTotal(value: number | undefined) { this.#scope.getStore()!.syncTotal = value; }
+  get #lightweightSources() { return this.#scope.getStore()!.lightweightSources; }
+  set #lightweightSources(value: boolean) { this.#scope.getStore()!.lightweightSources = value; }
+  get #partialInventory() { return this.#scope.getStore()!.partialInventory; }
+  set #partialInventory(value: boolean) { this.#scope.getStore()!.partialInventory = value; }
+  get #failedSessionIds() { return this.#scope.getStore()!.failedSessionIds; }
+  set #failedSessionIds(value: Set<string>) { this.#scope.getStore()!.failedSessionIds = value; }
 
   constructor(reader: Reader, dataRoot: string) {
     this.#reader = reader;
     this.#dataRoot = dataRoot;
+  }
+
+  releaseContext(sessionId: string, consumerId: string): void { this.#contextHistory.get(sessionId)?.consumers.delete(consumerId); }
+  contextHistory(source: QuerySource, consumerId: string, retry = false) {
+    const id = source.header.sessionId;
+    const key = `${source.throughSeq}:${source.stamp}:${source.codecSetDigest ?? ""}`;
+    let entry = this.#contextHistory.get(id);
+    if (!entry) {
+      if (this.#contextHistory.size >= 16) {
+        const idle = [...this.#contextHistory].find(([, item]) => !item.task && ![...item.consumers.values()].some(until => until > Date.now()));
+        if (idle) this.#contextHistory.delete(idle[0]); else throw new Error("Context query budget exceeded.");
+      }
+      entry = { key: "", result: null, consumers: new Map() }; this.#contextHistory.set(id, entry);
+    }
+    for (const [consumer, until] of entry.consumers) if (until <= Date.now()) entry.consumers.delete(consumer);
+    entry.consumers.set(consumerId, Date.now() + 20_000);
+    if (!entry.task && (entry.key !== key || (retry && entry.error))) {
+      entry.key = key; entry.error = undefined; entry.fallback = false;
+      const item = entry;
+      item.task = this.#serialize(async () => {
+        const demand = () => { if (this.#disposed || ![...item.consumers.values()].some(until => until > Date.now())) throw new Error("Context query paused."); };
+        demand();
+        item.result = await this.#send({ type: "context-query", sessionId: id }) as ContextHistoryResult | null;
+        let state = await this.#send({ type: "context-source-state", source }) as ContextHistoryState | null;
+        item.indexedThroughSeq = state?.revision ?? -1;
+        if (state && !state.building && state.revision === source.throughSeq && state.stamp === source.stamp && state.codec === (source.codecSetDigest ?? "")) return;
+        let reset = !state?.cursor || state.projector_version !== 1 || state.revision > source.throughSeq || state.codec !== (source.codecSetDigest ?? "") || (state.revision === source.throughSeq && state.stamp !== source.stamp);
+        for (let attempt = 0; attempt < 2; attempt++) {
+          let cursor = reset ? undefined : state?.cursor ?? undefined; let first = true;
+          try {
+            for (;;) {
+              demand();
+              if (!this.#reader.readSessionEventBatch) throw new Error("Session provider does not support bounded Context reads.");
+              const batch = await this.#reader.readSessionEventBatch(id, { throughSeq: source.throughSeq, ...(cursor ? { cursor } : {}) });
+              if (!batch.done && batch.cursor === cursor) throw new Error("Context query made no progress.");
+              demand();
+              await this.#send({ type: "context-journal", source, events: batch.events, cursor: batch.cursor, first, final: batch.done, reset });
+              cursor = batch.cursor; first = false;
+              item.indexedThroughSeq = batch.done ? source.throughSeq : batch.events.at(-1)?.seq ?? item.indexedThroughSeq;
+              if (batch.done) break;
+            }
+            item.result = await this.#send({ type: "context-query", sessionId: id }) as ContextHistoryResult | null;
+            break;
+          } catch (error) {
+            if (attempt || reset || !(error instanceof Error) || !/cursor.*invalid|invalidated/i.test(error.message)) throw error;
+            reset = true; state = null;
+          }
+        }
+      }, true).catch(async error => {
+        if (error instanceof Error && /paused/.test(error.message)) { item.key = ""; return; }
+        item.error = "历史索引暂不可用，请重试。";
+        if (this.#disposed || error instanceof WorkerTimeoutError || source.throughSeq >= 5000 || !this.#reader.readSessionEventBatch) return;
+        try {
+          const events: import("@actspace/session-journal").SessionEventEnvelopeV1[] = [];
+          let cursor: string | undefined, bytes = 0;
+          for (;;) {
+            if (![...item.consumers.values()].some(until => until > Date.now())) return;
+            const batch = await this.#reader.readSessionEventBatch(id, { throughSeq: source.throughSeq, ...(cursor ? { cursor } : {}) });
+            bytes += Buffer.byteLength(JSON.stringify(batch.events));
+            if (bytes > 8 * 1024 * 1024 || events.length + batch.events.length > 5000) return;
+            events.push(...batch.events);
+            if (batch.done) break;
+            if (cursor === batch.cursor) return;
+            cursor = batch.cursor;
+          }
+          item.result = await this.#send({ type: "context-fallback", source, events }) as ContextHistoryResult | null;
+          item.fallback = true;
+        } catch { /* Keep the visible index error; never expand the fallback budget. */ }
+      }).finally(() => { item.task = undefined; });
+    }
+    return { result: entry.result, syncing: !!entry.task, error: entry.error, fallback: entry.fallback, indexedThroughSeq: entry.indexedThroughSeq };
   }
 
   invalidate(): void {
@@ -85,7 +176,7 @@ export class UsageReadModelService {
   cancel(requestId: string): void {
     const status = this.#requests.get(requestId);
     if (status) {
-      const runningSql = this.#currentRequest === requestId;
+      const runningSql = this.#activeSqlRequest === requestId && this.#queued === 1 && this.#syncJobs.size === 0;
       status.phase = "cancelled";
       if (runningSql) this.#onWorkerError(new Error("Usage query cancelled."));
     }
@@ -112,7 +203,7 @@ export class UsageReadModelService {
         return result;
       }
       finally { this.#currentRequest = undefined; this.#syncTotal = undefined; }
-    }).finally(() => this.#requests.delete(requestId));
+    }, input.scope === "session" || !!input.sessionId).finally(() => this.#requests.delete(requestId));
   }
 
   getSessionPage(input: SessionListPageInput): Promise<SessionListPage> {
@@ -125,9 +216,8 @@ export class UsageReadModelService {
       } catch (error) {
         if (error instanceof WorkerTimeoutError) throw error;
         if (this.#disposed || (error instanceof Error && /^Usage (?:(result|search) exceeds|cursor invalid)/.test(error.message))) throw error;
-        await this.#restartWorker();
         try {
-          await this.#resetDerivedDatabase();
+          if (error instanceof Error && /schema|malformed|not a database/i.test(error.message)) { await this.#resetDerivedDatabase(); }
           if (this.#lightweightSources) await this.#syncChanged(undefined, true);
           else await this.#syncCatalog();
           return this.#sessionResult(await this.#send({ type: "query", request: "sessions", input }) as SessionListPage);
@@ -144,7 +234,16 @@ export class UsageReadModelService {
     return { ...page, failed: page.failed + this.#failedSessionIds.size };
   }
 
-  async #fallbackSessionPage(input: SessionListPageInput, reason: unknown): Promise<SessionListPage> {
+  #fallbackSessionPage(input: SessionListPageInput, reason: unknown): Promise<SessionListPage> {
+    return this.#withFallback(() => this.#fallbackSessionPageLocked(input, reason));
+  }
+  async #withFallback<T>(operation: () => Promise<T>): Promise<T> {
+    const prior = this.#fallbackLock; let release!: () => void;
+    this.#fallbackLock = new Promise<void>(resolve => { release = resolve; });
+    await prior;
+    try { this.#progress(); return await operation(); } finally { release(); }
+  }
+  async #fallbackSessionPageLocked(input: SessionListPageInput, reason: unknown): Promise<SessionListPage> {
     const summaries = this.#summaries ?? [];
     if (summaries.length > 1_000 || summaries.reduce((count, row) => count + row.throughJournalSeq + 1, 0) > 5_000) throw new Error("History Session fallback exceeds 1,000 sessions or 5,000 events. Retry rebuilding the index.");
     const read = this.#reader.readSessionEventBatch?.bind(this.#reader);
@@ -173,15 +272,27 @@ export class UsageReadModelService {
     } finally { await this.#send({ type: "catalog-fallback-end" }).catch(() => undefined); }
   }
 
-  #serialize<T>(operation: () => Promise<T>): Promise<T> {
+  #serialize<T>(operation: () => Promise<T>, foreground = false): Promise<T> {
     if (this.#queued >= 8) return Promise.reject(new Error("Usage query queue is full; retry shortly."));
     this.#queued++;
-    const task = this.#operations.then(() => {
+    const scope: QueryScope = { foreground, lightweightSources: false, partialInventory: false, failedSessionIds: new Set() };
+    return this.#scope.run(scope, async () => {
       if (this.#disposed) throw new Error("Usage read model disposed.");
-      return operation();
+      try { await this.#ensureDatabase().catch(error => { if (error instanceof WorkerTimeoutError || this.#disposed) throw error; }); return await operation(); }
+      finally { scope.cancelled = true; }
     }).finally(() => { this.#queued--; });
-    this.#operations = task.catch(() => undefined);
-    return task;
+  }
+
+  #ensureDatabase(): Promise<void> {
+    if (!this.#initializing) this.#initializing = (async () => {
+      try { await this.#send({ type: "source-state", sessionId: "" }); }
+      catch (error) {
+        if (!(error instanceof Error) || !/schema|malformed|not a database|file is not a database/i.test(error.message)) throw error;
+        await this.#resetDerivedDatabase();
+        await this.#send({ type: "source-state", sessionId: "" });
+      }
+    })().catch(error => { this.#initializing = undefined; throw error; });
+    return this.#initializing;
   }
 
   async dispose(): Promise<void> {
@@ -194,26 +305,25 @@ export class UsageReadModelService {
   }
 
   async #query(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }): Promise<WorkerResult> {
-    this.#summaries = await this.#readSummaries();
+    const sessionId = (message.input.scope ?? (message.input.sessionId ? "session" : "global")) === "session" ? message.input.sessionId ?? "" : undefined;
+    this.#summaries = await this.#readSummaries(sessionId);
     if (this.#reader.sessionQuerySources && !this.#lightweightSources) throw new Error("Session provider does not support bounded Usage queries. Session history and details remain available.");
     const resetAt = await this.#usageResetAt();
-    const sessionId = (message.input.scope ?? (message.input.sessionId ? "session" : "global")) === "session" ? message.input.sessionId ?? "" : undefined;
     if (sessionId !== undefined && this.#failedSessionIds.has(sessionId)) throw new Error("Requested Session is unreadable.");
     try {
       await this.#syncChanged(resetAt, false, sessionId);
       this.#progress("querying");
-      return await this.#send({ type: "query", request: message.kind, input: message.input });
+      return await this.#send({ type: "query", request: message.kind, input: message.input, resetAt });
     } catch (firstError) {
       if (firstError instanceof SessionSourceReadError || firstError instanceof WorkerTimeoutError) throw firstError;
       if (this.#disposed || (firstError instanceof Error && /^Usage (?:(result|search) exceeds|cursor invalid)/.test(firstError.message))) throw firstError;
       if (this.#currentRequest && this.#requests.get(this.#currentRequest)?.phase === "cancelled") { await this.#send({ type: "abort-sync" }).catch(() => undefined); throw firstError; }
       this.#progress("rebuilding");
-      await this.#restartWorker();
       try {
-        await this.#resetDerivedDatabase();
+        if (firstError instanceof Error && /schema|malformed|not a database/i.test(firstError.message)) { await this.#resetDerivedDatabase(); }
         await this.#syncChanged(resetAt, false, sessionId);
         this.#progress("querying");
-        return await this.#send({ type: "query", request: message.kind, input: message.input });
+        return await this.#send({ type: "query", request: message.kind, input: message.input, resetAt });
       } catch (error) {
         await this.#send({ type: "abort-sync" }).catch(() => undefined);
         this.#progress("fallback");
@@ -223,7 +333,10 @@ export class UsageReadModelService {
     }
   }
 
-  async #fallback(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }, resetAt: string | undefined, reason: unknown): Promise<WorkerResult> {
+  #fallback(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }, resetAt: string | undefined, reason: unknown): Promise<WorkerResult> {
+    return this.#withFallback(() => this.#fallbackLocked(message, resetAt, reason));
+  }
+  async #fallbackLocked(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }, resetAt: string | undefined, reason: unknown): Promise<WorkerResult> {
     const summaries = (this.#summaries ?? []).filter(row => message.input.scope === "session" || (message.input.scope === undefined && message.input.sessionId) ? row.sessionId === message.input.sessionId : true);
     if (summaries.length > 1_000) throw new Error("Usage index unavailable; Session fallback exceeds 1,000 sessions. Retry rebuilding the index.");
     if (summaries.reduce((count, row) => count + row.throughJournalSeq + 1, 0) > 5_000) throw new Error("Usage index unavailable; Session fallback exceeds 5,000 events. Retry rebuilding the index.");
@@ -249,8 +362,11 @@ export class UsageReadModelService {
     } finally { await this.#send({ type: "fallback-end" }).catch(() => undefined); }
   }
 
-  async #readSummaries(): Promise<readonly Summary[]> {
-    const catalog = await this.#reader.sessionQuerySources?.();
+  async #readSummaries(sessionId?: string): Promise<readonly Summary[]> {
+    this.#partialInventory = sessionId !== undefined && !!this.#reader.sessionQuerySource;
+    const single = this.#partialInventory ? await this.#reader.sessionQuerySource!(sessionId!) : undefined;
+    if (this.#partialInventory && !single) throw new Error("Session provider does not support bounded single-Session queries.");
+    const catalog = this.#partialInventory ? { sources: [single!], failedSessionIds: [] } : await this.#reader.sessionQuerySources?.();
     this.#lightweightSources = catalog != null;
     this.#failedSessionIds = new Set(catalog?.failedSessionIds ?? []);
     if (!catalog) return this.#reader.globalSessionSummaries();
@@ -268,7 +384,7 @@ export class UsageReadModelService {
     const path = join(this.#dataRoot, "global-usage-reset.json");
     try {
       const value = JSON.parse(await readFile(path, "utf8")) as { version?: number; resetAt?: string };
-      return value.version === 1 && typeof value.resetAt === "string" ? value.resetAt : undefined;
+      return value.version === 1 && typeof value.resetAt === "string" && Number.isFinite(Date.parse(value.resetAt)) ? new Date(value.resetAt).toISOString() : undefined;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") return undefined;
       const resetAt = new Date().toISOString();
@@ -279,7 +395,12 @@ export class UsageReadModelService {
     }
   }
 
-  async #syncCatalog(): Promise<void> {
+  #syncCatalog(): Promise<void> {
+    const task = this.#catalogLock.then(() => this.#syncCatalogUnlocked());
+    this.#catalogLock = task.catch(() => undefined);
+    return task;
+  }
+  async #syncCatalogUnlocked(): Promise<void> {
     const summaries = this.#summaries ?? [];
     const previous = this.#catalogFingerprints;
     const fingerprints = new Map(summaries.map(summary => [summary.sessionId, fingerprintCatalog(summary)]));
@@ -290,11 +411,12 @@ export class UsageReadModelService {
     }
     // One changed Session must not rewrite the entire catalog or rescan it for
     // deletions. A fresh Worker still reconciles all persisted identities once.
-    if (!previous || [...previous.keys()].some(id => !fingerprints.has(id))) {
+    if (!this.#partialInventory && (!previous || [...previous.keys()].some(id => !fingerprints.has(id)))) {
       await this.#send({ type: "sync", sources: [], activeSessionIds: summaries.map(summary => summary.sessionId) });
       for (const id of this.#indexed.keys()) if (!fingerprints.has(id.slice(id.indexOf(":") + 1))) this.#indexed.delete(id);
     }
-    this.#catalogFingerprints = fingerprints;
+    if (!this.#partialInventory) this.#catalogFingerprints = fingerprints;
+    else for (const [id, value] of fingerprints) this.#catalogFingerprints?.set(id, value);
   }
 
   async #syncChanged(resetAt?: string, catalogOnly = false, sessionId?: string): Promise<void> {
@@ -311,18 +433,43 @@ export class UsageReadModelService {
       this.#progress();
       const cacheId = `${catalogOnly ? "catalog" : "usage"}:${summary.sessionId}`;
       const key = `${summary.throughJournalSeq}:${summary.querySource?.stamp ?? ""}:${summary.querySource?.codecSetDigest ?? ""}`;
-      if (this.#indexed.get(cacheId) === key) { this.#progress(undefined, 0, 1); continue; }
-      const state = await this.#send({ type: "source-state", sessionId: summary.sessionId, catalogOnly }) as SourceState;
+      const waiter = this.#scope.getStore()!;
+      let job = this.#syncJobs.get(cacheId);
+      while (job && job.key !== key) { await job.task.catch(() => undefined); this.#progress(); job = this.#syncJobs.get(cacheId); }
+      if (!job) {
+        const waiters = new Set([waiter]);
+        const scope: QueryScope = { ...waiter, requestId: undefined };
+        const task = this.#scope.run(scope, () => this.#syncSource(summary, resetAt, catalogOnly, sessionId, read, waiters));
+        job = { key, waiters, task }; this.#syncJobs.set(cacheId, job);
+        void task.finally(() => { if (this.#syncJobs.get(cacheId)?.task === task) this.#syncJobs.delete(cacheId); }).catch(() => undefined);
+      } else job.waiters.add(waiter);
+      try { await job.task; this.#progress(undefined, 0, 1); }
+      finally { job.waiters.delete(waiter); }
+    }
+  }
+
+  async #syncSource(summary: Summary, resetAt: string | undefined, catalogOnly: boolean, sessionId: string | undefined, read: NonNullable<Reader["readSessionEventBatch"]>, waiters: Set<QueryScope>): Promise<void> {
+      const demand = (events = 0) => {
+        const live = [...waiters].filter(scope => !scope.cancelled && (!scope.requestId || (this.#requests.has(scope.requestId) && this.#requests.get(scope.requestId)?.phase !== "cancelled")));
+        if (this.#disposed || !live.length) throw new Error("Usage query cancelled.");
+        this.#scope.getStore()!.foreground = live.some(scope => scope.foreground);
+        for (const scope of live) { const progress = scope.requestId ? this.#requests.get(scope.requestId) : undefined; if (progress) { progress.phase = "syncing"; progress.eventsRead += events; } }
+      };
+      demand();
+      const cacheId = `${catalogOnly ? "catalog" : "usage"}:${summary.sessionId}`;
+      const key = `${summary.throughJournalSeq}:${summary.querySource?.stamp ?? ""}:${summary.querySource?.codecSetDigest ?? ""}`;
+      if (this.#indexed.get(cacheId) === key) { return; }
+      const state = await this.#send({ type: "source-state", sessionId: summary.sessionId, catalogOnly, target: { throughSeq: summary.throughJournalSeq, stamp: summary.querySource?.stamp, codecSetDigest: summary.querySource?.codecSetDigest } }) as SourceState;
       const digest = summary.querySource?.codecSetDigest;
       // Existing v8 indexes stored the Runtime digest as the last stamp field.
       // Keep that read-only compatibility check; new writes persist it separately.
       const codecChanged = digest !== undefined && (state.codecSetDigest !== undefined ? state.codecSetDigest !== digest : !state.stamp?.endsWith(`:${digest}`));
-      if (!codecChanged && state.revision === summary.throughJournalSeq && state.cursor && (!summary.querySource || state.stamp === summary.querySource.stamp)) { this.#indexed.set(cacheId, key); this.#progress(undefined, 0, 1); continue; }
+      if (!state.building && !codecChanged && state.revision === summary.throughJournalSeq && state.cursor && (!summary.querySource || state.stamp === summary.querySource.stamp)) { this.#indexed.set(cacheId, key); return; }
       const source = { sessionId: summary.sessionId, title: summary.title, workspaceRoot: summary.workspaceRoot, throughJournalSeq: summary.throughJournalSeq, querySource: summary.querySource };
       let reset = codecChanged || !state.cursor || state.revision === null || state.revision > summary.throughJournalSeq || (state.revision === summary.throughJournalSeq && !!summary.querySource && state.stamp !== summary.querySource.stamp);
       let cursor = reset ? undefined : state.cursor;
-      // An invalidated cursor rebuilds just this Session. Partial work stays in
-      // one transaction, including projection state, FTS and the final watermark.
+      // An invalidated cursor rebuilds only this Session. Each committed batch
+      // persists its cursor; rebuilding rows stay private until publication.
       for (let attempt = 0; attempt < 2; attempt++) {
         let first = true;
         type Batch = Awaited<ReturnType<typeof read>>;
@@ -330,13 +477,13 @@ export class UsageReadModelService {
         try {
           let batch = await read(summary.sessionId, { throughSeq: summary.throughJournalSeq, ...(cursor ? { cursor } : {}) });
           while (true) {
-            this.#progress("syncing");
+            demand();
             if (!batch.done && batch.cursor === cursor) throw new Error("Session provider made no query progress.");
             // One bounded lookahead overlaps provider parsing with SQL projection.
             // Capture rejection immediately; failures still roll back the Session.
             next = batch.done ? undefined : read(summary.sessionId, { throughSeq: summary.throughJournalSeq, cursor: batch.cursor }).then(batch => ({ batch }), error => ({ error }));
             await this.#send({ type: "journal", source, events: batch.events, cursor: batch.cursor, first, final: batch.done, reset, resetAt, catalogOnly });
-            this.#progress(undefined, batch.events.length);
+            demand(batch.events.length);
             first = false; cursor = batch.cursor;
             if (batch.done) break;
             const prefetched = await next!;
@@ -347,6 +494,7 @@ export class UsageReadModelService {
           this.#progress(undefined, 0, 1);
           break;
         } catch (error) {
+          if (error instanceof Error && /cancelled|timed out/.test(error.message)) throw error;
           await this.#send({ type: "abort-sync" }).catch(() => undefined);
           if (attempt > 0 || (reset && !(error instanceof SessionSourceReadError))) {
             if (!(error instanceof SessionSourceReadError)) throw error;
@@ -356,17 +504,24 @@ export class UsageReadModelService {
             this.#catalogFingerprints?.delete(summary.sessionId);
             // Quarantine only this derived projection; never delete Session files.
             // Failure remains explicit in the response and is retried next query.
-            await this.#send({ type: "sync", sources: [], activeSessionIds: (this.#summaries ?? []).filter(item => !this.#failedSessionIds.has(item.sessionId)).map(item => item.sessionId) });
+            if (!this.#partialInventory) await this.#send({ type: "sync", sources: [], activeSessionIds: (this.#summaries ?? []).filter(item => !this.#failedSessionIds.has(item.sessionId)).map(item => item.sessionId) });
             if (sessionId !== undefined) throw error;
             break;
           }
           reset = true; cursor = undefined;
         } finally { await next; }
       }
-    }
   }
 
-  async #send(message: Record<string, unknown>): Promise<WorkerResult> {
+  #send(message: Record<string, unknown>): Promise<WorkerResult> {
+    const scope = this.#scope.getStore();
+    return this.#scheduler.run(scope?.foreground ?? false, async () => {
+      this.#activeSqlRequest = scope?.requestId;
+      try { return await this.#sendNow(message); }
+      finally { this.#activeSqlRequest = undefined; }
+    });
+  }
+  async #sendNow(message: Record<string, unknown>): Promise<WorkerResult> {
     const worker = await this.#getWorker();
     const id = randomUUID();
     return new Promise<WorkerResult>((resolve, reject) => {
@@ -427,6 +582,8 @@ export class UsageReadModelService {
   async #resetDerivedDatabase(): Promise<void> {
     await this.#send({ type: "reset-database" });
     this.#indexed.clear();
+    this.#catalogFingerprints = undefined;
+    for (const entry of this.#contextHistory.values()) { entry.key = ""; entry.result = null; entry.fallback = false; entry.indexedThroughSeq = -1; }
   }
 }
 

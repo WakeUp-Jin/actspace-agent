@@ -106,9 +106,9 @@ describe("WorkbenchLayout narrow window behavior", () => {
       </SessionProjectionProvider>,
     );
     await waitFor(() => expect(getSessionProjectionSnapshot).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "上下文用量 4%" }));
-    expect(screen.getByText("4% 已用")).toBeVisible();
-    expect(screen.getByText("~49K / 1M Token")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "上下文用量 5%" }));
+    expect(screen.getByText("5% 已用")).toBeVisible();
+    expect(screen.getByText("≈49K / 1M Token")).toBeVisible();
     await user.hover(screen.getByRole("button", { name: "查看会话详情： Responsive layout" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("累计 Token：549K");
     expect(screen.getByRole("tooltip")).not.toHaveTextContent("上下文");

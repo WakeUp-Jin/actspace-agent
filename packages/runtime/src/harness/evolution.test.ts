@@ -10,7 +10,7 @@ vi.mock("./default-harness.js", async original => {
 import { createCordisRoot } from "@actspace/cordis-adapter";
 import { createCoreCodecRegistry } from "@actspace/session-journal";
 import { taskCodecs } from "@actspace/agent-service";
-import { codecs as contextCodecs } from "@actspace/context/codec";
+import { codecs as contextCodecs } from "@actspace/context-engine/codec";
 import { SessionStore } from "@actspace/session-persistence";
 import { JsonlSessionStorage } from "@actspace/session-jsonl";
 import { AgentRegistry } from "@actspace/core-agent";

@@ -6,8 +6,8 @@ import {
   ApprovalActions,
   ApprovalPath,
   ApprovalPattern,
+  ApprovalCard,
   ApprovalReason,
-  ApprovalRow,
   useApprovalDecision,
   useExactGrantSuggestion,
 } from "./ApprovalParts";
@@ -32,9 +32,8 @@ function FileReadApprovalLine({ message, className }: { message: FileReadApprova
   const decision = useApprovalDecision(message.approvalRequestId);
   const isRead = message.kind === "read";
   return (
-    <ApprovalRow
+    <ApprovalCard
       className={className}
-      icon={isRead ? <File size={14} strokeWidth={2} /> : <Search size={14} strokeWidth={2} />}
       verb={isRead ? "读取" : message.kind === "grep" ? "搜索" : "匹配"}
       target={isRead ? <ApprovalPath path={message.filePath} /> : <ApprovalPattern pattern={message.pattern} scope={message.scope} />}
       meta={<ApprovalReason reason={message.reason} />}
@@ -45,9 +44,9 @@ function FileReadApprovalLine({ message, className }: { message: FileReadApprova
 
 function GenericToolApprovalLine({ message, className }: { message: Extract<MessageBlock, { kind: "tool" }>; className?: string }) {
   const decision = useApprovalDecision(message.approvalRequestId);
-  return <ApprovalRow className={className} icon={<File size={14} strokeWidth={2} />}
-    verb="允许执行" target={<span>{message.title}</span>}
-    meta={<><span>{message.content}</span><ApprovalReason reason={message.approvalReason} /></>}
+  return <ApprovalCard className={className}
+    verb="允许执行" target={<span className="min-w-0 truncate text-text-muted">{message.title}</span>}
+    meta={<><span className="min-w-0 truncate">{message.content}</span><ApprovalReason reason={message.approvalReason} /></>}
     actions={<ApprovalActions state={decision} primaryLabel="允许" />} />;
 }
 

@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/13-Preload与MockBridge执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/13-Preload与MockBridge执行计划.md`
 - **执行模式**：交互，连续执行（00 §3）
 - **分支**：`refactor/desktop-fe-13`，从 `refactor/desktop-frontend@05ffe370`（12 的 squash 提交）拉出
 - **开始时间**：2026-10-06 02:08

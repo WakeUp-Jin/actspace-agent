@@ -11,8 +11,8 @@ const require = createRequire(import.meta.url);
 const { UsageReadModelService } = require('../dist-electron/main/runtime-v2/usage-read-model.js');
 
 const workerPath = fileURLToPath(new URL('../dist-electron/main/runtime-v2/usage-read-model-worker.js', import.meta.url));
-async function fixture(t) {
-  const root = await mkdtemp(join(tmpdir(), 'usage-sqlite-test-'));
+async function fixture(t, existingRoot) {
+  const root = existingRoot ?? await mkdtemp(join(tmpdir(), 'usage-sqlite-test-'));
   const worker = new Worker(workerPath, { workerData: { dataRoot: root } });
   const pending = new Map(); let sequence = 0;
   worker.on('message', reply => {
@@ -28,7 +28,7 @@ async function fixture(t) {
     const timer = setTimeout(() => { pending.delete(id); reject(new Error('Worker timeout')); }, 10_000);
     pending.set(id, { resolve, reject, timer }); worker.postMessage({ ...message, id });
   });
-  send.root=root;
+  send.root=root; send.worker=worker;
   return send;
 }
 function row(id, sessionId = 's') {
@@ -101,7 +101,7 @@ for (const failure of ['corrupt','version','application']) {
     t.after(async () => { await service.dispose(); await rm(root, { recursive: true, force: true }); });
     const result = await service.getSessionPage({});
     assert.equal(result.items[0].id, 'recovered');
-    const db = new DatabaseSync(path); assert.equal(db.prepare('PRAGMA user_version').get().user_version, 8); db.close();
+    const db = new DatabaseSync(path); assert.equal(db.prepare('PRAGMA user_version').get().user_version, 9); db.close();
   });
 }
 
@@ -235,16 +235,17 @@ test('real provider batches match the original projection, resume across queries
   db.close();
 });
 
-test('a failed later Journal batch rolls back earlier batches and persisted cursor', async t => {
+test('a failed Journal batch preserves previously committed batches and cursor', async t => {
   const send = await fixture(t);
   const session = { sessionId: 's', title: 's', workspaceRoot: '/workspace', throughJournalSeq: 0 };
   const event = { seq: 0, type: 'tool/call', time: '2026-10-11T00:00:00Z', data: { callId: 'call', name: 'read' } };
   await send({ type: 'journal', source: session, events: [event], cursor: 'first', first: true, final: true, reset: true });
   await send({ type: 'journal', source: { ...session, throughJournalSeq: 2 }, events: [{ ...event, seq: 1, data: { callId: 'new', name: 'write' } }], cursor: 'next', first: true, final: false, reset: false });
   await assert.rejects(send({ type: 'journal', source: { ...session, throughJournalSeq: 2 }, events: [{ ...event, seq: 1 }], cursor: 'bad', first: false, final: true, reset: false }), /UNIQUE/);
-  assert.deepEqual(await send({ type: 'source-state', sessionId: 's' }), { revision: 0, cursor: 'first' });
+  const committed = await send({ type: 'source-state', sessionId: 's' });
+  assert.equal(committed.revision, 1); assert.equal(committed.cursor, 'next');
   const result = await send({ type: 'query', request: 'activity', input: { range: 'total' } });
-  assert.deepEqual(result.rows.map(row => row.activityId), ['s:tool:call']);
+  assert.deepEqual(result.rows.map(row => row.activityId).sort(), ['s:tool:call', 's:tool:new']);
 });
 
 test('second index failure uses bounded Session fallback in Worker and exposes its status', async t => {
@@ -964,8 +965,8 @@ test('cancelling a chunked Session replacement rolls back deleted activities', a
 });
 
 // Known failing repros retained for the deferred unified acceptance plan.
-// Remove TODO only after the U-08/U-10 fix passes the same assertions.
-for (const fallback of [false, true]) test(`offset timestamps respect the reset boundary in ${fallback ? 'fallback' : 'indexed'} Usage`, { todo: 'U-08: reset filtering compares raw timestamp strings; deferred by user' }, async t => {
+// U-08/U-10 regression: compare canonical instants in both read paths.
+for (const fallback of [false, true]) test(`offset timestamps respect the reset boundary in ${fallback ? 'fallback' : 'indexed'} Usage`, async t => {
   const send = await fixture(t);
   const events = [
     ['before', '2026-10-11T03:00:00+08:00'],
@@ -986,7 +987,7 @@ for (const fallback of [false, true]) test(`offset timestamps respect the reset 
   assert.equal(page.rows[0].startedAt, '2026-10-11T02:00:00.000Z');
 });
 
-for (const fallback of [false, true]) test(`offset timestamps sort history and page correctly in ${fallback ? 'fallback' : 'indexed'} catalog`, { todo: 'U-10: catalog sorting compares raw timestamp strings; deferred by user' }, async t => {
+for (const fallback of [false, true]) test(`offset timestamps sort history and page correctly in ${fallback ? 'fallback' : 'indexed'} catalog`, async t => {
   const send = await fixture(t);
   const rows = [catalog('older-offset', { updatedAt: '2026-10-11T03:00:00+08:00' }), catalog('newer-utc')];
   if (fallback) {
@@ -999,4 +1000,114 @@ for (const fallback of [false, true]) test(`offset timestamps sort history and p
   const next = await query({ workspaceRoot: '/workspace', limit: 1, after: all.items[0].id });
   assert.equal(next.items[0].id, 'older-offset');
   assert.equal(next.items[0].updatedAt, '2026-10-10T19:00:00.000Z');
+});
+
+test('single-Session Usage uses one descriptor and never prunes other indexed sessions', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'usage-single-source-'));
+  await writeFile(join(root, 'global-usage-reset.json'), JSON.stringify({ version: 1, resetAt: '2000-01-01T00:00:00Z' }));
+  const descriptor = id => ({ header: { sessionId: id, createdAt: '2026-10-11T00:00:00Z', lineage: null, createdWith: { profileId: 'test' } }, throughSeq: 0, stamp: id });
+  let inventory = 0; const reads = [];
+  const service = new UsageReadModelService({
+    sessionQuerySources: async () => { inventory++; return { sources: [descriptor('a'), descriptor('b')], failedSessionIds: [] }; },
+    sessionQuerySource: async id => descriptor(id),
+    readSessionEventBatch: async id => { reads.push(id); return { events: [{ seq: 0, type: 'tool/call', time: '2026-10-11T00:00:00Z', data: { callId: id, name: 'read' }, surface: null }], cursor: 'done', done: true }; },
+  }, root);
+  t.after(async () => { await service.dispose(); await rm(root, { recursive: true, force: true }); });
+  assert.equal((await service.getActivity({ scope: 'global', range: 'total' })).rows.length, 2);
+  assert.equal(inventory, 1);
+  assert.equal((await service.getActivity({ scope: 'session', sessionId: 'a', range: 'total' })).rows.length, 1);
+  assert.equal(inventory, 1); assert.deepEqual(reads, ['a', 'b']);
+  assert.equal((await service.getActivity({ scope: 'global', range: 'total' })).rows.length, 2);
+});
+
+test('rebuild batches survive Worker exit while the published generation stays readable', async t => {
+  let send = await fixture(t);
+  await send({ type: 'sync', sources: [source([row('previous')])] });
+  const target = { throughSeq: 2, stamp: 'replacement', codecSetDigest: 'codec' };
+  const session = { sessionId: 's', title: 's', workspaceRoot: '/workspace', throughJournalSeq: 2, querySource: { ...target, header: { sessionId: 's', createdAt: '2026-10-11T00:00:00Z', lineage: null, createdWith: { profileId: 'test' } } } };
+  const event = { seq: 0, type: 'tool/call', time: '2026-10-11T00:00:00Z', data: { callId: 'new', name: 'read' } };
+  await send({ type: 'journal', source: session, events: [event], cursor: 'batch-1', first: true, final: false, reset: true });
+  assert.deepEqual((await send({ type: 'query', request: 'activity', input: { range: 'total' } })).rows.map(row => row.activityId), ['previous']);
+  await send.worker.terminate();
+  // An older schema-9 Worker created sorted-page indexes in private staging.
+  // Reopening may remove those indexes, but must preserve the committed cursor
+  // and old published generation until the replacement finishes.
+  const legacy = new DatabaseSync(join(send.root, 'runtime-v2', 'usage-read-model.sqlite'));
+  try { legacy.exec('CREATE INDEX building_usage_usage_activity_started_idx ON building_usage_usage_activity(started_at)'); }
+  finally { legacy.close(); }
+  send = await fixture(t, send.root);
+  const saved = await send({ type: 'source-state', sessionId: 's', target });
+  assert.equal(saved.building, true); assert.equal(saved.cursor, 'batch-1'); assert.equal(saved.revision, 0);
+  await send({ type: 'journal', source: session, events: [{ ...event, seq: 1, type: 'tool/result', data: { callId: 'new', status: 'success' } }], cursor: 'batch-2', first: true, final: false, reset: false });
+  await send.worker.terminate(); send = await fixture(t, send.root);
+  assert.equal((await send({ type: 'source-state', sessionId: 's', target })).cursor, 'batch-2');
+  await send({ type: 'journal', source: session, events: [], cursor: 'done', first: true, final: true, reset: false });
+  const result = await send({ type: 'query', request: 'activity', input: { range: 'total' } });
+  assert.deepEqual(result.rows.map(row => row.activityId), ['s:tool:new']);
+  assert.equal(result.summary.activityCount, 1);
+  assert.equal((await send({ type: 'source-state', sessionId: 's', target })).building, undefined);
+  const db = new DatabaseSync(join(send.root, 'runtime-v2', 'usage-read-model.sqlite'));
+  try {
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM read_model_builds').get().n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM building_usage_usage_activity').get().n, 0);
+    assert.equal(db.prepare("SELECT name FROM sqlite_master WHERE name='building_usage_usage_activity_started_idx'").get(), undefined);
+    assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE name='usage_activity_started_idx'").get());
+  }
+  finally { db.close(); }
+});
+
+test('concurrent consumers share Session synchronization; cancelling one keeps the other consumer and cursor', async t => {
+  const root=await mkdtemp(join(tmpdir(),'usage-shared-consumers-'));
+  await writeFile(join(root,'global-usage-reset.json'),JSON.stringify({version:1,resetAt:'2000-01-01T00:00:00Z'}));
+  const events=[{seq:0,time:'2026-10-11T00:00:00Z',type:'tool/call',data:{callId:'c',name:'read'}}];
+  let release, began;const ready=new Promise(resolve=>{began=resolve;});const gate=new Promise(resolve=>{release=resolve;});let reads=0;
+  const src={header:{sessionId:'s',createdAt:'2026-10-11T00:00:00Z',createdWith:{profileId:'test'}},throughSeq:0,stamp:'one'};
+  const service=new UsageReadModelService({sessionQuerySource:async()=>src,readSessionEventBatch:async()=>{reads++;began();await gate;return{events,cursor:'done',done:true};}},root);
+  t.after(async()=>{await service.dispose();await rm(root,{recursive:true,force:true});});
+  const first=service.getActivity({scope:'session',sessionId:'s',range:'total',requestId:'first'});
+  const observed=assert.rejects(first,/cancelled/);
+  await ready;
+  const second=service.getActivity({scope:'session',sessionId:'s',range:'total',requestId:'second'});
+  await new Promise(resolve=>setTimeout(resolve,20));service.cancel('first');release();
+  await observed;assert.equal((await second).rowsPage.totalRows,1);assert.equal(reads,1);
+  assert.equal((await service.getActivity({scope:'session',sessionId:'s',range:'total'})).rowsPage.totalRows,1);assert.equal(reads,1);
+});
+
+test('bulk and single-row writes preserve identical rollups, null costs, run counts and rollback',async t=>{
+  const bulk=await fixture(t),single=await fixture(t);
+  const rows=Array.from({length:30},(_,i)=>({...row(`batch-${i}`),kind:i%3?'llm_request':'tool_invocation',agentRunId:`run-${i%7}`,model:`model-${i%4}`,providerId:`provider-${i%2}`,startedAt:`2026-10-${String(10+i%2).padStart(2,'0')}T00:00:00Z`,costUsd:i%2?0.25:null,costAmount:i%2?0.25:null,costCurrency:i%2?'USD':null}));
+  await bulk({type:'sync',sources:[source(rows)]});
+  for(const item of rows)await single({type:'sync',sources:[source([item])],replaceSessionIds:[]});
+  for(const request of ['activity','statistics'])for(const input of [{range:'total'},{range:'total',search:'model-1'}]){
+    const a=await bulk({type:'query',request,input}),b=await single({type:'query',request,input});
+    const stable=x=>JSON.parse(JSON.stringify(x,(key,value)=>['generatedAt','updatedAt'].includes(key)?undefined:value));
+    assert.deepEqual(stable(a),stable(b));
+  }
+  await assert.rejects(bulk({type:'sync',sources:[source([...rows,rows[0]])]}),/UNIQUE/);
+  assert.equal((await bulk({type:'query',request:'activity',input:{range:'total'}})).rowsPage.totalRows,30);
+  await bulk({type:'sync',sources:[source([row('after-failure')])],replaceSessionIds:[]});
+  assert.equal((await bulk({type:'query',request:'activity',input:{range:'total'}})).rowsPage.totalRows,31);
+});
+
+test('C-03 advancing resetAt filters an already indexed Session without replaying it', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'usage-hot-reset-'));
+  const resetFile = join(root, 'global-usage-reset.json');
+  await writeFile(resetFile, JSON.stringify({ version: 1, resetAt: '2000-01-01T00:00:00Z' }));
+  const header = { sessionId: 's', createdAt: '2026-10-11T00:00:00Z', lineage: null, createdWith: { profileId: 'test' } };
+  const times = ['2026-10-11T00:00:00Z', '2026-10-11T00:00:01Z'];
+  let reads = 0;
+  const service = new UsageReadModelService({
+    sessionQuerySources: async () => ({ sources: [{ header, throughSeq: 1, stamp: 'same', codecSetDigest: 'codec' }], failedSessionIds: [] }),
+    readSessionEventBatch: async () => { reads++; return { events: times.map((time, seq) => ({ seq, type: 'tool/call', time, surface: null, data: { callId: `call-${seq}`, name: 'read' } })), cursor: 'done', done: true }; },
+  }, root);
+  t.after(async () => { await service.dispose(); await rm(root, { recursive: true, force: true }); });
+  assert.equal((await service.getActivity({ range: 'total' })).rowsPage.totalRows, 2);
+  await writeFile(resetFile, JSON.stringify({ version: 1, resetAt: '2026-10-11T08:00:01+08:00' }));
+  const boundary = await service.getActivity({ range: 'total' });
+  assert.equal(boundary.rowsPage.totalRows, 1, 'equal boundary remains, earlier indexed rows disappear');
+  assert.equal(boundary.summary.toolCount, 1); assert.equal(boundary.tabCounts.requests, 1);
+  await writeFile(resetFile, JSON.stringify({ version: 1, resetAt: '2026-10-11T00:00:02Z' }));
+  assert.equal((await service.getActivity({ range: 'total' })).rowsPage.totalRows, 0);
+  assert.equal((await service.getStatistics({ range: 'total' })).summary.toolCallCount, 0);
+  assert.equal(reads, 1, 'advancing the reset boundary must not rebuild the index');
 });

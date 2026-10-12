@@ -32,4 +32,4 @@ export type LogicalRequestSnapshot = LogicalRequestCandidate & {
   readonly prepared: PreparedRequestMetadata;
 };
 
-export { freezeRequest } from "@actspace/context";
+export { freezeRequest } from "@actspace/context-engine";

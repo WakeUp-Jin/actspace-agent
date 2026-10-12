@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.context-skills", version: "0.1.0", name: "ActSpace Context skills", entry: { entryId: "context.skills", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["actspace.host.prompt"], contributions: { services: ["context.source.skills"], tools: [], prompts: [], events: [] } });

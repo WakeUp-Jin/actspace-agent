@@ -26,7 +26,7 @@ describe("BrowserApprovalBlock", () => {
     render(<BrowserApprovalBlock message={makeMessage()} />);
 
     expect(screen.getByText("确认浏览器操作")).toBeInTheDocument();
-    expect(screen.getByText("仅这次")).toBeInTheDocument();
+    expect(screen.getByText(/只授权这一次/)).toHaveClass("approval-note");
     expect(screen.getByRole("button", { name: "拒绝" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "允许这次" })).toBeInTheDocument();
 

@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md`
 - **执行模式**：交互，连续执行（00 §3）
 - **分支**：`refactor/desktop-fe-16`，从 `refactor/desktop-frontend@59e8e64b`（15 的 squash `856b776f` + 验收反馈第 1 轮 `7154f57d` + 记录提交）拉出
 - **开始时间**：2026-10-06 13:40

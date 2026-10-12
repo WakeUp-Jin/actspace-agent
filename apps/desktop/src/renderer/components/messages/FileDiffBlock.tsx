@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, FilePlus, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
-import { ApprovalActions, ApprovalPath, ApprovalReason, ApprovalRow, useApprovalDecision, useExactGrantSuggestion } from "./ApprovalParts";
+import { ApprovalActions, ApprovalCard, ApprovalPath, ApprovalReason, useApprovalDecision, useExactGrantSuggestion } from "./ApprovalParts";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_CLASS,
@@ -17,7 +17,7 @@ type FileDiffMessage =
   | Extract<MessageBlock, { kind: "write_diff" }>;
 
 const DIFF_APPROVAL_STATS_CLASS =
-  "file-diff-approval-stats inline-flex flex-none items-center gap-0.5 rounded-act-xs border-0 bg-transparent px-1 font-mono text-act-xs leading-4 text-text-faint hover:bg-hover-overlay hover:text-text-main";
+  "file-diff-approval-stats inline-flex h-5 flex-none items-center gap-1 rounded-act-xs border-0 bg-transparent px-1 font-mono text-act-xs leading-4 hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring aria-expanded:bg-hover-overlay";
 const DIFF_ERROR_DETAIL_CLASS =
   "file-diff-error-detail mx-[var(--conversation-text-inset)] mt-1 rounded-act-sm bg-surface-subtle px-[9px] py-[7px] font-mono text-act-xs leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
 
@@ -87,9 +87,8 @@ function FileDiffApprovalCard({
   </> : null;
 
   return (
-    <ApprovalRow
+    <ApprovalCard
       className={className}
-      icon={isWrite ? <FilePlus size={14} strokeWidth={2} /> : <Pencil size={14} strokeWidth={2} />}
       verb={isWrite ? "写入" : "编辑"}
       target={<ApprovalPath path={message.filePath} />}
       meta={<>
@@ -102,15 +101,18 @@ function FileDiffApprovalCard({
             onClick={() => setDiffOpen((value) => !value)}
           >
             {stats}
-            {diffOpen ? <ChevronDown size={12} strokeWidth={2.2} /> : <ChevronRight size={12} strokeWidth={2.2} />}
+            {/* 箭头提示这里可以展开：收起朝右，展开朝下。 */}
+            {diffOpen
+              ? <ChevronDown className="text-text-faint" size={12} strokeWidth={2.2} aria-hidden />
+              : <ChevronRight className="text-text-faint" size={12} strokeWidth={2.2} aria-hidden />}
           </button>
         ) : stats ? <span className="inline-flex flex-none items-center font-mono text-act-xs leading-4">{stats}</span> : null}
         <ApprovalReason reason={message.reason} />
       </>}
       actions={<ApprovalActions state={decision} primaryLabel={isWrite ? "写入" : "应用"} suggestion={suggestion} />}
     >
-      {diffOpen ? <div className="px-3 pb-2.5"><DiffLines message={message} /></div> : null}
-    </ApprovalRow>
+      {diffOpen ? <div className="file-diff-approval-preview mx-3"><DiffLines message={message} /></div> : null}
+    </ApprovalCard>
   );
 }
 

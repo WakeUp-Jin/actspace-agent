@@ -1,14 +1,14 @@
 import { prepare } from "./usage-sql";
-import type { DatabaseSync } from "node:sqlite";
+import type { ProjectionDatabase } from "./usage-sql";
 import type { SessionQuerySource } from "@actspace/session-storage";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 
 /** Query-only fields. No transcript, recovery state, tools or Agent context. */
-export function projectQueryCatalog(db: DatabaseSync, descriptor: SessionQuerySource, events: readonly SessionEventEnvelopeV1[], reset: boolean) {
+export function projectQueryCatalog(db: ProjectionDatabase, descriptor: SessionQuerySource, events: readonly SessionEventEnvelopeV1[], reset: boolean) {
   const h = descriptor.header;
   const row = prepare(db, "SELECT title,workspace_root,pinned,archived,updated_at,agent_run_count,agent_mode,agent_mode_revision FROM session_catalog WHERE session_id=?").get(h.sessionId) as Record<string, string | number | null>;
   const previous = { ...row };
-  if (reset) Object.assign(row, { title: null, workspace_root: h.cwd ?? null, pinned: 0, archived: 0, updated_at: h.createdAt, agent_run_count: 0, agent_mode: h.createdWith.initialAgentMode ?? (h.createdWith.presetId === "actspace.chat" ? "chat" : "agent"), agent_mode_revision: 0 });
+  if (reset) Object.assign(row, { title: null, workspace_root: h.cwd ?? null, pinned: 0, archived: 0, updated_at: new Date(h.createdAt).toISOString(), agent_run_count: 0, agent_mode: h.createdWith.initialAgentMode ?? (h.createdWith.presetId === "actspace.chat" ? "chat" : "agent"), agent_mode_revision: 0 });
   if (reset) prepare(db, "DELETE FROM session_excerpt_search WHERE session_id=?").run(h.sessionId);
   if (reset) prepare(db, "DELETE FROM catalog_pending_tasks WHERE session_id=?").run(h.sessionId);
   const excerpt = prepare(db, "INSERT INTO session_excerpt_search(session_id,event_seq,content) VALUES(?,?,?)");
@@ -19,7 +19,7 @@ export function projectQueryCatalog(db: DatabaseSync, descriptor: SessionQuerySo
       const text = excerptText(node.content);
       if (text.trim()) excerpt.run(h.sessionId, event.seq, titleText(text, 512));
     }
-    row.updated_at = event.time;
+    row.updated_at = new Date(event.time).toISOString();
     const data = (event.data && typeof event.data === "object" && !Array.isArray(event.data) ? event.data : {}) as Record<string, unknown>;
     projectPendingTaskHint(db, h.sessionId, event.type, data);
     if (event.type === "session/title-set") row.title = typeof data.title === "string" ? titleText(data.title) : null;
@@ -42,7 +42,7 @@ export function projectQueryCatalog(db: DatabaseSync, descriptor: SessionQuerySo
 }
 
 /** Only identity/state for sidebar admission; no task content or executable state. */
-function projectPendingTaskHint(db: DatabaseSync, sessionId: string, type: string, data: Record<string, unknown>): void {
+function projectPendingTaskHint(db: ProjectionDatabase, sessionId: string, type: string, data: Record<string, unknown>): void {
   // Forked tasks retain their original Session id and must not trigger recovery.
   if (data.sessionId !== sessionId) return;
   if (type === "plugin/actspace.agent-service/task" && typeof data.taskId === "string") {

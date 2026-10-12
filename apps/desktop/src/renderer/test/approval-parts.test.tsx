@@ -4,10 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApprovalReason,
   compactApprovalDir,
-  getApprovalReasonChips,
+  getApprovalReasonNotes,
+  getCommandPrefixGrant,
   splitApprovalPath,
   submitApprovalDecision,
   useApprovalDecision,
+  useCommandPrefixGrantSuggestion,
 } from "../components/messages/ApprovalParts";
 import { legacyRunTarget } from "./helpers/workbench";
 import { RunTargetContext } from "../target/run-target-context";
@@ -30,18 +32,38 @@ describe("approval path formatting", () => {
 });
 
 describe("approval reason mapping", () => {
-  it("maps known Runtime reasons to chips and hides generic prompts", () => {
-    expect(getApprovalReasonChips("The requested file is outside the workspace.\nAllow this file to be deleted once?")).toEqual({
-      chips: [{ label: "工作区外", tone: "warning" }],
-      notes: [],
-    });
-    expect(getApprovalReasonChips("This file may contain credentials and requires one-time approval.").chips).toEqual([{ label: "敏感文件", tone: "danger" }]);
-    expect(getApprovalReasonChips(undefined)).toEqual({ chips: [], notes: [] });
+  it("hides known Runtime reasons and generic prompts", () => {
+    expect(getApprovalReasonNotes("The requested file is outside the workspace.\nAllow this file to be deleted once?")).toEqual([]);
+    expect(getApprovalReasonNotes("This file may contain credentials and requires one-time approval.")).toEqual([]);
+    expect(getApprovalReasonNotes(undefined)).toEqual([]);
+    expect(getApprovalReasonNotes("Allow Bash to run this command once?\nBash always-ask mode is enabled")).toEqual(["Bash always-ask mode is enabled"]);
   });
 
   it("keeps unknown reasons available behind an info icon", () => {
     render(<ApprovalReason reason="Bash always-ask mode is enabled" />);
     expect(screen.getByLabelText("审批原因")).toHaveAttribute("title", "Bash always-ask mode is enabled");
+  });
+});
+
+describe("command prefix grant suggestion", () => {
+  const suggestion = (selector: unknown) => ({
+    suggestionId: "s1",
+    lifetime: "session",
+    action: "file.read",
+    access: "read",
+    selector,
+    audience: { pluginId: "shell", permissionDomain: "process", policyVersion: 1 },
+    label: "本会话内运行以 pnpm 开头的命令不再询问",
+  }) as unknown as Parameters<typeof getCommandPrefixGrant>[0];
+
+  it("reads the prefix tokens of a command_prefix selector", () => {
+    expect(getCommandPrefixGrant(suggestion({ kind: "command_prefix", prefix: ["git", "status"] }))).toBe("git status");
+  });
+
+  it("ignores file selectors and malformed prefixes", () => {
+    expect(getCommandPrefixGrant(suggestion({ kind: "exact", canonicalPath: "/tmp/a" }))).toBeNull();
+    expect(getCommandPrefixGrant(suggestion({ kind: "command_prefix", prefix: [] }))).toBeNull();
+    expect(getCommandPrefixGrant(suggestion({ kind: "command_prefix", prefix: ["pnpm", 1] }))).toBeNull();
   });
 });
 
@@ -96,5 +118,19 @@ describe("useApprovalDecision on a remote Session", () => {
     expect(result.current.disabled).toBe(false);
     await act(() => result.current.decide("deny"));
     expect(submit).toHaveBeenCalledWith({ requestId: "local-r1", decision: "deny" });
+  });
+});
+
+describe("prefix suggestions follow the current approval request", () => {
+  it("drops the previous prefix immediately and stays empty on a failed refresh", async () => {
+    const grant = { suggestionId: "g1", action: "process.execute", access: "execute", lifetime: "session", selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: "/workspace" }, audience: { pluginId: "actspace.shell-tools", permissionDomain: "bash", policyVersion: 1 }, label: "pnpm" };
+    const list = vi.fn().mockResolvedValueOnce([{ requestId: "r1", grantSuggestions: [grant] }]).mockRejectedValueOnce(new Error("offline"));
+    setupBridge({ "approvals.listPending": list });
+    const { result, rerender } = renderHook(({ id }) => useCommandPrefixGrantSuggestion(id), { initialProps: { id: "r1" } });
+    await waitFor(() => expect(result.current?.suggestionId).toBe("g1"));
+    rerender({ id: "r2" });
+    expect(result.current).toBeUndefined();
+    await act(async () => {});
+    expect(result.current).toBeUndefined();
   });
 });

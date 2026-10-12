@@ -1,6 +1,6 @@
 # 使用统计 SQLite 读模型与 Worker 执行摘要
 
-状态：实现收口，验收与修复按用户要求暂停；已知缺陷和性能门禁未关闭。后续见[统一验收计划](../../exec-plans/active/20261011-usage-sqlite-acceptance.md)。
+状态：实现收口，验收与修复按用户要求暂停；已知缺陷和性能门禁未关闭。后续见[统一验收计划](../../exec-plans/completed/20261011-usage-sqlite-acceptance.md)。
 日期：2026-10-11
 计划：[20261011-usage-sqlite-read-model](../../exec-plans/completed/20261011-usage-sqlite-read-model.md)
 

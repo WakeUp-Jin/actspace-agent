@@ -11,7 +11,7 @@ import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {
   subagent?: boolean;
-  contextSources?: import("@actspace/context").ContextSourceRegistry;
+  contextSources?: import("@actspace/context-engine").ContextSourceRegistry;
   inputSource?: import("./loop.js").LoopInputSource;
   seedSession?: (session: SessionHandle) => Promise<void>;
   followup?: boolean;
@@ -35,7 +35,7 @@ export async function runToolStreamFixture(options: {
   mode?: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode;
   terminalOnly?: boolean;
   content?: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue;
-  compaction?: import("@actspace/compaction").CompactionPlugin;
+  compaction?: import("@actspace/context-compaction").CompactionPlugin;
   usage?: import("@actspace/llm-service").LlmUsage;
   contextWindow?: number;
   onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void;

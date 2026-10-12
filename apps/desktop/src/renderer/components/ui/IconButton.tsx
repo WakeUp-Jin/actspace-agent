@@ -36,7 +36,7 @@ const ICON_BUTTON_VARIANT_CLASS: Record<IconButtonVariant, string> = {
   inherit: "border-transparent bg-transparent text-current opacity-75 enabled:hover:bg-hover-overlay enabled:hover:opacity-100",
   secondary: BUTTON_VARIANT_CLASS.secondary,
   primary: BUTTON_VARIANT_CLASS.primary,
-  accent: "border-transparent bg-accent text-on-accent enabled:hover:bg-accent-hover",
+  accent: BUTTON_VARIANT_CLASS.accent,
   operational: "border-transparent bg-operational text-on-operational enabled:hover:bg-operational-hover",
   warning: "border-transparent bg-warning text-on-warning-solid enabled:hover:brightness-95",
 };

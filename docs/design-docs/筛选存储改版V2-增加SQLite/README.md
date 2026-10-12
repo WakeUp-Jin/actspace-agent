@@ -1,6 +1,9 @@
 # 存储改版 V2：增加 SQLite 查询读模型
 
-状态：当前实现收口，包含已知缺陷，尚未整体验收通过。用户要求等待其他任务完成后统一验收与修复，见[后续计划](../../exec-plans/active/20261011-usage-sqlite-acceptance.md)和[问题清单](../../exec-runs/20261011-usage-sqlite-read-model/acceptance-bugs.md)。
+> 2026-10-11 联合增补：[Context 面板与 SQLite 联合设计](../上下文管理引擎设计/上下文管理引擎V2/05-Context面板与SQLite联合设计.md)及[执行计划](../../exec-plans/completed/20261011-context-sqlite-integration/README.md)已批准并实施。当前 schema 9 已加入批次恢复、共享任务取消与 Context 投影，规模与真实界面尚未整体签收；具体事务和版本边界以联合设计及 worker.md 为准。
+
+
+状态：当前实现收口，包含已知缺陷，尚未整体验收通过。用户已批准联合实施，现按统一矩阵验收与修复，见[后续计划](../../exec-plans/completed/20261011-usage-sqlite-acceptance.md)和[问题清单](../../exec-runs/20261011-usage-sqlite-read-model/acceptance-bugs.md)。
 
 ## 1. 要解决的问题
 
@@ -80,7 +83,7 @@ Revision 不是另一套事件事实，也不是“索引版本替代 Session �
 
 ## 4. SQLite 读模型的内容
 
-当前 schema 8 限定用途，不复制完整 Journal：
+当前 schema 9 限定用途，不复制完整 Journal：
 
 - `session_catalog`：标题、workspace/worktree、pin/archive、时间、会话类型、完成 turn 数和源 revision。
 - `usage_activity`：时间、model/provider/tool、token、费用、状态和有限 `row_json`。
@@ -157,7 +160,7 @@ flowchart LR
 
 Workspace admission 继续从 Session 事实恢复；启动时只按批读取 workspace 相关字段，不完整重放 transcript/Usage，也不把 SQLite 当权限事实源。Provider 支持按事件类型过滤返回，但 cursor 仍跨所有物理事件推进。
 
-当前测试和测量按用户要求暂停。已完成的百万行 Worker 热查询达到初始目标，但真实 Journal 的 1,000 行增量尚未达到 250 ms 目标；M/L/XL 和真实 Electron 验收不能用小数据结果替代。最新数值、失败项和环境限制见[执行摘要](../../exec-runs/20261011-usage-sqlite-read-model/execution-summary.md)。
+当前已按联合计划恢复测试与测量。已完成的百万行 Worker 热查询达到初始目标，但真实 Journal 的 1,000 行增量尚未达到 250 ms 目标；M/L/XL 和真实 Electron 验收不能用小数据结果替代。最新数值、失败项和环境限制见[执行摘要](../../exec-runs/20261011-usage-sqlite-read-model/execution-summary.md)。
 
 ## 7. 一次性实施的验收边界
 
@@ -175,9 +178,9 @@ Workspace admission 继续从 Session 事实恢复；启动时只按批读取 wo
 
 
 
-## 当前实现补充（统一验收待执行）
+## 当前实现补充（联合验收中）
 
-- SQLite schema 8：activity 行、去重维度 FTS、catalog 标题/受限消息片段 FTS、小时/日/全量 rollup、run 去重计数、增量关联状态与水位。维度 FTS 不为每条请求重复保存相同 model/provider/tool 文本。
+- SQLite schema 9：activity 行、去重维度 FTS、catalog 标题/受限消息片段 FTS、小时/日/全量 rollup、run 去重计数、增量关联状态与水位。维度 FTS 不为每条请求重复保存相同 model/provider/tool 文本。
 - Provider 的轻量 Query Source 只返回必要 Header 字段、完整前缀 seq 和物理 stamp；128 个描述符一批。Provider Worker 缓存最多 10,000 项/16 MiB 编码量，单批结果最多 2 MiB。打开的 Session 由 Runtime durableSeq 限制，恢复与 Agent 仍读 Session。
 - 标题和片段搜索只作用于本机索引。片段最长 512 字符；它不承诺覆盖消息全部正文，点击会话读取原始详情。搜索结果每页 50 条、上限 500，翻页替换结果列表。
 - 首次同步、重建、查询与 fallback 状态可见；取消 SQL 查询通过终止查询 Worker 实现，Provider 批读和同步在批次边界检查取消。SQLite 所有者租约防止另一个 Worker 删除活动库。
@@ -195,4 +198,4 @@ Workspace admission 继续从 Session 事实恢复；启动时只按批读取 wo
 
 Activity支持精确`model`/`providerId`与range/status/kind/FTS组合；旧statistics接口保持原有整段范围汇总语义。标题命中全部catalog可直接使用全局rollup，部分命中在SQLite TEMP表中一次聚合，再复用摘要、费用和维度计算。仅保留最近一个TEMP结果，`total_changes()`变化即失效；不会把匹配行数组送到Main。时间窗口变化也会产生不同缓存键。未筛选Tab计数继续走全局汇总。
 
-旧statistics总览另有`usage_run_cardinality`，按天和全量维护精确运行身份数；同一运行的LLM/工具混合只计一次，删除最后一个kind才递减。已有派生库的辅助表创建、回填和触发器安装在单个事务完成，避免每次总览重新对全部运行去重；滑动时间窗口仍使用精确边界查询。
+旧statistics总览另有`usage_run_cardinality`，按天和全量维护精确运行身份数；同一运行的LLM/工具混合只计一次，删除最后一个kind才递减。schema 9 在空表阶段创建辅助表与触发器，后续随批次维护，避免每次总览重新对全部运行去重；滑动时间窗口仍使用精确边界查询。

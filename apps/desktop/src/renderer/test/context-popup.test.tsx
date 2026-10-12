@@ -79,15 +79,15 @@ describe("ContextPopup", () => {
 
     expect(screen.getByText("<1% 已用")).toBeInTheDocument();
     // meter 段宽相对 maxTokens：tools 占 ~0.19%，不再撑满整条。
-    const toolsMeter = screen.getByRole("button", { name: "工具 1K Token" });
+    const toolsMeter = screen.getByRole("button", { name: "工具 ≈1.9K Token" });
     expect(toolsMeter.style.width).toBe(`${(1_879 / 1_000_000) * 100}%`);
   });
 
-  it("shows zero for an unknown capacity instead of exposing Unknown", () => {
+  it("keeps an unknown capacity distinct from zero usage", () => {
     renderContextPopup({ snapshot: { ...makeSnapshot(), maxTokens: 0, percentUsed: 0 }, onClose: vi.fn() });
 
-    expect(screen.getByText("0% 已用")).toBeInTheDocument();
-    expect(screen.getByText(/\/ 0 Token/)).toBeInTheDocument();
+    expect(screen.getByText("— 已用")).toBeInTheDocument();
+    expect(screen.getByText(/\/ — Token/)).toBeInTheDocument();
     expect(screen.queryByText(/Unknown/)).not.toBeInTheDocument();
   });
 
@@ -118,8 +118,9 @@ describe("ContextPopup", () => {
     const user = userEvent.setup();
     renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
 
-    const toolsRow = screen.getByRole("button", { name: "工具 60" });
-    const toolsMeter = screen.getByRole("button", { name: "工具 60 Token" });
+    // 分类行：≈token 加占已用的比例（60 / 100）。
+    const toolsRow = screen.getByRole("button", { name: "工具 ≈60 60%" });
+    const toolsMeter = screen.getByRole("button", { name: "工具 ≈60 Token" });
 
     expect(toolsRow).toHaveAttribute("aria-pressed", "false");
     expect(toolsMeter).toHaveAttribute("aria-pressed", "false");

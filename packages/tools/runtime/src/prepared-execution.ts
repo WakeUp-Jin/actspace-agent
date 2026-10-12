@@ -13,7 +13,7 @@ import type { CapturedToolRegistration } from "./registry.js";
 import type { ToolExecutionResult } from "./result.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { waterfallDispatch } from "@actspace/cordis-adapter";
-import { canonicalizeFileResource, combinePermissionDecisions, evaluateGlobalBoundary, isPathWithin, sessionGrantsCoverResources, type OnceApproval, type ToolGrantSuggestion, type ToolPermissionDecision, type ToolResource } from "./permission/index.js";
+import { grantCoversProcess, matchingProcessGrant, canonicalizeFileResource, combinePermissionDecisions, evaluateGlobalBoundary, isPathWithin, sessionGrantsCoverResources, type OnceApproval, type ToolGrantSuggestion, type ToolPermissionDecision, type ToolResource } from "./permission/index.js";
 
 export type ToolCallInput = {
   readonly callId: string;
@@ -40,7 +40,7 @@ export interface ToolJournalPort {
   recordDispatch(fact: ToolDispatchFact): Promise<void>;
   checkpointBeforeBody(): Promise<void>;
   commitResult(result: ToolExecutionResult): Promise<void>;
-  recordPermission?(type: "permission/asked" | "permission/decided" | "permission/scope-denied" | "permission/grant-added" | "permission/grant-revoked", data: Readonly<Record<string, RuntimeV2JsonValue>>): Promise<void>;
+  recordPermission?(type: "permission/asked" | "permission/decided" | "permission/scope-denied" | "permission/grant-added" | "permission/grant-used" | "permission/grant-revoked", data: Readonly<Record<string, RuntimeV2JsonValue>>): Promise<void>;
 }
 
 export type ToolPreparedEnvironment = {
@@ -169,7 +169,9 @@ export class PreparedToolExecution {
         hostCapabilities: [...this.environment.hostCapabilities].sort(),
       });
       const globalWithGrant = this.#resolveGlobalGrant(global, tool);
-      const permission = combinePermissionDecisions(globalWithGrant, tool);
+      const processGrant = global.kind === "pass" && tool.kind === "ask" && tool.reusable === true ? this.#processGrant() : undefined;
+      if (processGrant) this.#admittedBySessionGrant = true;
+      const permission = combinePermissionDecisions(globalWithGrant, processGrant ? { kind: "allow" } : tool);
       if (permission.kind === "deny") {
         await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: permission.code, reason: permission.reason });
         return this.#rememberTerminal(this.#failureResult("denied", { code: permission.code || "POLICY_DENIED", message: permission.reason, retryable: false, phase: "policy" }));
@@ -180,6 +182,16 @@ export class PreparedToolExecution {
         this.#onceApproval = approval;
       }
       await this.#recheck(mode);
+      const usedGrant = this.#admittedBySessionGrant ? this.#processGrant() : undefined;
+      if (this.#admittedBySessionGrant && this.#resources.some(resource => resource.kind === "process") && !usedGrant) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "Session Grant is no longer available.", retryable: true, phase: "approval" });
+      if (usedGrant && !this.environment.journal.recordPermission) throw new ToolRuntimeError({ code: "GRANT_AUDIT_UNAVAILABLE", message: "Session Grant audit is unavailable.", retryable: false, phase: "approval" });
+      if (usedGrant) await this.#recordPermission("permission/grant-used", {
+        schemaVersion: 1, grantId: usedGrant.grantId, sessionId: this.input.sessionId,
+        agentId: this.input.agentId ?? `main:${this.input.sessionId}`, callId: this.callId,
+        pluginId: this.pluginId, toolName: this.name,
+        commandDigest: (this.#resources[0] as Extract<ToolResource, { kind: "process" }>).commandDigest,
+        usedAt: new Date().toISOString(),
+      });
       await this.environment.journal.recordDispatch({ callId: this.callId, pluginId: this.pluginId, name: this.name, registrationId: this.registrationId, definitionVersion: this.definitionVersion, definitionDigest: this.definitionDigest });
       try {
         await this.environment.journal.checkpointBeforeBody();
@@ -187,6 +199,7 @@ export class PreparedToolExecution {
         return this.#rememberTerminal(this.#failureResult("failed", { code: "CHECKPOINT_FAILED", message: "Tool dispatch could not pass its durability checkpoint.", retryable: true, phase: "checkpoint" }));
       }
       this.#checkToolScope();
+      if (usedGrant && this.#processGrant()?.grantId !== usedGrant.grantId) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "Session Grant changed before execution.", retryable: true, phase: "approval" });
       this.#stage = Object.freeze({ kind: "body" });
       return this.#stage;
     } catch (error) {
@@ -399,13 +412,21 @@ export class PreparedToolExecution {
     return typeof value === "function" ? value() : value ?? "default";
   }
 
-  async #recordPermission(type: "permission/asked" | "permission/decided" | "permission/scope-denied" | "permission/grant-added" | "permission/grant-revoked", data: Readonly<Record<string, RuntimeV2JsonValue>>): Promise<void> {
+  async #recordPermission(type: "permission/asked" | "permission/decided" | "permission/scope-denied" | "permission/grant-added" | "permission/grant-used" | "permission/grant-revoked", data: Readonly<Record<string, RuntimeV2JsonValue>>): Promise<void> {
     await this.environment.journal.recordPermission?.(type, data);
   }
 
   #sessionGrants(): readonly SessionGrant[] {
     const grants = this.environment.sessionGrants;
     return typeof grants === "function" ? grants() : grants ?? [];
+  }
+
+  #processGrant(): SessionGrant | undefined {
+    const audience = this.registration.permission.grantAudience;
+    if (!this.environment.sessionGrantCapability || !this.#isTrustedGrantAudience(audience)) return undefined;
+    return matchingProcessGrant(this.#sessionGrants(), this.#resources, {
+      sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}`, audience,
+    });
   }
 
   #resolveGlobalGrant(global: ReturnType<typeof evaluateGlobalBoundary>, tool: ToolPermissionDecision): ReturnType<typeof evaluateGlobalBoundary> {
@@ -537,12 +558,16 @@ function isOnceApproval(value: OnceApproval | ToolFailure): value is OnceApprova
 }
 
 function validGrantDraft(draft: ToolGrantSuggestion, resources: readonly ToolResource[]): boolean {
+  if (draft.action === "process.execute") {
+    const resource = resources[0];
+    return resources.length === 1 && resource?.kind === "process" && grantCoversProcess(draft, resource);
+  }
   if (draft.action !== "file.read" && draft.action !== "file.write") return false;
   if (draft.access !== (draft.action === "file.read" ? "read" : "write")) return false;
   if (resources.length === 0 || resources.some((resource) => resource.kind !== "file" || resource.access !== draft.access)) return false;
   const selector = draft.selector;
   if (selector.kind === "exact") return resources.every((resource) => resource.kind === "file" && resource.canonicalPath === selector.canonicalPath);
-  return resources.every((resource) => resource.kind === "file" && isPathWithin(selector.canonicalRoot, resource.canonicalPath));
+  return selector.kind === "subtree" && resources.every((resource) => resource.kind === "file" && isPathWithin(selector.canonicalRoot, resource.canonicalPath));
 }
 
 type RuntimeApprovalReason = ApprovalReason & { readonly reusable: boolean };

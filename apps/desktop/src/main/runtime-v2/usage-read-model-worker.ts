@@ -1,11 +1,15 @@
+import { commitContextBatch, contextSourceState, clearContextSession } from "./context-history-projection";
+import { queryContextHistory } from "./context-history-query";
 import { insertUsageActivities } from "./usage-activity-write";
 import { createReadModelSchema } from "./usage-read-model-schema";
 import { UsageCatalogFallback } from "./usage-catalog-fallback";
 import { prepare } from "./usage-sql";
 import { projectQueryCatalog } from "./usage-catalog-projection";
+import { enableUsageBatchWrites } from "./usage-batch-write";
 import { metricsSource, runCountsSource, metricSql, searchMetricsSource, clearSearchMetricsCache } from "./usage-rollups";
 import { UsageSessionFallback } from "./usage-session-fallback";
-import { clearUsageJournal, projectUsageJournalBatch, type UsageJournalSource } from "./usage-journal-projection";
+import type { UsageJournalSource } from "./usage-journal-projection";
+import { commitJournalBatch, resumableState, discardSessionBuilds, pruneSyncIndexes } from "./read-model-sync";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { DatabaseSync } from "node:sqlite";
 import { getHeapStatistics } from "node:v8";
@@ -17,8 +21,12 @@ import type { UsageCostSummary, SessionListPage, SessionListPageInput, UsageActi
 import type { IndexedUsageSource } from "@actspace/client/sessions";
 
 type Message =
+  | { id: string; type: "context-fallback"; source: import("@actspace/session-storage").SessionQuerySource; events: readonly SessionEventEnvelopeV1[] }
+  | { id: string; type: "context-query"; sessionId: string }
+  | { id: string; type: "context-source-state"; source: import("@actspace/session-storage").SessionQuerySource }
+  | { id: string; type: "context-journal"; source: import("@actspace/session-storage").SessionQuerySource; events: readonly SessionEventEnvelopeV1[]; cursor: string; first: boolean; final: boolean; reset: boolean }
   | { id: string; type: "sync"; sources: readonly IndexedUsageSource[]; catalog?: readonly CatalogRow[]; continuation?: boolean; final?: boolean; replaceSessionIds?: readonly string[]; activeSessionIds?: readonly string[] }
-  | { id: string; type: "query"; request: "activity" | "statistics" | "sessions"; input: UsageStatisticsGetInput | SessionListPageInput }
+  | { id: string; type: "query"; request: "activity" | "statistics" | "sessions"; input: UsageStatisticsGetInput | SessionListPageInput; resetAt?: string }
   | { id: string; type: "catalog-fallback-begin" | "catalog-fallback-end" }
   | { id: string; type: "catalog-fallback-append"; row: CatalogRow; events: readonly SessionEventEnvelopeV1[]; first: boolean }
   | { id: string; type: "catalog-fallback-query"; input: SessionListPageInput }
@@ -26,7 +34,7 @@ type Message =
   | { id: string; type: "fallback-append"; source: UsageJournalSource; events: readonly SessionEventEnvelopeV1[] }
   | { id: string; type: "fallback-query"; request: "activity" | "statistics"; input: UsageStatisticsGetInput; resetAt?: string }
   | { id: string; type: "reset-database" }
-  | { id: string; type: "source-state"; sessionId: string; catalogOnly?: boolean }
+  | { id: string; type: "source-state"; sessionId: string; catalogOnly?: boolean; target?: { throughSeq: number; stamp?: string; codecSetDigest?: string } }
   | { id: string; type: "abort-sync" }
   | { id: string; type: "journal"; catalogOnly?: boolean; source: UsageJournalSource; events: readonly SessionEventEnvelopeV1[]; cursor: string; first: boolean; final: boolean; reset: boolean; resetAt?: string }
   | { id: string; type: "diagnostics" };
@@ -49,7 +57,7 @@ parentPort?.on("message", (message: Message) => {
   chain = chain.then(async () => {
     activeMessageId = message.id;
     try {
-      const result = message.type.startsWith("catalog-fallback-") ? catalogFallbackMessage(message) : message.type === "reset-database" ? await resetDatabase() : message.type.startsWith("fallback-") ? await fallbackMessage(message) : message.type === "source-state" ? await sourceState(message.sessionId, message.catalogOnly) : message.type === "journal" ? await syncJournal(message) : message.type === "abort-sync" ? abortSync() : message.type === "sync" ? await sync(message.sources, message.catalog, message.replaceSessionIds, message.activeSessionIds, message.final, message.continuation) : message.type === "query" ? await query(message.request, message.input) : { memory: { ...process.memoryUsage(), heapSizeLimit: getHeapStatistics().heap_size_limit }, sqlite: db ? prepare(db, "PRAGMA temp_store").get() : null };
+      const result = message.type === "context-fallback" ? await contextFallback(message.source, message.events) : message.type === "context-query" ? queryContextHistory(await open(), message.sessionId) : message.type === "context-source-state" ? contextSourceState(await open(), message.source) : message.type === "context-journal" ? await commitContextBatch(await open(), message.source, message.events, message.cursor, message.first, message.final, message.reset, async () => { parentPort?.postMessage({ id: message.id, heartbeat: true }); await yieldWorker(); }) : message.type.startsWith("catalog-fallback-") ? catalogFallbackMessage(message) : message.type === "reset-database" ? await resetDatabase() : message.type.startsWith("fallback-") ? await fallbackMessage(message) : message.type === "source-state" ? await sourceState(message.sessionId, message.catalogOnly, message.target) : message.type === "journal" ? await syncJournal(message) : message.type === "abort-sync" ? abortSync() : message.type === "sync" ? await sync(message.sources, message.catalog, message.replaceSessionIds, message.activeSessionIds, message.final, message.continuation) : message.type === "query" ? await query(message.request, message.input, undefined, message.resetAt) : { memory: { ...process.memoryUsage(), heapSizeLimit: getHeapStatistics().heap_size_limit }, sqlite: db ? prepare(db, "PRAGMA temp_store").get() : null };
       if (result && Buffer.byteLength(JSON.stringify(result)) > 1024 * 1024) throw new Error("Usage result exceeds 1 MiB; narrow the query.");
       parentPort?.postMessage({ id: message.id, ok: true, result });
     } catch (error) {
@@ -110,70 +118,38 @@ async function open(): Promise<DatabaseSync> {
   try {
   const appId = Number((prepare(db, "PRAGMA application_id").get() as { application_id: number }).application_id);
   const version = Number((prepare(db, "PRAGMA user_version").get() as { user_version: number }).user_version);
-  if ((appId !== 0 && appId !== 0x41555332) || (version !== 0 && version !== 8)) throw new Error("Usage read model schema mismatch; rebuild required.");
+  if ((appId !== 0 && appId !== 0x41555332) || (version !== 0 && version !== 9)) throw new Error("Usage read model schema mismatch; rebuild required.");
   await chmod(databasePath, 0o600).catch(() => undefined);
-  db.exec("PRAGMA temp_store = FILE; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;");
+  db.exec("PRAGMA temp_store = FILE; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA cache_size = -32768; PRAGMA wal_autocheckpoint = 4096;");
   memoryTemp = false;
-  createReadModelSchema(db);
+  if (version === 0) createReadModelSchema(db);
+  else if (["usage_write_mode", "read_model_builds", "usage_activity_session_idx", "context_state", "context_request_seq", "context_event_seq", "building_context_state"].some(name => !prepare(db!, "SELECT 1 FROM sqlite_master WHERE name=?").get(name))) throw new Error("Usage read model schema incomplete; rebuild required.");
+  pruneSyncIndexes(db);
+  enableUsageBatchWrites(db);
   return db;
   } catch (error) { db.close(); db = undefined; throw error; }
 }
 
-async function sourceState(sessionId: string, catalogOnly = false): Promise<{ revision: number | null; cursor?: string; stamp?: string; codecSetDigest?: string }> {
-  const database = await open();
-  const prefix = catalogOnly ? "catalog-" : "";
-  const revision = prepare(database, "SELECT value FROM index_state WHERE key=?").get(`${prefix}session:${sessionId}`) as { value: string } | undefined;
-  // Older complete Usage projections also contain the complete catalog.
-  if (!revision && catalogOnly) return sourceState(sessionId);
-  const cursor = prepare(database, "SELECT value FROM index_state WHERE key=?").get(`${prefix}cursor:${sessionId}`) as { value: string } | undefined;
-  const stamp = prepare(database, "SELECT value FROM index_state WHERE key=?").get(`${prefix}stamp:${sessionId}`) as { value: string } | undefined;
-  const codec = prepare(database, "SELECT value FROM index_state WHERE key=?").get(`${prefix}codec:${sessionId}`) as { value: string } | undefined;
-  return { revision: revision ? Number(revision.value) : null, cursor: cursor?.value, ...(stamp ? { stamp: stamp.value } : {}), ...(codec ? { codecSetDigest: codec.value } : {}) };
+async function sourceState(sessionId: string, catalogOnly = false, target?: { throughSeq: number; stamp?: string; codecSetDigest?: string }) {
+  return resumableState(await open(), sessionId, catalogOnly, target);
 }
 function abortSync(): null {
   if (db && syncing) { db.exec("ROLLBACK"); syncing = false; }
   return null;
 }
 async function syncJournal(message: Extract<Message, { type: "journal" }>): Promise<null> {
+  if (syncing) throw new Error("Legacy synchronization is still active.");
   const database = await open();
-  const source = { ...message.source, rows: [] };
-  try {
-    const catalogState = await sourceState(source.sessionId, true);
-    if (message.first) {
-      await sync([source], [], !message.catalogOnly && message.reset ? [source.sessionId] : [], undefined, false, false, !(message.catalogOnly && message.reset && catalogState.revision !== null));
-      if (!message.catalogOnly && message.reset) clearUsageJournal(database, source.sessionId);
-    } else if (!syncing) throw new Error("Missing Usage Journal transaction.");
-    const catalogCurrent = catalogState.revision === source.throughJournalSeq && catalogState.stamp === source.querySource?.stamp;
-    const resetCatalog = message.first && message.reset && !catalogCurrent;
-    if (resetCatalog) {
-      // Keep a reset-in-progress watermark inside this transaction; later batches
-      // must project all events, not compare against the old catalog revision.
-      prepare(database, "INSERT INTO index_state(key,value) VALUES(?,'-1') ON CONFLICT(key) DO UPDATE SET value='-1'").run(`catalog-session:${source.sessionId}`);
-    }
-    if (source.querySource) {
-      const metadataEvents = resetCatalog ? message.events : message.events.filter(event => event.seq > (catalogState.revision ?? -1));
-      Object.assign(source, projectQueryCatalog(database, source.querySource, metadataEvents, resetCatalog));
-    }
-    if (!message.catalogOnly) await projectUsageJournalBatch(database, source, message.events, async rows => {
-      for (const row of rows) prepare(database, "DELETE FROM usage_activity WHERE activity_id=?").run(row.activityId);
-      const visible = message.resetAt ? rows.filter(row => row.startedAt >= message.resetAt!) : rows;
-      await sync([{ ...source, rows: visible }], [], [], undefined, false, true);
-    });
-    if (message.final) {
-      const save = prepare(database, "INSERT INTO index_state(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
-      if (source.querySource) save.run(`catalog-stamp:${source.sessionId}`, source.querySource.stamp);
-      if (source.querySource?.codecSetDigest) save.run(`catalog-codec:${source.sessionId}`, source.querySource.codecSetDigest);
-      save.run(`catalog-session:${source.sessionId}`, String(source.throughJournalSeq));
-      save.run(`catalog-cursor:${source.sessionId}`, message.cursor);
-      if (!message.catalogOnly) {
-        if (source.querySource) save.run(`stamp:${source.sessionId}`, source.querySource.stamp);
-        if (source.querySource?.codecSetDigest) save.run(`codec:${source.sessionId}`, source.querySource.codecSetDigest);
-        save.run(`cursor:${source.sessionId}`, message.cursor);
-      }
-      await sync(message.catalogOnly ? [] : [source], [], [], undefined, true, true);
-    }
-    return null;
-  } catch (error) { abortSync(); throw error; }
+  const state = resumableState(database, message.source.sessionId, !!message.catalogOnly, { throughSeq: message.source.throughJournalSeq, stamp: message.source.querySource?.stamp, codecSetDigest: message.source.querySource?.codecSetDigest });
+  // Ordinary appends have one bounded input batch and small trigger scratch
+  // tables. Rebuilds and metadata changes can touch an entire Session.
+  const changesMetadata = message.events.some(event => event.type === "session/title-set" || event.type === "session/workspace-set");
+  setTempStorage(database, !message.reset && !state.building && !changesMetadata);
+  await commitJournalBatch(database, message, async () => {
+    if (activeMessageId) parentPort?.postMessage({ id: activeMessageId, heartbeat: true });
+    await yieldWorker();
+  });
+  return null;
 }
 
 async function sync(sources: readonly Source[], catalogRows: readonly CatalogRow[] = [], replaceSessionIds: readonly string[] = sources.map(source => source.sessionId), activeSessionIds?: readonly string[], final = true, continuation = false, allowMemoryTemp = true): Promise<null> {
@@ -205,7 +181,7 @@ async function sync(sources: readonly Source[], catalogRows: readonly CatalogRow
         prepare(database, "UPDATE session_catalog SET revision=? WHERE session_id=?").run(row.revision, row.sessionId);
         continue;
       }
-      catalog.run(row.sessionId, row.title, row.revision, row.createdAt, row.updatedAt, row.workspaceRoot, row.worktree === undefined ? null : JSON.stringify(row.worktree), row.pinned ? 1 : 0, row.archived ? 1 : 0, row.accessState, row.isChildSession ? 1 : 0, row.agentRunCount, row.agentForm ?? null, row.agentMode ?? null, row.agentModeRevision ?? null);
+      catalog.run(row.sessionId, row.title, row.revision, new Date(row.createdAt).toISOString(), new Date(row.updatedAt).toISOString(), row.workspaceRoot, row.worktree === undefined ? null : JSON.stringify(row.worktree), row.pinned ? 1 : 0, row.archived ? 1 : 0, row.accessState, row.isChildSession ? 1 : 0, row.agentRunCount, row.agentForm ?? null, row.agentMode ?? null, row.agentModeRevision ?? null);
       if (!previous || previous.title !== row.title) {
         prepare(database, "DELETE FROM session_search WHERE rowid IN (SELECT rowid FROM session_catalog WHERE session_id=?)").run(row.sessionId);
         prepare(database, "INSERT INTO session_search(rowid,session_id,content) SELECT rowid,session_id,COALESCE(title,'') FROM session_catalog WHERE session_id=?").run(row.sessionId);
@@ -230,6 +206,9 @@ async function sync(sources: readonly Source[], catalogRows: readonly CatalogRow
       const active = new Set(activeSessionIds);
       const known = prepare(database, "SELECT session_id FROM session_catalog").iterate() as Iterable<{ session_id: string }>;
       for (const row of known) if (!active.has(row.session_id)) {
+        await clearContextSession(database, row.session_id, false, async () => { if (activeMessageId) parentPort?.postMessage({ id: activeMessageId, heartbeat: true }); await yieldWorker(); });
+        await clearContextSession(database, row.session_id, true, async () => { if (activeMessageId) parentPort?.postMessage({ id: activeMessageId, heartbeat: true }); await yieldWorker(); });
+        await discardSessionBuilds(database, row.session_id, async () => { if (activeMessageId) parentPort?.postMessage({ id: activeMessageId, heartbeat: true }); await yieldWorker(); });
         await removeSessionActivities(database, row.session_id);
         prepare(database, "DELETE FROM session_search WHERE rowid IN (SELECT rowid FROM session_catalog WHERE session_id=?)").run(row.session_id);
         prepare(database, "DELETE FROM session_excerpt_search WHERE session_id=?").run(row.session_id);
@@ -258,7 +237,7 @@ async function removeSessionActivities(database: DatabaseSync, sessionId: string
   }
 }
 
-async function query(kind: "activity" | "statistics" | "sessions", input: UsageStatisticsGetInput | SessionListPageInput, scratch?: DatabaseSync): Promise<UsageActivitySnapshot | UsageStatisticsSnapshot | SessionListPage | null> {
+async function query(kind: "activity" | "statistics" | "sessions", input: UsageStatisticsGetInput | SessionListPageInput, scratch?: DatabaseSync, resetAt?: string): Promise<UsageActivitySnapshot | UsageStatisticsSnapshot | SessionListPage | null> {
   const database = scratch ?? await open();
   if (syncing && !scratch) throw new Error("Usage synchronization is not committed.");
   // Large sorts, DISTINCT, and title aggregates may spill to disk. Changing
@@ -271,7 +250,11 @@ async function query(kind: "activity" | "statistics" | "sessions", input: UsageS
   const selected = scope === "session" ? prepare(database, "SELECT session_id,title FROM session_catalog WHERE session_id = ?").get(usageInput.sessionId ?? "") as { session_id: string; title: string | null } | undefined : undefined;
   if (scope === "session" && !selected) return null;
   const range = usageInput.range ?? "month";
-  const since = range === "total" ? undefined : new Date(Date.now() - (range === "day" ? 1 : range === "week" ? 7 : 31) * 86_400_000).toISOString();
+  const rangeSince = range === "total" ? undefined : new Date(Date.now() - (range === "day" ? 1 : range === "week" ? 7 : 31) * 86_400_000).toISOString();
+  // Reset is a read boundary too: unchanged Journal cursors do not replay old
+  // rows when the user advances it. Context has its own unfiltered history.
+  const resetSince = resetAt && Number.isFinite(Date.parse(resetAt)) ? new Date(resetAt).toISOString() : undefined;
+  const since = rangeSince && resetSince ? (rangeSince > resetSince ? rangeSince : resetSince) : rangeSince ?? resetSince;
   const where: string[] = []; const args: (string | number)[] = [];
   if (scope === "session") { where.push("a.session_id = ?"); args.push(usageInput.sessionId ?? ""); }
   if (since) { where.push("a.started_at >= ?"); args.push(since); }
@@ -478,4 +461,14 @@ function boundedRows<T>(rows: Iterable<T>, budget = { bytes: 0, rows: 0 }): T[] 
     result.push(row);
   }
   return result;
+}
+
+async function contextFallback(source: import("@actspace/session-storage").SessionQuerySource, events: readonly SessionEventEnvelopeV1[]): Promise<ReturnType<typeof queryContextHistory>> {
+  if (events.length > 5000 || Buffer.byteLength(JSON.stringify(events)) > 8 * 1024 * 1024) throw new Error("Context fallback exceeds bounded budget.");
+  const scratch = new DatabaseSync(":memory:");
+  try {
+    createReadModelSchema(scratch);
+    await commitContextBatch(scratch, source, events, "fallback", true, true, true, async () => { if (activeMessageId) parentPort?.postMessage({ id: activeMessageId, heartbeat: true }); await yieldWorker(); });
+    return queryContextHistory(scratch, source.header.sessionId);
+  } finally { scratch.close(); }
 }

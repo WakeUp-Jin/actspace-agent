@@ -69,6 +69,7 @@
 - `docs/design-docs/frontend/front-composer-file-mentions-and-response-annotations.md`：Composer `@` 工作区文件引用、助手回复选区批注、引用托盘与历史 marker（含 2026-09-28 实施决策修订）。
 - `docs/design-docs/frontend/front-workspace-git-worktree-context.md`：初始 Composer 的 Workspace、Git branch、This Mac 与 New Worktree 执行上下文。
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`：对象启动页、文件预览、Workspace 文件树和 diff。
+- `docs/design-docs/frontend/front-Context面板后端数据需求.md`：右侧栏 Context 面板（当前上下文、会话统计、明细对比上次请求、趋势、事件）需要后端提供的数据形状与缺口；2026-10-11 需求稿，前端先用 mock 实现。
 - `docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md`：交互式 Terminal 的 PTY 架构、会话归属、背压、进程清理、安全边界与打包签名。
 - `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的产品信息架构、页面职责、模型连接流程、身份设置、Usage 活动分析和实施边界。后续设置中心实现以本文为准。
 - `docs/design-docs/frontend/front-模型设置页面-Maka重做规范.md`：模型页面的 Maka 风格重做规范，冻结连接列表、目录、配置、详情和模型目录的页面语法与验收标准。
@@ -78,6 +79,8 @@
 
 - Space 工作台 demo 已移到 [`../多智能体协作/space-demo.html`](../多智能体协作/space-demo.html)。
 - `settings-redesign-demo.html`：2026-09-25 设置中心视觉重设计定稿 demo（内嵌分组 + 翡翠绿开关 + 独立「搜索」页 + 使用统计微调）；右下角调节面板只用于方案对比。
+- `context-panel-demo.html`：2026-10-11 右侧栏 Context 面板定稿方向（参考 dsh-context）；数据需求见 `front-Context面板后端数据需求.md`。
+- 其他 `*-demo.html` 文件是设计对比、交互验收或视觉原型；文件开头标明具体状态，当前实现以对应 Markdown 规范、执行计划和源码为准。
 
 ## 资产约定
 

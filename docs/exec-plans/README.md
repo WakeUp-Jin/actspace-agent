@@ -16,20 +16,28 @@
 | 计划 | 当前状态与下一步 |
 |---|---|
 | [多智能体协作（Space）前端演示](active/20261007-multi-agent-collab-frontend-demo.md) | 2026-10-07 立项，分支 `feat/multi-agent-collab-fe`；只做前端、数据全 mock。下一步由用户拍板设计文档 §10 的 Q1–Q8，再开工 T1–T11。 |
-| [Desktop 前端重构](active/20261005-desktop-frontend-refactor/00-总执行计划.md) | 9 份计划（10–16、09、17）已全部执行，2026-10-07 合入 main；下一步按各计划的 `acceptance-handoff.md` 验收，通过后移入 completed。设计文档在 `docs/desktop-frontend-refactor/`，进度见 00 §11。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
 | [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；DropdownMenu（及 Popover、Dialog、Select、ContextMenu）由 Desktop 前端重构 16 接手；剩 Switch、Textarea、Tabs 及对应迁移。 |
-| [使用统计 SQLite / Worker 统一验收与缺陷修复](active/20261011-usage-sqlite-acceptance.md) | 待执行：用户暂停验收与修复，等其他任务完成后统一处理；包含 U-01–U-10、S/M/L/XL、内存/事件循环和真实界面逐点验收。下一步由用户恢复验收，再冻结最终集成版本。 |
+| [工具审批卡 · Cursor 式](active/20261011-approval-card-cursor-style/README.md) | 2026-10-11 前端实现与自动化验证完成；Bash 前缀授权[完整方案](active/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md)已实现，见[执行摘要](../exec-runs/20261011-bash-command-prefix-grant/execution-summary.md)；后端和审批定向测试通过，桌面全量仍有 watcher 回归门槛；Electron 实机验收待做。 |
+| [仓库文档与 `packages` 清理](active/20261011-repo-cleanup.md) | 2026-10-11 实现与自动化验证完成，待用户审阅清理边界和遗留项。 |
 
 六个早期后端计划已移出执行导航，短页仅保留历史链接。独有目标与未完成项见[结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)，当前验证见本轮清理摘要。
 
 ## 最近完成
 
+- [Context 面板与 SQLite 联合实施](completed/20261011-context-sqlite-integration/README.md)：实现和本轮验收收尾，M/Small结果见报告；用户取消L剩余长测，保留测试失败及资源观察边界。
+- [使用统计 SQLite 统一验收](completed/20261011-usage-sqlite-acceptance.md)：联合验收子计划同步收尾，已接受性能限制和未验证范围原样保留。
+
 - [使用统计 SQLite 读模型与 Worker 实现](completed/20261011-usage-sqlite-read-model.md)：代码收口，保留未修缺陷和未通过性能门禁；统一验收由上方独立 active 计划接管，不能据此视为验收通过。
+- [上下文管理引擎 V2](completed/20261011-context-management-engine-v2/README.md)：物理 Context 插件拆包、长期 Context、Runtime/Host/IPC Projection 接线与后端自动化完成；最终 `gpt-6.1-sol` Computer Use 验收保留 browse-only Session 导致的写入型路线未覆盖边界，见执行摘要。
+
+- [Context 面板前端重做](completed/20261011-context-panel-frontend.md)：右侧 Context Tab 换成五区块面板（当前上下文、会话统计、明细对比、趋势、事件），会话内容点行跳轨迹；mock 先行，`describeContextPanel` main 暂返回 null 走过渡视图，待 Context 引擎 V2 实现。自动化通过，浏览器截图与 Electron 待人工验收，见[执行摘要](../exec-runs/20261011-context-panel-frontend/execution-summary.md)。
+
+- [Desktop 前端重构](completed/20261005-desktop-frontend-refactor/00-总执行计划.md)：9 份计划（10–16、09、17）已全部执行并归档；各计划的 `acceptance-handoff.md` 保留待人工验收边界，设计文档在 `docs/desktop-frontend-refactor/`。
 
 - [Desktop 验收问题 B03 / B08 / B12 修复](completed/20261007-desktop-acceptance-b03-b08-b12.md)：Review自动更新、搜索凭据即时生效、工作树首发与持久绑定已修复；真实Electron连续更新、同会话断开搜索和工作树冷重启复验通过。
 

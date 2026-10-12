@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/12-测试整理执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/12-测试整理执行计划.md`
 - **执行模式**：交互，连续执行（00 §3）
 - **分支**：`refactor/desktop-fe-12`，从 `refactor/desktop-frontend@99f9a7be`（11 的 squash 提交）拉出
 - **开始时间**：2026-10-06 01:48

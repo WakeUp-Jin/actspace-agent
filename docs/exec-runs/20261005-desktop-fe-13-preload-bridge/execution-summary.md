@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261005-desktop-frontend-refactor/13-Preload与MockBridge执行计划.md`
+- **关联计划**：`docs/exec-plans/completed/20261005-desktop-frontend-refactor/13-Preload与MockBridge执行计划.md`
 - **执行过程**：`docs/exec-runs/20261005-desktop-fe-13-preload-bridge/execution-process.md`
 - **执行模式**：交互，连续执行
 - **执行结果**：完成。T0–T11 全部完成，另有一个处理只读复核发现的提交。真实桌面端的行为应当不变；变化在浏览器开发模式（App 换成注入的 mock bridge）和非桌面环境（显示致命页，不再白屏或降级）

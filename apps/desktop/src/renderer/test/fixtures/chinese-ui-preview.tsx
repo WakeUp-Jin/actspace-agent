@@ -24,7 +24,7 @@ createRoot(document.getElementById("root")!).render(
           <p className="text-[13px] text-text-muted">检查菜单、上下文和模式名称。Chat、Plan、Thinking、Effort 保留英文。</p>
           <Composer contextSnapshot={context} onSend={() => {}} reviewSummary={{ status: "changes", additions: 12, deletions: 3 }} />
         </main>
-        {!narrow ? <aside className="w-[300px] shrink-0 border-l border-line"><RightPanel contextSnapshot={context} /></aside> : null}
+        {!narrow ? <aside className="w-[300px] shrink-0 border-l border-line"><RightPanel /></aside> : null}
       </div>
     </div>
   </RightPanelProvider></TooltipProvider>,

@@ -161,3 +161,19 @@ describe("Event Codec Registry", () => {
     expect(new SessionJournal({ registry: createCoreCodecRegistry(), seed: [ignorable] }).validation.accessState).toBe("degraded");
   });
 });
+
+
+it("validates process grant combinations and records grant use without a request", () => {
+  const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
+  const grant = { schemaVersion: 1, grantId: "g", sessionId: "s", agentId: "a", audience: { pluginId: "shell", permissionDomain: "bash", policyVersion: 1 }, action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["git", "status"], cwdRoot: "/workspace" }, sourceRequestId: "r", sourceCallId: "c", sourceToolName: "bash", issuedAt: "2026-10-11T00:00:00Z" };
+  expect(() => journal.append(candidate("permission/grant-added", grant))).not.toThrow();
+  for (const selector of [ { kind: "command_prefix", prefix: [], cwdRoot: "/workspace" }, { ...grant.selector, prefix: ["a", "b", "c"] }, { ...grant.selector, prefix: ["pnpm test"] }, { ...grant.selector, cwdRoot: "relative" }, { kind: "exact", canonicalPath: "/workspace" } ]) {
+    expect(() => journal.append(candidate("permission/grant-added", { ...grant, selector }))).toThrow();
+  }
+  expect(() => journal.append(candidate("permission/grant-added", { ...grant, access: "read" }))).toThrow();
+  expect(() => journal.append(candidate("permission/grant-added", { ...grant, action: "file.read", access: "read" }))).toThrow();
+  const use = { schemaVersion: 1, grantId: "g", sessionId: "s", agentId: "a", callId: "c", pluginId: "shell", toolName: "bash", commandDigest: "digest", usedAt: "2026-10-11T00:00:00Z" };
+  expect(() => journal.append(candidate("permission/grant-used", use))).not.toThrow();
+  expect(() => journal.append(candidate("permission/grant-used", { ...use, usedAt: "invalid" }))).toThrow();
+  expect(() => journal.append(candidate("permission/grant-used", { ...use, grantId: "" }))).toThrow();
+});

@@ -21,6 +21,7 @@ import {
 } from "./mock-db";
 import { emitLiveMessage, type MockClock } from "./clock";
 import { MOCK_REPLY, playReply, type ReplyPlayback } from "./stream-player";
+import { mockContextPanelView, mockContextState } from "./context-panel-fixture";
 
 /** 按域覆盖 mock 实现；未覆盖的成员用默认实现，默认也没有的成员调用时 reject。 */
 export type MockHandlers = { [D in keyof DesktopBridge]?: Partial<DesktopBridge[D]> };
@@ -169,7 +170,8 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         for (const sessionId of sessionIds) requireSession(db, sessionId).archived = true;
         return { ok: true, archivedSessionIds: sessionIds, failedSessionIds: [] };
       },
-      describeContext: async () => null,
+      describeContext: async ({ sessionId }) => db.sessions.has(sessionId) ? mockContextState(mockContextPanelView(sessionId, db.sessions.get(sessionId))) : null,
+      describeContextPanel: async ({ sessionId, release }) => release ? null : mockContextPanelView(sessionId, db.sessions.get(sessionId)),
     },
     usage: { getStatus: async () => null, cancel: async () => undefined, getStatistics: async () => null, getActivity: async () => null },
     // 浏览器里没有 pty：列表为空，其余操作在 UI 上不会出现（终端入口只在开发功能开启时显示）。

@@ -315,9 +315,9 @@ describe("Composer follow-up bar", () => {
       contextSnapshot: { ...mockContextSnapshot, totalTokens: 549_000, maxTokens: 1_000_000, percentUsed: 54.9 },
       contextState: { ...mockContextState, totalEstimatedTokens: 49_000, maxTokens: 1_000_000, percentUsed: 4.9 },
     });
-    await user.click(screen.getByRole("button", { name: "上下文用量 4%" }));
-    expect(screen.getByText("4% 已用")).toBeVisible();
-    expect(screen.getByText("~49K / 1M Token")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "上下文用量 5%" }));
+    expect(screen.getByText("5% 已用")).toBeVisible();
+    expect(screen.getByText("≈49K / 1M Token")).toBeVisible();
   });
 
   it("shows a fractional context estimate as <1% in the footer and popup", async () => {
@@ -329,20 +329,25 @@ describe("Composer follow-up bar", () => {
 
   it("rounds the context usage status to an integer", () => {
     renderComposer({
-      contextSnapshot: { ...mockContextSnapshot, percentUsed: 7.6092 },
+      contextSnapshot: { ...mockContextSnapshot, totalTokens: 76_092, maxTokens: 1_000_000, percentUsed: 7.6092 },
     });
 
-    expect(screen.getByRole("button", { name: "上下文用量 7%" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上下文用量 8%" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "上下文用量 7.6092%" })).not.toBeInTheDocument();
   });
 
-  it("shows zero instead of an unknown context percentage", () => {
+  it("keeps unknown capacity distinct from a known empty context", () => {
     renderComposer({
       contextSnapshot: { ...mockContextSnapshot, maxTokens: 0, percentUsed: 0 },
     });
 
+    expect(screen.getByRole("button", { name: "上下文用量 —" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "上下文用量 0%" })).not.toBeInTheDocument();
+  });
+
+  it("shows zero for an empty context with known capacity", () => {
+    renderComposer({ contextSnapshot: { ...mockContextSnapshot, totalTokens: 0, maxTokens: 1_000_000, percentUsed: 0 } });
     expect(screen.getByRole("button", { name: "上下文用量 0%" })).toBeInTheDocument();
-    expect(screen.queryByText(/Unknown/)).not.toBeInTheDocument();
   });
 
   it("hides the review action when no review summary is available", () => {

@@ -181,7 +181,6 @@ export class RuntimeSessionController {
     const result: import("@actspace/session-storage").SessionQuerySource[] = [];
     const ids = await this.store.listSessionIds();
     const failedSessionIds: string[] = [];
-    const digest = this.options.registry.digest;
     for (let offset = 0; offset < ids.length; offset += 128) {
       const batch = ids.slice(offset, offset + 128);
       let sources: readonly import("@actspace/session-storage").SessionQuerySource[];
@@ -194,14 +193,22 @@ export class RuntimeSessionController {
           failedSessionIds.push(batch[index]!); return [];
         });
       }
-      for (const source of sources) {
-        const id = source.header.sessionId;
-        const live = this.#open.get(id) ?? this.#external.get(id);
-        const throughSeq = live ? Math.min(source.throughSeq, live.durableSeq ?? -1) : source.throughSeq;
-        result.push({ ...source, throughSeq, codecSetDigest: digest, stamp: `${source.stamp}:${throughSeq}:${digest}` });
-      }
+      for (const source of sources) result.push(this.queryBoundary(source));
     }
     return { sources: result, failedSessionIds };
+  }
+  async querySource(sessionId: string): Promise<import("@actspace/session-storage").SessionQuerySource | null> {
+    if (!this.store.storage.querySource || !this.store.storage.readEventBatch) return null;
+    return this.queryBoundary(await this.store.storage.querySource(sessionId));
+  }
+  private queryBoundary(source: import("@actspace/session-storage").SessionQuerySource) {
+    const live = this.#open.get(source.header.sessionId) ?? this.#external.get(source.header.sessionId);
+    const throughSeq = live ? Math.min(source.throughSeq, live.durableSeq ?? -1) : source.throughSeq;
+    const digest = this.options.registry.digest;
+    // Only the owning provider can attest to append-only growth. A raw stamp
+    // change from an external or modified file retains conservative invalidation.
+    const physical = live?.durabilityState === "healthy" && source.appendOnlyToken ? `owned:${source.appendOnlyToken}` : source.stamp;
+    return { ...source, throughSeq, codecSetDigest: digest, stamp: `${physical}:${throughSeq}:${digest}` };
   }
   async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
   constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; projectionService?: SessionProjectionService; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void> }, store: SessionStore) { this.store = store; this.#cache = new SessionProjectionCache({ storage: store.storage, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService).projections }); this.#globalIndex = new GlobalSessionIndex(); }

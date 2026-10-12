@@ -42,11 +42,11 @@
     "@actspace/core-scope": "workspace:*",
     "@actspace/session-journal": "workspace:*",
     "@actspace/session-persistence": "workspace:*",
-    "@actspace/context": "workspace:*",
+    "@actspace/context-engine": "workspace:*",
     "@actspace/prompt": "workspace:*",
     "@actspace/llm-service": "workspace:*",
     "@actspace/tools-runtime": "workspace:*",
-    "@actspace/compaction": "workspace:*",
+    "@actspace/context-compaction": "workspace:*",
     "@actspace/shared": "workspace:*"
   },
   "devDependencies": {

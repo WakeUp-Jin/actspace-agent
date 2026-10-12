@@ -17,7 +17,7 @@ it("queries history beyond loaded sidebar items and replaces each bounded result
   expect(screen.queryByRole("button", { name: "Old session" })).not.toBeInTheDocument();
   expect(listPage).toHaveBeenLastCalledWith({ search: "needle", limit: 50, after: "first" });
   fireEvent.click(screen.getByRole("button", { name: "Another old session" }));
-  expect(select).toHaveBeenCalledWith("second");
+  expect(select).toHaveBeenCalledWith("second", "Another old session");
   await waitFor(() => expect(screen.queryByLabelText("搜索会话标题和片段")).not.toBeInTheDocument());
 });
 

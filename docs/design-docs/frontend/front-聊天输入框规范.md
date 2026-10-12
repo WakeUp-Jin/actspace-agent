@@ -2,7 +2,7 @@
 
 > 2026-09-09 文案更新：日常界面展示名称以[中文文案规范](front-desktop-chinese-ui.md)为准；保留 Chat、Plan、Thinking、Effort 和工具执行展示。本文英文名称仍可用于指代内部概念，协议与行为不变。
 >
-> 2026-10-06：09 输入框优化（`docs/exec-plans/active/20261005-desktop-frontend-refactor/09-输入框优化执行计划.md`，设计稿 `docs/desktop-frontend-refactor/demo/composer-run-target-demo.html`）实施后改写「Composer 形态」到「Skills」各节，并新增「发送队列」。运行目标的菜单与状态行细节见 [Workspace / Git / Worktree](front-workspace-git-worktree-context.md)。
+> 2026-10-06：09 输入框优化（`docs/exec-plans/completed/20261005-desktop-frontend-refactor/09-输入框优化执行计划.md`，设计稿 `docs/desktop-frontend-refactor/demo/composer-run-target-demo.html`）实施后改写「Composer 形态」到「Skills」各节，并新增「发送队列」。运行目标的菜单与状态行细节见 [Workspace / Git / Worktree](front-workspace-git-worktree-context.md)。
 >
 > Runtime 模式契约见[Agent 形态与三种工作模式](../agent-runtime/agent-forms-and-modes.md)；本文定义 Composer 的对应交互。
 

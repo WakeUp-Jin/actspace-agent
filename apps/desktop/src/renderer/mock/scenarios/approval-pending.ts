@@ -18,7 +18,23 @@ export function approvalPendingScenario({ db }: MockClock): MockHandlers | void 
     recovery: {
       agentRunId: lastRunId(session),
       toolCallId: "mock-tool-call-1",
-      preview: { kind: "bash", status: "pending", title: "删除构建产物", command, cwd: db.bootstrap.workspaceRoot },
+      // 不带 cwd：模型没传 args.cwd 时就在工作区根目录执行，审批卡底栏只显示执行环境。
+      preview: { kind: "bash", status: "pending", title: "删除构建产物", intent: "清理构建产物", command, sandboxed: false },
     },
   }]);
+}
+
+/** Explicit demo boundary for the backend-owned prefix suggestion. */
+export function approvalPrefixScenario(clock: MockClock): MockHandlers | void {
+  approvalPendingScenario(clock);
+  for (const [sessionId, requests] of clock.db.pendingApprovals) {
+    clock.db.pendingApprovals.set(sessionId, requests.map(request => ({
+      ...request, command: "pnpm test", summary: "运行项目测试",
+      grantSuggestions: [{ suggestionId: "mock-prefix-1", action: "process.execute", access: "execute", lifetime: "session",
+        selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: "/mock/workspace" },
+        audience: { pluginId: "actspace.shell-tools", permissionDomain: "bash", policyVersion: 1 },
+        label: "允许当前会话在当前工作区内运行符合规则的 pnpm 命令，包括项目脚本；执行环境沿用现有设置" }],
+      recovery: request.recovery ? { ...request.recovery, preview: { kind: "bash", status: "pending", title: "运行项目测试", intent: "运行项目测试", command: "pnpm test", sandboxed: false } } : undefined,
+    })));
+  }
 }

@@ -670,6 +670,7 @@ export function App() {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     async function bootstrapSession() {
+      const selectionRequest = messageRequestRef.current;
       setListLoading(true); setListError(null);
       const [page, registry] = await Promise.all([
         sessionsApi.listPage(),
@@ -686,7 +687,7 @@ export function App() {
       if (page.indexing) {
         timer = setTimeout(() => { void bootstrapSession().catch(handleBootstrapError); }, 500);
       }
-      if (activeSessionIdRef.current) { setSessionBootstrapComplete(true); return; }
+      if (activeSessionIdRef.current || selectionRequest !== messageRequestRef.current) { setSessionBootstrapComplete(true); return; }
       if (page.indexing) return;
 
       const hiddenWorkspaceIds = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id));
@@ -812,9 +813,10 @@ export function App() {
         setActiveSessionId(created.meta.id);
         setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.worktree?.sourceWorkspaceRoot ?? created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
       }
-      const refreshed = await readSidebarSessions();
-      setSessions(refreshed);
-      await refreshWorkspaces();
+      // A cold catalog is optional navigation data, not a dependency of the
+      // first task in the newly created durable Session.
+      void readSidebarSessions().then(setSessions).catch(console.error);
+      void refreshWorkspaces().catch(console.error);
       return created;
     } catch (error) {
       console.error("Failed to create session", error);
@@ -981,6 +983,7 @@ export function App() {
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
     // Create only on first send, after workspace / branch / worktree selection.
     setActiveSessionId(null);
+    setSessionBootstrapComplete(true);
     patchLocal(DRAFT_COMPOSER_KEY, { composer: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" } });
     targetChoices.selectHost(input.hostId ?? null);
     if (input.workspaceId) targetChoices.selectWorkspace(input.workspaceId);

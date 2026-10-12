@@ -116,6 +116,10 @@ export const desktopBridgeContract = {
     archive: invoke<S.SessionArchiveInput, S.SessionArchiveResult>(CH.archiveSession),
     archiveMany: invoke<S.SessionArchiveManyInput, S.SessionArchiveManyResult>(CH.archiveSessions),
     describeContext: invoke<S.DescribeContextInput, S.ContextState | null>(CH.describeContext),
+    /** 当前 Context 与异步历史摘要，支持条件读取和有界明细。 */
+    describeContextPanel: invoke<S.DescribeContextPanelInput, S.ContextPanelResponse | null>(CH.describeContextPanel),
+    listContextEntries: invoke<S.ContextEntriesInput, S.ContextEntriesPage>(CH.listContextEntries),
+    readContextEntry: invoke<S.ContextEntryInput, S.ContextEntryText>(CH.readContextEntry),
     readArtifact: invoke<S.SessionArtifactReadInput, S.SessionArtifactReadResult>(CH.readSessionArtifact),
   },
   usage: {

@@ -97,7 +97,7 @@ describe("RightPanel 工作区浏览态", () => {
     await user.click(screen.getByRole("tab", { name: "上下文" }));
     expect(screen.queryByRole("heading", { name: "选择文件查看" })).toBeNull();
     expect(screen.queryByRole("button", { name: /文件树$/ })).toBeNull();
-    expect(screen.getByText(/当前没有可展示的上下文明细/)).toBeInTheDocument();
+    expect(screen.getByText(/开始对话后，这里会列出喂给模型的上下文/)).toBeInTheDocument();
   });
 
   it("markdown 文件的预览/源码切换由操作栏承担，视图内不再自带控件", async () => {

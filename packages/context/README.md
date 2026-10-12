@@ -1,14 +1,12 @@
-# Context domain group
+# Context domain packages
 
-统一管理 `Context`，通过 `toLlmInput` 输出 `LlmInput`。`context.engine` 提供请求引擎工厂和唯一压缩协调器；每个 Agent scope 注册来源，单次请求冻结内容。转换保留现有消息、工具调用配对、图片及文件引用；状态不会自动发送给模型。
+`packages/context/` 是上下文管理领域目录。每个子目录都是一个独立的 workspace 插件包，统一由 Harness 装配：
 
-- `types.ts` / `engine.ts`：公共数据结构、来源调用、插槽与转换。
-- `registry.ts`：按顺序执行来源、字段所有权、必需来源与可选失败隔离。
-- `supplements.ts` / `codec.ts`：尾部补充和版本化插件事件；不改变 Session Surface。
-- `compaction.ts`：策略选择、取消/并发检查、四条连续 core 事件提交。
-- `disclosure/` / `state.ts`：规范化文件引用、周期读取计数、最多 100 条活跃路径、可重建睡眠索引和幂等恢复。
-- `sources/`：会话和工具来源；Prompt 包提供另外四个来源。
+- `engine/`：长期 Context 实例、reconcile、capture、LlmInput 转换、状态事件和只读 Projection。
+- `system/`、`runtime/`、`rules/`、`skills/`、`conversation/`、`tools/`：各自拥有来源与状态切片。
+- `disclosure/`：渐进式文件披露与状态恢复。
+- `compaction/`：压缩策略、摘要器和策略注册；协调提交仍由 engine 负责。
 
-Host 在恢复 Session 前加载纯 Codec。行为停用不删除历史；不识别 required Codec 的旧二进制只能 browse-only。原始历史和 artifact 由 `DisclosureHost` 提供，Context 不依赖 JSONL 布局；引用不会授予工具读取权限。
+`packages/prompt/` 只保留 Prompt contributor、装配支持和 Host source loading，不再承载 Context 类型插件实现。历史事件继续使用 `actspace.context` owner 与既有 Codec，以保证旧 Session 可读。
 
-`assembly.ts` 仅保留旧库调用兼容，生产不发布 `context.assembly`。请求快照保持现有 schemaVersion 2。设计和验证见[规范](../../docs/design-docs/上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)及[执行摘要](../../docs/exec-runs/20261006-context-management-engine/execution-summary.md)。
+Engine 的 `Context` 是按 `Session + logicalAgentScopeId` 管理的长期状态；面向模型的 `LlmInput` 和面向 Host/IPC 的 Projection 都是从它捕获出的只读值。

@@ -18,6 +18,9 @@ export interface SessionQuerySource {
   readonly stamp: string;
   /** Consumer decoding identity, independent of append-only physical growth. */
   readonly codecSetDigest?: string;
+  /** Provider verified this physical version belongs to one owned append-only writer epoch.
+   * Runtime may use it only while holding the live durable Session boundary. */
+  readonly appendOnlyToken?: string;
 }
 
 /** Runtime inventory keeps unreadable sources explicit without hiding healthy Sessions. */

@@ -1,5 +1,5 @@
 import type {
-  FileGrantSelector,
+  GrantSelector,
   GrantAccess,
   GrantAction,
   GrantAudience,
@@ -20,6 +20,10 @@ export type ToolResource =
       readonly commandDigest: string;
       readonly cwd: string;
       readonly dynamic: boolean;
+      readonly argv?: readonly string[];
+      readonly grantPrefix?: readonly string[];
+      readonly workspaceRoot?: string;
+      readonly noSandbox?: boolean;
     };
 
 export type ResourceSensitivity =
@@ -34,7 +38,7 @@ export type GlobalBoundaryDecision =
 
 export type ToolPermissionDecision =
   | { readonly kind: "allow" }
-  | { readonly kind: "ask"; readonly reason: string; readonly risk: "low" | "medium" | "high" }
+  | { readonly kind: "ask"; readonly reason: string; readonly risk: "low" | "medium" | "high"; readonly reusable?: boolean }
   | { readonly kind: "deny"; readonly code: string; readonly reason: string };
 
 export type PermissionReason = {
@@ -81,7 +85,7 @@ export type ToolPermissionContract = {
 export type ToolGrantSuggestion = {
   readonly action: GrantAction;
   readonly access: GrantAccess;
-  readonly selector: FileGrantSelector;
+  readonly selector: GrantSelector;
   readonly label: string;
 };
 

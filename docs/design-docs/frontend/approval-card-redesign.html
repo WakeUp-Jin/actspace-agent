@@ -105,11 +105,13 @@ code, .mono { font-family: var(--font-mono); }
   border-bottom: 1px solid var(--line);
 }
 .topbar h1 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
-.topbar .sub { color: var(--faint); font-size: 12px; }
+.topbar .sub { color: var(--faint); font-size: 12px; white-space: nowrap; }
+.topbar h1 { white-space: nowrap; }
+.topbar { flex-wrap: wrap; row-gap: 8px; }
 .seg { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); gap: 2px; }
 .seg button {
   border: 0; background: transparent; height: 26px; padding: 0 10px; border-radius: 6px;
-  font-size: 13px; color: var(--muted); cursor: pointer;
+  font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap;
   transition: background-color 120ms var(--ease), transform 90ms var(--ease);
 }
 .seg button:hover { background: var(--hover); color: var(--text); }
@@ -371,6 +373,79 @@ code, .mono { font-family: var(--font-mono); }
 .issue { margin: 6px 0 0 2px; font-size: 12px; color: var(--danger); display: flex; gap: 6px; }
 .issue::before { content: "↳"; }
 
+/* ---------- Direction D: Cursor-style ---------- */
+:root {
+  --accent: var(--action); --accent-hover: var(--action-hover); --on-accent: var(--on-action);
+  --sh-cmd: #b4461d; --sh-op: #2c67c5; --sh-flag: var(--muted); --sh-str: #087a4b;
+  --dz-btn-radius: 6px;
+}
+:root[data-theme="dark"] { --sh-cmd: #ef9466; --sh-op: #6aa3f8; --sh-str: #5fd49b; }
+:root[data-accent="blue"] { --accent: #2c67c5; --accent-hover: #2559ad; --on-accent: #ffffff; }
+:root[data-theme="dark"][data-accent="blue"] { --accent: #6aa3f8; --accent-hover: #8ab7fa; --on-accent: #0f1620; }
+:root[data-btn="pill"] { --dz-btn-radius: 999px; }
+
+.dz-status { padding: 0 17px; margin-bottom: 8px; font-size: 14px; line-height: 22px; color: var(--faint); }
+.dz { border-radius: 12px; }
+.dz.has-note { background: var(--surface-subtle); }
+.dz-card {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  box-shadow: 0 1px 2px rgba(31, 45, 61, 0.04);
+}
+.dz-head { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 10px 12px 0; font-size: 14px; line-height: 20px; }
+.dz-head .ico { margin-left: -1px; }
+.dz-verb { flex: none; color: var(--muted); }
+.dz-tgt { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--faint); }
+.dz-tgt .b { color: var(--muted); }
+.dz-head .chip.stat { margin-left: 4px; }
+.dz-card.is-shell .dz-head { padding-bottom: 9px; border-bottom: 1px solid var(--line); }
+.dz-cmd {
+  margin: 0; padding: 10px 12px 4px; max-height: 168px; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.6; color: var(--text);
+}
+.dz-cmd .p { color: var(--faint); user-select: none; }
+.sh-cmd { color: var(--sh-cmd); }
+.sh-op { color: var(--sh-op); }
+.sh-flag { color: var(--sh-flag); }
+.sh-str { color: var(--sh-str); }
+.dz-foot { display: flex; align-items: center; gap: 4px; min-height: 40px; padding: 8px 8px 8px 12px; }
+.dz-mode {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; margin-left: -6px; padding: 0 6px;
+  border: 0; border-radius: 6px; background: transparent; color: var(--faint); font-size: 13px; cursor: pointer;
+}
+.dz-mode:hover { background: var(--hover); color: var(--text); }
+.dz-mode svg { width: 13px; height: 13px; }
+.dz-acts { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.dz-note { padding: 6px 12px 8px; font-size: 12.5px; line-height: 1.5; color: var(--faint); }
+.dz-diff { margin: 8px 12px 0; max-height: 240px; overflow: auto; }
+.dz-diff .pv-diff .row:first-child { border-top: 0; }
+.dz-diff .rest { padding: 4px 12px 5px; border-top: 1px solid var(--line); background: var(--surface-subtle); font-size: 12px; color: var(--faint); }
+.dz-stat { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; padding: 0 4px; height: 20px; border: 0; border-radius: 4px; background: transparent; font-family: var(--font-mono); font-size: 12px; cursor: pointer; }
+.dz-stat:hover, .dz-stat[aria-expanded="true"] { background: var(--hover); }
+.dz-stat .a { color: var(--diff-add-text); }
+.dz-stat .d { color: var(--diff-del-text); }
+.dz-stat .chev { color: var(--faint); transition: transform 120ms; }
+.dz-stat[aria-expanded="true"] .chev { transform: rotate(90deg); }
+
+.dbtn {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px;
+  border: 0; border-radius: var(--dz-btn-radius); font-size: 13px; line-height: 1; white-space: nowrap; cursor: pointer;
+  transition: background-color 120ms var(--ease), color 120ms var(--ease), transform 90ms var(--ease);
+}
+.dbtn:active:not(:disabled) { transform: scale(0.97); }
+.dbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.dbtn:disabled { cursor: default; opacity: 0.55; }
+.dbtn.text { background: transparent; color: var(--faint); padding: 0 8px; }
+.dbtn.text:hover:not(:disabled) { color: var(--text); background: var(--hover); }
+.dbtn.soft { background: color-mix(in oklab, var(--text) 7%, var(--surface)); color: var(--text); }
+.dbtn.soft:hover:not(:disabled) { background: color-mix(in oklab, var(--text) 11%, var(--surface)); }
+.dbtn.primary { background: var(--accent); color: var(--on-accent); font-weight: 500; }
+.dbtn.primary:hover:not(:disabled) { background: var(--accent-hover); }
+.dbtn.danger { background: var(--danger); color: var(--on-danger-solid); font-weight: 500; }
+.dbtn.danger:hover:not(:disabled) { background: var(--danger-hover); }
+.dbtn kbd { font-family: var(--font-ui); font-size: 12px; font-weight: 400; opacity: 0.68; margin-right: -2px; }
+.dbtn .code { font-family: var(--font-mono); font-size: 12px; }
+
 .hidden { display: none !important; }
 </style>
 </head>
@@ -378,13 +453,22 @@ code, .mono { font-family: var(--font-mono); }
 
 <header class="topbar">
   <h1>审批卡重设计</h1>
-  <span class="sub">设计稿 · B 方向已定稿并实施（2026-09-25）</span>
+  <span class="sub">D 方向已实施（2026-10-11）· B 为上一版（2026-09-25）· 应用内不做键盘快捷键；Bash「本会话允许 前缀」等后端授权落地</span>
   <span class="spacer"></span>
+  <div class="seg" role="group" aria-label="D 方向按钮形状" id="btnSeg">
+    <button data-btn-set="round">圆角</button>
+    <button data-btn-set="pill">胶囊</button>
+  </div>
+  <div class="seg" role="group" aria-label="D 方向主按钮颜色" id="accentSeg">
+    <button data-accent-set="ink">墨色</button>
+    <button data-accent-set="blue">蓝色</button>
+  </div>
   <div class="seg" role="group" aria-label="方向" id="dirSeg">
     <button data-dir="A">A · 决策卡</button>
     <button data-dir="B">B · 按风险分密度</button>
     <button data-dir="C">C · 底部审批托盘</button>
-    <button data-dir="O">现状</button>
+    <button data-dir="D">D · Cursor 式</button>
+    <button data-dir="O">旧版</button>
   </div>
   <div class="seg" role="group" aria-label="主题" id="themeSeg">
     <button data-theme-set="light">浅色</button>
@@ -439,7 +523,17 @@ const SAMPLES = [
     log: { act: "Grep", tgt: "TODO|FIXME in ~/code/other-repo/src" }, denyText: "已拒绝搜索 ~/code/other-repo/src",
   },
   {
-    id: "edit", kind: "编辑", risk: "mid", icon: "pencil",
+    id: "edit", dDiff: { hunk: "@@ -42,7 +42,10 @@ export function Composer", rows: [
+      ["ctx", 42, 42, "  return ("],
+      ["ctx", 43, 43, "    <form className={COMPOSER_FORM_CLASS} onSubmit={handleSubmit}>"],
+      ["del", 44, "", "      <Textarea placeholder=\"Ask anything\" value={draft} />"],
+      ["add", "", 44, "      <Textarea placeholder=\"给 Agent 一个任务…\" value={draft} />"],
+      ["ctx", 45, 45, "      <ComposerStatusRow>"],
+      ["add", "", 46, "        {session && !session.isRemote ? ("],
+      ["add", "", 47, "          <PermissionModeControl sessionId={session.id} mode={mode} />"],
+      ["add", "", 48, "        ) : null}"],
+      ["ctx", 46, 49, "      </ComposerStatusRow>"],
+    ] }, kind: "编辑", risk: "mid", icon: "pencil",
     context: "把 Chat 表单的占位文案改掉，并把权限入口的显示条件收紧。",
     verb: "编辑", target: { dir: "apps/desktop/src/renderer/components/", base: "Composer.tsx", full: "apps/desktop/src/renderer/components/Composer.tsx" },
     chips: [["stat", "+4 −1"]],
@@ -448,7 +542,16 @@ const SAMPLES = [
     log: { act: "Edit", tgt: "apps/…/components/Composer.tsx", meta: "+4 −1" }, denyText: "已拒绝编辑 apps/…/components/Composer.tsx",
   },
   {
-    id: "write", kind: "写入 · 新建文件", risk: "mid", icon: "filePlus",
+    id: "write", dDiff: { isNew: true, rest: "还有 10 行", rows: [
+      ["add", "", 1, "# 审批卡重设计"],
+      ["add", "", 2, ""],
+      ["add", "", 3, "## 背景"],
+      ["add", "", 4, ""],
+      ["add", "", 5, "5 类审批组件结构各不相同，统一成一行审批条和底部按钮卡片。"],
+      ["add", "", 6, ""],
+      ["add", "", 7, "## 改动"],
+      ["add", "", 8, ""],
+    ] }, kind: "写入 · 新建文件", risk: "mid", icon: "filePlus",
     context: "记录这次改动的 history。",
     verb: "新建", target: { dir: "docs/histories/2026-09/", base: "20260925-1900-approval-redesign.md", full: "docs/histories/2026-09/20260925-1900-approval-redesign.md" },
     chips: [["stat", "+18"]],
@@ -464,7 +567,17 @@ const SAMPLES = [
     log: { act: "Delete", tgt: "apps/desktop/.vite-cache/deps.json" }, denyText: "已拒绝删除 apps/desktop/.vite-cache/deps.json",
   },
   {
-    id: "bash", kind: "Bash · 真实环境", risk: "mid", icon: "terminal",
+    id: "bash-multi", only: "D", kind: "Bash · 沙盒内 · 多条命令", risk: "low", icon: "terminal",
+    context: "先看一下当前分支状态和改动规模。",
+    verb: "运行", intent: "查看分支状态和改动统计",
+    dSession: { label: "本会话允许", code: "git", scope: "规划中：本会话内 git 开头的命令不再询问（命令前缀授权）" },
+    primary: "运行", primaryShort: "运行",
+    preview: { type: "cmd", text: "git status --short && git diff --stat | tail -n 5" },
+    meta: "~/…/actspace-agent",
+    log: { act: "Ran", tgt: "git status --short && git diff --stat | tail -n 5" }, denyText: "已跳过 git status --short && git diff --stat | tail -n 5",
+  },
+  {
+    id: "bash", note: ["这条命令会在沙盒外运行，可以访问整台电脑的文件和网络。"], dSession: { label: "本会话允许", code: "pnpm", scope: "规划中：本会话内 pnpm 开头的命令不再询问（命令前缀授权）" },  kind: "Bash · 真实环境", risk: "mid", icon: "terminal",
     context: "跑一下权限模式的单测，确认底栏按钮的改动没有破坏行为。",
     verb: "运行", intent: "权限模式的单元测试",
     chips: [["真实环境", "warn"]],
@@ -475,7 +588,7 @@ const SAMPLES = [
     log: { act: "Ran", tgt: "pnpm --filter @actspace/desktop exec vitest run src/renderer/test/permission-mode-control.test.tsx" }, denyText: "已拒绝运行 pnpm --filter @actspace/desktop exec vitest run …",
   },
   {
-    id: "bash-high", kind: "Bash · 高风险命令", risk: "high", icon: "terminal",
+    id: "bash-high", note: ["强制推送会覆盖远端 main 的提交历史。"],  kind: "Bash · 高风险命令", risk: "high", icon: "terminal",
     context: "本地分支已经整理好，推送到远端。",
     verb: "运行", intent: "强制推送到远端 main 分支",
     chips: [["真实环境", "warn"], ["高风险", "danger"]],
@@ -485,7 +598,7 @@ const SAMPLES = [
     log: { act: "Ran", tgt: "git push --force origin main" }, denyText: "已拒绝运行 git push --force origin main",
   },
   {
-    id: "browser", kind: "浏览器 · 单次授权", risk: "mid", icon: "globe",
+    id: "browser", note: ["只授权这一次；之后的浏览器写操作仍按权限模式判断。"],  kind: "浏览器 · 单次授权", risk: "mid", icon: "globe",
     context: "我需要打开页面核对一下线上文案。",
     verb: "使用浏览器", intent: "Chrome",
     chips: [["仅这次", "info"]],
@@ -540,7 +653,7 @@ function logHtml(s) {
   const st = state[s.id];
   const replay = `<button class="replay" data-replay="${s.id}" type="button">重置</button>`;
   if (st.status === "deny") return `<div class="log err"><span class="t">${esc(s.denyText)}</span>${replay}</div>`;
-  const tag = st.status === "session" ? `<span class="gtag">本会话已授权</span>` : "";
+  const tag = "";
   const meta = s.log.meta ? ` <span class="tg">${esc(s.log.meta)}</span>` : "";
   return `<div class="log"><span class="t">${esc(s.log.act)} <span class="tg">${esc(s.log.tgt)}</span>${meta}</span>${tag}${replay}</div>`;
 }
@@ -603,7 +716,7 @@ function cardB(s) { return s.preview ? cardA(s) : rowB(s); }
 /* ---------- Direction C ---------- */
 let trayIndex = 0;
 let traySel = 0;
-function pendingIds() { return SAMPLES.filter((s) => state[s.id].status === "pending" || state[s.id].status === "submitting").map((s) => s.id); }
+function pendingIds() { return visibleSamples().filter((s) => state[s.id].status === "pending" || state[s.id].status === "submitting").map((s) => s.id); }
 function trayOptions(s) {
   const o = [{ act: "once", label: s.primary, dsc: s.session ? "仅这一次" : s.id === "browser" ? "仅这次浏览器操作" : "仅这一次", tone: s.primaryTone }];
   if (s.session) o.push({ act: "session", label: s.session.label, dsc: s.session.scope });
@@ -615,7 +728,7 @@ function renderC() {
   const ids = pendingIds();
   if (trayIndex >= ids.length) trayIndex = Math.max(0, ids.length - 1);
   const cur = ids.length ? SAMPLES.find((s) => s.id === ids[trayIndex]) : null;
-  const lines = SAMPLES.map((s) => {
+  const lines = visibleSamples().map((s) => {
     const st = state[s.id];
     const turn = `<p class="assistant">${esc(s.context)}</p>`;
     if (st.status === "pending" || st.status === "submitting") {
@@ -652,6 +765,84 @@ function renderC() {
       <div class="composer">${cur ? "先处理上面的确认，或直接输入新指令（会拒绝当前请求）" : "继续给 Agent 指令…"}<span class="hint">↑↓ 选择 · 1–4 直选 · ⏎ 确认</span></div>
     </div>
   </div>`;
+}
+
+/* ---------- Direction D: Cursor-style ---------- */
+// 极简 shell 着色：每段命令的第一个词、连接符、参数、引号字符串。
+function shHtml(cmd) {
+  let expectCmd = true;
+  return cmd.split(/(\s+|&&|\|\||[|;]|"[^"]*"|'[^']*')/).filter(Boolean).map((tok) => {
+    if (/^\s+$/.test(tok)) return tok;
+    if (/^(&&|\|\||[|;])$/.test(tok)) { expectCmd = true; return `<span class="sh-op">${esc(tok)}</span>`; }
+    if (expectCmd) { expectCmd = false; return `<span class="sh-cmd">${esc(tok)}</span>`; }
+    if (/^["']/.test(tok)) return `<span class="sh-str">${esc(tok)}</span>`;
+    if (/^-/.test(tok)) return `<span class="sh-flag">${esc(tok)}</span>`;
+    return esc(tok);
+  }).join("");
+}
+function cmdHeads(cmd) {
+  return [...new Set(cmd.split(/&&|\|\||[|;]/).map((part) => part.trim().split(/\s+/)[0]).filter(Boolean))].join(", ");
+}
+function visibleSamples() { return SAMPLES.filter((s) => !s.only || s.only === dir); }
+function firstPendingD() {
+  const s = visibleSamples().find((x) => state[x.id].status === "pending");
+  return s ? s.id : null;
+}
+function dbtn(s, act, cls, label, kbd, extra = "") {
+  const st = state[s.id];
+  const busy = st.status === "submitting";
+  const text = busy && st.act === act ? `<span class="spin"></span>${label}` : `${label}${kbd ? `<kbd>${kbd}</kbd>` : ""}`;
+  return `<button class="dbtn ${cls}" type="button" data-id="${s.id}" data-act="${act}" ${busy ? "disabled" : ""} ${extra}>${text}</button>`;
+}
+function targetD(s) {
+  if (s.intent) return `<span class="dz-tgt"><span class="b">${esc(s.intent)}</span></span>`;
+  const t = s.target;
+  const kw = t.kw ? `<span class="b">${esc(t.kw)}</span> ${esc(t.sepText)} ` : "";
+  return `<span class="dz-tgt" title="${esc(t.full)}">${kw}${esc(t.dir)}<span class="b">${esc(t.base)}</span></span>`;
+}
+const diffOpen = {};
+function diffD(s) {
+  const p = s.dDiff;
+  const rows = p.rows.map(([k, o, n, tx]) =>
+    `<div class="row ${k}"><span class="ln">${o}</span><span class="ln">${n}</span><span class="sg">${k === "add" ? "+" : k === "del" ? "−" : " "}</span><span class="tx">${esc(tx)}</span></div>`).join("");
+  return `<div class="dz-diff"><div class="pv pv-diff${p.isNew ? " is-new" : ""}">${p.hunk ? `<div class="hunk">${esc(p.hunk)}</div>` : ""}${rows}${p.rest ? `<div class="rest">${esc(p.rest)}</div>` : ""}</div></div>`;
+}
+function cardD(s) {
+  const st = state[s.id];
+  if (st.status !== "pending" && st.status !== "submitting") return logHtml(s).replace("已拒绝", "已跳过");
+  const focused = firstPendingD() === s.id;
+  const isShell = s.preview && s.preview.type === "cmd";
+  const [noteText] = s.note || [];
+  const stat = (s.chips || []).filter(([t]) => t === "stat").map(([, v]) => {
+    const [a, d] = v.split(" ");
+    return `<button class="dz-stat" type="button" data-diff="${s.id}" aria-expanded="${Boolean(diffOpen[s.id])}" title="${diffOpen[s.id] ? "收起改动" : "查看改动"}"><span class="a">${a}</span>${d ? `<span class="d">${d}</span>` : ""}<svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
+  }).join("");
+
+  const head = isShell
+    ? `<div class="dz-head"><span class="ico">${ICON.terminal}</span><span class="dz-verb">${esc(s.intent)}</span><span class="dz-tgt">${esc(cmdHeads(s.preview.text))}</span></div>`
+    : `<div class="dz-head"><span class="dz-verb">${esc(s.verb)}</span>${targetD(s)}${stat}</div>`;
+  const body = isShell ? `<pre class="dz-cmd" title="cwd ${esc(s.meta || "")}"><span class="p">$ </span>${shHtml(s.preview.text)}</pre>`
+    : s.dDiff && diffOpen[s.id] ? diffD(s) : "";
+
+  const session = s.session
+    ? dbtn(s, "session", "soft", esc(s.session.label), focused ? "⇧⏎" : "", `title="${esc(s.session.scope)}"`)
+    : s.dSession
+      ? dbtn(s, "session", "soft", `${esc(s.dSession.label)} <span class="code">${esc(s.dSession.code)}</span>`, focused ? "⇧⏎" : "", `title="${esc(s.dSession.scope)}"`)
+      : "";
+  const primaryCls = s.primaryTone === "danger" ? "danger" : "primary";
+  const left = isShell ? `<button class="dz-mode" type="button" title="会话权限模式，和输入框状态行是同一个开关">自动${ICON.down}</button>` : "";
+  const foot = `<div class="dz-foot">${left}<span class="dz-acts">
+      ${dbtn(s, "deny", "text", "跳过", focused ? "Esc" : "")}
+      ${session}
+      ${dbtn(s, "once", primaryCls, esc(s.primaryShort), focused ? "⏎" : "")}
+    </span></div>`;
+  const note = noteText ? `<div class="dz-note">${esc(noteText)}</div>` : "";
+
+  return `<div class="dz-status">等待确认</div>
+    <div class="dz${noteText ? " has-note" : ""}">
+      <article class="dz-card${isShell ? " is-shell" : ""}">${head}${body}${foot}</article>
+      ${note}
+    </div>`;
 }
 
 /* ---------- As-is ---------- */
@@ -718,8 +909,24 @@ const NOTES = {
     ],
     verdict: "体验上限最高，但改动最大：要新做托盘、队列、焦点管理，还要处理托盘和输入框抢焦点。适合放到第二步。",
   },
+  D: {
+    title: "D · Cursor 式",
+    thesis: "参考 Cursor：卡片本身只回答「要做什么」，状态写在卡片上方，风险和原因放进卡片下方的一条底托里。去掉图标、标签和琥珀描边，整体更轻。",
+    points: [
+      "<b>状态在卡片外</b>：上方一行「等待确认」，和工具日志行同一节奏；处理后卡片收成日志行",
+      "<b>标题是一句话</b>：动作用 muted，目标用 faint，文件名稍重；非 Bash 不放图标",
+      "<b>编辑 / 写入</b>：点 +/− 统计在卡片内展开 diff（和现在的代码一致），不加箭头",
+      "<b>Bash 分三段</b>：意图 + 命令名摘要 / 带着色的命令 / 底部操作行，左下角是权限模式",
+      "<b>底托只放原因</b>：中性灰的一句小字，只有 Bash 和浏览器有；读取、搜索、编辑、删除都不加",
+      "<b>风险只靠按钮</b>：删除和高风险命令的主按钮是红色",
+      "<b>按钮</b>：跳过（文字）· 本会话允许（浅灰）· 动词（实心），聚焦卡片上显示快捷键",
+      "<b>Bash 的「本会话允许 pnpm」</b>需要后端支持命令前缀授权，目前是规划项；高风险命令不提供",
+      "右上角可以切按钮形状（圆角 / 胶囊）和主按钮颜色（墨色 / 蓝色）",
+    ],
+    verdict: "待讨论：Bash 各字段放在哪里（左下角、底托写什么、cwd）；拒绝改叫「跳过」是否合适。",
+  },
   O: {
-    title: "现状",
+    title: "旧版（重设计前）",
     thesis: "按当前代码还原的 5 种审批卡，方便对照。",
     points: [
       "<b>像表单不像对话</b>：灰色标题栏 + 分隔线，和上下的工具日志行格格不入",
@@ -735,20 +942,23 @@ const NOTES = {
 
 /* ---------- main render ---------- */
 const hash = new URLSearchParams(location.hash.slice(1));
-let dir = hash.get("dir") || load("dir") || "B";
+(hash.get("open") || "").split(",").filter(Boolean).forEach((id) => (diffOpen[id] = true));
+let dir = hash.get("dir") || load("dir") || "D";
 function render() {
   document.querySelectorAll("#dirSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.dir === dir)));
+  ["btnSeg", "accentSeg"].forEach((id) => document.getElementById(id).classList.toggle("hidden", dir !== "D"));
   const n = NOTES[dir];
   document.getElementById("notes").innerHTML = `<h2>${n.title}</h2><p class="thesis">${n.thesis}</p><h3>要点</h3><ul>${n.points.map((p) => `<li>${p}</li>`).join("")}</ul>${n.verdict ? `<div class="verdict">${n.verdict}</div>` : ""}
-    ${dir !== "O" && dir !== "C" ? `<h3>试一下</h3><ul><li>点任意按钮看提交中和提交后的状态</li><li>悬停「本会话允许」看授权范围</li><li>悬停已处理的日志行，点「重置」恢复</li></ul>` : ""}
+    ${dir === "D" ? `<h3>试一下</h3><ul><li>⏎ 运行第一张待确认卡，⇧⏎ 本会话允许，Esc 跳过</li><li>悬停 Bash 命令看 cwd，悬停「本会话允许」看授权范围</li><li>悬停已处理的日志行，点「重置」恢复</li></ul>` : ""}
+    ${dir !== "O" && dir !== "C" && dir !== "D" ? `<h3>试一下</h3><ul><li>点任意按钮看提交中和提交后的状态</li><li>悬停「本会话允许」看授权范围</li><li>悬停已处理的日志行，点「重置」恢复</li></ul>` : ""}
     ${dir === "C" ? `<h3>试一下</h3><ul><li>按 ↑↓、1–4、回车处理托盘</li><li>用 ‹ › 在排队的请求间切换</li></ul>` : ""}`;
 
   const stage = document.getElementById("stage");
   if (dir === "O") { stage.innerHTML = `<div class="convo">${renderOld()}</div>`; return; }
   if (dir === "C") { stage.innerHTML = renderC(); return; }
 
-  const make = dir === "A" ? (s, i) => cardA(s, { focus: i === 0 }) : (s) => cardB(s);
-  let html = SAMPLES.map((s, i) => `
+  const make = dir === "A" ? (s, i) => cardA(s, { focus: i === 0 }) : dir === "D" ? (s) => cardD(s) : (s) => cardB(s);
+  let html = visibleSamples().map((s, i) => `
     <div class="section-label"><span class="n">${String(i + 1).padStart(2, "0")}</span><b>${esc(s.kind)}</b></div>
     <p class="assistant">${esc(s.context)}</p>
     <div class="slot">${make(s, i)}</div>`).join("");
@@ -763,10 +973,10 @@ function render() {
     </div></div>`;
   }
   html += `<div class="divider"></div>
-    <div class="section-label"><span class="n">${dir === "B" ? "10" : "09"}</span><b>处理后：收成一行工具日志</b></div>
+    <div class="section-label"><span class="n">${dir === "B" ? "10" : String(visibleSamples().length + 1).padStart(2, "0")}</span><b>处理后：收成一行工具日志</b></div>
     <div class="slot" style="display:grid;gap:4px">
       <div class="log"><span class="t">Read <span class="tg">/private/tmp/…/scope/beta.txt</span></span></div>
-      <div class="log"><span class="t">Edit <span class="tg">apps/…/components/Composer.tsx +4 −1</span></span><span class="gtag">本会话已授权</span></div>
+      <div class="log"><span class="t">Edit <span class="tg">apps/…/components/Composer.tsx +4 −1</span></span></div>
       <div class="log err"><span class="t">已拒绝删除 apps/desktop/.vite-cache/deps.json</span></div>
       <div class="log faint"><span class="t">审批已过期 · Ran <span class="tg">git push --force origin main</span></span></div>
     </div>`;
@@ -785,6 +995,9 @@ document.addEventListener("click", (e) => {
   if (!t) return;
   if (t.dataset.dir) { dir = t.dataset.dir; store("dir", dir); render(); return; }
   if (t.dataset.themeSet) { setTheme(t.dataset.themeSet); return; }
+  if (t.dataset.btnSet) { setOpt("btn", t.dataset.btnSet); return; }
+  if (t.dataset.accentSet) { setOpt("accent", t.dataset.accentSet); return; }
+  if (t.dataset.diff) { diffOpen[t.dataset.diff] = !diffOpen[t.dataset.diff]; render(); return; }
   if (t.dataset.replay) { state[t.dataset.replay] = { status: "pending" }; render(); return; }
   if (t.hasAttribute("data-reset-all")) { resetAll(); trayIndex = 0; traySel = 0; render(); return; }
   if (t.dataset.page) { const n = pendingIds().length; trayIndex = (trayIndex + Number(t.dataset.page) + n) % n; traySel = 0; render(); return; }
@@ -800,6 +1013,15 @@ function commitTray() {
   decide(s.id, o.act);
 }
 document.addEventListener("keydown", (e) => {
+  if (dir === "D") {
+    const id = firstPendingD();
+    if (!id || e.target.matches("input, textarea")) return;
+    const s = SAMPLES.find((x) => x.id === id);
+    if (e.key === "Enter" && e.shiftKey) { if (s.session || s.dSession) decide(id, "session"); e.preventDefault(); }
+    else if (e.key === "Enter") { decide(id, "once"); e.preventDefault(); }
+    else if (e.key === "Escape") { decide(id, "deny"); }
+    return;
+  }
   if (dir !== "C") return;
   const ids = pendingIds(); if (!ids.length) return;
   const s = SAMPLES.find((x) => x.id === ids[trayIndex]);
@@ -820,6 +1042,13 @@ function setTheme(t) {
   store("theme", t);
   document.querySelectorAll("#themeSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themeSet === t)));
 }
+function setOpt(key, value) {
+  document.documentElement.dataset[key] = value;
+  store(key, value);
+  document.querySelectorAll(`#${key}Seg button`).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset[`${key}Set`] === value)));
+}
+setOpt("btn", load("btn") || "pill");
+setOpt("accent", load("accent") || "ink");
 setTheme(hash.get("theme") || load("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
 render();
 </script>

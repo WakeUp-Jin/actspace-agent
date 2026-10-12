@@ -67,3 +67,28 @@ it("plugin query capabilities preserve durable watermarks without initializing g
 
   } finally { await sessions.closeAll(); await storage.close(); await ctx.fiber.dispose(); await rm(dataRoot, { recursive: true, force: true }); }
 });
+
+it("single-source queries avoid inventory and keep owned append tails behind the durable boundary", async () => {
+  const dataRoot = await mkdtemp(join(tmpdir(), "context-single-query-")); const registry = createCoreCodecRegistry();
+  const ctx = new CordisContextClass();
+  ctx.provide("actspace.host.session", { dataRoot, runtimeId: "test" }); ctx.provide("session.journal", { registry });
+  const storage = new JsonlSessionStorageService(ctx);
+  const store = new SessionStore({ registry }, storage);
+  const sessions = new RuntimeSessionController({ dataRoot, runtimeId: "test", registry, profileId: "test", manifestDigest: "test", plugins: [] }, store);
+  const lists = vi.spyOn(store, "listSessionIds");
+  try {
+    const session = await sessions.create("owned", dataRoot);
+    await session.flush();
+    const before = await sessions.querySource("owned");
+    expect(before?.appendOnlyToken).toBeTruthy();
+    const durable = session.durableSeq!;
+    await session.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: "tail" }, surface: null });
+    await session.flush();
+    // Real Provider bytes advanced; withhold Runtime publication of that barrier.
+    const boundary = vi.spyOn(session, "durableSeq", "get").mockReturnValue(durable);
+    expect((await sessions.querySource("owned"))?.stamp).toBe(before?.stamp);
+    boundary.mockRestore();
+    expect((await sessions.querySource("owned"))?.throughSeq).toBeGreaterThan(durable);
+    expect(lists).not.toHaveBeenCalled();
+  } finally { await sessions.closeAll(); await storage.close(); await ctx.fiber.dispose(); await rm(dataRoot, { recursive: true, force: true }); }
+});

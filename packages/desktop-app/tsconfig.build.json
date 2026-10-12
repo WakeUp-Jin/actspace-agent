@@ -13,7 +13,7 @@
       "path": "./../bundle/tsconfig.build.json"
     },
     {
-      "path": "./../compaction/tsconfig.build.json"
+      "path": "./../context/compaction/tsconfig.build.json"
     },
     {
       "path": "./../cordis-adapter/tsconfig.build.json"

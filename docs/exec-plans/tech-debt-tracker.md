@@ -28,7 +28,7 @@
 
 ## Desktop 前端组件遗留
 
-2026-10-06 Desktop 前端重构 16（UI 原语与组件拆分，`active/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md`）之后仍未处理的项，过程见 `docs/exec-runs/20261005-desktop-fe-16-ui-primitives/execution-process.md`：
+2026-10-06 Desktop 前端重构 16（UI 原语与组件拆分，`completed/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md`）之后仍未处理的项，过程见 `docs/exec-runs/20261005-desktop-fe-16-ui-primitives/execution-process.md`：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|

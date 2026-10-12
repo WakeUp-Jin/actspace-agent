@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ContextEngine } from "@actspace/context";
+import { ContextEngine } from "@actspace/context-engine";
 import { createCoreCodecRegistry } from "@actspace/session-journal";
 import { SessionStore } from "@actspace/session-persistence";
 import { JsonlSessionStorage, sessionFileLayout } from "@actspace/session-jsonl";
@@ -32,7 +32,7 @@ it("converts an existing persisted Session without changing bytes, seq or Surfac
 });
 
 it("copies the typed sleeping-index reference during a real JSONL fork without rewriting parent text", async () => {
-  const { codecs, STATE_EVENT, CONTEXT_OWNER } = await import("@actspace/context/codec");
+  const { codecs, STATE_EVENT, CONTEXT_OWNER } = await import("@actspace/context-engine/codec");
   const dataRoot = await mkdtemp(join(tmpdir(), "context-fork-"));
   const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
   const storage = new JsonlSessionStorage({ dataRoot, runtimeId: "fixture", registry });

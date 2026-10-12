@@ -14,6 +14,7 @@ import type {
   RuntimeV2SessionListItem,
   RuntimeV2SessionSnapshot,
 } from "@actspace/shared/runtime-v2";
+import type { ManagedContextProjection } from "@actspace/shared";
 
 export type ApplicationSessionService = {
   readProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput): Promise<import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection>;
@@ -36,6 +37,7 @@ export type ApplicationSessionService = {
   inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]>;
   list(): Promise<readonly RuntimeV2SessionListItem[]>;
   browseSessions(): Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
+  querySource?(sessionId: string): Promise<import("@actspace/session-storage").SessionQuerySource | null>;
   querySources?(): Promise<import("@actspace/session-storage").SessionQueryCatalog | null>;
   readEventBatch?(sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput): Promise<import("@actspace/session-storage").SessionEventBatch>;
   globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]>;
@@ -68,12 +70,15 @@ export type AgentApplicationContract = {
   readonly subscribeSessionProjection: ApplicationSessionService["subscribeProjection"];
   readonly listSessions: () => Promise<readonly RuntimeV2SessionListItem[]>;
   readonly browseSessions: () => Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
+  readonly sessionQuerySource: (sessionId: string) => Promise<import("@actspace/session-storage").SessionQuerySource | null>;
   readonly sessionQuerySources: () => Promise<import("@actspace/session-storage").SessionQueryCatalog | null>;
   readonly globalSessionSummaries: () => Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]>;
   readonly browseToolDetail: (sessionId: string, callId: string) => Promise<DesktopBrowsePage>;
   readonly inspectSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly readSessionEventBatch: (sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) => Promise<import("@actspace/session-storage").SessionEventBatch>;
   readonly inspectSessionEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]>;
+  readonly readContextEntryText: (sessionId: string, scope: string, key: string, revision: number, generation: string) => Promise<string | null>;
+  readonly readContextProjection: (sessionId: string, logicalAgentScopeId?: string) => Promise<ManagedContextProjection | null>;
   readonly exportSession: (sessionId: string) => Promise<string>;
   readonly createMainSession: (sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm, worktree?: import("@actspace/shared").SessionWorktreeContext) => Promise<RuntimeV2SessionSnapshot>;
   readonly resumeMainSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
@@ -148,6 +153,7 @@ export class AgentApplication implements AgentApplicationContract {
   readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.#sessions.readObservation(input); }
   subscribeSessionProjection(listener: (update: import("@actspace/shared/runtime-v2").RuntimeV2SessionUpdate) => void) { return this.#sessions.subscribeProjection(listener); }
   browseSessions() { return this.#sessions.browseSessions(); }
+  async sessionQuerySource(sessionId: string) { return this.#sessions.querySource?.(sessionId) ?? null; }
   async sessionQuerySources() {
     if (!this.#sessions.querySources) return null;
     return this.#sessions.querySources();
@@ -160,6 +166,13 @@ export class AgentApplication implements AgentApplicationContract {
     return this.#sessions.readEventBatch(sessionId, input);
   }
   inspectSessionEvents(sessionId: string) { return this.#sessions.inspectEvents(sessionId); }
+  async readContextProjection(sessionId: string, logicalAgentScopeId = `main:${sessionId}`): Promise<ManagedContextProjection | null> {
+    const projection = await this.#runs.inspectCapability<{ readonly getProjection?: (id: string, scope?: string, basis?: "current-context" | "request") => ManagedContextProjection | undefined }, ManagedContextProjection | undefined>("context.engine", service => service?.getProjection?.(sessionId, logicalAgentScopeId, "current-context"), sessionId);
+    return projection ?? null;
+  }
+  async readContextEntryText(sessionId: string, scope: string, key: string, revision: number, generation: string): Promise<string | null> {
+    return await this.#runs.inspectCapability<{ readEntry?: (id: string, scope: string, key: string, revision: number, generation: string) => string | null }, string | null>("context.engine", service => service?.readEntry?.(sessionId, scope, key, revision, generation) ?? null, sessionId);
+  }
   exportSession(sessionId: string) { return this.#sessions.export(sessionId); }
 
   async createMainSession(sessionId?: string, workspaceRoot?: string, agentForm: MainAgentForm = "agent", worktree?: import("@actspace/shared").SessionWorktreeContext): Promise<RuntimeV2SessionSnapshot> {
@@ -236,7 +249,15 @@ export class AgentApplication implements AgentApplicationContract {
     return this.#runs.service.exclusive(sessionId, async () => {
       const session = await this.#sessions.resume(sessionId);
       if (session.header.worktree && next !== session.header.worktree.workspaceRoot) throw new Error("A worktree Session cannot change workspace.");
-      await session.append(core("session/workspace-set", { workspaceRoot: next }));
+      const snapshot = this.#sessions.snapshot(session);
+      const events: SessionEventCandidateV1[] = [];
+      if (snapshot.workspaceRoot !== next) {
+        for (const grant of snapshot.sessionGrants) {
+          if (grant.selector.kind === "command_prefix") events.push(core("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "workspace-changed" }));
+        }
+      }
+      events.push(core("session/workspace-set", { workspaceRoot: next }));
+      await session.appendMany(events);
       await session.flush();
       return this.#sessions.snapshot(session);
     });
@@ -250,6 +271,7 @@ export class AgentApplication implements AgentApplicationContract {
     const events: SessionEventCandidateV1[] = [];
     if (snapshot.permissionMode === "full-access" && mode === "default") {
       for (const grant of snapshot.sessionGrants) {
+        if (grant.selector.kind === "command_prefix") continue;
         const path = grant.selector.kind === "exact" ? grant.selector.canonicalPath : grant.selector.canonicalRoot;
         if (snapshot.workspaceRoot === null || !isPathWithin(snapshot.workspaceRoot, path)) events.push(core("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: changedAt, reason: "permission-mode-downgrade" }));
       }

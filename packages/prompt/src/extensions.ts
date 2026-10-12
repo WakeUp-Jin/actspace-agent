@@ -1,4 +1,4 @@
-import type { ContextSource } from "@actspace/context";
+import type { ContextSource } from "@actspace/context-engine";
 
 /** Host-owned registrations. Session registrations require an explicit main-Agent reader. */
 export class PromptExtensionRegistry {

@@ -3,6 +3,7 @@ import { Eye, X } from "lucide-react";
 import type { ContextState, ContextUsageSnapshot } from "@actspace/shared";
 import { getContextBucketDisplay } from "@actspace/shared";
 import { contextBucketLabel } from "../context-labels";
+import { formatApproxTokens, formatShare, formatTokenCount } from "../context-format";
 import { selectRequestContextEstimate } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { Popover, PopoverAnchor, PopoverContent } from "./ui/Popover";
@@ -18,7 +19,7 @@ const CONTEXT_METER_CLASS =
   "context-meter flex h-1.5 overflow-hidden rounded-full bg-[var(--act-color-meter-track)]";
 const CONTEXT_BUCKETS_CLASS = "context-buckets grid gap-1 py-3 pb-1";
 const CONTEXT_BUCKET_CLASS =
-  "context-bucket grid grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md px-1.5 py-1 text-left text-act-md leading-5 text-text-main transition-colors";
+  "context-bucket grid grid-cols-[14px_minmax(0,1fr)_auto_36px] items-center gap-2.5 rounded-md px-1.5 py-1 text-left text-act-md leading-5 text-text-main transition-colors";
 const BUCKET_SWATCH_CLASS = "bucket-swatch h-[13px] w-[13px] rounded-[3px]";
 const CONTEXT_BUCKET_VALUE_CLASS = "font-semibold text-text-main";
 
@@ -52,7 +53,7 @@ export function ContextPopup({
     totalTokens: contextState.totalEstimatedTokens,
     maxTokens: contextState.maxTokens,
     percentUsed: contextState.percentUsed,
-    compressionCount: 0,
+    compressionCount: projectionCell?.snapshot?.activity.compactionCount ?? snapshot?.compressionCount ?? 0,
     cumulativeTokens: snapshot?.cumulativeTokens,
     estimator: contextState.estimator,
     buckets: contextState.buckets,
@@ -71,10 +72,8 @@ export function ContextPopup({
     setSelectedKey((prev) => (prev === key ? null : key));
   };
 
-  // 有内容但占比不足 1% 时显示「<1」，避免「明明有数据却是 0%」的误解。
-  const percentLabel = safeSnapshot.maxTokens > 0 && safeSnapshot.totalTokens > 0 && safeSnapshot.percentUsed < 1
-      ? "<1"
-      : `${Math.floor(safeSnapshot.percentUsed)}`;
+  const percentLabel = formatShare(safeSnapshot.totalTokens, safeSnapshot.maxTokens);
+
 
   return (
     <Popover open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -126,9 +125,9 @@ export function ContextPopup({
           </div>
         </header>
         <div className={CONTEXT_SUMMARY_CLASS}>
-          <span>{percentLabel}% 已用</span>
+          <span>{percentLabel} 已用</span>
           <span>
-            ~{formatTokenCount(safeSnapshot.totalTokens)} / {formatTokenCount(safeSnapshot.maxTokens)} Token
+            {formatApproxTokens(safeSnapshot.totalTokens)} / {safeSnapshot.maxTokens > 0 ? formatTokenCount(safeSnapshot.maxTokens) : "—"} Token
           </span>
         </div>
         <div className={CONTEXT_METER_CLASS}>
@@ -150,7 +149,7 @@ export function ContextPopup({
                   opacity: dimmed ? 0.3 : 1
                 }}
                 aria-pressed={selectedKey === key}
-                aria-label={`${contextBucketLabel(key)} ${formatTokenCount(bucket.tokens)} Token`}
+                aria-label={`${contextBucketLabel(key)} ${formatApproxTokens(bucket.tokens)} Token`}
                 onClick={() => toggleSelected(key)}
               />
             );
@@ -173,7 +172,8 @@ export function ContextPopup({
               >
                 <span className={BUCKET_SWATCH_CLASS} style={{ background: `var(${display.colorVar})` }} />
                 <span className="truncate">{contextBucketLabel(key)}</span>
-                <strong className={CONTEXT_BUCKET_VALUE_CLASS}>{formatTokenCount(bucket.tokens)}</strong>
+                <strong className={CONTEXT_BUCKET_VALUE_CLASS}>{formatApproxTokens(bucket.tokens)}</strong>
+                <span className="text-right text-act-xs tabular-nums text-text-faint">{formatShare(bucket.tokens, safeSnapshot.totalTokens)}</span>
               </button>
             );
           })}
@@ -181,11 +181,4 @@ export function ContextPopup({
       </PopoverContent>
     </Popover>
   );
-}
-
-function formatTokenCount(value: number): string {
-  const safe = Math.max(0, Math.floor(value));
-  if (safe < 1_000) return safe.toLocaleString("zh-CN");
-  if (safe < 1_000_000) return `${Math.floor(safe / 1_000)}K`;
-  return `${Math.floor(safe / 1_000_000)}M`;
 }

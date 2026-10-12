@@ -1,6 +1,6 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { Context, ContextRequest } from "@actspace/context";
-import { surfaceMessage } from "@actspace/context";
+import type { Context, ContextRequest } from "@actspace/context-engine";
+import { surfaceMessage } from "@actspace/context-engine";
 import type { SessionSurfaceView, SessionSurfaceNodeV1 } from "@actspace/session-journal";
 import type { LlmToolDefinition } from "@actspace/llm-service";
 import type { LogicalRequestCandidate } from "./request-snapshot.js";

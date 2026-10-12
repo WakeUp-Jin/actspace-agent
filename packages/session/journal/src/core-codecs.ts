@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { isCommandPrefixSelector, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { EventCodecRegistry, type EventCodec } from "./codec-registry.js";
 import { SessionError } from "./errors.js";
 
@@ -33,6 +33,7 @@ export const PERSISTED_EXTENSION_EVENT_TYPES = [
   "permission/mode-set",
   "permission/scope-denied",
   "permission/grant-added",
+  "permission/grant-used",
   "permission/grant-revoked",
   "command/done",
   "command/run",
@@ -127,6 +128,12 @@ function validatePermissionData(type: PersistedExtensionEventType, data: Readonl
     validateGrantAdded(type, data);
     return;
   }
+  if (type === "permission/grant-used") {
+    requireSchemaVersion(data, type);
+    for (const field of ["grantId", "sessionId", "agentId", "callId", "pluginId", "toolName", "commandDigest"] as const) requireId(data[field], type, field);
+    requireTimestamp(data.usedAt, type, "usedAt");
+    return;
+  }
   if (type === "permission/grant-revoked") {
     requireSchemaVersion(data, type);
     for (const field of ["grantId", "sessionId", "agentId", "revokedAt"] as const) requireId(data[field], type, field);
@@ -161,16 +168,7 @@ function validateGrantAdded(type: PersistedExtensionEventType, data: Readonly<Re
     requireId(data.expiresAt, type, "expiresAt");
     requireTimestamp(data.expiresAt, type, "expiresAt");
   }
-  if (data.action !== "file.read" && data.action !== "file.write") throw invalid(type, "action must be file.read or file.write");
-  if (data.access !== "read" && data.access !== "write") throw invalid(type, "access must be read or write");
-  if ((data.action === "file.read") !== (data.access === "read")) throw invalid(type, "action and access must agree");
-  const audience = record(data.audience);
-  for (const field of ["pluginId", "permissionDomain"] as const) requireId(audience[field], type, `audience.${field}`);
-  if (!Number.isSafeInteger(audience.policyVersion) || (audience.policyVersion as number) < 1) throw invalid(type, "audience.policyVersion must be a positive integer");
-  const selector = record(data.selector);
-  if (selector.kind === "exact") requireCanonicalPath(selector.canonicalPath, type, "selector.canonicalPath");
-  else if (selector.kind === "subtree") requireCanonicalPath(selector.canonicalRoot, type, "selector.canonicalRoot");
-  else throw invalid(type, "selector.kind must be exact or subtree");
+  validateGrantScope(type, data);
 }
 
 function validateGrantSuggestion(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
@@ -180,13 +178,17 @@ function validateGrantSuggestion(type: PersistedExtensionEventType, data: Readon
 }
 
 function validateGrantScope(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
-  if (data.action !== "file.read" && data.action !== "file.write") throw invalid(type, "action must be file.read or file.write");
-  if (data.access !== "read" && data.access !== "write") throw invalid(type, "access must be read or write");
-  if ((data.action === "file.read") !== (data.access === "read")) throw invalid(type, "action and access must agree");
+  const process = data.action === "process.execute";
+  if (!process && data.action !== "file.read" && data.action !== "file.write") throw invalid(type, "invalid grant action");
+  if (data.access !== (process ? "execute" : data.action === "file.read" ? "read" : "write")) throw invalid(type, "action and access must agree");
   const audience = record(data.audience);
   for (const field of ["pluginId", "permissionDomain"] as const) requireId(audience[field], type, `audience.${field}`);
   if (!Number.isSafeInteger(audience.policyVersion) || (audience.policyVersion as number) < 1) throw invalid(type, "audience.policyVersion must be a positive integer");
   const selector = record(data.selector);
+  if (process) {
+    if (!isCommandPrefixSelector(selector)) throw invalid(type, "invalid command_prefix selector");
+    return;
+  }
   if (selector.kind === "exact") requireCanonicalPath(selector.canonicalPath, type, "selector.canonicalPath");
   else if (selector.kind === "subtree") requireCanonicalPath(selector.canonicalRoot, type, "selector.canonicalRoot");
   else throw invalid(type, "selector.kind must be exact or subtree");

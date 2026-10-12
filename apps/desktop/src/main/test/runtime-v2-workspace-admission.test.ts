@@ -41,6 +41,23 @@ describe("runtime workspace admission", () => {
     } finally { await runtime.dispose(); await restarted.dispose(); await rm(dataRoot, { recursive: true, force: true }); }
   });
 
+  it("returns from boot while historical admission is pending and aborts it at disposal", async () => {
+    const dataRoot = await mkdtemp(join(tmpdir(), "runtime-admission-held-"));
+    const roots = { dataRoot, workspaceRoot: dataRoot, defaultWorkspaceRoot: dataRoot };
+    let release!: (value: { sources: []; failedSessionIds: [] }) => void;
+    const app = { sessionQuerySources: vi.fn(() => new Promise(resolve => { release = resolve; })), listSessions: vi.fn(async () => []), subscribeSessionProjection: () => () => {} };
+    bootDesktopRuntimeV2.mockResolvedValue({ profile: { context: { get: (name: string) => name === "desktop.app" ? app : undefined }, getState: () => ({ runtimeInstanceId: "test" }), shutdown: vi.fn() } });
+    const runtime = new DesktopRuntimeV2Registry({ roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
+    try {
+      await runtime.boot();
+      await vi.waitFor(() => expect(app.sessionQuerySources).toHaveBeenCalledOnce());
+      const stopped = runtime.dispose();
+      release({ sources: [], failedSessionIds: [] });
+      await stopped;
+      expect(app.listSessions).not.toHaveBeenCalled();
+    } finally { release?.({ sources: [], failedSessionIds: [] }); await runtime.dispose(); await rm(dataRoot, { recursive: true, force: true }); }
+  });
+
   it.each([true, false])("restores existing roots and admits new roots without initializing Git (existing=%s)", async (existing) => {
     const dataRoot = await mkdtemp(join(tmpdir(), "runtime-workspaces-"));
     const oldRoot = join(dataRoot, "old");
@@ -63,6 +80,7 @@ describe("runtime workspace admission", () => {
     const runtime = new DesktopRuntimeV2Registry({ roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
     try {
       await runtime.boot();
+      if (existing) await vi.waitFor(async () => expect(await resolveRegisteredWorkspaceSelection(registryOptions, { workspaceRoot: oldRoot })).toMatchObject({ ok: true }));
       const restored = await resolveRegisteredWorkspaceSelection(registryOptions, { workspaceRoot: oldRoot });
       if (existing) expect(restored).toMatchObject({ ok: true });
       await runtime.createSession(undefined, newRoot);

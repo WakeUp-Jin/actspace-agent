@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { RuntimeV2AgentMode, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
-import { ContextEngine, surfaceMessage, snapshotContext, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context";
+import { ContextEngine, surfaceMessage, snapshotContext, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
 import { contextFromCandidate } from "@actspace/prompt";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
 import type { LlmService } from "@actspace/llm-service";
@@ -16,7 +16,7 @@ import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tools-run
 import type { ToolRuntime } from "@actspace/tools-runtime";
 import type { ToolExecutionResult } from "@actspace/tools-runtime";
 import { allowedAgentModeTools, createAgentEventDispatcher, defaultAgentSubject, type AgentDescriptor, type AgentSubject, type AgentEventDispatcher } from "@actspace/core-agent";
-import type { ContextCompactor } from "@actspace/context";
+import type { ContextCompactor } from "@actspace/context-engine";
 import { AgentRuntimeError } from "@actspace/core-agent";
 import type { MainAgentInbox } from "@actspace/core-agent";
 import type { RunTurnResult } from "@actspace/core-agent";
@@ -180,8 +180,9 @@ export class AgentLoop {
         });
         const retryPolicy = prepared.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY;
         const contextWindow = prepared.request.contextWindow ?? null;
+        if (this.options.contextSources) converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${prepared.request.routeId}/${prepared.request.model}`, label: prepared.request.model, contextWindow, autoCompactAtTokens: compaction?.threshold?.(contextWindow) ?? null }) };
         const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: prepared.registration.registrationId, adapterVersion: prepared.registration.adapter.adapterVersion, defaults: prepared.request.options as RuntimeV2JsonValue, retryPolicy: retryPolicySnapshot(retryPolicy) as unknown as RuntimeV2JsonValue, contextWindow };
-        const snapshot = this.options.contextSources ? snapshotContext(converted.context, { ...llmInput, messages: requestMessageList, tools: prepared.request.tools, routeId: prepared.request.routeId, model: prepared.request.model }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest) : assembler!.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+        const snapshot = this.options.contextSources ? snapshotContext(converted.context, { ...llmInput, requestId, messages: prepared.request.messages, tools: prepared.request.tools, routeId: prepared.request.routeId, model: prepared.request.model }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest, converted.input) : assembler!.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
         try {
           await converted.engine.bindRequest(converted.context);
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt: 1, agentMode: mode, agentModeRevision: modeRevision }));
@@ -245,9 +246,12 @@ export class AgentLoop {
             requestId,
             messages: requestMessageList,
           }, controller.signal, prepared.preparedAdapterCall);
-          const retrySnapshot = this.options.contextSources ? snapshotContext(converted.context, { ...converted.input, messages: requestMessageList, tools: activePrepared.request.tools, routeId: activePrepared.request.routeId, model: activePrepared.request.model }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest) : assembler!.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+          const retryContextWindow = activePrepared.request.contextWindow ?? null;
+          if (this.options.contextSources) converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${activePrepared.request.routeId}/${activePrepared.request.model}`, label: activePrepared.request.model, contextWindow: retryContextWindow, autoCompactAtTokens: compaction?.threshold?.(retryContextWindow) ?? null }) };
+          const retryMetadata = { ...metadata, route: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow: retryContextWindow };
+          const retrySnapshot = this.options.contextSources ? snapshotContext(converted.context, { ...converted.input, requestId, messages: activePrepared.request.messages, tools: activePrepared.request.tools, routeId: activePrepared.request.routeId, model: activePrepared.request.model }, retryMetadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest, converted.input) : assembler!.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
           await converted.engine.bindRequest(converted.context);
-          await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow, attempt, agentMode: mode, agentModeRevision: modeRevision }));
+          await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow: retryContextWindow, attempt, agentMode: mode, agentModeRevision: modeRevision }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot: retrySnapshot }));
           await this.checkpoint("before-llm-dispatch");
           output = undefined;
@@ -259,6 +263,18 @@ export class AgentLoop {
         if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");
+        // Publish the durable assistant/tool result to the long-lived Context
+        // before deciding whether this turn is complete. The next step will
+        // reconcile again, while an idle UI read can already observe this state.
+        const durableBeforeReconcile = this.options.session.durableSeq;
+        try {
+          await converted.engine.reconcile({ ...converted.context.request, requestId: `context:${turnId}:${stepId}` }, this.options.session.durableSeq ?? this.options.session.lastSeq);
+        } catch (error) {
+          throw error;
+        }
+        // Reconciliation may persist supplement changes while rebuilding the
+        // long-lived view; make those changes durable before the next step.
+        if (durableBeforeReconcile !== null && durableBeforeReconcile !== undefined && this.options.session.lastSeq > durableBeforeReconcile) await this.checkpoint("before-next-step");
         // 模型写最后回复时用户插入了消息：回合不结束，下一步开头读到它（仍受 maxSteps 约束）。
         const steerPending = this.options.inputSource?.hasPending(agentRunId);
         if (output.toolCalls.length === 0 && !budgetSummary && !steerPending) {
@@ -314,13 +330,13 @@ export class AgentLoop {
 
   private async contextInput(candidate: import("@actspace/prompt").LogicalRequestCandidate, requestId: string, options: import("@actspace/llm-service").LlmRequestOptions, runtime: { mode: RuntimeV2AgentMode; selectedSkillIds: readonly string[]; budgetSummary: boolean }) {
     const model = isRecord(candidate.requestOptions) && typeof candidate.requestOptions.model === "string" ? candidate.requestOptions.model : this.options.descriptor.model;
-    const request = { sessionId: candidate.sessionId, turnId: candidate.turnId, stepId: candidate.stepId, requestId,
+    const request = { sessionId: candidate.sessionId, logicalAgentScopeId: this.options.agentSubject?.agentId ?? this.options.scope.agentId, turnId: candidate.turnId, stepId: candidate.stepId, requestId,
       routeId: isRecord(candidate.requestOptions) && typeof candidate.requestOptions.routeId === "string" ? candidate.requestOptions.routeId : this.options.descriptor.routeId, model, options };
     const configuration: ContextEngineOptions = {
       resolve: input => this.options.contextSources ? {
         request: input,
         content: { system: { sections: [], modelFacts: [] }, conversation: this.options.session.journal.surface, supplements: [], tools: candidate.tools as unknown as readonly LlmToolDefinition[] },
-        status: { throughJournalSeq: this.options.session.lastSeq, cycle: 0, paths: [], facts: candidate.facts, plugins: { "actspace.loop": { ...runtime, hostFacts: candidate.facts[0] ?? {} } } },
+        status: { throughJournalSeq: this.options.session.lastSeq, cycle: 0, paths: [], facts: candidate.facts, plugins: { "actspace.loop": { ...runtime, hostFacts: candidate.facts[0] ?? {} }, "actspace.context.compaction": { summaries: this.options.session.journal.events.filter(event => event.type === "surface/replaced" && event.surface?.kind === "replace").map(event => ({ messageId: event.surface!.node.messageId, compactionId: (event.data as { compactionId?: string }).compactionId ?? event.surface!.node.messageId })) } } },
       } : contextFromCandidate(input, candidate, this.options.session.journal.surface, this.options.session.lastSeq),
       session: this.options.contextSources ? this.options.session : undefined,
       sources: this.options.contextSources,
@@ -329,7 +345,8 @@ export class AgentLoop {
     };
     const engine = this.options.createContextEngine?.(configuration) ?? new ContextEngine(configuration);
     if (runtime.budgetSummary && this.options.contextSources) await engine.insert("actspace.context-conversation", `execution-budget:${candidate.stepId}`, "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete.", "request", candidate.turnId);
-    const context = await engine.getContext(request);
+    const replayThrough = this.options.session.durableSeq ?? this.options.session.lastSeq;
+    const context = engine.getInstance(request) === undefined ? await engine.getContext(request) : await engine.reconcile(request, replayThrough);
     return { context, engine, input: await engine.toLlmInput(context) };
   }
 
@@ -345,7 +362,7 @@ export class AgentLoop {
       .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeV2JsonValue }));
   }
   /** The turn is already settled; a failed compaction is reported live and must not fail the turn. */
-  private async autoCompact(compaction: ContextCompactor, usage: import("@actspace/context").CompactionUsage, ids: { agentRunId: string; turnId: string }): Promise<void> {
+  private async autoCompact(compaction: ContextCompactor, usage: import("@actspace/context-engine").CompactionUsage, ids: { agentRunId: string; turnId: string }): Promise<void> {
     let startedAt: number | null = null;
     let removedCount = 0;
     try {
@@ -486,7 +503,7 @@ function currentAgentModeRevision(events: readonly { readonly type: string; read
   return 0;
 }
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> { return value !== null && typeof value === "object" && !Array.isArray(value); }
-function compactionUsage(value: RuntimeV2JsonValue, contextWindow: number | null): import("@actspace/context").CompactionUsage | null {
+function compactionUsage(value: RuntimeV2JsonValue, contextWindow: number | null): import("@actspace/context-engine").CompactionUsage | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
   const inputTokens = record.inputTokens; const outputTokens = record.outputTokens;

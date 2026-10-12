@@ -4,7 +4,7 @@
 
 ## 迁移前的 ActSpace 提示词
 
-迁移前 [LlmCompactionSummarizer](../../../packages/compaction/src/summarizer.ts) 内置以下 system 指令：
+迁移前 [LlmCompactionSummarizer](../../../packages/context/compaction/src/summarizer.ts) 内置以下 system 指令：
 
 ```text
 Summarize the supplied Agent history faithfully. Preserve user requirements, decisions, file paths, errors, unfinished work, and tool outcomes. Do not invent facts.

@@ -2,12 +2,30 @@ export type PermissionMode = "default" | "full-access";
 export type FileScope = "workspace" | "all";
 export type GrantLifetime = "once" | "session";
 
-export type GrantAction = "file.read" | "file.write";
-export type GrantAccess = "read" | "write";
+export type GrantAction = "file.read" | "file.write" | "process.execute";
+export type GrantAccess = "read" | "write" | "execute";
 
 export type FileGrantSelector =
   | { readonly kind: "exact"; readonly canonicalPath: string }
   | { readonly kind: "subtree"; readonly canonicalRoot: string };
+
+export type CommandPrefixGrantSelector = {
+  readonly kind: "command_prefix";
+  readonly prefix: readonly string[];
+  readonly cwdRoot: string;
+};
+export type GrantSelector = FileGrantSelector | CommandPrefixGrantSelector;
+
+/** Shared structural validation; command policy remains owned by shell-tools. */
+export function isCommandPrefixSelector(value: unknown): value is CommandPrefixGrantSelector {
+  if (!value || typeof value !== "object") return false;
+  const selector = value as Partial<CommandPrefixGrantSelector>;
+  return selector.kind === "command_prefix"
+    && Array.isArray(selector.prefix) && selector.prefix.length >= 1 && selector.prefix.length <= 2
+    && selector.prefix.every(token => typeof token === "string" && /^[A-Za-z0-9._@+-]{1,64}$/.test(token))
+    && typeof selector.cwdRoot === "string" && /^(?:\/|[A-Za-z]:[\\/])/.test(selector.cwdRoot)
+    && !/[*?\[\]{}]/.test(selector.cwdRoot);
+}
 
 export type GrantAudience = {
   readonly pluginId: string;
@@ -23,7 +41,7 @@ export type SessionGrant = {
   readonly audience: GrantAudience;
   readonly action: GrantAction;
   readonly access: GrantAccess;
-  readonly selector: FileGrantSelector;
+  readonly selector: GrantSelector;
   readonly sourceRequestId: string;
   readonly sourceCallId: string;
   readonly sourceToolName: string;
@@ -57,7 +75,7 @@ export type GrantSuggestion = {
   readonly lifetime: "session";
   readonly action: GrantAction;
   readonly access: GrantAccess;
-  readonly selector: FileGrantSelector;
+  readonly selector: GrantSelector;
   readonly audience: GrantAudience;
   readonly label: string;
 };

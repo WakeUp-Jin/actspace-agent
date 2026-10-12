@@ -36,5 +36,5 @@
 - `apps/desktop/src/main/settings/facades/`：`media.ts`、`search.ts`、`general.ts`、`providers.ts`、`custom-connections.ts`
 - `apps/desktop/src/main/test/settings-characterization.test.ts`、`apps/desktop/src/main/test/fixtures/settings/`
 - `docs/design-docs/core-storage-and-observability.md`、`docs/ARCHITECTURE.md`、`docs/desktop-frontend-refactor/01-安全与IPC收口.md`、`docs/exec-plans/tech-debt-tracker.md`
-- `docs/exec-plans/active/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md`、`00-总执行计划.md`
+- `docs/exec-plans/completed/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md`、`00-总执行计划.md`
 - `docs/exec-runs/20261005-desktop-fe-17-settings-split/`

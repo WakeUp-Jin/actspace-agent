@@ -261,7 +261,7 @@ S PID97724正常TERM退出后，fallback专属PID1728启动，data/workspace/cwd
 - 隔离目录 `/tmp/actspace-usage-acceptance-s`，cwd/workspace 均为该目录；最新 dist，主 PID 32539，日志 `/tmp/usage-cu-s-final.log`。
 - 实际进入 Usage 后同步持续增加：333,568 → 1,033,216 → 1,896,448 条，均为 0/100 会话。未显示结果；不能据此声称结果/分页通过。
 - 从 Usage 切到外观、选择浅色、返回 Usage，真实导航可响应；但日志出现 `Usage query cancelled.`，回到同步 0/100、已读取 0，丢失该巨型 Session 的未提交进度。未点击取消按钮。主线登记 U09；不修复。
-- E5 浅色宽窗/约 481 CSS px 窄窗同步态可见，布局无明显遮挡，仅同步态通过。证据：[浅色同步](cu-evidence/s-final-light-sync.jpg)、[窄窗同步](cu-evidence/s-final-light-narrow-sync.jpg)。
+- E5 当时观察到浅色宽窗/约 481 CSS px 窄窗同步态可见，布局无明显遮挡；只涉及同步态。原记录的本地截图文件名为 `s-final-light-sync.jpg`、`s-final-light-narrow-sync.jpg`，当前文件缺失，不能复核图片，不以此签收本轮视觉验收。
 - 当前继续等待，E1 最终完成、E2 大规模结果、E4 本轮历史和 E6 本轮 IPC 尚未完成。
 
 ## 用户要求停止时的交接（2026-10-11）

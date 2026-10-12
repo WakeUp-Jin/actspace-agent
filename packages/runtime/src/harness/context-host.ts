@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
-import type { DisclosureHost } from "@actspace/context";
+import type { DisclosureHost } from "@actspace/context-disclosure";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tools-runtime";
 import type { RuntimeSessionController } from "../session/session-controller.js";

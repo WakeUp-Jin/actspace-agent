@@ -1051,6 +1051,29 @@ describe("provider and model settings", () => {
     await waitFor(() => expect(updateModel).toHaveBeenCalledWith({ modelKey: installedModel.definition.key, enabled: false }));
   });
 
+  it("keeps the model trigger to one summary line and groups OpenRouter models by vendor", async () => {
+    const openRouterModels = ["Anthropic: Claude Opus 5.5", "Anthropic: Claude Haiku 5.5", "OpenAI: GPT-5.6 Luna", "OpenAI: GPT-6.1 Sol"].map((label, index) => ({
+      ...catalogInstalledModel,
+      definition: { ...catalogInstalledModel.definition, key: `openrouter:m${index}` as never, provider: "openrouter" as const, apiModel: `m${index}`, label },
+      settings: { ...catalogInstalledModel.settings, enabled: index !== 3 },
+    }));
+    setupBridge({ "models.listInstalled": async () => ({ models: openRouterModels }) });
+
+    render(<ModelSettings settings={settings} embedded providerFilter="openrouter" />);
+    const trigger = await screen.findByRole("button", { name: "选择启用模型" });
+    expect(trigger).toHaveTextContent("已启用 3 / 4");
+    expect(trigger).toHaveTextContent("Claude Haiku 5.5");
+    expect(trigger).toHaveTextContent("+1");
+    expect(trigger).not.toHaveTextContent("Anthropic:");
+
+    await userEvent.click(trigger);
+    const listbox = screen.getByRole("listbox", { name: "启用模型" });
+    expect(within(listbox).getByRole("group", { name: "Anthropic" })).toBeInTheDocument();
+    expect(within(within(listbox).getByRole("group", { name: "OpenAI" })).getAllByRole("option").map((option) => option.getAttribute("title"))).toEqual(["OpenAI: GPT-5.6 Luna", "OpenAI: GPT-6.1 Sol"]);
+    await userEvent.click(screen.getByRole("radio", { name: "已启用 3" }));
+    expect(within(listbox).queryByRole("option", { name: /GPT-6\.1 Sol/ })).not.toBeInTheDocument();
+  });
+
   it("shows the blocking references when an in-use catalog model cannot be removed", async () => {
     const removeModel = vi.fn(async () => ({
       ok: false as const,

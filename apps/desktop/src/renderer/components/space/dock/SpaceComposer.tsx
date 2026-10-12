@@ -43,7 +43,7 @@ function CoordStatusRow({ dirs, snapshot }: { dirs: string[]; snapshot: ContextU
           <span>只读，交事给 Actor</span>
         </span>
       </div>
-      <span className="inline-flex shrink-0 items-center gap-1.5 text-text-muted" title={`上下文已用 ${display.percentLabel}%`}>
+      <span className="inline-flex shrink-0 items-center gap-1.5 text-text-muted" title={`上下文已用 ${display.percentLabel}`}>
         <span
           className="h-[15px] w-[15px] shrink-0 rounded-full"
           aria-hidden="true"
@@ -53,7 +53,7 @@ function CoordStatusRow({ dirs, snapshot }: { dirs: string[]; snapshot: ContextU
             mask: RING_MASK,
           }}
         />
-        <span>{display.percentLabel}%</span>
+        <span>{display.percentLabel}</span>
       </span>
     </div>
   );

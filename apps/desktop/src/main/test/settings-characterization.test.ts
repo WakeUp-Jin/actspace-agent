@@ -761,3 +761,17 @@ describe("v4 namespace updates", () => {
     expect(updatedV2).not.toHaveProperty("defaultModelId");
   });
 });
+
+it("persists a paged quick-open Session choice through the v4 document and restart", async () => {
+  const root = await makeRoot({ "settings.json": "v4.json" });
+  const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto });
+  await service.load();
+  const target = { kind: "session" as const, sessionId: "history-later-page" };
+  await service.updateQuickOpenShortcut({ target, enabled: false });
+  expect(service.get().shortcuts?.quickOpen.target).toEqual(target);
+  const disk = JSON.parse(await readFile(join(root, "settings.json"), "utf8"));
+  expect(disk.general.shortcuts.quickOpen).toMatchObject({ target, enabled: false });
+  const reopened = new SettingsService({ dataRoot: root, crypto: fixtureCrypto });
+  await reopened.load();
+  expect(reopened.get().shortcuts?.quickOpen).toMatchObject({ target, enabled: false });
+});

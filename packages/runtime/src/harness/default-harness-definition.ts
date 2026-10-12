@@ -1,4 +1,6 @@
 /** Default Harness admission and build inputs share this declaration. */
+import { contextPluginPackage } from "@actspace/context-engine";
+
 export const DEFAULT_HARNESS_ENTRIES = [
   ["llm-service", ["llm.service", "llm.routes", "llm.service.types"], ["actspace.host.llm"]],
   ["tools-approval", ["tools.approval"], []],
@@ -18,11 +20,10 @@ export const DEFAULT_HARNESS_ENTRIES = [
 ] as const;
 
 export function defaultHarnessEntrySource(id: string): string {
-  const special: Record<string, string> = { "agent-factory": "harness:factory", "todo-tools": "harness:todo", "subagent-tools": "./dist/harness/harness-subagent-tools.js", "context-engine": "@actspace/context/plugin", "prompt-runtime": "@actspace/prompt/plugin", "compaction-runtime": "@actspace/compaction/plugin" };
+  const special: Record<string, string> = { "agent-factory": "harness:factory", "todo-tools": "harness:todo", "subagent-tools": "./dist/harness/harness-subagent-tools.js", "context-engine": "@actspace/context-engine/plugin", "prompt-runtime": "@actspace/prompt/plugin", "compaction-runtime": "@actspace/context-compaction/plugin" };
   if (id === "plugin-manager") return "@actspace/plugin-manager/plugin";
-  if (id === "context-disclosure") return "@actspace/context/disclosure";
-  if (["context-system", "context-rules", "context-skills", "context-runtime"].includes(id)) return `@actspace/prompt/sources/${id.slice(8)}`;
-  if (["context-conversation", "context-tools"].includes(id)) return `@actspace/context/sources/${id.slice(8)}`;
+  const contextPackage = contextPluginPackage(id);
+  if (contextPackage !== undefined) return contextPackage.behaviorEntry;
   if (special[id]) return special[id];
   if (id === "llm-service" || id === "tools-runtime" || id === "tools-approval") return `@actspace/${id}/plugin`;
   return `@actspace/tools-${id}/plugin`;

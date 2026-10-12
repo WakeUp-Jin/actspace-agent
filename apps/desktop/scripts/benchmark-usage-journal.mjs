@@ -81,10 +81,10 @@ try {
   assert.equal(cold.rowsPage.totalRows,rows);assert.equal(cold.sourceCount,sessions);
   const coldEvents=readEvents;readEvents=0;readSessions.clear();
   const timings={};
-  for(const [name,query] of [['page',input],['fts',{...input,search:'model-3'}],['cursor',{...input,requestRowsPage:{limit:100,cursor:cold.rowsPage.nextCursor}}]]) {
+  for(const [name,query] of [['page',input],['fts',{...input,search:'model-3'}],['title',{...input,search:'history 0'}],['cursor',{...input,requestRowsPage:{limit:100,cursor:cold.rowsPage.nextCursor}}]]) {
     const samples=[];
     for(let i=0;i<20;i++) {const start=performance.now();const result=await service.getActivity(query);samples.push(performance.now()-start);assert(result.rows.length<=100);assert(Buffer.byteLength(JSON.stringify(result))<=1024*1024);sample();if(i%5===0) memory.push(process.memoryUsage().heapUsed);}
-    timings[name]=distribution(samples);
+    timings[name]={firstMs:samples[0],...distribution(samples)};
   }
   assert.equal(readEvents,0,'unchanged complete-chain queries may stat descriptors but must not replay events');
   const appends={}; let appended=0;

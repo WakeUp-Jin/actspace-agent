@@ -7,7 +7,7 @@
   },
   "references": [
     {
-      "path": "./../context/tsconfig.build.json"
+      "path": "./../context/engine/tsconfig.build.json"
     },
     {
       "path": "./../cordis-adapter/tsconfig.build.json"

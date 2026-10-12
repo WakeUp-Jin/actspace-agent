@@ -1,5 +1,5 @@
 import { prepare } from "./usage-sql";
-import type { DatabaseSync } from "node:sqlite";
+import type { ProjectionDatabase } from "./usage-sql";
 import { projectSessionUsageActivities } from "@actspace/client/sessions";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { UsageActivityRow } from "@actspace/shared";
@@ -8,7 +8,7 @@ export type UsageJournalSource = { querySource?: import("@actspace/session-stora
 type Json = Record<string, unknown>;
 const record = (value: unknown): Json => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Json : {};
 
-export function createUsageJournalSchema(db: DatabaseSync): void {
+export function createUsageJournalSchema(db: ProjectionDatabase): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS usage_projection_events(session_id TEXT NOT NULL,seq INTEGER NOT NULL,group_key TEXT NOT NULL,event_json TEXT NOT NULL,PRIMARY KEY(session_id,seq),FOREIGN KEY(session_id) REFERENCES session_catalog(session_id) ON DELETE CASCADE) STRICT;
     CREATE INDEX IF NOT EXISTS usage_projection_group_idx ON usage_projection_events(session_id,group_key,seq);
@@ -19,14 +19,14 @@ export function createUsageJournalSchema(db: DatabaseSync): void {
   `);
 }
 
-export function clearUsageJournal(db: DatabaseSync, sessionId: string): void {
+export function clearUsageJournal(db: ProjectionDatabase, sessionId: string): void {
   for (const table of ["events", "requests", "groups", "turns"]) prepare(db, `DELETE FROM usage_projection_${table} WHERE session_id=?`).run(sessionId);
   prepare(db, "DELETE FROM index_state WHERE key=?").run(`cursor:${sessionId}`);
 }
 
 /** Persist only fields used by the existing Usage projection, never transcript/tool bodies.
  * Reproject affected step/call groups, so retries and terminal events can cross read batches. */
-export async function projectUsageJournalBatch(db: DatabaseSync, source: UsageJournalSource, events: readonly SessionEventEnvelopeV1[], write: (rows: UsageActivityRow[]) => Promise<void>): Promise<void> {
+export async function projectUsageJournalBatch(db: ProjectionDatabase, source: UsageJournalSource, events: readonly SessionEventEnvelopeV1[], write: (rows: UsageActivityRow[]) => Promise<void>): Promise<void> {
   const dirtyGroups = new Set<string>();
   let dirtyBytes = 0;
   const dirty = { add(key: string) {

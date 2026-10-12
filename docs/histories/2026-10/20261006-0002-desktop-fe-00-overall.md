@@ -13,7 +13,7 @@
 
 ### 主要改动
 
-- 计划 00、09–17 移到 `docs/exec-plans/active/20261005-desktop-frontend-refactor/`，并在执行导航登记；设计文档 01–08、demo 留在 `docs/desktop-frontend-refactor/`。
+- 计划 00、09–17 移到 `docs/exec-plans/completed/20261005-desktop-frontend-refactor/`，并在执行导航登记；设计文档 01–08、demo 留在 `docs/desktop-frontend-refactor/`。
 - 建立主线分支 `refactor/desktop-frontend`；重跑基线（与记录一致）；保存并实测 CDP 截图脚本。
 
 ### 跨计划决定
@@ -30,7 +30,7 @@
 
 ### 文件
 
-- `docs/exec-plans/active/20261005-desktop-frontend-refactor/*`
+- `docs/exec-plans/completed/20261005-desktop-frontend-refactor/*`
 - `docs/exec-plans/README.md`、`docs/exec-plans/active/frontend-ui-components-foundation.md`
 - `docs/desktop-frontend-refactor/{README,01-安全与IPC收口,06-Composer与运行目标交互重设计}.md`
 - `docs/exec-runs/20261005-desktop-fe-00-overall/`

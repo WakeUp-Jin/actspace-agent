@@ -1,4 +1,5 @@
-import { openSync, closeSync, readSync, fstatSync, statSync, type Stats } from "node:fs";
+import { openSync, closeSync, readSync, fstatSync, statSync } from "node:fs";
+import { queryStamp as sourceStamp } from "./query-stamp.js";
 import { createHash } from "node:crypto";
 import { parentPort } from "node:worker_threads";
 import { validateSessionHeader, validateEventEnvelopeShape, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
@@ -131,8 +132,4 @@ function readSource(path: string, sessionId: string): SessionQuerySource {
     sourceCache.set(sessionId, { source: result, bytes }); sourceCacheBytes += bytes;
     return result;
   } finally { closeSync(fd); }
-}
-
-function sourceStamp(stat: Stats): string {
-  return `${stat.dev}:${stat.ino}:${stat.birthtimeMs}:${stat.size}:${stat.mtimeMs}`;
 }

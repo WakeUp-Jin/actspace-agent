@@ -50,10 +50,10 @@ flowchart LR
 
 ## 维护入口
 
-- [公共类型](../../../packages/context/src/types.ts)、[引擎](../../../packages/context/src/engine.ts)、[注册表](../../../packages/context/src/registry.ts)。
-- [压缩协调器](../../../packages/context/src/compaction.ts)、[披露策略](../../../packages/context/src/disclosure/plugin.ts)、[状态 reducer](../../../packages/context/src/state.ts)。
+- [公共类型](../../../packages/context/engine/src/types.ts)、[引擎](../../../packages/context/engine/src/engine.ts)、[注册表](../../../packages/context/engine/src/registry.ts)。
+- [压缩协调器](../../../packages/context/engine/src/compaction.ts)、[披露策略](../../../packages/context/disclosure/src/plugin.ts)、[状态 reducer](../../../packages/context/engine/src/state.ts)。
 - [Host 路径能力](../../../packages/runtime/src/harness/context-host.ts)、[默认 Harness](../../../packages/runtime/src/harness/default-harness-definition.ts)。
-- [OpenCode 模板](../../../packages/compaction/src/prompts.ts)和包内 MIT 原文。
+- [OpenCode 模板](../../../packages/context/compaction/src/prompts.ts)和包内 MIT 原文。
 - [完整计划](../../exec-plans/completed/20261006-context-management-engine/README.md)、[执行过程](execution-process.md)、[数据设计](../../design-docs/上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)。
 
 ## 后续修复与复验
