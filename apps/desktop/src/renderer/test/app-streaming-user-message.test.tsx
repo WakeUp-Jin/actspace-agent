@@ -87,11 +87,10 @@ const settingsApiStub = {
 function createWorkspaceRegistryFixture(createdAt: string, updatedAt = createdAt): WorkspaceListResult {
   return {
     version: 1,
-    defaultWorkspaceId: "default",
     items: [
       {
         id: "default",
-        kind: "default",
+        kind: "folder",
         label: "Default workspace",
         path: "/tmp/downloads",
         order: 0,
@@ -226,7 +225,7 @@ describe("App streaming user message", () => {
     target.meta.title = "Archive target";
     const records = new Map([[active.meta.id, active], [target.meta.id, target]]);
     const sessions: SessionListItem[] = [active, target].map((record) => ({
-      id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0,
+      id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace",
     }));
     let resolveArchive!: (result: { ok: boolean; error?: string }) => void;
     const archiveSession = vi.fn(() => new Promise<{ ok: boolean; error?: string }>((resolve) => { resolveArchive = resolve; }));
@@ -385,6 +384,8 @@ describe("App streaming user message", () => {
       expect(setWorkspaceVisibility).toHaveBeenCalledWith({ workspaceId: "ws_source", hidden: true });
       expect(screen.queryByText("Hidden active session")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "查看会话详情： Visible fallback session" })).toBeInTheDocument();
+      // 分页列表的分组里仍有这个工作区，也不能把它的文件夹加回侧栏。
+      expect(screen.queryByRole("button", { name: "workspace" })).not.toBeInTheDocument();
     });
   });
 
@@ -628,7 +629,7 @@ describe("App streaming user message", () => {
     setupBridge(taskHostFixture({
       ...settingsApiStub,
       "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0 }],
+      "sessions.list": async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace" }],
       getRecord: async () => record,
       "sessions.create": projectRecord(createSession),
       "approvals.listPending": async () => [],
@@ -655,6 +656,7 @@ describe("App streaming user message", () => {
         title: "New chat",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -737,6 +739,7 @@ describe("App streaming user message", () => {
         title: "New chat",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -822,6 +825,7 @@ describe("App streaming user message", () => {
       title: "New chat",
       updatedAt: record.meta.updatedAt,
       agentRunCount: 0,
+      workspaceRoot: "/tmp/workspace",
     }];
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
 
@@ -881,6 +885,7 @@ describe("App streaming user message", () => {
         title: "Model wait",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -1085,12 +1090,14 @@ sessionId,
         title: alphaRecord.meta.title,
         updatedAt: "2026-07-17T07:10:00.000Z",
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
       {
         id: betaSessionId,
         title: betaRecord.meta.title,
         updatedAt: "2026-07-17T07:09:00.000Z",
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
     const streamListeners = new Set<(event: RuntimeStreamEvent) => void>();
@@ -1221,6 +1228,7 @@ sessionId: alphaSessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
     let currentRecord = record;
@@ -1435,7 +1443,7 @@ sessionId,
 
   function installCompactBridge(sessionId: string, compactContext: ((input: FixtureCompactionInput) => Promise<FixtureCompactionResult>), execute = vi.fn()) {
     const record = createEmptySessionRecord(sessionId);
-    const sessions: SessionListItem[] = [{ id: sessionId, title: "New chat", updatedAt: record.meta.updatedAt, agentRunCount: 0 }];
+    const sessions: SessionListItem[] = [{ id: sessionId, title: "New chat", updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace" }];
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     setupBridge(taskHostFixture({
       "app.getBootstrapState": async () => bootstrapState,
@@ -1549,6 +1557,7 @@ sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -1652,6 +1661,7 @@ sessionId,
         title: "Write status",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -1798,6 +1808,7 @@ sessionId,
         title: "Todo stream",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
     const now = new Date().toISOString();
@@ -1977,6 +1988,7 @@ sessionId,
         title: "SubAgent stream",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
     const transcriptEvent: SessionEvent = {
@@ -2138,6 +2150,7 @@ sessionId: input.sessionId,
         title: "Workspace source",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
     const selectWorkspaceDirectory = vi.fn(async () => ({
@@ -2307,6 +2320,7 @@ sessionId: input.sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
     const selectedAttachment = {
@@ -2443,6 +2457,7 @@ sessionId: input.sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -2542,6 +2557,7 @@ sessionId: input.sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -2657,6 +2673,7 @@ sessionId: input.sessionId,
         title: "Approval session",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -2811,6 +2828,7 @@ sessionId,
         title: "Delete approval session",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -2972,6 +2990,7 @@ sessionId,
         title: "Browser approval session",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -3079,6 +3098,7 @@ sessionId: input.sessionId,
         title: "Failure session",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -3224,6 +3244,7 @@ sessionId: input.sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
         agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
     ];
 
@@ -3359,7 +3380,7 @@ sessionId: input.sessionId,
       "app.getBootstrapState": async () => bootstrapState,
       "workspaces.list": async () => createWorkspaceRegistryFixture(latest.meta.createdAt),
       "events.sessionLive": (listener: (envelope: { event: unknown }) => void) => { live.add(listener); return () => { live.delete(listener); }; },
-      "sessions.listPage": async () => ({ items: [{ id: 'paged', title: 'Paged session', updatedAt: latest.meta.updatedAt, agentRunCount: 2 }], groups: [], indexing: false, failed: 0 }),
+      "sessions.listPage": async () => ({ items: [{ id: 'paged', title: 'Paged session', updatedAt: latest.meta.updatedAt, agentRunCount: 2, workspaceRoot: "/tmp/workspace" }], groups: [], indexing: false, failed: 0 }),
       "sessions.list": listSessions, getRecord: getSession,
       "sessions.create": projectRecord(async () => latest), "tasks.abort": async () => true, "approvals.submit": async () => ({ ok: true }), "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null, "approvals.listPending": async () => [], ...settingsApiStub, "sessions.getPage": getSessionPage,
@@ -3394,7 +3415,7 @@ sessionId: input.sessionId,
     let resolveA!: (page: import('@actspace/shared/runtime-v2').RuntimeV2DesktopSessionProjection) => void;
     setupBridge(taskHostFixture({
       "app.getBootstrapState": async () => bootstrapState, "workspaces.list": async () => createWorkspaceRegistryFixture(a.meta.createdAt),
-      "sessions.listPage": async () => ({ items: [a, b].map(record => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0 })), groups: [], indexing: false, failed: 0 }),
+      "sessions.listPage": async () => ({ items: [a, b].map(record => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace" })), groups: [], indexing: false, failed: 0 }),
       "sessions.list": async () => [], getRecord: vi.fn(),
       "sessions.create": projectRecord(async () => a), "tasks.abort": async () => true, "approvals.submit": async () => ({ ok: true }), "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null, "approvals.listPending": async () => [], ...settingsApiStub,
@@ -3420,7 +3441,7 @@ sessionId: input.sessionId,
     setupBridge(taskHostFixture({
       ...settingsApiStub,
       "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => [...records.values()].map(r => ({ id: r.meta.id, title: r.meta.title, updatedAt: r.meta.updatedAt, agentRunCount: r.meta.agentRunCount })),
+      "sessions.list": async () => [...records.values()].map(r => ({ id: r.meta.id, title: r.meta.title, updatedAt: r.meta.updatedAt, agentRunCount: r.meta.agentRunCount, workspaceRoot: "/tmp/workspace" })),
       getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
       "sessions.create": projectRecord(async () => createEmptySessionRecord('background-new')),
       "tasks.abort": abort, "approvals.listPending": async () => [],
@@ -3539,6 +3560,18 @@ sessionId: input.sessionId,
     expect(screen.queryByText('后台完成')).not.toBeInTheDocument();
   });
 
+  it('marks a background run that finished as unread until the session is opened', async () => {
+    const fixture = setupBackgroundSessions();
+    renderApp();
+    await fixture.send('Finish in the background');
+    await fixture.select('background-b');
+    await act(async () => fixture.complete('background-a'));
+    const row = () => document.querySelector('[data-session-id="background-a"]') as HTMLElement;
+    expect(within(row()).getByLabelText('会话状态： 已完成')).toBeInTheDocument();
+    await fixture.select('background-a');
+    expect(within(row()).queryByLabelText('会话状态： 已完成')).not.toBeInTheDocument();
+  });
+
   it('keeps an accepted background failure separate from another running composer', async () => {
     const fixture = setupBackgroundSessions();
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -3625,6 +3658,8 @@ sessionId: input.sessionId,
     await screen.findByText('Durable earlier question');
     await fixture.send('Pinned live question');
     await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: 'Pinned reply' }));
+    // 8 个会话在同一个工作区，每组先显示 5 个，其余点「展开其余」露出来。
+    await userEvent.click(screen.getByRole('button', { name: /^展开其余/ }));
     for (const id of others) await userEvent.click(screen.getByRole('button', { name: `Cache ${id}` }));
     overrideBridge({ "sessions.getPage": () => new Promise(() => {}) });
     await fixture.select('background-a');

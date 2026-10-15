@@ -4,12 +4,13 @@ import { dirname, join, basename, resolve } from "node:path";
 import type { SessionListItem, WorkspaceEntry, WorkspaceRegistry } from "@actspace/shared";
 
 const WORKSPACES_FILE = "workspaces.json";
-const DEFAULT_WORKSPACE_ID = "default";
-const DEFAULT_WORKSPACE_LABEL = "Default workspace";
+/** 首次启动兜底工作区的名字。登记后就是普通工作区：可以移除，移除后不再重建。 */
+const DEFAULT_WORKSPACE_LABEL = "默认工作区";
 const workspaceRegistryOperationChains = new Map<string, Promise<void>>();
 
 export type WorkspaceRegistryOptions = {
   dataRoot: string;
+  /** registry 里一个工作区都没有（含已隐藏）时，创建这个目录并登记。 */
   defaultWorkspaceRoot: string;
   fallbackWorkspaceRoot: string;
   sessions?: SessionListItem[];
@@ -26,7 +27,7 @@ export type WorkspaceSelectionResult =
 
 export type WorkspaceVisibilityResult =
   | { ok: true }
-  | { ok: false; error: "workspace_not_found" | "default_workspace_required" };
+  | { ok: false; error: "workspace_not_found" };
 
 export function readWorkspaceRegistry(options: WorkspaceRegistryOptions): Promise<WorkspaceRegistry> {
   return runWorkspaceRegistryOperation(options.dataRoot, () => readWorkspaceRegistryUnsafe(options));
@@ -40,7 +41,7 @@ async function readWorkspaceRegistryUnsafe(options: WorkspaceRegistryOptions): P
   let needsWrite = false;
   try {
     const raw = JSON.parse(await readFile(filePath, "utf8")) as unknown;
-    registry = sanitizeWorkspaceRegistry(raw, fallback);
+    registry = sanitizeWorkspaceRegistry(raw);
     needsWrite = JSON.stringify(raw) !== JSON.stringify(registry);
   } catch {
     registry = fallback;
@@ -48,7 +49,8 @@ async function readWorkspaceRegistryUnsafe(options: WorkspaceRegistryOptions): P
   }
 
   const withFallback = mergeWorkspaceEntries(registry, fallback.items);
-  const merged = mergeSessionWorkspaces(withFallback, options.sessions ?? []);
+  let merged = mergeSessionWorkspaces(withFallback, options.sessions ?? []);
+  if (merged.items.length === 0) merged = await addFirstRunWorkspace(merged, options.defaultWorkspaceRoot);
   if (JSON.stringify(merged) !== JSON.stringify(registry) || needsWrite) {
     await writeWorkspaceRegistry(options.dataRoot, merged);
   }
@@ -57,30 +59,25 @@ async function readWorkspaceRegistryUnsafe(options: WorkspaceRegistryOptions): P
 }
 
 export function createFallbackRegistry(options: WorkspaceRegistryOptions): WorkspaceRegistry {
-  const now = new Date().toISOString();
-  const defaultWorkspaceRoot = normalizeWorkspacePath(options.defaultWorkspaceRoot);
-  const items: WorkspaceEntry[] = [
-    {
-      id: DEFAULT_WORKSPACE_ID,
-      kind: "default",
-      label: DEFAULT_WORKSPACE_LABEL,
-      path: defaultWorkspaceRoot,
-      order: 0,
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
-
   const fallbackRoot = normalizeWorkspacePath(options.fallbackWorkspaceRoot);
-  if (fallbackRoot && fallbackRoot !== defaultWorkspaceRoot) {
-    items.push(createFolderWorkspaceEntry(fallbackRoot, items.length, now));
-  }
+  // 打包版的 fallback 就是兜底目录，交给 addFirstRunWorkspace 建目录并起名；开发版是仓库根或环境变量指定的目录。
+  const items = fallbackRoot && fallbackRoot !== normalizeWorkspacePath(options.defaultWorkspaceRoot)
+    ? [createFolderWorkspaceEntry(fallbackRoot, 0)]
+    : [];
+  return mergeSessionWorkspaces({ version: 1, items }, options.sessions ?? []);
+}
 
-  return mergeSessionWorkspaces({
-    version: 1,
-    defaultWorkspaceId: DEFAULT_WORKSPACE_ID,
-    items,
-  }, options.sessions ?? []);
+/** 首次启动兜底：建目录并登记成普通工作区。建不了只记日志，用户自己选文件夹。 */
+async function addFirstRunWorkspace(registry: WorkspaceRegistry, root: string): Promise<WorkspaceRegistry> {
+  const path = normalizeWorkspacePath(root);
+  if (!path) return registry;
+  try {
+    await mkdir(path, { recursive: true });
+  } catch (error) {
+    console.warn("[workspace-registry] failed to create default workspace", error);
+    return registry;
+  }
+  return { ...registry, items: [{ ...createFolderWorkspaceEntry(path, 0), label: DEFAULT_WORKSPACE_LABEL }] };
 }
 
 export function workspaceRegistryPath(dataRoot: string): string {
@@ -132,14 +129,7 @@ async function resolveWorkspaceSelectionUnsafe(
     return { ok: true, workspaceId: entry.id, workspaceRoot: entry.path };
   }
 
-  const defaultEntry =
-    registry.items.find((item) => item.id === registry.defaultWorkspaceId) ??
-    registry.items.find((item) => item.id === DEFAULT_WORKSPACE_ID) ??
-    registry.items.find((item) => item.kind === "default");
-  if (!defaultEntry) {
-    return { ok: false, error: "default workspace is missing" };
-  }
-  return { ok: true, workspaceId: defaultEntry.id, workspaceRoot: defaultEntry.path };
+  return { ok: false, error: "workspace is required" };
 }
 
 export function setWorkspaceHidden(
@@ -161,9 +151,6 @@ async function setWorkspaceHiddenUnsafe(
   const registry = await readWorkspaceRegistryUnsafe(options);
   const workspace = registry.items.find((item) => item.id === workspaceId);
   if (!workspace) return { ok: false, error: "workspace_not_found" };
-  if (hidden && workspace.kind === "default") {
-    return { ok: false, error: "default_workspace_required" };
-  }
   if (Boolean(workspace.hidden) === hidden) return { ok: true };
 
   await writeWorkspaceRegistry(options.dataRoot, {
@@ -213,8 +200,9 @@ export async function createWorkspaceFolder(
   return resolveWorkspaceSelection(options, { workspaceRoot });
 }
 
-function sanitizeWorkspaceRegistry(raw: unknown, fallback: WorkspaceRegistry): WorkspaceRegistry {
-  if (!raw || typeof raw !== "object") return fallback;
+/** 旧版的 `kind: "default"`（指向 Downloads 的默认工作区）在这里丢掉。 */
+function sanitizeWorkspaceRegistry(raw: unknown): WorkspaceRegistry {
+  if (!raw || typeof raw !== "object") return { version: 1, items: [] };
   const value = raw as Partial<WorkspaceRegistry>;
   const rawItems = Array.isArray(value.items) ? value.items : [];
   const items: WorkspaceEntry[] = [];
@@ -228,52 +216,22 @@ function sanitizeWorkspaceRegistry(raw: unknown, fallback: WorkspaceRegistry): W
     const id = typeof entry.id === "string" ? entry.id.trim() : "";
     const label = typeof entry.label === "string" ? entry.label.trim() : "";
     const path = typeof entry.path === "string" ? normalizeWorkspacePath(entry.path) : "";
-    const kind = entry.kind === "default" ? "default" : entry.kind === "folder" ? "folder" : null;
-    if (!id || !label || !path || !kind || seenIds.has(id)) continue;
-    if (kind !== "default" && seenPaths.has(path)) continue;
+    if (!id || !label || !path || entry.kind !== "folder" || seenIds.has(id) || seenPaths.has(path)) continue;
     seenIds.add(id);
     seenPaths.add(path);
     items.push({
       id,
-      kind,
+      kind: "folder",
       label,
       path,
       order: typeof entry.order === "number" ? entry.order : items.length,
-      hidden: kind === "default" ? false : entry.hidden === true,
+      hidden: entry.hidden === true,
       createdAt: typeof entry.createdAt === "string" ? entry.createdAt : now,
       updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : now,
     });
   }
 
-  const defaultItem = items.find((item) => item.id === DEFAULT_WORKSPACE_ID && item.kind === "default");
-  if (!defaultItem) {
-    return fallback;
-  }
-
-  const fallbackDefaultPath =
-    fallback.items.find((item) => item.id === DEFAULT_WORKSPACE_ID && item.kind === "default")?.path ??
-    defaultItem.path;
-  const normalizedItems = items.map((item) =>
-    item.id === DEFAULT_WORKSPACE_ID && item.kind === "default"
-      ? {
-          ...item,
-          label: DEFAULT_WORKSPACE_LABEL,
-          path: fallbackDefaultPath,
-          updatedAt: item.path === fallbackDefaultPath ? item.updatedAt : now,
-        }
-      : item,
-  );
-  const defaultWorkspaceId =
-    typeof value.defaultWorkspaceId === "string" &&
-    normalizedItems.some((item) => item.id === value.defaultWorkspaceId)
-      ? value.defaultWorkspaceId
-      : DEFAULT_WORKSPACE_ID;
-
-  return {
-    version: 1,
-    defaultWorkspaceId,
-    items: sortWorkspaceItems(normalizedItems),
-  };
+  return { version: 1, items: sortWorkspaceItems(items) };
 }
 
 function mergeSessionWorkspaces(registry: WorkspaceRegistry, sessions: SessionListItem[]): WorkspaceRegistry {
@@ -294,7 +252,7 @@ function mergeWorkspaceEntries(registry: WorkspaceRegistry, entries: WorkspaceEn
   const paths = new Set(items.map((item) => item.path));
   let changed = false;
   for (const entry of entries) {
-    if (entry.kind === "default" || !entry.path || paths.has(entry.path)) continue;
+    if (!entry.path || paths.has(entry.path)) continue;
     items.push(createFolderWorkspaceEntry(entry.path, items.length, entry.createdAt));
     paths.add(entry.path);
     changed = true;
@@ -348,11 +306,7 @@ function hashString(value: string): string {
 }
 
 function sortWorkspaceItems(items: WorkspaceEntry[]): WorkspaceEntry[] {
-  return [...items].sort((a, b) => {
-    if (a.kind === "default") return -1;
-    if (b.kind === "default") return 1;
-    return a.order - b.order || a.label.localeCompare(b.label);
-  });
+  return [...items].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
 }
 
 async function writeWorkspaceRegistry(dataRoot: string, registry: WorkspaceRegistry): Promise<void> {

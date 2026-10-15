@@ -28,7 +28,7 @@ function fixture(handlers: Record<string, unknown> = {}) {
   const live = new Set<(payload: unknown) => void>();
   setupBridge({
     "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [{ id: "default", kind: "default", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
+    "workspaces.list": async () => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
     "sessions.list": async () => [listItem()],
     "sessions.listPage": async () => ({ items: [listItem()], groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }], indexing: false, failed: 0 }),
     "sessions.getPage": async () => recordProjectionFixture(record()),

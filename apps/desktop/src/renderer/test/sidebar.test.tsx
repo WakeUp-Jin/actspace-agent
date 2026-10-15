@@ -50,7 +50,7 @@ const HOVER_CONTEXT: ContextUsageSnapshot = {
 const WORKSPACES: WorkspaceEntry[] = [
   {
     id: "default",
-    kind: "default",
+    kind: "folder",
     label: "Default workspace",
     path: "/Users/me/Downloads",
     order: 0,
@@ -210,7 +210,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(workspaceLabel).not.toHaveFocus();
   });
 
-  it("keeps the chevron dedicated to collapse and disables default workspace removal", async () => {
+  it("keeps the chevron dedicated to collapse and lets the first-run workspace be removed", async () => {
     const user = userEvent.setup();
     renderSidebar();
 
@@ -219,7 +219,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.queryByRole("menu", { name: "工作区操作： actspace-agent" })).not.toBeInTheDocument();
 
     fireEvent.contextMenu(screen.getByRole("button", { name: "Default workspace" }), { clientX: 24, clientY: 60 });
-    expect(screen.getByRole("menuitem", { name: "从侧栏移除" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "从侧栏移除" })).not.toHaveAttribute("aria-disabled", "true");
   });
 
   it("keeps the session list on vertical scrolling only", () => {
@@ -463,7 +463,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(onSelectView).toHaveBeenCalledWith("chat");
   });
 
-  it("shows See more when a workspace has more than 10 sessions and loads the next batch on click", async () => {
+  it("shows five sessions per workspace and reveals the rest with 展开其余 / 收起", async () => {
     const many: SessionListItem[] = Array.from({ length: 12 }, (_, idx) =>
       makeSession({
         id: `s-${idx}`,
@@ -475,14 +475,18 @@ describe("Sidebar (cursor-aligned layout)", () => {
 
     renderSidebar({ sessions: many });
 
-    expect(screen.queryByText("Plan item 0")).toBeInTheDocument();
+    expect(screen.getByText("Plan item 4")).toBeInTheDocument();
+    expect(screen.queryByText("Plan item 5")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "展开其余 7 个会话" }));
+    expect(screen.getByText("Plan item 9")).toBeInTheDocument();
     expect(screen.queryByText("Plan item 10")).not.toBeInTheDocument();
 
-    const seeMore = screen.getByRole("button", { name: /^Show more/ });
-    await userEvent.click(seeMore);
-
-    expect(screen.getByText("Plan item 9")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+    // 只剩 2 个时一次露完，然后变成「收起」。
+    await userEvent.click(screen.getByRole("button", { name: "展开其余 2 个会话" }));
+    expect(screen.getByText("Plan item 11")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "收起" }));
+    expect(screen.queryByText("Plan item 5")).not.toBeInTheDocument();
   });
 
   it("renders a status dot for the active session and a busy dot for busy sessions", () => {
@@ -620,22 +624,21 @@ describe("Sidebar (cursor-aligned layout)", () => {
     });
   });
 
-  it("keeps time last and always visible while trailing actions stay hover-only", () => {
-    const { container } = renderSidebar({ activeSessionId: "s-pinned-1" });
+  it("shares the trailing slot: time shows at rest, hover-only actions replace it", () => {
+    renderSidebar({ activeSessionId: "s-pinned-1" });
     const row = screen.getByText("Bash 工具开发与权限调度").closest(".session-row");
     expect(row).not.toBeNull();
 
-    const children = Array.from((row as HTMLElement).children);
     const actions = row?.querySelector(".session-row-actions");
     const time = row?.querySelector(".session-row-time");
     expect(actions).not.toBeNull();
     expect(time).not.toBeNull();
+    expect(time?.parentElement).toBe(actions?.parentElement);
 
-    const pin = within(actions as HTMLElement).getByRole("button", { name: "取消置顶会话" });
-    expect(children.indexOf(actions as Element)).toBeLessThan(children.indexOf(time as Element));
-    expect(time).not.toHaveClass("opacity-0");
-    expect(pin).not.toHaveClass("opacity-100");
-    expect(container.querySelector(".session-row-actions + .session-row-time")).not.toBeNull();
+    within(actions as HTMLElement).getByRole("button", { name: "取消置顶会话" });
+    expect(actions).toHaveClass("hidden", "group-hover/session-row:inline-flex");
+    expect(time).toHaveClass("group-hover/session-row:hidden");
+    expect(time).not.toHaveClass("hidden");
   });
 
   it("shows the complete session title and workspace path on hover", async () => {

@@ -160,7 +160,7 @@ describe("SettingsPage", () => {
   }));
   const listSessions = vi.fn(async (input?: { archived?: boolean }) => (input?.archived ? archivedSessions : []));
   const archiveSession = vi.fn(async () => ({ ok: true }));
-  const listWorkspaces = vi.fn(async () => ({ version: 1 as const, defaultWorkspaceId: "default", items: [] }));
+  const listWorkspaces = vi.fn(async () => ({ version: 1 as const, items: [] }));
   const getQuickOpenShortcutStatus = vi.fn(async () => ({
     registered: true,
     accelerator: "CommandOrControl+Shift+Space",

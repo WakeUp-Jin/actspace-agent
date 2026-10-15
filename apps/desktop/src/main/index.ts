@@ -117,7 +117,7 @@ function configureAppPaths(): void {
 async function ensureDataDirectories(): Promise<AppDataRoots> {
   const roots = await resolveAppDataRoots({
     dataRoot: app.getPath("userData"),
-    defaultWorkspaceRoot: app.getPath("downloads"),
+    defaultWorkspaceRoot: join(app.getPath("documents"), "ActSpace", "default-workspace"),
     cwd: process.cwd(),
     env: process.env,
   });

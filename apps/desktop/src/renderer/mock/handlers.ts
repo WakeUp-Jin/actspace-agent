@@ -117,7 +117,6 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       setVisibility: async ({ workspaceId, hidden }) => {
         const workspace = db.workspaces.items.find((item) => item.id === workspaceId);
         if (!workspace) return { ok: false, error: "workspace_not_found" };
-        if (workspace.kind === "default" && hidden) return { ok: false, error: "default_workspace_required" };
         db.workspaces = { ...db.workspaces, items: db.workspaces.items.map((item) => (item === workspace ? { ...item, hidden } : item)) };
         return { ok: true };
       },
@@ -174,7 +173,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         return { ok: true, mode, revision: session.agentModeRevision };
       },
       revokeGrant: async () => ({ ok: true }),
-      archive: async ({ sessionId }) => { touchSession(sessionId, (session) => { session.archived = true; }); return { ok: true }; },
+      archive: async ({ sessionId, archived }) => { touchSession(sessionId, (session) => { session.archived = archived; }); return { ok: true }; },
       archiveMany: async ({ sessionIds }) => {
         for (const sessionId of sessionIds) requireSession(db, sessionId).archived = true;
         return { ok: true, archivedSessionIds: sessionIds, failedSessionIds: [] };

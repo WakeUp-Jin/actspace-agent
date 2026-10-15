@@ -27,7 +27,7 @@ export function orderQuickOpenProjects(
     if ((session.updatedAt ?? "") > current) latestByWorkspace.set(workspace.id, session.updatedAt ?? "");
   }
   return workspaces
-    .filter((workspace) => !workspace.hidden && workspace.kind !== "default")
+    .filter((workspace) => !workspace.hidden)
     .sort((a, b) => {
       const byActivity = (latestByWorkspace.get(b.id) ?? "").localeCompare(latestByWorkspace.get(a.id) ?? "");
       return byActivity || a.order - b.order || a.label.localeCompare(b.label);

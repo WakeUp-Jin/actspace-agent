@@ -106,7 +106,7 @@ export function ShortcutSettings({
   };
 
   const projectOptions = useMemo(
-    () => workspaces.filter((workspace) => workspace.kind !== "default").map((workspace) => ({
+    () => workspaces.map((workspace) => ({
       value: workspace.id,
       label: workspace.label,
     })),

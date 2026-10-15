@@ -23,12 +23,13 @@ const automatic: QuickOpenShortcutSettings = {
 
 describe("quick open routing", () => {
   it("orders visible projects like the sidebar: latest session first, registry order as fallback", () => {
-    const workspaces = [workspace("default", 0, "default"), workspace("alpha", 1), workspace("beta", 2)];
+    const workspaces = [workspace("default", 0), workspace("alpha", 1), workspace("beta", 2), { ...workspace("gamma", 3), hidden: true }];
     const sessions: SessionListItem[] = [
       { id: "a", title: "A", workspaceId: "alpha", updatedAt: "2026-08-01T08:00:00.000Z", agentRunCount: 1 },
       { id: "b", title: "B", workspaceId: "beta", updatedAt: "2026-08-01T09:00:00.000Z", agentRunCount: 1 },
     ];
-    expect(orderQuickOpenProjects(workspaces, sessions).map((item) => item.id)).toEqual(["beta", "alpha"]);
+    // 默认工作区是普通工作区，没有会话时按登记顺序排在有会话的后面；已隐藏的不出现。
+    expect(orderQuickOpenProjects(workspaces, sessions).map((item) => item.id)).toEqual(["beta", "alpha", "default"]);
   });
 
   it("uses an existing configured session and falls back from a stale target", () => {
@@ -42,8 +43,8 @@ describe("quick open routing", () => {
       .toEqual({ kind: "workspace", workspaceId: "alpha", workspaceRoot: "/projects/alpha" });
   });
 
-  it("opens an empty chat when no project exists", () => {
-    expect(resolveQuickOpenTarget(automatic, [workspace("default", 0, "default")], [])).toEqual({ kind: "empty" });
+  it("opens an empty chat when every project has been removed", () => {
+    expect(resolveQuickOpenTarget(automatic, [{ ...workspace("default", 0), hidden: true }], [])).toEqual({ kind: "empty" });
   });
 
   it("turns a keyboard chord into an Electron accelerator", () => {

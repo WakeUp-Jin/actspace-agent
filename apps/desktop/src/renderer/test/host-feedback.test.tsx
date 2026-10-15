@@ -72,7 +72,7 @@ it.each([
   });
   setupBridge({
     "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
+    "workspaces.list": async () => ({ version: 1, items: [] }),
     "sessions.list": async () => [{ id, hostId: "server", hostName: "Cloud", connectionState: "offline", title: "Remote session", workspaceRoot: "/tmp/workspace", agentRunCount: 0, updatedAt: "2026-10-04T00:00:00Z" }],
     "sessions.getPage": page, "approvals.listPending": async () => [],
     "events.sessionLive": () => () => {}, "events.agentStream": () => () => {},
@@ -168,7 +168,7 @@ it("creates the first remote Session on the selected Host and records its worksp
   const submit = vi.fn(async () => ({ status: "queued", taskId: "task-1", snapshot: { sessionId: id, revision: 1, paused: false, queue: [], tasks: [], runs: [] } }));
   setupBridge({
     "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
+    "workspaces.list": async () => ({ version: 1, items: [] }),
     "sessions.list": async () => [], "sessions.getPage": async () => projectionFixture(id), "sessions.create": create, "approvals.listPending": async () => [],
     "hosts.list": async () => [host], "events.hostsChanged": () => () => {}, "events.hostEvent": () => () => {}, "events.hostUploadProgress": () => () => {}, "hosts.activate": async () => {},
     "hosts.call": async () => ({ state: "ready", workspaces: [{ id: "w1", name: "api", path: "/srv/api" }, { id: "w2", name: "web", path: "/srv/web" }], models: [{ id: "m", name: "Model" }], defaultModel: "m" }),
@@ -211,7 +211,7 @@ it("opens 设置 › 远端 Host from 连接远端机器… when no Host is conf
   // 09 T18：没有 Host 时运行位置菜单的第二项是「连接远端机器…」，点击进入设置的远端 Host 页。
   setupBridge({
     "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
+    "workspaces.list": async () => ({ version: 1, items: [] }),
     "sessions.list": async () => [], "approvals.listPending": async () => [],
     "hosts.list": async () => [], "events.hostsChanged": () => () => {}, "events.hostEvent": () => () => {}, "events.hostUploadProgress": () => () => {}, "hosts.activate": async () => {},
     "events.sessionLive": () => () => {}, "events.agentStream": () => () => {},

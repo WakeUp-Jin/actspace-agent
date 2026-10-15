@@ -100,7 +100,7 @@ const bridge: BridgeOverrides = {
     { id: "a1", title: "重构设置中心导航", updatedAt: "2026-09-20T10:00:00.000Z", agentRunCount: 4, workspaceRoot: "/Users/me/code/actspace-agent", archived: true },
     { id: "a2", title: "排查使用统计费用估算", updatedAt: "2026-09-18T10:00:00.000Z", agentRunCount: 2, workspaceRoot: "/Users/me/code/actspace-agent", archived: true },
   ],
-  "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
+  "workspaces.list": async () => ({ version: 1, items: [] }),
   "quickOpen.getShortcutStatus": async () => ({ registered: true, accelerator: "CommandOrControl+Shift+Space" }),
   "englishLearning.getState": async () => ({ revision: 1, hasApiKey: false, speechStatus: "idle", error: null }),
   "settings.getSearchUsage": async () => ({ ok: false, error: "预览样例：不查询用量。" }),

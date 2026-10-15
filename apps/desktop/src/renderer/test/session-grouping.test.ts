@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import {
-  DEFAULT_WORKSPACE_KEY,
   groupSessionsByWorkspace,
+  isOrphanSession,
   sessionWorkspaceRoot,
   sessionsByGroupKey,
 } from "../components/sidebar/session-grouping";
@@ -16,12 +16,12 @@ function session(id: string, updatedAt: string, partial: Partial<SessionListItem
 }
 
 const WORKSPACES = [
-  workspace("default", "/Users/me/Downloads", "default", "默认"),
+  workspace("default", "/Users/me/Documents/ActSpace/default-workspace", "folder", "默认工作区"),
   workspace("ws-a", "/Users/me/a", "folder", "项目 A"),
   workspace("ws-b", "/Users/me/b", "folder", "项目 B"),
 ];
 
-// 覆盖每一种归组路径：按 id、按路径、没有路径归默认、未登记的路径、未登记的 id、远端。
+// 覆盖每一种归组路径：按 id、按路径、没有路径（旧会话，不显示）、未登记的路径、未登记的 id、远端。
 const MIXED = [
   session("by-id", "2026-08-01T00:00:00.000Z", { workspaceId: "ws-a", workspaceRoot: "/elsewhere" }),
   session("by-root", "2026-08-03T00:00:00.000Z", { workspaceRoot: "/Users/me/a" }),
@@ -41,10 +41,11 @@ describe("groupSessionsByWorkspace", () => {
     const groups = groupSessionsByWorkspace(MIXED, WORKSPACES);
     expect(keyOf(groups, "by-id")).toBe("ws-a");
     expect(keyOf(groups, "by-root")).toBe("ws-a");
-    expect(keyOf(groups, "no-root")).toBe("default");
-    expect(keyOf(groups, "empty-root")).toBe("default");
-    // 未登记的 id、没有路径：归默认工作区。
-    expect(keyOf(groups, "unknown-id-no-root")).toBe("default");
+    // 没有路径、也匹配不到工作区的旧会话不显示，不再归到默认工作区。
+    expect(keyOf(groups, "no-root")).toBeUndefined();
+    expect(keyOf(groups, "empty-root")).toBeUndefined();
+    expect(keyOf(groups, "unknown-id-no-root")).toBeUndefined();
+    expect(groups.find((group) => group.key === "default")!.sessions).toEqual([]);
     // 未登记的 id、有路径：按 id 自成一组，名称取路径最后一段。
     expect(groups.find((group) => group.key === "ws-gone")).toMatchObject({ label: "gone", workspaceId: "ws-gone", workspaceRoot: "/Users/me/gone/" });
     expect(groups.find((group) => group.key === "/Users/me/c/")).toMatchObject({ label: "c", workspaceRoot: "/Users/me/c/", workspaceId: undefined });
@@ -68,25 +69,18 @@ describe("groupSessionsByWorkspace", () => {
     expect(labels).toEqual(["h3 · api", "记录名 · web", "新名 · app"]);
   });
 
-  it("orders sessions newest first and groups by their newest session, empty workspaces after, the unnamed default last", () => {
-    const groups = groupSessionsByWorkspace(
-      [...MIXED, session("no-default", "2026-09-01T00:00:00.000Z")],
-      WORKSPACES.filter((item) => item.kind !== "default"),
-    );
+  it("orders sessions newest first and groups by their newest session, empty workspaces after", () => {
+    const groups = groupSessionsByWorkspace([...MIXED, session("no-default", "2026-09-01T00:00:00.000Z")], WORKSPACES);
     expect(groups.map((group) => group.key)).toEqual([
       JSON.stringify(["h1", "/Users/me/a"]),
       "/Users/me/c/",
       JSON.stringify(["h1", "/srv/app"]),
       "ws-a",
       "ws-gone",
+      "default",
       "ws-b",
-      DEFAULT_WORKSPACE_KEY,
     ]);
-    expect(groups.at(-1)).toMatchObject({ label: "默认工作区", workspaceRoot: undefined });
-    expect(groups.at(-1)!.sessions.map((item) => item.id)).toEqual(["no-default", "no-root", "empty-root"]);
-    // 没有默认工作区时，未登记 id 的会话按 id 归组；组名取先出现的那条会话的路径。
-    expect(groups.find((group) => group.key === "ws-gone")).toMatchObject({ label: "默认工作区", workspaceRoot: undefined });
-    expect(groups.find((group) => group.key === "ws-gone")!.sessions.map((item) => item.id)).toEqual(["unknown-id-with-root", "unknown-id-no-root"]);
+    expect(groups.find((group) => group.key === "ws-gone")!.sessions.map((item) => item.id)).toEqual(["unknown-id-with-root"]);
   });
 
   it("lists every registered workspace even without sessions", () => {
@@ -98,22 +92,26 @@ describe("sessionsByGroupKey", () => {
   it("uses the same keys as the sidebar groups and keeps the input order", () => {
     const groups = groupSessionsByWorkspace(MIXED, WORKSPACES);
     const byKey = sessionsByGroupKey(MIXED, WORKSPACES);
-    for (const item of MIXED) expect(byKey.get(keyOf(groups, item.id)!)).toContain(item);
-    const noDefault = WORKSPACES.filter((item) => item.kind !== "default");
-    const groupsNoDefault = groupSessionsByWorkspace(MIXED, noDefault);
-    const byKeyNoDefault = sessionsByGroupKey(MIXED, noDefault);
-    for (const item of MIXED) expect(byKeyNoDefault.get(keyOf(groupsNoDefault, item.id)!)).toContain(item);
-    expect(byKey.get("default")!.map((item) => item.id)).toEqual(["no-root", "empty-root", "unknown-id-no-root"]);
-    expect([...byKey.values()].flat()).toHaveLength(MIXED.length);
+    const shown = MIXED.filter((item) => !isOrphanSession(item, WORKSPACES));
+    for (const item of shown) expect(byKey.get(keyOf(groups, item.id)!)).toContain(item);
+    expect(byKey.has("default")).toBe(false);
+    expect([...byKey.values()].flat()).toHaveLength(shown.length);
   });
 });
 
 describe("sessionWorkspaceRoot", () => {
   it("resolves the path shown in the row tooltip", () => {
     expect(sessionWorkspaceRoot(MIXED[0]!, WORKSPACES)).toBe("/Users/me/a");
-    expect(sessionWorkspaceRoot(MIXED[2]!, WORKSPACES)).toBe("/Users/me/Downloads");
+    expect(sessionWorkspaceRoot(MIXED[2]!, WORKSPACES)).toBeUndefined();
     expect(sessionWorkspaceRoot(MIXED[5]!, WORKSPACES)).toBe("/Users/me/gone/");
     expect(sessionWorkspaceRoot(MIXED[7]!, WORKSPACES)).toBe("/srv/app");
     expect(sessionWorkspaceRoot(MIXED[2]!, [])).toBeUndefined();
+  });
+});
+
+describe("isOrphanSession", () => {
+  it("flags only local sessions without a workspace or path", () => {
+    expect(MIXED.filter((item) => isOrphanSession(item, WORKSPACES)).map((item) => item.id)).toEqual(["no-root", "empty-root", "unknown-id-no-root"]);
+    expect(isOrphanSession(session("by-id-only", "2026-08-01T00:00:00.000Z", { workspaceId: "ws-b" }), WORKSPACES)).toBe(false);
   });
 });

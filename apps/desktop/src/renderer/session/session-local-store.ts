@@ -25,6 +25,8 @@ export type SessionLocalState = {
   lastSendOptions?: ComposerSendOptions;
   approvalPending: boolean;
   failed: boolean;
+  /** 不在当前会话时跑完了一轮，还没打开看过；只在本窗口内存里，侧栏显示绿点。 */
+  unread: boolean;
   messageQueue: SessionMessageQueue;
   /** 页请求 / 审批请求的版本号：响应回来时与它比较，旧响应丢弃。 */
   pageVersion: number;
@@ -35,6 +37,7 @@ export const DEFAULT_SESSION_LOCAL_STATE: SessionLocalState = Object.freeze({
   bashUpdates: Object.freeze({}),
   approvalPending: false,
   failed: false,
+  unread: false,
   messageQueue: EMPTY_MESSAGE_QUEUE,
   pageVersion: 0,
   approvalVersion: 0,

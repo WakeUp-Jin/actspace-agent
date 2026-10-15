@@ -15,6 +15,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [左侧会话栏改版](active/20261015-sidebar-redesign.md) | 2026-10-15 Demo 认可后立项，交互模式；T1–T13 已实施（未提交，在默认工作区改动之上）；原生按钮基线已审批，只剩 Electron 手测。 |
 | [内置 Harness 连续升级修复](active/20261014-harness-builtin-upgrade-fix.md) | 用户已批准；回归由红转绿，下一步真实 Electron 定向复验。 |
 | [轨迹页对齐 DeepSeek Harness](active/20261014-trajectory-dsh-parity.md) | 2026-10-14 立项并开始执行 T1–T12；D1（停止进工具栏）、D2（supplement 显示为上下文行）按建议定案。 |
 | [轨迹页流式拆分：定稿层与流式层](active/20261014-trajectory-streaming-split.md) | 2026-10-14 E1、T0–T6 完成，未提交：流式每帧 p95 24.83ms → 0.25ms，验收指标全部达到；剩用户验收和真实 Provider 流式检查，见[执行摘要](../exec-runs/20261014-trajectory-streaming-split/execution-summary.md)。 |
@@ -33,6 +34,7 @@
 
 ## 最近完成
 
+- [默认工作区改为首次启动兜底](completed/20261015-default-workspace-first-run.md)：2026-10-15 实现与自动化验证完成（未提交，分支 `fix/session-default`）；只剩 Electron 实机验收，见[执行摘要](../exec-runs/20261015-default-workspace-first-run/execution-summary.md)。
 - [Context 面板与 SQLite 联合实施](completed/20261011-context-sqlite-integration/README.md)：实现和本轮验收收尾，M/Small结果见报告；用户取消L剩余长测，保留测试失败及资源观察边界。
 - [使用统计 SQLite 统一验收](completed/20261011-usage-sqlite-acceptance.md)：联合验收子计划同步收尾，已接受性能限制和未验证范围原样保留。
 

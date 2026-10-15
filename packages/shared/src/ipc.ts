@@ -829,7 +829,7 @@ export type ArtifactContextMenuResult = {
   error?: "invalid_target" | "not_found" | "not_a_file";
 };
 
-export type WorkspaceEntryKind = "default" | "folder";
+export type WorkspaceEntryKind = "folder";
 
 export type WorkspaceEntry = {
   id: string;
@@ -844,7 +844,6 @@ export type WorkspaceEntry = {
 
 export type WorkspaceRegistry = {
   version: 1;
-  defaultWorkspaceId: string;
   items: WorkspaceEntry[];
 };
 
@@ -865,7 +864,7 @@ export type WorkspaceVisibilityInput = WorkspaceIdInput & {
 
 export type WorkspaceVisibilityResult = {
   ok: boolean;
-  error?: "workspace_not_found" | "default_workspace_required";
+  error?: "workspace_not_found";
 };
 
 export type SessionCreateInput = {

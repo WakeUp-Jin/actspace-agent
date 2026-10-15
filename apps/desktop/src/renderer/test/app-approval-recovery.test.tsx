@@ -30,7 +30,7 @@ function fixture(ordinary = false, pendingTool?: { name: string; preview: NonNul
   const decide = vi.fn(async () => ({ ok: true }));
   setupBridge({
     "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [{ id: "default", kind: "default", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: now, updatedAt: now }] }),
+    "workspaces.list": async () => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: now, updatedAt: now }] }),
     "sessions.list": async () => [{ id: "reloaded", title: record.meta.title, updatedAt: now, agentRunCount: 1, workspaceRoot: "/tmp/workspace" }],
     "sessions.getPage": async () => recordProjectionFixture(record),
     "approvals.listPending": async () => pending,

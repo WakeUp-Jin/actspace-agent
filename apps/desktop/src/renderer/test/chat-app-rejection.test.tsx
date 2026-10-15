@@ -45,7 +45,7 @@ const settingsApiStub = {
   "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
 };
 function createWorkspaceRegistryFixture(createdAt: string): WorkspaceListResult {
-  return { version: 1, defaultWorkspaceId: "default", items: [{ id: "default", kind: "default", label: "workspace", path: "/tmp/workspace", order: 0, createdAt, updatedAt: createdAt }] };
+  return { version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt, updatedAt: createdAt }] };
 }
 
 function createEmptySessionRecord(sessionId: string): SessionRecord {

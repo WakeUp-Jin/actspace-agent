@@ -35,7 +35,7 @@ function fixture() {
   const holds = new Map<string, Promise<void>>();
   setupBridge({
     "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [{ id: "default", kind: "default", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
+    "workspaces.list": async () => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
     "sessions.list": async () => items.filter((item) => !archived.has(item.id)),
     "sessions.listPage": async () => ({ items: items.filter((item) => !archived.has(item.id)), groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }], indexing: false, failed: 0 }),
     "sessions.archive": async ({ sessionId }: { sessionId: string }) => { archived.add(sessionId); return { ok: true }; },

@@ -51,7 +51,7 @@ describe("workbench contexts", () => {
       "sessions.list": async () => items,
       "sessions.listPage": async () => ({ items, groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }], indexing: false, failed: 0 }),
       "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(record(sessionId, items.find((item) => item.id === sessionId)!.title)),
-      "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [{ id: "default", kind: "default", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
+      "workspaces.list": async () => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
       "approvals.listPending": async () => [],
       "tasks.command": async (command: { sessionId: string }) => ({ snapshot: { sessionId: command.sessionId, revision: 1, paused: false, tasks: [], queue: [], runs: [] } }),
       "visualize.list": async () => ({ items: [] }),

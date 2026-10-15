@@ -1,11 +1,12 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as shared from "@actspace/shared";
 import type { SessionEvent, SessionListItem, SessionRecord } from "@actspace/shared";
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { setupBridge } from "./helpers/bridge";
+import { SIDEBAR_VIEW_STORAGE_KEY } from "../components/sidebar/sidebar-view-store";
 import { recordProjectionFixture } from "./projection-fixture";
 
 // 14 T0：会话数据流的 IPC 与投影预算。T0 只记录基线；T3 起断言审批 / 队列补齐只按新增会话 id 发生，T10 起断言投影次数
@@ -50,7 +51,7 @@ function install(input: { items: SessionListItem[]; page: (args: { sessionId: st
   const c = counter();
   setupBridge({
     "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [{ id: "default", kind: "default", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
+    "workspaces.list": async () => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
     "sessions.list": async () => input.items,
     "sessions.listPage": async (args?: { after?: string }) => input.listPage?.(args) ?? ({ items: input.items, groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }], indexing: false, failed: 0 }),
     "sessions.rename": async () => ({ ok: true }),
@@ -72,6 +73,8 @@ function renderApp() {
 }
 
 describe("session IPC budget", () => {
+  // 预算按「侧栏行全部挂上」来量：单列表不折叠，按工作区分组每组只先显示 5 条。
+  beforeEach(() => { localStorage.setItem(SIDEBAR_VIEW_STORAGE_KEY, JSON.stringify({ options: { groupBy: "flat" } })); });
   it("catalog rows without pending tasks do not recover background history", async () => {
     const items = Array.from({ length: 20 }, (_, index) => ({ ...listItem(index), hasPendingTasks: false }));
     const c = install({ items, page: ({ sessionId }) => recordProjectionFixture(eventsRecord(sessionId, [])) });
@@ -122,7 +125,7 @@ describe("session IPC budget", () => {
     await waitFor(() => expect(document.querySelectorAll(".session-row")).toHaveLength(20), { timeout: 10_000 });
     await settle();
     const before = c.snapshot();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Show more" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "加载更多会话" }));
     await waitFor(() => expect(document.querySelectorAll(".session-row")).toHaveLength(20 + M));
     await settle();
     const after = c.snapshot();

@@ -28,7 +28,7 @@ function fixture(initial = false, background = false) {
     "events.hostEvent": () => () => {}, "events.hostUploadProgress": () => () => {}, "hosts.activate": async () => {},
     "hosts.call": async () => ({ state: "ready", workspaces: [], models: [], defaultModel: "" }),
     "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, defaultWorkspaceId: "default", items: [] }),
+    "workspaces.list": async () => ({ version: 1, items: [] }),
     "sessions.list": async () => rows, "sessions.listPage": listPage,
     "sessions.getPage": async () => projectionFixture(id), "approvals.listPending": listPending,
     "events.sessionLive": (callback: (event: unknown) => void) => { listeners.add(callback); return () => listeners.delete(callback); },

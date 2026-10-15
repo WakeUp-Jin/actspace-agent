@@ -54,7 +54,7 @@ export function composerLocalRunTarget({ workspaceOptions, selectedWorkspaceRoot
   return {
     workspaces: workspaceOptions,
     selectedWorkspaceRoot,
-    workspaceLabel: workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ?? workspaceOptions[0]?.label ?? "工作区",
+    workspaceLabel: workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ?? workspaceOptions[0]?.label ?? "选择工作区",
     onSelectWorkspace,
     onUseExistingWorkspace: executionContext?.onUseExistingWorkspace,
     onCreateWorkspaceFolder: executionContext?.onCreateWorkspaceFolder,
