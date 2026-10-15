@@ -24,7 +24,7 @@ export type WorkspaceAccessDeps = {
 /**
  * renderer 传来的 workspaceRoot 必须等于 registry 某个条目的 path，或者某个本地会话的 workspaceRoot
  * （worktree 会话就是 worktree 路径）。比较前双方都先 realpath，所以指向外部的 symlink 会被拒绝，
- * 同一目录的 symlink 别名可以通过。没传 root 时用 registry 的默认工作区。
+ * 同一目录的 symlink 别名可以通过。没传 root 时直接拒绝。
  * 返回 realpath 后的 root；不允许时抛 `WorkspaceAccessError`。
  */
 export async function resolveWorkspaceAccess(
@@ -32,9 +32,7 @@ export async function resolveWorkspaceAccess(
   deps: WorkspaceAccessDeps,
 ): Promise<string> {
   const registry = await deps.readRegistry();
-  const requested = input.workspaceRoot?.trim()
-    || registry.items.find((item) => item.id === registry.defaultWorkspaceId)?.path
-    || "";
+  const requested = input.workspaceRoot?.trim() || "";
   if (!requested) throw new WorkspaceAccessError("");
 
   const realRequested = await realpathOrNull(requested);

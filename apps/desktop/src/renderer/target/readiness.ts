@@ -17,6 +17,8 @@ export type RunTargetReadiness =
   | { readonly state: "describe-failed"; readonly error: string }
   | { readonly state: "host-unavailable"; readonly hostState: string }
   | { readonly state: "workspace-missing"; readonly workspaceId?: string }
+  /** 本机目标还没有工作区（所有工作区都已从侧栏移除，或兜底目录没建成）。 */
+  | { readonly state: "workspace-required" }
   | { readonly state: "model-missing" };
 
 export type ReadinessInput = {
@@ -29,7 +31,7 @@ export type ReadinessInput = {
 const READY: RunTargetReadiness = { state: "ready" };
 
 export function resolveReadiness({ target, directory, workspaceId, modelId }: ReadinessInput): RunTargetReadiness {
-  if (target.kind === "local") return READY;
+  if (target.kind === "local") return target.workspaceRoot ? READY : { state: "workspace-required" };
   // 损坏的 key 连不到任何 Host；会话本身显示「会话标识损坏」，这里按已移除处理。
   if (target.kind === "invalid") return { state: "removed" };
   const host: HostConnection | undefined = directory.hosts.find((item) => item.hostId === target.hostId);
@@ -95,5 +97,6 @@ export function describeReadiness(readiness: Exclude<RunTargetReadiness, { state
     case "host-unavailable": return { tone: "pending", label: "暂不接受任务", reason: readiness.hostState === "blocked" ? `${host} 恢复上次的任务时出错，暂不接受新任务` : `${host} 正在停止，暂不接受新任务` };
     case "workspace-missing": return { tone: null, label: null, reason: readiness.workspaceId ? `该工作区在 ${host} 上已不存在` : "选择一个远端工作区" };
     case "model-missing": return { tone: null, label: null, reason: "选择一个模型" };
+    case "workspace-required": return { tone: null, label: null, reason: "请先选择工作区" };
   }
 }

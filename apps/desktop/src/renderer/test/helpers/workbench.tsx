@@ -37,7 +37,7 @@ const COMPOSER_KEYS = {
 
 const SESSION_ACTION_KEYS = {
   onNewSession: true, onAddWorkspace: true, onSelectSession: true, onTogglePin: true, onRenameSession: true, onCopySessionId: true,
-  onCopyTranscript: true, onForkSession: true, onArchiveSession: true, onOpenWorkspace: true, onArchiveWorkspace: true,
+  onCopyTranscript: true, onForkSession: true, onArchiveSession: true, onRestoreSession: true, onOpenWorkspace: true, onArchiveWorkspace: true,
   onRemoveWorkspace: true,
 } satisfies Record<keyof SessionActionsValue, true>;
 

@@ -86,8 +86,7 @@ export function createMockDb(): MockDb {
     bootstrap: mockBootstrapState,
     workspaces: {
       version: 1,
-      defaultWorkspaceId: "default",
-      items: [{ id: "default", kind: "default", label: "actspace-demo", path: MOCK_WORKSPACE_ROOT, order: 0, createdAt: now, updatedAt: now }],
+      items: [{ id: "ws_actspace_demo", kind: "folder", label: "actspace-demo", path: MOCK_WORKSPACE_ROOT, order: 0, createdAt: now, updatedAt: now }],
     },
     sessions: new Map(),
     hosts: [],

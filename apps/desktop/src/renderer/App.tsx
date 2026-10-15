@@ -63,7 +63,8 @@ import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
 import type { ComposerExecutionContext, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
-import { resolveQuickOpenTarget } from "./quick-open-routing";
+import { orderQuickOpenProjects, resolveQuickOpenTarget } from "./quick-open-routing";
+import { isOrphanSession } from "./components/sidebar/session-grouping";
 import { appApi } from "./api/app";
 import { approvalsApi } from "./api/approvals";
 import { dialogsApi } from "./api/dialogs";
@@ -84,7 +85,6 @@ function sessionReadError(error: unknown, fallback: string): string {
   return message || fallback;
 }
 
-const DEFAULT_WORKSPACE_LABEL = "默认工作区";
 /** 还没有会话（新建会话页）时 composer 模式与技能的存放键。 */
 const DRAFT_COMPOSER_KEY = "__draft__";
 const EMPTY_EVENTS: SessionEvent[] = [];
@@ -93,6 +93,7 @@ const QUEUE_COMMAND_FAILED = "队列操作没有完成，请重试。";
 const selectComposerState = (state: SessionLocalState) => state.composer;
 const selectApprovalPending = (state: SessionLocalState) => state.approvalPending;
 const selectFailed = (state: SessionLocalState) => state.failed;
+const selectUnread = (state: SessionLocalState) => state.unread;
 const selectBashUpdates = (state: SessionLocalState) => state.bashUpdates;
 const selectDraft = (state: SessionLocalState) => state.draft ?? null;
 const selectCompactionFailure = (state: SessionLocalState) => state.compactionFailure ?? null;
@@ -115,29 +116,19 @@ function workspaceLabelFromRoot(root: string): string {
   return segments[segments.length - 1] ?? root;
 }
 
-function createWorkspaceOptionsFromRoots(
-  roots: Array<string | undefined | null>,
-  defaultWorkspaceRoot?: string | null,
-): ComposerWorkspaceOption[] {
+function createWorkspaceOptionsFromRoots(roots: Array<string | undefined | null>): ComposerWorkspaceOption[] {
   const options = new Map<string, ComposerWorkspaceOption>();
-  const normalizedDefaultWorkspaceRoot = normalizeWorkspaceRoot(defaultWorkspaceRoot);
   for (const root of roots) {
-    const normalized = normalizeWorkspaceRoot(root) ?? normalizedDefaultWorkspaceRoot;
-    if (!normalized) continue;
-    const label = normalizeWorkspaceRoot(root) ? workspaceLabelFromRoot(normalized) : DEFAULT_WORKSPACE_LABEL;
-    const existing = options.get(normalized);
-    if (existing) {
-      if (label === DEFAULT_WORKSPACE_LABEL) {
-        existing.label = DEFAULT_WORKSPACE_LABEL;
-      }
-      continue;
-    }
-    options.set(normalized, {
-      value: normalized,
-      label,
-    });
+    const normalized = normalizeWorkspaceRoot(root);
+    if (!normalized || options.has(normalized)) continue;
+    options.set(normalized, { value: normalized, label: workspaceLabelFromRoot(normalized) });
   }
   return [...options.values()];
+}
+
+/** 没选工作区时的兜底：最近活跃的可见工作区；一个都没有时为 null，新建会话页不能发送。 */
+function firstVisibleWorkspaceRoot(registry: WorkspaceListResult | null | undefined, sessions: SessionListItem[]): string | null {
+  return normalizeWorkspaceRoot(registry ? orderQuickOpenProjects(registry.items, sessions)[0]?.path : null);
 }
 
 function createWorkspaceOptionsFromRegistry(items: WorkspaceEntry[]): ComposerWorkspaceOption[] {
@@ -222,6 +213,7 @@ export function App() {
   const messageRequestRef = useRef(0);
   const historyPendingRef = useRef<number | null>(null);
   const [workspaceRegistry, setWorkspaceRegistry] = useState<WorkspaceListResult | null>(null);
+  const fallbackWorkspaceRoot = useMemo(() => firstVisibleWorkspaceRoot(workspaceRegistry, sessions), [workspaceRegistry, sessions]);
   const [sessionBootstrapComplete, setSessionBootstrapComplete] = useState(false);
   // 运行中的 run 和 Host 任务队列缓存（14 T16）；当前会话的流式视图在 selectedSessionId 之后读取。
   const [liveRuns] = useState(createLiveRunStore);
@@ -253,11 +245,12 @@ export function App() {
   const patchLocal = useCallback((sessionId: string, patch: Partial<SessionLocalState>) => {
     localStore.update(sessionId, (state) => ({ ...state, ...patch }));
   }, [localStore]);
-  const setLocalFlag = useCallback((sessionId: string, flag: "approvalPending" | "failed", value: boolean) => {
+  const setLocalFlag = useCallback((sessionId: string, flag: "approvalPending" | "failed" | "unread", value: boolean) => {
     localStore.update(sessionId, (state) => state[flag] === value ? state : { ...state, [flag]: value });
   }, [localStore]);
   const approvalPendingSessionIds = useSessionLocalIds(localStore, selectApprovalPending);
   const failedSessionIds = useSessionLocalIds(localStore, selectFailed);
+  const unreadSessionIds = useSessionLocalIds(localStore, selectUnread);
   // 压缩失败没有 durable 事件；运行结束后按会话保留失败分隔线，直到该会话下一次发送。
   const [composerNotice, setComposerNotice] = useState<{ sessionId: string; text: string } | null>(null);
   const continueQueueRef = useRef<(sessionId: string, outcome: SessionRunOutcome) => Promise<void>>(async () => {});
@@ -275,7 +268,7 @@ export function App() {
     sessionId: selectedSessionId,
     sessionWorkspacePath: sessionRecord?.meta.workspaceRoot,
     locked: !!sessionRecord,
-    local: { workspaceRoot: sessionRecord?.meta.workspaceRoot ?? selectedWorkspaceRoot ?? bootstrapState?.workspaceRoot ?? undefined, branch: selectedBranch, worktree: sessionRecord?.meta.worktree, gitStatus: workspaceGitContext?.status },
+    local: { workspaceRoot: sessionRecord?.meta.workspaceRoot ?? selectedWorkspaceRoot ?? fallbackWorkspaceRoot ?? undefined, branch: selectedBranch, worktree: sessionRecord?.meta.worktree, gitStatus: workspaceGitContext?.status },
   });
   const { choices: targetChoices } = runTarget;
   const isLocalTarget = runTarget.target.kind === "local";
@@ -288,8 +281,9 @@ export function App() {
     setMessageError(null);
     activeSessionIdRef.current = sessionId;
     if (sessionId) pendingEvictionsRef.current.delete(sessionId);
+    if (sessionId) setLocalFlag(sessionId, "unread", false);
     setSelectedSessionId(sessionId);
-  }, []);
+  }, [setLocalFlag]);
   const userPickedChatModelRef = useRef(false);
 
   const refreshWorkspaces = useCallback(async () => {
@@ -394,7 +388,7 @@ export function App() {
 
   const { reviewSummary, refreshReviewSummary } = useReviewSummary({
     workspaceRoot: normalizeWorkspaceRoot(
-      sessionRecord?.meta.worktree?.workspaceRoot ?? selectedWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+      sessionRecord?.meta.worktree?.workspaceRoot ?? selectedWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
     ),
     sessionId: sessionRecord?.meta.id ?? null,
   });
@@ -456,9 +450,9 @@ export function App() {
   useEffect(() => {
     if (selectedWorkspaceRoot) return;
     setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-      sessionRecord?.meta.worktree?.sourceWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+      sessionRecord?.meta.worktree?.sourceWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
     ));
-  }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot]);
+  }, [fallbackWorkspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot]);
 
   useEffect(() => {
     const lockedWorktree = sessionRecord?.meta.worktree;
@@ -468,7 +462,7 @@ export function App() {
       setWorkspaceGitContext(null);
       return;
     }
-    const workspaceRoot = selectedWorkspaceRoot ?? bootstrapState?.workspaceRoot;
+    const workspaceRoot = selectedWorkspaceRoot ?? fallbackWorkspaceRoot;
     if (!isLocalTarget || !workspaceRoot) {
       setWorkspaceGitContext(null);
       setSelectedBranch(undefined);
@@ -495,7 +489,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [isLocalTarget, bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.agentRunCount, sessionRecord?.meta.worktree]);
+  }, [isLocalTarget, fallbackWorkspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.agentRunCount, sessionRecord?.meta.worktree]);
 
   const visibleSessions = useMemo(() => {
     if (!workspaceRegistry) return sessions;
@@ -510,6 +504,11 @@ export function App() {
       !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
     );
   }, [sessions, workspaceRegistry]);
+  // 分页列表的分组同样不显示已移除的工作区，否则侧栏会把它的空文件夹加回来。
+  const visibleBrowseGroups = useMemo(() => {
+    const hiddenPaths = new Set(workspaceRegistry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path));
+    return hiddenPaths.size ? browseGroups.filter((group) => group.hostId || !hiddenPaths.has(normalizeWorkspaceRoot(group.workspaceRoot) ?? "")) : browseGroups;
+  }, [browseGroups, workspaceRegistry]);
   // 每个会话 id 只补齐一次审批徽标和任务队列；之后靠 live 事件和选中会话时的刷新保持最新（14 T3）。
   // 只补齐侧栏可见的会话：移除工作区后，它的会话被 evict，不能因为仍在 sessions 里又被补齐回来。
   // 远端会话等 Host 列表读到之后再补齐；Host 已被移除的不补齐（15 T4：移除时被 evict，侧栏仍显示为未连接）。
@@ -672,18 +671,21 @@ export function App() {
     async function bootstrapSession() {
       const selectionRequest = messageRequestRef.current;
       setListLoading(true); setListError(null);
+      const registryRequest = workspacesApi.list();
+      // 工作区不等会话目录：目录重建期间也要能选出兜底工作区、正常发送。
+      void registryRequest.then((registry) => { if (!disposed && registry) setWorkspaceRegistry(registry); }, () => {});
       const [page, registry] = await Promise.all([
         sessionsApi.listPage(),
-        workspacesApi.list(),
+        registryRequest,
       ]);
       if (disposed) return;
       const listedSessions = page.items;
+      const bootstrapWorkspaceRoot = firstVisibleWorkspaceRoot(registry, listedSessions);
       setSessions(current => page.indexing ? [...new Map([...current, ...listedSessions].map(s => [s.id, s])).values()] : listedSessions);
       setBrowseGroups(page.groups);
       setListLoading(page.indexing);
       if (page.failed) setListError(`${page.failed} 个会话暂时无法读取，可重试`);
       else if (page.readModel?.status === "fallback") setListError("查询索引暂不可用，已从会话文件读取");
-      if (registry) setWorkspaceRegistry(registry);
       if (page.indexing) {
         timer = setTimeout(() => { void bootstrapSession().catch(handleBootstrapError); }, 500);
       }
@@ -693,6 +695,7 @@ export function App() {
       const hiddenWorkspaceIds = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id));
       const hiddenWorkspacePaths = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path));
       const existing = listedSessions.find((session) =>
+        !isOrphanSession(session, registry?.items ?? []) &&
         !hiddenWorkspaceIds.has(session.workspaceId ?? "") &&
         !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
       );
@@ -707,7 +710,7 @@ export function App() {
             restored?.meta.workspaceRoot ??
             existing.worktree?.sourceWorkspaceRoot ??
             existing.workspaceRoot ??
-            bootstrapState?.workspaceRoot,
+            bootstrapWorkspaceRoot,
           ),
         );
         setSessionBootstrapComplete(true);
@@ -715,10 +718,7 @@ export function App() {
       }
 
       setActiveSessionId(null);
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-        registry?.items.find((workspace) => workspace.id === registry.defaultWorkspaceId)?.path ??
-        bootstrapState?.workspaceRoot,
-      ));
+      setSelectedWorkspaceRoot(bootstrapWorkspaceRoot);
       setSessionBootstrapComplete(true);
     }
 
@@ -773,6 +773,8 @@ export function App() {
 
       if (event.type === "agent_run_finished" || event.type === "agent_run_aborted") {
         setFailedForSession(event.sessionId, false);
+        // 不在当前会话时跑完的一轮记成未读，侧栏显示绿点，打开会话时清掉。
+        if (event.type === "agent_run_finished" && activeSessionIdRef.current !== event.sessionId) setLocalFlag(event.sessionId, "unread", true);
       } else if (event.type === "agent_run_failed") {
         setFailedForSession(event.sessionId, true);
       }
@@ -794,7 +796,7 @@ export function App() {
         });
       }
     });
-  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal]);
+  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal, setLocalFlag]);
 
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
     const selectionRequest = messageRequestRef.current;
@@ -811,7 +813,7 @@ export function App() {
       const created = projectChatWindow(projection);
       if (selectionRequest === messageRequestRef.current) {
         setActiveSessionId(created.meta.id);
-        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.worktree?.sourceWorkspaceRoot ?? created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.worktree?.sourceWorkspaceRoot ?? created.meta.workspaceRoot ?? fallbackWorkspaceRoot));
       }
       // A cold catalog is optional navigation data, not a dependency of the
       // first task in the newly created durable Session.
@@ -823,7 +825,7 @@ export function App() {
       if (input.runLocation) throw error;
       return null;
     }
-  }, [bootstrapState?.workspaceRoot, refreshWorkspaces]);
+  }, [fallbackWorkspaceRoot, refreshWorkspaces]);
 
   /** 首次发送保留结果兼容接口；执行与后续队列均由 Host 调度。 */
   const continueQueue = useCallback(async (sessionId: string, _outcome: SessionRunOutcome) => { await refreshTaskQueue(sessionId); }, [refreshTaskQueue]);
@@ -895,7 +897,7 @@ export function App() {
     patchLocal(sessionId, { composer: { mode: options.mode, selectedSkills: options.selectedSkills } });
     // Keep workspace changes on the idle Session boundary before task admission.
     if (sessionRecord?.meta.id === sessionId && isLocalSession(sessionId) && !liveRuns.has(sessionId) && !sessionRecord.meta.worktree && selectedWorkspaceRoot &&
-        selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot)) {
+        selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot)) {
       const result = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
       if (!result.ok) throw new Error(result.error ?? "无法更新会话工作区");
     }
@@ -921,7 +923,7 @@ export function App() {
       await taskCommand({ op: "resume", sessionId: visibleSessionId, revision: snapshot.revision });
     }
     return;
-  }, [sessionGateway, runTarget, targetChoices, sessionRecord, selectedWorkspaceRoot, runLocation, selectedBranch, bootstrapState?.workspaceRoot, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, liveRuns, refreshTaskQueue, reportSessionFailure, patchLocal]);
+  }, [sessionGateway, runTarget, targetChoices, sessionRecord, selectedWorkspaceRoot, runLocation, selectedBranch, fallbackWorkspaceRoot, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, liveRuns, refreshTaskQueue, reportSessionFailure, patchLocal]);
 
   useEffect(() => {
     return hostDirectory.onHostsChanged(hosts => {
@@ -1042,10 +1044,10 @@ export function App() {
       const restored = await readSessionPage(sessionId)
       if (activeSessionIdRef.current !== sessionId) return;
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-        restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+        restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
       ));
     },
-    [bootstrapState?.workspaceRoot, refreshPendingApprovalStatuses, readSessionPage],
+    [fallbackWorkspaceRoot, refreshPendingApprovalStatuses, readSessionPage],
   );
 
   useEffect(() => {
@@ -1183,20 +1185,19 @@ export function App() {
       const registryOptions = workspaceRegistry
         ? createWorkspaceOptionsFromRegistry(workspaceRegistry.items)
         : [];
+      // 已隐藏的工作区不进选择器；当前会话和当前选择的目录照常显示。
       const fallbackOptions = createWorkspaceOptionsFromRoots([
         selectedWorkspaceRoot,
         sessionRecord?.meta.worktree?.sourceWorkspaceRoot,
         sessionRecord?.meta.workspaceRoot,
-        bootstrapState?.workspaceRoot,
-        ...sessions.map((session) => session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot),
-      ], bootstrapState?.workspaceRoot);
+      ]);
       const merged = new Map(registryOptions.map((option) => [option.value, option]));
       for (const option of fallbackOptions) {
         if (!merged.has(option.value)) merged.set(option.value, option);
       }
       return [...merged.values()];
     },
-    [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessions, workspaceRegistry],
+    [selectedWorkspaceRoot, sessionRecord?.meta.worktree?.sourceWorkspaceRoot, sessionRecord?.meta.workspaceRoot, workspaceRegistry],
   );
   const executionContext = useMemo<ComposerExecutionContext>(() => ({
     gitContext: isLocalTarget ? workspaceGitContext : null,
@@ -1216,6 +1217,9 @@ export function App() {
   ]);
   const sessionStatuses = useMemo<Record<string, SessionUiStatusKind>>(() => {
     const statuses: Record<string, SessionUiStatusKind> = {};
+    for (const sessionId of unreadSessionIds) {
+      statuses[sessionId] = "unread";
+    }
     for (const sessionId of failedSessionIds) {
       statuses[sessionId] = "failed";
     }
@@ -1226,7 +1230,7 @@ export function App() {
       statuses[sessionId] = "waiting_approval";
     }
     return statuses;
-  }, [approvalPendingSessionIds, busySessionIds, failedSessionIds]);
+  }, [approvalPendingSessionIds, busySessionIds, failedSessionIds, unreadSessionIds]);
 
   const handleCopySessionId = useCallback(async (sessionId: string) => {
     if (!sessionId) return;
@@ -1279,7 +1283,7 @@ export function App() {
 
       setActiveSessionId(forked.meta.id);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-        forked.meta.worktree?.sourceWorkspaceRoot ?? forked.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+        forked.meta.worktree?.sourceWorkspaceRoot ?? forked.meta.workspaceRoot ?? fallbackWorkspaceRoot,
       ));
       setApprovalPendingForSession(forked.meta.id, false);
       setFailedForSession(forked.meta.id, false);
@@ -1288,7 +1292,7 @@ export function App() {
     }
   }, [
     approvalPendingSessionIds,
-    bootstrapState?.workspaceRoot,
+    fallbackWorkspaceRoot,
     busySessionIds,
     refreshWorkspaces,
     setApprovalPendingForSession,
@@ -1358,15 +1362,11 @@ export function App() {
   }, []);
 
   const handleArchiveWorkspace = useCallback(async (workspaceId: string, workspaceRoot?: string) => {
-    if (!workspaceRoot && workspaceId === workspaceRegistry?.defaultWorkspaceId) {
-      workspaceRoot = workspaceRegistry.items.find((workspace) => workspace.id === workspaceId)?.path;
-    }
     const archiveCandidates = await sessionsApi.list();
     const targetSessionIds = archiveCandidates
       .filter((session) =>
         session.workspaceId === workspaceId ||
-        (!session.workspaceId && normalizeWorkspaceRoot(session.workspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) ||
-        (!session.workspaceId && !session.workspaceRoot && workspaceId === workspaceRegistry?.defaultWorkspaceId),
+        (!session.workspaceId && normalizeWorkspaceRoot(session.workspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)),
       )
       .map((session) => session.id);
     if (targetSessionIds.length === 0) return;
@@ -1383,12 +1383,9 @@ export function App() {
         !hiddenIds.has(session.workspaceId ?? "") &&
         !hiddenPaths.has(normalizeWorkspaceRoot(session.workspaceRoot)),
       );
-      if (fallback) {
-        await handleSelectSession(fallback.id);
-      } else {
-        const created = await createSessionForInput({ workspaceId, workspaceRoot });
-        if (!created) return;
-      }
+      // 没有别的会话可切时回到新建会话页，留在原工作区。
+      if (fallback) await handleSelectSession(fallback.id);
+      else await handleCreateSession({ workspaceRoot });
     }
 
     const result = await sessionsApi.archiveMany({ sessionIds: targetSessionIds });
@@ -1399,10 +1396,10 @@ export function App() {
     if (!result.ok) {
       console.error("Some workspace sessions could not be archived", result.failedSessionIds);
     }
-  }, [activeSessionId, approvalPendingSessionIds, busySessionIds, createSessionForInput, handleSelectSession, sessions, workspaceRegistry, evictSession]);
+  }, [activeSessionId, approvalPendingSessionIds, busySessionIds, handleCreateSession, handleSelectSession, sessions, workspaceRegistry, evictSession]);
 
   const handleRemoveWorkspace = useCallback(async (workspaceId: string, workspaceRoot?: string) => {
-    if (!workspaceRegistry || workspaceId === workspaceRegistry.defaultWorkspaceId) return;
+    if (!workspaceRegistry) return;
     const targetSessionIds = new Set(sessions
       .filter((session) =>
         session.workspaceId === workspaceId ||
@@ -1423,12 +1420,10 @@ export function App() {
         setActiveSessionId(fallback.id);
         const restored = await readSessionPage(fallback.id);
         if (!restored || activeSessionIdRef.current !== fallback.id) return;
-        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-          restored.meta.workspaceRoot ?? fallback.workspaceRoot ?? bootstrapState?.workspaceRoot,
-        ));
+        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(restored.meta.workspaceRoot ?? fallback.workspaceRoot));
       } else {
-        const created = await createSessionForInput({ workspaceId: workspaceRegistry.defaultWorkspaceId });
-        if (!created) return;
+        // 没有别的会话可切时回到新建会话页；工作区在隐藏完成后重新挑。
+        await handleCreateSession();
       }
     }
 
@@ -1438,14 +1433,11 @@ export function App() {
       return;
     }
     for (const sessionId of targetSessionIds) evictSession(sessionId);
-    await refreshWorkspaces();
+    const refreshed = await refreshWorkspaces();
     if (normalizeWorkspaceRoot(selectedWorkspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) {
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-        workspaceRegistry.items.find((workspace) => workspace.id === workspaceRegistry.defaultWorkspaceId)?.path ??
-        bootstrapState?.workspaceRoot,
-      ));
+      setSelectedWorkspaceRoot(firstVisibleWorkspaceRoot(refreshed, sessions));
     }
-  }, [activeSessionId, bootstrapState?.workspaceRoot, createSessionForInput, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry, evictSession]);
+  }, [activeSessionId, handleCreateSession, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry, evictSession]);
 
   const handleArchivedSessionsChange = useCallback(async () => {
     try {
@@ -1455,6 +1447,16 @@ export function App() {
       console.error("Failed to refresh sessions after archived chats changed", error);
     }
   }, []);
+
+  const handleRestoreSession = useCallback(async (sessionId: string) => {
+    try {
+      const result = await sessionsApi.archive({ sessionId, archived: false });
+      if (!result.ok) throw new Error(result.error ?? "Restore request failed");
+    } catch (error) {
+      console.error("Failed to restore session", error);
+    }
+    await handleArchivedSessionsChange();
+  }, [handleArchivedSessionsChange]);
 
   const getSessionPreview = useCallback(async (session: SessionListItem) => {
     return sessionsApi.getPreview({ sessionId: session.id });
@@ -1469,7 +1471,7 @@ export function App() {
   // Context value 用 useShallowStable 而不是 useMemo：工厂闭包会把 messages、contextState 等放进 App 的渲染作用域，
   // 旧作用域被 useCallback 链留住时，已归档会话的数据就释放不掉。
   const browse = useShallowStable<SessionBrowseState>({
-    groups: browseGroups, listLoading, listError, retryList, loadMore: loadMoreSessions, messageLoading, messageError, retryMessages,
+    groups: visibleBrowseGroups, listLoading, listError, retryList, loadMore: loadMoreSessions, messageLoading, messageError, retryMessages,
     hasEarlier: historyBefore !== null, earlierLoading, earlierError, loadEarlier: loadEarlierMessages,
   });
   const activeSession = useShallowStable<ActiveSessionValue>({
@@ -1489,7 +1491,7 @@ export function App() {
   const sessionActions = useShallowStable<SessionActionsValue>({
     onNewSession: handleCreateSession, onAddWorkspace: handleAddWorkspace, onSelectSession: handleSelectSession, onTogglePin: handleTogglePin,
     onRenameSession: handleRenameSession, onCopySessionId: handleCopySessionId, onCopyTranscript: handleCopyTranscript, onForkSession: handleForkSession,
-    onArchiveSession: handleArchiveSession, onOpenWorkspace: handleOpenWorkspace, onArchiveWorkspace: handleArchiveWorkspace, onRemoveWorkspace: handleRemoveWorkspace,
+    onArchiveSession: handleArchiveSession, onRestoreSession: handleRestoreSession, onOpenWorkspace: handleOpenWorkspace, onArchiveWorkspace: handleArchiveWorkspace, onRemoveWorkspace: handleRemoveWorkspace,
   });
 
   return (

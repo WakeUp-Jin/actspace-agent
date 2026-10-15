@@ -20,19 +20,19 @@
 
 1. **顶部窗口区**（红绿灯 + 折叠按钮 + 会话历史返回/前进）。
 2. **顶部主入口**：`New Agent` / `扩展`。
-3. **分区列表**：`Pinned` → `Workspaces`（父分类 + 多个 Workspace 文件夹）。当前没有定时任务产品能力，因此不展示 `Scheduled` 占位分区。
+3. **分区列表**：`已置顶` → `工作区`（按工作区分组时）或 `会话`（单列表、按时间时）。分组、排序和归档筛选由标题上的「视图选项」决定，见下文。当前没有定时任务产品能力，因此不展示 `Scheduled` 占位分区。
 4. **底部** `Settings`。
 
 ## 顶部窗口区
 
-- 自左到右：macOS 红绿灯（系统）、折叠按钮（PanelLeft icon），以及在 sidebar 顶部右侧对齐的会话历史 Back / Forward。PanelLeft 与导航按钮属于窗口级 chrome，不属于 sidebar 内部；Sidebar 内的 Search 仍保留为会话导航入口。
+- 自左到右：macOS 红绿灯（系统）、折叠按钮（PanelLeft icon），以及在 sidebar 顶部右侧对齐的会话历史 Back / Forward。PanelLeft 与导航按钮属于窗口级 chrome，不属于 sidebar 内部；会话搜索是「工作区 / 会话」标题上的放大镜图标。
 - **chrome 按钮由 `WindowChromeBar` 渲染**（参考 Cursor Agent Window 的 `.part.titlebar`）。它是 `position: fixed top:0 left:0 right:0 height:44px z-index:60 pointer-events:none` 的全宽浮层，并使用与 `SplitView` 实际 pane 宽度同步的三列 grid：
   - `.chrome-left`：红绿灯安全区（`padding-left: 86px`）+ PanelLeft；会话 Back / Forward 作为同一左列内的右对齐导航组
   - `.chrome-center`：左对齐的当前 view 标题（chat 时是 session title；lab/usage/kairos 时是对应名）+ 中间栏尾部的 Environment + 窗口拖动区（`-webkit-app-region: drag`）
   - `.chrome-right`：右 panel 的对象菜单和 PanelRight toggle；空白区域不恢复 pointer events，避免遮挡右栏 Tab
 - chrome bar 自身透明；主题感知底部分隔线只绘制在右侧对象面板列，左列与中间列不绘制底线；sidebar / main / right panel 三栏各自顶部留 `var(--window-chrome-strip-height) = 44px` 的 padding-top，让浮层覆盖到自己顶部时不挡内容，视觉上「三栏直接贯顶 + 标题与操作各归其位」。
 - 折叠按钮在 `expanded ↔ hidden` 之间切换；hidden 态时它的 aria-label 变成 `Expand session sidebar`，`aria-pressed=false`。
-- 顶部不再放搜索按钮，避免与 Sidebar 内 Search 重复；Sidebar 内 Search 继续承担会话/工作区搜索入口。
+- 顶部不再放搜索按钮；会话搜索只在「工作区 / 会话」标题上的放大镜图标里（2026-10-15 起不再有单独一行「搜索本机会话」）。
 - Back / Forward 只遍历本次 Workbench 已访问的会话历史，不修改 Session Journal；没有对应历史时禁用。切换到新会话后会截断当前位置之后的前进历史。
 - 不再有 main pane 自管的 `.topbar`，所有窗口级 chrome 元素都统一挂在 chrome bar 上。
 
@@ -47,47 +47,83 @@
 
 ### 分组标题统一规范
 
-`Pinned` / `Workspaces` 共享同一个 `NavSectionHeader` 组件，行为统一：
+> 2026-10-15 侧栏改版（DSH + Cursor + Codex 时间分组，方案见 [sidebar-redesign-demo.html](sidebar-redesign-demo.html)）。实现：`components/sidebar/SidebarSessions.tsx` 编排，`SidebarSectionHeader.tsx` 画标题。
 
-- 标题文字字号 **12px / weight 500 / `--color-text-faint`**：
-  - 字号比主入口（13px）小一档，颜色比主入口的 muted 弱一档（faint）。
-  - **字重和会话行、主入口同样是 500**，靠"字号小一档 + 颜色更浅"区分"导航主入口"和"分组标题"两种语义，而不是用 440 这种非标字重做区分。早期版本曾用「主入口 520 / 分组标题 440」靠字重对比，已纠正，理由见 [全局视觉语言规范](./front-全局视觉语言规范.md) 的「字重与行高」段。
-- 标题文字左对齐到 sidebar 内 padding-left 8px 起点；前面不再放任何 chevron / icon，文字本身就是分组的视觉锚点。
-- 整个标题区都是点击命中区，点击切换该分组的 `collapsed` 状态。
-- 右侧 `nav-section-actions` 默认全部隐藏，hover / focus 标题区时整体淡入：
-  - `chevron`：固定排在 actions 区最右，hover 出现 → 视觉上表达"我可以折叠"，点击同样切换 `collapsed`。
-  - 其它 extra actions（如 Workspaces 的 `Sort + New folder`）按 section 注入，统一渲染在 chevron 左边。
-- 折叠态下不渲染该 section 的内容；记忆只放组件内 `useState`，不持久化。
+`已置顶`、`工作区 / 会话` 和按时间分组的时间段标题共用 `SidebarSectionHeader`：
+
+- 标题文字 **12px / weight 500 / faint**，靠字号小一档 + 颜色更浅区分「导航主入口」和「分组标题」，不用非标字重（见 [全局视觉语言规范](./front-全局视觉语言规范.md)「字重与行高」）。
+- 点标题文字折叠 / 展开；文字右边一个 12px `ChevronDown`，展开时隐藏、悬停或键盘聚焦标题行时淡入，收起时转到朝右并常亮（Cursor）。
+- 「工作区 / 会话」标题右侧常驻三个图标：搜索、视图选项、添加工作区（DSH）。视图被改过时视图图标着强调色、右上角一个强调色小圆点，提示名改为「视图选项（已改动）」。
+- 折叠状态（分区、每个工作区、每个时间段）持久化在 `localStorage` 的 `actspace.sidebar.view.v1`，重启后保留；「恢复默认」不清折叠状态。
+
+### 搜索
+
+- 点放大镜，搜索框从图标位置向左展开盖住整个标题行，自动聚焦；`Esc` 或 ✕ 关闭；输入为空时点别处也关闭，有内容时保留。
+- 有输入时搜索结果替换下面的列表，已置顶分区也隐藏；结果行与普通会话行一样（状态点、工作区名、相对时间、悬停操作），点开即切换会话。
+- 搜索走 `sessions.listPage({ search })`（输入停 250ms 再查，每页 50 条，翻页替换当前页），不依赖侧栏已加载的会话；索引不可用时提示「查询索引暂不可用，已从会话文件读取」；没有结果显示「没有匹配的本机会话」。
+- 设置页（快捷键设置）里仍用独立的 `SessionSearch` 组件，两者共用 `use-session-search.ts`。
+
+### 视图选项
+
+视图选项菜单（`SidebarViewMenu`）三组单选 + 恢复默认，选一项菜单不关，方便连着改（DSH）：
+
+| 分组方式 | 说明 |
+| --- | --- |
+| 按工作区（默认） | 每个工作区一个可折叠文件夹，标题叫「工作区」 |
+| 单列表 | 未置顶的会话排成一列，每行标工作区名，标题叫「会话」 |
+| 按时间 | 见下文「按时间分组」，标题叫「会话」 |
+
+| 排序方式 | 说明 |
+| --- | --- |
+| 最近更新（默认） | 按 `updatedAt` 倒序，有新消息的会话自己浮到上面 |
+| 手动排序 | 用户拖出来的顺序；新会话出现在最上面，已归档的永远在最后。按时间分组时不可用（灰掉，提示「按时间时不可用」） |
+
+| 筛选会话 | 说明 |
+| --- | --- |
+| 隐藏已归档（默认） | 和以前一样 |
+| 全部对话（显示已归档） | 已归档会话回到各自工作区，排在最后，行尾显示「已归档」 |
+| 仅显示已归档 | 只显示已归档会话、隐藏已置顶分区；没有时显示「暂无已归档会话」和「查看其他会话」（切回隐藏已归档） |
+
+- 「恢复默认」把三项恢复成按工作区 / 最近更新 / 隐藏已归档，并清掉手动顺序。
+- 手动顺序按「账本」分别记：每个工作区的会话、置顶区、单列表，以及工作区之间的顺序；存在同一个 `localStorage` 键里，每个账本最多 1000 个 id。工作区顺序只存在本机，不写 `workspaces.json`。
+- 已归档会话 `listPage` 不返回，筛选不是「隐藏」时才用 `sessions.list({ archived: true })` 一次全量拉取；只放进还在侧栏里的工作区（远端会话或已登记的工作区），已移除的工作区不会因此重新出现。
+
+### 拖拽排序
+
+- 能拖的和 DSH 一样：同一工作区内的会话、置顶区内的会话、单列表里的会话、工作区文件夹之间。不能跨账本拖（不能把会话拖到另一个工作区或拖进置顶），不合法的位置显示浏览器的「禁止」光标。
+- 插入位置是行上沿或下沿一条 2px 强调色线，左端一个圆点；被拖的行半透明。按时间分组、搜索结果和已归档的行不能拖，重命名中的行也不能拖。
+- 在「最近更新」下拖一次：先把当前看到的顺序拍下来作为各账本起点，再切到手动排序，标题下出现约 3 秒的「已切换为手动排序」提示（`role="status"`）。
+- 用原生 HTML5 拖拽（`use-sidebar-drag.ts`），不挂 document 级监听。
 
 ### Pinned
 
 - 跨 Workspace 的顶层固定分区。
 - 用户可手动 pin/unpin 任意会话。
-- 至少有一个会话被 pin 时出现，没有则该 section 隐藏。
-- Pinned 区会话 hover 时显示深色填充图钉（`<Pin fill="currentColor" />`），区别于未 pin 状态下的描边图钉；非 hover 时仍隐藏操作，让时间列成为唯一常显的行尾信息。
+- 至少有一个会话被 pin 时出现，没有则该 section 隐藏；搜索时和「仅显示已归档」时隐藏。所有分组方式下都在最上面。
+- 不按工作区分组时置顶会话的行也标工作区名。置顶区内不折叠（不限 5 条），手动排序时可拖。
+- 悬停操作里置顶会话显示「取消置顶会话」（`PinOff`），未置顶显示「置顶会话」（`Pin`）。
 
 ### Workspaces
 
-- **Workspaces 是一层父级分类标题**，下面挂多个 Workspace 文件夹；父级本身可折叠（默认展开）。
-- 父级标题右侧 hover 时露出两个图标按钮：
-  - Sort：排序占位（点击 noop，title 标 `coming soon`）。
-  - New folder：新建工作区文件夹占位（点击 noop，title 标 `coming soon`）。
-- 单个 Workspace 按会话创建时记录的 `workspaceRoot` 自动归类，分组名 = `path.basename(workspaceRoot)`。
-- 旧会话缺 `workspaceRoot` 字段时归到 `Default workspace`。
+- **「工作区」是一层父级分类标题**，下面挂多个 Workspace 文件夹；父级本身可折叠（默认展开，状态持久化）。
+- 父级标题右侧常驻搜索、视图选项、添加工作区三个按钮（见上文）。
+- 单个 Workspace 按会话创建时记录的 `workspaceRoot` 自动归类，分组名 = 登记的名称，其次 `path.basename(workspaceRoot)`。
+- 本地会话既没有 `workspaceRoot`、也匹配不到已登记的 Workspace 时不显示（旧版「默认工作区」遗留会话），不再有兜底分组。
 - 每个 Workspace 文件夹行的交互：
-  - 行内布局是 `grid: [icon-slot 14px | name 1fr | actions auto]`，padding-left 与会话行完全一致，因此 folder name 的 X 位置严格等于其下方 session title 的 X 位置（视觉上文字连成一条左对齐线）。
-  - **左侧 icon-slot** 本身是一个 button：
-    - 默认显示 `<Folder>` 图标，表达"这是一个工作区"。
-    - hover 整行时 `<Folder>` 淡出、`<ChevronDown>` / `<ChevronRight>` 淡入覆盖在同一格子里，表达"我可以折叠"。
-    - 只有点击 icon-slot 触发折叠/展开，不再让文件夹名称同时承担折叠语义。
-  - **中间 folder name** 是 Workspace 主操作按钮：
-    - 单击打开 Workspace 操作菜单，不直接折叠、不直接打开 IDE。
-    - 右键文件夹行打开同一份菜单，菜单项和禁用状态必须一致。
-    - `aria-haspopup="menu"`；菜单打开时设置 `aria-expanded="true"`。
-  - **右侧 actions** 默认隐藏，hover 整行时露出 `<Plus>` 按钮，点击 = 在该 workspace 起一次新 Agent。
-  - 这一轮交互的核心是把三条意图**空间正交化**：左 = 折叠（导航），中 = Workspace 菜单（管理），右 = 新建 Agent（创造），跟 Cursor 的视觉与肌肉记忆一致。
-- 每个 Workspace 默认展开；超过 **8** 条会话用 `See more / See less` 折叠剩余项。
-- 当前仍不支持重命名、拖拽排序或把会话拖到另一个 Workspace；文件夹来源仍是用户选择的本地目录。
+  - 行高 30px，grid `[icon-slot 16px | name 1fr | actions auto]`，padding-left 与会话行一致，文件夹名的 X 位置等于下方会话标题的 X 位置。
+  - **左侧 icon-slot**：默认显示文件夹图标（展开 `FolderOpen`、收起 `Folder`；当前会话在这个工作区里时用强调色）；悬停整行时文件夹淡出、`ChevronDown` 淡入叠在同一格，收起时箭头转到朝右（Cursor）。点击折叠，不进 Tab 顺序。
+  - **中间文件夹名**：点击折叠 / 展开（`aria-expanded`），`title` 是完整路径；`Shift+F10` / Context Menu 键打开 Workspace 操作菜单。
+  - **右侧 actions** 悬停整行时出现：`⋯`（「更多操作：名称」，打开和右键相同的 Workspace 操作菜单）和 `+`（在该工作区新建 Agent 会话）。
+  - 右键文件夹行打开同一份菜单，菜单项和禁用状态一致。手动排序时文件夹行可拖动调整工作区顺序。
+- 每组先显示 **5** 条，运行中、待审批和当前会话不占名额且总是显示；其余用「展开其余 N 个会话」展开（剩不到 7 条一次展开完，否则每次 5 条），展开过后显示「收起」。已加载的都显示完而服务端还有更多时显示「加载更多会话」。
+- 没有会话的工作区显示「暂无会话」。
+- 当前仍不支持重命名工作区、把会话拖到另一个工作区；文件夹来源仍是用户选择的本地目录。
+
+### 按时间分组
+
+- 照 Codex：最上面「需要处理」（warning 色标题 + 数量胶囊）收待审批、失败、跑完未看的会话，其余按 `updatedAt` 落进：今天、昨天、近 7 天按星期（标题旁写「10月13日」）、本月更早、今年按月（「9月」）、往年按年月（「2025年3月」）。
+- 每个时间段可折叠（状态持久化），段内不限条数，每行标工作区名；置顶会话仍在已置顶分区，不进时间段。
+- 服务端还有未加载的会话时，列表最后统一「加载更多会话」（各工作区分组都翻一页）。单列表同理。
 
 ### Workspace 操作菜单
 
@@ -117,7 +153,7 @@
 - 任一目标会话处于 `running` 或 `waiting_approval` 时禁用 `Archive All`，禁用原因必须可见，避免把正在执行或等待用户决策的任务从导航中隐藏。
 - 如果当前 active session 在快照中：
   - 优先切换到另一个 Workspace 的最近未归档会话，然后执行批量归档。
-  - 如果不存在可切换会话，先在原 Workspace 创建一个新空会话作为导航落点；该新会话不属于菜单打开时的快照，不被本次批量归档。
+  - 如果不存在可切换会话，回到该 Workspace 的新建会话页（草稿，不创建空会话），首条消息发送时才创建会话。
 - 批量操作完成后只刷新一次 session list 和 Workspace 分组，不在每条会话归档时造成侧边栏连续跳动。
 - 若发生部分失败，明确告知已归档/未归档数量，未成功条目保持可见；不把部分成功伪装成全部成功。
 
@@ -125,8 +161,9 @@
 
 - 该操作只隐藏 Workspace 及其会话导航，**不删除本地文件、不删除 session、不改变 archived/pinned 状态**。
 - 被隐藏 Workspace 的会话同时从 `Workspaces` 和跨 Workspace 的 `Pinned` 分区移出，否则用户仍会在侧边栏看到该文件夹的会话，与操作名不符。
-- `Default workspace` 是应用的保底落点，不允许从侧边栏移除；其菜单中该项禁用并显示原因。
-- 如果 active session 属于目标 Workspace，先切换到另一个可见 Workspace 的最近会话；没有可切换会话时，在 `Default workspace` 创建一个新空会话后再隐藏。
+- 所有 Workspace 都可以移除，包括首次启动自动创建的「默认工作区」；移除后不会再自动创建。
+- 如果 active session 属于目标 Workspace，先切换到另一个可见 Workspace 的最近会话；没有可切换会话时，回到新建会话页（不创建空会话），工作区切到剩下按活跃度排第一的 Workspace。
+- 全部 Workspace 都被移除后，新建会话页不能发送，发送按钮提示「请先选择工作区」，由用户在 Composer 里选择文件夹。
 - Workspace registry 必须持久化 hidden 状态；后续读取 session meta 时不得因 `workspaceRoot` 仍存在而自动把已隐藏 Workspace 重新加回。
 - 用户通过 `New folder` 重新选择同一绝对路径时，清除 hidden 状态并恢复该 Workspace；原会话、pin 与 archive 信息保留。
 - 这一轮不新增隐藏 Workspace 管理页；「重新选择相同文件夹」是首版恢复入口。
@@ -134,27 +171,25 @@
 
 ## 会话行
 
-- 高度紧凑（约 36px），保持高密度文本导航的气质，不做卡片。
-- 整行用 grid 四段布局：`marker 14px | title 1fr | actions 46px | time auto`，padding 0 8px、gap 8px。左侧状态与标题继续和 workspace folder 对齐，右侧时间形成稳定扫描列。
-- 字号：`title` 13px / 500；`time` 11px / `--color-text-faint`，紧凑相对时间（`1h` / `3d` 缩写）。时间位于最右侧，在普通、选中和 hover 状态下始终显示。
+- 行高 30px，grid 三段：`marker 16px | title 1fr | end auto`，gap 6px，不做卡片。
+- 字号：标题 13px / 500，跑完未看的会话标题加粗；单列表、按时间、搜索结果和非工作区分组下的置顶区在标题后标工作区名（11px faint，最多占 34%）。
+- 行尾平时显示中文相对时间（刚刚 / 5分钟 / 3小时 / 2天 / 2个月 / 1年）；待审批显示 warning 色「待审批」；已归档显示「已归档」标签。
+- 悬停、键盘聚焦或右键菜单打开时，行尾文字让位给操作按钮（不预留空位）。双击标题重命名。
 - Hover 时背景轻灰；当前选中态使用更深一点的浅灰底。
 
 ### 左侧 marker（唯一状态点）
 
-- marker 列宽 14px，只渲染一个可点击的 `session-status-dot`，不再在行尾重复显示同一状态。
-- 默认 idle 使用中性灰点；active / busy 使用 operational green，waiting approval 使用 warning，failed / interrupted 使用 danger。
-- 点击状态点仍可查看状态名称和说明，移除重复点不牺牲原有状态详情功能。
-- Pin 不再覆盖状态点，因此置顶、选中、运行等状态可以同时表达，标题起点也不会因置顶状态变化。
+- marker 列只渲染一个可点击的 `session-status-dot`，点击查看状态名称和说明。
+- 空闲：不显示；运行中：operational 色转圈的圆环；待审批：warning 色呼吸点；失败：danger 色点；跑完未看（`unread`，「已完成」）：success 色点（DSH）。
+- 「跑完未看」由 renderer 在后台会话的 `agent_run_finished` 时记下，打开该会话即清除；只存在内存里，重启不保留。当前会话不显示这个点。
+- 已归档的行不显示状态。Pin 不覆盖状态点。
 
 ### 右侧 actions
 
-- 固定顺序为 **Pin / Unpin → Archive → 时间戳**；两个按钮均为 22×22，时间戳始终在最右侧。
-- Pin 与 Archive 只在行 hover 或各自获得 keyboard focus 时淡入；已置顶通过填充 Pin 表达，但不在非 hover 状态常显。
-- actions 固定预留 46px，避免 hover 时标题截断位置或时间戳横向跳动。
-- 非当前会话点击 Archive 会调用 `archiveSession({ sessionId, archived: true })`，写入 `SessionMeta.archived` 后从普通侧边栏列表隐藏。
-- 点击 Archive 后先从 renderer 侧栏移除目标行，不等待 Journal 持久化完成；IPC 返回失败或异常时重新读取会话列表恢复目标行。
-- 当前 active session 不允许归档，Archive 按钮保持占位但禁用，`aria-label` / `title` 为 `Current session cannot be archived`，避免当前工作区被操作清空或自动跳转。
-- 行尾不显示状态点，避免左右两边出现语义相同的圆点。
+- 悬停时依次是 **`⋯` 更多 → 归档 → 置顶 / 取消置顶**，都是 22×22 的 `IconButton`；`⋯` 打开和右键相同的会话菜单。
+- 已归档的行是 **`⋯` → 取消归档**（`ArchiveRestore`），不显示置顶；右键菜单里同样把「归档」换成「取消归档」，「置顶」禁用。取消归档走 `archiveSession({ sessionId, archived: false })` 后刷新会话列表。
+- 非当前会话点击归档会调用 `archiveSession({ sessionId, archived: true })`，先从 renderer 侧栏移除目标行，IPC 失败或异常时重新读取会话列表恢复。
+- 当前 active session 不允许归档，按钮禁用，名称为「当前会话无法归档」。
 
 ### 右键菜单、Copy、Fork 与重命名
 
@@ -266,20 +301,23 @@
 
 ## 验收矩阵
 
-- Workspace 文件夹：左侧 chevron 只折叠；名称左键只聚焦，右键打开菜单，`Shift+F10` / Context Menu 键提供键盘入口；右侧 `+` 仍只新建 Agent。
+- Workspace 文件夹：图标格和名称点击折叠，折叠状态重启保留；右键、`⋯`、`Shift+F10` / Context Menu 键打开菜单；右侧 `+` 只新建 Agent。
+- 视图选项：三种分组、两种排序、三种归档筛选和恢复默认都生效并持久化；按时间时手动排序禁用；拖拽只在同一账本内，「最近更新」下拖动后切到手动排序并提示。
+- 搜索：放大镜展开搜索框，结果替换列表，`Esc` 关闭后恢复原列表。
 - 菜单：顺序、图标、separator、danger 文字、键盘方向键、Escape 回焦和窗口 collision 正常。
 - `Open in IDE`：只打开 registry 对应目录；未注册、已隐藏、不存在和非目录目标都不启动外部程序。
 - `Archive All`：包含 Pinned 会话；存在 running/waiting approval 会话时禁用；active session 有导航落点；部分失败保留未成功条目。
-- `Remove from Sidebar`：同时移出 Workspaces/Pinned；Default workspace 禁用；重启不回流；重新选择同路径恢复。
+- `Remove from Sidebar`：同时移出 Workspaces/Pinned；所有 Workspace 都可移除；重启不回流；重新选择同路径恢复；全部移除后新建会话页提示「请先选择工作区」。
 - 会话 Tooltip：所有行可 hover/focus，只显示完整标题与绝对路径；定位锚点使用完整会话行，使浮层左边缘与 Sidebar 右侧分割线保持 `8px` 间距，而不是贴着标题文字出现；右键菜单和重命名时关闭。
 - 主题：浅色、深色和 system-dark 下不使用非主题感知颜色，focus/disabled/danger 状态可辨识。
 
 ## 设计原则
 
 - 轻量优先：信息密度高、视觉装饰少，不做重卡片。
-- 轻量管理：Workspace 来源仍是本地目录，侧边栏只暴露打开、归档和隐藏三个高频动作，不在导航区引入重命名、排序、迁移等重管理能力。
-- 状态合并：行首点首版只区分 active 和 busy，不细分未读/错误/审批，等业务上有真实区分需求再扩展。
+- 轻量管理：Workspace 来源仍是本地目录，侧边栏只暴露打开、归档和隐藏三个高频动作，加上拖拽排序；不在导航区引入重命名、迁移等重管理能力。
+- 状态合并：行首一个点表达运行中、待审批、失败、跑完未看四种状态，按时间分组时后三种汇总到「需要处理」。
 - 操作克制：顶部主入口只保留当前产品入口（扩展）和核心操作（New Agent）；退役或暂停的方向不占用公开入口。
+- 干净但有个性：静止时像 DSH 一样只有标题和时间，个性放在微交互里（文件夹与箭头交叉淡入、搜索框展开、拖拽插入线），不靠常驻装饰（Cursor）。
 - 折叠彻底：`hidden` 而非 `rail`，让 main content 真正占满，符合用户对"折叠"的直觉与 Cursor 行为一致；窗口顶部浮动的 chrome row 保证可逆。
 
 ## 会话浏览加载

@@ -28,13 +28,13 @@ describe("contextUsageDisplay", () => {
 describe("composerLocalRunTarget", () => {
   const workspaces = [{ value: "/a", label: "alpha" }, { value: "/b", label: "beta" }];
 
-  it("falls back to the first workspace, then to 「工作区」", () => {
+  it("falls back to the first workspace, then asks to pick one", () => {
     const label = (workspaceOptions: typeof workspaces, selectedWorkspaceRoot?: string) =>
       composerLocalRunTarget({ workspaceOptions, selectedWorkspaceRoot, newWorktree: { enabled: true } }).workspaceLabel;
 
     expect(label(workspaces, "/b")).toBe("beta");
     expect(label(workspaces, "/missing")).toBe("alpha");
-    expect(label([], undefined)).toBe("工作区");
+    expect(label([], undefined)).toBe("选择工作区");
   });
 });
 

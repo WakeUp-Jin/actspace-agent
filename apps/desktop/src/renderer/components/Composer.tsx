@@ -123,9 +123,9 @@ export function Composer({
   });
   const { message, setMessage, setText: setDraftText } = draft;
   const hasAttachments = attachments.length > 0 || (!isChatForm && selectedSkills.length > 0);
-  // 远端是否可发送只看 readiness（15 T7）；不能时的原因进发送按钮 tooltip 和状态行。
+  // 能否发送看 readiness（15 T7）：远端看 Host，本机看有没有工作区。不能时的原因进发送按钮 tooltip 和状态行。
   const remoteReady = readiness.state === "ready";
-  const remoteNotReady = isRemoteTarget && readiness.state !== "ready" ? describeReadiness(readiness, target.hostName) : null;
+  const targetNotReady = readiness.state !== "ready" ? describeReadiness(readiness, isRemoteTarget ? target.hostName : "") : null;
   const model = useComposerModel({
     target,
     sessionId: sessionId ?? null,
@@ -142,7 +142,7 @@ export function Composer({
     writeDraft,
     onSend,
     remote: isRemoteTarget,
-    ready: Boolean(message.trim() || attachments.length > 0 || responseAnnotations.length > 0) && model.available,
+    ready: Boolean(message.trim() || attachments.length > 0 || responseAnnotations.length > 0) && model.available && readiness.state === "ready",
     text: message,
     attachments,
     clearDraft: () => {
@@ -333,7 +333,7 @@ export function Composer({
           queueEnabled: Boolean(messageQueue),
           canSend: sender.canSend,
           modelAvailable: model.available,
-          notReady: remoteNotReady,
+          notReady: targetNotReady,
           hostReachable: hostReachable(readiness),
         }}
         onSend={sendCurrentMessage}
@@ -418,7 +418,7 @@ export function Composer({
       <ComposerStatusRow
         form={isChatForm ? "chat" : "agent"}
         target={target}
-        notReady={remoteNotReady}
+        notReady={targetNotReady}
         host={remoteHost}
         remoteDescription={choices?.description}
         branchLabel={branchLabel}
@@ -447,7 +447,7 @@ export function Composer({
         openField={overlays.runTargetField}
         onOpenChange={(field, open) => overlays.setOpen({ kind: "run-target", field }, open)}
         target={target}
-        notReady={remoteNotReady}
+        notReady={targetNotReady}
         locationOnly={isChatForm}
         hosts={choices?.hosts ?? []}
         remoteDescription={choices?.description}

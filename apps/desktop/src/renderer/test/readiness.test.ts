@@ -27,7 +27,8 @@ function input(patch: { target?: RunTarget; loaded?: boolean; hosts?: HostConnec
 
 describe("resolveReadiness", () => {
   it.each<[string, ReadinessInput, RunTargetReadiness]>([
-    ["local", input({ target: { kind: "local" }, hosts: [] }), { state: "ready" }],
+    ["local with a workspace", input({ target: { kind: "local", workspaceRoot: "/w" }, hosts: [] }), { state: "ready" }],
+    ["local without a workspace", input({ target: { kind: "local" }, hosts: [] }), { state: "workspace-required" }],
     ["remote with workspace and model", input(), { state: "ready" }],
     ["corrupt session key", input({ target: { kind: "invalid", key: "x" } }), { state: "removed" }],
     ["hosts not listed yet", input({ loaded: false, hosts: [] }), { state: "connecting" }],
@@ -68,6 +69,7 @@ describe("describeReadiness", () => {
     [{ state: "workspace-missing" }, null, "选择一个远端工作区"],
     [{ state: "workspace-missing", workspaceId: "w9" }, null, "该工作区在 Cloud 上已不存在"],
     [{ state: "model-missing" }, null, "选择一个模型"],
+    [{ state: "workspace-required" }, null, "请先选择工作区"],
   ])("%j", (readiness, label, reason) => {
     const copy = describeReadiness(readiness as Exclude<RunTargetReadiness, { state: "ready" }>, "Cloud");
     expect(copy.label).toBe(label);

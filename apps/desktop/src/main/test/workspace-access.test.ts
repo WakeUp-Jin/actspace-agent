@@ -20,10 +20,9 @@ async function tempDir(prefix: string): Promise<string> {
 function registryOf(...paths: string[]): WorkspaceRegistry {
   return {
     version: 1,
-    defaultWorkspaceId: "default",
     items: paths.map((path, index) => ({
-      id: index === 0 ? "default" : `ws-${index}`,
-      kind: index === 0 ? "default" : "folder",
+      id: `ws-${index}`,
+      kind: "folder",
       label: path,
       path,
       order: index,
@@ -54,9 +53,9 @@ describe("resolveWorkspaceAccess", () => {
     expect(await rejection(resolveWorkspaceAccess({ workspaceRoot: join(root, "src") }, access))).toBeInstanceOf(WorkspaceAccessError);
   });
 
-  it("falls back to the registry default workspace when no root is given", async () => {
+  it("rejects a missing root instead of falling back to a workspace", async () => {
     const root = await tempDir("actspace-access-default-");
-    expect(await resolveWorkspaceAccess({}, deps(registryOf(root)))).toBe(await realpath(root));
+    await expect(resolveWorkspaceAccess({}, deps(registryOf(root)))).rejects.toBeInstanceOf(WorkspaceAccessError);
   });
 
   it("rejects /, the home directory and unregistered directories", async () => {

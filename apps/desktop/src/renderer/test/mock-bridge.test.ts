@@ -105,7 +105,8 @@ describe("mock bridge", () => {
     const { bridge, db } = open(scenario);
     const page = await bridge.sessions.listPage();
     for (const item of page.items) await expect(bridge.sessions.getPage({ sessionId: item.id })).resolves.toMatchObject({ sessionId: item.id });
-    expect(page.items.length).toBe(db.sessions.size);
+    // listPage 不返回已归档的会话（侧栏按筛选另外拉）。
+    expect(page.items.length).toBe([...db.sessions.values()].filter((session) => !session.archived).length);
     if (scenario === "empty") expect(page.items).toEqual([]);
   });
 
