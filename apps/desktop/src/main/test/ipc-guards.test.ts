@@ -16,6 +16,8 @@ const CASES: Record<string, Case> = {
   "sessions.create": { spec: contract.sessions.create, valid: [undefined, {}, { runLocation: "worktree", branch: "main", agentForm: "agent" }], invalid: [null, { runLocation: "invalid" }, { branch: [] }, { agentForm: "plan" }, { hostId: "host", runLocation: "worktree" }] },
   "workspaces.readFile": { spec: contract.workspaces.readFile, valid: [{ relativePath: "a.ts" }, { workspaceRoot: "/w", relativePath: "a.ts" }], invalid: [undefined, { workspaceRoot: "/w" }, { relativePath: 1 }] },
   "workspaces.statFile": { spec: contract.workspaces.statFile, valid: [{ workspaceRoot: null, relativePath: "a.ts" }], invalid: [{ relativePath: ["a"] }] },
+  "workspaces.listFileApplications": { spec: contract.workspaces.listFileApplications, valid: [{ relativePath: "a.docx" }], invalid: [{}, { relativePath: 1 }] },
+  "workspaces.openFile": { spec: contract.workspaces.openFile, valid: [{ relativePath: "a.docx", action: "open" }, { workspaceRoot: "/w", relativePath: "a.docx", action: "open", applicationId: "/Applications/Pages.app" }, { relativePath: "a.docx", action: "reveal" }], invalid: [{ relativePath: "a.docx" }, { relativePath: "a.docx", action: "run" }, { relativePath: "a.docx", action: "open", applicationId: 1 }] },
   "workspaces.listDir": { spec: contract.workspaces.listDir, valid: [{}, { workspaceRoot: "/w", relativePath: "" }], invalid: [null, { relativePath: 0 }] },
   "sessions.readArtifact": { spec: contract.sessions.readArtifact, valid: [{ sessionId: "s", artifactPath: "out.png" }], invalid: [{ sessionId: "s" }] },
   "workspaces.createFolder": { spec: contract.workspaces.createFolder, valid: [{ parentRoot: "/w", name: "new" }], invalid: [{ parentRoot: "/w" }, "new"] },

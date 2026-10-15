@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
-  ChevronLeft,
   Plus,
   RefreshCw,
   Search,
@@ -28,7 +27,7 @@ import {
   type SettingsV4ConnectionSettings,
   type ProviderCatalogDefinition,
 } from "@actspace/shared";
-import { SectionShell, SettingGroup, SettingLinkRow, SettingRow, SettingSubhead, SettingTag, SettingsInput, StatusDot } from "./SettingsPrimitives";
+import { PageHeader, SectionShell, SettingGroup, SettingLinkRow, SettingRow, SettingSubhead, SettingTag, SettingsInput, StatusDot } from "./SettingsPrimitives";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ModelSettings } from "./ModelSettings";
 import { ProviderLogo } from "./ProviderLogo";
@@ -265,6 +264,7 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
       return (
         <ProviderSetupRoute
           provider={setup.provider}
+          backLabel={setup.origin === "catalog" ? "添加连接" : "模型"}
           current={providers[setup.provider]}
           onBack={() => {
             if (setup.origin === "catalog") setAdding({ kind: "catalog" });
@@ -284,6 +284,7 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
   const hasRows = loaded && (connectedProviders.length > 0 || customConnections.length > 0);
   return (
     <>
+      <PageHeader title="模型" description="模型连接、API Key 与模型目录管理。" />
       <SectionShell
         title="模型连接"
         action={
@@ -319,16 +320,13 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
         ) : null}
 
         {hasRows ? (
-          <div className="divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface">
+          <div className="mc-stack">
             {connectedProviders.map((provider) => <ConnectionRow key={provider.id} provider={provider} state={providers[provider.id]} isDefault={defaultProviderId === provider.id} onOpen={() => setDetailProvider(provider.id)} />)}
             {customConnections.map((connection) => (
-              <SettingLinkRow
+              <CustomConnectionCard
                 key={connection.connectionId}
-                leading={<ProviderLogo provider={connection.providerId} logoKey={protocolLogoKey(connection.protocol)} />}
-                title={<h4 className="text-act-sm font-medium">{connection.displayName ?? connection.connectionId}</h4>}
-                description={isOfficialAnthropic(connection) ? "Anthropic 官方 API" : `${protocolLabel(connection.protocol)} · ${hostOf(connection.baseUrl)}`}
-                trailing={<ConnectionStatusDot status={connection.lastConnection?.status} />}
-                onClick={() => setCustomDetail({ connection, autoTest: false })}
+                connection={connection}
+                onOpen={() => setCustomDetail({ connection, autoTest: false })}
               />
             ))}
           </div>
@@ -348,6 +346,7 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
   );
 }
 
+/** 一行连接就是一张发丝卡：logo、名称 + 模型摘要、状态点，整行可点。 */
 function ConnectionRow({
   provider,
   state,
@@ -359,39 +358,79 @@ function ConnectionRow({
   isDefault: boolean;
   onOpen: () => void;
 }) {
+  const enabled = state?.enabledModelCount ?? 0;
+  const installed = state?.installedModelCount ?? 0;
   return (
-    <SettingLinkRow
-      ariaLabel={`${provider.label}${isDefault ? "，默认" : ""}`}
-      leading={<ProviderLogo provider={provider.id} />}
-      title={<><h4 aria-label={provider.label} className="text-act-sm font-medium">{provider.label}</h4>{isDefault ? <SettingTag>默认</SettingTag> : null}</>}
-      description={`${provider.description} · ${state?.enabledModelCount ?? 0} / ${state?.installedModelCount ?? 0} 个模型启用`}
-      trailing={<StatusBadge status={state?.lastConnection?.status ?? "untested"} />}
+    <button
+      type="button"
       onClick={onOpen}
-    />
+      aria-label={`${provider.label}${isDefault ? "，默认" : ""}`}
+      className="mc-card mc-conn transition-colors duration-(--motion-fast) hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+    >
+      <ProviderLogo provider={provider.id} />
+      <span className="mc-body">
+        <span className="mc-name">
+          <h4 aria-label={provider.label} className="text-act-sm font-medium">{provider.label}</h4>
+          {isDefault ? <span className="mc-tag mc-tag-on">默认</span> : null}
+        </span>
+        <span className="mc-meta">
+          {enabled > 0 ? <>{enabled} / {installed} 个模型启用</> : provider.description}
+        </span>
+      </span>
+      <ConnectionStatusLabel status={state?.lastConnection?.status ?? "untested"} />
+    </button>
+  );
+}
+
+/** 自定义连接/中转站的一行，和内置服务商同样的卡片。 */
+function CustomConnectionCard({
+  connection,
+  onOpen,
+}: {
+  connection: SettingsV4ConnectionSettings;
+  onOpen: () => void;
+}) {
+  const official = isOfficialAnthropic(connection);
+  const name = connection.displayName ?? connection.connectionId;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="mc-card mc-conn transition-colors duration-(--motion-fast) hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+    >
+      <ProviderLogo provider={connection.providerId} logoKey={protocolLogoKey(connection.protocol)} />
+      <span className="mc-body">
+        <span className="mc-name">
+          <h4 className="text-act-sm font-medium">{name}</h4>
+          {official ? null : <span className="mc-tag">中转站</span>}
+        </span>
+        <span className="mc-meta">
+          {official ? "Anthropic 官方 API" : `${protocolLabel(connection.protocol)} · ${hostOf(connection.baseUrl)}`}
+        </span>
+      </span>
+      <ConnectionStatusLabel status={connection.lastConnection?.status} />
+    </button>
   );
 }
 
 function ProviderSetupRoute({
   provider,
   current,
+  backLabel,
   onBack,
   onSaved,
 }: {
   provider: LlmProviderId;
   current?: ProviderSettingsView;
+  backLabel: string;
   onBack: () => void;
   onSaved: () => void | Promise<void>;
 }) {
   const meta = PROVIDERS.find((item) => item.id === provider)!;
   return (
     <div className="w-full" data-provider-route="setup">
-      <div className="mb-7 flex items-center gap-3">
-        <RouteBack onBack={onBack} label="返回模型连接" />
-        <ProviderLogo provider={meta.id} />
-        <div className="min-w-0">
-          <h3 className="text-act-lg font-semibold tracking-tight text-text-main">{isProviderConfigured(current) ? `编辑 ${meta.label}` : `连接 ${meta.label}`}</h3>
-          <p className="mt-0.5 text-act-xs leading-relaxed text-text-faint">完成必要配置后，连接会出现在模型页上方。</p>
-        </div>
+      <div className="mb-9">
+        <PageHeader onBack={onBack} backLabel={backLabel} leading={<ProviderLogo provider={meta.id} />} title={isProviderConfigured(current) ? `编辑 ${meta.label}` : `连接 ${meta.label}`} description="完成必要配置后，连接会出现在模型页上方。" />
       </div>
       <ProviderConnectionForm provider={provider} current={current} onClose={onBack} onSaved={onSaved} />
     </div>
@@ -423,13 +462,8 @@ function CustomConnectionSetup({ catalog, onBack, onSaved }: { catalog: Provider
   const inputClass = "h-10 w-full rounded-act-md border border-line bg-surface px-3 text-act-sm text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 disabled:opacity-60";
   return (
     <div className="w-full" onKeyDown={(event) => { if (event.key === "Escape" && !saving) onBack(); }}>
-      <div className="mb-7 flex items-center gap-3">
-        <RouteBack onBack={onBack} label="返回添加连接" />
-        <ProviderLogo provider={catalog.runtimeProviderId ?? "openrouter"} logoKey={catalog.logoKey} />
-        <div className="min-w-0">
-          <h3 className="text-act-lg font-semibold tracking-tight text-text-main">{`连接 ${catalog.label}`}</h3>
-          <p className="mt-0.5 text-act-xs leading-relaxed text-text-faint">完成必要配置后，连接会出现在模型页上方。</p>
-        </div>
+      <div className="mb-9">
+        <PageHeader onBack={onBack} backLabel="添加连接" leading={<ProviderLogo provider={catalog.runtimeProviderId ?? "openrouter"} logoKey={catalog.logoKey} />} title={`连接 ${catalog.label}`} description="完成必要配置后，连接会出现在模型页上方。" />
       </div>
       <div className="grid gap-5">
         <ApiKeyField name="API Key" configured={false} value={apiKey} onChange={setApiKey} />
@@ -499,12 +533,13 @@ function ProviderDetailRoute({
   const address = state.baseUrl ?? PROVIDER_REGISTRY[provider.id].defaultBaseUrl;
   return (
     <div className="flex w-full flex-col gap-9">
-      <DetailHeader
+      <PageHeader
         onBack={onBack}
-        logo={<ProviderLogo provider={provider.id} />}
+        backLabel="模型"
+        leading={<ProviderLogo provider={provider.id} />}
         title={provider.label}
         tag={isDefault ? <SettingTag>默认</SettingTag> : null}
-        subtitle={<>{provider.description} · {categoryLabel(provider.category)} · <StatusBadge status={state.lastConnection?.status ?? "untested"} /></>}
+        description={<>{provider.description} · {categoryLabel(provider.category)} · <StatusBadge status={state.lastConnection?.status ?? "untested"} /></>}
       />
 
       <DetailSection title="连接" description="密钥只保存在本机。">
@@ -558,27 +593,9 @@ function ProviderDetailRoute({
   );
 }
 
-function DetailHeader({ onBack, logo, title, tag, subtitle }: { onBack: () => void; logo: React.ReactNode; title: string; tag?: React.ReactNode; subtitle: React.ReactNode }) {
-  return (
-    <div>
-      <RouteBack onBack={onBack} label="模型" />
-      <div className="mt-2 flex items-center gap-3">
-        <span className="shrink-0 [&>*]:h-10 [&>*]:w-10">{logo}</span>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-act-lg font-semibold tracking-tight text-text-main">{title}</h3>
-            {tag}
-          </div>
-          <p className="mt-0.5 flex flex-wrap items-center gap-1 text-act-xs text-text-muted">{subtitle}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** 连接详情里的一个分组：h4 标题 + 内嵌分组；plain 时内容自己负责容器（例如模型目录）。 */
+/** 连接详情里的一个分组：h4 标题 + 发丝卡（.mc-models）；plain 时内容自己负责容器（例如模型目录）。 */
 function DetailSection({ title, description, action, plain = false, children }: { title: string; description?: string; action?: React.ReactNode; plain?: boolean; children: React.ReactNode }) {
-  if (!plain) return <SettingGroup title={title} description={description} action={action}>{children}</SettingGroup>;
+  if (!plain) return <SettingGroup plain title={title} description={description} action={action}><div className="mc-models">{children}</div></SettingGroup>;
   return <SectionShell title={title} description={description} action={action} headingLevel={4}>{children}</SectionShell>;
 }
 
@@ -614,15 +631,6 @@ function DetailRow({ label, description, value, mono = false, action, onAction, 
         </>
       )}
     />
-  );
-}
-
-function RouteBack({ onBack, label }: { onBack: () => void; label: string }) {
-  return (
-    <button type="button" aria-label="返回连接" onClick={onBack} className="-ml-1.5 inline-flex h-[26px] items-center gap-0.5 rounded-act-sm pl-1 pr-2 text-act-xs text-text-muted transition-colors hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30">
-      <ChevronLeft size={14} aria-hidden="true" />
-      {label}
-    </button>
   );
 }
 
@@ -662,6 +670,13 @@ function getDefaultProviderId(modelKey?: string | null): LlmProviderId | null {
 function StatusBadge({ status }: { status: string }) {
   if (status === "unavailable") return <StatusDot tone="error">连接异常</StatusDot>;
   return <StatusDot tone="ok">{status === "available" ? "可用" : "已连接"}</StatusDot>;
+}
+
+/** 列表卡片右侧的状态短语：一个圆点加一句话，和详情页的措辞对齐。 */
+function ConnectionStatusLabel({ status }: { status?: string }) {
+  if (status === "unavailable") return <span className="mc-status" data-tone="error">连接异常</span>;
+  if (status === "available") return <span className="mc-status" data-tone="ok">可用</span>;
+  return <span className="mc-status" data-tone="off">未测试</span>;
 }
 
 function ProviderFact({ label, value, title }: { label: string; value: string; title?: string }) {
@@ -717,40 +732,49 @@ function ProviderCatalogRoute({
   // 「自定义服务」始终留在底部，搜不到服务商时就是出口。
   const custom = providers.find((provider) => provider.category === "custom");
   const row = (provider: CatalogEntry) => (
-    <SettingLinkRow
+    <button
       key={provider.id}
-      ariaLabel={`选择 ${provider.label}`}
-      leading={<ProviderLogo provider={provider.kind === "builtin" ? provider.id : provider.runtimeProviderId ?? "openrouter"} logoKey={provider.logoKey} />}
-      title={provider.label}
-      description={provider.description}
+      type="button"
       onClick={() => onSelect(provider)}
-    />
+      aria-label={`选择 ${provider.label}`}
+      className="mc-pick"
+    >
+      <span className="mc-logo">
+        <ProviderLogo provider={provider.kind === "builtin" ? provider.id : provider.runtimeProviderId ?? "openrouter"} logoKey={provider.logoKey} />
+      </span>
+      <span className="mc-body">
+        <span className="mc-name">{provider.label}</span>
+        <span className="mc-meta">{provider.description}</span>
+      </span>
+      <ChevronRight size={15} className="mc-chevron" aria-hidden="true" />
+    </button>
   );
   return (
-    <div className="flex w-full flex-col gap-6">
-      <div>
-        <RouteBack onBack={onBack} label="返回模型连接" />
-        <h3 className="mt-2 text-act-lg font-semibold tracking-tight text-text-main">添加连接</h3>
-      </div>
-      <div className="flex flex-col gap-3">
-        <label className="relative block w-[260px] max-[600px]:w-full">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" />
-          <SettingsInput autoFocus width="full" className="pl-8" aria-label="搜索模型服务" placeholder="搜索服务商" value={query} onChange={(event) => onQueryChange(event.target.value)} />
-        </label>
-        {groups.length ? (
-          <SettingGroup>
-            {groups.map((group) => (
-              <div key={group.category} className="divide-y divide-line/60">
-                <SettingSubhead>{group.label}</SettingSubhead>
-                {group.rows.map(row)}
-              </div>
-            ))}
-          </SettingGroup>
-        ) : (
-          <p className="px-0.5 text-act-xs text-text-muted">列表里没有匹配的服务商。</p>
-        )}
-      </div>
-      {custom ? <SettingGroup title="没有找到？">{row(custom)}</SettingGroup> : null}
+    <div className="flex w-full flex-col gap-5" data-provider-route="catalog">
+      <PageHeader onBack={onBack} backLabel="模型" title="添加连接" />
+      <label className="relative block w-[260px] max-[600px]:w-full">
+        <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" />
+        <SettingsInput autoFocus width="full" className="pl-8" aria-label="搜索模型服务" placeholder="搜索服务商" value={query} onChange={(event) => onQueryChange(event.target.value)} />
+      </label>
+      {groups.length ? (
+        <div className="mc-card mc-card-tight">
+          {groups.map((group) => (
+            <div key={group.category}>
+              <div className="mc-group-label">{group.label}</div>
+              {group.rows.map(row)}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="px-0.5 text-act-xs text-text-muted">列表里没有匹配的服务商。</p>
+      )}
+      {/* 自定义服务始终留在最后：搜不到服务商时它就是出口。 */}
+      {custom ? (
+        <section className="flex flex-col gap-2.5">
+          <h4 className="mc-group-label px-0.5">没有找到？</h4>
+          <div className="mc-card mc-card-tight">{row(custom)}</div>
+        </section>
+      ) : null}
     </div>
   );
 }

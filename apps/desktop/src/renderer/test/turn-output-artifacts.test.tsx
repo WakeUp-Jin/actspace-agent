@@ -84,7 +84,7 @@ describe("image generation presentation", () => {
     expect(screen.getByText("Image generation provider returned HTML instead of JSON.")).toBeInTheDocument();
   });
 
-  it("collects generated images and completed write/edit outputs only", () => {
+  it("collects generated images only; written files belong to the turn changes card", () => {
     const outputs = collectTurnOutputArtifacts([
       imageMessage,
       {
@@ -100,113 +100,10 @@ describe("image generation presentation", () => {
         status: "completed",
         createdAt: "2026-07-28T00:00:01.000Z",
       },
-      {
-        kind: "edit_diff",
-        id: "edit-running",
-        filePath: "draft.md",
-        outputPath: "/workspace/draft.md",
-        outputRelativePath: "draft.md",
-        additions: 0,
-        deletions: 0,
-        diff: "",
-        collapsedLines: 0,
-        status: "running",
-        createdAt: "2026-07-28T00:00:02.000Z",
-      },
     ]);
 
-    expect(outputs.map((output) => output.name)).toEqual(["generated-01.png", "result.md"]);
+    expect(outputs.map((output) => output.name)).toEqual(["generated-01.png"]);
     expect(outputs[0].displayPath).toBe("generated-images/batch/generated-01.png");
-    expect(outputs[1]).toMatchObject({ additions: 2, deletions: 0 });
-  });
-
-  it("merges repeated file changes and removes files deleted later in the turn", () => {
-    const outputs = collectTurnOutputArtifacts([
-      {
-        kind: "write_diff",
-        id: "write-report",
-        filePath: "report.md",
-        outputPath: "/workspace/docs/report.md",
-        outputRelativePath: "docs/report.md",
-        additions: 4,
-        deletions: 0,
-        diff: "",
-        collapsedLines: 0,
-        status: "completed",
-        createdAt: "2026-07-28T00:00:01.000Z",
-      },
-      {
-        kind: "edit_diff",
-        id: "edit-report",
-        filePath: "report.md",
-        outputPath: "/workspace/docs/report.md",
-        outputRelativePath: "docs/report.md",
-        additions: 2,
-        deletions: 1,
-        diff: "",
-        collapsedLines: 0,
-        status: "completed",
-        createdAt: "2026-07-28T00:00:02.000Z",
-      },
-      {
-        kind: "write_diff",
-        id: "write-temp",
-        filePath: "tmp-test.mjs",
-        outputPath: "/workspace/tmp-test.mjs",
-        outputRelativePath: "tmp-test.mjs",
-        additions: 10,
-        deletions: 0,
-        diff: "",
-        collapsedLines: 0,
-        status: "completed",
-        createdAt: "2026-07-28T00:00:03.000Z",
-      },
-      {
-        kind: "delete",
-        id: "delete-temp",
-        filePath: "tmp-test.mjs",
-        outputPath: "/workspace/tmp-test.mjs",
-        outputRelativePath: "tmp-test.mjs",
-        displayText: "Deleted tmp-test.mjs",
-        status: "completed",
-        createdAt: "2026-07-28T00:00:04.000Z",
-      },
-    ]);
-
-    expect(outputs).toHaveLength(1);
-    expect(outputs[0]).toMatchObject({
-      displayPath: "docs/report.md",
-      additions: 6,
-      deletions: 1,
-    });
-  });
-
-  it("removes a uniquely named file for legacy delete previews without output paths", () => {
-    const outputs = collectTurnOutputArtifacts([
-      {
-        kind: "write_diff",
-        id: "write-temp",
-        filePath: "tmp-test-orders.mjs",
-        outputPath: "/workspace/tmp-test-orders.mjs",
-        outputRelativePath: "tmp-test-orders.mjs",
-        additions: 46,
-        deletions: 0,
-        diff: "",
-        collapsedLines: 0,
-        status: "completed",
-        createdAt: "2026-07-28T00:00:01.000Z",
-      },
-      {
-        kind: "delete",
-        id: "delete-temp",
-        filePath: "tmp-test-orders.mjs",
-        displayText: "Deleted tmp-test-orders.mjs",
-        status: "completed",
-        createdAt: "2026-07-28T00:00:02.000Z",
-      },
-    ]);
-
-    expect(outputs).toEqual([]);
   });
 
   it("loads a session image through preload and opens a data URL in the right panel", async () => {
@@ -263,134 +160,6 @@ describe("image generation presentation", () => {
       kind: "session_image",
       sessionId: "session-1",
       artifactPath: imageMessage.images?.[0].path,
-    });
-  });
-
-  it("opens a completed workspace output file with the existing file renderer", async () => {
-    const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
-      kind: "write_diff",
-      id: "write-output",
-      filePath: "report.md",
-      outputPath: "/workspace/docs/report.md",
-      outputRelativePath: "docs/report.md",
-      additions: 3,
-      deletions: 0,
-      diff: "",
-      collapsedLines: 0,
-      status: "completed",
-      createdAt: "2026-07-28T00:00:01.000Z",
-    };
-    const readWorkspaceFile = vi.fn(async () => ({
-      relativePath: "docs/report.md",
-      renderKind: "markdown" as const,
-      content: "# Report",
-      size: 8,
-    }));
-    setupBridge({ "workspaces.readFile": readWorkspaceFile });
-
-    render(
-      <RightPanelProvider>
-        <TurnOutputArtifacts messages={[writeMessage]} sessionId="session-1" workspaceRoot="/workspace" />
-        <ActiveTabTitleProbe />
-      </RightPanelProvider>,
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: "Open report.md" }));
-
-    expect(readWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/report.md" });
-    expect(screen.getByTestId("active-tab-title")).toHaveTextContent("markdown:report.md");
-  });
-
-  it("shows a specific error when a workspace artifact no longer exists", async () => {
-    const readWorkspaceFile = vi.fn(async () => ({
-      relativePath: "tmp-test.mjs",
-      renderKind: "text" as const,
-      size: 0,
-      mtimeMs: 0,
-      error: "not_found" as const,
-    }));
-    setupBridge({ "workspaces.readFile": readWorkspaceFile });
-    const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
-      kind: "write_diff",
-      id: "write-missing",
-      filePath: "tmp-test.mjs",
-      outputPath: "/workspace/tmp-test.mjs",
-      outputRelativePath: "tmp-test.mjs",
-      additions: 4,
-      deletions: 0,
-      diff: "",
-      collapsedLines: 0,
-      status: "completed",
-      createdAt: "2026-07-28T00:00:01.000Z",
-    };
-
-    render(
-      <RightPanelProvider>
-        <TurnOutputArtifacts messages={[writeMessage]} sessionId="session-1" workspaceRoot="/workspace" />
-      </RightPanelProvider>,
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: "Open tmp-test.mjs" }));
-
-    expect(await screen.findByText("文件已不存在。")).toBeInTheDocument();
-  });
-
-  it("renders workspace outputs as a compact file list with per-file and total diff stats", () => {
-    const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
-      kind: "write_diff",
-      id: "write-output-list",
-      filePath: "report.md",
-      outputPath: "/workspace/docs/report.md",
-      outputRelativePath: "docs/report.md",
-      additions: 3,
-      deletions: 1,
-      diff: "",
-      collapsedLines: 0,
-      status: "completed",
-      createdAt: "2026-07-28T00:00:01.000Z",
-    };
-
-    render(
-      <RightPanelProvider>
-        <TurnOutputArtifacts messages={[writeMessage]} sessionId="session-1" workspaceRoot="/workspace" />
-      </RightPanelProvider>,
-    );
-
-    expect(screen.getByText("Edited 1 file")).toBeInTheDocument();
-    expect(screen.getByText("docs/report.md")).toBeInTheDocument();
-    expect(screen.getAllByText("+3")).toHaveLength(2);
-    expect(screen.getAllByText("-1")).toHaveLength(2);
-  });
-
-  it("asks main to open a workspace output context menu by relative path", () => {
-    const showArtifactContextMenu = vi.fn(async () => ({ shown: true }));
-    setupBridge({ "dialogs.showArtifactContextMenu": showArtifactContextMenu });
-    const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
-      kind: "write_diff",
-      id: "write-output-menu",
-      filePath: "report.md",
-      outputPath: "/workspace/docs/report.md",
-      outputRelativePath: "docs/report.md",
-      additions: 1,
-      deletions: 0,
-      diff: "",
-      collapsedLines: 0,
-      status: "completed",
-      createdAt: "2026-07-28T00:00:01.000Z",
-    };
-
-    render(
-      <RightPanelProvider>
-        <TurnOutputArtifacts messages={[writeMessage]} sessionId="session-1" workspaceRoot="/workspace" />
-      </RightPanelProvider>,
-    );
-
-    fireEvent.contextMenu(screen.getByRole("button", { name: "Open report.md" }));
-
-    expect(showArtifactContextMenu).toHaveBeenCalledWith({
-      kind: "workspace_file",
-      workspaceRoot: "/workspace",
-      relativePath: "docs/report.md",
     });
   });
 
@@ -596,34 +365,5 @@ describe("generic tool result presentation", () => {
     expect(call).toHaveBeenCalledWith({ hostId: "server", method: "files.reference", params: { sessionId: "remote-1", path: "docs/ARCHITECTURE.md" } });
     expect(readWorkspaceFile).not.toHaveBeenCalled();
     expect(await screen.findByTestId("active-tab-title")).toHaveTextContent("text:ARCHITECTURE.md");
-  });
-
-  it("opens and downloads output files through the Host when the run target is remote", async () => {
-    const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
-      kind: "write_diff", id: "write-remote", filePath: "report.md", outputPath: "/srv/docs/report.md", outputRelativePath: "docs/report.md",
-      additions: 3, deletions: 0, diff: "", collapsedLines: 0, status: "completed", createdAt: "2026-07-28T00:00:01.000Z",
-    };
-    const call = vi.fn(async () => ({ id: "artifact-2" }));
-    const preview = vi.fn(async () => ({ name: "report.md", size: 8, text: "# Report" }));
-    const download = vi.fn(async () => undefined);
-    const readWorkspaceFile = vi.fn();
-    const showArtifactContextMenu = vi.fn();
-    setupBridge({ "hosts.call": call, "hosts.preview": preview, "hosts.download": download, "workspaces.readFile": readWorkspaceFile, "dialogs.showArtifactContextMenu": showArtifactContextMenu });
-    render(
-      <RightPanelProvider>
-        <RunTargetContext.Provider value={legacyRunTarget({ runTarget: remoteTarget })}>
-          <TurnOutputArtifacts messages={[writeMessage]} sessionId={remoteKey} workspaceRoot="/workspace" />
-        </RunTargetContext.Provider>
-        <ActiveTabTitleProbe />
-      </RightPanelProvider>,
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: "Open report.md" }));
-    expect(preview).toHaveBeenCalledWith({ hostId: "server", sessionId: "remote-1", artifactId: "artifact-2" });
-    expect(screen.getByTestId("active-tab-title")).toHaveTextContent("text:report.md");
-    fireEvent.contextMenu(screen.getByRole("button", { name: "Open report.md" }));
-    await vi.waitFor(() => expect(download).toHaveBeenCalledWith({ hostId: "server", sessionId: "remote-1", artifactId: "artifact-2" }));
-    expect(readWorkspaceFile).not.toHaveBeenCalled();
-    expect(showArtifactContextMenu).not.toHaveBeenCalled();
   });
 });

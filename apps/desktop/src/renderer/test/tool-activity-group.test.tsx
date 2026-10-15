@@ -191,6 +191,17 @@ describe("ToolActivityGroup in ConversationView", () => {
     expect(screen.getByText("项目是 monorepo 结构，这是最终结论。")).toBeInTheDocument();
   });
 
+  it("shows a run failure as an error line outside the collapsed process", () => {
+    const failure: MessageBlock = { kind: "error", id: "failure-1", title: "LLM_ERROR", content: "Request snapshot contains a non-JSON value.", createdAt: "2026-06-02T00:00:09.000Z", recoverable: false };
+    renderConversation([...toolTurn.slice(0, 5), failure]);
+    expect(screen.getByRole("button", { name: /Worked for/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Grep ToolActivityGroup")).not.toBeInTheDocument();
+    expect(screen.getByText("Request snapshot contains a non-JSON value.")).toHaveClass("turn-status-line", "is-error");
+    // A failure before any request leaves only the user message and the error.
+    renderConversation([{ ...plainTurn[0], id: "user-failed" }, { ...failure, id: "failure-2" }]);
+    expect(screen.getAllByText("Request snapshot contains a non-JSON value.")).toHaveLength(2);
+  });
+
   it("does not render a Worked for group for a plain Q&A turn", () => {
     renderConversation(plainTurn);
 

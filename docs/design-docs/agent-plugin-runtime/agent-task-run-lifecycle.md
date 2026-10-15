@@ -48,6 +48,8 @@ Run 已有 harnessId/generationId/revision 保持不变，跨重启稳定摘要�
 
 替换只改变后续获取的组合。旧 Run 持有旧租约，父 Run 和子 Run 可使用不同 revision；同会话下一 Run 可更换 Loop。恢复缺产物、共享契约变化或选择日志损坏时执行 blocked，Host 控制服务仍存在；恢复内置组合需独立授权，成功产生新 revision。生产默认没有授权端口或面向用户的启用入口。普通任务失败不会触发 Harness 回退。
 
+Host 应用升级有一个受限例外：完整选择历史只含 `main` 的 Host 可信 bootstrap / builtin-upgrade，且 Runtime 确认当前组合全为内置插件时，启动可连续升级到随应用发布的内置版本，包括旧 Host 契约不兼容的情况。执行摘要和 Host 契约均未变化时不追加 revision；用户选择或分支历史不走此路径，其他恢复错误继续阻塞。HMR 获取租约时保留 `RECOVERY_BLOCKED` 语义，让任务队列进入可恢复暂停，避免普通异常造成 pending 且未暂停的悬挂状态。
+
 
 ## 远端接入
 

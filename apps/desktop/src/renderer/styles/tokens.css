@@ -129,6 +129,25 @@
   --act-color-diff-remove-text: #a43342;
   --act-color-diff-streaming-bg: rgba(44, 168, 105, 0.08);
 
+  /* 轮尾卡片（改动卡 / 交付卡，对照 DeepSeek Harness）：卡头底色、悬停底色、图标方块底色；diff 行号槽底色。 */
+  --act-color-turn-card-fill: #f7f7f5;
+  --act-color-turn-card-hover: #efefec;
+  --act-color-turn-card-tile: rgba(255, 255, 255, 0.5);
+  --act-color-diff-add-gutter: rgba(44, 168, 105, 0.2);
+  --act-color-diff-remove-gutter: rgba(225, 70, 86, 0.2);
+
+  /* 文件类型图标（移植自 DeepSeek Harness FileTypeIcon）：固定色，不随主题或强调色翻转，只在这里定义一次。 */
+  --act-file-type-blue: #4176e6;
+  --act-file-type-blue-light: #5686fe;
+  --act-file-type-green: #22c55e;
+  --act-file-type-amber: #f7ad31;
+  --act-file-type-orange: #f59e0b;
+  --act-file-type-red: #ec1313;
+  --act-file-type-violet: #8b76f6;
+  --act-file-type-muted: #cfd3d6;
+  --act-file-type-fold-muted: #a2a4a6;
+  --act-file-type-mark: #ffffff;
+
   /* 数据可视化色板（图表 / heatmap / 标签）；浅深各一组 */
   --act-chart-series-1: #3978b8;
   --act-chart-series-2: #4b919d;
@@ -290,6 +309,52 @@
 
   --scrollbar-thumb: var(--act-scrollbar-thumb);
   --scrollbar-thumb-hover: var(--act-scrollbar-thumb-hover);
+
+  /* 轨迹页（照搬 DeepSeek Harness 轨迹页的浅色取值，不跟随强调色）；样式在 trajectory.css。 */
+  --act-trajectory-label-primary: rgb(15, 17, 21);
+  --act-trajectory-label-secondary: rgb(97, 102, 107);
+  --act-trajectory-label-tertiary: rgb(129, 133, 140);
+  --act-trajectory-label-caption: rgb(173, 178, 184);
+  --act-trajectory-label-dimmed: rgb(225, 229, 238);
+  --act-trajectory-bg-base: rgb(255, 255, 255);
+  --act-trajectory-bg-layer-1: rgb(255, 255, 255);
+  --act-trajectory-bg-layer-2: rgb(255, 255, 255);
+  --act-trajectory-bg-module: rgb(245, 246, 247);
+  --act-trajectory-bg-sidebar: rgb(249, 250, 251);
+  --act-trajectory-border-l1: rgba(0, 0, 0, 0.04);
+  --act-trajectory-border-l2: rgba(0, 0, 0, 0.1);
+  --act-trajectory-border-l2-thin: rgba(0, 0, 0, 0.1);
+  --act-trajectory-border-l3: rgba(0, 0, 0, 0.12);
+  --act-trajectory-border-l4: rgba(0, 0, 0, 0.16);
+  --act-trajectory-hover: rgba(38, 49, 72, 0.06);
+  --act-trajectory-active: rgba(38, 49, 72, 0.1);
+  --act-trajectory-primary: rgb(65, 118, 230);
+  --act-trajectory-primary-soft: rgb(228, 237, 253);
+  --act-trajectory-primary-new: rgb(65, 118, 230);
+  --act-trajectory-blue: rgb(59, 130, 246);
+  --act-trajectory-error: rgb(236, 19, 19);
+  --act-trajectory-error-secondary: rgb(242, 90, 90);
+  --act-trajectory-success: rgb(34, 197, 94);
+  --act-trajectory-success-soft: rgb(230, 250, 237);
+  --act-trajectory-warn: rgb(221, 134, 41);
+  --act-trajectory-warn-soft: rgb(254, 245, 231);
+  --act-trajectory-scrollbar: rgb(229, 229, 229);
+  --act-trajectory-scrollbar-hover: rgb(212, 212, 212);
+  --act-trajectory-code-block: rgb(249, 250, 251);
+  --act-trajectory-citation: rgb(235, 238, 242);
+  --act-trajectory-tooltip-bg: rgb(44, 44, 46);
+  --act-trajectory-tooltip-text: rgb(255, 255, 255);
+  --act-trajectory-shadow-chip: 0 2px 6px rgba(0, 0, 0, 0.12);
+  --act-trajectory-shadow-drawer: -12px 0 32px rgba(0, 0, 0, 0.14);
+  --act-trajectory-shadow-panel: 0 0 0 0.5px rgba(0, 0, 0, 0.16), 0 3px 8px 0 rgba(0, 0, 0, 0.03), 0 0 16px 0 rgba(0, 0, 0, 0.02);
+  --act-json-property: #881391;
+  --act-json-string: #c41a16;
+  --act-json-number: #1c00cf;
+  --act-json-keyword: #1c00cf;
+  --act-json-punctuation: #202124;
+  --act-json-icon: #5f6368;
+  --act-json-hover: rgba(60, 64, 67, 0.04);
+  --act-trajectory-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /*
@@ -388,6 +453,12 @@
   --act-color-diff-remove-text: #f08a8a;
   --act-color-diff-streaming-bg: rgba(53, 193, 135, 0.1);
 
+  --act-color-turn-card-fill: #292a26;
+  --act-color-turn-card-hover: #30312d;
+  --act-color-turn-card-tile: rgba(255, 255, 255, 0.05);
+  --act-color-diff-add-gutter: rgba(53, 193, 135, 0.24);
+  --act-color-diff-remove-gutter: rgba(239, 109, 109, 0.26);
+
   --act-chart-series-1: #6ca6da;
   --act-chart-series-2: #70b5be;
   --act-chart-series-3: #aa96d7;
@@ -436,6 +507,51 @@
   --act-space-spark: #eef1ff;
   --act-space-sky-stars-opacity: 1;
   --act-space-sky-grid-opacity: 0;
+
+  /* 轨迹页深色（DeepSeek Harness 深色取值）。 */
+  --act-trajectory-label-primary: rgb(249, 250, 251);
+  --act-trajectory-label-secondary: rgb(207, 211, 214);
+  --act-trajectory-label-tertiary: rgb(173, 178, 184);
+  --act-trajectory-label-caption: rgb(129, 133, 140);
+  --act-trajectory-label-dimmed: rgb(67, 69, 74);
+  --act-trajectory-bg-base: rgb(21, 21, 23);
+  --act-trajectory-bg-layer-1: rgb(35, 35, 36);
+  --act-trajectory-bg-layer-2: rgb(44, 44, 46);
+  --act-trajectory-bg-module: rgb(53, 54, 56);
+  --act-trajectory-bg-sidebar: rgb(27, 27, 28);
+  --act-trajectory-border-l1: rgba(255, 255, 255, 0.06);
+  --act-trajectory-border-l2: rgba(255, 255, 255, 0.12);
+  --act-trajectory-border-l2-thin: rgba(255, 255, 255, 0.06);
+  --act-trajectory-border-l3: rgba(255, 255, 255, 0.16);
+  --act-trajectory-border-l4: rgba(255, 255, 255, 0.2);
+  --act-trajectory-hover: rgba(255, 255, 255, 0.08);
+  --act-trajectory-active: rgba(255, 255, 255, 0.14);
+  --act-trajectory-primary: rgb(122, 170, 255);
+  --act-trajectory-primary-soft: rgb(52, 65, 91);
+  --act-trajectory-primary-new: rgb(86, 134, 254);
+  --act-trajectory-blue: rgb(59, 130, 246);
+  --act-trajectory-error: rgb(242, 90, 90);
+  --act-trajectory-error-secondary: rgb(242, 90, 90);
+  --act-trajectory-success: rgb(34, 197, 94);
+  --act-trajectory-success-soft: rgb(35, 60, 44);
+  --act-trajectory-warn: rgb(221, 134, 41);
+  --act-trajectory-warn-soft: rgb(39, 36, 31);
+  --act-trajectory-scrollbar: rgb(84, 85, 87);
+  --act-trajectory-scrollbar-hover: rgb(101, 103, 107);
+  --act-trajectory-code-block: rgb(27, 27, 28);
+  --act-trajectory-citation: rgb(53, 54, 56);
+  --act-trajectory-tooltip-bg: rgb(67, 69, 74);
+  --act-trajectory-tooltip-text: rgb(255, 255, 255);
+  --act-trajectory-shadow-chip: 0 2px 6px rgba(0, 0, 0, 0.12);
+  --act-trajectory-shadow-drawer: -12px 0 32px rgba(0, 0, 0, 0.14);
+  --act-trajectory-shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.2), 0 3px 8px 0 rgba(0, 0, 0, 0.03), 0 0 16px 0 rgba(0, 0, 0, 0.02);
+  --act-json-property: #5db0d7;
+  --act-json-string: #f28b82;
+  --act-json-number: #99c8ff;
+  --act-json-keyword: #99c8ff;
+  --act-json-punctuation: #e8eaed;
+  --act-json-icon: #9aa0a6;
+  --act-json-hover: rgba(232, 234, 237, 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -526,6 +642,12 @@
     --act-color-diff-remove-text: #f08a8a;
     --act-color-diff-streaming-bg: rgba(53, 193, 135, 0.1);
 
+    --act-color-turn-card-fill: #292a26;
+    --act-color-turn-card-hover: #30312d;
+    --act-color-turn-card-tile: rgba(255, 255, 255, 0.05);
+    --act-color-diff-add-gutter: rgba(53, 193, 135, 0.24);
+    --act-color-diff-remove-gutter: rgba(239, 109, 109, 0.26);
+
     --act-chart-series-1: #6ca6da;
     --act-chart-series-2: #70b5be;
     --act-chart-series-3: #aa96d7;
@@ -574,6 +696,51 @@
     --act-space-spark: #eef1ff;
     --act-space-sky-stars-opacity: 1;
     --act-space-sky-grid-opacity: 0;
+
+    /* 轨迹页深色（DeepSeek Harness 深色取值）。 */
+    --act-trajectory-label-primary: rgb(249, 250, 251);
+    --act-trajectory-label-secondary: rgb(207, 211, 214);
+    --act-trajectory-label-tertiary: rgb(173, 178, 184);
+    --act-trajectory-label-caption: rgb(129, 133, 140);
+    --act-trajectory-label-dimmed: rgb(67, 69, 74);
+    --act-trajectory-bg-base: rgb(21, 21, 23);
+    --act-trajectory-bg-layer-1: rgb(35, 35, 36);
+    --act-trajectory-bg-layer-2: rgb(44, 44, 46);
+    --act-trajectory-bg-module: rgb(53, 54, 56);
+    --act-trajectory-bg-sidebar: rgb(27, 27, 28);
+    --act-trajectory-border-l1: rgba(255, 255, 255, 0.06);
+    --act-trajectory-border-l2: rgba(255, 255, 255, 0.12);
+    --act-trajectory-border-l2-thin: rgba(255, 255, 255, 0.06);
+    --act-trajectory-border-l3: rgba(255, 255, 255, 0.16);
+    --act-trajectory-border-l4: rgba(255, 255, 255, 0.2);
+    --act-trajectory-hover: rgba(255, 255, 255, 0.08);
+    --act-trajectory-active: rgba(255, 255, 255, 0.14);
+    --act-trajectory-primary: rgb(122, 170, 255);
+    --act-trajectory-primary-soft: rgb(52, 65, 91);
+    --act-trajectory-primary-new: rgb(86, 134, 254);
+    --act-trajectory-blue: rgb(59, 130, 246);
+    --act-trajectory-error: rgb(242, 90, 90);
+    --act-trajectory-error-secondary: rgb(242, 90, 90);
+    --act-trajectory-success: rgb(34, 197, 94);
+    --act-trajectory-success-soft: rgb(35, 60, 44);
+    --act-trajectory-warn: rgb(221, 134, 41);
+    --act-trajectory-warn-soft: rgb(39, 36, 31);
+    --act-trajectory-scrollbar: rgb(84, 85, 87);
+    --act-trajectory-scrollbar-hover: rgb(101, 103, 107);
+    --act-trajectory-code-block: rgb(27, 27, 28);
+    --act-trajectory-citation: rgb(53, 54, 56);
+    --act-trajectory-tooltip-bg: rgb(67, 69, 74);
+    --act-trajectory-tooltip-text: rgb(255, 255, 255);
+    --act-trajectory-shadow-chip: 0 2px 6px rgba(0, 0, 0, 0.12);
+    --act-trajectory-shadow-drawer: -12px 0 32px rgba(0, 0, 0, 0.14);
+    --act-trajectory-shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.2), 0 3px 8px 0 rgba(0, 0, 0, 0.03), 0 0 16px 0 rgba(0, 0, 0, 0.02);
+    --act-json-property: #5db0d7;
+    --act-json-string: #f28b82;
+    --act-json-number: #99c8ff;
+    --act-json-keyword: #99c8ff;
+    --act-json-punctuation: #e8eaed;
+    --act-json-icon: #9aa0a6;
+    --act-json-hover: rgba(232, 234, 237, 0.05);
   }
 }
 

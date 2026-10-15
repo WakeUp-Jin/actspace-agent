@@ -32,6 +32,17 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
     const common = { filePath, additions, deletions, diff: terminal && !failed ? output.split("\n\nFile ", 1)[0] ?? "" : "", collapsedLines: 0, status: fileStatus, ...outputMetadata, ...(errorMessage ? { errorMessage } : {}) };
     return localName === "write_file" ? { kind: "write", ...common } : { kind: "edit_diff", ...common };
   }
+  if (localName === "present") {
+    const declared = terminal && !failed ? record(detailValue(data, "present")).files : undefined;
+    const source = Array.isArray(declared) ? declared : Array.isArray(args.files) ? args.files : [];
+    const files = source.map(record).flatMap((file) => {
+      const path = string(file.path);
+      if (!path) return [];
+      const description = string(file.description);
+      return [{ path: displayPath(path), ...(terminal && !failed ? workspaceOutputMetadata(path, workspaceRoot) : {}), ...(description ? { description } : {}) }];
+    });
+    return { kind: "present", files, displayText: summary, status: fileStatus };
+  }
   if (localName === "delete_file") return { kind: "delete", filePath: displayPath(string(record(detailValue(data, "result")).path) ?? string(args.path) ?? ""), displayText: summary, status: fileStatus };
   if (localName === "bash" || localName === "bash_output" || localName === "bash_kill") {
     // Summary is diagnostic detail, never the title of a compact tool row.

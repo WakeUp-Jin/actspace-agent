@@ -66,3 +66,25 @@ it("returns the body after compaction even if unchanged and reports successful f
   expect(JSON.stringify(restored.modelOutput)).toContain("keep this evidence");
   for (const result of [first, repeated, restored]) expect(result.detail).toContainEqual(expect.objectContaining({ label: "actspace.context.file", value: expect.objectContaining({ kind: "file", operation: "read" }) }));
 });
+
+describe("present", () => {
+  it("records workspace-relative deliverables with optional descriptions", async () => {
+    const root = await workspace(); await mkdir(join(root, "out")); await writeFile(join(root, "out", "report.docx"), "doc"); await writeFile(join(root, "deck.pptx"), "deck");
+    const ports = createNodeToolPorts({ workspaceRoot: root });
+    const result = await invoke(ports.present, { files: [{ path: "out/report.docx", description: " 季度报告 " }, { path: join(root, "deck.pptx") }] });
+    expect(result).toMatchObject({ status: "completed", summary: "Presented 2 files", modelOutput: [{ type: "text", text: "Presented out/report.docx\nPresented deck.pptx" }] });
+    expect(result.detail).toEqual([{ label: "present", value: { files: [{ path: "out/report.docx", description: "季度报告" }, { path: "deck.pptx" }] } }]);
+  });
+  it("rejects missing files, directories, symlinks, paths outside the workspace and oversized calls", async () => {
+    const root = await workspace(); const outside = await workspace();
+    await mkdir(join(root, "dir")); await writeFile(join(root, "file.txt"), "x"); await writeFile(join(outside, "secret.txt"), "s");
+    await symlink(join(root, "file.txt"), join(root, "link.txt"));
+    const ports = createNodeToolPorts({ workspaceRoot: root });
+    await expect(invoke(ports.present, { files: [{ path: "missing.docx" }] })).resolves.toMatchObject({ status: "failed", failure: { code: "FILE_NOT_FOUND" } });
+    await expect(invoke(ports.present, { files: [{ path: "dir" }] })).resolves.toMatchObject({ status: "failed", failure: { code: "NOT_A_FILE" } });
+    await expect(invoke(ports.present, { files: [{ path: "link.txt" }] })).resolves.toMatchObject({ status: "failed", failure: { code: "NOT_A_FILE" } });
+    await expect(invoke(ports.present, { files: [{ path: join(outside, "secret.txt") }] })).resolves.toMatchObject({ status: "failed", failure: { code: "IO_ERROR" } });
+    await expect(invoke(ports.present, { files: Array.from({ length: 5 }, () => ({ path: "file.txt" })) })).resolves.toMatchObject({ status: "failed", failure: { code: "INVALID_ARGUMENTS" } });
+    await expect(invoke(ports.present, { files: [] })).resolves.toMatchObject({ status: "failed", failure: { code: "INVALID_ARGUMENTS" } });
+  });
+});

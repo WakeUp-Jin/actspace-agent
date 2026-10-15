@@ -21,9 +21,23 @@ const messages: MessageBlock[] = [
     createdAt: "2026-06-02T00:00:01.000Z",
     usage: {
       totalTokens: 33_361,
+      inputTokens: 4_000,
+      cacheReadTokens: 28_000,
+      cacheWriteTokens: 0,
+      outputTokens: 1_361,
+      reasoningTokens: 300,
+      routes: ["deepseek/deepseek-flash"],
       costUsd: 0.2321,
+      unpricedRequestCount: 0,
+      costEstimated: true,
     },
   },
+];
+
+const earlierTurnMessages: MessageBlock[] = [
+  { kind: "user", id: "user-earlier", content: "第一轮", createdAt: "2026-06-01T23:59:00.000Z" },
+  { kind: "assistant", id: "assistant-earlier", content: "第一轮回复", createdAt: "2026-06-01T23:59:01.000Z" },
+  ...messages,
 ];
 
 const messagesWithCompaction: MessageBlock[] = [
@@ -195,14 +209,36 @@ describe("ConversationView tooltips", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("更多操作");
   });
 
-  it("renders a hover-revealed turn footer with tokens, USD cost, and copy action", () => {
+  it("shows the turn usage pill after the actions and opens token, model, and cost details", async () => {
+    const user = userEvent.setup();
     renderConversation();
 
-    const usageMeta = screen.getByLabelText("本轮消耗：33,361 Token · $0.2321");
-    expect(usageMeta).toHaveTextContent("33,361 Token · $0.2321");
-    expect(usageMeta.parentElement).toHaveClass("opacity-0");
-    expect(usageMeta.parentElement).toHaveClass("group-hover/assistant-turn:opacity-100");
-    expect(screen.getByRole("button", { name: "复制回复" })).toBeInTheDocument();
+    const pill = screen.getByRole("button", { name: "用量 33.4K tok，查看本轮用量" });
+    const copy = screen.getByRole("button", { name: "复制回复" });
+    expect(copy.compareDocumentPosition(pill) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(pill);
+    const dialog = await screen.findByRole("dialog", { name: "本轮用量" });
+    expect(dialog).toHaveTextContent("33,361 tok");
+    const rows = Array.from(dialog.querySelectorAll("dt")).map((term) => [term.textContent, term.nextElementSibling?.textContent]);
+    expect(rows).toEqual([
+      ["提供方 / 模型", "deepseek/deepseek-flash"],
+      ["缓存命中", "87.5%"],
+      ["未缓存输入", "4,000 tok"],
+      ["缓存读取", "28,000 tok"],
+      ["缓存写入", "0 tok"],
+      ["输出", "1,361 tok（其中推理 300 tok）"],
+      ["花费", "$0.2321预估"],
+    ]);
+  });
+
+  it("keeps the latest turn's actions visible and reveals earlier turns on hover", () => {
+    const { container } = renderConversation(earlierTurnMessages);
+
+    const rows = Array.from(container.querySelectorAll<HTMLElement>("[data-turn-actions-reveal]"));
+    expect(rows.map((row) => row.dataset.turnActionsReveal)).toEqual(["hover", "always"]);
+    expect(rows[0]).toHaveClass("opacity-0", "group-hover/assistant-turn:opacity-100");
+    expect(rows[1]).not.toHaveClass("opacity-0");
   });
 
   it("keeps assistant turn actions above a following compaction divider", () => {
@@ -383,10 +419,10 @@ it("does not present a fragment's usage as a complete turn total", () => {
   const view = renderConversation([thinking, messages[1]]);
   expect(screen.getByRole("button", { name: "Worked" })).toBeVisible();
   expect(screen.queryByRole("button", { name: /Worked for/ })).not.toBeInTheDocument();
-  expect(screen.queryByText(/33,361 Token/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /用量 33.4K tok/ })).not.toBeInTheDocument();
   expect(screen.getByText(messages[1].kind === "assistant" ? messages[1].content : "")).toBeVisible();
   view.unmount();
   renderConversation([messages[0], thinking, messages[1]]);
   expect(screen.getByRole("button", { name: /Worked for 1s/ })).toBeVisible();
-  expect(screen.getByText(/33,361 Token/)).toBeVisible();
+  expect(screen.getByRole("button", { name: /用量 33.4K tok/ })).toBeVisible();
 });

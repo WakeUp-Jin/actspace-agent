@@ -5,6 +5,14 @@ import { expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { HarnessHmr, atomicJson } from "../service.js";
 import { apply } from "../plugin.js";
+it.each(["Host fingerprint changed", ""])("preserves recovery blocking for the task scheduler: %s", async blocked => {
+  const dataRoot = await mkdtemp(join(tmpdir(), "hmr-blocked-"));
+  const control = { inspect: () => ({ current: undefined, history: [], blocked }), acquire: async () => { throw new Error("must not acquire"); } };
+  const hmr = new HarnessHmr({ dataRoot, control: control as never });
+  try {
+    await expect(hmr.acquire("session")).rejects.toMatchObject({ code: "RECOVERY_BLOCKED" });
+  } finally { await hmr.close(); await rm(dataRoot, { recursive: true, force: true }); }
+});
 it("recovers a committed selection before admitting leases, without starting tasks", async () => {
   const dataRoot = await mkdtemp(join(tmpdir(), "hmr-recover-"));
   const base = { harnessId: "main", revision: 1, executionDigest: "old" };

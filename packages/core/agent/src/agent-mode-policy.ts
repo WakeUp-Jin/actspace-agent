@@ -5,7 +5,7 @@ export const AGENT_MODE_TOOLS: Readonly<Record<RuntimeV2AgentMode, readonly stri
   chat: Object.freeze(["web", "generate_image"]),
   plan: Object.freeze(["read_file", "list_directory", "grep", "glob", "web_search", "web_fetch", "inspect_image", "explore", "todo_read", "todo_write"]),
   agent: Object.freeze([
-    "read_file", "list_directory", "grep", "glob", "edit_file", "write_file", "delete_file",
+    "read_file", "list_directory", "grep", "glob", "edit_file", "write_file", "delete_file", "present",
     "bash", "bash_output", "bash_kill", "web_search", "web_fetch", "generate_image", "inspect_image",
     "todo_read", "todo_write", "agent", "explore", "plugin_manager", "harness_inspect",
     "browser_cua", "browser_dom", "browser_locator", "browser_navigation", "browser_tabs",

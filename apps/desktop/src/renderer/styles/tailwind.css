@@ -96,6 +96,10 @@
    * 用独立命名而不覆盖 Tailwind 默认 text-sm 等，避免「text-sm = 14px 还是 13px」的同名歧义；
    * 默认字号类由 pnpm check:frontend-tokens 禁止。只设字号，不带行高（行高继承或由 leading-* 指定）。
    */
+  /* 轨迹页专用小字号（DSH 轨迹的类型标签 / 请求圆点标签 / 轮次标签），不用于正文。 */
+  --text-act-5xs: 8px;
+  --text-act-4xs: 9px;
+  --text-act-3xs: 10px;
   --text-act-xxs: 11px;
   --text-act-xs: 12px;
   --text-act-sm: 13px;

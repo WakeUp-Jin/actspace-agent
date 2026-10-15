@@ -234,6 +234,11 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
     };
   }
 
+  if (tool.preview?.kind === "present") {
+    const status = tool.finished ? tool.terminalStatus === "denied" ? "denied" : tool.isError ? "failed" : "completed" : "running";
+    return { kind: "present", id: blockId, files: tool.preview.files, displayText: tool.preview.displayText, createdAt: now, status, isError: status === "failed" || status === "denied" };
+  }
+
   if (tool.preview?.kind === "delete") {
     const status = tool.approvalPending
       ? "pending"

@@ -1,7 +1,6 @@
 import { useRunTargetContext } from "../target/run-target-context";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Loader2 } from "lucide-react";
-import { Button } from "./ui/Button";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, WheelEvent as ReactWheelEvent } from "react";
 import type { ComposerAttachment, ContextState, ContextUsageSnapshot } from "@actspace/shared";
@@ -101,6 +100,13 @@ export function ConversationView({
     ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
   const inputHistory = useMemo(() => userInputHistory(messages), [messages]);
+  // Review 标签的「第 N 轮」：只有历史从头加载全了，已加载的用户轮次序号才是真实轮次。
+  const turnNumbers = useMemo(() => {
+    if (browse?.hasEarlier) return null;
+    const numbers = new Map<string, number>();
+    for (const turn of turns) if (turn.user) numbers.set(turn.id, numbers.size + 1);
+    return numbers;
+  }, [browse?.hasEarlier, turns]);
   const turnNavigationItems = useMemo(
     () => createTurnNavigationItems(turns, isStreaming),
     [isStreaming, turns],
@@ -330,8 +336,10 @@ export function ConversationView({
                       key={turn.id}
                       turn={turn}
                       isActive={isStreaming && turnIndex === turns.length - 1}
+                      isLatest={turnIndex === turns.length - 1}
                       sessionId={sessionId}
                       workspaceRoot={selectedWorkspaceRoot}
+                      turnNumber={turnNumbers?.get(turn.id)}
                       setTurnElement={turnNavigator.setTurnElement}
                       onOpenAttachmentPreview={openAttachmentPreview}
                       onOpenAgentTranscript={openAgentTranscript}
@@ -353,8 +361,8 @@ export function ConversationView({
           {isAwayFromBottom ? <ScrollToBottomButton onClick={scrollToBottom} /> : null}
         </div>
         {activeView === "trajectory" ? <div className="flex h-full min-h-0 flex-col">
-          {isStreaming ? <div className="flex shrink-0 justify-end border-b border-line px-4 py-2"><Button size="xs" onClick={onAbort} disabled={isAborting}>{isAborting ? "正在停止…" : "停止"}</Button></div> : null}
-          <div className="min-h-0 flex-1"><TrajectoryView /></div>
+          {/* 「停止」放在轨迹工具栏最右侧（DSH 工具栏只有 32px，不再单独占一行）。 */}
+          <div className="min-h-0 flex-1"><TrajectoryView onAbort={isStreaming ? onAbort : undefined} isAborting={isAborting} /></div>
         </div> : null}
       </div>
       {/* 放在消息区之后：React 按树序挂 ref 并跑 layout effect，放前面时首帧拿不到 scrollContainerRef。 */}

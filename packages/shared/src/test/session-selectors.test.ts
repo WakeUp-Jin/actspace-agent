@@ -405,6 +405,31 @@ describe("session selectors", () => {
     });
   });
 
+  it("folds token buckets, routes, and cost basis into the turn usage", () => {
+    const base = { sessionId: "session-usage", agentRunId: "turn-usage", timestamp: "2026-10-15T12:00:00.000Z", schemaVersion: 2 as const };
+    const usage = (id: string, payload: Record<string, unknown>) => ({
+      ...base,
+      id,
+      type: "llm_usage" as const,
+      payload: { llmCallId: id, attempt: 1, durationMs: 0, provider: "deepseek", model: "deepseek-flash", promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, currency: "USD" }, ...payload },
+    });
+    const [estimated] = createMessageBlocks([
+      usage("u1", { promptTokens: 100, completionTokens: 20, cacheHitTokens: 300, cacheMissTokens: 10, reasoningTokens: 5, totalTokens: 430, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.01, currency: "USD" }, costBasis: "estimated" }),
+      usage("u2", { provider: "default", model: "default", promptTokens: 50, completionTokens: 10, totalTokens: 60, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.02, currency: "USD" }, costBasis: "priced" }),
+      { ...base, id: "final", type: "assistant_message", payload: { content: "Done.", stopReason: "stop", model: "deepseek-flash", provider: "deepseek" } },
+    ]);
+    expect(estimated).toMatchObject({
+      usage: { totalTokens: 490, inputTokens: 150, cacheReadTokens: 300, cacheWriteTokens: 10, outputTokens: 30, reasoningTokens: 5, routes: ["deepseek/deepseek-flash"], unpricedRequestCount: 0, costEstimated: true },
+    });
+    expect((estimated as { usage: { costUsd: number } }).usage.costUsd).toBeCloseTo(0.03);
+
+    const [partial] = createMessageBlocks([
+      usage("u1", { promptTokens: 100, totalTokens: 100, costBasis: "unavailable" }),
+      { ...base, id: "final", type: "assistant_message", payload: { content: "Done.", stopReason: "stop", model: "m", provider: "p" } },
+    ]);
+    expect(partial).toMatchObject({ usage: { totalTokens: 100, costUsd: 0, unpricedRequestCount: 1, costEstimated: false } });
+  });
+
   it("stamps every block with its event's runId, and sourceSeq only when the event has one", () => {
     const base = { sessionId: "session-identity", agentRunId: "run-identity", timestamp: "2026-10-06T00:00:00.000Z", schemaVersion: 2 as const };
     const blocks = createMessageBlocks([
@@ -476,6 +501,24 @@ describe("session selectors", () => {
         approvalRequestId: undefined,
         createdAt: "2026-06-02T12:00:00.000Z",
       },
+    ]);
+  });
+
+  it("restores a completed present result as a present message block", () => {
+    const files = [{ path: "report.docx", outputPath: "/workspace/report.docx", outputRelativePath: "report.docx", description: "Quarterly report" }];
+    const blocks = createMessageBlocks([
+      toolResultEvent({
+        toolName: "present",
+        toolCallId: "tool-present-1",
+        ok: true,
+        summary: "Presented 1 file",
+        modelOutput: "Presented report.docx",
+        uiPreview: { kind: "present", files, displayText: "Presented 1 file", status: "completed" },
+      }),
+    ]);
+
+    expect(blocks).toMatchObject([
+      { kind: "present", id: "evt-present", runId: "turn-delete", files, displayText: "Presented 1 file", status: "completed", isError: false },
     ]);
   });
 

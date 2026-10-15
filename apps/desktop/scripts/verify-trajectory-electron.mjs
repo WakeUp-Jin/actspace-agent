@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { createCoreCodecRegistry } from '@actspace/session-journal';
 import { SessionStore } from '../../../packages/session/persistence/dist/index.js';
+import { JsonlSessionStorage } from '../../../packages/session/jsonl/dist/index.js';
 
 const require = createRequire(import.meta.url);
 const playwrightPath = process.env.ACTSPACE_PLAYWRIGHT_MODULE;
@@ -15,7 +16,8 @@ const { _electron } = await import(pathToFileURL(playwrightPath));
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const dataRoot = await mkdtemp(join(tmpdir(), 'actspace-trajectory-phase5-'));
 const registry = createCoreCodecRegistry();
-const store = new SessionStore({ dataRoot, runtimeId: 'trajectory-acceptance', registry });
+const storage = new JsonlSessionStorage({ dataRoot, runtimeId: 'trajectory-acceptance', registry });
+const store = new SessionStore({ registry }, storage);
 const sessionId = 'trajectory-phase5-verification';
 const session = await store.create({ sessionId, createdAt: new Date().toISOString(), cwd: desktop, lineage: null, createdWith: { profileId: 'base', runtimeContractVersion: 'actspace.runtime.v2', manifestDigest: 'acceptance', plugins: [{ id: '@actspace/core', version: '2.0.0' }], codecSetDigest: registry.digest } });
 const append = (type, data, surface = null) => session.append({ type, eventVersion: 1, source: { ownerPluginId: '@actspace/core' }, data, surface });
@@ -36,28 +38,29 @@ for (let turn = 1; turn <= 25; turn++) {
   await append('turn/end', { turnId: ids.turnId, reason: 'completed' });
 }
 await session.close();
+await storage.close();
 const env = { ...process.env, ACTSPACE_DATA_DIR: dataRoot, ACTSPACE_REPO_ROOT: resolve(desktop, '../..'), ACTSPACE_DEV_APP_NAME: 'ActSpace Trajectory Verification' };
 delete env.ELECTRON_RUN_AS_NODE; delete env.VITE_DEV_SERVER_URL;
 const app = await _electron.launch({ executablePath: require('electron'), args: [join(desktop, 'dist-electron/main/index.js')], cwd: desktop, env, timeout: 30000 });
 try {
   const page = await app.firstWindow();
-  await page.waitForFunction(() => typeof window.actspace?.getSessionProjectionSnapshot === 'function');
+  await page.waitForFunction(() => typeof window.actspace?.sessions?.getProjectionSnapshot === 'function');
   const result = await page.evaluate(async id => {
-    const first = await window.actspace.getSessionProjectionSnapshot({ sessionId: id });
-    const earlier = await window.actspace.getSessionProjectionSnapshot({ sessionId: id, beforeSeq: first.window.beforeSeq });
-    const earliest = await window.actspace.getSessionProjectionSnapshot({ sessionId: id, beforeSeq: earlier.window.beforeSeq });
-    return { revision: first.throughJournalSeq, snapshotRevision: first.snapshot.throughJournalSeq, history: first.window, earlier: earlier.window, earliest: earliest.window };
+    const first = await window.actspace.sessions.getProjectionSnapshot({ sessionId: id });
+    const earlier = await window.actspace.sessions.getProjectionSnapshot({ sessionId: id, beforeSeq: first.window.beforeSeq });
+    return { revision: first.throughJournalSeq, snapshotRevision: first.snapshot.throughJournalSeq, history: first.window, earlier: earlier.window };
   }, sessionId);
   assert.equal(result.revision, result.snapshotRevision);
-  assert.equal(result.history.turnOffset, 15); assert.equal(result.earlier.turnOffset, 5); assert.equal(result.earliest.fromSeq, 0);
+  // The first page holds the latest 20 complete turns; one earlier page reaches the start.
+  assert.equal(result.history.turnOffset, 5); assert.equal(result.earlier.turnOffset, 0); assert.equal(result.earlier.fromSeq, 0);
   await page.getByRole('button', { name: /Trajectory Phase 5 verification/ }).first().click();
   await page.getByRole('button', { name: '查看执行轨迹', exact: true }).click();
-  await page.getByRole('button', { name: 'Load earlier history', exact: true }).click();
-  await page.getByRole('button', { name: 'Load earlier history', exact: true }).click();
-  await page.getByRole('button', { name: 'USER user/message, Question 1', exact: true }).waitFor();
-  await page.getByRole('button', { name: 'ASSISTANT assistant/message, Answer 1', exact: true }).click();
-  await page.getByRole('button', { name: 'Open tool call c1', exact: true }).click();
-  await page.getByRole('tab', { name: 'Result', exact: true }).click();
+  const ledger = page.getByRole('table');
+  await ledger.getByRole('button', { name: '加载更早的历史', exact: true }).click();
+  await page.getByRole('row', { name: '用户，Question 1', exact: true }).waitFor();
+  await page.getByRole('row', { name: /^请求 \d+，助手，Answer 1$/ }).click();
+  await page.getByRole('tabpanel').getByRole('button', { name: /read_file/ }).click();
+  await page.getByRole('tab', { name: '结果', exact: true }).click();
   assert.match(await page.getByRole('tabpanel').innerText(), /File output 1/);
   await page.getByRole('tab', { name: 'Schema', exact: true }).click();
   assert.match(await page.getByRole('tabpanel').innerText(), /Read a UTF-8 file/);
@@ -66,21 +69,23 @@ try {
   const committed = await page.evaluate(async id => {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => { off(); reject(new Error('No committed Journal notification')); }, 10000);
-      const off = window.actspace.onSessionLiveEvent(({ event }) => {
+      const off = window.actspace.events.sessionLive(({ event }) => {
         if (event.sessionId === id && event.kind === 'journal-update') { clearTimeout(timeout); off(); resolve(event.throughJournalSeq); }
       });
-      window.actspace.renameSession({ sessionId: id, title: 'Trajectory Phase 5 verified' }).catch(error => { clearTimeout(timeout); off(); reject(error); });
+      window.actspace.sessions.rename({ sessionId: id, title: 'Trajectory Phase 5 verified' }).catch(error => { clearTimeout(timeout); off(); reject(error); });
     });
   }, sessionId);
   assert.ok(committed > result.revision);
+  // The trajectory view hides the Composer without unmounting it, so a draft survives the round trip.
   const composer = page.getByRole('textbox', { name: '消息输入框', exact: true });
+  await page.getByRole('button', { name: '返回对话', exact: true }).click();
   await composer.fill('Unsent verification draft');
+  await page.getByRole('button', { name: '查看执行轨迹', exact: true }).click();
+  assert.equal(await composer.isVisible(), false);
   await page.getByRole('button', { name: '返回对话', exact: true }).click();
   assert.equal(await composer.inputValue(), 'Unsent verification draft');
-  await page.getByRole('button', { name: '查看执行轨迹', exact: true }).click();
-  assert.equal(await composer.inputValue(), 'Unsent verification draft');
   await page.reload();
-  const reloaded = await page.evaluate(id => window.actspace.getSessionProjectionSnapshot({ sessionId: id }), sessionId);
+  const reloaded = await page.evaluate(id => window.actspace.sessions.getProjectionSnapshot({ sessionId: id }), sessionId);
   assert.equal(reloaded.snapshot.metadata.title, 'Trajectory Phase 5 verified');
   assert.equal(reloaded.throughJournalSeq, committed);
   console.log(JSON.stringify({ passed: true, checks: ['real Journal', 'preload', 'IPC revisions', 'history paging', 'UI history', 'assistant-tool link', 'tool output', 'schema', 'commit notifications', 'Composer draft toggle', 'reload'], evidence: join(dataRoot, 'electron-trajectory.png') }));

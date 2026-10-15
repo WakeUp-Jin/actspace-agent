@@ -121,3 +121,186 @@
 @keyframes streaming-cursor-blink {
   50% { opacity: 0; }
 }
+
+/*
+ * 轮尾改动的对比视图（悬停浮层与「第 N 轮改动」Review 标签共用）。
+ * 布局移植自 DeepSeek Harness `ui-deliverables/client/FileDiff.module.css`（MIT 许可，见 components/files/DEEPSEEK_HARNESS_LICENSE.txt）。
+ * 每行固定高度，左右两栏才能逐行对齐；不换行时两栏各自横向滚动并互相跟随。
+ */
+
+.turn-diff {
+  --turn-diff-empty-fill: color-mix(in srgb, var(--act-color-hover-overlay) 50%, transparent);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 0;
+  color: var(--color-text);
+}
+
+.turn-diff-status {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 0;
+  padding: 16px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.turn-diff-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 0 16px;
+  font-family: var(--font-mono);
+  font-size: var(--act-font-mono-size, 13px);
+}
+
+.turn-diff-columns {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 0;
+}
+
+/* 一条按内容宽度撑开的轨道，让每个 hunk 和每一行的底色铺满可滚动的宽度。 */
+.turn-diff-column,
+.turn-diff-body[data-view="unified"]:not([data-wrap]) {
+  display: grid;
+  grid-template-columns: minmax(max-content, 100%);
+  align-content: start;
+}
+
+.turn-diff-column {
+  min-width: 0;
+  overflow-x: scroll;
+  overscroll-behavior: none;
+}
+
+.turn-diff-column + .turn-diff-column,
+.turn-diff-cell + .turn-diff-cell {
+  border-left: 0.5px solid var(--line);
+}
+
+.turn-diff-side-line {
+  display: grid;
+  grid-template-columns: 3.5em max-content;
+  box-sizing: border-box;
+  min-width: 100%;
+  width: max-content;
+  min-height: 22px;
+  line-height: 22px;
+  white-space: pre;
+}
+
+.turn-diff-note {
+  margin: 0;
+  padding: 4px 16px 8px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--color-text-faint);
+}
+
+.turn-diff-hunk {
+  margin-bottom: 8px;
+}
+
+.turn-diff-hunk-header {
+  padding: 4px 16px;
+  color: var(--color-text-faint);
+  white-space: pre;
+}
+
+.turn-diff-line {
+  display: grid;
+  grid-template-columns: 3.5em 3.5em 1.2em minmax(0, 1fr);
+  box-sizing: border-box;
+  min-height: 22px;
+  line-height: 22px;
+  white-space: pre;
+}
+
+.turn-diff-split-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 22px;
+  line-height: 22px;
+  white-space: pre;
+}
+
+.turn-diff-cell {
+  display: grid;
+  grid-template-columns: 3.5em minmax(0, 1fr);
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.turn-diff-number {
+  padding-right: 8px;
+  color: var(--color-text-faint);
+  text-align: right;
+  user-select: none;
+}
+
+.turn-diff-sign {
+  text-align: center;
+  user-select: none;
+}
+
+.turn-diff-text {
+  padding-right: 16px;
+}
+
+.turn-diff-body[data-wrap] .turn-diff-line,
+.turn-diff-body[data-wrap] .turn-diff-split-line {
+  white-space: pre-wrap;
+}
+
+.turn-diff-body[data-wrap] .turn-diff-text {
+  overflow-wrap: anywhere;
+}
+
+.turn-diff .is-add {
+  --turn-diff-gutter: var(--act-color-diff-add-gutter);
+  --turn-diff-marker: var(--act-color-diff-add-text);
+  background: var(--act-color-diff-add-bg);
+}
+
+.turn-diff .is-del {
+  --turn-diff-gutter: var(--act-color-diff-remove-gutter);
+  --turn-diff-marker: var(--act-color-diff-remove-text);
+  background: var(--act-color-diff-remove-bg);
+}
+
+.turn-diff .is-add .turn-diff-number,
+.turn-diff .is-del .turn-diff-number {
+  background: var(--turn-diff-gutter);
+  color: var(--turn-diff-marker);
+}
+
+.turn-diff .is-add .turn-diff-number:first-child,
+.turn-diff .is-del .turn-diff-number:first-child {
+  box-shadow: inset 3px 0 0 var(--turn-diff-marker);
+}
+
+.turn-diff .is-add .turn-diff-sign,
+.turn-diff .is-del .turn-diff-sign {
+  color: var(--turn-diff-marker);
+}
+
+.turn-diff .is-context .turn-diff-text {
+  color: var(--color-text-muted);
+}
+
+.turn-diff .is-empty {
+  background: var(--turn-diff-empty-fill);
+}
+
+/* 悬停浮层只看改动本身：隐藏 hunk 头和「本轮新建」这类说明。 */
+.turn-diff[data-preview] .turn-diff-hunk-header,
+.turn-diff[data-preview] .turn-diff-note[data-note="metadata"] {
+  display: none;
+}

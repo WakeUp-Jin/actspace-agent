@@ -10,6 +10,7 @@ import type {
   SessionId,
   ThinkingPayload,
   ToolUiPreview,
+  TurnUsageSummary,
   UserMessagePayload,
   WorkspacePreparationPayload,
 } from "./session";
@@ -223,6 +224,16 @@ function messageBlockFromToolPreview(
         streamingContent: preview.streamingContent,
         createdAt: getDisplayTime(timestamp)
       };
+    case "present":
+      return {
+        kind: "present",
+        id: eventId,
+        files: preview.files,
+        displayText: preview.displayText,
+        status: preview.status ?? (isError ? "failed" : "completed"),
+        isError,
+        createdAt: getDisplayTime(timestamp)
+      };
     case "delete": {
       const status = preview.status ?? (isError ? "failed" : "completed");
       return {
@@ -371,10 +382,27 @@ function workspacePreparationBlock(event: SessionEvent): MessageBlock[] {
   }];
 }
 
+function emptyTurnUsage(): TurnUsageSummary {
+  return { totalTokens: 0, inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, reasoningTokens: 0, routes: [], costUsd: 0, unpricedRequestCount: 0, costEstimated: false };
+}
+
+function tokenCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+/** 「提供方/模型」；投影拿不到时是 "default"，不展示。 */
+function usageRoute(provider: unknown, model: unknown): string | null {
+  const known = (value: unknown) => typeof value === "string" && value !== "" && value !== "default" ? value : null;
+  const modelName = known(model);
+  if (!modelName) return null;
+  const providerName = known(provider);
+  return providerName ? `${providerName}/${modelName}` : modelName;
+}
+
 export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
   const lastAssistantEventIdByTurn = new Map<string, EventId>();
   const latestTodoEventIdByRun = new Map<string, EventId>();
-  const usageByTurn = new Map<string, { totalTokens: number; costUsd: number }>();
+  const usageByTurn = new Map<string, TurnUsageSummary>();
 
   for (const event of events) {
     if (event.type === "assistant_message" || event.type === "assistant_reply") {
@@ -397,9 +425,22 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
     const total = cost.total;
     if ((currency !== "USD" && currency !== "CNY") || typeof total !== "number") continue;
 
-    const current = usageByTurn.get(event.agentRunId) ?? { totalTokens: 0, costUsd: 0 };
+    const current = usageByTurn.get(event.agentRunId) ?? emptyTurnUsage();
     current.totalTokens += totalTokens;
-    current.costUsd += convertUsageCostToUsd({ total, currency });
+    current.inputTokens += tokenCount(event.payload.promptTokens);
+    current.outputTokens += tokenCount(event.payload.completionTokens);
+    // v2 投影把缓存写入记在 cacheMissTokens 上（见 packages/client/src/sessions/chat.ts）。
+    current.cacheReadTokens += tokenCount(event.payload.cacheHitTokens);
+    current.cacheWriteTokens += tokenCount(event.payload.cacheMissTokens);
+    current.reasoningTokens += tokenCount(event.payload.reasoningTokens);
+    const route = usageRoute(event.payload.provider, event.payload.model);
+    if (route && !current.routes.includes(route)) current.routes.push(route);
+    if (event.payload.costBasis === "unavailable") {
+      current.unpricedRequestCount += 1;
+    } else {
+      current.costUsd += convertUsageCostToUsd({ total, currency });
+      if (event.payload.costBasis === "estimated") current.costEstimated = true;
+    }
     usageByTurn.set(event.agentRunId, current);
   }
 

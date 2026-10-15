@@ -32,7 +32,7 @@ export interface HarnessControlOptions {
   readonly context: CordisContext; readonly dataRoot: string; readonly artifactRoot: string;
   readonly runtimeId: string; readonly compatibility: HarnessCompatibilityHost;
   readonly sharedServices: readonly string[]; readonly builtin: () => Promise<HarnessMountRequest>;
-  /** Host opts into upgrading an untouched bootstrap; custom selections/branches are excluded. */
+  /** Host opts into updating its builtin history; custom selections/branches are excluded. */
   readonly upgradePristineBuiltin?: (current: SelectionRecord) => boolean;
   readonly authorize?: HarnessAuthorizer; readonly now?: () => number;
   readonly onDiagnostic?: (error: unknown) => void;

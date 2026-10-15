@@ -1,5 +1,5 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { isCommandPrefixSelector, type GrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
+import { isCommandPrefixSelector, type GrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2SessionTiming, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
 import { SessionProjectionRegistry } from "./registry.js";
 
 export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;
@@ -7,6 +7,10 @@ type Data = Readonly<Record<string, RuntimeV2JsonValue>>;
 type GrantState = { readonly grantId: string; readonly grant: SessionGrant | null; readonly revokedAt: string | null };
 type UsageState = { activeStep: string | null; requests: Record<string, string>; selected: Record<string, { assistant: boolean; usage: RuntimeV2UsageSummary }>; total: RuntimeV2UsageSummary };
 const emptyUsage = (): RuntimeV2UsageSummary => ({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null });
+/** 进行中的一步：请求开始时间与首个非空 chunk 时间（毫秒）；step/end 时移除，状态不随会话增长。 */
+type OpenStep = { readonly startedAt: number | null; readonly firstTokenAt: number | null };
+type ActivityState = SessionFacts["activity"] & { readonly openSteps: Readonly<Record<string, OpenStep>> };
+const emptyTiming = (): RuntimeV2SessionTiming => ({ llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 });
 
 /** Domain reducers share one drive and one checkpoint protocol, never a second log. */
 export function registerSessionFacts(registry: SessionProjectionRegistry, redact: (text: string, limit?: number) => string): void {
@@ -60,17 +64,26 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
       return prior ? state.map(previous => previous.invocationId === invocationId ? item : previous) : [...state, item];
     },
   });
-  registry.register<SessionFacts["activity"]>({
-    key: "sessionStats", stateVersion: 1,
-    init: () => ({ turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null }),
-    view: state => state,
+  registry.register<ActivityState, SessionFacts["activity"]>({
+    key: "sessionStats", stateVersion: 2,
+    init: () => ({ turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: emptyTiming(), openSteps: {} }),
+    view: ({ openSteps: _openSteps, ...activity }) => activity,
     apply: (state, event) => {
       const data = record(event.data);
       switch (event.type) {
         case "turn/start": return { ...state, turnCount: state.turnCount + 1, activeTurnId: text(data.turnId) };
         case "turn/end": return { ...state, completedTurnCount: state.completedTurnCount + 1, activeTurnId: state.activeTurnId === text(data.turnId) ? null : state.activeTurnId };
-        case "step/start": return { ...state, stepCount: state.stepCount + 1, activeStepId: text(data.stepId) };
-        case "step/end": return { ...state, activeStepId: state.activeStepId === text(data.stepId) ? null : state.activeStepId };
+        case "step/start": {
+          const stepId = text(data.stepId);
+          const openSteps = stepId === null || state.openSteps[stepId] ? state.openSteps : { ...state.openSteps, [stepId]: { startedAt: eventTime(event), firstTokenAt: null } };
+          return { ...state, stepCount: state.stepCount + 1, activeStepId: stepId, openSteps };
+        }
+        case "step/end": {
+          const stepId = text(data.stepId);
+          const { [stepId ?? ""]: _closed, ...openSteps } = state.openSteps;
+          return { ...state, activeStepId: state.activeStepId === stepId ? null : state.activeStepId, openSteps: stepId !== null && state.openSteps[stepId] ? openSteps : state.openSteps };
+        }
+        case "request/header": case "assistant/chunk": case "assistant/message": return applyTiming(state, event, data);
         case "compaction/start": return { ...state, activeCompactionId: text(data.compactionId) };
         case "compaction/summary": return { ...state, lastCompactionSummary: text(data.summary) ?? text(data.content) };
         case "compaction/end": return { ...state, compactionCount: state.compactionCount + 1, activeCompactionId: state.activeCompactionId === text(data.compactionId) ? null : state.activeCompactionId };
@@ -152,6 +165,42 @@ function applyUsage(state: UsageState, event: SessionEventEnvelopeV1): UsageStat
   for (const field of ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "totalTokens"] as const) total[field] = state.total[field] - (previous?.usage[field] ?? 0) + usage[field];
   total.costUsd = Object.values(selected).some(row => row.usage.costUsd !== null) ? (state.total.costUsd ?? 0) - (previous?.usage.costUsd ?? 0) + (usage.costUsd ?? 0) : null;
   return { ...state, selected, total };
+}
+
+/**
+ * 模型侧计时：request/header 标请求开始，首个非空 chunk 标首 token，assistant/message 结算一次请求。
+ * 一步可能有多次请求（重试），结算后以完成时间作为下一次的起点、清掉首 token。
+ * 只有状态真的变了才返回新对象，流式 chunk 不会逐条触发投影推送。
+ */
+function applyTiming(state: ActivityState, event: SessionEventEnvelopeV1, data: Data): ActivityState {
+  const stepId = text(data.stepId) ?? state.activeStepId;
+  const at = eventTime(event);
+  if (stepId === null) return state;
+  const open = state.openSteps[stepId] ?? { startedAt: null, firstTokenAt: null };
+  const withStep = (next: OpenStep): ActivityState => ({ ...state, openSteps: { ...state.openSteps, [stepId]: next } });
+  if (event.type === "request/header") return at === null ? state : withStep({ ...open, startedAt: at });
+  if (event.type === "assistant/chunk") {
+    if (open.firstTokenAt !== null || at === null || !(isText(data.delta) || isText(data.content))) return state;
+    return withStep({ ...open, firstTokenAt: at });
+  }
+  if (at === null) return state;
+  const timing = { ...state.timing };
+  if (open.startedAt !== null) timing.llmMs += Math.max(0, at - open.startedAt);
+  if (open.firstTokenAt !== null) {
+    timing.ttftMs += Math.max(0, open.firstTokenAt - (open.startedAt ?? open.firstTokenAt));
+    timing.ttftSteps += 1;
+    const output = number(record(data.usage).outputTokens);
+    if (output > 0) {
+      timing.decodeMs += Math.max(0, at - open.firstTokenAt);
+      timing.decodeTokens += output;
+    }
+  }
+  return { ...withStep({ startedAt: at, firstTokenAt: null }), timing };
+}
+
+function eventTime(event: SessionEventEnvelopeV1): number | null {
+  const parsed = Date.parse(event.time);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function record(value: RuntimeV2JsonValue | undefined): Data { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Data : {}; }

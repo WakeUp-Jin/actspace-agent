@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { HarnessControl } from "@actspace/harness-control";
+import { HarnessControlError, type HarnessControl } from "@actspace/harness-control";
 
 export type SessionHarnessBinding = { schemaVersion: 1; sessionId: string; revision: number; harnessId: string; selectionRevision: number; executionDigest: string };
 type Intent = { schemaVersion: 1; sessionId: string; changeId: string; candidateId: string; harnessId: string; executionDigest: string; expectedBindingRevision: number };
@@ -67,7 +67,7 @@ export class HarnessHmr {
       await rm(this.#path(sessionId, "intent"), { force: true });
     }
     const current = this.options.control.inspect(binding?.harnessId ?? "main");
-    if (current.blocked || !current.current) throw new Error(`Harness recovery blocked: ${current.blocked || "missing selection"}`);
+    if (current.blocked || !current.current) throw new HarnessControlError("RECOVERY_BLOCKED", `Harness recovery blocked: ${current.blocked || "missing selection"}`);
     if (!binding) return { schemaVersion: 1, sessionId, revision: 0, harnessId: "main", selectionRevision: current.current.revision, executionDigest: current.current.executionDigest };
     if (binding.selectionRevision !== current.current.revision || binding.executionDigest !== current.current.executionDigest) throw new Error("Harness binding and selection differ");
     return binding;

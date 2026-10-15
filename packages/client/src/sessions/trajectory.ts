@@ -6,7 +6,19 @@ export function projectTrajectoryWindow(sessionId: string, window: RuntimeV2Even
     history: { fromSeq: window.fromSeq, previousFromSeq: window.beforeSeq, turnOffset: window.turnOffset, requestOffset: window.requestOffset } };
 }
 
+// Journal events are append-only, so each event object is converted once; while an assistant
+// streams, every chunk otherwise re-copies the whole window.
+const nodes = new WeakMap<SessionEventEnvelopeV1, RuntimeV2TrajectoryNode>();
+
 function toNode(sessionId: string, event: SessionEventEnvelopeV1): RuntimeV2TrajectoryNode {
+  const cached = nodes.get(event);
+  if (cached?.sessionId === sessionId) return cached;
+  const node = convert(sessionId, event);
+  nodes.set(event, node);
+  return node;
+}
+
+function convert(sessionId: string, event: SessionEventEnvelopeV1): RuntimeV2TrajectoryNode {
   const data = event.data;
   const callId = record(data).callId ?? record(data).toolCallId;
   return Object.freeze({

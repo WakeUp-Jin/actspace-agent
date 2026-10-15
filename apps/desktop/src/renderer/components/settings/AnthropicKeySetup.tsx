@@ -86,13 +86,13 @@ export function AnthropicKeySetup({ onCancel, onSaved }: { onCancel: () => void;
   return (
     <div className="flex w-full flex-col gap-6" onKeyDown={(event) => { if (event.key === "Escape" && !saving) onCancel(); }}>
       <SetupHeader backLabel="添加连接" onBack={onCancel} logo={<ProviderLogo provider="openrouter" logoKey="anthropic" />} title="连接 Anthropic" subtitle="填写 API Key 即可，模型和价格自动配置。" />
-      <SettingGroup>
+      <div className="mc-stack">
         <FormField label="API Key" htmlFor={keyId}>
           <SecretInput id={keyId} autoFocus placeholder="sk-ant-…" value={apiKey} onChange={(next) => { setApiKey(next); probeToken.current += 1; setProbe(invalidateProbe); }} />
         </FormField>
-        {probe.status === "idle" ? null : <ProbeResultNotice state={probe} />}
-      </SettingGroup>
-      {tested ? <ConnectionModelPicker listed={listed} value={picker} onChange={setPicker} showCommon /> : null}
+        <ProbeResultNotice state={probe} />
+      </div>
+      {tested ? <ConnectionModelPicker plain listed={listed} value={picker} onChange={setPicker} showCommon /> : null}
       {error ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}
       <SetupFooter hint={tested ? (picker.selected.length ? `默认：${defaultLabel}` : "至少选择一个模型") : null}>
         <Button variant="ghost" size="md" disabled={saving} onClick={onCancel}>取消</Button>

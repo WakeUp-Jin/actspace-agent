@@ -16,7 +16,7 @@ export const MAIN_AGENT_FORM = Object.freeze({
   defaultMode: "agent" as const,
   members: Object.freeze([
     Object.freeze({ id: "actspace.prompt", version: 1, required: true, toolNames: Object.freeze([]) }),
-    Object.freeze({ id: "actspace.filesystem-read", version: 2, required: true, toolNames: Object.freeze(["read_file", "list_directory"]) }),
+    Object.freeze({ id: "actspace.filesystem-read", version: 2, required: true, toolNames: Object.freeze(["read_file", "list_directory", "present"]) }),
     Object.freeze({ id: "actspace.filesystem-search", version: 2, required: true, toolNames: Object.freeze(["grep", "glob"]) }),
     Object.freeze({ id: "actspace.filesystem-write", version: 2, required: true, toolNames: Object.freeze(["edit_file", "write_file", "delete_file"]) }),
     Object.freeze({ id: "actspace.shell-tools", version: 2, required: true, toolNames: Object.freeze(["bash", "bash_output", "bash_kill"]) }),

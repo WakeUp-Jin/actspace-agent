@@ -30,6 +30,18 @@ it.each([
   } finally { await adapter.dispose(); }
 });
 
+it.each([
+  { requested: { reasoning: false, reasoningEffort: "high" }, expected: { reasoning: false } },
+  { requested: { reasoning: false }, expected: { reasoning: false } },
+  { requested: {}, expected: {} },
+])("keeps request options JSON-safe when no effort applies: $requested", ({ requested, expected }) => {
+  // The options become the request snapshot's defaults, which reject undefined values.
+  const resolution = { ok: true as const, model: { key: "fixture", definition: { api: "openai-completions" as const, provider: "deepseek", apiModel: "v4", contextWindow: 1000, capabilities: { reasoning: true, thinkingToggle: true, reasoningEfforts: ["high"] } as ModelCapabilities }, providerRuntime: {} } };
+  const adapter = new DesktopLegacyLlmAdapter({ resolveMainModel: () => resolution, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); });
+  const options = adapter.prepare({ request: { model: "fixture", options: requested }, credential: {} } as unknown as LlmAdapterPrepareInput).request.options;
+  expect(options).toStrictEqual(expected);
+});
+
 it("routes title requests to a text-only utility model with its own connection", async () => {
   const utility = { ok: true as const, model: { key: "utility", definition: { api: "openai-completions" as const, provider: "kimi", apiModel: "title-model", contextWindow: 1000, capabilities: { toolUse: false, reasoning: false } as ModelCapabilities }, providerRuntime: { apiKey: "fixture-utility-key", baseUrl: "https://utility.example/v1" } } };
   const resolveMainModel = vi.fn(() => { throw Error("must not validate utility model as chat"); });

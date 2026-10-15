@@ -34,19 +34,28 @@ export class HarnessControl {
           const candidate = await this.#manager.prepare(id, record.previousRevision, request);
           if (candidate.executionDigest !== record.executionDigest) { await this.#manager.discard(candidate); throw new Error("Recovered execution digest differs"); }
           this.#manager.restore(candidate, record.revision);
-        } catch (error) { this.#blocked.set(id, error); this.#diagnostic(error); }
+        } catch (error) { this.#blocked.set(id, error); }
       }
       const pristine = this.#store.latest("main");
-      if (pristine && this.#store.records.length === 1 && pristine.authorization.decisionId === "trusted-bootstrap" && this.options.upgradePristineBuiltin?.(structuredClone(pristine))) {
+      const ownedBuiltinHistory = this.#store.records.every(record => record.harnessId === "main" && record.authorization.actor === "Host"
+        && (record.authorization.decisionId === "trusted-bootstrap" && record.requestDigest === "bootstrap"
+          || record.authorization.decisionId === "trusted-builtin-upgrade" && record.requestDigest === "builtin-upgrade"));
+      const recoveryFailure = this.#blocked.get("main");
+      const canUpgrade = !recoveryFailure || recoveryFailure instanceof HarnessControlError && recoveryFailure.code === "RESTART_REQUIRED";
+      if (pristine && ownedBuiltinHistory && canUpgrade && this.options.upgradePristineBuiltin?.(structuredClone(pristine))) {
         // This is a Host application upgrade, never a model-requested authorization bypass.
         const request = this.#bindHost(await this.options.builtin());
         await validateCandidate(request, this.options.compatibility, this.options.sharedServices);
         const handle = await this.#manager.prepare("main", pristine.revision, request);
-        const record = this.#record(`builtin-upgrade:${randomUUID()}`, "builtin-upgrade", { handle, description: describeMount(request) }, { actor: "Host", decisionId: "trusted-builtin-upgrade" });
-        await this.#store.append(record);
-        if (this.#manager.inspect().some(r => r.harnessId === "main" && r.state === "current")) this.#manager.activate(handle);
-        else this.#manager.restore(handle, record.revision);
-        this.#blocked.delete("main");
+        if (handle.executionDigest === pristine.executionDigest && request.hostContractDigest === pristine.description.hostContractDigest) {
+          await this.#manager.discard(handle);
+        } else {
+          const record = this.#record(`builtin-upgrade:${randomUUID()}`, "builtin-upgrade", { handle, description: describeMount(request) }, { actor: "Host", decisionId: "trusted-builtin-upgrade" });
+          await this.#store.append(record);
+          if (this.#manager.inspect().some(r => r.harnessId === "main" && r.state === "current")) this.#manager.activate(handle);
+          else this.#manager.restore(handle, record.revision);
+          this.#blocked.delete("main");
+        }
       }
       if (!this.#store.latest("main")) {
         const request = this.#bindHost(await this.options.builtin());
@@ -56,6 +65,7 @@ export class HarnessControl {
         await this.#store.append(record);
         this.#manager.activate(handle);
       }
+      for (const error of this.#blocked.values()) this.#diagnostic(error);
     } catch (error) { this.#blocked.set("*", error); this.#diagnostic(error); }
   }
   inspect(harnessId = "main") {

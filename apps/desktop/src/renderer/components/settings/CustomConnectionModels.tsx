@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { MoreHorizontal, Plus, RefreshCw } from "lucide-react";
 import { customModelDraftFromCatalog, type InstalledModelView, type ModelMutationResult, type SettingsV4ConnectionSettings } from "@actspace/shared";
-import { SettingEditor, SettingGroup, SettingTag, SettingsInput, SettingsMenuButton, Toggle, useSettingsSaveNotice } from "./SettingsPrimitives";
+import { SettingEditor, SettingTag, SettingsInput, SettingsMenuButton, Toggle, useSettingsSaveNotice } from "./SettingsPrimitives";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { isKnownCatalogModel } from "./custom-connection-shared";
@@ -117,35 +117,39 @@ export function CustomConnectionModels({ connection, onConnectionChange, onChang
     return result;
   });
 
+  const enabledCount = models.filter((model) => model.settings.enabled).length;
   return (
-    <SettingGroup
-      title="模型"
-      action={<>
-        <Button variant="ghost" busy={refreshing} disabled={refreshing} onClick={() => void refresh()}><RefreshCw size={13} aria-hidden="true" />刷新</Button>
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-2 px-0.5">
+        <h4 className="text-act-sm font-semibold text-text-main">模型</h4>
+        <span className="text-act-xs text-text-subtle">{models.length ? `已开启 ${enabledCount} / ${models.length}` : null}</span>
+        <span className="flex-1" />
+        <Button variant="ghost" busy={refreshing} disabled={refreshing} onClick={() => void refresh()}><RefreshCw size={13} aria-hidden="true" />从服务商刷新</Button>
         <Button onClick={() => { setAdding((open) => !open); setAddError(null); }}><Plus size={13} aria-hidden="true" />添加</Button>
-      </>}
-    >
+      </div>
       {adding ? (
         <SettingEditor error={addError} saving={addSaving} saveLabel="添加" saveDisabled={!addValue.trim()} onCancel={() => { setAdding(false); setAddValue(""); }} onSave={() => void submitAdd()}>
           <SettingsInput width="full" mono autoFocus aria-label="模型 ID" placeholder="输入模型 ID" value={addValue} onChange={(event) => { setAddValue(event.target.value); setAddError(null); }} onKeyDown={(event) => { if (event.key === "Enter") void submitAdd(); }} />
         </SettingEditor>
       ) : null}
-      {notice || error ? <p role={error ? "alert" : "status"} className={`px-4 py-2.5 text-act-xs ${error ? "text-on-danger" : "text-text-muted"}`}>{error ?? notice}</p> : null}
-      {models.length ? models.map((model) => (
-        <ModelRow
-          key={model.definition.key}
-          model={model}
-          isDefault={connection.defaultModel === model.definition.apiModel}
-          isFresh={fresh.has(model.definition.key)}
-          onOpen={() => onEdit(model)}
-          onSetDefault={() => void setDefault(model)}
-          onRemove={() => setRemoving(model)}
-          onToggle={(enabled) => {
-            setFresh((current) => { const next = new Set(current); next.delete(model.definition.key); return next; });
-            void mutate(() => modelsApi.update({ modelKey: model.definition.key, enabled }));
-          }}
-        />
-      )) : <p className="px-4 py-5 text-center text-act-xs text-text-muted">这个连接还没有模型</p>}
+      {notice || error ? <p role={error ? "alert" : "status"} className={`px-0.5 text-act-xs ${error ? "text-on-danger" : "text-text-muted"}`}>{error ?? notice}</p> : null}
+      <div className="mc-models">
+        {models.length ? models.map((model) => (
+          <ModelRow
+            key={model.definition.key}
+            model={model}
+            isDefault={connection.defaultModel === model.definition.apiModel}
+            isFresh={fresh.has(model.definition.key)}
+            onOpen={() => onEdit(model)}
+            onSetDefault={() => void setDefault(model)}
+            onRemove={() => setRemoving(model)}
+            onToggle={(enabled) => {
+              setFresh((current) => { const next = new Set(current); next.delete(model.definition.key); return next; });
+              void mutate(() => modelsApi.update({ modelKey: model.definition.key, enabled }));
+            }}
+          />
+        )) : <p className="px-4 py-5 text-center text-act-xs text-text-muted">这个连接还没有模型</p>}
+      </div>
       {removing ? (
         <ConfirmDialog
           title={`删除 ${removing.definition.label}？`}
@@ -162,7 +166,7 @@ export function CustomConnectionModels({ connection, onConnectionChange, onChang
           }}
         />
       ) : null}
-    </SettingGroup>
+    </section>
   );
 }
 

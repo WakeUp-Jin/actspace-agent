@@ -210,7 +210,30 @@ export type LlmUsagePayload = {
     webFetchRequests?: number;
   };
   cost: LlmUsageCost;
+  /** 花费口径：priced = 官方计价，estimated = 按参考价预估，unavailable = 算不出（cost.total 记 0）。旧事件没有这个字段，按已知处理。 */
+  costBasis?: "priced" | "estimated" | "unavailable";
   relatedEventIds?: EventId[];
+};
+
+/** 一轮里所有 LLM 请求（含失败重试）的用量合计。 */
+export type TurnUsageSummary = {
+  /** 未缓存输入 + 缓存读取 + 缓存写入 + 输出。 */
+  totalTokens: number;
+  /** 未缓存输入。 */
+  inputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  outputTokens: number;
+  /** 输出里的推理部分。 */
+  reasoningTokens: number;
+  /** 本轮用到的「提供方/模型」，按第一次出现排序。 */
+  routes: string[];
+  /** 能算出价格的请求的花费合计（USD）。 */
+  costUsd: number;
+  /** 算不出价格的请求数；大于 0 时 costUsd 只是一部分。 */
+  unpricedRequestCount: number;
+  /** 有请求的花费是按参考价预估的。 */
+  costEstimated: boolean;
 };
 
 export type ContextSnapshotPayload = ContextUsageSnapshot;
@@ -392,6 +415,7 @@ export type ToolPreviewKind =
   | "edit_diff"
   | "write"
   | "delete"
+  | "present"
   | "bash"
   | "agent"
   | "todo"
@@ -422,6 +446,15 @@ export type ToolPreviewKind =
   | "browser_claim_tab"
   | "browser_finalize"
   | "generic";
+
+/** A file the Agent declared as a deliverable through `present`; it stays at its workspace path. */
+export type PresentedFile = {
+  /** Workspace-relative display path, or absolute when outside the workspace. */
+  path: string;
+  outputPath?: string;
+  outputRelativePath?: string;
+  description?: string;
+};
 
 export type ToolUiPreview =
   | { kind: "read"; filePath: string; range?: string; displayText: string; resultPreview?: string[] }
@@ -487,6 +520,7 @@ export type ToolUiPreview =
       status?: "pending" | "running" | "completed" | "failed" | "denied";
       approvalRequestId?: string;
     }
+  | { kind: "present"; files: PresentedFile[]; displayText: string; status?: "running" | "completed" | "failed" | "denied" }
   | BashPreview
   | AgentToolPreview
   | TodoUiPreview
@@ -694,11 +728,8 @@ export type MessageBlock = {
       createdAt: string;
       model?: string;
       provider?: string;
-      /** 本轮所有 LLM call 的真实 token 与统一 USD 预估费用，只挂在最终可见回复上。 */
-      usage?: {
-        totalTokens: number;
-        costUsd: number;
-      };
+      /** 本轮所有 LLM call 的用量合计，只挂在最终可见回复上。 */
+      usage?: TurnUsageSummary;
     }
   | {
       kind: "thinking";
@@ -860,6 +891,15 @@ export type MessageBlock = {
       isError?: boolean;
       approvalRequestId?: string;
       reason?: string;
+    }
+  | {
+      kind: "present";
+      id: EventId;
+      files: PresentedFile[];
+      displayText: string;
+      createdAt: string;
+      status?: "running" | "completed" | "failed" | "denied";
+      isError?: boolean;
     }
   | ({
       kind: "bash";

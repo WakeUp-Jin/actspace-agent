@@ -3,9 +3,9 @@ import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
 import { ResponseAnnotationPill } from "../composer/ResponseAnnotationPill";
 import { TodoListBlock } from "../messages/TodoListBlock";
 import { ToolActivityGroup } from "../messages/ToolActivityGroup";
-import { TurnOutputArtifacts } from "../messages/TurnOutputArtifacts";
 import { USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "../messages/UserMessage";
 import { renderMessageList, type AgentTranscriptHandler, type ReadMessageBlock } from "./render-message";
+import { TurnTail } from "../turn-tail/TurnTail";
 import { TurnActions } from "./TurnActions";
 import { finalAssistantMessages, getLatestTodoMessage, hasToolLikeItem, splitTurnMessages, workDurationMs, type ConversationTurn } from "./turns";
 
@@ -79,7 +79,7 @@ function renderTurnBody(
   onOpenReadFile?: (message: ReadMessageBlock) => void,
   onOpenWorkspaceFile?: (path: string) => void,
 ) {
-  const { workItems, finalReply } = splitTurnMessages(turn.messages);
+  const { workItems, finalReply, failures } = splitTurnMessages(turn.messages);
   const replyCompleted = !isActive && finalReply.length > 0;
   const attachTodoToPrompt = Boolean(turn.user);
   const preparationItems = workItems.filter((message) => message.kind === "workspace_preparation");
@@ -102,6 +102,7 @@ function renderTurnBody(
       {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile) : null}
       {processContent}
       {finalReply.length > 0 ? <div className={`message-flow${processContent ? " message-flow-final" : ""}`}>{renderMessageList(finalReply, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile)}</div> : null}
+      {failures.length > 0 ? renderMessageList(failures, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile) : null}
     </>
   );
 }
@@ -110,8 +111,12 @@ type TurnViewProps = {
   turn: ConversationTurn;
   /** 正在流式输出的最后一轮。 */
   isActive: boolean;
+  /** 会话里的最后一轮：它的回复操作一直显示，更早的轮次悬停才出现。 */
+  isLatest?: boolean;
   sessionId: string | null;
   workspaceRoot?: string | null;
+  /** 从 1 开始的用户轮次；更早的历史还没加载时为空（编号不可靠）。 */
+  turnNumber?: number;
   /** 有用户输入的轮次登记到轮次导航；没有用户输入的（压缩、工作树准备）不登记。 */
   setTurnElement: (turnId: string, element: HTMLElement | null) => void;
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
@@ -120,12 +125,14 @@ type TurnViewProps = {
   onOpenWorkspaceFile?: (path: string) => void;
 };
 
-/** 一轮对话：用户输入（吸顶）、过程和最终回复、产物、回复操作。 */
+/** 一轮对话：用户输入（吸顶）、过程和最终回复、轮尾（改动卡、交付卡、图片）、回复操作。 */
 export function TurnView({
   turn,
   isActive,
+  isLatest = false,
   sessionId,
   workspaceRoot,
+  turnNumber,
   setTurnElement,
   onOpenAttachmentPreview,
   onOpenAgentTranscript,
@@ -146,7 +153,9 @@ export function TurnView({
           {renderTurnBody(turn, isActive, onOpenAgentTranscript, onOpenReadFile, onOpenWorkspaceFile)}
         </div>
         {splitTurnMessages(turn.messages).finalReply.length > 0 && !isActive ? (
-          <TurnOutputArtifacts
+          <TurnTail
+            turnId={turn.id}
+            turnNumber={turnNumber}
             messages={turn.messages}
             sessionId={sessionId}
             workspaceRoot={workspaceRoot}
@@ -154,6 +163,7 @@ export function TurnView({
         ) : null}
         <TurnActions
           completeTurn={Boolean(turn.user)}
+          revealAlways={isLatest && !isActive}
           sessionId={sessionId}
           assistantMessages={assistantMessages}
         />

@@ -21,7 +21,7 @@ import {
 } from "./toolLogStyles";
 
 type ToolLogMessage = Extract<MessageBlock, {
-  kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "image_generation" | "directory_list" | "delete" | "tool" | "error";
+  kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "image_generation" | "directory_list" | "delete" | "present" | "tool" | "error";
 }>;
 type ToolLogStatus = "pending" | "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown" | undefined;
 
@@ -345,6 +345,18 @@ export function ToolLogLine({ message, className, onOpenFile, onExpand }: { onEx
         className={getToolLogLineClass(status, className)}
         status={status}
         text={message.displayText}
+      />
+    );
+  }
+
+  if (message.kind === "present") {
+    const names = message.files.map((file) => file.path.split(/[\\/]/).pop() || file.path).join(", ");
+    const action = message.status === "running" ? "Presenting" : message.status === "completed" ? "Presented" : "Present failed";
+    return (
+      <OverflowToolLine
+        className={getToolLogLineClass(message.status, className)}
+        status={message.status}
+        text={names ? `${action} ${names}` : message.displayText}
       />
     );
   }

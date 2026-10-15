@@ -22,7 +22,7 @@
 
 - 默认态是低高度的贴底输入面板，优先服务“继续追问 / 继续指挥当前会话”。
 - 复杂能力通过左侧 `+` 面板展开，不在默认态把所有入口铺开。
-- 输入栏下方是只读状态行，陈述「在哪儿跑」（分支 · 本机 / 工作树，或 Host · 工作区）和 context 用量。
+- 输入栏下方是只读状态行，陈述「在哪儿跑」（分支 · 本机 / 工作树，或 Host · 工作区）、会话累计统计胶囊和 context 用量。
 - 输入栏上方预留 `Review / overflow` 操作层，未来承载 diff review、批量操作和更多会话动作。
 - 新会话首屏使用 `initial composer`，发送首条消息后切换回底部 follow-up composer。
 
@@ -35,7 +35,7 @@
 - 模型按钮（始终显示：单行时贴在发送按钮左边，多行时在底部工具行）。
 - 发送 / 停止按钮。
 - 发送队列托盘（运行中发送的消息）。
-- 对话中的只读状态行：运行位置、权限控件、context 用量。
+- 对话中的只读状态行：运行位置、权限控件、会话统计 / Token 用量胶囊、context 用量。
 - 新建页的运行目标行：工作区、分支、运行位置。
 - 上下文弹窗。
 
@@ -119,7 +119,7 @@ Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布
 
 ### 浮层互斥
 
-`+` 面板、模型菜单、上下文用量、新建页的三个运行目标菜单由一个 `ComposerOverlay` 状态管理，同一时间只开一个；从一个点到另一个时新的直接打开、旧的关闭，关掉的那个不抢回焦点。斜杠菜单由输入内容推出，与它们互相收起。
+`+` 面板、模型菜单、上下文用量、状态行两个统计胶囊的面板、新建页的三个运行目标菜单由一个 `ComposerOverlay` 状态管理，同一时间只开一个；从一个点到另一个时新的直接打开、旧的关闭，关掉的那个不抢回焦点。斜杠菜单由输入内容推出，与它们互相收起。
 
 ## Initial composer 结构
 
@@ -137,7 +137,7 @@ Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布
 1. Review 操作层：位于输入栏上方，Git workspace 存在未提交改动时显示真实 `Review +N -M` 汇总和 quick actions；无改动时不显示 Review 入口；当前 workspace 不是 Git repository 时显示无计数的 `Review` 入口，引导用户在右侧 Review Tab 查看初始化提示。远端会话不显示。
 2. 发送队列托盘（有排队或已引导的消息时）。
 3. 输入 panel：单行或多行，见「单行与多行」。
-4. 只读状态行：左侧是运行位置（`⑂ main · 💻 本机` / `⑂ 分支 · ⑂ 工作树` / `🖥 Host · 📁 工作区`）和权限控件，右侧是 context 用量（打开 Context 弹窗的唯一入口）。没有下拉，不能在对话中切换机器。Chat 会话只有 context 用量。细节见 `front-workspace-git-worktree-context.md`。
+4. 只读状态行：左侧是运行位置（`⑂ main · 💻 本机` / `⑂ 分支 · ⑂ 工作树` / `🖥 Host · 📁 工作区`）和权限控件，右侧是两个统计胶囊和 context 用量（打开 Context 弹窗的唯一入口）。没有下拉，不能在对话中切换机器。Chat 会话右侧同样有胶囊和 context 用量，左侧为空。细节见 `front-workspace-git-worktree-context.md`。
 
 ### `+` 面板
 
@@ -287,6 +287,21 @@ placeholder 随模式改变，但不代替模式 chip 和运行时契约：
 - SubAgent transcript panel 打开期间不显示 Review strip，优先保证当前 panel 和 follow-up 输入的视觉关系；关闭 panel 后恢复。
 - 相邻 overflow `...` 只保留真实 Review quick actions，例如打开 `Last Turn` 或 `Uncommitted`；能力不可用时展示明确 disabled reason，不保留 AI Review 或无行为占位。
 
+
+## 状态行统计胶囊
+
+> 2026-10-14 实现（`components/composer/ComposerStatsPills.tsx`、`composer-stats.ts`；模型侧计时在宿主投影 `packages/session/projection/src/facts.ts`），交互原型 `composer-usage-dock-demo.html`。显示分支和数字格式逐条照 DeepSeek Harness `StatsPills.tsx`（详细模式）与 `token-format.ts`。
+
+follow-up 状态行右侧、context 圆环左边，两个整会话累计的胶囊：
+
+| 胶囊 | 文字 | 不显示 | 只读（span，不可点） | 面板 |
+|---|---|---|---|---|
+| 会话统计（`Gauge`） | `N 轮 M 步 · 43 tok/s` | 还没有任何一步 | 模型用时、工具用时、TTFT 步数都为 0 且没有输出速度 | 「会话统计」：模型用时 / 工具调用用时 / 首 token 平均（TTFT）/ 输出速度（TPS），有值才出行 |
+| Token 用量（`Database`） | `12.2K tok · 缓存命中 80%` | 计费输入和输出都为 0 | — | 「Token 用量」，标题值是精确总量：缓存命中 / 未缓存输入 / 缓存读取 / 缓存写入（非 0 才出行）/ 输出 |
+
+- 计费输入 = 未缓存输入 + 缓存读取 + 缓存写入；输出速度 = 总输出 token ÷ 总解码时长；缓存命中不会把「差一点全命中」舍成 100%。
+- 胶囊是状态行里的纯文字入口（原生 `<button>`，和 context 圆环一致），悬停或展开时给 hover 底色；面板是 `ui/Popover`，在胶囊上方右对齐，宽 300–440px。
+- 数据口径（2026-10-15 起和 DSH 一致）：全部取自宿主投影，不再读渲染端事件窗口。轮次、步数、Token 用量来自 `activity` / `usage`；模型用时、TTFT、输出速度来自 `activity.timing`——`sessionStats` 投影（stateVersion 2）扫全量 journal（含 `assistant/chunk`）累加，所以重新打开的会话和长会话也准；工具用时来自全量 `tools` 投影。历史窗口照旧去掉已定稿消息的 chunk，这不影响统计。
 ## Context 弹窗
 
 点击 follow-up 底部状态行右侧的 context usage 入口后弹出。

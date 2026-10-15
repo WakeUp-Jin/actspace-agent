@@ -131,6 +131,15 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       },
       listDir: async ({ workspaceRoot }) => ({ root: workspaceRoot ?? db.bootstrap.workspaceRoot, relativePath: "", entries: [] }),
       statFile: async ({ relativePath }) => ({ relativePath, size: 0, mtimeMs: 0, error: "not_found" }),
+      // 浏览器 mock 没有真实的关联应用；给几个示例应用，让交付卡的下拉菜单可以检查。
+      listFileApplications: async () => ({
+        applications: [
+          { id: "/Applications/Microsoft Word.app", name: "Microsoft Word", default: true },
+          { id: "/System/Applications/Pages.app", name: "Pages", default: false },
+          { id: "/System/Applications/TextEdit.app", name: "TextEdit", default: false },
+        ],
+      }),
+      openFile: async () => ({ ok: true }),
       listOpenTools: async () => ({ tools: [] }),
       openInIde: async () => ({ ok: false, error: "open_failed" }),
       openInTool: async ({ workspaceRoot, toolId }) => ({ ok: false, workspaceRoot: workspaceRoot ?? db.bootstrap.workspaceRoot, toolId, error: "unsupported_platform" }),

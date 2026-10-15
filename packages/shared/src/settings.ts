@@ -226,6 +226,8 @@ export type SettingsV4Namespace =
 
 export interface SettingsV4General {
   performanceMonitoring?: boolean;
+  /** 轮尾是否显示「本轮代码改动」卡；缺省视为开启。 */
+  showTurnCodeChanges?: boolean;
   /** Absent in older v4 snapshots. Runtime enablement is never persisted. */
   englishLearning?: { lastSessionId: string | null };
   personalization: {

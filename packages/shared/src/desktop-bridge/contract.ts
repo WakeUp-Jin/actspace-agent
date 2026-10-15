@@ -67,6 +67,8 @@ export const desktopBridgeContract = {
     listDir: invoke<S.WorkspaceListDirInput, S.WorkspaceListDirResult>(CH.listWorkspaceDir),
     readFile: invoke<S.WorkspaceReadFileInput, S.WorkspaceReadFileResult>(CH.readWorkspaceFile),
     statFile: invoke<S.WorkspaceStatFileInput, S.WorkspaceStatFileResult>(CH.statWorkspaceFile),
+    listFileApplications: invoke<S.WorkspaceFileApplicationsInput, S.WorkspaceFileApplicationsResult>(CH.listWorkspaceFileApplications),
+    openFile: invoke<S.WorkspaceOpenFileInput, S.WorkspaceOpenFileResult>(CH.openWorkspaceFile),
     getEnvironment: invoke<S.WorkspaceEnvironmentGetInput, S.WorkspaceEnvironmentSnapshot>(CH.getWorkspaceEnvironment),
     createBranch: invoke<S.WorkspaceGitCreateBranchInput, S.WorkspaceGitMutationResult>(CH.createWorkspaceBranch),
     switchBranch: invoke<S.WorkspaceGitSwitchBranchInput, S.WorkspaceGitMutationResult>(CH.switchWorkspaceBranch),

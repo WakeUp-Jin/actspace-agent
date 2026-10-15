@@ -1,0 +1,699 @@
+<!doctype html>
+<!-- 文档状态：交互验收原型（未实现）。按 DeepSeek Harness 0.2.1 的轮尾「改动摘要卡 + 交付卡」复刻布局与交互：
+     悬停 500ms 单栏 diff 浮层、点击打开本轮 Review 标签页、交付卡侧栏预览与原生应用菜单。
+     颜色取 ActSpace tokens.css 的浅/深两套值；尺寸照 DSH 的 CSS module 数值。 -->
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>轮尾交付卡 Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --surface-raised: #ffffff;
+  --hover: #eaeae7; --selected: #e4e4e1;
+  --line: #deded9; --line-soft: #e8e8e4; --line-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #72726b;
+  --success: #087a4b; --danger: #c74747;
+  --diff-add-bg: rgba(44, 168, 105, .12); --diff-add-text: #08784f;
+  --diff-del-bg: rgba(225, 70, 86, .12); --diff-del-text: #a43342;
+  --card-fill: #f7f7f5; --card-hover: #eeeeeb; --tile-bg: #ffffff;
+  --pop-shadow: 0 10px 32px rgba(32, 32, 30, .14), 0 1px 3px rgba(32, 32, 30, .08);
+  --ic-blue: #3f78e0; --ic-green: #23a45c; --ic-purple: #8a5cf0; --ic-orange: #e07a2f; --ic-gray: #7d7d76;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", sans-serif;
+  --mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --surface-raised: #30312d;
+    --hover: #2a2b27; --selected: #30312d;
+    --line: #353630; --line-soft: #2f302b; --line-strong: #787870;
+    --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+    --success: #36c783; --danger: #e06b6b;
+    --diff-add-bg: rgba(53, 193, 135, .14); --diff-add-text: #5fd49b;
+    --diff-del-bg: rgba(239, 109, 109, .16); --diff-del-text: #f08a8a;
+    --card-fill: #292a26; --card-hover: #30312d; --tile-bg: rgba(255, 255, 255, .05);
+    --pop-shadow: 0 12px 36px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --surface-raised: #30312d;
+  --hover: #2a2b27; --selected: #30312d;
+  --line: #353630; --line-soft: #2f302b; --line-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+  --success: #36c783; --danger: #e06b6b;
+  --diff-add-bg: rgba(53, 193, 135, .14); --diff-add-text: #5fd49b;
+  --diff-del-bg: rgba(239, 109, 109, .16); --diff-del-text: #f08a8a;
+  --card-fill: #292a26; --card-hover: #30312d; --tile-bg: rgba(255, 255, 255, .05);
+  --pop-shadow: 0 12px 36px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .3);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.5 var(--font); padding: 20px 16px 56px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--line-strong); outline-offset: 1px; }
+.tnum { font-variant-numeric: tabular-nums; }
+svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── 页面外壳 ─────────────────────────── */
+.page { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.page > header h1 { margin: 0; font-size: 19px; font-weight: 600; }
+.page > header p { margin: 6px 0 0; color: var(--muted); max-width: 92ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.ctl { display: inline-flex; align-items: center; gap: 6px; }
+.ctl > span { color: var(--muted); font-size: 12.5px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--surface); gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface-subtle); color: var(--text); font-weight: 600; }
+
+.app { display: flex; height: 760px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.conv { flex: 1; min-width: 0; overflow-y: auto; }
+.conv-inner { margin: 0 auto; padding: 28px 0 40px; max-width: var(--conv-width, 760px); }
+.app[data-width="narrow"] { --conv-width: 480px; }
+
+/* 消息 */
+.user-msg { display: flex; justify-content: flex-end; padding: 0 17px; margin-bottom: 22px; }
+.user-msg div { max-width: 78%; background: var(--surface-subtle); border-radius: 16px; padding: 8px 14px; }
+.assistant { padding: 0 17px; }
+.assistant p { margin: 0 0 10px; }
+.assistant code { font: 12px var(--mono); background: var(--surface-subtle); border-radius: 4px; padding: 1px 5px; }
+.work { color: var(--faint); font-size: 12.5px; display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+
+/* ── 轮尾区 ───────────────────────────── */
+.tail { padding: 0 17px; margin-top: 14px; display: flex; flex-direction: column; container-type: inline-size; }
+
+/* 改动摘要卡：DSH ChangedFiles.module.css */
+.chg { border: .5px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.chg[data-single="true"] { border-color: var(--line-soft); }
+.chg-head { display: flex; align-items: center; gap: 10px; height: 60px; padding: 8px 10px; width: 100%; border: 0; background: var(--card-fill); text-align: left; cursor: pointer; transition: background 120ms var(--ease); }
+.chg-head:hover, .chg-head:focus-visible { background: var(--card-hover); }
+.tile { width: 40px; height: 40px; border-radius: 10px; border: .5px solid var(--line); background: var(--tile-bg); display: grid; place-items: center; flex: none; }
+.head-body { min-width: 0; display: flex; flex-direction: column; }
+.head-title { font-size: 13px; font-weight: 500; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.head-stat { font-size: 10px; line-height: 16px; color: var(--faint); }
+.counts { display: inline-flex; gap: 6px; font-family: var(--mono); }
+.add { color: var(--success); } .del { color: var(--danger); }
+.hint { display: none; }
+.chg-head:hover .counts, .chg-head:focus-visible .counts { display: none; }
+.chg-head:hover .hint, .chg-head:focus-visible .hint { display: inline; }
+.chg-list { list-style: none; margin: 0; padding: 0; border-top: .5px solid var(--line); }
+.chg-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 24px; padding: 7px 18px 7px 14px; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.chg-row:hover, .chg-row:focus-visible, .chg-row[data-hovering="true"] { background: var(--hover); }
+.chg-path { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.chg-path bdi { direction: ltr; }
+.chg-row .counts { font-size: 11px; }
+.flag { font-size: 11px; color: var(--faint); }
+.toggle { display: flex; align-items: center; gap: 4px; width: 100%; padding: 10px 18px 10px 14px; border: 0; border-top: .5px solid var(--line); background: transparent; color: var(--faint); font-size: 12px; cursor: pointer; }
+.toggle:hover { color: var(--text); background: var(--hover); }
+.toggle svg.i { width: 14px; height: 14px; }
+
+/* 交付卡：DSH Deliverables.module.css */
+.pres-wrap { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.tail > .pres-wrap:first-child { margin-top: 4px; }
+.pres { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pres[data-single="true"] { grid-template-columns: 1fr; }
+@container (max-width: 620px) { .pres { grid-template-columns: 1fr; } }
+.file { position: relative; display: flex; align-items: center; gap: 10px; height: 60px; padding: 8px 10px; border: .5px solid var(--line-soft); border-radius: 12px; background: var(--card-fill); transition: background 120ms var(--ease); min-width: 0; }
+.file:hover { background: var(--card-hover); }
+.file-preview { position: absolute; inset: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+.file .tile, .file-body { position: relative; pointer-events: none; }
+.file-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.file-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.file-name { font-size: 13px; font-weight: 500; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-desc { font-size: 10px; line-height: 16px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity 200ms var(--ease); }
+.file-desc[data-fading="true"] { opacity: 0; }
+.file-desc[data-error="true"] { color: var(--danger); }
+.file:hover .file-desc:not([role="status"]) .sec { display: none; }
+.file:hover .file-desc:not([role="status"]) .hint { display: inline; }
+.actions { pointer-events: auto; position: relative; display: inline-flex; border: .5px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.actions button { border: 0; background: transparent; height: 30px; display: grid; place-items: center; cursor: pointer; color: var(--faint); }
+.actions button:hover { background: var(--hover); color: var(--text); }
+.act-open { width: 34px; }
+.act-more { width: 22px; border-left: .5px solid var(--line) !important; }
+.act-more svg.i { width: 13px; height: 13px; }
+.app-ic { width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; color: #fff; font-size: 10px; font-weight: 700; flex: none; }
+.pres-toggle { align-self: flex-start; border: .5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12px; padding: 1px 11px; cursor: pointer; }
+.pres-toggle:hover { color: var(--text); background: var(--hover); }
+
+/* 应用菜单 */
+.menu { position: fixed; z-index: 60; min-width: 200px; padding: 4px; border: .5px solid var(--line); border-radius: 10px; background: var(--surface-raised); box-shadow: var(--pop-shadow); }
+.menu button { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; text-align: left; font-size: 12.5px; }
+.menu button:hover, .menu button:focus-visible { background: var(--hover); }
+.menu .tag { margin-left: auto; color: var(--faint); font-size: 11px; }
+.menu hr { border: 0; border-top: .5px solid var(--line); margin: 4px 2px; }
+
+/* 操作栏（现有 TurnActions） */
+.turn-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; margin-top: 10px; padding: 0 17px; color: var(--faint); font-size: 12px; }
+.turn-actions .left { display: flex; gap: 2px; }
+.turn-actions .ib { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--faint); opacity: .65; cursor: pointer; }
+.turn-actions .ib:hover { background: var(--hover); color: var(--text); opacity: 1; }
+.turn-actions .meta { display: flex; gap: 10px; }
+
+/* ── 悬停 diff 浮层 ───────────────────── */
+.pop { position: fixed; z-index: 50; display: flex; flex-direction: column; border: .5px solid var(--line); border-radius: 12px; background: var(--surface-raised); box-shadow: var(--pop-shadow); overflow: hidden; opacity: 0; transition: opacity 100ms var(--ease); }
+.pop[data-open="true"] { opacity: 1; }
+.pop-head { flex: none; height: 38px; display: flex; align-items: center; padding: 0 14px; border-bottom: .5px solid var(--line); font: 11.5px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pop-body { overflow: auto; }
+
+/* ── 文件对比（FileDiff） ─────────────── */
+.diff { font: 12px/20px var(--mono); }
+.diff-u { display: grid; grid-template-columns: 3.5em 3.5em 1.2em minmax(0, 1fr); min-width: max-content; }
+.diff[data-wrap="true"] .diff-u { min-width: 0; }
+.diff-u > span, .diff-s .cell > span { padding: 0 6px; white-space: pre; }
+.diff[data-wrap="true"] .txt { white-space: pre-wrap; word-break: break-all; }
+.ln { color: var(--faint); text-align: right; user-select: none; opacity: .8; }
+.sg { color: var(--faint); user-select: none; padding: 0 2px !important; }
+.r-add { background: var(--diff-add-bg); } .r-add.sg { color: var(--diff-add-text); }
+.r-del { background: var(--diff-del-bg); } .r-del.sg { color: var(--diff-del-text); }
+.hunk-h { grid-column: 1 / -1; padding: 2px 10px !important; color: var(--faint); background: var(--surface-subtle); font-size: 11px; }
+.pop .hunk-h { display: none; }
+.pop .hunk-gap { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 4px 0; }
+.diff-s { display: grid; grid-template-columns: 1fr 1fr; }
+.diff-s .side { overflow-x: auto; min-width: 0; }
+.diff-s .side + .side { border-left: .5px solid var(--line); }
+.diff-s .cell { display: grid; grid-template-columns: 3.5em minmax(0, 1fr); min-width: max-content; }
+.diff[data-wrap="true"] .diff-s .cell { min-width: 0; }
+.cell.empty { background: repeating-linear-gradient(135deg, transparent 0 4px, var(--line-soft) 4px 5px); }
+.cell.empty > span { visibility: hidden; }
+.diff-note { padding: 32px 16px; text-align: center; color: var(--faint); font: 13px var(--font); }
+
+/* ── 右侧面板 ─────────────────────────── */
+.rp { width: 0; flex: none; border-left: .5px solid var(--line); background: var(--surface); display: flex; flex-direction: column; overflow: hidden; transition: width 180ms var(--ease); }
+.rp[data-open="true"] { width: 52%; }
+.rp-tabs { flex: none; display: flex; align-items: center; gap: 2px; height: 38px; padding: 0 6px; border-bottom: .5px solid var(--line); overflow-x: auto; }
+.rp-tab { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+.rp-tab[aria-selected="true"] { background: var(--selected); color: var(--text); }
+.rp-tab .x { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 4px; }
+.rp-tab .x:hover { background: var(--hover); }
+.rp-tab .x svg.i { width: 12px; height: 12px; }
+.rp-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.rv-bar { flex: none; display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 8px 0 10px; border-bottom: .5px solid var(--line); }
+.rv-file { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 70%; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+.rv-file:hover, .rv-file[aria-expanded="true"] { background: var(--hover); }
+.rv-file .p { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-file .counts { font-size: 11px; }
+.rv-tools { margin-left: auto; display: flex; gap: 2px; }
+.tb { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--faint); cursor: pointer; }
+.tb svg.i { width: 15px; height: 15px; }
+.tb:hover { background: var(--hover); color: var(--text); }
+.tb[aria-pressed="true"] { background: var(--selected); color: var(--text); }
+.rv-body { flex: 1; min-height: 0; overflow: auto; }
+
+.pv { flex: 1; overflow: auto; padding: 22px 26px; }
+.pv h2 { margin: 0 0 10px; font-size: 18px; } .pv h3 { margin: 18px 0 8px; font-size: 14px; }
+.pv p, .pv li { color: var(--muted); }
+.pv table { border-collapse: collapse; font-size: 12px; }
+.pv th, .pv td { border: .5px solid var(--line); padding: 5px 10px; text-align: left; }
+.pv th { background: var(--surface-subtle); font-weight: 600; }
+.pv .img { height: 260px; border-radius: 10px; background: linear-gradient(135deg, var(--ic-purple), var(--ic-blue)); opacity: .85; }
+.pv .frame { border: .5px solid var(--line); border-radius: 10px; padding: 18px; }
+.pv .empty { margin-top: 80px; text-align: center; color: var(--faint); }
+
+/* 说明区 */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.note { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px 16px; }
+.note h3 { margin: 0 0 6px; font-size: 13.5px; }
+.note ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; }
+.note li + li { margin-top: 3px; }
+
+@media (max-width: 760px) { .rp[data-open="true"] { width: 100%; } .app { height: 680px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="page">
+  <header>
+    <h1>轮尾交付卡 · 改动摘要卡</h1>
+    <p>复刻 DeepSeek Harness 的轮尾两类卡片：上面是<strong>改动摘要卡</strong>（这轮改了什么，数据来自写/改文件工具事件），下面是<strong>交付卡</strong>（Agent 用 <code>present</code> 声明交给你的文件）。在文件行上停 500ms 看 diff 浮层，点行或标题打开本轮 Review；点交付卡在侧栏预览，右侧按钮用应用打开。</p>
+  </header>
+
+  <div class="controls">
+    <div class="ctl"><span>场景</span><div class="seg" id="scenarioSeg"></div></div>
+    <div class="ctl"><span>主题</span><div class="seg" id="themeSeg">
+      <button data-v="system" aria-pressed="true">跟随系统</button><button data-v="light">浅色</button><button data-v="dark">深色</button>
+    </div></div>
+    <div class="ctl"><span>对话宽度</span><div class="seg" id="widthSeg">
+      <button data-v="wide" aria-pressed="true">760px</button><button data-v="narrow">480px（单列）</button>
+    </div></div>
+  </div>
+
+  <div class="app" id="app">
+    <main class="conv" id="conv"><div class="conv-inner" id="convInner"></div></main>
+    <aside class="rp" id="rp" data-open="false" aria-label="右侧面板">
+      <div class="rp-tabs" role="tablist" id="rpTabs"></div>
+      <div class="rp-body" id="rpBody"></div>
+    </aside>
+  </div>
+
+  <section class="notes">
+    <div class="note"><h3>数据从哪来</h3><ul>
+      <li>改动摘要：本轮已完成的 <code>write_file</code> / <code>edit_file</code> 结果，按路径合并为净变化；删除的文件移出列表。数据随会话持久化，重开历史会话卡片仍在。</li>
+      <li>交付：新增 <code>present</code> 工具，Agent 声明 <code>files: [{ path, description? }]</code>；后端校验文件存在后写入 <code>deliverables/presented</code> 事件。只取最终回复之前的声明，同路径取最后一次说明。</li>
+      <li>两类卡片互相独立：同一文件可以同时出现在两处，数量也不必一致。</li>
+    </ul></div>
+    <div class="note"><h3>改动摘要卡</h3><ul>
+      <li>单文件只显示标题「修改了 xx」；多文件显示列表，超过 4 行折叠。</li>
+      <li>悬停标题时，统计换成「查看本轮改动」；文件行停 500ms 弹出单栏 diff，宽度为卡片宽 − 48px，高度最多 420px，下方放不下就放上方。</li>
+      <li>移到浮层上会保持打开；移出 200ms 后关闭；Esc、滚动、点击都会关闭。</li>
+      <li>点标题打开第一项，点行打开对应项；同一轮只占一个 Review 标签页。</li>
+    </ul></div>
+    <div class="note"><h3>交付卡</h3><ul>
+      <li>高 60px，图标框 40px；默认双列，卡片容器 ≤ 620px 时单列（container query）；超过 4 张折叠。</li>
+      <li>悬停时说明换成「在侧边栏预览」；打开中、已打开、失败等状态不会被悬停覆盖，成功状态 5 秒后淡出。</li>
+      <li>右侧按钮用默认应用打开，下拉菜单列出关联应用，最后一项是「在 Finder 中显示」。</li>
+    </ul></div>
+  </section>
+</div>
+
+<div class="pop" id="pop" hidden><div class="pop-head" id="popHead"></div><div class="pop-body" id="popBody"></div></div>
+<div class="menu" id="menu" hidden role="menu"></div>
+
+<script>
+/* ── 图标 ───────────────────────────── */
+const ICONS = {
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  wand: '<path d="m15 4-11 11 3 3 11-11z"/><path d="M14 5l3 3"/><path d="M19 3v4M17 5h4M5 3v2M4 4h2"/>',
+  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  down: '<path d="m6 9 6 6 6-6"/>', up: '<path d="m18 15-6-6-6 6"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  split: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>',
+  wrap: '<path d="M3 6h18M3 12h15a3 3 0 0 1 0 6h-4"/><path d="m16 16-2 2 2 2"/><path d="M3 18h7"/>',
+  ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+};
+const ic = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
+
+const TYPE = {
+  md:   { color: 'var(--ic-blue)',   label: 'MD',  name: 'Markdown' },
+  csv:  { color: 'var(--ic-green)',  glyph: 'grid', name: 'CSV' },
+  html: { color: 'var(--ic-blue)',   glyph: 'globe', name: 'HTML' },
+  png:  { color: 'var(--ic-purple)', glyph: 'image', name: 'PNG' },
+  pptx: { color: 'var(--ic-orange)', label: 'PPT', name: 'PPTX' },
+  xlsx: { color: 'var(--ic-green)',  glyph: 'grid', name: 'XLSX' },
+  code: { color: 'var(--ic-blue)',   glyph: 'code', name: '代码' },
+  json: { color: 'var(--ic-gray)',   label: '{ }', name: 'JSON' },
+};
+function extOf(p) { const m = /\.([a-z0-9]+)$/i.exec(p); return m ? m[1].toLowerCase() : ''; }
+function kindOf(p) { const e = extOf(p); if (TYPE[e]) return e; if (['ts', 'tsx', 'js', 'mjs', 'css'].includes(e)) return 'code'; return 'json'; }
+function fileIcon(kind) {
+  const t = TYPE[kind] || TYPE.json;
+  const glyphs = {
+    grid: '<path d="M8.5 11.5h7v6h-7zM8.5 14.5h7M12 11.5v6" stroke="#fff" stroke-width="1.2" fill="none"/>',
+    globe: '<circle cx="12" cy="14.5" r="3.6" stroke="#fff" stroke-width="1.2" fill="none"/><path d="M8.4 14.5h7.2M12 10.9c1.3 1.6 1.3 5.6 0 7.2M12 10.9c-1.3 1.6-1.3 5.6 0 7.2" stroke="#fff" stroke-width="1" fill="none"/>',
+    image: '<path d="m8.3 18 2.6-3.2 1.8 2 1.3-1.4 1.8 2.6z" fill="#fff"/><circle cx="14.4" cy="11.8" r="1.1" fill="#fff"/>',
+    code: '<path d="m10 12.2-2 2.3 2 2.3M14 12.2l2 2.3-2 2.3" stroke="#fff" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  };
+  const inner = t.glyph ? glyphs[t.glyph]
+    : `<text x="12" y="16.6" text-anchor="middle" font-size="${t.label.length > 2 ? 4.6 : 5.6}" font-weight="700" fill="#fff" font-family="-apple-system,sans-serif">${t.label}</text>`;
+  return `<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5L19 7v13a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V4a1.5 1.5 0 0 1 1-1.5z" fill="${t.color}"/><path d="M14.5 2.5V7H19" fill="rgba(255,255,255,.35)"/>${inner}</svg>`;
+}
+
+/* ── 应用（演示用通用色块，不用真实图标） ─ */
+const APPS = {
+  md:   [['Typora', '#3d9a7a', true], ['Visual Studio Code', '#2f7fd0'], ['文本编辑', '#7d7d76']],
+  csv:  [['Numbers', '#2e9d4a', true], ['Microsoft Excel', '#1f7a45'], ['Visual Studio Code', '#2f7fd0']],
+  html: [['Google Chrome', '#d9a12b', true], ['Safari', '#3a8ee6'], ['Visual Studio Code', '#2f7fd0']],
+  png:  [['预览', '#4f8fd8', true], ['Pixelmator Pro', '#8a5cf0']],
+  pptx: [['Keynote', '#3b7bd9', true], ['Microsoft PowerPoint', '#c8502b']],
+  xlsx: [['Numbers', '#2e9d4a', true], ['Microsoft Excel', '#1f7a45']],
+};
+const appIcon = ([name, color]) => `<span class="app-ic" style="background:${color}">${name[0]}</span>`;
+
+/* ── 对比数据 ───────────────────────── */
+const H = (oldStart, newStart, lines) => ({ oldStart, newStart, lines });
+const DIFFS = {
+  '.render-probe/probe.md': { before: true, hunks: [
+    H(1, 1, [' # 渲染探测 · Markdown', ' ', '-这是第 1 版，只覆盖标题和段落。', '+这是第 2 版，新增多种语法元素，用来检查侧栏预览。', ' ', ' ## 段落']),
+    H(14, 14, [' ## 列表', ' ', ' - 一级条目', '-- 另一个条目', '+- 一级条目，含 **粗体** 与 `行内代码`', '+  - 二级条目', '+  - [ ] 任务项', ' ', '+## 表格', '+', '+| 列 | 说明 |', '+| --- | --- |', '+| 中文 | 宽字符对齐 |', '+| emoji | 🍵 |', '+', ' ## 代码', ' ', ' ```ts', '-const a = 1', '+const probe = { version: 2, blocks: ["table", "task", "quote"] };', ' ```']),
+  ]},
+  '.render-probe/probe.csv': { before: true, hunks: [
+    H(1, 1, ['-id,name,score', '+id,name,score,城市,备注', '-1,alpha,92', '-2,beta,85', '+1,alpha,92,上海,', '+2,beta,85,杭州,"含逗号, 的字段"', '+3,gamma,77,深圳,"跨行', '+字段"', ' 4,delta,64']),
+  ]},
+  'src/report/build.ts': { before: true, hunks: [
+    H(8, 8, [' import { readRows } from "./rows";', '+import { renderChart } from "./chart";', ' ', ' export async function buildReport(input: ReportInput) {', '   const rows = await readRows(input.source);', '-  return { rows };', '+  const chart = renderChart(rows, { kind: "bar" });', '+  return { rows, chart, generatedAt: Date.now() };', ' }']),
+    H(40, 42, [' function normalize(row: Row): Row {', '-  return row;', '+  return { ...row, name: row.name.trim() };', ' }']),
+  ]},
+  'src/report/chart.tsx': { before: false, hunks: [
+    H(1, 1, ['+import type { Row } from "./rows";', '+', '+export function renderChart(rows: Row[], opts: { kind: "bar" | "line" }) {', '+  const max = Math.max(...rows.map((r) => r.score));', '+  return rows.map((r) => ({ label: r.name, ratio: r.score / max, kind: opts.kind }));', '+}']),
+  ]},
+  'package.json': { before: true, hunks: [
+    H(12, 12, ['   "scripts": {', '-    "report": "tsx src/report/build.ts"', '+    "report": "tsx src/report/build.ts",', '+    "report:watch": "tsx watch src/report/build.ts"', '   },']),
+  ]},
+  'docs/notes/context.md': { before: true, hunks: [
+    H(30, 30, [' ## 已知限制', ' ', '+- 改动摘要只统计写/改文件工具，Shell 改动不计入。', '+- 交付文件只记路径，文件被删除后卡片仍在、打开会失败。', ' ']),
+  ]},
+  'assets/logo.png': { binary: true },
+  'data/fixtures/big.json': { oversized: true },
+};
+function countOf(path) {
+  const d = DIFFS[path]; let a = 0, r = 0;
+  for (const h of d.hunks || []) for (const l of h.lines) { if (l[0] === '+') a++; else if (l[0] === '-') r++; }
+  return { added: a, deleted: r, binary: !!d.binary, oversized: !!d.oversized };
+}
+
+/* ── 场景 ───────────────────────────── */
+const D = {
+  html: { path: '.render-probe/probe.html', description: 'HTML 渲染探测' },
+  png:  { path: '.render-probe/probe.png', description: 'PNG 位图渲染探测' },
+  md:   { path: '.render-probe/probe.md', description: 'Markdown 第 2 版：新增多种语法元素' },
+  csv:  { path: '.render-probe/probe.csv', description: 'CSV 第 2 版：新增中文列、长字段与 RFC 4180 转义（引号与换行）' },
+  pptx: { path: 'out/季度汇报.pptx', description: '季度汇报幻灯片（12 页）' },
+  xlsx: { path: 'out/销售数据.xlsx', description: '' },
+};
+const SCENARIOS = [
+  { id: 'both', label: '改动 + 交付',
+    user: '把 probe.md 和 probe.csv 升级到第 2 版，覆盖更多语法。',
+    reply: '两份探测文件都已升级到第 2 版：<code>probe.md</code> 新增了表格、任务列表和代码块，<code>probe.csv</code> 补了中文列和 RFC 4180 的转义场景。可以在侧栏直接预览检查渲染。',
+    changes: ['.render-probe/probe.csv', '.render-probe/probe.md'], presented: [D.md, D.csv] },
+  { id: 'present', label: '只有交付',
+    user: '用现有的 4 个探测文件做一次渲染回归，把它们给我。',
+    reply: '四个探测文件都在，内容没有改动。下面是本轮交付的文件，点击可以在侧栏逐个检查。',
+    changes: [], presented: [D.html, D.png, D.md, D.csv] },
+  { id: 'single', label: '单文件',
+    user: '报告加上图表，再导出一份季度汇报幻灯片。',
+    reply: '<code>buildReport</code> 现在会同时生成图表数据，并顺手修了名称首尾空格。季度汇报已导出为幻灯片。',
+    changes: ['src/report/build.ts'], presented: [D.pptx] },
+  { id: 'many', label: '多文件折叠',
+    user: '把报告模块整理一遍，补文档，产出全部样例。',
+    reply: '报告模块整理完成，新增 <code>chart.tsx</code>，并更新了脚本和文档。logo 换了新版，fixture 数据重新生成。下面是全部样例产物。',
+    changes: ['assets/logo.png', 'data/fixtures/big.json', 'docs/notes/context.md', 'package.json', 'src/report/build.ts', 'src/report/chart.tsx', '.render-probe/probe.md'],
+    presented: [D.html, D.png, D.md, D.csv, D.pptx, D.xlsx] },
+];
+const TURN = 3;
+const CWD = '~/code/report-lab';
+
+/* ── 状态 ───────────────────────────── */
+const state = { scenario: SCENARIOS[0], chgExpanded: false, presExpanded: false, tabs: [], active: null, phases: {} };
+
+/* ── 工具函数 ───────────────────────── */
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const nf = new Intl.NumberFormat('en-US');
+const base = (p) => p.split('/').pop();
+function countsHtml(c) {
+  if (c.binary) return '<span class="flag">二进制</span>';
+  if (c.oversized) return '<span class="flag">过大</span>';
+  return `<span class="counts tnum"><span class="add">+${nf.format(c.added)}</span><span class="del">−${nf.format(c.deleted)}</span></span>`;
+}
+function summaryOf(paths) {
+  const files = paths.map((path) => ({ path, display: path, ...countOf(path) })).sort((a, b) => a.display < b.display ? -1 : 1);
+  return { files, total: files.length, added: files.reduce((s, f) => s + f.added, 0), deleted: files.reduce((s, f) => s + f.deleted, 0) };
+}
+function cardDescription(file) {
+  const raw = (file.description || '').replace(/\s*[（(][^（()）]*[)）]\s*$/, '').trim();
+  return raw || (extOf(file.path).toUpperCase() || '文件');
+}
+
+/* ── 渲染：对话 + 轮尾 ──────────────── */
+function render() {
+  const s = state.scenario;
+  const summary = summaryOf(s.changes);
+  document.getElementById('convInner').innerHTML = `
+    <div class="user-msg"><div>${esc(s.user)}</div></div>
+    <div class="assistant">
+      <div class="work">${ic('layers')}已处理 1 分 12 秒 · ${s.changes.length + 3} 个步骤</div>
+      <p>${s.reply}</p>
+    </div>
+    <div class="tail" id="tail">${renderChanges(summary)}${renderPresented(s.presented)}</div>
+    <div class="turn-actions">
+      <div class="left">
+        <button class="ib" aria-label="复制">${ic('copy')}</button>
+        <button class="ib" aria-label="可视化">${ic('wand')}</button>
+        <button class="ib" aria-label="更多">${ic('more')}</button>
+      </div>
+      <div class="meta tnum"><span>223K tok · $0.41</span><span>12:03</span></div>
+    </div>`;
+  bindTail(summary);
+}
+
+function renderChanges(summary) {
+  if (!summary.files.length) return '';
+  if (summary.total === 1) {
+    const f = summary.files[0];
+    return `<div class="chg" data-single="true">
+      <button class="chg-head" data-review="0" data-diff="0" aria-label="查看本轮改动：${esc(f.path)}">
+        <span class="tile">${fileIcon(kindOf(f.path))}</span>
+        <span class="head-body"><span class="head-title">修改了 ${esc(base(f.path))}</span>
+        <span class="head-stat">${countsHtml(f)}<span class="hint">查看本轮改动</span></span></span>
+      </button></div>`;
+  }
+  const collapsible = summary.files.length > 4;
+  const shown = collapsible && !state.chgExpanded ? summary.files.slice(0, 4) : summary.files;
+  return `<div class="chg">
+    <button class="chg-head" data-review="0" aria-label="查看本轮改动">
+      <span class="tile">${fileIcon('code')}</span>
+      <span class="head-body"><span class="head-title">已编辑 ${summary.total} 个文件</span>
+      <span class="head-stat">${countsHtml(summary)}<span class="hint">查看本轮改动</span></span></span>
+    </button>
+    <ul class="chg-list">${shown.map((f, i) => `<li><button class="chg-row" data-review="${i}" data-diff="${i}" aria-label="${esc(f.path)}">
+      <span class="chg-path"><bdi>${esc(f.display)}</bdi></span>${countsHtml(f)}</button></li>`).join('')}</ul>
+    ${collapsible ? `<button class="toggle" id="chgToggle" aria-expanded="${state.chgExpanded}">${ic(state.chgExpanded ? 'up' : 'down')}${state.chgExpanded ? '收起' : `显示全部 ${summary.total} 个文件`}</button>` : ''}
+  </div>`;
+}
+
+function renderPresented(list) {
+  if (!list.length) return '';
+  const collapsible = list.length > 4;
+  const shown = collapsible && !state.presExpanded ? list.slice(0, 4) : list;
+  return `<div class="pres-wrap">
+    <div class="pres" data-single="${list.length === 1}">${shown.map((f, i) => {
+      const kind = kindOf(f.path); const apps = APPS[kind] || [];
+      const phase = state.phases[f.path];
+      const desc = phase
+        ? `<span class="file-desc" role="status" data-error="${!!phase.error}" data-fading="${!!phase.fading}">${esc(phase.text)}</span>`
+        : `<span class="file-desc"><span class="sec">${esc(cardDescription(f))}</span><span class="hint">在侧边栏预览</span></span>`;
+      return `<div class="file">
+        <button class="file-preview" data-preview="${i}" aria-label="在侧边栏预览 ${esc(f.path)}"></button>
+        <span class="tile">${fileIcon(kind)}</span>
+        <div class="file-body">
+          <div class="file-text"><span class="file-name">${esc(base(f.path))}</span>${desc}</div>
+          ${apps.length ? `<div class="actions">
+            <button class="act-open" data-open="${i}" aria-label="用 ${esc(apps[0][0])} 打开">${appIcon(apps[0])}</button>
+            <button class="act-more" data-more="${i}" aria-haspopup="menu" aria-label="选择打开方式">${ic('down')}</button>
+          </div>` : ''}
+        </div></div>`;
+    }).join('')}</div>
+    ${collapsible ? `<button class="pres-toggle" id="presToggle">${state.presExpanded ? '收起' : `全部 ${list.length} 个`}</button>` : ''}
+  </div>`;
+}
+
+function bindTail(summary) {
+  const tail = document.getElementById('tail');
+  tail.querySelectorAll('[data-review]').forEach((el) => {
+    el.addEventListener('click', () => { closePop(true); openReview(summary, Number(el.dataset.review)); });
+  });
+  tail.querySelectorAll('[data-diff]').forEach((el) => bindHover(el, summary.files[Number(el.dataset.diff)]));
+  document.getElementById('chgToggle')?.addEventListener('click', () => { state.chgExpanded = !state.chgExpanded; render(); });
+  document.getElementById('presToggle')?.addEventListener('click', () => { state.presExpanded = !state.presExpanded; render(); });
+  const list = state.scenario.presented;
+  tail.querySelectorAll('[data-preview]').forEach((el) => el.addEventListener('click', () => openPreview(list[Number(el.dataset.preview)])));
+  tail.querySelectorAll('[data-open]').forEach((el) => el.addEventListener('click', (e) => {
+    e.stopPropagation(); const f = list[Number(el.dataset.open)]; openWith(f, (APPS[kindOf(f.path)] || [])[0]);
+  }));
+  tail.querySelectorAll('[data-more]').forEach((el) => el.addEventListener('click', (e) => {
+    e.stopPropagation(); openMenu(el, list[Number(el.dataset.more)]);
+  }));
+}
+
+/* ── 原生打开（模拟 phase 状态机） ───── */
+function setPhase(path, phase) { if (phase) state.phases[path] = phase; else delete state.phases[path]; render(); }
+function openWith(file, app) {
+  closeMenu();
+  const reveal = !app;
+  setPhase(file.path, { text: reveal ? '正在 Finder 中定位…' : `正在用 ${app[0]} 打开…` });
+  setTimeout(() => {
+    setPhase(file.path, { text: reveal ? '已在 Finder 中显示' : `已在 ${app[0]} 中打开` });
+    setTimeout(() => { state.phases[file.path] = { ...state.phases[file.path], fading: true }; render(); }, 5000);
+    setTimeout(() => setPhase(file.path, null), 5200);
+  }, 450);
+}
+
+/* ── 应用菜单 ───────────────────────── */
+const menu = document.getElementById('menu');
+function openMenu(anchor, file) {
+  const apps = APPS[kindOf(file.path)] || [];
+  menu.innerHTML = apps.map((a, i) => `<button role="menuitem" data-app="${i}">${appIcon(a)}<span>${esc(a[0])}</span>${a[2] ? '<span class="tag">默认</span>' : ''}</button>`).join('')
+    + `${apps.length ? '<hr>' : ''}<button role="menuitem" data-reveal="1">${ic('folder')}<span>在 Finder 中显示</span></button>`;
+  menu.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+  menu.style.top = (r.bottom + 4 + h > innerHeight ? r.top - h - 4 : r.bottom + 4) + 'px';
+  menu.querySelectorAll('[data-app]').forEach((b) => b.addEventListener('click', () => openWith(file, apps[Number(b.dataset.app)])));
+  menu.querySelector('[data-reveal]').addEventListener('click', () => openWith(file, null));
+  menu.querySelector('button').focus();
+}
+function closeMenu() { menu.hidden = true; }
+document.addEventListener('click', (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
+
+/* ── 悬停 diff 浮层 ─────────────────── */
+const pop = document.getElementById('pop');
+let openTimer = 0, closeTimer = 0, popAnchor = null;
+function bindHover(el, file) {
+  const enter = () => {
+    if (popAnchor === el) { clearTimeout(closeTimer); return; }
+    clearTimeout(openTimer);
+    openTimer = setTimeout(() => showPop(el, file), 500);
+  };
+  const leave = () => { clearTimeout(openTimer); if (popAnchor === el) scheduleClose(); };
+  el.addEventListener('pointerenter', enter); el.addEventListener('pointerleave', leave);
+  el.addEventListener('focus', enter); el.addEventListener('blur', leave);
+}
+function scheduleClose() { clearTimeout(closeTimer); closeTimer = setTimeout(() => closePop(), 200); }
+pop.addEventListener('pointerenter', () => clearTimeout(closeTimer));
+pop.addEventListener('pointerleave', scheduleClose);
+function showPop(el, file) {
+  clearTimeout(closeTimer);
+  if (popAnchor) popAnchor.removeAttribute('data-hovering');
+  popAnchor = el; el.setAttribute('data-hovering', 'true');
+  document.getElementById('popHead').textContent = `${CWD}/${file.path}`;
+  document.getElementById('popBody').innerHTML = renderDiff(file.path, { split: false, wrap: false, preview: true });
+  pop.hidden = false;
+  const card = el.closest('.chg').getBoundingClientRect(), row = el.getBoundingClientRect();
+  const margin = 8, gap = 6;
+  const width = Math.min(card.width - 48, innerWidth - margin * 2);
+  const left = Math.max(margin, Math.min(card.left + 24, innerWidth - margin - width));
+  const below = innerHeight - row.bottom - gap - margin, above = row.top - gap - margin;
+  const placeBelow = below >= Math.min(420, pop.scrollHeight) || below >= above;
+  pop.style.width = width + 'px'; pop.style.left = left + 'px';
+  pop.style.maxHeight = Math.min(420, placeBelow ? below : above) + 'px';
+  if (placeBelow) { pop.style.top = row.bottom + gap + 'px'; pop.style.bottom = ''; }
+  else { pop.style.bottom = innerHeight - row.top + gap + 'px'; pop.style.top = ''; }
+  requestAnimationFrame(() => pop.setAttribute('data-open', 'true'));
+}
+function closePop(immediate) {
+  clearTimeout(openTimer); clearTimeout(closeTimer);
+  if (!popAnchor) return;
+  popAnchor.removeAttribute('data-hovering'); popAnchor = null;
+  pop.setAttribute('data-open', 'false');
+  if (immediate) pop.hidden = true; else setTimeout(() => { if (!popAnchor) pop.hidden = true; }, 100);
+}
+document.getElementById('conv').addEventListener('scroll', () => closePop(true));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closePop(true); closeMenu(); } });
+
+/* ── FileDiff ──────────────────────── */
+function hunkRows(h) {
+  let o = h.oldStart, n = h.newStart; const rows = [];
+  for (const l of h.lines) {
+    const kind = l[0] === '+' ? 'add' : l[0] === '-' ? 'del' : 'ctx', text = l.slice(1);
+    rows.push({ kind, text, old: kind === 'add' ? '' : o, new: kind === 'del' ? '' : n });
+    if (kind !== 'add') o++; if (kind !== 'del') n++;
+  }
+  return rows;
+}
+function splitRows(rows) {
+  const out = []; let i = 0;
+  while (i < rows.length) {
+    if (rows[i].kind === 'ctx') { out.push({ left: rows[i], right: rows[i] }); i++; continue; }
+    const dels = [], adds = [];
+    while (i < rows.length && rows[i].kind === 'del') dels.push(rows[i++]);
+    while (i < rows.length && rows[i].kind === 'add') adds.push(rows[i++]);
+    for (let k = 0; k < Math.max(dels.length, adds.length); k++) out.push({ left: dels[k] || null, right: adds[k] || null });
+  }
+  return out;
+}
+function renderDiff(path, { split, wrap, preview }) {
+  const d = DIFFS[path];
+  if (d.binary) return '<div class="diff-note">二进制文件，无法显示文本对比</div>';
+  if (d.oversized) return '<div class="diff-note">文件超过 2 MB，不提供对比</div>';
+  const onlyOneSide = d.hunks.every((h) => h.lines.every((l) => l[0] !== '-')) || d.hunks.every((h) => h.lines.every((l) => l[0] !== '+'));
+  const useSplit = split && !onlyOneSide;
+  const head = (h) => `@@ -${h.oldStart} +${h.newStart} @@`;
+  if (!useSplit) {
+    return `<div class="diff" data-wrap="${wrap}"><div class="diff-u">${d.hunks.map((h, hi) =>
+      `${preview && hi > 0 ? '<span class="hunk-gap"></span>' : ''}<span class="hunk-h">${head(h)}</span>` +
+      hunkRows(h).map((r) => { const c = r.kind === 'ctx' ? '' : `r-${r.kind}`;
+        return `<span class="ln ${c}">${r.old}</span><span class="ln ${c}">${r.new}</span><span class="sg ${c}">${r.kind === 'add' ? '+' : r.kind === 'del' ? '−' : ''}</span><span class="txt ${c}">${esc(r.text) || ' '}</span>`; }).join('')
+    ).join('')}</div></div>`;
+  }
+  const side = (pick) => d.hunks.map((h) => `<div class="cell"><span class="hunk-h" style="grid-column:1/-1">${head(h)}</span></div>` +
+    splitRows(hunkRows(h)).map((p) => { const r = pick(p);
+      if (!r) return '<div class="cell empty"><span class="ln"> </span><span> </span></div>';
+      const c = r.kind === 'ctx' ? '' : `r-${r.kind}`;
+      return `<div class="cell"><span class="ln ${c}">${pick === L ? r.old : r.new}</span><span class="txt ${c}">${esc(r.text) || ' '}</span></div>`; }).join('')).join('');
+  const L = (p) => p.left, R = (p) => p.right;
+  return `<div class="diff" data-wrap="${wrap}"><div class="diff-s"><div class="side">${side(L)}</div><div class="side">${side(R)}</div></div></div>`;
+}
+
+/* ── 右侧面板 ───────────────────────── */
+function openReview(summary, index) {
+  const id = `review-${TURN}`;
+  let tab = state.tabs.find((t) => t.id === id);
+  if (!tab) { tab = { id, title: `第 ${TURN} 轮改动`, kind: 'review', summary, index, split: true, wrap: false }; state.tabs.push(tab); }
+  else { tab.summary = summary; tab.index = index; }
+  state.active = id; renderPanel();
+}
+function openPreview(file) {
+  const id = `file:${file.path}`;
+  if (!state.tabs.find((t) => t.id === id)) state.tabs.push({ id, title: base(file.path), kind: 'preview', file });
+  state.active = id; renderPanel();
+}
+function renderPanel() {
+  const rp = document.getElementById('rp');
+  rp.dataset.open = String(state.tabs.length > 0);
+  document.getElementById('rpTabs').innerHTML = state.tabs.map((t) =>
+    `<button class="rp-tab" role="tab" aria-selected="${t.id === state.active}" data-tab="${esc(t.id)}">${esc(t.title)}<span class="x" data-close="${esc(t.id)}" aria-label="关闭">${ic('x')}</span></button>`).join('');
+  document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', (e) => {
+    const close = e.target.closest('[data-close]');
+    if (close) { state.tabs = state.tabs.filter((t) => t.id !== close.dataset.close); if (state.active === close.dataset.close) state.active = state.tabs.at(-1)?.id ?? null; }
+    else state.active = b.dataset.tab;
+    renderPanel();
+  }));
+  const tab = state.tabs.find((t) => t.id === state.active);
+  const body = document.getElementById('rpBody');
+  if (!tab) { body.innerHTML = ''; return; }
+  if (tab.kind === 'review') renderReview(tab, body); else body.innerHTML = renderPreviewBody(tab.file);
+}
+function renderReview(tab, body) {
+  const f = tab.summary.files[tab.index] || tab.summary.files[0];
+  body.innerHTML = `<div class="rv-bar">
+      <button class="rv-file" id="rvFile" aria-haspopup="menu" aria-expanded="false"><span class="tile" style="width:22px;height:22px;border-radius:6px;border:0;background:transparent">${fileIcon(kindOf(f.path))}</span><span class="p">${esc(f.display)}</span>${countsHtml(f)}${ic('down')}</button>
+      <div class="rv-tools">
+        <button class="tb" id="rvSplit" aria-pressed="${tab.split}" title="${tab.split ? '切换为单栏' : '切换为左右对比'}" aria-label="左右对比">${ic('split')}</button>
+        <button class="tb" id="rvWrap" aria-pressed="${tab.wrap}" title="自动换行" aria-label="自动换行">${ic('wrap')}</button>
+        <button class="tb" id="rvOpen" title="打开完整文件" aria-label="打开完整文件">${ic('ext')}</button>
+      </div></div>
+    <div class="rv-body">${renderDiff(f.path, { split: tab.split, wrap: tab.wrap })}</div>`;
+  document.getElementById('rvSplit').onclick = () => { tab.split = !tab.split; renderPanel(); };
+  document.getElementById('rvWrap').onclick = () => { tab.wrap = !tab.wrap; renderPanel(); };
+  document.getElementById('rvOpen').onclick = () => openPreview({ path: f.path, description: '' });
+  document.getElementById('rvFile').onclick = (e) => {
+    e.stopPropagation();
+    const anchor = e.currentTarget; anchor.setAttribute('aria-expanded', 'true');
+    menu.innerHTML = tab.summary.files.map((x, i) => `<button role="menuitem" data-i="${i}" style="min-width:280px">${fileIcon(kindOf(x.path))}<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.display)}</span>${countsHtml(x)}</button>`).join('');
+    menu.hidden = false;
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = Math.min(r.left, innerWidth - menu.offsetWidth - 8) + 'px'; menu.style.top = r.bottom + 4 + 'px';
+    menu.querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => { tab.index = Number(b.dataset.i); closeMenu(); renderPanel(); }));
+  };
+}
+function renderPreviewBody(file) {
+  const k = kindOf(file.path);
+  if (k === 'md') return `<div class="pv"><h2>渲染探测 · Markdown</h2><p>这是第 2 版，新增多种语法元素，用来检查侧栏预览。</p><h3>列表</h3><ul><li>一级条目，含 <strong>粗体</strong> 与 <code>行内代码</code><ul><li>二级条目</li></ul></li></ul><h3>表格</h3><table><tr><th>列</th><th>说明</th></tr><tr><td>中文</td><td>宽字符对齐</td></tr><tr><td>emoji</td><td>🍵</td></tr></table></div>`;
+  if (k === 'csv' || k === 'xlsx') return `<div class="pv"><table><tr><th>id</th><th>name</th><th>score</th><th>城市</th><th>备注</th></tr><tr><td>1</td><td>alpha</td><td>92</td><td>上海</td><td></td></tr><tr><td>2</td><td>beta</td><td>85</td><td>杭州</td><td>含逗号, 的字段</td></tr><tr><td>3</td><td>gamma</td><td>77</td><td>深圳</td><td>跨行<br>字段</td></tr><tr><td>4</td><td>delta</td><td>64</td><td></td><td></td></tr></table></div>`;
+  if (k === 'png') return '<div class="pv"><div class="img" role="img" aria-label="probe.png 预览"></div></div>';
+  if (k === 'html') return '<div class="pv"><div class="frame"><h2>HTML 渲染探测</h2><p>这是一个由 Agent 生成的静态页面，在侧栏沙箱里渲染。</p></div></div>';
+  if (k === 'code' || k === 'json') return `<div class="pv"><pre style="font:12px/20px var(--mono);margin:0">${esc(DIFFS[file.path]?.hunks?.flatMap((h) => h.lines.filter((l) => l[0] !== '-').map((l) => l.slice(1))).join('\n') || '…')}</pre></div>`;
+  return `<div class="pv"><div class="empty">${fileIcon(k)}<p>${TYPE[k].name} 暂不支持侧栏预览<br>用右侧按钮在本机应用中打开</p></div></div>`;
+}
+
+/* ── 控件 ───────────────────────────── */
+const scenarioSeg = document.getElementById('scenarioSeg');
+scenarioSeg.innerHTML = SCENARIOS.map((s, i) => `<button data-v="${s.id}" aria-pressed="${i === 0}">${s.label}</button>`).join('');
+function seg(id, fn) {
+  document.getElementById(id).addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    e.currentTarget.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    fn(b.dataset.v);
+  });
+}
+seg('scenarioSeg', (v) => {
+  state.scenario = SCENARIOS.find((s) => s.id === v); state.chgExpanded = false; state.presExpanded = false;
+  state.phases = {}; state.tabs = []; state.active = null; closePop(true); render(); renderPanel();
+});
+seg('themeSeg', (v) => { if (v === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = v; });
+seg('widthSeg', (v) => { document.getElementById('app').dataset.width = v; closePop(true); });
+
+render(); renderPanel();
+</script>

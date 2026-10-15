@@ -6,6 +6,23 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { ReviewWorkspaceWatcher } from "../review-workspace-watcher";
 
+/**
+ * A macOS recursive watch starts some time after `ensure` resolves and can then deliver the Git
+ * setup that preceded it as forced refreshes. Rewrite a probe until its event lands: events arrive
+ * in order, so the setup events are behind it.
+ */
+async function settleWatch(dir: string, changed: ReturnType<typeof vi.fn>) {
+  let attempt = 0;
+  await vi.waitFor(async () => {
+    if (!changed.mock.calls.some(([path]) => path === "watch-probe.txt")) {
+      await writeFile(join(dir, "watch-probe.txt"), `probe ${attempt++}\n`);
+      throw new Error("probe not observed yet");
+    }
+  }, { timeout: 5000, interval: 100 });
+  await new Promise(resolve => setTimeout(resolve, 150));
+  changed.mockClear();
+}
+
 it("watches linked-worktree index and common refs, ignores lock noise, and closes pending opens", async () => {
   const root = await mkdtemp(join(tmpdir(), "review-linked-watch-"));
   const repo = join(root, "repo");
@@ -21,6 +38,7 @@ it("watches linked-worktree index and common refs, ignores lock noise, and close
     await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixture"]);
     await git(["worktree", "add", "-b", "linked", tree]);
     await watcher.ensure("linked", tree, changed);
+    await settleWatch(tree, changed);
     const gitDir = (await git(["rev-parse", "--absolute-git-dir"], tree)).stdout.trim();
     await writeFile(join(gitDir, "index.lock"), "lock");
     await new Promise(resolve => setTimeout(resolve, 150));
@@ -61,6 +79,7 @@ it("reports checkout files as ignore candidates and forces refresh for ignore ru
     await git(["init", "-b", "main"]);
     await mkdir(join(repo, "dist"));
     await watcher.ensure("repo", repo, changed);
+    await settleWatch(repo, changed);
     await writeFile(join(repo, "dist", "out.js"), "built\n");
     await vi.waitFor(() => expect(changed).toHaveBeenCalledWith("dist/out.js"));
     expect(changed.mock.calls.every(([path]) => typeof path === "string")).toBe(true);

@@ -152,30 +152,92 @@ export type TrajectoryTurn = {
   readonly toolCallCount?: number;
 };
 
-export type TrajectoryTimelineSpan = TrajectoryTimeRange & {
+/** DSH display kinds. Builder records map onto them in layout.ts. */
+export type TrajectoryCellKind = "system" | "user" | "context" | "compacted" | "message" | "tool" | "subtool";
+export type TrajectoryApproval = "pending" | "allowed" | "denied";
+/** DSH status: 已完成 / 等待中 / 失败. */
+export type TrajectoryStatus = "completed" | "running" | "failed";
+
+/** One ledger record in layout order; `index` is 1-based and stable for a given snapshot. */
+export type TrajectoryCell = {
+  readonly index: number;
   readonly recordId: string;
-  readonly recordIndex: number;
+  readonly record: TrajectoryRecord;
+  readonly kind: TrajectoryCellKind;
+  readonly turn: number | null;
+  /** Group key inside the turn: the step, or a message group for inputs. */
+  readonly group: string;
+  /** Request view key (`turnId\u0000stepId` or `compaction:<recordId>`), when the record belongs to one. */
+  readonly requestKey: string | null;
+  /** A request that has started but has produced no visible record yet. */
+  readonly requestOnly: boolean;
+  readonly startedAt: number | null;
+  readonly durationMs: number | null;
+  readonly isError: boolean;
+  readonly approval: TrajectoryApproval | null;
+};
+
+export type TrajectoryGroup = { readonly key: string; readonly title: string; readonly cells: readonly TrajectoryCell[] };
+export type TrajectoryLayoutTurn = { readonly section: number; readonly turn: number | null; readonly groups: readonly TrajectoryGroup[] };
+
+/** One model request, numbered in session order. Retries of the same step fold into it. */
+export type TrajectoryRequestView = {
+  readonly key: string;
+  readonly number: number;
+  readonly purpose: "assistant" | "compaction";
+  readonly status: TrajectoryStatus;
+  readonly turn: number | null;
+  readonly group: string;
+  readonly provider: string | null;
+  readonly model: string | null;
+  readonly options: RuntimeV2JsonValue | null;
+  readonly usage: TrajectoryUsage | null;
+  readonly startedAt: number | null;
+  readonly completedAt: number | null;
+  readonly error: string | null;
+  readonly lastAttemptError: string | null;
+  readonly retries: number;
+  readonly retryDelayMs: number | null;
+  /** Assistant message or compaction record produced by this request. */
+  readonly resultRecordId: string | null;
+  readonly toolCalls: number;
+  readonly subtoolCalls: number;
+};
+
+export type TrajectoryLayout = {
+  readonly turns: readonly TrajectoryLayoutTurn[];
+  readonly cells: readonly TrajectoryCell[];
+  readonly requests: ReadonlyMap<string, TrajectoryRequestView>;
+};
+
+/** One table row after flattening, searching and folding. */
+export type TrajectoryTableRow = {
+  readonly key: string;
+  readonly cell: TrajectoryCell;
+  readonly section: number;
+  readonly groupStart: boolean;
+  readonly turnStart: boolean;
+  readonly turnEnd: boolean;
+  readonly collapsed?: { readonly kind: "turn" | "assistant"; readonly summary: string };
+};
+
+export type TrajectoryTimelineSpan = TrajectoryTimeRange & {
+  readonly index: number;
+  readonly recordId: string;
+  readonly kind: TrajectoryCellKind;
   readonly lane: 0 | 1 | 2;
-  readonly kind: TrajectoryRecordKind;
-  readonly state: TrajectoryRecordState;
+  readonly isError: boolean;
+  /** Real start (epoch ms) and duration, independent of the projected mode coordinates. */
+  readonly startedAt: number | null;
+  readonly durationMs: number | null;
+  /** Assistant first-token latency and decoding time; both null unless timing was recorded. */
+  readonly ttftMs: number | null;
+  readonly decodingMs: number | null;
 };
 
 export type TrajectoryTimeline = TrajectoryTimeRange & {
-  readonly mode: TrajectoryTimelineMode;
   readonly spans: readonly TrajectoryTimelineSpan[];
-  readonly turnBoundaries: readonly { readonly turnNumber: number; readonly time: number }[];
-};
-
-export type TrajectoryVirtualRow = {
-  readonly key: string;
-  readonly entries: readonly { readonly logicalIndex: number; readonly record: TrajectoryRecord }[];
-  readonly height: number;
-  readonly rowType?: "record" | "turn-summary" | "call-summary";
-  readonly summary?: string;
-  /** All calls represented by a synthetic call-summary row. */
-  readonly relatedCallIds?: readonly string[];
-  /** All turns represented by a synthetic turn-summary row. */
-  readonly relatedTurnIds?: readonly string[];
+  readonly turnBoundaries: readonly { readonly turn: number; readonly time: number }[];
 };
 
 export type TrajectoryDetail = {
@@ -193,8 +255,5 @@ export type TrajectoryRuntimeSnapshot = {
   /** All event-level records, including metadata hidden from the semantic ledger. */
   readonly rawRecords?: readonly TrajectoryRecord[];
   readonly turns: readonly TrajectoryTurn[];
-  readonly timeline: TrajectoryTimeline | null;
-  readonly searchIndex: ReadonlyMap<string, string>;
-  readonly virtualRows: readonly TrajectoryVirtualRow[];
   readonly partial: TrajectoryRecord | null;
 };

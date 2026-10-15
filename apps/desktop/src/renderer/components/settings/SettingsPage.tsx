@@ -24,6 +24,7 @@ import { GeneralSection } from "./sections/GeneralSection";
 import { LocalUpdateSection } from "./sections/LocalUpdateSection";
 import { MediaDefaultsSection } from "./sections/MediaDefaultsSection";
 import { PerformanceSection } from "./sections/PerformanceSection";
+import { ConversationDisplaySection } from "./sections/ConversationDisplaySection";
 import { SubagentSection } from "./sections/SubagentSection";
 import { TaskModelDefaultsSection } from "./sections/TaskModelDefaultsSection";
 import { ToolsSection } from "./sections/ToolsSection";
@@ -165,6 +166,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       return (
         <PageShell title="通用" description="ActSpace 与 Agent 的默认行为。">
           <PerformanceSection {...rest} />
+          <ConversationDisplaySection {...rest} />
           <GeneralSection {...rest} />
           <AgentInstructionsSection {...rest} />
           <TaskModelDefaultsSection
@@ -187,7 +189,8 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       );
     case "model":
       return (
-        <PageShell title="模型" description="模型连接、API Key 与模型目录管理。">
+        // 「模型」的页头由 ProviderSettings 自己画：二级路由要把返回箭头放进标题行。
+        <PageShell>
           <ProviderSettings settings={rest.settings} onChanged={rest.onRefresh} />
         </PageShell>
       );

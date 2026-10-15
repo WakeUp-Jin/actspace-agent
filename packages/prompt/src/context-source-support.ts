@@ -20,7 +20,7 @@ export function runtimeInfo(context: Context): { mode: RuntimeV2AgentMode; selec
 export async function contribute(options: SourceOptions, context: Context, owner: string, filter: (value: PromptContributor) => boolean, write: Parameters<ContextSource["get"]>[1]): Promise<void> {
   const info = runtimeInfo(context);
   const source = owner.endsWith("rules") || owner.endsWith("skills") ? await options.prompt.resolveForTurn(options.workspaceRoot, context.request.turnId ?? context.request.requestId, info.mode === "chat") : emptyRuntimePromptSource();
-  const contributors = options.prompt.createCoreContributors({ ...options, instructions: source.instructions, skills: source.skills, profile: info.mode === "chat" ? "chat" : "agent" }).filter(filter);
+  const contributors = options.prompt.createCoreContributors({ ...options, instructions: source.instructions, skills: source.skills, profile: info.mode === "chat" ? "chat" : "agent", deliverables: info.mode === "agent" }).filter(filter);
   const input: AssemblyInput = { sessionId: context.request.sessionId, turnId: context.request.turnId ?? "", stepId: context.request.stepId ?? "", scope: options.scope, surface: [], hostFacts: info.hostFacts, selectedSkillIds: info.selectedSkillIds };
   const sections = []; const modelFacts: RuntimeV2JsonValue[] = []; const modelFactSources: { id: string; owner: string }[] = [];
   for (const item of contributors) {

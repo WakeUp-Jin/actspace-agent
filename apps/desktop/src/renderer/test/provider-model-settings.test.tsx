@@ -267,13 +267,13 @@ describe("provider and model settings", () => {
 
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
-    expect(screen.getByRole("heading", { name: "添加连接", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "添加连接", level: 2 })).toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText("搜索模型服务"), "open");
     expect(screen.getByRole("button", { name: "选择 OpenRouter" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "选择 Moonshot" })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "返回连接" }));
+    await userEvent.click(screen.getByRole("button", { name: "返回模型" }));
     expect(await screen.findByRole("heading", { name: "模型连接", level: 3 })).toBeInTheDocument();
   });
 
@@ -291,7 +291,7 @@ describe("provider and model settings", () => {
     expect(screen.getByRole("button", { name: "选择 Anthropic" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "选择 OpenAI" }));
-    expect(await screen.findByRole("heading", { name: "连接 OpenAI", level: 3 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "连接 OpenAI", level: 2 })).toBeInTheDocument();
     expect(screen.getByDisplayValue("https://api.openai.com/v1")).toBeInTheDocument();
     expect(screen.getByDisplayValue("gpt-4o-mini")).toBeInTheDocument();
   });
@@ -517,7 +517,7 @@ describe("provider and model settings", () => {
     render(<ProviderSettings />);
     expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
     await userEvent.click(screen.getByRole("button", { name: "添加服务" }));
-    expect(screen.getByRole("heading", { name: "添加连接", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "添加连接", level: 2 })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "添加模型服务", level: 3 })).not.toBeInTheDocument();
     expect(document.querySelector("article")).toBeNull();
     expect(document.querySelector("[class*='rounded-act-lg'][class*='border']")).toBeNull();
@@ -551,12 +551,12 @@ describe("provider and model settings", () => {
     render(<ProviderSettings />);
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
     await userEvent.click(screen.getByRole("button", { name: "选择 Moonshot" }));
-    expect(screen.getByRole("heading", { name: "连接 Moonshot", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "连接 Moonshot", level: 2 })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText("API Key · 必填")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("输入或粘贴 API Key")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存" })).toHaveClass("bg-action");
-    expect(screen.getByRole("button", { name: "返回连接" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "返回添加连接" })).toBeInTheDocument();
   });
 
   it("returns from compatible setup to the filtered catalog with its search intact", async () => {
@@ -785,7 +785,7 @@ describe("provider and model settings", () => {
     await userEvent.type(screen.getByLabelText("模型 ID"), "claude-sonnet-5{Enter}");
     await waitFor(() => expect(addCustomModel).toHaveBeenCalledWith(expect.objectContaining({ connectionId: "anthropic-relay", apiModel: "claude-sonnet-5", enabled: true, contextWindow: 1_000_000, pricing: null, setAsConnectionDefault: false })));
 
-    await userEvent.click(screen.getByRole("button", { name: "刷新" }));
+    await userEvent.click(screen.getByRole("button", { name: "从服务商刷新" }));
     await waitFor(() => expect(probeCustomConnection).toHaveBeenCalledWith({ kind: "saved", connectionId: "anthropic-relay" }));
     await waitFor(() => expect(addCustomModel).toHaveBeenLastCalledWith(expect.objectContaining({ apiModel: "claude-haiku-4-5", label: "Haiku", enabled: false })));
     expect(await screen.findByText("发现 1 个新模型，默认不启用")).toBeInTheDocument();
@@ -902,7 +902,7 @@ describe("provider and model settings", () => {
     const apiKey = screen.getByLabelText("OpenRouter API Key");
     await userEvent.type(apiKey, "test-key");
     await userEvent.keyboard("{Escape}");
-    expect(await screen.findByRole("heading", { name: "添加连接", level: 3 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "添加连接", level: 2 })).toBeInTheDocument();
   });
 
   it("renders only connected providers as a flat connection list", async () => {
@@ -912,7 +912,7 @@ describe("provider and model settings", () => {
 
     render(<ProviderSettings />);
     await screen.findByRole("heading", { name: "DeepSeek" });
-    expect(screen.getByText(/DeepSeek 官方 API · 2 \/ 2 个模型启用/)).toBeInTheDocument();
+    expect(screen.getByText(/2 \/ 2 个模型启用/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "测试" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /移除 DeepSeek/ })).not.toBeInTheDocument();
@@ -932,11 +932,12 @@ describe("provider and model settings", () => {
     await screen.findByRole("heading", { name: "DeepSeek" });
     await userEvent.click(screen.getByRole("button", { name: "DeepSeek" }));
 
-    expect(await screen.findByRole("heading", { name: "DeepSeek", level: 3 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "返回连接" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "DeepSeek", level: 2 })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "模型", level: 2 })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "返回模型" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "测试连接" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "返回连接" }));
+    await userEvent.click(screen.getByRole("button", { name: "返回模型" }));
     expect(await screen.findByRole("heading", { name: "DeepSeek", level: 4 })).toBeInTheDocument();
   });
 
@@ -951,7 +952,7 @@ describe("provider and model settings", () => {
     render(<ProviderSettings settings={settings} />);
     await userEvent.click(await screen.findByRole("button", { name: /^DeepSeek/ }));
 
-    expect(screen.getByRole("heading", { name: "DeepSeek", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "DeepSeek", level: 2 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "连接", level: 4 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "高级连接设置", level: 4 })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "编辑自定义请求头" })).not.toBeInTheDocument();
