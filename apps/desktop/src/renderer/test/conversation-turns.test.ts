@@ -53,6 +53,13 @@ describe("splitTurnMessages", () => {
     expect(ids(splitTurnMessages([msg("assistant", "only")]).workItems)).toEqual([]);
   });
 
+  it("takes run failures out of the process so a partial reply before them stays the final reply", () => {
+    const { workItems, finalReply, failures } = splitTurnMessages([msg("tool", "t"), msg("assistant", "partial"), msg("error", "failed")]);
+    expect(ids(workItems)).toEqual(["t"]);
+    expect(ids(finalReply)).toEqual(["partial"]);
+    expect(ids(failures)).toEqual(["failed"]);
+  });
+
   it("lists the final assistant messages of a turn", () => {
     const turn = { id: "u", user: null, messages: [msg("assistant", "a0"), msg("bash", "b"), msg("assistant", "a1")] };
     expect(ids(finalAssistantMessages(turn))).toEqual(["a1"]);
@@ -60,11 +67,11 @@ describe("splitTurnMessages", () => {
 });
 
 describe("hasToolLikeItem", () => {
-  it("counts thinking, bash, tool log lines and diffs, but not plain text, todo or status", () => {
-    for (const kind of ["thinking", "bash", "read", "agent", "error", "edit_diff", "write_diff"] as const) {
+  it("counts thinking, bash, tool log lines and diffs, but not plain text, todo, status or run failures", () => {
+    for (const kind of ["thinking", "bash", "read", "agent", "edit_diff", "write_diff"] as const) {
       expect(hasToolLikeItem([msg(kind, kind)])).toBe(true);
     }
-    expect(hasToolLikeItem([msg("assistant", "a"), msg("todo", "todo"), msg("status", "s"), msg("user", "u")])).toBe(false);
+    expect(hasToolLikeItem([msg("assistant", "a"), msg("todo", "todo"), msg("status", "s"), msg("error", "e"), msg("user", "u")])).toBe(false);
   });
 });
 

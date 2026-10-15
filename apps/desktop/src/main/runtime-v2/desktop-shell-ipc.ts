@@ -12,6 +12,7 @@ import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, type Worksp
 import { openExternalSafely } from "../platform-actions";
 import { createWorkspaceAccessDeps, resolveWorkspaceAccess, workspaceRegistryOptions } from "../workspace-access";
 import { listWorkspaceDir, readWorkspaceFile, statWorkspaceFile } from "../workspace-fs-service";
+import { listWorkspaceFileApplications, openWorkspaceFile } from "../file-applications-service";
 import { ReviewCoordinator, type ResolvedReviewWorkspace } from "../review-coordinator";
 import { ReviewGitEngine } from "../review-git-engine";
 import { ReviewGitWorkerClient } from "../review-git-worker-client";
@@ -87,6 +88,8 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   ipc.handle(contract.workspaces.listDir, async (input) => listWorkspaceDir(await withWorkspaceAccess(input), options.roots));
   ipc.handle(contract.workspaces.readFile, async (input) => readWorkspaceFile(await withWorkspaceAccess(input), options.roots));
   ipc.handle(contract.workspaces.statFile, async (input) => statWorkspaceFile(await withWorkspaceAccess(input), options.roots));
+  ipc.handle(contract.workspaces.listFileApplications, async (input) => listWorkspaceFileApplications(await withWorkspaceAccess(input), options.roots));
+  ipc.handle(contract.workspaces.openFile, async (input) => openWorkspaceFile(await withWorkspaceAccess(input), options.roots));
   ipc.handle(contract.review.getSnapshot, (input) => review.getSnapshot(input));
   ipc.handle(contract.review.refreshSnapshot, (input) => review.refreshSnapshot(input));
   ipc.handle(contract.review.getFileDiffs, (input) => review.getFileDiffs(input));

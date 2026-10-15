@@ -3,3 +3,8 @@ Copyright 2026 wakeup-jin
 
 This product includes software developed as part of the Actspace project:
 https://github.com/WakeUp-Jin/actspace-agent
+
+This product includes software from DeepSeek Harness (MIT License,
+Copyright (c) 2026 DeepSeek): the file-type icons, turn deliverable cards,
+diff view and native "open with" query in apps/desktop. See
+apps/desktop/src/renderer/components/files/DEEPSEEK_HARNESS_LICENSE.txt.

@@ -20,6 +20,7 @@ export function ConnectionModelPicker({
   onChange,
   showCommon,
   footer,
+  plain = false,
 }: {
   listed: readonly ListedModel[] | null;
   value: ModelPickerValue;
@@ -27,6 +28,8 @@ export function ConnectionModelPicker({
   showCommon: boolean;
   /** 分组最后一行，例如「按官方价计费」。 */
   footer?: ReactNode;
+  /** 不画分组自己的框，行贴在调用方给的 .mc-models 容器里。 */
+  plain?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
@@ -57,7 +60,7 @@ export function ConnectionModelPicker({
   const chips = showCommon ? COMMON_ANTHROPIC_MODELS.filter((id) => !value.selected.includes(id)) : [];
 
   const addLine = (
-    <div className="flex items-center gap-2 px-4 py-2.5">
+    <div className="flex items-center gap-2 px-3.5 py-2.5">
       <SettingsInput
         mono
         width="full"
@@ -72,10 +75,10 @@ export function ConnectionModelPicker({
     </div>
   );
 
-  return (
-    <SettingGroup title={hasList ? "选择模型" : "添加模型"} meta={hasList ? `已选 ${value.selected.length} 个` : undefined}>
+  const body = (
+    <>
       {hasList && ids.length > SEARCH_THRESHOLD ? (
-        <div className="px-4 py-2.5">
+        <div className="px-3.5 py-2.5">
           <label className="relative block">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" />
             <SettingsInput width="full" className="pl-8" aria-label="搜索模型" placeholder="搜索模型" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -83,7 +86,7 @@ export function ConnectionModelPicker({
         </div>
       ) : null}
       {!hasList && chips.length ? (
-        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 px-3.5 py-2.5">
           <span className="mr-1 text-act-xs text-text-faint">常用</span>
           {chips.map((id) => (
             <button key={id} type="button" onClick={() => toggle(id)} className="inline-flex h-6 items-center gap-1 rounded-act-pill border border-line bg-surface px-2 font-mono text-act-xs text-text-muted transition-colors hover:border-line-strong hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30">
@@ -105,13 +108,31 @@ export function ConnectionModelPicker({
           onSetDefault={() => onChange({ ...value, defaultId: id })}
         />
       ))}
-      {hasList && normalized && visible.length === 0 ? <p className="px-4 py-3 text-act-xs text-text-faint">没有匹配的模型</p> : null}
+      {hasList && normalized && visible.length === 0 ? <p className="px-3.5 py-3 text-act-xs text-text-faint">没有匹配的模型</p> : null}
       {hasList ? (manualOpen ? addLine : (
-        <div className="px-4 py-2.5">
+        <div className="px-3.5 py-2.5">
           <button type="button" onClick={() => setManualOpen(true)} className="text-act-xs text-text-muted underline-offset-2 hover:text-text-main hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30">列表里没有？手动输入模型 ID</button>
         </div>
       )) : null}
       {footer}
+    </>
+  );
+
+  // plain：调用方（向导 / 详情页）负责外层留白，这里仍然给出标题和计数，行贴在 .mc-models 里。
+  if (plain) {
+    return (
+      <section className="flex flex-col gap-2.5">
+        <div className="mc-head">
+          <h4>{hasList ? "选择模型" : "添加模型"}</h4>
+          {hasList ? <span className="mc-head-note">已选 {value.selected.length} 个</span> : null}
+        </div>
+        <div className="mc-models">{body}</div>
+      </section>
+    );
+  }
+  return (
+    <SettingGroup title={hasList ? "选择模型" : "添加模型"} meta={hasList ? `已选 ${value.selected.length} 个` : undefined}>
+      {body}
     </SettingGroup>
   );
 }
@@ -139,7 +160,7 @@ function ModelRow({ id, label, pickable, selected, isDefault, onToggle, onSetDef
   return (
     <div
       {...(pickable ? { role: "checkbox", "aria-checked": selected, "aria-label": label, tabIndex: 0, onClick: onToggle, onKeyDown } : {})}
-      className={`group flex min-h-[48px] items-center gap-3 px-4 py-2 ${pickable ? "cursor-pointer transition-colors duration-(--motion-fast) hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none" : ""}`}
+      className={`group flex min-h-[48px] items-center gap-3 px-3.5 py-2 ${pickable ? "cursor-pointer transition-colors duration-(--motion-fast) hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none" : ""}`}
     >
       {pickable ? (
         <span aria-hidden="true" className={`grid h-4 w-4 shrink-0 place-items-center rounded-act-xs border ${selected ? "border-transparent bg-text-main text-surface" : "border-line-strong bg-surface"}`}>

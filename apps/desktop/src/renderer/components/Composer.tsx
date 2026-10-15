@@ -429,6 +429,10 @@ export function Composer({
           open: overlays.contextOpen,
           onToggle: () => overlays.toggle({ kind: "context" }),
         }}
+        stats={{
+          openStat: overlays.openStat,
+          onOpenChange: (stat, open) => overlays.setOpen({ kind: "stats", stat }, open),
+        }}
       />
     );
   }

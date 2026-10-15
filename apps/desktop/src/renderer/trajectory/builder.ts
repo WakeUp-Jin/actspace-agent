@@ -10,15 +10,12 @@ import type {
   TrajectoryRuntimeSnapshot,
   TrajectorySourceBlock,
   TrajectorySystemChangeKind,
-  TrajectoryTimeline,
-  TrajectoryTimelineMode,
-  TrajectoryTimelineSpan,
   TrajectoryTurn,
   TrajectoryUsage,
-  TrajectoryVirtualRow,
 } from "./contract";
+import { appendChunks, closedKey, chunkKey, emptyLiveContent, liveFields } from "./live";
+import { asRecord, type Data, dataOf, json, pick, sourceBlocks, text, valueText } from "./node-data";
 
-type Data = Readonly<Record<string, RuntimeV2JsonValue>>;
 type RequestFact = {
   id: string;
   header: RuntimeV2TrajectoryNode | null;
@@ -39,33 +36,8 @@ type Boundary = { start: string | null; end: string | null };
 type TurnBoundary = Boundary & { state: TrajectoryRecordState };
 type EventContext = { turnId: string | null; stepId: string | null };
 
-const asRecord = (value: RuntimeV2JsonValue | undefined): Data =>
-  value !== null && typeof value === "object" && !Array.isArray(value) ? value as Data : {};
-const dataOf = (node: RuntimeV2TrajectoryNode): Data => asRecord(node.data);
-const text = (value: RuntimeV2JsonValue | undefined): string | null => {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return null;
-};
-const pick = (data: Data, keys: readonly string[]): string | null => {
-  for (const key of keys) {
-    const value = text(data[key]);
-    if (value !== null && value !== "") return value;
-  }
-  return null;
-};
 const numberValue = (value: RuntimeV2JsonValue | undefined): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
-const json = (value: RuntimeV2JsonValue | undefined, max = 240): string => {
-  if (value === undefined || value === null) return "";
-  if (typeof value === "string") return value;
-  try {
-    const result = JSON.stringify(value);
-    return result.length > max ? `${result.slice(0, max - 1)}…` : result;
-  } catch {
-    return "";
-  }
-};
 const parseTime = (value: string | null): number | null => {
   if (!value) return null;
   const parsed = Date.parse(value);
@@ -76,37 +48,6 @@ const duration = (start: string | null, end: string | null): number | null => {
   const b = parseTime(end);
   return a === null || b === null || b < a ? null : b - a;
 };
-
-function valueText(value: RuntimeV2JsonValue | undefined): string {
-  if (typeof value === "string") return value;
-  if (value === undefined || value === null) return "";
-  if (Array.isArray(value)) return value.map(item => valueText(item)).filter(Boolean).join("\n\n");
-  const data = asRecord(value);
-  return pick(data, ["text", "content", "message", "summary", "delta"]) ?? json(value);
-}
-
-function sourceBlocks(value: RuntimeV2JsonValue | undefined, fallbackType = "text"): readonly TrajectorySourceBlock[] {
-  if (typeof value === "string") return value === "" ? [] : [{ type: fallbackType, content: value, raw: value }];
-  if (!Array.isArray(value)) {
-    const content = valueText(value);
-    return content === "" ? [] : [{ type: fallbackType, content, raw: value }];
-  }
-  return value.flatMap(item => {
-    const data = asRecord(item);
-    const type = pick(data, ["type", "kind"]) ?? fallbackType;
-    const args = data.arguments ?? data.args ?? data.input;
-    const content = type === "tool-call" && args !== undefined ? (typeof args === "string" ? args : JSON.stringify(args)) : valueText(item);
-    const callId = pick(data, ["callId", "toolCallId"]);
-    const toolName = pick(data, ["name", "toolName"]);
-    return [{
-      type,
-      content,
-      ...(callId === null ? {} : { callId }),
-      ...(toolName === null ? {} : { toolName }),
-      raw: item,
-    }];
-  });
-}
 
 /** Bind navigation and schemas after call/result merging; all links use identities. */
 function associateCalls(records: readonly TrajectoryRecord[]): TrajectoryRecord[] {
@@ -243,7 +184,7 @@ function changeKind(node: RuntimeV2TrajectoryNode, previous: TrajectoryPromptDet
   if (explicit === "prompt" || explicit === "prompt-updated" || explicit === "system") return "prompt-updated";
   if (explicit === "system-and-tools" || explicit === "prompt-and-tools") return "updated";
   if (previous === null) return "initial";
-  return node.eventType.toLocaleLowerCase().includes("tool") ? "tools-updated" : "updated";
+  return node.eventType.toLocaleLowerCase().includes("tool") ? "tools-updated" : "prompt-updated";
 }
 
 function eventRecordId(node: RuntimeV2TrajectoryNode, index: number): string {
@@ -258,14 +199,14 @@ function eventRecordId(node: RuntimeV2TrajectoryNode, index: number): string {
 
 function summaryFor(node: RuntimeV2TrajectoryNode, result: string | null = null): string {
   const data = dataOf(node);
-  if (node.eventType === "assistant/chunk") return "Assistant responding…";
-  if (node.eventType === "assistant/message") return valueText(data.content ?? data.message ?? data.summary) || "Assistant message";
+  if (node.eventType === "assistant/chunk") return "";
+  if (node.eventType === "assistant/message") return valueText(data.content ?? data.message ?? data.summary);
   if (node.eventType === "tool/call") {
     const name = pick(data, ["name", "toolName"]) ?? "tool";
     const args = data.arguments ?? data.args ?? data.input ?? data.command ?? data.query ?? data.path;
     return [name, json(args)].filter(Boolean).join(" ");
   }
-  if (node.eventType === "tool/result") return result ?? pick(data, ["status", "result", "content", "message", "summary"]) ?? "Tool result";
+  if (node.eventType === "tool/result") return result ?? pick(data, ["status", "result", "content", "message", "summary"]) ?? "";
   return pick(data, ["content", "summary", "message", "reason", "decision", "name", "status"]) ?? (valueText(node.data) || node.eventType);
 }
 
@@ -365,7 +306,7 @@ function buildEventContexts(nodes: readonly RuntimeV2TrajectoryNode[]): Map<numb
   return contexts;
 }
 
-function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[]): {
+function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: ReadonlySet<string>): {
   records: TrajectoryRecord[];
   rawRecords: TrajectoryRecord[];
   partial: TrajectoryRecord | null;
@@ -431,20 +372,16 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[]): {
       continue;
     }
     if (node.eventType === "assistant/chunk") {
-      const messageId = pick(data, ["messageId"]) ?? `${node.sessionId}:partial`;
-      chunks.set(messageId, [...(chunks.get(messageId) ?? []), node]);
+      const key = chunkKey(node);
+      const list = chunks.get(key);
+      if (list === undefined) chunks.set(key, [node]); else list.push(node);
       continue;
     }
     if (node.eventType === "assistant/message") {
-      const messageId = pick(data, ["messageId"]);
-      const failedFinal = data.finishReason === "failed" || data.finishReason === "aborted";
-      // A thrown provider stream can finalize with a fresh messageId. The exact
-      // request identity still ties its observed chunks to that terminal reply.
-      const chunkKey = messageId !== null && chunks.has(messageId) ? messageId : failedFinal && requestId !== null
-        ? [...chunks].find(([, list]) => pick(dataOf(list[0]!), ["requestId"]) === requestId)?.[0] : undefined;
-      const chunkList = chunkKey === undefined ? [] : chunks.get(chunkKey)!;
+      const closing = closedKey(node, chunks);
+      const chunkList = closing === undefined ? [] : chunks.get(closing)!;
       const source = [...chunkList.map(item => item.eventSeq), node.eventSeq];
-      const raw = baseRecord(node, node.eventSeq, source, { kind: "assistant", visible: true, partial: false, ...(chunkKey ? { id: `${node.sessionId}:record:assistant:${chunkKey}` } : {}) });
+      const raw = baseRecord(node, node.eventSeq, source, { kind: "assistant", visible: true, partial: false, ...(closing ? { id: `${node.sessionId}:record:assistant:${closing}` } : {}) });
       const firstNonEmptyChunk = chunkList.find(item => valueText(dataOf(item).delta ?? dataOf(item).content) !== "");
       const context = contexts.get(node.eventSeq) ?? { turnId: raw.turnId, stepId: raw.stepId };
       const stepKey = context.turnId !== null && context.stepId !== null ? `${context.turnId}\u0000${context.stepId}` : null;
@@ -470,7 +407,7 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[]): {
         ...sourceBlocks(data.toolCalls ?? data.tool_calls, "tool-call"),
       ];
       const content = blocks.filter(block => block.type === "text").map(block => block.content).join("\n\n")
-        || (contentValue == null ? chunkList.map(item => valueText(dataOf(item).delta ?? dataOf(item).content)).join("") : "");
+        || (contentValue == null ? appendChunks(emptyLiveContent(), chunkList).text : "");
       const enrichedBase: TrajectoryRecord = {
         ...raw,
         turnId: raw.turnId ?? context.turnId,
@@ -478,8 +415,8 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[]): {
         startedAt: stepStartAt,
         completedAt: pick(data, ["completedAt", "finishedAt"]) ?? node.time,
         durationMs: duration(stepStartAt, pick(data, ["completedAt", "finishedAt"]) ?? node.time),
-        summary: content || thinkingBlocks.map(block => block.content).join(" ") || (allBlocks.some(block => block.type === "tool-call") ? "Calling tools…" : raw.state === "failed" ? "Assistant request failed" : raw.state === "aborted" ? "Assistant request aborted" : "Assistant message"),
-        preview: content || valueText(thinkingValue) || "Assistant message",
+        summary: content || thinkingBlocks.map(block => block.content).join(" "),
+        preview: content || valueText(thinkingValue),
         inputDetail: data.input ?? data.prompt ?? null,
         outputDetail: contentValue ?? (content === "" ? null : content),
         thinkingDetail: thinkingBlocks.map(block => block.content).join("\n\n") || separateThinking || null,
@@ -487,7 +424,7 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[]): {
         usage: usage(data),
       };
       records.push({ ...enrichedBase, assistantMetrics: assistantMetrics(enrichedBase, stepStartAt, firstTokenAt, enrichedBase.completedAt) });
-      if (chunkKey !== undefined) chunks.delete(chunkKey);
+      if (closing !== undefined) chunks.delete(closing);
       continue;
     }
     if (node.eventType === "tool/call") {
@@ -568,15 +505,23 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[]): {
     const surface = asRecord(node.surface);
     const surfaceNode = asRecord(surface.node);
     if (node.eventType === "agent/inbox/spliced" && (data.operation !== "claim" || surfaceNode.kind !== "user")) continue;
-    if (kind === "user") {
-      const content = data.content ?? data.message ?? surfaceNode.content ?? null;
+    // Background task notifications and Context supplements reach the model as user content but are CONTEXT rows.
+    const notice = node.eventType === "agent/inbox/spliced" && data.source === "task_notification";
+    const supplement = node.eventType === "plugin/actspace.context/supplement" && data.op === "add";
+    if (kind === "user" || supplement) {
+      const content = data.content ?? data.message ?? data.text ?? surfaceNode.content ?? null;
+      const blocks = sourceBlocks(content);
+      const text = blocks.filter(block => block.type === "text").map(block => block.content).join("\n\n");
       const context = contexts.get(node.eventSeq);
       records.push(baseRecord(node, node.eventSeq, [node.eventSeq], {
-        id: `${node.sessionId}:record:user:${pick(data, ["messageId"]) ?? node.eventSeq}`,
-        visible: true, turnId: context?.turnId ?? null, stepId: null,
-        summary: valueText(content) || "User message", preview: valueText(content),
-        inputDetail: content, outputDetail: null, messageSource: data.source ?? node.source ?? null,
-        durationMs: 0, sourceBlocks: sourceBlocks(content),
+        id: `${node.sessionId}:record:${supplement ? "context" : "user"}:${pick(data, ["messageId"]) ?? node.eventSeq}`,
+        kind: notice || supplement ? "context" : "user",
+        visible: true, turnId: context?.turnId ?? pick(data, ["turnId"]), stepId: null,
+        summary: text, preview: text,
+        inputDetail: content, outputDetail: null,
+        messageSource: supplement ? { kind: data.owner ?? null, id: data.id ?? null, lifetime: data.lifetime ?? null }
+          : notice ? { ...asRecord(node.data), kind: "task-notification", form: "notice" } : data.source ?? node.source ?? null,
+        durationMs: 0, sourceBlocks: blocks,
       }));
       continue;
     }
@@ -589,24 +534,21 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[]): {
       const start = previous?.startedAt ?? node.time;
       const next = baseRecord(node, node.eventSeq, [...(previous?.sourceSequences ?? []), node.eventSeq], {
         id: previous?.id ?? `${node.sessionId}:compaction:${compactionId ?? node.eventSeq}`, kind: "compaction", visible: true,
-        raw: previous?.raw ?? node.data, summary: content || previous?.summary || "Context compaction",
-        preview: content || previous?.preview || "Context compaction", outputDetail: content || previous?.outputDetail || null,
+        raw: previous?.raw ?? node.data, summary: content || previous?.summary || "",
+        preview: content || previous?.preview || "", outputDetail: content || previous?.outputDetail || null,
         startedAt: start, completedAt: ended ? node.time : null, durationMs: ended ? duration(start, node.time) : null,
         state: ended ? "completed" : "running",
       });
       if (index < 0) records.push(next); else records[index] = next;
       continue;
     }
-    // Lifecycle facts are retained in rawRecords, never disguised as SYSTEM messages.
-    const hiddenMetadata = /^(session|turn|step|request|agent|tool-workflow|surface|recovery|runtime)\//.test(node.eventType);
-    if (kind === "error" || (kind === "raw" && !hiddenMetadata)) records.push(baseRecord(node, node.eventSeq, [node.eventSeq], { visible: true }));
+    // Errors, retries, plugin and delegation events stay in rawRecords; request views fold errors and retries.
   }
 
   let partial: TrajectoryRecord | null = null;
   for (const [messageId, chunkList] of chunks) {
     const first = chunkList[0];
-    const last = chunkList.at(-1);
-    if (first === undefined || last === undefined) continue;
+    if (first === undefined) continue;
     const firstData = dataOf(first);
     const context = contexts.get(first.eventSeq) ?? { turnId: pick(firstData, ["turnId", "turn"]), stepId: pick(firstData, ["stepId", "step"]) };
     const stepKey = context.turnId !== null && context.stepId !== null ? `${context.turnId}\u0000${context.stepId}` : null;
@@ -616,10 +558,12 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[]): {
       ?? (context.turnId === null ? null : turnBoundaries.get(context.turnId)?.start)
       ?? first.time;
     const firstNonEmpty = chunkList.find(item => valueText(dataOf(item).delta ?? dataOf(item).content) !== "");
-    const joined = chunkList.filter(item => dataOf(item).kind !== "reasoning-delta").map(item => valueText(dataOf(item).delta ?? dataOf(item).content)).join("");
-    const thinking = chunkList.filter(item => dataOf(item).kind === "reasoning-delta").map(item => valueText(dataOf(item).content)).join("");
     const ended = context.turnId ? turnBoundaries.get(context.turnId) : undefined;
-    const raw = baseRecord(first, first.eventSeq, chunkList.map(item => item.eventSeq), { id: `${first.sessionId}:record:assistant:${messageId}`, kind: "assistant", visible: true, state: ended?.end ? ended.state : "running", partial: !ended?.end, summary: joined || "Assistant responding…", preview: joined || "Assistant responding…", raw: { chunks: chunkList.map(item => item.data) }, turnId: firstData.turnId ? pick(firstData, ["turnId", "turn"]) : context.turnId, stepId: firstData.stepId ? pick(firstData, ["stepId", "step"]) : context.stepId, startedAt: stepStartAt, completedAt: null, durationMs: null, outputDetail: joined || null, sourceBlocks: [...sourceBlocks(thinking, "reasoning"), ...sourceBlocks(joined)], thinkingDetail: thinking || null, usage: usage(firstData) });
+    // A live group is an empty placeholder here; its content streams in through live.ts.
+    const fields = placeholders?.has(messageId)
+      ? { ...liveFields(emptyLiveContent()), sourceSequences: [first.eventSeq] }
+      : liveFields(appendChunks(emptyLiveContent(), chunkList));
+    const raw = baseRecord(first, first.eventSeq, fields.sourceSequences, { id: `${first.sessionId}:record:assistant:${messageId}`, kind: "assistant", visible: true, state: ended?.end ? ended.state : "running", partial: !ended?.end, ...fields, turnId: firstData.turnId ? pick(firstData, ["turnId", "turn"]) : context.turnId, stepId: firstData.stepId ? pick(firstData, ["stepId", "step"]) : context.stepId, startedAt: stepStartAt, completedAt: null, durationMs: null, usage: usage(firstData) });
     partial = { ...raw, assistantMetrics: { ...assistantMetrics(raw, stepStartAt, firstNonEmpty?.time ?? first.time, null), completedAt: null, completedTime: null, generationMs: null, throughputTokensPerSecond: null } };
     records.push(partial);
   }
@@ -745,7 +689,7 @@ function systemRecords(nodes: readonly RuntimeV2TrajectoryNode[]): TrajectoryRec
     const changed = isPromptChange(node, prompt) || (prompt !== null && promptSignature(prompt) !== previousSignature);
     if (!changed || prompt === null) continue;
     const kind = changeKind(node, previous);
-    const label = kind === "initial" ? "Initial System Prompt" : kind === "tools-updated" ? "Tools Updated" : "System Prompt Updated";
+    const label = kind === "initial" ? "初始系统提示词" : kind === "tools-updated" ? "工具已更新" : kind === "updated" ? "系统提示词和工具已更新" : "系统提示词已更新";
     output.push(baseRecord(node, index, [node.eventSeq], {
       id: `${node.sessionId}:system:${node.eventSeq}`,
       kind: "system",
@@ -766,113 +710,12 @@ function systemRecords(nodes: readonly RuntimeV2TrajectoryNode[]): TrajectoryRec
   return output;
 }
 
-function lane(record: TrajectoryRecord): 0 | 1 | 2 {
-  if (record.kind === "tool" || record.kind === "approval") return 2;
-  if (record.kind === "assistant") return 1;
-  return 0;
-}
-
-function timeline(records: readonly TrajectoryRecord[], mode: TrajectoryTimelineMode): TrajectoryTimeline | null {
-  const visible = records.filter(record => record.visible !== false && !record.requestOnly);
-  const spans: TrajectoryTimelineSpan[] = visible.flatMap((record, recordIndex) => {
-    const recordedStart = parseTime(record.startedAt);
-    if (mode !== "sequence" && recordedStart === null) return [];
-    const start = mode === "sequence" ? recordIndex : recordedStart!;
-    return [{ recordId: record.id, recordIndex, start,
-      end: start + (mode === "sequence" ? 1 : mode === "time" ? 0 : Math.max(0, record.durationMs ?? 0)),
-      lane: lane(record), kind: record.kind, state: record.state }];
-  });
-  if (spans.length === 0) return null;
-  // Remove only uncovered idle intervals; overlapping model/tool work stays aligned.
-  if (mode === "duration") {
-    let coveredUntil: number | null = null;
-    let removedIdle = 0;
-    for (const span of [...spans].sort((a, b) => a.start - b.start || a.end - b.end)) {
-      const originalEnd = span.end;
-      if (coveredUntil !== null && span.start > coveredUntil) removedIdle += span.start - coveredUntil;
-      coveredUntil = Math.max(coveredUntil ?? originalEnd, originalEnd);
-      Object.assign(span, { start: span.start - removedIdle, end: originalEnd - removedIdle });
-    }
-  }
-  const seenTurns = new Set<number>();
-  const turnBoundaries = spans.flatMap(span => {
-    const number = visible[span.recordIndex]!.turnNumber;
-    if (number === null || seenTurns.has(number)) return [];
-    seenTurns.add(number);
-    return [{ turnNumber: number, time: span.start }];
-  });
-  return { mode, start: Math.min(...spans.map(span => span.start)), end: Math.max(...spans.map(span => span.end)), spans, turnBoundaries };
-}
-
-function rowEntry(records: readonly TrajectoryRecord[], record: TrajectoryRecord): { logicalIndex: number; record: TrajectoryRecord } {
-  return { logicalIndex: Math.max(0, records.indexOf(record)), record };
-}
-
-export function groupVirtualRows(
-  records: readonly TrajectoryRecord[],
-  collapsedTurnIds: ReadonlySet<string> = new Set(),
-  collapsedCallIds: ReadonlySet<string> = new Set(),
-): readonly TrajectoryVirtualRow[] {
-  const visible = records.filter(record => record.visible !== false && !record.requestOnly);
-  const rows: TrajectoryVirtualRow[] = [];
-  const turnStats = new Map<string, { steps: Set<string>; calls: Set<string> }>();
-  for (const record of visible) {
-    if (record.turnId === null) continue;
-    const stats = turnStats.get(record.turnId) ?? { steps: new Set(), calls: new Set() };
-    if (record.stepId !== null) stats.steps.add(record.stepId);
-    if (record.callId !== null) stats.calls.add(record.callId);
-    turnStats.set(record.turnId, stats);
-  }
-  let index = 0;
-  while (index < visible.length) {
-    const record = visible[index]!;
-    if (record.turnId !== null && collapsedTurnIds.has(record.turnId)) {
-      let end = index + 1;
-      while (end < visible.length && visible[end]!.turnId === record.turnId) end += 1;
-      if (end - index > 1) {
-        rows.push({ key: record.id, entries: [rowEntry(records, record)], height: 36, rowType: "record" });
-        const stats = turnStats.get(record.turnId);
-        rows.push({ key: `${record.turnId}:turn-summary`, entries: visible.slice(index + 1, end).map(item => rowEntry(records, item)), height: 30, rowType: "turn-summary", summary: `… ${stats?.steps.size ?? 0} step${stats?.steps.size === 1 ? "" : "s"} · ${stats?.calls.size ?? 0} tool call${stats?.calls.size === 1 ? "" : "s"}` });
-        const partials = visible.slice(index + 1, end).filter(item => item.partial);
-        for (const partial of partials) rows.push({ key: partial.id, entries: [rowEntry(records, partial)], height: 36, rowType: "record" });
-        index = end;
-        continue;
-      }
-    }
-    if (record.kind === "assistant") {
-      let end = index + 1;
-      while (end < visible.length && visible[end]!.kind === "tool" && visible[end]!.turnId === record.turnId) end += 1;
-      const tools = visible.slice(index + 1, end);
-      if (tools.length > 0 && tools.some(tool => tool.callId !== null && collapsedCallIds.has(tool.callId))) {
-        rows.push({ key: record.id, entries: [rowEntry(records, record)], height: 36, rowType: "record" });
-        const names = [...new Set(tools.map(tool => tool.toolName ?? tool.summary.split(" ")[0] ?? "tool"))];
-        rows.push({ key: `${record.id}:call-summary`, entries: tools.map(tool => rowEntry(records, tool)), height: 28, rowType: "call-summary", summary: `… ${tools.length} tool call${tools.length === 1 ? "" : "s"} · ${names.join(", ")}` });
-        index = end;
-        continue;
-      }
-    }
-    if (record.kind === "tool" && record.callId !== null && collapsedCallIds.has(record.callId)) {
-      let end = index + 1;
-      while (end < visible.length && visible[end]!.kind === "tool" && visible[end]!.callId !== null && collapsedCallIds.has(visible[end]!.callId)) end += 1;
-      rows.push({ key: `${record.callId}:call-summary`, entries: visible.slice(index, end).map(tool => rowEntry(records, tool)), height: 28, rowType: "call-summary", summary: `… ${end - index} tool call${end - index === 1 ? "" : "s"}` });
-      index = end;
-      continue;
-    }
-    rows.push({ key: record.id, entries: [rowEntry(records, record)], height: 36, rowType: "record" });
-    index += 1;
-  }
-  return rows;
-}
-
-export function buildTrajectorySnapshot(snapshot: RuntimeV2TrajectorySnapshot, mode: TrajectoryTimelineMode = "sequence"): TrajectoryRuntimeSnapshot {
-  const merged = mergeNodes(snapshot.nodes);
-  const system = systemRecords(snapshot.nodes).map(record => snapshot.history?.fromSeq && record.systemChange === "initial" ? { ...record, summary: "System Prompt at History Boundary", preview: "System Prompt at History Boundary" } : record);
+/** `placeholders`: live chunk group keys (live.ts) that get an empty placeholder record. */
+export function buildTrajectorySnapshot(snapshot: RuntimeV2TrajectorySnapshot, options: { readonly placeholders?: ReadonlySet<string> } = {}): TrajectoryRuntimeSnapshot {
+  const merged = mergeNodes(snapshot.nodes, options.placeholders);
+  const system = systemRecords(snapshot.nodes);
   const combined = [...merged.records, ...system].sort((a, b) => a.systemChange === "initial" ? -1 : b.systemChange === "initial" ? 1 : (a.sourceSequences[0] ?? 0) - (b.sourceSequences[0] ?? 0));
   const assigned = assignGroups(combined, merged.rawRecords, merged.turnBoundaries, merged.stepBoundaries, snapshot.history?.turnOffset);
-  const searchIndex = new Map<string, string>();
-  for (const record of assigned.records) {
-    searchIndex.set(record.id, JSON.stringify({ eventType: record.eventType, kind: record.kind, state: record.state, summary: record.summary, preview: record.preview, result: record.result, raw: record.raw, request: record.requestDetail, schema: record.schemaDetail, input: record.inputDetail, output: record.outputDetail, sourceBlocks: record.sourceBlocks }).toLocaleLowerCase());
-  }
   return {
     sessionId: snapshot.sessionId,
     requestOffset: snapshot.history?.requestOffset ?? 0,
@@ -881,19 +724,8 @@ export function buildTrajectorySnapshot(snapshot: RuntimeV2TrajectorySnapshot, m
     records: assigned.records.filter(record => record.visible !== false && !record.requestOnly),
     rawRecords: merged.rawRecords,
     turns: assigned.turns,
-    timeline: timeline(assigned.records, mode),
-    searchIndex,
-    virtualRows: groupVirtualRows(assigned.records),
     partial: merged.partial,
   };
-}
-
-export function searchTrajectory(snapshot: TrajectoryRuntimeSnapshot, query: string): ReadonlySet<string> | null {
-  const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return null;
-  const result = new Set<string>();
-  for (const [id, value] of snapshot.searchIndex) if (terms.every(term => value.includes(term))) result.add(id);
-  return result;
 }
 
 export function buildTrajectoryDetail(snapshot: TrajectoryRuntimeSnapshot, recordId: string): TrajectoryDetail | null {

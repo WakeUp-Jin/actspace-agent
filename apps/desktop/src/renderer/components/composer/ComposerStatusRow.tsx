@@ -7,6 +7,7 @@ import type { HostDescription } from "../../target/host-directory";
 import type { ReadinessCopy } from "../../target/readiness";
 import type { RunTarget } from "../../target/run-target";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
+import { ComposerStatsPills, type ComposerStatsOverlay } from "./ComposerStatsPills";
 import { RunTargetDot } from "./RunLocationMenu";
 
 export type ComposerStatusContextUsage = {
@@ -29,7 +30,7 @@ export function contextUsageDisplay(snapshot: ContextUsageSnapshot | null) {
 }
 
 export type ComposerStatusRowProps = {
-  /** Chat 没有分支、运行位置和权限，只显示 context 用量。 */
+  /** Chat 没有分支、运行位置和权限，只显示会话累计胶囊和 context 用量。 */
   form: "agent" | "chat";
   target: RunTarget;
   /** 远端没就绪时的 readiness 文案；本机或已就绪时为 null。 */
@@ -41,6 +42,8 @@ export type ComposerStatusRowProps = {
   runLocation: SessionRunLocation;
   permissionControl?: ReactNode;
   context: ComposerStatusContextUsage;
+  /** 统计胶囊面板的开关，交给 ComposerOverlay 和其他浮层互斥；不传时胶囊自己管。 */
+  stats?: ComposerStatsOverlay;
 };
 
 const ROW_CLASS = "composer-status-row flex min-h-5 items-center justify-between gap-3 px-3 text-act-sm leading-5 text-text-faint";
@@ -48,6 +51,7 @@ const FACTS_CLASS = "flex min-w-0 items-center gap-1.5";
 const FACT_CLASS = "inline-flex min-w-0 items-center gap-1.5";
 const ICON_CLASS = "shrink-0 text-text-subtle";
 const SEP_CLASS = "shrink-0 opacity-60";
+const TRAILING_CLASS = "flex min-w-0 items-center gap-1";
 const USAGE_CLASS = "inline-flex shrink-0 items-center gap-1.5 text-text-muted";
 const USAGE_DOT_CLASS = "h-[15px] w-[15px] shrink-0 rounded-full";
 // 3px 环形进度：conic 填充已用占比，radial mask 挖空中心形成圆环。
@@ -61,7 +65,7 @@ function pathName(path: string): string {
  * 09 T19：对话中的只读状态行。运行目标已锁定，这里只陈述「在哪儿跑」，没有下拉。
  * 本机：⑂ 分支 · 💻 本机；工作树：⑂ 分支 · ⑂ 工作树；远端：🖥 Host · 📁 工作区（没就绪时第二段换成状态，context 用量写「—」）。
  */
-export function ComposerStatusRow({ form, target, notReady, host, remoteDescription, branchLabel, runLocation, permissionControl, context }: ComposerStatusRowProps) {
+export function ComposerStatusRow({ form, target, notReady, host, remoteDescription, branchLabel, runLocation, permissionControl, context, stats }: ComposerStatusRowProps) {
   // 第二段被 readiness 文案替换时，context 用量也不可信（Host 连不上或还没读到）。
   const usageUnavailable = target.kind === "remote" && notReady?.label != null;
   const display = contextUsageDisplay(context.snapshot);
@@ -83,7 +87,15 @@ export function ComposerStatusRow({ form, target, notReady, host, remoteDescript
     </button>
   );
 
-  if (form === "chat") return <div className={`${ROW_CLASS} justify-end`}>{usage}</div>;
+  // 右侧：会话累计胶囊（轮次/速度、Token 用量）+ context 圆环。
+  const trailing = (
+    <div className={TRAILING_CLASS}>
+      <ComposerStatsPills overlay={stats} />
+      {usage}
+    </div>
+  );
+
+  if (form === "chat") return <div className={`${ROW_CLASS} justify-end`}>{trailing}</div>;
 
   const facts = target.kind === "remote"
     ? remoteFacts(target, notReady, host, remoteDescription)
@@ -101,7 +113,7 @@ export function ComposerStatusRow({ form, target, notReady, host, remoteDescript
         </div>
         {permissionControl ? <span className={FACT_CLASS}>{permissionControl}</span> : null}
       </div>
-      {usage}
+      {trailing}
     </div>
   );
 }

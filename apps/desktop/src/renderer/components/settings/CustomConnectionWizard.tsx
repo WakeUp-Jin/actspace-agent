@@ -152,7 +152,7 @@ export function CustomConnectionWizard({ onCancel, onSaved }: { onCancel: () => 
 
       {step === 1 ? (
         <>
-          <SettingGroup>
+          <div className="mc-stack">
             <FormField label="协议">
               <SegmentedControl
                 ariaLabel="协议"
@@ -183,7 +183,7 @@ export function CustomConnectionWizard({ onCancel, onSaved }: { onCancel: () => 
               {proxyEnabled ? <SettingsInput id={ids.proxy} width="full" mono aria-label="代理地址" placeholder="http://127.0.0.1:7890" value={proxyUrl} onChange={(event) => { setProxyUrl(event.target.value); invalidate(); }} /> : null}
             </MoreSettings>
             {probe.status === "idle" ? null : <ProbeResultNotice state={probe} authMode={anthropic ? authMode : undefined} />}
-          </SettingGroup>
+          </div>
           <SetupFooter hint={canTest && !running && !tested ? <button type="button" onClick={skip} className="text-act-xs text-text-muted underline-offset-2 hover:text-text-main hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30">跳过测试</button> : null}>
             <Button variant="ghost" size="md" onClick={onCancel}>取消</Button>
             {tested
@@ -194,6 +194,7 @@ export function CustomConnectionWizard({ onCancel, onSaved }: { onCancel: () => 
       ) : (
         <>
           <ConnectionModelPicker
+            plain
             listed={listed}
             value={picker}
             onChange={setPicker}

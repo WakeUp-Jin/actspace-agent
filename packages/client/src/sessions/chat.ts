@@ -43,6 +43,8 @@ type EventIndex = {
   readonly runByInboxMessage: Map<string, string>;
   readonly turnByInboxMessage: Map<string, string>;
   readonly requestById: Map<string, RequestInfo>;
+  /** 每个 step 最后一次请求（重试后的那次）；step/end 不带 requestId，靠它找回模型。 */
+  readonly lastRequestByStep: Map<string, string>;
   readonly toolByCall: Map<string, RuntimeV2ToolView>;
   readonly callData: Map<string, EventRecord>;
   readonly childByCall: Map<string, { readonly childSessionId: string; readonly presetId: string; readonly status: string }>;
@@ -145,20 +147,23 @@ export function projectChatEvents(
       continue;
     }
     if (event.type === "surface/replaced") continue;
-    if (event.type === "assistant/message" || event.type === "step/end") {
-      const requestId = string(data.requestId) ?? identity.requestId ?? `request-${event.seq}`;
+    // 每次请求的用量记一次：成功的落在 step/end（assistant/message 带的是同一份，上面已 continue），
+    // 失败重试的落在 llm/retry。没有 usage 的 step/end（中断、失败）不记。
+    if (event.type === "step/end" || event.type === "llm/retry") {
       const usage = record(data.usage);
+      if (Object.keys(usage).length === 0) continue;
+      const stepId = string(data.stepId);
+      const requestId = string(data.requestId) ?? (stepId ? index.lastRequestByStep.get(stepId) : undefined) ?? `request-${event.seq}`;
       const request = index.requestById.get(requestId);
       const promptTokens = nonNegative(usage.inputTokens);
       const completionTokens = nonNegative(usage.outputTokens);
       const cacheHitTokens = nonNegative(usage.cacheReadTokens);
       const cacheMissTokens = nonNegative(usage.cacheWriteTokens);
       const reasoningTokens = nonNegative(usage.reasoningTokens);
-      const currency = "USD" as const;
-      const rawCurrency = string(usage.costCurrency)?.toUpperCase();
-      const rawCost = nonNegative(usage.cost);
-      const totalCost = rawCurrency === "CNY" ? rawCost / CNY_PER_USD : rawCost;
-      projected.push({ ...base, id: eventId(event), llmCallId: requestId, type: "llm_usage", payload: { llmCallId: requestId, attempt: 1, durationMs: 0, provider: request?.provider ?? "default", model: request?.model ?? "default", promptTokens, completionTokens, totalTokens: promptTokens + completionTokens + cacheHitTokens + cacheMissTokens, reasoningTokens, cacheHitTokens, cacheMissTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: totalCost, currency } } });
+      const cost = activityCost(usage);
+      // request/context 里的 route 常是 "default"；计价快照里有真实的提供方和模型。
+      const pricing = cost.costProvenance?.pricingSnapshot;
+      projected.push({ ...base, id: eventId(event), llmCallId: requestId, type: "llm_usage", payload: { llmCallId: requestId, attempt: 1, durationMs: 0, provider: pricing?.providerId ?? request?.provider ?? "default", model: pricing?.apiModel ?? request?.model ?? "default", promptTokens, completionTokens, totalTokens: promptTokens + completionTokens + cacheHitTokens + cacheMissTokens, reasoningTokens, cacheHitTokens, cacheMissTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: cost.costUsd ?? 0, currency: "USD" }, costBasis: cost.costBasis === "unavailable" ? "unavailable" : cost.costBasis === "estimated" ? "estimated" : "priced" } });
       continue;
     }
     if (event.type === "agent/error" || (event.type === "turn/end" && string(data.reason) === "failed")) {
@@ -543,7 +548,7 @@ function toolActivityStatus(status: string | null): UsageActivityStatus {
 }
 
 function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): EventIndex {
-  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, { childSessionId: string; presetId: string; status: string }>();
+  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, { childSessionId: string; presetId: string; status: string }>();
   const turnStarts = journal
     .filter((event) => event.type === "turn/start")
     .map((event) => {
@@ -559,7 +564,10 @@ function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly Sessio
     const stepId = string(data.stepId); if (stepId && turnId) turnByStep.set(stepId, turnId);
     if (event.type === "request/context") {
       const requestId = string(data.requestId); const snapshotData = record(data.snapshot); const prepared = record(snapshotData.prepared);
-      if (requestId && turnId && stepId) requestById.set(requestId, { requestId, agentRunId: runByTurn.get(turnId) ?? runId ?? "system", turnId, stepId, model: string(prepared.model) ?? "default", provider: string(prepared.route) ?? "default", time: event.time });
+      if (requestId && turnId && stepId) {
+        requestById.set(requestId, { requestId, agentRunId: runByTurn.get(turnId) ?? runId ?? "system", turnId, stepId, model: string(prepared.model) ?? "default", provider: string(prepared.route) ?? "default", time: event.time });
+        lastRequestByStep.set(stepId, requestId);
+      }
     }
     if (event.type === "agent/inbox/spliced" && data.operation === "claim") {
       const messageId = string(data.messageId);
@@ -585,7 +593,7 @@ function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly Sessio
       if (parentCallId) childByCall.set(parentCallId, { childSessionId: string(data.childSessionId) ?? "", presetId: string(data.presetId) ?? childByCall.get(parentCallId)?.presetId ?? "unknown", status: string(data.status) ?? "completed" });
     }
   }
-  return { runByTurn, turnByStep, runByInboxMessage, turnByInboxMessage, requestById, toolByCall: new Map(snapshot.tools.map((tool) => [tool.callId, tool])), callData, childByCall };
+  return { runByTurn, turnByStep, runByInboxMessage, turnByInboxMessage, requestById, lastRequestByStep, toolByCall: new Map(snapshot.tools.map((tool) => [tool.callId, tool])), callData, childByCall };
 }
 
 function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: EventIndex) {

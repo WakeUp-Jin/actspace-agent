@@ -91,6 +91,7 @@ export function defaultSettingsV4Metadata(): SettingsV4Metadata {
     },
     general: {
       performanceMonitoring: false,
+      showTurnCodeChanges: true,
       englishLearning: { lastSessionId: null },
       personalization: { displayName: "", responseStyle: "" },
       agentInstructions: { systemPromptPath: "" },

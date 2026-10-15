@@ -10,7 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { Check, ChevronDown, ChevronRight, CircleAlert, Minus, Plus, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Minus, Plus, RotateCcw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
@@ -29,25 +29,70 @@ function cx(...parts: Array<string | false | null | undefined>): string {
 
 /* ---------------------------------------------------------------- 页面与分组 */
 
+/**
+ * 设置页外壳。不传 title 时不画页头，由内容自己渲染 PageHeader（例如「模型」页的
+ * 二级路由要把返回箭头放进标题行）。
+ */
 export function PageShell({
   title,
   description,
   width = "default",
   children,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   width?: "default" | "wide";
   children: ReactNode;
 }) {
   return (
     <div className={cx("mx-auto w-full px-12 pb-24 pt-9 max-[600px]:px-4 max-[600px]:pb-16 max-[600px]:pt-6", width === "wide" ? "max-w-[928px]" : "max-w-[736px]")}>
-      <header className="flex min-w-0 flex-col gap-1">
-        <h2 className="text-act-xl font-semibold leading-tight tracking-tight text-text-main">{title}</h2>
-        {description ? <p className="max-w-[62ch] text-act-sm leading-relaxed text-text-muted">{description}</p> : null}
-      </header>
-      <div className="mt-9 flex min-w-0 flex-col gap-9 max-[600px]:mt-6 max-[600px]:gap-7">{children}</div>
+      {title ? <PageHeader title={title} description={description} /> : null}
+      <div className={cx("flex min-w-0 flex-col gap-9 max-[600px]:gap-7", title && "mt-9 max-[600px]:mt-6")}>{children}</div>
     </div>
+  );
+}
+
+/**
+ * 页面标题。二级页传 onBack：返回箭头和标题同一行、同一层级（macOS 系统设置的做法），
+ * 不再在标题上方另放一个小号的返回链接；leading 放服务商 logo 这类身份图标。
+ */
+export function PageHeader({
+  title,
+  description,
+  onBack,
+  backLabel,
+  leading,
+  tag,
+  children,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  onBack?: () => void;
+  /** 返回目标的名字，生成「返回 X」的 aria-label 和 Tooltip。 */
+  backLabel?: string;
+  leading?: ReactNode;
+  tag?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <header className="flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 items-center gap-3">
+        {onBack ? (
+          <IconButton label={backLabel ? `返回${backLabel}` : "返回"} tooltip={backLabel ? `返回${backLabel}` : "返回"} tooltipSide="bottom" className="-ml-2 shrink-0" onClick={onBack}>
+            <ChevronLeft size={18} aria-hidden="true" />
+          </IconButton>
+        ) : null}
+        {leading ? <span className="shrink-0 [&>*]:h-10 [&>*]:w-10">{leading}</span> : null}
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h2 className="min-w-0 truncate text-act-xl font-semibold leading-tight tracking-tight text-text-main">{title}</h2>
+            {tag}
+          </div>
+          {description ? <div className="flex max-w-[62ch] flex-wrap items-center gap-1 text-act-sm leading-relaxed text-text-muted">{description}</div> : null}
+        </div>
+      </div>
+      {children}
+    </header>
   );
 }
 
@@ -101,7 +146,10 @@ function GroupHeader({
   );
 }
 
-/** 内嵌分组：白底 + 1px 边框 + 10px 圆角，组内行用浅分隔线。 */
+/**
+ * 内嵌分组：白底 + 1px 边框 + 10px 圆角，组内行用浅分隔线。
+ * plain：不画分组自己的框，行直接贴在调用方给的容器里（模型连接详情用 .mc-models 承接）。
+ */
 export function SettingGroup({
   title,
   description,
@@ -109,6 +157,7 @@ export function SettingGroup({
   action,
   headingLevel = 4,
   id,
+  plain = false,
   children,
 }: {
   title?: string;
@@ -119,13 +168,14 @@ export function SettingGroup({
   action?: ReactNode;
   headingLevel?: 3 | 4;
   id?: string;
+  plain?: boolean;
   children: ReactNode;
 }) {
   const right = action ?? (meta ? <span className="whitespace-nowrap text-act-xs text-text-faint">{meta}</span> : null);
   return (
     <section id={id} className="flex min-w-0 flex-col gap-2.5 scroll-mt-8">
       <GroupHeader title={title} description={description} right={right} headingLevel={headingLevel} />
-      <div className="divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface">
+      <div className={plain ? "contents" : "divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface"}>
         {children}
       </div>
     </section>

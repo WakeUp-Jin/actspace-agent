@@ -1,8 +1,9 @@
-import { stat, readFile, readdir, realpath } from "node:fs/promises";
+import { lstat, stat, readFile, readdir, realpath } from "node:fs/promises";
 import { basename, extname, isAbsolute, relative, resolve } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tools-runtime";
 import type { ToolPorts } from "./plugin.js";
+import { PRESENT_MAX_FILES } from "./manifest.js";
 const READ_FILE_DEFAULT_LIMIT = 200;
 const IMAGE_MIME_BY_EXT: Readonly<Record<string, string>> = Object.freeze({
   ".png": "image/png",
@@ -15,7 +16,7 @@ const IMAGE_MIME_BY_EXT: Readonly<Record<string, string>> = Object.freeze({
 export type NodeToolPortsOptions = { readonly workspaceRoot: string; readonly resolveArtifact?: SessionArtifactResolver };
 export function createNodeToolPorts(options: NodeToolPortsOptions): ToolPorts {
   const cache = new Map<string, { readonly size: number; readonly mtimeMs: number }>();
-  return Object.freeze({ read_file: (args, context) => readFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), cache, options.resolveArtifact), list_directory: (args, context) => listDirectoryTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)) });
+  return Object.freeze({ read_file: (args, context) => readFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), cache, options.resolveArtifact), list_directory: (args, context) => listDirectoryTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)), present: (args, context) => presentTool(args, contextWorkspaceRoot(context, options.workspaceRoot)) });
 }
 function contextWorkspaceRoot(context: ToolExecutionContext, fallback: string): string {
   return resolve(context.workspaceRoot || fallback);
@@ -76,6 +77,32 @@ async function listDirectoryTool(args: Readonly<Record<string, RuntimeV2JsonValu
   } catch (error) {
     return ioFailure("list directory", pathArg, error);
   }
+}
+
+/** Declared deliverables stay at their workspace paths; the result records them for the turn-tail cards. */
+async function presentTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, workspaceRoot: string): Promise<ToolBodyResult> {
+  const entries = Array.isArray(args.files) ? args.files : [];
+  if (entries.length === 0 || entries.length > PRESENT_MAX_FILES) return failure("INVALID_ARGUMENTS", `present accepts 1 to ${PRESENT_MAX_FILES} files`);
+  const files: { path: string; description?: string }[] = [];
+  for (const entry of entries) {
+    const file = entry !== null && typeof entry === "object" && !Array.isArray(entry) ? entry : {};
+    const pathArg = typeof file.path === "string" ? file.path : "";
+    if (!pathArg.trim()) return failure("INVALID_ARGUMENTS", "present requires a non-empty file path");
+    try {
+      // lstat rejects a symlink itself; resolveExistingPath rejects targets that escape through parent links.
+      const info = await lstat(resolveWorkspacePath(pathArg, workspaceRoot));
+      if (!info.isFile()) return failure("NOT_A_FILE", `Cannot present ${pathArg}: not a regular file`);
+      const filePath = await resolveExistingPath(pathArg, workspaceRoot);
+      const description = typeof file.description === "string" ? file.description.trim() : "";
+      files.push({ path: displayPath(filePath, await realpath(workspaceRoot)), ...(description ? { description } : {}) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("ENOENT")) return failure("FILE_NOT_FOUND", `Cannot present ${pathArg}: file not found. Check the path, create the file if needed, and retry.`);
+      return ioFailure("present file", pathArg, error);
+    }
+  }
+  const text = files.map((file) => `Presented ${file.path}`).join("\n");
+  return { status: "completed", modelOutput: [{ type: "text", text }], summary: `Presented ${files.length} file${files.length === 1 ? "" : "s"}`, detail: [{ label: "present", value: { files } }] };
 }
 
 async function resolveReadablePath(input: string, workspaceRoot: string, sessionId: string, resolveArtifact?: SessionArtifactResolver, context?: ToolExecutionContext): Promise<string> {

@@ -13,6 +13,31 @@ function fixture() {
 }
 
 describe("Session facts", () => {
+  it("folds model timing from the full journal and keeps per-step scratch out of the view", () => {
+    const codecs = createCoreCodecRegistry();
+    const seconds = [0, 0, 1, 1, 3, 4, 5, 9, 9, 10, 12];
+    const journal = new SessionJournal({ registry: codecs, now: (() => { let i = 0; return () => new Date(Date.UTC(2026, 9, 15, 0, 0, seconds[i++]!)).toISOString(); })() });
+    const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value);
+    const append = (type: string, data: Record<string, unknown>) => registry.apply("timing", journal.append({ type, eventVersion: 1, source, data: data as never, surface: null }));
+    append("turn/start", { turnId: "t" });
+    append("step/start", { turnId: "t", stepId: "a" });
+    append("request/header", { turnId: "t", stepId: "a", requestId: "r1" });
+    append("request/context", { turnId: "t", stepId: "a", requestId: "r1" });
+    append("assistant/chunk", { turnId: "t", stepId: "a", requestId: "r1", messageId: "m1", chunkIndex: 0, content: "" });
+    append("assistant/chunk", { turnId: "t", stepId: "a", requestId: "r1", messageId: "m1", chunkIndex: 1, content: "hi" });
+    // 首 token 之后的 chunk 不改状态，流式时不会逐条推送投影。
+    expect(append("assistant/chunk", { turnId: "t", stepId: "a", requestId: "r1", messageId: "m1", chunkIndex: 2, content: "more" })).toBeNull();
+    append("assistant/message", { turnId: "t", stepId: "a", requestId: "r1", messageId: "m1", usage: { outputTokens: 100 } });
+    append("step/end", { turnId: "t", stepId: "a" });
+    append("step/start", { turnId: "t", stepId: "b" });
+    append("assistant/message", { turnId: "t", stepId: "b", messageId: "m2", usage: { outputTokens: 5 } });
+    const activity = registry.snapshot("timing").values.sessionStats as Record<string, unknown>;
+    // a：请求 1s→9s，TTFT 3s（空 chunk 不算），解码 5s/100 tok；b：只有模型用时 2s。
+    expect(activity.timing).toEqual({ llmMs: 10_000, ttftMs: 3_000, ttftSteps: 1, decodeMs: 5_000, decodeTokens: 100 });
+    expect(activity.stepCount).toBe(2);
+    expect(activity).not.toHaveProperty("openSteps");
+  });
+
   it("defaults permission mode and projects the last valid mode event", () => {
     const { header, journal } = fixture();
     const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value);

@@ -156,7 +156,7 @@ createRoot(document.getElementById("root")!).render(
   <TooltipProvider delayDuration={350}>
   <div className="mx-auto min-h-screen bg-app-bg" style={{ width: query.get("width") === "375" ? 375 : "100%", maxWidth: "100%" }}>
     <p className="px-4 py-2 text-[12px] text-text-muted">开发预览 · 固定样例 · 场景 {scenario} · 数据只在内存里，不连接服务</p>
-    <PageShell title="模型" description="模型连接、API Key 与模型目录管理。"><ProviderSettings /></PageShell>
+    <PageShell><ProviderSettings /></PageShell>
   </div>
   </TooltipProvider>,
 );

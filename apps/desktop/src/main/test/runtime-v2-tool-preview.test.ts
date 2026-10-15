@@ -7,7 +7,7 @@ describe("shared live and durable tool previews", () => {
     ["read_file", "read"], ["list_directory", "directory_list"], ["grep", "grep"], ["glob", "glob"],
     ["bash", "bash"], ["bash_output", "bash"], ["bash_kill", "bash"], ["web_search", "web_search"],
     ["web_fetch", "web_search"], ["write_file", "write"], ["edit_file", "edit_diff"], ["delete_file", "delete"],
-    ["inspect_image", "media_analysis"], ["generate_image", "image_generation"], ["todo_read", "todo"],
+    ["present", "present"], ["inspect_image", "media_analysis"], ["generate_image", "image_generation"], ["todo_read", "todo"],
     ["todo_write", "todo"], ["agent", "agent"], ["explore", "agent"], ["plugin.custom", "generic"],
   ])("keeps %s preview kind %s throughout its lifecycle", (name, kind) => {
     for (const phase of ["streaming", "prepared", "running", "finished"] as const) {
@@ -31,6 +31,12 @@ describe("shared live and durable tool previews", () => {
   });
   it("retains aborted child identity despite a failed tool-body status", () => {
     expect(toolPreview("agent", undefined, { status: "failed", failure: { message: "Cancelled" }, detail: [{ label: "delegation", value: { childSessionId: "child", status: "aborted" } }] }, { args: { task: "Inspect" } }, undefined, "parent", "run")).toMatchObject({ status: "aborted", error: "Cancelled", transcriptRef: { runId: "child" } });
+  });
+  it("projects presented files from the tool detail with workspace output metadata", () => {
+    const call = { args: { files: [{ path: "draft.docx" }] } };
+    expect(toolPreview("present", undefined, { status: "running" }, call, undefined, "s", "r", "running", "/work")).toMatchObject({ kind: "present", files: [{ path: "draft.docx" }] });
+    const finished = toolPreview("present", undefined, { status: "completed", summary: "Presented 1 file", detail: [{ label: "present", value: { files: [{ path: "out/report.docx", description: "Report" }] } }] }, call, undefined, "s", "r", "finished", "/work");
+    expect(finished).toEqual({ kind: "present", files: [{ path: "out/report.docx", outputPath: "/work/out/report.docx", outputRelativePath: "out/report.docx", description: "Report" }], displayText: "Presented 1 file", status: "completed" });
   });
   it("does not turn failed file-tool output into a result preview", () => {
     expect(toolPreview("glob", undefined, { status: "failed", failure: { message: "SEARCH_FAILED" }, modelOutput: [{ type: "text", text: "SEARCH_FAILED" }] }, { args: { pattern: "**/*.md", path: "." } }, undefined, "s", "r")).toMatchObject({ kind: "glob", resultPreview: undefined });

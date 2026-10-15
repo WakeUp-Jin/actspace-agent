@@ -198,3 +198,31 @@ it("never replaces a user-selected Harness through the pristine builtin upgrade 
   const restored = new HarnessControl({ ...options, upgradePristineBuiltin: upgrade }); controls.push(restored); await restored.initialize();
   expect(upgrade).not.toHaveBeenCalled(); expect(restored.inspect().current).toEqual(chosen);
 });
+
+it("upgrades a trusted builtin again after Host contracts change without repeated revisions", async () => {
+  const { control, options, next } = await setup(); await control.close();
+  const composition = composeRuntime({ profile: { id: "main", runtimeContract: "actspace.runtime.v2", orderedBundleIds: ["base"] }, bundles: [{ id: "base", version: "2", provenance: "test", manifests: [next.manifest.plugin] }], hostCapabilities: [] });
+  const upgradedOptions = { ...options, upgradePristineBuiltin: () => true, builtin: async () => ({ composition, artifacts: new Map([["new", next]]), sharedServices: [] }) };
+  const first = new HarnessControl(upgradedOptions); controls.push(first); await first.initialize();
+  expect(first.inspect().current?.revision).toBe(2); await first.close();
+  const onDiagnostic = vi.fn();
+  const currentOptions = { ...upgradedOptions, onDiagnostic, compatibility: { ...options.compatibility, events: [{ id: "new-host-event", version: 1, mode: "emit" as const }] } };
+  const second = new HarnessControl(currentOptions); controls.push(second); await second.initialize();
+  expect(second.inspect().blocked).toBe("");
+  expect(second.inspect().current?.revision).toBe(3);
+  expect(onDiagnostic).not.toHaveBeenCalled();
+  const lease = await second.acquire("main"); expect(lease.getService<{ read(): string }>("reader")!.read()).toBe("new"); await lease.release();
+  await second.close();
+  const restarted = new HarnessControl(currentOptions); controls.push(restarted); await restarted.initialize();
+  expect(restarted.inspect().history).toHaveLength(3);
+});
+
+it("does not rewrite an unchanged trusted bootstrap or auto-repair a damaged artifact", async () => {
+  const { control, options } = await setup(); const original = control.inspect().current!; await control.close();
+  const unchanged = new HarnessControl({ ...options, upgradePristineBuiltin: () => true }); controls.push(unchanged); await unchanged.initialize();
+  expect(unchanged.inspect().history).toHaveLength(1); await unchanged.close();
+  await rm(join(options.artifactRoot, original.description.artifactIds[0]!), { recursive: true });
+  const damaged = new HarnessControl({ ...options, upgradePristineBuiltin: () => true }); controls.push(damaged); await damaged.initialize();
+  expect(damaged.inspect().current).toEqual(original);
+  await expect(damaged.acquire("main")).rejects.toMatchObject({ code: "RECOVERY_BLOCKED" });
+});

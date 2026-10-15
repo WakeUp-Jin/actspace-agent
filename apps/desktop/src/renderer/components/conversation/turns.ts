@@ -23,9 +23,9 @@ const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "image_generation",
   "directory_list",
   "delete",
+  "present",
   "agent",
   "tool",
-  "error",
 ]);
 const DIFF_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["edit_diff", "write_diff"]);
 
@@ -82,22 +82,27 @@ export function hasToolLikeItem(messages: MessageBlock[]): boolean {
 }
 
 /**
- * 把一个 turn 的消息拆成「过程」和「最终回复」两段。
+ * 把一个 turn 的消息拆成「过程」「最终回复」「失败」三段。
  *
- * 最终回复 = turn 末尾、后面不再跟任何工具/thinking 的连续 assistant 块。
+ * 失败 = 运行失败的错误，单独放在轮次末尾，不收进活动组。
+ * 最终回复 = 其余消息末尾、后面不再跟任何工具/thinking 的连续 assistant 块。
  * 其余（thinking / 工具 / 工具间旁白 content）都归到过程段，统一收进一个 Worked for 活动组。
  */
 export function splitTurnMessages(messages: MessageBlock[]): {
   workItems: MessageBlock[];
   finalReply: MessageBlock[];
+  failures: MessageBlock[];
 } {
-  let splitIndex = messages.length;
-  while (splitIndex > 0 && messages[splitIndex - 1].kind === "assistant") {
+  const failures = messages.filter((message) => message.kind === "error");
+  const rest = failures.length === 0 ? messages : messages.filter((message) => message.kind !== "error");
+  let splitIndex = rest.length;
+  while (splitIndex > 0 && rest[splitIndex - 1].kind === "assistant") {
     splitIndex -= 1;
   }
   return {
-    workItems: messages.slice(0, splitIndex),
-    finalReply: messages.slice(splitIndex),
+    workItems: rest.slice(0, splitIndex),
+    finalReply: rest.slice(splitIndex),
+    failures,
   };
 }
 

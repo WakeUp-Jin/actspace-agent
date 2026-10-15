@@ -1,16 +1,21 @@
 import { useMemo, useRef, useState } from "react";
 import { Copy, Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { visualizeApi } from "../../api/visualize";
-import { formatUsdCost } from "../../usage-format";
+import { cn } from "../ui/cn";
 import { useRightPanel } from "../right-panel/RightPanelContext";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
+import { TurnUsagePill } from "./TurnUsagePill";
 import type { AssistantMessageBlock } from "./turns";
 
+// 照 DeepSeek Harness 的回复尾部：操作图标在前，用量胶囊和时间跟在后面。
 const TURN_ACTIONS_CLASS =
-  "turn-actions mt-1 flex min-h-7 items-center justify-between gap-3 px-[var(--conversation-text-inset)] text-act-xs text-text-faint opacity-0 pointer-events-none transition-opacity duration-(--motion-base) ease-in-out group-hover/assistant-turn:pointer-events-auto group-hover/assistant-turn:opacity-100 group-focus-within/assistant-turn:pointer-events-auto group-focus-within/assistant-turn:opacity-100";
-const TURN_ACTIONS_RIGHT_CLASS = "flex items-center justify-end gap-0.5";
-const TURN_USAGE_META_CLASS = "flex min-w-0 items-center gap-1.5 tabular-nums";
+  "turn-actions mt-1 flex min-h-7 min-w-0 items-center gap-0.5 px-[var(--conversation-text-inset)] text-act-xs text-text-faint";
+// 更早的轮次只在悬停或键盘聚焦时出现；最新一轮一直显示。用透明度藏，布局不跳。
+const TURN_ACTIONS_HOVER_REVEAL_CLASS =
+  "opacity-0 pointer-events-none transition-opacity duration-(--motion-base) ease-in-out group-hover/assistant-turn:pointer-events-auto group-hover/assistant-turn:opacity-100 group-focus-within/assistant-turn:pointer-events-auto group-focus-within/assistant-turn:opacity-100";
+const TURN_ACTIONS_END_CLASS = "ml-2 flex min-w-0 items-center gap-2";
+const TURN_TIME_CLASS = "whitespace-nowrap tabular-nums";
 const TURN_ACTION_TRIGGER_CLASS =
   "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-(--motion-base) ease-in-out hover:bg-hover-overlay hover:text-text-main hover:opacity-100 aria-disabled:cursor-default aria-expanded:bg-selected aria-expanded:text-text-main aria-expanded:opacity-100";
 const MESSAGE_TIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
@@ -69,10 +74,13 @@ export function TurnActions({
   assistantMessages,
   sessionId,
   completeTurn,
+  revealAlways = false,
 }: {
   assistantMessages: AssistantMessageBlock[];
   sessionId: string | null;
   completeTurn: boolean;
+  /** 最新一轮且已结束：不等悬停，一直显示。 */
+  revealAlways?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [visualizeState, setVisualizeState] = useState<VisualizeState>("idle");
@@ -88,10 +96,6 @@ export function TurnActions({
   if (!latestAssistantMessage) {
     return null;
   }
-
-  const usageLabel = completeTurn && latestAssistantMessage.usage
-    ? `${latestAssistantMessage.usage.totalTokens.toLocaleString("zh-CN")} Token · ${formatUsdCost(latestAssistantMessage.usage.costUsd)}`
-    : null;
 
   async function handleCopy(value: string) {
     await copyToClipboard(value);
@@ -158,70 +162,66 @@ export function TurnActions({
           : "用主模型把这条回复转成可视化 HTML";
 
   return (
-    <div className={TURN_ACTIONS_CLASS}>
-      <div
-        className={TURN_USAGE_META_CLASS}
-        aria-label={usageLabel ? `本轮消耗：${usageLabel}` : `回复时间：${formatMessageTime(latestAssistantMessage.createdAt)}`}
-      >
-        <span>{formatMessageTime(latestAssistantMessage.createdAt)}</span>
-        {usageLabel ? <span aria-hidden="true">·</span> : null}
-        {usageLabel ? <span>{usageLabel}</span> : null}
-      </div>
-      <div className={TURN_ACTIONS_RIGHT_CLASS}>
+    <div className={cn(TURN_ACTIONS_CLASS, !revealAlways && TURN_ACTIONS_HOVER_REVEAL_CLASS)} data-turn-actions-reveal={revealAlways ? "always" : "hover"}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            className={TURN_ACTION_TRIGGER_CLASS}
+            type="button"
+            aria-label="复制回复"
+            onClick={() => void handleCopy(copyText)}
+          >
+            <Copy size={15} strokeWidth={2} />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>复制回复</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            className={TURN_ACTION_TRIGGER_CLASS}
+            type="button"
+            aria-label={visualizeState === "ready" ? "查看可视化" : "可视化这条回复"}
+            aria-disabled={visualizeState === "generating"}
+            onClick={() => void handleVisualize(false)}
+          >
+            {visualizeState === "generating" ? (
+              <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />
+            ) : visualizeState === "ready" ? (
+              <Eye size={16} strokeWidth={2} />
+            ) : (
+              <Wand2 size={16} strokeWidth={2} />
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{visualizeLabel}</TooltipContent>
+      </Tooltip>
+      <Menu open={menuOpen} onOpenChange={setMenuOpen}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              className={TURN_ACTION_TRIGGER_CLASS}
-              type="button"
-              aria-label="复制回复"
-              onClick={() => void handleCopy(copyText)}
-            >
-              <Copy size={15} strokeWidth={2} />
-            </button>
+            <MenuTrigger asChild>
+              <button className={TURN_ACTION_TRIGGER_CLASS} type="button" aria-label="更多消息操作">
+                <MoreHorizontal size={18} strokeWidth={2.2} />
+              </button>
+            </MenuTrigger>
           </TooltipTrigger>
-          <TooltipContent>复制回复</TooltipContent>
+          <TooltipContent>更多操作</TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className={TURN_ACTION_TRIGGER_CLASS}
-              type="button"
-              aria-label={visualizeState === "ready" ? "查看可视化" : "可视化这条回复"}
-              aria-disabled={visualizeState === "generating"}
-              onClick={() => void handleVisualize(false)}
-            >
-              {visualizeState === "generating" ? (
-                <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />
-              ) : visualizeState === "ready" ? (
-                <Eye size={16} strokeWidth={2} />
-              ) : (
-                <Wand2 size={16} strokeWidth={2} />
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{visualizeLabel}</TooltipContent>
-        </Tooltip>
-        <Menu open={menuOpen} onOpenChange={setMenuOpen}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <MenuTrigger asChild>
-                <button className={TURN_ACTION_TRIGGER_CLASS} type="button" aria-label="更多消息操作">
-                  <MoreHorizontal size={18} strokeWidth={2.2} />
-                </button>
-              </MenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>更多操作</TooltipContent>
-          </Tooltip>
-          <MenuContent side="top" align="end" className="w-[178px]">
-            <MenuItem disabled>分叉会话</MenuItem>
-            <MenuItem onSelect={() => void handleCopy(copyText)}>复制消息</MenuItem>
-            <MenuItem onSelect={() => void handleCopy(latestAssistantMessage.id)}>复制请求 ID</MenuItem>
-            {visualizeState === "ready" || visualizeState === "error" ? (
-              <MenuItem onSelect={() => void handleVisualize(true)}>重新生成可视化</MenuItem>
-            ) : null}
-          </MenuContent>
-        </Menu>
-      </div>
+        <MenuContent side="top" align="start" className="w-[178px]">
+          <MenuItem disabled>分叉会话</MenuItem>
+          <MenuItem onSelect={() => void handleCopy(copyText)}>复制消息</MenuItem>
+          <MenuItem onSelect={() => void handleCopy(latestAssistantMessage.id)}>复制请求 ID</MenuItem>
+          {visualizeState === "ready" || visualizeState === "error" ? (
+            <MenuItem onSelect={() => void handleVisualize(true)}>重新生成可视化</MenuItem>
+          ) : null}
+        </MenuContent>
+      </Menu>
+      <span className={TURN_ACTIONS_END_CLASS}>
+        {completeTurn ? <TurnUsagePill usage={latestAssistantMessage.usage} /> : null}
+        <span className={TURN_TIME_CLASS} aria-label={`回复时间：${formatMessageTime(latestAssistantMessage.createdAt)}`}>
+          {formatMessageTime(latestAssistantMessage.createdAt)}
+        </span>
+      </span>
     </div>
   );
 }

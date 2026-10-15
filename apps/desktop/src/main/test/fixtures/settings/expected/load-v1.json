@@ -130,6 +130,7 @@
         "version": 4,
         "general": {
           "performanceMonitoring": false,
+          "showTurnCodeChanges": true,
           "englishLearning": {
             "lastSessionId": null
           },
@@ -302,6 +303,7 @@
       "version": 4,
       "general": {
         "performanceMonitoring": false,
+        "showTurnCodeChanges": true,
         "englishLearning": {
           "lastSessionId": null
         },

@@ -88,7 +88,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
         metadata: { title: null, pinned: false, archived: false },
         messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
         usage: { inputTokens: 549_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 549_000, costUsd: null },
-        activity: { turnCount: 1, completedTurnCount: 1, stepCount: 1, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null },
+        activity: { turnCount: 1, completedTurnCount: 1, stepCount: 1, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } },
       },
       values: {
         requestContextEstimate: {

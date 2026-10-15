@@ -752,6 +752,43 @@ export type WorkspaceStatFileResult = {
   error?: "not_found" | "not_a_file" | "escapes_root";
 };
 
+/**
+ * 工作区文件的关联应用（交付卡的「用应用打开」下拉）。只有 macOS 会列出应用；
+ * 其他平台返回空列表，前端退回「默认打开 + 在文件夹中显示」。
+ */
+export type WorkspaceFileApplication = {
+  /** 应用包的绝对路径；打开时原样传回，main 会对照当前关联列表再校验一次。 */
+  id: string;
+  name: string;
+  default: boolean;
+  /** 32×32 PNG data URL。 */
+  iconDataUrl?: string;
+};
+
+export type WorkspaceFileApplicationsInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+};
+
+export type WorkspaceFileApplicationsResult = {
+  applications: WorkspaceFileApplication[];
+  error?: "invalid_target" | "query_failed";
+};
+
+export type WorkspaceOpenFileInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+  /** open：用 applicationId 指定的应用打开，不传则用系统默认应用；reveal：在 Finder / 文件夹中显示。 */
+  action: "open" | "reveal";
+  applicationId?: string;
+};
+
+export type WorkspaceOpenFileResult = {
+  ok: boolean;
+  error?: "invalid_target" | "not_registered" | "open_failed";
+  message?: string;
+};
+
 /** 读取当前会话引用的 v2 图片 Artifact。字段名为兼容固定 renderer 保留，artifactPath 实际承载 Artifact ID。 */
 export type SessionArtifactReadInput = {
   sessionId: string;

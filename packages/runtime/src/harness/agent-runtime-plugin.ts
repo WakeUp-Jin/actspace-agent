@@ -65,8 +65,7 @@ export class AgentRuntimeService {
       builtin: () => prepareDefaultHarnessArtifact({ artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), hostCapabilities: host.host.capabilityCeiling, disabledEntries: host.disabledHarnessEntries ?? [] }), sharedServices: DEFAULT_HARNESS_SHARED_SERVICES,
       compatibility: { capabilities: host.host.capabilityCeiling, requiredServices: [{ id: "agent.run-factory", version: 1 }, { id: "actspace.agent.factory", version: 1 }], services: DEFAULT_HARNESS_SHARED_SERVICES.map(id => ({ id, version: 1 })), events: [],
         sharedModules, codecArtifacts: [] },
-      upgradePristineBuiltin: record => record.description.composition.entries.every(entry => entry.pluginId === "actspace.default-harness")
-        && !record.description.composition.entries.some(entry => entry.entryId === "plugin-manager"),
+      upgradePristineBuiltin: record => record.description.composition.entries.every(entry => entry.pluginId === "actspace.default-harness"),
       authorize: approval.authorize,
       onSelection: record => { emitNotification(ctx, "harness/selection-updated", record); },
       onDiagnostic: error => { host.onHarnessDiagnostic?.(error); },

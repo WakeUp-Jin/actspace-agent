@@ -200,6 +200,7 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
     version: 4,
     general: {
       performanceMonitoring: general.performanceMonitoring === true,
+      showTurnCodeChanges: general.showTurnCodeChanges !== false,
       englishLearning: { lastSessionId: isRecord(general.englishLearning) && typeof general.englishLearning.lastSessionId === "string" ? general.englishLearning.lastSessionId.slice(0, 200) : null },
       personalization: {
         displayName: typeof personalization.displayName === "string" ? personalization.displayName.slice(0, 60) : "",

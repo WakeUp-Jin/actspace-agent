@@ -15,6 +15,10 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [内置 Harness 连续升级修复](active/20261014-harness-builtin-upgrade-fix.md) | 用户已批准；回归由红转绿，下一步真实 Electron 定向复验。 |
+| [轨迹页对齐 DeepSeek Harness](active/20261014-trajectory-dsh-parity.md) | 2026-10-14 立项并开始执行 T1–T12；D1（停止进工具栏）、D2（supplement 显示为上下文行）按建议定案。 |
+| [轨迹页流式拆分：定稿层与流式层](active/20261014-trajectory-streaming-split.md) | 2026-10-14 E1、T0–T6 完成，未提交：流式每帧 p95 24.83ms → 0.25ms，验收指标全部达到；剩用户验收和真实 Provider 流式检查，见[执行摘要](../exec-runs/20261014-trajectory-streaming-split/execution-summary.md)。 |
+| [轮尾改动卡与交付文件卡](active/20261013-turn-deliverables-cards.md) | 2026-10-13 立项，照搬 DSH 的改动卡与 `present` 交付卡；T1–T10 完成，T11 只剩 Electron 实机验收（真实 `present`、Word/Excel 打开、Finder 定位）。 |
 | [多智能体协作（Space）前端演示](active/20261007-multi-agent-collab-frontend-demo.md) | 2026-10-07 立项，分支 `feat/multi-agent-collab-fe`；只做前端、数据全 mock。下一步由用户拍板设计文档 §10 的 Q1–Q8，再开工 T1–T11。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |

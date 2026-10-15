@@ -11,6 +11,7 @@ import type { HostConnection } from "@actspace/shared/host-protocol";
 import { encodeSessionLocator } from "@actspace/shared/session-locator";
 import type {
   RuntimeV2DesktopSessionProjection,
+  RuntimeV2JsonValue,
   RuntimeV2SessionObservation,
   RuntimeV2SessionSnapshot,
   SessionEventEnvelopeV1,
@@ -25,10 +26,21 @@ import { MOCK_WORKSPACE_ROOT, mockAppSettings, mockBootstrapState, mockSettingsV
 
 export type MockMessage = {
   readonly id: string;
-  readonly role: "user" | "assistant";
+  readonly role: "user" | "assistant" | "tool";
   readonly content: string;
   readonly createdAt: string;
   readonly agentRunId: string;
+  /** role 为 tool 时：一次已完成的工具调用，投影成 tool/call + tool/result 两条事件。 */
+  readonly tool?: MockToolCall;
+  /** role 为 assistant 时：这次请求的用量，紧跟着投影成一条带 usage 的 step/end。 */
+  readonly usage?: Readonly<Record<string, RuntimeV2JsonValue>>;
+};
+
+export type MockToolCall = {
+  readonly name: string;
+  readonly args: Readonly<Record<string, RuntimeV2JsonValue>>;
+  /** tool/result 的 data（除 callId 外），例如 status、summary、modelOutput、detail。 */
+  readonly result: Readonly<Record<string, RuntimeV2JsonValue>>;
 };
 
 export type MockSession = {
@@ -166,18 +178,35 @@ export function listMockSessions(db: MockDb, archived = false): SessionListItem[
 }
 
 function journal(session: MockSession): SessionEventEnvelopeV1[] {
-  return session.messages.map((message, seq) => ({
-    recordKind: "event",
-    seq,
-    type: message.role === "user" ? "user/message" : "assistant/message",
+  const events: SessionEventEnvelopeV1[] = [];
+  const base = (message: MockMessage) => ({
+    recordKind: "event" as const,
     eventVersion: 1,
-    criticality: "ignorable",
+    criticality: "ignorable" as const,
     time: message.createdAt,
     source: { ownerPluginId: "@actspace/core" },
-    data: { agentRunId: message.agentRunId, messageId: message.id, content: message.content },
-    surface: { kind: "append", node: { kind: message.role, messageId: message.id, content: message.content } },
     provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
-  }));
+  });
+  for (const message of session.messages) {
+    if (message.role === "tool" && message.tool) {
+      const callId = message.id;
+      events.push({ ...base(message), seq: events.length, type: "tool/call", data: { agentRunId: message.agentRunId, callId, name: message.tool.name, args: message.tool.args }, surface: null });
+      events.push({ ...base(message), seq: events.length, type: "tool/result", data: { agentRunId: message.agentRunId, callId, ...message.tool.result }, surface: null });
+      continue;
+    }
+    if (message.role === "tool") continue;
+    events.push({
+      ...base(message),
+      seq: events.length,
+      type: message.role === "user" ? "user/message" : "assistant/message",
+      data: { agentRunId: message.agentRunId, messageId: message.id, content: message.content },
+      surface: { kind: "append", node: { kind: message.role, messageId: message.id, content: message.content } },
+    });
+    if (message.usage) {
+      events.push({ ...base(message), seq: events.length, type: "step/end", data: { agentRunId: message.agentRunId, reason: "completed", usage: message.usage }, surface: null });
+    }
+  }
+  return events;
 }
 
 function snapshot(session: MockSession, throughJournalSeq: number): RuntimeV2SessionSnapshot {
@@ -197,14 +226,16 @@ function snapshot(session: MockSession, throughJournalSeq: number): RuntimeV2Ses
     sessionGrants: [],
     accessState: "read-write",
     metadata: { title: session.title, pinned: session.pinned, archived: session.archived },
-    messages: session.messages.map((message) => ({ kind: message.role, messageId: message.id, content: message.content })),
+    messages: session.messages.map((message) => message.role === "tool"
+      ? { kind: "tool-result" as const, messageId: message.id, content: message.content, callId: message.id }
+      : { kind: message.role, messageId: message.id, content: message.content }),
     tools: [],
     pendingInbox: [],
     todos: [],
     delegations: [],
     lineage: null,
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
-    activity: { turnCount: runs, completedTurnCount: runs, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null },
+    activity: { turnCount: runs, completedTurnCount: runs, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } },
   };
 }
 

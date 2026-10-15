@@ -84,8 +84,8 @@ export function renderMessage(
     case "image_generation":
     case "directory_list":
     case "delete":
+    case "present":
     case "tool":
-    case "error":
       if (message.kind === "delete" && message.status === "pending") {
         return <DeleteFileBlock key={renderKey} message={message} className={className} />;
       }
@@ -93,6 +93,9 @@ export function renderMessage(
         return <BrowserApprovalBlock key={renderKey} message={message} className={className} />;
       }
       return <ToolLogLine key={renderKey} message={message} className={className} onOpenFile={onOpenReadFile} onExpand={onExpand} />;
+    case "error":
+      // 运行失败：独立的错误状态行，不进工具过程。
+      return <div key={renderKey} className={`${TURN_STATUS_LINE_CLASS} ${TURN_STATUS_LINE_ERROR_CLASS}`}>{message.content || message.title}</div>;
     case "status":
       if (message.id.endsWith(":model-wait") || message.id === "model-wait") {
         return <ModelWaitingStatus key={renderKey} content={message.content} />;

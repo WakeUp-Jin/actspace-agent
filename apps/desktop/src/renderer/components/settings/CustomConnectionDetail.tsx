@@ -191,7 +191,8 @@ export function CustomConnectionDetail({ connection, autoTest = false, onConnect
         subtitle={<>{official ? "Anthropic 官方" : `${protocolLabel(protocol)} · ${hostOf(connection.baseUrl)}`}<span aria-hidden="true">·</span><ConnectionStatusDot status={status} testing={testing} /></>}
       />
 
-      <SettingGroup title="连接">
+      <SettingGroup plain title="连接">
+        <div className="mc-models">
         {official ? null : (
           <>
             <SettingRow title="名称" control={<><span className="max-w-[240px] truncate text-act-sm text-text-muted">{name}</span><Button aria-label="编辑名称" onClick={() => openEditor("name", name)}>编辑</Button></>} />
@@ -248,6 +249,7 @@ export function CustomConnectionDetail({ connection, autoTest = false, onConnect
           description={<span role="status">{testDescription}</span>}
           control={<Button busy={testing} disabled={testing || !connection.defaultModel} onClick={() => void test()}>{testing ? "测试中…" : "测试"}</Button>}
         />
+        </div>
       </SettingGroup>
       {rowError ? <p role="alert" className="-mt-5 px-0.5 text-act-xs text-on-danger">{rowError}</p> : null}
 
@@ -259,7 +261,8 @@ export function CustomConnectionDetail({ connection, autoTest = false, onConnect
         onEdit={setModelRoute}
       />
 
-      <SettingGroup title="计费">
+      <SettingGroup plain title="计费">
+        <div className="mc-models">
         {official ? <SettingRow title="按官方价格" /> : (
           <>
             <SettingRow title="计费方式" control={<SettingsSelect ariaLabel="计费方式" value={billingMode} options={BILLING_OPTIONS} onChange={(value) => void quickUpdate({ billingMode: value as CustomConnectionBillingMode })} />} />
@@ -268,10 +271,13 @@ export function CustomConnectionDetail({ connection, autoTest = false, onConnect
             ) : null}
           </>
         )}
+        </div>
       </SettingGroup>
 
-      <SettingGroup>
-        <SettingRow title="删除连接" control={<Button variant="danger" onClick={() => setConfirmingRemove(true)}>删除</Button>} />
+      <SettingGroup plain>
+        <div className="mc-models">
+          <SettingRow title="删除连接" control={<Button variant="danger" onClick={() => setConfirmingRemove(true)}>删除</Button>} />
+        </div>
       </SettingGroup>
 
       {confirmingRemove ? (

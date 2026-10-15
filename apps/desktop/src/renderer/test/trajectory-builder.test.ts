@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
-import { buildTrajectoryDetail, buildTrajectorySnapshot, groupVirtualRows, searchTrajectory } from "../trajectory";
+import { buildTrajectoryDetail, buildTrajectorySnapshot, deriveLayout, TrajectorySearchIndex } from "../trajectory";
 import { loadTrajectoryFixture } from "../trajectory/fixtures";
 
 const snapshot: RuntimeV2TrajectorySnapshot = {
@@ -21,25 +21,26 @@ const snapshot: RuntimeV2TrajectorySnapshot = {
 
 describe("trajectory runtime builder", () => {
   it("aggregates chunks and pairs tool result and approvals", () => {
-    const result = buildTrajectorySnapshot(snapshot, "actual");
+    const result = buildTrajectorySnapshot(snapshot);
     const assistant = result.records.find(record => record.messageId === "m1");
     expect(assistant?.sourceSequences).toEqual([2, 3, 4]);
     expect(result.records.find(record => record.callId === "c1" && record.kind === "tool")).toMatchObject({ result: "ok", state: "completed", sourceSequences: [5, 6, 7, 8] });
     expect(result.partial?.summary).toBe("still running");
     expect(result.turns).toHaveLength(1);
-    expect(result.timeline?.mode).toBe("actual");
   });
 
   it("searches by all terms and resolves raw detail source nodes", () => {
     const result = buildTrajectorySnapshot(snapshot);
-    const matches = searchTrajectory(result, "read_file README");
+    const index = new TrajectorySearchIndex();
+    index.update(deriveLayout(result).cells);
+    const matches = index.search("read_file README");
     expect(matches?.size).toBe(1);
     const detail = buildTrajectoryDetail(result, [...matches!][0]!);
     expect(detail?.sourceNodes.map(node => node.eventSeq)).toEqual([5, 6, 7, 8]);
   });
 
   it("keeps lifecycle and request facts raw-only while projecting semantic records", () => {
-    const result = buildTrajectorySnapshot(snapshot, "actual");
+    const result = buildTrajectorySnapshot(snapshot);
 
     expect(result.records.map(record => record.eventType)).toEqual([
       "user/message",
@@ -55,7 +56,7 @@ describe("trajectory runtime builder", () => {
   });
 
   it("derives DSH assistant timing metrics from step start and stream boundaries", () => {
-    const result = buildTrajectorySnapshot(snapshot, "actual");
+    const result = buildTrajectorySnapshot(snapshot);
     const assistant = result.records.find(record => record.messageId === "m1");
     expect(assistant).toMatchObject({ startedAt: "2026-09-05T00:00:00.000Z", durationMs: 400 });
     expect(assistant?.assistantMetrics).toMatchObject({
@@ -79,23 +80,12 @@ describe("trajectory runtime builder", () => {
     const result = buildTrajectorySnapshot({ ...snapshot, nodes });
     const systems = result.records.filter(record => record.kind === "system");
     expect(systems).toHaveLength(2);
-    expect(systems.map(record => record.summary)).toEqual(["Initial System Prompt", "System Prompt Updated"]);
+    expect(systems.map(record => record.summary)).toEqual(["初始系统提示词", "系统提示词已更新"]);
     expect(result.records.filter(record => record.kind === "request")).toHaveLength(0);
   });
 
-  it("retains the first visible turn row and groups adjacent tool calls when collapsed", () => {
-    const result = buildTrajectorySnapshot(snapshot);
-    const turnRows = groupVirtualRows(result.records, new Set(["t1"]));
-    expect(turnRows.map(row => row.rowType)).toEqual(["record", "turn-summary", "record"]);
-    expect(turnRows[1]?.summary).toContain("1 step");
-
-    const callRows = groupVirtualRows(result.records, new Set(), new Set(["c1"]));
-    expect(callRows.some(row => row.rowType === "call-summary")).toBe(true);
-    expect(callRows.find(row => row.rowType === "call-summary")?.summary).toContain("tool call");
-  });
-
   it("keeps request and lifecycle facts out of the semantic ledger", () => {
-    const result = buildTrajectorySnapshot(loadTrajectoryFixture("complete"), "actual");
+    const result = buildTrajectorySnapshot(loadTrajectoryFixture("complete"));
     expect(result.records.some(record => record.eventType === "request/header" && record.kind !== "system")).toBe(false);
     expect(result.records.some(record => record.eventType === "request/context")).toBe(false);
     expect(result.records.filter(record => record.kind === "system")).toHaveLength(1);
@@ -109,21 +99,36 @@ describe("trajectory runtime builder", () => {
     const assistant = result.records.find(record => record.kind === "assistant" && record.assistantMetrics);
     expect(assistant?.assistantMetrics?.ttftMs).toBeTypeOf("number");
   });
-  it("compresses idle gaps without counting overlap twice or inventing missing timestamps", () => {
-    const timed: RuntimeV2TrajectorySnapshot = { ...snapshot, nodes: [
-      { ...snapshot.nodes[5]!, time: "2026-09-05T00:00:01.000Z", data: { callId: "a" }, callId: "a" },
-      { ...snapshot.nodes[8]!, eventSeq: 6, time: "2026-09-05T00:00:03.000Z", data: { callId: "a" }, callId: "a" },
-      { ...snapshot.nodes[5]!, eventSeq: 7, time: "2026-09-05T00:00:02.000Z", data: { callId: "b" }, callId: "b" },
-      { ...snapshot.nodes[8]!, eventSeq: 8, time: "2026-09-05T00:00:04.000Z", data: { callId: "b" }, callId: "b" },
-      { ...snapshot.nodes[5]!, eventSeq: 9, time: "2026-09-05T00:01:00.000Z", data: { callId: "c" }, callId: "c" },
-      { ...snapshot.nodes[8]!, eventSeq: 10, time: "2026-09-05T00:01:02.000Z", data: { callId: "c" }, callId: "c" },
-      { ...snapshot.nodes[1]!, eventSeq: 11, time: null, data: { content: "no time" } },
-    ] };
-    const compressed = buildTrajectorySnapshot(timed, "duration").timeline!;
-    const actual = buildTrajectorySnapshot(timed, "actual").timeline!;
-    expect(compressed.end - compressed.start).toBe(5000);
-    expect(actual.end - actual.start).toBe(61000);
-    expect(compressed.spans).toHaveLength(3);
+  it("projects task notifications and context supplements as CONTEXT records with their source", () => {
+    const nodes = [
+      snapshot.nodes[0]!,
+      { ...snapshot.nodes[1]!, key: "s:20", eventSeq: 20, eventType: "agent/inbox/spliced", kind: "user" as const, data: { operation: "claim", messageId: "n1", target: "current-turn", source: "task_notification" }, surface: { kind: "append", node: { kind: "user", messageId: "n1", content: [{ type: "text", text: "后台任务完成" }, { type: "runtime-context", context: { agentMode: "agent" } }] } } },
+      { ...snapshot.nodes[1]!, key: "s:21", eventSeq: 21, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "add", id: "runtime-state", owner: "actspace.context-runtime", text: "当前目录 /tmp", afterEventSeq: 20, lifetime: "turn", turnId: "t1" } },
+      { ...snapshot.nodes[1]!, key: "s:22", eventSeq: 22, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "remove", id: "runtime-state", owner: "actspace.context-runtime" } },
+    ] as RuntimeV2TrajectorySnapshot["nodes"];
+    const result = buildTrajectorySnapshot({ ...snapshot, nodes });
+    const contexts = result.records.filter(record => record.kind === "context");
+    expect(contexts).toHaveLength(2);
+    expect(contexts[0]).toMatchObject({ summary: "后台任务完成", messageSource: { kind: "task-notification", form: "notice" } });
+    expect(contexts[0]?.sourceBlocks?.map(block => block.type)).toEqual(["text"]);
+    expect(contexts[1]).toMatchObject({ summary: "当前目录 /tmp", messageSource: { kind: "actspace.context-runtime", id: "runtime-state", lifetime: "turn" } });
+    expect(result.records.some(record => record.eventType === "plugin/actspace.context/supplement" && record.kind !== "context")).toBe(false);
+  });
+
+  it("keeps streamed tool arguments out of the message text and reuses the request identity", () => {
+    const chunk = (seq: number, data: Record<string, string>) => ({ ...snapshot.nodes[2]!, key: `s:${seq}`, eventSeq: seq, data: { turnId: "t1", stepId: "st1", requestId: "r1", ...data } });
+    const streaming = [
+      snapshot.nodes[0]!,
+      chunk(2, { kind: "text-delta", content: "先读文件" }),
+      chunk(3, { kind: "tool-call-delta", content: "{\"path\":", callId: "c9", name: "read_file" }),
+      chunk(4, { kind: "tool-call-delta", content: "\"a.md\"}", callId: "c9", name: "read_file" }),
+    ] as RuntimeV2TrajectorySnapshot["nodes"];
+    const partial = buildTrajectorySnapshot({ ...snapshot, nodes: streaming }).partial!;
+    expect(partial.summary).toBe("先读文件");
+    expect(partial.sourceBlocks?.find(block => block.type === "tool-call")).toMatchObject({ callId: "c9", toolName: "read_file", content: "{\"path\":\"a.md\"}" });
+    const final = { ...snapshot.nodes[4]!, key: "s:5", eventSeq: 5, data: { turnId: "t1", stepId: "st1", requestId: "r1", messageId: "m9", finishReason: "failed", content: [] } };
+    const done = buildTrajectorySnapshot({ ...snapshot, nodes: [...streaming, final] as RuntimeV2TrajectorySnapshot["nodes"] });
+    expect(done.records.find(record => record.kind === "assistant")?.id).toBe(partial.id);
   });
 
 });

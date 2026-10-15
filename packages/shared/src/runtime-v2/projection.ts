@@ -338,6 +338,22 @@ export type RuntimeV2SessionActivity = {
   readonly compactionCount: number;
   readonly activeCompactionId: string | null;
   readonly lastCompactionSummary: string | null;
+  readonly timing: RuntimeV2SessionTiming;
+};
+
+/**
+ * 全会话的模型侧计时，宿主扫全量 journal（含流式 chunk）累加；口径对应 DSH 的 `assistantMetrics()`。
+ * 模型用时 = 请求开始 → assistant/message；TTFT = 首个非空 chunk − 请求开始；
+ * 解码时间 = 首个 token → 完成，和同一批请求的输出 token 一起算 TPS。
+ */
+export type RuntimeV2SessionTiming = {
+  readonly llmMs: number;
+  readonly ttftMs: number;
+  /** 带 TTFT 记录的请求数。 */
+  readonly ttftSteps: number;
+  readonly decodeMs: number;
+  /** 与 decodeMs 同一批请求的输出 token 之和。 */
+  readonly decodeTokens: number;
 };
 
 export type RuntimeV2SessionSnapshot = {

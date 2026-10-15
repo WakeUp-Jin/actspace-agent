@@ -88,8 +88,23 @@ http://127.0.0.1:5173/
 | `approval-pending` | 一个会话停在高风险 `bash` 命令（`rm -rf …`）的审批上 | 审批卡片、允许 / 拒绝、刷新后经 `approvals.listPending` 恢复 | 真实工具执行结果 |
 | `approval-prefix` | pnpm test 待审批，含正式 command_prefix 建议 | 三按钮、会话授权文案和主题布局 | 真实授权复用、持久化与工具执行 |
 | `remote-host` | 三台 Host：devbox 已连接、GPU 服务器离线、旧笔记本已撤销；本机 / devbox / GPU 各一个会话 | 侧栏 Host 分组与离线标记、运行位置菜单、Host 删除 / 重连后的列表 | `hosts.call`（`host.describe`、`files.reference`）、`hosts.preview` / `download` 在 mock 中未实现，会 reject；因此 Host 工作区和模型显示为「等待 Host …」，远端读文件和下载产物只能由单测和真实 Host 覆盖 |
+| `turn-deliverables` | 一个会话三轮：第 1 轮改 2 个文件、交付 1 个；第 2 轮最终改 6 个文件（另有新建后删除的临时脚本）、交付 5 个；第 3 轮只改报告 1 个文件（+1/-1）、交付 1 个；三轮回复都带用量，第 2 轮没有价格 | 轮尾改动卡与交付卡的单文件 / 多文件形态与折叠、悬停 diff 浮层、「第 N 轮改动」标签、交付卡网格与打开方式菜单、设置开关「显示本轮代码改动」；回复尾部的「用量 … tok」胶囊与本轮用量弹窗（预估花费、花费未知）；`workspaces.readFile` 只认识 `docs/report.md` 和 `docs/summary.csv` | 真实 `present` 工具调用、原生关联应用列表与图标、远端 Host 下载（见 [front-中间消息区规范.md](design-docs/frontend/front-中间消息区规范.md) §轮尾改动卡与交付文件卡） |
 
 mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`，包括终端创建、新建工作树和 Git 写操作。界面上看到的报错属于 mock 的边界，不是缺陷。如需新增场景，按规范 §7 处理，并同步更新本表。
+
+#### 轨迹页 fixture（只在开发构建和测试中加载）
+
+在任意 mock 场景的地址后加 `&trajectoryFixture=<名称>`，切到轨迹视图后显示固定数据，例如 `http://127.0.0.1:5173/?mock=long-session&trajectoryFixture=complete`。加 `&trajectoryTheme=dark`（或 `light`）只临时覆盖轨迹样例的主题，卸载时恢复。数据在 `apps/desktop/src/renderer/fixtures/trajectory-complete.json` 和 `apps/desktop/src/renderer/trajectory/fixtures.ts`。
+
+| `trajectoryFixture=` | 内容 | 适合验证 |
+| --- | --- | --- |
+| `complete` | 6 轮：工具、重试、审批、压缩、缺计时的旧消息、运行中的回复 | 表格、请求圆点、时间轴、各类详情页签 |
+| `errors` | 在 `complete` 上加：上下文行（Context 补充、后台任务通知）、子工具失败、系统提示词差异、审批拒绝、请求失败 | 上下文 / 子工具类型标签、失败状态、差异页签、层级跳转 |
+| `running` | 去掉所有结束事件 | 等待中状态、请求占位行 |
+| `streaming` | `complete` 的运行中回复，每 120ms 追加一个 chunk | 流式时行在原地变长、不闪；时间轴不跟着重绘 |
+| `long` | `complete` 重复 24 次 | 虚拟化、加载更早的历史、帧耗时 |
+| `streaming-long` | `long` 加一条运行中的回复，每 120ms 追加 20 个 chunk，共 2000 个 | 长会话流式：行不重挂载、帧间隔、选中后详情实时变长；`TRAJECTORY_PERF=1` 跑 `trajectory-streaming-perf.test.ts` 测每帧耗时 |
+| `empty` | 没有事件 | 空态 |
 
 #### Space 多 Actor 协作演示（只在开发构建出现）
 

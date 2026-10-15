@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeStreamEvent } from "@actspace/shared";
+import { projectChatWindow } from "@actspace/client/sessions";
 import { desktopBridgeContract } from "@actspace/shared/desktop-bridge";
 import { createMockBridge, type MockBridgeHandle } from "../mock/create-mock-bridge";
 import { MOCK_SCENARIOS, type MockScenario } from "../mock/scenarios";
+import { collectPresentedFiles, collectTurnChanges } from "../components/turn-tail/turn-tail-data";
+import { groupMessagesIntoTurns } from "../components/conversation/turns";
 
 let handle: MockBridgeHandle | null = null;
 function open(scenario?: MockScenario, handlers?: Parameters<typeof createMockBridge>[0]["handlers"]) {
@@ -155,5 +158,33 @@ describe("mock bridge", () => {
     await bridge.hosts.remove("conn-laptop");
     expect((await bridge.hosts.list()).map((host) => host.id)).toEqual(["conn-devbox", "conn-gpu"]);
     expect(changes).toHaveLength(2);
+  });
+
+  it("projects the turn-deliverables scenario into changed files and presented files", async () => {
+    const { bridge, db } = open("turn-deliverables");
+    const sessions = await bridge.sessions.list();
+    const session = sessions[0];
+    const page = await bridge.sessions.getPage({ sessionId: session.id });
+    const messages = projectChatWindow(page, session.workspaceRoot ?? "").messageBlocks ?? [];
+    const turns = groupMessagesIntoTurns(messages);
+    expect(turns).toHaveLength(3);
+    expect(turns.map((turn) => collectTurnChanges(turn.messages)?.files.length)).toEqual([2, 6, 1]);
+    const firstTwoTurns = turns.slice(0, 2).flatMap((turn) => turn.messages);
+    const changes = collectTurnChanges(firstTwoTurns);
+    const presented = collectPresentedFiles(firstTwoTurns);
+
+    // 新建后又被删掉的 scripts/tmp-check.mjs 不算本轮改动。
+    expect(changes?.files.map((file) => file.path)).toEqual([
+      "scripts/export.ts", "docs/report.md", "src/report/build.ts", "src/report/csv.ts",
+      "src/report/chart.ts", "src/report/index.ts", "docs/summary.csv", "README.md",
+    ]);
+    expect(changes?.files.find((file) => file.path === "docs/report.md")).toMatchObject({ created: true, additions: 4 });
+    expect(changes?.files.find((file) => file.path === "src/report/chart.ts")).toMatchObject({ additions: 2, deletions: 1 });
+    expect(presented.map((file) => file.path)).toEqual(["docs/report.md", "docs/summary.csv", "docs/chart.json", "docs/slides.pptx", "docs/appendix.pdf"]);
+    // 后一次 present 的描述覆盖前一次。
+    expect(presented[0].description).toBe("季度报告（更新）");
+    expect(collectTurnChanges(turns[2].messages)).toMatchObject({ additions: 1, deletions: 1, files: [{ path: "docs/report.md", created: false }] });
+    expect(collectPresentedFiles(turns[2].messages)).toMatchObject([{ path: "docs/report.md", description: "单文件改动验收：报告终稿" }]);
+    expect(db.sessions.get(session.id)?.messages.some((message) => message.tool?.name === "present")).toBe(true);
   });
 });

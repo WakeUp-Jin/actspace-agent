@@ -1,24 +1,17 @@
-import { openRemoteFile } from "../../hooks/remoteArtifact";
-import { FileText, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Image as ImageIcon, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { MessageBlock, WorkspaceReadFileResult } from "@actspace/shared";
-import { useRightPanel, type RightPanelTab } from "../right-panel/RightPanelContext";
-import { tabFromFile } from "../right-panel/workspaceFileTab";
+import type { MessageBlock } from "@actspace/shared";
+import { useRightPanel } from "../right-panel/RightPanelContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { dialogsApi } from "../../api/dialogs";
 import { sessionsApi } from "../../api/sessions";
-import { workspacesApi } from "../../api/workspaces";
-import { useRunTargetContext } from "../../target/run-target-context";
 
-type TurnOutputArtifact = {
+/** 本轮生成的图片列表。改过的文件和交付文件由轮尾的改动卡 / 交付卡展示（components/turn-tail）。 */
+type TurnOutputImage = {
   id: string;
-  kind: "image" | "file";
   name: string;
   displayPath: string;
   sourcePath: string;
-  workspaceRelativePath?: string;
-  additions?: number;
-  deletions?: number;
 };
 
 const ARTIFACT_PANEL_CLASS =
@@ -43,84 +36,21 @@ function fileName(path: string): string {
   return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized;
 }
 
-function normalizedRelativePath(path: string | undefined): string | undefined {
-  if (!path || /^(?:[A-Za-z]:)?[\\/]/.test(path)) return undefined;
-  return path.replace(/\\/g, "/");
-}
-
-function normalizedPath(path: string | undefined): string | undefined {
-  return path?.replace(/\\/g, "/");
-}
-
-function fileArtifactKey(sourcePath: string, relativePath: string | undefined): string {
-  return `file:${relativePath ?? normalizedPath(sourcePath)}`;
-}
-
-export function collectTurnOutputArtifacts(messages: MessageBlock[]): TurnOutputArtifact[] {
-  const outputs = new Map<string, TurnOutputArtifact>();
+export function collectTurnOutputArtifacts(messages: MessageBlock[]): TurnOutputImage[] {
+  const outputs = new Map<string, TurnOutputImage>();
 
   for (const message of messages) {
-    if ((message.kind === "image_generation" && (message.status === "completed" || message.status === "partial")) || (message.kind === "tool" && message.artifacts?.length)) {
-      const images = message.kind === "image_generation" ? message.images : message.artifacts;
-      for (const image of images ?? []) {
-        if (image.type !== "image" || !image.path) continue;
-        const key = `image:${image.path}`;
-        if (outputs.has(key)) continue;
-        outputs.set(key, {
-          id: key,
-          kind: "image",
-          name: image.name || fileName(image.path),
-          displayPath: message.kind === "tool" ? image.name || displayArtifactPath(image.path) : displayArtifactPath(image.path),
-          sourcePath: image.path,
-        });
-      }
-      continue;
-    }
-
-    if (message.kind === "delete" && message.status === "completed") {
-      const deletedRelativePath = normalizedRelativePath(message.outputRelativePath);
-      const deletedSourcePath = normalizedPath(message.outputPath);
-      let removedExactMatch = false;
-
-      for (const [key, artifact] of outputs) {
-        if (artifact.kind !== "file") continue;
-        if (
-          (deletedRelativePath && artifact.workspaceRelativePath === deletedRelativePath)
-          || (deletedSourcePath && normalizedPath(artifact.sourcePath) === deletedSourcePath)
-        ) {
-          outputs.delete(key);
-          removedExactMatch = true;
-        }
-      }
-
-      // Older persisted delete previews only contain a basename. Remove it only
-      // when that basename identifies exactly one output in this turn.
-      if (!removedExactMatch && !deletedRelativePath && !deletedSourcePath) {
-        const legacyMatches = [...outputs.entries()].filter(([, artifact]) => (
-          artifact.kind === "file" && artifact.name === message.filePath
-        ));
-        if (legacyMatches.length === 1) outputs.delete(legacyMatches[0][0]);
-      }
-      continue;
-    }
-
-    if (
-      (message.kind === "write_diff" || message.kind === "edit_diff")
-      && message.status === "completed"
-      && message.outputPath
-    ) {
-      const relativePath = normalizedRelativePath(message.outputRelativePath);
-      const key = fileArtifactKey(message.outputPath, relativePath);
-      const existing = outputs.get(key);
+    if (!((message.kind === "image_generation" && (message.status === "completed" || message.status === "partial")) || (message.kind === "tool" && message.artifacts?.length))) continue;
+    const images = message.kind === "image_generation" ? message.images : message.artifacts;
+    for (const image of images ?? []) {
+      if (image.type !== "image" || !image.path) continue;
+      const key = `image:${image.path}`;
+      if (outputs.has(key)) continue;
       outputs.set(key, {
         id: key,
-        kind: "file",
-        name: message.filePath || fileName(message.outputPath),
-        displayPath: relativePath ?? fileName(message.outputPath),
-        sourcePath: message.outputPath,
-        workspaceRelativePath: relativePath,
-        additions: (existing?.additions ?? 0) + message.additions,
-        deletions: (existing?.deletions ?? 0) + message.deletions,
+        name: image.name || fileName(image.path),
+        displayPath: message.kind === "tool" ? image.name || displayArtifactPath(image.path) : displayArtifactPath(image.path),
+        sourcePath: image.path,
       });
     }
   }
@@ -135,174 +65,99 @@ function artifactReadError(error: string | undefined): string {
   return "图片读取失败。";
 }
 
-function workspaceReadError(error: WorkspaceReadFileResult["error"]): string {
-  if (error === "not_found") return "文件已不存在。";
-  if (error === "too_large") return "文件过大，无法预览。";
-  if (error === "binary") return "暂不支持预览二进制文件。";
-  if (error === "not_a_file") return "该路径不是文件。";
-  if (error === "escapes_root") return "文件路径不属于当前工作区。";
-  return "文件读取失败。";
-}
-
 export function TurnOutputArtifacts({
   messages,
   sessionId,
-  workspaceRoot,
 }: {
   messages: MessageBlock[];
   sessionId: string | null;
-  workspaceRoot?: string | null;
 }) {
   const outputs = useMemo(() => collectTurnOutputArtifacts(messages), [messages]);
   const { openTab } = useRightPanel();
-  // 产物属于当前会话；远端会话的文件经 Host 读取和下载（15 T6）。
-  const isRemoteTarget = useRunTargetContext().target.kind === "remote";
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (outputs.length === 0) return null;
 
-  async function openArtifact(artifact: TurnOutputArtifact) {
+  async function openArtifact(artifact: TurnOutputImage) {
     setLoadingId(artifact.id);
     setError(null);
     try {
-      if (artifact.kind === "image") {
-        if (!sessionId) {
-          setError("当前环境不支持会话图片预览。");
-          return;
-        }
-        const result = await sessionsApi.readArtifact({
-          sessionId,
-          artifactPath: artifact.sourcePath,
-        });
-        if (result.error || !result.dataUrl) {
-          setError(artifactReadError(result.error));
-          return;
-        }
-        openTab({
-          id: `session-artifact:${sessionId}:${result.relativePath}`,
-          kind: "image",
-          // The session-artifact IPC intentionally returns an opaque storage path;
-          // keep the user-facing label from the tool projection instead of exposing
-          // the UUID as a tab title.
-          title: artifact.name,
-          src: result.dataUrl,
-        });
+      if (!sessionId) {
+        setError("当前环境不支持会话图片预览。");
         return;
       }
-
-      if (isRemoteTarget && sessionId && await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab)) return;
-      if (!workspaceRoot || !artifact.workspaceRelativePath) {
-        setError("该文件不在当前工作区内，暂时不能预览。");
-        return;
-      }
-      const result = await workspacesApi.readFile({
-        workspaceRoot,
-        relativePath: artifact.workspaceRelativePath,
+      const result = await sessionsApi.readArtifact({
+        sessionId,
+        artifactPath: artifact.sourcePath,
       });
-      if (result.error) {
-        setError(workspaceReadError(result.error));
+      if (result.error || !result.dataUrl) {
+        setError(artifactReadError(result.error));
         return;
       }
-      openTab(tabFromFile(result));
+      openTab({
+        id: `session-artifact:${sessionId}:${result.relativePath}`,
+        kind: "image",
+        // The session-artifact IPC intentionally returns an opaque storage path;
+        // keep the user-facing label from the tool projection instead of exposing
+        // the UUID as a tab title.
+        title: artifact.name,
+        src: result.dataUrl,
+      });
     } catch {
-      setError(artifact.kind === "image" ? "图片读取失败。" : "文件读取失败。");
+      setError("图片读取失败。");
     } finally {
       setLoadingId(null);
     }
   }
 
-  async function showContextMenu(artifact: TurnOutputArtifact) {
+  async function showContextMenu(artifact: TurnOutputImage) {
     setError(null);
-    if (artifact.kind === "file" && sessionId && isRemoteTarget) {
-      try { await openRemoteFile(sessionId, artifact.workspaceRelativePath ?? artifact.sourcePath, openTab, true); }
-      catch { setError("远端文件下载失败，请确认连接后重试。"); }
-      return;
-    }
-    const input = artifact.kind === "image"
-      ? sessionId
-        ? { kind: "session_image" as const, sessionId, artifactPath: artifact.sourcePath }
-        : null
-      : workspaceRoot && artifact.workspaceRelativePath
-        ? {
-            kind: "workspace_file" as const,
-            workspaceRoot,
-            relativePath: artifact.workspaceRelativePath,
-          }
-        : null;
-    if (!input) return;
-
+    if (!sessionId) return;
     try {
-      const result = await dialogsApi.showArtifactContextMenu(input);
+      const result = await dialogsApi.showArtifactContextMenu({ kind: "session_image", sessionId, artifactPath: artifact.sourcePath });
       if (!result.shown) setError("无法打开 Artifact 菜单。");
     } catch {
       setError("无法打开 Artifact 菜单。");
     }
   }
 
-  const fileOutputs = outputs.filter((artifact) => artifact.kind === "file");
-  const imageCount = outputs.length - fileOutputs.length;
   const hasGeneratedImage = messages.some((message) => message.kind === "image_generation" && (message.status === "completed" || message.status === "partial"));
-  const additions = fileOutputs.reduce((total, artifact) => total + (artifact.additions ?? 0), 0);
-  const deletions = fileOutputs.reduce((total, artifact) => total + (artifact.deletions ?? 0), 0);
-  const summaryLabel = fileOutputs.length > 0 && imageCount > 0
-    ? `${fileOutputs.length} ${fileOutputs.length === 1 ? "file" : "files"} · ${imageCount} ${imageCount === 1 ? "image" : "images"}`
-    : fileOutputs.length > 0
-      ? `Edited ${fileOutputs.length} ${fileOutputs.length === 1 ? "file" : "files"}`
-      : `${hasGeneratedImage ? "Generated " : ""}${imageCount} ${imageCount === 1 ? "image" : "images"}`;
+  const summaryLabel = `${hasGeneratedImage ? "Generated " : ""}${outputs.length} ${outputs.length === 1 ? "image" : "images"}`;
 
   return (
     <section className={ARTIFACT_PANEL_CLASS} aria-label="Turn output artifacts">
       <header className={ARTIFACT_HEADER_CLASS}>
         <span>{summaryLabel}</span>
-        {fileOutputs.length > 0 ? (
-          <span className="flex shrink-0 gap-1 font-medium tabular-nums" aria-label={`${additions} additions, ${deletions} deletions`}>
-            <span className="text-success">+{additions}</span>
-            <span className="text-danger">-{deletions}</span>
-          </span>
-        ) : null}
       </header>
       <div>
-        {outputs.map((artifact) => {
-          const canOpen = artifact.kind === "image" || Boolean(artifact.workspaceRelativePath);
-          return (
-            <Tooltip key={artifact.id} delayDuration={400}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={ARTIFACT_ROW_CLASS}
-                  onClick={() => void openArtifact(artifact)}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    void showContextMenu(artifact);
-                  }}
-                  disabled={!canOpen || loadingId === artifact.id}
-                  aria-label={`Open ${artifact.name}`}
-                >
-                  <span className="grid h-5 w-5 shrink-0 place-items-center text-text-faint" aria-hidden="true">
-                    {loadingId === artifact.id
-                      ? <Loader2 size={14} className="animate-spin" />
-                      : artifact.kind === "image"
-                        ? <ImageIcon size={14} />
-                        : <FileText size={14} />}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-act-xs text-text-muted">
-                    {artifact.displayPath}
-                  </span>
-                  {artifact.kind === "file" ? (
-                    <span className="flex shrink-0 gap-1 text-act-xxs font-medium tabular-nums" aria-label={`${artifact.additions ?? 0} additions, ${artifact.deletions ?? 0} deletions`}>
-                      <span className="text-success">+{artifact.additions ?? 0}</span>
-                      <span className="text-danger">-{artifact.deletions ?? 0}</span>
-                    </span>
-                  ) : null}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" align="start" className="max-w-[420px] break-all font-normal">
-                {artifact.sourcePath}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
+        {outputs.map((artifact) => (
+          <Tooltip key={artifact.id} delayDuration={400}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className={ARTIFACT_ROW_CLASS}
+                onClick={() => void openArtifact(artifact)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  void showContextMenu(artifact);
+                }}
+                disabled={loadingId === artifact.id}
+                aria-label={`Open ${artifact.name}`}
+              >
+                <span className="grid h-5 w-5 shrink-0 place-items-center text-text-faint" aria-hidden="true">
+                  {loadingId === artifact.id ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-act-xs text-text-muted">
+                  {artifact.displayPath}
+                </span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="start" className="max-w-[420px] break-all font-normal">
+              {artifact.sourcePath}
+            </TooltipContent>
+          </Tooltip>
+        ))}
       </div>
       {error ? <div className="border-t border-line px-3 py-2 text-act-xs leading-4 text-danger">{error}</div> : null}
     </section>

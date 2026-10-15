@@ -6,8 +6,9 @@ import { emptyScenario } from "./empty";
 import { longSessionScenario } from "./long-session";
 import { remoteHostScenario } from "./remote-host";
 import { streamingScenario } from "./streaming";
+import { turnDeliverablesScenario } from "./turn-deliverables";
 
-export type MockScenario = "empty" | "streaming" | "long-session" | "approval-pending" | "remote-host" | "approval-prefix" | "context-pagination";
+export type MockScenario = "empty" | "streaming" | "long-session" | "approval-pending" | "remote-host" | "approval-prefix" | "context-pagination" | "turn-deliverables";
 
 /** 场景只负责写入种子数据，必要时覆盖少量 handler（如流式回放的触发时机）。 */
 export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) => MockHandlers | void>> = {
@@ -18,6 +19,7 @@ export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) =>
   "approval-pending": approvalPendingScenario,
   "approval-prefix": approvalPrefixScenario,
   "remote-host": remoteHostScenario,
+  "turn-deliverables": turnDeliverablesScenario,
 };
 
 export function isMockScenario(value: string | null): value is MockScenario {

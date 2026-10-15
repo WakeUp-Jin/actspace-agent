@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
@@ -28,11 +28,10 @@ describe("TrajectoryView", () => {
   it("renders the Journal projection nodes with stable sequence identity", () => {
     render(<TrajectoryView snapshot={snapshot} />);
     expect(screen.getByTestId("trajectory-view")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Trajectory timeline" })).toBeInTheDocument();
-    expect(screen.getByRole("table", { name: "Trajectory events" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "轨迹时间线" })).toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.queryByText("turn/start")).not.toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(1);
-    expect(screen.getAllByRole("row").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("row").find((row) => row.getAttribute("data-event-seq") === "1")).toBeInTheDocument();
   });
 
@@ -81,10 +80,10 @@ describe("TrajectoryView", () => {
       </SessionProjectionProvider>,
     );
 
-    await waitFor(() => expect(screen.getByRole("table", { name: "Trajectory events" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
   });
 
-  it("provides the dense overview, turn folding, search, and event details", async () => {
+  it("provides the toolbar, timeline, search, and event details", async () => {
     const user = userEvent.setup();
     const richSnapshot: RuntimeV2TrajectorySnapshot = {
       ...snapshot,
@@ -97,74 +96,105 @@ describe("TrajectoryView", () => {
 
     render(<TrajectoryView snapshot={richSnapshot} />);
 
-    expect(screen.getByRole("toolbar", { name: "Trajectory toolbar" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Trajectory timeline" })).toBeInTheDocument();
-    expect(screen.getByRole("searchbox", { name: "Search trajectory" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /TOOL tool\/call, read_file/ })).toBeInTheDocument();
+    expect(screen.getByRole("toolbar", { name: "轨迹工具栏" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "使用实际时长" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: "停止" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "轨迹时间线" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "搜索轨迹" })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /工具，read_file/ })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Collapse turns" }));
+    await user.click(screen.getByRole("button", { name: "收起所有轮次" }));
     // A turn with one visible semantic record is not collapsible in DSH.
-    expect(screen.getByText(/read_file \{"path":"src\/App\.tsx"\}/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Collapse turns" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /TOOL tool\/call, read_file/ }));
-    expect(screen.getByRole("complementary", { name: "Event details" })).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "Payload" }));
-    expect(screen.getByRole("tabpanel").textContent).toMatch(/"path":\s*"src\/App\.tsx"/);
+    expect(screen.getByText(/\{"path":"src\/App\.tsx"\}/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收起所有轮次" })).toBeInTheDocument();
+    await user.click(screen.getByRole("row", { name: /工具，read_file/ }));
+    expect(screen.getByRole("complementary", { name: "事件详情" })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /工具，read_file/ })).toHaveAttribute("data-selected", "true");
+    await user.click(screen.getByRole("tab", { name: "参数" }));
+    expect(screen.getByRole("tabpanel")).toHaveTextContent(/src\/App\.tsx/);
 
-    await user.click(screen.getByRole("button", { name: "Close event details" }));
-    expect(screen.queryByRole("complementary", { name: "Event details" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "关闭详情" }));
+    expect(screen.queryByRole("complementary", { name: "事件详情" })).not.toBeInTheDocument();
 
-    await user.type(screen.getByRole("searchbox", { name: "Search trajectory" }), "read_file");
-    expect(screen.getByRole("button", { name: "Clear trajectory search" })).toBeInTheDocument();
+    await user.type(screen.getByRole("searchbox", { name: "搜索轨迹" }), "no-such-text");
+    expect(screen.queryByRole("row", { name: /工具，read_file/ })).not.toBeInTheDocument();
+    await user.clear(screen.getByRole("searchbox", { name: "搜索轨迹" }));
+    expect(screen.getByRole("row", { name: /工具，read_file/ })).toBeInTheDocument();
   });
-  it("shows role-specific details and restores every tool in a folded group", async () => {
+
+  it("puts 停止 at the right edge of the toolbar while the session runs", async () => {
+    const onAbort = vi.fn();
+    const view = render(<TrajectoryView snapshot={snapshot} onAbort={onAbort} />);
+    const toolbar = screen.getByRole("toolbar", { name: "轨迹工具栏" });
+    const buttons = within(toolbar).getAllByRole("button");
+    expect(buttons.at(-1)).toHaveAccessibleName("停止");
+    await userEvent.click(buttons.at(-1)!);
+    expect(onAbort).toHaveBeenCalledTimes(1);
+    view.rerender(<TrajectoryView snapshot={snapshot} onAbort={onAbort} isAborting />);
+    expect(within(toolbar).getByRole("button", { name: "正在停止…" })).toBeDisabled();
+  });
+
+  it("shows role-specific details and folds assistants and turns", async () => {
     const user = userEvent.setup();
     render(<TrajectoryView snapshot={loadTrajectoryFixture("complete")} />);
-    await user.click(screen.getByRole("button", { name: "Collapse calls" }));
-    expect(screen.queryByRole("button", { name: /TOOL tool\/call, read_file/ })).not.toBeInTheDocument();
-    await user.click(screen.getAllByRole("button", { name: "Expand tool call" })[0]!);
-    expect(screen.getByRole("button", { name: /TOOL tool\/call, read_file.*core-codecs/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /TOOL tool\/call, bash.*session-journal/ })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /ASSISTANT assistant\/message, Journal 保留/ }));
-    expect(screen.getByText("Turn 1 · Step 2")).toBeInTheDocument();
-    expect(screen.getByText("700 ms")).toBeInTheDocument();
-    expect(screen.getByText(/2026-09-03 \d{2}:20:10\.100/)).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["Summary", "Preview", "Raw"]);
-    await user.click(screen.getByRole("button", { name: "Close event details" }));
-    await user.click(screen.getByRole("button", { name: /USER user\/message, 帮我检查/ }));
-    expect(screen.getByText("Turn 1 · Message")).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "Source" }));
-    expect(screen.getByRole("tabpanel")).toHaveTextContent('"kind": "user"');
+    await user.click(screen.getByRole("button", { name: "收起所有调用" }));
+    expect(screen.queryByRole("row", { name: /工具，read_file/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "展开所有调用" })).toBeInTheDocument();
+    await user.click(screen.getAllByRole("row", { name: /^已收起的助手概述/ })[0]!);
+    expect(screen.getByRole("row", { name: /工具，read_file.*core-codecs/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /工具，bash.*session-journal/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("row", { name: /助手，Journal 保留/ }));
+    const details = screen.getByRole("complementary", { name: "事件详情" });
+    expect(within(details).getByText("第 1 轮 · 第 2 步")).toBeInTheDocument();
+    expect(within(details).getByText(/2026-09-03 \d{2}:20:10\.100/)).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["概述", "预览", "原始内容"]);
+    await user.click(screen.getByRole("button", { name: "关闭详情" }));
+
+    await user.click(screen.getByRole("row", { name: /用户，帮我检查/ }));
+    expect(screen.getByText("第 1 轮 · 消息")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "来源" }));
+    expect(screen.getByRole("tabpanel")).toHaveTextContent(/kind.*user/);
+    await user.click(screen.getByRole("button", { name: "关闭详情" }));
+
+    // Double-clicking a turn's first row keeps the user message and folds the rest into one summary row.
+    await user.dblClick(screen.getByRole("row", { name: /用户，帮我检查/ }));
+    expect(screen.queryByRole("row", { name: /助手，Journal 保留/ })).not.toBeInTheDocument();
+    const summary = screen.getByRole("row", { name: /^已收起的轮次概述/ });
+    expect(summary).toHaveTextContent("2 个步骤 · 2 个工具调用");
+    await user.click(summary);
+    expect(screen.getByRole("row", { name: /助手，Journal 保留/ })).toBeInTheDocument();
   });
 
-  it("opens request boundaries and displays prompt changes with nested tool ancestry", async () => {
+  it("opens request details from the request dot without selecting the row, and shows prompt diffs and tool ancestry", async () => {
     const user = userEvent.setup();
     render(<TrajectoryView snapshot={loadTrajectoryFixture("errors")} />);
-    await user.click(screen.getByRole("button", { name: "Collapse nested tools" }));
-    expect(screen.queryByRole("button", { name: /TOOL tool\/call, bash.*session-journal/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Expand nested tools" }));
-    await user.click(screen.getByRole("button", { name: /ASSISTANT assistant\/message, Journal 保留/ }));
-    await user.click(screen.getByRole("button", { name: "Request #2" }));
-    expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["Summary", "Options", "Usage", "Timing"]);
-    await user.click(screen.getByRole("button", { name: "Close event details" }));
-    await user.click(screen.getAllByRole("button", { name: /SYSTEM request\/header, System Prompt Updated/ })[0]!);
-    expect(screen.getByRole("tab", { name: "Diff" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByLabelText("Prompt changes")).toHaveTextContent("+ 本轮只检查文件，不修改。");
-    await user.click(screen.getByRole("button", { name: "Close event details" }));
-    await user.click(screen.getByRole("button", { name: /TOOL tool\/call, bash.*session-journal/ }));
-    expect(screen.getByRole("button", { name: "Parent Tool" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Parent Tool" }));
+    await user.click(screen.getByRole("button", { name: "请求 #2" }));
+    expect(screen.getByRole("row", { name: /助手，Journal 保留/ })).not.toHaveAttribute("data-selected");
+    expect(screen.getByRole("button", { name: "请求 #2" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["概述", "选项", "用量", "计时"]);
+    await user.click(screen.getByRole("button", { name: "关闭详情" }));
+
+    await user.click(screen.getAllByRole("row", { name: /系统，系统提示词已更新/ })[0]!);
+    expect(screen.getByRole("tab", { name: "差异" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("本轮只检查文件，不修改。");
+    await user.click(screen.getByRole("button", { name: "关闭详情" }));
+
+    await user.click(screen.getByRole("row", { name: /子工具，bash.*session-journal/ }));
+    await user.click(screen.getByRole("button", { name: "工具调用" }));
+    expect(screen.getByRole("row", { name: /工具，read_file.*core-codecs/ })).toHaveAttribute("data-selected", "true");
     expect(screen.getByRole("tabpanel")).toHaveTextContent("80 lines read");
   });
 
   it("reveals earlier history in pages while retaining complete turn boundaries", async () => {
     const user = userEvent.setup();
     render(<TrajectoryView snapshot={loadTrajectoryFixture("long")} />);
-    const initial = screen.getAllByRole("row").length;
-    expect(screen.getAllByRole("row")[0]).toHaveTextContent("USER");
-    await user.click(screen.getByRole("button", { name: "Load earlier history" }));
-    expect(screen.getAllByRole("row").length).toBeGreaterThan(initial);
-    expect(screen.getAllByRole("row")[0]).toHaveTextContent("USER");
+    const records = () => document.querySelectorAll<HTMLTableRowElement>("tr[data-record-id]");
+    const initial = records().length;
+    expect(records()[0]).toHaveAttribute("data-kind", "user");
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "加载更早的历史" }));
+    expect(records().length).toBeGreaterThan(initial);
+    expect(records()[0]).toHaveAttribute("data-kind", "user");
   }, 15_000);
 
   it("selects the record a Context panel reveal points at and opens its details", async () => {
@@ -177,7 +207,7 @@ describe("TrajectoryView", () => {
     await userEvent.click(screen.getByRole("button", { name: "reveal" }));
     expect(onShowTrajectory).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getAllByRole("row").find((row) => row.getAttribute("data-event-seq") === "1")).toHaveAttribute("data-selected", "true"));
-    expect(screen.getByRole("button", { name: "Close event details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "关闭详情" })).toBeInTheDocument();
   });
 
   it("explains a reveal that does not match any loaded record", async () => {

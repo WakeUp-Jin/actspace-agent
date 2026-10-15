@@ -73,6 +73,12 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   // 工作区文件读取
   [contract.workspaces.readFile, shape({ workspaceRoot: "string?", relativePath: "string" }, "Invalid workspace file")],
   [contract.workspaces.statFile, shape({ workspaceRoot: "string?", relativePath: "string" }, "Invalid workspace file")],
+  [contract.workspaces.listFileApplications, shape({ workspaceRoot: "string?", relativePath: "string" }, "Invalid workspace file")],
+  [contract.workspaces.openFile, input => {
+    if (check(input, { workspaceRoot: "string?", relativePath: "string", applicationId: "string?" }, "Invalid workspace file")) return "Invalid workspace file";
+    const action = (input as Record<string, unknown>).action;
+    return action === "open" || action === "reveal" ? null : "Invalid workspace file action";
+  }],
   [contract.workspaces.listDir, shape({ workspaceRoot: "string?", relativePath: "string?" }, "Invalid workspace directory")],
   [contract.sessions.readArtifact, shape({ sessionId: "string", artifactPath: "string" }, "Invalid session artifact")],
   // 工作区路径

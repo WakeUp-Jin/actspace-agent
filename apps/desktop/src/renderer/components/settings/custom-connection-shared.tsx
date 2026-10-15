@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ArrowRight, Check, ChevronDown, ChevronLeft, CircleAlert, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, CircleAlert, Eye, EyeOff } from "lucide-react";
 import {
   customModelDraftFromCatalog,
   findBuiltinCatalogModel,
@@ -12,7 +12,7 @@ import {
   type ProviderConnectionErrorKind,
   type SettingsV4ConnectionSettings,
 } from "@actspace/shared";
-import { SettingsInput, StatusDot, Stepper } from "./SettingsPrimitives";
+import { PageHeader, SettingsInput, StatusDot, Stepper } from "./SettingsPrimitives";
 
 /** 自定义服务向导、官方 Anthropic 和连接详情共用的常量与小组件。 */
 
@@ -167,24 +167,9 @@ export function probeErrorResult(error: unknown): CustomConnectionProbeResult {
   return { ok: false, message: error instanceof Error ? error.message : "测试失败，请稍后重试。", checkedAt: new Date().toISOString(), models: null };
 }
 
-/** 添加和详情页共用的页头：返回链接、logo、标题和一行副标题。 */
+/** 添加和详情页共用的页头：标题行里的返回箭头、logo、标题和一行副标题。 */
 export function SetupHeader({ backLabel, onBack, logo, title, subtitle, children }: { backLabel: string; onBack: () => void; logo?: ReactNode; title: string; subtitle?: ReactNode; children?: ReactNode }) {
-  return (
-    <div>
-      <button type="button" onClick={onBack} className="-ml-1.5 inline-flex h-[26px] items-center gap-0.5 rounded-act-sm pl-1 pr-2 text-act-xs text-text-muted transition-colors hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30">
-        <ChevronLeft size={14} aria-hidden="true" />
-        {backLabel}
-      </button>
-      <div className="mt-2 flex items-center gap-3">
-        {logo ? <span className="shrink-0 [&>*]:h-10 [&>*]:w-10">{logo}</span> : null}
-        <div className="min-w-0">
-          <h3 className="text-act-lg font-semibold tracking-tight text-text-main">{title}</h3>
-          {subtitle ? <div className="mt-0.5 flex flex-wrap items-center gap-1 text-act-xs text-text-muted">{subtitle}</div> : null}
-        </div>
-      </div>
-      {children ? <div className="mt-4">{children}</div> : null}
-    </div>
-  );
+  return <PageHeader onBack={onBack} backLabel={backLabel} leading={logo} title={title} description={subtitle}>{children}</PageHeader>;
 }
 
 /** 表单底部：左侧提示，右侧按钮。 */
@@ -221,10 +206,11 @@ export function WizardSteps({ step }: { step: 1 | 2 }) {
 }
 
 /** 向导卡片里的一个竖排字段：标题在上，控件占满宽度。 */
+/** 一个字段一张发丝卡（方向 A）：标签在上，控件在下，卡片之间靠 mc-stack 的间距分开。 */
 export function FormField({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
   return (
-    <div className="px-4 py-3">
-      {htmlFor ? <label htmlFor={htmlFor} className="mb-1.5 block text-act-xs font-medium text-text-muted">{label}</label> : <span className="mb-1.5 block text-act-xs font-medium text-text-muted">{label}</span>}
+    <div className="mc-card mc-field">
+      {htmlFor ? <label htmlFor={htmlFor} className="mc-label">{label}</label> : <span className="mc-label">{label}</span>}
       {children}
     </div>
   );
@@ -245,13 +231,13 @@ export function SecretInput({ id, value, onChange, placeholder = "sk-…", ariaL
 /** 默认折叠的「更多设置」；折叠时在标题旁显示当前取值摘要。 */
 export function MoreSettings({ open, onToggle, summary, children }: { open: boolean; onToggle: () => void; summary?: string; children: ReactNode }) {
   return (
-    <div>
-      <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-act-sm text-text-muted transition-colors hover:text-text-main focus-visible:bg-hover-overlay focus-visible:outline-none">
+    <div className="mc-card p-0">
+      <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full items-center gap-2 rounded-act-xl px-3.5 py-3 text-left text-act-sm text-text-muted transition-colors hover:text-text-main focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring">
         <span className="font-medium">更多设置</span>
         {summary && !open ? <span className="min-w-0 truncate text-act-xs text-text-faint">{summary}</span> : null}
         <ChevronDown size={14} aria-hidden="true" className={`ml-auto shrink-0 transition-transform duration-(--motion-base) ${open ? "rotate-180" : ""}`} />
       </button>
-      {open ? <div className="grid gap-3 px-4 pb-3">{children}</div> : null}
+      {open ? <div className="grid gap-3 px-3.5 pb-3.5">{children}</div> : null}
     </div>
   );
 }
@@ -259,7 +245,7 @@ export function MoreSettings({ open, onToggle, summary, children }: { open: bool
 /** 测试结果：成功（附模型数）、失败（标题 + 原因）、或「需要重新测试」。 */
 export function ProbeResultNotice({ state, authMode }: { state: ProbeState; authMode?: CustomConnectionAuthMode }) {
   if (state.status === "idle") return null;
-  const box = "mx-4 my-3 flex items-start gap-2 rounded-act-md px-3 py-2.5 text-act-xs leading-relaxed";
+  const box = "flex items-start gap-2 rounded-act-md px-3 py-2.5 text-act-xs leading-relaxed";
   if (state.status === "running") return <div role="status" className={`${box} bg-surface-subtle text-text-muted`}><span className="mt-0.5 h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-line-strong border-t-transparent motion-reduce:animate-none" aria-hidden="true" />正在测试…</div>;
   if (state.status === "stale") return <div role="status" className={`${box} bg-warning-soft text-warning`}><CircleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" />连接信息已修改，需要重新测试</div>;
   if (!("result" in state)) return null;

@@ -13,6 +13,8 @@ export type CoreContributorOptions = {
   readonly instructions: readonly RuntimeInstructionSource[];
   readonly skills: SkillCatalog;
   readonly profile?: "agent" | "chat";
+  /** Agent mode exposes `present`; its output-choice guidance is omitted elsewhere. */
+  readonly deliverables?: boolean;
 };
 
 const HOST_INSTRUCTION_OWNER = "@actspace/prompt";
@@ -24,6 +26,7 @@ export function createCoreContributors(options: CoreContributorOptions): readonl
     contributor(options.scopeId, "core/safety", "core", 10, "prompt-section", chat ? chatSafety() : coreSafety()),
     contributor(options.scopeId, "core/agent-descriptor", "profile", 0, "model-fact", { agent: options.agent }),
   ];
+  if (!chat && options.deliverables) contributors.push(contributor(options.scopeId, "core/output-choice", "core", 20, "prompt-section", coreOutputChoice()));
   if (!chat) contributors.push(
     contributor(options.scopeId, "host/workspace-facts", "host", 0, "model-fact", {
       workspaceRoot: options.workspaceRoot,
@@ -88,6 +91,15 @@ function coreSafety(): string {
     "- Do not expose credentials, private transport state, or hidden reasoning in responses or tool arguments.",
     "- Follow user and workspace instructions unless they conflict with a higher-priority runtime safety rule. User instructions take priority over conflicting workspace instructions.",
   ].join("\n");
+}
+
+function coreOutputChoice(): string {
+  return [
+    "Prefer showing the primary results within your final response alongside a brief explanation.",
+    "Do not call present just to list edited source files, or run commands to check whether a diff view will appear.",
+    "Use present when a separate file card helps the user open the complete deliverable, including images, Office documents, spreadsheets, and slide decks. Each presented file adds a card below the reply, with preview and native-open actions.",
+    "Avoid repeating results already shown inline unless the separate card adds useful access.",
+  ].join(" ");
 }
 
 function chatIdentity(): string {

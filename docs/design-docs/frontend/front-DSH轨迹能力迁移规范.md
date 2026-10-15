@@ -34,7 +34,7 @@ Session Journal
 - DSH 运行时的 `Map`、类实例和回调不跨 IPC；IPC/preload 只传 JSON-safe DTO，renderer 内再恢复索引结构。
 - 保留 `ConversationLocation` 的 session / turn / step / unresolved 层级，以便 request inheritance、timeline 和详情定位。
 - 保留 `eventSeq`、`throughJournalSeq`、`sessionId`，并在 cell 上记录 `sourceSeq` / `sourceSequences` / `rawRef`。
-- 使用 ActSpace 主题 token，不复制 DSH CSS 颜色字面量。
+- 颜色取 DSH 的浅色、深色值，但写成 `tokens.css` 的 `--act-trajectory-*` 变量，组件和 `styles/trajectory.css` 只引用变量；轨迹页不跟随强调色（2026-10-14 起）。
 - Composer 继续由 ActSpace Conversation Shell 持有，Trajectory 只作为中心 viewport 内容，不卸载 Shell。
 
 ## 事件显示规则
@@ -76,7 +76,7 @@ Session Journal
 - Assistant Summary / Preview / Raw 共用工具记录导航；Raw 显示原始内容块，完整事件 JSON 仍在 Source events。缺失调用显示不可用入口。Tool Hierarchy 返回父工具或所属 Assistant。仅有工具侧明确归属、没有模型内容块的旧数据，可以在 Preview 展示引用，但不虚构 Raw 块。
 - 关联跳转恢复目标所在 Turn、工具组与父工具折叠，扩展本地历史窗口；只有搜索或时间范围排除目标时才解除对应条件。时间轴随选中记录定位。
 - Schema 从工具事件携带定义或该调用所属请求的 tools 快照读取，展示名称、描述和完整参数定义；不读取当前全局工具注册表。缺失明确请求/归属时不把后来同名工具定义套到旧调用上。Payload 是本次实参，与 Schema 分离。
-- ledger 移除请求编号小标记；Assistant Summary 的 Source → Request #N 入口继续提供请求详情。
+- ~~ledger 移除请求编号小标记~~：2026-10-14 恢复 DSH 的请求圆点，见下文「DSH 对齐实现」。
 - 以上仍属于 renderer fixture / 关联适配阶段；Phase 5 需独立核对真实 Journal 字段与 IPC 契约。
 
 ## Phase 5 真实接入（2026-09-06）
@@ -93,4 +93,69 @@ Session Journal
 
 ## 输入区可见性（2026-09-06）
 
-轨迹视图隐藏整个底部输入区，包括 Review、输入框、模型选择与底部状态；使用隐藏布局而非卸载 Composer，切回会话保留草稿、附件和模型。运行中在轨迹顶部提供 Stop，调用原有 abort；切换视图不影响运行。
+轨迹视图隐藏整个底部输入区，包括 Review、输入框、模型选择与底部状态；使用隐藏布局而非卸载 Composer，切回会话保留草稿、附件和模型。运行中在轨迹工具栏最右侧（搜索框右边）提供「停止」，调用原有 abort；切换视图不影响运行。DSH 为浮动输入框预留的底部空白不搬（2026-10-14）。
+
+## DSH 对齐实现（2026-10-14）
+
+计划：`docs/exec-plans/active/20261014-trajectory-dsh-parity.md`。本节取代上文 2026-09-06 各节里与之冲突的描述（英文文案、`Summary/Payload` 页签名、单独的 Stop 行、去掉请求标记）。
+
+**数据流**
+
+```text
+RuntimeV2TrajectorySnapshot（projectTrajectoryWindow，同一事件对象只转换一次）
+  -> splitLiveChunks（live.ts：定稿节点 / 正在输出的 chunk 组，定稿键 settledKey）
+  定稿层（settledKey 不变就不重算）：
+    -> buildTrajectorySnapshot（builder.ts：Journal 节点 -> 语义记录；正在输出的助手只留空占位）
+    -> deriveLayout（layout.ts + requests.ts：Turn -> Group -> Cell，请求视图与编号）
+    -> flattenLayout / filterRows / collapseTurns / collapseAssistants（表格行）
+    -> deriveTimeline（timeline.ts，按 [定稿布局, 模式] 缓存）
+  流式层（每帧）：
+    -> createLiveAccumulator（只折叠新到的 chunk）-> streamingCells（按 recordId 的流式 cell）
+  搜索：TrajectorySearchIndex（search-index.ts，按 recordId 增量，3 秒节流）
+  -> TrajectoryToolbar / TrajectoryTimeline / TrajectoryTable / details/*（表格和详情按 recordId 把占位换成流式 cell）
+```
+
+**类型映射**：builder 记录映射成 DSH 的 7 种 cell：系统、用户、上下文、助手、工具、子工具（有 `parentCallId`）、已压缩。
+
+- 上下文行有两种来源：`plugin/actspace.context/supplement` 的 `op=add`，以及 `source=task_notification` 的 inbox claim。`remove`、`bind` 不进主表。
+- 审批并入工具行（概述里的「审批」字段）。
+- 重试、错误并入请求视图（「重试」「上次尝试错误」「错误」）。
+- 其余原始事件不进主表。
+
+**请求**：每个步骤一个请求视图，key 是 `turnId\u0000stepId`。同一步骤的重试会换新的 requestId，它们折进同一个视图。压缩也算一次请求。编号按 Journal 顺序，加历史偏移。
+
+- 请求圆点贴在每个请求组里第一条非输入行上。
+- 还没有可见记录的请求显示为占位行（零高度，只有圆点）。
+
+**状态**：按 DSH 的 5 条规则（`status.ts`），显示为「已完成」「等待中」「失败」。
+
+**详情页签**（`detail-tabs.ts`）：
+
+| 选中 | 页签 |
+| --- | --- |
+| 系统 | 差异（有前一版）/ 系统提示词 / 工具 |
+| 用户、上下文、助手 | 概述 / 预览 / 原始内容 / 来源（有来源时） |
+| 工具 | 概述 / 参数 / 结果 / Schema / 计时 |
+| 已压缩 | 概述 / 原始输出 |
+| 请求 | 概述 / 选项（有选项时）/ 用量 / 计时 |
+
+换选中对象时，回到最近用过且新对象也有的页签。不做 `run_code` 代码页签。
+
+**样式**：DSH 的 CSS module 移植成全局的 `styles/trajectory.css`（前缀 `tjv-`、`tjb-`、`tjl-`、`tj-`）和 `styles/json-tree.css`。原因是 DSH 依赖伪元素、容器查询和属性选择器，用 Tailwind 类无法一比一还原。
+
+**流式**（照 DSH `finalized` + `streamingCells`，计划 `docs/exec-plans/active/20261014-trajectory-streaming-split.md`）：
+
+- 数据源（`use-trajectory-source.ts`）把 projection 更新合并到每个动画帧一次。
+- 拆分（`live.ts`）：一组 `assistant/chunk` 没有被 `assistant/message` 收尾、所在轮次也没有 `turn/end` 时，算正在输出。它的 `tool-call-delta` 对上了已落盘的 `tool/call` 时，仍算定稿（那个工具要靠它的内容关联助手）。
+- 定稿层：builder 只拿到每组的第一个 chunk 和第一个非空 chunk，生成正文为空的占位记录（id、计时、首 token 时间与完整结果相同）。定稿键由会话、历史起点、定稿节点数、首尾序号和每组的结构签名组成；流式期间只有 chunk 在长，键不变，builder、布局、时间轴都不重算。
+- 流式层：累加器按 recordId 记住处理到第几个 chunk，每帧只追加新增部分，再把正文、思考、工具调用块、`sourceSequences`、`raw` 合进占位 cell。拆分路径和不拆分时的结果逐帧相等（`trajectory-live.test.ts`）。
+- 表格渲染时按 recordId 用流式 cell 换掉占位 cell（DSH `TrajectoryTable` 的 `currentRecord`）；详情选中这条助手时也用流式 cell，正文实时变长。行组件按显示字段比较，只有这一行重渲，DOM 不重挂载。
+- 搜索索引按 recordId 增量更新，记录对象没变就复用文本；首次立即建立，之后最多每 3 秒更新一次，所以新流式出的文字最多晚 3 秒能搜到（DSH 同样如此）。
+- 开发态用 `?trajectoryFixture=streaming` 或 `streaming-long` 回放。
+
+**不包含**：
+
+- 实际时间开关：只隐藏，`time`、`actual` 模式留在纯函数里。
+- 代码页签、语法高亮。
+- 独立轨迹标签页。
+- 增量 builder：chunk 不再触发重建，但普通事件（工具调用、工具结果、请求头）到达时定稿层仍全量重建；`streaming-long`（4232 个节点）约 10ms。

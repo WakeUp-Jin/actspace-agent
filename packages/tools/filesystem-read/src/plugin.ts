@@ -5,7 +5,7 @@ import { isPathWithin, type ToolGrantSuggestion } from "@actspace/tools-runtime"
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tools-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
-import { FILESYSTEM_READ_PLUGIN_ID, FILESYSTEM_READ_TOOLS } from "./manifest.js";
+import { FILESYSTEM_READ_PLUGIN_ID, FILESYSTEM_READ_TOOLS, PRESENT_MAX_FILES } from "./manifest.js";
 
 export type ToolName = (typeof FILESYSTEM_READ_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
@@ -69,6 +69,7 @@ const READ = ["filesystem.read"] as const;
 export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
   definition("read_file", "Read a targeted line range from a workspace file. Prefer small ranges and page with offset/limit.", READ, "read-only", objectSchema({ path: stringSchema("File path, absolute or relative to workspace."), offset: integerSchema("Starting line, 1-based.", 1), limit: integerSchema("Maximum lines to read.", 1), force: { type: "boolean", default: false } }, ["path"])),
   definition("list_directory", "List files and subdirectories in a workspace directory. Use read_file for contents.", READ, "read-only", objectSchema({ path: stringSchema("Directory path, absolute or relative to workspace.") }, ["path"])),
+  definition("present", "Declare existing files as final deliverables for the user. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied.", READ, "read-only", objectSchema({ files: { type: "array", description: "Usually the 1-2 most important deliverables; at most 4 per call.", minItems: 1, maxItems: PRESENT_MAX_FILES, items: objectSchema({ path: stringSchema("Path of an existing regular file in the workspace. Relative paths use the workspace root."), description: { type: "string", description: "Brief description for the user." } }, ["path"]) } }, ["files"])),
 ]);
 function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
   return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: FILESYSTEM_READ_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });

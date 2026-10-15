@@ -17,6 +17,8 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   listWorkspaceDir: "runtime-v2:fixed-renderer:list-workspace-dir",
   readWorkspaceFile: "runtime-v2:fixed-renderer:read-workspace-file",
   statWorkspaceFile: "runtime-v2:fixed-renderer:stat-workspace-file",
+  listWorkspaceFileApplications: "runtime-v2:fixed-renderer:list-workspace-file-applications",
+  openWorkspaceFile: "runtime-v2:fixed-renderer:open-workspace-file",
   readSessionArtifact: "runtime-v2:fixed-renderer:read-session-artifact",
   showArtifactContextMenu: "runtime-v2:fixed-renderer:show-artifact-context-menu",
   initGitRepository: "runtime-v2:fixed-renderer:init-git-repository",

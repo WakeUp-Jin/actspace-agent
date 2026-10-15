@@ -115,7 +115,7 @@ describe("buildInterimPanelView", () => {
     const { view: interim } = buildInterimPanelView({
       sessionId: "s1",
       contextState,
-      activity: { turnCount: 3, completedTurnCount: 3, stepCount: 9, activeTurnId: null, activeStepId: null, compactionCount: 1, activeCompactionId: null, lastCompactionSummary: null },
+      activity: { turnCount: 3, completedTurnCount: 3, stepCount: 9, activeTurnId: null, activeStepId: null, compactionCount: 1, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } },
       usage: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 90, cacheWriteTokens: 0, totalTokens: 105, costUsd: null },
     });
     expect(interim.model).toBeNull();

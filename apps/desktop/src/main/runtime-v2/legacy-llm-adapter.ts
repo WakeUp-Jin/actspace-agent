@@ -47,7 +47,9 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     const reasoningEffort = reasoning === false ? undefined
       : effort && (capabilities === undefined || capabilities.reasoningEfforts === null || capabilities.reasoningEfforts?.includes(effort)) ? effort
       : capabilities?.reasoningDefaultEffort;
+    // Options enter the JSON request snapshot, so an unresolved value is omitted rather than undefined.
     const requestOptions = { ...requestedOptions, reasoning, reasoningEffort };
+    for (const key of Object.keys(requestOptions) as (keyof typeof requestOptions)[]) if (requestOptions[key] === undefined) delete requestOptions[key];
     const customConnection = Boolean(model.connectionId && model.connectionId !== `${model.definition.provider}:default`);
     if (customConnection && requestedOptions.reasoningEffort && !capabilities?.reasoningEfforts?.includes(requestedOptions.reasoningEffort)) throw new Error("该模型未配置此推理强度，请在模型设置中确认支持的档位。");
     // Auto is an omitted effort, including when the UI explicitly enables reasoning.

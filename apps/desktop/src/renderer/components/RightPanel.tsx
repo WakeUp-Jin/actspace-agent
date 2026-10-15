@@ -17,6 +17,7 @@ import { HtmlRenderView } from "./right-panel/HtmlRenderView";
 import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
 import { ReplyHtmlRenderView } from "./right-panel/ReplyHtmlRenderView";
 import { ReviewRenderView } from "./right-panel/ReviewRenderView";
+import { TurnReviewView } from "./turn-tail/TurnReviewView";
 import { WorkspaceFileTree } from "./right-panel/WorkspaceFileTree";
 import { RightPanelTabStrip } from "./right-panel/RightPanelTabStrip";
 import { RightPanelLauncherList, type RightPanelLauncherItem } from "./right-panel/RightPanelLauncherList";
@@ -126,7 +127,7 @@ function WorkspaceFileEmpty() {
 }
 
 function isDevelopmentTab(tab: RightPanelTab): boolean {
-  return isWorkspaceFileTab(tab) || ["review", "subagents", "terminal", "terminalStarting", "terminalError"].includes(tab.kind);
+  return isWorkspaceFileTab(tab) || ["review", "turnReview", "subagents", "terminal", "terminalStarting", "terminalError"].includes(tab.kind);
 }
 
 // 展示部分在 RightPanelTabStrip；这里只管普通会话的 Tab 来源和终端的异步关闭。
@@ -253,6 +254,8 @@ function RightPanelBody({
       />
     );
   }
+
+  if (tab.kind === "turnReview") return <TurnReviewView tab={tab} />;
 
   if (tab.kind === "terminal") {
     return (

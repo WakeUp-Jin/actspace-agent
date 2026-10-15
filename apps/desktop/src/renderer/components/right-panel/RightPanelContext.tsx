@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { TerminalSessionSnapshot, WorkspaceDirEntry } from "@actspace/shared";
 import { terminalDisplayTitle } from "./terminal-title";
+import type { TurnChanges } from "../turn-tail/turn-tail-data";
 
 /**
  * 右侧面板的 Tab 模型。`id` 同时是去重 key：用稳定 id（如 `context`、`html:<agentRunId>`、
@@ -31,6 +32,8 @@ export type RightPanelTab = { id: string } & (
   | { kind: "subagents"; title: string; sessionId: string; selected?: Extract<import("@actspace/shared").MessageBlock, { kind: "agent" }> }
   | { kind: "context"; title: string }
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
+  // 某一轮的改动快照（轮尾改动卡点开）；index 是要选中的文件，revision 每次点击递增，让同一 Tab 重新跳到该文件。
+  | { kind: "turnReview"; title: string; changes: TurnChanges; index: number; revision: number; sessionId: string | null; workspaceRoot?: string }
   | { kind: "replyHtml"; title: string; sessionId: string | null }
   | { kind: "terminalStarting"; title: string; requestId: string; sessionId: string }
   | { kind: "terminalError"; title: string; sessionId: string; message: string }
