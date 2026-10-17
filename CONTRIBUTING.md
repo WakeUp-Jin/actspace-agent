@@ -9,6 +9,10 @@
 - 如果行为变了，就一起更新代码、文档、测试和 release/history 记录。
 - 遇到跨度大、风险高、会分多轮推进的任务，先在 `docs/exec-plans/active/` 下建 execution plan。
 
+## 分支与 PR 流程
+
+功能和 Bug 修复统一采用：从最新 main 开独立分支 → 实现与验证 → 推送任务分支 → 创建 PR → 评审者审核并合并 → 本地 main 执行 `git pull --ff-only origin main`。不直接在 main 开发或推送，不复用已合并任务分支。完整规则见 [仓库协作约定](docs/REPO_COLLAB_GUIDE.md#功能开发与-bug-修复的默认交付流程)。
+
 ## 发起 Pull Request 之前
 
 - 运行 `npm run ci`。
