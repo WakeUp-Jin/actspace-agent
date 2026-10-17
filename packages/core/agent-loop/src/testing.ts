@@ -10,6 +10,7 @@ import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
 
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {
+  stream?: () => AsyncIterable<LlmStreamEvent>;
   subagent?: boolean;
   contextSources?: import("@actspace/context-engine").ContextSourceRegistry;
   inputSource?: import("./loop.js").LoopInputSource;
@@ -60,6 +61,7 @@ export async function runToolStreamFixture(options: {
       options.onRequest?.(input.request.options);
       options.onTools?.(input.request.tools);
       options.onMessages?.(input.request.messages);
+      if (options.stream) { yield* options.stream(); return; }
       if (options.terminalOnly) {
         requests += 1;
         yield { type: "text-delta", text: "Done." };

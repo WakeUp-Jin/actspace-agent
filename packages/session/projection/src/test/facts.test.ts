@@ -85,3 +85,37 @@ it("restores a process grant and replays its revocation", () => {
   journal.append({ type: "permission/grant-revoked", eventVersion: 1, source, data: { schemaVersion: 1, grantId: "bash-g", sessionId: header.sessionId, agentId: "main:todos", revokedAt: "2026-10-11T01:00:00Z" }, surface: null });
   expect(reload()).toEqual([]);
 });
+
+
+it.each([false, true])("settles failed attempts without retry wait (stop during wait=%s)", (stop) => {
+  const codecs = createCoreCodecRegistry();
+  let second = 0;
+  const journal = new SessionJournal({ registry: codecs, now: () => new Date(Date.UTC(2026, 9, 16, 0, 0, second)).toISOString() });
+  const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value);
+  const append = (at: number, type: string, data: Record<string, unknown>) => { second = at; registry.apply("retry", journal.append({ type, eventVersion: 1, source, data: { turnId: "t", ...data } as never, surface: null })); };
+  append(0, "turn/start", { turnId: "t" });
+  append(0, "step/start", { stepId: "s" });
+  append(1, "request/header", { stepId: "s", requestId: "r1" });
+  append(1, "request/context", { stepId: "s", requestId: "r1" });
+  append(4, "llm/retry", { requestId: "r1", retryId: "retry", attempt: 1, nextAttempt: 2, delayMs: 1000, failure: { kind: "unknown", message: "retry", retryable: true, attempt: 1 } });
+  if (!stop) {
+    append(5, "request/header", { stepId: "s", requestId: "r2" });
+    append(5, "request/context", { stepId: "s", requestId: "r2" });
+    append(6, "assistant/chunk", { stepId: "s", messageId: "m", chunkIndex: 0, content: "hi" });
+    append(9, "assistant/message", { stepId: "s", requestId: "r2", messageId: "m", usage: { outputTokens: 30 } });
+  }
+  append(10, "step/end", { stepId: "s", reason: stop ? "aborted" : "completed" });
+  const timing = (registry.snapshot("retry").values.sessionStats as { timing: unknown }).timing;
+  expect(timing).toEqual({ llmMs: stop ? 3000 : 7000, ttftMs: stop ? 0 : 1000, ttftSteps: stop ? 0 : 1, decodeMs: stop ? 0 : 3000, decodeTokens: stop ? 0 : 30 });
+  const replay = new SessionProjectionRegistry(); registerSessionFacts(replay, value => value); replay.sync("retry", journal.events);
+  expect((replay.snapshot("retry").values.sessionStats as { timing: unknown }).timing).toEqual(timing);
+});
+
+
+it("rejects old timing checkpoints so history can rebuild under the retry-aware version", () => {
+  const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value);
+  const checkpoint = registry.checkpoint("old");
+  const old = { ...checkpoint, rows: { ...checkpoint.rows, sessionStats: { ...checkpoint.rows.sessionStats!, stateVersion: 2 } } };
+  expect(() => registry.restore("old", old)).toThrow("version mismatch: sessionStats");
+  expect(registry.stateVersions.sessionStats).toBe(3);
+});

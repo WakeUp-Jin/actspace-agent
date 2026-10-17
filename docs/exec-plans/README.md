@@ -34,6 +34,8 @@
 
 ## 最近完成
 
+- [main 新增功能与轨迹遗留项统一验收](completed/20261015-main-frontend-acceptance.md)：2026-10-16验收收束，60项53通过/5失败/2部分覆盖，4个Bug与O01观察完整交接；只验收未修复，见[摘要](../exec-runs/20261015-main-frontend-acceptance/execution-summary.md)与[台账](../exec-runs/20261015-main-frontend-acceptance/acceptance.md)。
+
 - [默认工作区改为首次启动兜底](completed/20261015-default-workspace-first-run.md)：2026-10-15 实现与自动化验证完成（未提交，分支 `fix/session-default`）；只剩 Electron 实机验收，见[执行摘要](../exec-runs/20261015-default-workspace-first-run/execution-summary.md)。
 - [Context 面板与 SQLite 联合实施](completed/20261011-context-sqlite-integration/README.md)：实现和本轮验收收尾，M/Small结果见报告；用户取消L剩余长测，保留测试失败及资源观察边界。
 - [使用统计 SQLite 统一验收](completed/20261011-usage-sqlite-acceptance.md)：联合验收子计划同步收尾，已接受性能限制和未验证范围原样保留。

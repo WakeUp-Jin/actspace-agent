@@ -20,7 +20,7 @@ export type AgentMessageBlock = Extract<MessageBlock, { kind: "agent" }>;
 export type ReadMessageBlock = Extract<MessageBlock, { kind: "read" }>;
 export type AgentTranscriptHandler = (message: AgentMessageBlock) => void;
 
-const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-act-sm leading-[1.4] text-text-faint";
+const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-act-sm leading-[1.4]";
 const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const MODEL_WAITING_DELAY_MS = 300;
 
@@ -103,7 +103,7 @@ export function renderMessage(
       return (
         <div
           key={renderKey}
-          className={`${TURN_STATUS_LINE_CLASS}${message.tone === "error" ? ` ${TURN_STATUS_LINE_ERROR_CLASS}` : ""}`}
+          className={`${TURN_STATUS_LINE_CLASS}${message.tone === "error" ? ` ${TURN_STATUS_LINE_ERROR_CLASS}` : " text-text-faint"}`}
         >
           {message.content}
         </div>
@@ -156,7 +156,7 @@ function ModelWaitingStatus({ content }: { content: string }) {
 
   return (
     <div
-      className={`${TURN_STATUS_LINE_CLASS} px-[var(--conversation-text-inset)]`}
+      className={`${TURN_STATUS_LINE_CLASS} text-text-faint px-[var(--conversation-text-inset)]`}
       role="status"
       aria-live="polite"
     >

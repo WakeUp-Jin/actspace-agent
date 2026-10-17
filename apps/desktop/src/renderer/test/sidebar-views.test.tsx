@@ -196,3 +196,21 @@ describe("Sidebar views", () => {
     expect(screen.getByRole("button", { name: "beta" })).toHaveAttribute("aria-expanded", "false");
   });
 });
+
+
+it("restores search focus on explicit close but respects outside focus", async () => {
+  renderSidebar();
+  const user = userEvent.setup();
+  const trigger = screen.getByRole("button", { name: "搜索会话" });
+  await user.click(trigger);
+  await user.keyboard("{Escape}");
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  await user.click(screen.getByRole("button", { name: "关闭搜索" }));
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  const outside = screen.getByRole("button", { name: "已置顶" });
+  await user.click(outside);
+  expect(outside).toHaveFocus();
+  expect(screen.queryByRole("search")).not.toBeInTheDocument();
+});

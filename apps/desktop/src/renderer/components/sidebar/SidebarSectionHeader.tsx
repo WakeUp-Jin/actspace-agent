@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { ChevronDown, Search, X } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
 import { NAV_SECTION_LABEL_BASE_CLASS, NAV_SECTION_ACTIONS_CLASS } from "./styles";
@@ -47,7 +47,7 @@ export function SidebarSectionHeader({ label, collapsed, onToggle, actions, over
 type SidebarSearchBoxProps = {
   query: string;
   onQueryChange: (query: string) => void;
-  onClose: () => void;
+  onClose: (restoreFocus: boolean) => void;
 };
 
 /** 标题行里展开的搜索框：Esc 或 ✕ 关闭；输入为空时点别处也关闭，有内容时保留。 */
@@ -71,13 +71,13 @@ export function SidebarSearchBox({ query, onQueryChange, onClose }: SidebarSearc
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(); }
+          if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(true); }
         }}
         onBlur={(event) => {
-          if (!query.trim() && !event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) onClose();
+          if (!query.trim() && !event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) onClose(false);
         }}
       />
-      <IconButton size="xs" label="关闭搜索" tooltip={false} onClick={onClose}>
+      <IconButton size="xs" label="关闭搜索" tooltip={false} onClick={() => onClose(true)}>
         <X size={13} strokeWidth={1.9} aria-hidden="true" />
       </IconButton>
     </div>
@@ -85,9 +85,9 @@ export function SidebarSearchBox({ query, onQueryChange, onClose }: SidebarSearc
 }
 
 /** 标题行里的搜索图标按钮。 */
-export function SidebarSearchButton({ onOpen }: { onOpen: () => void }) {
+export function SidebarSearchButton({ onOpen, buttonRef }: { onOpen: () => void; buttonRef?: Ref<HTMLButtonElement> }) {
   return (
-    <IconButton className="sidebar-search-button" size="xs" label="搜索会话" tooltip="搜索会话" onClick={onOpen}>
+    <IconButton ref={buttonRef} className="sidebar-search-button" size="xs" label="搜索会话" tooltip="搜索会话" onClick={onOpen}>
       <Search size={13} strokeWidth={1.9} aria-hidden="true" />
     </IconButton>
   );
