@@ -54,6 +54,15 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
         tool(toolResults.length ? "write_file" : "bash", toolResults.length ? { path: "result.txt", content: "Fixture result.\n" } : { command: "pwd", intent: "隔离验收审批", requiredPermissions: ["no_sandbox"] });
       if (body.tools?.length && content.includes("FIXTURE_LONG") && toolResults.length < 12)
         tool("write_file", { path: "history-result.txt", content: `History step ${toolResults.length}` });
+      if (body.tools?.length && content.includes("FIXTURE_BASH_PAIR") && toolResults.length < 2)
+        tool("bash", { command: `printf acceptance-${toolResults.length + 1}`, intent: "连续 Bash 权限验收" });
+      if (body.tools?.length && content.includes("FIXTURE_BASH_DENIED") && toolResults.length === 0)
+        tool("bash", { command: "printf acceptance | cat", intent: "验证现有管道硬拒绝" });
+      if (body.tools?.length && content.includes("FIXTURE_BASH_BACKGROUND") && toolResults.length < 3) {
+        const taskId = JSON.stringify(toolResults).match(/bash_[0-9a-f-]+/)?.[0];
+        if (toolResults.length === 0) tool("bash", { command: "printf ready; sleep 30", intent: "后台生命周期验收", blockMs: 50 });
+        else if (taskId) tool(toolResults.length === 1 ? "bash_output" : "bash_kill", { taskId });
+      }
       if (isSummary) delta = { role: "assistant", content: "Fixture summary: preserve the task, verified results and pending work." };
       if (isTitle) delta = { role: "assistant", content: "Fixture automatic title" };
       const holdKind = isTitle ? "title" : isSummary ? "summary" : "run";

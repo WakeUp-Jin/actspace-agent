@@ -13,6 +13,7 @@ describe("PermissionModeControl", () => {
 
     render(<PermissionModeControl sessionId="session-1" mode="default" disabled={false} onChanged={onChanged} />);
     const trigger = screen.getByRole("button", { name: "会话权限模式" });
+    expect(trigger).toHaveAttribute("title", expect.stringContaining("自动批准通过策略检查的 Bash"));
     await user.click(trigger);
     expect(screen.getByRole("menuitemradio", { name: "自动" })).toHaveAttribute("aria-checked", "true");
     await user.click(screen.getByRole("menuitemradio", { name: "完全权限" }));

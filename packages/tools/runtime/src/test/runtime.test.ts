@@ -99,6 +99,81 @@ function success(summary = "ok"): ToolBodyResult {
 }
 
 describe("Tool Runtime execution contract", () => {
+  it.each(["user-denied", "timeout", "aborted"] as const)("does not turn a settled %s into approval on mode change", async code => {
+    let mode: "default" | "full-access" = "default";
+    let listener: (() => void) | undefined;
+    let decide!: () => void; let ready!: () => void;
+    const requested = new Promise<void>(resolve => { ready = resolve; });
+    const execute = vi.fn(async () => success());
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute }, permission: {
+      extractResources: () => [], evaluate: (_a, _r, c) => c.mode === "full-access" ? { kind: "allow" } : { kind: "ask", reason: "risk", risk: "high" },
+    } });
+    const pending = runtime.executeBatch([call("denial-race")], {
+      ...environment([], { approvalBroker: { requestApproval: request => new Promise(resolve => {
+        decide = () => resolve({ requestId: request.requestId, kind: "deny", code, decidedAt: new Date().toISOString() }); ready();
+      }) } }), permissionMode: () => mode,
+      subscribePermissionMode: callback => { listener = callback; return () => { listener = undefined; }; },
+    });
+    await requested; decide(); mode = "full-access"; listener?.();
+    expect((await pending)[0]?.status).toBe("denied");
+    expect(execute).not.toHaveBeenCalled(); expect(listener).toBeUndefined();
+  });
+
+  it("rechecks hard denial after mode invalidation", async () => {
+    let mode: "default" | "full-access" = "default";
+    let listener: (() => void) | undefined;
+    let ready!: () => void; const requested = new Promise<void>(resolve => { ready = resolve; });
+    const execute = vi.fn(async () => success()); const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute }, permission: {
+      extractResources: () => [], evaluate: (_a, _r, c) => c.mode === "full-access" ? { kind: "deny", code: "POLICY_DENIED", reason: "still forbidden" } : { kind: "ask", reason: "risk", risk: "high" },
+    } });
+    const pending = runtime.executeBatch([call("recheck-deny")], {
+      ...environment([], { approvalBroker: { requestApproval: (request, signal) => new Promise(resolve => {
+        signal.addEventListener("abort", () => resolve({ requestId: request.requestId, kind: "deny", code: "aborted", decidedAt: new Date().toISOString() })); ready();
+      }) } }), permissionMode: () => mode,
+      subscribePermissionMode: callback => { listener = callback; return () => { listener = undefined; }; },
+    });
+    await requested; mode = "full-access"; listener?.();
+    expect((await pending)[0]).toMatchObject({ status: "denied", failure: { code: "POLICY_DENIED" } });
+    expect(execute).not.toHaveBeenCalled(); expect(listener).toBeUndefined();
+  });
+
+  it("does not execute when full-access is downgraded during the durability checkpoint", async () => {
+    let mode: "default" | "full-access" = "full-access";
+    const execute = vi.fn(async () => success()); const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute }, permission: { extractResources: () => [], evaluate: () => ({ kind: "allow" }) } });
+    const result = await runtime.executeBatch([call("downgrade")], { ...environment([], { checkpoint: async () => { mode = "default"; } }), permissionMode: () => mode });
+    expect(result[0]).toMatchObject({ status: "failed", failure: { code: "PERMISSION_STATE_CHANGED" } });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("re-evaluates a pending approval on mode change and cleans up its request", async () => {
+    let mode: "default" | "full-access" = "default";
+    let listener: (() => void) | undefined;
+    let requested!: () => void;
+    const ready = new Promise<void>(resolve => { requested = resolve; });
+    const cleanup = vi.fn(); const execute = vi.fn(async () => success());
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute }, permission: {
+      extractResources: () => [],
+      evaluate: (_args, _resources, context) => context.mode === "full-access" ? { kind: "allow" } : { kind: "ask", reason: "approval", risk: "high" },
+    } });
+    const pending = runtime.executeBatch([call("switch")], {
+      ...environment([], { permissionRecords: records, approvalTimeoutMs: 100, approvalBroker: { requestApproval: (request, signal) => new Promise(resolve => {
+        signal.addEventListener("abort", () => { cleanup(); resolve({ requestId: request.requestId, kind: "deny", code: "aborted", decidedAt: new Date().toISOString() }); });
+        requested();
+      }) } }),
+      permissionMode: () => mode,
+      subscribePermissionMode: (callback: () => void) => { listener = callback; return () => { listener = undefined; }; },
+    });
+    await ready; mode = "full-access"; listener?.();
+    expect((await pending)[0]).toMatchObject({ status: "completed" });
+    expect(execute).toHaveBeenCalledTimes(1); expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(listener).toBeUndefined();
+    expect(records.filter(item => item.type === "permission/decided")).toHaveLength(1);
+  });
   it("denies a registered tool outside the caller scope before dispatch", async () => {
     const trace: string[] = [];
     const permissionEvents: string[] = [];
