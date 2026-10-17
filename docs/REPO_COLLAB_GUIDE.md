@@ -19,6 +19,8 @@
 
 ## Git 与评审
 
+- 本机访问 GitHub 超时时，使用 `export https_proxy=http://127.0.0.1:7897 http_proxy=http://127.0.0.1:7897 all_proxy=socks5://127.0.0.1:7897` 后重试（适用于 Git 与 `gh`，代理须已启动）。
+
 ### 功能开发与 Bug 修复的默认交付流程
 
 1. 开始改代码前，从最新 `origin/main` 创建独立功能或修复分支。先确认工作区状态；不在 `main` 直接开发、提交或推送。Codex 创建的分支默认使用 `codex/` 前缀。
