@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +17,49 @@ async function invoke(handler: ((args: Readonly<Record<string, RuntimeV2JsonValu
 import { createNodeBashToolPorts as createNodeToolPorts } from "../node-ports.js";
 import { getBashHardRejectReason } from "../command-rules.js";
 describe("shell-tools ports", () => {
+  it.each([false, true])("measures real foreground commands and background termination (sandbox=%s)", async sandbox => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    execFileSync("git", ["init", "-q", root]);
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, sandbox });
+    try {
+      for (const command of ["printf baseline", "git status --short --branch -uno", "git log -1 --oneline"]) {
+        const started = Date.now();
+        const result = await invoke(ports.bash, { command, intent: "execution baseline", blockMs: 2_000 });
+        console.info(JSON.stringify({ sandbox, command, ms: Date.now() - started, summary: result.summary.split("\n")[0] }));
+        expect(result.status).toBe(command.startsWith("git log") ? "failed" : "completed");
+        expect(result.detail).toBeUndefined();
+      }
+      const result = await invoke(ports.bash, { command: "printf ready; sleep 30", intent: "background boundary", blockMs: 30 });
+      expect(result.summary).toContain("block_timeout");
+      const taskId = JSON.stringify(result).match(/bash_[0-9a-f-]+/)![0];
+      await vi.waitFor(async () => expect(JSON.stringify(await invoke(ports.bash_output, { taskId }))).toContain("ready"));
+      expect((await invoke(ports.bash_kill, { taskId })).status).toBe("completed");
+      expect(ports.hasRunningBackgroundTask("session")).toBe(false);
+    } finally { await ports.dispose(); }
+  });
+
+  it("does not spawn a command after cancellation during preparation", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, sandbox: false });
+    const controller = new AbortController(); controller.abort();
+    try {
+      const result = await ports.bash!({ command: "touch should-not-exist", intent: "cancel before spawn" }, { ...context(), signal: controller.signal });
+      expect(result).toMatchObject({ status: "failed", failure: { code: "TOOL_ABORTED" } });
+      await expect(readFile(join(root, "should-not-exist"))).rejects.toThrow();
+    } finally { await ports.dispose(); }
+  });
+  it("cancels an active foreground process without waiting for blockMs", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, sandbox: false });
+    const controller = new AbortController();
+    const started = Date.now(); const timer = setTimeout(() => controller.abort(), 100);
+    try {
+      const result = await ports.bash!({ command: "printf ready; sleep 30", intent: "cancel foreground", blockMs: 5_000 }, { ...context(), signal: controller.signal });
+      expect(result.status).toBe("failed");
+      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(ports.hasRunningBackgroundTask("session")).toBe(false);
+    } finally { clearTimeout(timer); await ports.dispose(); }
+  });
   it("runs foreground Bash, streams background output and isolates tasks by Session", async () => {
     const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, sandbox: false });
     const foreground = await invoke(ports.bash, { command: "printf hello", intent: "verify output", blockMs: 5_000 });

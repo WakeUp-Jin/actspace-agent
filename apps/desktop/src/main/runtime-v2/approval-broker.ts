@@ -25,7 +25,7 @@ export class DesktopApprovalBroker implements ApprovalBroker {
     this.approvals.onApprovalRequired(hostRequest);
     let rejectAbort!: (reason?: unknown) => void;
     const onAbort = () => {
-      this.approvals.abortAgentRun?.(request.sessionId, request.agentRunId);
+      this.approvals.abortRequest?.(request.requestId);
       rejectAbort(signal.reason ?? new Error("Approval was aborted."));
     };
     const abortPromise = new Promise<never>((_, reject) => {

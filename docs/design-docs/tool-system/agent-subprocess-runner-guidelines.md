@@ -24,7 +24,7 @@
 
 入口为 `packages/tools/shell-tools/src/plugin.ts`、`command-rules.ts`、`node-ports.ts`。
 
-- Bash permission 合同先提取 process resource，再应用命令 hard guard；可放行调用仍需精确 once 审批。
+- Bash permission 合同先提取 process resource，再应用命令 hard guard；通过后 default 请求审批或匹配已有会话前缀授权，full-access 自动放行。模式切换会撤销旧等待并重新评估，硬拒绝与沙箱保持生效。
 - macOS 使用 `/bin/zsh -lc`，其他平台使用 `/bin/bash -lc`；macOS 可经 `sandbox-exec` 包装。这是 Bash 工具专用 shell 边界。
 - block 等待默认 30 秒；超过等待边界转为可通过 `bash_output` / `bash_kill` 管理的后台任务，不等于命令失败。
 - 每 Session 最多 8 个后台任务，运行上限 30 分钟；进程注册表属于 Host 端口并在 dispose 时关闭。
@@ -38,3 +38,5 @@
 若提取共用 runner，必须保留各工具现有的权限、退出码、后台任务和输出治理语义。建议返回 stdout、stderr、exitCode、signal、duration、timedOut、truncated 与启动失败；不能用一个通用 timeout 接口抹掉 Bash 的后台生命周期。
 
 这是一项待评审的内部整理方向，不是已有 `run-process.ts` 实现。当前验收仍直接覆盖各 package 的 Node 端口：退出码、参数边界、超限、abort、后台清理与权限复验。
+
+取消检查必须位于异步路径解析、沙箱准备之后且 spawn 之前，防止准备期间已取消的调用仍创建进程。`blockMs` 到期表示转后台，返回 taskId；不应把它解释为命令执行失败。

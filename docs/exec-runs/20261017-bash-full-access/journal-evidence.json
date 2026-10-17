@@ -1,0 +1,714 @@
+[
+  {
+    "sessionId": "0b323aa1-9d49-4b12-ac39-8efe658ba8c2",
+    "seq": 14,
+    "time": "2026-10-17T02:37:37.103Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "fa4774e4-294d-44f8-a623-3dd5ffa622ee",
+      "callId": "fixture-25",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-1",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "0b323aa1-9d49-4b12-ac39-8efe658ba8c2",
+    "seq": 15,
+    "time": "2026-10-17T02:37:37.106Z",
+    "type": "permission/asked",
+    "data": {
+      "requestId": "611ee059-3a68-400d-868c-051c41eaac68",
+      "callId": "fixture-25",
+      "requestedAt": "2026-10-17T02:37:37.106Z",
+      "expiresAt": "2026-10-17T02:47:37.106Z"
+    }
+  },
+  {
+    "sessionId": "0b323aa1-9d49-4b12-ac39-8efe658ba8c2",
+    "seq": 17,
+    "time": "2026-10-17T02:38:53.937Z",
+    "type": "permission/decided",
+    "data": {
+      "requestId": "611ee059-3a68-400d-868c-051c41eaac68",
+      "kind": "deny",
+      "decidedAt": "2026-10-17T02:38:53.931Z",
+      "code": "aborted"
+    }
+  },
+  {
+    "sessionId": "0b323aa1-9d49-4b12-ac39-8efe658ba8c2",
+    "seq": 18,
+    "time": "2026-10-17T02:38:53.951Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-25",
+      "name": "bash",
+      "status": "denied",
+      "summary": "aborted"
+    }
+  },
+  {
+    "sessionId": "0b323aa1-9d49-4b12-ac39-8efe658ba8c2",
+    "seq": 20,
+    "time": "2026-10-17T02:38:53.974Z",
+    "type": "turn/end",
+    "data": {
+      "reason": "aborted"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 14,
+    "time": "2026-10-17T01:54:52.752Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "452757bd-c3f4-42d4-a740-b90da4eebbe1",
+      "callId": "fixture-2",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-1",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 15,
+    "time": "2026-10-17T01:54:52.761Z",
+    "type": "permission/asked",
+    "data": {
+      "requestId": "8d2f187b-4000-45bf-823e-77815205f409",
+      "callId": "fixture-2",
+      "requestedAt": "2026-10-17T01:54:52.760Z",
+      "expiresAt": "2026-10-17T02:04:52.760Z"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 16,
+    "time": "2026-10-17T02:01:18.658Z",
+    "type": "permission/mode-set",
+    "data": {
+      "mode": "full-access"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 17,
+    "time": "2026-10-17T02:01:18.680Z",
+    "type": "permission/decided",
+    "data": {
+      "requestId": "8d2f187b-4000-45bf-823e-77815205f409",
+      "kind": "deny",
+      "decidedAt": "2026-10-17T02:01:18.644Z",
+      "code": "timeout"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 18,
+    "time": "2026-10-17T02:01:18.747Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-2",
+      "name": "bash",
+      "status": "denied",
+      "summary": "timeout"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 25,
+    "time": "2026-10-17T02:01:18.852Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "fc80e368-6174-4cbb-b16a-b20d17fd5454",
+      "callId": "fixture-3",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-2",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 27,
+    "time": "2026-10-17T02:01:18.911Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-3",
+      "name": "bash",
+      "status": "completed",
+      "summary": "Bash completed in 19ms (exit 0, sandboxed=true)."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 36,
+    "time": "2026-10-17T02:01:18.987Z",
+    "type": "turn/end",
+    "data": {
+      "reason": "completed"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 48,
+    "time": "2026-10-17T02:02:32.699Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "96c77c4a-6018-48e4-b00d-a442eae2f1cc",
+      "callId": "fixture-5",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-1",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 50,
+    "time": "2026-10-17T02:02:32.769Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-5",
+      "name": "bash",
+      "status": "completed",
+      "summary": "Bash completed in 46ms (exit 0, sandboxed=true)."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 58,
+    "time": "2026-10-17T02:02:32.840Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "e5634bd3-419d-4cb7-837a-7b3a73cbc3d6",
+      "callId": "fixture-6",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-2",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 60,
+    "time": "2026-10-17T02:02:32.882Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-6",
+      "name": "bash",
+      "status": "completed",
+      "summary": "Bash completed in 17ms (exit 0, sandboxed=true)."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 69,
+    "time": "2026-10-17T02:02:32.988Z",
+    "type": "turn/end",
+    "data": {
+      "reason": "completed"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 71,
+    "time": "2026-10-17T02:04:57.114Z",
+    "type": "permission/mode-set",
+    "data": {
+      "mode": "default"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 83,
+    "time": "2026-10-17T02:08:38.393Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "1698662c-9787-4a15-9ae2-9ecf382bc5c7",
+      "callId": "fixture-8",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-1",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 84,
+    "time": "2026-10-17T02:08:38.398Z",
+    "type": "permission/asked",
+    "data": {
+      "requestId": "da53043d-8111-4f28-8e21-9132f5ca3cee",
+      "callId": "fixture-8",
+      "requestedAt": "2026-10-17T02:08:38.397Z",
+      "expiresAt": "2026-10-17T02:18:38.397Z"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 85,
+    "time": "2026-10-17T02:09:57.154Z",
+    "type": "permission/decided",
+    "data": {
+      "requestId": "da53043d-8111-4f28-8e21-9132f5ca3cee",
+      "kind": "once",
+      "decidedAt": "2026-10-17T02:09:57.153Z"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 87,
+    "time": "2026-10-17T02:09:57.228Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-8",
+      "name": "bash",
+      "status": "completed",
+      "summary": "Bash completed in 18ms (exit 0, sandboxed=true)."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 95,
+    "time": "2026-10-17T02:09:57.330Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "e2573405-14d6-4080-9d2b-800be0b29585",
+      "callId": "fixture-9",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-2",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 96,
+    "time": "2026-10-17T02:09:57.335Z",
+    "type": "permission/asked",
+    "data": {
+      "requestId": "86ceccdc-e7f5-465a-98ea-1421c416fc0b",
+      "callId": "fixture-9",
+      "requestedAt": "2026-10-17T02:09:57.335Z",
+      "expiresAt": "2026-10-17T02:19:57.335Z"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 97,
+    "time": "2026-10-17T02:11:15.527Z",
+    "type": "permission/decided",
+    "data": {
+      "requestId": "86ceccdc-e7f5-465a-98ea-1421c416fc0b",
+      "kind": "deny",
+      "decidedAt": "2026-10-17T02:11:15.526Z",
+      "code": "user-denied"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 98,
+    "time": "2026-10-17T02:11:15.533Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-9",
+      "name": "bash",
+      "status": "denied",
+      "summary": "user-denied"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 106,
+    "time": "2026-10-17T02:11:15.692Z",
+    "type": "turn/end",
+    "data": {
+      "reason": "completed"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 118,
+    "time": "2026-10-17T02:14:00.384Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "7ce8c174-d13b-4b20-a691-9b077fdf8de9",
+      "callId": "fixture-11",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-1",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 119,
+    "time": "2026-10-17T02:14:00.411Z",
+    "type": "permission/asked",
+    "data": {
+      "requestId": "cefbf376-f4f4-4870-aab4-5b670299477e",
+      "callId": "fixture-11",
+      "requestedAt": "2026-10-17T02:14:00.410Z",
+      "expiresAt": "2026-10-17T02:24:00.410Z"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 121,
+    "time": "2026-10-17T02:18:04.037Z",
+    "type": "permission/mode-set",
+    "data": {
+      "mode": "full-access"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 122,
+    "time": "2026-10-17T02:18:04.154Z",
+    "type": "permission/decided",
+    "data": {
+      "requestId": "cefbf376-f4f4-4870-aab4-5b670299477e",
+      "kind": "deny",
+      "code": "aborted",
+      "decidedAt": "2026-10-17T02:18:04.057Z",
+      "reason": "permission-mode-changed"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 124,
+    "time": "2026-10-17T02:18:04.363Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-11",
+      "name": "bash",
+      "status": "completed",
+      "summary": "Bash completed in 84ms (exit 0, sandboxed=true)."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 132,
+    "time": "2026-10-17T02:18:04.713Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "52d6fbe1-b05a-4e59-b3ce-f6aad304e767",
+      "callId": "fixture-12",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-2",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 134,
+    "time": "2026-10-17T02:18:04.916Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-12",
+      "name": "bash",
+      "status": "completed",
+      "summary": "Bash completed in 57ms (exit 0, sandboxed=true)."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 143,
+    "time": "2026-10-17T02:18:05.531Z",
+    "type": "turn/end",
+    "data": {
+      "reason": "completed"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 154,
+    "time": "2026-10-17T02:18:06.398Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "b1597d69-b0f3-4bbd-bf11-5d182f088dbb",
+      "callId": "fixture-14",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-1",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 156,
+    "time": "2026-10-17T02:18:06.928Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-14",
+      "name": "bash",
+      "status": "completed",
+      "summary": "Bash completed in 341ms (exit 0, sandboxed=true)."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 164,
+    "time": "2026-10-17T02:18:07.285Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "f3aa0272-2a35-4815-aa27-76506a4c1ad7",
+      "callId": "fixture-15",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-2",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 166,
+    "time": "2026-10-17T02:18:07.478Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-15",
+      "name": "bash",
+      "status": "completed",
+      "summary": "Bash completed in 53ms (exit 0, sandboxed=true)."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 175,
+    "time": "2026-10-17T02:18:07.950Z",
+    "type": "turn/end",
+    "data": {
+      "reason": "completed"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 187,
+    "time": "2026-10-17T02:20:44.667Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "8c7067af-30c4-4215-bb3a-342da8566490",
+      "callId": "fixture-17",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance | cat",
+        "intent": "验证现有管道硬拒绝"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 188,
+    "time": "2026-10-17T02:20:44.711Z",
+    "type": "permission/scope-denied",
+    "data": {
+      "callId": "fixture-17",
+      "code": "BASH_COMMAND_DENIED",
+      "reason": "Command uses shell expansion, pipes, or redirection that cannot be safely classified."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 189,
+    "time": "2026-10-17T02:20:44.741Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-17",
+      "name": "bash",
+      "status": "denied",
+      "summary": "Command uses shell expansion, pipes, or redirection that cannot be safely classified."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 197,
+    "time": "2026-10-17T02:20:45.330Z",
+    "type": "turn/end",
+    "data": {
+      "reason": "completed"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 209,
+    "time": "2026-10-17T02:23:26.280Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "58094b84-47dc-4362-b7db-0dc934e27d94",
+      "callId": "fixture-19",
+      "name": "bash",
+      "args": {
+        "command": "printf ready; sleep 30",
+        "intent": "后台生命周期验收",
+        "blockMs": 50
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 211,
+    "time": "2026-10-17T02:23:26.415Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-19",
+      "name": "bash",
+      "status": "completed",
+      "summary": "Bash task bash_bd44fb14-7a39-4207-800a-3730d0fad298 is running in the background (block_timeout)."
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 219,
+    "time": "2026-10-17T02:23:26.702Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "b89753b7-1132-446f-9636-58b54c4a1c0b",
+      "callId": "fixture-20",
+      "name": "bash_output",
+      "args": {
+        "taskId": "bash_bd44fb14-7a39-4207-800a-3730d0fad298"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 221,
+    "time": "2026-10-17T02:23:26.826Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-20",
+      "name": "bash_output",
+      "status": "completed",
+      "summary": "Task bash_bd44fb14-7a39-4207-800a-3730d0fad298 status=running runtime=0s"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 229,
+    "time": "2026-10-17T02:23:27.309Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "bf199b0e-c258-40d6-a24a-575435503a83",
+      "callId": "fixture-21",
+      "name": "bash_kill",
+      "args": {
+        "taskId": "bash_bd44fb14-7a39-4207-800a-3730d0fad298"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 232,
+    "time": "2026-10-17T02:23:27.518Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-21",
+      "name": "bash_kill",
+      "status": "completed",
+      "summary": "Task bash_bd44fb14-7a39-4207-800a-3730d0fad298 status=killed runtime=1s exitCode=null"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 242,
+    "time": "2026-10-17T02:23:28.213Z",
+    "type": "turn/end",
+    "data": {
+      "reason": "completed"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 244,
+    "time": "2026-10-17T02:27:12.999Z",
+    "type": "permission/mode-set",
+    "data": {
+      "mode": "default"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 255,
+    "time": "2026-10-17T02:28:38.274Z",
+    "type": "tool/call",
+    "data": {
+      "requestId": "658f0ae7-7289-46b1-bb5d-5f5cb51d3b9f",
+      "callId": "fixture-23",
+      "name": "bash",
+      "args": {
+        "command": "printf acceptance-1",
+        "intent": "连续 Bash 权限验收"
+      }
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 256,
+    "time": "2026-10-17T02:28:38.285Z",
+    "type": "permission/asked",
+    "data": {
+      "requestId": "5a7deae6-30dd-4cd7-ba30-003b406d21af",
+      "callId": "fixture-23",
+      "requestedAt": "2026-10-17T02:28:38.284Z",
+      "expiresAt": "2026-10-17T02:38:38.284Z"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 258,
+    "time": "2026-10-17T02:31:01.882Z",
+    "type": "permission/decided",
+    "data": {
+      "requestId": "5a7deae6-30dd-4cd7-ba30-003b406d21af",
+      "kind": "deny",
+      "decidedAt": "2026-10-17T02:31:01.828Z",
+      "code": "aborted"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 259,
+    "time": "2026-10-17T02:31:02.078Z",
+    "type": "tool/result",
+    "data": {
+      "callId": "fixture-23",
+      "name": "bash",
+      "status": "denied",
+      "summary": "aborted"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 261,
+    "time": "2026-10-17T02:31:02.458Z",
+    "type": "turn/end",
+    "data": {
+      "reason": "aborted"
+    }
+  },
+  {
+    "sessionId": "bc2c5be5-a60e-4192-b4af-906d1e247d99",
+    "seq": 263,
+    "time": "2026-10-17T02:35:07.632Z",
+    "type": "permission/mode-set",
+    "data": {
+      "mode": "full-access"
+    }
+  }
+]

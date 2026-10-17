@@ -255,7 +255,7 @@ export class DesktopRuntimeV2Registry {
     this.assertAdmission();
     this.#admittedWork++;
     try {
-      this.options.approvals.expireAll?.(sessionId);
+      // Runtime invalidates each waiting request after observing the new policy.
       const snapshot = await this.requireApp().updateSessionPermissionMode(sessionId, mode);
       this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-permission-mode-updated");
       return snapshot;

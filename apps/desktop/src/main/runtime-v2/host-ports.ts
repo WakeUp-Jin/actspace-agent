@@ -34,6 +34,7 @@ export type DesktopRuntimeV2ApprovalDecision = {
 export interface DesktopRuntimeV2ApprovalPort {
   waitForDecision(request: DesktopRuntimeV2ApprovalRequest): Promise<DesktopRuntimeV2ApprovalDecision>;
   onApprovalRequired(request: DesktopRuntimeV2ApprovalRequest): void;
+  abortRequest?(requestId: string): void;
   abortAgentRun?(sessionId: string, agentRunId: string): number;
   expireAll?(sessionId?: string): number;
 }

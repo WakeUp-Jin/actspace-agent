@@ -34,6 +34,8 @@
 
 ## 最近完成
 
+- [Bash 完全权限与审批恢复](completed/20261017-bash-full-access.md)：2026-10-17 实现及定向回归完成，真实 Electron 已复验等待中切换并继续执行；完整覆盖与历史检查限制见[执行摘要](../exec-runs/20261017-bash-full-access/execution-summary.md)。
+
 - [main 新增功能与轨迹遗留项统一验收](completed/20261015-main-frontend-acceptance.md)：2026-10-16验收收束，60项53通过/5失败/2部分覆盖，4个Bug与O01观察完整交接；只验收未修复，见[摘要](../exec-runs/20261015-main-frontend-acceptance/execution-summary.md)与[台账](../exec-runs/20261015-main-frontend-acceptance/acceptance.md)。
 
 - [默认工作区改为首次启动兜底](completed/20261015-default-workspace-first-run.md)：2026-10-15 实现与自动化验证完成（未提交，分支 `fix/session-default`）；只剩 Electron 实机验收，见[执行摘要](../exec-runs/20261015-default-workspace-first-run/execution-summary.md)。

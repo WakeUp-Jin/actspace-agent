@@ -103,6 +103,11 @@ export class PendingApprovalRegistry implements DesktopRuntimeV2ApprovalPort {
     return { ok: true };
   }
 
+  abortRequest(requestId: string): void {
+    const entry = this.pending.get(requestId);
+    if (entry) this.resolveEntry(requestId, entry, "abort");
+  }
+
   abortAgentRun(sessionId: string, agentRunId: string): number {
     let count = 0;
     for (const [id, entry] of this.pending) {

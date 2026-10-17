@@ -67,6 +67,7 @@ async function executeBash(
   const wantsSandbox = options.sandbox !== false && !arrayStrings(args.requiredPermissions).includes("no_sandbox");
   const spawnSpec = wantsSandbox ? await sandboxSpawn(command, workspaceRoot, outputRoot) : { command: process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", args: ["-lc", command], env: process.env, sandboxed: false };
   const sandboxed = spawnSpec.sandboxed;
+  if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
   const monitor = new OutputMonitor(subscription);
   const processHandle = new ProcessHandle(spawnSpec.command, spawnSpec.args, realCwd, spawnSpec.env, outputPath, monitor.handleChunk);
   const abort = () => processHandle.kill();
