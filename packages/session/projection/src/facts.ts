@@ -65,7 +65,7 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
     },
   });
   registry.register<ActivityState, SessionFacts["activity"]>({
-    key: "sessionStats", stateVersion: 2,
+    key: "sessionStats", stateVersion: 3,
     init: () => ({ turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: emptyTiming(), openSteps: {} }),
     view: ({ openSteps: _openSteps, ...activity }) => activity,
     apply: (state, event) => {
@@ -83,7 +83,7 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
           const { [stepId ?? ""]: _closed, ...openSteps } = state.openSteps;
           return { ...state, activeStepId: state.activeStepId === stepId ? null : state.activeStepId, openSteps: stepId !== null && state.openSteps[stepId] ? openSteps : state.openSteps };
         }
-        case "request/header": case "assistant/chunk": case "assistant/message": return applyTiming(state, event, data);
+        case "request/header": case "assistant/chunk": case "assistant/message": case "llm/retry": return applyTiming(state, event, data);
         case "compaction/start": return { ...state, activeCompactionId: text(data.compactionId) };
         case "compaction/summary": return { ...state, lastCompactionSummary: text(data.summary) ?? text(data.content) };
         case "compaction/end": return { ...state, compactionCount: state.compactionCount + 1, activeCompactionId: state.activeCompactionId === text(data.compactionId) ? null : state.activeCompactionId };
@@ -169,7 +169,7 @@ function applyUsage(state: UsageState, event: SessionEventEnvelopeV1): UsageStat
 
 /**
  * 模型侧计时：request/header 标请求开始，首个非空 chunk 标首 token，assistant/message 结算一次请求。
- * 一步可能有多次请求（重试），结算后以完成时间作为下一次的起点、清掉首 token。
+ * 一步可能有多次请求（重试），llm/retry 结算失败请求；结算后清空起点，不计重试等待。
  * 只有状态真的变了才返回新对象，流式 chunk 不会逐条触发投影推送。
  */
 function applyTiming(state: ActivityState, event: SessionEventEnvelopeV1, data: Data): ActivityState {
@@ -178,7 +178,7 @@ function applyTiming(state: ActivityState, event: SessionEventEnvelopeV1, data: 
   if (stepId === null) return state;
   const open = state.openSteps[stepId] ?? { startedAt: null, firstTokenAt: null };
   const withStep = (next: OpenStep): ActivityState => ({ ...state, openSteps: { ...state.openSteps, [stepId]: next } });
-  if (event.type === "request/header") return at === null ? state : withStep({ ...open, startedAt: at });
+  if (event.type === "request/header") return at === null ? state : withStep({ startedAt: at, firstTokenAt: null });
   if (event.type === "assistant/chunk") {
     if (open.firstTokenAt !== null || at === null || !(isText(data.delta) || isText(data.content))) return state;
     return withStep({ ...open, firstTokenAt: at });
@@ -195,7 +195,7 @@ function applyTiming(state: ActivityState, event: SessionEventEnvelopeV1, data: 
       timing.decodeTokens += output;
     }
   }
-  return { ...withStep({ startedAt: at, firstTokenAt: null }), timing };
+  return { ...withStep({ startedAt: null, firstTokenAt: null }), timing };
 }
 
 function eventTime(event: SessionEventEnvelopeV1): number | null {

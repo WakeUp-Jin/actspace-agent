@@ -301,7 +301,7 @@ follow-up 状态行右侧、context 圆环左边，两个整会话累计的胶�
 
 - 计费输入 = 未缓存输入 + 缓存读取 + 缓存写入；输出速度 = 总输出 token ÷ 总解码时长；缓存命中不会把「差一点全命中」舍成 100%。
 - 胶囊是状态行里的纯文字入口（原生 `<button>`，和 context 圆环一致），悬停或展开时给 hover 底色；面板是 `ui/Popover`，在胶囊上方右对齐，宽 300–440px。
-- 数据口径（2026-10-15 起和 DSH 一致）：全部取自宿主投影，不再读渲染端事件窗口。轮次、步数、Token 用量来自 `activity` / `usage`；模型用时、TTFT、输出速度来自 `activity.timing`——`sessionStats` 投影（stateVersion 2）扫全量 journal（含 `assistant/chunk`）累加，所以重新打开的会话和长会话也准；工具用时来自全量 `tools` 投影。历史窗口照旧去掉已定稿消息的 chunk，这不影响统计。
+- 数据口径（2026-10-16 修订）：全部取自宿主投影，不再读渲染端事件窗口。轮次、步数、Token 用量来自 `activity` / `usage`；模型用时、TTFT、输出速度来自 `activity.timing`——`sessionStats` 投影（stateVersion 3）扫全量 journal（含 `assistant/chunk`）累加，所以重新打开的会话和长会话也准；工具用时来自全量 `tools` 投影。历史窗口照旧去掉已定稿消息的 chunk，这不影响统计。 模型用时按每次请求的 request/header 到 assistant/message 或 llm/retry 累加，包含失败尝试，不包含重试等待；重试结算后清空计时起点。旧版本统计缓存失效后从 Journal 重建。
 ## Context 弹窗
 
 点击 follow-up 底部状态行右侧的 context usage 入口后弹出。

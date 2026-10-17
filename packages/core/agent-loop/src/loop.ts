@@ -210,7 +210,10 @@ export class AgentLoop {
           const delayOverride = typeof recoveryRecord.delayMs === "number" ? recoveryRecord.delayMs : undefined;
           const delayMs = recoveryRecord.kind === "abort" || output.aborted || output.sawObservableDelta ? null : recoveryRecord.kind === "retry" ? (delayOverride ?? retryDelay(retryPolicy, output.failure, attempt)) : retryDelay(retryPolicy, output.failure, attempt);
           if (delayMs === null) {
-            await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content: [], finishReason: output.aborted ? "aborted" : "failed", usage: output.usage }));
+            // Failed partial tool calls must never enter the model surface or execute.
+            const partialContent = output.content.filter(block => block.type !== "tool-call");
+            const content = partialContent as unknown as RuntimeV2JsonValue;
+            await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content, finishReason: output.aborted ? "aborted" : "failed", usage: output.usage }, partialContent.length > 0 ? { surface: { kind: "append", node: { kind: "assistant", messageId: output.messageId, content } } } : undefined));
             await this.options.session.append(core("step/end", { turnId, stepId, reason: output.aborted ? "aborted" : "failed" }));
             throw new AgentRuntimeError(output.aborted ? "TURN_ABORTED" : "AGENT_SETUP_FAILED", output.failure.message, output.failure);
           }
@@ -459,16 +462,22 @@ type StreamDelta = { readonly messageId: string; readonly chunkIndex: number; re
 async function collectStream(stream: AsyncIterable<LlmStreamEvent>, signal: AbortSignal, emit: (event: StreamDelta) => void | Promise<void>): Promise<{ messageId: string; text: string; content: readonly LlmContentBlock[]; toolCalls: readonly CollectedToolCall[]; usage: RuntimeV2JsonValue; stopReason: string | null; failure: LlmFailure | null; aborted: boolean; sawObservableDelta: boolean }> {
   const messageId = randomUUID();
   let chunkIndex = 0; let text = ""; let content: readonly LlmContentBlock[] = []; let usage: RuntimeV2JsonValue = {}; let stopReason: string | null = null; let failure: LlmFailure | null = null; let aborted = false; let sawObservableDelta = false; const calls = new Map<string, CollectedToolCall>();
-  for await (const event of stream) {
-    if (event.type === "text-delta") { sawObservableDelta ||= event.text.length > 0; text += event.text; await emit({ messageId, chunkIndex: chunkIndex++, live: { kind: "assistant-delta", message: event.text } }); }
-    if (event.type === "reasoning-delta") { sawObservableDelta ||= event.text.length > 0; await emit({ messageId, chunkIndex: chunkIndex++, live: { kind: "reasoning-delta", message: event.text } }); }
-    if (event.type === "tool-call-delta") { sawObservableDelta ||= event.argumentsDelta.length > 0; const prior = calls.get(event.callId); calls.set(event.callId, { callId: event.callId, name: event.name || prior?.name || "", arguments: `${prior?.arguments ?? ""}${event.argumentsDelta}` }); await emit({ messageId, chunkIndex: chunkIndex++, live: { kind: "tool-call-delta", callId: event.callId, name: event.name || prior?.name || "", argumentsDelta: event.argumentsDelta } }); }
-    if (event.type === "done") { usage = event.usage as unknown as RuntimeV2JsonValue; stopReason = event.stopReason; content = event.content; for (const block of event.content) if (block.type === "tool-call") calls.set(block.callId, { callId: block.callId, name: block.name, arguments: block.arguments }); }
-    if ((event.type === "error" || event.type === "aborted") && event.usage) usage = event.usage as unknown as RuntimeV2JsonValue;
-    if (event.type === "error") failure = event.failure;
-    if (event.type === "aborted") { failure = { kind: "abort", message: event.reason, retryable: false, attempt: 1 }; aborted = true; }
-    if (signal.aborted) { failure = { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 }; aborted = true; break; }
+  try {
+    for await (const event of stream) {
+      if (event.type === "text-delta") { sawObservableDelta ||= event.text.length > 0; text += event.text; await emit({ messageId, chunkIndex: chunkIndex++, live: { kind: "assistant-delta", message: event.text } }); }
+      if (event.type === "reasoning-delta") { sawObservableDelta ||= event.text.length > 0; await emit({ messageId, chunkIndex: chunkIndex++, live: { kind: "reasoning-delta", message: event.text } }); }
+      if (event.type === "tool-call-delta") { sawObservableDelta ||= event.argumentsDelta.length > 0; const prior = calls.get(event.callId); calls.set(event.callId, { callId: event.callId, name: event.name || prior?.name || "", arguments: `${prior?.arguments ?? ""}${event.argumentsDelta}` }); await emit({ messageId, chunkIndex: chunkIndex++, live: { kind: "tool-call-delta", callId: event.callId, name: event.name || prior?.name || "", argumentsDelta: event.argumentsDelta } }); }
+      if (event.type === "done") { usage = event.usage as unknown as RuntimeV2JsonValue; stopReason = event.stopReason; content = event.content; for (const block of event.content) if (block.type === "tool-call") calls.set(block.callId, { callId: block.callId, name: block.name, arguments: block.arguments }); }
+      if ((event.type === "error" || event.type === "aborted") && event.usage) usage = event.usage as unknown as RuntimeV2JsonValue;
+      if (event.type === "error") failure = event.failure;
+      if (event.type === "aborted") { failure = { kind: "abort", message: event.reason, retryable: false, attempt: 1 }; aborted = true; }
+      if (signal.aborted) { failure = { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 }; aborted = true; break; }
+    }
+  } catch (error) {
+    failure = signal.aborted ? { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 } : normalizeLlmFailure(error, 1);
+    aborted = signal.aborted || failure.kind === "abort";
   }
+  if (signal.aborted) { failure = { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 }; aborted = true; }
   if (content.length === 0 && text.length > 0) content = Object.freeze([{ type: "text", text }]);
   return { messageId, text, content, toolCalls: Object.freeze([...calls.values()]), usage, stopReason, failure, aborted, sawObservableDelta };
 }

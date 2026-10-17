@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRef, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Archive, FolderPlus, MessagesSquare } from "lucide-react";
 import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
@@ -67,7 +67,8 @@ export function SidebarSessions({
   const [query, setQuery] = useState("");
   const search = useSessionSearch(query, searchOpen);
   const searching = searchOpen && query.trim().length > 0;
-  const closeSearch = () => { setSearchOpen(false); setQuery(""); };
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const closeSearch = (restoreFocus: boolean) => { setSearchOpen(false); setQuery(""); if (restoreFocus) searchButtonRef.current?.focus(); };
 
   // 已归档的只在筛选要求时拉，并且只放进还在侧栏里的工作区。
   const archivedPool = useArchivedSessions(options.archived !== "hide", sessions);
@@ -222,7 +223,7 @@ export function SidebarSessions({
           onToggle={() => store.toggle("sectionCollapsed", "sessions")}
           overlay={searchOpen ? <SidebarSearchBox query={query} onQueryChange={setQuery} onClose={closeSearch} /> : undefined}
           actions={<>
-            <SidebarSearchButton onOpen={() => setSearchOpen(true)} />
+            <SidebarSearchButton buttonRef={searchButtonRef} onOpen={() => setSearchOpen(true)} />
             <SidebarViewMenu
               options={options}
               onGroupBy={store.setGroupBy}
