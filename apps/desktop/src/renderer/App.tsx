@@ -993,25 +993,33 @@ export function App() {
     else if (input.workspaceId) setSelectedWorkspaceRoot(workspaceRegistry?.items.find(item => item.id === input.workspaceId)?.path ?? null);
   }, [targetChoices.selectHost, targetChoices.selectWorkspace, setActiveSessionId, workspaceRegistry, patchLocal]);
 
+  // 选目录时 main 已经把它登记进 registry；这里同步刷新，侧栏才能马上显示（新建会话不再立即创建，不能指望它顺带刷新）。
+  const pickAndRegisterWorkspace = useCallback(async () => {
+    const result = await dialogsApi.selectWorkspaceDirectory({ registerWorkspace: true });
+    if (result.canceled || !result.workspaceRoot) return null;
+    await refreshWorkspaces();
+    return result.workspaceRoot;
+  }, [refreshWorkspaces]);
+
   const handleAddWorkspace = useCallback(async () => {
     try {
-      const result = await dialogsApi.selectWorkspaceDirectory({ registerWorkspace: true });
-      if (result.canceled || !result.workspaceRoot) return;
-      await handleCreateSession({ workspaceRoot: result.workspaceRoot });
+      const workspaceRoot = await pickAndRegisterWorkspace();
+      if (!workspaceRoot) return;
+      await handleCreateSession({ workspaceRoot });
     } catch (error) {
       console.error("Failed to add workspace", error);
     }
-  }, [handleCreateSession]);
+  }, [handleCreateSession, pickAndRegisterWorkspace]);
 
   const handleUseExistingWorkspace = useCallback(async () => {
     try {
-      const result = await dialogsApi.selectWorkspaceDirectory({ registerWorkspace: true });
-      if (result.canceled || !result.workspaceRoot) return;
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(result.workspaceRoot));
+      const workspaceRoot = await pickAndRegisterWorkspace();
+      if (!workspaceRoot) return;
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(workspaceRoot));
     } catch (error) {
       console.error("Failed to select workspace", error);
     }
-  }, []);
+  }, [pickAndRegisterWorkspace]);
 
   const handleCreateWorkspaceFolder = useCallback(async (name: string) => {
     try {
@@ -1147,11 +1155,11 @@ export function App() {
           : visibleSessions.find((session) => session.id === sessionId)?.agentModeRevision;
         let result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision: revision });
         if (!result.ok && result.error === "WORKSPACE_REQUIRED") {
-          const selection = await dialogsApi.selectWorkspaceDirectory({ registerWorkspace: true });
-          if (selection.canceled || !selection.workspaceRoot) return;
-          const workspace = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selection.workspaceRoot });
+          const workspaceRoot = await pickAndRegisterWorkspace();
+          if (!workspaceRoot) return;
+          const workspace = await sessionsApi.setWorkspace({ sessionId, workspaceRoot });
           if (!workspace.ok) throw new Error(workspace.error ?? "设置工作区失败");
-          setSelectedWorkspaceRoot(normalizeWorkspaceRoot(selection.workspaceRoot));
+          setSelectedWorkspaceRoot(normalizeWorkspaceRoot(workspaceRoot));
           result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision: revision });
         }
         if (!result.ok) {
@@ -1174,7 +1182,7 @@ export function App() {
     } finally {
       if (sessionId) modeChangePendingRef.current.delete(sessionId);
     }
-  }, [busySessionIds, sessionRecord, visibleSessions, readSessionPage, localStore, composerStateKey]);
+  }, [busySessionIds, sessionRecord, visibleSessions, readSessionPage, localStore, composerStateKey, pickAndRegisterWorkspace]);
   const handleSelectedSkillsChange = useCallback((selectedSkills: string[]) => {
     localStore.update(composerStateKey, (state) => ({ ...state, composer: { mode: state.composer?.mode ?? "agent", selectedSkills } }));
   }, [localStore, composerStateKey]);
