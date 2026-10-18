@@ -5,6 +5,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { HOST_PROTOCOL, HOST_LIMITS, HostError, isRecord, parseHostRequest, stringParam, integerParam, type HostMethod, type HostHello } from "@actspace/shared/host-protocol";
 import { HostPayloads } from "./payloads.js";
 import type { HostAuth } from "./auth.js";
+import { createStaticHandler } from "./static.js";
 export interface HostRequestContext {
   readonly deviceId: string;
   readonly connectionId: string;
@@ -20,8 +21,14 @@ export interface HostGatewayOptions {
   readonly port?: number;
   readonly tls?: { key: string; cert: string };
   readonly allowedOrigins?: readonly string[];
+  readonly webRoot?: string;
   readonly state: () => HostHello["state"];
   readonly dispatch: (method: HostMethod, params: Readonly<Record<string, unknown>>, context: HostRequestContext) => Promise<unknown>;
+}
+export function isAllowedOrigin(origin: string, options: { allowedOrigins?: readonly string[]; loopback: boolean }): boolean {
+  if (options.allowedOrigins?.includes(origin)) return true;
+  if (!options.loopback) return false;
+  try { const url = new URL(origin); return url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname); } catch { return false; }
 }
 /** Transport owns sockets and subscriptions only. Never receives a Run cancellation signal. */
 export class HostGateway {
@@ -35,9 +42,10 @@ export class HostGateway {
     const address = options.address ?? "127.0.0.1";
     if (!options.tls && !["127.0.0.1", "::1"].includes(address)) throw new Error("Public Host binding requires TLS");
     this.#http = options.tls ? createHttpsServer(options.tls) : createHttpServer();
-    this.#http.on("request", (_request, response) => { response.writeHead(404); response.end(); });
+    const serveStatic = options.webRoot ? createStaticHandler(options.webRoot) : undefined, loopback = !options.tls;
+    this.#http.on("request", (request, response) => { if (serveStatic) serveStatic(request, response); else { response.writeHead(404); response.end(); } });
     this.#http.on("upgrade", (request, socket, head) => {
-      if (request.url !== "/rpc" || (request.headers.origin !== undefined && !options.allowedOrigins?.includes(request.headers.origin))) {
+      if (request.url !== "/rpc" || (request.headers.origin !== undefined && !isAllowedOrigin(request.headers.origin, { allowedOrigins: options.allowedOrigins, loopback }))) {
         socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n"); return;
       }
       this.#ws.handleUpgrade(request, socket, head, ws => this.#connect(ws, request.socket.remoteAddress ?? "unknown"));

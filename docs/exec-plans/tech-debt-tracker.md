@@ -77,3 +77,16 @@
 | 2026-07-04 | Bash 沙盒 / 网络 | 沙盒 profile 内 `(allow network*)` 全放行：沙盒内命令可连任意域名 / Unix socket，网络维度无隔离。 | 域名过滤需要本地 CONNECT/SNI 代理（profile 全拒网络只放行代理端口 + 子进程注入 HTTP_PROXY），是自研路线最大增量，E5 第一期裁掉。 | 网络代理阶段单独立项；落地后引入 `requiredPermissions: ["full_network"]`。 |
 | 2026-07-04 | Bash 沙盒 / 违规归因 | 违规标注只有输出模式匹配一条腿（EPERM / Operation not permitted 等），无 `log stream` 精确归因；程序吞掉错误输出时模型可能拿不到升级证据。 | log stream 监听（按 Seatbelt `with message` tag 过滤 + 降噪）约 200+ 行，不阻塞升级闭环，第一期裁掉。 | 参照 srt `startMacOSSandboxLogMonitor` 补第二条腿。 |
 | 2026-07-04 | Bash 沙盒 / 跨平台 | Linux 无 bwrap 沙盒实现：非 darwin 一律真实环境执行且权限层不放宽（回到 allowlist ask）。 | 桌面产品当前只发 macOS。 | Linux 发布前按设计文档 bwrap 路线补齐。 |
+
+## Web / PWA 客户端遗留
+
+2026-10-17 `apps/web` 首版（`active/20261017-web-pwa-client.md`）留下的事项，过程见 `docs/exec-runs/20261017-web-pwa-client/execution-process.md`：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-10-17 | 发布 / Host | web 构建产物没有打进 agent-cli 包，`webRoot` 要手动指向 `apps/web/dist`，服务器部署得先在仓库里构建。 | 发布流程把 `dist` 带进 agent-cli 包，`webRoot` 缺省时默认托管内置页面；配置里显式写 `webRoot` 时仍以配置为准。 |
+| 2026-10-17 | 前端 token | `apps/web/src/styles/tokens.css` 是 desktop `tokens.css` 的拷贝，两边靠人工同步。 | 出现第三个消费者（如官网要复用）时，抽成共享包，两端都从包里引入。 |
+| 2026-10-17 | web 包体 | 业务代码一个块 325 kB（gzip 64 kB），React / Markdown / 其他依赖已分块；没有按页面懒加载。 | 手机首屏变慢时，再把会话详情（Markdown、diff）按路由懒加载。 |
+| 2026-10-17 | web 运行计时 | 状态行「运行中 · Ns」从页面第一次看到这个 Run 开始计时，打开页面时已在跑的 Run 会少算。 | Host 的 tasks 快照带上 Run 开始时间后改用它。 |
+| 2026-10-18 | web 时间线规则 | 按轮拆分、Worked for 时长、本轮用量行顺序是桌面端 `turns.ts` / `turnUsageModel` 的重写（`apps/web/src/sessions/turn-model.ts`、`usage-format.ts`），两边靠测试和人工对齐。 | 把这几段纯函数抽到 `@actspace/client`，desktop 和 web 共用。 |
+| 2026-10-17 | Host 列表通知 | Host 每次 projection 更新都发 `sessions-changed`，流式输出时每个片段一次；web 端已改成 300ms 窗口内只刷新一次，但事件本身仍很密。 | Host 侧合并：只在会话元数据（标题、updatedAt 分钟级、归档等）变化时发。 |

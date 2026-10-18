@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "dataRoot": "./.host-data",
+  "listen": { "address": "127.0.0.1", "port": 4317 },
+  "allowedOrigins": [],
+  "webRoot": "./dist",
+  "workspaces": [{ "id": "main", "name": "Main", "path": "./.dev-workspace" }],
+  "providers": [{ "id": "deepseek", "type": "openai-completions", "baseUrl": "https://api.deepseek.com", "keyEnv": "DEEPSEEK_API_KEY", "models": ["deepseek-chat"] }],
+  "defaultModel": "deepseek/deepseek-chat"
+}

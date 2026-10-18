@@ -15,6 +15,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [Web / PWA 客户端](active/20261017-web-pwa-client.md) | 2026-10-17 立项并实施；2026-10-18 视觉改为 B · 轻玻璃，分支 `feat/web-mobile` 开 PR 合入 `main`。A1–D3 完成，浏览器验收截图见[执行摘要](../exec-runs/20261017-web-pwa-client/execution-summary.md)。只剩 D4 真机验收（iPhone + Tailscale），通过后移到 `completed/`。 |
 | [左侧会话栏改版](active/20261015-sidebar-redesign.md) | 2026-10-15 Demo 认可后立项，交互模式；T1–T13 已实施（未提交，在默认工作区改动之上）；原生按钮基线已审批，只剩 Electron 手测。 |
 | [内置 Harness 连续升级修复](active/20261014-harness-builtin-upgrade-fix.md) | 用户已批准；回归由红转绿，下一步真实 Electron 定向复验。 |
 | [轨迹页对齐 DeepSeek Harness](active/20261014-trajectory-dsh-parity.md) | 2026-10-14 立项并开始执行 T1–T12；D1（停止进工具栏）、D2（supplement 显示为上下文行）按建议定案。 |

@@ -27,7 +27,11 @@ export async function runHostCommand(argv: readonly string[]): Promise<number> {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`); return 0;
   }
   const config = await module.readHostConfig(configPath);
-  if (command === "check") { process.stdout.write("Host configuration valid\n"); return 0; }
+  if (command === "check") {
+    process.stdout.write("Host configuration valid\n");
+    if (config.webRoot && config.allowedOrigins.length === 0) process.stdout.write("Warning: webRoot is set but allowedOrigins is empty; only http://127.0.0.1 / localhost pages can connect to /rpc (and only without TLS). Add the HTTPS page origin (e.g. https://<mac>.<tailnet>.ts.net) to allowedOrigins for phones.\n");
+    return 0;
+  }
   const host = await startRemoteHost(config, { mock, forceExit: () => process.exit(1) });
   process.stdout.write(`${JSON.stringify({ hostId: host.hostId, address: config.listen.address, port: host.port, state: host.state() })}\n`);
   const stop = () => { void host.stop().catch(error => { process.stderr.write(`Host shutdown failed: ${String(error)}\n`); process.exitCode = 1; }); };

@@ -1,0 +1,202 @@
+/* V1 专用的材质与动效（front-web-pwa客户端规范 §10）。颜色只引用 --act-* / --web-*。 */
+
+.glass {
+  background: var(--act-color-surface);
+  box-shadow: 0 0 0 0.5px var(--act-color-border), var(--web-glass-shadow);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--web-glass);
+    box-shadow: 0 0 0 0.5px var(--web-glass-edge), var(--web-glass-shadow);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6);
+    backdrop-filter: blur(18px) saturate(1.6);
+  }
+
+  .glass-strong {
+    background: var(--web-glass-strong);
+  }
+}
+
+/* 顶栏与底部输入坞后面的渐隐，让滚动内容在玻璃件下淡出。--fade-bg 跟随所在栏的底色。 */
+.fade-top {
+  background: linear-gradient(var(--fade-bg, var(--act-color-bg)) 55%, transparent);
+}
+
+.fade-bottom {
+  background: linear-gradient(transparent, var(--fade-bg, var(--act-color-bg)) 30px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 等审批的黄点、引导中的蓝点：轻微呼吸。 */
+.pulse-dot {
+  animation: web-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes web-pulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.7; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+/* 运行中：10px 细线转圈（列表状态位、状态行）。 */
+.spinner {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--act-color-operational);
+  border-top-color: transparent;
+  animation: web-spin 0.8s linear infinite;
+}
+
+@keyframes web-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 进行中的过程行文字扫光（Running / 思考中 / 正在探索）。 */
+.shimmer-text {
+  background: linear-gradient(90deg, var(--act-color-text-faint) 0 40%, var(--act-color-text) 50%, var(--act-color-text-faint) 60% 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  animation: web-shimmer 1.1s ease-in-out infinite;
+}
+
+@keyframes web-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes web-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes web-sheet-up {
+  from { transform: translateY(40px); opacity: 0; }
+}
+
+@keyframes web-rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+@keyframes web-dialog-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.98); }
+}
+
+.anim-fade {
+  animation: web-fade-in var(--motion-base) ease;
+}
+
+.anim-sheet {
+  animation: web-sheet-up var(--motion-slow) var(--ease-standard);
+}
+
+.anim-rise {
+  animation: web-rise 260ms ease;
+}
+
+.anim-dialog {
+  animation: web-dialog-in var(--motion-base) ease;
+}
+
+/* 底部弹层 / 宽屏对话框：玻璃。 */
+.glass-sheet {
+  background: var(--act-color-surface);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-sheet {
+    background: var(--web-glass-strong);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: blur(24px) saturate(1.6);
+  }
+}
+
+/* 白底分组卡（列表分组、设置分组）：发丝外圈，不用边框。 */
+.inset-group {
+  background: var(--act-color-surface);
+  border-radius: var(--act-radius-lg);
+  box-shadow: 0 0 0 0.5px var(--web-glass-edge);
+  overflow: hidden;
+}
+
+/* 分组内的行：从 --row-inset 开始的发丝分隔线。 */
+.inset-row {
+  position: relative;
+}
+
+.inset-row + .inset-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--row-inset, 14px);
+  height: 0.5px;
+  background: var(--act-color-border);
+}
+
+/* 胶囊按钮（审批、排队托盘）：ghost / tonal / accent。 */
+.pill-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--act-radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--motion-fast), transform var(--motion-fast), opacity var(--motion-fast);
+}
+
+.pill-btn:active:not(:disabled) { transform: scale(0.97); }
+.pill-btn:disabled { cursor: default; opacity: 0.45; }
+.pill-btn[data-size="xs"] { height: 26px; padding: 0 9px; font-size: 12px; }
+.pill-btn[data-tone="ghost"] { color: var(--act-color-text-muted); }
+.pill-btn[data-tone="ghost"]:hover:not(:disabled), .pill-btn[data-tone="ghost"]:active:not(:disabled) { background: var(--act-color-hover-overlay); }
+.pill-btn[data-tone="tonal"] { background: color-mix(in srgb, var(--act-color-text) 7%, transparent); color: var(--act-color-text); }
+.pill-btn[data-tone="accent"] { background: var(--act-color-accent); color: var(--act-color-on-accent); }
+.pill-btn[data-tone="danger"] { background: var(--act-color-danger); color: var(--act-color-on-danger-solid); }
+.pill-btn code { font-family: var(--act-font-mono); font-size: 12px; font-weight: 400; }
+
+/* 输入框发送按钮：34px 圆；模式着色；空输入为浅灰。 */
+.send-btn {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--act-radius-pill);
+  background: var(--act-color-accent);
+  color: var(--act-color-on-accent);
+  transition: background var(--motion-fast), color var(--motion-fast), transform var(--motion-fast);
+}
+
+.send-btn:active:not(:disabled) { transform: scale(0.94); }
+.send-btn[data-tone="plan"] { background: var(--act-color-warning); color: var(--act-color-on-warning-solid); }
+.send-btn[data-tone="chat"] { background: var(--act-color-operational); color: var(--act-color-on-operational); }
+.send-btn[data-tone="stop"] { background: var(--act-color-action); color: var(--act-color-on-action); }
+.send-btn:disabled { cursor: default; background: color-mix(in srgb, var(--act-color-text) 8%, transparent); color: var(--act-color-text-subtle); }
+.send-stop { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
+.send-btn[data-tone="off"] { background: color-mix(in srgb, var(--act-color-text) 8%, transparent); color: var(--act-color-text-subtle); }
+
+/* 正文里的行内代码（连接页提示等，Markdown 之外）。 */
+.inline-code { font-family: var(--act-font-mono); font-size: 11px; padding: 1px 4px; border-radius: 3px; background: var(--act-color-inline-code-bg); color: var(--act-color-inline-code-text); }

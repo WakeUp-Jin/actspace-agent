@@ -1,0 +1,136 @@
+/* 会话详情：消息块、审批卡、输入框（C5–C8）。颜色只引用 --act-* / --web-*。 */
+
+/* Markdown（助手回复）：15px / 1.65，块间距 10。 */
+.md { font-size: 15px; line-height: 1.65; color: var(--act-color-text); overflow-wrap: anywhere; }
+.md > * { margin: 0; }
+.md > * + * { margin-top: 10px; }
+.md p { margin: 0; }
+.md * + p, .md * + ul, .md * + ol, .md * + blockquote { margin-top: 10px; }
+.md h1, .md h2, .md h3, .md h4 { margin: 16px 0 0; line-height: 1.35; font-weight: 600; }
+.md > h1:first-child, .md > h2:first-child, .md > h3:first-child { margin-top: 0; }
+.md h1 { font-size: 20px; }
+.md h2 { font-size: 18px; }
+.md h3, .md h4 { font-size: 16px; }
+.md ul, .md ol { display: grid; gap: 4px; padding-left: 1.3em; }
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md li > ul, .md li > ol { margin-top: 4px; }
+.md a { color: var(--act-color-info, var(--act-color-text)); text-decoration: underline; text-underline-offset: 2px; }
+.md blockquote { padding-left: 12px; border-left: 3px solid var(--act-color-border); color: var(--act-color-text-muted); }
+.md hr { border: 0; border-top: 1px solid var(--act-color-border); margin: 14px 0; }
+.md code { font-family: var(--act-font-mono); font-size: 0.88em; padding: 0.08em 0.3em; border-radius: 3px; background: var(--act-color-inline-code-bg); color: var(--act-color-inline-code-text); }
+.md .md-table { overflow-x: auto; }
+.md table { border-collapse: collapse; font-size: 14px; }
+.md th, .md td { padding: 6px 10px; border: 1px solid var(--act-color-border); text-align: left; }
+.md th { background: var(--act-color-surface-subtle); font-weight: 600; }
+
+/* 代码块：语言标签 + 复制按钮的细条，渐变底。 */
+.code-block { border: 1px solid var(--act-color-code-border); border-radius: var(--act-radius-lg); background: linear-gradient(var(--act-color-code-bg-top), var(--act-color-code-bg-bottom)); overflow: hidden; }
+.code-block-bar { display: flex; align-items: center; justify-content: space-between; min-height: 28px; padding: 0 4px 0 12px; font: 11px var(--act-font-mono); color: var(--act-color-text-muted); }
+.code-block pre { margin: 0; padding: 2px 12px 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.md .code-block pre code { padding: 0; border-radius: 0; background: none; color: var(--act-color-code-text); font-size: 12px; line-height: 1.6; white-space: pre; }
+
+/* 用户气泡：右对齐白底，发丝外圈。 */
+.user-bubble { align-self: flex-end; max-width: 84%; padding: 9px 14px; border-radius: var(--act-radius-xl); background: var(--act-color-surface); box-shadow: 0 0 0 0.5px var(--web-glass-edge); font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* 时间线间距：块 14；过程行之间 5；用户消息后 18；新一轮用户消息前 30。 */
+.timeline { display: flex; flex-direction: column; }
+.timeline > * { min-width: 0; }
+.timeline > * + * { margin-top: 14px; }
+.timeline > .tl-proc + .tl-proc { margin-top: 5px; }
+.timeline > .tl-user + * { margin-top: 18px; }
+.timeline > * + .tl-user { margin-top: 30px; }
+.timeline > .tl-tail { margin-top: 6px; }
+
+/* 过程行（桌面同款，无图标）：动作 + 浅色目标 + 元信息。 */
+.tl { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; font-size: 14px; line-height: 22px; color: var(--act-color-text-muted); text-align: left; }
+.tl-verb { flex: none; }
+.tl-target { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--act-color-text-faint); }
+.tl-meta { flex: none; color: var(--act-color-text-faint); font-variant-numeric: tabular-nums; }
+.tl-add { flex: none; color: var(--act-color-success); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tl-del { flex: none; color: var(--act-color-danger); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tl > svg { flex: none; color: var(--act-color-text-faint); }
+.tl[data-error], .tl[data-error] .tl-target { color: var(--act-color-on-danger); }
+.tl-body { margin-top: 7px; font-size: 14px; line-height: 1.65; color: var(--act-color-text-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.tool-badge { flex: none; padding: 0 5px; border: 1px solid var(--act-color-border); border-radius: var(--act-radius-sm); background: var(--act-color-surface-subtle); color: var(--act-color-text-faint); font-size: 11px; line-height: 16px; font-weight: 500; }
+.tool-badge[data-tone="warn"] { border-color: transparent; background: var(--act-color-warning-soft); color: var(--act-color-on-warning); }
+
+/* 展开的输出 / diff 盒子。 */
+.tool-out { margin-top: 7px; max-height: 240px; overflow: auto; border: 1px solid var(--act-color-border); border-radius: var(--act-radius-md); background: var(--act-color-surface-subtle); }
+.tool-out pre { margin: 0; padding: 10px 12px; font: 12px/1.6 var(--act-font-mono); color: var(--act-color-text-muted); white-space: pre-wrap; word-break: break-all; }
+.tool-out .tool-out-note { color: var(--act-color-text-faint); }
+.tool-mono { font-family: var(--act-font-mono); }
+
+/* 审批卡（桌面 Cursor 风格）。 */
+.approval { border: 1px solid var(--act-color-border); border-radius: var(--act-radius-lg); background: var(--act-color-surface); box-shadow: var(--act-shadow-xs); overflow: hidden; }
+.approval-head { display: flex; align-items: center; gap: 6px; padding: 9px 12px 8px; border-bottom: 1px solid var(--act-color-border); font-size: 13px; line-height: 20px; }
+.approval-head svg { flex: none; color: var(--act-color-text-faint); }
+.approval pre { margin: 0; padding: 10px 12px 4px; max-height: 180px; overflow: auto; font: 12px/1.6 var(--act-font-mono); color: var(--act-color-text); white-space: pre-wrap; word-break: break-all; }
+.approval pre .prompt { color: var(--act-color-text-faint); user-select: none; }
+.approval-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 44px; padding: 7px 7px 7px 12px; }
+
+/* 已完成一轮的改动卡。 */
+.changes { border: 1px solid var(--act-color-border); border-radius: var(--act-radius-lg); overflow: hidden; }
+.changes-head { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--act-color-turn-card-fill); }
+.changes-tile { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border: 0.5px solid var(--act-color-border); border-radius: var(--act-radius-group); background: var(--act-color-turn-card-tile); color: var(--act-file-type-blue); }
+.changes-row { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-top: 1px solid var(--act-color-border); font-size: 13px; color: var(--act-color-text-faint); }
+
+/* 用量弹层的键值行。 */
+.kv-row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 4px; border-bottom: 0.5px solid var(--act-color-border); font-size: 14px; }
+.kv-row:last-child { border-bottom: 0; }
+
+/* 输入框上方的排队托盘：贴着输入框顶边。 */
+.queue-tray { margin: 0 10px -1px; padding: 2px 4px; border: 0.5px solid var(--web-glass-border); border-bottom: 0; border-radius: 14px 14px 0 0; background: var(--web-glass-strong); -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6); }
+.queue-row { display: flex; align-items: center; gap: 8px; min-height: 40px; padding-left: 6px; font-size: 14px; }
+.queue-row + .queue-row { border-top: 0.5px solid var(--act-color-border); }
+
+/* 上下文占用圆环。 */
+.context-ring { --p: 0; flex: none; width: 15px; height: 15px; border-radius: 50%; background: conic-gradient(var(--act-color-text-muted) calc(var(--p) * 1%), var(--act-color-meter-track) 0); -webkit-mask: radial-gradient(circle, transparent 4.5px, #000 5px); mask: radial-gradient(circle, transparent 4.5px, #000 5px); }
+
+/* Diff */
+.diff { font-family: var(--act-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12px; line-height: 20px; overflow-x: auto; }
+.diff-row { display: flex; min-width: max-content; }
+.diff-gutter { flex: none; width: 22px; text-align: center; color: var(--act-color-text-faint); user-select: none; }
+.diff-text { padding-right: 12px; white-space: pre; }
+.diff-row[data-kind="add"] { background: var(--act-color-diff-add-bg); color: var(--act-color-diff-add-text); }
+.diff-row[data-kind="add"] .diff-gutter { background: var(--act-color-diff-add-gutter); }
+.diff-row[data-kind="del"] { background: var(--act-color-diff-remove-bg); color: var(--act-color-diff-remove-text); }
+.diff-row[data-kind="del"] .diff-gutter { background: var(--act-color-diff-remove-gutter); }
+.diff-row[data-kind="meta"] { color: var(--act-color-text-faint); }
+
+/* 任务清单卡 */
+.tool-card { border: 1px solid var(--act-color-border); border-radius: var(--act-radius-lg); background: var(--act-color-surface); overflow: hidden; }
+.todo-box { flex: none; width: 16px; height: 16px; border-radius: 5px; border: 2px solid var(--act-color-border); display: grid; place-items: center; }
+.todo-box[data-state="completed"] { background: var(--act-color-text); border-color: var(--act-color-text); color: var(--act-color-bg); }
+.todo-box[data-state="in_progress"] { border-color: var(--act-color-text); }
+
+/* 输入框（玻璃）：单行圆角 24，两层时 18；聚焦或等用户说明时加深阴影。 */
+.composer {
+  border-radius: 24px;
+  background: var(--act-color-surface);
+  border: 0.5px solid var(--act-color-composer-border);
+  box-shadow: var(--act-shadow-composer);
+  transition: box-shadow var(--motion-fast), border-radius var(--motion-fast);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .composer {
+    background: var(--web-glass-strong);
+    border-color: var(--web-glass-border);
+    box-shadow: 0 0 0 0.5px var(--web-glass-edge), var(--act-shadow-composer);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6);
+    backdrop-filter: blur(18px) saturate(1.6);
+  }
+
+  .composer:focus-within, .composer[data-attention] {
+    box-shadow: 0 0 0 0.5px var(--web-glass-edge), var(--act-shadow-composer-focus);
+  }
+}
+
+.composer[data-stacked] { border-radius: var(--act-radius-xl); }
+.composer-bar { display: flex; align-items: center; gap: 4px; min-height: 48px; padding: 6px; }
+.composer-text { flex: 1; min-width: 0; resize: none; overflow: hidden; border: 0; outline: 0; background: transparent; color: var(--act-color-text); font: inherit; font-size: 16px; line-height: 20px; max-height: 144px; padding: 7px 4px; }
+.composer[data-stacked] .composer-text { display: block; width: 100%; min-height: 64px; padding: 12px 14px 2px; overflow-y: auto; }
+.composer-text::placeholder { color: var(--act-color-text-subtle); }
+.composer-text:disabled { opacity: 0.6; }
+.dock-wrap { transition: transform 0.12s ease-out; }

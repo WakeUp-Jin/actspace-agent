@@ -59,3 +59,35 @@ it("serves maintenance diagnostics and releases subscriptions and locks on stop"
   expect(stopProjection).toHaveBeenCalledTimes(1);
   const next = new HostAdmin(cfg.dataRoot, async () => ({})); await next.open(); await next.close();
 });
+it("publishes Session run activity on the host topic and in the host.observe snapshot", async () => {
+  const cfg = await config(), { r } = runtime();
+  let tasks: ((snapshot: unknown) => void) | undefined;
+  r.subscribeTasks = listener => { tasks = listener as (snapshot: unknown) => void; return () => {}; };
+  const host = await bootstrapHost(cfg, { log: () => {}, bootRuntime: async () => r });
+  const { default: WebSocket } = await import("ws");
+  const ws = new WebSocket(`ws://127.0.0.1:${host.port}/rpc`);
+  try {
+    await new Promise<void>((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
+    const events: any[] = [];
+    let id = 0;
+    const call = (method: string, params: unknown = {}) => new Promise<any>(resolve => {
+      const current = ++id;
+      const listener = (data: Buffer) => { const reply = JSON.parse(data.toString()); if (reply.id === current) { ws.off("message", listener); resolve(reply.result); } };
+      ws.on("message", listener); ws.send(JSON.stringify({ jsonrpc: "2.0", id: current, method, params }));
+    });
+    let subscriptionId = "";
+    ws.on("message", (data: Buffer) => { const item = JSON.parse(data.toString()); if (item.method === "host.event" && item.params.subscriptionId === subscriptionId) events.push(item.params.value); });
+    await call("host.hello", { protocol: "actspace-host/1" });
+    await call("auth.pair", { code: (await host.auth.createPairCode()).code, name: "web" });
+    const observed = await call("host.observe");
+    subscriptionId = observed.subscriptionId;
+    expect(observed.snapshot.running).toEqual([]);
+    const snapshot = (state: string) => ({ sessionId: "s1", revision: 1, paused: false, tasks: [], queue: [], runs: [{ runId: "r1", taskId: "t1", harness: {}, configuration: {}, state, result: null }] });
+    tasks!(snapshot("running")); tasks!(snapshot("running"));
+    expect((await call("host.observe")).snapshot.running).toEqual(["s1"]);
+    tasks!(snapshot("completed"));
+    await vi.waitFor(() => expect(events.filter(value => value.kind === "activity")).toEqual([
+      { kind: "activity", sessionId: "s1", running: true }, { kind: "activity", sessionId: "s1", running: false },
+    ]));
+  } finally { ws.close(); await host.stop(); }
+});

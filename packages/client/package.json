@@ -26,6 +26,12 @@
       "import": "./dist/host/index.js",
       "require": "./dist/host.cjs",
       "default": "./dist/host/index.js"
+    },
+    "./live": {
+      "types": "./dist/live/index.d.ts",
+      "import": "./dist/live/index.js",
+      "require": "./dist/live.cjs",
+      "default": "./dist/live/index.js"
     }
   },
   "typesVersions": {
@@ -35,11 +41,14 @@
       ],
       "host": [
         "dist/host/index.d.ts"
+      ],
+      "live": [
+        "dist/live/index.d.ts"
       ]
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && esbuild src/sessions/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/sessions.cjs && esbuild src/host/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/host.cjs",
+    "build": "tsc -p tsconfig.json && esbuild src/sessions/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/sessions.cjs && esbuild src/host/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/host.cjs && esbuild src/live/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/live.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --globals --passWithNoTests"
   },

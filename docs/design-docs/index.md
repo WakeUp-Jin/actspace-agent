@@ -15,6 +15,8 @@
 
 - [工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)：Bash 大输出回读、历史引用、Provider 图片转换和失败反馈。
 
+- [Web / PWA 客户端规范](frontend/front-web-pwa客户端规范.md)：已实施（2026-10-17）；手机与浏览器共用的响应式客户端 `apps/web`，支持 PWA，直连 agent-host（Host 同源托管，手机经 Tailscale HTTPS）；2026-10-18 视觉改为 B · 轻玻璃；真机验收待做。
+
 - [聊天 Mermaid 图表渲染](frontend/front-chat-mermaid-diagrams.md)：已实施；助手回复中闭合的 Mermaid 代码块渲染为固定 Codex 浅色图表，源码按不可信输入处理，Electron 验收边界见执行摘要。
 
 - [日常桌面界面中文文案](frontend/front-desktop-chinese-ui.md)：日常操作中文化，保留模式、思考档位与工具执行名称；验收边界见执行摘要。
