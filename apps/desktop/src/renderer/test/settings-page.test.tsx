@@ -260,7 +260,7 @@ describe("SettingsPage", () => {
   it("loads settings and renders the general section by default", async () => {
     renderSettingsPage();
     expect(await screen.findByRole("heading", { name: "通用", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "搜索" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "搜索与网页读取" })).toBeInTheDocument();
     expect(screen.getByText("偏好")).toBeInTheDocument();
     expect(screen.getByText("能力")).toBeInTheDocument();
     expect(screen.getByText("活动")).toBeInTheDocument();
@@ -717,8 +717,8 @@ describe("SettingsPage", () => {
     expect(await screen.findByRole("heading", { name: "工具", level: 2 })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "联网", level: 3 })).not.toBeInTheDocument();
     expect(screen.queryByText("智谱 Web Search")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "搜索" }));
-    expect(await screen.findByRole("heading", { name: "搜索", level: 2 })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "搜索与网页读取" }));
+    expect(await screen.findByRole("heading", { name: "搜索与网页读取", level: 2 })).toBeInTheDocument();
     expect(screen.getByText("智谱 Web Search")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "通用" }));
     expect(await screen.findByLabelText("默认会话模型")).toBeInTheDocument();
@@ -741,7 +741,7 @@ describe("SettingsPage", () => {
 
     await assertHeadingContract("通用", "通用", ["个人偏好", "Agent 指令", "模型与生成", "媒体", "语音播放", "快捷键"]);
     await assertHeadingContract("模型", "模型", ["模型连接"]);
-    await assertHeadingContract("搜索", "搜索", ["搜索通道"]);
+    await assertHeadingContract("搜索与网页读取", "搜索与网页读取", ["搜索通道", "网页读取"]);
     await assertHeadingContract("工具", "工具", ["代码库", "终端", "浏览器", "多媒体", "显示"]);
     await assertHeadingContract("外观", "外观", ["主题", "强调色", "字体与字号"]);
     expect(within(main).queryByRole("heading", { name: "工具总览" })).not.toBeInTheDocument();

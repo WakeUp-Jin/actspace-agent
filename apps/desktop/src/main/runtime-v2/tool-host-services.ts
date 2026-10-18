@@ -16,6 +16,7 @@ export function createDesktopToolHostServices(options: { readonly workspaceRoot:
     [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: () => createShelltools(options) },
     [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({
       // Ports live as long as the Harness; each search must observe settings changes.
+      get deepseekFetchApiKey() { return options.modelRuntime.getToolEnvironment().deepseekFetchApiKey; },
       get credentials() { return options.modelRuntime.getToolEnvironment().searchCredentials; },
     }) },
     [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => ({ generate_image: (...args: Parameters<NonNullable<import("@actspace/tools-image-generation").ToolPorts["generate_image"]>>) => createImagegeneration({ generation: options.modelRuntime.getToolEnvironment().imageGeneration }).generate_image!(...args) }) },

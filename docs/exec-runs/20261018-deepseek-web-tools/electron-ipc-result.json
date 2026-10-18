@@ -1,0 +1,20 @@
+[
+  {
+    "ok": true,
+    "mode": "preload-ipc-write",
+    "deepseekSearch": true,
+    "zhipuSearch": false,
+    "tavilySearch": true,
+    "deepseekFetch": true,
+    "realProviderCalls": false
+  },
+  {
+    "ok": true,
+    "mode": "restart-read",
+    "deepseekSearch": true,
+    "zhipuSearch": false,
+    "tavilySearch": true,
+    "deepseekFetch": true,
+    "realProviderCalls": false
+  }
+]

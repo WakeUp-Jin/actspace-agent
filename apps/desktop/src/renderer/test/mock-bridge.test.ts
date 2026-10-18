@@ -20,6 +20,22 @@ afterEach(() => {
 });
 
 describe("mock bridge", () => {
+  it("connects only the chosen provider and merges independent search preferences", async () => {
+    const { bridge } = open();
+    await bridge.providers.setKey({ provider: "deepseek", apiKey: "fixture-secret" });
+    const settings = await bridge.settings.get();
+    expect(settings.providers.deepseek.hasApiKey).toBe(true);
+    expect(settings.searchProviders.deepseek?.hasApiKey).toBe(true);
+    expect(settings.providers.kimi.hasApiKey).toBe(true);
+    expect(settings.searchProviders.zhipu.hasApiKey).toBe(false);
+    expect(JSON.stringify(settings)).not.toContain("fixture-secret");
+    for (const provider of ["deepseek", "zhipu"] as const) {
+      const { revision } = await bridge.settings.getV4();
+      await bridge.settings.updateV4({ namespace: "tools", expectedRevision: revision, patch: { searchProviders: { [provider]: { enabled: true } } } });
+    }
+    expect((await bridge.settings.getV4()).settings.tools.searchProviders).toEqual({ deepseek: { enabled: true }, zhipu: { enabled: true } });
+  });
+
   it("exposes every contract member and nothing else", () => {
     const { bridge } = open();
     for (const [domain, members] of Object.entries(desktopBridgeContract)) {

@@ -30,7 +30,7 @@ export const ALL_SETTINGS_V4_NAMESPACES: SettingsV4Namespace[] = [
 
 export const ALL_SECRET_PROVIDER_IDS: readonly PersistedSecretProviderId[] = [
   ...PROVIDER_IDS,
-  ...SEARCH_PROVIDER_IDS,
+  ...SEARCH_PROVIDER_IDS.filter((id) => id !== "deepseek"),
   "openrouter-management",
   "image-generation",
   "speech-minimax",

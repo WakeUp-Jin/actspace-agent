@@ -37,13 +37,13 @@ function renderSearch(overrides: Partial<Parameters<typeof SearchSettings>[0]> =
 
 
 describe("SearchSettings", () => {
-  it("lists the four channels without logos and counts connected ones", () => {
+  it("lists the five channels without logos and counts connected ones", () => {
     renderSearch();
     expect(screen.getByRole("heading", { name: "搜索通道", level: 3 })).toBeInTheDocument();
-    expect(screen.getByText("1 / 4 已连接")).toBeInTheDocument();
+    expect(screen.getByText("1 / 5 已连接")).toBeInTheDocument();
     expect(screen.getByText("智谱 Web Search")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "管理 智谱 Web Search" })).toBeInTheDocument();
-    for (const name of ["Tavily", "TinyFish", "Exa"]) {
+    for (const name of ["DeepSeek", "Tavily", "TinyFish", "Exa"]) {
       expect(screen.getByRole("button", { name: `连接 ${name}` })).toBeInTheDocument();
     }
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
@@ -80,5 +80,31 @@ describe("SearchSettings", () => {
     await userEvent.click(screen.getByRole("switch", { name: "允许联网搜索" }));
     expect(props.onUpdate).toHaveBeenCalledWith({ agent: { disabledTools: ["web_search"] } });
     expect(screen.getByRole("button", { name: "连接 Tavily" })).toBeEnabled();
+  });
+});
+
+
+describe("DeepSeek settings opt-in", () => {
+  function snapshot() {
+    return { revision: "test", settings: { tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: { zhipu: { enabled: true }, deepseek: { enabled: false } }, deepseekFetchEnabled: false } } } as unknown as import("@actspace/shared").SettingsV4Snapshot;
+  }
+  it("reuses a model key but keeps both paid capabilities off and writes independent patches", async () => {
+    const settings = makeSettings(); settings.providers.deepseek.hasApiKey = true;
+    const props = renderSearch({ settings, settingsV4: snapshot(), onUpdateNamespace: vi.fn(async () => snapshot()) });
+    expect(screen.getByRole("switch", { name: "启用 DeepSeek 搜索" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "使用 DeepSeek 抓取网页" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "启用 智谱 Web Search 搜索" })).toBeChecked();
+    await userEvent.click(screen.getByRole("switch", { name: "启用 DeepSeek 搜索" }));
+    await waitFor(() => expect(props.onUpdateNamespace).toHaveBeenCalledWith({ namespace: "tools", patch: { searchProviders: { deepseek: { enabled: true } } } }));
+    await userEvent.click(screen.getByRole("switch", { name: "使用 DeepSeek 抓取网页" }));
+    expect(props.onUpdateNamespace).toHaveBeenLastCalledWith({ namespace: "tools", patch: { deepseekFetchEnabled: true } });
+    expect(screen.getByRole("switch", { name: "启用 智谱 Web Search 搜索" })).toBeChecked();
+  });
+  it("disables paid fetch without a key and reports failed writes", async () => {
+    renderSearch({ settingsV4: snapshot(), onUpdateNamespace: vi.fn(async () => null) });
+    expect(screen.getByRole("switch", { name: "使用 DeepSeek 抓取网页" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("switch", { name: "启用 智谱 Web Search 搜索" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("保存失败");
+    expect(screen.getByRole("switch", { name: "启用 智谱 Web Search 搜索" })).toBeChecked();
   });
 });
