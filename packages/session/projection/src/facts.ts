@@ -5,7 +5,7 @@ import { SessionProjectionRegistry } from "./registry.js";
 export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;
 type Data = Readonly<Record<string, RuntimeV2JsonValue>>;
 type GrantState = { readonly grantId: string; readonly grant: SessionGrant | null; readonly revokedAt: string | null };
-type UsageState = { activeStep: string | null; requests: Record<string, string>; selected: Record<string, { assistant: boolean; usage: RuntimeV2UsageSummary }>; total: RuntimeV2UsageSummary };
+type UsageState = { activeStep: string | null; requests: Record<string, string>; selected: Record<string, { assistant: boolean; step: string | null; usage: RuntimeV2UsageSummary }>; knownCosts: number; total: RuntimeV2UsageSummary };
 const emptyUsage = (): RuntimeV2UsageSummary => ({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null });
 /** 进行中的一步：请求开始时间与首个非空 chunk 时间（毫秒）；step/end 时移除，状态不随会话增长。 */
 type OpenStep = { readonly startedAt: number | null; readonly firstTokenAt: number | null };
@@ -21,22 +21,7 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
   registry.register<readonly GrantState[]>({
     key: "sessionGrants", stateVersion: 1, init: () => [],
     view: state => state.flatMap(item => item.grant !== null && item.revokedAt === null ? [item.grant] : []),
-    apply: (state, event) => {
-      const data = record(event.data);
-      if (event.type === "permission/grant-added") {
-        const grant = grantFromData(data);
-        if (grant === null || state.some(item => item.grantId === grant.grantId)) return state;
-        return [...state, { grantId: grant.grantId, grant, revokedAt: null }];
-      }
-      if (event.type === "permission/grant-revoked") {
-        const grantId = text(data.grantId);
-        if (!grantId) return state;
-        const revokedAt = text(data.revokedAt) ?? event.time;
-        if (!state.some(item => item.grantId === grantId)) return [...state, { grantId, grant: null, revokedAt }];
-        return state.map(item => item.grantId === grantId && item.revokedAt === null ? { ...item, revokedAt } : item);
-      }
-      return state;
-    },
+    apply: applySessionGrantEvent,
   });
   registry.register<SessionFacts["metadata"]>({
     key: "metadata", stateVersion: 1, init: () => ({ title: null, pinned: false, archived: false }), view: state => state,
@@ -91,7 +76,7 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
       }
     },
   });
-  registry.register<UsageState>({ key: "providerUsage", stateVersion: 1, init: () => ({ activeStep: null, requests: {}, selected: {}, total: emptyUsage() }), apply: applyUsage, view: state => state.total });
+  registry.register<UsageState>({ key: "providerUsage", stateVersion: 2, init: () => ({ activeStep: null, requests: {}, selected: {}, knownCosts: 0, total: emptyUsage() }), apply: applyUsage, view: state => state.total });
   registry.register<SessionFacts["pendingInbox"]>({
     key: "pendingInbox", stateVersion: 1, init: () => [], view: state => state,
     apply: (state, event) => {
@@ -121,13 +106,7 @@ export function projectPermissionMode(events: readonly SessionEventEnvelopeV1[])
 }
 
 export function projectSessionGrants(events: readonly SessionEventEnvelopeV1[]): readonly SessionGrant[] {
-  const registry = new SessionProjectionRegistry();
-  registerSessionFacts(registry, value => value);
-  const firstGrant = events.find(event => event.type === "permission/grant-added");
-  const sessionId = text(record(firstGrant?.data).sessionId);
-  if (sessionId === null) return [];
-  registry.sync(sessionId, events);
-  return sessionFacts(registry, sessionId).sessionGrants;
+  return events.reduce(applySessionGrantEvent, [] as readonly GrantState[]).flatMap(item => item.grant !== null && item.revokedAt === null ? [item.grant] : []);
 }
 
 function grantFromData(data: Data): SessionGrant | null {
@@ -147,6 +126,15 @@ function grantFromData(data: Data): SessionGrant | null {
 }
 
 function applyUsage(state: UsageState, event: SessionEventEnvelopeV1): UsageState {
+  const next = applyUsageValue(state, event);
+  if (event.type !== "step/end") return next;
+  const step = text(record(event.data).stepId) ?? state.activeStep;
+  const requests = { ...next.requests }; if (step) delete requests[step];
+  const selected = Object.fromEntries(Object.entries(next.selected).filter(([, value]) => value.step !== step));
+  return { ...next, activeStep: next.activeStep === step ? null : next.activeStep, requests, selected };
+}
+
+function applyUsageValue(state: UsageState, event: SessionEventEnvelopeV1): UsageState {
   const data = record(event.data);
   if (event.type === "step/start") return { ...state, activeStep: text(data.stepId) };
   const step = text(data.stepId) ?? state.activeStep;
@@ -160,11 +148,12 @@ function applyUsage(state: UsageState, event: SessionEventEnvelopeV1): UsageStat
   const costKnown = (raw.costCurrency === "USD" || raw.costCurrency === "usd") && typeof raw.cost === "number" && Number.isFinite(raw.cost) && (raw.cost > 0 || (provenance.version === 1 && (provenance.basis === "estimated" || provenance.basis === "provider-reported")));
   const usage = { inputTokens: number(raw.inputTokens), outputTokens: number(raw.outputTokens), cacheReadTokens: number(raw.cacheReadTokens), cacheWriteTokens: number(raw.cacheWriteTokens), totalTokens: 0, costUsd: costKnown ? number(raw.cost) : null };
   usage.totalTokens = usage.inputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
-  const selected = { ...state.selected, [key]: { assistant, usage } };
+  const selected = key.startsWith("event:") ? state.selected : { ...state.selected, [key]: { assistant, step, usage } };
+  const knownCosts = state.knownCosts - (previous?.usage.costUsd != null ? 1 : 0) + (usage.costUsd !== null ? 1 : 0);
   const total = { ...state.total };
   for (const field of ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "totalTokens"] as const) total[field] = state.total[field] - (previous?.usage[field] ?? 0) + usage[field];
-  total.costUsd = Object.values(selected).some(row => row.usage.costUsd !== null) ? (state.total.costUsd ?? 0) - (previous?.usage.costUsd ?? 0) + (usage.costUsd ?? 0) : null;
-  return { ...state, selected, total };
+  total.costUsd = knownCosts > 0 ? (state.total.costUsd ?? 0) - (previous?.usage.costUsd ?? 0) + (usage.costUsd ?? 0) : null;
+  return { ...state, selected, knownCosts, total };
 }
 
 /**
@@ -207,3 +196,21 @@ function record(value: RuntimeV2JsonValue | undefined): Data { return value !== 
 function text(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" && value.length ? value : null; }
 function isText(value: RuntimeV2JsonValue | undefined): value is string { return typeof value === "string" && value.length > 0; }
 function number(value: RuntimeV2JsonValue | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0; }
+
+export function applySessionGrantEvent(state: readonly GrantState[], event: SessionEventEnvelopeV1): readonly GrantState[] {
+  const data = record(event.data);
+  if (event.type === "permission/grant-added") {
+    const grant = grantFromData(data);
+    if (grant === null || state.some(item => item.grantId === grant.grantId)) return state;
+    return [...state, { grantId: grant.grantId, grant, revokedAt: null }];
+  }
+  if (event.type === "permission/grant-revoked") {
+    const grantId = text(data.grantId);
+    if (!grantId) return state;
+    const revokedAt = text(data.revokedAt) ?? event.time;
+    if (!state.some(item => item.grantId === grantId)) return [...state, { grantId, grant: null, revokedAt }];
+    return state.map(item => item.grantId === grantId && item.revokedAt === null ? { ...item, revokedAt } : item);
+  }
+  return state;
+
+}

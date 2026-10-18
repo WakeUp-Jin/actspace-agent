@@ -15,7 +15,7 @@ export type ActiveSessionValue = {
   readonly contextState?: ContextState | null;
   readonly isStreaming: boolean;
   readonly isAborting: boolean;
-  /** 上下文压缩进行中：停止按钮置灰（压缩不可中止）。 */
+  /** 上下文压缩进行中；是否可停止由 onAbort 能力决定。 */
   readonly isCompacting: boolean;
   readonly isSessionReady: boolean;
   readonly sendScrollRequestId: number;

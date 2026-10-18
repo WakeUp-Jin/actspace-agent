@@ -32,9 +32,9 @@ export class RuntimeSessionController {
 
   private liveModel(session: SessionHandle): SessionReadModel {
     let model = this.#models.get(session.header.sessionId);
-    if (!model) { model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(session.journal.events); this.#models.set(session.header.sessionId, model); return model; }
+    if (!model) { model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(session.journal.readEvents()); this.#models.set(session.header.sessionId, model); return model; }
     const seq = model.projections.throughSeq(session.header.sessionId);
-    for (const event of session.journal.events.slice(seq + 1)) {
+    for (const event of session.journal.eventsAfter(seq)) {
       const values = model.apply(event)?.values ?? {};
       const changes = this.#changes.get(session.header.sessionId) ?? new Map();
       changes.set(event.seq, values); this.#changes.set(session.header.sessionId, changes);
@@ -84,16 +84,21 @@ export class RuntimeSessionController {
     const source = await this.readModel(input.sessionId);
     const { model, snapshot, read } = source;
     const live = this.#open.get(input.sessionId);
-    const events = live?.journal.events;
+    const boundaries = live?.journal.project(HISTORY_BOUNDARIES, () => ({ floor: 0, starts: [] as number[], requests: [] as number[] }), (state, event) => {
+      if (event.type === "turn/start") return { ...state, starts: [...state.starts, state.floor] };
+      if (event.type === "turn/end") return { ...state, floor: event.seq + 1 };
+      if (event.type === "request/header") return { ...state, requests: [...state.requests, event.seq] };
+      return state;
+    });
     const end = snapshot.throughJournalSeq + 1;
-    const starts = read?.starts ?? turnStarts(events ?? []);
-    const requestSeqs = read?.requests ?? (events ?? []).filter(event => event.type === "request/header").map(event => event.seq);
+    const starts = read?.starts ?? boundaries?.starts ?? [];
+    const requestSeqs = read?.requests ?? boundaries?.requests ?? [];
     const before = input.beforeSeq ?? end;
     if (!Number.isSafeInteger(before) || before < 0 || before > end || (input.afterSeq !== undefined && (!Number.isSafeInteger(input.afterSeq) || input.afterSeq < -1 || input.afterSeq >= end))) throw new Error("Invalid history cursor.");
     const candidates = starts.filter(seq => seq < before);
     const from = input.afterSeq !== undefined ? input.afterSeq + 1 : candidates.length <= HISTORY_PAGE_TURNS ? 0 : candidates[candidates.length - HISTORY_PAGE_TURNS]!;
     const until = input.afterSeq !== undefined ? end : before;
-    let journal = events ? events.slice(from, until) : await this.#cache.events(read!, from, until);
+    let journal = live ? live.journal.readEvents(from, until) : await this.#cache.events(read!, from, until);
     if (input.afterSeq === undefined && !input.includeToolDetails) journal = slimHistoryWindow(journal);
     const maxEvents = Math.max(1, Math.min(input.maxWindowEvents ?? 2_000, 2_000));
     const maxBytes = Math.max(4_096, Math.min(input.maxWindowBytes ?? 2_000_000, 2_000_000));
@@ -156,7 +161,7 @@ export class RuntimeSessionController {
     const tool = source.snapshot.tools.find(item => item.callId === callId);
     if (!tool) throw new Error("Tool detail is unavailable.");
     const sequences = source.read?.calls[callId];
-    const journal = sequences ? (await Promise.all(sequences.map(seq => this.#cache.events(source.read!, seq, seq + 1)))).flat() : (this.#open.get(sessionId)?.journal.events ?? []).filter(event => event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).callId === callId);
+    const journal = sequences ? (await Promise.all(sequences.map(seq => this.#cache.events(source.read!, seq, seq + 1)))).flat() : (this.#open.get(sessionId)?.journal.readEvents() ?? []).filter(event => event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).callId === callId);
     return { snapshot: { ...source.snapshot, tools: [tool] }, journal, history: { before: null, throughJournalSeq: source.snapshot.throughJournalSeq } };
   }
 
@@ -229,11 +234,9 @@ export class RuntimeSessionController {
     };
   }
   private onFlush(sessionId: string): (throughSeq: number) => void | Promise<void> { return async throughSeq => {
-    // The persistence callback is the durability barrier. Build or refresh the
-    // cold-read checkpoint only after the Journal has reached that barrier.
+    // Durability is independent of browse caches. Cold reads rebuild on demand.
     await this.options.onFlush?.(sessionId, throughSeq);
     if (!this.#ephemeral.has(sessionId)) {
-      await this.#cache.read(sessionId).catch(() => undefined);
       // Global summaries are a lazy read cache. A flush must not initialize
       // every historical Session merely to refresh an unused cache.
       if (!this.#globalIndexReady) return;
@@ -269,9 +272,9 @@ export class RuntimeSessionController {
     });
     return { ...batch, events };
   }
-  async inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]> { const open = this.#open.get(sessionId); if (open !== undefined) return open.journal.events; const inspection = await this.store.inspect(sessionId); if (inspection.header === null || inspection.validation === null) throw new Error(`Session ${sessionId} is corrupt.`); return inspection.events; }
+  async inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]> { const open = this.#open.get(sessionId); if (open !== undefined) return open.journal.readEvents(); const inspection = await this.store.inspect(sessionId); if (inspection.header === null || inspection.validation === null) throw new Error(`Session ${sessionId} is corrupt.`); return inspection.events; }
   async list(): Promise<readonly RuntimeV2SessionListItem[]> { return (await this.browseSessions()).items; }
-  async export(sessionId: string): Promise<string> { const open = this.#open.get(sessionId); if (open !== undefined && this.#ephemeral.has(sessionId)) return [open.header, ...open.journal.events].map((record) => JSON.stringify(record)).join("\n") + "\n"; const inspection = await this.store.inspect(sessionId); if (inspection.header === null) throw new Error(`Session ${sessionId} has no header.`); return [inspection.header, ...inspection.events].map((record) => JSON.stringify(record)).join("\n") + "\n"; }
+  async export(sessionId: string): Promise<string> { const open = this.#open.get(sessionId); if (open !== undefined && this.#ephemeral.has(sessionId)) return [open.header, ...open.journal.readEvents()].map((record) => JSON.stringify(record)).join("\n") + "\n"; const inspection = await this.store.inspect(sessionId); if (inspection.header === null) throw new Error(`Session ${sessionId} has no header.`); return [inspection.header, ...inspection.events].map((record) => JSON.stringify(record)).join("\n") + "\n"; }
   openSessions(): readonly SessionHandle[] { return Object.freeze([...this.#open.values()]); }
   async flushAll(): Promise<void> { for (const session of this.#open.values()) await session.flush(); }
   async closeAll(): Promise<void> {
@@ -281,7 +284,7 @@ export class RuntimeSessionController {
     const closed = await Promise.allSettled(entries.map(async ([sessionId, session]) => {
       let error: unknown;
       try {
-        if (session.journal.events.at(-1)?.type !== "session/end-seed") await session.append({ type: "session/end-seed", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { sessionId: session.header.sessionId, lastSeq: session.lastSeq }, surface: null });
+        if (session.journal.eventsAfter(Math.max(-1, session.lastSeq - 1)).at(-1)?.type !== "session/end-seed") await session.append({ type: "session/end-seed", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { sessionId: session.header.sessionId, lastSeq: session.lastSeq }, surface: null });
         await session.flush();
         // The Session already left #open, so onFlush cannot see the end-seed; record it here.
         if (!this.#ephemeral.has(sessionId) && this.#globalIndexReady) this.#globalIndex.replace(this.summary(this.snapshot(session), this.options.profileId));
@@ -309,6 +312,8 @@ const DEFERRED_DETAIL_BYTES = 24_000;
  * - 已有 assistant/message 定稿的消息，其 assistant/chunk 流式增量客户端会直接跳过（约占 journal 事件的 97%）；
  * - request/context 每次请求都记录一份完整上下文，随对话增长累积；窗口内只保留最新一份给 Context 面板，
  *   其余大快照收敛为模型 / 路由 / 请求参数等身份字段，与大工具事件的 bounded 处理一致。
+ *   系统提示词和工具定义是轨迹「系统」行与工具 Schema 的来源：窗口内第一次请求和它们变化的请求保留原文，
+ *   其余标 `promptUnchanged`，由 renderer 沿用上一份。
  */
 export function slimHistoryWindow(journal: readonly SessionEventEnvelopeV1[]): SessionEventEnvelopeV1[] {
   const completedMessages = new Set<string>();
@@ -324,14 +329,21 @@ export function slimHistoryWindow(journal: readonly SessionEventEnvelopeV1[]): S
     }
     if (event.type === "request/context") latestContextSeq = event.seq;
   }
+  let previousPrompt: string | null = null;
   return journal.flatMap(event => {
     const data = eventData(event);
+    if (event.type === "request/context") {
+      const prompt = requestPrompt(data);
+      const changed = prompt.signature !== previousPrompt;
+      previousPrompt = prompt.signature;
+      if (event.seq !== latestContextSeq && JSON.stringify(event).length > DEFERRED_DETAIL_BYTES) return [boundRequestContextEvent(event, changed ? prompt.fields : null)];
+      return [event];
+    }
     if (event.type === "assistant/chunk" && typeof data?.messageId === "string" && completedMessages.has(data.messageId)) return [];
     if (event.type === "assistant/message" && typeof data?.messageId === "string" && data.firstTokenAt == null && data.firstTokenTime == null) {
       const timing = tokenTimes.get(data.messageId);
       if (timing) return [{ ...event, data: { ...data, firstTokenAt: timing.nonEmpty ?? timing.first } }];
     }
-    if (event.type === "request/context" && event.seq !== latestContextSeq && JSON.stringify(event).length > DEFERRED_DETAIL_BYTES) return [boundRequestContextEvent(event)];
     return [event];
   });
 }
@@ -344,7 +356,17 @@ function hasChunkText(value: RuntimeV2JsonValue | undefined): boolean {
   return record ? hasChunkText(record.text ?? record.content ?? record.value) : false;
 }
 
-function boundRequestContextEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
+const REQUEST_PROMPT_KEYS = ["renderedSystemPrompt", "systemPrompt", "system", "tools", "contextSections", "contextModelFacts"] as const;
+
+function requestPrompt(data: Readonly<Record<string, RuntimeV2JsonValue>> | null): { signature: string; fields: Record<string, RuntimeV2JsonValue> } {
+  const snapshot = jsonRecord(data?.snapshot);
+  const fields: Record<string, RuntimeV2JsonValue> = {};
+  for (const key of REQUEST_PROMPT_KEYS) if (snapshot?.[key] !== undefined) fields[key] = snapshot[key];
+  return { signature: JSON.stringify(fields), fields };
+}
+
+/** `prompt` 为 null 表示与窗口内上一次请求相同，只留 `promptUnchanged` 标记。 */
+function boundRequestContextEvent(event: SessionEventEnvelopeV1, prompt: Record<string, RuntimeV2JsonValue> | null): SessionEventEnvelopeV1 {
   const data = eventData(event);
   if (!data) return event;
   const bounded: Record<string, RuntimeV2JsonValue> = { deferredDetail: true };
@@ -364,6 +386,8 @@ function boundRequestContextEvent(event: SessionEventEnvelopeV1): SessionEventEn
     boundedSnapshot.prepared = boundedPrepared;
   }
   if (snapshot?.requestOptions !== undefined) boundedSnapshot.requestOptions = snapshot.requestOptions;
+  if (prompt === null) boundedSnapshot.promptUnchanged = true;
+  else Object.assign(boundedSnapshot, prompt);
   bounded.snapshot = boundedSnapshot;
   return { ...event, data: bounded };
 }
@@ -402,3 +426,5 @@ function turnStarts(events: readonly SessionEventEnvelopeV1[]): number[] {
 function watermarksFor(session: SessionHandle | undefined, projectionThroughSeq: number, windowThroughSeq: number): RuntimeV2ReadModelWatermarks {
   return { acceptedThroughSeq: session?.acceptedSeq ?? projectionThroughSeq, durableThroughSeq: session?.durableSeq ?? projectionThroughSeq, projectionThroughSeq, windowThroughSeq, indexGeneration: null };
 }
+
+const HISTORY_BOUNDARIES = Symbol("history-boundaries");

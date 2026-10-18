@@ -116,7 +116,7 @@ export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[]): 
 }
 
 export async function applySessionRecovery(session: SessionHandle): Promise<SessionRecoveryPlan | null> {
-  const plan = planSessionRecovery(session.journal.events);
+  const plan = planSessionRecovery(session.journal.readEvents());
   if (plan === null) return null;
   await session.appendMany(plan.candidates);
   await session.flush();

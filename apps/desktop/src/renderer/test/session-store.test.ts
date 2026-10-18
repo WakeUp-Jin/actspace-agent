@@ -129,3 +129,37 @@ describe("Desktop Session refresh retries", () => {
     expect(reads()).toBe(2);
   });
 });
+
+it('observes related sessions without selecting them and stops repairing after release', async () => {
+  let emit!: (event: RuntimeV2LiveEvent) => void;
+  const read = vi.fn(async ({ sessionId }: { sessionId: string }) => projectionFixture(sessionId, 0, [event(0)]));
+  const bridge = createDesktopSessionBridge({ getSessionProjectionSnapshot: read, onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; } });
+  bridge.start(); await bridge.open('parent');
+  const release = bridge.watch('s');
+  await vi.waitFor(() => expect(bridge.store.get('s').snapshot).not.toBeNull());
+  expect(bridge.store.selectedSessionId).toBe('parent');
+  emit(update(1));
+  expect(bridge.store.get('s').window?.events).toHaveLength(2);
+  release();
+  emit(update(3));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(bridge.store.selectedSessionId).toBe('parent');
+  bridge.dispose();
+});
+
+it('keeps related-session read failures visible and retries without changing the parent', async () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  let fail = true;
+  const bridge = createDesktopSessionBridge({ getSessionProjectionSnapshot: async ({ sessionId }) => {
+    if (sessionId === 'child' && fail) throw new Error('child unavailable');
+    return projectionFixture(sessionId);
+  }, onSessionLiveEvent: () => () => {} }, undefined, { retryDelaysMs: [] });
+  bridge.start(); await bridge.open('parent');
+  const release = bridge.watch('child');
+  await vi.waitFor(() => expect(bridge.store.get('child').error).toBe('child unavailable'));
+  fail = false; await bridge.refreshRelated('child');
+  expect(bridge.store.get('child').error).toBeNull();
+  expect(bridge.store.selectedSessionId).toBe('parent');
+  release(); bridge.dispose(); error.mockRestore();
+});

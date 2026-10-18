@@ -109,7 +109,8 @@ export class EnglishLearningService {
     binding.injected.delete(turnId);
     if (!injected) return;
     const sessions = this.ctx.get?.("session.runtime") as { getOpen(id: string): AgentHandle["session"] | undefined } | undefined;
-    const message = completedMessage((sessions?.getOpen(sessionId) ?? binding.session).journal.events, event);
+    const latest = (sessions?.getOpen(sessionId) ?? binding.session).journal.latestEvent("assistant/message", event.seq - 1);
+    const message = completedMessage(latest ? [latest] : [], event);
     if (!message || !injected.has(message.stepId)) return;
     const key = `${sessionId}:${turnId}:${message.messageId}`;
     if (this.seen.has(key)) return;

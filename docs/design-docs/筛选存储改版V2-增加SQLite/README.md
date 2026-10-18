@@ -18,10 +18,13 @@
 
 ## 2. 已确认的核心决策
 
-### 2.1 两层存储
+整体存储归属见[数据存储结构与职责](../core-data-storage-design.md)。本专题只说明查询加速，不代表所有前端读取都经过 SQLite；实时状态与聊天窗口路径见总设计。
+
+### 2.1 事实层与查询层
 
 ```text
-sessions-v2/<session-id>/journal.jsonl       <- 唯一事实源，可读、可导出、可重放
+sessions-v2/<session-id>/journal.jsonl       <- 结构化会话事实，可读、可重放
+artifacts-v2/                              <- 被 Session 引用的正式正文与元数据
 runtime-v2/usage-read-model.sqlite           <- 派生查询索引，可删除、可重建
 ```
 
@@ -46,16 +49,18 @@ sequenceDiagram
     S-->>R: durable revision = N
     Note over I: 此时不强制写 SQLite
     I->>R: 查询时读取 revision
-    alt index revision < durable revision
-        I->>S: 读取 N 之后的增量或变化 Session
+    alt 已处理到 M，且 M 小于 N、游标仍有效
+        I->>S: 从已保存游标读取 M 之后至 N 的增量
         I->>I: 事务写入结构化表/FTS5/聚合
         I-->>R: index revision = N
+    else 索引缺失、失效或游标不可用
+        I->>S: 分批读取事实，重建相关索引
     else 已同步
         I-->>A: 直接查询现有读模型
     end
 ```
 
-这样做的关键收益是：没有查询者时不做索引计算；Agent 写入也不需要等待第二份存储完成。代价是第一次打开使用统计或历史搜索时可能触发一次增量同步，这个成本由 Worker 承担并且只读取落后的部分。
+这样做的关键收益是：没有查询者时不做索引计算；Agent 写入也不需要等待第二份存储完成。代价是第一次打开使用统计或历史搜索时可能触发同步，由 Worker 分批处理。游标有效时只读取落后的部分；索引缺失、版本变化或游标失效时，需要重建相关索引。
 
 ### 2.3 Revision 与水位
 

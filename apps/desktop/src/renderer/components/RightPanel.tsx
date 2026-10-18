@@ -303,7 +303,7 @@ function RightPanelBody({
     return <CodeRenderView content={tab.content} language={tab.language} />;
   }
 
-  return <ContextPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} contextState={contextState} contextRevision={contextRevision} />;
+  return <ContextPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} contextState={contextState} contextRevision={contextRevision} workspaceRoot={workspaceRoot} />;
 }
 
 /**

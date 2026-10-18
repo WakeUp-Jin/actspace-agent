@@ -779,6 +779,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   ipc.handle(contract.usage.getStatus, input => usageReadModels.get(options.registry)?.getStatus(input.requestId) ?? null);
   ipc.handle(contract.usage.cancel, input => usageReadModels.get(options.registry)?.cancel(input.requestId));
   ipc.handle(contract.sessions.describeContextPanel, input => contextPanel.describe(input));
+  ipc.handle(contract.sessions.listContextPaths, input => contextPanel.listPaths(input));
   ipc.handle(contract.sessions.listContextEntries, input => contextPanel.listEntries(input));
   ipc.handle(contract.sessions.readContextEntry, input => contextPanel.readEntry(input));
   ipc.handle(contract.usage.getStatistics, (input) => createUsageStatistics(options.registry, options.roots.dataRoot, input));

@@ -48,6 +48,8 @@ export interface SessionStorageHandle {
   readonly header: SessionHeaderV1;
   readonly access: "read" | "write";
   read(): Promise<SessionStorageSnapshot>;
+  /** Optional direct file history for releasing durable event bodies from a live Journal. */
+  readonly history?: import("@actspace/session-journal").SessionEventHistory;
   append(events: readonly SessionEventEnvelopeV1[]): Promise<void>;
   flush(): Promise<void>;
   assertOwned(): Promise<void>;

@@ -49,3 +49,18 @@ it("does not advance durable sequence when append succeeds but flush fails, and 
   expect(coordinator.blocked).toBe(true);
   await expect(coordinator.close(0)).rejects.toThrow(); expect(closed).toBe(true);
 });
+
+it("backpressures a full queue until a slow durable write finishes", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const coordinator = new SessionPersistenceCoordinator({ append: async () => gate, flush: async () => undefined, assertOwned: async () => undefined, close: async () => undefined }, []);
+  for (let i = 0; i < 127; i++) expect(coordinator.accept(event(i))).toBeUndefined();
+  let completed = false;
+  const waiting = Promise.resolve(coordinator.accept(event(127))).then(() => { completed = true; });
+  await Promise.resolve(); await Promise.resolve();
+  expect(completed).toBe(false);
+  expect(coordinator.durableSeq).toBe(-1);
+  release(); await waiting;
+  expect(coordinator.durableSeq).toBe(127);
+  await coordinator.close(127);
+});

@@ -95,3 +95,5 @@
 ## 工具流交互演示
 
 - [消息流排版原型归档与恢复](../retired-html-demos.md)：静态排版与工具摘要视觉参考。
+
+- [Context 面板 Step 刷新与路径展示交接](front-Context面板Step刷新与路径展示交接.md)：后端与刷新已实现，CloudOps 待补活跃/睡眠路径 UI 和交互验收。

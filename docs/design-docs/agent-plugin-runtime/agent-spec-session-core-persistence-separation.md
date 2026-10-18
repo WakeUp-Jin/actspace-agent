@@ -2,6 +2,8 @@
 
 本规范描述当前实现。它替代早期新增 `session-core` 包、将 write-behind 放进 JSONL Provider 的方案。实施及验收进度见[第二轮清理计划](../../exec-plans/completed/20261004-agent-storage-and-cleanup/README.md)；接口落地不等于整个清理计划或应用验收已完成。
 
+2026-10-18 增量运行态重构已落地，验证见[执行摘要](../../exec-runs/20261018-session-storage-refactor/execution-summary.md)，整体结构见[数据存储设计](../core-data-storage-design.md)。JSONL 与受管附件为完整会话事实；Agent 执行和恢复不依赖 SQLite，查询索引不拥有独有会话事实。
+
 ## 1. 依赖与所有权
 
 | 模块 | 职责 |
@@ -24,6 +26,7 @@ Host Cordis 树装配：`session.journal` → `session.storage` → `session.sto
 
 - Provider：`identity`、`inspect(sessionId)`、`listSessionIds()`、`create(header)`、`open(sessionId, access)`、`discard(handle)`、`close()`。
 - 会话 Handle：`header`、`access`、`read()`、`append(events)`、`flush()`、`assertOwned()`、`close()`。
+- 可选 Handle 历史能力：`history.readEvents(start, end)`，按绝对 seq 读取完整范围，end 不含在内。用于 Journal 释放已持久正文后的回读；当前为同步 Host 端口，不依赖 SQLite。缺失此能力时不淘汰唯一历史。
 - 快照：`revision`、`header`、`events`、`integrity`、可选 `problem`。
 - 可选轻量描述：`querySource` / `querySources` 返回必要 Header 字段、完整前缀 seq 与 Provider 不透明 stamp；Runtime 对打开的 Session 额外以 durableSeq 限定。此能力不返回完整语义 snapshot。Runtime 对调用者返回 `{ sources, failedSessionIds }`，逐会话隔离不可读描述符，并附加独立 codecSetDigest；Provider 未实现查询加速时返回 null，由目录调用者走原 Session 路径。
 - 可选查询加速：`readEventBatch(sessionId, { cursor?, throughSeq })`，返回有界 `events`、不透明 `cursor` 与 `done`；不参与恢复、写入或 flush，cursor 只能由同一 Provider/Session 解释。
@@ -42,6 +45,16 @@ Journal 接纳的事件不等于已经持久化。Coordinator 持有 write-behin
 
 `session/event`、`session/flush` 使用 Cordis 通知；重要写入与持久屏障通过明确的 await 调用完成，不依赖通知监听器返回值。
 
+### 3.1 增量接纳、背压与正文释放
+
+`SessionEventValidator` 只校验新增事件，并保留关系、去重身份和未完成事务。校验及 Surface 发布失败回退本次变更；接纳后的写入失败保留 blocked 状态。自定义 codec 如声明依赖完整 previous 的关系校验，仍按契约显式读取历史，不能宣称所有扩展都固定成本。
+
+write-behind 默认延迟 200 ms、128 条 / 256 KiB；背压计入 pending 与 active，生产者必须等待 append Promise。定时器不是落盘完成时限；大事件或尚未保存的数据可以突破预算。
+
+Journal 默认近期正文预算为 512 条 / 4 MiB。构造、append 或 flush 时根据 durable 水位释放旧正文；JSONL Provider 用内存字节位置索引回读，不每批复制或重新编码全历史。当前 Surface、业务状态和未完成事务保留，去重 ID 与位置索引仍可能增长；这不是进程总内存上限。
+
+`readEvents` / `eventsAfter` 是显式范围读取，`iterateEvents` 分批迭代，`latestEvent` 使用类型索引；兼容 `events` getter 仍表示完整历史。`journal.project` 首次按批折叠，此后仅处理新后缀。
+
 ## 4. 恢复、fork 与附件
 
 物理损坏检测和 JSONL 有效前缀修复归 JSONL；任务中断、未结束轮次和语义恢复事件归 Session 业务层。恢复提交事件是 `recovery/committed`。
@@ -56,7 +69,9 @@ SessionStore 读取父快照，计算合法 fork 种子，预留子会话的 wri
 
 缓存最多保留 3 份完整事件快照，并按序列化字符估算的 16 MiB 预算淘汰；这是保留缓存预算，不是读取过程峰值内存上限。
 
-Session 详情冷读仍读取完整一致快照；revision 未变时复用语义投影。Usage 派生索引使用新增的有界 `readEventBatch`，JSONL Provider 负责在独立 Worker 中解析并校验连续前缀；Main 与通用 Runtime 不解释物理 cursor。旧磁盘 checkpoint 和全局列表缓存不再作为当前真源，全局列表从当前 Provider 重建。此实现简化了后端边界，但不承诺大历史冷读性能与旧文件索引相同；后续优化应在该契约内测量，不能让通用层重新绕过 Provider 读文件。
+打开会话的聊天窗口按 Journal 范围读取。Session 详情冷读仍读取完整一致快照后截取窗口；即使语义缓存命中，也仍先 inspect 来源快照。revision 未变时复用语义投影。Usage 派生索引使用新增的有界 `readEventBatch`，JSONL Provider 负责在独立 Worker 中解析并校验连续前缀；Main 与通用 Runtime 不解释物理 cursor。旧磁盘 checkpoint 和全局列表缓存不再作为当前真源，全局列表从当前 Provider 重建。此实现简化了后端边界，但不承诺大历史冷读性能与旧文件索引相同；后续优化应在该契约内测量，不能让通用层重新绕过 Provider 读文件。
+
+`flush` 不再读取冷缓存；已有 live/global 摘要按当前模型更新。Agent 冷打开与显式导出仍可全量加载，本轮没有新增 JSON 文件检查点。
 
 ## 6. 替换与验证边界
 
@@ -72,6 +87,6 @@ acceptedSeq 与 durableSeq 分离；空日志前缀为 -1，临时会话的 dura
 
 `session/created` 在 live 注册完成后通知，恢复 seed 不逐条重发历史事件；`session/disposed` 报告关闭尝试结果。观察者异常各自诊断，不阻断其他观察者，也不递归写入失败的 Session。
 
-`session.checkpoint.flush` 是必需 awaited Service：LLM dispatch、tool body、下一步和最终 settlement 各自等待检查点；处理器缺失或失败阻断副作用。shutdown 排空 Run、Session 后再释放存储和插件树。JSONL lease 只在实现层检验，业务层不读取锁文件。
+这里的 durability checkpoint 表示持久化屏障，不是写入 `projection-checkpoint.json`。`session.checkpoint.flush` 是必需 awaited Service：LLM dispatch、tool body、下一步和最终 settlement 各自等待检查点；处理器缺失或失败阻断副作用。shutdown 排空 Run、Session 后再释放存储和插件树。JSONL lease 只在实现层检验，业务层不读取锁文件。
 
 创建/恢复失败释放已取得资源；fork 只写新后缀，不重新发送历史通知。中断工具的 outcome-unknown 保守保留，不能自动重试。压缩以追加 summary/replacement 改变未来上下文，失败不提交半事务。历史事实不删除，用户数据不因本次清理迁移。

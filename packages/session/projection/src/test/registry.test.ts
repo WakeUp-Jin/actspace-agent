@@ -124,3 +124,17 @@ describe("SessionProjectionRegistry", () => {
     expect(registry.snapshot("session-1").throughJournalSeq).toBe(0);
   });
 });
+
+it("sealed runtime cells retain no replay bodies and require resync for evicted duplicate proofs", () => {
+  const registry = new SessionProjectionRegistry();
+  registry.register({ key: "count", stateVersion: 1, init: () => 0, apply: state => state + 1, view: state => state });
+  registry.seal();
+  const base = eventJournal()[0]!;
+  for (let seq = 0; seq < 1000; seq++) registry.apply("s", { ...base, seq });
+  expect(registry.retainedEventCount("s")).toBe(0);
+  expect(registry.snapshot("s").values.count).toBe(1000);
+  expect(registry.apply("s", { ...base, seq: 999 })).toBeNull();
+  expect(() => registry.apply("s", { ...base, seq: 999, time: "different" })).toThrow("resync");
+  expect(() => registry.apply("s", base)).toThrow("resync");
+  expect(() => registry.register({ key: "late", stateVersion: 1, init: () => 0, apply: state => state, view: state => state })).toThrow("sealing");
+});

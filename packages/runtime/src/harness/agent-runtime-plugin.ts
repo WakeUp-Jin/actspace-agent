@@ -40,10 +40,13 @@ export class AgentRuntimeService {
         if (!factory) { void lease.release(); throw new Error("Harness has no child factory"); }
         let ledger: TaskLedger | undefined;
         let runId: string | undefined;
+        let releaseLedger: (() => void) | undefined;
         return {
-          scope: lease.scope, createLoop: factory.createSubagentLoop, release: lease.release,
+          scope: lease.scope, createLoop: factory.createSubagentLoop,
+          release: async () => { releaseLedger?.(); await lease.release(); },
           start: async (session, content, id) => {
             ledger = await TaskLedger.open(session);
+            releaseLedger = this.runs.service.registerExternalLedger(ledger);
             const receipt = await ledger.submit(id, content);
             await ledger.start(receipt.task.taskId, id, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, JSON.parse(JSON.stringify({ harnessExecutionDigest: lease.executionDigest, presetId: preset.id, model: preset.model, routeId: preset.routeId, maxSteps: preset.maxSteps, durationMs: preset.maxDurationMs })));
             runId = id;

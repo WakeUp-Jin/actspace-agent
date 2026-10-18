@@ -1,0 +1,145 @@
+The following is a diff from the previous accessibility tree for Window: "actspace" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 152-477
+~147 标准窗口 actspace, Secondary Actions: Raise
+~	148 container actspace
+~		149 container
+~			150 HTML 内容 actspace, URL: 127.0.0.1:5178/
+~				151 container
++					152 切换按钮 Description: 收起会话侧栏, Help: 收起侧栏, Value: 1
++					153 container 会话导航
++						154 按钮 Description: 后退, Help: 返回
++						155 按钮 (disabled) 前进
++					156 切换按钮 Description: 查看执行轨迹, Value: 0
++					157 按钮 查看会话详情： Fixture automatic title
++					158 弹出式按钮 查看工作区环境
++					159 弹出式按钮 Description: 新建右侧面板对象, Help: 新建对象
++					160 切换按钮 Description: 关闭面板, Help: 关闭右侧面板, Value: 1
++					161 container
++						162 按钮 新建会话
++						163 按钮 新建 Space
++						164 按钮 扩展
++						165 按钮 Actor 名册 8
++							166 文本 Actor 名册
++							167 文本 8
++						168 container 会话
++							169 container Space
++								170 按钮 Space 演示
++									171 文本 Space
++									172 文本 演示
++								173 按钮 新建 Space
++								174 按钮 收起 Space
++								175 按钮 支付链路提速 1
++									176 文本 支付链路提速
++									177 文本 1
++								178 按钮 结算页重构
++							179 container
++								180 按钮 工作区
++								181 按钮 搜索会话
++								182 弹出式按钮 视图选项
++								183 按钮 添加工作区
++								184 container
++									185 按钮 收起 workspace
++									186 按钮 workspace, Help: /tmp/actspace-context-storage-cu-20261018/workspace
++									187 container 工作区操作
++										188 弹出式按钮 更多操作：workspace
++										189 按钮 在工作区中新建会话
++								190 按钮 会话状态： 空闲
++								191 按钮 CU Long History 180 turns
++								192 文本 9分钟
++								193 按钮 会话状态： 空闲
++								194 按钮 Fixture automatic title
++								195 文本 9分钟
++						196 按钮 设置
++					197 分离器 Description: 调整会话侧栏宽度, Value: 260
++					198 container
++						199 container
++							200 container 会话消息
++								201 container
++									202 文本 FIXTURE_LONG 联合验收：读取大文件并继续
++									203 按钮 Worked for 7s
++									204 text Fixture completed: fixture-alternate.
++									205 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++									206 按钮 复制回复
++									207 按钮 可视化这条回复
++									208 弹出式按钮 更多消息操作
++									209 弹出式按钮 用量 120K tok，查看本轮用量
++									210 container 回复时间：18:42
++										211 文本 18:42
++								212 container
++									213 文本 FIXTURE_STORAGE CU-EARLY-000
++									214 container
++										215 文本 CU-EARLY-000 first persisted chunk. record-1 record-2 record-3 record-4 record-5 record-6 record-7 record-8 record-9 record-10 record-11 record-12 record-13 record-14 record-15 record-16 record-17 record-18 record-19 record-20 record-21 record-22 record-23 record-24 record-25 record-26 record-27 record-28 record-29 record-30 record-31 record-32 record-33 record-34 record-35 record-36 record-37 record-38 record-39 record-40 record-41 record-42 record-43 record-44 record-45 record-46 record-47 record-48 recor
++										216 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++									217 按钮 复制回复
++									218 按钮 可视化这条回复
++									219 弹出式按钮 更多消息操作
++									220 弹出式按钮 用量 120 tok，查看本轮用量
++									221 container 回复时间：18:53
++										222 文本 18:53
++								223 container
++									224 文本 FIXTURE_TODO
++									225 container Agent Todo list
++										226 按钮 0 of 1 To-dos Completed
++										227 内容列表
++											228 container Pending: CU-TODO-RECOVERY verify storage
++												229 文本 CU-TODO-RECOVERY verify storage
++									230 container
++										231 文本 Fixture completed: fixture-alternate.
++										232 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++									233 按钮 复制回复
++									234 按钮 可视化这条回复
++									235 弹出式按钮 更多消息操作
++									236 弹出式按钮 用量 240 tok，查看本轮用量
++									237 container 回复时间：18:55
++										238 文本 18:55
++								239 container
++									240 文本 CU-ATTACHMENT-RECOVERY 图片持久化验收
++									241 container
++										242 文本 Fixture completed: fixture-alternate.
++										243 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++									244 按钮 复制回复
++									245 按钮 可视化这条回复
++									246 弹出式按钮 更多消息操作
++									247 弹出式按钮 用量 120 tok，查看本轮用量
++									248 container 回复时间：19:07
++										249 文本 19:07
++							250 container 会话轮次导航
++								251 按钮 跳到第 1 轮对话：FIXTURE_LONG 联合验收：读取大文件并继续
++								252 按钮 跳到第 2 轮对话：FIXTURE_STORAGE CU-EARLY-000
++								253 按钮 跳到第 3 轮对话：FIXTURE_TODO
++								254 按钮 跳到第 4 轮对话：CU-ATTACHMENT-RECOVERY 图片持久化验收
++						255 container
++							256 container 待处理的审查操作
++								257 按钮 查看工作区变更
++								258 按钮 更多审查操作
++							259 container 消息输入面板
++								260 container 已附加的文件
++									261 container 已附加的图片 valid.png
++										262 按钮 Description: 预览附加图片 valid.png, Help: valid.png
++										263 按钮 移除 valid.png
++								264 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续追问…
++								265 container 输入框工具栏
++									266 弹出式按钮 添加 Agent、上下文或工具
++									267 弹出式按钮 fixture-main
++										268 文本 fixture-main
++									269 按钮 发送消息
++							270 container 运行位置
++								271 文本 本机
++								272 弹出式按钮 Description: 会话权限模式, Help: 权限：自动。完全权限扩大文件范围并自动批准通过策略检查的 Bash；沙箱和禁止规则仍生效，文件删除及敏感文件仍按策略审批。
++								273 弹出式按钮 4 轮 10 步 · 36 tok/s
++									274 文本 4 轮 10 步
++									275 文本 36 tok/s
++								276 弹出式按钮 121K tok · 缓存命中 0%
++									277 文本 121K tok
++									278 文本 缓存命中 0%
++								279 按钮 上下文用量 50%
++					280 分离器 Description: 调整预览面板宽度, Value: 390
++					281 container
++						282 标签组 右侧面板
++							283 标签 (selected) valid.png, Value: 1
++							284 按钮 关闭 valid.png
++						285 图像 预览图片
++	286 关闭按钮
++	287 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
++	288 最小化按钮
+The focused UI element is 264 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续追问…

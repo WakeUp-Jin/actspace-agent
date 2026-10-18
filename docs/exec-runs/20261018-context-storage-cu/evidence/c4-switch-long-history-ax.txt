@@ -1,0 +1,46 @@
+The following is a diff from the previous accessibility tree for Window: "actspace" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 48, 58, 69, 85, 96, 110, 124, 135, 169, 184-185, 188-189, 192-193, 196-197, 200-201, 204-205, 227-229, 232-233, 248-251, 254-257, 260, 299-302, 305-308, 311-314, 317-320, 323-329, 337-338, 342, 346, 350, 354, 358, 362, 366, 370, 374, 378, 382, 386-389
+~								45 文本 6分钟
++								421 弹出式按钮 更多操作：CU Long History 180 turns
++								422 按钮 归档会话
++								423 按钮 置顶会话
++									424 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										425 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										426 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										427 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										428 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										429 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										430 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+~									168 text 261K tok 缓存命中 0%
+~								183 text 系统提示词 ≈707 3%
+~								187 text 工具 ≈3K 13%
+~								191 text 规则 ≈0 0%
+~								195 text Skills ≈2.7K 12%
+~								199 text 会话摘要 ≈70 <1%
+~								203 text 会话内容 ≈16.5K 72%
+~								226 text 活跃 3 /  100
+~								231 text 睡眠 0 在索引中，按需读取
+~							243 组合框 Description: 对比基准, Value: 最近请求输入（第 6 轮 · 步 1）
+~								247 text 系统提示词 6  项 ≈707 3%
+~								253 text 工具 21  项 ≈3K 13%
+~							258 文本栏 筛选工具
+~							259 组合框 Description: 工具排序, Value: 按大小
+~								298 text 再显示  9  项（共  21 ）
+~								304 text 规则 0  项 ≈0 0%
+~								310 text Skills 26  项 ≈2.7K 12%
+~								316 text 会话摘要 1  项 ≈70 <1%
+~								322 text 会话内容 15  项 + 1 +21 ≈16.5K 72%
+~								336 text 助手 模型回复 新增
+~								341 text 工具结果 工具结果
+~								345 text 工具调用 read_file
+~								349 text 工具结果 工具结果
+~								353 text 工具调用 read_file
+~								357 text 工具结果 工具结果
+~								361 text 工具调用 read_file
+~								365 text 工具结果 工具结果
+~								369 text 工具调用 read_file
+~								373 text 工具结果 工具结果
+~								377 text 工具调用 read_file
+~								381 text 用户 用户消息
+~								385 text 再显示  3  项（共  15 ）
+The focused UI element is 47 按钮 CU Long History 180 turns

@@ -25,8 +25,14 @@ export async function contribute(options: SourceOptions, context: Context, owner
   const sections = []; const modelFacts: RuntimeV2JsonValue[] = []; const modelFactSources: { id: string; owner: string }[] = [];
   for (const item of contributors) {
     const result = await item.resolve(input);
-    if (item.kind === "prompt-section") sections.push({ id: item.id, owner, order: ["core", "profile", "host", "agent", "plugin"].indexOf(item.layer) * 1000 + item.order, content: result.value });
+    if (item.kind === "prompt-section") sections.push({ id: item.id, owner, order: ["core", "profile", "host", "agent", "plugin"].indexOf(item.layer) * 1000 + item.order, content: result.value, ...(result.provenance ? { provenance: result.provenance } : {}) });
     if (item.kind === "model-fact") { modelFacts.push(result.value); modelFactSources.push({ id: item.id, owner }); }
   }
   write({ system: { sections, modelFacts, modelFactSources } });
+}
+
+/** Matches the existing per-Turn prompt loader; Step/request ids are not inputs. */
+export function promptSourceKey(context: Context): string {
+  return JSON.stringify([context.request.turnId ?? context.request.requestId, context.request.routeId,
+    context.request.model, runtimeInfo(context)]);
 }

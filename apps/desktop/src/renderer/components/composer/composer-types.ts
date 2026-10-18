@@ -73,7 +73,7 @@ export type ComposerProps = {
   sessionId?: string | null;
   isStreaming?: boolean;
   isAborting?: boolean;
-  /** 上下文压缩进行中：压缩不可中止，停止按钮置灰。 */
+  /** 上下文压缩进行中；自动压缩可随 Agent 取消，独立操作由 onAbort 能力决定。 */
   isCompacting?: boolean;
   /** 提供时运行中仍可输入：发送进入队列，托盘显示在输入框上方。 */
   messageQueue?: MessageQueueControls;

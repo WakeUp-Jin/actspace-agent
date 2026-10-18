@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Context, ContextIdentity, ContextInstanceSnapshot } from "./types.js";
-import { freezeRequest } from "./request-snapshot.js";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { freezeContextView } from "./context-snapshot.js";
 
 const DEFAULT_LOGICAL_SCOPE = "main";
 
@@ -52,12 +51,12 @@ export class ContextInstanceRegistry {
     const candidate = { ...assembled, status: { ...assembled.status, ...(assembled.status.requestModel || !inheritedModel ? {} : { requestModel: inheritedModel }) } };
     const digest = stateDigest(candidate);
     const revision = previous === undefined ? 1 : previous.digest === digest ? previous.revision : previous.revision + 1;
-    const view = freezeRequest({
+    const view = freezeContextView({
       ...candidate,
       request: { ...candidate.request, logicalAgentScopeId: identity.logicalAgentScopeId },
       status: { ...candidate.status, instanceGeneration: previous?.view.status.instanceGeneration ?? randomUUID(),
         ...(candidate.status.requestModel ? {} : previous?.view.request.model === candidate.request.model && previous?.view.request.routeId === candidate.request.routeId && previous?.view.status.requestModel ? { requestModel: previous.view.status.requestModel } : {}), contextRevision: revision, logicalAgentScopeId: identity.logicalAgentScopeId },
-    } as unknown as RuntimeV2JsonValue) as unknown as Context;
+    });
     const entry: Entry = previous ?? { identity, revision, digest, activeBindings: 0, view };
     entry.revision = revision;
     entry.digest = digest;

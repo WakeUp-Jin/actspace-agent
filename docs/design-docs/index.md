@@ -9,7 +9,7 @@
 
 - [LLM Core Pi 收敛设计](agent-plugin-runtime/agent-llm-core-pi.md)：已实施 Host prepare、重试 generation、pi-ai 直接调用、backend parity 与 replay；外部验收边界见执行摘要。
 
-- [Session 事件持久化重构](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)：核心行为已实施；Session 接纳、持久化协调器、检查点与 live/durable 边界。
+- [Session 事件持久化重构](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)：核心行为已实施；Session 增量接纳、持久化协调器、背压、历史回读与 accepted/durable 边界。
 
 - [Session 三类读模型设计规范](agent-plugin-runtime/agent-spec-runtime-projection.md)：已落地；定义 Global Aggregate、Session Projection、Window Presentation 及其水位、缓存和 Client 边界。
 
@@ -47,6 +47,7 @@
 - `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
 - [ActSpace 产品概念思路（初稿）](ActSpace产品概念思路初稿.md)：产品形象：定位、信念“唯变所适，每一个问题都有它的空间”、故事线、Agent / 场景 / Actor / Actor 名册 / 空间、意象与气质；视觉方向待定。
 - `core-storage-and-observability.md`：本地存储、workspace root 和可观测性边界。
+- [ActSpace 数据存储结构与职责](core-data-storage-design.md)：当前四块存储结构、接纳与落盘写入图、按用途读取图；区分完整事实、当前内存、SQLite 查询缓存和全局配置，明确冷读与检查点限制。
 - `core-review-change-sources.md`：Git-first Review Workbench 单一事实源，覆盖六种 scope、upstream Branch、结构化 diff、Review Options、Git actions 与验收边界。
 - `core-review-large-diff-loading.md`：Review Standard/capped 双模式、批量 patch、完整文件正文、虚拟渲染和性能验收规范。
 - `agent-index.md`：Agent Runtime 和全部 Agent 专题的总入口。
@@ -115,3 +116,5 @@
 - `docs/references/llm-agent-dev-skill-fixes/README.md` 是 Skill 修复分析归档，不作为主线架构事实来源。
 
 - [ActSpace 官网专属设计规范](../../apps/site/DESIGN.md)：产品参考取舍、双主题、排版与官网各页面设计方向。
+
+- [Session 存储职责与实现边界](core-data-storage-responsibilities.md)：Session 文件权威事实、运行态增量投影、近期正文预算与 SQLite 展示查询职责；含本轮实现和验收入口。

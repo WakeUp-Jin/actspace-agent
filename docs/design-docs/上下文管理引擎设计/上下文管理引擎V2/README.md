@@ -14,6 +14,7 @@
 | [04：旧文档与源码漂移核对](04-旧文档与源码漂移核对.md) | 第一版哪些仍有效，哪些是 V2 的有意变化，哪些旧表述已经滞后 |
 | [05：Context 面板与 SQLite 联合设计](05-Context面板与SQLite联合设计.md) | 当前与历史数据如何分工、索引如何同步、面板如何刷新、Bug 修复如何共用基础能力 |
 | [06：原会话决策与联合方案校验](06-原会话决策与联合方案校验.md) | 对照完整 SQLite 会话，哪些是已确认约束、新增提案、历史遗漏；哪些验收仍未完成 |
+| [07：Step 增量更新与披露面板决策记录](07-Step增量更新与披露面板决策记录.md) | 2026-10-18 起持续讨论；读取链路、DSH 参考；T1–T5 后端/刷新已实施，路径 UI 待交接 |
 
 [联合执行计划](../../../exec-plans/completed/20261011-context-sqlite-integration/README.md) · [测试验收计划](../../../exec-plans/completed/20261011-context-sqlite-integration/acceptance.md)
 
@@ -47,3 +48,5 @@ Host/IPC 接线已经由 Runtime 的 `context.engine.getProjection`、Desktop Ap
 联合实施已接入面板与 SQLite，保留原有 Journal、权限、附件、压缩事务和模型适配边界。未来记忆、工作流、质量评估或修复 Agent 保留接入空间，不在本轮新增实现，也不为它们建立空插件包。
 
 包迁移与 V2 生命周期的既有实施记录保留；实现完成不代表未覆盖的验收点已通过。
+
+2026-10-18 追加实现：[Step 更新执行摘要](../../../exec-runs/20261018-context-step-update/execution-summary.md) · [CloudOps 前端交接](../../frontend/front-Context面板Step刷新与路径展示交接.md)。来源依赖缓存、Step 安全点压缩和路径分页已接入；未执行真实 Provider 性能测试或路径 UI 验收。

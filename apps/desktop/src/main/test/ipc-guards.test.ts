@@ -6,6 +6,7 @@ type Case = { spec: InvokeSpec<unknown, unknown>; valid: unknown[]; invalid: unk
 
 const CASES: Record<string, Case> = {
   "sessions.describeContextPanel": { spec: contract.sessions.describeContextPanel, valid: [{ sessionId: "s" }, { sessionId: "s", consumerId: "c", release: true }], invalid: [null, { sessionId: 2 }, { sessionId: "s", retry: "yes" }] },
+  "sessions.listContextPaths": { spec: contract.sessions.listContextPaths, valid: [{ sessionId: "s", revision: "r", visibility: "active" }, { sessionId: "s", revision: "r", visibility: "sleeping", limit: 50 }], invalid: [{ sessionId: "s" }, { sessionId: "s", revision: "r", visibility: "all" }, { sessionId: "s", revision: "r", visibility: "active", limit: -1 }] },
   "sessions.listContextEntries": { spec: contract.sessions.listContextEntries, valid: [{ sessionId: "s", revision: "r", limit: 200 }], invalid: [{ sessionId: "s" }, { sessionId: "s", revision: "r", limit: Infinity }] },
   "sessions.readContextEntry": { spec: contract.sessions.readContextEntry, valid: [{ sessionId: "s", revision: "r", key: "k", offset: 0 }], invalid: [{ sessionId: "s", revision: "r", path: "/etc/passwd" }, { sessionId: "s", revision: "r", key: "k", offset: "1" }] },
   "sessions.listPage": { spec: contract.sessions.listPage, valid: [undefined, {}, { search: "hello", limit: 50 }], invalid: [{ search: "x".repeat(301) }, { limit: 501 }, { pinned: "true" }] },

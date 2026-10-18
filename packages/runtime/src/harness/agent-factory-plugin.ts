@@ -15,7 +15,7 @@ import type { CompactionPlugin } from "@actspace/context-compaction";
 import type { RuntimeSessionController } from "../session/session-controller.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
-import { projectPermissionMode, projectSessionGrants } from "@actspace/session-projection";
+import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
 
 export type AgentFactoryService = {
@@ -74,16 +74,16 @@ export function apply(ctx: CordisContext): AgentFactoryService {
     return Object.freeze({
       ...host.toolEnvironment,
       contextGeneration: session.journal.surface.replaceGeneration,
-      workspaceRoot: resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot),
+      workspaceRoot: resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot),
       permissionMode: () => host.toolEnvironment.permissionModeExplicit
         ? (typeof configuredMode === "function" ? configuredMode() : configuredMode ?? "default")
-        : projectPermissionMode(session.journal.events),
+        : projectPermissionMode(session.journal.latestEvents(["permission/mode-set"])),
       subscribePermissionMode: (listener: () => void) => host.toolEnvironment.permissionModeExplicit
         ? (host.toolEnvironment.subscribePermissionMode?.(listener) ?? (() => undefined))
         : sessions.subscribeProjection(update => {
           if (update.sessionId === session.header.sessionId && update.event.type === "permission/mode-set") listener();
         }),
-      sessionGrants: () => host.toolEnvironment.sessionGrantCapability ? projectSessionGrants(session.journal.events) : [],
+      sessionGrants: () => host.toolEnvironment.sessionGrantCapability ? session.journal.project(SESSION_GRANTS, () => [], applySessionGrantEvent).flatMap(item => item.grant && item.revokedAt === null ? [item.grant] : []) : [],
     });
   };
 
@@ -97,7 +97,7 @@ export function apply(ctx: CordisContext): AgentFactoryService {
   }): Promise<AgentLoop> => {
     scope.disposer.add(sessions.registerExternal(session));
     scope.disposer.add(() => { activeSessions.delete(session.header.sessionId); });
-    const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot);
+    const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot);
     const subject: AgentSubject = Object.freeze({ agentId: agentId ?? scope.agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
     const scopedToolEnvironment = descriptor.kind === "subagent"
       ? (activeSession: import("@actspace/session-persistence").SessionHandle) => ({ ...toolEnvironmentFor(activeSession), sessionGrantCapability: false, sessionGrants: [] })
@@ -137,7 +137,7 @@ export function apply(ctx: CordisContext): AgentFactoryService {
       scope.disposer.add(binding.dispose);
       const subject: AgentSubject = Object.freeze({ agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
       const inbox = new MainAgentInbox(session);
-      const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal.events, host.workspaceRoot);
+      const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot);
       const disclosure = getDisclosure();
       const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, descriptor.kind), observeContextToolResult: disclosure ? (session, event) => disclosure.observe(session, event) : undefined, createContextEngine: options => engine.create({ ...options, disclosure }), descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, modeRuntime: async mode => { const compaction = ctx.get?.("compaction.runtime") as CompactionPlugin | undefined; return { compaction: mode === "chat" && compaction ? engine.compaction.withStrategy(compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))) : engine.compaction }; }, llm, tools, toolEnvironment: activeSession => {
         const environment = toolEnvironmentFor(activeSession);
@@ -235,3 +235,5 @@ export function applyRunFactory(ctx: CordisContext): void {
 function taskContent(content: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue) {
   return content && typeof content === "object" && !Array.isArray(content) && "kind" in content && content.kind === "composer-task" ? content.prepared : content;
 }
+
+const SESSION_GRANTS = Symbol("session-grants");

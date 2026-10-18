@@ -55,7 +55,7 @@ export class OneShotSubagentProvider {
     let admitted = false;
     let result: SubagentTerminalResult;
     try {
-      const workspaceRoot = resolveSessionWorkspaceRoot(input.parentSession.header, input.parentSession.journal.events);
+      const workspaceRoot = resolveSessionWorkspaceRoot(input.parentSession.header, input.parentSession.journal);
       child = await createChildSession({ store: this.options.store, parentSessionId: input.parentSession.header.sessionId, parentBoundarySeq: input.parentSession.lastSeq, parentCallId: input.parentCallId, childSessionId, createdAt: new Date().toISOString(), ...(workspaceRoot ? { cwd: workspaceRoot } : {}), delegationDepth: input.delegationDepth + 1, task: input.task, preset, manifestDigest: this.options.manifestDigest, plugins: this.options.plugins });
       controller.signal.throwIfAborted();
       lease = await this.options.acquireRun?.(preset, controller.signal, input);

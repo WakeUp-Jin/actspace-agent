@@ -15,7 +15,7 @@ export class TaskLedger {
   #failure: unknown;
   #blocked = false;
   #snapshot: TaskSnapshot;
-  private constructor(readonly session: SessionHandle) { this.#snapshot = projectTasks(session.header.sessionId, session.journal.events); }
+  private constructor(readonly session: SessionHandle) { this.#snapshot = projectTasks(session.header.sessionId, session.journal.readEvents()); }
 
   /** Only call once when taking ownership, never when refreshing a client view. */
   static async open(session: SessionHandle): Promise<TaskLedger> {
@@ -141,7 +141,7 @@ export class TaskLedger {
     try {
       const accepted = await this.session.appendMany(events);
       appended = true;
-      const next = projectTasks(this.session.header.sessionId, this.session.journal.events);
+      const next = projectTasks(this.session.header.sessionId, this.session.journal.eventsAfter(this.#snapshot.revision), this.#snapshot);
       await this.session.flush(accepted.at(-1)!.seq);
       this.#snapshot = next;
       for (const listener of this.#listeners) { try { listener(next); } catch { /* observation cannot invalidate a durable commit */ } }

@@ -1441,7 +1441,7 @@ sessionId,
     ]);
   });
 
-  function installCompactBridge(sessionId: string, compactContext: ((input: FixtureCompactionInput) => Promise<FixtureCompactionResult>), execute = vi.fn()) {
+  function installCompactBridge(sessionId: string, compactContext: ((input: FixtureCompactionInput) => Promise<FixtureCompactionResult>), execute = vi.fn(), controls: { onStream?: (callback: (event: RuntimeStreamEvent) => void) => void; abort?: () => Promise<boolean> } = {}) {
     const record = createEmptySessionRecord(sessionId);
     const sessions: SessionListItem[] = [{ id: sessionId, title: "New chat", updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace" }];
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
@@ -1451,7 +1451,7 @@ sessionId,
       "sessions.list": async () => sessions,
       getRecord: async () => record,
       "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
+      "tasks.abort": controls.abort ?? (async () => true),
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
@@ -1474,6 +1474,7 @@ sessionId,
       executeCompaction: compactContext,
       "events.agentStream": (callback) => {
         streamHandler = callback;
+        controls.onStream?.(callback);
         return () => {
           if (streamHandler === callback) {
             streamHandler = null;
@@ -1546,6 +1547,56 @@ sessionId,
     await waitFor(() => {
       expect(screen.queryByText("上下文压缩失败 · 模型请求超时")).not.toBeInTheDocument();
     });
+  });
+
+  it.each(["context_compaction_failed", "context_compaction_finished"] as const)("retains automatic failure after completion and retries (%s)", async (type) => {
+    let emit!: (event: RuntimeStreamEvent) => void;
+    let finish!: () => void;
+    let input!: FixtureRunInput;
+    const compact = vi.fn(async (value: FixtureCompactionInput) => compactedResult(value, "skipped"));
+    const execute = vi.fn((value: FixtureRunInput) => {
+      input = value;
+      return new Promise<AgentRunResult>(resolve => { finish = () => resolve({ ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"), status: "completed" }); });
+    });
+    installCompactBridge("auto-failed", compact, execute, { onStream: callback => { emit = callback; } });
+    renderApp();
+    await userEvent.type(await screen.findByLabelText("消息输入框"), "automatic failure");
+    await userEvent.click(screen.getByLabelText("发送消息"));
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      const identity = { sessionId: input.sessionId, agentRunId: input.agentRunId };
+      emit(type === "context_compaction_failed"
+        ? { ...identity, type, error: { code: "TEST", message: "自动压缩超时", recoverable: true } }
+        : { ...identity, type, payload: { triggerTokens: 100, thresholdTokens: 90, summaryChars: 0, historyRefPath: "session.jsonl", status: "failed", beforeCount: 10, afterCount: 10, reason: "自动压缩超时" } });
+    });
+    expect(await screen.findByText("上下文压缩失败 · 自动压缩超时")).toBeInTheDocument();
+    await act(async () => { finish(); });
+    await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
+    expect(screen.getByText("上下文压缩失败 · 自动压缩超时")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "重试" }));
+    await waitFor(() => expect(compact).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText("上下文压缩失败 · 自动压缩超时")).not.toBeInTheDocument());
+  });
+
+  it("aborts an Agent while automatic compaction is running", async () => {
+    let emit!: (event: RuntimeStreamEvent) => void;
+    let input!: FixtureRunInput;
+    let finish!: () => void;
+    const abort = vi.fn(async () => { finish(); return true; });
+    const execute = vi.fn((value: FixtureRunInput) => {
+      input = value;
+      return new Promise<AgentRunResult>(resolve => { finish = () => resolve({ ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"), status: "aborted" }); });
+    });
+    installCompactBridge("auto-abort", vi.fn(), execute, { onStream: callback => { emit = callback; }, abort });
+    renderApp();
+    await userEvent.type(await screen.findByLabelText("消息输入框"), "automatic compaction");
+    await userEvent.click(screen.getByLabelText("发送消息"));
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+    await act(async () => { emit({ type: "context_compaction_started", sessionId: input.sessionId, agentRunId: input.agentRunId, startedAt: new Date().toISOString() }); });
+    expect(await screen.findByText("正在压缩上下文")).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("停止 Agent"));
+    await waitFor(() => expect(abort).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText("正在压缩上下文")).not.toBeInTheDocument());
   });
 
   it.each([false, true])("renders real loop tools and rehydrates without duplicates (finishOnly=%s)", async (finishOnly) => {

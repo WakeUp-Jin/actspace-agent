@@ -1,5 +1,10 @@
 import { getContextBucketDisplay, type ContextState, type ContextPanelBucketKey, type ContextPanelBucketTokens, type ContextPanelConversationKind, type ContextPanelEntry, type ContextPanelView } from "@actspace/shared";
+import { mockContextPaths, mockDisclosureSummary } from "./context-paths-fixture";
 import type { MockSession } from "./mock-db";
+
+/** 默认场景的披露路径：87 条活跃、342 条睡眠，第 4 周期。 */
+export const MOCK_CONTEXT_PATHS = mockContextPaths();
+export const MOCK_CONTEXT_PATHS_REVISION = "mock-paths";
 
 /**
  * 浏览器 mock 的 Context 面板完整数据，内容照 `docs/design-docs/frontend/context-panel-demo.html`。
@@ -141,6 +146,7 @@ export function mockContextPanelView(sessionId: string, session?: MockSession): 
     contextRevision: 47,
     throughJournalSeq: 1,
     model: { modelKey: "anthropic:claude-opus-5-5", label: "Claude Opus 5.5", contextWindow: 200_000, autoCompactAtTokens: 160_000 },
+    disclosure: mockDisclosureSummary(MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION),
     current: { totalEstimatedTokens: total, buckets: sumBuckets(entries), entries, status: "ready" },
     previous: { requestId: lastRequestId, turnIndex: 8, stepIndex: 47, sentAt: "2026-10-11T10:58:00.000Z", totalEstimatedTokens: previousTotal, buckets: sumBuckets(previousEntries), entries: previousEntries },
     stats: {

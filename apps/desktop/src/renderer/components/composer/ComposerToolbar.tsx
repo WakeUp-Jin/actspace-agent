@@ -27,6 +27,8 @@ export type ComposerSendState = {
   readonly isStreaming: boolean;
   readonly isAborting: boolean;
   readonly isCompacting: boolean;
+  /** 独立操作没有 Agent run 可取消时为 false。 */
+  readonly canAbort?: boolean;
   /** 调用方接了消息队列：运行中有内容时发送即入队。 */
   readonly queueEnabled: boolean;
   /** 有内容、模型可用、不在提交中。 */
@@ -45,9 +47,9 @@ export type ComposerSendState = {
 export function composerSendButtonState(state: ComposerSendState) {
   const showStop = state.isStreaming && !(state.queueEnabled && state.canSend);
   const queueing = state.isStreaming && !showStop;
-  const stopBlockedByCompaction = showStop && state.isCompacting;
+  const stopBlockedByCompaction = showStop && state.isCompacting && state.canAbort === false;
   const stopUnreachable = showStop && state.notReady && !state.hostReachable ? state.notReady : null;
-  const disabled = showStop ? state.isAborting || stopBlockedByCompaction || stopUnreachable !== null : !state.canSend;
+  const disabled = showStop ? state.isAborting || state.canAbort === false || stopUnreachable !== null : !state.canSend;
   const modelUnavailable = !state.modelAvailable;
   const tooltip = stopBlockedByCompaction
     ? "压缩完成后可继续"
@@ -100,7 +102,7 @@ export type ComposerToolbarProps = {
  * 同时让 + / 模式 / 模型 / 发送直接参与外层 grid 的 grid-template-areas 排布。
  */
 export function ComposerToolbar({ mode, isStreaming, paletteOpen, onTogglePalette, onExitMode, model, send, onSend, onAbort }: ComposerToolbarProps) {
-  const sendButton = composerSendButtonState(send);
+  const sendButton = composerSendButtonState({ ...send, canAbort: Boolean(onAbort) });
   const modeMeta = mode === "agent" ? null : MODE_META[mode];
   const ModeIcon = modeMeta?.icon;
 

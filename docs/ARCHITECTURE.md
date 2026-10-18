@@ -98,6 +98,8 @@ runtime --(Host capability)--> browser-bridge
 
 ## 当前已确认的实现方向
 
+存储结构与读写路线见[数据存储结构与职责](design-docs/core-data-storage-design.md)：Session JSONL 与附件保存完整事实，内存维护当前运行状态，SQLite 按需提供查询加速，全局配置独立管理。
+
 - 桌面端首版采用 `Electron + React + TypeScript + Vite`。
 - 交互基础组件优先采用 `Radix UI` primitives，而不是直接依赖重样式组件库。
 - 本地数据优先使用 `jsonl` 文件存储，直接落盘到用户电脑。

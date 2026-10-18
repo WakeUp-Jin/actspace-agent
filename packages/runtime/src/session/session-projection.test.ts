@@ -63,6 +63,25 @@ describe("history window slimming", () => {
     expect(older!.data).toEqual({ deferredDetail: true, turnId: "t", stepId: "s", requestId: "r0", snapshot: { prepared: { model: "m", route: "r", contextWindow: 1000 }, requestOptions: { temperature: 0 } } });
     expect(JSON.stringify(latest!.data)).toContain("x".repeat(30_000));
   });
+
+  it("keeps the system prompt and tools of bounded requests only where they first appear or change", () => {
+    const withPrompt = (seq: number, system: string, tools: string[]) => {
+      const event = bigContext(seq, `r${seq}`);
+      const data = event.data as { snapshot: Record<string, unknown> };
+      return { ...event, data: { ...data, snapshot: { ...data.snapshot, renderedSystemPrompt: system, systemSections: [system], contextSections: [{ id: "base", owner: "system", order: 0, content: system }], contextModelFacts: [], tools: tools.map(name => ({ name })) } } } as typeof event;
+    };
+    const out = slimHistoryWindow([withPrompt(0, "A", ["read"]), withPrompt(1, "A", ["read"]), withPrompt(2, "A", ["read", "write"]), withPrompt(3, "B", ["read", "write"]), withPrompt(4, "B", ["read", "write"])]);
+    const snapshots = out.map(event => (event.data as { snapshot: Record<string, unknown> }).snapshot);
+    expect(snapshots[0]).toMatchObject({ renderedSystemPrompt: "A", tools: [{ name: "read" }] });
+    expect(snapshots[0]).not.toHaveProperty("systemSections");
+    expect(snapshots[0]).toHaveProperty("contextSections", [{ id: "base", owner: "system", order: 0, content: "A" }]);
+    expect(snapshots[1]).not.toHaveProperty("contextSections");
+    expect(snapshots[1]).toMatchObject({ promptUnchanged: true });
+    expect(snapshots[1]).not.toHaveProperty("tools");
+    expect(snapshots[2]).toMatchObject({ renderedSystemPrompt: "A", tools: [{ name: "read" }, { name: "write" }] });
+    expect(snapshots[3]).toMatchObject({ renderedSystemPrompt: "B" });
+    expect(snapshots[4]).toHaveProperty("systemSections");
+  });
 });
 
 describe("production Session projections", () => {

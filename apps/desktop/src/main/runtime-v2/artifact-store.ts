@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
 import type { ToolArtifactOwner, ToolArtifactRef } from "@actspace/tools-runtime";
 
@@ -28,8 +28,12 @@ export class DesktopArtifactStore {
     });
     const metadata: ArtifactMetadata = Object.freeze({ schemaVersion: 1, ...ref, owner: Object.freeze({ ...input.owner }) });
     try {
-      await writeFile(path, input.bytes, { flag: "wx" });
-      await writeFile(metadataPath, `${JSON.stringify(metadata)}\n`, { encoding: "utf8", flag: "wx" });
+      const file = await open(path, "wx", 0o600);
+      try { await file.writeFile(input.bytes); await file.sync(); } finally { await file.close(); }
+      const meta = await open(metadataPath, "wx", 0o600);
+      try { await meta.writeFile(`${JSON.stringify(metadata)}\n`); await meta.sync(); } finally { await meta.close(); }
+      const directory = await open(this.root, "r");
+      try { await directory.sync(); } finally { await directory.close(); }
       return ref;
     } catch (error) {
       await Promise.allSettled([rm(path, { force: true }), rm(metadataPath, { force: true })]);

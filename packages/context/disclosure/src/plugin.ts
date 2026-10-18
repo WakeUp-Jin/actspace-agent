@@ -3,7 +3,7 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { Context, ContextPathState, ContextSource, CompactionDisclosure, CompactionRegion, CompactionResult, CompactionSession, ContextCompactionCoordinator } from "@actspace/context-engine";
 import { CONTEXT_OWNER, STATE_EVENT } from "@actspace/context-engine/codec";
-import { ContextSupplements } from "@actspace/context-engine";
+import { ContextSupplements, contextEvents, latestContextEvent } from "@actspace/context-engine";
 import { applyStateEvent, candidatePaths, emptyDisclosureState, registerPaths, type DisclosureState, type StateOperation } from "@actspace/context-engine/state";
 import { selectActive } from "./policy.js";
 import { collectPathHints, referenceText, type DisclosureHost, type PathReference } from "./paths.js";
@@ -18,7 +18,7 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
   private state(session: CompactionSession): DisclosureState {
     let state = this.states.get(session);
     if (!state) { state = emptyDisclosureState(); this.states.set(session, state); }
-    for (const event of session.journal.events.slice(state.throughSeq + 1)) applyStateEvent(state, event);
+    for (const event of contextEvents(session, state.throughSeq + 1)) applyStateEvent(state, event);
     return state;
   }
   private async append(session: CompactionSession, data: StateOperation): Promise<void> {
@@ -46,10 +46,10 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
     const state = this.state(session);
     let scanned = this.scanned.get(session);
     if (!scanned || scanned.seq < state.boundary) {
-      const previous = session.journal.events.slice(0, state.boundary + 1).reverse().find(event => event.type === "request/context");
+      const previous = latestContextEvent(session, "request/context", state.boundary);
       scanned = { seq: state.boundary, enabled: previous ? disclosureEnabled(previous) : false };
     }
-    for (const event of session.journal.events.slice(scanned.seq + 1)) {
+    for (const event of contextEvents(session, scanned.seq + 1)) {
       if (event.type === "request/context") {
         scanned.enabled = disclosureEnabled(event);
       }
@@ -145,7 +145,7 @@ export function batchReferences(paths: readonly PathReference[]): readonly (read
   return batches;
 }
 export function createDisclosureSource(): ContextSource {
-  return { id: "context-disclosure", owner: DISCLOSURE_OWNER, order: 60, criticality: "required", fields: ["supplements"], get: (context, write) => {
+  return { id: "context-disclosure", owner: DISCLOSURE_OWNER, order: 60, criticality: "required", fields: ["supplements"], cacheKey: context => JSON.stringify([context.status.cycle, context.status.paths, context.status.sleepingDirectory]), get: (context, write) => {
     const active = context.status.paths.filter(path => path.visibility === "active");
     const sleeping = context.status.sleepingDirectory;
     const text = [...(active.length ? ["Current active context files (this list supersedes earlier navigation lists):", ...active.map(path => `- ${referenceText(path)}`)] : []), ...(sleeping ? [`Sleeping references index: ${JSON.stringify(sleeping.path)}. Read it to discover other files.`] : [])].join("\n");

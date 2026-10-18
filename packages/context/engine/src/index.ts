@@ -18,3 +18,5 @@ export * from "./disclosure-contract.js";
 export * from "./content-manifest.js";
 
 export * from "./persisted-manifest.js";
+
+export { contextEvents, latestContextEvent } from "./supplements.js";

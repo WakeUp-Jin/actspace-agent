@@ -15,6 +15,8 @@ export class SessionWriteBehind {
   readonly #maxBytes: number;
   #pending: SessionEventEnvelopeV1[] = [];
   #pendingBytes = 0;
+  #activeEvents = 0;
+  #activeBytes = 0;
   #timer: ReturnType<typeof setTimeout> | undefined;
   #active: Promise<void> | undefined;
   #barrier: Promise<void> | undefined;
@@ -35,7 +37,7 @@ export class SessionWriteBehind {
     if (this.#closed) throw new SessionError("SESSION_CLOSED", "Session write-behind is closed.");
     if (this.#blocked !== undefined) throw new SessionError("SESSION_DURABILITY_FAILED", "Session writer is blocked after a durability failure.", this.#blocked);
     this.#pending.push(event);
-    this.#pendingBytes += JSON.stringify(event).length;
+    this.#pendingBytes += Buffer.byteLength(JSON.stringify(event));
     if (this.#pending.length >= this.#maxEvents || this.#pendingBytes >= this.#maxBytes) {
       this.#cancelTimer();
       void this.#startBackground();
@@ -46,6 +48,11 @@ export class SessionWriteBehind {
       }, this.#maxDelayMs);
       this.#timer.unref?.();
     }
+  }
+
+  /** The producer waits at the queue budget; a slow fsync cannot accumulate unlimited batches. */
+  waitForCapacity(): Promise<void> | undefined {
+    return this.#pending.length + this.#activeEvents >= this.#maxEvents || this.#pendingBytes + this.#activeBytes >= this.#maxBytes ? this.flush() : undefined;
   }
 
   flush(): Promise<void> {
@@ -91,19 +98,20 @@ export class SessionWriteBehind {
 
   #startWrite(background: boolean): Promise<void> {
     const batch = this.#pending;
+    this.#activeEvents = batch.length; this.#activeBytes = this.#pendingBytes;
     this.#pending = [];
     this.#pendingBytes = 0;
     const operation = Promise.resolve()
       .then(() => this.options.write(batch))
       .catch((error: unknown) => {
         this.#pending = batch.concat(this.#pending);
-        this.#pendingBytes = this.#pending.reduce((size, event) => size + JSON.stringify(event).length, 0);
+        this.#pendingBytes = this.#pending.reduce((size, event) => size + Buffer.byteLength(JSON.stringify(event)), 0);
         this.#blocked = error;
         if (background) this.options.reportBackgroundFailure(error);
         throw error;
       })
       .finally(() => {
-        this.#active = undefined;
+        this.#active = undefined; this.#activeEvents = 0; this.#activeBytes = 0;
       });
     this.#active = operation;
     return operation;

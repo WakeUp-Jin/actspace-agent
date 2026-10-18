@@ -119,3 +119,19 @@ it("rejects old timing checkpoints so history can rebuild under the retry-aware 
   expect(() => registry.restore("old", old)).toThrow("version mismatch: sessionStats");
   expect(registry.stateVersions.sessionStats).toBe(3);
 });
+
+it("releases closed Step usage correction state while retaining exact totals and known zero cost", () => {
+  const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value); registry.seal();
+  let seq = 0;
+  const append = (type: string, data: Record<string, unknown>) => registry.apply("bounded", { recordKind: "event", type, seq: seq++, eventVersion: 1, criticality: "required", source, time: "2026-10-18T00:00:00Z", data, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } } as never);
+  for (let index = 0; index < 1000; index++) {
+    const stepId = `s${index}`, requestId = `r${index}`;
+    append("step/start", { stepId });
+    append("request/header", { stepId, requestId });
+    append("assistant/message", { stepId, requestId, usage: { inputTokens: 3, outputTokens: 2, cost: 0, costCurrency: "USD", costProvenance: { version: 1, basis: "provider-reported" } } });
+    append("step/end", { stepId, usage: { inputTokens: 900, outputTokens: 900 } });
+  }
+  expect(registry.snapshot("bounded").values.providerUsage).toMatchObject({ inputTokens: 3000, outputTokens: 2000, totalTokens: 5000, costUsd: 0 });
+  const state = registry.checkpoint("bounded").rows.providerUsage!.state as Record<string, unknown>;
+  expect(state.selected).toEqual({}); expect(state.requests).toEqual({}); expect(state.activeStep).toBeNull();
+});

@@ -1,3 +1,5 @@
+import { disclosurePaths, disclosureSummary, contextPathsPage } from "./context-paths";
+import type { ContextPathsInput, ContextPathsPage } from "@actspace/shared";
 import { createHash } from "node:crypto";
 import type { ContextEntriesInput, ContextEntriesPage, ContextEntryInput, ContextEntryText, ContextPanelEntry, ContextPanelHistory, ContextPanelResponse, ContextPanelView, DescribeContextPanelInput, ManagedContextProjection, ContextState } from "@actspace/shared";
 import { getContextBucketDisplay } from "@actspace/shared";
@@ -40,7 +42,7 @@ export class ContextPanelService {
     const view: ContextPanelView = {
       schemaVersion: 2, sessionId, logicalAgentScopeId: projection?.identity.logicalAgentScopeId ?? result?.logicalAgentScopeId ?? `main:${sessionId}`,
       contextRevision: projection?.contextRevision ?? 0, throughJournalSeq: projection?.throughJournalSeq ?? result?.revision ?? -1,
-      currentVersion, versionToken, history, model: projection?.model ?? result?.model ?? null,
+      currentVersion, versionToken, history, disclosure: disclosureSummary(projection, currentVersion), model: projection?.model ?? result?.model ?? null,
       current: { basis: projection ? "current-context" : prior ? "last-request" : "unavailable", status: manifest ? "ready" : prior ? "stale" : "unavailable", totalEstimatedTokens: manifest?.totalEstimatedTokens ?? prior?.totalEstimatedTokens ?? 0, buckets: manifest?.buckets ?? prior?.buckets ?? {}, entries: [] },
       previous: prior ? { ...prior, entries: [] } : null,
       stats: result && (history.status === "ready" || history.status === "fallback") && result.revision >= history.targetThroughSeq ? result.stats : null,
@@ -69,6 +71,14 @@ export class ContextPanelService {
     // history. Absence is exposed as last-request/unavailable, never live-ready.
     try { return await this.runtime.readContextProjection(sessionId); }
     catch { return null; }
+  }
+  async listPaths(input: ContextPathsInput): Promise<ContextPathsPage> {
+    const cached = this.#views.get(input.sessionId);
+    if (!cached || cached.view.currentVersion !== input.revision) throw new Error("Context revision stale; reload the panel.");
+    const current = await this.#current(input.sessionId, cached.version);
+    const paths = disclosurePaths(current.projection);
+    if (paths === null) throw new Error("Context disclosure unavailable.");
+    return contextPathsPage(paths, input);
   }
   async listEntries(input: ContextEntriesInput): Promise<ContextEntriesPage> { return this.#page(await this.#current(input.sessionId, input.revision), input); }
   async readEntry(input: ContextEntryInput): Promise<ContextEntryText> {

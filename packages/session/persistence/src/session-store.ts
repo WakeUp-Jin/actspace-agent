@@ -90,8 +90,8 @@ export class SessionStore {
     const report = options.onBackgroundFailure ?? (() => undefined);
     const notify = (event: import("@actspace/session-journal").SessionEventEnvelopeV1) => { void Promise.resolve().then(() => options.onEvent?.(event)).catch(report); };
     return SessionHandle.create({ header: handle.header, registry: this.options.registry, driver: handle, seed: snapshot.events, now: options.now,
-      onEvent: event => { coordinator.accept(event); notify(event); },
-      onEvents: events => { coordinator.acceptMany(events); events.forEach(notify); },
+      onEvent: async event => { await coordinator.accept(event); notify(event); },
+      onEvents: async events => { await coordinator.acceptMany(events); events.forEach(notify); },
       onFlush: async seq => { await coordinator.flush(seq); await options.onFlush?.(seq); },
       onClose: seq => coordinator.close(seq), durableSeq: () => coordinator.durableSeq, durabilityBlocked: () => coordinator.blocked,
     });

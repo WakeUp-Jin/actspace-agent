@@ -14,3 +14,5 @@ export * from "./journal.js";
 export * from "./surface.js";
 
 export * from "./workspace.js";
+
+export * from "./history.js";

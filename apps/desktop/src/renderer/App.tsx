@@ -786,6 +786,12 @@ export function App() {
       }
 
       handleStreamEvent(event);
+      // Live 压缩块随 run 释放；失败提示由会话本地状态接续，成功或再次开始压缩时清除。
+      if (run && run.agentRunId === event.agentRunId && !liveRuns.isTerminal(event.agentRunId) &&
+        (event.type === "context_compaction_failed" || event.type === "context_compaction_finished" || event.type === "context_compaction_started")) {
+        const block = run.state.activeCompactions.get(event.agentRunId);
+        setCompactionFailureForSession(event.sessionId, block?.status === "failed" ? block : null);
+      }
       if (run && (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed")) {
         // Host events settle every run; no renderer-owned execution promise.
         void readSidebarSessions().then(setSessions).catch(console.error);
@@ -796,7 +802,7 @@ export function App() {
         });
       }
     });
-  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal, setLocalFlag]);
+  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal, setLocalFlag, setCompactionFailureForSession]);
 
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
     const selectionRequest = messageRequestRef.current;
@@ -1484,7 +1490,7 @@ export function App() {
   });
   const activeSession = useShallowStable<ActiveSessionValue>({
     sessionId: activeSessionId, title, messages, contextSnapshot, contextState, isStreaming, isAborting, isCompacting, isSessionReady,
-    sendScrollRequestId, composerFocusRequestId, onSend: handleSend, onAbort: handleAbort, onRetryCompaction: handleRetryCompaction,
+    sendScrollRequestId, composerFocusRequestId, onSend: handleSend, onAbort: activeSessionId && liveRuns.get(activeSessionId)?.operationTaskId ? undefined : handleAbort, onRetryCompaction: handleRetryCompaction,
   });
   const drafts = useSessionDrafts(localStore, activeSessionId);
   const activeComposerNotice = composerNotice && composerNotice.sessionId === activeSessionId ? composerNotice.text : null;

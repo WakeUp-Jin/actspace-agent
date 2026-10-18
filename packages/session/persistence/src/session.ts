@@ -42,7 +42,8 @@ export class SessionHandle {
   }
 
   static async create(options: CreatePersistentSessionOptions): Promise<SessionHandle> {
-    const journal = new SessionJournal({ registry: options.registry, now: options.now, seed: options.seed });
+    const journal = new SessionJournal({ registry: options.registry, now: options.now, seed: options.seed, history: options.driver.history });
+    journal.releaseDurable(options.durableSeq?.() ?? -1);
     return new SessionHandle(options.header, journal, options.driver, options.onEvent, options.onEvents, options.onFlush, options.onClose, options.durableSeq, options.durabilityBlocked);
   }
 
@@ -65,6 +66,7 @@ export class SessionHandle {
         this.#blocked = error;
         throw error;
       }
+      this.journal.releaseDurable(this.durableSeq ?? -1);
       return event;
     });
   }
@@ -82,6 +84,7 @@ export class SessionHandle {
         this.#blocked = error;
         throw error;
       }
+      this.journal.releaseDurable(this.durableSeq ?? -1);
       return events;
     });
   }
@@ -92,6 +95,7 @@ export class SessionHandle {
       this.#assertWritable();
       if (this.journal.lastSeq < throughSeq) throw new SessionError("INVALID_EVENT", `Cannot flush unknown seq ${throughSeq}.`);
       await this.onFlush?.(throughSeq);
+      this.journal.releaseDurable(this.durableSeq ?? -1);
     });
   }
 

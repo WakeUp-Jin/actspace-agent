@@ -89,3 +89,23 @@ it("query descriptors wait for the real writer fsync while old durable cursors r
     expect((await storage.readEventBatch("durable", { throughSeq: after.throughSeq, cursor })).events).toEqual([event]);
   } finally { release(); await storage.close(); await rm(dataRoot, { recursive: true, force: true }); }
 });
+
+it("reads indexed ranges from legacy JSONL containing empty lines and non-ASCII text", async () => {
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const dataRoot = await mkdtemp(join(tmpdir(), "storage-legacy-range-"));
+  const registry = createCoreCodecRegistry();
+  const storage = new JsonlSessionStorage({ dataRoot, runtimeId: "test", registry });
+  const header = createSessionHeader({ sessionId: "legacy", createdAt: "2026-10-18T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } });
+  const journal = new SessionJournal({ registry });
+  journal.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: "中文🌱" }, surface: null });
+  try {
+    await mkdir(join(dataRoot, "sessions-v2", "legacy"), { recursive: true });
+    await writeFile(storage.journalPath("legacy"), `\n${JSON.stringify(header)}\n\n${JSON.stringify(journal.events[0])}\n\n`);
+    const writer = await storage.open("legacy", "write");
+    expect(writer.history!.readEvents(0, 1)).toEqual(journal.events);
+    const next = journal.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: "second" }, surface: null });
+    await writer.append([next]); await writer.flush();
+    expect(writer.history!.readEvents(0, 2)).toEqual(journal.events);
+    await writer.close();
+  } finally { await storage.close(); await rm(dataRoot, { recursive: true, force: true }); }
+});

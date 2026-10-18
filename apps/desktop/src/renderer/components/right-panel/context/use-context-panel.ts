@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ContextState } from "@actspace/shared";
+import { liveEvents } from "../../../api/live-events";
 import { sessionsApi } from "../../../api/sessions";
 import { useOptionalSessionProjection } from "../../../session";
 import { buildInterimPanelView, type ContextPanelData } from "./context-panel-model";
@@ -62,9 +63,10 @@ export function useContextPanel({ sessionId, revision, fallbackState }: {
     };
     refresh.current = retry => void run(retry);
     const visibility = () => { if (document.hidden) { clearTimeout(timer); release(); } else void run(); };
+    const unsubscribe = liveEvents.onMessage("context-updated", ({ event }) => { if (event.sessionId === sessionId) void run(); });
     document.addEventListener("visibilitychange", visibility);
     void run();
-    return () => { stopped = true; refresh.current = () => {}; clearTimeout(timer); document.removeEventListener("visibilitychange", visibility); release(); };
+    return () => { unsubscribe(); stopped = true; refresh.current = () => {}; clearTimeout(timer); document.removeEventListener("visibilitychange", visibility); release(); };
   }, [sessionId]);
   const previousRevision = useRef(revision);
   useEffect(() => { if (previousRevision.current !== revision) { previousRevision.current = revision; refresh.current(); } }, [revision]);
@@ -83,5 +85,5 @@ export function useContextPanel({ sessionId, revision, fallbackState }: {
     } catch (reason) { if (dataRef.current?.view.sessionId === sessionId) setError(reason instanceof Error ? reason.message : "读取更多条目失败"); }
     finally { setPaging(false); }
   };
-  return { data, loading, error, paging, loadMore, retry: () => refresh.current(true) };
+  return { data, loading, error, paging, loadMore, retry: () => refresh.current(true), refresh: () => refresh.current() };
 }

@@ -68,3 +68,10 @@ Desktop 本地首发、忙碌补充和远端都通过 submitTask 返回持久 re
 Headless 的 submit-and-wait 返回通用 outcome/value，等待 Run settlement 和资源释放后才返回。默认 Loop 的 reason/steps 不属于应用出口前置条件；CLI 可选读取 value.finalText。
 
 `/compact` 是持久 Task operation：占同一调度槽，pending 可取消，执行时不创建 Loop Run，不能作为普通提示发给模型。operation-finish 保存 compacted 或错误结果以支持观察；UI 首次加载历史不重复弹出旧操作通知。会话运行中不切换模式，下一条空闲输入可选择新模式。
+
+
+## Provider-owned 子 Run 的观察边界（2026-10-18）
+
+直接子智能体的 TaskLedger 由 Subagent lease 创建、完成和释放。接纳任务前通过 AgentService.registerExternalLedger 登记；Host snapshot 只能读取它的已确认状态，不能为这个 Session 再执行 TaskLedger.open/recover。外部持有期间，另一个调度入口必须返回 SESSION_BUSY。lease 释放时解除登记，Host 关闭仍先排空子执行，再释放 Harness；外部 Ledger 不转移给 SessionRunManager。
+
+该约束防止 UI 或 RPC 的只读任务查询将正在运行的子任务误恢复成 interrupted。实现与验证见[修复记录](../../exec-runs/20261018-subagent-durability/execution-summary.md)。

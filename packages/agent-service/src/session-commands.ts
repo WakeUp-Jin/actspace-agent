@@ -22,7 +22,7 @@ export class SessionModeWriter {
 }
 
 export async function setInitialSessionTitle(session: SessionHandle, title: string | undefined): Promise<void> {
-  if (title === undefined || session.journal.events.some(event => event.type === "session/title-set")) return;
+  if (title === undefined || session.journal.latestEvent("session/title-set") !== undefined) return;
   await session.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: title.trim().slice(0, 160) || null }, surface: null });
   await session.flush();
 }

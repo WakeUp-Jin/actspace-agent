@@ -133,3 +133,14 @@ describe('DetailPanel', () => {
     expect(screen.getByText('v4')).toBeInTheDocument();
   });
 });
+
+it('shows the recorded context start time in overview and supports timestamp switching', async () => {
+  const original = cellOf(cell => cell.kind === 'user');
+  const cell: TrajectoryCell = { ...original, kind: 'context', startedAt: 1700000000000,
+    record: { ...original.record, kind: 'context', startedAt: '2023-11-14T22:13:20.000Z' } };
+  setup(record(cell), 'overview');
+  expect(screen.getByText('开始时间')).toBeInTheDocument();
+  const toggle = screen.getByTitle('显示 Unix 时间戳');
+  await userEvent.setup().click(toggle);
+  expect(toggle.textContent).toContain('1700000000');
+});

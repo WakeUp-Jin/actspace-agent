@@ -1,10 +1,11 @@
+import { JsonlEventHistory } from "./event-history.js";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { SessionError, validateSessionEvents, validateSessionHeader, type EventCodecRegistry, type SessionHeaderV1 } from "@actspace/session-journal";
+import { SessionError, SessionEventValidator, validateSessionHeader, type EventCodecRegistry, type SessionHeaderV1 } from "@actspace/session-journal";
 import type { SessionStorage, SessionStorageHandle, SessionStorageSnapshot } from "@actspace/session-storage";
 import { inspectJsonlSession } from "./jsonl-reader.js";
-import { JsonlSessionWriter, encodeRows, type JsonlWriterHooks } from "./jsonl-writer.js";
+import { JsonlSessionWriter, type JsonlWriterHooks } from "./jsonl-writer.js";
 import { sessionFileLayout } from "./layout.js";
 import { JsonlQueryReader } from "./query-reader.js";
 import { queryStamp } from "./query-stamp.js";
@@ -133,28 +134,44 @@ export class JsonlSessionStorage implements SessionStorage {
   #handle(snapshot: SessionStorageSnapshot, access: "read" | "write", writer?: JsonlSessionWriter, lease?: SessionWriterLease, initialStamp?: string): SessionStorageHandle {
     this.#assertOpen();
     if (!snapshot.header) throw new SessionError("SESSION_CORRUPT", "Missing session header.");
-    let current = snapshot; let closed = false; let blocked = false;
+    const header = snapshot.header;
+    const validator = new SessionEventValidator(this.options.registry);
+    validator.append(snapshot.events);
+    const history = new JsonlEventHistory(this.journalPath(header.sessionId), snapshot.events.length);
+    let lastSeq = snapshot.events.at(-1)?.seq ?? -1;
+    // Release event bodies after validation. Explicit reads reload the authoritative file.
+    snapshot = { ...snapshot, events: [] };
+    let closed = false; let blocked = false;
     let mutation = Promise.resolve(); let closing: Promise<void> | undefined;
     const assertOpen = () => { if (closed) throw new SessionError("SESSION_CLOSED", "Storage handle is closed."); };
     const assertOwned = async () => { assertOpen(); if (access !== "write") throw new SessionError("SESSION_BROWSE_ONLY", "Read-only storage handle."); await lease!.assertOwned(); };
     const serialize = (operation: () => Promise<void>) => { const job = mutation.then(operation); mutation = job.catch(() => undefined); return job; };
     const proof = { idle: () => mutation, stamp: initialStamp, token: randomUUID(), owned: assertOwned };
-    if (writer) this.#queryProofs.set(snapshot.header.sessionId, proof);
+    if (writer) this.#queryProofs.set(header.sessionId, proof);
     const handle: SessionStorageHandle = {
-      header: snapshot.header, access,
-      read: async () => { await mutation; assertOpen(); return structuredClone(current); },
+      header, access, history,
+      read: async () => {
+        await mutation; assertOpen();
+        const read = await this.inspect(header.sessionId);
+        if (read.integrity !== "complete") throw new SessionError("SESSION_CORRUPT", read.problem ?? "Session requires repair.");
+        if (access === "read") return { ...read, events: read.events.slice(0, lastSeq + 1), revision: snapshot.revision };
+        return read;
+      },
       assertOwned,
       append: events => {
         const copied = structuredClone(events);
         return serialize(async () => {
           await assertOwned(); if (blocked) throw new SessionError("SESSION_DURABILITY_FAILED", "Storage writer is blocked.");
-          const all = [...current.events, ...copied]; validateSessionEvents(all, this.options.registry);
+          const needsHistory = copied.some(event => this.options.registry.get(event.type)?.validateRelations !== undefined);
+          const previous = needsHistory ? (await this.inspect(header.sessionId)).events : [];
           const before = queryStamp(await stat(writer!.journalPath));
-          if (before !== proof.stamp) proof.stamp = undefined;
+          if (before !== proof.stamp) { blocked = true; proof.stamp = undefined; throw new SessionError("SESSION_CORRUPT", "Journal changed outside its owned writer."); }
+          validator.append(copied, () => previous);
           try {
             await writer!.append(copied);
             if (proof.stamp) proof.stamp = queryStamp(await stat(writer!.journalPath));
-            current = { ...current, events: all, revision: createHash("sha256").update(encodeRows([current.header!, ...all])).digest("hex") };
+            history.appended(copied);
+            lastSeq = copied.at(-1)?.seq ?? lastSeq;
           }
           catch (error) { blocked = true; proof.stamp = undefined; throw error; }
         });
@@ -162,7 +179,7 @@ export class JsonlSessionStorage implements SessionStorage {
       flush: () => serialize(async () => { await assertOwned(); if (blocked) throw new SessionError("SESSION_DURABILITY_FAILED", "Storage writer is blocked."); }),
       close: () => closing ??= serialize(async () => {
         closed = true;
-        const results = await Promise.allSettled([writer?.close(), lease?.dispose()]);
+        const results = await Promise.allSettled([Promise.resolve().then(() => history.close()), writer?.close(), lease?.dispose()]);
         this.#handles.delete(handle);
         if (this.#queryProofs.get(handle.header.sessionId) === proof) this.#queryProofs.delete(handle.header.sessionId);
         const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");

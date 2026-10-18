@@ -1,3 +1,5 @@
+import { useSubagentTrajectories } from './trajectory/use-subagent-trajectories';
+import { attachSubagentTools } from '../trajectory/subagents';
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
@@ -58,10 +60,12 @@ export function TrajectoryView({ snapshot, onAbort, isAborting }: TrajectoryView
   const split = useMemo(() => source.snapshot ? splitLiveChunks(source.snapshot) : null, [source.snapshot]);
   const splitRef = useRef(split);
   splitRef.current = split;
-  const runtime = useMemo(() => {
+  const ownRuntime = useMemo(() => {
     const current = splitRef.current;
     return current ? buildTrajectorySnapshot(current.settled(), { placeholders: new Set(current.live.keys()) }) : null;
   }, [split?.settledKey]);
+  const subagents = useSubagentTrajectories(source.snapshot, source.projection, !source.isFixture && snapshot === undefined);
+  const runtime = useMemo(() => ownRuntime ? attachSubagentTools(ownRuntime, subagents.delegations, subagents.children) : null, [ownRuntime, subagents.delegations, subagents.children]);
   const layout = useMemo(() => runtime ? deriveLayout(runtime) : null, [runtime]);
   const cellsById = useMemo(() => new Map((layout?.cells ?? []).map(cell => [cell.recordId, cell])), [layout]);
   // 流式层（DSH streamingCells）：累加器只折叠新到的 chunk，表格和详情按 recordId 把占位换成流式 cell。
@@ -208,6 +212,10 @@ export function TrajectoryView({ snapshot, onAbort, isAborting }: TrajectoryView
       <span className="tjv-noticeText">{projectionCell.error}</span>
       <Button size="xs" onClick={() => { if (bridge) void bridge.open(projectionCell.sessionId).catch(() => undefined); }}>重试</Button>
     </div>}
+    {subagents.notices.map(notice => <div key={notice.id} role={notice.error ? "alert" : "status"} className="tjv-notice">
+      <span className="tjv-noticeText">子工具：{notice.error ?? (notice.loading ? '正在加载' : '还有更早的历史未加载')}</span>
+      {!notice.loading && <Button size="xs" onClick={() => { void (notice.error ? subagents.bridge?.refreshRelated(notice.id) : subagents.bridge?.loadEarlierHistory(notice.id))?.catch(() => undefined); }}>{notice.error ? '重试' : '加载更早的子工具'}</Button>}
+    </div>)}
     {revealMissed && <div role="status" className="tjv-notice">
       <span className="tjv-noticeText">没有在已加载的轨迹里找到这条记录。{hasEarlier ? `它可能在更早的历史里，可以点「${T.loadEarlier}」后再试。` : ''}</span>
       <IconButton label="关闭说明" size="xs" onClick={() => setRevealMissed(false)}><X size={12} /></IconButton>

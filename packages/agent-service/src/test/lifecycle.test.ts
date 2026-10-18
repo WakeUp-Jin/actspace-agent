@@ -1,3 +1,4 @@
+import { TaskLedger } from "../task-ledger.js";
 import { describe, expect, it } from "vitest";
 import { createCoreCodecRegistry, createSessionHeader, SessionError } from "@actspace/session-journal";
 import { SessionHandle } from "@actspace/session-persistence";
@@ -57,4 +58,31 @@ it("keeps durability failures blocked on subsequent requests", async () => {
   await expect(service.snapshot("broken")).rejects.toBe(error);
   expect(opens).toBe(1);
   await plugin.dispose();
+});
+
+
+it("observes a provider-owned child without recovering it or admitting a second scheduler", async () => {
+  const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
+  const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "child", createdAt: "2026-10-18T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
+  let opens = 0;
+  const plugin = activate({ openSession: async () => { opens++; return session; }, harnessId: () => "main", readConfiguration: () => ({ mode: "plan" }), acquire: () => { throw new Error("must not schedule child"); } });
+  const service = plugin.services["agent.service"];
+  const ledger = await TaskLedger.open(session);
+  const release = service.registerExternalLedger(ledger);
+  const receipt = await ledger.submit("child-task", "read");
+  await ledger.start(receipt.task.taskId, "child-run", { harnessId: "main", generationId: "one", revision: 1 }, {});
+  const seq = session.lastSeq;
+  const states = await Promise.all([service.snapshot("child"), service.snapshot("child")]);
+  expect(states.every(state => state.runs[0]?.state === "running")).toBe(true);
+  expect(session.lastSeq).toBe(seq);
+  expect(opens).toBe(0);
+  await expect(service.submit("child", "intruder", "new work")).rejects.toMatchObject({ code: "SESSION_BUSY" });
+  expect(() => service.registerExternalLedger(ledger)).toThrow("SESSION_BUSY");
+  await ledger.finish("child-run", "completed", { text: "read result" });
+  expect((await service.snapshot("child")).runs[0]).toMatchObject({ state: "completed", result: { text: "read result" } });
+  expect(ledger.blocked).toBe(false);
+  release(); release();
+  expect((await service.snapshot("child")).runs[0]?.state).toBe("completed");
+  expect(opens).toBe(1);
+  await plugin.dispose(); await session.close();
 });

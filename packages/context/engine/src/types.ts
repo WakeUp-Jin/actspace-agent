@@ -13,7 +13,7 @@ export type ContextRequest = {
   readonly model: string;
   readonly options: LlmRequestOptions;
 };
-export type SystemSection = { readonly id: string; readonly owner: string; readonly order: number; readonly content: RuntimeV2JsonValue };
+export type SystemSection = { readonly id: string; readonly owner: string; readonly order: number; readonly content: RuntimeV2JsonValue; readonly provenance?: RuntimeV2JsonValue };
 export type SystemContext = { readonly sections: readonly SystemSection[]; readonly modelFacts: readonly RuntimeV2JsonValue[]; readonly modelFactSources?: readonly { readonly id: string; readonly owner: string }[] };
 export type ContextSupplement = { readonly id: string; readonly owner: string; readonly sourceEventSeq: number; readonly afterEventSeq: number; readonly text: string };
 export type ContextPathState = {

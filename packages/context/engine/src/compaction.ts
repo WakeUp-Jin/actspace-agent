@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { createCompactionTransaction, type SessionEventCandidateV1, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { Context } from "./types.js";
-import type { ContextSession } from "./supplements.js";
+import { contextEvents, type ContextSession } from "./supplements.js";
 
 export interface CompactionSession extends ContextSession {
   appendMany(events: readonly SessionEventCandidateV1[]): Promise<readonly SessionEventEnvelopeV1[]>;
@@ -64,7 +64,7 @@ export class ContextCompactionCoordinator implements ContextCompactor {
       const surface = session.journal.surface;
       const context: Context = { request: { sessionId: session.header.sessionId, requestId: `compaction:${randomUUID()}`, routeId: "utility", model: "default", options: {} },
         content: { system: { sections: [], modelFacts: [] }, conversation: surface, supplements: [], tools: [] },
-        status: { throughJournalSeq: session.lastSeq, cycle: 0, paths: [], facts: [], plugins: { "actspace.context.compaction": { summaryIds: session.journal.events.filter(event => event.type === "surface/replaced" && event.surface?.kind === "replace").map(event => event.surface!.node.messageId) } } },
+        status: { throughJournalSeq: session.lastSeq, cycle: 0, paths: [], facts: [], plugins: { "actspace.context.compaction": { summaryIds: surface.entries.flatMap(entry => { const seq = entry.sourceEventSeqs.reduce((a, b) => Math.max(a, b), -1); const event = contextEvents(session, seq, seq + 1).next().value; return event?.surface?.kind === "replace" ? [entry.node.messageId] : []; }) } } },
       };
       const region = strategy.select(context);
       if (!region) return false;

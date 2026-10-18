@@ -1,3 +1,4 @@
+import { ContextBody } from './ContextBody';
 import { ChevronRight } from 'lucide-react';
 import { T, blockLabel, openBlockSummary, type TrajectoryCell, type TrajectorySourceBlock } from '../../../trajectory';
 import { JsonTree } from '../../ui/JsonTree';
@@ -101,6 +102,7 @@ export function MarkdownRecordContent({ cell, layout, rendered, preview = false,
     const source = [thinking, text].filter(Boolean).join('\n\n');
     return source === '' ? <NoPayload>{T.noContent}</NoPayload> : <RawFragment text={source} preview={preview} />;
   }
+  if (cell.kind === 'context' && record.contextPresentation && text !== '') return <ContextBody cell={cell} text={text} preview={preview} />;
   const hasCalls = cell.kind === 'message' && toolCallEntries(cell, layout).length > 0;
   if (!thinking && text === '' && !hasCalls) return <NoPayload>{record.summary || T.noContent}</NoPayload>;
   const calls = hasCalls && <AssistantToolCalls cell={cell} layout={layout} preview={preview} onSelectRecord={onSelectRecord} />;

@@ -48,6 +48,8 @@ Durable Session Projection 是从已接纳的 Session Journal 前缀派生的可
 - projection cache 可以删除并重建，不是第二份 Session 真相；
 - 未知 required event、非法 payload 或 invariant failure 按 Session 兼容策略 fail-closed，不能静默跳过后继续执行。
 
+“Durable Projection”是历史契约名称，不表示当前显示的全部前缀都已经 fsync。运行态投影可以达到 accepted 水位；可靠保存仍由 observation 的 durable 水位判断，持久化屏障失败不能靠展示成功掩盖。
+
 Durable Projection 可以显示一个尚未终结的 call，因为 Journal 已经记录 tool call、approval 或 dispatch boundary；冷恢复必须再根据 durable facts 追加 repair，不能永远把历史尾部留成“正在运行”。
 
 ### 2.2 Live Progress
@@ -778,6 +780,8 @@ Definition 必须满足：
 - view 是 detached、脱敏、不可变的公开值；
 - full replay 与 incremental apply 结果一致。
 
+2026-10-18：`providerUsage` 的 `stateVersion=2`，累计 Token 和费用增量维护；Step 结束释放请求关联与用量纠正缓存。已知零费用与未知费用分别处理；旧 checkpoint 版本不匹配时重建。
+
 ### Window Presentation
 
 Host 提供有界 raw event window，Client 为 Chat、Trajectory、Tool Card 分别建立展示投影：
@@ -798,7 +802,7 @@ type SessionEventWindow = {
 Window 规则：
 
 - 默认按完整 Turn 分页（每页 20 个 Turn），同时受事件数（默认 2000，调用方可降低）和 JSON 字节数（默认约 2 MB）限制；
-- 历史页（非 `afterSeq`、非 `includeToolDetails`）先剔除展示用不到的负载再计上限：已有 `assistant/message` 定稿的消息不再携带其 `assistant/chunk` 流式增量；窗口内只保留最新一份完整 `request/context`，其余超过 24,000 字符的收敛为 `deferredDetail` 身份字段（request/turn/step id、`prepared.model/route/contextWindow`、`requestOptions`）。2026-09-26 本机 59 个会话统计：chunk 占 journal 事件约 97%，request/context 占字节约 22%，精简前 55/59 个会话首页装不下一轮完整 Turn；
+- 历史页（非 `afterSeq`、非 `includeToolDetails`）先剔除展示用不到的负载再计上限：已有 `assistant/message` 定稿的消息不再携带其 `assistant/chunk` 流式增量；窗口内只保留最新一份完整 `request/context`，其余超过 24,000 字符的收敛为 `deferredDetail` 身份字段（request/turn/step id、`prepared.model/route/contextWindow`、`requestOptions`）；系统提示词与工具定义（`renderedSystemPrompt` / `systemPrompt` / `system` / `tools`）在窗口内第一次请求和它们变化的请求上保留原文，其余只带 `promptUnchanged: true`，renderer 沿用上一份，用于轨迹「系统」行和工具 Schema。2026-09-26 本机 59 个会话统计：chunk 占 journal 事件约 97%，request/context 占字节约 22%，精简前 55/59 个会话首页装不下一轮完整 Turn；
 - 超大 Turn 可以在 Turn 内续页；
 - Surface replacement、跨页工具关联和请求关系进入 support；
 - 大型 args/result/detail/artifact 返回 `DeferredDetailRef`，详情必须按 `sessionId + callId/artifactId` 读取并重新执行 redaction；
@@ -831,8 +835,22 @@ Session Projection Cache 保存 reducer state、stateVersion、checkpoint seq、
 
 `packages/session/projection/src/registry.ts` 是唯一 Host registry。所有 definition 成功后才提交新状态与水位；checkpoint 保存内部 reducer state 而非展示 value。`replayTail` 先验证尾部连续性，再折叠有效事务与 pending，不生成中间 view 或实时通知；实时事件走 apply。未知 required 事件不伪装成可写会话。
 
+2026-10-18：Runtime 完成 definition 注册后调用 `seal()`，不再保留第二份完整重放正文，保留最近 512 条事件指纹和 pending transaction。已知重复幂等；冲突或超过保留范围、无法证明一致的旧重复要求 resync。未封口 registry 为兼容晚注册仍可保留历史，不能把生产封口行为泛化为所有实例。`checkpoint` 是派生状态对象，不表示启用了新的 JSON 检查点文件。
+
 Runtime 的 SessionReadModel 组合 Surface、tool lifecycle、workspaceRoot、updatedAt 和 requestContext；昂贵预览按语义输入复用，不能用累计 token 代替当前占用，也不虚构缺失模型容量。
 
 `RuntimeSessionController.readProjection` 返回全会话水位、snapshot/values、window、activeMessageIds 和 deferredToolCalls。用户 Task 消息可以位于 turn/start 前；历史页尾不能覆盖最新 facts。大工具传输裁剪不修改 Journal 原文；完整导出不得只复制已加载页。
 
 ClientSessionStore 按 sessionId 管理 facts/window/live overlay，请求 generation 防旧响应覆盖新状态；equal-seq same-value 幂等，equal-seq conflict 触发 resync。Desktop main 负责权限、传输和 live adapter，renderer 共用一个 Session store。Chat、Trajectory、Tool Card 各自展示，不创建独立历史文件。
+
+
+### 轨迹的上下文来源与子会话工具（2026-10-18）
+
+- 请求快照的 `contextSections` 保留 `id/owner/order/content/provenance`，`contextModelFacts` 保留模型事实的贡献者身份。它们与全文一起参与历史窗口首份/变化份保留，其余沿用 `promptUnchanged`。适配器改写后无法对应来源、或新增元数据超过预算时，字段为 null，界面回退全文，不解析文字猜来源。
+- 固定系统提示词只比较固定 system 来源；规则、技能目录、已加载技能、运行信息按来源生成首次、更新、移除的上下文展示行。它们是请求组成投影，不是新增 Journal 事件，也不改变实际 LLM 消息角色。原文和实际完整 system 消息仍可查看，规则路径来自 provenance。
+- 动态补充继续展示原有来源和生命周期；旧日志没有结构化来源时维持旧展示，不凭 XML 或 Markdown 标记反推来源。
+- user/context 概述展示已有开始时间，复用本地时间/Unix 切换。
+- 父轨迹通过 `delegation/requested` 的 parentCallId/childSessionId 读取直接子 Session。DesktopSessionBridge 引用计数订阅相关会话，数据仍归 ClientSessionStore；退出释放订阅，不切换当前会话。加载失败可重试，有更早历史时显式提供加载入口。
+- 各 Session 独立构建工具记录，关联后使用子 Session 命名空间防 callId 冲突。子工具 Schema 来自子请求，父请求统计不重复计入子请求。当前不递归加载孙会话；跨页记录随加载补齐，不能将未加载历史显示为完整结果。
+
+实施记录：[轨迹上下文分类](../../exec-runs/20261018-trajectory-context/execution-summary.md)。

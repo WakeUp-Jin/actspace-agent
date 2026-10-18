@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { effectiveSessionEvents, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type {
   ProjectionChange,
@@ -24,6 +25,7 @@ export type ProjectionSnapshotListener = (change: ProjectionChange) => void;
 
 type ProjectionCell = {
   events: SessionEventEnvelopeV1[];
+  fingerprints: Map<number, string>;
   states: Map<string, unknown>;
   lastSeq: number;
   listeners: Set<ProjectionSnapshotListener>;
@@ -41,11 +43,13 @@ type ProjectionCell = {
  */
 export class SessionProjectionRegistry {
   readonly #definitions = new Map<string, ProjectionDefinition<unknown>>();
+  #sealed = false;
   readonly #cells = new Map<string, ProjectionCell>();
 
   constructor(private readonly accepts: (event: SessionEventEnvelopeV1) => boolean = () => true) {}
 
   register<State, Value extends RuntimeV2JsonValue = RuntimeV2JsonValue>(definition: ProjectionDefinition<State, Value>): () => void {
+    if (this.#sealed) throw new Error("Register projection definitions before sealing the runtime registry.");
     validateDefinition(definition as unknown as ProjectionDefinition<unknown>);
     if (this.#definitions.has(definition.key)) throw new TypeError(`Duplicate projection key ${definition.key}.`);
 
@@ -84,7 +88,8 @@ export class SessionProjectionRegistry {
     const nextStates = new Map<string, unknown>();
     const effective = effectiveSessionEvents(events);
     for (const definition of this.#definitions.values()) nextStates.set(definition.key, fold(definition, effective.filter(this.accepts)));
-    cell.events = [...events];
+    cell.events = this.#sealed ? [] : [...events];
+    cell.fingerprints = new Map(events.slice(-512).map(event => [event.seq, fingerprint(event)]));
     cell.states = nextStates;
     cell.lastSeq = events.length === 0 ? -1 : (events[events.length - 1]?.seq ?? -1);
     cell.pending = events.slice(effective.length);
@@ -98,7 +103,7 @@ export class SessionProjectionRegistry {
     const cell = this.#cells.get(sessionId) ?? this.#createCell();
     if (event.seq <= cell.lastSeq) {
       const prior = cell.events.find(candidate => candidate.seq === event.seq);
-      if (prior && sameEvent(prior, event)) return null;
+      if ((prior && sameEvent(prior, event)) || cell.fingerprints.get(event.seq) === fingerprint(event)) return null;
       throw new Error(`Projection sequence conflict for ${sessionId} at seq ${event.seq}; resync required.`);
     }
     if (event.seq !== cell.lastSeq + 1) throw new Error(`Projection event gap for ${sessionId}: expected ${cell.lastSeq + 1}, received ${event.seq}.`);
@@ -119,7 +124,8 @@ export class SessionProjectionRegistry {
       }
     }
 
-    cell.events.push(event);
+    if (!this.#sealed) cell.events.push(event);
+    this.#remember(cell, [event]);
     cell.pending = candidate.slice(effective.length);
     cell.states = nextStates;
     cell.lastSeq = event.seq;
@@ -159,7 +165,8 @@ export class SessionProjectionRegistry {
     }
     // Commit only after every reducer succeeds, including transaction buffering.
     cell.states = states;
-    cell.events = [...cell.events, ...events];
+    if (!this.#sealed) for (const event of events) cell.events.push(event);
+    this.#remember(cell, events);
     cell.pending = candidate.slice(effective.length);
     cell.lastSeq = events.at(-1)?.seq ?? cell.lastSeq;
     this.#cells.set(sessionId, cell);
@@ -232,6 +239,24 @@ export class SessionProjectionRegistry {
     this.#cells.set(sessionId, cell);
   }
 
+  /** Production definitions are assembled once. Drop replay bodies after that boundary. */
+  seal(): void {
+    this.#sealed = true;
+    for (const cell of this.#cells.values()) cell.events = [];
+  }
+
+  retainedEventCount(sessionId: string): number {
+    const cell = this.#cells.get(sessionId);
+    return cell ? cell.events.length + cell.pending.length : 0;
+  }
+
+  #remember(cell: ProjectionCell, events: readonly SessionEventEnvelopeV1[]): void {
+    for (const event of events) {
+      cell.fingerprints.set(event.seq, fingerprint(event));
+      if (cell.fingerprints.size > 512) cell.fingerprints.delete(cell.fingerprints.keys().next().value!);
+    }
+  }
+
   get stateVersions(): Readonly<Record<string, number>> {
     return Object.fromEntries([...this.#definitions].map(([key, definition]) => [key, definition.stateVersion]));
   }
@@ -239,7 +264,7 @@ export class SessionProjectionRegistry {
   #createCell(): ProjectionCell {
     const states = new Map<string, unknown>();
     for (const definition of this.#definitions.values()) states.set(definition.key, immutableState(definition.init()));
-    return { events: [], states, lastSeq: -1, listeners: new Set(), pending: [], restored: false };
+    return { events: [], fingerprints: new Map(), states, lastSeq: -1, listeners: new Set(), pending: [], restored: false };
   }
 }
 
@@ -291,3 +316,5 @@ function immutableState<T>(value: T): T {
 function sameEvent(left: SessionEventEnvelopeV1, right: SessionEventEnvelopeV1): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
+
+function fingerprint(event: SessionEventEnvelopeV1): string { return createHash("sha256").update(JSON.stringify(event)).digest("hex"); }
