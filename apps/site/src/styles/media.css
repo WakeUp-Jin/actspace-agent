@@ -2,7 +2,13 @@
   margin: 0;
   min-width: 0;
 }
-.product-shot img { display: block; width: 100%; height: auto; border-radius: 10px; }
+.product-shot img { display: block; width: 100%; height: auto; }
+/* 纸面相框：文档、博客与更新日志共用。阴影画在外框上，外框裁圆角。 */
+.product-shot .screenshot-link,
+.prose-image-frame {
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px var(--line), 0 18px 36px -28px rgba(29, 28, 26, 0.45);
+}
 .product-shot > figcaption { margin-top: 12px; color: var(--body); font-size: 13px; }
 .screenshot-link { display: block; cursor: zoom-in; }
 .image-loading-frame {
@@ -10,7 +16,8 @@
   overflow: hidden;
   background: var(--surface);
 }
-.prose-image-frame { display: block; border-radius: 8px; }
+.prose-image-frame { display: block; width: fit-content; max-width: 100%; }
+.docs-prose .prose-image-frame img { display: block; border-radius: 0; box-shadow: none; }
 .image-loading-frame[data-image-enhanced][data-image-state="loading"] {
   animation: none;
 }

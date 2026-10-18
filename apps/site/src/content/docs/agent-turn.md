@@ -3,7 +3,7 @@ title: "一次 Agent 执行"
 description: "从输入到模型请求、工具执行和日志，理解一次任务如何推进。"
 group: "settings-development"
 order: 4
-updatedAt: 2026-09-19
+updatedAt: 2026-10-17
 draft: false
 ---
 
@@ -29,13 +29,13 @@ draft: false
 
 Session Journal 保存可恢复的运行事实，界面据此呈现消息、工具、用量和上下文。压缩会替换后续请求使用的部分历史摘要，但保留原始 Journal。
 
-在会话顶部切换到 Trajectory，可以沿时间线搜索执行记录，选中工具后检查参数与结果。切回 Chat 后继续原任务。
+点会话标题旁的「查看执行轨迹」，输入、模型和工具调用按轮次排在一条时间线上：可以按时长、轮次或调用筛选，搜索执行记录，每次工具调用的参数和返回并排列出；报错、重试、你按下的停止和上下文压缩也按发生顺序留在原处。点「返回对话」继续原任务。
 
 用户需要检查任务时，可以看工具详情、[上下文](../context/)和[审阅](../review/)。开发者继续追踪实现，可从仓库的 `docs/ARCHITECTURE.md` 和 Agent Run 分层文档进入。
 
-![会话时间线、执行记录与选中的用户消息详情](../../assets/screenshots/docs/trajectory-inspector.png)
+![执行轨迹：顶部时间线，下面按轮次列出消息、工具调用与结果](../../assets/screenshots/docs/trajectory-inspector.png)
 
-*会话时间线、执行记录与选中的用户消息详情。*
+*执行轨迹：顶部时间线，下面按轮次列出消息、工具调用与结果，失败与停止留在原处。（示例数据）*
 
 ## 停止与恢复的边界
 

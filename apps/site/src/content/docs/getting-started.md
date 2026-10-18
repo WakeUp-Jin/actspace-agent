@@ -3,7 +3,7 @@ title: "快速开始"
 description: "从源码启动桌面应用，连接模型并打开第一个工作区。"
 group: "getting-started"
 order: 2
-updatedAt: 2026-09-19
+updatedAt: 2026-10-17
 draft: false
 ---
 
@@ -36,9 +36,9 @@ pnpm dev:log
 
 选择模型和模式后，发送一个范围明确的任务。完整演示见[完成第一个任务](../first-task/)。
 
-![工作区、会话列表与代码回复](../../assets/screenshots/docs/workspace-overview.png)
+![工作区、会话列表与一轮回复的交付卡](../../assets/screenshots/docs/workspace-overview.png)
 
-*工作区、会话列表与代码回复。*
+*工作区、会话列表与一轮回复：末尾列出改动、交付文件和用量。（示例数据）*
 
 ## 本地打包
 

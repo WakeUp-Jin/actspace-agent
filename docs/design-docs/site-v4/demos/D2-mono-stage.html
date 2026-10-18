@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ActSpace · 方向 D2 单色工具舞台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&display=swap">
+<style>
+:root{
+  --canvas:#f7f6f4; --win:#fff; --ink:#18171c; --ink2:#8c8a94; --ink3:#5c5a63; --line:rgba(24,23,28,.09); --line2:rgba(24,23,28,.14);
+  --accent:#6d4fc2;
+  /* 薰衣草灰舞台：同一色相，只靠明度区分 */
+  --st-1:#dcd9e3; --st-2:#cecad9; --st-3:#e7e5ec;
+  --ok:#3f8a66; --warn:#b9822b; --bad:#b4553f;
+  --head:"Inter Tight",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --sans:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  --grain:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .25  0 0 0 0 .22  0 0 0 0 .32  0 0 0 .8 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--canvas);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1360px;margin:0 auto;padding:0 40px}
+
+header{position:fixed;inset:0 0 auto 0;height:56px;z-index:20;background:rgba(247,246,244,.85);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+header .wrap{height:100%;display:flex;align-items:center;gap:32px}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--head);font-weight:600;font-size:16px}
+.brand img{width:24px;height:24px}
+nav{display:flex;gap:24px;font-size:14px;color:var(--ink2)}
+nav a.cur,nav a:hover{color:var(--ink)}
+.hr{margin-left:auto;display:flex;align-items:center;gap:16px}
+.hr svg{width:20px;height:20px;fill:var(--ink)}
+.btn{display:inline-flex;align-items:center;height:40px;padding:0 16px;border-radius:8px;background:var(--ink);color:#fff;font-size:14px;font-weight:500;transition:background .2s}
+.btn:hover{background:var(--accent)}
+.btn.sm{height:32px;padding:0 16px}
+.link{font-size:14px;color:var(--ink);border-bottom:1px solid var(--line2);padding-bottom:1px}
+.link:hover{border-color:var(--ink)}
+
+/* hero：整屏恰好 100vh，舞台上下边缘都在视口内 */
+.hero{height:100vh;min-height:760px;max-height:960px;padding:56px 0 32px;display:flex}
+.hero .wrap{width:100%;display:flex;flex-direction:column}
+.hero-top{display:grid;grid-template-columns:1fr minmax(0,520px);gap:48px;align-items:end;padding:32px 0 24px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--ink2);margin-bottom:16px}
+h1{font-family:var(--head);font-weight:600;font-size:40px;line-height:1.2;letter-spacing:-.01em;text-wrap:balance}
+h1 span{display:block}
+h1 .g{color:#a9a7b0;font-weight:500}
+.lede{font-size:15px;line-height:1.8;color:var(--ink3);text-wrap:pretty}
+.cta{display:flex;align-items:center;gap:24px;margin-top:16px}
+
+.stage{position:relative;overflow:hidden;border-radius:16px;isolation:isolate;background:var(--st)}
+.stage::before{content:"";position:absolute;inset:0;z-index:-2;background:radial-gradient(90% 100% at 15% 0%,rgba(255,255,255,.38),transparent 62%),radial-gradient(80% 90% at 100% 100%,rgba(70,55,110,.08),transparent 65%)}
+.stage::after{content:"";position:absolute;inset:0;z-index:-1;background:var(--grain);opacity:.22;mix-blend-mode:multiply;pointer-events:none}
+.s1{--st:var(--st-1)}.s2{--st:var(--st-2)}.s3{--st:var(--st-3)}
+.hero .stage{flex:1;min-height:440px}
+
+.win{position:absolute;background:var(--win);border-radius:8px;box-shadow:0 0 0 1px rgba(24,23,28,.1),0 1px 2px rgba(24,23,28,.06),0 24px 48px -16px rgba(40,30,70,.3);overflow:hidden;font-size:13px}
+.tb{height:32px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid var(--line);background:#fafafb;font-size:12px;color:var(--ink2)}
+.tb i{width:8px;height:8px;border-radius:50%;background:#dcdbe0}
+.tb em{font-style:normal;margin:0 auto;transform:translateX(-24px);font-family:var(--mono)}
+.app{inset:32px 56px 32px 56px;display:grid;grid-template-columns:208px minmax(0,1fr) 320px;grid-template-rows:32px 1fr}
+.side{background:#fafafb;border-right:1px solid var(--line);padding:16px 8px;display:flex;flex-direction:column;gap:2px}
+.actor{display:flex;align-items:center;gap:8px;padding:0 8px 16px}
+.dot{width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(109,79,194,.16);flex:none}
+.actor b{display:block;font-size:13px;line-height:1.3}
+.actor small{font-size:12px;color:var(--ink2)}
+.side h6{font-size:11px;font-weight:500;color:var(--ink2);padding:8px 8px 4px;letter-spacing:.04em}
+.side p{padding:6px 8px;border-radius:6px;font-size:13px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side p.on{background:#fff;color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.side .foot{margin-top:auto;padding:8px;font-family:var(--mono);font-size:11px;color:var(--ink2);border-top:1px solid var(--line)}
+.chat{padding:24px 24px 16px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.um{align-self:flex-end;background:#f1f0f3;padding:8px 16px;border-radius:8px;max-width:80%}
+.steps{display:flex;flex-direction:column;gap:8px;font-family:var(--mono);font-size:12.5px}
+.st{display:flex;align-items:center;gap:8px;color:var(--ink3);white-space:nowrap}
+.st::before{content:"";width:6px;height:6px;border-radius:50%;background:#c3c1ca;flex:none}
+.st.ok::before{background:var(--ok)}
+.st u{text-decoration:none;color:var(--ok)}.st s{text-decoration:none;color:var(--bad)}
+.out{background:#18171c;color:#d9d7e0;border-radius:8px;font-family:var(--mono);font-size:12px;line-height:1.7;padding:16px;white-space:pre;overflow:hidden}
+.out .g{color:#8bc7a4}.out .d{color:#85838e}
+.rv{display:flex;align-items:center;gap:16px;border:1px solid var(--line2);border-radius:8px;padding:8px 16px;font-size:13px;margin-top:auto}
+.rv b{font-weight:500}.rv span{font-family:var(--mono);color:var(--ink2)}.rv em{font-style:normal;margin-left:auto;color:var(--accent);font-weight:500}
+.comp{border:1px solid var(--line2);border-radius:8px;padding:8px 16px;color:var(--ink2);font-size:13px}
+.rvp{border-left:1px solid var(--line);background:#fff;display:flex;flex-direction:column;min-width:0}
+.rvp h6{font-size:12px;font-weight:500;padding:8px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;color:var(--ink3)}
+.rvp h6 span{font-family:var(--mono);color:var(--ink2);font-weight:400}
+.fl{display:flex;justify-content:space-between;padding:8px 16px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--line);background:#fafafb}
+.fl u{text-decoration:none;color:var(--ok)}.fl s{text-decoration:none;color:var(--bad)}
+.df{font-family:var(--mono);font-size:12px;line-height:24px;padding:8px 0;white-space:pre;overflow:hidden}
+.df div{padding:0 16px}
+.df .a{background:rgba(63,138,102,.1);color:#2c6b4c}.df .r{background:rgba(180,85,63,.09);color:#9b4531}.df .n{color:var(--ink2)}
+
+/* feature */
+.feat{padding:96px 0 0}
+.feat .wrap{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;align-items:center}
+.tags{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;color:var(--ink2)}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);font-weight:500}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.pill.wip{color:var(--ink3)}.pill.wip::before{background:transparent;box-shadow:inset 0 0 0 1.5px #a9a7b0}
+h2{font-family:var(--head);font-weight:600;font-size:32px;line-height:1.25;letter-spacing:-.01em;margin-bottom:16px;text-wrap:balance}
+.feat p.d{color:var(--ink3);line-height:1.8;text-wrap:pretty;margin-bottom:24px;font-size:15px}
+.feat ul{list-style:none;padding:0;margin-bottom:24px;border-top:1px solid var(--line)}
+.feat li{padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;display:flex;gap:16px;text-wrap:pretty}
+.feat li span{font-family:var(--mono);font-size:12px;color:var(--ink2);padding-top:2px}
+.feat .stage{height:min(640px,calc(100vh - 152px));min-height:520px}
+
+.ctx{left:50%;top:50%;transform:translate(-50%,-50%);width:min(512px,88%)}
+.ctx .tb em{transform:none;margin:0 auto 0 8px}
+.use{padding:16px;border-bottom:1px solid var(--line)}
+.use .n{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12.5px;margin-bottom:8px}
+.use .n span:last-child{color:var(--ink2)}
+.bar{height:8px;border-radius:4px;background:#ecebef;overflow:hidden}
+.bar i{display:block;height:100%;width:84%;background:var(--warn);border-radius:4px;transition:width 1.4s cubic-bezier(.6,0,.2,1),background .8s}
+.body{display:grid;padding:16px;height:272px;align-content:start}
+.rows{grid-area:1/1;display:flex;flex-direction:column;gap:4px;font-family:var(--mono);font-size:12.5px}
+.rows .st{padding:8px;border-radius:6px;background:#f6f5f8;transition:opacity .6s,transform .8s cubic-bezier(.5,0,.2,1)}
+.ctx[data-p="0"] .rows .st,.ctx[data-p="0"] .sum,.ctx[data-p="0"] .sum *{transition:none}
+.sum{grid-area:1/1;align-self:start;opacity:0;transform:translateY(8px);transition:opacity .5s,transform .6s;border:1px solid var(--line2);border-radius:8px;background:#fff;padding:16px;pointer-events:none}
+.sum h5{font-size:13px;font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between}
+.sum h5 span{font-family:var(--mono);font-weight:400;font-size:12px;color:var(--ink2)}
+.sum dl{display:grid;grid-template-columns:64px 1fr;gap:8px 8px;font-size:12.5px;line-height:1.5}
+.sum dt{color:var(--ink2)}.sum dd{margin:0;font-family:var(--mono);font-size:12px}
+.sum dt,.sum dd{opacity:0;transform:translateY(4px);transition:opacity .4s,transform .4s}
+.raw{margin-top:8px;font-size:12px;color:var(--ink2);font-family:var(--mono);padding-top:8px;border-top:1px dashed var(--line2)}
+.ev{border-top:1px solid var(--line);padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:8px;color:var(--ink2);min-height:40px}
+.ev::before{content:"";width:8px;height:8px;border-radius:50%;background:#cfcdd5;flex:none}
+.ev .t2,.ev .t3{display:none}
+.ctx[data-p="1"] .ev .t1,.ctx[data-p="2"] .ev .t1{display:none}
+.ctx[data-p="1"] .ev .t2{display:inline;color:var(--ink)}
+.ctx[data-p="1"] .ev::before{background:var(--warn);animation:pulse 1s infinite}
+.ctx[data-p="2"] .ev .t3{display:inline;color:var(--ink)}
+.ctx[data-p="2"] .ev::before{background:var(--ok)}
+.ctx[data-p="1"] .bar i,.ctx[data-p="2"] .bar i{background:var(--ok)}
+.ctx[data-p="2"] .bar i{width:30.5%}
+/* 摘要与旧行同时开始：行逐条收拢上移的同时摘要卡淡入，任何时刻都不空 */
+.ctx[data-p="1"] .rows .st,.ctx[data-p="2"] .rows .st{opacity:0;transform:translateY(-16px) scale(.96)}
+.ctx[data-p="1"] .sum,.ctx[data-p="2"] .sum{opacity:1;transform:none}
+.ctx[data-p="1"] .sum dt,.ctx[data-p="1"] .sum dd,.ctx[data-p="2"] .sum dt,.ctx[data-p="2"] .sum dd{opacity:1;transform:none}
+.ctx[data-p="1"] .sum dl>:nth-child(-n+2){transition-delay:.15s}.ctx[data-p="1"] .sum dl>:nth-child(n+3):nth-child(-n+4){transition-delay:.3s}.ctx[data-p="1"] .sum dl>:nth-child(n+5):nth-child(-n+6){transition-delay:.45s}.ctx[data-p="1"] .sum dl>:nth-child(n+7):nth-child(-n+8){transition-delay:.6s}.ctx[data-p="1"] .sum dl>:nth-child(n+9){transition-delay:.75s}
+.ctx[data-p="1"] .rows .st:nth-child(1){transition-delay:.9s}.ctx[data-p="1"] .rows .st:nth-child(2){transition-delay:.8s}.ctx[data-p="1"] .rows .st:nth-child(3){transition-delay:.7s}.ctx[data-p="1"] .rows .st:nth-child(4){transition-delay:.6s}.ctx[data-p="1"] .rows .st:nth-child(5){transition-delay:.5s}.ctx[data-p="1"] .rows .st:nth-child(6){transition-delay:.4s}.ctx[data-p="1"] .rows .st:nth-child(7){transition-delay:.3s}.ctx[data-p="1"] .rows .st:nth-child(8){transition-delay:.2s}
+@keyframes pulse{50%{opacity:.3}}
+
+.next{padding:96px 0 96px}
+.next h2{margin-bottom:24px}
+.next .stage{padding:24px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--win);border-radius:8px;padding:24px;box-shadow:0 0 0 1px var(--line2)}
+.card .pill{margin-bottom:32px}
+.card h3{font-family:var(--head);font-weight:600;font-size:18px;margin-bottom:8px}
+.card p{font-size:14px;color:var(--ink3);line-height:1.7;text-wrap:pretty}
+.tag{position:fixed;right:12px;bottom:10px;font:11px var(--mono);opacity:.5;z-index:30;pointer-events:none}
+
+@media (max-width:1100px){.app{grid-template-columns:200px minmax(0,1fr)}.rvp{display:none}}
+@media (max-width:900px){
+  .wrap{padding:0 16px}
+  header .wrap{gap:16px}nav{display:none}
+  .hero{height:auto;min-height:0;max-height:none;padding-bottom:32px}
+  .hero-top{grid-template-columns:1fr;gap:16px}
+  h1{font-size:32px}
+  .hero .stage{flex:none;height:480px}
+  .app{inset:16px 16px 16px 16px;grid-template-columns:1fr}.side{display:none}
+  .chat{padding:16px}.out{display:none}
+  .feat{padding:48px 0 0}.feat .wrap{grid-template-columns:1fr;gap:32px}
+  .feat .stage{min-height:560px;height:auto}
+  h2{font-size:28px}
+  .cards{grid-template-columns:1fr}.card .pill{margin-bottom:16px}
+  .st{white-space:normal}
+  .next .stage{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <a class="brand" href="#"><img src="../../../../apps/site/src/assets/brand/actspace-logo.png" alt="">ActSpace</a>
+  <nav><a class="cur" href="#">产品</a><a href="#">文档</a><a href="#">博客</a><a href="#">更新日志</a></nav>
+  <div class="hr"><svg viewBox="0 0 16 16" aria-label="GitHub"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><a class="btn sm" href="#">快速开始</a></div>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <div class="hero-top">
+    <div><div class="eyebrow">唯变所适</div><h1><span>会自我进化的</span><span>Agent 运行空间。</span><span class="g">每一个问题，都有它的空间。</span></h1></div>
+    <div>
+      <p class="lede">今天，ActSpace 在你的本地项目里读取文件、调用工具、交付可审阅的改动；接下来，它会在不同的场景里长成各自专业的 Actor。</p>
+      <div class="cta"><a class="btn" href="#">下载 macOS 版 →</a><a class="link" href="#">阅读产品理念 →</a></div>
+    </div>
+  </div>
+  <div class="stage s1">
+    <div class="win app">
+      <div class="tb" style="grid-column:1/-1"><i></i><i></i><i></i><em>acme-web · 登录页校验</em></div>
+      <div class="side">
+        <div class="actor"><div class="dot"></div><div><b>前端助手</b><small>Actor · 本地项目</small></div></div>
+        <h6>会话</h6><p class="on">把登录页的表单校验补完</p><p>修复路由守卫</p><p>整理 API 类型</p><p>升级依赖版本</p>
+        <div class="foot">~/code/acme-web</div>
+      </div>
+      <div class="chat">
+        <div class="um">把登录页的表单校验补完，跑一下测试</div>
+        <div class="steps">
+          <div class="st ok">读取 src/pages/Login.tsx</div>
+          <div class="st ok">编辑 src/lib/validate.ts <u>+24</u> <s>−3</s></div>
+          <div class="st ok">运行 pnpm test · 18 通过</div>
+        </div>
+        <div class="out"><span class="d">$</span> pnpm test
+<span class="g">✓</span> validate.test.ts <span class="d">(11)</span>
+<span class="g">✓</span> Login.test.tsx <span class="d">(7)</span>
+<span class="g">Tests  18 passed</span> <span class="d">· 2.4s</span></div>
+        <div class="done">已完成。改动 2 个文件，可在 Review 中查看。</div>
+        <div class="rv"><b>Review</b><span>2 个文件 +31 −3</span><em>查看</em></div>
+        <div class="comp">继续补充要求…</div>
+      </div>
+      <div class="rvp">
+        <h6>Review <span>2 个文件</span></h6>
+        <div class="fl"><span>src/lib/validate.ts</span><span><u>+24</u> <s>−3</s></span></div>
+<div class="df"><div class="n">12  export function validate(v) {</div><div class="r">13−   return v.email.length &gt; 0</div><div class="a">13+   const email = emailSchema.parse(v.em)</div><div class="a">14+   if (!email.ok) return fail(email)</div><div class="a">15+   const pw = pwSchema.parse(v.pw)</div><div class="a">16+   if (!pw.ok) return fail(pw)</div><div class="a">17+   return ok(v)</div><div class="n">18  }</div></div>
+        <div class="fl" style="border-top:1px solid var(--line)"><span>src/pages/Login.tsx</span><span><u>+7</u></span></div>
+<div class="df"><div class="n">41  &lt;form onSubmit={submit}&gt;</div><div class="a">42+   &lt;Field error={errors.email} /&gt;</div><div class="a">43+   &lt;Field error={errors.pw} /&gt;</div><div class="n">44  &lt;/form&gt;</div></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section class="feat"><div class="wrap">
+  <div>
+    <div class="tags"><span class="pill">已上线</span><span>上下文管理引擎</span></div>
+    <h2>长任务，不会失忆。</h2>
+    <p class="d">对话变长时，引擎把旧历史压缩成结构化摘要：目标、决策、未完成的事和相关文件都会留下，原始记录随时可查。每一次请求带了什么，都看得见。</p>
+    <ul><li><span>01</span>结构化压缩，保留目标与未完成事项</li><li><span>02</span>渐进披露，只把当前需要的文件放进上下文</li><li><span>03</span>上下文面板，逐次查看请求内容与变化</li></ul>
+    <a class="link" href="#">了解上下文管理 →</a>
+  </div>
+  <div class="stage s2">
+    <div class="win ctx" id="ctx" data-p="0">
+      <div class="tb"><i></i><i></i><i></i><em>上下文</em></div>
+      <div class="use"><div class="n"><span>上下文用量</span><span><b id="used" style="color:var(--ink);font-weight:500">168k</b> / 200k</span></div><div class="bar"><i></i></div></div>
+      <div class="body">
+        <div class="rows">
+          <div class="st">读取 package.json</div><div class="st">读取 src/pages/Login.tsx</div><div class="st">编辑 validate.ts</div><div class="st">运行测试 · 2 失败</div><div class="st">读取 validate.test.ts</div><div class="st">编辑 Login.tsx</div><div class="st">运行测试 · 18 通过</div><div class="st">搜索 zod schema</div>
+        </div>
+        <div class="sum">
+          <h5>对话摘要<span>42 条 → 1 张</span></h5>
+          <dl><dt>目标</dt><dd>补完登录页表单校验</dd><dt>重要细节</dt><dd>沿用 zod；错误文案走 i18n</dd><dt>工作状态</dt><dd>校验已完成，测试通过</dd><dt>下一步</dt><dd>补充边界用例，提交 Review</dd><dt>相关文件</dt><dd>src/pages/Login.tsx、src/lib/validate.ts</dd></dl>
+          <div class="raw">原始记录 42 条已折叠，随时可查</div>
+        </div>
+      </div>
+      <div class="ev"><span class="t1">较早的 42 条消息</span><span class="t2">正在压缩 42 条消息…</span><span class="t3">已压缩 · 用时 6.2 秒</span></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="next"><div class="wrap">
+  <h2>接下来，它会长成你的 Actor。</h2>
+  <div class="stage s3"><div class="cards">
+    <div class="card"><span class="pill">已上线</span><h3>上下文管理引擎</h3><p>长任务压缩与可检查的上下文。</p></div>
+    <div class="card"><span class="pill wip">进行中</span><h3>Harness 自进化</h3><p>工具、上下文与行为都是插件，可以按问题派生新版本。</p></div>
+    <div class="card"><span class="pill wip">进行中</span><h3>Actor 与 Space</h3><p>在场景里长成的 Actor，在 Space 里一起解决专业问题。</p></div>
+  </div></div>
+</div></section>
+<div class="tag">方向 D2 · 单色工具舞台</div>
+
+<script>
+(function(){
+  var el=document.getElementById('ctx'),used=document.getElementById('used');
+  var cur=168;
+  function tween(to){var from=cur,t0=performance.now();(function f(t){var k=Math.min(1,(t-t0)/1400);k=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;cur=from+(to-from)*k;used.textContent=Math.round(cur)+'k';if(k<1)requestAnimationFrame(f)})(t0)}
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){el.dataset.p='2';used.textContent='61k';return}
+  function run(){
+    el.dataset.p='0';cur=168;used.textContent='168k';
+    setTimeout(function(){el.dataset.p='1'},1500);
+    setTimeout(function(){el.dataset.p='2';tween(61)},4300);
+    setTimeout(run,8000);
+  }
+  run();
+})();
+</script>
+</body>
+</html>

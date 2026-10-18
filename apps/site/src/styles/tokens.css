@@ -1,39 +1,62 @@
 :root {
   color-scheme: light;
-  --site-quote-surface: #f3f0f9;
-  --site-quote-border: #b9a4df;
-  --site-quote-ink: #3e374b;
-  --site-canvas: #fafaf9;
-  --site-canvas-soft: #f5f5f3;
+  /* 引用块：暖纸底 + 暖灰竖线，不再用冷紫。 */
+  --site-quote-surface: #ebe9e3;
+  --site-quote-border: #b9b5ab;
+  --site-quote-ink: #3f3c36;
+  /* V4 纸本：暖纸画布、纸面窗口、墨色正文。 */
+  --site-canvas: #f2f1ed;
+  --site-canvas-soft: #ebe9e3;
+  --site-paper: #fbfaf7;
   --site-surface: #ffffff;
-  --site-ink: #202421;
-  --site-body: #5f625c;
-  --site-muted: #8a8d85;
-  --site-line: #dedfdb;
-  --site-line-strong: #b7b9b0;
-  --site-action: #202421;
+  --site-ink: #1d1c1a;
+  --site-body: #5d5a53;
+  --site-muted: #8a8780;
+  --site-line: #dcd9d1;
+  --site-line-strong: #b9b5ab;
+  --site-action: #1d1c1a;
   --site-on-action: #ffffff;
   /* 品牌紫取自 Logo，是全站唯一强调色；每屏大面积使用不超过两处。 */
   --site-accent: #6d4fc2;
-  --site-accent-soft: #f0ebfa;
+  --site-accent-soft: #f2eefb;
   --site-accent-line: #cdbdf0;
   /* 与博客角色插画背景同色，插画放在上面不会出现色差。 */
   --site-peach: #fde0cf;
+  /* 路线图状态：已上线 / 进行中。 */
+  --site-live: #2f6b4d;
+  --site-live-soft: #dcebe0;
+  --site-wip: #8a6420;
+  --site-wip-soft: #efe5cf;
   --site-operational: #2b9a68;
   --site-operational-soft: #dceee4;
   --site-warning: #a87218;
   --site-danger: #c74747;
   --site-focus: var(--site-accent);
-  --site-shadow: rgba(27, 28, 25, 0.12);
-  --site-overlay: rgba(11, 18, 15, 0.6);
-  --site-page: min(1600px, calc(100% - 2 * clamp(24px, 4.8vw, 64px)));
+  --site-shadow: rgba(29, 28, 26, 0.12);
+  --site-overlay: rgba(14, 13, 11, 0.6);
+  /* 舞台色场：桃 + 灰蓝、薄荷 + 柠檬。只用于舞台底板。 */
+  --stage-peach: #efc3a6;
+  --stage-peach-soft: #f4d9c6;
+  --stage-peach-base: #e6cdbb;
+  --stage-slate: #8fa3b8;
+  --stage-slate-soft: #b7c5d3;
+  --stage-mint: #b9d9c7;
+  --stage-mint-deep: #9cc5ae;
+  --stage-mint-base: #cfe3d2;
+  --stage-lemon: #efe3a0;
+  --stage-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2  0 0 0 0 .18  0 0 0 0 .15  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --site-page: min(1360px, calc(100% - 2 * clamp(16px, 4.8vw, 40px)));
   --site-reading: min(680px, calc(100vw - 40px));
   --site-font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --site-font-serif: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif;
+  /* 标题衬线：系统字体，不加载 Web 字体（国内加载不稳）。 */
+  --site-font-display:
+    Charter, "Songti SC", "Noto Serif SC", "Noto Serif CJK SC",
+    "Source Han Serif SC", Georgia, serif;
+  --site-font-serif: var(--site-font-display);
   --site-font-mono:
-    "SFMono-Regular", "JetBrains Mono", "Cascadia Code", monospace;
+    ui-monospace, "SF Mono", "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
 
   /* 短别名：旧代码大量引用，保留；新代码请直接用 --site-*。 */
   --canvas: var(--site-canvas);
@@ -44,5 +67,5 @@
   --line: var(--site-line);
   --sans: var(--site-font-sans);
   --mono: var(--site-font-mono);
-  --blog-serif: Charter, "Songti SC", Georgia, serif;
+  --blog-serif: var(--site-font-display);
 }

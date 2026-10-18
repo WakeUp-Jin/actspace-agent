@@ -1,0 +1,33 @@
+---
+import { harnessPoints } from '../../lib/home-features';
+import { sitePath } from '../../lib/site-path';
+---
+<section class="wrap feature reverse" id="harness" aria-labelledby="harness-title">
+  <div class="feature-copy">
+    <p class="feature-tags"><span class="pill wip">进行中</span><span>Harness 自进化</span></p>
+    <h2 id="harness-title">插件按问题长出新版本</h2>
+    <p class="feature-description">遇到具体问题，插件会派生出更合适的版本，由你决定留不留。</p>
+    <ol class="feature-points">{harnessPoints.map((point, i) => <li><span>0{i + 1}</span>{point}</li>)}</ol>
+    <a class="text-link" href={sitePath('/docs/harness-tools/')}>让 Agent 新增工具 <span class="arrow" aria-hidden="true">→</span></a>
+  </div>
+  <div class="stage stage-peach feature-stage" data-loop="0:0,1:1000,2:2600,3:4200,4:5600,5:7000" data-period="9600">
+    <span class="mock-note">示意 · 尚未上线</span>
+    <div class="win evo" data-p="0" role="img" aria-label="Harness 自进化示意：插件「编辑」从 v1 派生出 v2，在沙箱评估后被接受">
+      <div class="win-bar"><i></i><i></i><i></i><em>Harness · 插件「编辑」</em></div>
+      <div class="evo-body">
+        <p class="evo-ask"><span>问题</span>这个项目里，Agent 总会顺手改到生成文件。</p>
+        <div class="evo-versions">
+          <div class="ver"><b>编辑 v1</b><small>当前</small><code>范围：整个工作区</code></div>
+          <span class="evo-arrow" aria-hidden="true">→</span>
+          <div class="ver next"><b>编辑 v2</b><small class="s-derive">派生中</small><small class="s-eval">沙箱评估中</small><small class="s-ok">已接受</small>
+            <code class="del">- 范围：整个工作区</code><code class="add">+ 范围：src/**，跳过生成文件</code></div>
+        </div>
+        <div class="evo-eval">
+          <p>沙箱评估 · 样例任务</p>
+          <ul>{["改登录页表单", "重命名 API 字段", "升级依赖版本"].map((task) => <li>{task}<span class="wait">等待</span><span class="pass">通过</span></li>)}</ul>
+        </div>
+        <div class="evo-actions"><span class="evo-accept">接受 v2</span><span class="evo-revert">撤销</span><span class="evo-result">已接受 · 从下一条消息起生效</span></div>
+      </div>
+    </div>
+  </div>
+</section>

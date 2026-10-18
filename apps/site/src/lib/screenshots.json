@@ -1,20 +1,20 @@
 {
   "workspace-overview.png": {
     "number": 1,
-    "instruction": "工作区、会话列表与代码回复",
-    "usage": "ActSpace 是什么、快速开始（首页首屏已改用 review-workspace.png）",
+    "instruction": "工作区、会话列表与一轮回复的交付卡（mock=turn-deliverables，1440×900 DPR2，示例数据）",
+    "usage": "ActSpace 是什么、快速开始",
     "status": "ready"
   },
   "review-workspace.png": {
     "number": 36,
     "instruction": "一次真实的架构分析任务：左侧对话，右侧 Review 未提交改动列表",
-    "usage": "首页首屏",
+    "usage": "首页已不用（侧栏是旧版）",
     "status": "ready"
   },
   "context-detail.png": {
     "number": 2,
     "instruction": "上下文面板中的系统提示词、工具和规则分组；需在真实开发任务中重拍（当前是格式测试会话）",
-    "usage": "上下文展示；上下文与压缩",
+    "usage": "已不被引用；上下文与压缩改用 docs/context-panel.png",
     "status": "needs-retake"
   },
   "tool-execution.png": {
@@ -43,14 +43,14 @@
   },
   "trajectory-inspector.png": {
     "number": 7,
-    "instruction": "会话时间线、执行记录与选中的用户消息详情",
-    "usage": "会话轨迹展示；一次 Agent 执行",
+    "instruction": "执行轨迹：时间线与按轮次的工具调用（mock + trajectoryFixture=complete，侧栏收起，与首页 home/trajectory.png 同图）",
+    "usage": "一次 Agent 执行",
     "status": "ready"
   },
   "context-popup.png": {
     "number": 8,
     "instruction": "输入框上方的上下文占用与分类",
-    "usage": "文档精读配图；可作首页上下文的局部补图",
+    "usage": "文档精读配图",
     "status": "ready"
   },
   "model-connection.png": {
@@ -216,6 +216,12 @@
     "number": 35,
     "instruction": "设置导航与通用设置",
     "usage": "设置与本地数据：设置入口段",
+    "status": "ready"
+  },
+  "context-panel.png": {
+    "number": 37,
+    "instruction": "上下文面板五块，切成左右两栏（由 home/context-panel.png 生成，mock=long-session，示例数据）",
+    "usage": "上下文与压缩：上下文面板",
     "status": "ready"
   }
 }

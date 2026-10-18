@@ -6,7 +6,7 @@ const source = "docs/roadmap.md";
 describe("parseRoadmap", () => {
   it("loads the repository roadmap source", async () => {
     const result = await loadRoadmap();
-    expect(result.some((item) => item.title === "Agent Room 协作空间")).toBe(true);
+    expect(result.some((item) => item.title === "Actor 与 Space：多 Actor 协作运行时")).toBe(true);
   });
 
   it("parses open and completed tasks in source order", () => {

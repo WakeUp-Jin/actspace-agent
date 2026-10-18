@@ -1,13 +1,31 @@
 # 官网与文档截图清单
 
-## 2026-09-26 首页改版后需重拍
+## 2026-10-17 官网 V4
 
-| 编号 | 文件名 | 要求 |
-| --- | --- | --- |
-| 02 | `context-detail.png` | 当前图是“多种编程语言代码格式测试”会话，和首页主张不符（`screenshots.json` 标为 `needs-retake`）。在一个真实开发任务（例如给示例项目加一个小功能：读代码 → 修改 → 跑测试）进行中截图：窗口 1440×900、浅色主题、右侧打开上下文面板，隐藏私人路径。 |
-| 01 | `workspace-overview.png` | 首页首屏已改用 36 `review-workspace.png`（真实架构分析任务）；文档仍在使用 01，建议同一任务中顺手重拍。 |
+首页功能块的截图在 `src/assets/screenshots/home/`，全部来自桌面端渲染进程的浏览器 mock（示例数据，没有本机路径和私人会话名）。重拍方法：
 
-36 `review-workspace.png` 已接入首页首屏，无需再拍。
+1. `pnpm --filter @actspace/desktop dev:renderer`，打开 `http://127.0.0.1:5173/?mock=<场景>`。
+2. 用 Chrome DevTools 协议设视口与 DPR，截图后用 sharp 裁切。侧栏用「收起会话侧栏」按钮收起；窄视口下侧栏会自动隐藏，要先点一次「会话侧栏」按钮。
+3. 换图后重新量 `src/lib/home-features.ts` 里每个要点的 `rect`。
+
+| 文件 | 场景与参数 |
+| --- | --- |
+| `home/turn-deliverables.png` | `mock=turn-deliverables`，820×2000 CSS、DPR3、侧栏收起；从第二轮用户消息裁到第三轮用量胶囊下方 |
+| `home/trajectory.png` | `mock=long-session&trajectoryFixture=complete`，点「查看执行轨迹」，940×760、DPR3、侧栏收起；`docs/trajectory-inspector.png` 是同一张 |
+| `home/approval.png` | `mock=approval-prefix`，760×470、DPR3、侧栏收起，用 pointer 事件打开「会话权限模式」菜单 |
+| `home/context-panel.png` | `mock=long-session`，localStorage `actspace.workbench.layout.v1` 设 `rightWidth: 440`，1440×1400 视口（矮了统计格会挤），折叠工具与会话内容分组，只裁右侧面板列；`docs/context-panel.png` 是它切成左右两栏 |
+| `home/space.png` | 点侧栏「支付链路提速」，1060×800、DPR3、侧栏收起 |
+| `docs/workspace-overview.png` | `mock=turn-deliverables`，1440×900、DPR2，侧栏展开 |
+
+浏览器 mock 里发送消息不经过消息队列，排队与「插入」画面拍不出来，所以首页没有消息队列块。
+
+`docs/context-popup.png` 顶部露出的上一条消息残字已抹平。仍是旧界面、建议重拍的：
+
+| 文件 | 原因 |
+| --- | --- |
+| `context-detail.png` / `docs/context-detail.png` | 格式测试会话；文档已改用 `docs/context-panel.png`，这张不再被引用 |
+| `review-workspace.png` | 侧栏仍是旧版（New Agent / Lab / Kairos）；首页已不用 |
+| `context-and-approval.png`、`docs/subagent-running.png` | 画面里露出本机路径或私人会话名 |
 
 ## 当前进度（2026-09-19）
 
