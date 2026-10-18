@@ -33,6 +33,7 @@ export const SEARCH_PROVIDER_ROWS: Array<{
   tag?: string;
   description: string;
 }> = [
+  { provider: "deepseek", label: "DeepSeek", description: "搜索 ¥0.005 / 次成功请求。与 DeepSeek 模型和网页抓取共用官方 API Key；连接后需单独启用搜索。" },
   { provider: "zhipu", label: "智谱 Web Search", description: "国内 · search_pro ¥0.03 / 次" },
   { provider: "tavily", label: "Tavily", tag: "国际 1", description: "每月 1000 credits 免费，超出按量计费。" },
   { provider: "tinyfish", label: "TinyFish", tag: "国际 2", description: "搜索接口目前免费（按套餐限速）。" },
@@ -54,12 +55,28 @@ export function SearchSettings({
   onSaveProviderKey: (provider: SecretProviderId, apiKey: string) => Promise<SetProviderKeyResult>;
   onClearProvider: (provider: SecretProviderId) => Promise<void>;
 }) {
+  const notifySaved = useSettingsSaveNotice();
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
+  const saveTools = async (patch: Partial<import("@actspace/shared").SettingsV4Tools>) => {
+    setWriteError(null);
+    setWriting(true);
+    try {
+      const result = await onUpdateNamespace({ namespace: "tools", patch });
+      if (!result) throw new Error("保存失败，请重试。");
+      notifySaved();
+    } catch { setWriteError("保存失败，请重试。"); }
+    finally { setWriting(false); }
+  };
+  const hasDeepseekKey = settings.searchProviders.deepseek?.hasApiKey === true || settings.providers.deepseek.hasApiKey;
+  const hasKey = (provider: SearchProviderId) => provider === "deepseek" ? hasDeepseekKey : settings.searchProviders[provider]?.hasApiKey === true;
   const tools = useToolToggle({ settings, settingsV4, onUpdate, onUpdateNamespace });
   const editor = useSingleEditor<SearchProviderId>();
-  const connectedCount = SEARCH_PROVIDER_ROWS.filter(({ provider }) => settings.searchProviders[provider]?.hasApiKey).length;
+  const connectedCount = SEARCH_PROVIDER_ROWS.filter(({ provider }) => hasKey(provider)).length;
 
   return (
     <>
+      {writeError ? <p role="alert">{writeError}</p> : null}
       <SettingGroup>
         <SettingRow
           title="允许联网搜索"
@@ -77,14 +94,17 @@ export function SearchSettings({
       <SettingGroup
         title="搜索通道"
         headingLevel={3}
-        description="国内内容优先使用智谱；国际内容按 Tavily → TinyFish → Exa 的顺序使用第一个已连接的通道。"
+        description="DeepSeek、智谱与国际通道并行搜索，结果去重、融合排序后取前几条，各来源分别计费。国际通道按 Tavily → TinyFish → Exa 使用首个可用来源。"
         meta={`${connectedCount} / ${SEARCH_PROVIDER_ROWS.length} 已连接`}
       >
         {SEARCH_PROVIDER_ROWS.map((row) => (
           <SearchProviderRow
             key={row.provider}
             {...row}
-            hasApiKey={settings.searchProviders[row.provider]?.hasApiKey === true}
+            hasApiKey={hasKey(row.provider)}
+            enabled={hasKey(row.provider) && (settingsV4?.settings.tools.searchProviders[row.provider]?.enabled ?? (row.provider !== "deepseek"))}
+            toggleDisabled={!settingsV4 || writing || !hasKey(row.provider)}
+            onToggle={(enabled) => void saveTools({ searchProviders: { [row.provider]: { enabled } } })}
             editing={editor.isOpen(row.provider)}
             onEdit={() => editor.toggle(row.provider)}
             onCloseEditor={editor.close}
@@ -92,6 +112,18 @@ export function SearchSettings({
             onClear={() => onClearProvider(row.provider)}
           />
         ))}
+      </SettingGroup>
+      <SettingGroup title="网页读取" headingLevel={3}>
+        <SettingRow
+          title="使用 DeepSeek 抓取网页"
+          description={<>开启后优先使用 DeepSeek，目标网址将发送至 DeepSeek，当前 ¥0.005 / 次成功请求。普通获取失败时回退本地；关闭时使用本地抓取。{!hasDeepseekKey ? "请先连接上方 DeepSeek。" : "使用上方共享的 DeepSeek Key，与搜索开关独立。"}</>}
+          control={<Toggle
+            ariaLabel="使用 DeepSeek 抓取网页"
+            checked={hasDeepseekKey && settingsV4?.settings.tools.deepseekFetchEnabled === true}
+            disabled={!settingsV4 || writing || !hasDeepseekKey}
+            onChange={(deepseekFetchEnabled) => void saveTools({ deepseekFetchEnabled })}
+          />}
+        />
       </SettingGroup>
     </>
   );
@@ -103,6 +135,9 @@ function SearchProviderRow({
   tag,
   description,
   hasApiKey,
+  enabled,
+  toggleDisabled,
+  onToggle,
   editing,
   onEdit,
   onCloseEditor,
@@ -114,6 +149,9 @@ function SearchProviderRow({
   tag?: string;
   description: string;
   hasApiKey: boolean;
+  enabled: boolean;
+  toggleDisabled: boolean;
+  onToggle: (enabled: boolean) => void;
   editing: boolean;
   onEdit: () => void;
   onCloseEditor: () => void;
@@ -165,19 +203,21 @@ function SearchProviderRow({
 
   return (
     <>
+      {error && !editing ? <p role="alert">{error}</p> : null}
       <SettingRow
         title={<>{label}{tag ? <SettingTag>{tag}</SettingTag> : null}</>}
         description={<>{description}{usage}</>}
         control={
           hasApiKey ? (
             <>
+              <Toggle ariaLabel={`启用 ${label} 搜索`} checked={enabled} disabled={toggleDisabled} onChange={onToggle} />
               <StatusDot tone="ok">已连接</StatusDot>
               <SettingsMenuButton
                 label="管理"
                 ariaLabel={`管理 ${label}`}
                 items={[
                   { label: "更换 Key", onSelect: onEdit },
-                  { label: "断开连接", danger: true, onSelect: () => void clear() },
+                  ...(provider === "deepseek" ? [] : [{ label: "断开连接", danger: true, onSelect: () => void clear() }]),
                 ]}
               />
             </>
@@ -191,7 +231,7 @@ function SearchProviderRow({
       {editing ? (
         <SettingEditor
           id={editorId}
-          hint="Key 只保存在本机，不会回显。"
+          hint={provider === "deepseek" ? "与 DeepSeek 模型及网页抓取共用官方 Key；更换会影响三者。Key 只保存在本机，不会回显。" : "Key 只保存在本机，不会回显。"}
           error={error}
           saving={saving}
           saveDisabled={!apiKey.trim()}

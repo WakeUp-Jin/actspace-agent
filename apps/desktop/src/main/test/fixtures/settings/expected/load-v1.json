@@ -75,6 +75,9 @@
         "exploreModel": "deepseek:deepseek-flash"
       },
       "searchProviders": {
+        "deepseek": {
+          "hasApiKey": false
+        },
         "zhipu": {
           "hasApiKey": false
         },
@@ -237,7 +240,11 @@
             "alwaysAsk": true
           },
           "showFileChangeStats": true,
+          "deepseekFetchEnabled": false,
           "searchProviders": {
+            "deepseek": {
+              "enabled": false
+            },
             "zhipu": {
               "enabled": true
             },
@@ -410,7 +417,11 @@
           "alwaysAsk": true
         },
         "showFileChangeStats": true,
+        "deepseekFetchEnabled": false,
         "searchProviders": {
+          "deepseek": {
+            "enabled": false
+          },
           "zhipu": {
             "enabled": true
           },

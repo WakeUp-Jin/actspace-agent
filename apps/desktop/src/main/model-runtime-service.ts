@@ -63,21 +63,27 @@ export class ModelRuntimeService {
 
   getToolEnvironment(): {
     hasWebSearchKey: boolean;
-    searchCredentials: Partial<Record<"zhipu" | "tavily" | "tinyfish" | "exa", string>>;
+    deepseekFetchApiKey?: string;
+    searchCredentials: Partial<Record<"zhipu" | "tavily" | "tinyfish" | "exa" | "deepseek", string>>;
     disabledTools: string[];
     hasKimiKey: boolean;
     imageGeneration?: { apiKey: string; baseUrl: string; model: string };
   } {
     const settings = this.settings.getV2();
     const imageGeneration = this.settings.getImageGenerationRuntimeConfig();
+    const tools = this.settings.getV4().settings.tools;
+    const deepseekKey = this.settings.getStoredKey("deepseek");
+    const searchCredentials = tools.disabledTools.includes("web_search") ? {} : Object.fromEntries(
+      (["zhipu", "tavily", "tinyfish", "exa", "deepseek"] as const).flatMap((provider) => {
+        const enabled = tools.searchProviders[provider]?.enabled ?? (provider !== "deepseek");
+        const key = enabled ? this.settings.getStoredKey(provider) : undefined;
+        return key ? [[provider, key] as const] : [];
+      }),
+    );
     return {
-      hasWebSearchKey: Object.values(settings.searchProviders).some((provider) => provider.hasApiKey),
-      searchCredentials: Object.fromEntries(
-        (["zhipu", "tavily", "tinyfish", "exa"] as const).flatMap((provider) => {
-          const key = this.settings.getStoredKey(provider);
-          return key ? [[provider, key] as const] : [];
-        }),
-      ),
+      hasWebSearchKey: Object.keys(searchCredentials).length > 0,
+      searchCredentials,
+      ...(tools.deepseekFetchEnabled === true && deepseekKey ? { deepseekFetchApiKey: deepseekKey } : {}),
       disabledTools: [...settings.agent.disabledTools],
       hasKimiKey: settings.providers.kimi.hasApiKey,
       ...(imageGeneration && { imageGeneration }),

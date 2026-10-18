@@ -19,10 +19,11 @@ export type ProviderId = LegacySettingsProviderId;
 
 export const SETTINGS_PROVIDER_IDS: readonly LegacySettingsProviderId[] = ["deepseek", "kimi"];
 
-/** 网络搜索供应商（web_search 工具）。zhipu = 国内通道；其余为国际通道候选。 */
-export type SearchProviderId = "zhipu" | "tavily" | "tinyfish" | "exa";
+/** 网络搜索供应商：deepseek、zhipu 为独立聚合通道，其余为国际通道候选。 */
+export type SearchProviderId = "zhipu" | "tavily" | "tinyfish" | "exa" | "deepseek";
 
 export const SEARCH_PROVIDER_IDS: readonly SearchProviderId[] = [
+  "deepseek",
   "zhipu",
   "tavily",
   "tinyfish",
@@ -185,7 +186,7 @@ export interface AppSettingsV1 {
   defaultModelId: ModelId | null;
   providers: Record<LegacySettingsProviderId, ProviderSettingsView>;
   /** 网络搜索供应商的密钥状态（web_search 工具）。 */
-  searchProviders: Record<SearchProviderId, ProviderSettingsView>;
+  searchProviders: Record<Exclude<SearchProviderId, "deepseek">, ProviderSettingsView> & Partial<Record<"deepseek", ProviderSettingsView>>;
   agent: AgentSettings;
   skills: SkillsSettings;
 }
@@ -198,7 +199,7 @@ export interface AppSettingsV2 {
   customModels: Partial<Record<ModelKey, ModelDefinition>>;
   taskModels: TaskModelSettings;
   /** 网络搜索供应商继续独立于 LLM Provider Registry。 */
-  searchProviders: Record<SearchProviderId, ProviderSettingsView>;
+  searchProviders: Record<Exclude<SearchProviderId, "deepseek">, ProviderSettingsView> & Partial<Record<"deepseek", ProviderSettingsView>>;
   /** OpenAI-compatible 图片生成连接；与 LLM/search provider 布局保持独立。 */
   imageGeneration: ImageGenerationSettingsView;
   /** inspect_image 使用的视觉模型与已有 provider 凭据引用。 */
@@ -348,6 +349,8 @@ export interface SettingsV4Tools {
   };
   /** Show live additions/deletions while write/edit tools are running. */
   showFileChangeStats?: boolean;
+  /** Explicit opt-in to paid DeepSeek Fetch; missing means false. */
+  deepseekFetchEnabled?: boolean;
   searchProviders: Partial<Record<SearchProviderId, { enabled: boolean }>>;
 }
 

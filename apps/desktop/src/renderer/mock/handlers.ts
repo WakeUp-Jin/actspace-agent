@@ -196,6 +196,9 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         if (expectedRevision !== latest.revision) return { ok: false, code: "revision_conflict", latest, message: "设置已在别处修改。" };
         const revision = `mock-${Number(latest.revision.replace("mock-", "")) + 1}`;
         db.settingsV4 = { ...latest, revision, settings: { ...latest.settings, [namespace]: { ...latest.settings[namespace], ...patch } } };
+        if (namespace === "tools" && "searchProviders" in patch) {
+          db.settingsV4.settings.tools.searchProviders = { ...latest.settings.tools.searchProviders, ...patch.searchProviders };
+        }
         clock.emit("settingsChanged", { revision, changedNamespaces: [namespace] });
         return { ok: true, snapshot: db.settingsV4 };
       },
@@ -206,7 +209,19 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       consume: async () => null,
       getShortcutStatus: async () => ({ registered: false, accelerator: db.settings.shortcuts?.quickOpen.accelerator ?? "" }),
     },
-    providers: { list: async () => mockProviders() },
+    providers: {
+      list: async () => mockProviders(),
+      setKey: async ({ provider }) => {
+        if (provider in db.settings.providers) db.settings.providers[provider as keyof typeof db.settings.providers] = { ...db.settings.providers[provider as keyof typeof db.settings.providers], hasApiKey: true };
+        if (provider in db.settings.searchProviders) db.settings.searchProviders[provider as keyof typeof db.settings.searchProviders] = { hasApiKey: true };
+        return { ok: true };
+      },
+      clearKey: async ({ provider }) => {
+        if (provider in db.settings.providers) db.settings.providers[provider as keyof typeof db.settings.providers] = { ...db.settings.providers[provider as keyof typeof db.settings.providers], hasApiKey: false };
+        if (provider in db.settings.searchProviders) db.settings.searchProviders[provider as keyof typeof db.settings.searchProviders] = { hasApiKey: false };
+        return { ok: true };
+      },
+    },
     models: {
       listInstalled: async () => ({ models: mockInstalledModels() }),
       listUsable: async () => ({ models: mockUsableModels() }),

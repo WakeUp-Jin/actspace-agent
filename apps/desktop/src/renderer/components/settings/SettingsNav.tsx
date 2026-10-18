@@ -29,7 +29,7 @@ export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId
     sections: [
       { id: "hosts", label: "远端 Host", icon: Server },
       { id: "model", label: "模型", icon: Cpu },
-      { id: "search", label: "搜索", icon: Search },
+      { id: "search", label: "搜索与网页读取", icon: Search },
       { id: "tools", label: "工具", icon: Wrench },
       { id: "subagents", label: "子 Agent", icon: Users },
     ],
