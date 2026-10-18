@@ -1,8 +1,10 @@
 # 轨迹页流式拆分 — 执行摘要
 
+> 2026-10-18 状态校准：实现已合入；旧 fixture 性能数字保留为当时证据，不据此关闭 O01 原生性能观察。
+
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261014-trajectory-streaming-split.md`
+- **关联计划**：`docs/exec-plans/completed/20261014-trajectory-streaming-split.md`
 - **执行过程**：`docs/exec-runs/20261014-trajectory-streaming-split/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：完成（E1、T0–T6）。改动未提交，等用户验收。

@@ -45,6 +45,19 @@ describe("history window slimming", () => {
     expect(out.map(event => event.seq)).toEqual([1, 2]);
   });
 
+  it("retains observed first token timing without restoring completed chunks", () => {
+    const empty = { ...envelope(0, "assistant/chunk", { messageId: "done", delta: "" }), time: "2026-09-26T00:00:01Z" };
+    const token = { ...envelope(1, "assistant/chunk", { messageId: "done", delta: "hello" }), time: "2026-09-26T00:00:02Z" };
+    const done = envelope(2, "assistant/message", { messageId: "done", content: "hello" });
+    const unknown = envelope(3, "assistant/message", { messageId: "no-chunks", content: "unknown" });
+    const out = slimHistoryWindow([empty, token, done, unknown]);
+    expect(out.map(event => event.seq)).toEqual([2, 3]);
+    expect(out[0]!.data).toMatchObject({ firstTokenAt: token.time });
+    expect(out[1]!.data).not.toHaveProperty("firstTokenAt");
+    expect(done.data).not.toHaveProperty("firstTokenAt");
+    expect(slimHistoryWindow([{ ...done, data: { ...done.data as object, firstTokenAt: empty.time } }])[0]!.data).toMatchObject({ firstTokenAt: empty.time });
+  });
+
   it("keeps the latest request context whole and bounds older large ones to identity fields", () => {
     const [older, latest] = slimHistoryWindow([bigContext(0, "r0"), bigContext(1, "r1")]);
     expect(older!.data).toEqual({ deferredDetail: true, turnId: "t", stepId: "s", requestId: "r0", snapshot: { prepared: { model: "m", route: "r", contextWindow: 1000 }, requestOptions: { temperature: 0 } } });

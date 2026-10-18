@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261014-trajectory-streaming-split.md`
+- **关联计划**：`docs/exec-plans/completed/20261014-trajectory-streaming-split.md`
 - **执行模式**：交互
 - **开始时间**：2026-10-14
 

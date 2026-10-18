@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261017-site-v4-redesign.md`
+- **关联计划**：`docs/exec-plans/completed/20261017-site-v4-redesign.md`
 - **执行模式**：交互
 - **开始时间**：2026-10-17 10:20
 - **结束时间**：2026-10-17 11:35

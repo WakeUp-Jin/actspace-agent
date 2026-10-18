@@ -1,9 +1,9 @@
 # Web / PWA 客户端规范
 
 > 状态：已实施（2026-10-17，`apps/web`，分支 `feat/web-mobile`）。D1–D4 已由用户确认，见 §3；浏览器验收已完成，真机（iPhone + Tailscale）验收待用户执行。
-> 原型：结构沿用 [mobile-web-demo.html](mobile-web-demo.html) 的 **V1 · Happy 原生移植**（含「V1 宽屏」）。2026-10-18 视觉改为 [mobile-web-v2-demo.html](mobile-web-v2-demo.html) 的 **B · 轻玻璃**（iOS 原生感，手机优先），已实施；下文 §9、§10 按 B 描述。V2、V3 及 v2 demo 里的 A 只做对比保留。
+> 原型：结构沿用 [mobile-web-demo.html（已迁出）](../retired-html-demos.md) 的 **V1 · Happy 原生移植**（含「V1 宽屏」）。2026-10-18 视觉改为 [mobile-web-v2-demo.html（已迁出）](../retired-html-demos.md) 的 **B · 轻玻璃**（iOS 原生感，手机优先），已实施；下文 §9、§10 按 B 描述。早期 V2、V3 及 A 只保留为本地历史对比；当前规范以本页 §9、§10 和 apps/web 为准。
 > 参考：[slopus/happy](https://github.com/slopus/happy) `packages/happy-app`（Expo，手机端和 Web 共用一套组件）。
-> 执行计划：[20261017-web-pwa-client](../../exec-plans/active/20261017-web-pwa-client.md)。
+> 执行计划：[20261017-web-pwa-client](../../exec-plans/completed/20261017-web-pwa-client.md)。
 
 ## 1. 定位
 

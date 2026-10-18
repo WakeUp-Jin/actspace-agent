@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261017-web-pwa-client.md`
+- **关联计划**：`docs/exec-plans/completed/20261017-web-pwa-client.md`
 - **执行过程**：`docs/exec-runs/20261017-web-pwa-client/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：A1–D3 完成；2026-10-18 视觉改为 B · 轻玻璃并完成浏览器验收；分支 `feat/web-mobile` 开 PR 合入 `main`，在 main 上与其他功能一起测。D4 真机验收待用户执行。

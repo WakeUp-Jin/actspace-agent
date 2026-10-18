@@ -8,7 +8,7 @@
 - **适用范围**：ActSpace Desktop 设置中心、Usage 活动页面，以及与设置页面直接相关的 shared IPC 适配。
 - **当前事实来源**：本文是设置中心重构后的产品与交互规范。实现细节、执行顺序和具体改动文件进入 `docs/exec-plans/` 后再冻结。
 - **模型页面子规范**：模型页面的视觉和路由细节以 [`front-模型设置页面-Maka重做规范.md`](front-模型设置页面-Maka重做规范.md) 为准。
-- **视觉重设计**：2026-09-25 按 [`settings-redesign-demo.html`](settings-redesign-demo.html) 统一分组、行、控件和保存方式，新增「能力 → 搜索」页；实现与验收见 `docs/exec-plans/completed/20260925-settings-visual-redesign.md`。本文 4.1、5.2、6.1、6.5 与 9.1 已同步。
+- **视觉重设计**：2026-09-25 按 [`settings-redesign-demo.html`（已迁出）](../retired-html-demos.md) 统一分组、行、控件和保存方式，新增「能力 → 搜索」页；实现与验收见 `docs/exec-plans/completed/20260925-settings-visual-redesign.md`。本文 4.1、5.2、6.1、6.5 与 9.1 已同步。
 - **使用统计更新**：2026-09-07 已实现视觉统一、中文与费用口径，详见 [`front-usage-statistics-refresh.md`](front-usage-statistics-refresh.md)；真实 Electron / Provider 门禁见该任务执行摘要，不改变本文其他阶段的验收状态。
 
 本文不是 Maka 的复制规范。Maka 源码和 `curated-design-docs` 只作为参考证据，用来提炼可迁移的页面语法、对象模型、状态处理和数据分析方法。Maka 中 ActSpace 没有的 Runtime Host、Bot Chat、宠物、每日回顾等功能不因为视觉参考而进入本次范围。

@@ -46,7 +46,7 @@ export type ComposerStatusRowProps = {
   stats?: ComposerStatsOverlay;
 };
 
-const ROW_CLASS = "composer-status-row flex min-h-5 items-center justify-between gap-3 px-3 text-act-sm leading-5 text-text-faint";
+const ROW_CLASS = "composer-status-row flex min-h-5 min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 text-act-sm leading-5 text-text-faint";
 const FACTS_CLASS = "flex min-w-0 items-center gap-1.5";
 const FACT_CLASS = "inline-flex min-w-0 items-center gap-1.5";
 const ICON_CLASS = "shrink-0 text-text-subtle";

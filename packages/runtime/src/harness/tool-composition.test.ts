@@ -36,6 +36,7 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
     expect(profile.context.get!("tools.runtime")).toBeUndefined();
     const runtime = profile.context.get!("agent.runtime") as import("./agent-runtime-plugin.js").AgentRuntimeService;
     const lease = await runtime.harnesses.acquire("main");
+    const previousDigest = lease.executionDigest;
     const tools = lease.getService<ToolRuntime>("tools.runtime")!;
     const names = tools.registry.listDefinitions().map(item => item.name);
     expect(names).toContain("read_file");
@@ -57,16 +58,23 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
     expect(cleanup).toHaveBeenCalledTimes(2);
     profile = undefined;
     expect(() => tools.registry.capture("read_file")).toThrow(/not active/);
-    // A changed Host permission ceiling must not silently restore the former execution environment.
+    // A pristine builtin upgrades to the new Host ceiling; it must not reuse the old execution environment.
     profile = await bootProfileRuntime({ ...options, host: { ...host, capabilityCeiling: ["filesystem.read"] },
       authorizeHarness: async request => ({ ...request, actor: "maintenance-test", decisionId: "repair", expiresAt: Date.now() + 10000 }),
     });
     const restored = profile.context.get!("harness.control") as import("@actspace/harness-control").HarnessControl;
     expect(restored).toBeDefined();
-    await expect(restored.acquire("main")).rejects.toMatchObject({ code: "RECOVERY_BLOCKED" });
-    expect(profile.getDiagnostics().diagnostics.some(d => d.code === "HARNESS_RECOVERY_BLOCKED")).toBe(true);
-    expect((await restored.recoverBuiltin("repair-permissions", 1)).revision).toBe(2);
-    const repaired = await restored.acquire("main"); expect(repaired.revision).toBe(2); await repaired.release();
+    const upgraded = await restored.acquire("main");
+    try {
+      expect(upgraded.revision).toBe(2);
+      expect(upgraded.executionDigest).not.toBe(previousDigest);
+      expect(restored.inspect().current).toMatchObject({
+        authorization: { actor: "Host", decisionId: "trusted-builtin-upgrade" },
+        description: { composition: { hostCapabilities: ["filesystem.read"] } },
+      });
+      expect(restored.inspect().blocked).toBe("");
+    } finally { await upgraded.release(); }
+
   } finally {
     await profile?.shutdown();
     await rm(root, { recursive: true, force: true });

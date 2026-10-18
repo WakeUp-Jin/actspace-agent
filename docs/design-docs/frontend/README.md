@@ -1,6 +1,6 @@
 # 前端设计文档
 
-- [Web / PWA 客户端规范](front-web-pwa客户端规范.md)：已实施（2026-10-17）；`apps/web` 响应式浏览器客户端（手机 V1 单栏、宽屏两栏），PWA 安装，直连 agent-host；原型 `mobile-web-demo.html`；2026-10-18 视觉改为 `mobile-web-v2-demo.html` 的 B · 轻玻璃（已实施）；验收截图见 `docs/exec-runs/20261017-web-pwa-client/`，真机验收待做。
+- [Web / PWA 客户端规范](front-web-pwa客户端规范.md)：已实施（2026-10-17）；`apps/web` 响应式浏览器客户端（手机 V1 单栏、宽屏两栏），PWA 安装，直连 agent-host；2026-10-18 视觉更新为 B · 轻玻璃（已实施），早期原型已迁出；验收截图见 `docs/exec-runs/20261017-web-pwa-client/`，真机验收待做。
 
 - [聊天 Mermaid 图表渲染](front-chat-mermaid-diagrams.md)：已实施：闭合的 ` ```mermaid ` 渲染为固定 Codex 浅色图表，支持查看/复制源码、PNG 导出与缩放预览；Electron 验收边界见执行摘要。
 
@@ -21,7 +21,7 @@
 
 - `Ink & Emerald` renderer token 与组件迁移已完成，旧 `brand` / `warm` 消费者已清零。
 - 工程验证与防回流检查已落地；真实 Electron / Retina 与完整页面状态保留人工验收。
-- [打开 Sidebar / Composer / Settings 四态主题样板](ink-emerald-color-preview.html)。
+- [四态主题样板归档与恢复](../retired-html-demos.md)。
 
 ## 总目标
 
@@ -79,16 +79,14 @@
 
 ## HTML 原型
 
-- Space 工作台 demo 已移到 [`../多智能体协作/space-demo.html`](../多智能体协作/space-demo.html)。
-- `settings-redesign-demo.html`：2026-09-25 设置中心视觉重设计定稿 demo（内嵌分组 + 翡翠绿开关 + 独立「搜索」页 + 使用统计微调）；右下角调节面板只用于方案对比。
-- `context-panel-demo.html`：2026-10-11 右侧栏 Context 面板定稿方向（参考 dsh-context）；数据需求见 `front-Context面板后端数据需求.md`。
-- `mobile-web-demo.html`：2026-10-17 Web / PWA 客户端三版对比，选定 V1（Happy 原生移植），含「V1 宽屏」画面；规范见 `front-web-pwa客户端规范.md`。
-- `mobile-web-v2-demo.html`：2026-10-18 Web 视觉重做对比（现状 / A / B，9 个手机画面 + 宽屏），选定 B · 轻玻璃并已实施到 `apps/web`。
-- 其他 `*-demo.html` 文件是设计对比、交互验收或视觉原型；文件开头标明具体状态，当前实现以对应 Markdown 规范、执行计划和源码为准。
+已实现的设计 Demo 已本地备份后迁出当前仓库，原路径与恢复方式见 [迁出清单](../retired-html-demos.md)。后续实现以本目录 Markdown 规范和正式应用为准。
+
+- [Space 工作台演示](../多智能体协作/space-demo.html) 仍保留，当前是 mock 前端；Runtime 协作不在该演示的交付范围。
+- PA2 批注验收 Demo 仍保留，PB 尚未实施。
 
 ## 资产约定
 
-- 主要原型放在本目录；成组配套素材可集中放入 `assets/`，引用必须能从原型或规范追踪。
+- 未实施原型可暂存本目录；实现落地后按迁出清单流程备份到本机，当前导航转为 Markdown 规范。配套素材引用必须能从保留的原型或规范追踪。
 - 每个资产尽量只表达一个明确状态，并使用可识别的功能名。
 - 新增资产时同步更新本入口或对应组件规范，写清它验证的状态。
 
@@ -96,4 +94,4 @@
 
 ## 工具流交互演示
 
-- [消息流排版演示](tool-stream-typography-demo.html)：静态排版与工具摘要视觉参考。
+- [消息流排版原型归档与恢复](../retired-html-demos.md)：静态排版与工具摘要视觉参考。

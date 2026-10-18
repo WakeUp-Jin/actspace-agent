@@ -47,7 +47,7 @@ export function Composer({ observation, composer, awaitingApproval, queued, deni
   return (
     <div>
       <StatusLine awaitingApproval={awaitingApproval} running={observation.running} connected={connected} maintenance={maintenance} runStartedAt={observation.runStartedAt} contextPercent={observation.contextPercent} />
-      <QueueTray items={queued} onCancel={taskId => void composer.cancelQueued(taskId)} />
+      <QueueTray items={queued} paused={observation.tasks?.paused === true} resumeDisabled={!connected || maintenance || composer.resuming} onResume={() => void composer.resume()} onCancel={taskId => void composer.cancelQueued(taskId)} />
       <ComposerBox
         value={draft}
         onChange={value => { setDraft(value); if (composer.error) composer.clearError(); }}

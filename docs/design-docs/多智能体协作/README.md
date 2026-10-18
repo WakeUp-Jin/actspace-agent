@@ -10,7 +10,7 @@
 | [space-demo.html](space-demo.html) | 可交互 demo，数据全部 mock；直接用浏览器打开 | 设计以它为准 |
 | [assets/](assets/) | demo 用的头像素材：`space/` 6 色 Space 头像、`ball/` 5 色小球（原图），`demo/` 256px 裁切版，`unused/` 落选稿 | — |
 
-执行计划：[多智能体协作前端演示](../../exec-plans/active/20261007-multi-agent-collab-frontend-demo.md)（只做前端，不碰后端）。
+执行计划：[多智能体协作前端演示](../../exec-plans/completed/20261007-multi-agent-collab-frontend-demo.md)（只做前端，不碰后端）。
 
 ## 和其他专题的关系
 

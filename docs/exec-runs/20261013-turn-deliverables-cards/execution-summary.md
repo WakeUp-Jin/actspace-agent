@@ -1,8 +1,10 @@
 # 轮尾改动卡与交付文件卡 — 执行摘要
 
+> 2026-10-18 状态校准：实现已合入；真实文件写入及 present 结果见 20261018 近期验收，本轮另修复别名工作区的相对路径缺陷；原生应用/远端下载边界继续保留。
+
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261013-turn-deliverables-cards.md`
+- **关联计划**：`docs/exec-plans/completed/20261013-turn-deliverables-cards.md`
 - **执行过程**：`docs/exec-runs/20261013-turn-deliverables-cards/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：T1–T11 代码与文档完成；浏览器核对完成，Electron 实机验收留给用户

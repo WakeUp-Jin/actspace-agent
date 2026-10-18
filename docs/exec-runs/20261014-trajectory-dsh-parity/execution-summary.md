@@ -1,8 +1,10 @@
 # 轨迹页对齐 DeepSeek Harness — 执行摘要
 
+> 2026-10-18 状态校准：实现已合入；以 20261015/16 和 20261018 的逐项验收为后续证据，DSH 对照及 O01 原生性能观察保留。
+
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261014-trajectory-dsh-parity.md`
+- **关联计划**：`docs/exec-plans/completed/20261014-trajectory-dsh-parity.md`
 - **执行过程**：`docs/exec-runs/20261014-trajectory-dsh-parity/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：完成（T1–T12）。改动未提交，等用户验收。
@@ -62,7 +64,7 @@ R = `apps/desktop/src/renderer`。
 ## 已知风险和遗留事项
 
 - **长会话流式**：builder 每帧全量重建，2280 个节点时约 13ms，已接近 16.7ms 的帧预算。比这更长的会话流式时可能掉帧。建议另立计划做增量 builder。
-  - 2026-10-14 已由[轨迹页流式拆分](../../exec-plans/active/20261014-trajectory-streaming-split.md)处理：chunk 不再触发重建，每帧约 0.25ms；见[执行摘要](../20261014-trajectory-streaming-split/execution-summary.md)。普通事件到达时仍全量重建。
+  - 2026-10-14 已由[轨迹页流式拆分](../../exec-plans/completed/20261014-trajectory-streaming-split.md)处理：chunk 不再触发重建，每帧约 0.25ms；见[执行摘要](../20261014-trajectory-streaming-split/execution-summary.md)。普通事件到达时仍全量重建。
 - **与 DSH 的已知差异**（都是有意保留或数据所限）：
   - 时间轴点空白处会选中最近的记录（DSH 只聚焦）。
   - 助手预览按「思考、文本、工具调用」排列，不按原始块交错。

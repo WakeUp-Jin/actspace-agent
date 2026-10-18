@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261013-turn-deliverables-cards.md`
+- **关联计划**：`docs/exec-plans/completed/20261013-turn-deliverables-cards.md`
 - **执行模式**：交互
 - **开始时间**：2026-10-13
 - **结束时间**：进行中

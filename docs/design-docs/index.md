@@ -24,7 +24,7 @@
 - [外观强调色](frontend/front-accent-palette.md)：已实施，Electron 验收待做；5 个调色板只驱动发送按钮、开关、焦点、链接与文字选中，默认零变化。
 - [使用统计页面更新](frontend/front-usage-statistics-refresh.md)与[本地模型目录及使用费用](model-context/agent-model-catalog-and-usage-cost.md)：已实施，实机门禁见执行摘要；统一设置视觉，修正费用来源，定义随包目录、缓存和按需刷新。
 - [存储改版 V2：增加 SQLite 查询读模型](筛选存储改版V2-增加SQLite/README.md)：Session JSONL 继续作为唯一事实源，SQLite 负责使用统计、历史搜索和过去会话查询；Worker 边界见[单独说明](筛选存储改版V2-增加SQLite/worker.md)。
-- [Context 面板与 SQLite 联合设计](上下文管理引擎设计/上下文管理引擎V2/05-Context面板与SQLite联合设计.md)：当前 Context、历史索引、同步生命周期与联合修复；待审阅未实施。
+- [Context 面板与 SQLite 联合设计](上下文管理引擎设计/上下文管理引擎V2/05-Context面板与SQLite联合设计.md)：当前 Context、历史索引、同步生命周期与联合修复已实现；性能与实机覆盖边界见联合执行摘要。
 - [SQLite 原会话与联合方案校验](上下文管理引擎设计/上下文管理引擎V2/06-原会话决策与联合方案校验.md)：核对按需查询、失败恢复、迁移成本与已有验收边界，登记早期导出/诊断的范围缺口。
 - [英语辅助学习插件设计](agent-plugin-runtime/agent-english-learning.md)：提示词与朗读功能保留；当前 live Agent 绑定存在接线限制，详见正文。
 - [Agent 工具流式渲染修复设计](frontend/front-agent-tool-stream-rendering.md)：已实施的跨 Core、Tools、Desktop 事件链修复设计。
@@ -62,7 +62,7 @@
 | `agent-plugin-runtime/` | v2 后端插件化重构的总体架构、研究证据、已确认决策、目标边界、包结构与公共契约 | `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`、`docs/design-docs/agent-plugin-runtime/README.md` |
 | `agent-runtime/` | Agent 形态、工作模式与 Journal 观测数据契约 | `docs/design-docs/agent-runtime/agent-forms-and-modes.md`、`docs/design-docs/agent-runtime/agent-observability-trace-model.md` |
 | `model-context/` | 当前模型供应商、模型能力、request snapshot、token usage 和 Context Projection | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md` |
-| `上下文管理引擎设计/` | V2 生命周期与物理拆包已有实现；Context 面板与 SQLite 联合设计待审阅，联合验收未执行 | [V2 设计](上下文管理引擎设计/上下文管理引擎V2/README.md)、[第一版数据结构规范](上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)、[第一版插件拆分](上下文管理引擎设计/上下文管理引擎的插件拆分和上下文的插件拆分.md)、[渐进式披露](上下文管理引擎设计/agent-progressive-disclosure.md)、[压缩提示词](上下文管理引擎设计/agent-compaction-prompt.md)、[第一版执行计划](../exec-plans/completed/20261006-context-management-engine/README.md) |
+| `上下文管理引擎设计/` | V2 生命周期与物理拆包已有实现；Context 面板与 SQLite 联合实现已完成，联合验收保留未覆盖及性能限制 | [V2 设计](上下文管理引擎设计/上下文管理引擎V2/README.md)、[第一版数据结构规范](上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)、[第一版插件拆分](上下文管理引擎设计/上下文管理引擎的插件拆分和上下文的插件拆分.md)、[渐进式披露](上下文管理引擎设计/agent-progressive-disclosure.md)、[压缩提示词](上下文管理引擎设计/agent-compaction-prompt.md)、[第一版执行计划](../exec-plans/completed/20261006-context-management-engine/README.md) |
 | `tool-system/` | 当前 Skill、Web/图片工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md` |
 | `execution-safety/` | v2 Tool Runtime、Host policy、权限模式、审批、Grant、Bash hard guard 和副作用恢复边界 | `docs/design-docs/execution-safety/README.md`、`docs/design-docs/execution-safety/agent-tool-permission-model.md` |
 | `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |

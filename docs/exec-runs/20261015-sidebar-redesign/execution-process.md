@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261015-sidebar-redesign.md`
+- **关联计划**：`docs/exec-plans/completed/20261015-sidebar-redesign.md`
 - **执行模式**：交互
 - **开始时间**：2026-10-15 23:10
 - **结束时间**：2026-10-15 23:30（Electron 手测待做）
@@ -12,7 +12,7 @@
 ### 步骤 1：调研与计划
 
 - **操作**：读侧栏组件、会话列表分页、归档、状态来源、偏好持久化和检查脚本；写执行计划。
-- **影响文件**：`docs/exec-plans/active/20261015-sidebar-redesign.md`、`docs/exec-plans/README.md`。
+- **影响文件**：`docs/exec-plans/completed/20261015-sidebar-redesign.md`、`docs/exec-plans/README.md`。
 - **决定**：见计划「决策记录」。
 - **验证**：无代码改动。
 

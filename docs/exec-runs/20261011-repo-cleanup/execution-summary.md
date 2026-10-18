@@ -10,13 +10,13 @@
 
 可追溯入口：
 
-- 计划：`docs/exec-plans/active/20261011-repo-cleanup.md`
+- 计划：`docs/exec-plans/completed/20261011-repo-cleanup.md`
 - 过程：`docs/exec-runs/20261011-repo-cleanup/execution-process.md`
 - History：`docs/histories/2026-10/20261011-repo-cleanup.md`
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261011-repo-cleanup.md`
+- **关联计划**：`docs/exec-plans/completed/20261011-repo-cleanup.md`
 - **执行过程**：`docs/exec-runs/20261011-repo-cleanup/execution-process.md`
 - **History**：`docs/histories/2026-10/20261011-repo-cleanup.md`
 - **执行模式**：交互
