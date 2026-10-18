@@ -16,7 +16,7 @@ export function applyProviderKey(secrets: PersistedSecrets, provider: PersistedS
 export function applyToEnv(settings: PersistedSettingsV3, secrets: PersistedSecrets, reloadEnv: () => void): void {
   delete process.env.DEEPSEEK_API_KEY;
   delete process.env.KIMI_API_KEY;
-  for (const id of SEARCH_PROVIDER_IDS) applyProviderKey(secrets, id, SEARCH_PROVIDER_ENV_KEYS[id]);
+  for (const id of SEARCH_PROVIDER_IDS) if (id !== "deepseek") applyProviderKey(secrets, id, SEARCH_PROVIDER_ENV_KEYS[id]);
   process.env.IMAGE_GENERATION_BASE_URL = settings.imageGeneration.baseUrl;
   process.env.IMAGE_GENERATION_MODEL = settings.imageGeneration.model;
   process.env.ACTSPACE_DISABLED_TOOLS = settings.agent.disabledTools.join(",");

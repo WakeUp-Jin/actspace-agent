@@ -22,7 +22,7 @@ type PermissionMode = "default" | "full-access";
 type FileScope = "workspace" | "all";
 ```
 
-`default` 映射为 workspace 文件范围，`full-access` 映射为 Host ceiling 内的全部文件范围。模式只决定基础文件范围，不自动批准 Bash、删除、敏感资源或其他高风险动作。
+`default` 映射为 workspace 文件范围，`full-access` 映射为 Host ceiling 内的全部文件范围。通过硬规则检查的 Bash 在 `full-access` 下自动执行；文件删除、敏感资源仍按各自策略审批，Host ceiling 与 Bash sandbox 不变。
 
 ## 2. 非目标
 
@@ -176,7 +176,7 @@ Runtime 合同已暴露 `GrantLifetime`。Desktop 接受 `once | session | deny`
 | 文件读取 | `allow` | scope `ask` | 非敏感资源 `allow` | 支持 |
 | 文件写入/编辑 | `allow` | scope `ask` | 非敏感资源 `allow` | 支持 |
 | 文件删除 | `ask once` | scope + delete `ask once` | `ask once` | 不支持 |
-| Bash | 工具风险 `ask once` | 不提供外部目录 Grant | 工具风险仍 `ask once` | 不支持 |
+| Bash | 工具风险 `ask`；可消费符合条件的前缀授权 | 不提供外部目录 Grant | 通过 hard guard 后 `allow` | Desktop 支持限定前缀 |
 
 敏感分类和 hard deny 始终优先于该表。
 
@@ -326,9 +326,10 @@ Desktop 会签发、恢复、展示、匹配和撤销 Session Grant；CLI Host c
 - 只有 Host 接受的用户操作可以改变模式；
 - Agent、工具和 Renderer 不能直接写 mode event；
 - Session 恢复时重建最后一个有效 mode；
-- `default -> full-access` 不改变工具风险策略；
-- `full-access -> default` 使待审批请求和未消费 OnceApproval 失效，并撤销 workspace 外 Session Grant；
-- 已越过 durability checkpoint 的调用不被追溯取消；
+- `default -> full-access` 使通过 hard guard 的 Bash 自动执行；等待中的请求撤销后由 Runtime 重新评估，不伪造用户 once 批准；
+- `full-access -> default` 使待审批请求重新评估、未消费 OnceApproval 失效，并撤销 workspace 外文件 Session Grant；
+- checkpoint 后及执行体调用前再次检查模式；已开始执行的命令不因模式切换被追溯取消；
+- 模式通知由 Session projection 接入 Tool Runtime，订阅仅存活于审批等待；旧请求按 requestId 取消并记录 `deny/aborted`（reason 为 `permission-mode-changed`）。已返回的拒绝/过期优先，不得因切换放行；
 - CLI resume 只有在用户显式传入 `--permission-mode` 时才覆盖已恢复模式。
 
 ## 13. 审批协议
@@ -380,7 +381,7 @@ type ApprovalDecision =
     };
 ```
 
-其中 `session` 只在 Desktop 核心文件范围审批中可达。Renderer 只返回 Runtime 生成的 `suggestionId`；CLI、Bash、delete、敏感文件和不完整覆盖请求仍只有 `once | deny`。
+其中 `session` 在 Desktop 核心文件范围及符合既有前缀规则的 Bash 审批中可达。Renderer 只返回 Runtime 生成的 `suggestionId`；CLI、delete、敏感文件和不完整覆盖请求仍只有 `once | deny`。
 
 Renderer 只能返回 Runtime 生成的 `suggestionId`，不能提交任意 action、路径或 pattern。迟到、重复、过期或不匹配的 decision 必须拒绝。
 
@@ -442,10 +443,10 @@ Session Journal 是 Session Grant 的唯一持久事实源，不增加独立 Hos
 
 - 空命令、控制字符、不可安全解释的 pipe/redirection/expansion 直接拒绝；
 - `eval`、不可信 `source`、动态执行和危险删除直接拒绝；
-- 其余命令只支持精确 `once`；
+- 其余命令在 `default` 下请求审批（Desktop 可建议严格 command_prefix 会话授权），`full-access` 下允许；
 - `full-access` 不改变 Bash sandbox；
 - 批准 Bash 不隐式批准外部目录；
-- 不生成命令 pattern 或 Session Grant；
+- 不生成自由命令 pattern；符合既有前缀分析规则的命令可生成限定 workspace 的 Session Grant；
 - sandbox 或 executor 无法表达请求边界时 fail-closed。
 
 未来 Bash AST、命令 pattern 与跨平台 sandbox 必须另立设计和计划，不能扩展本轮类型后直接开放。

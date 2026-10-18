@@ -62,7 +62,9 @@ function permissionContract(name: ToolName): ToolPermissionContract {
       const command = typeof args.command === "string" ? args.command : "";
       const cwd = typeof args.cwd === "string" ? resolve(context.workspaceRoot, args.cwd) : context.workspaceRoot;
       const reason = getBashHardRejectReason(command, cwd, context.workspaceRoot);
-      return reason ? { kind: "deny" as const, code: "BASH_COMMAND_DENIED", reason } : { kind: "ask" as const, reason: "Allow Bash to run this command once?", risk: "high" as const, reusable: resources.some(resource => resource.kind === "process" && resource.grantPrefix !== undefined) };
+      if (reason) return { kind: "deny" as const, code: "BASH_COMMAND_DENIED", reason };
+      if (context.mode === "full-access") return { kind: "allow" as const };
+      return { kind: "ask" as const, reason: "Allow Bash to run this command once?", risk: "high" as const, reusable: resources.some(resource => resource.kind === "process" && resource.grantPrefix !== undefined) };
     },
     suggestGrants: (_args, resources) => resources.flatMap(resource => resource.kind === "process" && resource.grantPrefix && resource.workspaceRoot && resource.noSandbox === false ? [{
       action: "process.execute" as const, access: "execute" as const,

@@ -55,6 +55,8 @@ export type ToolPreparedEnvironment = {
   readonly contextGeneration?: number;
   readonly permissionMode?: PermissionMode | (() => PermissionMode);
   readonly permissionModeExplicit?: boolean;
+  /** Subscribe to policy invalidation; the listener only wakes a pending admission. */
+  readonly subscribePermissionMode?: (listener: () => void) => () => void;
   readonly hostCapabilities: ReadonlySet<string>;
   readonly capabilitySet: ToolCapabilitySet;
   readonly approvalBroker?: ApprovalBroker;
@@ -108,6 +110,7 @@ export class PreparedToolExecution {
   #forceOutcomeUnknown = false;
   #resources: readonly ToolResource[] = [];
   #onceApproval: OnceApproval | undefined;
+  #admittedMode: PermissionMode | undefined;
   #admittedBySessionGrant = false;
 
   constructor(
@@ -157,31 +160,39 @@ export class PreparedToolExecution {
         signal: this.#controller.signal,
         executorConcurrencySafe: this.registration.executor.concurrencySafe === true,
       });
-      const mode = this.#permissionMode();
-      this.#resources = Object.freeze(await this.registration.permission.extractResources(this.#args, {
-        workspaceRoot: this.environment.workspaceRoot,
-        canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot),
-      }));
-      const global = evaluateGlobalBoundary(mode, this.environment.workspaceRoot, this.#resources);
-      const tool = await this.registration.permission.evaluate(this.#args, this.#resources, {
-        mode,
-        workspaceRoot: this.environment.workspaceRoot,
-        hostCapabilities: [...this.environment.hostCapabilities].sort(),
-      });
-      const globalWithGrant = this.#resolveGlobalGrant(global, tool);
-      const processGrant = global.kind === "pass" && tool.kind === "ask" && tool.reusable === true ? this.#processGrant() : undefined;
-      if (processGrant) this.#admittedBySessionGrant = true;
-      const permission = combinePermissionDecisions(globalWithGrant, processGrant ? { kind: "allow" } : tool);
-      if (permission.kind === "deny") {
-        await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: permission.code, reason: permission.reason });
-        return this.#rememberTerminal(this.#failureResult("denied", { code: permission.code || "POLICY_DENIED", message: permission.reason, retryable: false, phase: "policy" }));
+      let mode: PermissionMode;
+      while (true) {
+        mode = this.#permissionMode();
+        this.#onceApproval = undefined;
+        this.#admittedBySessionGrant = false;
+        this.#resources = Object.freeze(await this.registration.permission.extractResources(this.#args, {
+          workspaceRoot: this.environment.workspaceRoot,
+          canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot),
+        }));
+        const global = evaluateGlobalBoundary(mode, this.environment.workspaceRoot, this.#resources);
+        const tool = await this.registration.permission.evaluate(this.#args, this.#resources, {
+          mode,
+          workspaceRoot: this.environment.workspaceRoot,
+          hostCapabilities: [...this.environment.hostCapabilities].sort(),
+        });
+        const globalWithGrant = this.#resolveGlobalGrant(global, tool);
+        const processGrant = global.kind === "pass" && tool.kind === "ask" && tool.reusable === true ? this.#processGrant() : undefined;
+        if (processGrant) this.#admittedBySessionGrant = true;
+        const permission = combinePermissionDecisions(globalWithGrant, processGrant ? { kind: "allow" } : tool);
+        if (permission.kind === "deny") {
+          await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: permission.code, reason: permission.reason });
+          return this.#rememberTerminal(this.#failureResult("denied", { code: permission.code || "POLICY_DENIED", message: permission.reason, retryable: false, phase: "policy" }));
+        }
+        if (permission.kind === "ask") {
+          const approval = await this.#requestApproval(mode, permission.reasons.map(({ code, message, risk, reusable }) => ({ code, message, risk, reusable })));
+          if (approval === "mode-changed") continue;
+          if (!isOnceApproval(approval)) return this.#rememberTerminal(this.#failureResult("denied", approval));
+          this.#onceApproval = approval;
+        }
+        await this.#recheck(mode);
+        break;
       }
-      if (permission.kind === "ask") {
-        const approval = await this.#requestApproval(permission.reasons.map(({ code, message, risk, reusable }) => ({ code, message, risk, reusable })));
-        if (!isOnceApproval(approval)) return this.#rememberTerminal(this.#failureResult("denied", approval));
-        this.#onceApproval = approval;
-      }
-      await this.#recheck(mode);
+      this.#admittedMode = mode;
       const usedGrant = this.#admittedBySessionGrant ? this.#processGrant() : undefined;
       if (this.#admittedBySessionGrant && this.#resources.some(resource => resource.kind === "process") && !usedGrant) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "Session Grant is no longer available.", retryable: true, phase: "approval" });
       if (usedGrant && !this.environment.journal.recordPermission) throw new ToolRuntimeError({ code: "GRANT_AUDIT_UNAVAILABLE", message: "Session Grant audit is unavailable.", retryable: false, phase: "approval" });
@@ -200,6 +211,7 @@ export class PreparedToolExecution {
       }
       this.#checkToolScope();
       if (usedGrant && this.#processGrant()?.grantId !== usedGrant.grantId) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "Session Grant changed before execution.", retryable: true, phase: "approval" });
+      this.#checkAdmittedMode();
       this.#stage = Object.freeze({ kind: "body" });
       return this.#stage;
     } catch (error) {
@@ -247,6 +259,7 @@ export class PreparedToolExecution {
     try {
       const invoke = async () => {
         this.#checkToolScope();
+        this.#checkAdmittedMode();
         try { this.environment.onExecutionStarted?.({ callId: this.callId, name: this.name }); } catch { /* Observers cannot affect tool execution. */ }
         return this.registration.executor.execute(this.#args ?? {}, context);
       };
@@ -314,7 +327,7 @@ export class PreparedToolExecution {
     await this.#releaseAfterUse();
   }
 
-  async #requestApproval(reasons: readonly RuntimeApprovalReason[]): Promise<OnceApproval | ToolFailure> {
+  async #requestApproval(mode: PermissionMode, reasons: readonly RuntimeApprovalReason[]): Promise<OnceApproval | ToolFailure | "mode-changed"> {
     if (this.environment.approvalBroker === undefined) {
       return { code: "APPROVAL_REQUIRED", message: "Host approval is required but no ApprovalBroker is available.", retryable: false, phase: "approval" };
     }
@@ -341,8 +354,35 @@ export class PreparedToolExecution {
       expiresAt: expiresAt.toISOString(),
     };
     await this.#recordPermission("permission/asked", request as unknown as Readonly<Record<string, RuntimeV2JsonValue>>);
+    const requestController = new AbortController();
+    const abort = () => requestController.abort(this.#controller.signal.reason);
+    this.#controller.signal.addEventListener("abort", abort, { once: true });
+    if (this.#controller.signal.aborted) abort();
+    let settled = false;
+    let changed!: () => void;
+    const modeChanged = new Promise<"mode-changed">(resolve => { changed = () => {
+      if (this.#permissionMode() === mode) return;
+      // Give an already settled human decision priority over policy invalidation.
+      queueMicrotask(() => {
+        if (!settled && !this.#controller.signal.aborted && this.#permissionMode() !== mode) resolve("mode-changed");
+      });
+    }; });
+    let unsubscribe: (() => void) | undefined;
     try {
-      const decision = await withTimeout(this.environment.approvalBroker.requestApproval(request, this.#controller.signal), this.environment.approvalTimeoutMs ?? 10 * 60_000);
+      unsubscribe = this.environment.subscribePermissionMode?.(changed);
+      const response = this.environment.approvalBroker.requestApproval(request, requestController.signal).then(decision => { settled = true; return decision; });
+      changed(); // Covers changes while recording the request or registering the listener.
+      let decision = await withTimeout(Promise.race([response, modeChanged]), Math.max(0, expiresAt.getTime() - Date.now()));
+      if (decision === "mode-changed") {
+        requestController.abort("permission-mode-changed");
+        const closed = await withTimeout(response, Math.max(0, expiresAt.getTime() - Date.now()));
+        // A Host may have already accepted a refusal before cancellation reached it.
+        if (closed.kind === "deny" && closed.code !== "aborted") decision = closed;
+        else {
+          await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: "aborted", decidedAt: new Date().toISOString(), reason: "permission-mode-changed" });
+          return "mode-changed";
+        }
+      }
       if (decision.requestId !== request.requestId) {
         await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: "invalid-decision", decidedAt: new Date().toISOString() });
         return { code: "APPROVAL_STALE", message: "Approval response does not match this request.", retryable: false, phase: "approval" };
@@ -382,7 +422,15 @@ export class PreparedToolExecution {
     } catch (error) {
       await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: this.#controller.signal.aborted ? "aborted" : "timeout", decidedAt: new Date().toISOString() });
       return { code: "APPROVAL_TIMEOUT", message: this.#controller.signal.aborted ? "Approval was aborted." : "Approval timed out.", retryable: true, phase: "approval" };
+    } finally {
+      unsubscribe?.();
+      this.#controller.signal.removeEventListener("abort", abort);
+      requestController.abort("approval-finished");
     }
+  }
+
+  #checkAdmittedMode(): void {
+    if (this.#admittedMode !== this.#permissionMode()) throw new ToolRuntimeError({ code: "PERMISSION_STATE_CHANGED", message: "Permission mode changed before execution.", retryable: true, phase: "guard" });
   }
 
   async #recheck(expectedMode: PermissionMode): Promise<void> {

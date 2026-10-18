@@ -24,7 +24,7 @@
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
-| [官网 V4：运行空间叙事与纸本插件舞台](active/20261017-site-v4-redesign.md) | 2026-10-17 阶段 A（T1–T7）完成，未提交，分支 `feat/site-redesign-v4`：首页重写为 HTML/CSS 插件舞台，全站纸本统一；check/test/build 通过。待用户验收，阶段 B（文档重写与截图标注）验收后另立计划，见[执行摘要](../exec-runs/20261017-site-v4-redesign/execution-summary.md)。 |
+| [官网 V4：运行空间叙事与纸本插件舞台](active/20261017-site-v4-redesign.md) | 2026-10-17–18 阶段 A（T1–T9）与首屏精修完成，分支 `feat/site-redesign-v4` 已提 PR 待审核：首屏按桌面端界面重画的插件舞台、真实界面功能块、全站纸本统一；check/test/build 通过。阶段 B（文档重写与截图标注）验收后另立计划，见[执行摘要](../exec-runs/20261017-site-v4-redesign/execution-summary.md)。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；DropdownMenu（及 Popover、Dialog、Select、ContextMenu）由 Desktop 前端重构 16 接手；剩 Switch、Textarea、Tabs 及对应迁移。 |
 | [工具审批卡 · Cursor 式](active/20261011-approval-card-cursor-style/README.md) | 2026-10-11 前端实现与自动化验证完成；Bash 前缀授权[完整方案](active/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md)已实现，见[执行摘要](../exec-runs/20261011-bash-command-prefix-grant/execution-summary.md)；后端和审批定向测试通过，桌面全量仍有 watcher 回归门槛；Electron 实机验收待做。 |
@@ -33,6 +33,10 @@
 六个早期后端计划已移出执行导航，短页仅保留历史链接。独有目标与未完成项见[结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)，当前验证见本轮清理摘要。
 
 ## 最近完成
+
+- [DeepSeek 搜索聚合与可选抓取](completed/20261018-deepseek-web-tools.md)：三路聚合、独立启停与默认关闭的付费抓取已实现；工程与mock UI通过，原生CU和真实Provider边界见执行摘要。
+
+- [Bash 完全权限与审批恢复](completed/20261017-bash-full-access.md)：2026-10-17 实现及定向回归完成，真实 Electron 已复验等待中切换并继续执行；完整覆盖与历史检查限制见[执行摘要](../exec-runs/20261017-bash-full-access/execution-summary.md)。
 
 - [main 新增功能与轨迹遗留项统一验收](completed/20261015-main-frontend-acceptance.md)：2026-10-16验收收束，60项53通过/5失败/2部分覆盖，4个Bug与O01观察完整交接；只验收未修复，见[摘要](../exec-runs/20261015-main-frontend-acceptance/execution-summary.md)与[台账](../exec-runs/20261015-main-frontend-acceptance/acceptance.md)。
 

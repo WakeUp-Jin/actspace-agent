@@ -78,6 +78,11 @@ export function apply(ctx: CordisContext): AgentFactoryService {
       permissionMode: () => host.toolEnvironment.permissionModeExplicit
         ? (typeof configuredMode === "function" ? configuredMode() : configuredMode ?? "default")
         : projectPermissionMode(session.journal.events),
+      subscribePermissionMode: (listener: () => void) => host.toolEnvironment.permissionModeExplicit
+        ? (host.toolEnvironment.subscribePermissionMode?.(listener) ?? (() => undefined))
+        : sessions.subscribeProjection(update => {
+          if (update.sessionId === session.header.sessionId && update.event.type === "permission/mode-set") listener();
+        }),
       sessionGrants: () => host.toolEnvironment.sessionGrantCapability ? projectSessionGrants(session.journal.events) : [],
     });
   };

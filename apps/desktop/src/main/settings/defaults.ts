@@ -108,7 +108,8 @@ export function defaultSettingsV4Metadata(): SettingsV4Metadata {
       disabledTools: [],
       bash: { alwaysAsk: false },
       showFileChangeStats: true,
-      searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => [id, { enabled: true }])),
+      deepseekFetchEnabled: false,
+      searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => [id, { enabled: id !== "deepseek" }])),
     },
     subagents: { routes: {} },
     activity: {

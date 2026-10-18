@@ -8,6 +8,19 @@ import { apply, registerTools, TOOL_DEFINITIONS } from "../plugin.js";
 import { manifest } from "../manifest.js";
 
 describe("shell-tools lifecycle", () => {
+  it("allows full-access Bash after hard guards while default mode still asks", async () => {
+    const runtime = new ToolRuntime(); const registrations = registerTools(runtime, {});
+    const policy = runtime.registry.capture("bash").permission;
+    const context = { workspaceRoot: "/workspace", hostCapabilities: ["process"] };
+    for (const args of [{ command: "ls -la pi/.pi" }, { command: "git status --short", requiredPermissions: ["no_sandbox"] }]) {
+      expect(await policy.evaluate(args, [], { ...context, mode: "full-access" })).toMatchObject({ kind: "allow" });
+      expect(await policy.evaluate(args, [], { ...context, mode: "default" })).toMatchObject({ kind: "ask" });
+    }
+    for (const mode of ["default", "full-access"] as const) {
+      expect(await policy.evaluate({ command: "rm -rf /" }, [], { ...context, mode })).toMatchObject({ kind: "deny" });
+    }
+    for (const item of registrations) await item.handle.dispose();
+  });
   it("owns its manifest, registers exactly its tools, rejects duplicates and disposes", async () => {
     const runtime = new ToolRuntime();
     const registrations = registerTools(runtime, {});

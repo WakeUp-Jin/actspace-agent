@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 const { bootDesktopRuntimeV2 } = vi.hoisted(() => ({ bootDesktopRuntimeV2: vi.fn() }));
 vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntimeV2 }));
+import { PendingApprovalRegistry } from "../approval-registry";
 import { DesktopRuntimeV2Registry, type DesktopRuntimeV2RegistryOptions } from "../runtime-v2/runtime-registry";
 
 function deferred<T>() {
@@ -26,7 +27,9 @@ describe("Browser Runtime restart admission", () => {
     rootsToRemove.push(dataRoot);
     let bridgeReady = blockedHarness;
     const browser = { socketPath: "/tmp/test-browser.sock", getStatus: vi.fn(async () => ({ runState: "ready", bridgeReady })), setRuntimeReady: vi.fn() };
+    const approvals = new PendingApprovalRegistry();
     const app = {
+      updateSessionPermissionMode: vi.fn(async () => ({ throughJournalSeq: 2 })),
       taskCommand: vi.fn(async (_input: unknown) => ({ snapshot: {} })),
       submitTask: vi.fn(async () => ({ task: {} })),
       browserAvailable: () => { if (blockedHarness) throw Object.assign(new Error("Harness recovery blocked"), { code: "RECOVERY_BLOCKED" }); return bridgeReady; },
@@ -42,11 +45,23 @@ describe("Browser Runtime restart admission", () => {
       context: { get: (name: string) => name === "desktop.app" ? app : name === "english-learning" ? learning : name === "tools.browser" ? { available: bridgeReady, registrations: [1], definitions: [1] } : undefined },
       getState: () => ({ state: "ready", runtimeInstanceId: "test" }), shutdown,
     } }));
-    const registry = new DesktopRuntimeV2Registry({ roots: { dataRoot, workspaceRoot: join(dataRoot, "workspace"), defaultWorkspaceRoot: join(dataRoot, "workspace") }, browser, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
+    const registry = new DesktopRuntimeV2Registry({ roots: { dataRoot, workspaceRoot: join(dataRoot, "workspace"), defaultWorkspaceRoot: join(dataRoot, "workspace") }, browser, approvals, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
     registries.push(registry);
     await registry.boot();
-    return { registry, app, browser, learning, shutdown, connect: () => { bridgeReady = true; } };
+    return { registry, app, browser, approvals, learning, shutdown, connect: () => { bridgeReady = true; } };
   }
+
+  it("leaves pending requests for Runtime policy re-evaluation when permission mode changes", async () => {
+    const { registry, app, approvals } = await setup();
+    const pending = approvals.waitForDecision({ id: "pending", toolName: "bash", args: {}, summary: "test", reason: "test", sessionId: "session", agentRunId: "run", createdAt: Date.now() });
+    try {
+      await registry.updateSessionPermissionMode("session", "full-access");
+      expect(app.updateSessionPermissionMode).toHaveBeenCalledWith("session", "full-access");
+      expect(approvals.size).toBe(1);
+      approvals.abortRequest("pending");
+      await expect(pending).resolves.toMatchObject({ decision: "abort" });
+    } finally { approvals.expireAll(); }
+  });
 
   it("keeps the Host application available when Harness recovery blocks execution", async () => {
     const fixture = await setup(true);
