@@ -1,3 +1,4 @@
+import { contextEvents } from "./supplements.js";
 import { contextEntryKey, rememberInputManifest } from "./content-manifest.js";
 import type { CompactionSession } from "./compaction.js";
 import { ContextSupplements, type ContextSession } from "./supplements.js";
@@ -10,6 +11,7 @@ import { projectContext } from "./projection.js";
 import type { ContextProjection } from "./types.js";
 import { convertMessages, surfaceMessage } from "./conversion.js";
 import { freezeRequest } from "./request-snapshot.js";
+import { freezeContextView } from "./context-snapshot.js";
 import { renderSystemPrompt } from "./system.js";
 
 export type ContextEngineOptions = {
@@ -48,9 +50,9 @@ export class ContextEngine {
     const previous = this.#instances.get(request.sessionId, request.logicalAgentScopeId ?? this.options.logicalAgentScopeId);
     const from = previous?.view.status.throughJournalSeq ?? -1;
     if (previous !== undefined) context = this.options.reducers.restore(previous.view, context);
-    for (const event of session.journal.events) if (event.seq > from && event.seq <= throughJournalSeq) context = await this.options.reducers.apply(context, event);
+    for (const event of contextEvents(session, from + 1, throughJournalSeq + 1)) context = await this.options.reducers.apply(context, event);
     context = { ...context, status: { ...context.status, throughJournalSeq: throughJournalSeq } };
-    const frozen = freezeRequest(context as unknown as RuntimeV2JsonValue) as unknown as Context;
+    const frozen = freezeContextView(context);
     return this.#instances.commit(frozen, request.logicalAgentScopeId ?? this.options.logicalAgentScopeId);
   }
 
@@ -67,7 +69,7 @@ export class ContextEngine {
       await supplements.refresh(owners);
       context = { ...context, content: { ...context.content, supplements: supplements.get(request, owners) }, status: { ...context.status, throughJournalSeq: this.options.session.lastSeq } };
     }
-    return freezeRequest(context as unknown as RuntimeV2JsonValue) as unknown as Context;
+    return freezeContextView(context);
   }
 
   getInstance(request: ContextRequest): ContextInstanceSnapshot | undefined {

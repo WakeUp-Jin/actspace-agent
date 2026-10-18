@@ -25,6 +25,9 @@ describe("Context content manifest", () => {
     expect(changed.comparable).toBe(false); expect(changed.entries).toEqual([]);
     const snapshot = snapshotContext(context, input, {}, "composition", "host", input) as Record<string, unknown>;
     expect(Object.isFrozen(snapshot.contextManifest)).toBe(true);
+    expect(snapshot.contextSections).toEqual(context.content.system.sections);
+    const rewritten = snapshotContext(context, { ...input, messages: [{ role: "system", content: "rewritten" }] }, {}, "c", "h", input) as Record<string, unknown>;
+    expect(rewritten.contextSections).toBeNull();
     expect(JSON.stringify(snapshot.contextManifest)).not.toContain("thought");
   });
   it("keeps individual skill identities and excludes unrelated model facts from skills", () => {

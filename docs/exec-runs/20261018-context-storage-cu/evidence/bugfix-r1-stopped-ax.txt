@@ -1,0 +1,191 @@
+Window: "actspace", App: Actspace Dev actspace-agent-2067.
+0 标准窗口 actspace, Secondary Actions: Raise
+	1 container actspace
+		2 container
+			3 HTML 内容 actspace, URL: 127.0.0.1:5178/
+				4 container
+					5 切换按钮 Description: 收起会话侧栏, Help: 收起侧栏, Value: 1
+					6 container 会话导航
+						7 按钮 (disabled) Description: 后退, Help: 返回
+						8 按钮 (disabled) 前进
+					9 切换按钮 Description: 查看执行轨迹, Value: 0
+					10 按钮 查看会话详情： Fixture automatic title
+					11 弹出式按钮 查看工作区环境
+					12 切换按钮 Description: 打开面板, Help: 打开右侧面板, Value: 0
+					13 container
+						14 按钮 新建会话
+						15 按钮 新建 Space
+						16 按钮 扩展
+						17 按钮 Actor 名册 8
+							18 文本 Actor 名册
+							19 文本 8
+						20 container 会话
+							21 container Space
+								22 按钮 Space 演示
+									23 文本 Space
+									24 文本 演示
+								25 按钮 新建 Space
+								26 按钮 收起 Space
+								27 按钮 支付链路提速 1
+									28 文本 支付链路提速
+									29 文本 1
+								30 按钮 结算页重构
+							31 container
+								32 按钮 工作区
+								33 按钮 搜索会话
+								34 弹出式按钮 视图选项
+								35 按钮 添加工作区
+								36 container
+									37 按钮 收起 workspace
+									38 按钮 workspace, Help: /tmp/actspace-context-storage-cu-20261018/workspace
+									39 container 工作区操作
+										40 弹出式按钮 更多操作：workspace
+										41 按钮 在工作区中新建会话
+								42 按钮 会话状态： 运行中
+								43 按钮 Fixture automatic title
+								44 文本 17分钟
+								45 按钮 会话状态： 空闲
+								46 按钮 CU Long History 180 turns
+								47 文本 17分钟
+						48 按钮 设置
+					49 分离器 Description: 调整会话侧栏宽度, Value: 260
+					50 container
+						51 container
+							52 container 会话消息
+								53 container
+									54 文本 FIXTURE_LONG 联合验收：读取大文件并继续
+									55 按钮 Worked for 7s
+									56 text Fixture completed: fixture-alternate.
+									57 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									58 按钮 复制回复
+									59 按钮 可视化这条回复
+									60 弹出式按钮 更多消息操作
+									61 弹出式按钮 用量 120K tok，查看本轮用量
+									62 container 回复时间：18:42
+										63 文本 18:42
+								64 container
+									65 文本 FIXTURE_STORAGE CU-EARLY-000
+									66 container
+										67 文本 CU-EARLY-000 first persisted chunk. record-1 record-2 record-3 record-4 record-5 record-6 record-7 record-8 record-9 record-10 record-11 record-12 record-13 record-14 record-15 record-16 record-17 record-18 record-19 record-20 record-21 record-22 record-23 record-24 record-25 record-26 record-27 record-28 record-29 record-30 record-31 record-32 record-33 record-34 record-35 record-36 record-37 record-38 record-39 record-40 record-41 record-42 record-43 record-44 record-45 record-46 record-47 record-48 recor
+										68 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									69 按钮 复制回复
+									70 按钮 可视化这条回复
+									71 弹出式按钮 更多消息操作
+									72 弹出式按钮 用量 120 tok，查看本轮用量
+									73 container 回复时间：18:53
+										74 文本 18:53
+								75 container
+									76 文本 FIXTURE_TODO
+									77 container Agent Todo list
+										78 按钮 0 of 1 To-dos Completed
+										79 内容列表
+											80 container Pending: CU-TODO-RECOVERY verify storage
+												81 文本 CU-TODO-RECOVERY verify storage
+									82 container
+										83 文本 Fixture completed: fixture-alternate.
+										84 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									85 按钮 复制回复
+									86 按钮 可视化这条回复
+									87 弹出式按钮 更多消息操作
+									88 弹出式按钮 用量 240 tok，查看本轮用量
+									89 container 回复时间：18:55
+										90 文本 18:55
+								91 container
+									92 文本 CU-ATTACHMENT-RECOVERY 图片持久化验收
+									93 container
+										94 文本 Fixture completed: fixture-alternate.
+										95 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									96 按钮 复制回复
+									97 按钮 可视化这条回复
+									98 弹出式按钮 更多消息操作
+									99 弹出式按钮 用量 120 tok，查看本轮用量
+									100 container 回复时间：19:07
+										101 文本 19:07
+								102 container
+									103 container
+										104 文本 [valid.png]
+										105 container Message attachments
+											106 按钮 (disabled) Description: Preview message image valid.png, Help: valid.png
+									107 container
+										108 文本 Fixture completed: fixture-main.
+										109 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									110 按钮 复制回复
+									111 按钮 可视化这条回复
+									112 弹出式按钮 更多消息操作
+									113 弹出式按钮 用量 120 tok，查看本轮用量
+									114 container 回复时间：19:25
+										115 文本 19:25
+								116 container
+									117 文本 FIXTURE_LONG 第二轮步骤验收
+									118 按钮 Worked for 1s
+								119 按钮 上下文已压缩 · 23 条消息 · 3m 30s
+								120 container
+									121 container
+										122 文本 Fixture completed: fixture-main.
+										123 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									124 按钮 复制回复
+									125 按钮 可视化这条回复
+									126 弹出式按钮 更多消息操作
+									127 container 回复时间：19:37
+										128 文本 19:37
+								129 container
+									130 文本 FIXTURE_LONG 自动失败场景
+									131 按钮 Worked for 7s
+									132 container
+										133 文本 Fixture completed: fixture-main.
+										134 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									135 按钮 复制回复
+									136 按钮 可视化这条回复
+									137 弹出式按钮 更多消息操作
+									138 弹出式按钮 用量 120K tok，查看本轮用量
+									139 container 回复时间：19:41
+										140 文本 19:41
+								141 container
+									142 文本 FIXTURE_LONG BUGFIX-R1 自动压缩取消复验
+									143 按钮 Worked
+								144 container
+									145 text 正在压缩上下文 2m 28s
+									146 进度指示器 上下文压缩进度
+									147 文本 正在总结较早的消息。
+							148 container 会话轮次导航
+								149 按钮 跳到第 1 轮对话：FIXTURE_LONG 联合验收：读取大文件并继续
+								150 按钮 跳到第 2 轮对话：FIXTURE_STORAGE CU-EARLY-000
+								151 按钮 跳到第 3 轮对话：FIXTURE_TODO
+								152 按钮 跳到第 4 轮对话：CU-ATTACHMENT-RECOVERY 图片持久化验收
+								153 按钮 跳到第 5 轮对话：[valid.png]
+								154 按钮 跳到第 6 轮对话：FIXTURE_LONG 第二轮步骤验收
+								155 按钮 跳到第 7 轮对话：FIXTURE_LONG 自动失败场景
+								156 按钮 跳到第 8 轮对话：FIXTURE_LONG BUGFIX-R1 自动压缩取消复验
+						157 container
+							158 container 待处理的审查操作
+								159 按钮 查看工作区变更
+								160 按钮 更多审查操作
+							161 container 消息输入面板
+								162 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续追问，运行中发送会进入队列…
+								163 container 输入框工具栏
+									164 弹出式按钮 添加 Agent、上下文或工具
+									165 弹出式按钮 fixture-main
+										166 文本 fixture-main
+									167 按钮 (disabled) 停止 Agent
+							168 container 运行位置
+								169 文本 本机
+								170 弹出式按钮 Description: 会话权限模式, Help: 权限：自动。完全权限扩大文件范围并自动批准通过策略检查的 Bash；沙箱和禁止规则仍生效，文件删除及敏感文件仍按策略审批。
+								171 弹出式按钮 8 轮 20 步 · 72 tok/s
+									172 文本 8 轮 20 步
+									173 文本 72 tok/s
+								174 弹出式按钮 281K tok · 缓存命中 0%
+									175 文本 281K tok
+									176 文本 缓存命中 0%
+								177 按钮 上下文用量 95%
+	178 关闭按钮
+	179 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	180 最小化按钮
+181 menu bar
+	182 Actspace Dev actspace-agent-2067
+	183 File
+	184 Edit
+	185 View
+	186 Window
+	187 Help
+
+The focused UI element is 167 按钮 (disabled) 停止 Agent

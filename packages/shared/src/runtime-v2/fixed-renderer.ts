@@ -52,6 +52,7 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   listWorkspaceOpenTools: "runtime-v2:fixed-renderer:list-workspace-open-tools",
   openWorkspaceInTool: "runtime-v2:fixed-renderer:open-workspace-in-tool",
   describeContext: "runtime-v2:fixed-renderer:describe-context",
+  listContextPaths: "runtime-v2:fixed-renderer:list-context-paths",
   listContextEntries: "runtime-v2:fixed-renderer:list-context-entries",
   readContextEntry: "runtime-v2:fixed-renderer:read-context-entry",
   describeContextPanel: "runtime-v2:fixed-renderer:describe-context-panel",

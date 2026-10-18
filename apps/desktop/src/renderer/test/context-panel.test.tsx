@@ -43,7 +43,7 @@ describe("ContextPanel", () => {
     expect(screen.getByText(/自动压缩 ≈160K/)).toBeInTheDocument();
     expect(screen.getByText("$0.42")).toBeInTheDocument();
     expect(screen.getByText(/最近请求实际/)).toBeInTheDocument();
-    expect(screen.queryByText(/趋势和事件需要后端数据/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/趋势、事件和路径需要后端数据/)).not.toBeInTheDocument();
   });
 
   it("falls back to the interim view when describeContextPanel returns null", async () => {
@@ -67,7 +67,7 @@ describe("ContextPanel", () => {
     });
     renderPanel({ navigation: true });
 
-    expect(await screen.findByText("趋势和事件需要后端数据，暂未提供")).toBeInTheDocument();
+    expect(await screen.findByText("趋势、事件和路径需要后端数据，暂未提供")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "上下文趋势" })).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "对比基准" })).toBeDisabled();
     // 过渡数据的会话条目没有类型和轨迹身份：没有类型 chip，行不可点，只留「在轨迹中打开」。

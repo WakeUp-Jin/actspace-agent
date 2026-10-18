@@ -1,0 +1,68 @@
+The following is a diff from the previous accessibility tree for Window: "actspace" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 58, 69, 85, 96, 110, 119-120, 132-139, 353-360
+~								45 文本 8分钟
+~								48 文本 23分钟
++									392 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										393 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										394 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										395 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										396 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++									397 按钮 Worked
++								398 container
++									399 text 正在压缩上下文 54s
++									400 进度指示器 上下文压缩进度
++									401 文本 正在总结较早的消息。
+~									146 按钮 (disabled) 正在压缩上下文，压缩完成后可继续
+~								150 弹出式按钮 6 轮 12 步 · 43 tok/s
+~									152 文本 43 tok/s
+~								153 弹出式按钮 141K tok · 缓存命中 0%
+~									154 文本 141K tok
+~								156 按钮 上下文用量 73%
+~							165 text 当前上下文 fixture-main ≈23.9K / 32.8K tokens 73% 已用
+~							168 切换按钮 系统提示词 ≈596 2%, Value: 0
+~								171 文本 2%
+~							172 切换按钮 工具 ≈3K 13%, Value: 0
+~								175 文本 13%
+~							180 切换按钮 Skills ≈2.7K 11%, Value: 0
+~								183 文本 11%
+~							188 切换按钮 会话内容 ≈17.5K 73%, Value: 0
+~								190 文本 ≈17.5K
+~								191 文本 73%
++						402 container
++							403 text 历史索引同步中（已处理  772  /  773  条记录），完整统计稍后显示。
+~							194 文本 —
+~							196 文本 —
+~								199 text — 次
+~							202 文本 —
+~							205 文本 —
+~							225 text ≈23.9K  估算 · 最近请求实际  20K （服务商返回） 78  项
+~							226 按钮 系统提示词 6 项 ≈596 2%
+~								231 文本 2%
+~							232 按钮 工具 21 项 ≈3K 13%
+~								237 文本 13%
+~							289 按钮 Skills 26 项 ≈2.7K 11%
+~								294 文本 11%
+~							301 按钮 会话内容 25 项 +2 +8.1K ≈17.5K 73%
+~								303 文本 25
++								404 文本 +
++								405 文本 2
+~								305 文本 +8.1K
+~								306 文本 ≈17.5K
+~								307 文本 73%
+~							310 切换按钮 工具调用7, Value: 0
+~							311 切换按钮 工具结果7, Value: 0
++							406 按钮 工具结果 工具结果 新增 ≈8K, Help: 在轨迹中查看：工具结果
++								407 文本 工具结果
++								408 文本 工具结果
++								409 文本 新增
++								410 文本 ≈8K
++							411 按钮 工具调用 read_file 新增 ≈28, Help: 在轨迹中查看：read_file
++								412 文本 工具调用
++								413 文本 read_file
++								414 文本 新增
++								415 文本 ≈28
+~							361 按钮 再显示 13 项（共 25）
+~								363 文本 13
+~								365 文本 25
+~								370 text 第  6  轮 · 步  1  ·  ≈15.8K  · 实际输入 20K
+The focused UI element is 3 HTML 内容 actspace, URL: 127.0.0.1:5178/

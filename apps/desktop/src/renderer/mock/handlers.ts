@@ -21,7 +21,8 @@ import {
 } from "./mock-db";
 import { emitLiveMessage, type MockClock } from "./clock";
 import { MOCK_REPLY, playReply, type ReplyPlayback } from "./stream-player";
-import { mockContextPanelView, mockContextState } from "./context-panel-fixture";
+import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView, mockContextState } from "./context-panel-fixture";
+import { mockContextPathsPage } from "./context-paths-fixture";
 
 /** 按域覆盖 mock 实现；未覆盖的成员用默认实现，默认也没有的成员调用时 reject。 */
 export type MockHandlers = { [D in keyof DesktopBridge]?: Partial<DesktopBridge[D]> };
@@ -179,6 +180,10 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         return { ok: true, archivedSessionIds: sessionIds, failedSessionIds: [] };
       },
       describeContext: async ({ sessionId }) => db.sessions.has(sessionId) ? mockContextState(mockContextPanelView(sessionId, db.sessions.get(sessionId))) : null,
+      listContextPaths: async input => {
+        if (input.revision !== MOCK_CONTEXT_PATHS_REVISION) throw new Error("Context revision stale; reload the panel.");
+        return mockContextPathsPage(MOCK_CONTEXT_PATHS, input);
+      },
       describeContextPanel: async ({ sessionId, release }) => release ? null : mockContextPanelView(sessionId, db.sessions.get(sessionId)),
     },
     usage: { getStatus: async () => null, cancel: async () => undefined, getStatistics: async () => null, getActivity: async () => null },

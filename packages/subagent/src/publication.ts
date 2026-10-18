@@ -20,7 +20,7 @@ export async function repairSubagentPublications(options: {
 }): Promise<{ readonly repairedLinks: number; readonly repairedToolResults: number }> {
   // Recovery can only accept a child with a persisted request in this parent.
   // Ordinary Sessions must not inspect every historical transcript on open.
-  if (!options.parent.journal.events.some(event => event.type === "delegation/requested")) return Object.freeze({ repairedLinks: 0, repairedToolResults: 0 });
+  if (!options.parent.journal.readEvents().some(event => event.type === "delegation/requested")) return Object.freeze({ repairedLinks: 0, repairedToolResults: 0 });
   const terminals: Array<{ readonly inspection: SessionInspection; readonly event: SessionEventEnvelopeV1; readonly data: ChildTerminalData }> = [];
   for (const sessionId of await options.store.listSessionIds()) {
     if (sessionId === options.parent.header.sessionId) continue;
@@ -37,7 +37,7 @@ export async function repairSubagentPublications(options: {
     if (event === undefined) continue;
     const data = decodeTerminal(event.data);
     if (data.childSessionId !== sessionId || data.parentSessionId !== options.parent.header.sessionId || data.parentCallId !== inspection.header.lineage.parentCallId) continue;
-    const requested = options.parent.journal.events.some((candidate) => {
+    const requested = options.parent.journal.readEvents().some((candidate) => {
       if (candidate.type !== "delegation/requested") return false;
       const request = record(candidate.data);
       return string(request.invocationId) === data.invocationId && string(request.parentCallId) === data.parentCallId && string(request.presetId) === data.presetId;
@@ -46,12 +46,12 @@ export async function repairSubagentPublications(options: {
     terminals.push({ inspection, event, data });
   }
 
-  const callOrder = new Map(options.parent.journal.events.filter((event) => event.type === "tool/call").map((event, index) => [string(record(event.data).callId), index]));
+  const callOrder = new Map(options.parent.journal.readEvents().filter((event) => event.type === "tool/call").map((event, index) => [string(record(event.data).callId), index]));
   terminals.sort((left, right) => (callOrder.get(left.data.parentCallId) ?? Number.MAX_SAFE_INTEGER) - (callOrder.get(right.data.parentCallId) ?? Number.MAX_SAFE_INTEGER));
   let repairedLinks = 0;
   let repairedToolResults = 0;
   for (const terminal of terminals) {
-    const events = options.parent.journal.events;
+    const events = options.parent.journal.readEvents();
     const linked = events.some((event) => event.type === "delegation/completed" && string(record(event.data).childSessionId) === terminal.data.childSessionId);
     const toolTerminal = events.some((event) => TOOL_TERMINALS.has(event.type) && string(record(event.data).callId) === terminal.data.parentCallId);
     const candidates: SessionEventCandidateV1[] = [];

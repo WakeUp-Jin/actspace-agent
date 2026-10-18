@@ -42,3 +42,22 @@ it("closes healthy and blocked sessions even when the final checkpoint fails", a
     await controller.closeAll();
   } finally { await storage.close(); }
 });
+
+it("flush does not rebuild cold history or consult a query backend", async () => {
+  const registry = createCoreCodecRegistry(); const storage = new MemorySessionStorage(registry);
+  const controller = new RuntimeSessionController({ dataRoot: "/unused", runtimeId: "test", registry, profileId: "test", manifestDigest: "test", plugins: [] }, new SessionStore({ registry }, storage));
+  try {
+    const session = await controller.create("flush-only");
+    let inspections = 0;
+    const inspect = storage.inspect.bind(storage);
+    storage.inspect = async id => { inspections++; return inspect(id); };
+    for (let i = 0; i < 10; i++) {
+      await session.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: String(i) }, surface: null });
+      await session.flush();
+    }
+    expect(inspections).toBe(0);
+    expect(controller.snapshot(session).metadata.title).toBe("9");
+    expect(session.durableSeq).toBe(9);
+    await controller.closeAll();
+  } finally { await storage.close(); }
+});

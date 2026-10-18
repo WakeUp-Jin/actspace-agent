@@ -12,6 +12,7 @@ export const stepKey = (turnId: string, stepId: string) => `${turnId}\u0000${ste
 
 /** Request view key for a builder record: the exact request id first, then its step. */
 export function requestKeyOf(record: TrajectoryRecord, requests: { readonly byRequestId: ReadonlyMap<string, string>; readonly keys: ReadonlySet<string> }): string | null {
+  if (record.childSessionId) return null;
   if (record.kind === "user" || record.kind === "context" || record.kind === "system") return null;
   const exact = record.requestId === null ? undefined : requests.byRequestId.get(record.requestId);
   if (exact !== undefined) return exact;

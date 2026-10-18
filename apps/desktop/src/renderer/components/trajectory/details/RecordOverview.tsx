@@ -1,13 +1,13 @@
 import { ChevronRight } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  APPROVAL_LABEL, STATUS_LABEL, T, TAB_LABEL, cellStatus, formatDurationMs, formatTokens, requestLabel, toolInput, toolOutput,
+  APPROVAL_LABEL, STATUS_LABEL, T, TAB_LABEL, promptDiffLines, cellStatus, formatDurationMs, formatTokens, requestLabel, toolInput, toolOutput,
   type DetailTab, type TrajectoryCell,
 } from '../../../trajectory';
 import { MarkdownRecordContent, markdownSource } from './MessageBody';
 import { MarkdownFragment, findToolCell, type RecordBodyProps } from './shared';
 import { RecordPayload, RecordSchema } from './ToolBody';
-import { RecordTiming } from './TimingFields';
+import { RecordTiming, StartedAtValue } from './TimingFields';
 
 /** 概述里的跳转链接：文字加一个小箭头。 */
 export function NavLink({ label, onClick }: { label: string; onClick: () => void }) {
@@ -133,9 +133,12 @@ export function RecordOverview(props: OverviewProps) {
         <OverviewRow label={T.status} error={failed}>{STATUS_LABEL[status]}</OverviewRow>
         {cell.approval && <OverviewRow label={T.approval}>{APPROVAL_LABEL[cell.approval]}</OverviewRow>}
         {cell.kind === 'message' && <TokenRows cell={cell} />}
-        {(cell.kind === 'user' || cell.kind === 'context') && <OverviewRow label={T.duration}>{formatDurationMs(cell.durationMs)}</OverviewRow>}
+        {(cell.kind === 'user' || cell.kind === 'context') && <><div><dt>{T.started}</dt><StartedAtValue timestamp={cell.startedAt} /></div><OverviewRow label={T.duration}>{formatDurationMs(cell.durationMs)}</OverviewRow></>}
+        {record.contextPresentation && <><OverviewRow label="上下文类型">{record.contextPresentation.category}</OverviewRow><OverviewRow label="名称">{record.contextPresentation.title}</OverviewRow><OverviewRow label="变更">{record.contextPresentation.action}</OverviewRow><OverviewRow label="模型消息角色">{record.contextPresentation.placement}（请求组成）</OverviewRow></>}
+        {record.childSessionId && <OverviewRow label="子会话">{record.childSessionId}</OverviewRow>}
       </dl>
       <div className="tj-overviewSections">
+        {record.contextPresentation?.previousText !== undefined && <details className="tj-toolCatalogItem"><summary>与上一版本比较</summary><pre className="tj-promptDiff">{promptDiffLines(record.contextPresentation.previousText, typeof record.inputDetail === 'string' ? record.inputDetail : '').map((line, index) => <span className={`tj-promptDiffLine${line.kind}`} key={index}>{line.text}{'\n'}</span>)}</pre></details>}
         {markdown && (
           <OverviewSection label={TAB_LABEL.preview} onOpen={() => { onTab('preview'); }}>
             <MarkdownRecordContent {...props} rendered preview />

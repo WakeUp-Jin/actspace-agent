@@ -60,6 +60,8 @@
   "components/right-panel/context/ContextConversationList.tsx": 3,
   "components/right-panel/context/ContextEntryList.tsx": 2,
   "components/right-panel/context/ContextOverview.tsx": 1,
+  "components/right-panel/context/ContextPathList.tsx": 1,
+  "components/right-panel/context/ContextPaths.tsx": 4,
   "components/ScrollToBottomButton.tsx": 1,
   "components/SessionViewToggle.tsx": 1,
   "components/settings/ConnectionModelPicker.tsx": 2,

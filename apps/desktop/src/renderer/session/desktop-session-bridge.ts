@@ -31,6 +31,7 @@ export class DesktopSessionBridge {
   #disposed = false;
   readonly #refreshes = new Map<string, Promise<void>>();
   readonly #pendingRefresh = new Set<string>();
+  readonly #watched = new Map<string, number>();
   readonly #historyLoads = new Map<string, Promise<void>>();
   readonly #retryTimers = new Map<ReturnType<typeof setTimeout>, () => void>();
   readonly #retryDelaysMs: readonly number[];
@@ -41,7 +42,7 @@ export class DesktopSessionBridge {
     this.#disposed = false;
     this.#unsubscribeLive ??= this.transport.subscribeLive(event => {
       const applied = this.store.applyLiveEvent(event);
-      if (this.store.selectedSessionId !== event.sessionId) return;
+      if (this.store.selectedSessionId !== event.sessionId && !this.#watched.has(event.sessionId)) return;
       const type = event.update?.event.type;
       if (!applied || event.kind === "resync-required" || type === "compaction/end" || type === "recovery/end" || type === "surface/replaced") {
         this.#pendingRefresh.add(event.sessionId); this.#refresh(event.sessionId);
@@ -54,6 +55,24 @@ export class DesktopSessionBridge {
     const generation = this.store.beginRequest(sessionId);
     return this.#load({ sessionId }, generation);
   }
+  /** Observe a related Session without changing the selected conversation. */
+  watch(sessionId: string): () => void {
+    this.#watched.set(sessionId, (this.#watched.get(sessionId) ?? 0) + 1);
+    if (this.#watched.get(sessionId) === 1) {
+      this.#pendingRefresh.add(sessionId);
+      this.#refresh(sessionId);
+    }
+    return () => {
+      const count = (this.#watched.get(sessionId) ?? 1) - 1;
+      if (count > 0) this.#watched.set(sessionId, count);
+      else { this.#watched.delete(sessionId); this.#pendingRefresh.delete(sessionId); }
+    };
+  }
+  refreshRelated(sessionId: string): Promise<void> {
+    if (!this.#watched.has(sessionId)) return Promise.resolve();
+    this.#pendingRefresh.add(sessionId); this.#refresh(sessionId);
+    return this.#refreshes.get(sessionId) ?? Promise.resolve();
+  }
   loadEarlierHistory(sessionId: string): Promise<void> {
     const pending = this.#historyLoads.get(sessionId);
     if (pending) return pending;
@@ -65,7 +84,7 @@ export class DesktopSessionBridge {
   }
   #refresh(sessionId: string): void {
     if (this.#refreshes.has(sessionId)) return;
-    const current = () => !this.#disposed && this.store.selectedSessionId === sessionId;
+    const current = () => !this.#disposed && (this.store.selectedSessionId === sessionId || this.#watched.has(sessionId));
     const job = (async () => {
       while (this.#pendingRefresh.delete(sessionId) && current()) {
         // 失败时 #load 已经把错误写进 cell；按退避重试，成功的 applyEnvelope 会清掉错误。
@@ -97,6 +116,7 @@ export class DesktopSessionBridge {
     } catch (error) { this.store.markError(input.sessionId, error, generation); throw error; }
   }
   dispose(): void {
+    this.#watched.clear();
     this.#disposed = true; this.#unsubscribeLive?.(); this.#unsubscribeLive = undefined; this.#pendingRefresh.clear();
     // 等待中的重试立即结束，循环看到 disposed 后退出。
     for (const [timer, resolve] of this.#retryTimers) { clearTimeout(timer); resolve(); }

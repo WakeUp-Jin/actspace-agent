@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Context Paths Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #eaeae7;
+  --line: #deded9; --line-strong: #8c8c85; --track: #e9e9e5;
+  --text: #20201e; --muted: #676762; --faint: #72726b;
+  --action: #20201e; --on-action: #ffffff;
+  --success: #087a4b; --success-soft: #e5f2ea; --danger: #c74747; --danger-soft: #f8e9e9;
+  --warning: #91600e; --warning-soft: #f7eedb; --info: #3978b8; --info-soft: #e8f1f9;
+  --c-system: #7d858b; --c-tools: #7a68ad; --c-rules: #087a4b; --c-skills: #91600e; --c-summarized: #a84f7a; --c-conversation: #b96831; --c-supp: #3978b8;
+  --active: #087a4b; --sleep: #8c8c85;
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --selected: #30312d; --hover: #2a2b27;
+  --line: #353630; --line-strong: #787870; --track: #3a3b35;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+  --action: #f1f1ed; --on-action: #181916;
+  --success: #36c783; --success-soft: #193a2b; --danger: #e06b6b; --danger-soft: #452525;
+  --warning: #d2a14d; --warning-soft: #3e321c; --info: #6ca6da; --info-soft: #1e3345;
+  --c-system: #a2aaa9; --c-tools: #aa96d7; --c-rules: #55d99a; --c-skills: #e2ba6b; --c-summarized: #dc8db4; --c-conversation: #dfa06a; --c-supp: #6ca6da;
+  --active: #36c783; --sleep: #787870;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 13px/1.5 var(--font-ui); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); }
+
+/* ---------- demo chrome ---------- */
+.demo-bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.demo-bar h1 { margin: 0 8px 0 0; font-size: 13px; font-weight: 600; }
+.demo-bar .grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+
+.stage { display: flex; height: calc(100vh - 49px); }
+.chat { flex: 1; min-width: 0; padding: 28px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
+.notes { max-width: 560px; color: var(--muted); font-size: 12.5px; }
+.notes h2 { font-size: 13px; color: var(--text); margin: 0 0 6px; }
+.notes ul { margin: 0 0 14px; padding-left: 18px; }
+.notes li { margin: 3px 0; }
+.notes code { font-family: var(--font-mono); font-size: 11.5px; background: var(--surface-subtle); padding: 0 4px; border-radius: 4px; }
+
+/* ---------- right panel ---------- */
+.panel { width: 420px; flex-shrink: 0; border-left: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
+.panel-tabs { display: flex; align-items: center; gap: 2px; height: 40px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+.panel-tabs .tab { padding: 4px 10px; border-radius: 6px; color: var(--faint); font-size: 12.5px; }
+.panel-tabs .tab.on { background: var(--selected); color: var(--text); font-weight: 500; }
+.panel-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.panel-body > * { flex-shrink: 0; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.card-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 0; }
+.card-title { font-weight: 600; font-size: 12.5px; display: inline-flex; align-items: center; gap: 4px; }
+.card-meta { margin-left: auto; color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.q { display: inline-grid; place-items: center; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line-strong); font-size: 8.5px; color: var(--faint); cursor: help; font-weight: 400; position: relative; }
+.q:hover::after, .q:focus::after { content: attr(data-tip); position: absolute; top: 16px; left: -40px; z-index: 30; width: 260px; padding: 8px 10px; border-radius: 8px; background: var(--action); color: var(--on-action); font-size: 11.5px; line-height: 1.55; white-space: normal; text-align: left; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+
+/* overview (static, for context) */
+.ov { padding: 8px 12px 12px; }
+.ov-figs { display: flex; align-items: baseline; justify-content: space-between; }
+.ov-big { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.ov-max { color: var(--faint); font-size: 12px; margin-left: 2px; }
+.ov-pct { font-size: 18px; font-weight: 600; }
+.ov-pct small { color: var(--faint); font-weight: 400; font-size: 11.5px; margin-left: 3px; }
+.bar { position: relative; display: flex; height: 10px; margin: 8px 0 4px; border-radius: 5px; overflow: hidden; background: var(--track); }
+.bar > span + span { box-shadow: inset 1px 0 0 var(--surface); }
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; margin-top: 8px; }
+.lg { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.lg .nm { flex: 1; } .lg .tk { color: var(--muted); } .lg .pc { width: 30px; text-align: right; color: var(--faint); }
+.sw { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* stats */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.stat { background: var(--surface); padding: 8px 10px; }
+.stat .k { color: var(--faint); font-size: 11px; }
+.stat .v { font-size: 15px; font-weight: 600; margin-top: 1px; }
+.stat .v small { font-size: 11px; color: var(--faint); font-weight: 400; margin-left: 2px; }
+.collapsed { display: flex; align-items: center; gap: 8px; padding: 10px 12px; color: var(--faint); }
+.collapsed b { color: var(--text); font-weight: 600; font-size: 12.5px; }
+
+/* ---------- B: overview strip ---------- */
+.strip { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--surface-subtle); text-align: left; font-size: 12px; }
+.strip:hover { background: var(--hover); }
+.strip .lbl { font-weight: 600; }
+.strip .mini { flex: 0 0 64px; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.strip .mini i { display: block; height: 100%; background: var(--active); }
+.strip .sp { flex: 1; }
+.strip .go { color: var(--faint); }
+.sub-head { display: flex; align-items: center; gap: 6px; margin: -2px 0 0; font-size: 12.5px; }
+.back { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 4px; border-radius: 6px; color: var(--muted); }
+.back:hover { background: var(--hover); color: var(--text); }
+
+/* ---------- paths block ---------- */
+.list-toggle { display: inline-flex; align-items: center; gap: 5px; margin-left: -6px; padding: 3px 7px 3px 5px; border-radius: 6px; font-size: 11.5px; color: var(--muted); }
+.list-toggle:hover { background: var(--hover); color: var(--text); }
+.list-toggle:focus-visible { outline: 2px solid var(--info); outline-offset: -2px; }
+.list-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.paths .ph { display: flex; align-items: center; gap: 4px; padding: 4px 8px 4px 4px; }
+.ph-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 7px; text-align: left; }
+.ph-toggle:hover { background: var(--hover); }
+.ph-toggle:focus-visible { outline: 2px solid var(--info); outline-offset: -2px; }
+.chev { width: 12px; height: 12px; flex-shrink: 0; color: var(--faint); transition: transform .15s; }
+.paths.open .chev { transform: rotate(90deg); }
+.ph-sum { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ph-sum .faint { color: var(--faint); }
+.ph-sum .mini { width: 48px; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; margin-right: 4px; }
+.ph-sum .mini i { display: block; height: 100%; background: var(--active); }
+.ph-sum .mini.is-full i { background: var(--warning); }
+.ph-off { margin-left: auto; font-size: 12px; color: var(--faint); }
+.paths.open .p-sum { margin-top: 0; }
+.p-sum { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1px; margin: 8px 12px 0; border-radius: 8px; overflow: hidden; background: var(--line); border: 1px solid var(--line); }
+.p-sum > button { background: var(--surface); padding: 8px 10px; text-align: left; position: relative; }
+.p-sum > button:hover { background: var(--hover); }
+.p-sum > button[aria-pressed="true"] { background: var(--surface-subtle); }
+.p-sum > button[aria-pressed="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--text); }
+.p-sum .k { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--faint); }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot.a { background: var(--active); }
+.dot.s { background: transparent; border: 1.5px solid var(--sleep); }
+.p-sum .v { font-size: 17px; font-weight: 600; margin-top: 1px; letter-spacing: -.01em; }
+.p-sum .v small { font-size: 11.5px; color: var(--faint); font-weight: 400; margin-left: 2px; }
+.cap { position: relative; height: 4px; margin-top: 7px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.cap i { display: block; height: 100%; background: var(--active); }
+.cap.is-full i { background: var(--warning); }
+.cap::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1.5px), var(--surface) calc(10% - 1.5px) 10%); }
+.p-note { margin: 8px 12px 0; padding: 6px 9px; border-radius: 7px; background: var(--warning-soft); color: var(--warning); font-size: 11.5px; }
+.p-explain { margin: 8px 12px 0; color: var(--faint); font-size: 11.5px; line-height: 1.55; }
+
+.p-tools { display: flex; align-items: center; gap: 6px; padding: 8px 12px 2px; font-size: 11.5px; color: var(--faint); }
+.p-tools .sp { flex: 1; }
+.seg.sm button { font-size: 11px; padding: 1px 7px; }
+
+.grp-h { display: flex; align-items: center; gap: 6px; padding: 8px 12px 2px 14px; font: 11px/1.4 var(--font-mono); color: var(--faint); }
+.grp-h span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grp-h .c { margin-left: auto; font-family: var(--font-ui); }
+
+.pth { margin: 0 6px; border-radius: 6px; }
+.pth-row { display: flex; align-items: center; gap: 7px; width: 100%; padding: 4px 6px 4px 8px; border-radius: 6px; text-align: left; }
+.pth-row:hover { background: var(--hover); }
+.pth.open .pth-row { background: var(--surface-subtle); border-radius: 6px 6px 0 0; }
+.ficon { width: 13px; height: 13px; flex-shrink: 0; color: var(--faint); }
+.pth-name { min-width: 0; flex: 1; display: flex; align-items: baseline; gap: 6px; overflow: hidden; }
+.pth-name .fn { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+.pth-name .dir { font: 11px var(--font-mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.pth-name .desc { font-size: 11.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sleeping .fn { color: var(--muted); }
+.tag { font-size: 10.5px; padding: 0 5px; border-radius: 4px; line-height: 17px; white-space: nowrap; flex-shrink: 0; font-weight: 500; }
+.tag.wake { background: var(--success-soft); color: var(--success); }
+.tag.risk { background: var(--surface-subtle); color: var(--faint); border: 1px solid var(--line); font-weight: 400; }
+.tag.new { background: var(--info-soft); color: var(--info); }
+.tag.jr { background: var(--surface-subtle); color: var(--muted); border: 1px solid var(--line); font-weight: 400; }
+.reads { width: 30px; text-align: right; font-size: 11.5px; color: var(--muted); flex-shrink: 0; }
+.reads.zero { color: var(--faint); opacity: .6; }
+.when { width: 52px; text-align: right; font-size: 11px; color: var(--faint); flex-shrink: 0; }
+.copy { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; color: var(--faint); opacity: 0; flex-shrink: 0; }
+.pth-row:hover .copy, .copy:focus-visible { opacity: 1; }
+.copy:hover { background: var(--selected); color: var(--text); }
+
+.pth-body { display: none; padding: 2px 10px 10px 28px; background: var(--surface-subtle); border-radius: 0 0 6px 6px; }
+.pth.open .pth-body { display: block; }
+.full { display: flex; align-items: flex-start; gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font: 11.5px/1.5 var(--font-mono); word-break: break-all; user-select: text; }
+.full span { flex: 1; }
+.full .copy { opacity: 1; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin-top: 8px; font-size: 11.5px; }
+.kv dt { color: var(--faint); } .kv dd { margin: 0; }
+.hint { margin-top: 8px; font-size: 11px; color: var(--faint); }
+
+.more { display: block; width: calc(100% - 24px); margin: 6px 12px 0; padding: 5px 0; border-radius: 6px; border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.more.ghost { border: 0; text-align: left; padding-left: 24px; color: var(--faint); }
+.more:hover { background: var(--hover); color: var(--text); }
+.more[disabled] { opacity: .6; cursor: default; }
+.p-foot { padding: 8px 12px 12px; color: var(--faint); font-size: 11px; text-align: center; }
+.empty { padding: 18px 12px; text-align: center; color: var(--faint); font-size: 12px; }
+.err { display: flex; align-items: center; gap: 8px; margin: 10px 12px 12px; padding: 7px 10px; border-radius: 8px; background: var(--danger-soft); color: var(--danger); font-size: 12px; }
+.err span { flex: 1; }
+.err button { padding: 2px 9px; border-radius: 6px; border: 1px solid currentColor; font-size: 11.5px; }
+.skel { height: 22px; margin: 4px 12px; border-radius: 5px; background: linear-gradient(90deg, var(--surface-subtle), var(--hover), var(--surface-subtle)); background-size: 200% 100%; animation: sk 1.2s infinite linear; }
+@keyframes sk { to { background-position: -200% 0; } }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 40; padding: 8px 14px; border-radius: 8px; background: var(--action); color: var(--on-action); font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <h1>Context 面板 · 活跃 / 睡眠路径 Demo</h1>
+  <div class="grp">数据 <span class="seg" data-ctl="scene"><button aria-pressed="true" data-v="normal">常规</button><button aria-pressed="false" data-v="full">满 100</button><button aria-pressed="false" data-v="empty">空</button><button aria-pressed="false" data-v="unavailable">不可用</button><button aria-pressed="false" data-v="error">读取失败</button></span></div>
+  <div class="grp">下次压缩预判 <span class="seg" data-ctl="predict"><button aria-pressed="true" data-v="on">显示</button><button aria-pressed="false" data-v="off">隐藏</button></span></div>
+  <div class="grp">主题 <span class="seg" data-ctl="theme"><button aria-pressed="true" data-v="light">浅色</button><button aria-pressed="false" data-v="dark">深色</button></span></div>
+</div>
+
+<div class="stage">
+  <div class="chat">
+    <div class="notes">
+      <h2>这一版（A · 列表默认收起）</h2>
+      <ul>
+        <li><b>一直可见</b>：卡片标题、压缩周期和「活跃 87/100 · 睡眠 342」两格统计。这部分只用面板摘要 <code>view.disclosure</code>，不请求路径列表。</li>
+        <li><b>列表默认收起</b>：两格下面只有一行 <code>› 显示活跃路径 · 87 条</code>。点这个小开关才请求第一页（Demo 里短暂显示骨架）；展开后这行变成 <code>⌄ 活跃 · 已显示 12 / 87</code>，再点就收起。</li>
+        <li><b>两格兼当 Tab</b>：点「活跃 / 睡眠」切换下面列哪类，展开 / 收起状态不变。展开后先显示 12 行，「再显示 20 项」逐步展开，到已加载部分的末尾再拉下一页。</li>
+        <li><b>再收起</b>：保留已加载的页。会话或 <code>disclosure.revision</code> 变化时清空，下次展开重新读取。</li>
+        <li><b>预判标签</b>：<span class="tag wake">待唤醒</span> 表示睡眠路径本周期被读过；<span class="tag risk">将睡眠</span> 表示活跃路径本周期没被读过，也不是本周期新加入的。实现时由后端在 <code>ContextPathEntry</code> 上给出，前端不复刻 <code>selectActive</code> 规则。</li>
+        <li><b>Token</b>：路径列表不重复计 Token。活跃路径的导航行已计入「补充上下文」。</li>
+      </ul>
+      <h2>没放进来的</h2>
+      <ul>
+        <li>搜索 / 筛选（需要后端查询参数）、手动唤醒 / 睡眠（没有这个能力）。</li>
+      </ul>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <div class="panel-tabs"><button class="tab">文件</button><button class="tab">变更</button><button class="tab on">上下文</button></div>
+    <div class="panel-body" id="body"></div>
+  </aside>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const ROOT = "/Users/astra/code/actspace-agent";
+const NOW = new Date("2026-10-18T14:00:00+11:00").getTime();
+const OWNER = "actspace.context-disclosure";
+
+// ---------- mock data ----------
+const DIRS = [
+  "apps/desktop/src/main/runtime-v2", "apps/desktop/src/main/ipc", "apps/desktop/src/renderer/components/right-panel/context",
+  "apps/desktop/src/renderer/mock", "packages/context/engine/src", "packages/context/disclosure/src", "packages/context/conversation/src",
+  "packages/agent-service/src", "packages/shared/src", "packages/core/agent-loop/src", "docs/design-docs/frontend", "docs/exec-runs/20261018-context-step-update",
+];
+const FILES = ["index.ts", "types.ts", "state.ts", "policy.ts", "paths.ts", "plugin.ts", "compaction.ts", "source.ts", "context-panel.ts", "context-panel-service.ts",
+  "fixed-renderer-ipc.ts", "guards.ts", "handlers.ts", "use-context-panel.ts", "ContextPanel.tsx", "ContextStats.tsx", "task-ledger.ts", "loop.ts",
+  "README.md", "execution-summary.md", "artifact-store.ts", "session-commands.ts", "context-paths.ts", "disclosure-contract.ts", "index-impl.ts"];
+
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+function build(nActive, nSleep, cycle) {
+  const r = rng(nActive * 31 + nSleep + 7);
+  const pool = [];
+  DIRS.forEach((d) => FILES.forEach((f) => pool.push(`${ROOT}/${d}/${f}`)));
+  for (let i = 0; pool.length < nActive + nSleep + 4; i++) pool.push(`${ROOT}/packages/legacy/mod-${String(i).padStart(3, "0")}/index.ts`);
+  pool.sort(() => r() - .5);
+  const mk = (p, vis) => {
+    const reads = vis === "active" ? (r() < .55 ? Math.ceil(r() * 6) : 0) : (r() < .08 ? Math.ceil(r() * 2) : 0);
+    const added = vis === "active" ? (r() < .3 ? cycle : Math.floor(r() * cycle)) : Math.floor(r() * cycle);
+    const last = reads > 0 ? NOW - Math.floor(r() * 50) * 60e3 : r() < .5 ? NOW - Math.floor(2 + r() * 40) * 3600e3 : undefined;
+    return { id: p, path: p, owners: [OWNER], visibility: vis, readsInCycle: reads, addedCycle: added, lastReadAt: last };
+  };
+  const active = pool.slice(0, Math.max(0, nActive - 1)).map((p) => mk(p, "active"));
+  const sleeping = pool.slice(nActive, nActive + nSleep).map((p) => mk(p, "sleeping"));
+  if (nActive) active.push({ id: "journal", path: "/Users/astra/.actspace/sessions/s_7f3a/journal.jsonl", description: "Original Session Journal", owners: [OWNER], visibility: "active", readsInCycle: 0, addedCycle: cycle });
+  const sort = (a, b) => a.path.localeCompare(b.path);
+  return { active: active.sort(sort), sleeping: sleeping.sort(sort) };
+}
+const SCENES = {
+  normal: { status: "ready", cycle: 4, ...build(87, 342, 4) },
+  full: { status: "ready", cycle: 9, ...build(100, 1284, 9) },
+  empty: { status: "ready", cycle: 0, active: [], sleeping: [] },
+  unavailable: { status: "unavailable" },
+  error: { status: "ready", cycle: 4, ...build(87, 342, 4), fail: true },
+};
+const PAGE = 50;
+
+const INITIAL = 12, STEP = 20;
+const state = { expanded: false, fetched: false, firstLoading: false, visible: { active: INITIAL, sleeping: INITIAL }, place: "A", scene: "normal", predict: true, tab: "active", group: "dir", sub: false, loaded: { active: 0, sleeping: 0 }, loading: false, open: new Set() };
+
+// ---------- helpers ----------
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ago = (t) => { if (!t) return "未读过"; const m = Math.round((NOW - t) / 60e3); return m < 1 ? "刚刚" : m < 60 ? `${m} 分钟前` : m < 1440 ? `${Math.round(m / 60)} 小时前` : `${Math.round(m / 1440)} 天前`; };
+const stamp = (t) => t ? new Date(t).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+const rel = (p) => p.startsWith(ROOT + "/") ? p.slice(ROOT.length + 1) : p.replace(/^\/Users\/[^/]+/, "~");
+const mid = (s, n = 46) => s.length <= n ? s : "…" + s.slice(s.length - n + 1);
+const split = (p) => { const r = rel(p); const i = r.lastIndexOf("/"); return i < 0 ? ["", r] : [r.slice(0, i + 1), r.slice(i + 1)]; };
+const FILE = '<svg class="ficon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
+const COPY = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+const CHEV = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>';
+const BACK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 6-6 6 6 6"/></svg>';
+const TIP_PATHS = "活跃路径会以一行「路径 — 说明」放进模型上下文，告诉模型有哪些文件可以去读，不包含文件全文。活跃最多 100 条，超出的或本周期没再用到的会在压缩时转为睡眠，只保留在索引里，模型仍可按需读取。睡眠路径被重新读到后，下次压缩时会回到活跃。";
+const TIP_CYCLE = "每次上下文压缩开启一个新周期，活跃集合只在压缩时重新排定，读取文件不会立刻改变活跃 / 睡眠。";
+
+function predictTag(p, cycle) {
+  if (!state.predict) return "";
+  if (p.visibility === "sleeping" && p.readsInCycle > 0) return '<span class="tag wake" title="本周期被读取过，下次压缩时会重新排入活跃">待唤醒</span>';
+  if (p.visibility === "active" && p.readsInCycle === 0 && p.addedCycle < cycle && !p.description) return '<span class="tag risk" title="本周期未被读取，下次压缩时会转为睡眠">将睡眠</span>';
+  return "";
+}
+
+// ---------- render ----------
+function overview() {
+  const cats = [["系统提示词", 4210, "--c-system"], ["工具", 15890, "--c-tools"], ["规则", 3100, "--c-rules"], ["补充上下文", 2860, "--c-supp"], ["会话摘要", 5420, "--c-summarized"], ["会话内容", 48230, "--c-conversation"]];
+  const total = cats.reduce((s, c) => s + c[1], 0), max = 200000;
+  const sc = SCENES[state.scene];
+  const strip = state.place === "B" ? (sc.status === "ready"
+    ? `<button class="strip" data-act="sub"><span class="lbl">路径</span><span class="dot a"></span><span class="num">活跃 ${sc.active.length}<span style="color:var(--faint)">/100</span></span><span class="mini"><i style="width:${sc.active.length}%;${sc.active.length >= 100 ? "background:var(--warning)" : ""}"></i></span><span class="dot s"></span><span class="num">睡眠 ${sc.sleeping.length.toLocaleString()}</span><span class="sp"></span><span class="go">查看 ›</span></button>`
+    : `<div class="strip" style="cursor:default"><span class="lbl">路径</span><span style="color:var(--faint)">当前会话不支持路径记录</span></div>`) : "";
+  return `<section class="card"><div class="card-head"><span class="card-title">当前上下文</span><span class="card-meta">Claude Opus 5.5</span></div>
+  <div class="ov"><div class="ov-figs num"><span><span class="ov-big">≈${(total / 1000).toFixed(1)}k</span><span class="ov-max">/ 200k tokens</span></span><span class="ov-pct">${Math.round(total / max * 100)}%<small>已用</small></span></div>
+  <div class="bar">${cats.map((c) => `<span style="width:${c[1] / max * 100}%;background:var(${c[2]})"></span>`).join("")}</div>
+  <div class="legend">${cats.map((c) => `<div class="lg"><span class="sw" style="background:var(${c[2]})"></span><span class="nm">${c[0]}</span><span class="tk num">≈${(c[1] / 1000).toFixed(1)}k</span><span class="pc num">${Math.round(c[1] / total * 100)}%</span></div>`).join("")}</div>
+  ${strip}</div></section>`;
+}
+function stats() {
+  const cells = [["轮次", "12"], ["步数", "86"], ["压缩", "3", "次"], ["缓存命中", "91.4%"], ["累计 Token", "2.1M"], ["费用", "$4.82"]];
+  return `<section class="stats">${cells.map(([k, v, u]) => `<div class="stat"><div class="k">${k}</div><div class="v num">${v}${u ? `<small>${u}</small>` : ""}</div></div>`).join("")}</section>`;
+}
+function rest() {
+  return `<section class="card collapsed"><b>上下文明细</b><span>· 6 类 · 142 项</span></section><section class="card collapsed"><b>趋势</b></section><section class="card collapsed"><b>事件</b></section>`;
+}
+
+function pathsInner(sc) {
+  if (sc.status !== "ready") return `<div class="empty">当前会话不支持路径记录（上下文披露能力不可用）。</div>`;
+  const nA = sc.active.length, nS = sc.sleeping.length, full = nA >= 100;
+
+  let html = `<div class="p-sum">
+    <button aria-pressed="${state.tab === "active"}" data-tab="active"><div class="k"><span class="dot a"></span>活跃</div><div class="v num">${nA}<small>/ 100</small></div><div class="cap ${full ? "is-full" : ""}"><i style="width:${Math.min(100, nA)}%"></i></div></button>
+    <button aria-pressed="${state.tab === "sleeping"}" data-tab="sleeping"><div class="k"><span class="dot s"></span>睡眠</div><div class="v num">${nS.toLocaleString()}</div><div style="font-size:11px;color:var(--faint);margin-top:2px">在索引中，按需读取</div></button>
+  </div>`;
+  if (full) html += `<div class="p-note">活跃路径已满 100 条，之后新出现的路径会先进入睡眠。</div>`;
+  if (nA + nS === 0) return html + `<div class="empty">还没有记录到文件路径。Agent 读写文件后会出现在这里。</div>`;
+
+  const list = sc[state.tab];
+  const label = state.tab === "active" ? "活跃" : "睡眠";
+  if (!state.expanded) {
+    return html + `<div class="p-tools"><button class="list-toggle" data-act="list" aria-expanded="false">${CHEV}<span class="num">显示${label}路径 · ${list.length.toLocaleString()} 条</span></button></div><div style="height:6px"></div>`;
+  }
+  if (state.firstLoading) return html + `<div class="p-tools"><button class="list-toggle" data-act="list" aria-expanded="true">${CHEV}<span>正在读取${label}路径…</span></button></div>` + `<div class="skel"></div>`.repeat(5) + `<div style="height:10px"></div>`;
+  if (sc.fail && state.tab === "sleeping") return html + `<div class="err"><span>睡眠路径读取失败。</span><button data-act="retry">重试</button></div>`;
+  if (state.loaded[state.tab] === 0) { state.loaded[state.tab] = Math.min(PAGE, list.length); }
+  // A：卡片内先显示 12 行，和「上下文明细」一致；B 子页显示已加载的整页
+const limit = state.place === "A" ? Math.min(state.visible[state.tab], state.loaded[state.tab]) : state.loaded[state.tab];
+  const shown = list.slice(0, limit);
+
+  html += `<div class="p-tools"><button class="list-toggle" data-act="list" aria-expanded="true">${CHEV}<span class="num">${label} · 已显示 ${shown.length} / ${list.length.toLocaleString()}</span></button><span class="sp"></span>
+    <span class="seg sm" data-ctl="group"><button aria-pressed="${state.group === "dir"}" data-v="dir">按目录</button><button aria-pressed="${state.group === "flat"}" data-v="flat">平铺</button></span></div>`;
+  if (!list.length) html += `<div class="empty">${state.tab === "active" ? "没有活跃路径。" : "没有睡眠路径。"}</div>`;
+
+  let lastDir = null;
+  const counts = {};
+  shown.forEach((p) => { const d = split(p.path)[0]; counts[d] = (counts[d] || 0) + 1; });
+  shown.forEach((p) => {
+    const [dir, fn] = split(p.path);
+    if (state.group === "dir" && dir !== lastDir) { html += `<div class="grp-h"><span title="${esc(dir)}">${esc(mid(dir || "/"))}</span><span class="c num">${counts[dir]}</span></div>`; lastDir = dir; }
+    const open = state.open.has(p.id);
+    const extra = p.description === "Original Session Journal" ? '<span class="tag jr">会话日志</span>' : p.addedCycle === sc.cycle && p.visibility === "active" ? '<span class="tag new" title="本周期新加入">新</span>' : "";
+    html += `<div class="pth ${p.visibility} ${open ? "open" : ""}">
+      <div class="pth-row" role="button" tabindex="0" data-path="${esc(p.id)}" title="${esc(p.path)}">
+        ${FILE}<span class="pth-name"><span class="fn">${esc(fn)}</span>${state.group === "flat" ? `<span class="dir">${esc(mid(dir, 34))}</span>` : p.description && p.description !== "Original Session Journal" ? `<span class="desc">${esc(p.description)}</span>` : ""}</span>
+        ${extra}${predictTag(p, sc.cycle)}
+        <span class="reads num ${p.readsInCycle ? "" : "zero"}" title="本周期读取次数">${p.readsInCycle ? "读 " + p.readsInCycle : "—"}</span>
+        <span class="when num" title="${p.lastReadAt ? "最近读取 " + stamp(p.lastReadAt) : "从未读取"}">${p.lastReadAt ? ago(p.lastReadAt) : "未读过"}</span>
+        <button class="copy" data-copy="${esc(p.path)}" title="复制完整路径" aria-label="复制完整路径">${COPY}</button>
+      </div>
+      <div class="pth-body">
+        <div class="full"><span>${esc(p.path)}</span><button class="copy" data-copy="${esc(p.path)}" title="复制">${COPY}</button></div>
+        <dl class="kv">
+          ${p.description ? `<dt>说明</dt><dd>${esc(p.description)}</dd>` : ""}
+          <dt>状态</dt><dd>${p.visibility === "active" ? "活跃 · 导航行在上下文中，不含全文" : "睡眠 · 只在索引中，模型仍可按需读取"}</dd>
+          <dt>本周期读取</dt><dd class="num">${p.readsInCycle} 次</dd>
+          <dt>最近读取</dt><dd class="num">${stamp(p.lastReadAt)}</dd>
+          <dt>加入于</dt><dd class="num">第 ${p.addedCycle} 周期${p.addedCycle === sc.cycle ? "（本周期）" : ""}</dd>
+          <dt>来源</dt><dd style="color:var(--faint)">${p.owners.map((o) => o.replace("actspace.", "")).join("、")}</dd>
+        </dl>
+      </div></div>`;
+  });
+  if (state.loading) html += `<div class="skel"></div><div class="skel"></div><div class="skel"></div>`;
+  const left = list.length - shown.length;
+  if (left > 0 && state.place === "A") html += `<button class="more ghost" data-act="more" ${state.loading ? "disabled" : ""}>${state.loading ? "正在读取…" : `再显示 ${Math.min(STEP, left)} 项（共 ${list.length.toLocaleString()}）`}</button>`;
+  else if (left > 0) html += `<button class="more" data-act="more" ${state.loading ? "disabled" : ""}>${state.loading ? "正在读取…" : `加载更多（还有 ${left.toLocaleString()} 条）`}</button>`;
+  html += `<div class="p-foot">活跃路径的导航行已计入「补充上下文」，这里不重复计 Token</div>`;
+  return html;
+}
+
+function pathsCard() {
+  const sc = SCENES[state.scene];
+  return `<section class="card" aria-label="路径">
+    <div class="card-head"><span class="card-title">路径<span class="q" tabindex="0" data-tip="${esc(TIP_PATHS)}">?</span></span>
+    ${sc.status === "ready" ? `<span class="card-meta" style="display:inline-flex;align-items:center;gap:4px">第 ${sc.cycle} 压缩周期<span class="q" tabindex="0" data-tip="${esc(TIP_CYCLE)}">?</span></span>` : ""}</div>
+    ${pathsInner(sc)}</section>`;
+}
+
+function render() {
+  const body = document.getElementById("body");
+  if (state.place === "B" && state.sub) {
+    body.innerHTML = `<div class="sub-head"><button class="back" data-act="back">${BACK}上下文</button><span style="color:var(--faint)">/</span><b>路径</b></div>${pathsCard()}`;
+  } else {
+    body.innerHTML = overview() + stats() + (state.place === "A" ? pathsCard() : "") + rest();
+  }
+}
+
+// ---------- events ----------
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("on"), 1600); }
+function startFirstLoad() {
+  state.fetched = true; state.firstLoading = true; render();
+  setTimeout(() => { state.firstLoading = false; render(); }, 380);
+}
+function resetPaging() { state.fetched = false; state.visible = { active: INITIAL, sleeping: INITIAL }; state.loaded = { active: 0, sleeping: 0 }; state.open.clear(); state.loading = false; }
+
+document.addEventListener("click", (e) => {
+  const ctl = e.target.closest(".seg button");
+  if (ctl) {
+    const seg = ctl.parentElement, key = seg.dataset.ctl, v = ctl.dataset.v;
+    seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === ctl)));
+    if (key === "theme") document.documentElement.dataset.theme = v;
+    else if (key === "predict") state.predict = v === "on";
+    else if (key === "group") state.group = v;
+    else if (key === "place") { state.place = v; state.sub = false; }
+    else if (key === "scene") { state.scene = v; SCENES.error.fail = true; state.tab = "active"; resetPaging(); if (state.expanded && SCENES[v].status === "ready") return startFirstLoad(); }
+    return render();
+  }
+  const cp = e.target.closest("[data-copy]");
+  if (cp) { e.stopPropagation(); navigator.clipboard?.writeText(cp.dataset.copy).catch(() => {}); return toast("已复制完整路径"); }
+  const tab = e.target.closest("[data-tab]");
+  if (tab) { state.tab = tab.dataset.tab; return render(); }
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (act === "list") {
+    state.expanded = !state.expanded;
+    if (state.expanded && !state.fetched && SCENES[state.scene].status === "ready") return startFirstLoad();
+    return render();
+  }
+  if (act === "sub") { state.sub = true; return render(); }
+  if (act === "back") { state.sub = false; return render(); }
+  if (act === "retry") { SCENES.error.fail = false; return render(); }
+  if (act === "more") {
+    if (state.place === "A") {
+      state.visible[state.tab] += STEP;
+      if (state.visible[state.tab] <= state.loaded[state.tab]) return render();
+    }
+    state.loading = true; render();
+    setTimeout(() => { state.loading = false; state.loaded[state.tab] += PAGE; render(); }, 450);
+    return;
+  }
+  const row = e.target.closest("[data-path]");
+  if (row) { const id = row.dataset.path; state.open.has(id) ? state.open.delete(id) : state.open.add(id); render(); }
+});
+document.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-path]")) { e.preventDefault(); e.target.click(); } });
+// ?place=B&scene=full&theme=dark&sub=1&tab=sleeping&open=1 直接打开某个状态
+const qs = new URLSearchParams(location.search);
+for (const [k, v] of qs) {
+  const b = document.querySelector(`.seg[data-ctl="${k}"] button[data-v="${v}"]`);
+  if (b) b.click();
+}
+if (qs.get("sub")) state.sub = true;
+if (qs.get("expanded")) { state.expanded = true; state.fetched = true; }
+if (qs.get("tab")) state.tab = qs.get("tab");
+if (qs.get("open")) { render(); const r = document.querySelectorAll("[data-path]")[3]; r && state.open.add(r.dataset.path); }
+render();
+</script>
+</body>
+</html>

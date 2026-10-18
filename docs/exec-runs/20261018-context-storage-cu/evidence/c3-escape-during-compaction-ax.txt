@@ -1,0 +1,394 @@
+Window: "actspace", App: Actspace Dev actspace-agent-2067.
+0 标准窗口 actspace, Secondary Actions: Raise
+	1 container actspace
+		2 container
+			3 HTML 内容 actspace, URL: 127.0.0.1:5178/
+				4 container
+					5 切换按钮 Description: 收起会话侧栏, Help: 收起侧栏, Value: 1
+					6 container 会话导航
+						7 按钮 Description: 后退, Help: 返回
+						8 按钮 (disabled) 前进
+					9 切换按钮 Description: 查看执行轨迹, Value: 0
+					10 按钮 查看会话详情： Fixture automatic title
+					11 弹出式按钮 查看工作区环境
+					12 弹出式按钮 Description: 新建右侧面板对象, Help: 新建对象
+					13 切换按钮 Description: 关闭面板, Help: 关闭右侧面板, Value: 1
+					14 container
+						15 按钮 新建会话
+						16 按钮 新建 Space
+						17 按钮 扩展
+						18 按钮 Actor 名册 8
+							19 文本 Actor 名册
+							20 文本 8
+						21 container 会话
+							22 container Space
+								23 按钮 Space 演示
+									24 文本 Space
+									25 文本 演示
+								26 按钮 新建 Space
+								27 按钮 收起 Space
+								28 按钮 支付链路提速 1
+									29 文本 支付链路提速
+									30 文本 1
+								31 按钮 结算页重构
+							32 container
+								33 按钮 工作区
+								34 按钮 搜索会话
+								35 弹出式按钮 视图选项
+								36 按钮 添加工作区
+								37 container
+									38 按钮 收起 workspace
+									39 按钮 workspace, Help: /tmp/actspace-context-storage-cu-20261018/workspace
+									40 container 工作区操作
+										41 弹出式按钮 更多操作：workspace
+										42 按钮 在工作区中新建会话
+								43 按钮 会话状态： 运行中
+								44 按钮 Fixture automatic title
+								45 文本 10分钟
+								46 按钮 会话状态： 空闲
+								47 按钮 CU Long History 180 turns
+								48 文本 24分钟
+						49 按钮 设置
+					50 分离器 Description: 调整会话侧栏宽度, Value: 260
+					51 container
+						52 container
+							53 container 会话消息
+								54 container
+									55 文本 FIXTURE_LONG 联合验收：读取大文件并继续
+									56 按钮 Worked for 7s
+									57 text Fixture completed: fixture-alternate.
+									58 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									59 按钮 复制回复
+									60 按钮 可视化这条回复
+									61 弹出式按钮 更多消息操作
+									62 弹出式按钮 用量 120K tok，查看本轮用量
+									63 container 回复时间：18:42
+										64 文本 18:42
+								65 container
+									66 文本 FIXTURE_STORAGE CU-EARLY-000
+									67 container
+										68 文本 CU-EARLY-000 first persisted chunk. record-1 record-2 record-3 record-4 record-5 record-6 record-7 record-8 record-9 record-10 record-11 record-12 record-13 record-14 record-15 record-16 record-17 record-18 record-19 record-20 record-21 record-22 record-23 record-24 record-25 record-26 record-27 record-28 record-29 record-30 record-31 record-32 record-33 record-34 record-35 record-36 record-37 record-38 record-39 record-40 record-41 record-42 record-43 record-44 record-45 record-46 record-47 record-48 recor
+										69 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									70 按钮 复制回复
+									71 按钮 可视化这条回复
+									72 弹出式按钮 更多消息操作
+									73 弹出式按钮 用量 120 tok，查看本轮用量
+									74 container 回复时间：18:53
+										75 文本 18:53
+								76 container
+									77 文本 FIXTURE_TODO
+									78 container Agent Todo list
+										79 按钮 0 of 1 To-dos Completed
+										80 内容列表
+											81 container Pending: CU-TODO-RECOVERY verify storage
+												82 文本 CU-TODO-RECOVERY verify storage
+									83 container
+										84 文本 Fixture completed: fixture-alternate.
+										85 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									86 按钮 复制回复
+									87 按钮 可视化这条回复
+									88 弹出式按钮 更多消息操作
+									89 弹出式按钮 用量 240 tok，查看本轮用量
+									90 container 回复时间：18:55
+										91 文本 18:55
+								92 container
+									93 文本 CU-ATTACHMENT-RECOVERY 图片持久化验收
+									94 container
+										95 文本 Fixture completed: fixture-alternate.
+										96 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									97 按钮 复制回复
+									98 按钮 可视化这条回复
+									99 弹出式按钮 更多消息操作
+									100 弹出式按钮 用量 120 tok，查看本轮用量
+									101 container 回复时间：19:07
+										102 文本 19:07
+								103 container
+									104 container
+										105 文本 [valid.png]
+										106 container Message attachments
+											107 按钮 Description: Preview message image valid.png, Help: valid.png
+									108 container
+										109 文本 Fixture completed: fixture-main.
+										110 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+									111 按钮 复制回复
+									112 按钮 可视化这条回复
+									113 弹出式按钮 更多消息操作
+									114 弹出式按钮 用量 120 tok，查看本轮用量
+									115 container 回复时间：19:25
+										116 文本 19:25
+								117 container
+									118 文本 FIXTURE_LONG 第二轮步骤验收
+									119 按钮 Worked
+								120 container
+									121 text 正在压缩上下文 2m 7s
+									122 进度指示器 上下文压缩进度
+									123 文本 正在总结较早的消息。
+							124 container 会话轮次导航
+								125 按钮 跳到第 1 轮对话：FIXTURE_LONG 联合验收：读取大文件并继续
+								126 按钮 跳到第 2 轮对话：FIXTURE_STORAGE CU-EARLY-000
+								127 按钮 跳到第 3 轮对话：FIXTURE_TODO
+								128 按钮 跳到第 4 轮对话：CU-ATTACHMENT-RECOVERY 图片持久化验收
+								129 按钮 跳到第 5 轮对话：[valid.png]
+								130 按钮 跳到第 6 轮对话：FIXTURE_LONG 第二轮步骤验收
+						131 container
+							132 container 待处理的审查操作
+								133 按钮 查看工作区变更
+								134 按钮 更多审查操作
+							135 container 消息输入面板
+								136 文本输入区 (settable) Description: 消息输入框, Placeholder: 继续追问，运行中发送会进入队列…
+								137 container 输入框工具栏
+									138 弹出式按钮 添加 Agent、上下文或工具
+									139 弹出式按钮 fixture-main
+										140 文本 fixture-main
+									141 按钮 (disabled) 正在压缩上下文，压缩完成后可继续
+							142 container 运行位置
+								143 文本 本机
+								144 弹出式按钮 Description: 会话权限模式, Help: 权限：自动。完全权限扩大文件范围并自动批准通过策略检查的 Bash；沙箱和禁止规则仍生效，文件删除及敏感文件仍按策略审批。
+								145 弹出式按钮 6 轮 12 步 · 43 tok/s
+									146 文本 6 轮 12 步
+									147 文本 43 tok/s
+								148 弹出式按钮 141K tok · 缓存命中 0%
+									149 文本 141K tok
+									150 文本 缓存命中 0%
+								151 按钮 上下文用量 73%
+					152 分离器 Description: 调整预览面板宽度, Value: 390
+					153 container
+						154 标签组 右侧面板
+							155 标签 (settable, integer) valid.png, Value: 0
+							156 按钮 关闭 valid.png
+							157 标签 (selected) 上下文, Value: 1
+							158 按钮 关闭 上下文
+						159 container 当前上下文
+							160 text 当前上下文 fixture-main ≈23.9K / 32.8K tokens 73% 已用
+							161 container
+								162 text 自动压缩  ≈16.8K
+							163 切换按钮 系统提示词 ≈596 2%, Value: 0
+								164 文本 系统提示词
+								165 文本 ≈596
+								166 文本 2%
+							167 切换按钮 工具 ≈3K 13%, Value: 0
+								168 文本 工具
+								169 文本 ≈3K
+								170 文本 13%
+							171 切换按钮 规则 ≈0 0%, Value: 0
+								172 文本 规则
+								173 文本 ≈0
+								174 文本 0%
+							175 切换按钮 Skills ≈2.7K 11%, Value: 0
+								176 文本 Skills
+								177 文本 ≈2.7K
+								178 文本 11%
+							179 切换按钮 会话摘要 ≈0 0%, Value: 0
+								180 文本 会话摘要
+								181 文本 ≈0
+								182 文本 0%
+							183 切换按钮 会话内容 ≈17.5K 73%, Value: 0
+								184 文本 会话内容
+								185 文本 ≈17.5K
+								186 文本 73%
+						187 container 会话统计
+							188 文本 轮次
+							189 文本 6
+							190 文本 步数
+							191 文本 12
+							192 文本 压缩
+							193 container
+								194 text 0 次
+							195 文本 缓存命中
+							196 container 缓存读 ÷（缓存读 + 未命中输入），来自服务商返回的真实用量
+							197 文本 0.0%
+							198 文本 累计 Token
+							199 container 整个会话所有请求的输入 + 输出 + 缓存读写
+							200 文本 140.7K
+						201 container 路径
+							202 文本 路径
+							203 container 活跃路径以一行「路径 — 说明」放进模型上下文，告诉模型有哪些文件可以读，不包含文件全文。活跃最多 100 条；超出的或本周期没再用到的，会在压缩时转为睡眠，只留在索引里，模型仍可按需读取。睡眠路径被重新读到后，下次压缩时回到活跃。
+							204 text 第  0  压缩周期
+							205 container 每次上下文压缩开启一个新周期；活跃集合只在压缩时重新排定，读取文件不会立刻改变活跃 / 睡眠。
+							206 切换按钮 活跃 1/ 100, Value: 1
+								207 文本 活跃
+								208 文本 1
+								209 文本 /
+								210 文本 100
+							211 切换按钮 睡眠 0 在索引中，按需读取, Value: 0
+								212 文本 睡眠
+								213 文本 0
+								214 文本 在索引中，按需读取
+							215 按钮 显示活跃路径 · 1 条
+						216 container 上下文明细
+							217 文本 上下文明细
+							218 组合框 (settable) Description: 对比基准, Value: 最近请求输入（第 6 轮 · 步 1）
+								219 文本 最近请求输入（第 6 轮 · 步 1）
+							220 text ≈23.9K  估算 · 最近请求实际  20K （服务商返回） 78  项
+							221 按钮 系统提示词 6 项 ≈596 2%
+								222 文本 系统提示词
+								223 文本 6
+								224 文本  项
+								225 文本 ≈596
+								226 文本 2%
+							227 按钮 工具 21 项 ≈3K 13%
+								228 文本 工具
+								229 文本 21
+								230 文本  项
+								231 文本 ≈3K
+								232 文本 13%
+							233 文本栏 (settable) 筛选工具
+							234 组合框 (settable) Description: 工具排序, Value: 按大小
+								235 文本 按大小
+							236 按钮 bash ≈317
+								237 文本 bash
+								238 文本 ≈317
+							239 按钮 present ≈241
+								240 文本 present
+								241 文本 ≈241
+							242 按钮 plugin_manager ≈218
+								243 文本 plugin_manager
+								244 文本 ≈218
+							245 按钮 todo_write ≈213
+								246 文本 todo_write
+								247 文本 ≈213
+							248 按钮 edit_file ≈162
+								249 文本 edit_file
+								250 文本 ≈162
+							251 按钮 read_file ≈160
+								252 文本 read_file
+								253 文本 ≈160
+							254 按钮 grep ≈147
+								255 文本 grep
+								256 文本 ≈147
+							257 按钮 generate_image ≈140
+								258 文本 generate_image
+								259 文本 ≈140
+							260 按钮 inspect_image ≈135
+								261 文本 inspect_image
+								262 文本 ≈135
+							263 按钮 agent ≈125
+								264 文本 agent
+								265 文本 ≈125
+							266 按钮 glob ≈125
+								267 文本 glob
+								268 文本 ≈125
+							269 按钮 write_file ≈124
+								270 文本 write_file
+								271 文本 ≈124
+							272 按钮 再显示 9 项（共 21）
+								273 文本 再显示
+								274 文本 9
+								275 文本  项（共
+								276 文本 21
+								277 文本 ）
+							278 按钮 规则 0 项 ≈0 0%
+								279 文本 规则
+								280 文本 0
+								281 文本  项
+								282 文本 ≈0
+								283 文本 0%
+							284 按钮 Skills 26 项 ≈2.7K 11%
+								285 文本 Skills
+								286 文本 26
+								287 文本  项
+								288 文本 ≈2.7K
+								289 文本 11%
+							290 按钮 会话摘要 0 项 ≈0 0%
+								291 文本 会话摘要
+								292 文本 0
+								293 文本  项
+								294 文本 ≈0
+								295 文本 0%
+							296 按钮 会话内容 25 项 +2 +8.1K ≈17.5K 73%
+								297 文本 会话内容
+								298 文本 25
+								299 文本  项
+								300 文本 +
+								301 文本 2
+								302 文本 +8.1K
+								303 文本 ≈17.5K
+								304 文本 73%
+							305 切换按钮 用户6, Value: 0
+							306 切换按钮 助手5, Value: 0
+							307 切换按钮 工具调用7, Value: 0
+							308 切换按钮 工具结果7, Value: 0
+							309 按钮 在轨迹中打开
+							310 按钮 工具结果 工具结果 新增 ≈8K, Help: 在轨迹中查看：工具结果
+								311 文本 工具结果
+								312 文本 工具结果
+								313 文本 新增
+								314 文本 ≈8K
+							315 按钮 工具调用 read_file 新增 ≈28, Help: 在轨迹中查看：read_file
+								316 文本 工具调用
+								317 文本 read_file
+								318 文本 新增
+								319 文本 ≈28
+							320 按钮 用户 用户消息 ≈5, Help: 在轨迹中查看：用户消息
+								321 文本 用户
+								322 文本 用户消息
+								323 文本 ≈5
+							324 按钮 助手 模型回复 ≈21, Help: 在轨迹中查看：模型回复
+								325 文本 助手
+								326 文本 模型回复
+								327 文本 ≈21
+							328 按钮 用户 用户消息 ≈33, Help: 在轨迹中查看：用户消息
+								329 文本 用户
+								330 文本 用户消息
+								331 文本 ≈33
+							332 按钮 助手 模型回复 ≈22, Help: 在轨迹中查看：模型回复
+								333 文本 助手
+								334 文本 模型回复
+								335 文本 ≈22
+							336 按钮 用户 用户消息 ≈8, Help: 在轨迹中查看：用户消息
+								337 文本 用户
+								338 文本 用户消息
+								339 文本 ≈8
+							340 按钮 助手 模型回复 ≈22, Help: 在轨迹中查看：模型回复
+								341 文本 助手
+								342 文本 模型回复
+								343 文本 ≈22
+							344 按钮 工具结果 工具结果 ≈76, Help: 在轨迹中查看：工具结果
+								345 文本 工具结果
+								346 文本 工具结果
+								347 文本 ≈76
+							348 按钮 工具调用 todo_write ≈50, Help: 在轨迹中查看：todo_write
+								349 文本 工具调用
+								350 文本 todo_write
+								351 文本 ≈50
+							352 按钮 用户 用户消息 ≈3, Help: 在轨迹中查看：用户消息
+								353 文本 用户
+								354 文本 用户消息
+								355 文本 ≈3
+							356 按钮 助手 模型回复 ≈1.7K, Help: 在轨迹中查看：模型回复
+								357 文本 助手
+								358 文本 模型回复
+								359 文本 ≈1.7K
+							360 按钮 再显示 13 项（共 25）
+								361 文本 再显示
+								362 文本 13
+								363 文本  项（共
+								364 文本 25
+								365 文本 ）
+						366 container 上下文趋势
+							367 text 上下文趋势 每根柱 = 一次请求
+							368 container
+								369 text 第  6  轮 · 步  1  ·  ≈15.8K  · 实际输入 20K
+							370 text #1 # 12  最新
+						371 container 上下文事件
+							372 文本 上下文事件
+							373 内容列表
+								374 container
+									375 text 模型 模型已切换 （根据请求推导）
+								376 container
+									377 text 注入 上下文补充
+								378 container
+									379 text 注入 上下文补充
+						380 文本 ≈ 为本地估算 · 实际值来自服务商返回的用量
+	381 关闭按钮
+	382 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	383 最小化按钮
+384 menu bar
+	385 Actspace Dev actspace-agent-2067
+	386 File
+	387 Edit
+	388 View
+	389 Window
+	390 Help
+
+The focused UI element is 3 HTML 内容 actspace, URL: 127.0.0.1:5178/

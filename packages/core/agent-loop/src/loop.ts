@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { RuntimeV2AgentMode, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
-import { ContextEngine, surfaceMessage, snapshotContext, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
+import { ContextEngine, surfaceMessage, snapshotContext, describeContextContent, estimateContextTokens, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
 import { contextFromCandidate } from "@actspace/prompt";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
 import type { LlmService } from "@actspace/llm-service";
@@ -110,14 +110,14 @@ export class AgentLoop {
       const messageId = input.messageId ?? randomUUID();
       const mode = input.mode ?? "agent";
       let configuration: LoopExecutionConfiguration = input;
-      const modeRevision = currentAgentModeRevision(this.options.session.journal.events);
+      const modeRevision = currentAgentModeRevision(this.options.session.journal.latestEvents(["agent/mode-set"]));
       const modeRuntime = await this.options.modeRuntime?.(mode);
       const assembler = modeRuntime?.assembler ?? this.options.assembler;
       const compaction = modeRuntime?.compaction ?? this.options.compaction;
       await this.options.session.append(core("turn/start", { turnId, agentRunId, mode, modeRevision }));
       const turnEnvironment = this.options.toolEnvironment(this.options.session);
       const configuredPermissionMode = typeof turnEnvironment.permissionMode === "function" ? turnEnvironment.permissionMode() : turnEnvironment.permissionMode ?? "default";
-      if (turnEnvironment.permissionModeExplicit && currentPermissionMode(this.options.session.journal.events) !== configuredPermissionMode) {
+      if (turnEnvironment.permissionModeExplicit && currentPermissionMode(this.options.session.journal.latestEvents(["permission/mode-set"])) !== configuredPermissionMode) {
         await this.options.session.append(core("permission/mode-set", { mode: configuredPermissionMode, changedAt: new Date().toISOString(), source: "host" }));
       }
       const persistedContent = this.options.contextSources ? input.content : appendRuntimeContext(input.content, mode, modeRevision);
@@ -178,6 +178,7 @@ export class AgentLoop {
           options: llmInput.options,
           signal: controller.signal,
         });
+        this.checkContextCapacity({ ...converted.input, messages: prepared.request.messages, tools: prepared.request.tools, options: prepared.request.options }, prepared.request.contextWindow ?? null, () => prepared.release());
         const retryPolicy = prepared.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY;
         const contextWindow = prepared.request.contextWindow ?? null;
         if (this.options.contextSources) converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${prepared.request.routeId}/${prepared.request.model}`, label: prepared.request.model, contextWindow, autoCompactAtTokens: compaction?.threshold?.(contextWindow) ?? null }) };
@@ -249,6 +250,7 @@ export class AgentLoop {
             requestId,
             messages: requestMessageList,
           }, controller.signal, prepared.preparedAdapterCall);
+          this.checkContextCapacity({ ...converted.input, messages: activePrepared.request.messages, tools: activePrepared.request.tools, options: activePrepared.request.options }, activePrepared.request.contextWindow ?? null, () => activePrepared.release());
           const retryContextWindow = activePrepared.request.contextWindow ?? null;
           if (this.options.contextSources) converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${activePrepared.request.routeId}/${activePrepared.request.model}`, label: activePrepared.request.model, contextWindow: retryContextWindow, autoCompactAtTokens: compaction?.threshold?.(retryContextWindow) ?? null }) };
           const retryMetadata = { ...metadata, route: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow: retryContextWindow };
@@ -266,26 +268,30 @@ export class AgentLoop {
         if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");
-        // Publish the durable assistant/tool result to the long-lived Context
-        // before deciding whether this turn is complete. The next step will
-        // reconcile again, while an idle UI read can already observe this state.
-        const durableBeforeReconcile = this.options.session.durableSeq;
-        try {
-          await converted.engine.reconcile({ ...converted.context.request, requestId: `context:${turnId}:${stepId}` }, this.options.session.durableSeq ?? this.options.session.lastSeq);
-        } catch (error) {
-          throw error;
+        let updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
+        if (compaction !== undefined && !controller.signal.aborted) {
+          // Include this Step's tool bodies: the previous Provider usage cannot
+          // account for results produced after that request completed.
+          const manifest = describeContextContent({ ...updated, content: { ...updated.content, conversation: this.options.session.journal.surface } }).manifest;
+          const actual = compactionUsage(output.usage, activePrepared.request.contextWindow ?? null);
+          const calls = new Set(output.toolCalls.map(call => call.callId));
+          const toolTokens = manifest.entries.filter(entry => entry.kind === "tool-result" && calls.has(entry.trajectoryRef?.callId ?? "")).reduce((sum, entry) => sum + entry.estimatedTokens, 0);
+          const usage = { contextWindow: activePrepared.request.contextWindow ?? null,
+            inputTokens: Math.max(manifest.totalEstimatedTokens - (actual?.outputTokens ?? 0), (actual?.inputTokens ?? 0) + toolTokens), outputTokens: actual?.outputTokens ?? 0 };
+          const before = this.options.session.lastSeq;
+          const compacted = await this.autoCompact(compaction, usage, { agentRunId, turnId }, controller.signal);
+          if (compacted || this.options.session.lastSeq !== before) {
+            await this.checkpoint("before-next-step");
+            updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
+          }
         }
-        // Reconciliation may persist supplement changes while rebuilding the
-        // long-lived view; make those changes durable before the next step.
-        if (durableBeforeReconcile !== null && durableBeforeReconcile !== undefined && this.options.session.lastSeq > durableBeforeReconcile) await this.checkpoint("before-next-step");
+        controller.signal.throwIfAborted();
         // 模型写最后回复时用户插入了消息：回合不结束，下一步开头读到它（仍受 maxSteps 约束）。
         const steerPending = this.options.inputSource?.hasPending(agentRunId);
         if (output.toolCalls.length === 0 && !budgetSummary && !steerPending) {
           await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "completed", stepCount });
           await this.options.session.append(core("turn/end", { turnId, reason: "completed" }));
           await this.checkpoint("after-turn-settled");
-          const usage = compactionUsage(output.usage, activePrepared.request.contextWindow ?? null);
-          if (usage !== null && compaction !== undefined) await this.autoCompact(compaction, usage, { agentRunId, turnId });
           this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "completed" });
           this.notify("agent/status", { agentRunId, turnId, status: "completed" });
           return Object.freeze({ agentRunId, turnId, reason: "completed", steps: stepCount, finalText });
@@ -339,7 +345,7 @@ export class AgentLoop {
       resolve: input => this.options.contextSources ? {
         request: input,
         content: { system: { sections: [], modelFacts: [] }, conversation: this.options.session.journal.surface, supplements: [], tools: candidate.tools as unknown as readonly LlmToolDefinition[] },
-        status: { throughJournalSeq: this.options.session.lastSeq, cycle: 0, paths: [], facts: candidate.facts, plugins: { "actspace.loop": { ...runtime, hostFacts: candidate.facts[0] ?? {} }, "actspace.context.compaction": { summaries: this.options.session.journal.events.filter(event => event.type === "surface/replaced" && event.surface?.kind === "replace").map(event => ({ messageId: event.surface!.node.messageId, compactionId: (event.data as { compactionId?: string }).compactionId ?? event.surface!.node.messageId })) } } },
+        status: { throughJournalSeq: this.options.session.lastSeq, cycle: 0, paths: [], facts: candidate.facts, plugins: { "actspace.loop": { ...runtime, hostFacts: candidate.facts[0] ?? {} }, "actspace.context.compaction": { summaries: this.options.session.journal.surface.entries.flatMap(entry => { const seq = entry.sourceEventSeqs.reduce((a, b) => Math.max(a, b), -1); return this.options.session.journal.readEvents(seq, seq + 1); }).filter(event => event.type === "surface/replaced" && event.surface?.kind === "replace").map(event => ({ messageId: event.surface!.node.messageId, compactionId: (event.data as { compactionId?: string }).compactionId ?? event.surface!.node.messageId })) } } },
       } : contextFromCandidate(input, candidate, this.options.session.journal.surface, this.options.session.lastSeq),
       session: this.options.contextSources ? this.options.session : undefined,
       sources: this.options.contextSources,
@@ -364,12 +370,32 @@ export class AgentLoop {
         && (this.options.allowedToolNames?.has(definition.name) ?? true))
       .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeV2JsonValue }));
   }
-  /** The turn is already settled; a failed compaction is reported live and must not fail the turn. */
-  private async autoCompact(compaction: ContextCompactor, usage: import("@actspace/context-engine").CompactionUsage, ids: { agentRunId: string; turnId: string }): Promise<void> {
+  private checkContextCapacity(input: import("@actspace/context-engine").LlmInput, capacity: number | null, release: () => void): void {
+    if (capacity === null || !Number.isFinite(capacity) || capacity <= 0) return;
+    const estimate = input.messages.reduce((sum, message) => sum + estimateContextTokens(message.content), 0) + input.tools.reduce((sum, tool) => sum + estimateContextTokens(tool), 0);
+    const reserve = Math.max(0, input.options.maxTokens ?? 0);
+    if (estimate >= capacity || estimate + reserve > capacity) {
+      release();
+      throw new Error(`Context exceeds model capacity (${estimate} estimated input tokens + ${reserve} requested output tokens / ${capacity}). Reduce input or compact the conversation before continuing.`);
+    }
+  }
+
+  private async publishContext(engine: ContextEngine, request: import("@actspace/context-engine").ContextRequest, ids: { agentRunId: string; turnId: string; stepId: string }) {
+    const before = this.options.session.lastSeq;
+    const context = await engine.reconcile({ ...request, requestId: `context:${ids.turnId}:${ids.stepId}` }, this.options.session.durableSeq ?? this.options.session.lastSeq);
+    // Sources can write supplement facts. Publish only after these are durable.
+    if (this.options.session.lastSeq > before) await this.checkpoint("before-next-step");
+    if (this.options.contextSources) this.emitLive({ kind: "run-state", ...ids, message: "context-updated" });
+    return context;
+  }
+
+  /** One attempt per safe point; failed summaries keep the original Surface. */
+  private async autoCompact(compaction: ContextCompactor, usage: import("@actspace/context-engine").CompactionUsage, ids: { agentRunId: string; turnId: string }, signal: AbortSignal): Promise<boolean> {
     let startedAt: number | null = null;
     let removedCount = 0;
     try {
       const compacted = await compaction.maybeCompact(this.options.session, usage, {
+        signal,
         onStarted: ({ entryCount }) => {
           startedAt = Date.now();
           removedCount = entryCount;
@@ -377,8 +403,11 @@ export class AgentLoop {
         },
       });
       if (compacted && startedAt !== null) this.emitLive({ kind: "compaction-finished", ...ids, removedCount, durationMs: Date.now() - startedAt });
+      return compacted;
     } catch (error) {
+      if (signal.aborted || this.options.session.durabilityState === "blocked") throw error;
       this.emitLive({ kind: "compaction-failed", ...ids, message: redactLlmText(error instanceof Error ? error.message : String(error)).slice(0, 500) });
+      return false;
     }
   }
   private emitLive(event: WithoutSession<AgentLoopLiveEvent>): void {
@@ -522,10 +551,15 @@ function compactionUsage(value: RuntimeV2JsonValue, contextWindow: number | null
   if (![inputTokens, outputTokens, cacheRead, cacheWrite].every(value => Number.isFinite(value) && value >= 0)) return null;
   return { inputTokens: inputTokens + cacheRead + cacheWrite, outputTokens, contextWindow };
 }
+const USER_MESSAGE_IDS = Symbol("user-message-ids");
 function hasUserMessage(session: SessionHandle, messageId: string): boolean {
-  if (session.journal.events.some((event) => event.type === "user/message" && isRecord(event.data) && event.data.messageId === messageId)) return true;
-  return session.journal.surface.entries.some((entry) => entry.node.kind === "user" && entry.node.messageId === messageId);
+  const ids = session.journal.project(USER_MESSAGE_IDS, () => new Set<string>(), (prior, event) => {
+    if (event.type !== "user/message" || !isRecord(event.data) || typeof event.data.messageId !== "string") return prior;
+    const next = new Set(prior); next.add(event.data.messageId); return next;
+  });
+  return ids.has(messageId) || session.journal.surface.entries.some(entry => entry.node.kind === "user" && entry.node.messageId === messageId);
 }
+
 function currentPermissionMode(events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]): "default" | "full-access" {
   let mode: "default" | "full-access" = "default";
   for (const event of events) if (event.type === "permission/mode-set" && isRecord(event.data) && (event.data.mode === "default" || event.data.mode === "full-access")) mode = event.data.mode;

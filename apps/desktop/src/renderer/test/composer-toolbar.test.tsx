@@ -23,6 +23,12 @@ describe("composerSendButtonState", () => {
     expect(state.disabled).toBe(true);
   });
 
+  it("allows stop during automatic compaction", () => {
+    const state = composerSendButtonState({ ...idle, isStreaming: true, isCompacting: true });
+    expect(state.disabled).toBe(false);
+    expect(state.ariaLabel).toBe("停止 Agent");
+  });
+
   it("queues instead of stopping when a running session has a draft", () => {
     const state = composerSendButtonState({ ...idle, isStreaming: true, canSend: true });
 

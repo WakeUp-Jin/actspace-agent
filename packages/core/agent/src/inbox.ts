@@ -7,6 +7,8 @@ export type InboxTarget = "next-step" | "next-turn";
 export type InboxSource = "task_notification" | "steer";
 export type InboxItem = { readonly messageId: string; readonly target: InboxTarget; readonly content: RuntimeV2JsonValue; readonly enqueuedSeq: number; readonly source?: InboxSource };
 
+const INBOX_STATE = Symbol("inbox-state");
+
 export class MainAgentInbox {
   constructor(private readonly session: SessionHandle) {}
   async enqueue(content: RuntimeV2JsonValue): Promise<InboxItem> {
@@ -17,16 +19,18 @@ export class MainAgentInbox {
     return Object.freeze({ messageId, target, content, enqueuedSeq: event.seq, source });
   }
   pending(): readonly InboxItem[] {
-    const pending = new Map<string, InboxItem>();
-    for (const event of this.session.journal.events) {
-      const data = record(event.data); const messageId = text(data.messageId); const target = data.target;
-      if (messageId === null || (target !== "next-step" && target !== "next-turn")) continue;
-      if (event.type === "agent/inbox/spliced" && data.operation === "enqueue") {
+    const pending = this.session.journal.project(INBOX_STATE, () => new Map<string, InboxItem>(), (previous, event) => {
+      if (event.type !== "agent/inbox/spliced") return previous;
+      const data = record(event.data), messageId = text(data.messageId), target = data.target;
+      if (messageId === null || (target !== "next-step" && target !== "next-turn")) return previous;
+      const next = new Map(previous);
+      if (data.operation === "enqueue") {
         const source = inboxSource(data.source);
-        pending.set(messageId, { messageId, target, content: data.content ?? null, enqueuedSeq: event.seq, ...(source === undefined ? {} : { source }) });
+        next.set(messageId, { messageId, target, content: data.content ?? null, enqueuedSeq: event.seq, ...(source === undefined ? {} : { source }) });
       }
-      if (event.type === "agent/inbox/spliced" && (data.operation === "claim" || data.operation === "discard")) pending.delete(messageId);
-    }
+      if (data.operation === "claim" || data.operation === "discard") next.delete(messageId);
+      return next;
+    });
     return Object.freeze([...pending.values()].sort((a, b) => a.enqueuedSeq - b.enqueuedSeq));
   }
   async claim(): Promise<readonly InboxItem[]> {

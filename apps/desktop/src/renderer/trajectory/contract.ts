@@ -9,6 +9,8 @@ export type TrajectoryRecordState = "started" | "running" | "updated" | "complet
 /** A prompt/tool snapshot used by an explicit SYSTEM prompt boundary. */
 export type TrajectoryPromptDetail = {
   readonly systemPrompt?: string | null;
+  readonly contextSections?: RuntimeV2JsonValue;
+  readonly contextModelFacts?: RuntimeV2JsonValue;
   readonly systemPromptParts?: RuntimeV2JsonValue;
   readonly tools?: RuntimeV2JsonValue;
   readonly config?: RuntimeV2JsonValue;
@@ -124,6 +126,8 @@ export type TrajectoryRecord = {
   readonly messageSource?: RuntimeV2JsonValue | null;
   /** Parent call identity for nested tool dispatch records. */
   readonly parentCallId?: string | null;
+  readonly childSessionId?: string;
+  readonly contextPresentation?: { readonly category: string; readonly title: string; readonly action: string; readonly placement: string; readonly previousText?: string };
   /** Resolved owner from explicit message/call identity, never row proximity. */
   readonly assistantRecordId?: string | null;
 };

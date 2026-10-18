@@ -33,85 +33,111 @@ type MutableRelations = {
   requests: Map<string, { header: boolean; context: boolean; terminal: boolean }>;
   tools: Map<string, { terminal: boolean; order: number }>;
   inbox: Map<string, { status: "pending" | "claimed" | "discarded"; target: "next-step" | "next-turn"; seq: number }>;
+  requestIds: Set<string>;
+  toolIds: Set<string>;
+  inboxIds: Set<string>;
   activeRepairId: string | null;
   committedRepairIds: Set<string>;
 };
 
-export function validateSessionEvents(events: readonly SessionEventEnvelopeV1[], registry: EventCodecRegistry): SessionValidationResult {
-  const diagnostics: SessionValidationDiagnostic[] = [];
-  const relations = createRelations();
-  let transactionBuffer: Array<{ event: SessionEventEnvelopeV1; data: RuntimeV2JsonValue }> | null = null;
-  let transactionKind: "recovery" | "compaction" | null = null;
-  let transactionId: string | null = null;
-  let accessState: SessionAccessState = "read-write";
+/** Incremental validator. Atomic batches undo only touched relations, never replay history. */
+export class SessionEventValidator {
+  private readonly relations = createRelations();
+  private readonly diagnostics: SessionValidationDiagnostic[] = [];
+  private accessState: SessionAccessState = "read-write";
+  private nextSeq = 0;
+  private pending: Array<{ event: SessionEventEnvelopeV1; data: RuntimeV2JsonValue }> = [];
+  private kind: "recovery" | "compaction" | null = null;
+  private transactionId: string | null = null;
 
-  for (let index = 0; index < events.length; index += 1) {
-    const event = events[index];
+  constructor(private readonly registry: EventCodecRegistry) {}
+
+  /** publish runs before commit; a Surface failure rolls validation back too. */
+  append(events: readonly SessionEventEnvelopeV1[], previous: () => readonly SessionEventEnvelopeV1[] = () => [], publish?: (effective: readonly SessionEventEnvelopeV1[]) => void): SessionValidationResult {
+    const checkpoint = { nextSeq: this.nextSeq, accessState: this.accessState, diagnostics: this.diagnostics.length, pending: this.pending, pendingLength: this.pending.length, kind: this.kind, transactionId: this.transactionId };
+    const undo: Array<() => void> = [];
+    const effective: SessionEventEnvelopeV1[] = [];
+    const apply = (event: SessionEventEnvelopeV1, data: RuntimeV2JsonValue) => {
+      undo.push(relationUndo(this.relations, data));
+      applyRelations(this.relations, event, data);
+      effective.push(event);
+    };
     try {
-      validateEventEnvelopeShape(event);
-      if (event.seq !== index) throw new SessionError("SESSION_CORRUPT", `Expected seq ${index}, received ${event.seq}.`);
-      validateReferences(event);
-      const resolution = registry.resolve(event);
-      switch (resolution.kind) {
-        case "unknown-required":
-          accessState = "browse-only";
-          diagnostics.push(diagnostic("UNKNOWN_REQUIRED_CODEC", event, `No codec is installed for required event ${event.type}.`));
+      for (let index = 0; index < events.length; index++) {
+        const event = events[index]!;
+        validateEventEnvelopeShape(event);
+        if (event.seq !== this.nextSeq) throw new SessionError("SESSION_CORRUPT", `Expected seq ${this.nextSeq}, received ${event.seq}.`);
+        validateReferences(event);
+        const resolution = this.registry.resolve(event);
+        this.nextSeq++;
+        if (resolution.kind !== "known") {
+          const required = resolution.kind.endsWith("required") && !resolution.kind.endsWith("ignorable");
+          if (required) this.accessState = "browse-only";
+          else if (this.accessState === "read-write") this.accessState = "degraded";
+          const code = resolution.kind === "unknown-required" ? "UNKNOWN_REQUIRED_CODEC" : resolution.kind === "unknown-ignorable" ? "UNKNOWN_IGNORABLE_CODEC" : resolution.kind === "unsupported-required" ? "UNSUPPORTED_REQUIRED_VERSION" : "UNSUPPORTED_IGNORABLE_VERSION";
+          this.diagnostics.push(diagnostic(code, event, `Unavailable codec or version for ${event.type}.`));
           continue;
-        case "unknown-ignorable":
-          if (accessState === "read-write") accessState = "degraded";
-          diagnostics.push(diagnostic("UNKNOWN_IGNORABLE_CODEC", event, `No codec is installed for ignorable event ${event.type}.`));
-          continue;
-        case "unsupported-required":
-          accessState = "browse-only";
-          diagnostics.push(diagnostic("UNSUPPORTED_REQUIRED_VERSION", event, `Event version ${event.eventVersion} is newer than codec ${resolution.codec.currentVersion}.`));
-          continue;
-        case "unsupported-ignorable":
-          if (accessState === "read-write") accessState = "degraded";
-          diagnostics.push(diagnostic("UNSUPPORTED_IGNORABLE_VERSION", event, `Ignorable event version ${event.eventVersion} is unsupported.`));
-          continue;
-        case "known":
-          resolution.codec.validateRelations?.({ previous: events.slice(0, index), candidate: event });
-          if (transactionBuffer !== null && transactionKind !== null) {
-            const eventTransactionId = transactionIdOf(resolution.data, transactionKind);
-            if (isTransactionStart(event.type) || eventTransactionId !== transactionId) invalid(`${transactionKind} transaction ${transactionId} must be contiguous.`);
-            transactionBuffer.push({ event, data: resolution.data });
-            if (isTransactionEnd(event.type, transactionKind)) {
-              for (const buffered of transactionBuffer) applyRelations(relations, buffered.event, buffered.data);
-              transactionBuffer = null;
-              transactionKind = null;
-              transactionId = null;
-            }
-          } else if (event.type === "recovery/start" || event.type === "compaction/start") {
-            transactionKind = event.type === "recovery/start" ? "recovery" : "compaction";
-            transactionId = transactionIdOf(resolution.data, transactionKind);
-            if (transactionId === null) invalid(`${transactionKind} start must carry its transaction identity.`);
-            transactionBuffer = [{ event, data: resolution.data }];
-          } else {
-            if (event.type === "recovery/committed" || event.type === "compaction/summary" || event.type === "compaction/end" || event.type === "surface/replaced" || event.type === "tool/recovery-outcome") {
-              invalid(`${event.type} must be part of its matching transaction.`);
-            }
-            applyRelations(relations, event, resolution.data);
+        }
+        if (resolution.codec.validateRelations) resolution.codec.validateRelations({ previous: [...previous(), ...events.slice(0, index)], candidate: event });
+        if (this.kind !== null) {
+          if (isTransactionStart(event.type) || transactionIdOf(resolution.data, this.kind) !== this.transactionId) invalid(`${this.kind} transaction ${this.transactionId} must be contiguous.`);
+          this.pending.push({ event, data: resolution.data });
+          if (isTransactionEnd(event.type, this.kind)) {
+            for (const item of this.pending) apply(item.event, item.data);
+            this.pending = []; this.kind = null; this.transactionId = null;
           }
-          break;
+        } else if (isTransactionStart(event.type)) {
+          this.kind = event.type === "recovery/start" ? "recovery" : "compaction";
+          this.transactionId = transactionIdOf(resolution.data, this.kind);
+          if (this.transactionId === null) invalid(`${this.kind} start must carry its transaction identity.`);
+          this.pending = [{ event, data: resolution.data }];
+        } else {
+          if (["recovery/committed", "compaction/summary", "compaction/end", "surface/replaced", "tool/recovery-outcome"].includes(event.type)) invalid(`${event.type} must be part of its matching transaction.`);
+          apply(event, resolution.data);
+        }
       }
+      publish?.(effective);
+      return this.result;
     } catch (error) {
+      for (let index = undo.length - 1; index >= 0; index--) undo[index]!();
+      this.nextSeq = checkpoint.nextSeq; this.accessState = checkpoint.accessState;
+      this.diagnostics.length = checkpoint.diagnostics;
+      this.pending = checkpoint.pending; this.pending.length = checkpoint.pendingLength;
+      this.kind = checkpoint.kind; this.transactionId = checkpoint.transactionId;
       if (error instanceof SessionError) throw error;
-      throw new SessionError("SESSION_CORRUPT", `Invalid event at seq ${index}.`, error);
+      throw new SessionError("SESSION_CORRUPT", `Invalid event batch at seq ${checkpoint.nextSeq}.`, error);
     }
   }
 
-  return Object.freeze({
-    accessState,
-    diagnostics: Object.freeze(diagnostics),
-    relations: Object.freeze({
-      openTurnId: relations.openTurnId,
-      openStepId: relations.openStepId,
-      openRequestIds: Object.freeze([...relations.requests].filter(([, value]) => !value.terminal).map(([id]) => id)),
-      openToolCallIds: Object.freeze([...relations.tools].filter(([, value]) => !value.terminal).sort((a, b) => a[1].order - b[1].order).map(([id]) => id)),
-      pendingInboxMessageIds: Object.freeze([...relations.inbox].filter(([, value]) => value.status === "pending").sort((left, right) => left[1].seq - right[1].seq).map(([id]) => id)),
-      committedRepairIds: Object.freeze([...relations.committedRepairIds].sort()),
-    }),
-  });
+  get result(): SessionValidationResult {
+    return Object.freeze({ accessState: this.accessState, diagnostics: Object.freeze([...this.diagnostics]), relations: Object.freeze({
+      openTurnId: this.relations.openTurnId, openStepId: this.relations.openStepId,
+      openRequestIds: Object.freeze([...this.relations.requests.keys()]),
+      openToolCallIds: Object.freeze([...this.relations.tools].sort((a, b) => a[1].order - b[1].order).map(([id]) => id)),
+      pendingInboxMessageIds: Object.freeze([...this.relations.inbox].sort((a, b) => a[1].seq - b[1].seq).map(([id]) => id)),
+      committedRepairIds: Object.freeze([...this.relations.committedRepairIds].sort()),
+    }) });
+  }
+}
+
+export function validateSessionEvents(events: readonly SessionEventEnvelopeV1[], registry: EventCodecRegistry): SessionValidationResult {
+  return new SessionEventValidator(registry).append(events);
+}
+
+/** Preserve duplicate-ID checks without retaining settled request/tool payloads. */
+function relationUndo(state: MutableRelations, dataValue: RuntimeV2JsonValue): () => void {
+  const data = asRecord(dataValue, "relation");
+  const turn = state.openTurnId, step = state.openStepId, repair = state.activeRepairId;
+  const restores: Array<() => void> = [];
+  const save = <T extends object>(map: Map<string, T>, key: unknown) => {
+    if (typeof key !== "string") return;
+    const prior = map.get(key); const copy = prior ? { ...prior } : undefined;
+    restores.push(() => { if (copy) map.set(key, copy); else map.delete(key); });
+  };
+  const saveSet = (set: Set<string>, key: unknown) => { if (typeof key === "string" && !set.has(key)) restores.push(() => { set.delete(key); }); };
+  save(state.requests, data.requestId); save(state.tools, data.callId ?? data.toolCallId); save(state.inbox, data.messageId);
+  saveSet(state.requestIds, data.requestId); saveSet(state.toolIds, data.callId ?? data.toolCallId); saveSet(state.inboxIds, data.messageId); saveSet(state.committedRepairIds, data.repairId);
+  return () => { state.openTurnId = turn; state.openStepId = step; state.activeRepairId = repair; restores.forEach(restore => restore()); };
 }
 
 export function effectiveSessionEvents(events: readonly SessionEventEnvelopeV1[]): readonly SessionEventEnvelopeV1[] {
@@ -146,7 +172,7 @@ export function assertSessionCanClose(result: SessionValidationResult): void {
 }
 
 function createRelations(): MutableRelations {
-  return { openTurnId: null, openStepId: null, requests: new Map(), tools: new Map(), inbox: new Map(), activeRepairId: null, committedRepairIds: new Set() };
+  return { openTurnId: null, openStepId: null, requests: new Map(), tools: new Map(), inbox: new Map(), requestIds: new Set(), toolIds: new Set(), inboxIds: new Set(), activeRepairId: null, committedRepairIds: new Set() };
 }
 
 function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, dataValue: RuntimeV2JsonValue): void {
@@ -182,7 +208,8 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
     case "request/header": {
       requireOpenStep(state, data, event.type);
       const requestId = id(data.requestId, event.type);
-      if (state.requests.has(requestId)) invalid(`Duplicate request ${requestId}.`);
+      if (state.requestIds.has(requestId)) invalid(`Duplicate request ${requestId}.`);
+      state.requestIds.add(requestId);
       state.requests.set(requestId, { header: true, context: false, terminal: false });
       break;
     }
@@ -199,7 +226,7 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
       const requestId = id(data.requestId, event.type);
       const request = state.requests.get(requestId);
       if (request === undefined || !request.context || request.terminal) invalid(`Retry references an invalid request ${requestId}.`);
-      request.terminal = true;
+      state.requests.delete(requestId);
       break;
     }
     case "assistant/message": {
@@ -207,14 +234,15 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
       if (requestId !== null) {
         const request = state.requests.get(requestId);
         if (request === undefined || !request.context || request.terminal) invalid(`Assistant message references an invalid request ${requestId}.`);
-        request.terminal = true;
+        state.requests.delete(requestId);
       }
       break;
     }
     case "tool/call": {
       if (state.openStepId === null) invalid("Tool call requires an open Step.");
       const callId = id(data.callId ?? data.toolCallId, event.type);
-      if (state.tools.has(callId)) invalid(`Duplicate tool call ${callId}.`);
+      if (state.toolIds.has(callId)) invalid(`Duplicate tool call ${callId}.`);
+      state.toolIds.add(callId);
       state.tools.set(callId, { terminal: false, order: event.seq });
       break;
     }
@@ -224,14 +252,14 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
       if (tool === undefined || tool.terminal) invalid(`Tool call ${callId} has no open result slot.`);
       const earliest = [...state.tools].filter(([, candidate]) => !candidate.terminal).sort((left, right) => left[1].order - right[1].order)[0]?.[0];
       if (earliest !== callId) invalid(`Tool terminal facts must commit in call order; expected ${earliest}, received ${callId}.`);
-      tool.terminal = true;
+      state.tools.delete(callId);
       break;
     }
     case "tool/recovery-outcome": {
       const callId = id(data.callId ?? data.toolCallId, event.type);
       const tool = state.tools.get(callId);
       if (tool === undefined || tool.terminal) invalid(`Tool call ${callId} has no open recovery slot.`);
-      tool.terminal = true;
+      state.tools.delete(callId);
       break;
     }
     case "agent/inbox/spliced": {
@@ -239,7 +267,8 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
       const operation = data.operation;
       const target = inboxTarget(data.target, event.type);
       if (operation === "enqueue") {
-        if (state.inbox.has(messageId)) invalid(`Inbox message ${messageId} is duplicated.`);
+        if (state.inboxIds.has(messageId)) invalid(`Inbox message ${messageId} is duplicated.`);
+        state.inboxIds.add(messageId);
         state.inbox.set(messageId, { status: "pending", target, seq: event.seq });
       } else if (operation === "claim" || operation === "discard") {
         const item = state.inbox.get(messageId);
@@ -248,10 +277,10 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
           const earliest = [...state.inbox].filter(([, candidate]) => candidate.status === "pending" && candidate.target === target).sort((left, right) => left[1].seq - right[1].seq)[0]?.[0];
           if (earliest !== messageId) invalid(`Inbox ${target} claims must preserve enqueue order.`);
           if (event.surface?.kind !== "append" || event.surface.node.kind !== "user" || !event.provenance.sourceEventSeqs.includes(item.seq)) invalid("Claimed Inbox input must append a user Surface node citing enqueue.");
-          item.status = "claimed";
+          state.inbox.delete(messageId);
         } else {
           if (event.surface !== null) invalid("Discarded Inbox input cannot enter Surface.");
-          item.status = "discarded";
+          state.inbox.delete(messageId);
         }
       } else invalid("Inbox splice operation must be enqueue, claim, or discard.");
       break;

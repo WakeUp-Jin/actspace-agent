@@ -4,12 +4,12 @@ import { TaskError, type TaskSnapshot, type TaskRecord, type RunRecord } from ".
 import { TASK_EVENT, RUN_EVENT, QUEUE_EVENT, TASK_OWNER, validateSchedulingEvent } from "./task-events.js";
 
 /** Keep inherited Journal facts for provenance, but never inherit executable state. */
-export function projectTasks(sessionId: string, events: readonly SessionEventEnvelopeV1[]): TaskSnapshot {
-  const tasks = new Map<string, TaskRecord>();
-  const runs = new Map<string, RunRecord>();
-  let queue: string[] = [];
-  let revision = -1;
-  let paused = false;
+export function projectTasks(sessionId: string, events: readonly SessionEventEnvelopeV1[], initial?: TaskSnapshot): TaskSnapshot {
+  const tasks = new Map<string, TaskRecord>(initial?.tasks.map(task => [task.taskId, task]));
+  const runs = new Map<string, RunRecord>(initial?.runs.map(run => [run.runId, run]));
+  let queue: string[] = [...(initial?.queue ?? [])];
+  let revision = initial?.revision ?? -1;
+  let paused = initial?.paused ?? false;
   const pending = (id: string) => { const task = tasks.get(id); if (!task || task.state !== "pending") invalid(); return task; };
   const active = (id: string) => { const run = runs.get(id); if (!run || run.state !== "running") invalid(); return run; };
   for (const event of events) {

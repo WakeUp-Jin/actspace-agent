@@ -96,6 +96,12 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
     return null;
   }],
   [contract.sessions.describeContextPanel, contextShape({ sessionId: "string", versionToken: "string?", consumerId: "string?", release: "boolean?", retry: "boolean?" }, "Invalid Context panel query")],
+  [contract.sessions.listContextPaths, input => {
+    const invalid = contextShape({ sessionId: "string", revision: "string", visibility: "string", cursor: "string?", limit: "number?" }, "Invalid Context paths query")(input);
+    if (invalid) return invalid;
+    const value = input as { visibility: string; limit?: number };
+    return (value.visibility === "active" || value.visibility === "sleeping") && (value.limit === undefined || (Number.isSafeInteger(value.limit) && value.limit > 0)) ? null : "Invalid Context paths query";
+  }],
   [contract.sessions.listContextEntries, contextShape({ sessionId: "string", revision: "string", cursor: "string?", bucket: "string?", limit: "number?" }, "Invalid Context entries query")],
   [contract.sessions.readContextEntry, contextShape({ sessionId: "string", revision: "string", key: "string", offset: "number?" }, "Invalid Context entry query")],
   [contract.sessions.setWorkspace, shape({ sessionId: "string", workspaceId: "string?", workspaceRoot: "string?" }, "Invalid session workspace")],

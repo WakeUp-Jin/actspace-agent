@@ -82,6 +82,7 @@ export class SessionReadModel {
         return JSON.parse(JSON.stringify(value));
       },
     });
+    this.projections.seal();
     this.projections.ensureSession(header.sessionId);
   }
 

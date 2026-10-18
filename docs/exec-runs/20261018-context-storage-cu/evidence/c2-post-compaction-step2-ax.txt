@@ -1,0 +1,46 @@
+The following is a diff from the previous accessibility tree for Window: "actspace" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 58, 69, 85, 96, 110, 124
+~								45 文本 1分钟
+~								48 文本 27分钟
++									360 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										361 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										362 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										363 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										364 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
++										365 link Description: 查看结果, Value: 127.0.0.1:5178/result.txt
+~							221 按钮 活跃 · 已显示 3 / 3
++							366 container 列表样式
++								367 切换按钮 按目录, Value: 1
++								368 切换按钮 平铺, Value: 0
++							369 container /private/tmp/actspace-context-storage-cu-20261018/desktop-data/sessions-v2/ea90d32d-2815-4576-bce9-bdd42f30c987/
++								370 文本 /private/tmp/actspace-context-storage-cu-20261018/desktop-data/sessions-v2/ea90d32d-2815-4576-bce9-bdd42f30c987/
++								371 文本 1
++								372 内容列表
++									373 container
++										374 按钮 journal.jsonl Original Session Journal 将睡眠 — 未读过, Help: /private/tmp/actspace-context-storage-cu-20261018/desktop-data/sessions-v2/ea90d32d-2815-4576-bce9-bdd42f30c987/journal.jsonl
++											375 文本 journal.jsonl
++											376 文本 Original Session Journal
++											377 文本 将睡眠
++											378 文本 —
++											379 文本 未读过
++										380 按钮 复制完整路径
++							381 container /private/tmp/actspace-context-storage-cu-20261018/workspace/
++								382 文本 /private/tmp/actspace-context-storage-cu-20261018/workspace/
++								383 文本 2
++								384 内容列表
++									385 container
++										386 按钮 large-evidence.txt 将睡眠 — 4 分钟前, Help: /private/tmp/actspace-context-storage-cu-20261018/workspace/large-evidence.txt
++											387 文本 large-evidence.txt
++											388 文本 将睡眠
++											389 文本 —
++											390 文本 4 分钟前
++										391 按钮 复制完整路径
++									392 container
++										393 按钮 result.txt 将睡眠 — 未读过, Help: /private/tmp/actspace-context-storage-cu-20261018/workspace/result.txt
++											394 文本 result.txt
++											395 文本 将睡眠
++											396 文本 —
++											397 文本 未读过
++										398 按钮 复制完整路径
++							399 文本 导航行已计入「补充上下文」，不重复计 Token
+The focused UI element is 221 按钮 活跃 · 已显示 3 / 3

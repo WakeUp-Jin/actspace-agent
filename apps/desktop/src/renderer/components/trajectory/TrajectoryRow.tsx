@@ -41,6 +41,10 @@ function rowText(cell: TrajectoryCell): RowText {
     const result = record.result !== null ? oneLine(record.result) : cellStatus(cell) === 'completed' ? T.noOutput : undefined;
     return { list: [name, args].filter(Boolean).join(' '), tool: { name, args }, toolCallOnly: false, result };
   }
+  if (cell.kind === 'context' && record.contextPresentation) {
+    const { category, title, action } = record.contextPresentation;
+    return { list: `${category} · ${title} · ${action}`, toolCallOnly: false };
+  }
   const text = oneLine(record.summary);
   const toolCallOnly = cell.kind === 'message' && text === '' && !record.thinkingDetail && (record.sourceBlocks ?? []).some(block => block.type === 'tool-call');
   return { list: toolCallOnly ? T.toolCallOnly : text, toolCallOnly };

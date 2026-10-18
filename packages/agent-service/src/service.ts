@@ -13,7 +13,7 @@ declare module "@actspace/cordis-adapter" {
 import type { SessionHandle } from "@actspace/session-persistence";
 import { SessionError } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { TaskReceipt, TaskSnapshot, RunRecord, TaskRecord } from "./contracts.js";
+import { TaskError, type TaskReceipt, type TaskSnapshot, type RunRecord, type TaskRecord } from "./contracts.js";
 import { SessionRunManager, type ExecutionConfiguration, type RunLease } from "./run-manager.js";
 import { TaskLedger } from "./task-ledger.js";
 
@@ -31,6 +31,7 @@ export interface AgentServicePorts {
 /** Host-scoped application owner. Opening a Session never creates a Loop or lease. */
 export class AgentService {
   readonly #sessions = new Map<string, Promise<SessionRunManager>>();
+  readonly #externalLedgers = new Map<string, TaskLedger>();
   #closed = false;
   #draining = false;
   #closing: Promise<void> | undefined;
@@ -41,7 +42,19 @@ export class AgentService {
     if (this.#draining) throw new Error("HOST_DRAINING");
     return manager.submit(submissionId, content, continuationOf);
   }
-  async snapshot(sessionId: string): Promise<TaskSnapshot> { return (await this.#manager(sessionId)).ledger.snapshot(); }
+  /** Observe a provider-owned Run without taking recovery or scheduling ownership. */
+  registerExternalLedger(ledger: TaskLedger): () => void {
+    if (this.#closed) throw new Error("Agent service is closed");
+    const id = ledger.session.header.sessionId;
+    if (this.#sessions.has(id) || this.#externalLedgers.has(id)) throw new TaskError("SESSION_BUSY");
+    this.#externalLedgers.set(id, ledger);
+    return () => { if (this.#externalLedgers.get(id) === ledger) this.#externalLedgers.delete(id); };
+  }
+  async snapshot(sessionId: string): Promise<TaskSnapshot> {
+    if (this.#closed) throw new Error("Agent service is closed");
+    const external = this.#externalLedgers.get(sessionId);
+    return external ? external.snapshot() : (await this.#manager(sessionId)).ledger.snapshot();
+  }
   async designate(sessionId: string, taskId: string, runId: string | null, revision: number): Promise<TaskSnapshot> {
     const manager = await this.#manager(sessionId);
     const snapshot = await manager.ledger.designate(taskId, runId, revision);
@@ -107,6 +120,7 @@ export class AgentService {
   }
   #manager(sessionId: string): Promise<SessionRunManager> {
     if (this.#closed) return Promise.reject(new Error("Agent service is closed"));
+    if (this.#externalLedgers.has(sessionId)) return Promise.reject(new TaskError("SESSION_BUSY"));
     const existing = this.#sessions.get(sessionId);
     if (existing) return existing;
     let acquired = false;

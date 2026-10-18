@@ -30,6 +30,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   const host = { hostKind: "cli-run" as const, capabilityCeiling: [], runtimeContract: "actspace.runtime.v2" as const, invocationId: "fixed-default" };
   const toolEnvironment = { workspaceRoot: directory, hostCapabilities: new Set<string>(), capabilitySet: { ids: [], has: () => false, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };
   const agentRegistry = new AgentRegistry();
+  let observeChild: (() => Promise<void>) | undefined;
   let holdRequest = false;
   let requestEntered!: () => void;
   const entered = new Promise<void>(resolve => { requestEntered = resolve; });
@@ -48,6 +49,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
         if (!input.signal?.aborted) await new Promise<void>(resolve => input.signal?.addEventListener("abort", () => resolve(), { once: true }));
         yield { type: "aborted", reason: "host-stop", usage: EMPTY_LLM_USAGE }; return;
       }
+      await observeChild?.();
       yield { type: "done", stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "fixed loop result" }] }; })() } }] },
   };
   await root.mount("host", ctx => { for (const [name, value] of Object.entries(ports)) ctx.provide(name, value); }, { provides: Object.keys(ports) });
@@ -83,7 +85,14 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     expect(agentRegistry.list()).toHaveLength(0);
     try {
       const parent = sessions.getOpen("conversation")!;
+      observeChild = async () => {
+        const childId = (await sessions.store.listSessionIds()).find(id => id !== "conversation")!;
+        const before = (await sessions.inspectEvents(childId)).length;
+        expect((await runtime.runs.service.snapshot(childId)).runs[0]?.state).toBe("running");
+        expect((await sessions.inspectEvents(childId)).length).toBe(before);
+      };
       const childResult = await runtime.subagents.invoke({ parentSession: parent, parentScope, parentCallId: "child-call", presetId: "actspace.explore", task: "Report a short result", parentVisibleToolIds: [], delegationDepth: 0 });
+      observeChild = undefined;
       expect(childResult).toMatchObject({ status: "completed", text: "fixed loop result" });
       const child = await sessions.resume(childResult.childSessionId);
       const childLedger = await TaskLedger.open(child);

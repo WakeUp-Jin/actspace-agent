@@ -17,7 +17,7 @@ export function createContextHost(getSessions: () => RuntimeSessionController | 
       if (isAbsolute(path)) return file(path);
       const session = getSessions()?.getOpen(sessionId);
       if (!session) return;
-      const root = resolveSessionWorkspaceRoot(session.header, session.journal.events, tools.workspaceRoot);
+      const root = resolveSessionWorkspaceRoot(session.header, session.journal, tools.workspaceRoot);
       return root ? file(resolve(root, path)) : undefined;
     },
     historyPath: async sessionId => {

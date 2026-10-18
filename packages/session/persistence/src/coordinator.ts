@@ -32,15 +32,16 @@ export class SessionPersistenceCoordinator {
   get durableSeq(): number { return this.#durableSeq; }
   get blocked(): boolean { return !this.#writes.canAccept; }
 
-  accept(event: SessionEventEnvelopeV1): void {
+  accept(event: SessionEventEnvelopeV1): void | Promise<void> {
     if (this.#closed) throw new Error("Session persistence coordinator is closed.");
     this.#writes.enqueue(event);
+    return this.#writes.waitForCapacity();
   }
 
-  acceptMany(events: readonly SessionEventEnvelopeV1[]): void {
+  async acceptMany(events: readonly SessionEventEnvelopeV1[]): Promise<void> {
     if (this.#closed) throw new Error("Session persistence coordinator is closed.");
     if (this.#writes.canAccept === false) throw new Error("Session persistence coordinator is blocked.");
-    for (const event of events) this.#writes.enqueue(event);
+    for (const event of events) await this.accept(event);
   }
 
   async flush(throughSeq: number): Promise<void> {

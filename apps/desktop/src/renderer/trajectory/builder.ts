@@ -1,3 +1,4 @@
+import { contextCategory, contextSectionRecords, fixedSystemText } from "./context-sections";
 import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import type {
   TrajectoryAssistantMetrics,
@@ -147,6 +148,8 @@ function promptDetail(data: Data): TrajectoryPromptDetail | null {
   if (!hasRaw || (systemPrompt === null && systemPromptParts === undefined && tools === undefined && config === undefined)) return null;
   return {
     ...(systemPrompt === null ? {} : { systemPrompt }),
+    ...(directRecord.contextSections === undefined ? {} : { contextSections: directRecord.contextSections }),
+    ...(directRecord.contextModelFacts === undefined ? {} : { contextModelFacts: directRecord.contextModelFacts }),
     ...(systemPromptParts === undefined ? {} : { systemPromptParts }),
     ...(tools === undefined ? {} : { tools }),
     ...(config === undefined ? {} : { config }),
@@ -154,9 +157,29 @@ function promptDetail(data: Data): TrajectoryPromptDetail | null {
   };
 }
 
-function promptSignature(prompt: TrajectoryPromptDetail | null): string {
-  if (prompt === null) return "";
-  try { return JSON.stringify(prompt === null ? null : { systemPrompt: prompt.systemPrompt, systemPromptParts: prompt.systemPromptParts, tools: prompt.tools, config: prompt.config }); } catch { return ""; }
+/** 系统行只看系统提示词和工具：模型、请求选项变化不算提示词变化（对齐 DSH）。 */
+const systemSignature = (prompt: TrajectoryPromptDetail): string => JSON.stringify(fixedSystemText(prompt));
+const toolsSignature = (prompt: TrajectoryPromptDetail): string => JSON.stringify(prompt.tools ?? null);
+const hasPromptBody = (prompt: TrajectoryPromptDetail | null): boolean =>
+  prompt !== null && (typeof prompt.systemPrompt === "string" || prompt.systemPromptParts !== undefined || prompt.tools !== undefined);
+
+function promptSignature(prompt: TrajectoryPromptDetail): string {
+  try { return `${systemSignature(prompt)}\u0000${toolsSignature(prompt)}`; } catch { return ""; }
+}
+
+/** 历史窗口里与上一次请求相同的提示词只带 `promptUnchanged`（session-controller slimHistoryWindow），沿用上一份正文。 */
+function inheritPrompt(data: Data, prompt: TrajectoryPromptDetail | null, last: TrajectoryPromptDetail | null): TrajectoryPromptDetail | null {
+  if (hasPromptBody(prompt) || last === null || asRecord(data.snapshot).promptUnchanged !== true) return prompt;
+  const { systemPrompt, systemPromptParts, tools, contextSections, contextModelFacts } = last;
+  return {
+    ...(systemPrompt === undefined ? {} : { systemPrompt }),
+    ...(contextSections === undefined ? {} : { contextSections }),
+    ...(contextModelFacts === undefined ? {} : { contextModelFacts }),
+    ...(systemPromptParts === undefined ? {} : { systemPromptParts }),
+    ...(tools === undefined ? {} : { tools }),
+    ...(prompt?.config === undefined ? {} : { config: prompt.config }),
+    raw: prompt?.raw ?? data,
+  };
 }
 
 function isPromptChange(node: RuntimeV2TrajectoryNode, prompt: TrajectoryPromptDetail | null): boolean {
@@ -174,7 +197,7 @@ function isPromptChange(node: RuntimeV2TrajectoryNode, prompt: TrajectoryPromptD
   );
 }
 
-function changeKind(node: RuntimeV2TrajectoryNode, previous: TrajectoryPromptDetail | null): TrajectorySystemChangeKind {
+function changeKind(node: RuntimeV2TrajectoryNode, previous: TrajectoryPromptDetail | null, prompt: TrajectoryPromptDetail): TrajectorySystemChangeKind {
   const data = dataOf(node);
   const change = asRecord(data.promptChange);
   const explicit = pick(data, ["changeKind", "promptChangeKind"])
@@ -184,6 +207,11 @@ function changeKind(node: RuntimeV2TrajectoryNode, previous: TrajectoryPromptDet
   if (explicit === "prompt" || explicit === "prompt-updated" || explicit === "system") return "prompt-updated";
   if (explicit === "system-and-tools" || explicit === "prompt-and-tools") return "updated";
   if (previous === null) return "initial";
+  const systemChanged = systemSignature(previous) !== systemSignature(prompt);
+  const toolsChanged = toolsSignature(previous) !== toolsSignature(prompt);
+  if (systemChanged && toolsChanged) return "updated";
+  if (toolsChanged) return "tools-updated";
+  if (systemChanged) return "prompt-updated";
   return node.eventType.toLocaleLowerCase().includes("tool") ? "tools-updated" : "prompt-updated";
 }
 
@@ -297,8 +325,13 @@ function buildEventContexts(nodes: readonly RuntimeV2TrajectoryNode[]): Map<numb
     const explicitStep = pick(data, ["stepId", "step"]);
     if (node.eventType === "turn/start" && explicitTurn !== null) activeTurn = explicitTurn;
     if (node.eventType === "step/start" && explicitStep !== null) activeStep = explicitStep;
+    // 用户消息先于 turn/start 写入且不带 turnId：归到同一 agentRun 的下一个轮次。
+    const agentRunId = pick(data, ["agentRunId"]);
     const claimedTurn = node.eventType === "agent/inbox/spliced" && data.operation === "claim" && data.target === "next-turn"
-      ? nodes.find(item => item.eventSeq > node.eventSeq && item.eventType === "turn/start") : undefined;
+      ? nodes.find(item => item.eventSeq > node.eventSeq && item.eventType === "turn/start")
+      : node.eventType === "user/message" && explicitTurn === null && activeTurn === null
+        ? nodes.find(item => item.eventSeq > node.eventSeq && item.eventType === "turn/start" && pick(dataOf(item), ["agentRunId"]) === agentRunId)
+        : undefined;
     contexts.set(node.eventSeq, { turnId: explicitTurn ?? (claimedTurn ? pick(dataOf(claimedTurn), ["turnId"]) : activeTurn), stepId: explicitStep ?? activeStep });
     if (node.eventType === "step/end") activeStep = null;
     if (node.eventType === "turn/end") { activeStep = null; activeTurn = null; }
@@ -329,6 +362,7 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
   const stepBoundaries = new Map<string, Boundary>();
   const turnBoundaries = new Map<string, TurnBoundary>();
   const contexts = buildEventContexts(ordered);
+  let lastPrompt: TrajectoryPromptDetail | null = null;
 
   for (const node of ordered) {
     const data = dataOf(node);
@@ -356,7 +390,9 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
         fact.provider = pick(data, ["provider", "routeId"]) ?? pick(prepared, ["route"]) ?? fact.provider;
         fact.model = pick(data, ["model"]) ?? pick(prepared, ["model"]) ?? fact.model;
         fact.options = data.options ?? data.requestOptions ?? asRecord(data.snapshot).requestOptions ?? fact.options;
-        fact.prompt = promptDetail(data) ?? fact.prompt;
+        const prompt = inheritPrompt(data, promptDetail(data), lastPrompt);
+        if (hasPromptBody(prompt)) lastPrompt = prompt;
+        fact.prompt = prompt ?? fact.prompt;
         fact.sequences.push(node.eventSeq);
         if (node.eventType === "request/header") fact.header = node;
         else fact.context = node;
@@ -408,6 +444,7 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
       ];
       const content = blocks.filter(block => block.type === "text").map(block => block.content).join("\n\n")
         || (contentValue == null ? appendChunks(emptyLiveContent(), chunkList).text : "");
+      const summary = content || thinkingBlocks.map(block => block.content).join(" ");
       const enrichedBase: TrajectoryRecord = {
         ...raw,
         turnId: raw.turnId ?? context.turnId,
@@ -415,8 +452,8 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
         startedAt: stepStartAt,
         completedAt: pick(data, ["completedAt", "finishedAt"]) ?? node.time,
         durationMs: duration(stepStartAt, pick(data, ["completedAt", "finishedAt"]) ?? node.time),
-        summary: content || thinkingBlocks.map(block => block.content).join(" "),
-        preview: content || valueText(thinkingValue),
+        summary,
+        preview: summary || valueText(thinkingValue),
         inputDetail: data.input ?? data.prompt ?? null,
         outputDetail: contentValue ?? (content === "" ? null : content),
         thinkingDetail: thinkingBlocks.map(block => block.content).join("\n\n") || separateThinking || null,
@@ -516,12 +553,13 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
       records.push(baseRecord(node, node.eventSeq, [node.eventSeq], {
         id: `${node.sessionId}:record:${supplement ? "context" : "user"}:${pick(data, ["messageId"]) ?? node.eventSeq}`,
         kind: notice || supplement ? "context" : "user",
+        ...(notice || supplement ? { contextPresentation: { category: contextCategory(notice ? "task-notification" : String(data.owner ?? ""), String(data.id ?? "")), title: notice ? "任务通知" : String(data.id ?? "动态补充"), action: "已注入", placement: "user" } } : {}),
         visible: true, turnId: context?.turnId ?? pick(data, ["turnId"]), stepId: null,
         summary: text, preview: text,
         inputDetail: content, outputDetail: null,
         messageSource: supplement ? { kind: data.owner ?? null, id: data.id ?? null, lifetime: data.lifetime ?? null }
           : notice ? { ...asRecord(node.data), kind: "task-notification", form: "notice" } : data.source ?? node.source ?? null,
-        durationMs: 0, sourceBlocks: blocks,
+        startedAt: node.time, durationMs: 0, sourceBlocks: blocks,
       }));
       continue;
     }
@@ -685,10 +723,11 @@ function systemRecords(nodes: readonly RuntimeV2TrajectoryNode[]): TrajectoryRec
   let previous: TrajectoryPromptDetail | null = null;
   let previousSignature = "";
   for (const [index, node] of [...nodes].sort((a, b) => a.eventSeq - b.eventSeq).entries()) {
+    // 只带请求选项或 promptUnchanged 标记的请求没有提示词正文，不产生系统行。
     const prompt = promptDetail(dataOf(node));
-    const changed = isPromptChange(node, prompt) || (prompt !== null && promptSignature(prompt) !== previousSignature);
-    if (!changed || prompt === null) continue;
-    const kind = changeKind(node, previous);
+    if (prompt === null || !hasPromptBody(prompt)) continue;
+    if (!isPromptChange(node, prompt) && promptSignature(prompt) === previousSignature) continue;
+    const kind = changeKind(node, previous, prompt);
     const label = kind === "initial" ? "初始系统提示词" : kind === "tools-updated" ? "工具已更新" : kind === "updated" ? "系统提示词和工具已更新" : "系统提示词已更新";
     output.push(baseRecord(node, index, [node.eventSeq], {
       id: `${node.sessionId}:system:${node.eventSeq}`,
@@ -714,7 +753,8 @@ function systemRecords(nodes: readonly RuntimeV2TrajectoryNode[]): TrajectoryRec
 export function buildTrajectorySnapshot(snapshot: RuntimeV2TrajectorySnapshot, options: { readonly placeholders?: ReadonlySet<string> } = {}): TrajectoryRuntimeSnapshot {
   const merged = mergeNodes(snapshot.nodes, options.placeholders);
   const system = systemRecords(snapshot.nodes);
-  const combined = [...merged.records, ...system].sort((a, b) => a.systemChange === "initial" ? -1 : b.systemChange === "initial" ? 1 : (a.sourceSequences[0] ?? 0) - (b.sourceSequences[0] ?? 0));
+  const sections = contextSectionRecords(snapshot.nodes, (node, overrides) => baseRecord(node, node.eventSeq, [node.eventSeq], overrides));
+  const combined = [...merged.records, ...system, ...sections].sort((a, b) => a.systemChange === "initial" ? -1 : b.systemChange === "initial" ? 1 : (a.sourceSequences[0] ?? 0) - (b.sourceSequences[0] ?? 0));
   const assigned = assignGroups(combined, merged.rawRecords, merged.turnBoundaries, merged.stepBoundaries, snapshot.history?.turnOffset);
   return {
     sessionId: snapshot.sessionId,

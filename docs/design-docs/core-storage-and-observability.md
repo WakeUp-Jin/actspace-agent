@@ -4,6 +4,8 @@
 
 Runtime 公共契约见 [`agent-plugin-runtime/`](agent-plugin-runtime/README.md)，Session schema 见 [`agent-spec-session-format-v1.md`](agent-plugin-runtime/agent-spec-session-format-v1.md)。
 
+整体结构及读写流程见[数据存储结构与职责](core-data-storage-design.md)；模块 API、默认预算与已知限制见[职责与决策记录](core-data-storage-responsibilities.md#7-2026-10-18-实现落点与边界)。本文维护物理布局、Host 配置和观测边界。
+
 ## 数据根目录
 
 Desktop 与 CLI 使用同一个平台默认 `dataRoot`，目录名固定为大小写敏感的 `ActSpace`；Host 仍可通过显式 `--data-dir` 或 `ACTSPACE_DATA_DIR` 覆盖。Electron 的 `userData` 被设置为同一 canonical root，因此两端共享 Session、artifact 和运行时数据。
@@ -37,7 +39,7 @@ Desktop 以这个 canonical root 作为 Electron `userData`，并解析以下根
 
 ## 存储接口与当前 JSONL 实现
 
-Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；创建、读写、列表、恢复、fork 和投影缓存经同一后端。JSONL 的目录、writer lease、fsync 和物理修复归 `@actspace/session-jsonl`。独立内存实现验证契约可替换；SQLite/MySQL 作为 Session 事实存储后端尚未实现。正在接入的 `runtime-v2/usage-read-model.sqlite` 仅为 Usage/历史查询派生索引，通过 Provider 的有界事件读取同步，不能据此推导为已支持 SQLite Session 后端；状态见[SQLite 专题](筛选存储改版V2-增加SQLite/README.md)。详见[存储规范](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
+Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；创建、读写、列表、恢复、fork 和投影缓存经同一后端。JSONL 的目录、writer lease、fsync 和物理修复归 `@actspace/session-jsonl`。独立内存实现验证契约可替换；SQLite/MySQL 作为 Session 事实存储后端尚未实现。当前 `runtime-v2/usage-read-model.sqlite` 仅为 Usage/历史查询派生索引，通过 Provider 的有界事件读取同步，不能据此推导为已支持 SQLite Session 后端；状态见[SQLite 专题](筛选存储改版V2-增加SQLite/README.md)。详见[存储规范](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
 
 下列是默认 JSONL 后端的物理布局，不是所有后端必须使用的公共格式：
 
@@ -52,7 +54,7 @@ Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；�
 
 其中：
 
-- `journal.jsonl` 是唯一恢复事实源，包含 Header 与 append-only Event Envelope；
+- `journal.jsonl` 是已记录 Session 事件的恢复事实源，包含 Header 与 append-only Event Envelope；引用的 artifact 正文和应用配置等有各自存储，不能仅凭日志恢复整个应用的全部数据；
 - `artifacts/` 是 Session persistence 预留的受管目录，不代表所有 concrete tool artifact 当前都物理存放在这里；
 - `recovery/` 保存 torn-tail repair 前的 forensic 副本和失效 writer lock；
 - `.writer-lock/owner.json` 保存当前 writer lease，关闭 Session 后移除；
@@ -73,13 +75,13 @@ traces/<agentRunId>.jsonl
 
 ## Journal、Surface 与 Projection
 
-Journal 保存不可变领域事件；Session Surface 是这些事件经过 append / replace 语义折叠后的有效模型历史；Runtime Projection 再把 Surface 与事件投影为 Host-facing DTO。
+Journal 管理不可变领域事件；完整持久事实位于 JSONL，运行内存默认仅保留 512 条 / 4 MiB 预算的近期正文，未保存事件不得淘汰。Session Surface 是事件经过 append / replace 语义折叠后的有效模型历史；Runtime Projection 再把 Surface 与事件投影为 Host-facing DTO。当前状态、待落盘队列与近期正文是不同对象，4 MiB 不是整个进程的内存上限。
 
 ```text
 journal.jsonl
     ↓ codec + invariant validation
 Session Journal / Surface
-    ↓ durable projection
+    ↓ projection（另带 accepted / durable 水位）
 RuntimeV2SessionSnapshot
     ↓ fixed renderer adapter
 SessionRecord / Context / Usage
@@ -95,7 +97,7 @@ SessionRecord / Context / Usage
 
 ## Context、Usage 与 Trajectory
 
-当前 Context 面板没有独立持久化文件。Desktop 从最近一次 `request/context` Journal event 生成 Context entries、bucket 和 token 估算：
+当前 Context 面板没有独立持久化文件。实时内容来自 `context.engine` 内存实例的只读投影；历史请求与趋势来自派生查询读模型。没有实时实例时，可用最近一次请求信息回退展示并标记为 last-request / stale，不能冒充当前状态。具体读取与同步路径见[Context 决策记录](上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)。历史 `request/context` Journal event 提供下列请求信息：
 
 - `systemSections` -> System Prompt、Rules、Skills；
 - `tools` -> Tool Definitions；
@@ -116,7 +118,7 @@ Artifact 的语义所有权属于 Session / Tool call，但当前 Desktop 与 pe
 <dataRoot>/artifacts-v2/<artifactId>.json
 ```
 
-元数据记录 `sessionId`、`callId`、`pluginId`、`toolId`、MIME、大小与 SHA-256。读取时必须：
+元数据记录 `sessionId`、`callId`、`pluginId`、`toolId`、MIME、大小与 SHA-256。Desktop 与 Node store 在返回引用前 fsync 正文、元数据及目录；日志中的引用不等于正文已经包含在 JSONL 导出中。读取时必须：
 
 1. 校验 artifact ID；
 2. 验证实际路径没有逃出 store root；
@@ -174,7 +176,7 @@ Main 侧实现位于 `apps/desktop/src/main/settings/`。`settings-service.ts` �
 - `general.personalization` 保存 `displayName` 和 `responseStyle`；System Prompt 正文继续保存在 `<dataRoot>/prompts/main-agent.md`，身份偏好不能覆盖系统约束、项目指令或安全策略。
 - 主题、字体、字号等首屏 Client UI 偏好第一阶段继续保存在 renderer `localStorage`，不进入 Runtime 设置 namespace。
 - `activity.usage` 只保存 Usage 页面筛选和展示偏好，例如时间范围、状态、模型筛选、明细开关和当前 Tab；Token、成本、请求状态和运行轨迹 仍以 Session Journal 为事实来源。
-- 未来可以增加 `runtime-v2/usage-read-model.sqlite` 作为可删除、可重建的查询缓存，但它不能成为恢复事实或第二套 Usage 真相。
+- 当前 `runtime-v2/usage-read-model.sqlite` 是可删除、可重建的查询缓存。查询时检查来源水位并按游标追赶；实时事件不强制更新 SQLite，它不参与 Agent 执行或恢复。
 - Renderer 通过 typed IPC 提交 namespace partial patch；Main 校验、合并并原子写入。第一阶段只需要 root revision 和现有 mutation queue，namespace revision、外部编辑热加载和插件自定义 schema 暂缓到确有多写入方需求时再引入。
 - 设置属于 `<dataRoot>` 全局作用域，不跟随 workspace root；未来若需要项目级设置，另行定义显式 scope 和迁移规则。
 
@@ -200,4 +202,6 @@ Main 侧实现位于 `apps/desktop/src/main/settings/`。`settings-service.ts` �
 
 ## 可重建的会话浏览缓存
 
-当前 projection-cache 从 storage 读取完整快照，按后端 identity、会话 revision、codec 和投影版本失效；最多保留 3 项及 16 MiB 序列化估算。已不使用 `projection-checkpoint.json` 或 Journal byte-offset cache；旧文件不参与读取或恢复，亦不在本轮操作用户数据时删除。分页面向展示，不代表底层已经增量读取。
+当前 projection-cache 从 storage 读取完整快照，按后端 identity、会话 revision、codec 和投影版本失效；最多保留 3 项及 16 MiB 序列化估算。当前不读取旧 `projection-checkpoint.json`，也没有新增持久化检查点文件。与此不同，JSONL Provider 的 `JsonlEventHistory` 现在持有可重建的内存字节位置索引，用于 Journal 已释放正文的范围回读；它不是旧的磁盘 byte-offset cache。
+
+已打开会话的聊天窗口通过 Journal 读指定范围；未打开会话的冷缓存仍 inspect 全量快照后截取窗口。SQLite 索引另走 Worker 的有界读取。`flush` 不再触发冷缓存重建。旧缓存文件不参与读取或恢复，本轮不删除用户目录中的旧文件。

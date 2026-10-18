@@ -5,6 +5,8 @@
 > 视觉定稿：[context-panel-demo.html（已迁出）](../retired-html-demos.md)
 > 相关：[上下文管理引擎 V2 · 01 总体设计 §4 前端显示当前 Context](../上下文管理引擎设计/上下文管理引擎V2/01-总体设计与调用流程.md)、[右侧面板与文件渲染规范 · Context 面板](front-右侧面板与文件渲染规范.md#context-面板)
 
+> 2026-10-18 追加：Step 更新通知、披露概要与路径分页已接入，字段和前端待办见[路径展示交接](front-Context面板Step刷新与路径展示交接.md)。
+
 ## 1. 要做什么
 
 右侧栏 Context 面板从「按分类列条目」升级为五个区块。本文只写前端需要后端提供什么数据，不规定引擎内部怎么实现。
@@ -128,7 +130,7 @@ manifest 将压缩摘要独立归入 `summarizedConversation`，身份包含 com
 
 Main 门面：`apps/desktop/src/main/runtime-v2/context-panel-service.ts`；历史投影：同目录 `context-history-projection.ts`、`context-history-query.ts`。前端刷新、分页、错误状态位于 `components/right-panel/context/`；Composer 和面板使用同一口径。
 
-浏览器 `?mock=long-session` 展示完整五区块，`?mock=context-pagination` 覆盖历史失败/重试、670 条清单与原文分段。mock 成功不代表真实 IPC/Loop 成功，最终证据统一记录在[联合执行目录](../../exec-runs/20261011-context-sqlite-integration/execution-process.md)。
+浏览器 `?mock=long-session` 展示完整区块（2026-10-18 起含「路径」），`?mock=context-pagination` 覆盖历史失败/重试、670 条清单与原文分段，以及路径满额与多页。mock 成功不代表真实 IPC/Loop 成功，最终证据统一记录在[联合执行目录](../../exec-runs/20261011-context-sqlite-integration/execution-process.md)。
 
 ## 6. 验收状态
 

@@ -6,6 +6,8 @@ import type { Context, LlmInput } from "./types.js";
 export function snapshotContext(context: Context, input: LlmInput, prepared: RuntimeV2JsonValue, compositionDigest: string, hostCapabilityDigest: string, original?: LlmInput): RuntimeV2JsonValue {
   const contextManifest = requestContentManifest(context, input, original);
   const snapshot = { schemaVersion: 2, sessionId: input.sessionId, logicalAgentScopeId: context.request.logicalAgentScopeId ?? "main", contextRevision: context.status.contextRevision ?? null, throughJournalSeq: context.status.throughJournalSeq, surfaceGeneration: context.content.conversation.replaceGeneration, turnId: context.request.turnId ?? null, stepId: context.request.stepId ?? null,
+    contextSections: contextManifest.comparable ? [...context.content.system.sections].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)) : null,
+    contextModelFacts: contextManifest.comparable ? context.content.system.modelFacts.map((content, index) => ({ id: context.content.system.modelFactSources?.[index]?.id ?? `model-facts:${index}`, owner: context.content.system.modelFactSources?.[index]?.owner ?? "runtime", order: index, content })) : null,
     systemSections: [...context.content.system.sections].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).map(section => section.content),
     modelFacts: context.content.system.modelFacts, facts: context.status.facts,
     renderedSystemPrompt: input.messages.filter(message => message.role === "system").map(message => message.content).join("\n\n"),
@@ -14,6 +16,7 @@ export function snapshotContext(context: Context, input: LlmInput, prepared: Run
     contextManifest, contextModel: context.status.requestModel ?? null,
     prepared, compositionDigest, hostCapabilityDigest,
   };
+  if (Buffer.byteLength(JSON.stringify(snapshot)) > 960 * 1024) { snapshot.contextSections = null; snapshot.contextModelFacts = null; }
   // Metadata must not push an otherwise legal Journal record over the Provider
   // budget. Totals survive; a missing identity list is explicitly uncomparable.
   if (contextManifest.entries.length > 5000 || Buffer.byteLength(JSON.stringify(contextManifest)) > 256 * 1024 || Buffer.byteLength(JSON.stringify(snapshot)) > 960 * 1024) {

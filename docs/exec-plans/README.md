@@ -25,6 +25,10 @@
 
 ## 最近完成
 
+- [Context 面板「路径」卡片](completed/20261018-context-paths-panel.md)：卡片、预判字段与 mock 完成，自动化测试和浏览器截图通过；交接文档 P1–P8 Electron 验收未执行，见[执行摘要](../exec-runs/20261018-context-paths-panel/execution-summary.md)。
+
+- [Context Step 更新、压缩与路径面板接口](completed/20261018-context-step-update.md)：T1–T5 后端、刷新与交接完成；路径 UI 留给 CloudOps，验证边界见[执行摘要](../exec-runs/20261018-context-step-update/execution-summary.md)。
+
 - [验收缺陷修复与文档迁出](completed/20261018-acceptance-fixes-docs-cleanup.md)：5 个产品缺陷及 Runtime 测试已修复，31 个 Demo 经桌面备份和哈希校验后迁出；定向复验、工程检查及未覆盖边界见[执行摘要](../exec-runs/20261018-acceptance-fixes-docs-cleanup/execution-summary.md)。
 
 - [Web / PWA 客户端](completed/20261017-web-pwa-client.md)：A1–D3 已实现并合入 main；D4 iPhone + Tailscale 真机验收仍未覆盖，不因归档改成通过。
@@ -193,3 +197,8 @@
 ## 本轮已完成
 
 - [代码与文档清理](completed/20261004-agent-refactor-cleanup.md)：本批完成，保护 histories/learnings 和既有工作区修改。
+
+
+- [Session 数据存储职责与增量运行态重构](completed/20261018-session-storage-refactor.md)：代码与本轮自动化完成；Session 文件事实、增量写入、有界近期正文、背压和派生查询职责，限制见执行摘要。
+
+- [轨迹上下文分类与子工具接线](completed/20261018-trajectory-context.md)：轨迹时间、来源分类与直接子会话工具展示已实现；验收边界与既有持久化失败单列。

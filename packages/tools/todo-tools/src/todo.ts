@@ -15,17 +15,18 @@ export type TodoItem = {
 };
 export type TodoWriteItem = { readonly id?: string; readonly content: string; readonly status: Exclude<TodoState, "cancelled">; readonly activeForm?: string };
 
+const TODO_STATE = Symbol("todo-state");
+
 export class TodoService {
   constructor(private readonly session: SessionHandle) {}
   list(): readonly TodoItem[] {
-    let items: readonly import("@actspace/shared/runtime-v2").RuntimeV2TodoItem[] = [];
-    for (const event of this.session.journal.events) {
-      if (event.type !== TODO_EVENT_TYPE || event.data === null || typeof event.data !== "object" || Array.isArray(event.data)) continue;
+    const items = this.session.journal.project(TODO_STATE, () => [] as readonly import("@actspace/shared/runtime-v2").RuntimeV2TodoItem[], (items, event) => {
+      if (event.type !== TODO_EVENT_TYPE || event.data === null || typeof event.data !== "object" || Array.isArray(event.data)) return items;
       const data = event.data as Record<string, unknown>;
-      if (!Array.isArray(data.items)) continue;
+      if (!Array.isArray(data.items)) return items;
       const rawItems = data.items.filter((value): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value));
-      items = mergeRuntimeV2TodoItems(items, rawItems, value => value, event.time);
-    }
+      return mergeRuntimeV2TodoItems(items, rawItems, value => value, event.time);
+    });
     return Object.freeze(items.map(item => Object.freeze({ ...item, createdAt: item.createdAt ?? "", updatedAt: item.updatedAt ?? item.createdAt ?? "" })) as TodoItem[]);
   }
   async create(text: string, todoId: string = randomUUID(), state: Exclude<TodoState, "cancelled"> = "pending", activeForm?: string): Promise<TodoItem> {

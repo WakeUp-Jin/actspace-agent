@@ -274,6 +274,8 @@ Persistence Coordinator 可以使用短窗口 write-behind，但必须提供以�
 - dispose 必须停止接纳、取消 batch window、drain 或报告失败，并等待 writer 和 lease 静止；
 - inspect/browse 不获取 writer lease，也不隐式 repair 或改写文件。
 
+此处 durability checkpoint 指 awaited 持久化屏障，不是 JSON 检查点文件。2026-10-18 的增量校验、队列背压与近期正文释放不改变本节语义，当前参数与历史回读端口见[存储规范](agent-spec-session-core-persistence-separation.md#31-增量接纳背压与正文释放)。
+
 至少在这些位置执行 durability checkpoint：
 
 1. 完整 logical request snapshot 后、LLM dispatch 前；

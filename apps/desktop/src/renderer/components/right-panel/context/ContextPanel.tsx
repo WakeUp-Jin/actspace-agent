@@ -5,6 +5,7 @@ import { buildCategories } from "./context-panel-model";
 import { ContextBrowser } from "./ContextBrowser";
 import { ContextEvents } from "./ContextEvents";
 import { ContextOverview } from "./ContextOverview";
+import { ContextPaths } from "./ContextPaths";
 import { ContextStats } from "./ContextStats";
 import { ContextTrend } from "./ContextTrend";
 import { useContextPanel } from "./use-context-panel";
@@ -15,15 +16,16 @@ const NOTE_CLASS = "m-0 text-center text-act-xxs text-text-faint";
 
 /**
  * 右侧面板的 Context Tab（见 `front-右侧面板与文件渲染规范.md`「Context 面板」）：
- * 当前上下文、会话统计、上下文明细、趋势、事件五块。只看占用，会话原文在轨迹里读。
+ * 当前上下文、会话统计、路径、上下文明细、趋势、事件六块。只看占用，会话原文在轨迹里读。
  * 后端 `describeContextPanel` 未实现时是过渡视图：没有对比、趋势和事件，底部写明。
  */
-export function ContextPanel({ sessionId, contextRevision, contextState }: {
+export function ContextPanel({ sessionId, contextRevision, contextState, workspaceRoot }: {
   sessionId: string | null;
   contextRevision?: number;
   contextState?: ContextState | null;
+  workspaceRoot?: string;
 }) {
-  const { data, loading, error, retry, paging, loadMore } = useContextPanel({ sessionId, revision: contextRevision, fallbackState: contextState ?? null });
+  const { data, loading, error, retry, refresh, paging, loadMore } = useContextPanel({ sessionId, revision: contextRevision, fallbackState: contextState ?? null });
   const [focus, setFocus] = useState<string | null>(null);
   const [compare, setCompare] = useState(true);
   const view = data?.view ?? null;
@@ -55,6 +57,7 @@ export function ContextPanel({ sessionId, contextRevision, contextState }: {
       {view.history?.error ? <ErrorBar message={view.history.error} onRetry={retry} /> : null}
       {view.history?.status === "syncing" || view.history?.status === "rebuilding" ? <p className={NOTE_CLASS}>历史索引同步中（已处理 {Math.max(0, view.history.indexedThroughSeq + 1)} / {Math.max(0, view.history.targetThroughSeq + 1)} 条记录），完整统计稍后显示。</p> : null}
       <ContextStats stats={view.stats} />
+      {data?.source === "backend" ? <ContextPaths sessionId={sessionId} disclosure={view.disclosure} workspaceRoot={workspaceRoot} onStale={refresh} /> : null}
       {status === "unavailable" ? null : (
         <ContextBrowser view={view} categories={categories} compare={compare} onCompareChange={setCompare} focus={focus} />
       )}
@@ -66,7 +69,7 @@ export function ContextPanel({ sessionId, contextRevision, contextState }: {
           {view.limits?.trend.truncated || view.limits?.events.truncated ? <p className={NOTE_CLASS}>展示最近 {view.limits.trend.returnedCount} 次请求、{view.limits.events.returnedCount} 个事件；会话统计包含全部历史。</p> : null}
         </>
       ) : (
-        <p className={NOTE_CLASS}>趋势和事件需要后端数据，暂未提供</p>
+        <p className={NOTE_CLASS}>趋势、事件和路径需要后端数据，暂未提供</p>
       )}
       <p className={NOTE_CLASS}>≈ 为本地估算 · 实际值来自服务商返回的用量</p>
     </div>

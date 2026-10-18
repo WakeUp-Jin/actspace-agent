@@ -33,6 +33,8 @@ export type ContextPanelView = {
   versionToken?: string;
   currentVersion?: string;
   history?: ContextPanelHistory;
+  /** Live disclosure only; absence means an older backend. */
+  disclosure?: ContextDisclosureSummary;
   entriesPage?: { revision?: string; total: number; nextCursor?: string; truncated: boolean };
   limits?: { trend: ContextPanelTruncation; events: ContextPanelTruncation };
   /** 对比基准：最近已持久化的请求输入；还没发过请求时为 null。 */
@@ -140,3 +142,46 @@ export type ContextEntryInput = { sessionId: string; revision: string; key: stri
 export type ContextEntryText = { revision: string; key: string; text: string; nextOffset?: number };
 /** Persisted request metadata. Contains identities/estimates, never body text. */
 export type ContextContentManifest = { schemaVersion: 1; estimatorVersion: string; comparable: boolean; comparisonUnavailableReason?: string; totalEstimatedTokens: number; buckets: ContextPanelBucketTokens; entries: ContextPanelEntry[] };
+
+
+export const CONTEXT_ACTIVE_PATH_LIMIT = 100;
+
+export type ContextPathEntry = {
+  id: string;
+  path: string;
+  description?: string;
+  owners: string[];
+  visibility: "active" | "sleeping";
+  readsInCycle: number;
+  addedCycle: number;
+  lastReadAt?: string;
+  /**
+   * 按当前读取记录、假设此刻压缩时这条路径的变化：`wake` 睡眠 → 活跃，`sleep` 活跃 → 睡眠；不变时省略。
+   * 只是预判，之后的读取会改变结果。由 `selectNextActivePathIds` 算出，与引擎压缩时用的是同一规则。
+   */
+  nextCompaction?: "wake" | "sleep";
+};
+
+/** 路径排序与下次活跃集合只需要的字段；引擎状态和面板条目都满足。 */
+export type ContextPathRank = { readonly id: string; readonly readsInCycle: number; readonly addedCycle: number; readonly lastReadAt?: string };
+
+/** 活跃路径的优先级：本周期读得多、最近读过、加入得晚的在前。 */
+export function compareContextPaths(a: ContextPathRank, b: ContextPathRank): number {
+  return b.readsInCycle - a.readsInCycle
+    || (b.lastReadAt ?? "").localeCompare(a.lastReadAt ?? "")
+    || b.addedCycle - a.addedCycle
+    || a.id.localeCompare(b.id);
+}
+
+/**
+ * 压缩时重新排定的活跃集合：只保留本周期读过或本周期加入的路径，按优先级取前 100。
+ * 引擎 disclosure 的 `selectActive` 和面板的 `nextCompaction` 预判都调用这里，规则只有这一份。
+ */
+export function selectNextActivePathIds(paths: readonly ContextPathRank[], cycle: number): string[] {
+  return paths.filter(path => path.readsInCycle > 0 || path.addedCycle === cycle).sort(compareContextPaths).slice(0, CONTEXT_ACTIVE_PATH_LIMIT).map(path => path.id);
+}
+export type ContextDisclosureSummary =
+  | { status: "unavailable" }
+  | { status: "ready"; revision: string; cycle: number; activeLimit: number; activeCount: number; sleepingCount: number };
+export type ContextPathsInput = { sessionId: string; revision: string; visibility: "active" | "sleeping"; cursor?: string; limit?: number };
+export type ContextPathsPage = { revision: string; visibility: "active" | "sleeping"; total: number; paths: ContextPathEntry[]; nextCursor?: string };

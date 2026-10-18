@@ -53,3 +53,20 @@ it("keeps a single refresh in flight when revisions change",async()=>{
   hook.rerender({revision:2});hook.rerender({revision:3});expect(max).toBe(1);
   await act(async()=>{release(mockContextPanelView("s"));});hook.unmount();expect(max).toBe(1);
 });
+
+it("refreshes on committed Context notifications without polling and ignores other sessions", async () => {
+  vi.useFakeTimers();
+  const read = vi.fn(async (input: any) => input.release ? null : mockContextPanelView(input.sessionId));
+  const bridge = setupBridge({ "sessions.describeContextPanel": read });
+  const hook = renderHook(() => useContextPanel({ sessionId: "s", revision: 1, fallbackState: null }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  const event = (sessionId: string) => ({ emittedAt: new Date().toISOString(), event: { schemaVersion: 1 as const, runtimeInstanceId: "runtime", liveSeq: 1, kind: "run-state" as const, sessionId, agentRunId: "run", turnId: "turn", throughJournalSeq: 12, message: "context-updated" } });
+  await act(async () => { bridge.emit("sessionLive", event("other")); });
+  expect(read).toHaveBeenCalledTimes(1);
+  await act(async () => { bridge.emit("sessionLive", event("s")); });
+  expect(read).toHaveBeenCalledTimes(2);
+  Object.defineProperty(document, "hidden", { configurable: true, value: true });
+  await act(async () => { bridge.emit("sessionLive", event("s")); });
+  expect(read).toHaveBeenCalledTimes(2);
+  hook.unmount();
+});

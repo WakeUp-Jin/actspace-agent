@@ -1,3 +1,4 @@
+import { CONTEXT_ACTIVE_PATH_LIMIT, compareContextPaths } from "@actspace/shared";
 import type { ContextPathState } from "./types.js";
 
 /** Durable contract shared by the engine state reducer and disclosure plugin. */
@@ -12,13 +13,11 @@ export type DisclosureArtifact = {
   readonly sha256: string;
 };
 
-export const ACTIVE_PATH_LIMIT = 100;
+export const ACTIVE_PATH_LIMIT = CONTEXT_ACTIVE_PATH_LIMIT;
 
+/** 排序规则的唯一实现在 shared（面板预判也用它）。 */
 export function comparePaths(a: ContextPathState, b: ContextPathState): number {
-  return b.readsInCycle - a.readsInCycle
-    || (b.lastReadAt ?? "").localeCompare(a.lastReadAt ?? "")
-    || b.addedCycle - a.addedCycle
-    || a.id.localeCompare(b.id);
+  return compareContextPaths(a, b);
 }
 
 export function capNewPaths(paths: readonly ContextPathState[], newIds: ReadonlySet<string>): readonly string[] {
