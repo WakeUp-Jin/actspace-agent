@@ -50,6 +50,8 @@ export interface HostRpcOptions {
   artifacts?: import("./artifacts.js").HostArtifacts;
   output: import("./live-output.js").HostLiveOutput;
   state(): "ready" | "draining" | "blocked";
+  /** Sessions with a running Run; `activity` host events carry later changes. */
+  runningSessions?(): readonly string[];
 }
 /** Wire validation and Host policy only; durable task ownership stays in AgentService. */
 export class HostRpc {
@@ -68,7 +70,7 @@ export class HostRpc {
         if (params.workspaceRoot !== undefined && typeof params.workspaceRoot !== "string" || params.pinned !== undefined && typeof params.pinned !== "boolean" || params.after !== undefined && typeof params.after !== "string") throw new TypeError("Invalid list cursor");
         return paginateSessionSummaries({ items: await app.listSessions(), indexing: false, failed: 0 }, params);
       }
-      case "host.observe": fields(params, []); return observations.observe("host", async () => ({ approvals: approvals.list(), state: this.options.state() }), context);
+      case "host.observe": fields(params, []); return observations.observe("host", async () => ({ approvals: approvals.list(), state: this.options.state(), running: this.options.runningSessions?.() ?? [] }), context);
       case "sessions.observe": {
         fields(params, ["sessionId"]); const sessionId = stringParam(params, "sessionId", 128);
         return observations.observe(sessionId, async () => ({ observation: await app.readSessionObservation({ sessionId, maxWindowEvents: 100, maxWindowBytes: 262144 }), tasks: (await app.taskCommand({ sessionId, op: "snapshot" })).snapshot, approvals: approvals.list(sessionId), output: this.options.output.describe(sessionId) }), context);

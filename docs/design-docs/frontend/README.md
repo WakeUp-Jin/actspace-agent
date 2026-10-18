@@ -1,5 +1,7 @@
 # 前端设计文档
 
+- [Web / PWA 客户端规范](front-web-pwa客户端规范.md)：已实施（2026-10-17）；`apps/web` 响应式浏览器客户端（手机 V1 单栏、宽屏两栏），PWA 安装，直连 agent-host；原型 `mobile-web-demo.html`；2026-10-18 视觉改为 `mobile-web-v2-demo.html` 的 B · 轻玻璃（已实施）；验收截图见 `docs/exec-runs/20261017-web-pwa-client/`，真机验收待做。
+
 - [聊天 Mermaid 图表渲染](front-chat-mermaid-diagrams.md)：已实施：闭合的 ` ```mermaid ` 渲染为固定 Codex 浅色图表，支持查看/复制源码、PNG 导出与缩放预览；Electron 验收边界见执行摘要。
 
 - [消息流排版与工具摘要规范](front-tool-stream-typography.md)：已实施：统一过程行、相邻间距与摘要层级；自动验证和真实桌面验收边界见执行摘要。
@@ -80,6 +82,8 @@
 - Space 工作台 demo 已移到 [`../多智能体协作/space-demo.html`](../多智能体协作/space-demo.html)。
 - `settings-redesign-demo.html`：2026-09-25 设置中心视觉重设计定稿 demo（内嵌分组 + 翡翠绿开关 + 独立「搜索」页 + 使用统计微调）；右下角调节面板只用于方案对比。
 - `context-panel-demo.html`：2026-10-11 右侧栏 Context 面板定稿方向（参考 dsh-context）；数据需求见 `front-Context面板后端数据需求.md`。
+- `mobile-web-demo.html`：2026-10-17 Web / PWA 客户端三版对比，选定 V1（Happy 原生移植），含「V1 宽屏」画面；规范见 `front-web-pwa客户端规范.md`。
+- `mobile-web-v2-demo.html`：2026-10-18 Web 视觉重做对比（现状 / A / B，9 个手机画面 + 宽屏），选定 B · 轻玻璃并已实施到 `apps/web`。
 - 其他 `*-demo.html` 文件是设计对比、交互验收或视觉原型；文件开头标明具体状态，当前实现以对应 Markdown 规范、执行计划和源码为准。
 
 ## 资产约定

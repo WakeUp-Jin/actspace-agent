@@ -38,6 +38,10 @@
 
 前端代码修改完成后，必须按 `FRONTEND_VERIFICATION.md` 说明选择合适的验收路径，并在最终说明中写明实际跑过的验证。
 
+## 浏览器 / PWA 客户端（apps/web）
+
+`apps/web` 是第二个前端入口，规则与 desktop renderer 相同：token 检查和主题检查覆盖 `apps/web/src`，原生 `<button>`、`createPortal`、`role="dialog"` 只允许出现在 `apps/web/src/ui/`。它复制了 desktop 的 `tokens.css`，额外的 web 专用 token（玻璃材质、`--text-act-base`、`--radius-act-sheet`）只在 web 内定义。界面与交互见 [`front-web-pwa客户端规范.md`](design-docs/frontend/front-web-pwa客户端规范.md)，本机联调和手机访问步骤见 [`apps/web/README.md`](../apps/web/README.md)。
+
 ## 性能监控
 
 设置 → 通用的性能开关默认关闭，开启后显示左栏底部面板（侧栏隐藏时紧凑显示）。监控组件独立更新，每两秒请求可信主进程 CPU/工作集内存采样；关闭与窗口隐藏停止采集。度量口径、投影优化和验收边界见 [执行摘要](exec-runs/20261001-performance-monitor-projection/execution-summary.md)。

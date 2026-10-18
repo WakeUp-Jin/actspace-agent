@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readHostConfig } from "../config.js";
@@ -19,4 +19,15 @@ it("validates configured paths, provider references, unknown fields and public T
   await writeFile(file, JSON.stringify({ ...config, workspaces: [{ id: "a/b", name: "Main", path: "." }] }));
   await expect(readHostConfig(file, { FIXTURE_KEY: "secret" })).rejects.toThrow("identifier");
   await writeFile(file, JSON.stringify({ ...config, defaultModel: "p/missing" })); await expect(readHostConfig(file, { FIXTURE_KEY: "secret" })).rejects.toThrow("defaultModel");
+});
+it("resolves webRoot against the config dir and requires an existing directory", async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "host-webroot-"))); roots.push(root);
+  const file = join(root, "host.json"); await mkdir(join(root, "dist"));
+  await writeFile(join(root, "plain.txt"), "x");
+  const config = { schemaVersion: 1, dataRoot: "./data", listen: { address: "127.0.0.1", port: 4317 }, allowedOrigins: [], workspaces: [{ id: "main", name: "Main", path: "." }], providers: [{ id: "p", type: "openai-completions", baseUrl: "https://example.com", keyEnv: "FIXTURE_KEY", models: ["m"] }], defaultModel: "p/m" };
+  const env = { FIXTURE_KEY: "secret" };
+  await writeFile(file, JSON.stringify({ ...config, webRoot: "./dist" })); expect((await readHostConfig(file, env)).webRoot).toBe(join(root, "dist"));
+  await writeFile(file, JSON.stringify(config)); expect("webRoot" in await readHostConfig(file, env)).toBe(false);
+  await writeFile(file, JSON.stringify({ ...config, webRoot: "./nope" })); await expect(readHostConfig(file, env)).rejects.toThrow("webRoot must be an existing directory");
+  await writeFile(file, JSON.stringify({ ...config, webRoot: "./plain.txt" })); await expect(readHostConfig(file, env)).rejects.toThrow("webRoot must be an existing directory");
 });

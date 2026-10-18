@@ -1,0 +1,765 @@
+/*
+ * 来源：apps/desktop/src/renderer/styles/tokens.css 第 1–745 行（不含强调色调色板），2026-10-17 复制。
+ * 改桌面 token 时同步这里；变量名保持 --act-* 不变（front-web-pwa客户端规范 §10）。
+ * web 专用：--web-glass / --web-glass-strong / --web-glass-border / --web-glass-edge / --web-glass-shadow（玻璃材质），每个主题块末尾各一组。
+ */
+:root {
+  color: #20201e;
+  background: #f7f7f5;
+
+  --act-font-ui:
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Segoe UI",
+    "Microsoft YaHei",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  --act-font-display: var(--act-font-ui);
+  --act-font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+  /* 代码/等宽字号，由外观设置驱动（代码块 / diff / bash 输出消费）。 */
+  --act-font-mono-size: 13px;
+
+  --act-color-bg: #f7f7f5;
+  --act-color-surface: #ffffff;
+  --act-color-surface-subtle: #f1f1ef;
+  --act-color-surface-raised: #ffffff;
+  --act-color-sidebar: #efefed;
+  --act-color-selected: #e4e4e1;
+  --act-color-sidebar-selected: var(--act-color-selected);
+  --act-color-hover-overlay: #eaeae7;
+
+  --act-color-border: #deded9;
+  --act-color-border-strong: #8c8c85;
+  /* Composer 输入框的低对比细边（09，06 §5.1）：比 border 更淡，靠阴影托起。 */
+  --act-color-composer-border: rgb(0 0 0 / 0.07);
+  --act-color-composer-border-focus: rgb(0 0 0 / 0.11);
+  --act-color-meter-track: #e9e9e5;
+  --act-color-toggle-off: #d3d3ce;
+
+  /* 外观页主题缩略图：展示另一套主题的样子，故意不随当前主题翻转，只在这里定义一次。 */
+  --act-preview-light-bg: #f7f7f5;
+  --act-preview-light-sidebar: #efefed;
+  --act-preview-light-line: #d6d6d1;
+  --act-preview-light-ink: #20201e;
+  --act-preview-dark-bg: #181916;
+  --act-preview-dark-sidebar: #1e1f1c;
+  --act-preview-dark-line: #3a3b35;
+  --act-preview-dark-ink: #f1f1ed;
+  /* 外观页强调色色样：同上，固定色，不随当前主题或当前调色板翻转。 */
+  --act-preview-accent-default-ink: #20201e;
+  --act-preview-accent-default-emerald: #087a4b;
+  --act-preview-accent-blue: #3a83f7;
+  --act-preview-accent-purple: #a67df2;
+  --act-preview-accent-pink: #f077af;
+  --act-preview-accent-orange: #ee7c37;
+
+  --act-color-text: #20201e;
+  --act-color-text-muted: #676762;
+  --act-color-text-faint: #72726b;
+  --act-color-text-subtle: #85857e;
+
+  --act-color-action: #20201e;
+  --act-color-action-hover: #343430;
+  --act-color-on-action: #ffffff;
+
+  --act-color-operational: #087a4b;
+  --act-color-operational-hover: #06673f;
+  --act-color-operational-soft: #e5f2ea;
+  --act-color-on-operational: #ffffff;
+
+  --act-color-info: #3978b8;
+  --act-color-info-hover: #2f689f;
+  --act-color-info-soft: #e8f1f9;
+  --act-color-on-info: #315f8e;
+
+  --act-color-warning: #91600e;
+  --act-color-warning-soft: #f7eedb;
+  --act-color-on-warning: #7a500a;
+  /* 实心 warning 底上的字色（Plan 的发送按钮）。on-warning 是浅底上的深黄字，不能用在实心底上。 */
+  --act-color-on-warning-solid: #ffffff;
+
+  --act-color-danger: #c74747;
+  --act-color-danger-hover: #a93a3a;
+  --act-color-danger-soft: #f8e9e9;
+  --act-color-on-danger: #a93a3a;
+  --act-color-on-danger-solid: #ffffff;
+
+  --act-color-success: #087a4b;
+  --act-color-success-soft: #e5f2ea;
+  --act-color-on-success: #087a4b;
+
+  /* 浮层（卡片/模态/popover 高一层背景）与模态遮罩 */
+  --act-color-overlay: rgba(17, 24, 39, 0.32);
+
+  /*
+   * 强调色（外观 → 强调色，front-accent-palette.md）：只驱动发送按钮、开关开启态、焦点、普通链接与文字选中。
+   * 调色板源值 --act-palette-light-* 只由文件末尾的 :root[data-accent="…"] 定义；
+   * 默认调色板不定义，这里全部回落到原有 action / operational / info / 中性值。
+   */
+  --act-color-accent: var(--act-palette-light-accent, var(--act-color-action));
+  --act-color-accent-hover: var(--act-palette-light-accent-hover, var(--act-color-action-hover));
+  --act-color-on-accent: var(--act-palette-light-on-accent, var(--act-color-on-action));
+  --act-color-toggle-on: var(--act-palette-light-accent, var(--act-color-operational));
+  --act-color-link: var(--act-palette-light-accent, var(--act-color-info));
+
+  /* 焦点环 / 选区 / chrome hover 叠加 */
+  --act-color-focus-ring: var(--act-palette-light-accent, #4d4d48);
+  --act-color-operational-focus-ring: #087a4b;
+  --act-color-selection: var(--act-palette-light-selection, rgba(77, 77, 72, 0.2));
+  /* 回复批注：原文高亮（CSS Custom Highlight API，常规档 / 当前条加深档）与选区末尾的编号圆点；固定 info 蓝，不跟强调色 */
+  --act-color-annotation-highlight: rgba(57, 120, 184, 0.18);
+  --act-color-annotation-highlight-active: rgba(57, 120, 184, 0.32);
+  --act-color-annotation-mark: var(--act-color-info);
+  --act-color-on-annotation-mark: #ffffff;
+
+  /* 代码（行内 / 代码块）/ 引用 / 表头等内容呈现色 */
+  --act-color-code-text: #343430;
+  --act-color-code-bg-top: rgba(247, 247, 245, 0.98);
+  --act-color-code-bg-bottom: rgba(241, 241, 239, 0.98);
+  --act-color-code-border: rgba(140, 140, 133, 0.48);
+  --act-color-inline-code-text: #343430;
+  --act-color-inline-code-bg: rgba(241, 241, 239, 0.92);
+  --act-color-inline-code-border: rgba(140, 140, 133, 0.4);
+  --act-color-quote-border: rgba(77, 77, 72, 0.42);
+  --act-color-table-head-bg: rgba(228, 228, 225, 0.78);
+  --act-color-table-head-text: #343430;
+
+  /* diff 增删底/字 */
+  --act-color-diff-add-bg: rgba(44, 168, 105, 0.12);
+  --act-color-diff-add-text: #08784f;
+  --act-color-diff-remove-bg: rgba(225, 70, 86, 0.12);
+  --act-color-diff-remove-text: #a43342;
+  --act-color-diff-streaming-bg: rgba(44, 168, 105, 0.08);
+
+  /* 轮尾卡片（改动卡 / 交付卡，对照 DeepSeek Harness）：卡头底色、悬停底色、图标方块底色；diff 行号槽底色。 */
+  --act-color-turn-card-fill: #f7f7f5;
+  --act-color-turn-card-hover: #efefec;
+  --act-color-turn-card-tile: rgba(255, 255, 255, 0.5);
+  --act-color-diff-add-gutter: rgba(44, 168, 105, 0.2);
+  --act-color-diff-remove-gutter: rgba(225, 70, 86, 0.2);
+
+  /* 文件类型图标（移植自 DeepSeek Harness FileTypeIcon）：固定色，不随主题或强调色翻转，只在这里定义一次。 */
+  --act-file-type-blue: #4176e6;
+  --act-file-type-blue-light: #5686fe;
+  --act-file-type-green: #22c55e;
+  --act-file-type-amber: #f7ad31;
+  --act-file-type-orange: #f59e0b;
+  --act-file-type-red: #ec1313;
+  --act-file-type-violet: #8b76f6;
+  --act-file-type-muted: #cfd3d6;
+  --act-file-type-fold-muted: #a2a4a6;
+  --act-file-type-mark: #ffffff;
+
+  /* 数据可视化色板（图表 / heatmap / 标签）；浅深各一组 */
+  --act-chart-series-1: #3978b8;
+  --act-chart-series-2: #4b919d;
+  --act-chart-series-3: #7a68ad;
+  --act-chart-series-4: #c06f52;
+  --act-chart-series-5: #087a4b;
+  --act-chart-series-6: #7d858b;
+
+  /*
+   * Context 弹层 bucket 配色（数据可视化色，浅/深各一组）。
+   * 由 @actspace/shared 的 CONTEXT_BUCKET_REGISTRY.colorVar 引用；新增 bucket = 注册表加一行 + 这里加一对 token。
+   * 浅色取较深饱和值以在白底弹层可见；深色取较亮值以在深底弹层可见。
+   */
+  --act-context-system: #7d858b;
+  --act-context-tools: #7a68ad;
+  --act-context-rules: #087a4b;
+  --act-context-skills: #91600e;
+  --act-context-summarized: #a84f7a;
+  --act-context-conversation: #b96831;
+  --act-context-fallback: #8c8c85;
+
+  /* Analysis 数据角色编码：只用于分析页面内容，不作为全局导航或 action 色。 */
+  --act-analysis-canvas: #fbfcfd;
+  --act-analysis-selection-soft: #edf6ff;
+  --act-analysis-user-soft: #f0f7ff;
+  --act-analysis-assistant-soft: #eef9f2;
+  --act-analysis-tool-soft: #f6f2fc;
+  --act-analysis-thinking-soft: #f5f6f7;
+
+  /* 会话顶部「当前轮提问」的贴顶渐隐遮罩（从 surface 渐隐到透明）。 */
+  --act-gradient-surface-fade: linear-gradient(
+    180deg,
+    #fff 0%,
+    rgba(255, 255, 255, 0.96) 78%,
+    rgba(255, 255, 255, 0) 100%
+  );
+
+  --act-radius-xs: 4px;
+  --act-radius-sm: 6px;
+  --act-radius-md: 8px;
+  --act-radius-lg: 12px;
+  /* 设置内嵌分组（surface + hairline）的圆角，2026-09-25 用户批准的独立档位。 */
+  --act-radius-group: 10px;
+  --act-radius-xl: 18px;
+  --act-radius-pill: 999px;
+
+  /*
+   * 阴影：暖色基底 rgba(20, 21, 18)，与 Ink & Emerald 灰阶同源。
+   * xs = 小按钮描边感；knob = Toggle 白色滑块；thumb = 附件缩略图；
+   * soft = 大面积浮起（占位页、关机遮罩、Sheet）；popover = 菜单 / tooltip；float = dialog / 抽屉。
+   * 工作台常驻卡片（用户消息卡）不使用阴影，只靠 surface + hairline；Composer 例外，
+   * 用 composer / composer-focus 两档柔和阴影托起（09，06 §5.1、§9 #7）。
+   */
+  --act-shadow-xs: 0 1px 2px rgba(20, 21, 18, 0.06);
+  --act-shadow-knob: 0 1px 3px rgba(20, 21, 18, 0.24);
+  --act-shadow-thumb: 0 4px 12px rgba(20, 21, 18, 0.08);
+  --act-shadow-soft: 0 18px 48px rgba(20, 21, 18, 0.08);
+  --act-shadow-popover: 0 24px 64px rgba(20, 21, 18, 0.14);
+  --act-shadow-float: 0 24px 64px rgba(20, 21, 18, 0.18);
+  --act-shadow-composer: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.06);
+  --act-shadow-composer-focus: 0 1px 2px rgb(0 0 0 / 0.05), 0 8px 28px -6px rgb(0 0 0 / 0.1);
+
+  --act-scrollbar-thumb: rgba(171, 177, 186, 0.46);
+  --act-scrollbar-thumb-hover: rgba(146, 153, 164, 0.56);
+  --act-scrollbar-thumb-subtle: rgba(146, 153, 164, 0.3);
+  --act-scrollbar-thumb-subtle-hover: rgba(126, 133, 144, 0.46);
+
+  /*
+   * Legacy alias layer:
+   * old renderer styles still read unprefixed variables while slices migrate
+   * to Tailwind/theme tokens. Keep these aliases here so legacy CSS no longer
+   * needs to redeclare a second :root block.
+   */
+  --font-ui: var(--act-font-ui);
+  --font-display: var(--act-font-display);
+  --font-mono: var(--act-font-mono);
+
+  --color-bg: var(--act-color-bg);
+  --color-surface: var(--act-color-surface);
+  --color-surface-subtle: var(--act-color-surface-subtle);
+  --color-sidebar: var(--act-color-sidebar);
+  --color-sidebar-selected: var(--act-color-sidebar-selected);
+  --color-border: var(--act-color-border);
+  --color-border-strong: var(--act-color-border-strong);
+  --color-text: var(--act-color-text);
+  --color-text-muted: var(--act-color-text-muted);
+  --color-text-faint: var(--act-color-text-faint);
+  --color-text-subtle: var(--act-color-text-subtle);
+  --color-warning: var(--act-color-warning);
+  --color-danger: var(--act-color-danger);
+  --color-success: var(--act-color-success);
+
+  --surface: var(--color-surface);
+  --surface-soft: var(--color-surface-subtle);
+  --line: var(--color-border);
+  --line-strong: var(--color-border-strong);
+  --text: var(--color-text);
+  --text-soft: var(--color-text-muted);
+  --text-faint: var(--color-text-faint);
+  --success: var(--color-success);
+  --danger: var(--color-danger);
+
+  --radius-xs: var(--act-radius-xs);
+  --radius-sm: var(--act-radius-sm);
+  --radius-md: var(--act-radius-md);
+  --radius-lg: var(--act-radius-lg);
+  --radius-pill: var(--act-radius-pill);
+
+  --shadow-soft: var(--act-shadow-soft);
+  --shadow-popover: var(--act-shadow-popover);
+
+  /*
+   * z-index 分层（front-全局视觉语言规范「层级」）。组件用 z-(--act-z-*) 消费；
+   * 组件内部的局部叠放用 Tailwind 内置 z-1 / z-2，不进分层。
+   * pane: SplitView 拖拽柄；drawer: 窄窗口侧栏 / 右面板抽屉（低于 chrome，保证标题栏按钮可点）；
+   * chrome: 窗口标题栏；dropdown: 组件内 absolute / fixed 菜单；overlay: 工作区内的全屏遮罩层；
+   * modal: dialog / Sheet；popover: tooltip、hover card、portal 到 body 的菜单与提示；system: 关机遮罩。
+   */
+  --act-z-pane: 30;
+  --act-z-drawer: 50;
+  --act-z-chrome: 60;
+  --act-z-dropdown: 80;
+  --act-z-overlay: 100;
+  --act-z-modal: 150;
+  --act-z-popover: 200;
+  --act-z-system: 1000;
+
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
+  --motion-slow: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Space 工作台（space.css）：星空 / 点阵 / 星尘。浅色换成极淡点阵，深色是星点。 */
+  --act-space-star: transparent;
+  --act-space-grid-dot: rgba(32, 32, 30, 0.16);
+  --act-space-spark: #3b4a9c;
+  --act-space-sky-stars-opacity: 0;
+  --act-space-sky-grid-opacity: 1;
+  /* Space 动效时长：没有对应 --motion-* 档位的慢动画 */
+  --act-space-ring-duration: 2.4s;
+  --act-space-sky-drift-a: 200s;
+  --act-space-sky-drift-b: 300s;
+  --act-space-sky-twinkle-duration: 7s;
+  --act-space-float-duration: 5s;
+  --act-space-pop-ease: cubic-bezier(0.3, 1.5, 0.4, 1);
+
+  --window-chrome-strip-height: 44px;
+  --window-chrome-left-padding: 86px;
+  --window-chrome-control-size: 22px;
+  --window-chrome-collapsed-left-width: 146px;
+  --window-chrome-collapsed-right-width: 34px;
+
+  --conversation-inline-padding: 32px;
+  --conversation-content-width: 880px;
+  /* 消息块（Thinking、工具、审批、回复）最大宽度：与内容列同宽，左右缘和用户消息卡、Composer 对齐。 */
+  --conversation-block-max-width: var(--conversation-content-width);
+  --conversation-card-padding: 16px;
+  --conversation-text-inset: calc(var(--conversation-card-padding) + 1px);
+
+  --scrollbar-thumb: var(--act-scrollbar-thumb);
+  --scrollbar-thumb-hover: var(--act-scrollbar-thumb-hover);
+
+  /* 轨迹页（照搬 DeepSeek Harness 轨迹页的浅色取值，不跟随强调色）；样式在 trajectory.css。 */
+  --act-trajectory-label-primary: rgb(15, 17, 21);
+  --act-trajectory-label-secondary: rgb(97, 102, 107);
+  --act-trajectory-label-tertiary: rgb(129, 133, 140);
+  --act-trajectory-label-caption: rgb(173, 178, 184);
+  --act-trajectory-label-dimmed: rgb(225, 229, 238);
+  --act-trajectory-bg-base: rgb(255, 255, 255);
+  --act-trajectory-bg-layer-1: rgb(255, 255, 255);
+  --act-trajectory-bg-layer-2: rgb(255, 255, 255);
+  --act-trajectory-bg-module: rgb(245, 246, 247);
+  --act-trajectory-bg-sidebar: rgb(249, 250, 251);
+  --act-trajectory-border-l1: rgba(0, 0, 0, 0.04);
+  --act-trajectory-border-l2: rgba(0, 0, 0, 0.1);
+  --act-trajectory-border-l2-thin: rgba(0, 0, 0, 0.1);
+  --act-trajectory-border-l3: rgba(0, 0, 0, 0.12);
+  --act-trajectory-border-l4: rgba(0, 0, 0, 0.16);
+  --act-trajectory-hover: rgba(38, 49, 72, 0.06);
+  --act-trajectory-active: rgba(38, 49, 72, 0.1);
+  --act-trajectory-primary: rgb(65, 118, 230);
+  --act-trajectory-primary-soft: rgb(228, 237, 253);
+  --act-trajectory-primary-new: rgb(65, 118, 230);
+  --act-trajectory-blue: rgb(59, 130, 246);
+  --act-trajectory-error: rgb(236, 19, 19);
+  --act-trajectory-error-secondary: rgb(242, 90, 90);
+  --act-trajectory-success: rgb(34, 197, 94);
+  --act-trajectory-success-soft: rgb(230, 250, 237);
+  --act-trajectory-warn: rgb(221, 134, 41);
+  --act-trajectory-warn-soft: rgb(254, 245, 231);
+  --act-trajectory-scrollbar: rgb(229, 229, 229);
+  --act-trajectory-scrollbar-hover: rgb(212, 212, 212);
+  --act-trajectory-code-block: rgb(249, 250, 251);
+  --act-trajectory-citation: rgb(235, 238, 242);
+  --act-trajectory-tooltip-bg: rgb(44, 44, 46);
+  --act-trajectory-tooltip-text: rgb(255, 255, 255);
+  --act-trajectory-shadow-chip: 0 2px 6px rgba(0, 0, 0, 0.12);
+  --act-trajectory-shadow-drawer: -12px 0 32px rgba(0, 0, 0, 0.14);
+  --act-trajectory-shadow-panel: 0 0 0 0.5px rgba(0, 0, 0, 0.16), 0 3px 8px 0 rgba(0, 0, 0, 0.03), 0 0 16px 0 rgba(0, 0, 0, 0.02);
+  --act-json-property: #881391;
+  --act-json-string: #c41a16;
+  --act-json-number: #1c00cf;
+  --act-json-keyword: #1c00cf;
+  --act-json-punctuation: #202124;
+  --act-json-icon: #5f6368;
+  --act-json-hover: rgba(60, 64, 67, 0.04);
+  --act-trajectory-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --web-glass: rgba(255, 255, 255, 0.72);
+  --web-glass-strong: rgba(255, 255, 255, 0.9);
+  --web-glass-border: rgba(255, 255, 255, 0.95);
+  --web-glass-edge: rgba(0, 0, 0, 0.07);
+  --web-glass-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.14);
+}
+
+/*
+ * 深色主题：只覆盖 --act-color-* / --act-shadow-* / --act-scrollbar-* 这组源 token。
+ * 因为 tailwind.css 的 @theme inline 与本文件的 legacy alias 都从 --act-* 派生，
+ * 覆盖源 token 即可让所有用语义类 / 语义变量的区域整体翻转。
+ *
+ * - data-theme="dark"：始终深色。
+ * - data-theme="system"：跟随 OS，OS 深色时走下方 @media。
+ *   两块声明刻意重复（CSS 无 mixin），改色板时两处需同步。
+ */
+:root[data-theme="dark"] {
+  color: #f1f1ed;
+  background: #181916;
+
+  --act-color-bg: #181916;
+  --act-color-surface: #242522;
+  --act-color-surface-subtle: #292a26;
+  --act-color-surface-raised: #30312d;
+  --act-color-sidebar: #1e1f1c;
+  --act-color-selected: #30312d;
+  --act-color-sidebar-selected: var(--act-color-selected);
+  --act-color-hover-overlay: #2a2b27;
+
+  --act-color-border: #353630;
+  --act-color-border-strong: #787870;
+  --act-color-composer-border: rgb(255 255 255 / 0.07);
+  --act-color-composer-border-focus: rgb(255 255 255 / 0.12);
+  --act-color-meter-track: #3a3b35;
+  --act-color-toggle-off: #4a4b45;
+
+  --act-color-text: #f1f1ed;
+  --act-color-text-muted: #b5b5ae;
+  --act-color-text-faint: #96968f;
+  --act-color-text-subtle: #787870;
+
+  --act-color-action: #f1f1ed;
+  --act-color-action-hover: #dbdbd5;
+  --act-color-on-action: #181916;
+
+  --act-color-operational: #36c783;
+  --act-color-operational-hover: #55d99a;
+  --act-color-operational-soft: #193a2b;
+  --act-color-on-operational: #102119;
+
+  --act-color-info: #6ca6da;
+  --act-color-info-hover: #8ab9e2;
+  --act-color-info-soft: #1e3345;
+  --act-color-on-info: #a9cbe7;
+
+  --act-color-warning: #d2a14d;
+  --act-color-warning-soft: #3e321c;
+  --act-color-on-warning: #e2ba6b;
+  --act-color-on-warning-solid: #181916;
+
+  --act-color-danger: #e06b6b;
+  --act-color-danger-hover: #ef8585;
+  --act-color-danger-soft: #452525;
+  --act-color-on-danger: #f08a8a;
+  --act-color-on-danger-solid: #181916;
+
+  --act-color-success: #36c783;
+  --act-color-success-soft: #193a2b;
+  --act-color-on-success: #55d99a;
+
+  --act-color-overlay: rgba(0, 0, 0, 0.55);
+
+  --act-color-accent: var(--act-palette-dark-accent, var(--act-color-action));
+
+  --act-color-accent-hover: var(--act-palette-dark-accent-hover, var(--act-color-action-hover));
+  --act-color-on-accent: var(--act-palette-dark-on-accent, var(--act-color-on-action));
+  --act-color-toggle-on: var(--act-palette-dark-accent, var(--act-color-operational));
+  --act-color-link: var(--act-palette-dark-accent, var(--act-color-info));
+  --act-color-focus-ring: var(--act-palette-dark-accent, #c8c8c0);
+  --act-color-operational-focus-ring: #55d99a;
+  --act-color-selection: var(--act-palette-dark-selection, rgba(200, 200, 192, 0.2));
+  --act-color-annotation-highlight: rgba(108, 166, 218, 0.22);
+  --act-color-annotation-highlight-active: rgba(108, 166, 218, 0.38);
+  --act-color-annotation-mark: var(--act-color-info);
+  --act-color-on-annotation-mark: #181916;
+
+  --act-color-code-text: #c6d4e6;
+  --act-color-code-bg-top: #1d2024;
+  --act-color-code-bg-bottom: #191c1f;
+  --act-color-code-border: rgba(255, 255, 255, 0.08);
+  --act-color-inline-code-text: #d4d4cd;
+  --act-color-inline-code-bg: rgba(255, 255, 255, 0.06);
+  --act-color-inline-code-border: rgba(255, 255, 255, 0.1);
+  --act-color-quote-border: rgba(200, 200, 192, 0.4);
+  --act-color-table-head-bg: rgba(200, 200, 192, 0.1);
+  --act-color-table-head-text: #d4d4cd;
+
+  --act-color-diff-add-bg: rgba(53, 193, 135, 0.14);
+  --act-color-diff-add-text: #5fd49b;
+  --act-color-diff-remove-bg: rgba(239, 109, 109, 0.16);
+  --act-color-diff-remove-text: #f08a8a;
+  --act-color-diff-streaming-bg: rgba(53, 193, 135, 0.1);
+
+  --act-color-turn-card-fill: #292a26;
+  --act-color-turn-card-hover: #30312d;
+  --act-color-turn-card-tile: rgba(255, 255, 255, 0.05);
+  --act-color-diff-add-gutter: rgba(53, 193, 135, 0.24);
+  --act-color-diff-remove-gutter: rgba(239, 109, 109, 0.26);
+
+  --act-chart-series-1: #6ca6da;
+  --act-chart-series-2: #70b5be;
+  --act-chart-series-3: #aa96d7;
+  --act-chart-series-4: #df9477;
+  --act-chart-series-5: #55d99a;
+  --act-chart-series-6: #a2aaa9;
+
+  --act-context-system: #a2aaa9;
+  --act-context-tools: #aa96d7;
+  --act-context-rules: #55d99a;
+  --act-context-skills: #e2ba6b;
+  --act-context-summarized: #dc8db4;
+  --act-context-conversation: #dfa06a;
+  --act-context-fallback: #96968f;
+
+  --act-analysis-canvas: #1d1e1c;
+  --act-analysis-selection-soft: #21303d;
+  --act-analysis-user-soft: #202d38;
+  --act-analysis-assistant-soft: #1d3028;
+  --act-analysis-tool-soft: #2a2535;
+  --act-analysis-thinking-soft: #272825;
+
+  --act-gradient-surface-fade: linear-gradient(
+    180deg,
+    #242522 0%,
+    rgba(36, 37, 34, 0.96) 78%,
+    rgba(36, 37, 34, 0) 100%
+  );
+
+  --act-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --act-shadow-knob: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --act-shadow-thumb: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --act-shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --act-shadow-popover: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --act-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --act-shadow-composer: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px -6px rgb(0 0 0 / 0.4);
+  --act-shadow-composer-focus: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 32px -6px rgb(0 0 0 / 0.55);
+
+  --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+  --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
+  --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
+
+  --act-space-star: #eef1ff;
+  --act-space-grid-dot: rgba(238, 241, 255, 0.12);
+  --act-space-spark: #eef1ff;
+  --act-space-sky-stars-opacity: 1;
+  --act-space-sky-grid-opacity: 0;
+
+  /* 轨迹页深色（DeepSeek Harness 深色取值）。 */
+  --act-trajectory-label-primary: rgb(249, 250, 251);
+  --act-trajectory-label-secondary: rgb(207, 211, 214);
+  --act-trajectory-label-tertiary: rgb(173, 178, 184);
+  --act-trajectory-label-caption: rgb(129, 133, 140);
+  --act-trajectory-label-dimmed: rgb(67, 69, 74);
+  --act-trajectory-bg-base: rgb(21, 21, 23);
+  --act-trajectory-bg-layer-1: rgb(35, 35, 36);
+  --act-trajectory-bg-layer-2: rgb(44, 44, 46);
+  --act-trajectory-bg-module: rgb(53, 54, 56);
+  --act-trajectory-bg-sidebar: rgb(27, 27, 28);
+  --act-trajectory-border-l1: rgba(255, 255, 255, 0.06);
+  --act-trajectory-border-l2: rgba(255, 255, 255, 0.12);
+  --act-trajectory-border-l2-thin: rgba(255, 255, 255, 0.06);
+  --act-trajectory-border-l3: rgba(255, 255, 255, 0.16);
+  --act-trajectory-border-l4: rgba(255, 255, 255, 0.2);
+  --act-trajectory-hover: rgba(255, 255, 255, 0.08);
+  --act-trajectory-active: rgba(255, 255, 255, 0.14);
+  --act-trajectory-primary: rgb(122, 170, 255);
+  --act-trajectory-primary-soft: rgb(52, 65, 91);
+  --act-trajectory-primary-new: rgb(86, 134, 254);
+  --act-trajectory-blue: rgb(59, 130, 246);
+  --act-trajectory-error: rgb(242, 90, 90);
+  --act-trajectory-error-secondary: rgb(242, 90, 90);
+  --act-trajectory-success: rgb(34, 197, 94);
+  --act-trajectory-success-soft: rgb(35, 60, 44);
+  --act-trajectory-warn: rgb(221, 134, 41);
+  --act-trajectory-warn-soft: rgb(39, 36, 31);
+  --act-trajectory-scrollbar: rgb(84, 85, 87);
+  --act-trajectory-scrollbar-hover: rgb(101, 103, 107);
+  --act-trajectory-code-block: rgb(27, 27, 28);
+  --act-trajectory-citation: rgb(53, 54, 56);
+  --act-trajectory-tooltip-bg: rgb(67, 69, 74);
+  --act-trajectory-tooltip-text: rgb(255, 255, 255);
+  --act-trajectory-shadow-chip: 0 2px 6px rgba(0, 0, 0, 0.12);
+  --act-trajectory-shadow-drawer: -12px 0 32px rgba(0, 0, 0, 0.14);
+  --act-trajectory-shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.2), 0 3px 8px 0 rgba(0, 0, 0, 0.03), 0 0 16px 0 rgba(0, 0, 0, 0.02);
+  --act-json-property: #5db0d7;
+  --act-json-string: #f28b82;
+  --act-json-number: #99c8ff;
+  --act-json-keyword: #99c8ff;
+  --act-json-punctuation: #e8eaed;
+  --act-json-icon: #9aa0a6;
+  --act-json-hover: rgba(232, 234, 237, 0.05);
+  --web-glass: rgba(36, 37, 34, 0.72);
+  --web-glass-strong: rgba(42, 43, 40, 0.92);
+  --web-glass-border: rgba(255, 255, 255, 0.1);
+  --web-glass-edge: rgba(255, 255, 255, 0.05);
+  --web-glass-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color: #f1f1ed;
+    background: #181916;
+
+    --act-color-bg: #181916;
+    --act-color-surface: #242522;
+    --act-color-surface-subtle: #292a26;
+    --act-color-surface-raised: #30312d;
+    --act-color-sidebar: #1e1f1c;
+    --act-color-selected: #30312d;
+    --act-color-sidebar-selected: var(--act-color-selected);
+    --act-color-hover-overlay: #2a2b27;
+
+    --act-color-border: #353630;
+    --act-color-border-strong: #787870;
+    --act-color-composer-border: rgb(255 255 255 / 0.07);
+    --act-color-composer-border-focus: rgb(255 255 255 / 0.12);
+    --act-color-meter-track: #3a3b35;
+    --act-color-toggle-off: #4a4b45;
+
+    --act-color-text: #f1f1ed;
+    --act-color-text-muted: #b5b5ae;
+    --act-color-text-faint: #96968f;
+    --act-color-text-subtle: #787870;
+
+    --act-color-action: #f1f1ed;
+    --act-color-action-hover: #dbdbd5;
+    --act-color-on-action: #181916;
+
+    --act-color-operational: #36c783;
+    --act-color-operational-hover: #55d99a;
+    --act-color-operational-soft: #193a2b;
+    --act-color-on-operational: #102119;
+
+    --act-color-info: #6ca6da;
+    --act-color-info-hover: #8ab9e2;
+    --act-color-info-soft: #1e3345;
+    --act-color-on-info: #a9cbe7;
+
+    --act-color-warning: #d2a14d;
+    --act-color-warning-soft: #3e321c;
+    --act-color-on-warning: #e2ba6b;
+    --act-color-on-warning-solid: #181916;
+
+    --act-color-danger: #e06b6b;
+    --act-color-danger-hover: #ef8585;
+    --act-color-danger-soft: #452525;
+    --act-color-on-danger: #f08a8a;
+    --act-color-on-danger-solid: #181916;
+
+    --act-color-success: #36c783;
+    --act-color-success-soft: #193a2b;
+    --act-color-on-success: #55d99a;
+
+    --act-color-overlay: rgba(0, 0, 0, 0.55);
+
+    --act-color-accent: var(--act-palette-dark-accent, var(--act-color-action));
+
+    --act-color-accent-hover: var(--act-palette-dark-accent-hover, var(--act-color-action-hover));
+    --act-color-on-accent: var(--act-palette-dark-on-accent, var(--act-color-on-action));
+    --act-color-toggle-on: var(--act-palette-dark-accent, var(--act-color-operational));
+    --act-color-link: var(--act-palette-dark-accent, var(--act-color-info));
+    --act-color-focus-ring: var(--act-palette-dark-accent, #c8c8c0);
+    --act-color-operational-focus-ring: #55d99a;
+    --act-color-selection: var(--act-palette-dark-selection, rgba(200, 200, 192, 0.2));
+    --act-color-annotation-highlight: rgba(108, 166, 218, 0.22);
+    --act-color-annotation-highlight-active: rgba(108, 166, 218, 0.38);
+    --act-color-annotation-mark: var(--act-color-info);
+    --act-color-on-annotation-mark: #181916;
+
+    --act-color-code-text: #c6d4e6;
+    --act-color-code-bg-top: #1d2024;
+    --act-color-code-bg-bottom: #191c1f;
+    --act-color-code-border: rgba(255, 255, 255, 0.08);
+    --act-color-inline-code-text: #d4d4cd;
+    --act-color-inline-code-bg: rgba(255, 255, 255, 0.06);
+    --act-color-inline-code-border: rgba(255, 255, 255, 0.1);
+    --act-color-quote-border: rgba(200, 200, 192, 0.4);
+    --act-color-table-head-bg: rgba(200, 200, 192, 0.1);
+    --act-color-table-head-text: #d4d4cd;
+
+    --act-color-diff-add-bg: rgba(53, 193, 135, 0.14);
+    --act-color-diff-add-text: #5fd49b;
+    --act-color-diff-remove-bg: rgba(239, 109, 109, 0.16);
+    --act-color-diff-remove-text: #f08a8a;
+    --act-color-diff-streaming-bg: rgba(53, 193, 135, 0.1);
+
+    --act-color-turn-card-fill: #292a26;
+    --act-color-turn-card-hover: #30312d;
+    --act-color-turn-card-tile: rgba(255, 255, 255, 0.05);
+    --act-color-diff-add-gutter: rgba(53, 193, 135, 0.24);
+    --act-color-diff-remove-gutter: rgba(239, 109, 109, 0.26);
+
+    --act-chart-series-1: #6ca6da;
+    --act-chart-series-2: #70b5be;
+    --act-chart-series-3: #aa96d7;
+    --act-chart-series-4: #df9477;
+    --act-chart-series-5: #55d99a;
+    --act-chart-series-6: #a2aaa9;
+
+    --act-context-system: #a2aaa9;
+    --act-context-tools: #aa96d7;
+    --act-context-rules: #55d99a;
+    --act-context-skills: #e2ba6b;
+    --act-context-summarized: #dc8db4;
+    --act-context-conversation: #dfa06a;
+    --act-context-fallback: #96968f;
+
+    --act-analysis-canvas: #1d1e1c;
+    --act-analysis-selection-soft: #21303d;
+    --act-analysis-user-soft: #202d38;
+    --act-analysis-assistant-soft: #1d3028;
+    --act-analysis-tool-soft: #2a2535;
+    --act-analysis-thinking-soft: #272825;
+
+    --act-gradient-surface-fade: linear-gradient(
+      180deg,
+      #242522 0%,
+      rgba(36, 37, 34, 0.96) 78%,
+      rgba(36, 37, 34, 0) 100%
+    );
+
+    --act-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --act-shadow-knob: 0 1px 3px rgba(0, 0, 0, 0.45);
+    --act-shadow-thumb: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --act-shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.45);
+    --act-shadow-popover: 0 24px 64px rgba(0, 0, 0, 0.55);
+    --act-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.6);
+    --act-shadow-composer: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px -6px rgb(0 0 0 / 0.4);
+    --act-shadow-composer-focus: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 32px -6px rgb(0 0 0 / 0.55);
+
+    --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
+    --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+    --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
+    --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
+
+    --act-space-star: #eef1ff;
+    --act-space-grid-dot: rgba(238, 241, 255, 0.12);
+    --act-space-spark: #eef1ff;
+    --act-space-sky-stars-opacity: 1;
+    --act-space-sky-grid-opacity: 0;
+
+    /* 轨迹页深色（DeepSeek Harness 深色取值）。 */
+    --act-trajectory-label-primary: rgb(249, 250, 251);
+    --act-trajectory-label-secondary: rgb(207, 211, 214);
+    --act-trajectory-label-tertiary: rgb(173, 178, 184);
+    --act-trajectory-label-caption: rgb(129, 133, 140);
+    --act-trajectory-label-dimmed: rgb(67, 69, 74);
+    --act-trajectory-bg-base: rgb(21, 21, 23);
+    --act-trajectory-bg-layer-1: rgb(35, 35, 36);
+    --act-trajectory-bg-layer-2: rgb(44, 44, 46);
+    --act-trajectory-bg-module: rgb(53, 54, 56);
+    --act-trajectory-bg-sidebar: rgb(27, 27, 28);
+    --act-trajectory-border-l1: rgba(255, 255, 255, 0.06);
+    --act-trajectory-border-l2: rgba(255, 255, 255, 0.12);
+    --act-trajectory-border-l2-thin: rgba(255, 255, 255, 0.06);
+    --act-trajectory-border-l3: rgba(255, 255, 255, 0.16);
+    --act-trajectory-border-l4: rgba(255, 255, 255, 0.2);
+    --act-trajectory-hover: rgba(255, 255, 255, 0.08);
+    --act-trajectory-active: rgba(255, 255, 255, 0.14);
+    --act-trajectory-primary: rgb(122, 170, 255);
+    --act-trajectory-primary-soft: rgb(52, 65, 91);
+    --act-trajectory-primary-new: rgb(86, 134, 254);
+    --act-trajectory-blue: rgb(59, 130, 246);
+    --act-trajectory-error: rgb(242, 90, 90);
+    --act-trajectory-error-secondary: rgb(242, 90, 90);
+    --act-trajectory-success: rgb(34, 197, 94);
+    --act-trajectory-success-soft: rgb(35, 60, 44);
+    --act-trajectory-warn: rgb(221, 134, 41);
+    --act-trajectory-warn-soft: rgb(39, 36, 31);
+    --act-trajectory-scrollbar: rgb(84, 85, 87);
+    --act-trajectory-scrollbar-hover: rgb(101, 103, 107);
+    --act-trajectory-code-block: rgb(27, 27, 28);
+    --act-trajectory-citation: rgb(53, 54, 56);
+    --act-trajectory-tooltip-bg: rgb(67, 69, 74);
+    --act-trajectory-tooltip-text: rgb(255, 255, 255);
+    --act-trajectory-shadow-chip: 0 2px 6px rgba(0, 0, 0, 0.12);
+    --act-trajectory-shadow-drawer: -12px 0 32px rgba(0, 0, 0, 0.14);
+    --act-trajectory-shadow-panel: 0 0 0 0.5px rgba(255, 255, 255, 0.2), 0 3px 8px 0 rgba(0, 0, 0, 0.03), 0 0 16px 0 rgba(0, 0, 0, 0.02);
+    --act-json-property: #5db0d7;
+    --act-json-string: #f28b82;
+    --act-json-number: #99c8ff;
+    --act-json-keyword: #99c8ff;
+    --act-json-punctuation: #e8eaed;
+    --act-json-icon: #9aa0a6;
+    --act-json-hover: rgba(232, 234, 237, 0.05);
+    --web-glass: rgba(36, 37, 34, 0.72);
+    --web-glass-strong: rgba(42, 43, 40, 0.92);
+    --web-glass-border: rgba(255, 255, 255, 0.1);
+    --web-glass-edge: rgba(255, 255, 255, 0.05);
+  --web-glass-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.5);
+  }
+}

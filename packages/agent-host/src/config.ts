@@ -5,7 +5,7 @@ import { constants } from "node:fs";
 import { isRecord } from "@actspace/shared/host-protocol";
 export interface HostConfig {
   schemaVersion: 1; dataRoot: string; listen: { address: string; port: number };
-  tls?: { cert: string; key: string }; allowedOrigins: string[];
+  tls?: { cert: string; key: string }; allowedOrigins: string[]; webRoot?: string;
   workspaces: { id: string; name: string; path: string }[];
   providers: { id: string; type: "openai-completions" | "openai-responses" | "anthropic-messages"; baseUrl: string; keyEnv: string; models: string[] }[];
   defaultModel: string;
@@ -21,7 +21,7 @@ function identifier(value: unknown): string {
 }
 export async function readHostConfig(file: string, env: NodeJS.ProcessEnv = process.env): Promise<HostConfig> {
   const raw: unknown = JSON.parse(await readFile(file, "utf8"));
-  keys(raw, ["schemaVersion", "dataRoot", "listen", "tls", "allowedOrigins", "workspaces", "providers", "defaultModel"]);
+  keys(raw, ["schemaVersion", "dataRoot", "listen", "tls", "allowedOrigins", "webRoot", "workspaces", "providers", "defaultModel"]);
   if (raw.schemaVersion !== 1) throw new Error("Unsupported Host configuration version");
   keys(raw.listen, ["address", "port"]);
   const address = string(raw.listen.address), port = raw.listen.port;
@@ -30,6 +30,11 @@ export async function readHostConfig(file: string, env: NodeJS.ProcessEnv = proc
   if (raw.tls !== undefined) { keys(raw.tls, ["cert", "key"]); tls = { cert: resolve(base, string(raw.tls.cert)), key: resolve(base, string(raw.tls.key)) }; await access(tls.cert, constants.R_OK); await access(tls.key, constants.R_OK); createSecureContext({ cert: await readFile(tls.cert), key: await readFile(tls.key) }); }
   if (!tls && !["127.0.0.1", "::1"].includes(address)) throw new Error("Public Host binding requires TLS");
   if (!Array.isArray(raw.allowedOrigins) || raw.allowedOrigins.some(origin => typeof origin !== "string" || new URL(origin).origin !== origin || !origin.startsWith("https://"))) throw new Error("Origins must be exact HTTPS origins");
+  let webRoot: string | undefined;
+  if (raw.webRoot !== undefined) {
+    try { webRoot = await realpath(resolve(base, string(raw.webRoot))); if (!(await stat(webRoot)).isDirectory()) throw new Error(); await access(webRoot, constants.R_OK | constants.X_OK); }
+    catch { throw new Error("webRoot must be an existing directory"); }
+  }
   if (!Array.isArray(raw.workspaces) || !raw.workspaces.length) throw new Error("At least one workspace required");
   const workspaces: HostConfig["workspaces"] = [];
   for (const item of raw.workspaces) {
@@ -61,5 +66,5 @@ export async function readHostConfig(file: string, env: NodeJS.ProcessEnv = proc
     try { const info = await stat(parent); if (!info.isDirectory()) throw new Error("Host data path is not a directory"); await access(parent, constants.W_OK | constants.X_OK); break; }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT" || dirname(parent) === parent) throw error; parent = dirname(parent); }
   }
-  return { schemaVersion: 1, dataRoot: resolve(base, string(raw.dataRoot)), listen: { address, port }, ...(tls ? { tls } : {}), allowedOrigins: raw.allowedOrigins as string[], workspaces, providers, defaultModel };
+  return { schemaVersion: 1, dataRoot: resolve(base, string(raw.dataRoot)), listen: { address, port }, ...(tls ? { tls } : {}), allowedOrigins: raw.allowedOrigins as string[], ...(webRoot ? { webRoot } : {}), workspaces, providers, defaultModel };
 }

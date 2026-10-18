@@ -68,7 +68,7 @@ export async function bootstrapHost(config: HostConfig, options: {
     let rpc: HostRpc | undefined;
     const gateway = new HostGateway({ auth, address: config.listen.address, port: config.listen.port,
       ...(config.tls ? { tls: { cert: await readFile(config.tls.cert, "utf8"), key: await readFile(config.tls.key, "utf8") } } : {}),
-      allowedOrigins: config.allowedOrigins, state: () => lifecycle?.state() ?? "blocked",
+      allowedOrigins: config.allowedOrigins, ...(config.webRoot ? { webRoot: config.webRoot } : {}), state: () => lifecycle?.state() ?? "blocked",
       dispatch: async (method, params, context) => {
         await admin.assertOwned();
         if (!rpc) throw new Error("Host starting");
@@ -90,10 +90,17 @@ export async function bootstrapHost(config: HostConfig, options: {
       onState: state => observations.publish("host", { kind: "state", state }), forceExit: options.forceExit,
     });
     const { application } = runtime;
-    rpc = new HostRpc({ application, config, approvals, observations, uploads, output, artifacts: new HostArtifacts(uploads, artifacts), state: () => lifecycle!.state() });
+    // Session lists observe the host topic only; run state is otherwise published per session.
+    const running = new Set<string>();
+    rpc = new HostRpc({ application, config, approvals, observations, uploads, output, artifacts: new HostArtifacts(uploads, artifacts), state: () => lifecycle!.state(), runningSessions: () => [...running] });
     own(runtime.subscribeTasks(containNotification({ logger: { error: (_message, error) => options.log(`Task notification observer failed: ${String(error)}`) } }, snapshot => {
       for (const run of snapshot.runs) if (run.state !== "running") output.clear(snapshot.sessionId, run.runId);
       observations.publish(snapshot.sessionId, { kind: "tasks", snapshot });
+      const active = snapshot.runs.some(run => run.state === "running");
+      if (active !== running.has(snapshot.sessionId)) {
+        if (active) running.add(snapshot.sessionId); else running.delete(snapshot.sessionId);
+        observations.publish("host", { kind: "activity", sessionId: snapshot.sessionId, running: active });
+      }
       observations.publish("host", { kind: "sessions-changed" });
     })));
     own(application.subscribeSessionProjection(update => {

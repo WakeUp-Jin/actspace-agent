@@ -18,6 +18,8 @@
 - `pnpm test`
 - `pnpm package:desktop`
 - `pnpm dev:site`
+- `pnpm dev:web`
+- `pnpm build:web`
 - `pnpm check:site`
 - `pnpm test:site`
 - `pnpm build:site`
@@ -45,6 +47,7 @@
   - 执行 `pnpm install --frozen-lockfile`。
   - 执行 `pnpm typecheck`、`pnpm test`、`pnpm build`。
   - 显式执行站点的 `check:site`、`test:site` 和 `build:site`，并使用 Netlify 的 `/` base path 验证生产构建；CI 中的 `https://example.com` 仅用于构建检查，不是官网地址。
+- 浏览器客户端 `apps/web` 没有单独的 workflow：`pnpm typecheck`、`pnpm test`（`pnpm -r`）覆盖它的类型检查和 vitest，根 `pnpm build` 在 desktop 之后执行 `@actspace/web build`（依赖 desktop 构建先产出的 `@actspace/client` dist）。`pnpm check:frontend-tokens` 和 `pnpm check:frontend-theme` 同时检查 desktop 与 web 两套前端。web 产物 `apps/web/dist` 目前不打进任何发布包，由用户在 Host 配置的 `webRoot` 指向它。
 - workspace 依赖当前允许 `electron` 和 `esbuild` 执行构建脚本；否则 Electron 开发启动无法正确安装运行时。
 - 当前桌面端优先跟随较新的稳定 Electron 版本，以降低 macOS 26 这类新系统上的启动兼容风险。
 - `apps/desktop` 的开发启动依赖 `packages/shared`、领域 packages 和 `packages/runtime` 的可消费构建产物；如果包边界被改回源码直引，Electron 启动链会再次失稳。

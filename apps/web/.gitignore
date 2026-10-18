@@ -1,0 +1,4 @@
+# 本机联调：复制自 dev-host.config.example.json 的配置、Host 数据和示例工作区
+dev-host.config.json
+.host-data/
+.dev-workspace/

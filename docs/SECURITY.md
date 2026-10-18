@@ -133,4 +133,11 @@ nono 挡住了边界外的破坏，但边界内仍有需要人工兜底的风险
 - 大响应使用连接内有界分页，不能无限累积慢客户端队列。管理命令仅通过受保护的本地 dataRoot 管理目录，未暴露网络管理权限。
 - 远端会话历史缓存、待确认正文和附件路径会保留在本机应用数据中，以支持离线查看和查证；它们不是设备密钥。移除连接不等于删除 Host 上的会话或撤销服务器设备授权；撤销使用服务器管理命令。
 
+### 浏览器客户端（apps/web）
+
+- 配对得到的设备 token 存在该浏览器 `localStorage`（键 `actspace.web.hosts`），不加密；防护依赖同源隔离、CSP 与不渲染不可信 HTML（Markdown 不启用原始 HTML，链接只允许 https/http/mailto）。丢失设备时在服务器执行 `host revoke`；页面收到 4003 或 `REVOKED` 后清除本地 token 并回到连接页。
+- Host 静态托管（`webRoot`）对每个请求 `realpath` 后校验仍在 `webRoot` 内，拒绝目录穿越和指向外部的符号链接；只允许 GET/HEAD。响应带 `Content-Security-Policy`（`default-src 'self'`，`connect-src` 只额外列出页面自身主机的 ws/wss，`frame-ancestors 'none'`）、`nosniff` 与 `Referrer-Policy: no-referrer`。
+- WebSocket 的 Origin：`allowedOrigins` 只接受精确的 https origin；回环 http 来源（`http://127.0.0.1|localhost|[::1]:*`）仅在 Host 未启用 TLS（即只能回环监听）时放行，用于本机开发和同源预览。手机经 `tailscale serve` 访问时必须把 `ts.net` 地址写进 `allowedOrigins`。
+- Service Worker 只缓存导航页面与 `/assets/*`，从不缓存或拦截 `/rpc`。
+
 操作说明与当前验收边界见 [Agent Host](design-docs/agent-plugin-runtime/agent-host-guide.md) 和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。

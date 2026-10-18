@@ -3,6 +3,8 @@ import test from "node:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   checkCssBlocks,
   checkNativeButtons,
@@ -13,7 +15,9 @@ import {
   collectNativeButtonCounts,
   countNativeButtons,
   loadNativeButtonBaseline,
+  runAllChecks,
   runCheck,
+  WEB_PROFILE,
 } from "../check-frontend-design-tokens.mjs";
 
 const rules = (relative, source) => checkSource(relative, source).map((violation) => `${violation.rule}:${violation.match}`);
@@ -200,4 +204,89 @@ test("the current renderer passes the check and matches the native button baseli
   const notices = [];
   assert.deepEqual(runCheck(undefined, loadNativeButtonBaseline(), notices), []);
   assert.deepEqual(notices, []);
+});
+
+// ---- apps/web 扫描根 ----
+
+const lightTokens = ["bg", "surface", "surface-subtle", "surface-raised", "sidebar", "selected", "sidebar-selected", "hover-overlay", "border", "border-strong", "meter-track", "toggle-off", "text", "text-muted", "text-faint", "text-subtle", "action", "action-hover", "on-action", "operational", "operational-hover", "operational-soft", "on-operational", "info", "info-hover", "info-soft", "on-info", "warning", "warning-soft", "on-warning", "danger", "danger-hover", "danger-soft", "on-danger", "on-danger-solid", "success", "success-soft", "on-success", "accent", "accent-hover", "on-accent", "toggle-on", "link", "focus-ring", "operational-focus-ring", "selection"]
+  .map((name) => `--act-color-${name}: #112233;`)
+  .join(" ");
+
+function makeWebRepo(files) {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "frontend-web-"));
+  const src = path.join(repo, "apps/web/src");
+  fs.mkdirSync(path.join(src, "styles"), { recursive: true });
+  fs.writeFileSync(path.join(src, "styles/tailwind.css"), "@theme inline { --text-act-base: 15px; --text-act-sm: 13px; --radius-act-md: 8px; }\n");
+  fs.writeFileSync(
+    path.join(src, "styles/tokens.css"),
+    `:root { ${lightTokens} --web-glass: rgba(255,255,255,.72); }\n@media (prefers-color-scheme: dark) { :root { ${lightTokens} --web-glass: rgba(36,37,34,.72); } }\n`,
+  );
+  for (const [relative, source] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(src, relative)), { recursive: true });
+    fs.writeFileSync(path.join(src, relative), source);
+  }
+  return repo;
+}
+
+const webProblems = (files) => {
+  const repo = makeWebRepo(files);
+  try {
+    return runAllChecks(repo, {}).flatMap((result) => result.problems);
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true });
+  }
+};
+
+test("web root: text-act-base is valid in web but undefined in desktop tokens", () => {
+  assert.deepEqual(webProblems({ "pages/A.tsx": 'export const A = () => <p className="text-act-base text-act-sm" />;' }), []);
+  const desktopDefined = collectDefinedVariables([fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../apps/desktop/src/renderer/styles/tailwind.css"), "utf8")]);
+  assert.deepEqual(checkTokenReferences("a.tsx", 'x="text-act-base"', desktopDefined).map((item) => item.variable), ["--text-act-base"]);
+});
+
+test("web root: hard-coded font sizes and undefined tokens fail", () => {
+  const problems = webProblems({ "pages/A.tsx": 'export const A = () => <p className="text-[13px] text-act-huge" />;' });
+  assert.equal(problems.length, 2);
+  assert.match(problems[0], /^\[web\] pages\/A\.tsx:1 text-\[13px\]/);
+  assert.match(problems[1], /未定义的 token --text-act-huge/);
+});
+
+test("web root: native <button>, createPortal and role=dialog are only allowed in ui/", () => {
+  const problems = webProblems({
+    "pages/A.tsx": 'createPortal(<div role="dialog"><button /></div>, document.body);',
+    "ui/Button.tsx": 'export const Button = () => <button type="button" />;',
+    "ui/Sheet.tsx": 'createPortal(<div role="dialog" />, document.body);',
+    "test/A.test.tsx": "<button />;",
+  });
+  assert.equal(problems.length, 3);
+  assert.ok(problems.some((problem) => /pages\/A\.tsx:1 createPortal — .*apps\/web|pages\/A\.tsx:1 createPortal — 弹层用 ui\//.test(problem)));
+  assert.ok(problems.some((problem) => /role="dialog" — .*ui\//.test(problem)));
+  assert.ok(problems.some((problem) => /^\[web\] pages\/A\.tsx 有 1 个原生 <button>，基线是 0 — 用 ui\/ 的 Button/.test(problem)));
+});
+
+test("web root is skipped when apps/web/src does not exist", () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "frontend-noweb-"));
+  try {
+    assert.deepEqual(runAllChecks(repo, {}), []);
+    assert.equal(WEB_PROFILE.root, "apps/web/src");
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("theme check script scans apps/web/src and flags raw color utilities", () => {
+  const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "../check-frontend-theme-colors.mjs");
+  const run = (files) => {
+    const repo = makeWebRepo(files);
+    try {
+      return spawnSync(process.execPath, [script], { env: { ...process.env, FRONTEND_CHECK_REPO_ROOT: repo }, encoding: "utf8" });
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  };
+  const ok = run({ "pages/A.tsx": 'x = "bg-surface text-text-main";' });
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(ok.stdout, /web/);
+  const bad = run({ "pages/A.tsx": 'x = "bg-white text-[#fff]";' });
+  assert.notEqual(bad.status, 0);
+  assert.match(bad.stderr, /\[web\] pages\/A\.tsx contains non-theme-aware color utility bg-white/);
 });

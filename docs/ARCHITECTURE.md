@@ -16,6 +16,7 @@
 - `packages/harness-control`：Host 级固定 Harness 选择服务，负责 Patch 准备、独立授权、持久启用、恢复与回退；执行者只能经它异步获取租约。详见 [P3 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-3.md)。
 - `packages/session/storage`：存储中性 provider/handle 契约；`session/jsonl` 提供物理实现，`session/persistence` 负责 Session 业务语义。读写、列表、恢复、fork 与缓存均通过注入后端，详见[存储规范](design-docs/agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
 - `packages/shared`：IPC contracts、session schema、跨进程共享类型。
+- `apps/web`：浏览器 / PWA 客户端（React + Vite），手机和电脑浏览器经 WebSocket `/rpc` 连接一台 Agent Host，查看会话、审批与发送消息；可由 Host 的 `webRoot` 同源托管。设计见 [front-web-pwa客户端规范](design-docs/frontend/front-web-pwa客户端规范.md)。
 - `apps/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。
 - `browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层。
 - `scripts/`：正式自动化入口；人工诊断位于 `diagnostics/`，原生实验位于 `experiments/`，可复建验收环境位于 `acceptance/`。
@@ -39,6 +40,11 @@
 - `packages/shared`
   - 只放跨进程共享契约和类型
   - 不依赖 `desktop` 或旧版 Agent Core
+
+- `apps/web`
+  - 只依赖 `packages/shared` 与 `@actspace/client`（`host`、`sessions`、`live` 子入口），通过 Host 协议访问 `packages/agent-host`，不加载 Runtime、不访问文件系统
+  - 不依赖 `apps/desktop` 源码；与 desktop 共用的实时流折叠逻辑在 `@actspace/client/live`，desktop 侧只保留 re-export
+  - 构建产物是静态文件，由 Host 静态托管（`webRoot`）或 Vite 开发服务器提供
 
 - `apps/site`
   - 独立消费公开 Markdown 与脱敏后的静态资产

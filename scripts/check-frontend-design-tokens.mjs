@@ -3,7 +3,9 @@
 // 另有少量 CSS 块规则（CSS_BLOCK_RULES），守住个别选择器里的禁用值和必要行为。
 // 颜色契约（tokens、强调色、黑白与任意值颜色）由 check-frontend-theme-colors.mjs 负责；这里只拦 Tailwind 调色板色名和旧的彩色焦点环。
 // 基础组件约束（16 S8）：原生 <button> 按文件不超过基线；createPortal 和 role="dialog" 只能写在 components/ui/。
-// 规范见 docs/design-docs/frontend/front-全局视觉语言规范.md。
+// 扫描根是一个列表（SCAN_PROFILES）：desktop = apps/desktop/src/renderer，web = apps/web/src（目录不存在时静默跳过）。
+// 每个根读自己的 token 定义；web 的原生 <button>、createPortal、role="dialog" 只允许在 apps/web/src/ui/，其余基线为 0，没有字面量例外。
+// 规范见 docs/design-docs/frontend/front-全局视觉语言规范.md 和 front-web-pwa客户端规范.md §10。
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,6 +92,30 @@ export const UI_ONLY_ALLOWLIST = new Map([
   ["components/composer/ResponseAnnotationPill.tsx", ["role-dialog-outside-ui"]],
 ]);
 
+/**
+ * 扫描根配置。root 相对仓库根；styleFiles 为 null 表示读 styles/ 下全部 css。
+ * 例外表和 CSS 块规则只属于 desktop；web 全部为空（不允许字面量例外）。
+ */
+export const DESKTOP_PROFILE = {
+  name: "desktop",
+  root: "apps/desktop/src/renderer",
+  primitivesDir: UI_PRIMITIVES_DIR,
+  styleFiles: null,
+  literalAllowlist: LITERAL_ALLOWLIST,
+  uiOnlyAllowlist: UI_ONLY_ALLOWLIST,
+  cssBlockRules: CSS_BLOCK_RULES,
+};
+export const WEB_PROFILE = {
+  name: "web",
+  root: "apps/web/src",
+  primitivesDir: "ui/",
+  styleFiles: ["styles/tailwind.css", "styles/tokens.css"],
+  literalAllowlist: new Map(),
+  uiOnlyAllowlist: new Map(),
+  cssBlockRules: [],
+};
+export const SCAN_PROFILES = [DESKTOP_PROFILE, WEB_PROFILE];
+
 // 组件中引用的 token 类 → 需要在 tailwind.css / tokens.css 中存在的变量名。
 const TOKEN_REFERENCES = [
   { pattern: /(?<![\w-])text-act-([a-z0-9]+)(?![\w-])/g, variable: (name) => `--text-act-${name}` },
@@ -107,8 +133,8 @@ function lineOf(source, index) {
 }
 
 /** 检查单个文件的写死值；返回 { rule, match, line, hint }[]。 */
-export function checkSource(relative, source) {
-  const allowed = LITERAL_ALLOWLIST.get(relative) ?? [];
+export function checkSource(relative, source, profile = DESKTOP_PROFILE) {
+  const allowed = profile.literalAllowlist.get(relative) ?? [];
   const code = stripComments(source);
   const violations = [];
   for (const rule of RULES) {
@@ -121,23 +147,23 @@ export function checkSource(relative, source) {
 }
 
 /** createPortal / role="dialog" 是否写在了 components/ui/ 之外；返回 { rule, match, line, hint }[]。 */
-export function checkUiOnly(relative, source) {
-  if (relative.startsWith(UI_PRIMITIVES_DIR)) return [];
-  const allowed = UI_ONLY_ALLOWLIST.get(relative) ?? [];
+export function checkUiOnly(relative, source, profile = DESKTOP_PROFILE) {
+  if (relative.startsWith(profile.primitivesDir)) return [];
+  const allowed = profile.uiOnlyAllowlist.get(relative) ?? [];
   const code = stripComments(source);
   const violations = [];
   for (const rule of UI_ONLY_RULES) {
     if (allowed.includes(rule.id)) continue;
     for (const match of code.matchAll(rule.pattern)) {
-      violations.push({ rule: rule.id, match: match[0], line: lineOf(code, match.index), hint: rule.hint });
+      violations.push({ rule: rule.id, match: match[0], line: lineOf(code, match.index), hint: rule.hint.replaceAll(UI_PRIMITIVES_DIR, profile.primitivesDir) });
     }
   }
   return violations;
 }
 
 /** 文件里原生 `<button` 的个数（不含注释）；components/ui/ 不计数。 */
-export function countNativeButtons(relative, source) {
-  if (relative.startsWith(UI_PRIMITIVES_DIR) || !relative.endsWith(".tsx")) return 0;
+export function countNativeButtons(relative, source, primitivesDir = UI_PRIMITIVES_DIR) {
+  if (relative.startsWith(primitivesDir) || !relative.endsWith(".tsx")) return 0;
   return stripComments(source).match(/<button(?![\w-])/g)?.length ?? 0;
 }
 
@@ -145,13 +171,13 @@ export function countNativeButtons(relative, source) {
  * 原生按钮数量对照基线：超过基线（含基线里没有的新文件）是错误；低于基线只提示收紧。
  * 返回 { errors: string[], notices: string[] }。
  */
-export function checkNativeButtons(counts, baseline) {
+export function checkNativeButtons(counts, baseline, primitivesDir = UI_PRIMITIVES_DIR) {
   const errors = [];
   const notices = [];
   for (const [relative, count] of [...counts].sort(([a], [b]) => a.localeCompare(b))) {
     const limit = baseline[relative] ?? 0;
     if (count > limit) {
-      errors.push(`${relative} 有 ${count} 个原生 <button>，基线是 ${limit} — 用 components/ui/ 的 Button / IconButton；确实需要原生按钮时说明原因并更新基线`);
+      errors.push(`${relative} 有 ${count} 个原生 <button>，基线是 ${limit} — 用 ${primitivesDir} 的 Button / IconButton；确实需要原生按钮时说明原因并更新基线`);
     } else if (count < limit) {
       notices.push(`${relative} 原生 <button> 从 ${limit} 降到 ${count}，可以收紧基线`);
     }
@@ -247,39 +273,67 @@ function collectFiles(directory) {
 }
 
 /** renderer 各文件的原生按钮数（只列大于 0 的）。 */
-export function collectNativeButtonCounts(root = rendererRoot) {
+export function collectNativeButtonCounts(root = rendererRoot, primitivesDir = UI_PRIMITIVES_DIR) {
   const counts = new Map();
   for (const file of collectFiles(root)) {
     const relative = path.relative(root, file).split(path.sep).join("/");
-    const count = countNativeButtons(relative, fs.readFileSync(file, "utf8"));
+    const count = countNativeButtons(relative, fs.readFileSync(file, "utf8"), primitivesDir);
     if (count > 0) counts.set(relative, count);
   }
   return counts;
 }
 
-export function runCheck(root = rendererRoot, baseline = loadNativeButtonBaseline(), notices = []) {
+export function runCheck(root, baseline = loadNativeButtonBaseline(), notices = [], profile = DESKTOP_PROFILE) {
+  root = root ?? path.join(repoRoot, profile.root);
   const styleDir = path.join(root, "styles");
-  const styleFiles = fs.readdirSync(styleDir).filter((name) => name.endsWith(".css"));
-  const styleSources = new Map(styleFiles.map((name) => [`styles/${name}`, fs.readFileSync(path.join(styleDir, name), "utf8")]));
-  const defined = collectDefinedVariables([...styleSources.values()]);
+  const styleNames = profile.styleFiles ?? fs.readdirSync(styleDir).filter((name) => name.endsWith(".css")).map((name) => `styles/${name}`);
   const problems = [];
-  for (const rule of CSS_BLOCK_RULES) {
+  const styleSources = new Map();
+  for (const relative of styleNames) {
+    const absolute = path.join(root, relative);
+    if (fs.existsSync(absolute)) styleSources.set(relative, fs.readFileSync(absolute, "utf8"));
+    else problems.push(`${relative} — 找不到 ${profile.name} 的样式层文件`);
+  }
+  const defined = collectDefinedVariables([...styleSources.values()]);
+  for (const rule of profile.cssBlockRules) {
     if (!styleSources.has(rule.file)) problems.push(`${rule.file} — 找不到 CSS 块规则 ${rule.id} 指定的文件`);
   }
   for (const [relative, source] of styleSources) {
-    for (const v of checkCssBlocks(relative, source)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
+    for (const v of checkCssBlocks(relative, source, profile.cssBlockRules)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
   }
   for (const file of collectFiles(root)) {
     const relative = path.relative(root, file).split(path.sep).join("/");
     const source = fs.readFileSync(file, "utf8");
-    for (const v of checkSource(relative, source)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
+    for (const v of checkSource(relative, source, profile)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
     for (const m of checkTokenReferences(relative, source, defined)) problems.push(`${relative}:${m.line} ${m.match} — 未定义的 token ${m.variable}`);
-    for (const v of checkUiOnly(relative, source)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
+    for (const v of checkUiOnly(relative, source, profile)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
   }
-  const buttons = checkNativeButtons(collectNativeButtonCounts(root), baseline);
+  const buttons = checkNativeButtons(collectNativeButtonCounts(root, profile.primitivesDir), baseline, profile.primitivesDir);
   problems.push(...buttons.errors);
   notices.push(...buttons.notices);
   return problems;
+}
+
+/**
+ * 对仓库里存在的每个扫描根运行检查；根目录不存在则跳过。
+ * 返回 { name, root, problems, notices }[]，problems / notices 已加上 `[name]` 前缀。web 的原生按钮基线固定为 0。
+ */
+export function runAllChecks(repo = repoRoot, desktopBaseline = loadNativeButtonBaseline()) {
+  const results = [];
+  for (const profile of SCAN_PROFILES) {
+    const root = path.join(repo, profile.root);
+    if (!fs.existsSync(root)) continue;
+    const notices = [];
+    const baseline = profile.name === "desktop" ? desktopBaseline : {};
+    const problems = runCheck(root, baseline, notices, profile);
+    results.push({
+      name: profile.name,
+      root: profile.root,
+      problems: problems.map((problem) => `[${profile.name}] ${problem}`),
+      notices: notices.map((notice) => `[${profile.name}] ${notice}`),
+    });
+  }
+  return results;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes("--update-native-button-baseline")) {
@@ -288,14 +342,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   fs.writeFileSync(NATIVE_BUTTON_BASELINE_PATH, `${JSON.stringify(counts, null, 2)}\n`);
   console.log(`已写入 ${path.relative(repoRoot, NATIVE_BUTTON_BASELINE_PATH)}：${Object.keys(counts).length} 个文件，${Object.values(counts).reduce((sum, n) => sum + n, 0)} 个原生 <button>`);
 } else if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const notices = [];
-  const problems = runCheck(rendererRoot, loadNativeButtonBaseline(), notices);
-  for (const notice of notices) console.log(`  提示：${notice}`);
+  const results = runAllChecks();
+  const problems = results.flatMap((result) => result.problems);
+  for (const result of results) for (const notice of result.notices) console.log(`  提示：${notice}`);
   if (problems.length) {
     console.error(`frontend design token check failed (${problems.length}):`);
     for (const problem of problems) console.error(`  ${problem}`);
     process.exitCode = 1;
   } else {
-    console.log("前端设计 token 检查通过");
+    console.log(`前端设计 token 检查通过（${results.map((result) => `${result.name}: ${result.root}`).join("；")}）`);
   }
 }

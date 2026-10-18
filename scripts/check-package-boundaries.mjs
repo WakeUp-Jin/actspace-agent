@@ -17,7 +17,8 @@ async function walk(dir, kind) {
   for (const entry of entries) {
     if (entry.name === "node_modules" || entry.name === "dist") continue;
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) await walk(path, kind);
+    // 隐藏目录不放包（如 apps/web/.host-data 是本地 Host 数据，里面的产物带 package.json）
+    if (entry.isDirectory()) { if (!entry.name.startsWith(".")) await walk(path, kind); }
     else if (entry.name === "package.json") {
       const manifest = JSON.parse(await readFile(path, "utf8"));
       manifests.set(manifest.name, { manifest, path, dir, kind });
@@ -30,7 +31,7 @@ function dependencyNames(manifest) {
 }
 
 function assertExports(name, manifest) {
-  const exempt = new Set(["@actspace/desktop", "@actspace/agent-cli", "@actspace/shared", "@actspace/site"]);
+  const exempt = new Set(["@actspace/desktop", "@actspace/agent-cli", "@actspace/shared", "@actspace/site", "@actspace/web"]);
   if (exempt.has(name)) return;
   if (!manifest.exports || typeof manifest.exports !== "object" || !manifest.exports["."]) failures.push(`${name}: missing package exports['.']`);
   const isLeaf = name.startsWith("@actspace/");
