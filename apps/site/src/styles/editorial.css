@@ -40,7 +40,7 @@
 .post-intro h1 {
   font-family: var(--blog-serif);
   font-size: clamp(35px, calc(28.857px + 1.607vw), 52px);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.25;
   margin: 0 0 24px;
   text-wrap: initial;

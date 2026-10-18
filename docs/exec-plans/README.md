@@ -24,7 +24,7 @@
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
-| [官网首页改版与全站轻量统一](active/20260926-site-homepage-redesign.md) | T1–T9、T11 已完成（check/test/build 通过，四宽度截图对照）；只剩 T10：用户重拍 `context-detail.png` 后替换并移入 completed。 |
+| [官网 V4：运行空间叙事与纸本插件舞台](active/20261017-site-v4-redesign.md) | 2026-10-17 阶段 A（T1–T7）完成，未提交，分支 `feat/site-redesign-v4`：首页重写为 HTML/CSS 插件舞台，全站纸本统一；check/test/build 通过。待用户验收，阶段 B（文档重写与截图标注）验收后另立计划，见[执行摘要](../exec-runs/20261017-site-v4-redesign/execution-summary.md)。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；DropdownMenu（及 Popover、Dialog、Select、ContextMenu）由 Desktop 前端重构 16 接手；剩 Switch、Textarea、Tabs 及对应迁移。 |
 | [工具审批卡 · Cursor 式](active/20261011-approval-card-cursor-style/README.md) | 2026-10-11 前端实现与自动化验证完成；Bash 前缀授权[完整方案](active/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md)已实现，见[执行摘要](../exec-runs/20261011-bash-command-prefix-grant/execution-summary.md)；后端和审批定向测试通过，桌面全量仍有 watcher 回归门槛；Electron 实机验收待做。 |

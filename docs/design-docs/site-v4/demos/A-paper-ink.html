@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ActSpace · 方向 A 纸与墨</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f3eee5; --paper-2:#ebe5d8; --card:#faf7f0;
+  --ink:#1f1b16; --ink-2:#5c554a; --ink-3:#8a8275;
+  --rule:rgba(31,27,22,.2); --rule-soft:rgba(31,27,22,.1);
+  --accent:#5f43b3;
+  --peach:#fee0cf; --slate:#52688a;
+  --serif:"Newsreader","Noto Serif SC","Songti SC",Georgia,serif;
+  --sans:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --head:60px;
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1360px;margin:0 auto;padding:0 40px;position:relative;z-index:1}
+
+/* header */
+header{position:fixed;top:0;left:0;right:0;height:var(--head);z-index:20;background:rgba(243,238,229,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule)}
+header .wrap{height:100%;display:flex;align-items:center;gap:40px}
+.brand{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-size:20px;font-weight:500}
+.brand img{width:26px;height:26px}
+nav{display:flex;gap:26px;font-size:14px;color:var(--ink-2)}
+nav a[aria-current]{color:var(--ink);box-shadow:0 1.5px 0 var(--ink);padding-bottom:2px}
+nav a:hover{color:var(--ink)}
+.hr{margin-left:auto;display:flex;align-items:center;gap:18px}
+.hr svg{width:20px;height:20px;fill:var(--ink)}
+.btn{display:inline-flex;align-items:center;font-size:14px;font-weight:500;background:var(--ink);color:var(--paper);padding:7px 16px;border-radius:4px;border:1px solid var(--ink);transition:background .2s}
+.btn:hover{background:#3a332b}
+.btn.lg{font-size:15px;padding:11px 22px}
+.tlink{font-size:15px;color:var(--ink);border-bottom:1px solid var(--ink);padding-bottom:1px}
+.tlink:hover{color:var(--accent);border-color:var(--accent)}
+
+/* hero */
+.hero{padding-top:var(--head);height:100vh;min-height:620px;max-height:960px;display:flex;align-items:center}
+.hero .wrap{display:grid;grid-template-columns:1fr 1.02fr;gap:56px;align-items:center;width:100%}
+.eyebrow{font-family:var(--serif);font-style:italic;font-size:17px;color:var(--accent);display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.eyebrow::before{content:"";width:28px;height:1px;background:var(--accent)}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(46px,5.4vw,78px);line-height:1.12;letter-spacing:-.01em;text-wrap:balance}
+h1 .l{display:block;white-space:nowrap}
+h1 mark{background:linear-gradient(transparent 62%,rgba(95,67,179,.2) 62%);color:inherit;padding:0 2px}
+.lede{margin-top:26px;max-width:30em;font-size:17px;color:var(--ink-2);text-wrap:pretty}
+.cta{margin-top:30px;display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+
+.plate{position:relative;border-radius:6px;overflow:visible}
+.hero .plate{background:var(--peach);height:min(640px,calc(100vh - var(--head) - 70px));min-height:520px;padding:0;overflow:hidden}
+.hero .spirit{position:absolute;top:0;right:30px;width:340px;z-index:1}
+.win{position:absolute;left:44px;right:44px;top:225px;bottom:-1px;background:var(--card);border:1px solid var(--ink);border-bottom:0;border-radius:8px 8px 0 0;z-index:2;display:flex;flex-direction:column;overflow:hidden}
+.win-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule-soft);font-size:12px;color:var(--ink-3);font-family:var(--mono)}
+.win-bar i{width:9px;height:9px;border-radius:50%;border:1px solid var(--ink-3)}
+.win-bar span{margin-left:8px}
+.chat{padding:18px 20px;display:flex;flex-direction:column;gap:12px;font-size:14px;flex:1}
+.msg-u{align-self:flex-end;background:var(--paper-2);border-radius:8px 8px 2px 8px;padding:9px 13px;max-width:82%;line-height:1.55}
+.step{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-2);padding:7px 0;border-bottom:1px solid var(--rule-soft)}
+.step b{font-family:var(--mono);font-weight:500;font-size:11.5px;color:var(--ink);background:var(--paper-2);padding:1px 6px;border-radius:3px;white-space:nowrap}
+.step em{margin-left:auto;font-style:normal;font-family:var(--mono);font-size:12px;color:var(--ink-3);white-space:nowrap}
+.step em .p{color:#3d7a52}.step em .m{color:#b0553d}
+.msg-a{font-size:14px;line-height:1.6}
+.composer{margin:0 16px 16px;border:1px solid var(--rule);border-radius:6px;padding:10px 12px;font-size:13px;color:var(--ink-3);background:var(--paper)}
+
+/* feature */
+.feature{padding:28px 0 44px}
+.feature .wrap{display:grid;grid-template-columns:.9fr 1.1fr;gap:56px;align-items:center;min-height:calc(100vh - var(--head) - 72px);max-height:calc(100vh - var(--head) - 28px)}
+.tags{display:flex;align-items:center;gap:14px;font-size:13px;margin-bottom:18px}
+.status{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ink);border-radius:99px;padding:1px 11px 1px 9px;font-size:12.5px;line-height:1.7}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.status.wip::before{background:transparent;border:1.5px solid var(--ink-2)}
+.status.wip{border-color:var(--rule);color:var(--ink-2)}
+.kicker{color:var(--ink-2);font-family:var(--serif);font-style:italic;font-size:16px}
+h2{font-family:var(--serif);font-weight:600;font-size:clamp(34px,3.6vw,52px);line-height:1.2;text-wrap:balance}
+.feature .lede{margin-top:18px;font-size:16.5px}
+.points{list-style:none;margin:24px 0 24px;border-top:1px solid var(--ink);padding:0}
+.points li{padding:11px 0;border-bottom:1px solid var(--rule);font-size:15px;display:flex;gap:14px;align-items:baseline}
+.points li::before{content:attr(data-n);font-family:var(--serif);font-style:italic;color:var(--ink-3);font-size:15px;min-width:1.3em}
+
+.feature .plate{background:var(--slate);height:min(640px,calc(100vh - var(--head) - 110px));min-height:520px;overflow:hidden}
+.feature .spirit{position:absolute;top:0;left:40px;width:300px;z-index:1}
+.ctx{position:absolute;left:12%;right:12%;top:195px;bottom:0;background:var(--card);border:1px solid var(--ink);border-bottom:0;border-radius:8px 8px 0 0;z-index:2;padding:16px 18px 0;display:flex;flex-direction:column;overflow:hidden}
+.ctx-h{display:flex;justify-content:space-between;align-items:baseline;font-size:13px}
+.ctx-h strong{font-family:var(--serif);font-size:16px;font-weight:600}
+.ctx-h code{font-family:var(--mono);font-size:12.5px}
+.meter{height:6px;border:1px solid var(--ink);border-radius:3px;margin:8px 0 6px;overflow:hidden;background:var(--paper)}
+.meter i{display:block;height:100%;width:84%;background:var(--ink);transition:width 1.4s cubic-bezier(.5,0,.2,1)}
+.ctx.done .meter i{width:30.5%}
+.meter-n{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-3);font-family:var(--mono)}
+.ev{margin:10px 0 8px;font-size:13px;display:flex;align-items:center;gap:8px;min-height:24px;color:var(--ink-2);border-top:1px solid var(--rule-soft);padding-top:10px}
+.ev::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ink-3);flex:none}
+.ev.run::before{background:var(--accent);animation:pulse 1s infinite}
+.ev.ok::before{background:#3d7a52}
+.ev.hide{visibility:hidden}
+@keyframes pulse{50%{opacity:.25}}
+.stage{position:relative;flex:1;min-height:0}
+.rows{list-style:none;padding:0;transition:opacity .6s,transform .8s}
+.rows li{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--ink-2);padding:7px 0;border-bottom:1px solid var(--rule-soft);transition:opacity .5s}
+.rows li b{font-family:var(--mono);font-weight:500;font-size:11.5px;color:var(--ink);background:var(--paper-2);padding:1px 6px;border-radius:3px;min-width:3.6em;text-align:center}
+.ctx.packing .rows{opacity:.35;transform:scale(.97) translateY(12px)}
+.ctx.done .rows,.ctx.sum .rows{opacity:0;transform:scale(.9) translateY(30px);pointer-events:none}
+.sumcard{position:absolute;inset:0 0 auto 0;background:var(--paper);border:1px solid var(--ink);border-radius:6px;padding:12px 14px 4px;opacity:0;transform:translateY(14px);transition:opacity .6s,transform .7s}
+.ctx.sum .sumcard,.ctx.done .sumcard{opacity:1;transform:none}
+.sumcard h4{font-family:var(--serif);font-size:14.5px;font-weight:600;margin-bottom:4px;display:flex;justify-content:space-between}
+.sumcard h4 span{font-family:var(--mono);font-weight:400;font-size:11.5px;color:var(--ink-3)}
+.sec{display:grid;grid-template-columns:4.6em 1fr;gap:8px;padding:6px 0;border-top:1px solid var(--rule-soft);font-size:13px;line-height:1.5;opacity:0;transform:translateY(5px);transition:opacity .5s,transform .5s}
+.sec dt{font-family:var(--serif);font-weight:600;color:var(--accent)}
+.sec dd{margin:0}
+.sec dd code{font-family:var(--mono);font-size:11.5px}
+.ctx.sum .sec,.ctx.done .sec{opacity:1;transform:none}
+.sec:nth-of-type(1){transition-delay:.15s}.sec:nth-of-type(2){transition-delay:.35s}.sec:nth-of-type(3){transition-delay:.55s}.sec:nth-of-type(4){transition-delay:.75s}.sec:nth-of-type(5){transition-delay:.95s}
+.raw{font-size:12px;color:var(--ink-3);padding:8px 0 10px;border-top:1px solid var(--rule-soft)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* next */
+.next{padding:64px 0 90px;border-top:1px solid var(--ink)}
+.next h2{max-width:14em}
+.trio{margin-top:34px;display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--ink)}
+.trio article{padding:20px 28px 28px 0;border-right:1px solid var(--rule);margin-right:28px}
+.trio article:last-child{border-right:0;margin-right:0}
+.trio h3{font-family:var(--serif);font-size:22px;font-weight:600;margin:14px 0 8px}
+.trio p{font-size:15px;color:var(--ink-2);text-wrap:pretty}
+
+.stamp{position:fixed;right:12px;bottom:10px;z-index:30;font:11px var(--mono);opacity:.5}
+
+@media (max-width:900px){
+  .wrap{padding:0 20px}
+  header .wrap{gap:14px}nav{display:none}
+  .hero{height:auto;max-height:none;padding-top:calc(var(--head) + 28px)}
+  .hero .wrap,.feature .wrap{grid-template-columns:1fr;gap:34px;max-height:none;min-height:0}
+  .hero .plate{height:540px;min-height:0}
+  .hero .spirit{width:230px;right:16px}
+  .win{left:16px;right:16px;top:140px}
+  .feature .plate{height:520px;min-height:0}
+  .feature .spirit{width:220px;left:16px}
+  .ctx{left:5%;right:5%;top:145px}
+  .trio{grid-template-columns:1fr}
+  .trio article{border-right:0;margin-right:0;border-bottom:1px solid var(--rule)}
+  .hr .gh{display:none}
+}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <a class="brand" href="#"><img src="../../../../apps/site/src/assets/brand/actspace-logo.png" alt="">ActSpace</a>
+  <nav><a href="#" aria-current="page">产品</a><a href="#">文档</a><a href="#">博客</a><a href="#">更新日志</a></nav>
+  <div class="hr"><a class="gh" href="#" aria-label="GitHub"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a><a class="btn" href="#">快速开始</a></div>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <div>
+    <div class="eyebrow">唯变所适</div>
+    <h1><span class="l">会自我进化的</span><span class="l">Agent <mark>运行空间</mark></span></h1>
+    <p class="lede">每一个问题，都有它的空间。今天，ActSpace 在你的本地项目里读取文件、调用工具、交付可审阅的改动；接下来，它会在不同的场景里长成各自专业的 Actor。</p>
+    <div class="cta"><a class="btn lg" href="#">下载 macOS 版 →</a><a class="tlink" href="#">阅读产品理念 →</a></div>
+  </div>
+  <div class="plate">
+    <img class="spirit" src="../../../../apps/site/src/assets/blog/covers/character-01.png" alt="">
+    <div class="win" aria-label="任务对话示意">
+      <div class="win-bar"><i></i><i></i><i></i><span>login-form · 任务</span></div>
+      <div class="chat">
+        <div class="msg-u">把登录页的表单校验补完，跑一下测试</div>
+        <div>
+          <div class="step"><b>读取</b>src/pages/Login.tsx</div>
+          <div class="step"><b>编辑</b>src/lib/validate.ts<em><span class="p">+24</span> <span class="m">−3</span></em></div>
+          <div class="step"><b>运行</b>pnpm test<em>18 通过</em></div>
+        </div>
+        <div class="msg-a">已完成。改动 2 个文件，可在 Review 中查看。</div>
+      </div>
+      <div class="composer">继续对话…</div>
+    </div>
+  </div>
+</div></section>
+
+<section class="feature"><div class="wrap">
+  <div>
+    <div class="tags"><span class="status">已上线</span><span class="kicker">上下文管理引擎</span></div>
+    <h2>长任务，不会失忆。</h2>
+    <p class="lede">对话变长时，引擎把旧历史压缩成结构化摘要：目标、决策、未完成的事和相关文件都会留下，原始记录随时可查。每一次请求带了什么，都看得见。</p>
+    <ul class="points">
+      <li data-n="一">结构化压缩，保留目标与未完成事项</li>
+      <li data-n="二">渐进披露，只把当前需要的文件放进上下文</li>
+      <li data-n="三">上下文面板，逐次查看请求内容与变化</li>
+    </ul>
+    <a class="tlink" href="#">了解上下文管理 →</a>
+  </div>
+  <div class="plate">
+    <img class="spirit" src="../../../../apps/site/src/assets/blog/covers/character-04.png" alt="">
+    <div class="ctx" id="ctx" aria-label="上下文压缩演示">
+      <div class="ctx-h"><strong>上下文</strong><code id="used">168k / 200k</code></div>
+      <div class="meter"><i></i></div>
+      <div class="meter-n"><span id="pct">84%</span><span>上限 200k</span></div>
+      <div class="ev" id="ev">已接近上限</div>
+      <div class="stage">
+        <ul class="rows">
+          <li><b>读取</b>package.json</li>
+          <li><b>读取</b>src/pages/Login.tsx</li>
+          <li><b>编辑</b>validate.ts</li>
+          <li><b>运行</b>测试 · 2 失败</li>
+          <li><b>读取</b>src/lib/errors.ts</li>
+          <li><b>编辑</b>Login.tsx</li>
+          <li><b>运行</b>测试 · 1 失败</li>
+          <li><b>搜索</b>zod schema 用法</li>
+        </ul>
+        <div class="sumcard">
+          <h4>摘要 <span>替代 42 条消息</span></h4>
+          <dl style="margin:0">
+            <div class="sec"><dt>目标</dt><dd>补完登录页表单校验</dd></div>
+            <div class="sec"><dt>重要细节</dt><dd>沿用 zod；错误文案集中在 errors.ts</dd></div>
+            <div class="sec"><dt>工作状态</dt><dd>校验已写完，1 个用例仍失败</dd></div>
+            <div class="sec"><dt>下一步</dt><dd>修复失败用例并重跑测试</dd></div>
+            <div class="sec"><dt>相关文件</dt><dd><code>src/pages/Login.tsx</code>、<code>src/lib/validate.ts</code></dd></div>
+          </dl>
+          <div class="raw" style="border-top:1px solid var(--rule-soft);margin-top:2px">原始记录已保留，可随时展开查看</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section class="next"><div class="wrap">
+  <h2>接下来，它会长成你的 Actor。</h2>
+  <div class="trio">
+    <article><span class="status">已上线</span><h3>上下文管理引擎</h3><p>长任务压缩与可检查的上下文。</p></article>
+    <article><span class="status wip">进行中</span><h3>Harness 自进化</h3><p>工具、上下文与行为都是插件，可以按问题派生新版本。</p></article>
+    <article><span class="status wip">进行中</span><h3>Actor 与 Space</h3><p>在场景里长成的 Actor，在 Space 里一起解决专业问题。</p></article>
+  </div>
+</div></section>
+
+<div class="stamp">方向 A · 纸与墨</div>
+
+<script>
+(function(){
+  var ctx=document.getElementById('ctx'),ev=document.getElementById('ev'),used=document.getElementById('used'),pct=document.getElementById('pct');
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches,timers=[];
+  function at(ms,fn){timers.push(setTimeout(fn,ms))}
+  function setEv(t,c){ev.textContent=t;ev.className='ev '+(c||'')}
+  function num(from,to,ms){var s=performance.now();(function f(n){var k=Math.min(1,(n-s)/ms),v=Math.round(from+(to-from)*(1-Math.pow(1-k,3)));used.textContent=v+'k / 200k';pct.textContent=Math.round(v/2)+'%';if(k<1)requestAnimationFrame(f)})(s)}
+  function reset(){ctx.className='ctx';used.textContent='168k / 200k';pct.textContent='84%';setEv('已接近上限','')}
+  function final(){ctx.className='ctx done';used.textContent='61k / 200k';pct.textContent='31%';setEv('已压缩 · 用时 6.2 秒','ok')}
+  function cycle(){
+    reset();
+    at(1200,function(){setEv('正在压缩 42 条消息…','run');ctx.classList.add('packing')});
+    at(2600,function(){ctx.classList.add('sum')});
+    at(3600,function(){ctx.classList.add('done');num(168,61,1400)});
+    at(5200,function(){setEv('已压缩 · 用时 6.2 秒','ok')});
+    at(8200,cycle);
+  }
+  if(reduce)final();else cycle();
+})();
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 ---
 import {sitePath} from "../lib/site-path";
 import { Image } from 'astro:assets';
-import logo from '../assets/brand/actspace-logo.png';
+import logo from '../assets/brand/actspace-mark.png';
 interface Props { hero?: boolean; }
 const links=[['/','产品'],['/docs/','文档'],['/blog/','博客'],['/updates/','更新日志']];
 const active=(path:string)=>path==='/'?Astro.url.pathname===sitePath('/'):Astro.url.pathname.startsWith(sitePath(path));

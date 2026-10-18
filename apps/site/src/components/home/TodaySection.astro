@@ -1,0 +1,15 @@
+---
+import { todayCapabilities } from '../../lib/home-features';
+import { sitePath } from '../../lib/site-path';
+---
+<section class="wrap today" aria-labelledby="today-title">
+  <div class="section-head">
+    <h2 id="today-title">基础功能</h2>
+  </div>
+  <div class="today-grid">
+    {todayCapabilities.map((item) => <a class="today-card" href={sitePath(`/docs/${item.slug}/`)}>
+      <h3>{item.title}<span aria-hidden="true">→</span></h3>
+      <p>{item.description}</p>
+    </a>)}
+  </div>
+</section>

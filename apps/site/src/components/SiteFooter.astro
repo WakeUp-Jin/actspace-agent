@@ -1,7 +1,7 @@
 ---
 import {sitePath} from "../lib/site-path";
 import { Image } from 'astro:assets';
-import logo from '../assets/brand/actspace-logo.png';
+import logo from '../assets/brand/actspace-mark.png';
 ---
 <footer class="site-footer">
 <div class="wrap">
@@ -12,11 +12,12 @@ import logo from '../assets/brand/actspace-logo.png';
 </a>
 <nav aria-label="页脚导航">
 <a href={sitePath('/docs/')}>文档</a>
+<a href={sitePath('/blog/')}>博客</a>
 <a href={sitePath('/updates/')}>更新日志</a>
 <a href={sitePath('/roadmap/')}>开发计划</a>
 <a href="https://github.com/WakeUp-Jin/actspace-agent" target="_blank" rel="noreferrer noopener">GitHub ↗</a>
 </nav>
 </div>
-<small class="footer-note">© {new Date().getFullYear()} ActSpace · 给模型一个真正能行动的空间</small>
+<small class="footer-note">© {new Date().getFullYear()} ActSpace · 唯变所适 · 会自我进化的 Agent 运行空间</small>
 </div>
 </footer>

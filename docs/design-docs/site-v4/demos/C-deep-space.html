@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ActSpace · 方向 C 深空</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#121018; --bg2:#1a1722; --line:rgba(240,228,210,.12);
+  --cream:#f3e9d6; --text:#b5aca3; --dim:#7d766f;
+  --accent:#c4b2f7; --accent-deep:#6d4fc2;
+  --paper:#f7f0e2; --paper2:#efe5d2; --ink:#2a2420; --ink2:#6b6157; --paper-line:#dfd3bd;
+  --ok:#3f7a52; --warn:#b5622e;
+  --serif:"Noto Serif SC","Songti SC","Instrument Serif",serif;
+  --sans:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{background:var(--bg);color:var(--text);font:16px/1.7 var(--sans);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+ background-image:radial-gradient(1px 1px at 12% 18%,#f3e9d6 50%,transparent 51%),radial-gradient(1px 1px at 34% 72%,#f3e9d6 50%,transparent 51%),radial-gradient(1px 1px at 58% 12%,#f3e9d6 50%,transparent 51%),radial-gradient(1px 1px at 83% 40%,#f3e9d6 50%,transparent 51%),radial-gradient(1px 1px at 91% 84%,#f3e9d6 50%,transparent 51%),radial-gradient(1px 1px at 22% 46%,#f3e9d6 50%,transparent 51%),radial-gradient(1px 1px at 70% 66%,#f3e9d6 50%,transparent 51%);
+ background-size:620px 520px;opacity:.28}
+a{color:inherit;text-decoration:none}
+header{position:fixed;top:0;left:0;right:0;height:64px;z-index:50;display:flex;align-items:center;gap:36px;padding:0 40px;background:rgba(18,16,24,.78);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;color:var(--cream);font-weight:600;font-size:17px}
+.brand img{width:30px;height:30px;border-radius:8px}
+nav{display:flex;gap:26px;font-size:14.5px}
+nav a{color:var(--text)} nav a.on{color:var(--cream);box-shadow:0 1px 0 var(--accent);padding-bottom:3px}
+.hr{margin-left:auto;display:flex;align-items:center;gap:18px}
+.hr svg{width:20px;height:20px;fill:var(--text)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 20px;border-radius:999px;background:var(--accent);color:#1c1530;font-weight:600;font-size:14.5px;transition:transform .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(196,178,247,.3)}
+.btn.sm{height:34px;padding:0 16px;font-size:13.5px}
+.lnk{color:var(--cream);border-bottom:1px solid rgba(243,233,214,.35);padding-bottom:2px}
+.lnk:hover{border-color:var(--accent);color:var(--accent)}
+main{position:relative;z-index:1;overflow-x:clip}
+/* hero */
+.hero{min-height:100vh;padding:64px 40px 0;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);align-items:center;gap:20px;max-width:1440px;margin:0 auto;position:relative}
+.eyebrow{font-family:var(--serif);font-size:15px;letter-spacing:.3em;color:var(--accent);margin-bottom:22px;display:flex;align-items:center;gap:12px}
+.eyebrow::before{content:"";width:28px;height:1px;background:var(--accent)}
+h1{font-family:var(--serif);font-weight:600;color:var(--cream);font-size:clamp(44px,4.6vw,68px);line-height:1.2;text-wrap:balance}
+h1 span{display:block;white-space:nowrap}
+h1 em{font-family:"Instrument Serif",serif;font-style:normal;font-weight:400}
+.lead{margin-top:26px;max-width:30em;font-size:16.5px;text-wrap:pretty}
+.cta{margin-top:34px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.stage{position:relative;height:640px}
+.win{position:absolute;left:6%;top:90px;width:88%;background:var(--paper);border-radius:14px;color:var(--ink);box-shadow:0 50px 90px -20px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.08),0 0 120px rgba(196,178,247,.12);transform:perspective(1600px) rotateY(-6deg) rotateX(2deg);overflow:hidden;z-index:3}
+.bar{height:38px;background:var(--paper2);border-bottom:1px solid var(--paper-line);display:flex;align-items:center;gap:7px;padding:0 14px;font-size:12px;color:var(--ink2)}
+.bar i{width:10px;height:10px;border-radius:50%;background:#d6c9b0}
+.bar b{margin:0 auto;font-weight:500}
+.wb{display:grid;grid-template-columns:150px 1fr;min-height:330px}
+.side{border-right:1px solid var(--paper-line);padding:14px 12px;font-size:12px;color:var(--ink2);background:#f2e9d8}
+.side h6{font-size:11px;font-weight:600;letter-spacing:.08em;color:#9a8f80;margin:0 0 8px}
+.side div{padding:6px 8px;border-radius:6px;margin-bottom:2px}
+.side .cur{background:#e6dbc4;color:var(--ink)}
+.chat{padding:18px 20px;display:flex;flex-direction:column;gap:12px;font-size:13.5px}
+.um{align-self:flex-end;background:#e9dfc9;padding:9px 14px;border-radius:12px 12px 3px 12px;max-width:85%}
+.step{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink2);padding:7px 11px;border:1px solid var(--paper-line);border-radius:8px;background:#fbf6ea}
+.step code{font-family:var(--mono);font-size:12px;color:var(--ink)}
+.step .d{margin-left:auto;font-family:var(--mono);font-size:12px}
+.pl{color:var(--ok)}.mi{color:var(--warn)}
+.step .ic{width:7px;height:7px;border-radius:50%;background:var(--accent-deep)}
+.done{margin-top:2px;line-height:1.6}
+.done u{text-decoration:none;color:var(--accent-deep);border-bottom:1px solid currentColor}
+.sprite{position:absolute;border-radius:50%;z-index:2;pointer-events:none}
+.sprite img{width:100%;height:100%;object-fit:contain;display:block}
+.s1{width:190px;height:190px;right:-2%;top:-6px;z-index:4;animation:fl 9s ease-in-out infinite}
+.s1::before,.s2::before,.s3::before{content:"";position:absolute;inset:-35%;border-radius:50%;z-index:-1;background:radial-gradient(circle,var(--g) 0%,transparent 62%);opacity:.5}
+.s1{--g:rgba(232,170,128,.55)}
+.s2{--g:rgba(150,120,230,.55);width:96px;height:96px;left:-2%;bottom:30px;z-index:4;animation:fl 11s -3s ease-in-out infinite}
+.s2 img{border-radius:22px}
+.s3{--g:rgba(120,190,150,.4);width:92px;height:92px;left:18%;top:-8px;filter:blur(3px);opacity:.85;animation:fl 13s -6s ease-in-out infinite;z-index:1}
+.s3 img{border-radius:50%;-webkit-mask:radial-gradient(circle,#000 30%,transparent 55%);mask:radial-gradient(circle,#000 30%,transparent 55%);transform:scale(1.5)}
+.s4{--g:rgba(240,228,210,.3);width:46px;height:46px;right:4%;bottom:8px;filter:blur(5px);opacity:.7;background:radial-gradient(circle,rgba(243,233,214,.9),rgba(243,233,214,.1) 60%,transparent 70%);animation:fl 10s -2s ease-in-out infinite}
+@keyframes fl{50%{transform:translateY(-12px)}}
+/* context */
+section.ctx{padding:90px 40px;max-width:1440px;margin:0 auto;min-height:calc(100vh - 64px);display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:60px;align-items:center;position:relative}
+.ctx::before{content:"";position:absolute;left:-10%;top:10%;width:60%;height:80%;background:radial-gradient(closest-side,rgba(109,79,194,.16),transparent);pointer-events:none}
+.tags{display:flex;gap:12px;align-items:center;margin-bottom:20px;font-size:13px}
+.st{display:inline-flex;align-items:center;gap:7px;padding:3px 12px;border:1px solid rgba(196,178,247,.4);border-radius:999px;color:var(--accent)}
+.st::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.st.wip{color:var(--text);border-color:var(--line)} .st.wip::before{background:var(--dim);box-shadow:none}
+.tag{color:var(--dim)}
+h2{font-family:var(--serif);font-weight:600;color:var(--cream);font-size:clamp(34px,3.4vw,48px);line-height:1.25;text-wrap:balance}
+.ctx p.d{margin-top:18px;max-width:31em;text-wrap:pretty}
+.pts{list-style:none;margin:26px 0 30px;display:grid;gap:12px}
+.pts li{display:flex;gap:14px;color:var(--cream);font-size:15.5px;text-wrap:pretty}
+.pts li::before{content:"";flex:none;width:7px;height:7px;margin-top:11px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.panel{background:var(--paper);color:var(--ink);border-radius:14px;box-shadow:0 40px 80px -20px rgba(0,0,0,.6),0 0 100px rgba(196,178,247,.1);overflow:hidden;max-width:560px;width:100%;justify-self:center}
+.ph{padding:14px 18px;background:var(--paper2);border-bottom:1px solid var(--paper-line)}
+.ph .t{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink2);margin-bottom:8px}
+.ph .t b{color:var(--ink);font-family:var(--mono);font-weight:500;font-size:13px}
+.meter{height:7px;border-radius:9px;background:#ddd0b6;overflow:hidden}
+.meter i{display:block;height:100%;width:84%;background:var(--warn);border-radius:9px;transition:width 1.1s cubic-bezier(.5,0,.2,1),background .6s}
+.ev{padding:9px 18px;font-size:12.5px;color:var(--ink2);border-bottom:1px solid var(--paper-line);display:flex;align-items:center;gap:9px;min-height:38px}
+.ev i{width:8px;height:8px;border-radius:50%;background:#b9ab90}
+.panel.busy .ev i{background:var(--accent-deep);animation:pu 1s infinite}
+.panel.done .ev i{background:var(--ok)}
+@keyframes pu{50%{opacity:.25}}
+.body{position:relative;height:372px}
+.row{position:absolute;left:14px;right:14px;height:34px;display:flex;align-items:center;gap:10px;padding:0 12px;border:1px solid var(--paper-line);background:#fbf6ea;border-radius:8px;font-size:12.5px;transition:transform .9s cubic-bezier(.6,0,.3,1),opacity .7s,filter .7s}
+.row code{font-family:var(--mono);color:var(--ink);font-size:12px}
+.row .ic{width:6px;height:6px;border-radius:50%;background:#a99b82}
+.row em{margin-left:auto;font-style:normal;font-family:var(--mono);font-size:11.5px;color:var(--ink2)}
+.panel.busy .row{transform:translate(0,var(--dy)) scale(.12,.3);opacity:0;filter:blur(2px)}
+.panel.done .row{display:none}
+.star{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:#fff6dc;box-shadow:0 0 18px 8px rgba(196,178,247,.7),0 0 50px 20px rgba(196,178,247,.35);opacity:0;transform:scale(.2);transition:opacity .5s,transform .8s}
+.panel.busy .star{opacity:1;transform:scale(1);transition-delay:.55s}
+.panel.done .star{opacity:0;transform:scale(5);transition:opacity .7s,transform .7s}
+.sum{position:absolute;inset:14px;background:#fbf6ea;border:1px solid var(--paper-line);border-radius:10px;padding:14px 16px;opacity:0;transform:scale(.86);transition:opacity .7s,transform .8s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 0 1px rgba(109,79,194,.25),0 0 40px rgba(196,178,247,.4)}
+.panel.done .sum{opacity:1;transform:none}
+.sum h5{font-size:12px;color:var(--accent-deep);font-weight:600;margin-bottom:6px}
+.sum dl{display:grid;gap:0}
+.sum dl div{display:grid;grid-template-columns:72px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--paper-line);font-size:12.5px;line-height:1.55}
+.sum dt{color:var(--ink2)} .sum dd{color:var(--ink)}
+.sum dd code{font-family:var(--mono);font-size:11.5px;color:var(--accent-deep)}
+.sum .raw{margin-top:6px;font-size:11.5px;color:var(--ink2)}
+/* next */
+.next{max-width:1440px;margin:0 auto;padding:60px 40px 120px;position:relative}
+.next h2{max-width:14em;margin-bottom:34px}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.card{border:1px solid var(--line);border-radius:14px;padding:26px;background:linear-gradient(180deg,rgba(255,255,255,.04),transparent);min-height:200px}
+.card h3{font-family:var(--serif);color:var(--cream);font-size:21px;font-weight:600;margin:16px 0 8px;text-wrap:balance}
+.card p{font-size:15px;text-wrap:pretty}
+.mark{position:fixed;right:14px;bottom:10px;z-index:60;font:11px var(--mono);color:rgba(243,233,214,.45);pointer-events:none}
+@media (max-width:900px){
+ header{padding:0 16px;gap:8px}nav{display:none}.hr{gap:10px}.btn.sm{padding:0 12px;font-size:13px}.brand{font-size:16px}
+ .hero,section.ctx{grid-template-columns:1fr;padding-left:16px;padding-right:16px}
+ .hero{min-height:0;padding-top:96px;gap:30px}
+ h1{font-size:40px}
+ .stage{height:460px}.win{left:0;width:100%;top:70px;transform:none}
+ .wb{grid-template-columns:1fr}.side{display:none}
+ .s1{width:110px;height:110px;right:0}.s2{left:0}.ctx::before{left:0}.s2{width:70px;height:70px}
+ section.ctx{padding:60px 16px;gap:36px;min-height:0}
+ .next{padding:40px 16px 90px}.cards{grid-template-columns:1fr}
+ .body{height:400px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="#"><img src="../../../../apps/site/src/assets/brand/actspace-logo.png" alt="">ActSpace</a>
+  <nav><a class="on" href="#">产品</a><a href="#">文档</a><a href="#">博客</a><a href="#">更新日志</a></nav>
+  <div class="hr">
+    <a href="#" aria-label="GitHub"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+    <a class="btn sm" href="#">快速开始</a>
+  </div>
+</header>
+<main>
+<div class="hero">
+  <div>
+    <div class="eyebrow">唯变所适</div>
+    <h1><span>会自我进化的</span><span>Agent 运行空间</span></h1>
+    <p class="lead">每一个问题，都有它的空间。今天，ActSpace 在你的本地项目里读取文件、调用工具、交付可审阅的改动；接下来，它会在不同的场景里长成各自专业的 Actor。</p>
+    <div class="cta"><a class="btn" href="#">下载 macOS 版 →</a><a class="lnk" href="#">阅读产品理念 →</a></div>
+  </div>
+  <div class="stage">
+    <div class="sprite s3"><img src="../../../../apps/site/src/assets/blog/covers/character-03.png" alt=""></div>
+    <div class="sprite s4"></div>
+    <div class="win">
+      <div class="bar"><i></i><i></i><i></i><b>ActSpace · login-app</b></div>
+      <div class="wb">
+        <div class="side"><h6>会话</h6><div class="cur">补完登录页表单校验</div><div>重构路由守卫</div><div>修复构建警告</div></div>
+        <div class="chat">
+          <div class="um">把登录页的表单校验补完，跑一下测试</div>
+          <div class="step"><span class="ic"></span>读取 <code>src/pages/Login.tsx</code></div>
+          <div class="step"><span class="ic"></span>编辑 <code>src/lib/validate.ts</code><span class="d"><span class="pl">+24</span> <span class="mi">−3</span></span></div>
+          <div class="step"><span class="ic"></span>运行 <code>pnpm test</code> · 18 通过</div>
+          <div class="done">已完成。改动 2 个文件，可在 <u>Review</u> 中查看。</div>
+        </div>
+      </div>
+    </div>
+    <div class="sprite s1"><img src="../../../../apps/site/src/assets/blog/covers/character-06.png" alt=""></div>
+    <div class="sprite s2"><img src="../../../../apps/site/src/assets/brand/actspace-logo.png" alt=""></div>
+  </div>
+</div>
+
+<section class="ctx">
+  <div>
+    <div class="tags"><span class="st">已上线</span><span class="tag">上下文管理引擎</span></div>
+    <h2>长任务，不会失忆。</h2>
+    <p class="d">对话变长时，引擎把旧历史压缩成结构化摘要：目标、决策、未完成的事和相关文件都会留下，原始记录随时可查。每一次请求带了什么，都看得见。</p>
+    <ul class="pts"><li>结构化压缩，保留目标与未完成事项</li><li>渐进披露，只把当前需要的文件放进上下文</li><li>上下文面板，逐次查看请求内容与变化</li></ul>
+    <a class="lnk" href="#">了解上下文管理 →</a>
+  </div>
+  <div class="panel" id="panel">
+    <div class="ph"><div class="t"><span>上下文</span><b id="use">168k / 200k</b></div><div class="meter"><i id="bar"></i></div></div>
+    <div class="ev"><i></i><span id="evt">上下文接近上限</span></div>
+    <div class="body" id="body">
+      <div class="star"></div>
+      <div class="sum">
+        <h5>摘要 · 由 42 条消息压缩</h5>
+        <dl>
+          <div><dt>目标</dt><dd>补完登录页表单校验</dd></div>
+          <div><dt>重要细节</dt><dd>邮箱与密码规则统一放进 validate.ts</dd></div>
+          <div><dt>工作状态</dt><dd>校验已写入，测试 18 通过</dd></div>
+          <div><dt>下一步</dt><dd>补错误提示文案，检查提交按钮状态</dd></div>
+          <div><dt>相关文件</dt><dd><code>src/pages/Login.tsx</code><br><code>src/lib/validate.ts</code></dd></div>
+        </dl>
+        <p class="raw">原始记录已保留，可随时展开查看。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="next">
+  <h2>接下来，它会长成你的 Actor。</h2>
+  <div class="cards">
+    <div class="card"><span class="st">已上线</span><h3>上下文管理引擎</h3><p>长任务压缩与可检查的上下文。</p></div>
+    <div class="card"><span class="st wip">进行中</span><h3>Harness 自进化</h3><p>工具、上下文与行为都是插件，可以按问题派生新版本。</p></div>
+    <div class="card"><span class="st wip">进行中</span><h3>Actor 与 Space</h3><p>在场景里长成的 Actor，在 Space 里一起解决专业问题。</p></div>
+  </div>
+</section>
+</main>
+<div class="mark">方向 C · 深空</div>
+<script>
+(function(){
+  var rows=[["读取 package.json","1.2k"],["读取 src/pages/Login.tsx","3.4k"],["编辑 validate.ts","+24 −3"],["运行测试 · 2 失败","5.1k"],["读取 src/lib/validate.ts","2.0k"],["编辑 Login.tsx","+11 −2"],["运行测试 · 18 通过","4.7k"],["读取 tsconfig.json","0.6k"]];
+  var body=document.getElementById('body'),panel=document.getElementById('panel'),bar=document.getElementById('bar'),use=document.getElementById('use'),evt=document.getElementById('evt');
+  var star=body.querySelector('.star');
+  rows.forEach(function(r,i){var d=document.createElement('div');d.className='row';var y=14+i*43;d.style.top=y+'px';d.style.setProperty('--dy',(186-y-17)+'px');d.style.transitionDelay=(i*.04)+'s';d.innerHTML='<span class="ic"></span><code>'+r[0]+'</code><em>'+r[1]+'</em>';body.insertBefore(d,star);});
+  function set(k,pct){bar.style.width=pct+'%';use.textContent=k+'k / 200k';bar.style.background=pct>70?'var(--warn)':'var(--ok)'}
+  var tw;function tween(a,b){cancelAnimationFrame(tw);var t0=performance.now();(function s(t){var p=Math.min(1,(t-t0)/1100);p=1-Math.pow(1-p,3);var v=Math.round(a+(b-a)*p);use.textContent=v+'k / 200k';if(p<1)tw=requestAnimationFrame(s)})(t0)}
+  function done(){panel.className='panel done';set(61,30.5);evt.textContent='已压缩 · 用时 6.2 秒'}
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){done();return}
+  function cycle(){
+    panel.className='panel';set(168,84);evt.textContent='上下文接近上限';
+    setTimeout(function(){panel.className='panel busy';evt.textContent='正在压缩 42 条消息…'},1800);
+    setTimeout(function(){panel.className='panel done';bar.style.width='30.5%';bar.style.background='var(--ok)';tween(168,61);evt.textContent='已压缩 · 用时 6.2 秒'},3600);
+    setTimeout(cycle,8200);
+  }
+  cycle();
+})();
+</script>
+</body>
+</html>

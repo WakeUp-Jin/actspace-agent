@@ -1,6 +1,8 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { loadRoadmap } from "../lib/roadmap";
+import { directions, statusLabel } from "../lib/home-features";
+import { sitePath } from "../lib/site-path";
 
 const roadmap = await loadRoadmap();
 const openCount = roadmap.filter((item) => item.status === "open").length;
@@ -15,9 +17,9 @@ const completedCount = roadmap.length - openCount;
     <section class="roadmap-hero">
       <div class="site-page roadmap-heading">
         <div class="roadmap-intro">
-          <span class="site-kicker">Roadmap · 公开开发进度</span>
+          <p class="eyebrow">公开开发进度</p>
           <h1>开发计划</h1>
-          <p>查看 ActSpace 已经完成、正在开发和计划探索的功能。完成的项目会保留勾选记录，未来方向会随着验证结果和用户反馈调整。</p>
+          <p>ActSpace 沿着三个方向迭代：先让长任务不失忆，再让 Harness 按问题进化，最后让 Actor 在 Space 里协作。下面是每个方向走到了哪里，以及完整的功能清单。</p>
         </div>
 
         <div class="status-summary" aria-label="开发计划状态统计">
@@ -31,6 +33,25 @@ const completedCount = roadmap.length - openCount;
           </div>
         </div>
       </div>
+    </section>
+
+    <section class="site-page roadmap-directions" aria-label="三个方向">
+      <ol>
+        {directions.map((item, index) => (
+          <li>
+            <a href={sitePath(`/#${item.id}`)}>
+              <span class="direction-head">
+                <span class="direction-index">0{index + 1}</span>
+                <span class:list={["direction-pill", item.status]}>{statusLabel[item.status]}</span>
+              </span>
+              <strong>{item.name}</strong>
+              <span class="direction-summary">{item.summary}</span>
+              <span class="direction-row"><b>已完成</b>{item.done}</span>
+              <span class="direction-row"><b>下一步</b>{item.next}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
     </section>
 
     <section class="site-page roadmap-checklist" aria-label="开发计划清单">
@@ -95,7 +116,7 @@ const completedCount = roadmap.length - openCount;
   }
 
   .roadmap-hero {
-    padding-block: clamp(82px, 10vw, 132px) clamp(58px, 7vw, 82px);
+    padding-block: clamp(56px, 7vw, 96px) clamp(44px, 5vw, 64px);
   }
 
   .roadmap-heading {
@@ -106,11 +127,115 @@ const completedCount = roadmap.length - openCount;
   }
 
   .roadmap-intro h1 {
-    margin: 20px 0 0;
-    font-size: clamp(58px, 7vw, 84px);
-    font-weight: 540;
-    letter-spacing: -0.065em;
-    line-height: 1;
+    margin: 14px 0 0;
+    font-family: var(--site-font-display);
+    font-size: clamp(40px, 5vw, 56px);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: var(--site-muted);
+    font-size: 13px;
+  }
+
+  .eyebrow::before {
+    width: 22px;
+    height: 1px;
+    background: currentColor;
+    content: "";
+  }
+
+  .roadmap-directions {
+    padding-bottom: clamp(56px, 7vw, 88px);
+  }
+
+  .roadmap-directions ol {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .roadmap-directions a {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+    gap: 10px;
+    padding: 24px 24px 22px;
+    border: 1px solid var(--site-line);
+    border-radius: 18px;
+    color: inherit;
+    background: var(--site-paper);
+    text-decoration: none;
+    transition: border-color 160ms ease, transform 160ms ease;
+  }
+
+  .roadmap-directions a:hover {
+    border-color: var(--site-line-strong);
+    transform: translateY(-2px);
+  }
+
+  .direction-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .direction-index {
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 12px;
+  }
+
+  .direction-pill {
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .direction-pill.live { color: var(--site-live); background: var(--site-live-soft); }
+  .direction-pill.wip { color: var(--site-wip); background: var(--site-wip-soft); }
+
+  .roadmap-directions strong {
+    margin-top: 6px;
+    font-family: var(--site-font-display);
+    font-size: 24px;
+    font-weight: 500;
+  }
+
+  .direction-summary {
+    color: var(--site-body);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .direction-row {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--site-line);
+    color: var(--site-ink);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .direction-summary + .direction-row {
+    margin-top: auto;
+  }
+
+  .direction-row b {
+    color: var(--site-muted);
+    font-weight: 500;
   }
 
   .roadmap-intro p {
@@ -145,7 +270,7 @@ const completedCount = roadmap.length - openCount;
     position: relative;
     border: 1.5px solid var(--site-line-strong);
     border-radius: 50%;
-    background: var(--site-surface);
+    background: var(--site-paper);
   }
 
   .status-circle {
@@ -155,15 +280,15 @@ const completedCount = roadmap.length - openCount;
 
   .status-stat--completed .status-circle,
   .roadmap-item--completed .item-circle {
-    border-color: var(--site-operational);
-    background: var(--site-operational);
+    border-color: var(--site-live);
+    background: var(--site-live);
   }
 
   .status-stat--completed .status-circle::after,
   .roadmap-item--completed .item-circle::after {
     position: absolute;
-    border-right: 1.5px solid var(--site-surface);
-    border-bottom: 1.5px solid var(--site-surface);
+    border-right: 1.5px solid var(--site-paper);
+    border-bottom: 1.5px solid var(--site-paper);
     content: "";
     transform: rotate(43deg);
   }
@@ -177,9 +302,9 @@ const completedCount = roadmap.length - openCount;
 
   .status-stat strong {
     display: block;
-    font-size: 24px;
-    font-weight: 640;
-    letter-spacing: -0.04em;
+    font-family: var(--site-font-display);
+    font-size: 26px;
+    font-weight: 500;
   }
 
   .status-stat div span {
@@ -297,7 +422,7 @@ const completedCount = roadmap.length - openCount;
     border: 1px solid var(--site-line);
     border-radius: 999px;
     color: var(--site-body);
-    background: var(--site-surface);
+    background: var(--site-paper);
     cursor: pointer;
     font-size: 12px;
     font-weight: 640;
@@ -321,7 +446,11 @@ const completedCount = roadmap.length - openCount;
     }
 
     .roadmap-intro h1 {
-      font-size: 54px;
+      font-size: 40px;
+    }
+
+    .roadmap-directions ol {
+      grid-template-columns: 1fr;
     }
 
     .status-summary {

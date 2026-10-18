@@ -8,7 +8,7 @@
 .docs-prose h2,
 .reading-body h2 {
   color: var(--ink);
-  font: 600 25px/1.5 var(--sans);
+  font: 500 26px/1.5 var(--site-font-display);
   margin: 42px 0 18px;
   scroll-margin-top: 104px;
 }
@@ -44,20 +44,23 @@
   position: relative;
   overflow: auto;
   padding: 56px 20px 20px;
-  background: var(--surface) !important;
+  background: var(--site-paper) !important;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
 }
 .docs-prose code {
   font-family: var(--mono);
   font-size: 0.85em;
 }
+/* 文档、博客、更新日志共用的纸面相框。 */
 .docs-prose img,
 .docs-prose video {
   max-width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: 12px;
+  background: var(--site-surface);
+  box-shadow: 0 0 0 1px var(--line), 0 18px 36px -28px rgba(29, 28, 26, 0.45);
 }
 .docs-prose table {
   display: block;
@@ -108,6 +111,8 @@
 .docs-prose blockquote > :last-child { margin-bottom: 0; }
 
 .docs-copy-button { min-height: 36px; min-width: 60px; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
-.docs-copy-button:hover { color: var(--ink); background: var(--surface); }
+.docs-copy-button:hover { color: var(--ink); background: var(--site-canvas-soft); }
 .docs-copy-button:active { transform: scale(.96); }
 .docs-code-language { top: 18px; left: 20px; right: auto; max-width: calc(100% - 108px); overflow: hidden; }
+.docs-prose th { color: var(--ink); font-weight: 600; border-bottom-color: var(--site-line-strong); }
+.docs-prose :not(pre) > code { padding: 1px 6px; border-radius: 5px; background: var(--site-canvas-soft); }

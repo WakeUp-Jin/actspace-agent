@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>官网 v4 视觉方向</title>
+<style>
+  :root { --bg: #f4f3ef; --ink: #1f1f1d; --muted: #77766f; --line: #dcdad3; --card: #fff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  header { max-width: 1480px; margin: 0 auto; padding: 40px 24px 8px; }
+  h1 { margin: 0 0 6px; font-size: 26px; font-weight: 600; }
+  header p { margin: 0; color: var(--muted); }
+  main { max-width: 1480px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 28px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .frame { position: relative; aspect-ratio: 1440 / 900; overflow: hidden; background: #eee; }
+  .frame iframe { position: absolute; top: 0; left: 0; width: 1440px; height: 900px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 18px; border-top: 1px solid var(--line); }
+  .meta b { font-weight: 600; }
+  .meta span { color: var(--muted); font-size: 13px; }
+  .meta a { color: var(--ink); white-space: nowrap; text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>官网 v4 · 视觉方向</h1>
+  <p>同一套文案与结构，只换视觉语言。第 1 张是第三轮（D1 + D4 融合），接下来 5 张是第二轮（D 的变体），最后 5 张是第一轮。缩略图只显示首屏，点「打开」看完整页面（含上下文压缩动画）。</p>
+</header>
+<main id="grid"></main>
+<script>
+  const demos = [
+    ['H1-hero-desktop-stage.html', '首屏精修 H1 · 桌面端窗口', '窗口按桌面端真实界面重画，用到的插件各对应一处可见变化，开关后按新配置重跑'],
+    ['D6-paper-plugin-stage.html', '第三轮 D6 · 纸本插件舞台', 'D1 的纸本风格 + D4 的插件结构：用到的插件随任务点亮，可悬停、可开关'],
+    ['D1-paper-stage.html', '第二轮 D1 · 纸本舞台', '原 D 精修：衬线标题、纸本肌理色场、白色锐利窗口'],
+    ['D2-mono-stage.html', '第二轮 D2 · 单色工具舞台', '无衬线、双色标题，全站舞台只用一个淡紫灰色相'],
+    ['D3-starchart-stage.html', '第二轮 D3 · 星图舞台', '公共领域天文绘画做舞台底，产品窗口浮在上面'],
+    ['D4-structure-stage.html', '第二轮 D4 · 空间结构', '把运行空间画出来：窗口四周的插件模块随任务点亮'],
+    ['D5-night-stage.html', '第二轮 D5 · 夜间舞台', 'D 的克制换成暖炭灰深色，深色界面放在被照亮的色场上'],
+    ['A-paper-ink.html', '方向 A · 纸与墨', '把博客的语言扩展到全站：暖纸、衬线、角色色块'],
+    ['B-orbit.html', '方向 B · 轨道', '从 Logo 行星环长出的细线轨道系统，理性精确'],
+    ['C-deep-space.html', '方向 C · 深空', '暖调深色空间里，各自发光的 Actor'],
+    ['D-stage.html', '方向 D · 舞台', '克制标题 + 质感舞台，产品界面是主角'],
+    ['E-sprites.html', '方向 E · 精灵', '角色精灵当主角的产品隐喻场景'],
+  ];
+  const grid = document.getElementById('grid');
+  for (const [file, name, note] of demos) {
+    grid.insertAdjacentHTML('beforeend', `
+      <article class="card">
+        <div class="frame"><iframe src="${file}" loading="lazy" tabindex="-1" title="${name}"></iframe></div>
+        <div class="meta"><div><b>${name}</b><br><span>${note}</span></div><a href="${file}" target="_blank">打开 ↗</a></div>
+      </article>`);
+  }
+  const fit = () => document.querySelectorAll('.frame').forEach(f => {
+    f.querySelector('iframe').style.transform = `scale(${f.clientWidth / 1440})`;
+  });
+  addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

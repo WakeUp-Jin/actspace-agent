@@ -21,12 +21,13 @@ document.querySelectorAll<HTMLImageElement>('.docs-prose img').forEach(img => {
 document.querySelectorAll<HTMLAnchorElement>('.screenshot-link').forEach(link => {
   link.addEventListener('click', event => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const img = link.querySelector('img');
-    if (!img) return;
+    // 链接里没有图片时（首页「查看原图」），用 data-alt 作为说明。
+    const alt = link.querySelector('img')?.alt ?? link.dataset.alt;
+    if (alt === undefined) return;
     event.preventDefault();
     trigger = link;
     expanded.src = link.href;
-    expanded.alt = img.alt;
+    expanded.alt = alt;
     dialog.showModal();
     document.documentElement.classList.add('media-open');
   });

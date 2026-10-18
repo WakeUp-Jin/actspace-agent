@@ -1,0 +1,20 @@
+---
+import { directions, statusLabel } from '../../lib/home-features';
+---
+<section class="wrap directions" aria-labelledby="directions-title">
+  <div class="section-head">
+    <h2 id="directions-title">接下来，长成你的 Actor</h2>
+    <p>三个方向：长任务不失忆，Harness 按问题进化，Actor 在 Space 里协作。</p>
+  </div>
+  <ol class="direction-strip">
+    {directions.map((item, index) => <li>
+      <a href={`#${item.id}`}>
+        <span class="direction-index">0{index + 1}</span>
+        <span class:list={['pill', item.status]}>{statusLabel[item.status]}</span>
+        <strong>{item.name}</strong>
+        <span class="direction-summary">{item.summary}</span>
+        <span class="arrow" aria-hidden="true">→</span>
+      </a>
+    </li>)}
+  </ol>
+</section>

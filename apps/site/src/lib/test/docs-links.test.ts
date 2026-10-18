@@ -12,7 +12,9 @@ const files = readdirSync(dir).filter(file => file.endsWith(".md"));
 describe("public documentation links", () => {
   it.each(["/", "/actspace-agent", "/preview/site/"])("renders links under %s, including the welcome alias", async (base) => {
     const prefix = base === "/" ? "" : base.replace(/\/$/, "");
-    const routes = new Set(files.map(file => `${prefix}/docs/${file.replace(/\.md$/, "")}/`));
+    // 文档也可以链到站内其它页面（开发计划、更新日志、博客）。
+    const pages = ["/roadmap/", "/updates/", "/blog/"].map(page => `${prefix}${page}`);
+    const routes = new Set([...files.map(file => `${prefix}/docs/${file.replace(/\.md$/, "")}/`), ...pages]);
     const renderer = await satteri({mdastPlugins:[docsLinks({base})]}).createRenderer({syntaxHighlight:false});
     for (const file of files) {
       const markdown = readFileSync(join(dir, file), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");

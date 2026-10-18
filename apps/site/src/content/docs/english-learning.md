@@ -2,7 +2,7 @@
 title: "英语辅助学习"
 description: "给指定会话开启英中双语回复，并按需要朗读英文。"
 group: "extensions"
-order: 3
+order: 4
 updatedAt: 2026-09-19
 draft: false
 ---
