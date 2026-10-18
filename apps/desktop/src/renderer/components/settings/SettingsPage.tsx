@@ -196,12 +196,12 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       );
     case "search":
       return (
-        <PageShell title="搜索" description="Agent 联网搜索使用的服务。Key 只保存在本机。">
+        <PageShell title="搜索与网页读取" description="管理聚合搜索来源与网页正文读取方式。Key 只保存在本机。">
           <SearchSettings {...rest} />
         </PageShell>
       );
     case "tools":
-      return <PageShell title="工具" description="Agent 可以调用哪些工具，以及执行前是否需要你确认。联网搜索在「搜索」中管理。"><ToolsSection {...rest} /></PageShell>;
+      return <PageShell title="工具" description="Agent 可以调用哪些工具，以及执行前是否需要你确认。联网搜索在「搜索与网页读取」中管理。"><ToolsSection {...rest} /></PageShell>;
     case "appearance":
       return <PageShell title="外观" description="主题、强调色、字体与字号。"><AppearanceSection /></PageShell>;
     case "archivedChats":

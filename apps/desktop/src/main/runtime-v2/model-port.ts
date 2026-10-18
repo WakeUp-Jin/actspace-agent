@@ -37,7 +37,8 @@ export interface DesktopRuntimeV2ModelPort {
   resolveMainModel(requested?: string | null): DesktopRuntimeV2ModelResolution;
   resolveImageInspectionModel(): DesktopRuntimeV2ModelResolution;
   getToolEnvironment(): {
-    readonly searchCredentials: Partial<Record<"zhipu" | "tavily" | "tinyfish" | "exa", string>>;
+    readonly deepseekFetchApiKey?: string;
+    readonly searchCredentials: Partial<Record<"zhipu" | "tavily" | "tinyfish" | "exa" | "deepseek", string>>;
     readonly imageGeneration?: { readonly apiKey: string; readonly baseUrl: string; readonly model: string };
   };
 }

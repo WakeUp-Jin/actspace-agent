@@ -79,6 +79,9 @@
         "exploreModel": "kimi:kimi-k2.7-code"
       },
       "searchProviders": {
+        "deepseek": {
+          "hasApiKey": false
+        },
         "zhipu": {
           "hasApiKey": false
         },
@@ -239,7 +242,11 @@
             "alwaysAsk": false
           },
           "showFileChangeStats": true,
+          "deepseekFetchEnabled": false,
           "searchProviders": {
+            "deepseek": {
+              "enabled": false
+            },
             "zhipu": {
               "enabled": true
             },

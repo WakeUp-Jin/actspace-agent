@@ -65,7 +65,7 @@ export function mockAppSettings(): AppSettings {
     version: 2,
     defaultModelId: null,
     providers: { deepseek: providerView("deepseek"), kimi: providerView("kimi") },
-    searchProviders: { zhipu: unconfigured, tavily: unconfigured, tinyfish: unconfigured, exa: unconfigured },
+    searchProviders: { deepseek: unconfigured, zhipu: unconfigured, tavily: unconfigured, tinyfish: unconfigured, exa: unconfigured },
     agent: { systemPromptPath: PROMPT_PATH, temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false, exploreModelId: null },
     skills: { disabled: [] },
     taskModels: { defaultChatModel: MOCK_DEFAULT_MODEL_KEY, utilityModel: null, exploreModel: null },

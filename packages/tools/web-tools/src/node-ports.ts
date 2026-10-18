@@ -13,11 +13,13 @@ const MAX_REDIRECTS = 5;
 const CACHE_TTL_MS = 15 * 60_000;
 const CACHE_MAX_ENTRIES = 32;
 
-export type WebSearchProviderId = "zhipu" | "tavily" | "tinyfish" | "exa";
+export type WebSearchProviderId = "zhipu" | "tavily" | "tinyfish" | "exa" | "deepseek";
 export type WebSearchCredentials = Partial<Readonly<Record<WebSearchProviderId, string>>>;
 
 export type NodeWebToolPortsOptions = {
   readonly credentials?: WebSearchCredentials;
+  /** Presence authorizes paid Fetch independently of search credentials. */
+  readonly deepseekFetchApiKey?: string;
   readonly fetchImpl?: typeof fetch;
   readonly resolveHostname?: (hostname: string) => Promise<readonly string[]>;
 };
@@ -29,7 +31,7 @@ export function createNodeWebToolPorts(options: NodeWebToolPortsOptions = {}): N
   const resolveHostname = options.resolveHostname ?? resolveHostnameAddresses;
   const cache = new Map<string, { readonly expiresAt: number; readonly value: string }>();
   const search = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webSearch(args, context, options.credentials ?? {}, fetchImpl);
-  const open = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webFetch(args, context, fetchImpl, resolveHostname, cache);
+  const open = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webFetch(args, context, fetchImpl, resolveHostname, cache, options.deepseekFetchApiKey);
   return Object.freeze({
     web: (args, context) => args.action === "search" ? search(args, context) : args.action === "open" ? open(args, context) : Promise.resolve(failed("INVALID_ARGUMENTS", "action must be search or open", false)),
     web_search: search,
@@ -47,17 +49,19 @@ async function webSearch(args: Readonly<Record<string, RuntimeV2JsonValue>>, con
   const maxResults = clampInteger(args.max_results, 5, 1, 10);
   const domestic = credentials.zhipu ? provider("zhipu", credentials.zhipu, fetchImpl) : undefined;
   const international = (["tavily", "tinyfish", "exa"] as const).flatMap((id) => credentials[id] ? [provider(id, credentials[id]!, fetchImpl)] : []);
-  if (domestic === undefined && international.length === 0) return failed("WEB_SEARCH_NOT_CONFIGURED", "Web search is unavailable: configure at least one Zhipu, Tavily, TinyFish, or Exa API key, then restart the Runtime.", false);
-  const [domesticResult, internationalResult] = await Promise.all([
+  if (domestic === undefined && international.length === 0 && !credentials.deepseek) return failed("WEB_SEARCH_NOT_CONFIGURED", "Web search is unavailable: enable and configure at least one DeepSeek, Zhipu, Tavily, TinyFish, or Exa search source.", false);
+  const [domesticResult, internationalResult, deepseekResult] = await Promise.all([
+    // Each lane participates independently; DeepSeek never replaces existing lanes.
     domestic === undefined ? Promise.resolve<SearchOutcome>({ results: [] }) : runProvider(domestic, query, maxResults, context.signal),
     runProviderFallback(international, query, maxResults, context.signal),
+    credentials.deepseek ? runProvider(provider("deepseek", credentials.deepseek, fetchImpl), query, maxResults, context.signal) : Promise.resolve<SearchOutcome>({ results: [] }),
   ]);
-  const lanes = [{ label: "international", outcome: internationalResult }, { label: "domestic", outcome: domesticResult }] as const;
+  const lanes = [{ label: "deepseek", outcome: deepseekResult }, { label: "international", outcome: internationalResult }, { label: "domestic", outcome: domesticResult }] as const;
   if (lanes.every(({ outcome }) => outcome.results.length === 0)) {
     const details = lanes.flatMap(({ label, outcome }) => outcome.failure ? [`${label}: ${outcome.failure}`] : []);
     return failed("WEB_SEARCH_FAILED", details.length ? `Web search failed. ${details.join(" | ")}` : `Web search returned no results for "${query}".`, true);
   }
-  return completed(formatSearchResults(query, lanes), `Web search completed for ${query}`);
+  return completed(formatSearchResults(query, lanes, maxResults), `Web search completed for ${query}`);
 }
 
 type SearchProvider = { readonly id: WebSearchProviderId; search(query: string, maxResults: number, signal: AbortSignal): Promise<readonly SearchResult[]> };
@@ -66,6 +70,11 @@ function provider(id: WebSearchProviderId, apiKey: string, fetchImpl: typeof fet
   return Object.freeze({
     id,
     async search(query, maxResults, signal) {
+      if (id === "deepseek") {
+        if (Array.from(query).length > 128) throw new Error("DeepSeek query must not exceed 128 Unicode characters.");
+        const value = record(await jsonRequest(id, fetchImpl, "https://api.deepseek.com/v1/tools/search", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ query, count: maxResults, need_content: false }) }, signal));
+        return normalizeResults(value?.results, { url: "url", snippet: "summary", date: "date" }, maxResults);
+      }
       if (id === "zhipu") {
         const value = record(await jsonRequest(id, fetchImpl, "https://open.bigmodel.cn/api/paas/v4/web_search", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ search_engine: "search_pro", search_query: query, count: maxResults }) }, signal));
         return normalizeResults(value?.search_result, { url: "link", snippet: "content", date: "publish_date" }, maxResults);
@@ -86,12 +95,15 @@ function provider(id: WebSearchProviderId, apiKey: string, fetchImpl: typeof fet
 }
 
 async function jsonRequest(id: WebSearchProviderId, fetchImpl: typeof fetch, url: string, init: RequestInit, signal: AbortSignal): Promise<unknown> {
-  const response = await fetchImpl(url, { ...init, signal: combinedSignal(signal, SEARCH_TIMEOUT_MS), redirect: "error" });
-  if (!response.ok) {
-    const detail = (await response.text().catch(() => "")).slice(0, 300);
-    throw new Error(`${id} HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+  try {
+    const response = await fetchImpl(url, { ...init, signal: combinedSignal(signal, SEARCH_TIMEOUT_MS), redirect: "error" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    // Never forward upstream bodies or transport errors, which may echo credentials.
+    const status = error instanceof Error && /^HTTP \d{3}$/.test(error.message) ? error.message : "request failed or timed out";
+    throw new Error(`${id} ${status}`);
   }
-  return response.json();
 }
 
 async function runProvider(candidate: SearchProvider, query: string, maxResults: number, signal: AbortSignal): Promise<SearchOutcome> {
@@ -122,15 +134,32 @@ function normalizeResults(value: RuntimeV2JsonValue | undefined, fields: { reado
   }).slice(0, maxResults);
 }
 
-function formatSearchResults(query: string, lanes: readonly { readonly label: string; readonly outcome: SearchOutcome }[]): string {
-  const seen = new Set<string>(); const sections: string[] = []; const providers: string[] = [];
-  for (const { label, outcome } of lanes) {
+function formatSearchResults(query: string, lanes: readonly { readonly label: string; readonly outcome: SearchOutcome }[], maxResults: number): string {
+  // Reciprocal rank fusion compares ranks, never incompatible provider scores.
+  const merged = new Map<string, { item: SearchResult; score: number; sources: string[] }>();
+  for (const { outcome } of lanes) {
     if (!outcome.provider) continue;
-    const results = outcome.results.filter((item) => { const key = item.url.replace(/\/+$/, ""); if (seen.has(key)) return false; seen.add(key); return true; });
-    if (!results.length) continue;
-    providers.push(outcome.provider);
-    sections.push([`## ${outcome.provider} (${label})`, ...results.map((item, index) => [`${index + 1}. ${item.title}`, `   URL: ${item.url}`, item.publishedDate ? `   Published: ${item.publishedDate}` : "", item.snippet ? `   ${item.snippet}` : ""].filter(Boolean).join("\n"))].join("\n"));
+    const seen = new Set<string>();
+    outcome.results.forEach((item, index) => {
+      let url: URL;
+      try { url = new URL(item.url); } catch { return; }
+      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) return;
+      url.hash = "";
+      const key = url.toString().replace(/\/+$/, "");
+      if (seen.has(key)) return;
+      seen.add(key);
+      const entry = merged.get(key) ?? { item, score: 0, sources: [] };
+      entry.score += 1 / (60 + index + 1);
+      entry.sources.push(outcome.provider!);
+      merged.set(key, entry);
+    });
   }
+  const results = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, maxResults);
+  const providers = lanes.flatMap(({ outcome }) => outcome.provider ? [outcome.provider] : []);
+  const sections = results.map(({ item, sources }, index) => [
+    `${index + 1}. ${item.title}`, `   URL: ${item.url}`, `   Sources: ${sources.join(", ")}`,
+    item.publishedDate ? `   Published: ${item.publishedDate}` : "", item.snippet ? `   ${item.snippet}` : "",
+  ].filter(Boolean).join("\n"));
   const failures = lanes.flatMap(({ label, outcome }) => outcome.failure ? [`Note: ${label} lane failed - ${outcome.failure}`] : []);
   return [`Query: ${query}`, `Providers: ${providers.join(", ")}`, `Searched at: ${new Date().toISOString()}`, "", ...sections, ...failures, "", "Tip: call web_fetch with a result URL to read the full page content."].join("\n");
 }
@@ -141,14 +170,42 @@ async function webFetch(
   fetchImpl: typeof fetch,
   resolveHostname: (hostname: string) => Promise<readonly string[]>,
   cache: Map<string, { readonly expiresAt: number; readonly value: string }>,
+  deepseekApiKey?: string,
 ): Promise<ToolBodyResult> {
   const raw = stringArg(args, "url").trim();
   if (!raw) return failed("INVALID_ARGUMENTS", "url is required", false);
   const parsed = parsePublicUrl(raw);
   if (parsed instanceof Error) return failed("WEB_FETCH_URL_DENIED", parsed.message, false);
-  const cached = cache.get(parsed.toString());
+  if (context.signal.aborted) return failed("WEB_FETCH_CANCELLED", "Web fetch cancelled.", false);
+  const cacheKey = `${deepseekApiKey ? "deepseek" : "local"}:${parsed.toString()}`;
+  const cached = cache.get(cacheKey);
   if (cached !== undefined && cached.expiresAt >= Date.now()) return completed(cached.value, `Fetched ${parsed.toString()} from cache`);
-  if (cached !== undefined) cache.delete(parsed.toString());
+  if (cached !== undefined) cache.delete(cacheKey);
+  let fallbackNote = "";
+  if (deepseekApiKey) {
+    try { await assertPublicHostname(parsed.hostname, resolveHostname); }
+    catch { return failed("WEB_FETCH_URL_DENIED", "Target must resolve to a public address.", false); }
+    try {
+      const remote = await fetchImpl("https://api.deepseek.com/v1/tools/fetch", {
+        method: "POST", headers: { Authorization: `Bearer ${deepseekApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ url: parsed.toString() }), redirect: "error", signal: combinedSignal(context.signal, FETCH_TIMEOUT_MS),
+      });
+      if (remote.status === 403) return failed("WEB_FETCH_URL_DENIED", "DeepSeek rejected this URL under its safety policy.", false);
+      if (!remote.ok) throw new Error(`HTTP ${remote.status}`);
+      const bytes = await readBoundedBody(remote, MAX_RESPONSE_BYTES);
+      const page = record(JSON.parse(bytes.toString("utf8")));
+      const body = stringValue(page?.content)?.trim();
+      if (!body) throw new Error("No readable content");
+      const content = body.length > MAX_MARKDOWN_CHARS ? `${body.slice(0, MAX_MARKDOWN_CHARS)}\n\n[Content truncated]` : body;
+      const value = [`URL: ${parsed}`, `Provider: deepseek`, `Title: ${stringValue(page?.title) ?? ""}`, `Fetched at: ${new Date().toISOString()}`, "", content].join("\n");
+      if (cache.size >= CACHE_MAX_ENTRIES) { const oldest = cache.keys().next().value; if (oldest) cache.delete(oldest); }
+      cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value });
+      return completed(value, `Fetched ${parsed} via DeepSeek`);
+    } catch {
+      if (context.signal.aborted) return failed("WEB_FETCH_CANCELLED", "Web fetch cancelled.", false);
+      fallbackNote = "Note: DeepSeek fetch unavailable; used local fetch.";
+    }
+  }
   let response: Response;
   try { response = await fetchFollowingSafeRedirects(parsed, context.signal, fetchImpl, resolveHostname); }
   catch (error) { return failed("WEB_FETCH_FAILED", safeError("web_fetch", error), true); }
@@ -166,10 +223,10 @@ async function webFetch(
   if (!content) return failed("WEB_FETCH_EMPTY", `Fetched ${raw} but found no readable text content.`, false);
   const originalChars = content.length;
   if (content.length > MAX_MARKDOWN_CHARS) content = `${content.slice(0, MAX_MARKDOWN_CHARS)}\n\n[Content truncated: showing first ${MAX_MARKDOWN_CHARS} of ${originalChars} characters]`;
-  const value = [`URL: ${response.url || raw}`, title ? `Title: ${title}` : "", `Content-Type: ${mime || "unknown"}`, `Fetched at: ${new Date().toISOString()}`, "", content].filter((line, index) => line || index >= 4).join("\n");
+  const value = [`URL: ${response.url || raw}`, `Provider: local`, fallbackNote, title ? `Title: ${title}` : "", `Content-Type: ${mime || "unknown"}`, `Fetched at: ${new Date().toISOString()}`, "", content].filter((line, index) => line || index >= 4).join("\n");
   if (cache.size >= CACHE_MAX_ENTRIES) { const oldest = cache.keys().next().value; if (oldest) cache.delete(oldest); }
-  cache.set(parsed.toString(), { expiresAt: Date.now() + CACHE_TTL_MS, value });
-  return completed(value, `Fetched ${response.url || raw}`);
+  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value });
+  return completed(value, `Fetched ${response.url || raw} locally${fallbackNote ? " (DeepSeek fallback)" : ""}`);
 }
 
 async function fetchFollowingSafeRedirects(start: URL, signal: AbortSignal, fetchImpl: typeof fetch, resolveHostname: (hostname: string) => Promise<readonly string[]>): Promise<Response> {

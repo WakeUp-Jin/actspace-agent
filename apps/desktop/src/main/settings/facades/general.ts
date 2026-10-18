@@ -133,6 +133,7 @@ export function getV2(store: SettingsStore): AppSettingsV2 {
     customModels: cloneJson(store.settings.customModels),
     taskModels: { ...store.settings.taskModels },
     searchProviders: {
+      deepseek: { hasApiKey: Boolean(store.getStoredKey("deepseek")) },
       zhipu: { hasApiKey: Boolean(store.getStoredKey("zhipu")) },
       tavily: { hasApiKey: Boolean(store.getStoredKey("tavily")) },
       tinyfish: { hasApiKey: Boolean(store.getStoredKey("tinyfish")) },
