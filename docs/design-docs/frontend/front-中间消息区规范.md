@@ -165,7 +165,7 @@ Read、Search、Grep、Glob、Directory List、Web Search、Thinking、Bash、�
 
 ## 轮尾改动卡与交付文件卡
 
-最终回复之后、图片列表之前，按「改了什么」「交给你什么」分两张卡，接在尾栏（时间 / 费用 / 操作）上方。数据全部由本轮已完成的工具事件推导，不读 Git，也不从回复正文猜。设计源见 `docs/design-docs/frontend/turn-deliverables-demo.html`。
+最终回复之后、图片列表之前，按「改了什么」「交给你什么」分两张卡，接在尾栏（时间 / 费用 / 操作）上方。数据全部由本轮已完成的工具事件推导，不读 Git，也不从回复正文猜。当前规则以下文为准；早期轮尾卡片原型已迁出，见 [迁出清单](../retired-html-demos.md)。
 
 ### 改动卡
 
@@ -331,7 +331,7 @@ Edit File 和 Write File 是文件修改类工具消息。后端工具名为 `ed
 
 ## Context Compaction 组件
 
-Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接输入 `/compact` 手动触发，或回合结束后由后端自动触发；两者使用同一套 UI，不区分、不标注触发方式，都落到消息流中的 `context_compaction` 消息块。设计稿：`docs/design-docs/frontend/context-compaction-demo.html`。
+Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接输入 `/compact` 手动触发，或回合结束后由后端自动触发；两者使用同一套 UI，不区分、不标注触发方式，都落到消息流中的 `context_compaction` 消息块。原压缩设计稿已迁出，当前生命周期展示以本节和正式应用为准。
 
 ### 结构
 
@@ -359,7 +359,7 @@ Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接
 
 ## 消息队列与运行中引导
 
-回合运行中（包括上下文压缩中），用户仍可在 Composer 输入并发送。消息进入输入框上方的队列托盘，当前运行结束后按顺序自动发出，每条是一个新回合，不合并。设计稿：`docs/desktop-frontend-refactor/demo/composer-run-target-demo.html`（队列托盘在输入框上方，09 实施；旧的 `message-queue-demo.html` 已废弃）。
+回合运行中（包括上下文压缩中），用户仍可在 Composer 输入并发送。消息进入输入框上方的队列托盘，当前运行结束后按顺序自动发出，每条是一个新回合，不合并。队列托盘在输入框上方；早期 Composer 与 message-queue 原型均已迁出，当前行为以本节及 TaskLedger 生命周期规范为准。
 
 ### 结构
 
@@ -374,7 +374,7 @@ Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接
 - `↳ 引导` 将同一 Task 指定给当前 Run，Host 在下一步边界交付内容，模型下一步开始时读到；如果模型当时正在写最后的回复，回合多跑一步。任务领取并生成用户消息后这条以普通用户消息出现在当前回合的对应位置，不加标记，并从托盘移除。
 - 没有运行中的回合时不显示 `引导`；压缩中、等待审批时显示但不可用，悬停说明原因。
 - `撤回` 或回合结束时还没被读到的引导，回到队首。引导被拒（附件 / 引用失效）时回到队首并在 Composer 顶部提示原因。
-- 回合停止、失败或发送被拒后队列暂停，不自动发出；点 `继续发送` 或手动发送一条后恢复。
+- 回合停止、失败或发送被拒后队列暂停，不自动发出；仅点 `继续发送` 显式恢复；普通发送只新增排队任务，不解除暂停。Web 与 Desktop 采用相同 TaskLedger 语义。
 - 队列由 Host TaskLedger 按会话持久保存，Renderer 仅投影状态；客户端 Reload 不重复提交。Host 重启后队列需手动继续，后台会话由同一个调度器负责。
 
 ## 顺序原则
@@ -412,7 +412,7 @@ Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接
 ### 按钮与原因
 
 - 按钮全部是 xs 胶囊：拒绝（ghost）→ 本会话允许（tonal，仅在有授权建议时出现，`title` 为建议说明）→ 主按钮（`accent`，跟随外观强调色；删除用 `danger-solid`）。
-- Bash 的“本会话允许”在后端给出 `selector.kind === "command_prefix"` 的建议时显示，并在按钮里带上前缀（如 `本会话允许 pnpm`）；后端契约见 `docs/exec-plans/active/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md`，未落地前不出现。
+- Bash 的“本会话允许”在后端给出 `selector.kind === "command_prefix"` 的建议时显示，并在按钮里带上前缀（如 `本会话允许 pnpm`）；后端契约见 `docs/exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md`，未落地前不出现。
 - 提交中：被点按钮前出现旋转图标，所有按钮禁用；Bridge 返回 `ok: false` 时恢复可点。
 - “工作区外”“敏感文件”和通用审批提示都不展示；未知原因收进 Info 图标 tooltip，不丢信息。
 - 不做键盘快捷键：Enter 与 Composer 发送冲突，按钮上也不显示快捷键提示。

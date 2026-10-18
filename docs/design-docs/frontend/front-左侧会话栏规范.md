@@ -47,7 +47,7 @@
 
 ### 分组标题统一规范
 
-> 2026-10-15 侧栏改版（DSH + Cursor + Codex 时间分组，方案见 [sidebar-redesign-demo.html](sidebar-redesign-demo.html)）。实现：`components/sidebar/SidebarSessions.tsx` 编排，`SidebarSectionHeader.tsx` 画标题。
+> 2026-10-15 侧栏改版（DSH + Cursor + Codex 时间分组，方案见 [sidebar-redesign-demo.html（已迁出）](../retired-html-demos.md)）。实现：`components/sidebar/SidebarSessions.tsx` 编排，`SidebarSectionHeader.tsx` 画标题。
 
 `已置顶`、`工作区 / 会话` 和按时间分组的时间段标题共用 `SidebarSectionHeader`：
 

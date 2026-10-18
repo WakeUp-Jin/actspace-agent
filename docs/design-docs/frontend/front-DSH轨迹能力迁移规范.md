@@ -97,7 +97,7 @@ Session Journal
 
 ## DSH 对齐实现（2026-10-14）
 
-计划：`docs/exec-plans/active/20261014-trajectory-dsh-parity.md`。本节取代上文 2026-09-06 各节里与之冲突的描述（英文文案、`Summary/Payload` 页签名、单独的 Stop 行、去掉请求标记）。
+计划：`docs/exec-plans/completed/20261014-trajectory-dsh-parity.md`。本节取代上文 2026-09-06 各节里与之冲突的描述（英文文案、`Summary/Payload` 页签名、单独的 Stop 行、去掉请求标记）。
 
 **数据流**
 
@@ -143,7 +143,7 @@ RuntimeV2TrajectorySnapshot（projectTrajectoryWindow，同一事件对象只转
 
 **样式**：DSH 的 CSS module 移植成全局的 `styles/trajectory.css`（前缀 `tjv-`、`tjb-`、`tjl-`、`tj-`）和 `styles/json-tree.css`。原因是 DSH 依赖伪元素、容器查询和属性选择器，用 Tailwind 类无法一比一还原。
 
-**流式**（照 DSH `finalized` + `streamingCells`，计划 `docs/exec-plans/active/20261014-trajectory-streaming-split.md`）：
+**流式**（照 DSH `finalized` + `streamingCells`，计划 `docs/exec-plans/completed/20261014-trajectory-streaming-split.md`）：
 
 - 数据源（`use-trajectory-source.ts`）把 projection 更新合并到每个动画帧一次。
 - 拆分（`live.ts`）：一组 `assistant/chunk` 没有被 `assistant/message` 收尾、所在轮次也没有 `turn/end` 时，算正在输出。它的 `tool-call-delta` 对上了已落盘的 `tool/call` 时，仍算定稿（那个工具要靠它的内容关联助手）。

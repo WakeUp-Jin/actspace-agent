@@ -1,16 +1,16 @@
 # Context 面板与 SQLite 联合设计
 
-状态：2026-10-11，用户已批准并进入联合实施/验收。数据接线已实现，性能及 Computer Use 按联合计划逐项签收；未全量通过。
+状态：2026-10-18，联合实现与本轮验收已收束；schema 9 与 Context 面板契约 2 已接入。性能及 Computer Use 仍按原记录保留限制，未全量通过。
 
-已对照用户提供的 SQLite 分支完整会话复核，见[06：原会话决策与联合方案校验](06-原会话决策与联合方案校验.md)。本文的 schema 9、Context manifest、分批发布和刷新协议是联合方案新增提案，不是 SQLite 分支已实现或已验收的能力。
+已对照用户提供的 SQLite 分支完整会话复核，见[06：原会话决策与联合方案校验](06-原会话决策与联合方案校验.md)。schema 9、Context manifest、分批发布和刷新协议已在后续联合实施落地；它们不属于早期 SQLite 分支基线。
 
 执行入口：[联合执行计划](../../../exec-plans/completed/20261011-context-sqlite-integration/README.md)。测试入口：[联合测试验收计划](../../../exec-plans/completed/20261011-context-sqlite-integration/acceptance.md)。本文是 Context V2 在面板查询与 SQLite 集成方面的增补；01–03 的 Session 权威、实例生命周期和插件边界继续有效。
 
-## 1. 目标、基线与范围
+## 1. 原实施基线与范围（2026-10-11 历史记录）
 
 在 `fix/context_manager_v1` 上完成两件关联工作：补齐右侧 Context 五区块的真实数据，修复 SQLite 查询已知问题并统一验收。基线包含 `2cbb634f` 和当前未提交的 Context、前端及其他改动；HEAD 不能独自代表待验版本，执行时记录受影响工作树内容指纹。不得为整合任务覆盖其他未提交工作。
 
-已核对的源码事实：
+以下为实施前核对事实，不是当前行为。当前 `describeContextPanel` 已委托 ContextPanelService，历史索引已升级 schema 9：
 
 - `packages/context/engine/src/instances.ts` 以 Session + logicalAgentScopeId 保存长期实例；一次提交替换不可变 view，不要求外部一直持有同一可变对象。
 - `packages/agent-service/src/application.ts` 已同时提供 `readContextProjection` 和有界 `readSessionEventBatch`；`sessionQuerySources` 当前枚举全库。

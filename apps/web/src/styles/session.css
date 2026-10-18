@@ -68,6 +68,7 @@
 .approval pre { margin: 0; padding: 10px 12px 4px; max-height: 180px; overflow: auto; font: 12px/1.6 var(--act-font-mono); color: var(--act-color-text); white-space: pre-wrap; word-break: break-all; }
 .approval pre .prompt { color: var(--act-color-text-faint); user-select: none; }
 .approval-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 44px; padding: 7px 7px 7px 12px; }
+.approval-foot .pill-btn, .queue-resume.pill-btn { min-height: 44px; min-width: 44px; height: auto; }
 
 /* 已完成一轮的改动卡。 */
 .changes { border: 1px solid var(--act-color-border); border-radius: var(--act-radius-lg); overflow: hidden; }

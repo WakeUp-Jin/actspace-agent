@@ -41,8 +41,8 @@ last_updated: 2026-10-05
 
 - 真实截图、品牌与博客图片在 `apps/site/src/assets/` 维护，构建时按用途生成响应式资源。
 - 缺少截图时明确说明要拍摄的页面和状态，不伪造应用画面或显示破图。
-- 截图任务与完成状态见 [SCREENSHOTS.md](../../apps/site/SCREENSHOTS.md)，首页内容见 [SHOWCASE_PLAN.md](../../apps/site/SHOWCASE_PLAN.md)。
-- [首页原型](website-redesign-demo.html) 是视觉对照，正式路由、正文与资源以 apps/site 为准。
+- 截图任务与完成状态见 [SCREENSHOTS.md](../../apps/site/SCREENSHOTS.md)，首页内容见 [DESIGN.md](../../apps/site/DESIGN.md)。
+- [首页原型（已迁出）](retired-html-demos.md) 是视觉对照，正式路由、正文与资源以 apps/site 为准。
 - 图片预览、移动导航、复制与筛选必须支持键盘与窄屏；动态效果尊重 reduced-motion。具体验收点随视觉规范维护。
 
 ## 工程与部署

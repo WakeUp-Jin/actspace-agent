@@ -101,7 +101,7 @@ runtime --(Host capability)--> browser-bridge
 - 桌面端首版采用 `Electron + React + TypeScript + Vite`。
 - 交互基础组件优先采用 `Radix UI` primitives，而不是直接依赖重样式组件库。
 - 本地数据优先使用 `jsonl` 文件存储，直接落盘到用户电脑。
-- 工程骨架已落地为 `apps/{desktop,cli,site} + packages/runtime + 多个领域 workspace packages + packages/shared` 的单仓结构。
+- 工程骨架已落地为 `apps/{desktop,cli,site,web} + packages/runtime + 多个领域 workspace packages + packages/shared` 的单仓结构。
 - 桌面端主模型由前端模型选择器驱动，模型注册表定义在 `packages/shared/src/model-config.ts`，并由 IPC 契约 re-export。
 - 密钥不进入 renderer 或 Session Journal，Host 只通过 credential resolver 向 Runtime 提供短生命周期凭据。
 - 开发态启动需要先确保 `shared`、领域 packages、`runtime` 有可消费产物，再启动 Electron main/preload 的 watch 与 renderer。

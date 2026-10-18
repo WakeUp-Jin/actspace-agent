@@ -74,3 +74,34 @@ it("retries cancel once with the snapshot revision after CONFLICT, and configure
   await controller.configure({ model: "p/m", reasoningEffort: "high" });
   expect(client.calls[3]!.params).toEqual({ sessionId: "s1", op: "configure", configuration: { model: "p/m", reasoningEffort: "high" } });
 });
+
+it("resumes explicitly with the current revision and refreshes once on conflict", async () => {
+  let attempts = 0;
+  const { client, controller, applied } = setup((_method, params) => {
+    if (params.op === "resume" && ++attempts === 1) return { snapshot: taskSnapshot({ revision: 11, paused: true }), error: "REVISION_CONFLICT" };
+    return { snapshot: taskSnapshot({ revision: 12, paused: params.op === "snapshot" }) };
+  });
+  await controller.resume();
+  expect(client.calls.map(call => call.params.op)).toEqual(["resume", "snapshot", "resume"]);
+  expect(client.calls[0]!.params.revision).toBe(7);
+  expect(client.calls[2]!.params.revision).toBe(12);
+  expect(applied.at(-1)).toMatchObject({ paused: false });
+});
+
+it("does not resume implicitly when submitting into a paused queue", async () => {
+  const { client, controller } = setup(() => null);
+  await controller.send("queued");
+  expect(client.calls.map(call => call.method)).toEqual(["tasks.submit"]);
+});
+
+it("reports a resume failure without retrying a non-conflict error", async () => {
+  const { client, controller } = setup(() => ({ error: "Host unavailable" }));
+  await expect(controller.resume()).rejects.toThrow("Host unavailable");
+  expect(client.calls).toHaveLength(1);
+});
+
+it("stops retrying resume after a second real-protocol revision conflict", async () => {
+  const { client, controller } = setup((_method, params) => ({ snapshot: taskSnapshot({ revision: 12, paused: true }), ...(params.op === "resume" ? { error: "REVISION_CONFLICT" } : {}) }));
+  await expect(controller.resume()).rejects.toThrow("REVISION_CONFLICT");
+  expect(client.calls.filter(call => call.params.op === "resume")).toHaveLength(2);
+});

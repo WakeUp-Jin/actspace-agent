@@ -1,6 +1,6 @@
 # ActSpace Site 设计规范
 
-状态：V4，2026-10-17 用户确认 D6「纸本插件舞台」方向（`docs/design-docs/site-v4/demos/D6-paper-plugin-stage.html`）与「插件化只在首屏讲」原则，执行计划见 `docs/exec-plans/active/20261017-site-v4-redesign.md`。正式实现位于本目录，demo 只作对照，不作为内容源。
+状态：V4，阶段 A 及 T9/H1 精修已合入 main。2026-10-17 确认的 D6 方向已演进为当前桌面插件舞台；执行计划见 `docs/exec-plans/completed/20261017-site-v4-redesign.md`。早期 HTML 已本地备份迁出，见 [原型迁出清单](../../docs/design-docs/retired-html-demos.md)；正式实现和本文是当前视觉依据。
 
 ## 产品与风格
 

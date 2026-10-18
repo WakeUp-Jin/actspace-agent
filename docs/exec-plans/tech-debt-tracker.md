@@ -80,7 +80,7 @@
 
 ## Web / PWA 客户端遗留
 
-2026-10-17 `apps/web` 首版（`active/20261017-web-pwa-client.md`）留下的事项，过程见 `docs/exec-runs/20261017-web-pwa-client/execution-process.md`：
+2026-10-17 `apps/web` 首版（`completed/20261017-web-pwa-client.md`）留下的事项，过程见 `docs/exec-runs/20261017-web-pwa-client/execution-process.md`：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|

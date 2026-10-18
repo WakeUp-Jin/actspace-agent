@@ -15,25 +15,37 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [Web / PWA 客户端](active/20261017-web-pwa-client.md) | 2026-10-17 立项并实施；2026-10-18 视觉改为 B · 轻玻璃，分支 `feat/web-mobile` 开 PR 合入 `main`。A1–D3 完成，浏览器验收截图见[执行摘要](../exec-runs/20261017-web-pwa-client/execution-summary.md)。只剩 D4 真机验收（iPhone + Tailscale），通过后移到 `completed/`。 |
-| [左侧会话栏改版](active/20261015-sidebar-redesign.md) | 2026-10-15 Demo 认可后立项，交互模式；T1–T13 已实施（未提交，在默认工作区改动之上）；原生按钮基线已审批，只剩 Electron 手测。 |
-| [内置 Harness 连续升级修复](active/20261014-harness-builtin-upgrade-fix.md) | 用户已批准；回归由红转绿，下一步真实 Electron 定向复验。 |
-| [轨迹页对齐 DeepSeek Harness](active/20261014-trajectory-dsh-parity.md) | 2026-10-14 立项并开始执行 T1–T12；D1（停止进工具栏）、D2（supplement 显示为上下文行）按建议定案。 |
-| [轨迹页流式拆分：定稿层与流式层](active/20261014-trajectory-streaming-split.md) | 2026-10-14 E1、T0–T6 完成，未提交：流式每帧 p95 24.83ms → 0.25ms，验收指标全部达到；剩用户验收和真实 Provider 流式检查，见[执行摘要](../exec-runs/20261014-trajectory-streaming-split/execution-summary.md)。 |
-| [轮尾改动卡与交付文件卡](active/20261013-turn-deliverables-cards.md) | 2026-10-13 立项，照搬 DSH 的改动卡与 `present` 交付卡；T1–T10 完成，T11 只剩 Electron 实机验收（真实 `present`、Word/Excel 打开、Finder 定位）。 |
-| [多智能体协作（Space）前端演示](active/20261007-multi-agent-collab-frontend-demo.md) | 2026-10-07 立项，分支 `feat/multi-agent-collab-fe`；只做前端、数据全 mock。下一步由用户拍板设计文档 §10 的 Q1–Q8，再开工 T1–T11。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
-| [官网 V4：运行空间叙事与纸本插件舞台](active/20261017-site-v4-redesign.md) | 2026-10-17–18 阶段 A（T1–T9）与首屏精修完成，分支 `feat/site-redesign-v4` 已提 PR 待审核：首屏按桌面端界面重画的插件舞台、真实界面功能块、全站纸本统一；check/test/build 通过。阶段 B（文档重写与截图标注）验收后另立计划，见[执行摘要](../exec-runs/20261017-site-v4-redesign/execution-summary.md)。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；DropdownMenu（及 Popover、Dialog、Select、ContextMenu）由 Desktop 前端重构 16 接手；剩 Switch、Textarea、Tabs 及对应迁移。 |
-| [工具审批卡 · Cursor 式](active/20261011-approval-card-cursor-style/README.md) | 2026-10-11 前端实现与自动化验证完成；Bash 前缀授权[完整方案](active/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md)已实现，见[执行摘要](../exec-runs/20261011-bash-command-prefix-grant/execution-summary.md)；后端和审批定向测试通过，桌面全量仍有 watcher 回归门槛；Electron 实机验收待做。 |
-| [仓库文档与 `packages` 清理](active/20261011-repo-cleanup.md) | 2026-10-11 实现与自动化验证完成，待用户审阅清理边界和遗留项。 |
 
 六个早期后端计划已移出执行导航，短页仅保留历史链接。独有目标与未完成项见[结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)，当前验证见本轮清理摘要。
 
 ## 最近完成
+
+- [验收缺陷修复与文档迁出](completed/20261018-acceptance-fixes-docs-cleanup.md)：5 个产品缺陷及 Runtime 测试已修复，31 个 Demo 经桌面备份和哈希校验后迁出；定向复验、工程检查及未覆盖边界见[执行摘要](../exec-runs/20261018-acceptance-fixes-docs-cleanup/execution-summary.md)。
+
+- [Web / PWA 客户端](completed/20261017-web-pwa-client.md)：A1–D3 已实现并合入 main；D4 iPhone + Tailscale 真机验收仍未覆盖，不因归档改成通过。
+
+- [左侧会话栏改版](completed/20261015-sidebar-redesign.md)：侧栏实现已合入 main；后续登记刷新和焦点修复见统一验收与修复记录。
+
+- [内置 Harness 连续升级修复](completed/20261014-harness-builtin-upgrade-fix.md)：内置 Harness 连续升级已实现；旧 Vite 缺失样式阻塞是当时现场，当前基线可启动并完成真实调用。
+
+- [轨迹页对齐 DeepSeek Harness](completed/20261014-trajectory-dsh-parity.md)：轨迹页对齐实现已合入；DSH 双页逐项比对及 O01 性能观察不视为已关闭。
+
+- [轨迹页流式拆分：定稿层与流式层](completed/20261014-trajectory-streaming-split.md)：定稿/流式拆分实现已合入；原记录中的基准只代表当时 fixture，不等于所有原生性能通过。
+
+- [轮尾改动卡与交付文件卡](completed/20261013-turn-deliverables-cards.md)：改动卡、present 交付卡已实现；原生关联应用及远端下载的未覆盖边界保留。
+
+- [多智能体协作（Space）前端演示](completed/20261007-multi-agent-collab-frontend-demo.md)：T0 决策及 T1–T11 前端演示已完成；数据仍是 mock，不代表 Runtime 多 Agent 协作已经交付。
+
+- [官网 V4：运行空间叙事与纸本插件舞台](completed/20261017-site-v4-redesign.md)：阶段 A（T1–T9、H1 首屏精修）已合入 main；以 T9/H1 的真实截图与桌面插件舞台为最终实现。阶段 B 文档重写与截图标注尚未实施，另行立项。
+
+- [工具审批卡 · Cursor 式](completed/20261011-approval-card-cursor-style/README.md)：前端与 Bash 前缀授权已实现；真实审批行为的分项覆盖见近期验收。
+
+- [仓库文档与 `packages` 清理](completed/20261011-repo-cleanup.md)：实现与自动化验证已完成；兼容层及暂无消费者包的退役条件继续保留。
 
 - [DeepSeek 搜索聚合与可选抓取](completed/20261018-deepseek-web-tools.md)：三路聚合、独立启停与默认关闭的付费抓取已实现；工程与mock UI通过，原生CU和真实Provider边界见执行摘要。
 
@@ -48,7 +60,7 @@
 - [使用统计 SQLite 读模型与 Worker 实现](completed/20261011-usage-sqlite-read-model.md)：代码收口，保留未修缺陷和未通过性能门禁；统一验收由上方独立 active 计划接管，不能据此视为验收通过。
 - [上下文管理引擎 V2](completed/20261011-context-management-engine-v2/README.md)：物理 Context 插件拆包、长期 Context、Runtime/Host/IPC Projection 接线与后端自动化完成；最终 `gpt-6.1-sol` Computer Use 验收保留 browse-only Session 导致的写入型路线未覆盖边界，见执行摘要。
 
-- [Context 面板前端重做](completed/20261011-context-panel-frontend.md)：右侧 Context Tab 换成五区块面板（当前上下文、会话统计、明细对比、趋势、事件），会话内容点行跳轨迹；mock 先行，`describeContextPanel` main 暂返回 null 走过渡视图，待 Context 引擎 V2 实现。自动化通过，浏览器截图与 Electron 待人工验收，见[执行摘要](../exec-runs/20261011-context-panel-frontend/execution-summary.md)。
+- [Context 面板前端重做](completed/20261011-context-panel-frontend.md)：右侧 Context Tab 换成五区块面板（当前上下文、会话统计、明细对比、趋势、事件），会话内容点行跳轨迹；已由 Context/SQLite 联合实施接通 schemaVersion 2 真实数据；历史 mock 过渡已结束。联合验收保留性能及实机覆盖边界，见[执行摘要](../exec-runs/20261011-context-panel-frontend/execution-summary.md)。
 
 - [Desktop 前端重构](completed/20261005-desktop-frontend-refactor/00-总执行计划.md)：9 份计划（10–16、09、17）已全部执行并归档；各计划的 `acceptance-handoff.md` 保留待人工验收边界，设计文档在 `docs/desktop-frontend-refactor/`。
 

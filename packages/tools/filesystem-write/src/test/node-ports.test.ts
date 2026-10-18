@@ -1,8 +1,9 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { canonicalizeFileResource } from "@actspace/tools-runtime";
 import type { ToolExecutionContext } from "@actspace/tools-runtime";
 import type { ToolBodyResult } from "@actspace/tools-runtime";
 
@@ -38,4 +39,33 @@ it("counts header-like content as additions and deletions in write and edit prev
       detail: [expect.objectContaining({ label: "result", value: expect.objectContaining({ additions: 1, deletions: 1 }) }), expect.objectContaining({ label: "actspace.context.file", value: expect.objectContaining({ kind: "file", operation: "write" }) })],
     });
   }
+});
+
+it("keeps write/edit/delete result paths workspace-relative through a symlink root", async () => {
+  const root = await workspace();
+  const alias = join(root, "alias");
+  const physical = await workspace();
+  await symlink(physical, alias, "dir");
+  await mkdir(join(physical, "nested"));
+  const ports = createNodeToolPorts({ workspaceRoot: alias });
+  for (const [name, args, access] of [
+    ["write_file", { path: "nested/result.txt", content: "old" }, "write"],
+    ["edit_file", { path: "nested/result.txt", old_string: "old", new_string: "new" }, "write"],
+    ["delete_file", { path: "nested/result.txt" }, "delete"],
+  ] as const) {
+    const ctx = { ...context("session", undefined, alias), admittedResources: [await canonicalizeFileResource(args.path, access, alias)] };
+    const result = await ports[name]!(args, ctx);
+    expect(result).toMatchObject({ status: "completed", detail: expect.arrayContaining([
+      { label: "result", value: expect.objectContaining({ path: "nested/result.txt" }) },
+    ]) });
+  }
+  // An admitted external target must stay absolute, never look like a workspace output.
+  const external = await workspace();
+  const file = join(external, "outside.txt");
+  const result = await ports.write_file!({ path: file, content: "external" }, {
+    ...context("session", undefined, alias), admittedResources: [await canonicalizeFileResource(file, "write", alias)],
+  });
+  expect(result).toMatchObject({ detail: expect.arrayContaining([
+    { label: "result", value: expect.objectContaining({ path: await realpath(file) }) },
+  ]) });
 });

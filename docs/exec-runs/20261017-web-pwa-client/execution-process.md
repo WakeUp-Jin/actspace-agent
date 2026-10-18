@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261017-web-pwa-client.md`
+- **关联计划**：`docs/exec-plans/completed/20261017-web-pwa-client.md`
 - **设计规范**：`docs/design-docs/frontend/front-web-pwa客户端规范.md`
 - **执行模式**：交互（主智能体 Claude Opus 5.5；C 组的一部分页面委派 Sonnet 5.5 子智能体，主智能体审查后合入）
 - **分支**：`feat/web-mobile`（worktree `../actspace-agent-web-mobile`，从 main 9fb607a2 切出），未提交

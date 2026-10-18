@@ -18,7 +18,7 @@ import {
 /**
  * 状态行右侧的两个会话累计胶囊：「N 轮 M 步 · 输出速度」和「总量 tok · 缓存命中」。
  * 显示/隐藏/可点分支逐条照 DeepSeek Harness 的 `StatsPills.tsx`（详细模式），
- * 落位与面板见 docs/design-docs/frontend/composer-usage-dock-demo.html。
+ * 落位与面板见 docs/design-docs/frontend/front-聊天输入框规范.md。
  */
 
 const PILL_CLASS = "inline-flex min-h-5 max-w-full items-center gap-1.5 whitespace-nowrap rounded-act-pill px-2 py-px text-left text-act-xs leading-5 text-text-faint tabular-nums";
@@ -108,7 +108,7 @@ export function ComposerStatsPills({ overlay }: { overlay?: ComposerStatsOverlay
   const usage = useMemo(() => usagePillModel(snapshot?.usage), [snapshot?.usage]);
   if (activity === null && usage === null) return null;
   return (
-    <span className="flex min-w-0 shrink items-center gap-1" data-composer-stats="">
+    <span className="flex min-w-0 shrink flex-wrap items-center gap-1" data-composer-stats="">
       {activity ? <StatPill stat="activity" icon={Gauge} model={activity} open={openStat === "activity"} onOpenChange={onOpenChange} /> : null}
       {usage ? <StatPill stat="usage" icon={Database} model={usage} open={openStat === "usage"} onOpenChange={onOpenChange} /> : null}
     </span>

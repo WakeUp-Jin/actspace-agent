@@ -188,17 +188,17 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 | 场景 | 单测 | 浏览器 mock | Electron |
 | --- | --- | --- | --- |
 | 新建本机会话 → 发送 → 流式 → 完成 | app-streaming | `?mock=streaming` | ✓（需要模型 key） |
-| 流式中切换会话再切回 | transcript* | `?mock=streaming` | ✓ |
+| 流式中切换会话再切回 | transcript | `?mock=streaming` | ✓ |
 | 流式中刷新窗口恢复 | app-approval-recovery | — | ✓ |
 | 加载早期历史后收到新消息 | app-earlier-history* | `?mock=long-session` | ✓ |
 | 运行中发送 → 进入队列 → 引导 → 撤回 → 删除 | app-message-queue | `?mock=streaming` | ✓ |
 | 审批弹出 → 允许 / 拒绝 / 重启后恢复 | app-approval-recovery | `?mock=approval-pending` | ✓ |
-| 新建远端会话（connected / offline / revoked） | run-target-readiness* | `?mock=remote-host`（只看状态显示） | 需要真实 Host |
+| 新建远端会话（connected / offline / revoked） | readiness | `?mock=remote-host`（只看状态显示） | 需要真实 Host |
 | 远端会话中读文件、下载产物 | remoteArtifact | —（mock 未实现 `hosts.call` / `preview` / `download`） | 需要真实 Host |
 | Host 删除后历史会话显示 | app-remote-host-refresh | `?mock=remote-host` | ✓ |
-| 新建工作树（Git / 无提交 / 非 Git） | run-location-menu* | `?mock=empty`（只看菜单） | ✓ |
-| Composer：inline ↔ stacked、`+` 面板、模型、模式 chip | composer-* | ✓ | ✓ |
-| 中文输入法 | composer-ime* | — | ✓（必须真机） |
+| 新建工作树（Git / 无提交 / 非 Git） | run-location-menu | `?mock=empty`（只看菜单） | ✓ |
+| Composer：inline ↔ stacked、`+` 面板、模型、模式 chip | composer / composer-toolbar / composer-palette | ✓ | ✓ |
+| 中文输入法 | composer-ime | — | ✓（必须真机） |
 | 外链点击不导航主窗口 | window-security（window-navigation* 补全） | — | ✓（系统浏览器是否打开需真机） |
 | macOS 关窗再打开，无孤儿 pty | — | — | ✓（`ps` 核对） |
 | 退出后无残留子进程 | — | — | ✓ |
@@ -206,9 +206,13 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 | 浅色 / 深色、480px 窄窗 | — | ✓ | ✓ |
 | 键盘走查（`+` 面板、运行位置菜单、Settings 对话框） | ui-layering* | ✓ | ✓ |
 
-单测列带 `*` 的文件尚未落地，由 08 §4 列出、在后续计划（14 状态层、09 输入框等）中补齐；落地后去掉 `*`。
+2026-10-18 核对：transcript、readiness、run-location-menu、composer-ime 及 Composer 系列测试已经落地。仍带 `*` 的 app-earlier-history、window-navigation、ui-layering 专项测试未找到同名文件，保留缺口；不能用相邻测试推定完整覆盖。
 
 相关自动检查：`pnpm check:ipc-channels`（IPC 以契约为准）、`pnpm check:renderer-bridge`（renderer 只经 `api/<域>` 访问 bridge）、`pnpm check:frontend-tokens`、`pnpm check:frontend-theme`。其中 `check:renderer-bridge`、`check:ipc-channels` 和这些检查脚本自己的测试（`test:renderer-bridge`、`test:ipc-channels`、`test:frontend-tokens`）已包含在 `pnpm test` 里；`check:frontend-tokens`、`check:frontend-theme` 由 CI 的仓库卫生检查（`scripts/check-repo-hygiene.sh`）运行。
+
+## Web 客户端验证边界
+
+Web 使用独立 Host 协议与浏览器存储；Desktop renderer 的 `?mock=` 不覆盖 Web 连接、认证、重连、任务队列或浏览器下载。Web 工程检查运行 `pnpm --filter @actspace/web test` 与 `build`，真实路线还需隔离 Host、有效模型配置及浏览器交互。停止/失败后验证暂停状态、普通发送仍排队、显式继续、刷新后恢复入口；审批触控目标在 390px 浅深主题检查至少 44px。iPhone/Tailscale、PWA 安装与系统通知需真实设备单独验收。
 
 ## 计划与收尾写法
 

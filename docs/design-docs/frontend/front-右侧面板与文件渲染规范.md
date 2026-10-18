@@ -330,7 +330,7 @@ V1 不做写 / 删 / 重命名、`.gitignore` 解析、快速打开、多 root �
 
 ## Context 面板
 
-> 状态：2026-10-11 定稿。视觉以 [context-panel-demo.html](context-panel-demo.html) 为准（demo 顶部的调节条只用于方案对比，不进入产品），后端数据形状以 [Context 面板后端数据需求](front-Context面板后端数据需求.md) 为准。
+后端数据形状以 [Context 面板后端数据需求](front-Context面板后端数据需求.md) 的当前契约为准。视觉与交互以本节规范、`ContextPanelParts` 当前组件和正式应用为准；旧 HTML 仅为设计过程记录，已备份迁出，见 [原型迁出清单](../retired-html-demos.md)。
 
 Context Tab 回答三个问题：现在占了多少、由哪些条目组成、是怎么变成这样的。它只看占用，不负责读原文：会话里每条消息和工具输入输出的原文在轨迹视图里读，面板只给跳转。面板只读，参考 dsh-context 的信息结构。
 

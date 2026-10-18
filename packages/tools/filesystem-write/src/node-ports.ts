@@ -19,7 +19,7 @@ async function writeFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>,
     const filePath = await resolveWritablePath(pathArg, workspaceRoot, context);
     const oldContent = existsSync(filePath) ? await readFile(filePath, "utf8") : "";
     const created = !existsSync(filePath);
-    const path = displayPath(filePath, workspaceRoot);
+    const path = await displayPath(filePath, workspaceRoot);
     context.reportProgress({ message: `${created ? "Creating" : "Updating"} ${path}`, additions: 0, deletions: 0 });
     await writeTextAtomic(filePath, content);
     const diff = createUnifiedDiff(path, oldContent, content);
@@ -46,7 +46,7 @@ async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, 
     if (matches === 0) return failure("EDIT_NOT_FOUND", "old_string was not found in the file");
     if (matches > 1 && args.replace_all !== true) return failure("EDIT_NOT_UNIQUE", `old_string matches ${matches} locations; include more context or set replace_all=true`);
     const after = oldText === "" ? newText : args.replace_all === true ? before.split(oldText).join(newText) : replaceOnePreservingLine(before, oldText, newText);
-    const path = displayPath(filePath, workspaceRoot);
+    const path = await displayPath(filePath, workspaceRoot);
     context.reportProgress({ message: `${exists ? "Updating" : "Creating"} ${path}`, additions: 0, deletions: 0 });
     await writeTextAtomic(filePath, after);
     const diff = createUnifiedDiff(path, before, after);
@@ -68,7 +68,7 @@ async function deleteFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>
     if (info.isDirectory()) return failure("NOT_A_FILE", "delete_file only supports files. Directories are not supported.");
     if (!info.isFile()) return failure("NOT_A_FILE", "delete_file only supports regular files.");
     await unlink(filePath);
-    const path = displayPath(filePath, workspaceRoot);
+    const path = await displayPath(filePath, workspaceRoot);
     return completed(`File deleted: ${path}`, `Deleted ${path}`, { type: "delete", path });
   } catch (error) {
     return ioFailure("delete file", pathArg, error);
@@ -100,7 +100,7 @@ async function resolveWritablePath(input: string, workspaceRoot: string, context
   }
   const realParent = await realpath(parent);
   if (!isWithin(realRoot, realParent)) throw new Error(`Path escapes workspace boundary: ${input}`);
-  return candidate;
+  return resolve(realParent, relative(parent, candidate));
 }
 
 async function recheckAdmittedFile(input: string, access: "read" | "write" | "delete", workspaceRoot: string, context: ToolExecutionContext): Promise<string> {
@@ -152,7 +152,7 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
 }
 
 function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-function displayPath(path: string, workspaceRoot: string): string { const nested = relative(workspaceRoot, path); return nested && !nested.startsWith("..") && !isAbsolute(nested) ? nested : path; }
+async function displayPath(path: string, workspaceRoot: string): Promise<string> { const nested = relative(await realpath(workspaceRoot), path); return nested && !nested.startsWith("..") && !isAbsolute(nested) ? nested : path; }
 function countOccurrences(text: string, needle: string): number { let count = 0; let offset = 0; while ((offset = text.indexOf(needle, offset)) !== -1) { count += 1; offset += Math.max(needle.length, 1); } return count; }
 function replaceOnePreservingLine(text: string, oldText: string, newText: string): string { const index = text.indexOf(oldText); if (newText !== "" || oldText.includes("\n") || text[index + oldText.length] !== "\n") return text.slice(0, index) + newText + text.slice(index + oldText.length); return text.slice(0, index) + text.slice(index + oldText.length + 1); }
 function createUnifiedDiff(path: string, before: string, after: string): string { const oldLines = before.split("\n"); const newLines = after.split("\n"); let prefix = 0; while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) prefix += 1; let suffix = 0; while (suffix < oldLines.length - prefix && suffix < newLines.length - prefix && oldLines[oldLines.length - 1 - suffix] === newLines[newLines.length - 1 - suffix]) suffix += 1; const contextStart = Math.max(0, prefix - 3); const oldEnd = Math.min(oldLines.length, oldLines.length - suffix + 3); const newEnd = Math.min(newLines.length, newLines.length - suffix + 3); return [`--- a/${path}`, `+++ b/${path}`, `@@ -${contextStart + 1},${oldEnd - contextStart} +${contextStart + 1},${newEnd - contextStart} @@`, ...oldLines.slice(contextStart, prefix).map((line) => ` ${line}`), ...oldLines.slice(prefix, oldLines.length - suffix).map((line) => `-${line}`), ...newLines.slice(prefix, newLines.length - suffix).map((line) => `+${line}`), ...newLines.slice(newLines.length - suffix, newEnd).map((line) => ` ${line}`)].join("\n"); }

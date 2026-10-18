@@ -8,7 +8,7 @@
 
 将已认可的 demo 排版应用到真实消息流：统一过程行、收敛 Thinking 邻接间距、区分动作与目标、缩短 Bash 摘要，保持工具执行事实、现有操作和状态生命周期。
 
-设计唯一入口：[消息流排版与工具摘要规范](../../design-docs/frontend/front-tool-stream-typography.md)。视觉基线：[demo 调整后](../../design-docs/frontend/tool-stream-typography-demo.html)。demo 的调整前为示意，不作像素复刻基线。
+设计唯一入口：[消息流排版与工具摘要规范](../../design-docs/frontend/front-tool-stream-typography.md)。视觉基线：[demo 调整后（已迁出）](../../design-docs/retired-html-demos.md)。demo 的调整前为示意，不作像素复刻基线。
 
 ## 必读与约束
 

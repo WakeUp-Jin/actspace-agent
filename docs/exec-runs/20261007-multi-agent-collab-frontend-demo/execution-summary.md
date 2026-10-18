@@ -6,7 +6,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261007-multi-agent-collab-frontend-demo.md`
+- **关联计划**：`docs/exec-plans/completed/20261007-multi-agent-collab-frontend-demo.md`
 - **执行过程**：`docs/exec-runs/20261007-multi-agent-collab-frontend-demo/execution-process.md`
 - **执行模式**：交互模式（T1–T3、T5–T10 由子智能体按目录分工并行；T4 装配、T7a、共享组件由主会话完成）
 - **工作树 / 分支**：`actspace-agent-multi-agent` / `feat/multi-agent-collab-fe`

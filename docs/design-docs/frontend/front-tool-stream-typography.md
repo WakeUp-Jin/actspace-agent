@@ -7,7 +7,7 @@
 
 让工具调用、Thinking 和解释性正文在同一消息流中具有稳定的文字层级与阅读节奏。采用轻量独立行，通过字体、留白和摘要的信息结构建立主次。
 
-视觉参考为[消息流排版 demo](tool-stream-typography-demo.html)的“调整后”。“调整前”仅为截图风格示意，不是产品实时渲染。demo 使用静态数据和内嵌 token 快照，不能证明真实工具状态、历史恢复、分页或 IPC 已实现。
+视觉参考为[消息流排版 demo（已迁出）](../retired-html-demos.md)的“调整后”。“调整前”仅为截图风格示意，不是产品实时渲染。demo 使用静态数据和内嵌 token 快照，不能证明真实工具状态、历史恢复、分页或 IPC 已实现。
 
 本规范补充[中间消息区规范](front-中间消息区规范.md)，颜色遵守[主题与配色规范](front-主题与配色规范.md)，数据语义遵守[工具预览契约](../tool-system/agent-tool-preview-design-guidelines.md)。实施入口为[执行计划](../../exec-plans/completed/20260916-tool-stream-typography.md)。关联规范已同步。
 

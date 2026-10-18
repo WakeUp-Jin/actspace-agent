@@ -1,7 +1,7 @@
 # Context 面板前端重做（mock 先行）
 
 > 状态：2026-10-11 T1–T9 实现与自动化验证完成（未提交）。浏览器 mock 截图与 Electron 实机待人工验收，见[执行摘要](../../exec-runs/20261011-context-panel-frontend/execution-summary.md)。执行模式：交互模式。
-> 设计：[右侧面板与文件渲染规范 · Context 面板](../../design-docs/frontend/front-右侧面板与文件渲染规范.md#context-面板)；视觉：[context-panel-demo.html](../../design-docs/frontend/context-panel-demo.html)；数据契约：[Context 面板后端数据需求](../../design-docs/frontend/front-Context面板后端数据需求.md)。
+> 设计：[右侧面板与文件渲染规范 · Context 面板](../../design-docs/frontend/front-右侧面板与文件渲染规范.md#context-面板)；视觉：[context-panel-demo.html（已迁出）](../../design-docs/retired-html-demos.md)；数据契约：[Context 面板后端数据需求](../../design-docs/frontend/front-Context面板后端数据需求.md)。
 > 执行记录：`docs/exec-runs/20261011-context-panel-frontend/`。
 
 ## 目标

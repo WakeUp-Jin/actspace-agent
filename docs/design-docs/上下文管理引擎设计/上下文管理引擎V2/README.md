@@ -1,6 +1,6 @@
 # 上下文管理引擎 V2
 
-状态：2026-10-11，V2 引擎、物理拆包与旧 describeContext 接线已有实现；此前 Computer Use 仅覆盖部分只读路线，写入型路线未覆盖。新 Context 面板数据与 SQLite 联合修复处于设计/计划审阅阶段，尚未实施或联合验收。
+状态：2026-10-18，V2 引擎、Context 面板与 SQLite 联合实现已完成。面板契约为 schemaVersion 2，SQLite 读模型为 schema 9；联合验收已收束，M/Small 结果、用户取消的 L 剩余长测和未覆盖边界见[联合执行摘要](../../../exec-runs/20261011-context-sqlite-integration/execution-summary.md)。
 
 **Context 是按 Session 与 Agent 逻辑作用域隔离的长期状态；每次模型调用从它生成不可变的 LlmInput。** 模型与工具输出继续先进入 Session，再由对应插件更新 Context。
 
@@ -34,7 +34,7 @@
 
 当前实现入口：`packages/context/engine/src/instances.ts` 管理 `Session + logicalAgentScopeId` 实例，`packages/context/engine/src/reducers.ts` 管理受 owner/fields 约束的事件 reducer，`packages/context/engine/src/projection.ts` 生成 Host/UI 只读投影；`packages/context/*` 下的类型插件提供各自来源，`packages/core/agent-loop/src/loop.ts` 使用稳定 Agent 身份创建请求，并在已有实例时走 durable reconcile。
 
-Host/IPC 接线已经由 Runtime 的 `context.engine.getProjection`、Desktop App 的 `readContextProjection` 和 fixed renderer `sessions.describeContext` 串起；renderer 仍只收到 `ContextState`，不会拿到 Context 实例。
+Host/IPC 接线已经由 Runtime 的 `context.engine.getProjection`、Desktop App 的 `readContextProjection` 和 fixed renderer `sessions.describeContext` 串起；旧轻量入口返回 `ContextState`；面板通过 `sessions.describeContextPanel` / `listContextEntries` / `readContextEntry` 查询 schemaVersion 2 投影，由 Main 的 ContextPanelService 聚合当前引擎与 SQLite 历史索引，不会把 Context 实例暴露给 renderer。
 
 - **长期状态不要求内存对象永不释放**：当前每次 Run 会创建运行 Scope 并归还 Harness 租约，必须区分稳定逻辑身份与短期运行绑定。
 - **Session 接纳不等于落盘**：保留 accepted/durable 水位，在明确持久屏障后发布可继续执行的 Context 状态。
@@ -44,6 +44,6 @@ Host/IPC 接线已经由 Runtime 的 `context.engine.getProjection`、Desktop Ap
 
 ## 本轮边界
 
-当前增补轮只落联合设计与执行计划，保留原有 Journal、权限、附件、压缩事务和模型适配边界。未来记忆、工作流、质量评估或修复 Agent 保留接入空间，不在本轮新增实现，也不为它们建立空插件包。
+联合实施已接入面板与 SQLite，保留原有 Journal、权限、附件、压缩事务和模型适配边界。未来记忆、工作流、质量评估或修复 Agent 保留接入空间，不在本轮新增实现，也不为它们建立空插件包。
 
-包迁移与 V2 生命周期的既有实施记录保留；当前联合计划待用户审阅后执行，不把文档决策记为代码已实现。
+包迁移与 V2 生命周期的既有实施记录保留；实现完成不代表未覆盖的验收点已通过。

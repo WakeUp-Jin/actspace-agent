@@ -1,8 +1,10 @@
 # 左侧会话栏改版 — 执行摘要
 
+> 2026-10-18 状态校准：实现已合入 main，后续侧栏登记刷新/焦点修复和真实覆盖见 20261015/16 统一验收及 20261018 近期验收。下文测试数和当时手测状态作为历史快照保留。
+
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261015-sidebar-redesign.md`
+- **关联计划**：`docs/exec-plans/completed/20261015-sidebar-redesign.md`
 - **执行过程**：`docs/exec-runs/20261015-sidebar-redesign/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：完成（Electron 手测待做）

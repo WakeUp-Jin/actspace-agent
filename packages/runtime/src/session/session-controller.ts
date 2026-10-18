@@ -312,18 +312,36 @@ const DEFERRED_DETAIL_BYTES = 24_000;
  */
 export function slimHistoryWindow(journal: readonly SessionEventEnvelopeV1[]): SessionEventEnvelopeV1[] {
   const completedMessages = new Set<string>();
+  const tokenTimes = new Map<string, { first: string; nonEmpty?: string }>();
   let latestContextSeq = -1;
   for (const event of journal) {
     const data = eventData(event);
     if (event.type === "assistant/message" && typeof data?.messageId === "string") completedMessages.add(data.messageId);
+    if (event.type === "assistant/chunk" && typeof data?.messageId === "string") {
+      const timing = tokenTimes.get(data.messageId) ?? { first: event.time };
+      if (!timing.nonEmpty && hasChunkText(data.delta ?? data.content)) timing.nonEmpty = event.time;
+      tokenTimes.set(data.messageId, timing);
+    }
     if (event.type === "request/context") latestContextSeq = event.seq;
   }
   return journal.flatMap(event => {
     const data = eventData(event);
     if (event.type === "assistant/chunk" && typeof data?.messageId === "string" && completedMessages.has(data.messageId)) return [];
+    if (event.type === "assistant/message" && typeof data?.messageId === "string" && data.firstTokenAt == null && data.firstTokenTime == null) {
+      const timing = tokenTimes.get(data.messageId);
+      if (timing) return [{ ...event, data: { ...data, firstTokenAt: timing.nonEmpty ?? timing.first } }];
+    }
     if (event.type === "request/context" && event.seq !== latestContextSeq && JSON.stringify(event).length > DEFERRED_DETAIL_BYTES) return [boundRequestContextEvent(event)];
     return [event];
   });
+}
+
+// Match display text extraction without retaining bulky completed stream payloads.
+function hasChunkText(value: RuntimeV2JsonValue | undefined): boolean {
+  if (typeof value === "string") return value.length > 0;
+  if (Array.isArray(value)) return value.some(hasChunkText);
+  const record = jsonRecord(value);
+  return record ? hasChunkText(record.text ?? record.content ?? record.value) : false;
 }
 
 function boundRequestContextEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {

@@ -8,7 +8,7 @@
 > 3. 输入框样式和交互改成 Cursor 式：边框更淡，用柔和阴影；`+` 改为统一面板。
 >
 > 已拍板：D2（菜单只有本机 / 远端机器）、D3（对话中不能切换机器）、D4（`+` 面板方案）、D4+（低对比边框 + 柔和阴影）、D7（先看 demo）。
-> Demo：[`demo/composer-run-target-demo.html`](demo/composer-run-target-demo.html)，可切换浅色 / 深色、新建 / 对话中、本机 / 远端、柔和阴影 / Cursor 原样，以及新旧对比。
+> Demo：[`demo/composer-run-target-demo.html`（已迁出）](../design-docs/retired-html-demos.md)，可切换浅色 / 深色、新建 / 对话中、本机 / 远端、柔和阴影 / Cursor 原样，以及新旧对比。
 > 2026-10-05 第二轮：按 Cursor 编译后源码（§11）修正了工具行顺序、单行 / 多行规则和 `+` 面板形态。
 > 依赖：03 的 `RunTarget`；05 的 Popover / Menu 原语。
 > 迁移去向：改写 `front-聊天输入框规范.md`（视觉、`+` 菜单、队列三节），改写 `front-workspace-git-worktree-context.md` 的「Run on 菜单」「Follow-up 状态行」两节；`message-queue-demo.html` 标为已废弃。

@@ -1,7 +1,8 @@
 # Context 面板后端数据需求
 
 > 状态：2026-10-11 联合实施已接通 schemaVersion 2 门面、当前引擎投影与 SQLite 历史索引，工程测试和 Computer Use 分项验收中，尚未整体签收。实现边界见 [Context / SQLite 联合设计](../上下文管理引擎设计/上下文管理引擎V2/05-Context面板与SQLite联合设计.md)。
-> 视觉定稿：[context-panel-demo.html](context-panel-demo.html)
+> 2026-10-18：本文保留最初的需求取舍；§2 当前契约已经落地，旧缺口记录不作为现状。验收边界见联合执行摘要。
+> 视觉定稿：[context-panel-demo.html（已迁出）](../retired-html-demos.md)
 > 相关：[上下文管理引擎 V2 · 01 总体设计 §4 前端显示当前 Context](../上下文管理引擎设计/上下文管理引擎V2/01-总体设计与调用流程.md)、[右侧面板与文件渲染规范 · Context 面板](front-右侧面板与文件渲染规范.md#context-面板)
 
 ## 1. 要做什么

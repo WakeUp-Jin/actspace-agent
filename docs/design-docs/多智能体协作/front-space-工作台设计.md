@@ -1,7 +1,7 @@
 # Space 工作台设计（多智能体协作 · 前端）
 
 > **状态：已实施（演示，2026-10-07），只在开发构建出现，数据全部 mock，后端不动；Electron 验收待做。交互以 [space-demo.html](space-demo.html) 为准。**
-> 执行计划：[多智能体协作前端演示](../../exec-plans/active/20261007-multi-agent-collab-frontend-demo.md)。
+> 执行计划：[多智能体协作前端演示](../../exec-plans/completed/20261007-multi-agent-collab-frontend-demo.md)。
 > 接入桌面端的问题 2026-10-07 全部确认（D18–D31）。界面样式以真实桌面端组件和 token 为准，demo 只定结构和交互。代码在 `apps/desktop/src/renderer/components/space/`，走查步骤见 [FRONTEND_VERIFICATION](../../FRONTEND_VERIFICATION.md)「Space 多 Actor 协作演示」。
 > 历史：2026-10-02 首版「主会话 + 线程」→ 2026-10-03「协调 Agent + 工作 Agent」→ 2026-10-05 按 [ActSpace 产品概念](../ActSpace产品概念思路初稿.md) 改为 Actor 模型（本文）。前两版的取舍记录在 `docs/histories/2026-10/` 下对应日期的 history 里。
 

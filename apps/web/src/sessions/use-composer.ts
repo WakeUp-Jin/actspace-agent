@@ -18,7 +18,7 @@ export type ComposerDeps = {
   readonly pending?: { current: { text: string; id: string } | null };
 };
 
-const isConflict = (error: unknown) => isRecord(error) && error.kind === "CONFLICT";
+const isConflict = (error: unknown) => isRecord(error) && (error.kind === "CONFLICT" || error.code === "REVISION_CONFLICT");
 type CommandResult = { snapshot: TaskSnapshot; error?: string };
 
 /** 输入框要发的所有 RPC（非 React，便于测试）。失败一律抛出，由调用方显示原因。 */
@@ -48,9 +48,18 @@ export class ComposerController {
 
   /** 撤回排队消息；revision 过期（CONFLICT）时取最新快照重试一次。 */
   async cancel(taskId: string): Promise<void> {
+    await this.#revisionCommand({ op: "cancel", taskId });
+  }
+
+  /** 停止或失败后的队列只能由用户显式恢复；提交新消息不解除暂停。 */
+  async resume(): Promise<void> {
+    await this.#revisionCommand({ op: "resume" });
+  }
+
+  async #revisionCommand(params: Record<string, unknown>): Promise<void> {
     const attempt = async (revision: number) => {
-      const result = await this.#command({ op: "cancel", taskId, revision });
-      if (result.error) throw new Error(result.error);
+      const result = await this.#command({ ...params, revision });
+      if (result.error) throw Object.assign(new Error(result.error), { code: result.error });
     };
     const known = this.deps.taskRevision();
     try { await attempt(known ?? (await this.#command({ op: "snapshot" })).snapshot.revision); }
@@ -97,6 +106,8 @@ export function useComposer(sessionId: string, observation: SessionObservation) 
   const store = useConnectionStore();
   const [draft, setDraftState] = useState(() => readStorage(draftKey(sessionId)) ?? "");
   const [sending, setSending] = useState(false);
+  const [resuming, setResuming] = useState(false);
+  const resumePending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [prefs, setPrefs] = useState(() => readPrefs(sessionId));
   const latest = useRef(observation);
@@ -131,6 +142,13 @@ export function useComposer(sessionId: string, observation: SessionObservation) 
     if (runId) await guard("停止失败", c => c.stop(runId));
   }, [guard]);
   const cancelQueued = useCallback((taskId: string) => guard("撤回失败", c => c.cancel(taskId)), [guard]);
+  const resume = useCallback(async () => {
+    if (resumePending.current || !connection || maintenance) return;
+    resumePending.current = true;
+    setResuming(true);
+    try { await guard("恢复队列失败，请重试", c => c.resume()); }
+    finally { resumePending.current = false; setResuming(false); }
+  }, [connection, maintenance, guard]);
   const setMode = useCallback((mode: AgentMode) => guard("切换模式失败，请重试", c => c.setMode(mode)), [guard]);
 
   const model = prefs.model ?? observation.runModel ?? connection?.description.defaultModel ?? "";
@@ -144,5 +162,5 @@ export function useComposer(sessionId: string, observation: SessionObservation) 
     return ok;
   }, [guard, sessionId]);
 
-  return { draft, setDraft, send, sending, stop, cancelQueued, setMode, configure, model, effort, effortOptions, error, clearError: () => setError(null), connected: connection !== null, maintenance };
+  return { draft, setDraft, send, sending, stop, cancelQueued, resume, resuming, setMode, configure, model, effort, effortOptions, error, clearError: () => setError(null), connected: connection !== null, maintenance };
 }
