@@ -47,7 +47,7 @@ export function metadataFromSettingsV3(settings: PersistedSettingsV3): SettingsV
       connections: {},
       definitions: cloneJson(settings.customModels),
       installed: {},
-      taskBindings: { defaultChat: settings.taskModels.defaultChatModel, utility: settings.taskModels.utilityModel, explore: settings.taskModels.exploreModel },
+      taskBindings: { defaultChat: settings.taskModels.defaultChatModel, utility: settings.taskModels.utilityModel, autoReview: settings.taskModels.autoReviewModel ?? null, explore: settings.taskModels.exploreModel },
     },
     general: {
       ...defaults.general,
@@ -118,7 +118,7 @@ export function toSettingsV4(settings: PersistedSettingsV3, metadata: SettingsV4
       ])),
       taskBindings: {
         defaultChat: settings.taskModels.defaultChatModel,
-        utility: settings.taskModels.utilityModel,
+        utility: settings.taskModels.utilityModel, autoReview: settings.taskModels.autoReviewModel ?? null,
         explore: settings.taskModels.exploreModel,
       },
     },
@@ -157,6 +157,7 @@ export function legacySettingsFromV4(settings: SettingsV4, dataRoot: string): Pe
     taskModels: {
       defaultChatModel: settings.models.taskBindings.defaultChat,
       utilityModel: settings.models.taskBindings.utility,
+      autoReviewModel: settings.models.taskBindings.autoReview ?? null,
       exploreModel: explore,
     },
     imageGeneration: sanitizeImageGenerationSettings(settings.media.imageGeneration, seed.imageGeneration),
@@ -253,6 +254,7 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
       taskBindings: {
         defaultChat: normalizeModelKeyOrNull(taskBindings.defaultChat),
         utility: normalizeModelKeyOrNull(taskBindings.utility),
+        autoReview: normalizeModelKeyOrNull(taskBindings.autoReview),
         explore: normalizeModelKeyOrNull(taskBindings.explore),
       },
     },

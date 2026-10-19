@@ -75,6 +75,21 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     expect(harnesses.inspect().instances[0].users).toBe(0);
     // Keep a parent generation pinned while its child inherits the same generation.
     const parentLease = await harnesses.acquire("main");
+    const reviewer = parentLease.getService<import("@actspace/auto-review").AutoReviewer>("approval.auto-review");
+    expect(reviewer).toBeDefined();
+    const reviewRoute = parentLease.getService<import("@actspace/llm-service").LlmService>("llm.service")!.routes.register({ routeId: "auto-review", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async input => {
+      expect(input.request.tools).toEqual([]);
+      expect(input.request.model).toBe("test");
+      return (async function* () { yield { type: "done" as const, stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text" as const, text: '{"approved":true,"reason":"User requested inspection"}' }] }; })();
+    } } });
+    try {
+      expect(await reviewer!.review({ sessionId: "conversation", callId: "review-fixture", model: "test", snapshot: { user: "inspect", action: "ls" }, signal: new AbortController().signal })).toMatchObject({ approved: true });
+      await sessions.create("route-regression", undefined, "chat");
+      await app.submit("route-regression", "chat-route", "Use the main model, not the reviewer");
+      await app.waitForIdle("route-regression");
+      expect(failures).toEqual([]);
+      expect((await sessions.inspectEvents("route-regression")).find(event => event.type === "request/header")?.data).toMatchObject({ routeId: "default" });
+    } finally { await reviewRoute.dispose(); }
     const parentScope = parentLease.scope.child("parent-generation-one");
     // A second candidate must not duplicate the Host's history projection.
     const candidate = await harnesses.prepareRollback("main", 1, harnesses.inspect().current!.executionDigest);

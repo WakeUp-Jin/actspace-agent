@@ -3,6 +3,7 @@ import { contextPluginPackage } from "@actspace/context-engine";
 
 export const DEFAULT_HARNESS_ENTRIES = [
   ["llm-service", ["llm.service", "llm.routes", "llm.service.types"], ["actspace.host.llm"]],
+  ["auto-review", ["approval.auto-review"], ["llm.service"]],
   ["tools-approval", ["tools.approval"], []],
   ["tools-runtime", ["tools.runtime", "tools.runtime.types"], ["tools.approval"]],
   ["context-engine", ["context.engine"], ["session.journal"]],
@@ -21,6 +22,7 @@ export const DEFAULT_HARNESS_ENTRIES = [
 
 export function defaultHarnessEntrySource(id: string): string {
   const special: Record<string, string> = { "agent-factory": "harness:factory", "todo-tools": "harness:todo", "subagent-tools": "./dist/harness/harness-subagent-tools.js", "context-engine": "@actspace/context-engine/plugin", "prompt-runtime": "@actspace/prompt/plugin", "compaction-runtime": "@actspace/context-compaction/plugin" };
+  if (id === "auto-review") return "@actspace/auto-review/plugin";
   if (id === "plugin-manager") return "@actspace/plugin-manager/plugin";
   const contextPackage = contextPluginPackage(id);
   if (contextPackage !== undefined) return contextPackage.behaviorEntry;

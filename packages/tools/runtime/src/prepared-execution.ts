@@ -43,7 +43,11 @@ export interface ToolJournalPort {
   recordPermission?(type: "permission/asked" | "permission/decided" | "permission/scope-denied" | "permission/grant-added" | "permission/grant-used" | "permission/grant-revoked", data: Readonly<Record<string, RuntimeV2JsonValue>>): Promise<void>;
 }
 
+export type AutoReviewInput = { readonly callId: string; readonly model?: string; readonly workspaceRoot: string; readonly action: unknown; readonly signal: AbortSignal };
 export type ToolPreparedEnvironment = {
+  readonly mainModel?: string;
+  readonly autoReview?: (input: AutoReviewInput) => Promise<{ readonly approved: boolean; readonly reason?: string | null }>;
+
   /** Bound by the owning Agent Loop; production Tool Runtime rejects missing scopes. */
   readonly allowedToolNames?: ReadonlySet<string>;
   /** Re-resolved before staging and execution, including approval resume. */
@@ -110,6 +114,8 @@ export class PreparedToolExecution {
   #forceOutcomeUnknown = false;
   #resources: readonly ToolResource[] = [];
   #onceApproval: OnceApproval | undefined;
+  #approvalMode: "auto" | "manual" | "session" | undefined;
+  #approvalReason: string | undefined;
   #admittedMode: PermissionMode | undefined;
   #admittedBySessionGrant = false;
 
@@ -163,6 +169,8 @@ export class PreparedToolExecution {
       let mode: PermissionMode;
       while (true) {
         mode = this.#permissionMode();
+        this.#approvalMode = undefined;
+        this.#approvalReason = undefined;
         this.#onceApproval = undefined;
         this.#admittedBySessionGrant = false;
         this.#resources = Object.freeze(await this.registration.permission.extractResources(this.#args, {
@@ -178,6 +186,7 @@ export class PreparedToolExecution {
         const globalWithGrant = this.#resolveGlobalGrant(global, tool);
         const processGrant = global.kind === "pass" && tool.kind === "ask" && tool.reusable === true ? this.#processGrant() : undefined;
         if (processGrant) this.#admittedBySessionGrant = true;
+        if (this.#admittedBySessionGrant) this.#approvalMode = "session";
         const permission = combinePermissionDecisions(globalWithGrant, processGrant ? { kind: "allow" } : tool);
         if (permission.kind === "deny") {
           await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: permission.code, reason: permission.reason });
@@ -328,6 +337,12 @@ export class PreparedToolExecution {
   }
 
   async #requestApproval(mode: PermissionMode, reasons: readonly RuntimeApprovalReason[]): Promise<OnceApproval | ToolFailure | "mode-changed"> {
+    if (mode === "auto-review") {
+      const result = await this.#reviewAutomatically(mode, reasons);
+      if (result === "mode-changed") return result;
+      if (result) return result;
+    }
+    this.#approvalMode = "manual";
     if (this.environment.approvalBroker === undefined) {
       return { code: "APPROVAL_REQUIRED", message: "Host approval is required but no ApprovalBroker is available.", retryable: false, phase: "approval" };
     }
@@ -414,9 +429,11 @@ export class PreparedToolExecution {
         };
         await this.#recordPermission("permission/grant-added", grant as unknown as Readonly<Record<string, RuntimeV2JsonValue>>);
         this.#admittedBySessionGrant = true;
+        this.#approvalMode = "session";
       } else {
         await this.#recordPermission("permission/decided", decision as unknown as Readonly<Record<string, RuntimeV2JsonValue>>);
       }
+      if (this.#approvalReason) this.#approvalReason += decision.kind === "once" || decision.kind === "session" ? "；人工允许" : "；人工未允许";
       if (decision.kind !== "once" && decision.kind !== "session") return { code: decision.code === "broker-unavailable" ? "APPROVAL_REQUIRED" : "APPROVAL_DENIED", message: decision.code, retryable: false, phase: "approval" };
       return { kind: "once", requestId: request.requestId, callId: this.callId, sessionId: this.input.sessionId, agentRunId: this.input.agentRunId, pluginId: this.pluginId, toolName: this.name, definitionDigest: this.definitionDigest, normalizedArgsDigest, issuedAt: decision.decidedAt, expiresAt: request.expiresAt };
     } catch (error) {
@@ -427,6 +444,37 @@ export class PreparedToolExecution {
       this.#controller.signal.removeEventListener("abort", abort);
       requestController.abort("approval-finished");
     }
+  }
+
+  async #reviewAutomatically(mode: PermissionMode, reasons: readonly RuntimeApprovalReason[]): Promise<OnceApproval | "mode-changed" | undefined> {
+    this.#approvalMode = "auto";
+    if (!this.environment.autoReview) { this.#approvalReason = "自动审批插件不可用，转人工审批"; return undefined; }
+    const controller = new AbortController();
+    const abort = () => controller.abort(this.#controller.signal.reason ?? "permission-mode-changed");
+    const unsubscribe = this.environment.subscribePermissionMode?.(() => { if (this.#permissionMode() !== mode) abort(); });
+    this.#controller.signal.addEventListener("abort", abort, { once: true });
+    if (this.#controller.signal.aborted || this.#permissionMode() !== mode) abort();
+    const interrupted = new Promise<never>((_, reject) => {
+      const rejectAbort = () => reject(new Error("Review interrupted"));
+      if (controller.signal.aborted) rejectAbort(); else controller.signal.addEventListener("abort", rejectAbort, { once: true });
+    });
+    try {
+      if (!this.environment.autoReview) throw new Error("Reviewer unavailable");
+      const decision = await withTimeout(Promise.race([interrupted, this.environment.autoReview({ callId: this.callId, model: this.environment.mainModel, workspaceRoot: this.environment.workspaceRoot, action: { name: this.name, args: this.#args, resources: this.#resources, reasons }, signal: controller.signal })]), 30_000);
+      if (this.#controller.signal.aborted) throw new ToolRuntimeError({ code: "TOOL_ABORTED", message: "Tool approval was aborted.", retryable: true, phase: "approval" });
+      if (this.#permissionMode() !== mode) return "mode-changed";
+      if (typeof decision.approved !== "boolean") throw new Error("Invalid review");
+      this.#approvalReason = decision.reason ? redactToolText(decision.reason).slice(0, 500) : undefined;
+      if (!decision.approved) { this.#approvalReason = `自动审批未允许${this.#approvalReason ? `：${this.#approvalReason}` : ""}`; return undefined; }
+      this.#approvalMode = "auto";
+      const now = new Date();
+      return { kind: "once", requestId: randomUUID(), callId: this.callId, sessionId: this.input.sessionId, agentRunId: this.input.agentRunId, pluginId: this.pluginId, toolName: this.name, definitionDigest: this.definitionDigest, normalizedArgsDigest: createHash("sha256").update(canonicalJson(this.#args)).digest("hex"), issuedAt: now.toISOString(), expiresAt: new Date(now.getTime() + 30_000).toISOString() };
+    } catch {
+      if (this.#controller.signal.aborted) throw new ToolRuntimeError({ code: "TOOL_ABORTED", message: "Tool approval was aborted.", retryable: true, phase: "approval" });
+      if (this.#permissionMode() !== mode) return "mode-changed";
+      this.#approvalReason = "自动审批不可用或超时，转人工审批";
+      return undefined;
+    } finally { unsubscribe?.(); this.#controller.signal.removeEventListener("abort", abort); controller.abort("review-finished"); }
   }
 
   #checkAdmittedMode(): void {
@@ -509,6 +557,8 @@ export class PreparedToolExecution {
     const status = this.#forceOutcomeUnknown ? "outcome-unknown" : this.#controller.signal.aborted ? "aborted" : invalid ? "failed" : body.status;
     const renderer = normalizeRenderer(body.renderer);
     return Object.freeze({
+      ...(this.#approvalMode ? { approvalMode: this.#approvalMode } : {}),
+      ...(this.#approvalReason ? { approvalReason: this.#approvalReason } : {}),
       status,
       callId: this.callId,
       pluginId: this.pluginId,
@@ -529,6 +579,8 @@ export class PreparedToolExecution {
 
   #failureResult(status: "failed" | "denied" | "aborted", failure: ToolFailure): ToolExecutionResult {
     return Object.freeze({
+      ...(this.#approvalMode ? { approvalMode: this.#approvalMode } : {}),
+      ...(this.#approvalReason ? { approvalReason: this.#approvalReason } : {}),
       status,
       callId: this.callId,
       pluginId: this.pluginId,

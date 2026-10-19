@@ -325,6 +325,7 @@ export function sanitizeTaskModels(input: unknown): TaskModelSettings {
   return {
     defaultChatModel: normalizeNullableModelKey(value.defaultChatModel),
     utilityModel: normalizeNullableModelKey(value.utilityModel),
+    autoReviewModel: normalizeNullableModelKey(value.autoReviewModel),
     exploreModel: normalizeNullableModelKey(value.exploreModel),
   };
 }

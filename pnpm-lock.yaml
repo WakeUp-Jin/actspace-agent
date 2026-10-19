@@ -518,6 +518,31 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/auto-review:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../llm/service
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session/journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/boot:
     dependencies:
       '@actspace/bundle':
@@ -1246,6 +1271,9 @@ importers:
       '@actspace/agent-service':
         specifier: workspace:*
         version: link:../agent-service
+      '@actspace/auto-review':
+        specifier: workspace:*
+        version: link:../auto-review
       '@actspace/boot':
         specifier: workspace:*
         version: link:../boot

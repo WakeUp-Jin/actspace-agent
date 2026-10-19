@@ -266,6 +266,8 @@ export type RuntimeV2ToolRendererHint = {
 };
 
 export type RuntimeV2ToolView = {
+  readonly approvalMode?: "auto" | "manual" | "session";
+  readonly approvalReason?: string | null;
   readonly kind: "tool";
   readonly schemaVersion: 1;
   readonly sessionId: string;

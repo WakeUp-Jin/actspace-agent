@@ -64,6 +64,8 @@ export function completeToolView(previous: RuntimeV2ToolView, result: ToolExecut
   const state = result.status === "outcome-unknown" ? "failed" : result.status;
   return Object.freeze({
     ...previous,
+    ...(result.approvalMode ? { approvalMode: result.approvalMode } : {}),
+    ...(result.approvalReason ? { approvalReason: redactProjectionText(result.approvalReason, 600) } : {}),
     state,
     phase: null,
     finishedAt,

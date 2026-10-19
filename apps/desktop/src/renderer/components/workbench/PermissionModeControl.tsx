@@ -4,10 +4,10 @@ import { Check, ChevronDown, ShieldCheck } from "lucide-react";
 import { sessionsApi } from "../../api/sessions";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 
-const PERMISSION_MODES = ["default", "full-access"] as const satisfies readonly PermissionMode[];
+const PERMISSION_MODES = ["default", "auto-review", "full-access"] as const satisfies readonly PermissionMode[];
 
 function permissionModeLabel(mode: PermissionMode): string {
-  return mode === "full-access" ? "完全权限" : "自动";
+  return mode === "auto-review" ? "替我审批" : mode === "full-access" ? "完全权限" : "自动";
 }
 
 /** 输入框状态行上的会话权限模式（16 T16b 改用 ui/Menu）：选中即保存，保存成功后关闭菜单并刷新会话投影。 */
@@ -46,7 +46,7 @@ export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: 
           className="inline-flex h-7 items-center gap-1 rounded-act-sm border-0 bg-transparent px-1.5 text-act-xs text-text-muted hover:bg-surface-subtle hover:text-text-main disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="会话权限模式"
           disabled={disabled || submitting}
-          title={`权限：${permissionModeLabel(mode)}。完全权限扩大文件范围并自动批准通过策略检查的 Bash；沙箱和禁止规则仍生效，文件删除及敏感文件仍按策略审批。`}
+          title={`权限：${permissionModeLabel(mode)}。替我审批由所选模型判断，未允许时交回人工。完全权限扩大文件范围并自动批准通过策略检查的 Bash；沙箱和禁止规则仍生效，文件删除及敏感文件仍按策略审批。`}
         >
           <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
           <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />

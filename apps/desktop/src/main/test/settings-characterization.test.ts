@@ -775,3 +775,17 @@ it("persists a paged quick-open Session choice through the v4 document and resta
   await reopened.load();
   expect(reopened.get().shortcuts?.quickOpen).toMatchObject({ target, enabled: false });
 });
+
+it("persists auto-review model selection and clears it back to following the session", async () => {
+  const root = await makeRoot();
+  const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, reloadEnv: () => {} });
+  await service.load();
+  expect(service.getV2().taskModels.autoReviewModel).toBeNull();
+  await service.updateV2({ taskModels: { autoReviewModel: "kimi:kimi-k2.6" } });
+  const reloaded = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, reloadEnv: () => {} });
+  await reloaded.load();
+  expect(reloaded.getV2().taskModels.autoReviewModel).toBe("kimi:kimi-k2.6");
+  expect(reloaded.getV4().settings.models.taskBindings.autoReview).toBe("kimi:kimi-k2.6");
+  await reloaded.updateV2({ taskModels: { autoReviewModel: null } });
+  expect(reloaded.getV4().settings.models.taskBindings.autoReview).toBeNull();
+});

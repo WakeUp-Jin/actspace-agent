@@ -106,6 +106,13 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
           adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "utility"),
           credentialRef: "desktop:utility",
           defaults: { reasoning: false },
+        }, {
+          routeId: "auto-review",
+          providerId: "desktop",
+          modelPattern: "*",
+          adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "auto-review"),
+          credentialRef: DEFAULT_CREDENTIAL_REF,
+          defaults: { reasoning: false },
         }]),
       }),
       ...createDesktopToolHostServices({ workspaceRoot: options.roots.workspaceRoot, tmpRoot: options.roots.tmpRoot, modelRuntime: options.models, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) }),

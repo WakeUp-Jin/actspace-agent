@@ -6,6 +6,7 @@ type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
 type FileChangeStats = { readonly additions: number; readonly deletions: number };
 
 export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefined, data: EventRecord, call: EventRecord | undefined, child: { childSessionId: string; presetId: string; status: string } | undefined, sessionId: string, agentRunId: string, phase: "streaming" | "prepared" | "running" | "finished" = "finished", workspaceRoot?: string, fileChangeStats?: FileChangeStats): ToolUiPreview {
+  data = { ...(tool?.approvalMode ? { approvalMode: tool.approvalMode } : {}), ...(tool?.approvalReason ? { approvalReason: tool.approvalReason } : {}), ...data };
   const localName = toolName;
   const args = record(call?.args);
   const displayPath = (value: string) => workspaceDisplayPath(value, workspaceRoot);
@@ -49,7 +50,9 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
     // Missing environment/exit facts stay unknown; do not parse them from prose.
     const backgroundTask = record(detailValue(data, "background-task"));
     const backgroundTaskId = string(backgroundTask.taskId);
-    const detail = terminal ? [summary, errorMessage].filter((value, index, all) => value && all.indexOf(value) === index && !output.includes(value)).join("\n") : undefined;
+    const approval = data.approvalMode === "auto" ? "自动审批" : data.approvalMode === "manual" ? "人工审批" : data.approvalMode === "session" ? "会话授权" : undefined;
+    const approvalDetail = approval ? `${approval}${typeof data.approvalReason === "string" && data.approvalReason ? `：${data.approvalReason}` : ""}` : undefined;
+    const detail = terminal ? [approvalDetail, summary, errorMessage].filter((value, index, all) => value && all.indexOf(value) === index && !output.includes(value)).join("\n") : undefined;
     return { kind: "bash", ...(backgroundTaskId ? { backgroundTaskId, backgroundStatus: "running" as const } : {}), status: !terminal ? "running" : state === "denied" ? "denied" : state === "aborted" ? "cancelled" : failed ? "failed" : "success", title: "Bash command", command: string(args.command) ?? localName, commandPreview: string(args.command) ?? localName, cwd: string(args.cwd) ?? undefined, stdout: failed ? undefined : output, stderr: failed ? output || errorMessage : undefined, reason: detail || undefined, durationMs: tool?.durationMs ?? undefined, intent: string(args.intent) ?? undefined };
   }
   if (localName === "inspect_image") return { kind: "media_analysis", mediaName: string(args.artifact_id) ?? "image", mediaKind: "image", displayText: summary };

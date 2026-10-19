@@ -1,5 +1,6 @@
 import { realpath } from "node:fs/promises";
 import { analyzeCommandPrefixGrant } from "./command-prefix.js";
+import { queryPathsWithinWorkspace } from "./query-paths.js";
 import { isPathWithin } from "@actspace/tools-runtime";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -55,7 +56,8 @@ function permissionContract(name: ToolName): ToolPermissionContract {
       const workspaceRoot = await realpath(context.workspaceRoot);
       const cwd = await realpath(resolve(context.workspaceRoot, typeof args.cwd === "string" ? args.cwd : "."));
       const noSandbox = Array.isArray(args.requiredPermissions) && args.requiredPermissions.includes("no_sandbox");
-      const analysis = !noSandbox && isPathWithin(workspaceRoot, cwd) ? analyzeCommandPrefixGrant(command) : undefined;
+      let analysis = !noSandbox && isPathWithin(workspaceRoot, cwd) ? analyzeCommandPrefixGrant(command) : undefined;
+      if (analysis && !await queryPathsWithinWorkspace(analysis, cwd, workspaceRoot)) analysis = undefined;
       return [{ kind: "process" as const, access: "execute" as const, commandDigest: createHash("sha256").update(command).digest("hex"), cwd, workspaceRoot, noSandbox, dynamic: false, ...(analysis ? { argv: analysis.argv, grantPrefix: analysis.prefix } : {}) }];
     },
     evaluate: (args, resources, context) => {
@@ -69,7 +71,7 @@ function permissionContract(name: ToolName): ToolPermissionContract {
     suggestGrants: (_args, resources) => resources.flatMap(resource => resource.kind === "process" && resource.grantPrefix && resource.workspaceRoot && resource.noSandbox === false ? [{
       action: "process.execute" as const, access: "execute" as const,
       selector: { kind: "command_prefix" as const, prefix: resource.grantPrefix, cwdRoot: resource.workspaceRoot },
-      label: `允许当前会话在当前工作区内运行符合规则的 ${resource.grantPrefix.join(" ")} 命令，包括项目脚本；执行环境沿用现有设置`,
+      label: `允许当前会话在当前工作区内运行符合规则的 ${resource.grantPrefix.join(" ")} 命令；执行环境沿用现有设置`,
     }] : []),
   };
   return Object.freeze(contract);

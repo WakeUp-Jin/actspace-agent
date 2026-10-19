@@ -158,3 +158,15 @@ it("passes reasoning settings to every request in a tool turn", async () => {
       expect.objectContaining({ callId: "unknown-2", status: "denied" }),
     ]);
   });
+
+it.each([false, true])("persists automatic approval fields on tool/result (body fails=%s)", async fails => {
+  const { journal, events } = await runToolStreamFixture({
+    toolEnvironment: { permissionMode: "auto-review", autoReview: async input => { expect(input.action).toMatchObject({ name: "read_file", args: { path: "fixture.txt" } }); return { approved: true, reason: "Inspection requested" }; } },
+    permission: { extractResources: () => [], evaluate: () => ({ kind: "ask", reason: "inspect", risk: "low" }) },
+    ...(fails ? { execute: async () => { throw Error("body failed"); } } : {}),
+  });
+  const expected = { status: fails ? "failed" : "completed", approvalMode: "auto", approvalReason: "Inspection requested" };
+  expect(journal.find(e => e.type === "tool/result")?.data).toMatchObject(expected);
+  expect(events.find(e => e.kind === "tool-finished")).toMatchObject({ result: expected });
+  expect(journal.some(e => e.type.startsWith("permission/"))).toBe(false);
+});

@@ -16,9 +16,13 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
   readonly #proxies = new ProviderProxyPool();
   #deepSeekFiles: DeepSeekFileUploader | undefined;
 
-  constructor(private readonly models: DesktopRuntimeV2ModelPort, private readonly readArtifact: SessionArtifactReader, private readonly purpose: "chat" | "utility" = "chat") {}
+  constructor(private readonly models: DesktopRuntimeV2ModelPort, private readonly readArtifact: SessionArtifactReader, private readonly purpose: "chat" | "utility" | "auto-review" = "chat") {}
 
   private resolveModel(requested?: string) {
+    if (this.purpose === "auto-review") {
+      if (!this.models.resolveAutoReviewModel) throw new Error("自动审批模型不可用");
+      return this.models.resolveAutoReviewModel(requested);
+    }
     return this.purpose === "utility" && this.models.resolveUtilityTaskModel
       ? this.models.resolveUtilityTaskModel(requested)
       : this.models.resolveMainModel(requested);

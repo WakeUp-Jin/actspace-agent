@@ -73,6 +73,7 @@
       "taskModels": {
         "defaultChatModel": "deepseek:deepseek-flash",
         "utilityModel": "kimi:kimi-k2.6",
+        "autoReviewModel": null,
         "exploreModel": null
       },
       "searchProviders": {
@@ -224,6 +225,7 @@
           "taskBindings": {
             "defaultChat": "deepseek:deepseek-flash",
             "utility": "kimi:kimi-k2.6",
+            "autoReview": null,
             "explore": null
           }
         },
@@ -391,6 +393,7 @@
         "taskBindings": {
           "defaultChat": "deepseek:deepseek-flash",
           "utility": "kimi:kimi-k2.6",
+          "autoReview": null,
           "explore": null
         }
       },

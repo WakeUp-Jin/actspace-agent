@@ -52,6 +52,11 @@ it("offers grants only for canonical in-workspace literal commands and retains h
       expect(suggestions.length).toBe(Object.keys(args).length === 1 && args.command === "pnpm test" ? 1 : 0);
       if (suggestions.length) expect(suggestions[0]?.selector).toMatchObject({ cwdRoot: await realpath(root) });
     }
+    for (const [command, count] of [["ls -la .", 1], ["ls escape", 0], ["git -C . status", 1], ["git -C escape status", 0], ["node --version", 1], ["node -e code", 0], ["rg --pre script needle", 0]] as const) {
+      const args = { command };
+      const resources = await policy.extractResources(args, context);
+      expect((await policy.suggestGrants!(args, resources, permissionContext)).length, command).toBe(count);
+    }
     const args = { command: "pnpm test | cat" };
     expect(await policy.evaluate(args, await policy.extractResources(args, context), permissionContext)).toMatchObject({ kind: "deny" });
   } finally { await rm(dir, { recursive: true, force: true }); }

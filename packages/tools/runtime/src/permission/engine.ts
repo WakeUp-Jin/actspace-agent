@@ -15,7 +15,7 @@ export function evaluateGlobalBoundary(
     if (sensitivity.kind === "once-only") {
       reasons.push({ code: sensitivity.code, message: sensitivity.reason, risk: "high", reusable: false });
     }
-    if (mode === "default" && !isPathWithin(workspaceRoot, resource.canonicalPath)) {
+    if (mode !== "full-access" && !isPathWithin(workspaceRoot, resource.canonicalPath)) {
       reasons.push({ code: "WORKSPACE_SCOPE_APPROVAL_REQUIRED", message: "The requested file is outside the workspace.", risk: resource.access === "read" ? "medium" : "high", reusable: resource.access !== "delete" });
     }
   }

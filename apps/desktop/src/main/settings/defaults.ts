@@ -59,7 +59,7 @@ export function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
     providers: Object.fromEntries(PROVIDER_IDS.map((id) => [id, defaultProviderSettings()])) as PersistedSettingsV3["providers"],
     installedModels: defaultInstalledModels(),
     customModels: {},
-    taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: null },
+    taskModels: { defaultChatModel: null, utilityModel: null, autoReviewModel: null, exploreModel: null },
     imageGeneration,
     imageInspection: { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY },
     agent: {
@@ -87,7 +87,7 @@ export function defaultSettingsV4Metadata(): SettingsV4Metadata {
       connections: {},
       definitions: {},
       installed: {},
-      taskBindings: { defaultChat: null, utility: null, explore: null },
+      taskBindings: { defaultChat: null, utility: null, autoReview: null, explore: null },
     },
     general: {
       performanceMonitoring: false,

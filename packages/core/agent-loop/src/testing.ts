@@ -10,6 +10,7 @@ import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
 
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {
+  toolEnvironment?: Partial<import("@actspace/tools-runtime").ToolPreparedEnvironment>;
   stream?: () => AsyncIterable<LlmStreamEvent>;
   subagent?: boolean;
   createContextEngine?: import("./loop.js").AgentLoopOptions["createContextEngine"];
@@ -88,7 +89,7 @@ export async function runToolStreamFixture(options: {
     assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
     llm: new LlmService(routes, { resolve: async () => ({ apiKey: "fixture" }) }),
     compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },
-    toolEnvironment: () => ({ resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: async () => { throw new Error("not used"); } }),
+    toolEnvironment: () => ({ ...options.toolEnvironment, resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: async () => { throw new Error("not used"); } }),
     onLiveEvent: (event) => { events.push(event); options.onLiveEvent?.(event); },
     context: options.context,
     compaction: options.compaction,

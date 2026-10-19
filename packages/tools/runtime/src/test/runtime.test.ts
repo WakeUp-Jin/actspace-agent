@@ -589,3 +589,70 @@ describe("process Session Grant execution", () => {
     expect(calls).toBe(2);
   });
 });
+
+describe("automatic approval", () => {
+  function setup(deny = false) {
+    const runtime = new ToolRuntime();
+    const execute = vi.fn(async () => success());
+    runtime.register({ definition: definition(), executor: { execute }, permission: { extractResources: () => [], evaluate: () => deny ? { kind: "deny", code: "HARD_DENIED", reason: "protected" } : { kind: "ask", reason: "inspect", risk: "low" } } });
+    const requestApproval = vi.fn(async (r: import("@actspace/tools-approval").ApprovalRequest) => ({ requestId: r.requestId, kind: "once" as const, decidedAt: new Date().toISOString() }));
+    return { runtime, execute, requestApproval, env: { ...environment([], { approvalBroker: { requestApproval } }), permissionMode: "auto-review" as const } };
+  }
+  it("approves only the current call, records result metadata, and bypasses the human broker", async () => {
+    const { runtime, env, requestApproval } = setup();
+    const autoReview = vi.fn(async () => ({ approved: true, reason: "User requested this inspection" }));
+    const results = await runtime.executeBatch([call("auto-1"), call("auto-2")], { ...env, autoReview });
+    expect(autoReview).toHaveBeenCalledTimes(2);
+    expect(requestApproval).not.toHaveBeenCalled();
+    expect(results.map(r => [r.status, r.approvalMode, r.approvalReason])).toEqual(Array(2).fill(["completed", "auto", "User requested this inspection"]));
+  });
+  it.each(["false", "error", "invalid", "missing"])("falls back to manual for %s", async kind => {
+    const { runtime, env, requestApproval } = setup();
+    const autoReview = kind === "missing" ? undefined : async () => { if (kind === "error") throw Error("secret failure"); return kind === "invalid" ? { approved: "true" as unknown as boolean } : { approved: false, reason: "Need human confirmation" }; };
+    const [result] = await runtime.executeBatch([call("fallback")], { ...env, autoReview });
+    expect(requestApproval).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ status: "completed", approvalMode: "manual" });
+    expect(result?.approvalReason).toContain("人工允许");
+    expect(result?.approvalReason).not.toContain("secret failure");
+  });
+  it("never asks the model to override a hard denial", async () => {
+    const { runtime, env, execute, requestApproval } = setup(true);
+    const autoReview = vi.fn(async () => ({ approved: true }));
+    expect((await runtime.executeBatch([call("hard")], { ...env, autoReview }))[0]?.status).toBe("denied");
+    expect(autoReview).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled(); expect(requestApproval).not.toHaveBeenCalled();
+  });
+  it("cancels an unresponsive reviewer without running the tool or asking a human", async () => {
+    const { runtime, env, execute, requestApproval } = setup();
+    const controller = new AbortController();
+    let started!: () => void;
+    const ready = new Promise<void>(resolve => { started = resolve; });
+    const run = runtime.executeBatch([{ ...call("cancel"), signal: controller.signal }], { ...env, autoReview: async () => { started(); return new Promise(() => {}); } });
+    await ready; controller.abort();
+    expect((await run)[0]).toMatchObject({ status: "aborted", approvalMode: "auto" });
+    expect(execute).not.toHaveBeenCalled(); expect(requestApproval).not.toHaveBeenCalled();
+  });
+  it("discards a pending judgment after a permission mode change", async () => {
+    const { runtime, env, requestApproval } = setup();
+    let mode: "default" | "auto-review" = "auto-review", listener = () => {};
+    let started!: () => void;
+    const ready = new Promise<void>(resolve => { started = resolve; });
+    const run = runtime.executeBatch([call("switch")], { ...env, permissionMode: () => mode, subscribePermissionMode: fn => { listener = fn; return () => {}; }, autoReview: async () => { started(); return new Promise(() => {}); } });
+    await ready; mode = "default"; listener();
+    expect((await run)[0]).toMatchObject({ status: "completed", approvalMode: "manual" });
+    expect(requestApproval).toHaveBeenCalledOnce();
+  });
+});
+
+it("times out automatic review and cancels its request before manual approval", async () => {
+  vi.useFakeTimers();
+  try {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute: async () => success() }, permission: { extractResources: () => [], evaluate: () => ({ kind: "ask", reason: "inspect", risk: "low" }) } });
+    let reviewerSignal: AbortSignal | undefined, started!: () => void;
+    const ready = new Promise<void>(resolve => { started = resolve; });
+    const run = runtime.executeBatch([call("timeout")], { ...environment([], { approvalBroker: { requestApproval: async r => ({ requestId: r.requestId, kind: "once", decidedAt: new Date().toISOString() }) } }), permissionMode: "auto-review", autoReview: async input => { reviewerSignal = input.signal; started(); return new Promise(() => {}); } });
+    await ready; await vi.advanceTimersByTimeAsync(30_001);
+    expect((await run)[0]).toMatchObject({ status: "completed", approvalMode: "manual" });
+    expect(reviewerSignal?.aborted).toBe(true);
+  } finally { vi.useRealTimers(); }
+});

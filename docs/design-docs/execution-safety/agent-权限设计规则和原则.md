@@ -56,7 +56,7 @@ Host capability ceiling
 - 一次性或明确的 Session scope；
 - 过期、取消和重放规则。
 
-当前只支持 prepared invocation `once` 与 Desktop 文件 `session` Grant，不支持动态 Bash allowlist、project 或用户级永久授权。实现使用 strict permission event/codec，不复用 v1 `bash_allowlist_added` 或旧宽松 approval 事件。
+当前支持 prepared invocation `once` 与 Desktop 文件及限定 Bash 查询/构建前缀的 `session` Grant，不支持动态 Bash allowlist、project 或用户级永久授权。实现使用 strict permission event/codec，不复用 v1 `bash_allowlist_added` 或旧宽松 approval 事件。
 
 ### 5. Renderer 不拥有执行能力
 
@@ -93,7 +93,7 @@ Bash 是高风险 Host capability，除通用原则外还需要：
 - abort 后若子进程状态不确定，返回 `outcome_unknown`，不伪装成普通取消；
 - stdout/stderr 流式输出受限，完整大输出进入 Artifact，而不是无限写入 Journal。
 
-当前代码已保留 Bash 硬防线和统一 Tool Runtime 边界。已确认目标仍只允许 Bash 精确 once；不会恢复“会话级 Allow 相似命令”或用户级 allowlist。
+当前代码已保留 Bash 硬防线和统一 Tool Runtime 边界。Desktop 可对受限字面命令生成 command_prefix 会话建议；每次复用仍重新分析参数、目录和查询路径，不能仅按首 token 放行。`auto-review` 只在原本需要询问处调用判断插件，失败回人工。
 
 ## Browser Bridge 特别规则
 

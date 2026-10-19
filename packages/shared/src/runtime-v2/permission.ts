@@ -1,4 +1,4 @@
-export type PermissionMode = "default" | "full-access";
+export type PermissionMode = "default" | "full-access" | "auto-review";
 export type FileScope = "workspace" | "all";
 export type GrantLifetime = "once" | "session";
 
