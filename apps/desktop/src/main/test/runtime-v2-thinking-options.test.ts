@@ -71,3 +71,18 @@ it("resolves a changed utility binding on the next prepared call", async () => {
     expect(resolveMainModel).not.toHaveBeenCalled();
   } finally { await adapter.dispose(); }
 });
+
+it("uses the auto-review binding with the current main model and fails closed when unavailable", async () => {
+  const resolution = { ok: true as const, model: { key: "review", definition: { api: "openai-completions" as const, provider: "kimi", apiModel: "review-api", contextWindow: 1000 }, providerRuntime: { baseUrl: "https://review.example/v1" } } };
+  const resolveMainModel = vi.fn(() => resolution);
+  const resolveAutoReviewModel = vi.fn((): import("../runtime-v2/model-port").DesktopRuntimeV2ModelResolution => resolution);
+  const adapter = new DesktopLegacyLlmAdapter({ resolveMainModel, resolveAutoReviewModel, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); }, "auto-review");
+  try {
+    const input = { request: { model: "chosen-main", options: {} }, signal: new AbortController().signal } as unknown as LlmAdapterPrepareInput;
+    expect(adapter.prepare(input).request.model).toBe("review-api");
+    expect(resolveAutoReviewModel).toHaveBeenCalledWith("chosen-main");
+    resolveAutoReviewModel.mockReturnValue({ ok: false, message: "review unavailable" });
+    expect(() => adapter.prepare(input)).toThrow("review unavailable");
+    expect(resolveMainModel).not.toHaveBeenCalled();
+  } finally { await adapter.dispose(); }
+});

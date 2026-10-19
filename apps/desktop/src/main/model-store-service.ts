@@ -314,6 +314,7 @@ export class ModelStoreService {
     const stored = this.settings.getModelStorageState();
     const references: string[] = [];
     if (stored.taskModels.defaultChatModel === modelKey) references.push("defaultChatModel");
+    if (stored.taskModels.autoReviewModel === modelKey) references.push("autoReviewModel");
     if (stored.taskModels.utilityModel === modelKey) references.push("utilityModel");
     if (stored.taskModels.exploreModel === modelKey) references.push("exploreModel");
     return references;

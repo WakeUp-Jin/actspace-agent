@@ -213,7 +213,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return { ok: true };
   });
   ipc.handle(contract.sessions.setPermissionMode, async (input) => {
-    if (input.mode !== "default" && input.mode !== "full-access") return { ok: false, error: "invalid_permission_mode" };
+    if (input.mode !== "default" && input.mode !== "full-access" && input.mode !== "auto-review") return { ok: false, error: "invalid_permission_mode" };
     try {
       const snapshot = await options.registry.updateSessionPermissionMode(input.sessionId, input.mode);
       return { ok: true, mode: snapshot.permissionMode };

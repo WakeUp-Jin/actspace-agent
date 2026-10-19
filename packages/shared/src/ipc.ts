@@ -344,7 +344,7 @@ export type ModelMutationResult =
           | "credential_missing"
           | "write_failed";
         message: string;
-        references?: Array<"defaultChatModel" | "utilityModel" | "exploreModel">;
+        references?: Array<"defaultChatModel" | "utilityModel" | "exploreModel" | "autoReviewModel">;
       };
     };
 

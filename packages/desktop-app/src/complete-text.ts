@@ -2,7 +2,10 @@ import type { LlmMessage, LlmService, LlmUsage } from "@actspace/llm-service";
 
 export async function completeText(llm: LlmService, input: { readonly messages: readonly LlmMessage[]; readonly model?: string; readonly purpose?: "chat" | "utility"; readonly sessionId?: string; readonly signal?: AbortSignal }) {
   const model = input.model ?? "default";
-  const routeId = input.purpose === "utility" ? "utility" : llm.routes.list()[0]?.routeId ?? "default";
+  const routes = llm.routes.list();
+  const chatRoute = routes.find(route => route.routeId === "default")
+    ?? routes.find(route => route.routeId !== "auto-review" && route.routeId !== "utility");
+  const routeId = input.purpose === "utility" ? "utility" : chatRoute?.routeId ?? "default";
   const prepared = llm.prepare({ routeId, model, messages: input.messages, ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), ...(input.signal === undefined ? {} : { signal: input.signal }) });
   let text = "";
   let usage: LlmUsage = { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, cost: null, costCurrency: null, source: "unknown" };

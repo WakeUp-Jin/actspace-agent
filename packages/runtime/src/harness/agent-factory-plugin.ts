@@ -1,3 +1,4 @@
+import { reviewConversation, type AutoReviewer } from "@actspace/auto-review";
 import { ContextSourceRegistry, type ContextCompactionCoordinator } from "@actspace/context-engine";
 import { createDisclosureSource, type ProgressiveDisclosure } from "@actspace/context-disclosure";
 import type { ContributorRegistry, PromptContributor } from "@actspace/prompt";
@@ -73,6 +74,14 @@ export function apply(ctx: CordisContext): AgentFactoryService {
     const configuredMode = host.toolEnvironment.permissionMode;
     return Object.freeze({
       ...host.toolEnvironment,
+      autoReview: async (input: import("@actspace/tools-runtime").AutoReviewInput) => {
+        const reviewer = ctx.get?.("approval.auto-review") as AutoReviewer | undefined;
+        if (!reviewer) throw new Error("Auto reviewer unavailable");
+        const revision = session.journal.lastSeq;
+        const decision = await reviewer.review({ sessionId: session.header.sessionId, callId: input.callId, model: input.model ?? "default", signal: input.signal, snapshot: { conversation: reviewConversation(session.journal.iterateEvents()), action: input.action, workspaceRoot: input.workspaceRoot, execution: "Existing executor; sandbox isolation is not guaranteed" } });
+        if (session.journal.lastSeq !== revision) throw new Error("Review context changed");
+        return decision;
+      },
       contextGeneration: session.journal.surface.replaceGeneration,
       workspaceRoot: resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot),
       permissionMode: () => host.toolEnvironment.permissionModeExplicit
@@ -121,7 +130,10 @@ export function apply(ctx: CordisContext): AgentFactoryService {
     readonly mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode;
   }): Promise<AgentLoopAssembly> => {
     resolveMainAgentPreset(session.header.createdWith.presetId);
-    const descriptor = Object.freeze({ ...MAIN_AGENT_DESCRIPTOR, routeId: llm.routes.list()[0]?.routeId ?? MAIN_AGENT_DESCRIPTOR.routeId });
+    const routes = llm.routes.list();
+    const route = routes.find(route => route.routeId === MAIN_AGENT_DESCRIPTOR.routeId)
+      ?? routes.find(route => route.routeId !== "auto-review" && route.routeId !== "utility");
+    const descriptor = Object.freeze({ ...MAIN_AGENT_DESCRIPTOR, routeId: route?.routeId ?? MAIN_AGENT_DESCRIPTOR.routeId });
     const agentId = `main:${session.header.sessionId}`;
     const scope = run.scope.child(agentId);
     try {

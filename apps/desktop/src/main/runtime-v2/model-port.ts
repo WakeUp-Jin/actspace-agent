@@ -32,6 +32,7 @@ export type DesktopRuntimeV2ModelResolution =
   | { readonly ok: false; readonly message: string };
 
 export interface DesktopRuntimeV2ModelPort {
+  resolveAutoReviewModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
   resolveUtilityTaskModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
   resolvePricing?(model: DesktopRuntimeV2ResolvedModel, apiModel: string): import("@actspace/shared").ModelPricingSnapshot | null;
   resolveMainModel(requested?: string | null): DesktopRuntimeV2ModelResolution;

@@ -16,7 +16,7 @@ const emptyTiming = (): RuntimeV2SessionTiming => ({ llmMs: 0, ttftMs: 0, ttftSt
 export function registerSessionFacts(registry: SessionProjectionRegistry, redact: (text: string, limit?: number) => string): void {
   registry.register<PermissionMode>({
     key: "permissionMode", stateVersion: 1, init: () => "default", view: state => state,
-    apply: (state, event) => event.type === "permission/mode-set" && record(event.data).mode === "full-access" ? "full-access" : event.type === "permission/mode-set" && record(event.data).mode === "default" ? "default" : state,
+    apply: (state, event) => event.type === "permission/mode-set" && record(event.data).mode === "auto-review" ? "auto-review" : event.type === "permission/mode-set" && record(event.data).mode === "full-access" ? "full-access" : event.type === "permission/mode-set" && record(event.data).mode === "default" ? "default" : state,
   });
   registry.register<readonly GrantState[]>({
     key: "sessionGrants", stateVersion: 1, init: () => [],
@@ -100,7 +100,7 @@ export function projectPermissionMode(events: readonly SessionEventEnvelopeV1[])
   for (const event of events) {
     if (event.type !== "permission/mode-set") continue;
     const value = record(event.data).mode;
-    if (value === "default" || value === "full-access") mode = value;
+    if (value === "default" || value === "full-access" || value === "auto-review") mode = value;
   }
   return mode;
 }

@@ -102,7 +102,7 @@ export class HostRpc {
           return app.updateSessionAgentMode(sessionId, patch.mode as "chat" | "plan" | "agent", integerParam(patch, "expectedRevision", Number.MAX_SAFE_INTEGER));
         }
         if (patch.permissionMode !== undefined) {
-          if (patch.permissionMode !== "default" && patch.permissionMode !== "full-access") throw new TypeError("Invalid permission mode");
+          if (patch.permissionMode !== "default" && patch.permissionMode !== "full-access" && patch.permissionMode !== "auto-review") throw new TypeError("Invalid permission mode");
           return app.updateSessionPermissionMode(sessionId, patch.permissionMode);
         }
         if (patch.title !== undefined && patch.title !== null && (typeof patch.title !== "string" || patch.title.length > 160)) throw new TypeError("Invalid title");

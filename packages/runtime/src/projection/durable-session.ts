@@ -145,6 +145,8 @@ function completeFromEvent(previous: RuntimeV2ToolView, event: SessionEventEnvel
       retryable: data.failure.retryable === true,
       phase: "body" as const,
     } : status === "outcome-unknown" ? { code: "TOOL_OUTCOME_UNKNOWN", message: "Tool outcome is unknown.", retryable: false, phase: "body" as const } : undefined,
+    ...(data.approvalMode === "auto" || data.approvalMode === "manual" || data.approvalMode === "session" ? { approvalMode: data.approvalMode as "auto" | "manual" | "session" } : {}),
+    ...(typeof data.approvalReason === "string" ? { approvalReason: data.approvalReason } : {}),
     finalizerFailures: [],
     dispatched: true,
   } as const;

@@ -31,7 +31,8 @@ describe("permission engine", () => {
     expect(combinePermissionDecisions({ kind: "pass" }, { kind: "allow" })).toEqual({ kind: "allow" });
   });
 
-  it("asks outside the workspace only in default mode", () => {
+  it("asks outside the workspace in default and auto review modes", () => {
+    expect(evaluateGlobalBoundary("auto-review", "/workspace", [file("/outside/file.txt")])).toMatchObject({ kind: "ask" });
     expect(evaluateGlobalBoundary("default", "/workspace", [file("/outside/file.txt")])).toMatchObject({ kind: "ask" });
     expect(evaluateGlobalBoundary("full-access", "/workspace", [file("/outside/file.txt")])).toEqual({ kind: "pass" });
   });

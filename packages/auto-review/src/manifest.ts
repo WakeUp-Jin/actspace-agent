@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.auto-review", version: "0.1.0", name: "Auto review", entry: { entryId: "approval.auto-review", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["llm.service"], contributions: { services: ["approval.auto-review"], tools: [], prompts: [], events: [] } });

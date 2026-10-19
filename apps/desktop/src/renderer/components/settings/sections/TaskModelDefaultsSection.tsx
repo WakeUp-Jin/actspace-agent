@@ -117,6 +117,7 @@ export function TaskModelDefaultsSection({
     <SettingGroup title="模型与生成" headingLevel={3} description="新请求使用的模型和生成参数，只影响之后的请求。">
       <ModelPurposeSelect label="默认会话模型" description="新会话和未手动选择模型时使用。" value={taskModels.defaultChatModel} models={usable.chat} onChange={(value) => void updateTask("defaultChatModel", value)} />
       <ModelPurposeSelect label="轻量任务模型" description="标题、工具摘要和上下文压缩。" value={taskModels.utilityModel} models={usable.utility} onChange={(value) => void updateTask("utilityModel", value)} />
+      <ModelPurposeSelect label="自动审批模型" emptyLabel="跟随会话模型" description="用于「替我审批」；未选择时跟随当前会话模型，判断失败时交回人工。" value={taskModels.autoReviewModel ?? null} models={usable.utility} onChange={(value) => void updateTask("autoReviewModel", value)} />
       <SettingLinkRow
         title="Explore 模型"
         description="在「子 Agent」中管理。"

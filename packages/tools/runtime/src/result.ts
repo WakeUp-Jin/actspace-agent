@@ -4,6 +4,8 @@ import type { ToolFailure } from "./errors.js";
 export type ToolTerminalStatus = "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
 
 export type ToolExecutionResult = {
+  readonly approvalMode?: "auto" | "manual" | "session";
+  readonly approvalReason?: string | null;
   readonly status: ToolTerminalStatus;
   readonly callId: string;
   readonly pluginId: string;

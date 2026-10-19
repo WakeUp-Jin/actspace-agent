@@ -111,3 +111,13 @@ describe("PermissionModeControl", () => {
     expect(screen.queryByLabelText("管理会话授权")).not.toBeInTheDocument();
   });
 });
+
+it("selects automatic review independently of full access", async () => {
+  const save = vi.fn(async () => ({ ok: true as const }));
+  setupBridge({ "sessions.setPermissionMode": save });
+  const user = userEvent.setup();
+  render(<PermissionModeControl sessionId="auto-session" mode="default" disabled={false} onChanged={() => undefined} />);
+  await user.click(screen.getByRole("button", { name: "会话权限模式" }));
+  await user.click(screen.getByRole("menuitemradio", { name: "替我审批" }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith({ sessionId: "auto-session", mode: "auto-review" }));
+});

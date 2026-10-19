@@ -110,6 +110,11 @@ export class ModelRuntimeService {
     return { ok: true, model: { ...main, source: "fallback", fallbackReason: "utility_to_main:not_configured" } };
   }
 
+  resolveAutoReviewModel(requestedMain?: string | null): RuntimeModelResolution {
+    const configured = this.settings.getModelStorageState().taskModels.autoReviewModel;
+    return configured ? this.resolve(configured, "utility", "configured") : this.resolveMainModel(requestedMain);
+  }
+
   resolveUtilityTaskModel(requestedMain?: string | null): RuntimeModelResolution {
     const configured = this.settings.getModelStorageState().taskModels.utilityModel;
     if (configured) {

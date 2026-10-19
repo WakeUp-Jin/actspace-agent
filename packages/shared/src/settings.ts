@@ -132,6 +132,7 @@ export interface InstalledModelSettings {
 export interface TaskModelSettings {
   defaultChatModel: ModelKey | null;
   utilityModel: ModelKey | null;
+  autoReviewModel?: ModelKey | null;
   exploreModel: ModelKey | null;
 }
 
@@ -338,6 +339,7 @@ export interface SettingsV4Models {
   taskBindings: {
     defaultChat: ModelKey | null;
     utility: ModelKey | null;
+    autoReview?: ModelKey | null;
     explore: ModelKey | null;
   };
 }

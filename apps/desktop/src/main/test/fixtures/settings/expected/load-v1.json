@@ -228,6 +228,7 @@
           "taskBindings": {
             "defaultChat": "kimi:kimi-k2.6",
             "utility": null,
+            "autoReview": null,
             "explore": "deepseek:deepseek-flash"
           }
         },
@@ -405,6 +406,7 @@
         "taskBindings": {
           "defaultChat": "kimi:kimi-k2.6",
           "utility": null,
+          "autoReview": null,
           "explore": "deepseek:deepseek-flash"
         }
       },

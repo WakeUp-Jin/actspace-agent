@@ -115,7 +115,7 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
 
 function validatePermissionData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
   if (type === "permission/mode-set") {
-    if (data.mode !== "default" && data.mode !== "full-access") throw invalid(type, "mode must be default or full-access");
+    if (data.mode !== "default" && data.mode !== "full-access" && data.mode !== "auto-review") throw invalid(type, "mode must be default or full-access or auto-review");
     return;
   }
   if (type === "permission/scope-denied") {
@@ -233,6 +233,8 @@ function validateCoreData(type: CoreSessionEventType, data: RuntimeV2JsonValue):
       requireToolName(data.name, type);
       break;
     case "tool/result":
+      if (data.approvalMode !== undefined && !["auto", "manual", "session"].includes(data.approvalMode as string)) throw invalid(type, "invalid approvalMode");
+      if (data.approvalReason != null && typeof data.approvalReason !== "string") throw invalid(type, "invalid approvalReason");
       requireId(data.callId ?? data.toolCallId, type, "callId");
       requireToolName(data.name, type);
       if (typeof data.status !== "string" || data.status.length === 0) throw invalid(type, "status must be a non-empty string");

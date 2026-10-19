@@ -18,7 +18,7 @@
 本设计只保留两个产品模式：
 
 ```ts
-type PermissionMode = "default" | "full-access";
+type PermissionMode = "default" | "auto-review" | "full-access";
 type FileScope = "workspace" | "all";
 ```
 
@@ -29,7 +29,7 @@ type FileScope = "workspace" | "all";
 第一轮不实现：
 
 - project、跨 Session 或用户级持久 Grant；
-- Bash Session Grant、命令 pattern 或动态 allowlist；
+- 任意 Bash pattern、动态 allowlist 或跨会话永久授权；
 - Browser 与 Network Grant；
 - 跨平台 sandbox 收敛；
 - 不可信第三方插件沙箱；
@@ -312,7 +312,7 @@ type SessionGrant = {
 - 相同 `pluginId + permissionDomain + policyVersion` 的受信核心文件工具可以共享；
 - `read_file`、`grep`、`glob` 可以共享 `file.read` subtree；
 - `write_file`、`edit_file` 可以共享 `file.write` selector；
-- 第三方插件、Bash、delete 和 Subagent 不能消费主 Agent 的 Grant；
+- 第三方插件、delete 和 Subagent 不能消费主 Agent 的 Grant；Bash 只能消费自己 audience 下受限 command_prefix Grant；
 - Session Grant 不绑定 `definitionDigest`，权限兼容性由显式 `policyVersion` 控制；
 - Session Grant 可以随同一个 Session 恢复，但不跨 Session、Agent 或 Host 明确禁用的能力。
 
@@ -501,7 +501,7 @@ Session Grant 自动化另外覆盖 exact/subtree 路径段匹配、多资源全
 
 人工验收至少覆盖：
 
-- Desktop 两种 mode 的真实文件访问；
+- Desktop 三种 mode 的真实文件访问；
 - once、mode 恢复和敏感资源；
 - hard deny 不出现强制执行入口；
 - CLI 只显示 once/deny；
@@ -522,3 +522,16 @@ Session Grant 自动化另外覆盖 exact/subtree 路径段匹配、多资源全
 - 首 token Bash 前缀授权；
 - Permission 替代 OS sandbox；
 - 为旧 permission API、事件或模式保留兼容 alias。
+
+
+## 2026-10 自动审批与查询会话授权
+
+`auto-review` 沿用 default 的文件范围，先检查硬规则与已有 Grant；剩余 ask 交给 `packages/auto-review` 的 `approval.auto-review` 服务。插件只有一次无工具 LLM 判断，输出 `{approved:boolean, reason?:string|null}`。Runtime 在 30 秒内接受 true 后仍执行资源/模式/取消复验；false、缺失插件、坏格式、错误、超时回原人工卡片。插件不发 Grant、不执行工具。切回 default 即停止自动判断。未配置自动审批 route 的 Host 会回人工，CLI 入口仍只显式提供 default/full-access。
+
+Desktop「模型与生成 → 自动审批模型」默认为跟随会话模型，可指定已有连接模型。不可用时不改用别的模型。固定 prompt 位于插件 `src/prompt.ts`；上下文取原始 user/message 与 assistant/message 的文本（保留人类答复的提议上下文）、近期 24 条调用/状态、完整当前参数与资源、实际工作区及沙箱不保证隔离的事实。普通工具结果与 reasoning 不发送；原始用户上下文超过 64k 字符或总输入超过 96k 字符回人工，不静默截断授权。判断期间 journal 改变则丢弃判断。当前无独立人工问答工具，未来如增加必须明确其可信用户答复来源后接入。
+
+现有 `tool/result` 仅增加两个可选字段：`approvalMode: auto | manual | session` 与 `approvalReason?: string | null`。它们表示实际审批路径；自动不允许/失败后人工允许记 manual，并附简短回退说明。工具执行失败仍记录。缺字段的旧事件继续读取；这些字段不产生恢复授权，也不增加事件类型。自动判断未完成就崩溃时沿用现有工具恢复语义。
+
+查询名单与限制以 [shell-tools README](../../../packages/tools/shell-tools/README.md) 为准。git -C 与明确查询目标做 realpath 工作区校验；未知选项、外部目标、敏感文件、跟随链接参数、复合命令不提供新会话建议。目录型查询的深层内容与项目脚本不构成文件系统隔离，本次不增强 sandbox。
+
+参考：Codex guardian 的 action/context 分离、Claude Code 2.1.302 本地制品对原始用户消息与普通工具输出的区别处理，以及 tmp/deepseek-harness 的 experimental/auto-review 接入位置；只借鉴职责与上下文取舍，不复制外部执行权限设置。

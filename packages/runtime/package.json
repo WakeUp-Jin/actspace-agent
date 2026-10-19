@@ -103,7 +103,8 @@
     "@actspace/harness-control": "workspace:*",
     "@actspace/official-skills": "workspace:*",
     "@actspace/plugin-manager": "workspace:*",
-    "@actspace/harness-hmr": "workspace:*"
+    "@actspace/harness-hmr": "workspace:*",
+    "@actspace/auto-review": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

@@ -265,7 +265,7 @@ export class AgentLoop {
           finalText = output.text || output.content.filter((block) => block.type === "text").map((block) => block.text).join("");
           await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content: output.content as unknown as RuntimeV2JsonValue, finishReason: output.stopReason ?? (output.aborted ? "aborted" : "completed"), usage: output.usage }, { surface: { kind: "append", node: { kind: "assistant", messageId: output.messageId, content: output.content as unknown as RuntimeV2JsonValue } } }));
         }
-        if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames);
+        if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames, requestModel);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");
         let updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
@@ -435,7 +435,7 @@ export class AgentLoop {
   }
   private recordPayload<T>(payload: T): Readonly<Record<string, unknown>> { return isRecord(payload) ? payload : {}; }
 
-  private async runTools(calls: readonly CollectedToolCall[], ids: { agentRunId: string; turnId: string; stepId: string; requestId: string }, signal: AbortSignal, visibleToolNames: ReadonlySet<string>): Promise<readonly ToolExecutionResult[]> {
+  private async runTools(calls: readonly CollectedToolCall[], ids: { agentRunId: string; turnId: string; stepId: string; requestId: string }, signal: AbortSignal, visibleToolNames: ReadonlySet<string>, mainModel?: string): Promise<readonly ToolExecutionResult[]> {
     const unavailable = calls.find((call) => !visibleToolNames.has(call.name));
     if (unavailable !== undefined) {
       // The assistant message already contains every call. Settle the whole
@@ -464,7 +464,7 @@ export class AgentLoop {
       this.emitLive({ kind: "tool-prepared", ...ids, callId: call.callId, name: definition.name, arguments: args });
     }
     const base = this.options.toolEnvironment(this.options.session);
-    const environment: ToolPreparedEnvironment = { ...base, allowedToolNames: visibleToolNames, agentScopeToken: this.options.toolScopeToken, context: this.options.context, eventCarrier: this.#events.carrier,
+    const environment: ToolPreparedEnvironment = { ...base, mainModel, allowedToolNames: visibleToolNames, agentScopeToken: this.options.toolScopeToken, context: this.options.context, eventCarrier: this.#events.carrier,
       onExecutionStarted: (call) => {
         this.emitLive({ kind: "tool-started", ...ids, callId: call.callId, name: call.name });
         try { base.onExecutionStarted?.(call); } catch { /* Isolate optional observers. */ }
@@ -473,7 +473,7 @@ export class AgentLoop {
       checkpointBeforeBody: async () => { await this.checkpoint("before-tool-body"); },
       recordPermission: async (type, data) => { await this.options.session.append(core(type, data as RuntimeV2JsonValue)); },
       commitResult: async (result) => {
-        const data = { callId: result.callId, pluginId: result.pluginId, name: result.name, status: result.status, summary: result.summary, modelOutput: result.modelOutput, detail: result.detail, artifacts: result.artifacts, failure: result.failure ?? null, renderer: result.renderer ?? null } as unknown as RuntimeV2JsonValue;
+        const data = { ...(result.approvalMode ? { approvalMode: result.approvalMode } : {}), ...(result.approvalReason ? { approvalReason: result.approvalReason } : {}), callId: result.callId, pluginId: result.pluginId, name: result.name, status: result.status, summary: result.summary, modelOutput: result.modelOutput, detail: result.detail, artifacts: result.artifacts, failure: result.failure ?? null, renderer: result.renderer ?? null } as unknown as RuntimeV2JsonValue;
         const surface = { surface: { kind: "append", node: { kind: "tool-result", messageId: `tool-${result.callId}`, callId: result.callId, content: result.modelOutput as unknown as RuntimeV2JsonValue, isError: result.status !== "completed" } } };
         const event = await this.options.session.append(core("tool/result", data, surface));
         await this.options.observeContextToolResult?.(this.options.session, event);
@@ -560,9 +560,9 @@ function hasUserMessage(session: SessionHandle, messageId: string): boolean {
   return ids.has(messageId) || session.journal.surface.entries.some(entry => entry.node.kind === "user" && entry.node.messageId === messageId);
 }
 
-function currentPermissionMode(events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]): "default" | "full-access" {
-  let mode: "default" | "full-access" = "default";
-  for (const event of events) if (event.type === "permission/mode-set" && isRecord(event.data) && (event.data.mode === "default" || event.data.mode === "full-access")) mode = event.data.mode;
+function currentPermissionMode(events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]): "default" | "full-access" | "auto-review" {
+  let mode: "default" | "full-access" | "auto-review" = "default";
+  for (const event of events) if (event.type === "permission/mode-set" && isRecord(event.data) && (event.data.mode === "default" || event.data.mode === "full-access" || event.data.mode === "auto-review")) mode = event.data.mode;
   return mode;
 }
 function core(type: string, data: RuntimeV2JsonValue, extra: Record<string, unknown> = {}) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null, ...extra } as never; }

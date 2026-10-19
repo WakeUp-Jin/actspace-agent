@@ -61,3 +61,17 @@ describe("Agent mode recovery", () => {
     expect(new SessionReadModel(header, registry).replay(journal.events).snapshot()).toMatchObject({ agentMode: "plan", agentModeRevision: 1 });
   });
 });
+
+it.each([undefined, "auto", "manual", "session"] as const)("replays tool audit without requiring new fields (%s)", approvalMode => {
+  const registry = createCoreCodecRegistry();
+  const header = createSessionHeader({ sessionId: "audit", createdAt: "2026-10-18T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: registry.digest } });
+  const journal = new SessionJournal({ registry });
+  const append = (type: string, data: RuntimeV2JsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
+  append("turn/start", { turnId: "t" });
+  append("step/start", { turnId: "t", stepId: "s" });
+  append("tool/call", { callId: "c", name: "bash", args: { command: "ls" } });
+  append("tool/result", { callId: "c", name: "bash", status: "failed", ...(approvalMode ? { approvalMode, approvalReason: "fixture explanation" } : {}) });
+  const tool = new SessionReadModel(header, registry).replay(journal.events).snapshot().tools[0];
+  expect(tool?.approvalMode).toBe(approvalMode);
+  expect(tool?.approvalReason).toBe(approvalMode ? "fixture explanation" : undefined);
+});

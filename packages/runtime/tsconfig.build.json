@@ -13,6 +13,9 @@
       "path": "./../agent-service/tsconfig.build.json"
     },
     {
+      "path": "./../auto-review/tsconfig.build.json"
+    },
+    {
       "path": "./../boot/tsconfig.build.json"
     },
     {
