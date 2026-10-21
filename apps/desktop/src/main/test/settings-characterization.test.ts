@@ -144,10 +144,6 @@ function recordingWriter() {
   };
 }
 
-function sequentialIds(): () => string {
-  let next = 0;
-  return () => `cred${++next}`;
-}
 
 describe("settings load snapshots (v1–v4)", () => {
   it.each(["v1", "v2", "v3", "v4"])("loads a %s settings file", async (version) => {
@@ -172,8 +168,14 @@ describe("settings load snapshots (v1–v4)", () => {
     expect(reloadEnv).toHaveBeenCalledTimes(1);
 
     if (version === "v1") expect(await readFile(join(root, "settings.v1.backup.json"), "utf8")).toBe(fixtureRaw);
-    // v4 原样读取：load 不重写 settings.json，也不生成备份。
-    if (version === "v4") expect(await readFile(join(root, "settings.json"), "utf8")).toBe(fixtureRaw);
+    // 四层模型之前的 v4：load 迁移一次并留备份；迁移过的文件再 load 原样读取，不重写。
+    if (version === "v4") {
+      expect(await readFile(join(root, "settings.v4.pre-model-layers.backup.json"), "utf8")).toBe(fixtureRaw);
+      const migrated = await readFile(join(root, "settings.json"), "utf8");
+      expect(migrated).not.toBe(fixtureRaw);
+      await new SettingsService({ dataRoot: root, crypto: fixtureCrypto, reloadEnv }).load();
+      expect(await readFile(join(root, "settings.json"), "utf8")).toBe(migrated);
+    }
   });
 
   it("starts from env defaults when settings.json is missing", async () => {
@@ -213,7 +215,10 @@ describe("settings load snapshots (v1–v4)", () => {
     expect(service.get().taskModels).toEqual({
       defaultChatModel: "kimi:kimi-k2.6",
       utilityModel: "deepseek:deepseek-flash",
+      autoReviewModel: null,
       exploreModel: "deepseek:deepseek-flash",
+      visionModel: null,
+      thinking: { utility: "off", autoReview: "off" },
     });
     await expectGolden("load-v1-with-legacy-secrets", { files: await readTree(root) });
   });
@@ -244,17 +249,16 @@ describe("legacy v1 secrets", () => {
     const service = new SettingsService({ dataRoot: root, crypto: { ...fixtureCrypto, decrypt } });
     await service.load();
 
-    expect(decrypt).toHaveBeenCalledTimes(3);
+    expect(decrypt).toHaveBeenCalledTimes(2);
     expect(service.getStoredKey("deepseek")).toBe("legacy-deepseek-key");
     expect(service.getStoredKey("tavily")).toBe("legacy-tavily-key");
     expect(service.getCredentialStorageView()).toEqual({ status: "ready" });
     expect(service.get().searchProviders.tavily).toEqual({ hasApiKey: true });
-    // kimi:extra1 的密钥被保留，但 settings 里没有对应的额外 key 条目（v1 settings 不存在时用默认值）。
-    expect(service.get().providers.kimi.additionalCredentials).toEqual([]);
+    // 多 Key 已删除：kimi:extra1 这类旧密钥读取时直接丢弃。
     const tree = await readTree(root);
     expect(tree["secrets.json"]).toEqual({
       version: 2,
-      providerCredentials: { "kimi:extra1": "legacy-kimi-extra-key" },
+      providerCredentials: {},
       deepseek: "legacy-deepseek-key",
       tavily: "legacy-tavily-key",
     });
@@ -303,27 +307,10 @@ const ROLLBACK_CASES: RollbackCase[] = [
     message: "供应商设置写入失败。",
   },
   {
-    name: "removeProvider",
-    seed: (service) => service.updateProviderConnection({ provider: "kimi", apiKey: "old-kimi-key", enabled: false }),
-    run: (service) => service.removeProvider("kimi"),
-    message: "服务商移除失败。",
-  },
-  {
     name: "updateImageGeneration",
     seed: (service) => service.updateImageGeneration({ apiKey: "old-image-key", baseUrl: "https://images.example/v1", model: "old-model" }),
     run: (service) => service.updateImageGeneration({ apiKey: "new-image-key", baseUrl: "https://images.example/v2", model: "new-model" }),
     message: "图片生成配置写入失败。",
-  },
-  {
-    name: "addProviderCredential",
-    run: (service) => service.addProviderCredential({ provider: "kimi", label: "Second key", apiKey: "kimi-extra-key", pricingMultiplier: 2 }),
-    message: "额外 API Key 写入失败。",
-  },
-  {
-    name: "removeProviderCredential",
-    seed: (service) => service.addProviderCredential({ provider: "kimi", label: "Team key", apiKey: "kimi-extra-key" }),
-    run: (service) => service.removeProviderCredential("kimi", "cred1"),
-    message: "额外 API Key 删除失败。",
   },
 ];
 
@@ -331,7 +318,7 @@ describe("rollback when settings.json fails after secrets.json was written", () 
   async function seeded(testCase: RollbackCase) {
     const root = await makeRoot({ "settings.json": "v4.json" });
     const writer = recordingWriter();
-    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, writeJson: writer.writeJson, createCredentialId: sequentialIds() });
+    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, writeJson: writer.writeJson });
     await service.load();
     // 先让两份文件都按当前格式写一遍，后面才能逐字节比较「恢复前后」。
     await service.setProviderKey("tavily", "seed-tavily-key");
@@ -374,21 +361,21 @@ describe("rollback when settings.json fails after secrets.json was written", () 
   it("restores from memory rather than the original bytes", async () => {
     const root = await makeRoot({ "settings.json": "v4.json" });
     const writer = recordingWriter();
-    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, writeJson: writer.writeJson, createCredentialId: sequentialIds() });
+    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, writeJson: writer.writeJson });
     await service.load();
     const before = await readTree(root);
     expect(before["secrets.json"]).toBeUndefined();
     writer.reset();
     writer.failOn(2, "after");
 
-    await expect(service.addProviderCredential({ provider: "kimi", label: "First", apiKey: "kimi-extra-key" })).rejects.toMatchObject({ code: "write_failed" });
+    await expect(service.updateProviderConnection({ provider: "kimi", apiKey: "kimi-extra-key" })).rejects.toMatchObject({ code: "write_failed" });
     const after = await readTree(root);
-    // 现有行为：原来没有 secrets.json，恢复后多出一份空的；settings.json 按内存重新序列化，
-    // 样本里的相对 systemPromptPath 变成了绝对路径。
+    // 现有行为：原来没有 secrets.json，恢复后多出一份空的；settings.json 按内存重新序列化。
+    // 样本是四层模型之前的 v4，加载时已经迁移重写过一次，相对 systemPromptPath 在 before 里就成了绝对路径。
     expect(after["secrets.json"]).toEqual({ version: 2, providerCredentials: {} });
     expect(after["secrets.json mode"]).toBe("600");
     expect(after["settings.json"]).toEqual(normalized(service.getV4().settings, root));
-    expect((before["settings.json"] as { general: { agentInstructions: unknown } }).general.agentInstructions).toEqual({ systemPromptPath: "v4-agent.md" });
+    expect((before["settings.json"] as { general: { agentInstructions: unknown } }).general.agentInstructions).toEqual({ systemPromptPath: "<root>/prompts/v4-agent.md" });
     expect((after["settings.json"] as { general: { agentInstructions: unknown } }).general.agentInstructions).toEqual({ systemPromptPath: "<root>/prompts/v4-agent.md" });
   });
 
@@ -412,7 +399,7 @@ describe("mutation queue", () => {
   async function loadedWithWriter() {
     const root = await makeRoot({ "settings.json": "v4.json" });
     const writer = recordingWriter();
-    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, writeJson: writer.writeJson, createCredentialId: sequentialIds() });
+    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, writeJson: writer.writeJson });
     await service.load();
     writer.reset();
     return { root, writer, service };
@@ -442,7 +429,7 @@ describe("mutation queue", () => {
     writer.failOn(1, "before");
 
     const first = service.update({ skills: { disabled: ["lost"] } });
-    const second = service.update({ imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" } });
+    const second = service.update({ skills: { disabled: ["pptx"] } });
     await expect(first).rejects.toThrow("injected failure before write #1");
     await expect(second).resolves.toMatchObject({ skills: { disabled: ["pptx"] } });
     expect(service.get().skills.disabled).toEqual(["pptx"]);
@@ -457,7 +444,6 @@ describe("mutation queue", () => {
       service.updateProviderConnection({ provider: "deepseek", apiKey: "queued-deepseek-key" }),
       service.setProviderKey("tavily", "queued-tavily-key"),
       service.update({ skills: { disabled: ["queued-skill"] } }),
-      service.addProviderCredential({ provider: "kimi", label: "Queued", apiKey: "queued-kimi-key" }),
     ];
     await vi.waitFor(() => expect(writer.calls).toHaveLength(1));
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -469,7 +455,6 @@ describe("mutation queue", () => {
       "secrets.json", "settings.json",
       "secrets.json",
       "settings.json",
-      "secrets.json", "settings.json",
     ]);
   });
 });
@@ -514,7 +499,7 @@ describe("applyToEnv", () => {
   it("calls reloadEnv once for each env-affecting mutation and never for the others", async () => {
     const root = await makeRoot({ "settings.json": "v4.json" });
     const reloadEnv = vi.fn();
-    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, reloadEnv, createCredentialId: sequentialIds() });
+    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, reloadEnv });
     const steps: Array<[string, () => Promise<unknown>]> = [
       ["load", () => service.load()],
       ["update", () => service.update({ skills: { disabled: ["a"] } })],
@@ -523,7 +508,6 @@ describe("applyToEnv", () => {
       ["updateNamespaceV4", () => service.updateNamespaceV4({ namespace: "skills", expectedRevision: service.getV4().revision, patch: { disabled: ["c"] } })],
       ["updateModelStorage", () => service.updateModelStorage({ installedModels: { "kimi:kimi-k2.6": null } })],
       ["updateProviderConnection", () => service.updateProviderConnection({ provider: "kimi", apiKey: "kimi-key" })],
-      ["removeProvider", () => service.removeProvider("kimi")],
       ["updateImageGeneration", () => service.updateImageGeneration({ apiKey: "image-key", baseUrl: "https://images.example/v5", model: "m5" })],
       ["setProviderKey(image-generation)", () => service.setProviderKey("image-generation", "image-key-2")],
       ["clearProviderKey(image-generation)", () => service.clearProviderKey("image-generation")],
@@ -532,12 +516,6 @@ describe("applyToEnv", () => {
       ["setProviderKey(deepseek)", () => service.setProviderKey("deepseek", "deepseek-key")],
       ["clearProviderKey(deepseek)", () => service.clearProviderKey("deepseek")],
       ["setProviderKey(speech-minimax)", () => service.setProviderKey("speech-minimax", "speech-key")],
-      ["addProviderCredential", () => service.addProviderCredential({ provider: "openrouter", label: "Extra", apiKey: "or-extra" })],
-      ["updateProviderCredential", () => service.updateProviderCredential("openrouter", "cred1", "Renamed")],
-      ["removeProviderCredential", () => service.removeProviderCredential("openrouter", "cred1")],
-      ["createCustomConnection", () => service.createCustomConnection({ providerId: "openrouter", connectionId: "proxy-one", displayName: "Proxy One", apiKey: "proxy-key", baseUrl: "https://proxy.example/v1", defaultModel: "gpt-4o-mini" })],
-      ["updateCustomConnection", () => service.updateCustomConnection({ providerId: "openrouter", connectionId: "proxy-one", displayName: "Proxy Two", apiKey: "", baseUrl: "https://proxy.example/v2", defaultModel: "gpt-4o-mini" })],
-      ["removeCustomConnection", () => service.removeCustomConnection("proxy-one")],
       ["writeAgentSystemPrompt", () => service.writeAgentSystemPrompt("Custom prompt")],
     ];
     const deltas: Array<[string, number]> = [];
@@ -557,7 +535,6 @@ describe("applyToEnv", () => {
       ["updateNamespaceV4", 1],
       ["updateModelStorage", 0],
       ["updateProviderConnection", 1],
-      ["removeProvider", 1],
       ["updateImageGeneration", 1],
       ["setProviderKey(image-generation)", 1],
       ["clearProviderKey(image-generation)", 1],
@@ -566,13 +543,6 @@ describe("applyToEnv", () => {
       ["setProviderKey(deepseek)", 1],
       ["clearProviderKey(deepseek)", 1],
       ["setProviderKey(speech-minimax)", 0],
-      ["addProviderCredential", 0],
-      ["updateProviderCredential", 0],
-      ["removeProviderCredential", 0],
-      // custom connection 经 applyNamespaceV4 落盘，所以也会写 env。
-      ["createCustomConnection", 1],
-      ["updateCustomConnection", 1],
-      ["removeCustomConnection", 1],
       ["writeAgentSystemPrompt", 0],
     ]);
     expect(env["setProviderKey(tavily)"]).toEqual({ TAVILY_API_KEY: "tavily-key", LLM_TEMPERATURE: "1.2", IMAGE_GENERATION_MODEL: "m5" });
@@ -590,7 +560,7 @@ describe("applyToEnv", () => {
 describe("v4 change notifications", () => {
   it("notifies subscribers after each committed write with the changed namespaces", async () => {
     const root = await makeRoot({ "settings.json": "v4.json" });
-    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, createCredentialId: sequentialIds() });
+    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto });
     const notifications: Array<{ revision: string; changedNamespaces: string[] }> = [];
     service.subscribeV4Changes((notification) => notifications.push(notification));
     const steps: Array<[string, () => Promise<unknown>]> = [
@@ -603,8 +573,6 @@ describe("v4 change notifications", () => {
       ["updateImageGeneration", () => service.updateImageGeneration({ apiKey: "image-key", baseUrl: "https://images.example/v5", model: "m5" })],
       ["setProviderKey(tavily)", () => service.setProviderKey("tavily", "tavily-key")],
       ["setProviderKey(speech-minimax)", () => service.setProviderKey("speech-minimax", "speech-key")],
-      ["addProviderCredential", () => service.addProviderCredential({ provider: "openrouter", label: "Extra", apiKey: "or-extra" })],
-      ["createCustomConnection", () => service.createCustomConnection({ providerId: "openrouter", connectionId: "proxy-one", displayName: "Proxy One", apiKey: "proxy-key", baseUrl: "https://proxy.example/v1", defaultModel: "gpt-4o-mini" })],
       ["writeAgentSystemPrompt", () => service.writeAgentSystemPrompt("Custom prompt")],
     ];
     const perStep: Array<[string, string[][]]> = [];

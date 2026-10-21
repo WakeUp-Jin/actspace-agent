@@ -148,7 +148,7 @@ function GroupHeader({
 
 /**
  * 内嵌分组：白底 + 1px 边框 + 10px 圆角，组内行用浅分隔线。
- * plain：不画分组自己的框，行直接贴在调用方给的容器里（模型连接详情用 .mc-models 承接）。
+ * plain：不画分组自己的框，行直接贴在调用方给的容器里（由调用方给容器）。
  */
 export function SettingGroup({
   title,

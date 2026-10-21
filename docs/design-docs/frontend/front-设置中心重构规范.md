@@ -758,8 +758,7 @@ Usage UI
 - [`sections/`](../../../apps/desktop/src/renderer/components/settings/sections/)（通用、外观、工具、子 Agent、归档会话、更新等各分区）
 - [`SettingsNav.tsx`](../../../apps/desktop/src/renderer/components/settings/SettingsNav.tsx)
 - [`SettingsPrimitives.tsx`](../../../apps/desktop/src/renderer/components/settings/SettingsPrimitives.tsx)
-- [`ProviderSettings.tsx`](../../../apps/desktop/src/renderer/components/settings/ProviderSettings.tsx)
-- [`ModelSettings.tsx`](../../../apps/desktop/src/renderer/components/settings/ModelSettings.tsx)
+- [`models/`](../../../apps/desktop/src/renderer/components/settings/models/)（「模型」页：用途、连接与模型，见 [模型页规范](front-模型设置页面-Maka重做规范.md)）
 - [`UsageStatisticsPage.tsx`](../../../apps/desktop/src/renderer/components/UsageStatisticsPage.tsx)
 - [`packages/shared/src/settings.ts`](../../../packages/shared/src/settings.ts)
 - [`packages/shared/src/ipc.ts`](../../../packages/shared/src/ipc.ts)

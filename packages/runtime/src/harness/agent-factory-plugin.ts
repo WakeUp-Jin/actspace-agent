@@ -19,6 +19,8 @@ import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
 import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
 
+const PURPOSE_ROUTE_IDS = new Set(["utility", "auto-review", "explore"]);
+
 export type AgentFactoryService = {
   readonly runFactory: RunFactory;
   readonly activeSessions: ReadonlyMap<string, import("@actspace/session-persistence").SessionHandle>;
@@ -123,6 +125,14 @@ export function apply(ctx: CordisContext): AgentFactoryService {
     return loop;
   };
 
+  // 用途路由（轻量任务、自动审批、探索）不能拿来跑主 Agent。
+  const mainRouteId = (): string => {
+    const routes = llm.routes.list();
+    const route = routes.find(route => route.routeId === MAIN_AGENT_DESCRIPTOR.routeId)
+      ?? routes.find(route => !PURPOSE_ROUTE_IDS.has(route.routeId));
+    return route?.routeId ?? MAIN_AGENT_DESCRIPTOR.routeId;
+  };
+
   const createMainAgent = async (session: import("@actspace/session-persistence").SessionHandle, run: {
     readonly scope: AgentScope;
     readonly budget?: Parameters<RunFactory["create"]>[0]["budget"];
@@ -130,10 +140,7 @@ export function apply(ctx: CordisContext): AgentFactoryService {
     readonly mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode;
   }): Promise<AgentLoopAssembly> => {
     resolveMainAgentPreset(session.header.createdWith.presetId);
-    const routes = llm.routes.list();
-    const route = routes.find(route => route.routeId === MAIN_AGENT_DESCRIPTOR.routeId)
-      ?? routes.find(route => route.routeId !== "auto-review" && route.routeId !== "utility");
-    const descriptor = Object.freeze({ ...MAIN_AGENT_DESCRIPTOR, routeId: route?.routeId ?? MAIN_AGENT_DESCRIPTOR.routeId });
+    const descriptor = Object.freeze({ ...MAIN_AGENT_DESCRIPTOR, routeId: mainRouteId() });
     const agentId = `main:${session.header.sessionId}`;
     const scope = run.scope.child(agentId);
     try {
@@ -202,7 +209,8 @@ export function apply(ctx: CordisContext): AgentFactoryService {
   const service: AgentFactoryService = Object.freeze({
     runFactory,
     activeSessions,
-    createSubagentLoop: ({ session, scope, preset, allowedToolNames, signal, agentId }) => createLoop({ session, scope, signal, agentId, allowedToolNames, descriptor: Object.freeze({ id: preset.id, version: preset.version, kind: "subagent", description: `One-shot ${preset.id} child Agent`, presetId: preset.id, routeId: preset.routeId, model: preset.model, maxSteps: preset.maxSteps }) }),
+    // 宿主没注册预设专用的路由（例如 explore）时，退回主 Agent 用的路由。
+    createSubagentLoop: ({ session, scope, preset, allowedToolNames, signal, agentId }) => createLoop({ session, scope, signal, agentId, allowedToolNames, descriptor: Object.freeze({ id: preset.id, version: preset.version, kind: "subagent", description: `One-shot ${preset.id} child Agent`, presetId: preset.id, routeId: llm.routes.list().some(route => route.routeId === preset.routeId) ? preset.routeId : mainRouteId(), model: preset.model, maxSteps: preset.maxSteps }) }),
   });
   ctx.provide?.("actspace.agent.factory", service);
   return service;

@@ -14,6 +14,8 @@ export const SETTINGS_V1_BACKUP_FILE = "settings.v1.backup.json";
 export const SETTINGS_V2_BACKUP_FILE = "settings.v2.backup.json";
 export const SETTINGS_V2_BACKUP_DIGEST_FILE = "settings.v2.backup.sha256";
 export const SETTINGS_V3_BACKUP_FILE = "settings.v3.backup.json";
+/** 四层模型迁移前的 v4 设置（只写一次）。 */
+export const SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE = "settings.v4.pre-model-layers.backup.json";
 export const SETTINGS_V3_BACKUP_DIGEST_FILE = "settings.v3.backup.sha256";
 export const SECRETS_FILE = "secrets.json";
 export const BUILTIN_MODEL_ADDED_AT = "2026-07-24T00:00:00.000Z";

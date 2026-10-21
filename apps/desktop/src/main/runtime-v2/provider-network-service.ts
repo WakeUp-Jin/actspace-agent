@@ -1,12 +1,12 @@
 import { ProviderProxyPool } from "@actspace/llm-service";
-import { customConnectionRequestUrl } from "@actspace/shared";
+import { customConnectionRequestUrl, isEmptyFacts, normalizeProviderModelFacts } from "@actspace/shared";
 import type {
   BalanceProviderId,
   CustomConnectionAuthMode,
   CustomConnectionProbeResult,
   CustomConnectionResolvedAuth,
-  CustomConnectionTestResult,
   ModelApi,
+  ModelFacts,
   ProviderBalanceSnapshot,
   ProviderConnectionErrorKind,
 } from "@actspace/shared";
@@ -46,10 +46,6 @@ export type ProviderNetworkServiceOptions = {
   readonly directFetch?: ProviderFetch;
   readonly proxyFetch?: (proxyUrl: string) => Promise<ProviderFetch>;
 };
-export type ProviderCatalogFetchResult =
-  | { readonly ok: true; readonly payload: unknown }
-  | { readonly ok: false; readonly code: string; readonly message: string };
-
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 export class ProviderNetworkService {
@@ -64,46 +60,6 @@ export class ProviderNetworkService {
     this.#now = options.now ?? (() => new Date());
     this.#directFetch = options.directFetch ?? globalThis.fetch.bind(globalThis);
     this.#proxyFetch = options.proxyFetch ?? ((url) => this.#proxies.getFetch(url));
-  }
-
-  async testConnection(runtime: ProviderNetworkRuntime): Promise<ProviderConnectionProbe> {
-    const checkedAt = this.#now().toISOString();
-    try {
-      const response = await this.#request(runtime, connectionUrl(runtime));
-      if (response.ok) return { ok: true, message: "Connection succeeded.", checkedAt };
-      return statusFailure(response.status, checkedAt);
-    } catch (error) {
-      const errorKind = classifyNetworkFailure(error);
-      const message = errorKind === "timeout"
-        ? "Connection timed out."
-        : errorKind === "proxy"
-          ? "Provider proxy connection failed."
-          : "Provider network connection failed.";
-      return { ok: false, message, checkedAt, errorKind };
-    }
-  }
-
-  /** 发 1 Token 的真实请求。auto 模式还没识别过认证方式时，x-api-key 被拒就改用 Bearer 再试一次。 */
-  async testCustomConnection(runtime: CustomConnectionProbeRuntime): Promise<CustomConnectionTestResult> {
-    const checkedAt = this.#now().toISOString();
-    try {
-      const fetchImpl = await this.#customFetch(runtime);
-      let failure: CustomConnectionTestResult | undefined;
-      for (const scheme of authAttempts(runtime)) {
-        const response = await this.#withTimeout((signal) => fetchImpl(customConnectionRequestUrl(runtime.baseUrl, runtime.protocol), {
-          method: "POST",
-          headers: { ...customConnectionHeaders(runtime, scheme), "Content-Type": "application/json" },
-          body: JSON.stringify(customConnectionBody(runtime)),
-          signal,
-        }));
-        if (response.ok) return { ok: true, message: "模型测试成功。", checkedAt, ...resolvedAuthField(runtime, scheme) };
-        failure = customStatusFailure(response.status, checkedAt);
-        if (failure.errorKind !== "auth") break;
-      }
-      return failure!;
-    } catch (error) {
-      return customNetworkFailure(error, checkedAt, "模型测试");
-    }
   }
 
   /**
@@ -132,10 +88,10 @@ export class ProviderNetworkService {
     }
   }
 
-  async #listModels(fetchImpl: ProviderFetch, runtime: CustomConnectionProbeRuntime, scheme: CustomConnectionResolvedAuth): Promise<{ readonly models: { id: string; label?: string }[] } | { readonly status: number }> {
+  async #listModels(fetchImpl: ProviderFetch, runtime: CustomConnectionProbeRuntime, scheme: CustomConnectionResolvedAuth): Promise<{ readonly models: { id: string; label?: string; facts?: ModelFacts }[] } | { readonly status: number }> {
     const base = runtime.baseUrl.replace(/\/+$/, "");
     const anthropic = runtime.protocol === "anthropic-messages";
-    const models = new Map<string, { id: string; label?: string }>();
+    const models = new Map<string, { id: string; label?: string; facts?: ModelFacts }>();
     let afterId: string | undefined;
     for (let page = 0; page < (anthropic ? MODEL_LIST_MAX_PAGES : 1); page += 1) {
       const url = anthropic
@@ -152,7 +108,9 @@ export class ProviderNetworkService {
       for (const row of rows) {
         if (typeof row.id !== "string" || !row.id.trim() || models.has(row.id)) continue;
         const label = typeof row.display_name === "string" && row.display_name.trim() ? row.display_name.trim() : undefined;
-        models.set(row.id, { id: row.id, ...(label ? { label } : {}) });
+        // 服务商自带的上下文、价格、能力等字段原样留下，优先级高于目录。
+        const facts = normalizeProviderModelFacts(row, runtime.protocol);
+        models.set(row.id, { id: row.id, ...(label ? { label } : {}), ...(isEmptyFacts(facts) ? {} : { facts }) });
       }
       const lastId = isRecord(payload) && typeof payload.last_id === "string" ? payload.last_id : undefined;
       if (!anthropic || !isRecord(payload) || payload.has_more !== true || !lastId) break;
@@ -189,21 +147,6 @@ export class ProviderNetworkService {
       if (kind === "timeout") throw new Error(`${provider} balance request timed out.`);
       if (kind === "proxy") throw new Error(`${provider} balance proxy connection failed.`);
       throw new Error(`${provider} balance request failed.`);
-    }
-  }
-
-  async fetchModelCatalog(runtime: ProviderNetworkRuntime): Promise<ProviderCatalogFetchResult> {
-    if (runtime.provider !== "openrouter" && runtime.provider !== "deepseek" && runtime.provider !== "kimi") return { ok: false, code: "invalid_provider", message: "This provider does not expose a supported model catalog." };
-    try {
-      const response = await this.#request(runtime, `${runtime.baseUrl.replace(/\/+$/, "")}/models`);
-      if (!response.ok) {
-        const failure = statusFailure(response.status, this.#now().toISOString());
-        return { ok: false, code: failure.errorKind ?? "invalid_request", message: failure.message };
-      }
-      return { ok: true, payload: await response.json() as unknown };
-    } catch (error) {
-      const code = classifyNetworkFailure(error);
-      return { ok: false, code, message: code === "timeout" ? "Model catalog request timed out." : code === "proxy" ? "Model catalog proxy connection failed." : "Model catalog network request failed." };
     }
   }
 
@@ -252,7 +195,7 @@ function customConnectionHeaders(runtime: CustomConnectionProbeRuntime, scheme: 
 }
 
 /** 面向自定义连接的中文结果；不包含 Key 或响应正文。 */
-function customStatusFailure(status: number, checkedAt: string): CustomConnectionTestResult {
+function customStatusFailure(status: number, checkedAt: string): Omit<CustomConnectionProbeResult, "models"> {
   const { errorKind } = statusFailure(status, checkedAt);
   const reason = errorKind === "auth" ? "API Key 无效，或认证方式不被接受"
     : errorKind === "insufficient_balance" ? "账户余额不足"
@@ -263,20 +206,9 @@ function customStatusFailure(status: number, checkedAt: string): CustomConnectio
   return { ok: false, message: `${reason}（HTTP ${status}）。`, checkedAt, errorKind, statusCode: status };
 }
 
-function customNetworkFailure(error: unknown, checkedAt: string, action: string): CustomConnectionTestResult {
+function customNetworkFailure(error: unknown, checkedAt: string, action: string): Omit<CustomConnectionProbeResult, "models"> {
   const errorKind = classifyNetworkFailure(error);
   return { ok: false, checkedAt, errorKind, message: errorKind === "timeout" ? `${action}超时。` : errorKind === "proxy" ? "代理连接失败。" : "网络请求失败，请检查服务地址。" };
-}
-
-function customConnectionBody(runtime: CustomConnectionProbeRuntime): Record<string, unknown> {
-  if (runtime.protocol === "openai-responses") return { model: runtime.model, input: "Reply with OK.", max_output_tokens: 1 };
-  return { model: runtime.model, max_tokens: 1, messages: [{ role: "user", content: "Reply with OK." }] };
-}
-
-function connectionUrl(runtime: ProviderNetworkRuntime): string {
-  const base = runtime.baseUrl.replace(/\/+$/, "");
-  if (runtime.provider === "deepseek") return `${base.replace(/\/anthropic$/i, "").replace(/\/v1$/i, "")}/user/balance`;
-  return `${base}/models`;
 }
 
 function balanceUrl(runtime: ProviderNetworkRuntime): string {

@@ -78,8 +78,24 @@ models.dev / OpenRouter public API
 3. 仅生成当前 ActSpace 支持的服务商及 OpenRouter 模型；外部目录出现新服务商不自动启用新适配器。过滤表覆盖现有连接预设支持的官方端点，不受旧 ProviderId 命名空间数量限制。
 4. 直连使用 models.dev 对应 provider 的价格；OpenRouter 请求使用 OpenRouter 价格。同名模型经过不同服务商时不可互相替代价格。
 5. Kimi 与 Moonshot 区域名称建立显式映射，结合实际连接端点识别区域；自定义代理和不认识的区域默认未知，除非有显式连接价格配置。模型 key 不等于实际 API model。
-6. 除下述 DeepSeek 固定高峰规则外，已验证的显式用户价格优先于目录；源码中标注“示意”的内置价格不作为可靠依据。连接倍率只在冻结价格时应用一次，并记录倍率。
-7. 能力数据补充已支持字段，不覆盖用户配置、协议兼容选项和已确认的 reasoning model 映射；本轮不重做模型选择器。
+6. 价格与能力的优先级见下一节「模型有效值（2026-10-21）」。DeepSeek 官方端点的固定高峰规则保留；源码中标注“示意”的内置价格不作为可靠依据。
+7. 能力数据不覆盖用户修改和协议兼容选项；对话框的模型选择器不随本规则改动。
+
+## 模型有效值（2026-10-21）
+
+> 2026-10-21 改：删掉连接级 `billingMode`（reference / token / manual）和「已乘倍率」开关，价格与能力统一按四层数据模型算。计划见 `docs/exec-plans/completed/20261021-model-provider-redesign.md`，页面见 `front-模型设置页面-Maka重做规范.md`。
+
+每个模型字段（显示名称、上下文、最大输出、输入类型、思考档位、价格）的有效值按下面的顺序取第一个有值的，并记录来源（`EffectiveModel.sources`）：
+
+1. **用户修改**：`settings.models.overrides[modelKey]`，对所有模型都一样。「恢复目录值」就是删掉这一项。
+2. **服务商数据**：连接 `/models` 返回的富字段，存在 `definitions[key].providerFacts`；内置模型的 `MODEL_REGISTRY` / `deepseek-model-facts` 也算这一层。中转站自带的字段优先于目录（D9）。
+3. **模型目录**：按连接模板的 `catalogProvider` 精确匹配；去掉日期后缀能匹配上的只作为建议（「像是 … 的日期版本」），用户点「沿用」后写入 `overrides.canonical`。
+4. **未知**：上下文、价格为空，思考为 `null`（不发思考参数）。
+
+- 纯函数 `resolveEffectiveModel`（`packages/shared/src/model-layers.ts`），main 的 `ModelStoreService.getModelSnapshot()` 统一调用一次并写回 `definition.pricing` 与 capabilities，运行时、对话框、设置页读同一份。
+- 目录没有思考档位数据，思考档位由 `model-thinking-profiles.ts` 按模型 id 规则匹配；`effectiveToCapabilities` 把档位映射回 `ModelCapabilities`，对话框不用改。
+- **价格 = 参考价 × 连接倍率**。参考价是服务商数据或目录价；倍率只在这里乘一次（`ratesScaled: true`）。用户在模型上手填的价格（USD / 百万 token）就是最终价，不乘倍率。
+- 价格为空时费用显示未知；不再有「只统计 Token」模式。
 
 ## DeepSeek 固定高峰估算
 
@@ -107,7 +123,7 @@ models.dev / OpenRouter public API
 - 任意实际发生的计费桶缺少单价，或计费桶无法可靠拆分，整次估算为未知；零 token 的缺价桶不阻止其他桶计价。
 - 缺 usage、取消或失败请求也保留记录；有可靠已消耗用量即可估算，没有则未知，不能根据请求失败推断费用为零。
 - 显式免费模型的有效零价与未知费用严格区分。自定义代理没有实际费用和配置价格时保持未知。
-- 自定义连接模型的手动价格不经过官方域名匹配或名称推断。用户开启价格后必须同时填写币种、标准输入、输出、缓存读取和缓存写入；快照来源为 `configured`。关闭价格会删除模型上的 pricing，之后的新请求只记录 Token，既有快照不变。
+- 模型上手填的价格不经过官方域名匹配或名称推断，按 USD / 百万 token 填写，快照来源为 `configured`。清空手填价后回到参考价 × 倍率；没有参考价时费用未知。既有快照不变。
 - 每个请求使用最终模型身份，覆盖按 reasoning effort 改写的模型、子 Agent、重试；请求开始后不受目录更新影响。
 
 ## 历史费用与币种

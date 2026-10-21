@@ -80,6 +80,10 @@ export interface ModelDefinition {
   family?: string;
   pricing?: ModelPricing;
   catalogUpdatedAt?: string;
+  /** 连接 /models 返回的字段（服务商数据层），刷新模型列表时更新。 */
+  providerFacts?: import("./model-layers").ModelFacts;
+  /** 只在 ModelStoreService 的快照里出现：这一份 definition 是按哪些有效值算出来的。不落盘。 */
+  effective?: import("./model-layers").EffectiveModel;
 }
 
 export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {

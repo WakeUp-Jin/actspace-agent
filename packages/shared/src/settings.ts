@@ -10,7 +10,6 @@
  */
 import type { ModelDefinition, ModelId, ModelKey } from "./model-config";
 import type { ProviderId as LlmProviderId } from "./provider-config";
-import type { ImageInspectionModelKey } from "./image-inspection-config";
 
 /** Settings v1 仍只包含两家 LLM provider；Plan 2 迁移后改用完整 ProviderId。 */
 export type LegacySettingsProviderId = Extract<LlmProviderId, "deepseek" | "kimi">;
@@ -40,12 +39,6 @@ export interface ImageGenerationSettingsView {
   model: string;
 }
 
-export interface ImageInspectionSettings {
-  modelKey: ImageInspectionModelKey;
-  /** 缺省使用 provider 默认 Key；有值时选择该 provider 下已保存的额外 Key。 */
-  credentialId?: string;
-}
-
 /** 可在设置页保存本地凭据的全部供应商（LLM + 搜索 + 图片生成）。 */
 export type SecretProviderId = LlmProviderId | SearchProviderId | ImageGenerationSecretId | "speech-minimax";
 
@@ -66,8 +59,6 @@ export interface ProviderSettingsView {
   enabledModelCount?: number;
   /** 默认 Key 的价格倍率；旧数据和未配置值按 1 处理。 */
   defaultPricingMultiplier?: number;
-  /** 额外 Key 的脱敏视图，不包含密钥明文或密文。 */
-  additionalCredentials?: ProviderCredentialView[];
 }
 
 export type CredentialStorageIssueCode = "read_failed" | "invalid_format" | "migration_failed";
@@ -105,18 +96,6 @@ export interface ProviderConnectionSettings {
   proxy: ProviderProxySettings;
   lastConnection: ProviderConnectionState;
   defaultPricingMultiplier: number;
-  additionalCredentials: ProviderCredentialSettings[];
-}
-
-export interface ProviderCredentialSettings {
-  id: string;
-  label: string;
-  pricingMultiplier: number;
-  lastConnection: ProviderConnectionState;
-}
-
-export interface ProviderCredentialView extends ProviderCredentialSettings {
-  hasApiKey: boolean;
 }
 
 export interface InstalledModelSettings {
@@ -125,8 +104,6 @@ export interface InstalledModelSettings {
   /** Optional V4 connection binding; omitted means the provider default connection. */
   connectionId?: string;
   customLabel?: string;
-  /** 缺省使用 provider 默认 Key；有值时引用同 provider 下已保存的额外 Key。 */
-  credentialId?: string;
 }
 
 export interface TaskModelSettings {
@@ -134,6 +111,10 @@ export interface TaskModelSettings {
   utilityModel: ModelKey | null;
   autoReviewModel?: ModelKey | null;
   exploreModel: ModelKey | null;
+  /** 看图；null = 跟随会话默认（需能看图）。 */
+  visionModel?: ModelKey | null;
+  /** 每个用途的思考档位；缺省用模型的默认档位。 */
+  thinking?: Partial<Record<import("./model-connections").PurposeId, import("./model-thinking-profiles").ThinkingLevel>>;
 }
 
 export interface AgentSettings {
@@ -203,8 +184,6 @@ export interface AppSettingsV2 {
   searchProviders: Record<Exclude<SearchProviderId, "deepseek">, ProviderSettingsView> & Partial<Record<"deepseek", ProviderSettingsView>>;
   /** OpenAI-compatible 图片生成连接；与 LLM/search provider 布局保持独立。 */
   imageGeneration: ImageGenerationSettingsView;
-  /** inspect_image 使用的视觉模型与已有 provider 凭据引用。 */
-  imageInspection: ImageInspectionSettings;
   agent: AgentSettingsV2;
   skills: SkillsSettings;
   shortcuts: ShortcutsSettings;
@@ -262,60 +241,11 @@ export interface SettingsV4ConnectionSettings extends ProviderConnectionSettings
   authMode?: CustomConnectionAuthMode;
   /** 只有 authMode 为 auto 时才有值：测试时确认能用的那种。 */
   resolvedAuth?: CustomConnectionResolvedAuth;
-  /** 旧数据缺省按 manual（保持升级前的计费行为）；倍率沿用 defaultPricingMultiplier。 */
-  billingMode?: CustomConnectionBillingMode;
 }
 
 export type CustomConnectionPromptCacheMode = "short" | "off";
 export type CustomConnectionAuthMode = "auto" | "x-api-key" | "bearer";
 export type CustomConnectionResolvedAuth = "x-api-key" | "bearer";
-/** reference：按官方目录价 × 倍率；token：只统计 Token；manual：只用模型上手填的单价。 */
-export type CustomConnectionBillingMode = "reference" | "token" | "manual";
-
-export interface CustomConnectionInput {
-  modelReasoning?: import("./custom-model-reasoning").CustomModelReasoning;
-  providerId: LlmProviderId;
-  protocol?: import("./model-config").ModelApi;
-  connectionId?: string;
-  displayName: string;
-  apiKey: string;
-  baseUrl: string;
-  defaultModel?: string | null;
-  catalogId?: string;
-  promptCacheMode?: CustomConnectionPromptCacheMode;
-  proxy?: ProviderProxySettings;
-  initialModel?: Omit<import("./custom-model-input").CustomModelCreateInput, "connectionId" | "setAsConnectionDefault">;
-  authMode?: CustomConnectionAuthMode;
-  resolvedAuth?: CustomConnectionResolvedAuth;
-  billingMode?: CustomConnectionBillingMode;
-  pricingMultiplier?: number;
-  /** 一次创建多个模型；和 initialModel 二选一。 */
-  initialModels?: readonly import("./custom-model-input").CustomModelDraftInput[];
-  /** 必须是 initialModels 里的一个。 */
-  defaultApiModel?: string;
-}
-
-export type CustomConnectionTestInput = { readonly connectionId: string };
-export type CustomConnectionTestResult = {
-  readonly ok: boolean;
-  readonly message: string;
-  readonly checkedAt: string;
-  readonly errorKind?: ProviderConnectionErrorKind;
-  readonly statusCode?: number;
-  readonly resolvedAuth?: CustomConnectionResolvedAuth;
-};
-
-/** 保存前用草稿参数探测，或刷新已保存连接的模型列表。 */
-export type CustomConnectionProbeInput =
-  | {
-      readonly kind: "draft";
-      readonly protocol: import("./model-config").ModelApi;
-      readonly baseUrl: string;
-      readonly apiKey: string;
-      readonly authMode: CustomConnectionAuthMode;
-      readonly proxy?: ProviderProxySettings;
-    }
-  | { readonly kind: "saved"; readonly connectionId: string };
 
 export type CustomConnectionProbeResult = {
   readonly ok: boolean;
@@ -325,7 +255,7 @@ export type CustomConnectionProbeResult = {
   readonly statusCode?: number;
   readonly resolvedAuth?: CustomConnectionResolvedAuth;
   /** 服务不提供模型列表时为 null（404/405/501） */
-  readonly models: readonly { readonly id: string; readonly label?: string }[] | null;
+  readonly models: readonly { readonly id: string; readonly label?: string; readonly facts?: import("./model-layers").ModelFacts }[] | null;
 };
 
 export interface SettingsV4InstalledModelSettings extends InstalledModelSettings {
@@ -341,7 +271,13 @@ export interface SettingsV4Models {
     utility: ModelKey | null;
     autoReview?: ModelKey | null;
     explore: ModelKey | null;
+    vision?: ModelKey | null;
+    thinking?: TaskModelSettings["thinking"];
   };
+  /** 用户对模型的修改，按 ModelKey 索引；对内置、目录、自定义模型都一样。 */
+  overrides?: Partial<Record<ModelKey, import("./model-layers").ModelOverrides>>;
+  /** 四层模型迁移的版本；缺省表示还没迁移过旧的自定义模型和计费模式。 */
+  layersVersion?: number;
 }
 
 export interface SettingsV4Tools {
@@ -363,7 +299,6 @@ export interface SettingsV4Media {
     baseUrl: string;
     model: string;
   };
-  imageInspection: ImageInspectionSettings;
 }
 
 export interface SettingsV4SubagentRoute {
@@ -436,8 +371,6 @@ export interface AppSettings extends Omit<AppSettingsV1, "version" | "providers"
   taskModels?: TaskModelSettings;
   /** 迁移期可选，旧测试 fixture 缺失时 renderer 使用内置默认值。 */
   imageGeneration?: ImageGenerationSettingsView;
-  /** 旧测试 fixture 缺失时 renderer 使用内置默认值。 */
-  imageInspection?: ImageInspectionSettings;
   /** 旧测试 fixture 缺失时 renderer 使用内置快捷键默认值。 */
   shortcuts?: ShortcutsSettings;
 }
@@ -448,7 +381,6 @@ export type SettingsUpdateInput = Partial<{
   defaultModelId: ModelId | null;
   agent: Partial<AgentSettings>;
   skills: Partial<SkillsSettings>;
-  imageInspection: ImageInspectionSettings;
 }>;
 
 export type SettingsV2UpdateInput = Partial<{
@@ -459,7 +391,6 @@ export type SettingsV2UpdateInput = Partial<{
   agent: Partial<AgentSettingsV2>;
   skills: Partial<SkillsSettings>;
   imageGeneration: Partial<Pick<ImageGenerationSettingsView, "baseUrl" | "model">>;
-  imageInspection: Partial<ImageInspectionSettings>;
   shortcuts: Partial<{ quickOpen: Partial<ShortcutsSettings["quickOpen"]> }>;
 }>;
 

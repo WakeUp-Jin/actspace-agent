@@ -19,7 +19,6 @@ function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSet
     defaultModelId: input.defaultModelId !== undefined ? input.defaultModelId : current.defaultModelId,
     agent: input.agent ? { ...current.agent, ...input.agent } : current.agent,
     skills: input.skills ? { ...current.skills, ...input.skills } : current.skills,
-    imageInspection: input.imageInspection ?? current.imageInspection,
   };
 }
 

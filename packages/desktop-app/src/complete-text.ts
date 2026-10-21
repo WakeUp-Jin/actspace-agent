@@ -4,7 +4,7 @@ export async function completeText(llm: LlmService, input: { readonly messages: 
   const model = input.model ?? "default";
   const routes = llm.routes.list();
   const chatRoute = routes.find(route => route.routeId === "default")
-    ?? routes.find(route => route.routeId !== "auto-review" && route.routeId !== "utility");
+    ?? routes.find(route => !["auto-review", "utility", "explore"].includes(route.routeId));
   const routeId = input.purpose === "utility" ? "utility" : chatRoute?.routeId ?? "default";
   const prepared = llm.prepare({ routeId, model, messages: input.messages, ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), ...(input.signal === undefined ? {} : { signal: input.signal }) });
   let text = "";

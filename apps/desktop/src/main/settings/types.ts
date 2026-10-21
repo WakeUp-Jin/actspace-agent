@@ -3,16 +3,15 @@ import type { SpeechSettings } from "@actspace/shared";
 import type {
   AgentSettingsV2,
   CustomConnectionAuthMode,
-  CustomConnectionBillingMode,
   CustomConnectionPromptCacheMode,
   CustomConnectionResolvedAuth,
   CredentialStorageIssueCode,
   InstalledModelSettings,
-  ImageInspectionSettings,
   LlmProviderId,
   ModelDefinition,
   ModelApi,
   ModelKey,
+  ModelOverrides,
   ProviderConnectionSettings,
   ProviderConnectionState,
   ProviderProxySettings,
@@ -43,7 +42,6 @@ export type ProviderRuntimeConfig = {
   readonly promptCacheMode?: CustomConnectionPromptCacheMode;
   /** 只在自定义连接上出现；Anthropic 协议按它选认证头，其他协议固定 Bearer。 */
   readonly authScheme?: CustomConnectionResolvedAuth;
-  readonly billingMode?: CustomConnectionBillingMode;
   readonly transport?: { readonly proxyUrl: string };
 };
 export type CustomConnectionRuntimeConfig = ProviderRuntimeConfig & {
@@ -68,7 +66,6 @@ export interface SettingsServiceOptions {
   reloadEnv?: () => void;
   /** Test seam for deterministic write failures; production uses temp file + rename. */
   writeJson?: AtomicJsonWriter;
-  createCredentialId?: () => string;
 }
 
 export interface ProviderConnectionMutationInput {
@@ -87,14 +84,13 @@ export interface ProviderRuntimeError {
   message: string;
 }
 
-export type ProviderCredentialMutationResult =
-  | { ok: true }
-  | { ok: false; code: "credential_not_found" | "credential_in_use"; message: string; references?: ModelKey[] };
-
 export interface ModelStorageMutationInput {
   installedModels?: Partial<Record<ModelKey, InstalledModelSettings | null>>;
   customModels?: Partial<Record<ModelKey, ModelDefinition | null>>;
   connections?: Partial<Record<string, SettingsV4ConnectionSettings | null>>;
+  /** null = 清掉这个模型的全部修改。 */
+  overrides?: Partial<Record<ModelKey, ModelOverrides | null>>;
+  taskModels?: Partial<TaskModelSettings>;
 }
 
 export class ProviderSettingsError extends Error {
@@ -125,12 +121,13 @@ export interface PersistedSettingsV3 {
   providers: Record<LlmProviderId, ProviderConnectionSettings>;
   installedModels: Partial<Record<ModelKey, InstalledModelSettings>>;
   customModels: Partial<Record<ModelKey, ModelDefinition>>;
+  /** 用户对模型的修改（四层模型的最上层），按 ModelKey 索引。 */
+  modelOverrides: Partial<Record<ModelKey, ModelOverrides>>;
   taskModels: TaskModelSettings;
   imageGeneration: {
     baseUrl: string;
     model: string;
   };
-  imageInspection: ImageInspectionSettings;
   agent: AgentSettingsV2;
   skills: SkillsSettings;
   shortcuts: ShortcutsSettings;
@@ -167,6 +164,8 @@ export interface ReadSettingsResult {
   rawV1?: string;
   rawV2?: string;
   rawV3?: string;
+  /** 四层模型迁移前的 v4 原文，迁移时原样备份。 */
+  rawV4?: string;
   warning?: string;
   blockingError?: string;
 }

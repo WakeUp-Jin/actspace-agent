@@ -118,29 +118,6 @@ describe("SettingsPage", () => {
   }));
   const setProviderKey = vi.fn(async () => ({ ok: true }));
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
-  const testProviderConnection = vi.fn(async () => ({ ok: true, message: "连接成功" }));
-  const listProviders = vi.fn(async () => ({
-    credentialStorage: { status: "ready" as const },
-    providers: {
-      deepseek: { provider: "deepseek" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
-      kimi: { provider: "kimi" as const, hasApiKey: true, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
-      openrouter: { provider: "openrouter" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 0, enabledModelCount: 0 },
-    },
-  }));
-  const connectProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.deepseek }));
-  const updateProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.openrouter }));
-  const disconnectProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.kimi }));
-  const removeProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.kimi }));
-  const getProviderBalance = vi.fn(async ({ provider }: { provider: "deepseek" | "kimi" | "openrouter" }) => ({
-    provider,
-    isConfigured: true,
-    isAvailable: true,
-    generatedAt: "2026-07-25T08:00:00.000Z",
-    displayBalance: provider === "openrouter"
-      ? { amount: "74.75", currency: "USD" }
-      : { amount: "31.11", currency: "CNY" },
-  }));
-  const listInstalledModels = vi.fn(async () => ({ models: [] }));
   const listUsableModels = vi.fn(async () => ({ models: [] }));
   const updateImageGeneration = vi.fn(async () => ({ ok: true as const }));
   const getLocalUpdateState = vi.fn(async () => makeLocalUpdateState());
@@ -191,14 +168,6 @@ describe("SettingsPage", () => {
     writeAgentSystemPrompt.mockClear();
     setProviderKey.mockClear();
     clearProviderKey.mockClear();
-    testProviderConnection.mockClear();
-    listProviders.mockClear();
-    connectProvider.mockClear();
-    updateProvider.mockClear();
-    disconnectProvider.mockClear();
-    removeProvider.mockClear();
-    getProviderBalance.mockClear();
-    listInstalledModels.mockClear();
     listUsableModels.mockClear();
     updateImageGeneration.mockClear();
     getLocalUpdateState.mockReset();
@@ -234,14 +203,6 @@ describe("SettingsPage", () => {
       "settings.writeSystemPrompt": writeAgentSystemPrompt,
       "providers.setKey": setProviderKey,
       "providers.clearKey": clearProviderKey,
-      "providers.testConnection": testProviderConnection,
-      "providers.list": listProviders,
-      "providers.connect": connectProvider,
-      "providers.update": updateProvider,
-      "providers.disconnect": disconnectProvider,
-      "providers.remove": removeProvider,
-      "providers.getBalance": getProviderBalance,
-      "models.listInstalled": listInstalledModels,
       "models.listUsable": listUsableModels,
       "settings.updateImageGeneration": updateImageGeneration,
       "updates.getState": getLocalUpdateState,
@@ -310,7 +271,7 @@ describe("SettingsPage", () => {
         },
         models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, explore: null } },
         tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {} },
-        media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" } },
+        media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" } },
         skills: { disabled: [] },
         subagents: { routes: {} },
         activity: { usage: { range: "30d", status: "all", modelFilter: "", showDetails: false, activeTab: "requests" } },
@@ -492,41 +453,6 @@ describe("SettingsPage", () => {
     expect(screen.queryByRole("dialog", { name: "本地更新进度" })).not.toBeInTheDocument();
   });
 
-  it("connecting a provider opens the inline setup route and saves the key", async () => {
-    renderSettingsPage();
-    await screen.findByRole("heading", { name: "通用", level: 2 });
-
-    await userEvent.click(screen.getByRole("button", { name: "模型" }));
-    await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
-    await userEvent.click(screen.getByRole("button", { name: "选择 DeepSeek" }));
-
-    const input = await screen.findByLabelText("DeepSeek API Key");
-    await userEvent.type(input, "sk-test-123");
-    await userEvent.click(screen.getByRole("button", { name: "保存" }));
-
-    await waitFor(() => {
-      expect(connectProvider).toHaveBeenCalledWith({
-        provider: "deepseek",
-        apiKey: "sk-test-123",
-        baseUrl: null,
-        proxy: { enabled: false, url: null },
-      });
-    });
-  });
-
-  it("连接详情显示账户余额并支持手动刷新", async () => {
-    renderSettingsPage();
-    await screen.findByRole("heading", { name: "通用", level: 2 });
-
-    await userEvent.click(screen.getByRole("button", { name: "模型" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Moonshot" }));
-    const balance = await screen.findByLabelText("Moonshot 账户余额");
-    expect(balance).toHaveTextContent("¥31.11 CNY");
-
-    await userEvent.click(screen.getByRole("button", { name: "刷新 Moonshot 账户余额" }));
-    await waitFor(() => expect(getProviderBalance).toHaveBeenCalledTimes(2));
-  });
-
   it("图片生成服务用摘要卡片打开配置弹窗，并把兼容地址收进高级设置", async () => {
     getSettings.mockResolvedValueOnce(makeSettings({
       imageGeneration: {
@@ -565,32 +491,6 @@ describe("SettingsPage", () => {
     });
   });
 
-  it("图片分析默认使用 OpenRouter Luna，并可切换到 Kimi 已有凭据", async () => {
-    getSettings.mockResolvedValueOnce(makeSettings({
-      providers: {
-        deepseek: { hasApiKey: false },
-        kimi: { hasApiKey: true },
-        openrouter: { hasApiKey: true },
-      },
-      imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" },
-    }));
-    renderSettingsPage();
-    await screen.findByRole("heading", { name: "通用", level: 2 });
-
-    await userEvent.click(screen.getByRole("button", { name: "通用" }));
-    expect(await screen.findByText(/openai\/gpt-5\.6-luna · 调用时会把本地图片发送给 OpenRouter/)).toBeInTheDocument();
-    expect(screen.queryByText(/缺少 OpenRouter Key/)).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByLabelText("图片分析模型"));
-    await userEvent.click(await screen.findByRole("option", { name: "Kimi K2.7 Code · Kimi" }));
-
-    await waitFor(() => {
-      expect(updateSettings).toHaveBeenCalledWith({
-        imageInspection: { modelKey: "kimi:kimi-k2.7-code", credentialId: undefined },
-      });
-    });
-  });
-
   it("已配置的图片服务不回显 Key，并可从弹窗更换或断开", async () => {
     getSettings.mockResolvedValueOnce(makeSettings({
       imageGeneration: {
@@ -616,34 +516,6 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "断开服务" }));
     await waitFor(() => {
       expect(clearProviderKey).toHaveBeenCalledWith({ provider: "image-generation" });
-    });
-  });
-
-  it("OpenRouter 编辑弹窗可保存独立 Management Key", async () => {
-    listProviders.mockResolvedValueOnce({
-      credentialStorage: { status: "ready" },
-      providers: {
-        deepseek: { provider: "deepseek" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
-        kimi: { provider: "kimi" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
-        openrouter: { provider: "openrouter" as const, hasApiKey: true, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 1, enabledModelCount: 1 },
-      },
-    });
-    renderSettingsPage();
-    await screen.findByRole("heading", { name: "通用", level: 2 });
-
-    await userEvent.click(screen.getByRole("button", { name: "模型" }));
-    await userEvent.click(await screen.findByRole("button", { name: "OpenRouter" }));
-    const modelKeySection = (await screen.findByRole("heading", { name: "模型密钥", level: 4 })).closest("section");
-    expect(modelKeySection).not.toBeNull();
-    await userEvent.click(within(modelKeySection as HTMLElement).getByRole("button", { name: "更换模型密钥" }));
-    await userEvent.type(screen.getByLabelText("OpenRouter Management Key"), "sk-or-management");
-    await userEvent.click(screen.getByRole("button", { name: "保存" }));
-
-    await waitFor(() => {
-      expect(updateProvider).toHaveBeenCalledWith(expect.objectContaining({
-        provider: "openrouter",
-        managementKey: "sk-or-management",
-      }));
     });
   });
 
@@ -707,10 +579,10 @@ describe("SettingsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "模型" }));
     expect(await screen.findByRole("heading", { name: "模型", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "模型连接", level: 3 })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "模型目录", level: 3 })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "用途", level: 3 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "模型连接", level: 3 })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "联网搜索", level: 3 })).not.toBeInTheDocument();
-    await userEvent.click(await screen.findByRole("button", { name: "Moonshot" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^DeepSeek/ }));
     expect(await screen.findByRole("button", { name: "删除" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "工具" }));
@@ -720,11 +592,11 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "搜索与网页读取" }));
     expect(await screen.findByRole("heading", { name: "搜索与网页读取", level: 2 })).toBeInTheDocument();
     expect(screen.getByText("智谱 Web Search")).toBeInTheDocument();
+    // 通用页不再选模型，只留去「模型」的入口。
     await userEvent.click(screen.getByRole("button", { name: "通用" }));
-    expect(await screen.findByLabelText("默认会话模型")).toBeInTheDocument();
-    expect(screen.getByLabelText("轻量任务模型")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "前往模型设置用途模型" }));
+    expect(await screen.findByRole("heading", { name: "模型", level: 2 })).toBeInTheDocument();
   });
-
   it("keeps one page h2 and uses h3 for settings groups", async () => {
     renderSettingsPage();
     await screen.findByRole("heading", { name: "通用", level: 2 });
@@ -740,7 +612,7 @@ describe("SettingsPage", () => {
     };
 
     await assertHeadingContract("通用", "通用", ["个人偏好", "Agent 指令", "模型与生成", "媒体", "语音播放", "快捷键"]);
-    await assertHeadingContract("模型", "模型", ["模型连接"]);
+    await assertHeadingContract("模型", "模型", ["用途", "模型连接"]);
     await assertHeadingContract("搜索与网页读取", "搜索与网页读取", ["搜索通道", "网页读取"]);
     await assertHeadingContract("工具", "工具", ["代码库", "终端", "浏览器", "多媒体", "显示"]);
     await assertHeadingContract("外观", "外观", ["主题", "强调色", "字体与字号"]);
@@ -764,22 +636,17 @@ describe("SettingsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "子 Agent" }));
     expect(screen.getByRole("heading", { name: "Explore", level: 3 })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Explore 模型" })).toHaveTextContent("跟随会话模型");
+    expect(screen.getByRole("button", { name: "前往模型设置 Explore 模型" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "扩展管理" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Skill 管理" })).not.toBeInTheDocument();
   });
 
-  it("子 Agent 页选择 Explore 模型写入任务模型", async () => {
-    const usable = [{ key: "deepseek:deepseek-v4-pro", label: "DeepSeek V4 Pro", provider: "deepseek", apiModel: "deepseek-v4-pro", contextWindow: 128000, thinkingDefault: true, capabilities: {} }];
-    listUsableModels.mockImplementation(async () => ({ models: usable }) as never);
-    const updateTaskModels = vi.fn(async () => ({ taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: "deepseek:deepseek-v4-pro" } }));
-    overrideBridge({ "models.updateTaskModels": updateTaskModels as never });
+  it("子 Agent 页的 Explore 模型入口跳到「模型」页", async () => {
     renderSettingsPage({ onBack: () => {}, initialSection: "subagents" });
-    await userEvent.click(await screen.findByRole("combobox", { name: "Explore 模型" }));
-    await userEvent.click(await screen.findByRole("option", { name: "DeepSeek V4 Pro" }));
-    await waitFor(() => expect(updateTaskModels).toHaveBeenCalledWith({ exploreModel: "deepseek:deepseek-v4-pro" }));
+    await userEvent.click(await screen.findByRole("button", { name: "前往模型设置 Explore 模型" }));
+    expect(await screen.findByRole("heading", { name: "模型", level: 2 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /子 Agent 探索/ })).toBeInTheDocument();
   });
-
   it("归档会话分区加载归档列表并支持恢复", async () => {
     const onArchivedSessionsChange = vi.fn();
     renderSettingsPage({ onBack: () => {}, onArchivedSessionsChange });

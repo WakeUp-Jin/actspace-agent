@@ -25,7 +25,6 @@ import { TerminalSessionService } from "./terminal/terminal-session-service";
 import { createNodePtyBackend } from "./terminal/node-pty-terminal-backend";
 import { ProviderNetworkService } from "./runtime-v2/provider-network-service";
 import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
-import { RuntimeV2OpenRouterCatalogService } from "./runtime-v2/openrouter-catalog-service";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
 import { LocalUpdateService } from "./local-update-service";
 import { attachWindowLifecycle, installProcessErrorLogging } from "./main-lifecycle";
@@ -52,9 +51,6 @@ let pricingCatalog: ModelCatalogService | undefined;
 let modelRuntimeService: ModelRuntimeService | undefined;
 let providerNetworkService: ProviderNetworkService | undefined;
 let quickOpenShortcutController: QuickOpenShortcutController | undefined;
-let openRouterCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
-let deepSeekCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
-let kimiCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
 let browserBridgeService: BrowserBridgeService | undefined;
 let browserConnectionTimer: NodeJS.Timeout | undefined;
 let localUpdateService: LocalUpdateService | undefined;
@@ -170,21 +166,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   providerNetworkService = new ProviderNetworkService();
   pricingCatalog = new ModelCatalogService({ dataRoot: roots.dataRoot, fetch: net.fetch.bind(net) as typeof fetch });
   await pricingCatalog.load();
-  let modelStore: ModelStoreService;
-  openRouterCatalogService = new RuntimeV2OpenRouterCatalogService({
-    dataRoot: roots.dataRoot,
-    pricingCatalog: () => pricingCatalog!.snapshot(),
-    fetchCatalog: (runtime) => providerNetworkService!.fetchModelCatalog(runtime),
-    isAdded: (apiModel) => modelStore?.isCatalogModelAdded(apiModel) ?? false,
-  });
-  deepSeekCatalogService = new RuntimeV2OpenRouterCatalogService({
-    provider: "deepseek", dataRoot: roots.dataRoot,
-    fetchCatalog: (runtime) => providerNetworkService!.fetchModelCatalog(runtime),
-    isAdded: (apiModel) => modelStore?.isCatalogModelAdded(apiModel, "deepseek") ?? false,
-  });
-  kimiCatalogService = new RuntimeV2OpenRouterCatalogService({ provider: "kimi", dataRoot: roots.dataRoot, fetchCatalog: (runtime) => providerNetworkService!.fetchModelCatalog(runtime), isAdded: (apiModel) => modelStore?.isCatalogModelAdded(apiModel, "kimi") ?? false });
-  await Promise.all([openRouterCatalogService.load(), deepSeekCatalogService.load(), kimiCatalogService.load()]);
-  modelStore = new ModelStoreService({ settings: settingsService, findCatalogModel: (apiModel, provider) => (provider === "deepseek" ? deepSeekCatalogService : provider === "kimi" ? kimiCatalogService : openRouterCatalogService)?.findModel(apiModel) });
+  const modelStore = new ModelStoreService({ settings: settingsService, catalog: () => pricingCatalog!.snapshot() });
   modelRuntimeService = new ModelRuntimeService(settingsService, modelStore, () => pricingCatalog!.snapshot());
   const quickOpenSettings = settingsService.getV2().shortcuts.quickOpen;
   quickOpenShortcutController = new QuickOpenShortcutController(globalShortcut, () => {
@@ -293,7 +275,6 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     modelRuntime: modelRuntimeService,
     pricingCatalog,
     providerNetwork: providerNetworkService,
-    catalog: openRouterCatalogService, deepSeekCatalog: deepSeekCatalogService, kimiCatalog: kimiCatalogService,
     approvals: approvalRegistry,
     browserBridge: browserBridgeService,
     quickOpen: quickOpenShortcutController,

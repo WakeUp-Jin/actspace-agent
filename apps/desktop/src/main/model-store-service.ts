@@ -1,48 +1,41 @@
 import {
-  applyCustomModelReasoning,
-  buildCustomModelDefinition,
-  type CustomModelCreateInput,
-  type CustomModelEditInput,
-  type CustomModelSetDefaultInput,
-  type CustomModelReasoning,
   BUILTIN_MODEL_LIST,
   deepSeekModelDefinition,
-  normalizeModelKey,
   CURATED_OPENROUTER_MODEL_LIST,
   listUsableModels,
   resolveConfiguredModel,
-  type CatalogModelView,
   type InstalledModelSettings,
   type InstalledModelView,
-  type ModelDefinition,
   type ModelKey,
   type ModelPurpose,
   type ModelSnapshot,
-  type LlmProviderId,
   type UsableModelView,
+  applyEffectiveToDefinition,
+  providerFactsOf,
+  resolveEffectiveModel,
+  templateForConnection,
+  type ModelCatalogSnapshot,
 } from "@actspace/shared";
+import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import type { SettingsService } from "./settings-service";
 
 const PURPOSES: readonly ModelPurpose[] = ["chat", "utility", "explore", "vision"];
 
-export type ModelStoreResult =
-  | { ok: true; model?: InstalledModelView }
-  | { ok: false; code: "invalid_provider" | "invalid_model" | "invalid_pricing" | "connection_missing" | "model_already_exists" | "default_model_requires_replacement" | "model_not_found" | "model_not_installed" | "model_not_removable" | "model_in_use" | "credential_missing"; message: string; references?: string[] };
-
 export interface ModelStoreServiceOptions {
   settings: SettingsService;
-  findCatalogModel?: (apiModel: string, provider?: LlmProviderId) => CatalogModelView | undefined;
+  /** 模型目录快照（会联网刷新）；缺省用内置快照。 */
+  catalog?: () => ModelCatalogSnapshot;
   now?: () => Date;
 }
 
 export class ModelStoreService {
   private readonly settings: SettingsService;
-  private readonly findCatalogModel: (apiModel: string, provider?: LlmProviderId) => CatalogModelView | undefined;
   private readonly now: () => Date;
+  readonly catalog: () => ModelCatalogSnapshot;
 
   constructor(options: ModelStoreServiceOptions) {
     this.settings = options.settings;
-    this.findCatalogModel = options.findCatalogModel ?? (() => undefined);
+    this.catalog = options.catalog ?? (() => BUILTIN_MODEL_CATALOG);
     this.now = options.now ?? (() => new Date());
   }
 
@@ -50,13 +43,26 @@ export class ModelStoreService {
     const view = this.settings.getV2();
     const stored = this.settings.getModelStorageState();
     const connections = this.settings.getV4().settings.models.connections;
+    const catalog = this.catalog();
+    // 每个字段的有效值在这里算一次（用户 > 服务商 > 目录），运行时、对话框、设置页都读这一份。
     const definitions = Object.fromEntries(
       [...BUILTIN_MODEL_LIST, ...CURATED_OPENROUTER_MODEL_LIST, ...Object.values(stored.customModels).filter(isDefined)]
         .map((original) => {
           const definition = original.provider === "deepseek" && original.source === "builtin" ? deepSeekModelDefinition(original.apiModel, this.now().toISOString()) ?? original : original;
-          const connectionId = stored.installedModels[definition.key]?.connectionId;
-          const connection = connectionId && connectionId !== `${definition.provider}:default` ? connections[connectionId] : undefined;
-          return [definition.key, clone(connection ? { ...definition, api: connection.protocol ?? "openai-completions" } : definition)];
+          const connectionId = stored.installedModels[definition.key]?.connectionId ?? `${definition.provider}:default`;
+          const connection = connections[connectionId];
+          const protocol = connection && connectionId !== `${definition.provider}:default` ? connection.protocol ?? "openai-completions" : definition.api;
+          const template = templateForConnection(connection ?? { connectionId, providerId: definition.provider });
+          const effective = resolveEffectiveModel({
+            apiModel: definition.apiModel,
+            protocol,
+            catalog,
+            catalogProvider: template.catalogProvider,
+            providerFacts: providerFactsOf(definition),
+            overrides: stored.modelOverrides[definition.key],
+            multiplier: connection?.defaultPricingMultiplier ?? 1,
+          });
+          return [definition.key, clone(applyEffectiveToDefinition(definition, effective, protocol))];
         }),
     ) as ModelSnapshot["definitions"];
     return {
@@ -64,17 +70,13 @@ export class ModelStoreService {
         providerId: connection.providerId,
         displayName: connection.displayName,
         enabled: connection.enabled,
-        hasApiKey: !("code" in this.settings.getProviderRuntimeConfigForCredential(connection.providerId, undefined, connection.connectionId)),
+        hasApiKey: !("code" in this.settings.getConnectionRuntimeConfig(connection.providerId, connection.connectionId)),
         lastConnection: connection.lastConnection,
       }])),
       providers: Object.fromEntries(Object.entries(view.providers).map(([provider, state]) => [provider, {
         enabled: state.enabled ?? true,
         hasApiKey: state.hasApiKey,
         lastConnection: state.lastConnection ?? { status: "untested" },
-        additionalCredentials: Object.fromEntries((state.additionalCredentials ?? []).map((credential) => [credential.id, {
-          hasApiKey: credential.hasApiKey,
-          lastConnection: credential.lastConnection,
-        }])),
       }])) as ModelSnapshot["providers"],
       definitions,
       installedModels: clone(stored.installedModels),
@@ -119,12 +121,6 @@ export class ModelStoreService {
     }));
   }
 
-  isCatalogModelAdded(apiModel: string, provider: LlmProviderId = "openrouter"): boolean {
-    const snapshot = this.getModelSnapshot();
-    const key = normalizeModelKey(`${provider}:${apiModel}`)!;
-    return Boolean(snapshot.installedModels[key]);
-  }
-
   async ensureCuratedModelsInstalled(): Promise<void> {
     const stored = this.settings.getModelStorageState();
     const additions: Partial<Record<ModelKey, InstalledModelSettings>> = {};
@@ -136,218 +132,6 @@ export class ModelStoreService {
     if (Object.keys(additions).length > 0) await this.settings.updateModelStorage({ installedModels: additions });
   }
 
-  async addCatalogModel(provider: LlmProviderId, apiModel: string): Promise<ModelStoreResult> {
-    const catalog = this.findCatalogModel(apiModel, provider);
-    if (!catalog) return { ok: false, code: "model_not_found", message: "目录中未找到该模型，请重新加载。" };
-    const key = normalizeModelKey(`${provider}:${catalog.apiModel}`)!;
-    const stored = this.settings.getModelStorageState();
-    const installed = stored.installedModels[key] ?? { enabled: true, addedAt: this.now().toISOString() };
-    const definition = provider === "deepseek" ? deepSeekModelDefinition(catalog.apiModel, this.now().toISOString()) ?? catalogToDefinition(catalog, this.now().toISOString()) : catalogToDefinition(catalog, this.now().toISOString());
-    await this.settings.updateModelStorage({
-      installedModels: { [key]: installed },
-      ...(definition.source === "builtin" ? {} : { customModels: { [key]: definition } }),
-    });
-    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
-  }
-
-  async addCustomModel(input: CustomModelCreateInput): Promise<ModelStoreResult> {
-    const settings = this.settings.getV4().settings.models;
-    if (typeof input?.connectionId !== "string" || typeof input?.enabled !== "boolean" || typeof input?.setAsConnectionDefault !== "boolean") {
-      return { ok: false, code: "invalid_model", message: "模型添加参数无效。" };
-    }
-    const connection = settings.connections[input.connectionId];
-    if (!connection || input.connectionId === `${connection.providerId}:default`) {
-      return { ok: false, code: "connection_missing", message: "自定义连接不存在。" };
-    }
-    let definition: ModelDefinition;
-    try {
-      definition = buildCustomModelDefinition(input, { providerId: connection.providerId, protocol: connection.protocol ?? "openai-completions", connectionId: input.connectionId });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "模型配置无效。";
-      return { ok: false, code: /价格|币种/.test(message) ? "invalid_pricing" : "invalid_model", message };
-    }
-    if (settings.definitions[definition.key] || settings.installed[definition.key]) {
-      return { ok: false, code: "model_already_exists", message: "该连接中已存在相同的 API 模型 ID。" };
-    }
-    await this.settings.updateModelStorage({
-      customModels: { [definition.key]: definition },
-      installedModels: { [definition.key]: { enabled: input.enabled, addedAt: this.now().toISOString(), connectionId: input.connectionId } },
-      ...(input.setAsConnectionDefault ? { connections: { [input.connectionId]: { ...connection, defaultModel: definition.apiModel } } } : {}),
-    });
-    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === definition.key) };
-  }
-
-  async editCustomModel(input: CustomModelEditInput): Promise<ModelStoreResult> {
-    const settings = this.settings.getV4().settings.models;
-    if (typeof input?.modelKey !== "string" || typeof input?.enabled !== "boolean") {
-      return { ok: false, code: "invalid_model", message: "模型编辑参数无效。" };
-    }
-    const current = settings.definitions[input.modelKey];
-    const installed = settings.installed[input.modelKey];
-    if (!current || current.source !== "custom") return { ok: false, code: "model_not_found", message: "自定义模型不存在。" };
-    if (!installed) return { ok: false, code: "model_not_installed", message: "模型尚未添加。" };
-    const connection = settings.connections[installed.connectionId];
-    if (!connection) return { ok: false, code: "connection_missing", message: "模型绑定的连接不存在。" };
-    let definition: ModelDefinition;
-    try {
-      definition = buildCustomModelDefinition({ ...input, apiModel: current.apiModel }, { providerId: connection.providerId, protocol: connection.protocol ?? "openai-completions", connectionId: connection.connectionId });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "模型配置无效。";
-      return { ok: false, code: /价格|币种/.test(message) ? "invalid_pricing" : "invalid_model", message };
-    }
-    await this.settings.updateModelStorage({
-      customModels: { [input.modelKey]: { ...definition, key: input.modelKey } },
-      installedModels: { [input.modelKey]: { ...installed, enabled: input.enabled } },
-    });
-    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === input.modelKey) };
-  }
-
-  async setCustomConnectionDefaultModel(input: CustomModelSetDefaultInput): Promise<ModelStoreResult> {
-    const settings = this.settings.getV4().settings.models;
-    if (typeof input?.connectionId !== "string" || typeof input?.modelKey !== "string") {
-      return { ok: false, code: "invalid_model", message: "默认模型参数无效。" };
-    }
-    const connection = settings.connections[input.connectionId];
-    const definition = settings.definitions[input.modelKey];
-    const installed = settings.installed[input.modelKey];
-    if (!connection) return { ok: false, code: "connection_missing", message: "自定义连接不存在。" };
-    if (!definition || !installed || installed.connectionId !== input.connectionId) return { ok: false, code: "model_not_found", message: "模型不属于该连接。" };
-    await this.settings.updateModelStorage({ connections: { [input.connectionId]: { ...connection, defaultModel: definition.apiModel } } });
-    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === input.modelKey) };
-  }
-
-  async refreshInstalledCatalogModels(provider: LlmProviderId = "openrouter"): Promise<number> {
-    const stored = this.settings.getModelStorageState();
-    const updates: Partial<Record<ModelKey, ModelDefinition>> = {};
-    for (const [rawKey, current] of Object.entries(stored.customModels)) {
-      const key = rawKey as ModelKey;
-      if (!current || current.provider !== provider || current.source !== "provider-catalog") continue;
-      if (!stored.installedModels[key]) continue;
-      const catalog = this.findCatalogModel(current.apiModel, provider);
-      if (!catalog) continue;
-      updates[key] = catalogToDefinition(catalog, this.now().toISOString());
-    }
-    const count = Object.keys(updates).length;
-    if (count > 0) await this.settings.updateModelStorage({ customModels: updates });
-    return count;
-  }
-
-  async setModelEnabled(modelKey: ModelKey, enabled: boolean): Promise<ModelStoreResult> {
-    return this.updateModelSettings(modelKey, { enabled });
-  }
-
-  async updateModelSettings(
-    modelKey: ModelKey,
-    patch: { reasoningConfig?: CustomModelReasoning; enabled?: boolean; customLabel?: string | null; credentialId?: string | null; connectionId?: string | null },
-  ): Promise<ModelStoreResult> {
-    const stored = this.settings.getModelStorageState();
-    const current = stored.installedModels[modelKey];
-    if (!current) return { ok: false, code: "model_not_installed", message: "模型尚未添加。" };
-    const definition = this.getModelSnapshot().definitions[modelKey];
-    if (!definition) return { ok: false, code: "model_not_found", message: "模型不存在。" };
-    let reasoningModel: ModelDefinition | undefined;
-    if (patch.reasoningConfig !== undefined) {
-      if (definition.source !== "custom") return { ok: false, code: "invalid_model", message: "仅自定义模型可覆盖推理能力。" };
-      try { reasoningModel = applyCustomModelReasoning(definition, patch.reasoningConfig); }
-      catch (error) { return { ok: false, code: "invalid_model", message: error instanceof Error ? error.message : "推理配置无效。" }; }
-    }
-    const credentialId = patch.credentialId === undefined
-      ? current.credentialId
-      : patch.credentialId?.trim() || undefined;
-    if (credentialId && !this.settings.getV2().providers[definition.provider].additionalCredentials?.some(
-      (credential) => credential.id === credentialId && credential.hasApiKey,
-    )) {
-      return { ok: false, code: "credential_missing", message: "选择的额外 API Key 不存在。" };
-    }
-    const customLabel = patch.customLabel === undefined
-      ? current.customLabel
-      : patch.customLabel?.trim() || undefined;
-    await this.settings.updateModelStorage({
-      ...(reasoningModel ? { customModels: { [modelKey]: reasoningModel } } : {}),
-      installedModels: {
-        [modelKey]: {
-          ...current,
-          enabled: patch.enabled ?? current.enabled,
-          ...(patch.connectionId?.trim() && { connectionId: patch.connectionId.trim() }),
-          ...(patch.connectionId === null && { connectionId: undefined }),
-          ...(customLabel && { customLabel }),
-          ...(credentialId && { credentialId }),
-          ...(!customLabel && { customLabel: undefined }),
-          ...(!credentialId && { credentialId: undefined }),
-        },
-      },
-    });
-    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === modelKey) };
-  }
-
-  async removeModel(modelKey: ModelKey): Promise<ModelStoreResult> {
-    const snapshot = this.getModelSnapshot();
-    const definition = snapshot.definitions[modelKey];
-    if (!definition) return { ok: false, code: "model_not_found", message: "模型不存在。" };
-    if (definition.source === "builtin" || definition.source === "curated") {
-      return { ok: false, code: "model_not_removable", message: "内置或精选模型只能停用，不能删除。" };
-    }
-    if (!snapshot.installedModels[modelKey]) {
-      return { ok: false, code: "model_not_installed", message: "模型尚未添加。" };
-    }
-    const references = this.findReferences(modelKey);
-    if (references.length > 0) {
-      return { ok: false, code: "model_in_use", message: "模型仍被任务配置引用。", references };
-    }
-    const installed = snapshot.installedModels[modelKey];
-    const connectionId = installed?.connectionId;
-    const connection = connectionId ? this.settings.getV4().settings.models.connections[connectionId] : undefined;
-    const isConnectionDefault = connection?.defaultModel === definition.apiModel;
-    if (isConnectionDefault) {
-      const alternatives = Object.entries(snapshot.installedModels).filter(([key, value]) => key !== modelKey && value?.connectionId === connectionId);
-      if (alternatives.length > 0) return { ok: false, code: "default_model_requires_replacement", message: "请先选择新的连接默认模型，再删除当前默认模型。" };
-    }
-    await this.settings.updateModelStorage({
-      installedModels: { [modelKey]: null },
-      customModels: { [modelKey]: null },
-      ...(isConnectionDefault && connectionId && connection ? { connections: { [connectionId]: { ...connection, defaultModel: null } } } : {}),
-    });
-    return { ok: true };
-  }
-
-  private findReferences(modelKey: ModelKey): string[] {
-    const stored = this.settings.getModelStorageState();
-    const references: string[] = [];
-    if (stored.taskModels.defaultChatModel === modelKey) references.push("defaultChatModel");
-    if (stored.taskModels.autoReviewModel === modelKey) references.push("autoReviewModel");
-    if (stored.taskModels.utilityModel === modelKey) references.push("utilityModel");
-    if (stored.taskModels.exploreModel === modelKey) references.push("exploreModel");
-    return references;
-  }
-}
-
-function catalogToDefinition(model: CatalogModelView, catalogUpdatedAt: string): ModelDefinition {
-  const thinkingDefault = model.reasoningMandatory || model.reasoningDefaultEnabled === true ||
-    (model.reasoningDefaultEnabled === undefined && model.reasoning);
-  return {
-    key: normalizeModelKey(`${model.provider}:${model.apiModel}`)!,
-    provider: model.provider,
-    api: "openai-completions",
-    apiModel: model.apiModel,
-    label: model.name,
-    source: "provider-catalog",
-    contextWindow: model.contextWindow,
-    maxTokens: model.maxTokens,
-    thinkingDefault,
-    capabilities: {
-      input: [...model.input],
-      toolUse: model.toolUse,
-      reasoning: model.reasoning,
-      thinkingToggle: model.reasoning && !model.reasoningMandatory,
-      ...(model.reasoningEfforts !== undefined && {
-        reasoningEfforts: model.reasoningEfforts === null ? null : [...model.reasoningEfforts],
-      }),
-      ...(model.reasoningDefaultEffort && { reasoningDefaultEffort: model.reasoningDefaultEffort }),
-      ...(model.reasoningMandatory !== undefined && { reasoningMandatory: model.reasoningMandatory }),
-    },
-    ...(model.pricing && { pricing: clone(model.pricing) }),
-    catalogUpdatedAt,
-  };
 }
 
 function clone<T>(value: T): T {

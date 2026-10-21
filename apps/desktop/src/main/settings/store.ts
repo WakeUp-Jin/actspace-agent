@@ -1,6 +1,6 @@
 /** settings 的内存状态和落盘：读写 settings.json / secrets.json、legacy 迁移、写入失败时的回滚、串行队列、变更通知，以及写 env 的入口。 */
 import { chmod, readFile } from "node:fs/promises";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import type {
   LlmProviderId,
@@ -10,14 +10,18 @@ import type {
   SettingsV4Snapshot,
 } from "@actspace/shared";
 import { writeBackupOnce, writeJsonAtomic, writeSettingsV2Backup, writeSettingsV3Backup } from "./atomic-io";
-import { ALL_SETTINGS_V4_NAMESPACES, SECRETS_FILE, SETTINGS_FILE, SETTINGS_V1_BACKUP_FILE } from "./constants";
+import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
+import { ALL_SETTINGS_V4_NAMESPACES, SECRETS_FILE, SETTINGS_FILE, SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE, SETTINGS_V1_BACKUP_FILE } from "./constants";
+import { legacyModelHints, migrateModelLayers } from "./model-layers-migration";
 import { blockingSettings, defaultSettingsFromEnv, defaultSettingsV4Metadata } from "./defaults";
 import { applyToEnv as applySettingsToEnv } from "./env";
 import {
   hasRemovedDuckCodingSettings,
   hasRequiredSettingsSections,
   mergePersistedSettingsV3,
+  legacySettingsFromV4,
   metadataFromSettingsV3,
+  metadataFromSettingsV4,
   migrateV1Settings,
   parseSettingsV4,
   toSettingsV4,
@@ -27,7 +31,6 @@ import {
   isProviderCredentialSecretId,
   parseSecretsV1,
   parseSecretsV2,
-  providerCredentialSecretId,
   secretEntries,
   unavailableSecrets,
 } from "./secrets-file";
@@ -58,7 +61,6 @@ export class SettingsStore {
   readonly crypto: SecretCrypto;
   readonly reloadEnv: () => void;
   readonly writeJson: AtomicJsonWriter;
-  readonly createCredentialId: () => string;
 
   settings: PersistedSettingsV3;
   v4Metadata: SettingsV4Metadata;
@@ -73,7 +75,6 @@ export class SettingsStore {
     this.crypto = options.crypto;
     this.reloadEnv = options.reloadEnv ?? (() => undefined);
     this.writeJson = options.writeJson ?? writeJsonAtomic;
-    this.createCredentialId = options.createCredentialId ?? randomUUID;
     this.settings = defaultSettingsFromEnv(this.dataRoot);
     this.v4Metadata = defaultSettingsV4Metadata();
   }
@@ -97,6 +98,12 @@ export class SettingsStore {
     this.v4Metadata = loaded.v4Metadata;
     this.lastLoadError = loaded.warning;
     if (loaded.blockingError !== undefined) throw new Error(loaded.blockingError);
+    const beforeLayers = toSettingsV4(this.settings, this.v4Metadata);
+    const layered = migrateModelLayers(beforeLayers, BUILTIN_MODEL_CATALOG, legacyModelHints(loaded.rawV4 ?? loaded.rawV3 ?? loaded.rawV2 ?? loaded.rawV1));
+    if (layered) {
+      this.settings = legacySettingsFromV4(layered, this.dataRoot);
+      this.v4Metadata = metadataFromSettingsV4(layered);
+    }
 
     try {
       await this.ensureAgentSystemPromptFile(loaded.legacySystemPrompt);
@@ -110,6 +117,9 @@ export class SettingsStore {
         await writeSettingsV3Backup(this.dataRoot, loaded.rawV3);
         await this.writeSettingsFile();
       } else if (loaded.source === "missing" || loaded.source === "legacy-removed") {
+        await this.writeSettingsFile();
+      } else if (layered) {
+        await writeBackupOnce(join(this.dataRoot, SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE), loaded.rawV4 ?? `${JSON.stringify(beforeLayers, null, 2)}\n`);
         await this.writeSettingsFile();
       }
     } catch {
@@ -148,10 +158,6 @@ export class SettingsStore {
   /** Main-only credential boundary. */
   getStoredKey(provider: PersistedSecretProviderId): string | undefined {
     return this.secrets[provider];
-  }
-
-  getStoredProviderCredential(provider: LlmProviderId, credentialId: string): string | undefined {
-    return this.secrets.providerCredentials[providerCredentialSecretId(provider, credentialId)];
   }
 
   /** 写 env 的唯一入口；调用点和拆分前相同。 */
@@ -208,7 +214,7 @@ export class SettingsStore {
     if (parsed.version === 4) {
       const migrated = parseSettingsV4(parsed, this.dataRoot);
       if (!migrated) return blockingSettings(this.dataRoot, "Settings v4 is incomplete or contains invalid fields.");
-      return { ...migrated, source: "v4" };
+      return { ...migrated, source: "v4", rawV4: raw };
     }
     return blockingSettings(this.dataRoot, "Settings file version is unsupported.");
   }

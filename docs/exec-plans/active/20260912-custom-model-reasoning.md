@@ -1,6 +1,6 @@
 # 自定义模型推理能力
 
-状态：实施中；用户已确认方案并要求开始。
+状态：已被 `docs/exec-plans/completed/20261021-model-provider-redesign.md` 取代（2026-10-21）。模型级 reasoningConfig 改为每个模型声明的思考档位（`ModelThinking`）和用户修改（`settings.models.overrides`）；本计划不再推进，是否删除由用户决定。
 
 ## 范围与契约
 
