@@ -47,6 +47,15 @@ export type BackgroundTaskWaitResult =
   | { readonly status: "timed_out" | "interrupted"; readonly running: readonly BackgroundTaskRecord[] }
   | { readonly status: "no_running_tasks" };
 
+export type BackgroundTaskErrorCode = "TASK_NOT_FOUND" | "TASK_ID_CONFLICT";
+
 export class BackgroundTaskError extends Error {
-  constructor(readonly code: "TASK_NOT_FOUND" | "TASK_ID_CONFLICT", message: string) { super(message); this.name = "BackgroundTaskError"; }
+  constructor(readonly code: BackgroundTaskErrorCode, message: string) { super(message); this.name = "BackgroundTaskError"; }
+}
+
+/** Harness artifacts inline their own copy of this package, so a Host error is recognised by shape, never by `instanceof`. */
+export function isBackgroundTaskError(error: unknown): error is { readonly name: "BackgroundTaskError"; readonly code: BackgroundTaskErrorCode; readonly message: string } {
+  if (typeof error !== "object" || error === null) return false;
+  const { name, code, message } = error as { readonly name?: unknown; readonly code?: unknown; readonly message?: unknown };
+  return name === "BackgroundTaskError" && (code === "TASK_NOT_FOUND" || code === "TASK_ID_CONFLICT") && typeof message === "string";
 }

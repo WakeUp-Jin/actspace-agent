@@ -20,12 +20,12 @@ function source(taskId: string, sessionId = "parent"): BackgroundTaskSource & { 
     finish: () => finish({ status: "completed", summary: "done", body: "ok", exitCode: 0 }) };
 }
 
-function setup() {
+function setup(host?: unknown) {
   const sessions = new Map(["parent", "other"].map(id => [id, session(id)]));
   const registry = new BackgroundTaskRegistry({ openSession: async id => sessions.get(id)!, wake: () => undefined, now: () => Date.parse("2026-10-22T06:00:00.000Z") });
   const tools = new ToolRuntime();
   let cleanup: (() => Promise<void>) | undefined;
-  apply({ get: (id: string) => ({ "tools.runtime": tools, "actspace.host.background-tasks": registry })[id], provide: () => undefined, effect: (factory: () => () => Promise<void>) => { cleanup = factory(); } } as never);
+  apply({ get: (id: string) => ({ "tools.runtime": tools, "actspace.host.background-tasks": host ?? registry })[id], provide: () => undefined, effect: (factory: () => () => Promise<void>) => { cleanup = factory(); } } as never);
   const env: ToolPreparedEnvironment = {
     workspaceRoot: "/workspace", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw Error("unused"); } },
     journal: { recordDispatch: async () => {}, checkpointBeforeBody: async () => {}, commitResult: async () => {} }, createArtifact: async () => { throw Error("unused"); },
@@ -73,5 +73,23 @@ describe("background task tools", () => {
     const { run } = setup();
     const result = await run("task_wait", { timeoutSeconds: 500 });
     expect(result.status).toBe("failed");
+  });
+
+  it("keeps Host error codes across a copied error class", async () => {
+    // A Harness artifact inlines its own BackgroundTaskError, so the Host's class is a different constructor.
+    class CopiedBackgroundTaskError extends Error {
+      constructor(readonly code: string, message: string) { super(message); this.name = "BackgroundTaskError"; }
+    }
+    const throwing = (error: unknown) => async () => { throw error; };
+    const host = (error: unknown) => ({ list: throwing(error), output: throwing(error), stop: throwing(error), wait: throwing(error), register: throwing(error), notifyOutputMatch: throwing(error), hasRunning: () => false });
+    const notFound = setup(host(new CopiedBackgroundTaskError("TASK_NOT_FOUND", "Background task bash_x was not found.")));
+    for (const [name, args] of [["task_output", { taskId: "bash_x" }], ["task_stop", { taskId: "bash_x" }], ["task_wait", { taskId: "bash_x", timeoutSeconds: 1 }]] as const) {
+      const result = await notFound.run(name, args);
+      expect(result.status).toBe("failed");
+      expect(result.text).toContain('"code":"TASK_NOT_FOUND"');
+    }
+    expect((await setup(host(Object.assign(new Error("boom"), { code: "TASK_NOT_FOUND" }))).run("task_output", { taskId: "bash_x" })).text).toContain('"code":"BACKGROUND_TASK_FAILED"');
+    expect((await setup(host(new CopiedBackgroundTaskError("SOMETHING_ELSE", "odd"))).run("task_output", { taskId: "bash_x" })).text).toContain('"code":"BACKGROUND_TASK_FAILED"');
+    expect((await notFound.run("task_output", { taskId: " " })).text).toContain('"code":"INVALID_ARGUMENTS"');
   });
 });

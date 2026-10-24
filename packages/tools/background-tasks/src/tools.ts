@@ -1,4 +1,4 @@
-import { BackgroundTaskError, type BackgroundTaskHost, type BackgroundTaskOutput, type BackgroundTaskRecord } from "@actspace/background-tasks";
+import { isBackgroundTaskError, type BackgroundTaskHost, type BackgroundTaskOutput, type BackgroundTaskRecord } from "@actspace/background-tasks";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntime } from "@actspace/tools-runtime";
 import { BACKGROUND_TASK_TOOLS_PLUGIN_ID } from "./manifest.js";
@@ -75,8 +75,11 @@ function withOutput(task: BackgroundTaskRecord, output: BackgroundTaskOutput): s
 function completed(summary: string, text: string): ToolBodyResult { return { status: "completed", summary, modelOutput: [{ type: "text", text }] }; }
 
 function failed(error: unknown): ToolBodyResult {
-  const code = error instanceof BackgroundTaskError ? error.code : error instanceof BackgroundTaskInputError ? "INVALID_ARGUMENTS" : "BACKGROUND_TASK_FAILED";
-  const message = error instanceof Error ? error.message : String(error);
+  if (isBackgroundTaskError(error)) return failure(error.code, error.message);
+  return failure(error instanceof BackgroundTaskInputError ? "INVALID_ARGUMENTS" : "BACKGROUND_TASK_FAILED", error instanceof Error ? error.message : String(error));
+}
+
+function failure(code: string, message: string): ToolBodyResult {
   return { status: "failed", summary: message, modelOutput: [{ type: "text", text: message }], failure: { code, message, retryable: false } };
 }
 
