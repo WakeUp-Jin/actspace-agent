@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../core/agent/tsconfig.build.json"
+    },
+    {
+      "path": "./../session/persistence/tsconfig.build.json"
+    },
+    {
+      "path": "./../shared/tsconfig.build.json"
+    }
+  ]
+}

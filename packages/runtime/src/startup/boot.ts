@@ -23,6 +23,7 @@ import { SESSION_RUNTIME_HOST_PORT_ID, type RuntimeSessionHostPort } from "../se
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "../harness/agent-host-port.js";
 import type { AgentRuntimeService } from "../harness/agent-runtime-plugin.js";
 import { HEADLESS_HOST_PORT_ID } from "@actspace/headless";
+import { BACKGROUND_TASK_HOST_SERVICE, createBackgroundTaskHost } from "@actspace/background-tasks";
 import { RuntimeStateController } from "./runtime-state.js";
 import { settleWithinDeadline } from "./shutdown.js";
 
@@ -118,7 +119,16 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
       if (!runtime) throw new Error("Agent runtime is not ready");
       return runtime.subagents.invoke(input);
+    }, launch: (input: import("@actspace/subagent").SubagentInvocation) => {
+      const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
+      if (!runtime) throw new Error("Agent runtime is not ready");
+      return runtime.subagents.launch(input);
     } }),
+    [BACKGROUND_TASK_HOST_SERVICE]: createBackgroundTaskHost(() => {
+      const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
+      if (!runtime) throw new Error("Agent runtime is not ready");
+      return runtime.backgroundTasks;
+    }),
     "actspace.host.prompt": promptPort,
     [SESSION_CODEC_HOST_PORT_ID]: pluginCodecs,
     [SESSION_RUNTIME_HOST_PORT_ID]: runtimeHost,

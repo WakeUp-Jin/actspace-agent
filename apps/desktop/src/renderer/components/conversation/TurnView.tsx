@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
 import { ResponseAnnotationPill } from "../composer/ResponseAnnotationPill";
+import { BackgroundNoticeRow } from "../messages/BackgroundNoticeRow";
 import { TodoListBlock } from "../messages/TodoListBlock";
 import { ToolActivityGroup } from "../messages/ToolActivityGroup";
 import { USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "../messages/UserMessage";
@@ -43,7 +44,7 @@ function TurnPrompt({
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
   sessionId?: string | null;
 }) {
-  if (!turn.user) return null;
+  if (!turn.user) return turn.notice ? <BackgroundNoticeRow message={turn.notice} /> : null;
   const latestTodo = getLatestTodoMessage(turn.messages);
 
   return (

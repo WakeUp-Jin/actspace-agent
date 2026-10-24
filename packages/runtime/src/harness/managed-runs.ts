@@ -2,6 +2,8 @@ import { taskOperation } from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
 import { AgentService, type ExecutionConfiguration, type TaskSnapshot } from "@actspace/agent-service";
 import type { HarnessLease } from "@actspace/boot";
+import { MainAgentInbox } from "@actspace/core-agent";
+import type { SessionHandle } from "@actspace/session-persistence";
 import type { RuntimeV2RunTurnRequest, RuntimeV2RunTurnResponse } from "@actspace/shared/runtime-v2";
 import type { RuntimeSessionController } from "../session/session-controller.js";
 
@@ -12,9 +14,14 @@ export class ManagedRuns {
   readonly #settings = new Map<string, Omit<ExecutionConfiguration, "mode">>();
   readonly #states = new Map<string, TaskSnapshot>();
   #closed = false;
-  constructor(private readonly sessions: RuntimeSessionController, private readonly harnesses: { acquire(id: string, signal?: AbortSignal): Promise<HarnessLease> | HarnessLease; acquireSession?(sessionId: string, signal?: AbortSignal): Promise<HarnessLease>; acquireVersion?(harnessId: string, generationId: string): Promise<HarnessLease> }, onSnapshot?: (snapshot: TaskSnapshot) => void) {
+  constructor(private readonly sessions: RuntimeSessionController, private readonly harnesses: { acquire(id: string, signal?: AbortSignal): Promise<HarnessLease> | HarnessLease; acquireSession?(sessionId: string, signal?: AbortSignal): Promise<HarnessLease>; acquireVersion?(harnessId: string, generationId: string): Promise<HarnessLease> }, onSnapshot?: (snapshot: TaskSnapshot) => void, background?: { reconcile(session: SessionHandle): Promise<void> }) {
     this.service = new AgentService({
-      openSession: async id => sessions.getOpen(id) ?? await sessions.resume(id),
+      openSession: async id => {
+        const session = sessions.getOpen(id) ?? await sessions.resume(id);
+        await background?.reconcile(session);
+        return session;
+      },
+      hasPendingNotifications: session => new MainAgentInbox(session).hasPendingNotifications(),
       runIdForTask: (sessionId, task) => { const key = `${sessionId}/${task.submissionId}`; const id = this.#requestedRunIds.get(key); this.#requestedRunIds.delete(key); return id; },
       operationForTask: (session, task) => {
         if (taskOperation(task.content) !== "compact") return undefined;

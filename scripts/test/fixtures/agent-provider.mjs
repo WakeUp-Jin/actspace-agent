@@ -61,7 +61,7 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
       if (body.tools?.length && content.includes("FIXTURE_BASH_BACKGROUND") && toolResults.length < 3) {
         const taskId = JSON.stringify(toolResults).match(/bash_[0-9a-f-]+/)?.[0];
         if (toolResults.length === 0) tool("bash", { command: "printf ready; sleep 30", intent: "后台生命周期验收", blockMs: 50 });
-        else if (taskId) tool(toolResults.length === 1 ? "bash_output" : "bash_kill", { taskId });
+        else if (taskId) tool(toolResults.length === 1 ? "task_output" : "task_stop", { taskId });
       }
       if (isSummary) delta = { role: "assistant", content: "Fixture summary: preserve the task, verified results and pending work." };
       if (isTitle) delta = { role: "assistant", content: "Fixture automatic title" };

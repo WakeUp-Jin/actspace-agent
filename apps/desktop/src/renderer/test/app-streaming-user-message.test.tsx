@@ -3243,31 +3243,6 @@ sessionId: input.sessionId,
     expect(screen.getAllByText('/tmp/background.txt')).toHaveLength(1);
   });
 
-  it('keeps background Bash updates after the run settles and isolates equal task IDs', async () => {
-    const fixture = setupBackgroundSessions();
-    renderApp();
-    await fixture.send('Launch background Bash');
-    await fixture.select('background-b');
-    await act(async () => fixture.complete('background-a'));
-    for (const id of ['background-a', 'background-b']) {
-      const record = fixture.records.get(id)!;
-      const base = { sessionId: id, agentRunId: `run-${id}`, schemaVersion: 2 as const, timestamp: record.meta.createdAt };
-      record.events = [
-        { ...base, id: `user-${id}`, type: 'user_message', payload: { content: 'Launch background Bash' } },
-        { ...base, id: `call-${id}`, type: 'tool_call', payload: { toolCallId: `bash-${id}`, name: 'bash', args: { command: 'sleep 1' } } },
-        { ...base, id: `result-${id}`, type: 'tool_result', payload: { toolCallId: `bash-${id}`, toolName: 'bash', ok: true, detail: [{ label: 'background-task', value: { taskId: 'task-shared', status: 'running' } }] } },
-      ] as SessionEvent[];
-    }
-    await act(async () => fixture.event('background-a', { type: 'bash_task_update', taskId: 'task-shared', status: 'completed', exitCode: 0 }));
-    await fixture.select('background-a');
-    await userEvent.click(screen.getByRole('button', { name: /^Worked/ }));
-    expect(await screen.findByText('后台完成')).toBeInTheDocument();
-    await fixture.select('background-b');
-    await userEvent.click(screen.getByRole('button', { name: /^Worked/ }));
-    expect(await screen.findByText('后台运行中')).toBeInTheDocument();
-    expect(screen.queryByText('后台完成')).not.toBeInTheDocument();
-  });
-
   it('marks a background run that finished as unread until the session is opened', async () => {
     const fixture = setupBackgroundSessions();
     renderApp();

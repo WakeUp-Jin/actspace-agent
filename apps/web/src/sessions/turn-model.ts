@@ -19,7 +19,7 @@ export type Turn = {
 const isKind = (item: TranscriptItem, kinds: ReadonlySet<string>) => item.type === "block" && kinds.has(item.block.kind);
 const TAIL_KINDS: ReadonlySet<string> = new Set(["error", "status"]);
 const ASSISTANT: ReadonlySet<string> = new Set(["assistant"]);
-const SEPARATE: ReadonlySet<string> = new Set(["context_compaction", "workspace_preparation"]);
+const SEPARATE: ReadonlySet<string> = new Set(["context_compaction", "workspace_preparation", "background_notice"]);
 
 export function buildTurns(items: readonly TranscriptItem[]): Turn[] {
   const raw: { key: string; user: UserBlock | null; items: TranscriptItem[] }[] = [];

@@ -1,5 +1,6 @@
 import { toolPreview } from "./tool-card.js";
 import {
+  type BackgroundNotice,
   createMessageBlocks,
   type ContextUsageSnapshot,
   projectContextState,
@@ -48,6 +49,8 @@ type EventIndex = {
   readonly toolByCall: Map<string, RuntimeV2ToolView>;
   readonly callData: Map<string, EventRecord>;
   readonly childByCall: Map<string, { readonly childSessionId: string; readonly presetId: string; readonly status: string }>;
+  /** Background task status by the tool call that started it, from `background/task` facts. */
+  readonly backgroundByCall: Map<string, { readonly status: string }>;
 };
 
 export function projectChatSession(
@@ -102,7 +105,7 @@ export function projectChatEvents(
     if (event.type === "user/message" || (event.type === "agent/inbox/spliced" && string(data.operation) === "claim")) {
       const node = appendNode(event);
       if (node === null || !activeSurface.showsMessage(node.messageId, event.seq)) continue;
-      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined);
+      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined, data.opensTurn === true ? backgroundNotice(data.notice) : undefined);
       continue;
     }
     if (event.type === "assistant/message") {
@@ -124,7 +127,7 @@ export function projectChatEvents(
       const tool = index.toolByCall.get(callId);
       const toolName = tool?.name ?? string(index.callData.get(callId)?.name) ?? "tool";
       const ok = event.type === "tool/result" && string(data.status) === "completed";
-      const preview = toolPreview(toolName, tool, data, index.callData.get(callId), index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "finished", snapshot.workspaceRoot ?? undefined);
+      const preview = toolPreview(toolName, tool, data, index.callData.get(callId), index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "finished", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId));
       projected.push({
         ...base,
         id: eventId(event),
@@ -203,6 +206,7 @@ function projectSurfaceNode(
   base: SurfaceProjectionBase,
   index: EventIndex,
   source?: string,
+  notice?: BackgroundNotice,
 ): void {
   if (node.kind === "user") {
     const fileReferences = readFileReferenceBlocks(node.content);
@@ -213,6 +217,7 @@ function projectSurfaceNode(
       ...(fileReferences.length === 0 ? {} : { fileReferences }),
       ...(responseAnnotations.length === 0 ? {} : { responseAnnotations }),
       ...(source === undefined ? {} : { source }),
+      ...(notice === undefined ? {} : { backgroundNotice: notice }),
     } });
     return;
   }
@@ -303,7 +308,7 @@ export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal:
     const child = index.childByCall.get(callId);
     const terminalEvent = journal.find((candidate) => isToolTerminal(candidate.type) && record(candidate.data).callId === callId);
     const identity = identityFor(event, call, index);
-    const preview = toolPreview(String(call.name), tool, terminalEvent ? record(terminalEvent.data) : {}, call, child, snapshot.sessionId, identity.agentRunId, terminalEvent ? "finished" : "running", snapshot.workspaceRoot ?? undefined);
+    const preview = toolPreview(String(call.name), tool, terminalEvent ? record(terminalEvent.data) : {}, call, child, snapshot.sessionId, identity.agentRunId, terminalEvent ? "finished" : "running", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId));
     if (preview.kind === "agent" && !terminalEvent) preview.stats = { durationMs: Math.max(0, Date.now() - Date.parse(event.time)), toolCallCount: 0 };
     return createMessageBlocks([{ id: `subagent:${callId}`, sessionId: snapshot.sessionId, agentRunId: identity.agentRunId, timestamp: event.time, type: "tool_result", payload: { toolCallId: callId, uiPreview: preview, status: terminalEvent ? tool?.state : "running" } } as SessionEvent]);
   });
@@ -548,7 +553,7 @@ function toolActivityStatus(status: string | null): UsageActivityStatus {
 }
 
 function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): EventIndex {
-  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, { childSessionId: string; presetId: string; status: string }>();
+  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, { childSessionId: string; presetId: string; status: string }>(); const backgroundByCall = new Map<string, { status: string }>(); const callByTask = new Map<string, string>();
   const turnStarts = journal
     .filter((event) => event.type === "turn/start")
     .map((event) => {
@@ -587,13 +592,19 @@ function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly Sessio
       const parentCallId = string(data.parentCallId); const presetId = string(data.presetId);
       if (parentCallId) childByCall.set(parentCallId, { childSessionId: string(data.childSessionId) ?? "", presetId: presetId ?? "unknown", status: "running" });
     }
+    if (event.type === "background/task") {
+      const taskId = string(data.taskId);
+      if (data.op === "start" && taskId && callId) { callByTask.set(taskId, callId); backgroundByCall.set(callId, { status: "running" }); }
+      const owner = taskId ? callByTask.get(taskId) : undefined;
+      if (data.op === "settle" && owner) backgroundByCall.set(owner, { status: string(data.status) ?? "lost" });
+    }
     if (event.type === "delegation/completed") {
       const invocationId = string(data.invocationId); const completed = invocationId ? journal.find((candidate) => candidate.type === "delegation/requested" && string(record(candidate.data).invocationId) === invocationId) : undefined;
       const parentCallId = completed ? string(record(completed.data).parentCallId) : null;
       if (parentCallId) childByCall.set(parentCallId, { childSessionId: string(data.childSessionId) ?? "", presetId: string(data.presetId) ?? childByCall.get(parentCallId)?.presetId ?? "unknown", status: string(data.status) ?? "completed" });
     }
   }
-  return { runByTurn, turnByStep, runByInboxMessage, turnByInboxMessage, requestById, lastRequestByStep, toolByCall: new Map(snapshot.tools.map((tool) => [tool.callId, tool])), callData, childByCall };
+  return { runByTurn, turnByStep, runByInboxMessage, turnByInboxMessage, requestById, lastRequestByStep, toolByCall: new Map(snapshot.tools.map((tool) => [tool.callId, tool])), callData, childByCall, backgroundByCall };
 }
 
 function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: EventIndex) {
@@ -608,6 +619,10 @@ function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: Ev
   return { requestId, turnId, stepId, agentRunId };
 }
 
+function backgroundNotice(value: RuntimeV2JsonValue | undefined): BackgroundNotice | undefined {
+  const notice = record(value); const taskId = string(notice.taskId); const kind = notice.kind;
+  return taskId && (kind === "bash" || kind === "agent") ? { taskId, taskKind: kind, title: string(notice.title) ?? taskId, status: string(notice.status) ?? "completed" } : undefined;
+}
 function appendNode(event: SessionEventEnvelopeV1) { return event.surface?.kind === "append" ? event.surface.node : null; }
 function contentBlocks(value: RuntimeV2JsonValue): readonly EventRecord[] { return Array.isArray(value) ? value.filter(isRecord) : []; }
 function contentText(value: RuntimeV2JsonValue, includeReasoning = true): string { if (typeof value === "string") return value; if (!Array.isArray(value)) return JSON.stringify(value ?? null, null, 2); return value.flatMap((entry) => { if (typeof entry === "string") return [entry]; if (!isRecord(entry)) return [JSON.stringify(entry)]; if (entry.type === "text" && typeof entry.text === "string") return [entry.text]; if (includeReasoning && entry.type === "reasoning" && typeof entry.text === "string") return [entry.text]; if (entry.type === "image") return [typeof entry.alt === "string" ? `[${entry.alt}]` : "[image]"]; if (entry.type === "artifact") return [typeof entry.label === "string" ? `[${entry.label}]` : "[attachment]"]; return []; }).join(""); }

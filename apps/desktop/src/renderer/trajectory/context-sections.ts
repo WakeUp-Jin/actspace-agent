@@ -19,10 +19,11 @@ export function contextCategory(owner: string, id = ''): string {
   if (owner === 'actspace.context-skills') return id === 'core/skills-catalog' ? '技能目录' : '已加载技能';
   if (owner === 'actspace.context-disclosure' || owner === 'actspace.context.disclosure') return '路径导航';
   if (owner === 'task-notification') return '通知';
+  if (owner === 'actspace.context-background-tasks') return '后台任务';
   if (owner === 'runtime' || owner === 'actspace.context-runtime') return '运行信息';
   return '动态补充';
 }
-const titleOf = (section: ContextSection) => ({ 'host/user-instructions': '用户规则', 'host/workspace-instructions': '工作区规则（AGENTS.md）', 'core/skills-catalog': '可用技能目录', 'core/selected-skills': '本次加载的技能' }[section.id] ?? section.id);
+const titleOf = (section: ContextSection) => ({ 'host/user-instructions': '用户规则', 'host/workspace-instructions': '工作区规则（AGENTS.md）', 'core/skills-catalog': '可用技能目录', 'core/selected-skills': '本次加载的技能', 'background-tasks': '后台任务清单' }[section.id] ?? section.id);
 
 /** Request composition is a display projection, not a fabricated user/injection event. */
 export function contextSectionRecords(nodes: readonly RuntimeV2TrajectoryNode[], base: (node: RuntimeV2TrajectoryNode, overrides: Partial<TrajectoryRecord>) => TrajectoryRecord): TrajectoryRecord[] {

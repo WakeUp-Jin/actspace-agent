@@ -71,7 +71,7 @@
 | 日期 | 区域 | 债务描述 | 为什么会存在 | 计划中的后续动作 |
 | --- | --- | --- | --- | --- |
 | 2026-05-29 | Agent-core / 安全 | 读取类工具（`read_file`/`grep`/`glob`/`list_directory`）已放开 workspace 边界（`resolveReadablePath`），主 Agent 理论上可读任意本机文件（含 `~/.ssh`、密钥文件等）。 | 上下文压缩需要模型回读 `<userData>/tmp` 的 bash 落盘文件和 `<userData>/sessions` 的完整历史，这些都在 workspace 之外，workspace 硬边界会挡住正常回读（见 `context-compression.md`「读边界放开」）。 | 补「敏感路径 blocklist + 按需读审核」：读类工具命中敏感路径（如家目录密钥、系统配置）时拒绝或升级为审核，而非恢复 workspace 硬限制。可复用 Kairos 的 blocklist-check 思路。 |
-| 2026-07-03 | Bash 后台任务 / 前端 | 后台任务终态只有内存态 `bash_task_update` 事件，session.jsonl 里持久化的 preview 停在 backgrounded/running；重启后历史块显示为「后台运行中」不再更新。 | 任务注册表不持久化（进程活不过 app 退出），终态发生在 turn 结束后，没有回写持久化事件的通道。 | 任务终态时回写/追加一条 session 事件（或加载会话时对 backgrounded 块做「进程已不存在」的降级显示）。 |
+| 2026-07-03 | Bash 后台任务 / 前端 | ~~后台任务终态只有内存态 `bash_task_update` 事件，重启后历史块停在「后台运行中」。~~ 2026-10-22 已偿还：终态写入持久事件 `background/task settle`，卡片按它显示；重启后未结算的任务标为 `lost`。 | — | 见 [后台任务](../design-docs/collaboration/agent-background-tasks.md)。 |
 | 2026-07-03 | Bash 后台任务 / 前端 | 后台任务卡片无输出流式滚动、无 kill 按钮（设计文档前端契约的完整形态）。 | Plan 02 MVP 先复用 bash 块 + 徽标；输出流式与 kill 需要新增 IPC 通道和预览流对接。 | 独立前端任务卡片立项（可与 E5 沙盒标签一起做）。 |
 | 2026-07-03 | Bash 后台任务 / 收割 | app 崩溃（非正常退出）时 before-quit 不触发，detached 后台进程可能残留。 | 收割依赖正常退出钩子；崩溃场景无进程内兜底。 | 可选：spawn 时记 pid 文件，启动时清理上次残留进程组。 |
 | 2026-07-04 | Bash 沙盒 / 网络 | 沙盒 profile 内 `(allow network*)` 全放行：沙盒内命令可连任意域名 / Unix socket，网络维度无隔离。 | 域名过滤需要本地 CONNECT/SNI 代理（profile 全拒网络只放行代理端口 + 子进程注入 HTTP_PROXY），是自研路线最大增量，E5 第一期裁掉。 | 网络代理阶段单独立项；落地后引入 `requiredPermissions: ["full_network"]`。 |

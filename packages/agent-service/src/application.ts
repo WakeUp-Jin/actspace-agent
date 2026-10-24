@@ -58,7 +58,7 @@ export type ApplicationRunService = {
   isIdle?: () => boolean;
 };
 
-type AgentRuntimeService = { readonly runs: ApplicationRunService; readonly subagents?: { readonly activeCount: number } };
+type AgentRuntimeService = { readonly runs: ApplicationRunService; readonly subagents?: { readonly activeCount: number }; readonly backgroundTasks?: { hasRunning(sessionId?: string): boolean } };
 
 export type AgentApplicationContract = {
   readonly browserAvailable: () => Promise<boolean>;
@@ -97,7 +97,7 @@ export class AgentApplication implements AgentApplicationContract {
   readonly #sessions: ApplicationSessionService;
   readonly #runs: ApplicationRunService;
   readonly #subagents: { readonly activeCount: number } | undefined;
-  readonly #hasRunningBackgroundTask: (sessionId: string) => boolean | Promise<boolean>;
+  readonly #backgroundTasks: AgentRuntimeService["backgroundTasks"];
   readonly #manifestDigest: string;
   readonly #modeWriter = new SessionModeWriter();
 
@@ -106,7 +106,7 @@ export class AgentApplication implements AgentApplicationContract {
     const agentRuntime = required<AgentRuntimeService>(ctx, "agent.runtime");
     this.#runs = agentRuntime.runs;
     this.#subagents = agentRuntime.subagents;
-    this.#hasRunningBackgroundTask = (sessionId) => this.#runs.inspectCapability<{ readonly hasRunningBackgroundTask?: (sessionId: string) => boolean }, boolean>("tools.shell-tools", service => service?.hasRunningBackgroundTask?.(sessionId) ?? false, sessionId);
+    this.#backgroundTasks = agentRuntime.backgroundTasks;
     this.#manifestDigest = (ctx.get?.("actspace.host.session") as { readonly manifestDigest?: string } | undefined)?.manifestDigest ?? "desktop-app";
   }
 
@@ -142,10 +142,11 @@ export class AgentApplication implements AgentApplicationContract {
   listSessions() { return this.#sessions.list(); }
   async isIdleForReconfigure(): Promise<boolean> {
     if (this.#runs.isIdle?.() !== true) return false;
-    if (this.#subagents?.activeCount) return false;
+    if (this.#subagents?.activeCount || this.#backgroundTasks?.hasRunning()) return false;
     for (const item of await this.#sessions.list()) {
       const snapshot = await this.#sessions.inspect(item.sessionId);
-      if (snapshot.pendingInbox.length > 0) return false;
+      // An unread background notification waits for the next Run; it does not hold a reconfigure.
+      if (snapshot.pendingInbox.some(entry => entry.source !== "task_notification")) return false;
     }
     return this.#runs.isIdle?.() === true;
   }
@@ -210,7 +211,7 @@ export class AgentApplication implements AgentApplicationContract {
   async updateSessionAgentMode(sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number): Promise<RuntimeV2SessionSnapshot> {
     this.#modeWriter.assertAvailable(sessionId);
     return this.#runs.service.exclusive(sessionId, async () => {
-      if (await this.#hasRunningBackgroundTask(sessionId)) throw new Error("SESSION_BUSY");
+      if (this.#backgroundTasks?.hasRunning(sessionId)) throw new Error("SESSION_BUSY");
       const session = await this.#sessions.resume(sessionId);
       const snapshot = this.#sessions.snapshot(session);
       if (expectedRevision !== undefined && expectedRevision !== (snapshot.agentModeRevision ?? 0)) throw new Error("AGENT_MODE_CONFLICT");

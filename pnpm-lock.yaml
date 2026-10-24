@@ -543,6 +543,31 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/background-tasks:
+    dependencies:
+      '@actspace/core-agent':
+        specifier: workspace:*
+        version: link:../core/agent
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../session/persistence
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session/journal
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/boot:
     dependencies:
       '@actspace/bundle':
@@ -620,6 +645,31 @@ importers:
       '@actspace/diagnostics':
         specifier: workspace:*
         version: link:../diagnostics
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/background-tasks:
+    dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../../prompt
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1274,6 +1324,9 @@ importers:
       '@actspace/auto-review':
         specifier: workspace:*
         version: link:../auto-review
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../background-tasks
       '@actspace/boot':
         specifier: workspace:*
         version: link:../boot
@@ -1283,6 +1336,9 @@ importers:
       '@actspace/composition':
         specifier: workspace:*
         version: link:../composition
+      '@actspace/context-background-tasks':
+        specifier: workspace:*
+        version: link:../context/background-tasks
       '@actspace/context-compaction':
         specifier: workspace:*
         version: link:../context/compaction
@@ -1382,6 +1438,9 @@ importers:
       '@actspace/tools-approval':
         specifier: workspace:*
         version: link:../tools/approval
+      '@actspace/tools-background-tasks':
+        specifier: workspace:*
+        version: link:../tools/background-tasks
       '@actspace/tools-browser-tools':
         specifier: workspace:*
         version: link:../tools/browser-tools
@@ -1594,6 +1653,9 @@ importers:
 
   packages/subagent:
     dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
@@ -1656,6 +1718,40 @@ importers:
         specifier: workspace:*
         version: link:../../shared
     devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/tools/background-tasks:
+    dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+    devDependencies:
+      '@actspace/core-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/persistence
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -1825,6 +1921,9 @@ importers:
 
   packages/tools/shell-tools:
     dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../cordis-adapter

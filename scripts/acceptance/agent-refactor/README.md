@@ -22,7 +22,7 @@ Provider 标记：
 - `FIXTURE_LONG`：12 次工具步骤，产生可压缩历史。
 - `FIXTURE_BASH_PAIR`：连续两次无副作用 printf，用于权限切换和自动执行验收。
 - `FIXTURE_BASH_DENIED`：无副作用管道命令，验证现有 Shell 语法 hard guard。
-- `FIXTURE_BASH_BACKGROUND`：printf + sleep 转后台，随后 bash_output、bash_kill 验证任务生命周期。
+- `FIXTURE_BASH_BACKGROUND`：printf + sleep 转后台，随后 task_output、task_stop 验证任务生命周期。
 - 测试 Skill 名为 `acceptance-fixture`，目录标记 `ACTSPACE_FIXTURE_SKILL`，正文标记 `ACTSPACE_FIXTURE_SKILL_BODY`；hasSkill 只检测正文，不能把目录可见当成技能已读取。
 - 两个模型 fixture-main/fixture-alternate 均声明图片及 low/medium/high 推理档位。
 - `valid.png` 是 32 × 32 不透明双色棋盘 PNG，`oversized.png` 大于当前 20 MiB 限制。

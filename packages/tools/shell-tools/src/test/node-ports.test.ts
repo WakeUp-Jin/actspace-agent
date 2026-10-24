@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolExecutionContext } from "@actspace/tools-runtime";
 import type { ToolBodyResult } from "@actspace/tools-runtime";
+import type { BackgroundTaskHost, BackgroundTaskSource, BackgroundTaskTerminal } from "@actspace/background-tasks";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
@@ -14,7 +15,19 @@ async function workspace(): Promise<string> { const root = await mkdtemp(join(tm
 function context(sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = ""): ToolExecutionContext { return { pluginId: "actspace.shell-tools", name: "test", callId: "call", sessionId, workspaceRoot, agentRunId: "run", turnId: "turn", stepId: "step", signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("missing"); } }, reportProgress: () => undefined, createArtifact: async ({ bytes, mediaType }) => ({ artifactId: "artifact", mediaType, size: bytes.byteLength, sha256: "sha" }), defer: () => undefined, ...(notifyAgent === undefined ? {} : { notifyAgent }) }; }
 async function invoke(handler: ((args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>) | undefined, args: Readonly<Record<string, RuntimeV2JsonValue>>, sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = "") { if (!handler) throw new Error("handler unavailable"); return handler(args, context(sessionId, notifyAgent, workspaceRoot)); }
 
-import { createNodeBashToolPorts as createNodeToolPorts } from "../node-ports.js";
+import { createNodeBashToolPorts } from "../node-ports.js";
+
+/** Records what Bash hands to the Host registry. */
+function fakeHost() {
+  const sources = new Map<string, BackgroundTaskSource>(); const terminals = new Map<string, BackgroundTaskTerminal>(); const matches: { taskId: string; summary: string; line: string }[] = [];
+  const host = {
+    register: async (source: BackgroundTaskSource) => { sources.set(source.taskId, source); void source.done.then(terminal => terminals.set(source.taskId, terminal)); return undefined as never; },
+    notifyOutputMatch: async (taskId: string, summary: string, line: string) => { matches.push({ taskId, summary, line }); },
+  } as unknown as BackgroundTaskHost;
+  return { host, sources, terminals, matches };
+}
+let lastHost: ReturnType<typeof fakeHost>;
+function createNodeToolPorts(options: Omit<Parameters<typeof createNodeBashToolPorts>[0], "background">) { lastHost = fakeHost(); return createNodeBashToolPorts({ ...options, background: lastHost.host }); }
 import { getBashHardRejectReason } from "../command-rules.js";
 describe("shell-tools ports", () => {
   it.each([false, true])("measures real foreground commands and background termination (sandbox=%s)", async sandbox => {
@@ -32,8 +45,10 @@ describe("shell-tools ports", () => {
       const result = await invoke(ports.bash, { command: "printf ready; sleep 30", intent: "background boundary", blockMs: 30 });
       expect(result.summary).toContain("block_timeout");
       const taskId = JSON.stringify(result).match(/bash_[0-9a-f-]+/)![0];
-      await vi.waitFor(async () => expect(JSON.stringify(await invoke(ports.bash_output, { taskId }))).toContain("ready"));
-      expect((await invoke(ports.bash_kill, { taskId })).status).toBe("completed");
+      const source = lastHost.sources.get(taskId)!;
+      await vi.waitFor(async () => expect((await source.output()).text).toContain("ready"));
+      await source.stop("test");
+      expect(lastHost.terminals.get(taskId)).toMatchObject({ status: "stopped" });
       expect(ports.hasRunningBackgroundTask("session")).toBe(false);
     } finally { await ports.dispose(); }
   });
@@ -69,13 +84,15 @@ describe("shell-tools ports", () => {
     expect(background.detail).toEqual([{ label: "background-task", value: { taskId, status: "running" } }]);
     expect(ports.hasRunningBackgroundTask("session")).toBe(true);
     expect(ports.hasRunningBackgroundTask("other-session")).toBe(false);
+    const source = lastHost.sources.get(taskId!)!;
+    expect(source).toMatchObject({ kind: "bash", sessionId: "session", callId: "call", description: "verify background" });
     await vi.waitFor(async () => {
-      const output = await invoke(ports.bash_output, { taskId: taskId! });
-      expect(JSON.stringify(output)).toContain("ready");
+      const output = await source.output();
+      expect(output.text).toContain("ready");
+      expect(output.outputPath).toMatch(/\.log$/);
     }, { timeout: 3_000, interval: 20 });
-    await expect(invoke(ports.bash_output, { taskId: taskId! }, "other-session")).resolves.toMatchObject({ status: "failed", failure: { code: "BASH_TASK_NOT_FOUND" } });
     await ports.dispose?.();
-    await expect(invoke(ports.bash_output, { taskId: taskId! })).resolves.toMatchObject({ status: "failed" });
+    await vi.waitFor(() => expect(lastHost.terminals.get(taskId!)).toMatchObject({ status: "stopped" }));
   });
   it("keeps large foreground Bash output out of the model surface and exposes an artifact", async () => {
     const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, sandbox: false });
@@ -84,21 +101,27 @@ describe("shell-tools ports", () => {
     expect(JSON.stringify(result.modelOutput).length).toBeLessThan(10_000);
     await ports.dispose?.();
   });
-  it("validates Bash output subscriptions before spawn and drains durable notifications on dispose", async () => {
+  it("reports a finished background command to the Host registry", async () => {
+    const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, sandbox: false });
+    const background = await invoke(ports.bash, { command: "sleep 0.1; printf 'done token-abcdefgh'; exit 3", intent: "exit later", blockMs: 0 });
+    const taskId = JSON.stringify(background).match(/bash_[0-9a-f-]+/)![0];
+    expect(JSON.stringify(background)).toContain("task_output");
+    await vi.waitFor(() => expect(lastHost.terminals.get(taskId)).toMatchObject({ status: "failed", exitCode: 3, summary: "Background command failed with exit code 3." }), { timeout: 3_000 });
+    expect(lastHost.terminals.get(taskId)!.body).toContain("done");
+    await ports.dispose();
+  });
+  it("validates Bash output subscriptions before spawn and routes output matches through the Host", async () => {
     const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, sandbox: false });
     await expect(invoke(ports.bash, { command: "printf invalid > should-not-exist", intent: "must not start", blockMs: 0, notifyOnOutput: { pattern: "[", reason: "invalid regex" } })).resolves.toMatchObject({ status: "failed", failure: { code: "INVALID_ARGUMENTS" } });
     await expect(readFile(join(root, "should-not-exist"), "utf8")).rejects.toThrow();
 
-    const notifications: RuntimeV2JsonValue[] = [];
-    const notifyAgent = async (content: RuntimeV2JsonValue) => { await new Promise((resolveWait) => setTimeout(resolveWait, 10)); notifications.push(content); };
-    const background = await invoke(ports.bash, { command: "printf 'READY token-abcdefgh\\n'; sleep 30", intent: "verify notifications", blockMs: 0, notifyOnOutput: { pattern: "READY", reason: "service ready", debounceMs: 5_000 } }, "session", notifyAgent);
+    const background = await invoke(ports.bash, { command: "printf 'READY token-abcdefgh\\n'; sleep 30", intent: "verify notifications", blockMs: 0, notifyOnOutput: { pattern: "READY", reason: "service ready", debounceMs: 5_000 } });
     expect(JSON.stringify(background)).toContain("bash_");
-    await waitFor(() => notifications.some((item) => String(item).includes("output_match")));
-    expect(JSON.stringify(notifications)).toContain("[REDACTED]");
-    expect(JSON.stringify(notifications)).not.toContain("token-abcdefgh");
-
+    await waitFor(() => lastHost.matches.length > 0);
+    expect(lastHost.matches[0]!.summary).toContain("service ready");
+    expect(JSON.stringify(lastHost.matches)).toContain("[REDACTED]");
+    expect(JSON.stringify(lastHost.matches)).not.toContain("token-abcdefgh");
     await ports.dispose?.();
-    expect(notifications.some((item) => String(item).includes("<status>killed</status>"))).toBe(true);
   });
   it("hard-rejects broad deletion and repository metadata targets before execution", async () => {
     const root = await workspace();

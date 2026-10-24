@@ -15,7 +15,7 @@ export function createNodeToolHostServices(options: { readonly workspaceRoot: st
     [FILESYSTEM_READ_HOST_PORT_ID]: { createPorts: () => createFilesystemread(options) },
     [FILESYSTEM_SEARCH_HOST_PORT_ID]: { createPorts: () => createFilesystemsearch(options) },
     [FILESYSTEM_WRITE_HOST_PORT_ID]: { createPorts: () => createFilesystemwrite(options) },
-    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: () => createShelltools(options) },
+    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: (background?: Parameters<typeof createShelltools>[0]["background"]) => createShelltools({ ...options, background }) },
     [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({ credentials, deepseekFetchApiKey: process.env.ACTSPACE_DEEPSEEK_FETCH === "1" ? process.env.DEEPSEEK_API_KEY : undefined }) },
     [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => createImagegeneration({ generation: apiKey && baseUrl && model ? { apiKey, baseUrl, model } : undefined }) },
     [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmService) => createImageinspection({ readArtifact: options.readArtifact, inspect: createLlmImageInspector({ llm, routeId: "default", model: options.model }) }) },

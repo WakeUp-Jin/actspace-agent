@@ -23,6 +23,7 @@ export const SERVICE_SOURCE = Object.freeze({
 });
 
 export const MANIFEST_PATHS = Object.freeze([
+  "packages/auto-review/src/manifest.ts",
   "packages/english-learning/src/manifest.ts",
   "packages/harness-control/src/manifest.ts",
   "packages/harness-hmr/src/manifest.ts",
@@ -33,6 +34,7 @@ export const MANIFEST_PATHS = Object.freeze([
   "packages/context/engine/src/manifest.ts",
   "packages/context/system/src/manifest.ts",
   "packages/context/runtime/src/manifest.ts",
+  "packages/context/background-tasks/src/manifest.ts",
   "packages/context/rules/src/manifest.ts",
   "packages/context/skills/src/manifest.ts",
   "packages/context/conversation/src/manifest.ts",
@@ -58,6 +60,7 @@ export const MANIFEST_PATHS = Object.freeze([
   "packages/tools/filesystem-search/src/manifest.ts",
   "packages/tools/filesystem-write/src/manifest.ts",
   "packages/tools/shell-tools/src/manifest.ts",
+  "packages/tools/background-tasks/src/manifest.ts",
   "packages/tools/web-tools/src/manifest.ts",
   "packages/tools/image-generation/src/manifest.ts",
   "packages/tools/image-inspection/src/manifest.ts",
@@ -86,6 +89,8 @@ export const PACKAGE_PATHS = Object.freeze([
   "packages/harness-control/package.json",
   "packages/harness-hmr/package.json",
   "packages/agent-service/package.json",
+  "packages/auto-review/package.json",
+  "packages/background-tasks/package.json",
   "packages/agent-host/package.json",
   "packages/boot/package.json",
   "packages/bundle/package.json",
@@ -94,6 +99,7 @@ export const PACKAGE_PATHS = Object.freeze([
   "packages/context/engine/package.json",
   "packages/context/system/package.json",
   "packages/context/runtime/package.json",
+  "packages/context/background-tasks/package.json",
   "packages/context/rules/package.json",
   "packages/context/skills/package.json",
   "packages/context/conversation/package.json",
@@ -126,6 +132,7 @@ export const PACKAGE_PATHS = Object.freeze([
   "packages/tools/filesystem-search/package.json",
   "packages/tools/filesystem-write/package.json",
   "packages/tools/shell-tools/package.json",
+  "packages/tools/background-tasks/package.json",
   "packages/tools/web-tools/package.json",
   "packages/tools/image-generation/package.json",
   "packages/tools/image-inspection/package.json",
@@ -135,6 +142,7 @@ export const PACKAGE_PATHS = Object.freeze([
   "apps/cli/package.json",
   "apps/desktop/package.json",
   "apps/site/package.json",
+  "apps/web/package.json",
 ]);
 
 export const VERIFICATION_SOURCES = Object.freeze([

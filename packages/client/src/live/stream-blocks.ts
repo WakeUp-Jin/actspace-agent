@@ -105,7 +105,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       approvalRequestId: tool.approvalRequestId,
       intent: tool.preview.intent,
       backgroundTaskId: tool.preview.backgroundTaskId,
-      backgroundStatus: tool.preview.backgroundStatus,
+      background: tool.preview.background,
       outputFilePath: tool.preview.outputFilePath,
       sandboxed: tool.preview.sandboxed,
       notExecuted: tool.preview.notExecuted,
@@ -321,6 +321,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       status: tool.finished ? tool.preview.status : "running",
       subagentType: tool.preview.subagentType,
       agentKind: tool.preview.agentKind,
+      background: tool.preview.background,
       displayText: tool.preview.displayText,
       summary: tool.preview.summary,
       recentEvents: tool.preview.recentEvents,
@@ -417,7 +418,7 @@ export function streamingStateToBlocks(state: StreamingState, agentRunId?: strin
     } else if (seg.type === "workspace_preparation") {
       const block = state.activeWorkspacePreparations.get(seg.agentRunId);
       if (block) blocks.push(block);
-    } else if (seg.type === "user_message") {
+    } else if (seg.type === "user_message" || seg.type === "background_notice") {
       blocks.push(seg.block);
     }
   }

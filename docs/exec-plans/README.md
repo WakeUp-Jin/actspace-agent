@@ -25,6 +25,7 @@
 
 ## 最近完成
 
+- [后台任务：后台 Bash、后台子智能体与任务工具](completed/20261022-background-tasks.md)：T1–T10 完成（分支 feat/background-tasks，未提交）；统一登记表、空闲唤醒、`task_*` 四个工具、后台子 Agent、任务清单上下文、「后台」标签与唤醒分隔行；浏览器 mock 截图完成；Electron 未验证，见[执行摘要](../exec-runs/20261022-background-tasks/execution-summary.md)。
 - [设置 › 模型：四层数据模型与页面重做](completed/20261021-model-provider-redesign.md)：A–E 完成，旧 provider 页面、多 Key、billingMode 与旧 IPC 删除；desktop main 512、renderer 1388、shared 179 通过，浏览器 mock 截图完成；Electron 与真实 Key 未验证，见[执行摘要](../exec-runs/20261021-model-provider-redesign/execution-summary.md)。
 
 - [会话查询授权与替我审批](completed/20261018-permission-auto-review.md)：查询会话授权、判断插件、模型设置与结果审计完成；398 项定向测试通过，追加真实 Electron 交互、路由缺陷修复复验及原生 Computer Use；商业 Provider 未覆盖，见[执行摘要](../exec-runs/20261018-permission-auto-review/execution-summary.md)。

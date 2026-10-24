@@ -13,7 +13,7 @@ export function createDesktopToolHostServices(options: { readonly workspaceRoot:
     [FILESYSTEM_READ_HOST_PORT_ID]: { createPorts: () => createFilesystemread(options) },
     [FILESYSTEM_SEARCH_HOST_PORT_ID]: { createPorts: () => createFilesystemsearch(options) },
     [FILESYSTEM_WRITE_HOST_PORT_ID]: { createPorts: () => createFilesystemwrite(options) },
-    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: () => createShelltools(options) },
+    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: (background?: Parameters<typeof createShelltools>[0]["background"]) => createShelltools({ ...options, background }) },
     [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({
       // Ports live as long as the Harness; each search must observe settings changes.
       get deepseekFetchApiKey() { return options.modelRuntime.getToolEnvironment().deepseekFetchApiKey; },

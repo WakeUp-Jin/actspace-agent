@@ -266,7 +266,7 @@ function messageBlockFromToolPreview(
         reason: preview.reason,
         policyLabel: preview.policyLabel,
         backgroundTaskId: preview.backgroundTaskId,
-        backgroundStatus: preview.backgroundStatus,
+        background: preview.background,
         outputFilePath: preview.outputFilePath,
         sandboxed: preview.sandboxed,
         notExecuted: preview.notExecuted,
@@ -280,6 +280,7 @@ function messageBlockFromToolPreview(
         status: preview.status,
         subagentType: preview.subagentType,
         agentKind: preview.agentKind,
+        background: preview.background,
         displayText: preview.displayText,
         summary: preview.summary,
         recentEvents: preview.recentEvents,
@@ -463,10 +464,10 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
     switch (event.type) {
       case "user_message": {
         const payload = event.payload as UserMessagePayload;
-        // 任务通知注入消息只给模型消费，用户侧不渲染：
-        // 任务状态由 bash 块徽标（bash_task_update）呈现，输出在落盘文件里
+        // 任务通知只给模型消费；只有开启空闲唤醒那一轮的通知渲染成一行分隔行。
         if (payload.source === "task_notification") {
-          return [];
+          const notice = payload.backgroundNotice;
+          return notice ? [{ kind: "background_notice", id: event.id, renderKey: nextRenderKey(event, "background-notice"), content: payload.content, createdAt: getDisplayTime(event.timestamp), ...notice }] : [];
         }
         return [
           {

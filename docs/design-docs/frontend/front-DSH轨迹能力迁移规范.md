@@ -118,6 +118,7 @@ RuntimeV2TrajectorySnapshot（projectTrajectoryWindow，同一事件对象只转
 **类型映射**：builder 记录映射成 DSH 的 7 种 cell：系统、用户、上下文、助手、工具、子工具（有 `parentCallId`）、已压缩。
 
 - 上下文行有两种来源：`plugin/actspace.context/supplement` 的 `op=add`，以及 `source=task_notification` 的 inbox claim。`remove`、`bind` 不进主表。
+- 上下文分类按 owner 映射（`contextCategory`）：owner `actspace.context-background-tasks` 显示为「后台任务」，标题「后台任务清单」；任务全部结束后的收尾文本同样显示为「已更新」。后台任务完成通知仍是 inbox claim，分类「通知」。
 - 审批并入工具行（概述里的「审批」字段）。
 - 重试、错误并入请求视图（「重试」「上次尝试错误」「错误」）。
 - 其余原始事件不进主表。
