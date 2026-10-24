@@ -81,6 +81,32 @@ export function formatMultiplier(value: number): string {
   return String(Number(value.toFixed(4)));
 }
 
+/** 输入框里的 token 数：整千写成 K，整百万写成 M，按 1024 整除的也写成 K（262144 → 256K）。 */
+export function formatTokenInput(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "";
+  if (value % 1_000_000 === 0) return `${value / 1_000_000}M`;
+  if (value % 1_048_576 === 0) return `${value / 1_048_576}M`;
+  if (value % 1000 === 0) return `${value / 1000}K`;
+  if (value % 1024 === 0) return `${value / 1024}K`;
+  return String(value);
+}
+
+/** 解析 token 数，接受 128000、128K、1M；空 → null，非法 → undefined。 */
+export function parseTokens(text: string): number | null | undefined {
+  const trimmed = text.trim().replace(/,/g, "");
+  if (!trimmed) return null;
+  const match = /^(\d+(?:\.\d+)?)\s*([kKmM]?)$/.exec(trimmed);
+  if (!match) return undefined;
+  const unit = match[2].toLowerCase();
+  const value = Math.round(Number(match[1]) * (unit === "m" ? 1_000_000 : unit === "k" ? 1000 : 1));
+  return value > 0 ? value : undefined;
+}
+
+/** 输入框里的价格：去掉多余的小数位，未知为空。 */
+export function formatRateInput(value: number | null | undefined): string {
+  return value === null || value === undefined || !Number.isFinite(value) ? "" : String(Number(value.toFixed(6)));
+}
+
 /** 解析用户输入的正数；空 → null，非法 → undefined。 */
 export function parsePositive(text: string): number | null | undefined {
   const trimmed = text.trim();
@@ -94,6 +120,25 @@ export function parseRate(text: string): number | null | undefined {
   if (!trimmed) return null;
   const value = Number(trimmed);
   return Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+/** 收起时行尾的摘要：「256K · 思考高 · 看图」。什么都不知道的模型没有摘要。 */
+export function modelMeta(effective: EffectiveModel): string {
+  const parts: string[] = [];
+  if (effective.contextWindow) parts.push(formatTokens(effective.contextWindow));
+  const thinking = effective.thinking;
+  const kind = thinkingKind(thinking);
+  if (kind === "toggle") parts.push(thinking!.default === "off" ? "思考关" : "思考开");
+  else if (kind === "levels" || kind === "mandatory") parts.push(thinking!.default === "off" ? "思考关" : `思考${LEVEL_LABELS[thinking!.default ?? "medium"]}`);
+  else if (kind === "always") parts.push("始终思考");
+  if (canSeeImages(effective)) parts.push("看图");
+  return parts.join(" · ");
+}
+
+/** 字段旁的「已修改 · 恢复」：只有目录认得的模型才有可恢复的值。 */
+export function canRestore(effective: EffectiveModel, field: keyof EffectiveModel["sources"]): boolean {
+  if (effective.sources[field] !== "user") return false;
+  return field === "label" || Boolean(effective.catalog?.exact) || effective.aliased;
 }
 
 /** 名字后面那句灰黄小字：什么都不知道的模型才有。 */
@@ -112,7 +157,7 @@ export function canSeeImages(effective: EffectiveModel): boolean {
 }
 
 export function pendingCount(connection: ConnectionView): number {
-  return connection.models.filter((model) => model.enabled && unknownNote(model.effective) !== null).length;
+  return connection.models.filter((model) => unknownNote(model.effective) !== null).length;
 }
 
 /** 价格后面的「×倍率」：只有参考价乘了倍率才显示。 */
@@ -140,15 +185,14 @@ export const EMPTY_RATES: ModelRates = { input: 0, output: 0, cacheRead: null, c
 
 export type PickerGroup = { connection: ConnectionView; models: ConnectionModelView[] };
 
-/** 选择器左栏：已启用的模型按连接分组；看图只列能看图的。 */
+/** 选择器左栏：模型按连接分组；看图只列能看图的。 */
 export function pickerGroups(connections: readonly ConnectionView[], purpose: PurposeMeta, query: string): PickerGroup[] {
   const q = query.trim().toLowerCase();
   return connections
     .filter((connection) => connection.enabled)
     .map((connection) => ({
       connection,
-      models: connection.models.filter((model) => model.enabled
-        && (!purpose.needImage || canSeeImages(model.effective))
+      models: connection.models.filter((model) => (!purpose.needImage || canSeeImages(model.effective))
         && (!q || model.apiModel.toLowerCase().includes(q) || model.effective.label.toLowerCase().includes(q))),
     }))
     .filter((group) => group.models.length > 0);

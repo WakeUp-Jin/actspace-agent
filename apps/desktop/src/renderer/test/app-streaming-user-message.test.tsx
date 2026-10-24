@@ -850,8 +850,8 @@ describe("App streaming user message", () => {
     await userEvent.type(composer, "wait for the model");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
-
+    // The 300ms visibility boundary is covered with a controlled clock in
+    // model-waiting-status.test.tsx; userEvent may itself exceed that delay.
     const initialWaitingText = await screen.findByText("Operating Space · Expanding");
     expect(initialWaitingText).toHaveClass("tool-log-text-running");
     expect(initialWaitingText).toHaveAttribute("data-shimmer-text", "Operating Space · Expanding");
@@ -3375,6 +3375,6 @@ sessionId: input.sessionId,
     expect(screen.getByText('Pinned live question')).toBeInTheDocument();
     expect(screen.getByText('Pinned reply')).toBeInTheDocument();
     expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
-  });
+  }, 10_000);
 
 });

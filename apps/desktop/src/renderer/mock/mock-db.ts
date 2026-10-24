@@ -41,6 +41,8 @@ export type MockToolCall = {
   readonly args: Readonly<Record<string, RuntimeV2JsonValue>>;
   /** tool/result 的 data（除 callId 外），例如 status、summary、modelOutput、detail。 */
   readonly result: Readonly<Record<string, RuntimeV2JsonValue>>;
+  /** 这次调用委派出的子会话：紧跟 tool/call 投影一条 delegation/requested。 */
+  readonly delegation?: { readonly childSessionId: string; readonly presetId: string };
 };
 
 export type MockSession = {
@@ -56,6 +58,8 @@ export type MockSession = {
   archived: boolean;
   hostId?: string;
   hostName?: string;
+  /** 子智能体的会话：和真实 listPage 一样不进侧栏。 */
+  parentSessionId?: string;
   messages: MockMessage[];
 };
 
@@ -165,6 +169,7 @@ export function sessionListItem(session: MockSession, db: MockDb): SessionListIt
     workspaceRoot: session.workspaceRoot,
     pinned: session.pinned,
     archived: session.archived,
+    ...(session.parentSessionId ? { isChildSession: true } : {}),
     ...(session.hostId ? { hostId: session.hostId, hostName: session.hostName ?? host?.name, connectionState: host?.state ?? "offline" } : {}),
   };
 }
@@ -190,6 +195,10 @@ function journal(session: MockSession): SessionEventEnvelopeV1[] {
     if (message.role === "tool" && message.tool) {
       const callId = message.id;
       events.push({ ...base(message), seq: events.length, type: "tool/call", data: { agentRunId: message.agentRunId, callId, name: message.tool.name, args: message.tool.args }, surface: null });
+      if (message.tool.delegation) {
+        const { childSessionId, presetId } = message.tool.delegation;
+        events.push({ ...base(message), seq: events.length, type: "delegation/requested", data: { invocationId: `${callId}:delegation`, presetId, parentCallId: callId, childSessionId }, surface: null });
+      }
       events.push({ ...base(message), seq: events.length, type: "tool/result", data: { agentRunId: message.agentRunId, callId, ...message.tool.result }, surface: null });
       continue;
     }

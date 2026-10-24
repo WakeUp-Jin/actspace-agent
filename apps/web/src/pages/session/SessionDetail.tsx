@@ -44,8 +44,8 @@ export function SessionDetail({ sessionId }: { readonly sessionId: string }) {
   const renderApproval = useCallback((request: ApprovalRequest) => {
     const block = toolBlockForCall(items, request.callId);
     const bash = block && block.kind === "bash" ? block : null;
-    return <ApprovalCard request={request} {...(bash ? { command: bash.command, ...(bash.sandboxed !== undefined ? { sandboxed: bash.sandboxed } : {}) } : {})} onDecided={onDecided} />;
-  }, [items, onDecided]);
+    return <ApprovalCard request={request} {...(bash ? { command: bash.command, ...(bash.sandboxed !== undefined ? { sandboxed: bash.sandboxed } : {}) } : {})} onDecided={onDecided} onStale={observation.refresh} />;
+  }, [items, onDecided, observation.refresh]);
 
   const onScroll = () => {
     const el = scroller.current;

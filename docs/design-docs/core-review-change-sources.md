@@ -55,7 +55,9 @@ Renderer 只发送稳定 selection、snapshot id 和用户意图。Main 重新�
 
 工作区注册只把用户选用的目录加入应用数据目录中的 `workspaces.json`，不创建 `.git`、不运行 `git init`，也不提交文件。用户选择“添加工作区”或“使用现有文件夹”时，目录选择 IPC 显式传入 `registerWorkspace: true`；选父目录或能力配置目录时不注册。
 
-Desktop Host 在创建会话前注册其工作区，在启动完成前从持久化会话摘要补齐旧工作区。恢复操作合并已有条目，保留稳定 ID 和隐藏偏好。Review、环境查询和 Git mutation 继续只接受已注册目录，不因查询时收到未知路径就自动注册。已注册的非 Git 目录返回不可用状态，初始化 Git 仍是独立的用户操作。
+Desktop Host 在创建会话前注册其工作区，在启动完成前从持久化会话摘要补齐旧工作区。恢复操作合并已有条目，保留稳定 ID 和隐藏偏好。Review 和环境只读查询允许已注册目录或持久化本地会话持有的执行目录，经 realpath 授权检查；不因收到路径就自动注册。Git mutation 仍保留注册准入。非 Git 目录返回不可用状态，初始化 Git 仍是独立的用户操作。
+
+未注册工作树的 Review 身份由授权后的 canonical root 派生为 `session-root:<sha256>`，其 ID 与 root 必须成对传递，显式 ID/root 冲突必须拒绝。刷新、snapshot、diff 和内容查询沿用相同身份；刷新不得丢弃 root 后再将派生 ID 当 registry ID 解析。跨会话绑定的面板继续使用自身目标。
 
 ### 摘要先行、Diff 按需加载
 
@@ -173,7 +175,7 @@ type ReviewSnapshot = {
 
 ### Enable word wrap
 
-只影响 renderer 长行布局，不重新查询 Git。关闭时整个 Diff Canvas 是唯一横向滚动容器，所有行同步横移；单个代码行不得创建自己的滚动条。开启时 Canvas 收回到可视宽度，代码按行内宽度折行。
+只影响 renderer 长行布局，不重新查询 Git。关闭时整个 Diff Canvas 是唯一横向滚动容器，所有代码行同步横移；单个代码行不得创建自己的滚动条。文件标题、file/hunk 操作、图片和状态提示使用 Canvas 的实际可视宽度，并在横向滚动时保持可见，不能按长代码内容宽度居中或把操作推到屏外。开启时 Canvas 收回到可视宽度，代码按行内宽度折行。
 
 ### Load full files / Don't load full files
 
@@ -223,6 +225,7 @@ git apply -- '<validated temporary patch path>'
 - split diff 只在 Review 容器宽度不小于 `640px` 时可用；判断依据是 Review 自身宽度，不是 `window.innerWidth`。
 - Scope、Options、Jump 和 Commit 菜单通过顶层 portal 定位，不能作为横向滚动 toolbar 的子元素，否则会被 `overflow` 裁切成“点击无反应”。
 - Diff Canvas 同时拥有纵向虚拟列表和横向滚动位置；虚拟行共享根据结构化 Diff 预估的稳定内容宽度，避免长行进入或离开挂载窗口时横向范围跳变。
+- 非代码内容的可视宽度复用 Canvas 的尺寸观察，宽度单独变化时也必须更新；不能依赖纵向虚拟范围变化才重绘。横向粘附容器放在共享宽行内部，避免引入第二个滚动条或影响虚拟行纵向定位。
 - Files、Jump、Expand 与 split 在当前 snapshot 不具备数据或宽度条件时显示明确 disabled 状态，不执行空操作。
 - Review Tab 的关闭由右侧对象 Tab chrome 负责，不在 Review 工具栏重复增加关闭按钮。
 

@@ -18,6 +18,7 @@ import { EMPTY_LLM_USAGE, type LlmAdapterDispatchInput } from "@actspace/llm-ser
 import { emptyRuntimePromptSource } from "@actspace/prompt";
 import { AgentRuntimeService } from "./agent-runtime-plugin.js";
 import { RuntimeSessionController } from "../session/session-controller.js";
+import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
 import { createContextHost } from "./context-host.js";
 
 it("runs the model/tool pipeline: explicit development, next-message activation, session isolation and restart", async () => {
@@ -34,7 +35,8 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
   const ports = {
     "agent.registry": new AgentRegistry(),
     ...Object.fromEntries(["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
-    "session.runtime": sessions, "session.journal": { registry }, "session.projection": {},
+    "session.runtime": sessions,
+    "llm.auxiliary-requests": createAuxiliaryRequestRecorder(sessions), "session.journal": { registry }, "session.projection": {},
     "actspace.host.session": { dataRoot: directory, runtimeId: "evolution" },
     "actspace.host.agent": { disabledHarnessEntries: ["browser-tools"], evolution: { inspect: (context: any) => runtime.evolution.inspect(context), execute: (args: any, context: any) => runtime.evolution.execute(args, context) }, contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
     "actspace.host.prompt": { workspaceRoot: directory, resolveSource: async () => emptyRuntimePromptSource() },

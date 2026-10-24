@@ -1,7 +1,7 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { freezeRuntimeV2Json } from "@actspace/shared/runtime-v2";
 import { TaskError, type TaskSnapshot, type TaskRecord, type RunRecord } from "./contracts.js";
-import { TASK_EVENT, RUN_EVENT, QUEUE_EVENT, TASK_OWNER, validateSchedulingEvent } from "./task-events.js";
+import { TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT, TASK_OWNER, validateSchedulingEvent } from "./task-events.js";
 
 /** Keep inherited Journal facts for provenance, but never inherit executable state. */
 export function projectTasks(sessionId: string, events: readonly SessionEventEnvelopeV1[], initial?: TaskSnapshot): TaskSnapshot {
@@ -13,7 +13,7 @@ export function projectTasks(sessionId: string, events: readonly SessionEventEnv
   const pending = (id: string) => { const task = tasks.get(id); if (!task || task.state !== "pending") invalid(); return task; };
   const active = (id: string) => { const run = runs.get(id); if (!run || run.state !== "running") invalid(); return run; };
   for (const event of events) {
-    if (![TASK_EVENT, RUN_EVENT, QUEUE_EVENT].includes(event.type)) continue;
+    if (![TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT].includes(event.type)) continue;
     if (event.source.ownerPluginId !== TASK_OWNER) invalid();
     const data = event.data;
     validateSchedulingEvent(event.type, data);
@@ -33,6 +33,19 @@ export function projectTasks(sessionId: string, events: readonly SessionEventEnv
         break;
       }
       case "cancel": tasks.set(data.taskId, { ...pending(data.taskId), state: "cancelled", targetRunId: null }); queue = queue.filter(id => id !== data.taskId); break;
+      case "return-steering": {
+        active(data.runId);
+        const returning = new Set(data.taskIds);
+        const ordered = queue.filter(id => returning.has(id));
+        if (ordered.length !== data.taskIds.length || ordered.some((id, index) => id !== data.taskIds[index])) invalid();
+        for (const id of ordered) {
+          const task = pending(id);
+          if (task.targetRunId !== data.runId) invalid();
+          tasks.set(id, { ...task, targetRunId: null });
+        }
+        queue = [...ordered, ...queue.filter(id => !returning.has(id))];
+        break;
+      }
       case "operation-start": {
         const task = pending(data.taskId);
         if (paused || task.targetRunId || queue[0] !== task.taskId || [...tasks.values()].some(item => item.state === "claimed")) invalid();

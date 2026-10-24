@@ -1,6 +1,7 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { TrajectoryCell, TrajectoryRecord, TrajectoryRequestView, TrajectoryRuntimeSnapshot, TrajectoryStatus } from "./contract";
 import { parseTimestamp } from "./format";
+import { auxiliaryRequestViews, collectAuxiliaryRequests } from "./auxiliary-requests";
 
 type Data = Readonly<Record<string, RuntimeV2JsonValue>>;
 const asData = (value: RuntimeV2JsonValue | undefined): Data =>
@@ -12,7 +13,6 @@ export const stepKey = (turnId: string, stepId: string) => `${turnId}\u0000${ste
 
 /** Request view key for a builder record: the exact request id first, then its step. */
 export function requestKeyOf(record: TrajectoryRecord, requests: { readonly byRequestId: ReadonlyMap<string, string>; readonly keys: ReadonlySet<string> }): string | null {
-  if (record.childSessionId) return null;
   if (record.kind === "user" || record.kind === "context" || record.kind === "system") return null;
   const exact = record.requestId === null ? undefined : requests.byRequestId.get(record.requestId);
   if (exact !== undefined) return exact;
@@ -31,6 +31,7 @@ export function deriveRequests(runtime: TrajectoryRuntimeSnapshot) {
   const raw = [...(runtime.rawRecords ?? [])].sort((a, b) => (a.sourceSequences[0] ?? 0) - (b.sourceSequences[0] ?? 0));
   const times = new Map(runtime.nodes.map(node => [node.eventSeq, node.time]));
   const byRequestId = new Map<string, string>();
+  const auxiliary = collectAuxiliaryRequests(raw, byRequestId);
   const steps = new Map<string, StepRequest>();
   for (const record of raw) {
     const seq = record.sourceSequences[0] ?? 0;
@@ -56,6 +57,7 @@ export function deriveRequests(runtime: TrajectoryRuntimeSnapshot) {
     const byKey = new Map<string, TrajectoryCell[]>();
     for (const cell of cells) if (cell.requestKey !== null) byKey.set(cell.requestKey, [...(byKey.get(cell.requestKey) ?? []), cell]);
     const views: (Omit<TrajectoryRequestView, "number"> & { seq: number })[] = [];
+    views.push(...auxiliaryRequestViews(auxiliary, cells));
     for (const step of steps.values()) {
       const own = byKey.get(step.key) ?? [];
       const assistant = own.find(cell => cell.kind === "message" && !cell.requestOnly);
@@ -87,6 +89,7 @@ export function deriveRequests(runtime: TrajectoryRuntimeSnapshot) {
     }
     for (const cell of cells) {
       if (cell.kind !== "compacted") continue;
+      if (cell.requestKey?.startsWith("auxiliary:")) continue;
       const status: TrajectoryStatus = cell.isError ? "failed" : cell.durationMs === null ? "running" : "completed";
       views.push({
         key: `compaction:${cell.recordId}`, seq: cell.record.sourceSequences[0] ?? 0, purpose: "compaction", status,

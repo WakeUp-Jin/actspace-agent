@@ -8,7 +8,8 @@ import type { CompactionBlock } from "./session/live-runs/stream-blocks";
 import { getSessionTitle } from "./session/session-title";
 import { createSessionCellRetention, useChatSessionRecord } from "./session/session-store";
 import { mergeTranscript } from "./session/transcript";
-import { createLiveRunStore, useBusySessionIds, useLiveRunView, type StreamEvent } from "./session/live-runs/live-run-store";
+import { createLiveRunStore, TERMINAL_RUN_LIMIT, useBusySessionIds, useLiveRunView, type StreamEvent } from "./session/live-runs/live-run-store";
+import { scheduleFrame } from "./session/frame-batch";
 import { applyTaskSnapshot as applyHostTaskSnapshot, createTaskQueueStore } from "./session/task-queue";
 import { loadEarlier } from "./session/session-pages";
 import { createSessionLocalStore, useSessionLocalIds, useSessionLocalState, type ComposerSessionState, type SessionLocalState } from "./session/session-local-store";
@@ -64,7 +65,7 @@ import { resolvePreferredChatModel } from "./model-selection";
 import type { ComposerExecutionContext, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import { orderQuickOpenProjects, resolveQuickOpenTarget } from "./quick-open-routing";
-import { isOrphanSession } from "./components/sidebar/session-grouping";
+import { isOrphanSession, sessionsByGroupKey } from "./components/sidebar/session-grouping";
 import { appApi } from "./api/app";
 import { approvalsApi } from "./api/approvals";
 import { dialogsApi } from "./api/dialogs";
@@ -216,7 +217,8 @@ export function App() {
   const fallbackWorkspaceRoot = useMemo(() => firstVisibleWorkspaceRoot(workspaceRegistry, sessions), [workspaceRegistry, sessions]);
   const [sessionBootstrapComplete, setSessionBootstrapComplete] = useState(false);
   // 运行中的 run 和 Host 任务队列缓存（14 T16）；当前会话的流式视图在 selectedSessionId 之后读取。
-  const [liveRuns] = useState(createLiveRunStore);
+  // 流式增量按帧通知：一帧里来多少个 delta，App 都只渲染一次。
+  const [liveRuns] = useState(() => createLiveRunStore(TERMINAL_RUN_LIMIT, { scheduleNotify: scheduleFrame }));
   const [taskQueue] = useState(createTaskQueueStore);
   // 后台 bash 任务状态（taskId → 最新状态）；bash_task_update 事件驱动，覆写块显示
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
@@ -263,7 +265,7 @@ export function App() {
   const compactionFailure = useSessionLocalState(localStore, selectedSessionId, selectCompactionFailure);
   const messageQueue = useSessionLocalState(localStore, selectedSessionId, selectMessageQueue);
   // durable 历史从 store 的 cell 派生；cell 不放进 App 的作用域，见 useChatSessionRecord。
-  const { sessionRecord, historyBefore } = useChatSessionRecord(sessionStore, selectedSessionId, bootstrapState?.workspaceRoot);
+  const { sessionRecord, historyBefore } = useChatSessionRecord(sessionStore, selectedSessionId, bootstrapState?.workspaceRoot, isRecoveredRun);
   const runTarget = useRunTarget({
     sessionId: selectedSessionId,
     sessionWorkspacePath: sessionRecord?.meta.workspaceRoot,
@@ -1071,12 +1073,14 @@ export function App() {
     const consumeRequest = async () => {
       const request = await quickOpenApi.consume();
       if (!request || disposed) return;
-      const [settings, listedSessions, registry] = await Promise.all([
+      const [settings, allSessions, registry] = await Promise.all([
         settingsApi.get(),
         sessionsApi.list(),
         workspacesApi.list(),
       ]);
       if (disposed) return;
+      // 和侧栏 listPage 一致：子 Agent 的会话不进会话列表。
+      const listedSessions = allSessions.filter((session) => !session.isChildSession);
       setSessions(listedSessions);
       setWorkspaceRegistry(registry);
       const shortcut = settings.shortcuts?.quickOpen ?? {
@@ -1375,14 +1379,10 @@ export function App() {
     }
   }, []);
 
-  const handleArchiveWorkspace = useCallback(async (workspaceId: string, workspaceRoot?: string) => {
+  const handleArchiveWorkspace = useCallback(async (groupKey: string, workspaceRoot?: string) => {
     const archiveCandidates = await sessionsApi.list();
-    const targetSessionIds = archiveCandidates
-      .filter((session) =>
-        session.workspaceId === workspaceId ||
-        (!session.workspaceId && normalizeWorkspaceRoot(session.workspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)),
-      )
-      .map((session) => session.id);
+    const groupSessions = sessionsByGroupKey(archiveCandidates, workspaceRegistry?.items ?? []).get(groupKey) ?? [];
+    const targetSessionIds = groupSessions.map((session) => session.id);
     if (targetSessionIds.length === 0) return;
     if (targetSessionIds.some((sessionId) => busySessionIds.has(sessionId) || approvalPendingSessionIds.has(sessionId))) {
       return;
@@ -1399,7 +1399,7 @@ export function App() {
       );
       // 没有别的会话可切时回到新建会话页，留在原工作区。
       if (fallback) await handleSelectSession(fallback.id);
-      else await handleCreateSession({ workspaceRoot });
+      else await handleCreateSession({ workspaceRoot, hostId: groupSessions[0]?.hostId, workspaceId: groupSessions[0]?.workspaceId });
     }
 
     const result = await sessionsApi.archiveMany({ sessionIds: targetSessionIds });
@@ -1410,7 +1410,7 @@ export function App() {
     if (!result.ok) {
       console.error("Some workspace sessions could not be archived", result.failedSessionIds);
     }
-  }, [activeSessionId, approvalPendingSessionIds, busySessionIds, handleCreateSession, handleSelectSession, sessions, workspaceRegistry, evictSession]);
+  }, [activeSessionId, approvalPendingSessionIds, busySessionIds, handleCreateSession, handleSelectSession, sessions, workspaceRegistry, evictSession, readSidebarSessions]);
 
   const handleRemoveWorkspace = useCallback(async (workspaceId: string, workspaceRoot?: string) => {
     if (!workspaceRegistry) return;

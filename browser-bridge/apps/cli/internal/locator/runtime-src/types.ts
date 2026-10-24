@@ -28,6 +28,7 @@ export interface LocatorParams {
   scrollY?: number;
   includeNonInteractable?: boolean;
   localCoordinates?: boolean;
+  scrollIntoView?: boolean;
   items?: ClipboardPayloadItem[];
   text?: string;
 }

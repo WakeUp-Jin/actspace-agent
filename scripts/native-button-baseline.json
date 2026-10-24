@@ -92,7 +92,7 @@
   "components/turn-tail/TurnChangesCard.tsx": 3,
   "components/turn-tail/TurnDeliverables.tsx": 2,
   "components/workspace/WorkspaceChromeControls.tsx": 17,
-  "components/settings/models/model-fields.tsx": 3,
-  "components/settings/models/ModelList.tsx": 1,
+  "components/settings/models/FetchModelsDialog.tsx": 1,
+  "components/settings/models/model-fields.tsx": 2,
   "components/settings/models/PurposePicker.tsx": 3
 }

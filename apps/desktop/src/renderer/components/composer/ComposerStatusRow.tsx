@@ -57,10 +57,6 @@ const USAGE_DOT_CLASS = "h-[15px] w-[15px] shrink-0 rounded-full";
 // 3px 环形进度：conic 填充已用占比，radial mask 挖空中心形成圆环。
 const USAGE_DOT_MASK = "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))";
 
-function pathName(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
-}
-
 /**
  * 09 T19：对话中的只读状态行。运行目标已锁定，这里只陈述「在哪儿跑」，没有下拉。
  * 本机：⑂ 分支 · 💻 本机；工作树：⑂ 分支 · ⑂ 工作树；远端：🖥 Host · 📁 工作区（没就绪时第二段换成状态，context 用量写「—」）。
@@ -73,7 +69,7 @@ export function ComposerStatusRow({ form, target, notReady, host, remoteDescript
     <span className={USAGE_CLASS} aria-label="上下文用量暂不可用">—</span>
   ) : (
     // 原生 button（从 Composer 搬来）：状态行里的纯文字 + 圆环入口，没有 Button 的边框、内边距和字重。
-    <button className={USAGE_CLASS} type="button" aria-label={`上下文用量 ${display.percentLabel}`} aria-expanded={context.open} onClick={context.onToggle}>
+    <button className={USAGE_CLASS} type="button" aria-label={`上下文用量 ${display.percentLabel}`} aria-expanded={context.open} onClick={context.onToggle} data-context-usage-toggle="">
       <span
         className={USAGE_DOT_CLASS}
         aria-hidden="true"
@@ -130,11 +126,17 @@ function localFacts(target: Extract<RunTarget, { kind: "local" | "invalid" }>, b
   }
   const worktree = target.kind === "local" ? target.worktree : undefined;
   if (runLocation === "worktree") {
+    const source = worktree ? `原工作区：${worktree.sourceWorkspaceRoot} · 基于 ${worktree.baseBranch}` : "工作树";
     facts.push(
-      <span className={FACT_CLASS} title={worktree ? `原工作区：${pathName(worktree.sourceWorkspaceRoot)} · 基于 ${worktree.baseBranch}` : undefined}>
-        <GitFork className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
-        <span>工作树</span>
-      </span>,
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span tabIndex={0} aria-label={`工作树，${source}`} className={`${FACT_CLASS} rounded-act-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}>
+            <GitFork className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
+            <span>工作树</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="break-all">{source}</TooltipContent>
+      </Tooltip>,
     );
   } else {
     facts.push(

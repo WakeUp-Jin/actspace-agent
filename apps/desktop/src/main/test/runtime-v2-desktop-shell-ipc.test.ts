@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { ReviewGitEngine } from "../review-git-engine";
+import type { ReviewGetSnapshotResult } from "@actspace/shared";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 
 const { handlers, removeHandler } = vi.hoisted(() => {
@@ -33,6 +34,46 @@ import { registerRuntimeV2DesktopShell } from "../runtime-v2/desktop-shell-ipc";
 import { trustedWindow } from "./ipc-sender-fixture";
 
 describe("runtime v2 desktop shell IPC", () => {
+  it.each(["refresh", "mismatched-id"])("preserves the authorized Session root for Review %s", async (operation) => {
+    handlers.clear();
+    const root = await mkdtemp(join(tmpdir(), "review-session-refresh-"));
+    const workspace = join(root, "worktree");
+    const registered = join(root, "registered");
+    await Promise.all([mkdir(workspace), mkdir(registered)]);
+    const git = (args: string[]) => promisify(execFile)("git", args, { cwd: workspace });
+    await git(["init", "-b", "main"]);
+    await writeFile(join(workspace, "sample.txt"), "before\n");
+    await git(["add", "."]);
+    await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixture"]);
+    const engine = new ReviewGitEngine();
+    const realSnapshot = engine.getSnapshot.bind(engine);
+    const snapshotSpy = vi.spyOn(ReviewGitEngine.prototype, "getSnapshot").mockImplementation(realSnapshot);
+    const trusted = trustedWindow();
+    const registration = registerRuntimeV2DesktopShell({
+      roots: { dataRoot: root, sessionRoot: join(root, "sessions-v2"), logRoot: join(root, "logs"), tmpRoot: join(root, "tmp"), defaultWorkspaceRoot: registered, workspaceRoot: registered },
+      getMainWindow: () => trusted.window as never,
+      listSessions: async () => [{ workspaceRoot: workspace }],
+    });
+    const invoke = (channel: string, workspaceId?: string) => handlers.get(channel)!(trusted.event, { workspaceRoot: workspace, workspaceId, selection: { kind: "uncommitted" } }) as Promise<ReviewGetSnapshotResult>;
+    try {
+      const initial = await invoke(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot);
+      if (!initial.ok) throw new Error(initial.message);
+      if (operation === "refresh") {
+        await writeFile(join(workspace, "sample.txt"), "after\n");
+        const refreshed = await invoke(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot);
+        expect(refreshed).toMatchObject({ ok: true, snapshot: { workspaceRoot: initial.snapshot.workspaceRoot, files: [expect.objectContaining({ path: "sample.txt" })] } });
+        if (refreshed.ok) expect(refreshed.snapshot.generation).toBeGreaterThan(initial.snapshot.generation);
+      } else {
+        // A valid root must not silently override an unrelated explicit identity.
+        expect(await invoke(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot, "unknown-workspace")).toMatchObject({ ok: false, code: "invalid_workspace" });
+        expect(await invoke(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot, "session-root:wrong")).toMatchObject({ ok: false, code: "invalid_workspace" });
+      }
+    } finally {
+      registration.dispose();
+      snapshotSpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
   it.each([false, true])("invalidates real external writes and disposes watches (Session-only root: %s)", async (sessionOnly) => {
     handlers.clear();
     const root = await mkdtemp(join(tmpdir(), "review-external-write-"));

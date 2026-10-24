@@ -76,6 +76,10 @@ export function SettingsPage({
     useSettings(onSettingsChange);
   const [keyModalProvider, setKeyModalProvider] = useState<SecretProviderId | null>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!shellRef.current?.contains(document.activeElement) && !document.querySelector('[aria-modal="true"]')) shellRef.current?.focus();
+  }, []);
 
   const navigate = useCallback((nextSection: SettingsSectionId) => {
     setSection(nextSection);
@@ -92,6 +96,14 @@ export function SettingsPage({
   return (
     <SettingsSaveNoticeProvider>
     <div
+      ref={shellRef}
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onBack();
+      }}
       data-testid="settings-page-shell"
       className="flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-text-main"
     >

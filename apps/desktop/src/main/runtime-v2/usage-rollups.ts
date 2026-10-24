@@ -3,7 +3,7 @@ import { prepare } from "./usage-sql";
 
 // Hourly global aggregates keep the normal Usage overview independent of the
 // number of activity rows. Session/text searches keep the exact detail path.
-const dimensions = ["kind", "status", "model", "provider_id", "connection_id", "tool_name", "cost_currency", "historical_unverified"];
+const dimensions = ["kind", "status", "model", "provider_id", "connection_id", "tool_name", "cost_currency", "historical_unverified", "input_tokens_unknown", "output_tokens_unknown", "cache_read_tokens_unknown", "cache_write_tokens_unknown", "reasoning_tokens_unknown", "total_tokens_unknown"];
 const measures = ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens", "total_tokens", "duration_ms", "cost_usd", "cost_amount"];
 const fields = ["group_key", "started_at", ...dimensions, ...measures, "metric_count"];
 const hour = (alias: string) => `substr(${alias}.started_at,1,13)||':00:00.000Z'`;
@@ -12,16 +12,22 @@ const searchCache = new WeakMap<DatabaseSync, { key: string; changes: number }>(
 
 export function clearSearchMetricsCache(db: DatabaseSync): void { searchCache.delete(db); }
 
+/** Background requests are billable Session facts, not synthetic Agent Runs.
+ * Keep legacy rows without a purpose and tool-owned auxiliary requests. */
+export function countableRunSql(alias: string): string {
+  return `COALESCE(json_extract(${alias}.row_json,'$.purpose'),'') NOT IN ('session-title','compaction')`;
+}
+
 export function createUsageRollups(db: DatabaseSync): void {
   // Exact distinct runs are maintained separately from metric dimensions.
   for (const [table, bucket] of [["usage_run_counts", hour("new")], ["usage_run_days", "substr(new.started_at,1,10)||'T00:00:00.000Z'"], ["usage_run_totals", "''"]] as const) {
     const oldBucket = bucket.replaceAll("new.", "old.");
     db.exec(`
       CREATE TABLE IF NOT EXISTS ${table}(session_id TEXT NOT NULL,agent_run_id TEXT NOT NULL,started_at TEXT NOT NULL,kind TEXT NOT NULL,metric_count INTEGER NOT NULL,PRIMARY KEY(started_at,session_id,agent_run_id,kind)) STRICT;
-      CREATE TRIGGER IF NOT EXISTS ${table}_insert AFTER INSERT ON usage_activity WHEN (SELECT batching FROM usage_write_mode)=0 BEGIN
+      CREATE TRIGGER IF NOT EXISTS ${table}_insert AFTER INSERT ON usage_activity WHEN (SELECT batching FROM usage_write_mode)=0 AND ${countableRunSql("new")} BEGIN
         INSERT INTO ${table} VALUES(new.session_id,new.agent_run_id,${bucket},new.kind,1) ON CONFLICT DO UPDATE SET metric_count=metric_count+1;
       END;
-      CREATE TRIGGER IF NOT EXISTS ${table}_delete AFTER DELETE ON usage_activity BEGIN
+      CREATE TRIGGER IF NOT EXISTS ${table}_delete AFTER DELETE ON usage_activity WHEN ${countableRunSql("old")} BEGIN
         UPDATE ${table} SET metric_count=metric_count-1 WHERE session_id=old.session_id AND agent_run_id=old.agent_run_id AND started_at=${oldBucket} AND kind=old.kind;
         DELETE FROM ${table} WHERE session_id=old.session_id AND agent_run_id=old.agent_run_id AND started_at=${oldBucket} AND kind=old.kind AND metric_count=0;
       END;
@@ -35,6 +41,8 @@ export function createUsageRollups(db: DatabaseSync): void {
       CREATE TABLE IF NOT EXISTS ${table} (
         group_key TEXT PRIMARY KEY,started_at TEXT NOT NULL,kind TEXT NOT NULL,status TEXT NOT NULL,
         model TEXT,provider_id TEXT,connection_id TEXT,tool_name TEXT,cost_currency TEXT,historical_unverified INTEGER NOT NULL,
+        input_tokens_unknown INTEGER NOT NULL,output_tokens_unknown INTEGER NOT NULL,cache_read_tokens_unknown INTEGER NOT NULL,
+        cache_write_tokens_unknown INTEGER NOT NULL,reasoning_tokens_unknown INTEGER NOT NULL,total_tokens_unknown INTEGER NOT NULL,
         ${measures.map(name => `${name} REAL`).join(",")},metric_count INTEGER NOT NULL
       ) STRICT;
       CREATE INDEX IF NOT EXISTS ${table}_time_idx ON ${table}(started_at);
@@ -127,5 +135,5 @@ export function searchMetricsSource(db: DatabaseSync, where: string, args: (stri
 export function runCountsSource(since?: string): string {
   if (!since) return "usage_run_counts";
   const boundary = new Date(Math.ceil(Date.parse(since) / 3_600_000) * 3_600_000).toISOString();
-  return `(SELECT session_id,agent_run_id,started_at,kind FROM usage_run_counts WHERE started_at >= '${boundary}' UNION ALL SELECT session_id,agent_run_id,started_at,kind FROM usage_activity WHERE started_at >= '${since}' AND started_at < '${boundary}')`;
+  return `(SELECT session_id,agent_run_id,started_at,kind FROM usage_run_counts WHERE started_at >= '${boundary}' UNION ALL SELECT session_id,agent_run_id,started_at,kind FROM usage_activity WHERE started_at >= '${since}' AND started_at < '${boundary}' AND ${countableRunSql("usage_activity")})`;
 }

@@ -83,10 +83,8 @@ export class ModelConnectionsService {
             return [{
               key,
               apiModel: definition.apiModel,
-              enabled: installed.enabled,
               effective: definition.effective,
               overrides: overrides && Object.keys(overrides).length > 0 ? overrides : null,
-              removable: definition.source !== "builtin" && definition.source !== "curated",
               usedBy: usedBy.get(key) ?? [],
             }];
           })
@@ -173,7 +171,8 @@ export class ModelConnectionsService {
       const current = this.settings.getV4().settings.models;
       const legacyProvider = template.legacyProviderId as LlmProviderId | undefined;
       const legacyId = legacyProvider ? `${legacyProvider}:default` : undefined;
-      // 内置服务商还没配 Key 时，第一份 Key 落在旧的 `<p>:default` 连接上，内置模型直接可用。
+      // 内置服务商还没配 Key 时，第一份 Key 落在旧的 `<p>:default` 连接上。
+      // 新连接的模型列表从空开始，由用户在「获取可用模型」里挑：先清掉这个连接下预装的内置模型（没有 Key 时它们本来就看不到）。
       const useLegacy = Boolean(legacyProvider && legacyId && !this.settings.hasConnectionKey(legacyId, legacyProvider));
       const providerId: LlmProviderId = legacyProvider ?? "openrouter";
       const connectionId = useLegacy ? legacyId! : uniqueConnectionId(template.id, current);
@@ -201,10 +200,22 @@ export class ModelConnectionsService {
             defaultModel: input.models[0]?.apiModel.trim() || null,
             ...(draft.protocol === "anthropic-messages" ? { authMode: "auto" as const, ...(input.resolvedAuth ? { resolvedAuth: input.resolvedAuth } : {}) } : {}),
           };
-      await this.settings.applyModelsChange((models) => ({
-        connections: { [connectionId]: connection },
-        ...this.#modelsPatch({ ...models, connections: { ...models.connections, [connectionId]: connection } }, connectionId, input.models ?? []),
-      }), { connectionId, providerId, apiKey: draft.apiKey });
+      await this.settings.applyModelsChange((models) => {
+        const cleared = useLegacy ? removeKeysPatch(models, this.#keysOf(models, connectionId)) : {};
+        const base: SettingsV4Models = {
+          ...models,
+          connections: { ...models.connections, [connectionId]: connection },
+          installed: Object.fromEntries(Object.entries(models.installed).filter(([key]) => !cleared.installed || !(key in cleared.installed))) as SettingsV4Models["installed"],
+        };
+        const added = this.#modelsPatch(base, connectionId, input.models ?? []);
+        return {
+          ...cleared,
+          connections: { [connectionId]: connection },
+          ...(added.definitions ? { definitions: { ...cleared.definitions, ...added.definitions } } : {}),
+          installed: { ...cleared.installed, ...added.installed },
+          ...(added.overrides ? { overrides: { ...cleared.overrides, ...added.overrides } } : {}),
+        };
+      }, { connectionId, providerId, apiKey: draft.apiKey });
       return connectionId;
     });
   }
@@ -287,7 +298,6 @@ export class ModelConnectionsService {
       const key = this.#installedKey(input?.key);
       await this.settings.applyModelsChange((models) => {
         const patch: Partial<SettingsV4Models> = {};
-        if (input.enabled !== undefined) patch.installed = { [key]: { ...models.installed[key]!, enabled: input.enabled === true } };
         if (input.overrides !== undefined) {
           const overrides = input.overrides === null ? {} : sanitizeModelOverrides(input.overrides);
           patch.overrides = { [key]: Object.keys(overrides).length > 0 ? overrides : null } as SettingsV4Models["overrides"];
@@ -300,11 +310,8 @@ export class ModelConnectionsService {
 
   async removeModel(input: { key: ModelKey }): Promise<ModelConnectionsResult> {
     return this.#run(async () => {
+      // 内置模型也能移除（只移出列表，定义还在），之后可以从「获取可用模型」再加回来。
       const key = this.#installedKey(input?.key);
-      const definition = this.models.getModelSnapshot().definitions[key];
-      if (definition?.source === "builtin" || definition?.source === "curated") {
-        throw new ModelConnectionsError("model_not_removable", "内置模型只能停用，不能移除。");
-      }
       const connectionId = this.#connectionIdOf(key);
       await this.settings.applyModelsChange((models) => removeKeysPatch(models, [key]));
       return connectionId;
@@ -445,7 +452,7 @@ export class ModelConnectionsService {
       if (installed[key]) continue;
       const builtin = builtins[key];
       if (models.installed[key]) {
-        // 已经在连接里：重新获取列表时只刷新服务商数据，启用状态和用户修改不动。
+        // 已经在连接里：只刷新服务商数据，用户修改不动。
         const stored = models.definitions[key];
         const facts = sanitizeModelFacts(input.providerFacts);
         if (stored && Object.keys(facts).length > 0 && stored.source !== "builtin" && stored.source !== "curated") definitions[key] = { ...stored, providerFacts: facts };
@@ -467,7 +474,7 @@ export class ModelConnectionsService {
           ...(Object.keys(facts).length > 0 ? { providerFacts: facts } : {}),
         };
       }
-      installed[key] = { enabled: input.enabled !== false, addedAt, connectionId };
+      installed[key] = { enabled: true, addedAt, connectionId };
       const userOverrides = input.overrides ? sanitizeModelOverrides(input.overrides) : {};
       if (Object.keys(userOverrides).length > 0) overrides[key] = userOverrides;
     }

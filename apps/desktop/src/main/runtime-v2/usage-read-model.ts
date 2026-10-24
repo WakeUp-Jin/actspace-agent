@@ -1,11 +1,11 @@
 import type { ContextHistoryResult } from "./context-history-query";
+import { isDelegatedSession } from "@actspace/shared/session-list-page";
 import type { ContextHistoryState } from "./context-history-projection";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { ReadModelScheduler } from "./read-model-scheduler";
 import type { UsageQueryProgress, SessionListPage, SessionListPageInput, UsageActivitySnapshot, UsageStatisticsGetInput, UsageStatisticsSnapshot } from "@actspace/shared";
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { RuntimeV2GlobalSessionSummary } from "@actspace/shared/runtime-v2";
 
@@ -210,7 +210,7 @@ export class UsageReadModelService {
     return this.#serialize(async () => {
       this.#summaries = await this.#readSummaries();
       try {
-        if (this.#lightweightSources) await this.#syncChanged(undefined, true);
+        if (this.#lightweightSources) await this.#syncChanged(true);
         else await this.#syncCatalog();
         return this.#sessionResult(await this.#send({ type: "query", request: "sessions", input }) as SessionListPage);
       } catch (error) {
@@ -218,7 +218,7 @@ export class UsageReadModelService {
         if (this.#disposed || (error instanceof Error && /^Usage (?:(result|search) exceeds|cursor invalid)/.test(error.message))) throw error;
         try {
           if (error instanceof Error && /schema|malformed|not a database/i.test(error.message)) { await this.#resetDerivedDatabase(); }
-          if (this.#lightweightSources) await this.#syncChanged(undefined, true);
+          if (this.#lightweightSources) await this.#syncChanged(true);
           else await this.#syncCatalog();
           return this.#sessionResult(await this.#send({ type: "query", request: "sessions", input }) as SessionListPage);
         } catch (reason) {
@@ -308,12 +308,11 @@ export class UsageReadModelService {
     const sessionId = (message.input.scope ?? (message.input.sessionId ? "session" : "global")) === "session" ? message.input.sessionId ?? "" : undefined;
     this.#summaries = await this.#readSummaries(sessionId);
     if (this.#reader.sessionQuerySources && !this.#lightweightSources) throw new Error("Session provider does not support bounded Usage queries. Session history and details remain available.");
-    const resetAt = await this.#usageResetAt();
     if (sessionId !== undefined && this.#failedSessionIds.has(sessionId)) throw new Error("Requested Session is unreadable.");
     try {
-      await this.#syncChanged(resetAt, false, sessionId);
+      await this.#syncChanged(false, sessionId);
       this.#progress("querying");
-      return await this.#send({ type: "query", request: message.kind, input: message.input, resetAt });
+      return await this.#send({ type: "query", request: message.kind, input: message.input });
     } catch (firstError) {
       if (firstError instanceof SessionSourceReadError || firstError instanceof WorkerTimeoutError) throw firstError;
       if (this.#disposed || (firstError instanceof Error && /^Usage (?:(result|search) exceeds|cursor invalid)/.test(firstError.message))) throw firstError;
@@ -321,22 +320,22 @@ export class UsageReadModelService {
       this.#progress("rebuilding");
       try {
         if (firstError instanceof Error && /schema|malformed|not a database/i.test(firstError.message)) { await this.#resetDerivedDatabase(); }
-        await this.#syncChanged(resetAt, false, sessionId);
+        await this.#syncChanged(false, sessionId);
         this.#progress("querying");
-        return await this.#send({ type: "query", request: message.kind, input: message.input, resetAt });
+        return await this.#send({ type: "query", request: message.kind, input: message.input });
       } catch (error) {
         await this.#send({ type: "abort-sync" }).catch(() => undefined);
         this.#progress("fallback");
-        return this.#fallback(message, resetAt, error);
+        return this.#fallback(message, error);
 
       }
     }
   }
 
-  #fallback(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }, resetAt: string | undefined, reason: unknown): Promise<WorkerResult> {
-    return this.#withFallback(() => this.#fallbackLocked(message, resetAt, reason));
+  #fallback(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }, reason: unknown): Promise<WorkerResult> {
+    return this.#withFallback(() => this.#fallbackLocked(message, reason));
   }
-  async #fallbackLocked(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }, resetAt: string | undefined, reason: unknown): Promise<WorkerResult> {
+  async #fallbackLocked(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }, reason: unknown): Promise<WorkerResult> {
     const summaries = (this.#summaries ?? []).filter(row => message.input.scope === "session" || (message.input.scope === undefined && message.input.sessionId) ? row.sessionId === message.input.sessionId : true);
     if (summaries.length > 1_000) throw new Error("Usage index unavailable; Session fallback exceeds 1,000 sessions. Retry rebuilding the index.");
     if (summaries.reduce((count, row) => count + row.throughJournalSeq + 1, 0) > 5_000) throw new Error("Usage index unavailable; Session fallback exceeds 5,000 events. Retry rebuilding the index.");
@@ -356,7 +355,7 @@ export class UsageReadModelService {
         }
       }
       this.#progress("querying");
-      const result = await this.#send({ type: "fallback-query", request: message.kind, input: message.input, resetAt }) as UsageActivitySnapshot | UsageStatisticsSnapshot | null;
+      const result = await this.#send({ type: "fallback-query", request: message.kind, input: message.input }) as UsageActivitySnapshot | UsageStatisticsSnapshot | null;
       if (result) result.readModel = { source: "session", status: "fallback", reason: reason instanceof Error ? reason.message : String(reason) };
       return result;
     } finally { await this.#send({ type: "fallback-end" }).catch(() => undefined); }
@@ -378,21 +377,6 @@ export class UsageReadModelService {
         agentFormId: "actspace.main", agentMode: h.createdWith.initialAgentMode ?? (h.createdWith.presetId === "actspace.chat" ? "chat" : "agent"), agentModeRevision: 0,
         title: null, pinned: false, archived: false, completedTurnCount: 0, accessState: "browse-only", lineage: h.lineage, querySource };
     });
-  }
-
-  async #usageResetAt(): Promise<string | undefined> {
-    const path = join(this.#dataRoot, "global-usage-reset.json");
-    try {
-      const value = JSON.parse(await readFile(path, "utf8")) as { version?: number; resetAt?: string };
-      return value.version === 1 && typeof value.resetAt === "string" && Number.isFinite(Date.parse(value.resetAt)) ? new Date(value.resetAt).toISOString() : undefined;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") return undefined;
-      const resetAt = new Date().toISOString();
-      await mkdir(this.#dataRoot, { recursive: true });
-      try { await writeFile(path, JSON.stringify({ version: 1, resetAt }), { flag: "wx", mode: 0o600 }); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code === "EEXIST") return this.#usageResetAt(); throw error; }
-      return resetAt;
-    }
   }
 
   #syncCatalog(): Promise<void> {
@@ -419,7 +403,7 @@ export class UsageReadModelService {
     else for (const [id, value] of fingerprints) this.#catalogFingerprints?.set(id, value);
   }
 
-  async #syncChanged(resetAt?: string, catalogOnly = false, sessionId?: string): Promise<void> {
+  async #syncChanged(catalogOnly = false, sessionId?: string): Promise<void> {
     await this.#syncCatalog();
     const providerRead = this.#reader.readSessionEventBatch?.bind(this.#reader);
     if (!providerRead) throw new Error("Session provider does not support bounded Usage reads.");
@@ -439,7 +423,7 @@ export class UsageReadModelService {
       if (!job) {
         const waiters = new Set([waiter]);
         const scope: QueryScope = { ...waiter, requestId: undefined };
-        const task = this.#scope.run(scope, () => this.#syncSource(summary, resetAt, catalogOnly, sessionId, read, waiters));
+        const task = this.#scope.run(scope, () => this.#syncSource(summary, catalogOnly, sessionId, read, waiters));
         job = { key, waiters, task }; this.#syncJobs.set(cacheId, job);
         void task.finally(() => { if (this.#syncJobs.get(cacheId)?.task === task) this.#syncJobs.delete(cacheId); }).catch(() => undefined);
       } else job.waiters.add(waiter);
@@ -448,7 +432,7 @@ export class UsageReadModelService {
     }
   }
 
-  async #syncSource(summary: Summary, resetAt: string | undefined, catalogOnly: boolean, sessionId: string | undefined, read: NonNullable<Reader["readSessionEventBatch"]>, waiters: Set<QueryScope>): Promise<void> {
+  async #syncSource(summary: Summary, catalogOnly: boolean, sessionId: string | undefined, read: NonNullable<Reader["readSessionEventBatch"]>, waiters: Set<QueryScope>): Promise<void> {
       const demand = (events = 0) => {
         const live = [...waiters].filter(scope => !scope.cancelled && (!scope.requestId || (this.#requests.has(scope.requestId) && this.#requests.get(scope.requestId)?.phase !== "cancelled")));
         if (this.#disposed || !live.length) throw new Error("Usage query cancelled.");
@@ -482,7 +466,7 @@ export class UsageReadModelService {
             // One bounded lookahead overlaps provider parsing with SQL projection.
             // Capture rejection immediately; failures still roll back the Session.
             next = batch.done ? undefined : read(summary.sessionId, { throughSeq: summary.throughJournalSeq, cursor: batch.cursor }).then(batch => ({ batch }), error => ({ error }));
-            await this.#send({ type: "journal", source, events: batch.events, cursor: batch.cursor, first, final: batch.done, reset, resetAt, catalogOnly });
+            await this.#send({ type: "journal", source, events: batch.events, cursor: batch.cursor, first, final: batch.done, reset, catalogOnly });
             demand(batch.events.length);
             first = false; cursor = batch.cursor;
             if (batch.done) break;
@@ -592,5 +576,5 @@ function fingerprintCatalog(summary: Summary): string {
 }
 
 function toCatalogRow(summary: Summary): CatalogRow {
-  return { sessionId: summary.sessionId, title: summary.title, revision: summary.throughJournalSeq, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), pinned: summary.pinned, archived: summary.archived, accessState: summary.accessState, isChildSession: summary.lineage !== null, agentRunCount: summary.completedTurnCount, agentForm: summary.agentForm, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, querySource: summary.querySource };
+  return { sessionId: summary.sessionId, title: summary.title, revision: summary.throughJournalSeq, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), pinned: summary.pinned, archived: summary.archived, accessState: summary.accessState, isChildSession: isDelegatedSession(summary.lineage), agentRunCount: summary.completedTurnCount, agentForm: summary.agentForm, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, querySource: summary.querySource };
 }

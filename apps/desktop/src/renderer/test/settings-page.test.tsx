@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { AppSettings, LocalUpdateState, SessionListItem, SettingsV4Snapshot, SettingsV4UpdateInput } from "@actspace/shared";
 import { SettingsPage } from "../components/settings/SettingsPage";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { Dialog, DialogContent, DialogTitle } from "../components/ui/Dialog";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 
 function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
@@ -106,6 +107,48 @@ function renderSettingsPage(props: Parameters<typeof SettingsPage>[0] = { onBack
 }
 
 describe("SettingsPage", () => {
+  it.each([true, false])("respects an existing modal=%s dialog when settings mounts", async (modal) => {
+    const view = (showSettings: boolean) => (
+      <TooltipProvider delayDuration={0}>
+        <Dialog open modal={modal}>
+          <DialogContent>
+            <DialogTitle>Existing layer</DialogTitle>
+            <button>Layer action</button>
+          </DialogContent>
+        </Dialog>
+        {showSettings && <SettingsPage onBack={() => {}} initialSection="appearance" />}
+      </TooltipProvider>
+    );
+    const { rerender } = render(view(false));
+    const action = await screen.findByRole("button", { name: "Layer action" });
+    await waitFor(() => expect(action).toHaveFocus());
+    rerender(view(true));
+    await waitFor(() => expect(modal ? action : screen.getByTestId("settings-page-shell")).toHaveFocus());
+  });
+
+  it("leaves settings on an unconsumed Escape even when opened without a mouse", async () => {
+    const onBack = vi.fn();
+    renderSettingsPage({ onBack, initialSection: "appearance" });
+    await screen.findByTestId("settings-page-shell");
+    await userEvent.keyboard("{Escape}");
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns focus after cancelling an inline edit so the next Escape leaves settings", async () => {
+    stubToolsV4();
+    const onBack = vi.fn();
+    renderSettingsPage({ onBack });
+    const edit = await screen.findByRole("button", { name: "编辑显示名称" });
+    await userEvent.click(edit);
+    await userEvent.type(screen.getByRole("textbox", { name: "显示名称" }), "临时名称");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("textbox", { name: "显示名称" })).not.toBeInTheDocument();
+    expect(onBack).not.toHaveBeenCalled();
+    await waitFor(() => expect(edit).toHaveFocus());
+    await userEvent.keyboard("{Escape}");
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
   const getSettings = vi.fn(async () => makeSettings());
   const updateSettings = vi.fn(async (input) => makeSettings(input as Partial<AppSettings>));
   const readAgentSystemPrompt = vi.fn(async () => ({

@@ -1,3 +1,4 @@
+import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
 import { ContextCompactionCoordinator } from "@actspace/context-engine";
 import { describe, expect, it, vi } from "vitest";
 import { apply, CompactionPlugin, CompactionService } from "../plugin.js";
@@ -14,12 +15,13 @@ describe("compaction plugin lifecycle", () => {
     { routes: ["fixture"], override: undefined, expected: "fixture" },
   ])("uses $expected for routes $routes and override $override", async ({ routes, override, expected }) => {
     const ctx = new CordisContextClass();
+    ctx.provide("llm.auxiliary-requests", { start: async () => ({ finish: async () => {} }) });
     ctx.provide("context.engine", { compaction: new ContextCompactionCoordinator() });
     const session = await compactionSession();
     const prepare = vi.fn((request) => ({
-      request,
+      request: { ...request, requestId: "fixture-request" },
       registration: { registrationId: "fixture", adapter: { adapterVersion: "fixture" } },
-      dispatch: async () => (async function* () { yield { type: "done", content: [{ type: "text", text: "summary" }] }; })(),
+      dispatch: async () => (async function* () { yield { type: "done", usage: EMPTY_LLM_USAGE, stopReason: "stop", content: [{ type: "text", text: "summary" }] }; })(),
       release: vi.fn(),
     }));
     ctx.provide("llm.service", { routes: { list: () => routes.map(routeId => ({ routeId })) }, prepareAsync: prepare });
@@ -35,6 +37,7 @@ describe("compaction plugin lifecycle", () => {
 
   it("owns the compaction runtime through a Cordis Service", async () => {
     const ctx = new CordisContextClass();
+    ctx.provide("llm.auxiliary-requests", { start: async () => ({ finish: async () => {} }) });
     ctx.provide("context.engine", { compaction: new ContextCompactionCoordinator() });
     ctx.provide("llm.service", { routes: { list: () => [{ routeId: "fixture" }] } });
     await ctx.plugin({ inject: ["llm.service", "context.engine"], apply: (inner) => apply(inner as never) });
@@ -47,6 +50,7 @@ describe("compaction plugin lifecycle", () => {
 
   it("exposes live Chat trigger overrides through the registered Cordis service", async () => {
     const ctx = new CordisContextClass();
+    ctx.provide("llm.auxiliary-requests", { start: async () => ({ finish: async () => {} }) });
     ctx.provide("context.engine", { compaction: new ContextCompactionCoordinator() });
     ctx.provide("llm.service", { routes: { list: () => [{ routeId: "fixture" }] } });
     try {

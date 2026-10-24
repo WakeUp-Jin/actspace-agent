@@ -126,13 +126,27 @@ models.dev / OpenRouter public API
 - 模型上手填的价格不经过官方域名匹配或名称推断，按 USD / 百万 token 填写，快照来源为 `configured`。清空手填价后回到参考价 × 倍率；没有参考价时费用未知。既有快照不变。
 - 每个请求使用最终模型身份，覆盖按 reasoning effort 改写的模型、子 Agent、重试；请求开始后不受目录更新影响。
 
+### 协议字段存在性与 SDK 适配
+
+Token 的已知性按字段保存：没有 usage、空对象、缺失字段和无效的负数/非数值均为 `null`；供应商明确返回的有限非负数（包括 `0`）才是用量事实。部分响应只能推进已经报告的字段，后续部分帧不清空早先事实。成功、失败和取消使用同一规则，缺输入或输出时不生成整次费用估算。SDK 预填的零计数和零费用均不能充当响应事实。
+
+固定依赖 `@earendil-works/pi-ai@0.82.1` 通过版本化 pnpm patch，在 Chat Completions、Responses 和 Anthropic 原始 usage 边界附带 `actspaceWireUsage.version = 1` 的字段存在性元数据；普通 SDK 消费者的数值契约不变。适配层只读取这份元数据，再归一化互斥缓存桶。缺少兼容元数据时保守返回未知。补丁升级须重新通过真实 SDK/SSE 的缺失、部分、显式零、非零、缓存、非法值、失败和取消测试，以及离线 frozen-lockfile 全新安装验证；不能直接改 node_modules 或只测试模拟的 SDK 对象。
+
+这项修复仅影响新请求。历史 Journal 没有保留原始字段存在性，不能猜测旧零计数的真实性或自动重写历史事实；请求次数仍按实际请求生命周期累计，不以 token 是否为零或未知决定是否计数。
+
 ## 历史费用与币种
 
 不修改历史 Journal，也不按今天的价目自动重算旧请求。旧记录没有价格证据的零值不能展示为“确认免费”。投影优先使用新增 provenance；对无 provenance 的历史零值作保守降级，以旧 adapterVersion 等元数据解释已知缺陷，有可靠免费证据的除外。非零旧记录保留金额并标注“历史记录，来源未验证”。
 
-系统内部费用统一保存和展示为 USD。外部接口若返回 CNY，在进入模型价格、请求投影和统计聚合的边界按 `7.2 CNY = 1 USD` 转换；未提供币种时按 USD 处理。升级时一次性清空已有使用统计索引，不迁移或重算旧记录；Session Journal 仍保留用于会话恢复，清空时间之后的新请求才进入统计。精度只在展示时舍入，保留小额费用最多六位小数。
+系统内部费用统一保存和展示为 USD。外部接口若返回 CNY，在进入模型价格、请求投影和统计聚合的边界按 `7.2 CNY = 1 USD` 转换；未提供币种时按 USD 处理。统计默认覆盖现有 Session Journal 中的请求和工具活动，不能以首次打开统计页的时间隐式截断历史。旧 `global-usage-reset.json` 已退役，保留文件但不读取、不新建；历史费用继续按上述来源证据规则解释，不能因价格未知而丢弃请求或 Token。精度只在展示时舍入，保留小额费用最多六位小数。
 
 没有任何已知金额且存在请求时显示“费用未知”；有部分金额时显示“已知费用”及未知请求数。没有请求时显示空状态。工具本身没有计费事实，不计入未知模型费用请求数。
+
+辅助模型的真实 dispatch 必须独立计入请求、Token 与费用，覆盖图像识别、标题生成、上下文压缩和自动审核。图像识别与自动审核绑定实际父工具的 Run/Turn/Step/call；标题仅归属 Session，压缩归属 Session 并可关联实际 Turn，不能为后台任务虚构 Run。主 Step 与辅助请求各自消费自己的终结用量，禁止将辅助 Token 叠加到主 Step 后重复聚合。每次 attempt 使用 Prepared request 的实际唯一 requestId、路由与模型，logicalRequestId 仅关联同一逻辑请求。
+
+辅助请求开始事实持久化后才派发，结束事实持久化后才返回；业务解析在计量结束之后，格式不合法也可能已经产生费用。失败、取消和未终结均保留真实的部分或未知用量，显式零保留。自动审核的并发检查仅忽略本次审核自身、完整身份一致的计量事实，其他并发事件仍使快照失效。辅助事实不得生成对话气泡或进入 Context。
+
+Session 与全局统计保留全部辅助请求的请求数、Token 与费用；标题和压缩不增加 Run 数，轮尾仅聚合属于实际 Run 的用量。SQL 明细、小时/日/总量汇总、批量写入与降级投影必须保持相同规则。派生 SQLite schema14 升级时同时废弃旧行、触发器和游标，从 Journal 重放；旧 Journal 没有辅助事实时不按工具或标题次数猜算。图像调用的完整生命周期见[图片分析工具](../tool-system/agent-image-inspection-tool.md)。
 
 ## 本地更新与性能
 
@@ -168,6 +182,6 @@ models.dev / OpenRouter public API
 
 目录归一化、端点匹配位于 `packages/shared/src/model-catalog-normalize.ts`、`model-pricing.ts`；费用计算器位于 `packages/llm/service/src/usage-cost.ts`。目录宿主在 `apps/desktop/src/main/model-catalog-service.ts`，worker 随 Electron main 产物构建。
 
-统计通过 `UsageSourceCache` 合并首次读取，收到宿主 durable 通知后失效；未变更时筛选和分页不会重读 Journal。活动行按不可变 Journal 与 revision 复用，时间窗和聚合每次重新计算。单写者宿主以外直接修改文件需重启重建缓存；冷读取仍沿用现有会话枚举路径，不承诺全库首次读取的常数耗时。
+桌面统计通过 `UsageReadModelService` 和 SQLite Worker 分批投影 Journal，收到宿主 durable 通知后失效；未变更时筛选和分页不会重读 Journal。活动行保存完整历史，时间窗只在查询时过滤。SQLite schema 10 通过现有派生库重建机制淘汰旧的截断索引及其游标，回放 Journal 补回历史；此过程会重建同库的目录与 Context 派生数据，不修改 Session 原始事实。旧 JSON `UsageSourceCache` 同步升级到版本 2，拒绝复用版本 1 的截断结果。首次升级需承担重建成本，之后沿用增量读取，不承诺即时完成。
 
 自动化、浏览器截图观察、构建 worker 压测与真实宿主缺口见[执行摘要](../../exec-runs/20260906-actspace-usage-statistics/execution-summary.md)。

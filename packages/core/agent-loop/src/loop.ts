@@ -261,10 +261,9 @@ export class AgentLoop {
           await this.checkpoint("before-llm-dispatch");
           output = undefined;
         }
-        if (output.content.length > 0 || output.failure !== null) {
-          finalText = output.text || output.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-          await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content: output.content as unknown as RuntimeV2JsonValue, finishReason: output.stopReason ?? (output.aborted ? "aborted" : "completed"), usage: output.usage }, { surface: { kind: "append", node: { kind: "assistant", messageId: output.messageId, content: output.content as unknown as RuntimeV2JsonValue } } }));
-        }
+        // Empty content still settles the request before its Step can end.
+        finalText = output.text || output.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+        await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content: output.content as unknown as RuntimeV2JsonValue, finishReason: output.stopReason ?? (output.aborted ? "aborted" : "completed"), usage: output.usage }, { surface: { kind: "append", node: { kind: "assistant", messageId: output.messageId, content: output.content as unknown as RuntimeV2JsonValue } } }));
         if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames, requestModel);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");

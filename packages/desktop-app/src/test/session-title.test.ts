@@ -12,6 +12,7 @@ function fixture(initialTitle: string | null = null) {
   const snapshot = () => ({ metadata: { title }, sessionId: "session" });
   const run = vi.fn(async () => ({ sessionId: "session", snapshot: snapshot() }));
   const services = new Map<string, unknown>([
+    ["llm.auxiliary-requests", { start: async () => ({ finish: async () => {} }) }],
     ["session.runtime", { resume: async () => session, snapshot }],
     ["agent.runtime", { runs: { service: { submit: run }, configuration: () => ({ model: "main-model" }) } }], ["compaction.runtime", {}], ["llm.service", {}],
   ]);
@@ -37,7 +38,7 @@ describe("first message session title", () => {
     await f.submit(input);
     expect(f.run).toHaveBeenCalledOnce();
     await vi.waitFor(() => expect(f.complete).toHaveBeenCalledOnce());
-    expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ purpose: "utility", model: "main-model" }));
+    expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "session", purpose: "utility", model: "main-model", auxiliary: { recorder: expect.any(Object), owner: { sessionId: "session", purpose: "session-title" } } }));
     await f.submit({ ...input, content: "第二条" });
     expect(f.complete).toHaveBeenCalledOnce();
     f.resolve({ text: '"项目架构分析"' });

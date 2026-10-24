@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { ConnectionModelView, ConnectionView, EffectiveModel, FactSource, ModelKey } from "@actspace/shared";
 import {
   PURPOSES,
+  canRestore,
+  formatTokenInput,
+  modelMeta,
+  parseTokens,
   familyLogo,
   formatMultiplier,
   formatPrice,
@@ -40,7 +44,7 @@ function effective(patch: Partial<EffectiveModel> = {}, source: FactSource = "ca
 }
 
 function model(key: string, patch: Partial<ConnectionModelView> = {}): ConnectionModelView {
-  return { key: key as ModelKey, apiModel: key.split("/").pop()!, enabled: true, effective: effective({ label: key }), overrides: null, removable: true, usedBy: [], ...patch };
+  return { key: key as ModelKey, apiModel: key.split("/").pop()!, effective: effective({ label: key }), overrides: null, usedBy: [], ...patch };
 }
 
 function connection(connectionId: string, models: ConnectionModelView[], patch: Partial<ConnectionView> = {}): ConnectionView {
@@ -145,12 +149,11 @@ describe("model-view", () => {
     expect(toggleLevel(null, "low")).toEqual({ levels: ["low"] });
   });
 
-  it("groups enabled models per enabled connection, filtered by purpose and query", () => {
+  it("groups models per enabled connection, filtered by purpose and query", () => {
     const vision = model("a/vision-pro", { effective: effective({ label: "Vision Pro", input: ["text", "image"] }) });
     const text = model("a/text-only");
-    const off = model("a/disabled", { enabled: false });
     const connections = [
-      connection("a", [vision, text, off]),
+      connection("a", [vision, text]),
       connection("b", [model("b/other")], { enabled: false }),
     ];
     const chat = PURPOSES.find((purpose) => purpose.id === "chat")!;
@@ -168,8 +171,32 @@ describe("model-view", () => {
     expect(purposeSummary(connections, { model: "gone" as ModelKey, thinking: null })).toMatchObject({ missing: true });
   });
 
-  it("counts enabled unknown models as pending", () => {
-    expect(pendingCount(connection("a", [model("a/known"), model("a/new", { effective: UNKNOWN }), model("a/off", { effective: UNKNOWN, enabled: false })]))).toBe(1);
+  it("counts unknown models as pending", () => {
+    expect(pendingCount(connection("a", [model("a/known"), model("a/new", { effective: UNKNOWN })]))).toBe(1);
+  });
+
+  it("formats and parses token counts for inputs", () => {
+    expect(formatTokenInput(128_000)).toBe("128K");
+    expect(formatTokenInput(1_000_000)).toBe("1M");
+    expect(formatTokenInput(1_048_576)).toBe("1M");
+    expect(formatTokenInput(262_144)).toBe("256K");
+    expect(formatTokenInput(12_345)).toBe("12345");
+    expect(formatTokenInput(null)).toBe("");
+    expect(parseTokens("128K")).toBe(128_000);
+    expect(parseTokens("1.5m")).toBe(1_500_000);
+    expect(parseTokens("200,000")).toBe(200_000);
+    expect(parseTokens("")).toBeNull();
+    expect(parseTokens("abc")).toBeUndefined();
+    expect(parseTokens("0")).toBeUndefined();
+  });
+
+  it("summarises a collapsed card and knows when a field can be restored", () => {
+    expect(modelMeta(effective({ contextWindow: 256_000, thinking: { levels: ["off", "low", "high"], default: "high" }, input: ["text", "image"] }))).toBe("256K · 思考高 · 看图");
+    expect(modelMeta(effective({ contextWindow: null, thinking: { levels: ["off", "high"], default: "off" }, input: ["text"] }))).toBe("思考关");
+    const edited = effective({ sources: { label: "catalog", contextWindow: "user", maxOutput: "catalog", input: "catalog", thinking: "catalog", rates: "catalog" } });
+    expect(canRestore(edited, "contextWindow")).toBe(true);
+    expect(canRestore(edited, "rates")).toBe(false);
+    expect(canRestore({ ...edited, catalog: null }, "contextWindow")).toBe(false);
   });
 
   it("picks a family mark from the catalog id, else the raw id", () => {

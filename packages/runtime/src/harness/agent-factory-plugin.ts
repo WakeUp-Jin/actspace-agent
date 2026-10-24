@@ -1,4 +1,5 @@
-import { reviewConversation, type AutoReviewer } from "@actspace/auto-review";
+import type { AutoReviewer } from "@actspace/auto-review";
+import { reviewSessionAction } from "./review-session-action.js";
 import { ContextSourceRegistry, type ContextCompactionCoordinator } from "@actspace/context-engine";
 import { createDisclosureSource, type ProgressiveDisclosure } from "@actspace/context-disclosure";
 import type { ContributorRegistry, PromptContributor } from "@actspace/prompt";
@@ -79,10 +80,7 @@ export function apply(ctx: CordisContext): AgentFactoryService {
       autoReview: async (input: import("@actspace/tools-runtime").AutoReviewInput) => {
         const reviewer = ctx.get?.("approval.auto-review") as AutoReviewer | undefined;
         if (!reviewer) throw new Error("Auto reviewer unavailable");
-        const revision = session.journal.lastSeq;
-        const decision = await reviewer.review({ sessionId: session.header.sessionId, callId: input.callId, model: input.model ?? "default", signal: input.signal, snapshot: { conversation: reviewConversation(session.journal.iterateEvents()), action: input.action, workspaceRoot: input.workspaceRoot, execution: "Existing executor; sandbox isolation is not guaranteed" } });
-        if (session.journal.lastSeq !== revision) throw new Error("Review context changed");
-        return decision;
+        return reviewSessionAction(session, reviewer, input);
       },
       contextGeneration: session.journal.surface.replaceGeneration,
       workspaceRoot: resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot),

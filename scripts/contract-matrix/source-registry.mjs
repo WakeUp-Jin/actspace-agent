@@ -23,6 +23,7 @@ export const SERVICE_SOURCE = Object.freeze({
 });
 
 export const MANIFEST_PATHS = Object.freeze([
+  "packages/auto-review/src/manifest.ts",
   "packages/english-learning/src/manifest.ts",
   "packages/harness-control/src/manifest.ts",
   "packages/harness-hmr/src/manifest.ts",
@@ -79,6 +80,7 @@ export const COMPOSITION_SOURCES = Object.freeze([
 ]);
 
 export const PACKAGE_PATHS = Object.freeze([
+  "packages/auto-review/package.json",
   "packages/session/projection-cache/package.json",
   "packages/session/storage/package.json",
   "packages/english-learning/package.json",
@@ -135,11 +137,15 @@ export const PACKAGE_PATHS = Object.freeze([
   "apps/cli/package.json",
   "apps/desktop/package.json",
   "apps/site/package.json",
+  "apps/web/package.json",
 ]);
 
 export const VERIFICATION_SOURCES = Object.freeze([
   Object.freeze({ id: "session-journal/core-codec-contract", path: "packages/session/journal/src/test/journal.test.ts", kind: "contract" }),
   Object.freeze({ id: "session-journal/lifecycle-contract", path: "packages/session/journal/src/test/lifecycle.test.ts", kind: "lifecycle" }),
+  Object.freeze({ id: "session-journal/auxiliary-request-contract", path: "packages/session/journal/src/test/auxiliary-requests.test.ts", kind: "contract" }),
+  Object.freeze({ id: "runtime/auxiliary-request-recorder", path: "packages/runtime/src/session/auxiliary-request-recorder.test.ts", kind: "lifecycle" }),
+  Object.freeze({ id: "image-inspection/auxiliary-request-lifecycle", path: "packages/tools/image-inspection/src/test/auxiliary-requests.test.ts", kind: "lifecycle" }),
   Object.freeze({ id: "session-persistence/provider-seam", path: "packages/session/persistence/src/test/provider-seam.test.ts", kind: "contract" }),
   Object.freeze({ id: "cordis-adapter/event-contract", path: "packages/cordis-adapter/tests/contract.spec.ts", kind: "contract" }),
   Object.freeze({ id: "cordis-adapter/service-contract", path: "packages/cordis-adapter/tests/service-contract.spec.ts", kind: "contract" }),

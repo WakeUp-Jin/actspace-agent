@@ -103,7 +103,7 @@ it("filters an official /models list to the catalog and falls back to catalog mo
   expect(await service.probe({ kind: "draft", draft: { templateId: "openai", apiKey: " " } })).toMatchObject({ ok: false, message: "请输入 API Key。" });
 });
 
-it("puts the first DeepSeek key on the built-in connection and a second key on its own connection", async () => {
+it("puts the first DeepSeek key on the built-in connection with an empty model list and a second key on its own connection", async () => {
   const { settings, service, runtime } = await fixture();
   expect(service.list().connections).toEqual([]);
   const first = await service.create({ templateId: "deepseek", apiKey: "ds-one", models: [] });
@@ -112,8 +112,12 @@ it("puts the first DeepSeek key on the built-in connection and a second key on i
   expect(settings.getStoredKey("deepseek")).toBe("ds-one");
   const builtin = first.view.connections[0]!;
   expect(builtin).toMatchObject({ templateId: "deepseek", label: "DeepSeek", balance: true, relay: false, defaultBaseUrl: "https://api.deepseek.com" });
-  const flash = builtin.models.find((model) => model.key === "deepseek:deepseek-flash")!;
-  expect(flash).toMatchObject({ removable: false });
+  // 新连接从空列表开始：预装的内置模型被清掉，由用户自己挑。
+  expect(builtin.models).toEqual([]);
+  const added = await service.addModels({ connectionId: "deepseek:default", models: [{ apiModel: "deepseek-flash" }] });
+  if (!added.ok) throw new Error(added.error.message);
+  const flash = added.view.connections[0]!.models.find((model) => model.key === "deepseek:deepseek-flash")!;
+  expect(flash).toBeDefined();
   expect(runtime.resolveMainModel("deepseek:deepseek-flash")).toMatchObject({ ok: true, model: { providerRuntime: { apiKey: "ds-one" } } });
 
   const second = await service.create({ templateId: "deepseek", apiKey: "ds-two", label: "DeepSeek 团队", models: [{ apiModel: "deepseek-flash" }] });
@@ -122,11 +126,16 @@ it("puts the first DeepSeek key on the built-in connection and a second key on i
   const team = second.view.connections.find((item) => item.connectionId === second.connectionId)!;
   expect(team).toMatchObject({ label: "DeepSeek 团队", templateId: "deepseek", balance: true });
   const teamFlash = team.models[0]!;
-  expect(teamFlash.removable).toBe(true);
   expect(runtime.resolveMainModel(teamFlash.key)).toMatchObject({ ok: true, model: { providerRuntime: { apiKey: "ds-two", baseUrl: "https://api.deepseek.com" } } });
   await expect(service.getBalance({ connectionId: second.connectionId! })).resolves.toMatchObject({ isConfigured: true });
 
-  expect(await service.removeModel({ key: flash.key })).toMatchObject({ ok: false, error: { code: "model_not_removable" } });
+  // 内置模型也能移除，定义保留，之后可以再加回来。
+  const removed = await service.removeModel({ key: flash.key });
+  if (!removed.ok) throw new Error(removed.error.message);
+  expect(removed.view.connections.find((item) => item.connectionId === "deepseek:default")!.models).toEqual([]);
+  expect(settings.getV4().settings.models.installed[flash.key]).toBeUndefined();
+  const back = await service.addModels({ connectionId: "deepseek:default", models: [{ apiModel: "deepseek-flash" }] });
+  expect(back.ok && back.view.connections.find((item) => item.connectionId === "deepseek:default")!.models.map((model) => model.key)).toEqual([flash.key]);
 });
 
 it("removes models and connections together with their purpose bindings and keys", async () => {
@@ -166,15 +175,15 @@ it("updates a connection and forgets the tested auth when the address changes", 
   expect(moved.view.connections[0]).toMatchObject({ baseUrl: "https://other.example", multiplier: 2, protocol: "openai-completions", lastConnection: { status: "untested" } });
   expect(settings.getV4().settings.models.definitions[moved.view.connections[0]!.models[0]!.key]).toMatchObject({ api: "openai-completions" });
 
-  // 重新获取：已有模型只刷新服务商数据，新模型以未启用状态加入。
+  // 再次添加已有的模型：只刷新服务商数据；新模型直接在用。
   const refreshed = await service.addModels({ connectionId: id, models: [
-    { apiModel: "claude-sonnet-5", providerFacts: { contextWindow: 900_000 }, enabled: false },
-    { apiModel: "relay-new", enabled: false },
+    { apiModel: "claude-sonnet-5", providerFacts: { contextWindow: 900_000 } },
+    { apiModel: "relay-new" },
   ] });
   if (!refreshed.ok) throw new Error(refreshed.error.message);
   const rows = refreshed.view.connections[0]!.models;
-  expect(rows.find((model) => model.apiModel === "claude-sonnet-5")).toMatchObject({ enabled: true, effective: { contextWindow: 900_000, sources: { contextWindow: "provider" } } });
-  expect(rows.find((model) => model.apiModel === "relay-new")).toMatchObject({ enabled: false });
+  expect(rows.find((model) => model.apiModel === "claude-sonnet-5")).toMatchObject({ effective: { contextWindow: 900_000, sources: { contextWindow: "provider" } } });
+  expect(settings.getV4().settings.models.installed[rows.find((model) => model.apiModel === "relay-new")!.key]).toMatchObject({ enabled: true });
   expect(await service.update({ connectionId: id, baseUrl: "ftp://bad" })).toMatchObject({ ok: false, error: { code: "invalid_base_url" } });
 });
 

@@ -33,7 +33,6 @@ export function ConnectionListSection({ connections }: { connections: readonly C
       {connections.length === 0 ? (
         <div className="px-4 py-4 text-act-sm text-text-muted">还没有连接。添加一个服务商，填入 API Key 就能用。</div>
       ) : connections.map((connection) => {
-        const enabled = connection.models.filter((model) => model.enabled).length;
         const pending = pendingCount(connection);
         const status = connectionStatus(connection);
         return (
@@ -42,7 +41,7 @@ export function ConnectionListSection({ connections }: { connections: readonly C
             leading={<ConnectionLogo connection={connection} size="sm" />}
             title={<>{connection.label}{connection.relay ? <SettingTag>中转</SettingTag> : null}</>}
             description={PROTOCOL_LABELS[connection.protocol]}
-            value={<span className="tabular-nums">{enabled} / {connection.models.length} 个模型</span>}
+            value={<span className="tabular-nums">{connection.models.length} 个模型</span>}
             trailing={(
               <>
                 {pending > 0 ? <span className="whitespace-nowrap text-act-xs text-warning">{pending} 个待补充</span> : null}

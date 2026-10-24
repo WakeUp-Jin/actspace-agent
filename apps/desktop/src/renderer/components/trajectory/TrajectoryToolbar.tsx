@@ -70,7 +70,7 @@ export const TrajectoryToolbar = memo(function TrajectoryToolbar(props: Trajecto
           onChange={event => props.onQueryChange(event.currentTarget.value)}
         />
       </div>
-      {props.onAbort && <button type="button" className="tjb-action" disabled={props.isAborting} onClick={props.onAbort}>
+      {props.onAbort && <button type="button" className="tjb-action tjb-stop" disabled={props.isAborting} onClick={props.onAbort}>
         {props.isAborting ? T.stopping : T.stop}
       </button>}
     </div>

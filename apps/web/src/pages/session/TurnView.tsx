@@ -5,6 +5,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { itemBlocks, type TranscriptItem } from "../../sessions/transcript-model";
 import { formatWorked, replyAssistants, turnChanges, turnUsage, workedMs, type Turn, type TurnChanges } from "../../sessions/turn-model";
 import { turnUsageView } from "../../sessions/usage-format";
+import { turnOutputFiles } from "../../sessions/turn-output-files";
 import { Pressable } from "../../ui/Pressable";
 import { cx } from "../../ui/cx";
 import { AssistantText, CopyButton } from "./blocks/AssistantText";
@@ -19,6 +20,7 @@ import { TodoCard } from "./blocks/TodoCard";
 import { ToolLine } from "./blocks/ToolLine";
 import { UserBubble } from "./blocks/UserBubble";
 import { UsageSheet } from "./UsageSheet";
+import { OutputFiles } from "./OutputFiles";
 
 function BlockView({ block, sessionId }: { readonly block: MessageBlock; readonly sessionId: string }) {
   switch (block.kind) {
@@ -139,6 +141,7 @@ export function TurnView({ turn, sessionId, active, approvalsAfter, renderApprov
       {trailing}
       {turn.reply.map(item => <ItemView key={item.key} item={item} sessionId={sessionId} />)}
       {changes ? <ChangesCard changes={changes} /> : null}
+      <OutputFiles sessionId={sessionId} paths={turnOutputFiles(turn)} />
       {showTail ? <TurnTail turn={turn} /> : null}
       {turn.tail.map(item => <ItemView key={item.key} item={item} sessionId={sessionId} />)}
     </>

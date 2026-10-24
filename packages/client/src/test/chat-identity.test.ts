@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
-import { projectChatEvents, projectSubagentList } from "../sessions/chat.js";
+import { projectChatEvents, projectSubagentList, projectChatSession, projectSubagentTranscript } from "../sessions/chat.js";
 
 // 14 T12：投影出的事件带来源 envelope 的 seq；由多条 envelope 合成的 subagent 块只带 runId。
 function snapshot(messageIds: string[]): RuntimeV2SessionSnapshot {
@@ -18,6 +18,46 @@ function envelope(seq: number, type: string, data: SessionEventEnvelopeV1["data"
 }
 
 describe("chat projection identity", () => {
+  it("recovers pending text and reasoning in Journal order without changing ordinary live projections", () => {
+    const journal = [
+      envelope(1, "turn/start", { agentRunId: "run-1", turnId: "turn-1" }),
+      envelope(2, "request/context", { requestId: "request-1", turnId: "turn-1", stepId: "step-1", snapshot: { prepared: {} } }),
+      envelope(3, "assistant/chunk", { messageId: "a-1", requestId: "request-1", kind: "reasoning-delta", content: "think " }),
+      envelope(4, "assistant/chunk", { messageId: "a-1", requestId: "request-1", kind: "assistant-delta", content: "line 1\n" }),
+      envelope(5, "assistant/chunk", { messageId: "a-1", requestId: "request-1", kind: "assistant-delta", content: "line 2\n" }),
+      envelope(6, "assistant/chunk", { messageId: "a-1", requestId: "request-1", kind: "reasoning-delta", content: "more" }),
+    ];
+    expect(projectChatSession(snapshot([]), journal, "/w").events).toEqual([]);
+    const recovered = projectChatSession(snapshot([]), journal, "/w", { includePendingChunks: true });
+    expect(recovered.events).toMatchObject([
+      { type: "thinking", agentRunId: "run-1", turnId: "turn-1", llmCallId: "request-1", payload: { content: "think more" } },
+      { type: "assistant_message", agentRunId: "run-1", payload: { content: "line 1\nline 2\n" } },
+    ]);
+    expect(recovered.events.every(event => event.sourceSeq === undefined)).toBe(true);
+    expect(recovered.messageBlocks).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "assistant", content: "line 1\nline 2\n" })]));
+  });
+
+  it("replaces recovered chunks with the completed message exactly once", () => {
+    const journal = [
+      envelope(1, "assistant/chunk", { agentRunId: "run-1", messageId: "a-1", kind: "assistant-delta", content: "partial" }),
+      envelope(2, "assistant/message", { agentRunId: "run-1", messageId: "a-1" }, { kind: "append", node: { kind: "assistant", messageId: "a-1", content: "complete" } }),
+      envelope(3, "assistant/chunk", { agentRunId: "run-2", messageId: "a-2", kind: "assistant-delta", content: "next" }),
+    ];
+    const events = projectChatSession(snapshot(["a-1"]), journal, "/w", { includePendingChunks: true }).events;
+    expect(events.map(event => [event.type, (event.payload as { content?: string }).content])).toEqual([
+      ["assistant_message", "complete"], ["assistant_message", "next"],
+    ]);
+    expect(projectSubagentTranscript(snapshot(["a-1"]), journal)).toEqual(events);
+  });
+
+  it("restores the complete pending command from durable call facts for a new observer", () => {
+    const pending = { ...snapshot([]), tools: [{ callId: "pending", name: "bash", state: "running", artifacts: [], failure: null }] } as RuntimeV2SessionSnapshot;
+    const command = `printf '%s' '${"long command ".repeat(400)}'`;
+    const journal = [envelope(8, "tool/call", { agentRunId: "run-1", callId: "pending", name: "bash", args: { command, cwd: "/w" } })];
+    const blocks = projectChatSession(pending, journal, "/w").messageBlocks!;
+    expect(blocks).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "bash", command, status: "running" })]));
+    expect(projectSubagentTranscript(pending, journal).filter(event => event.type === "tool_result")).toHaveLength(1);
+  });
   it("stamps each projected event with the seq of the envelope it came from", () => {
     const journal = [
       envelope(4, "user/message", { agentRunId: "run-1", messageId: "u-1", content: "question" }, { kind: "append", node: { kind: "user", messageId: "u-1", content: "question" } }),

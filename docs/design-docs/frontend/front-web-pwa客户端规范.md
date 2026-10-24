@@ -23,6 +23,7 @@ ActSpace 新增一个浏览器客户端 `apps/web`：
 | 连接服务器 | 输入地址和配对码，换取设备 token；之后自动恢复连接 |
 | 会话列表 | 一台 Host 上全部未归档会话，平铺，按更新时间倒序；可展开已归档 |
 | 会话详情 | 用户消息、助手回复（Markdown）、思考、探索分组、文件改动 diff、Bash、待办、错误、状态行 |
+| 产物下载 | 成功 write/edit/present 的结构化产物可下载；复用 Host 授权快照和分块读取，不提供任意路径文件浏览 |
 | 输入框 | 发送、停止、运行中排队（可撤回）、模式（Agent / Plan / Chat）、模型和推理强度 |
 | 审批 | 运行 / 本会话允许（有授权建议时）/ 拒绝；拒绝后引导补充说明 |
 | 新建会话 | 选工作区（Host 发布的列表），写第一条消息，创建后进入会话 |
@@ -89,6 +90,14 @@ ActSpace 新增一个浏览器客户端 `apps/web`：
 | 模型推理档位 | `@actspace/shared/model-catalog-data`；判定方式与桌面端远端路径一致（`apps/desktop/src/renderer/components/composer/use-composer-model.ts`） |
 
 ## 5. 连接与配对
+
+### 产物下载边界（2026-10-23，BUG-016）
+
+- 每轮交付区在过程折叠后仍展示成功工具的产物。仅接受投影提供的 `outputRelativePath`，不从助手文本、diff 或展示用绝对路径构造下载入口；失败、拒绝、运行中及无结构化元数据的旧记录不产生下载能力。
+- 点击时调用现有 `files.reference { sessionId, path }` 创建当前文件的不可变快照，随后仅以 `sessionId/artifactId` 调用 `artifacts.read`。这是点击时的内容，不能当作工具执行时的历史文件版本。
+- Host 负责已发布工作区、真实路径、符号链接、Session 归属和 20 MiB 上限；Web 在分配内存前检查大小，按协议分块并核对每块及整文件 SHA-256。验证通过后才交给浏览器保存，所有类型使用 attachment Blob，不能打开或执行 HTML/SVG。
+- 下载中禁用重复操作，失败原位展示原因并允许重试；离线禁用，切换会话、连接或卸载时丢弃未完成结果。下载后显示快照大小；“已请求保存”只表示已交给浏览器，不代表用户已完成磁盘保存。
+- 不在 Service Worker 或 localStorage 缓存产物字节或下载能力。刷新后通过同一成功工具重新创建快照，既有 artifact 引用仍受 Host 生命周期和 Session 归属校验。
 
 ### 首次连接
 

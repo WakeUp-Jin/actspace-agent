@@ -40,6 +40,7 @@ apps/desktop/src/renderer/components/ui/Tooltip.tsx
 - 分段控件每个选项已有短文本，例如“预览 / 源码”。
 - 普通列表行按钮本身显示对象标题，点击含义足够明确。
 - 图标只是文字按钮的辅助装饰，并且 `aria-hidden="true"`。
+- Dialog 中作为初始焦点的关闭图标按钮：如果焦点 Tooltip 会先消费 Escape，且 Dialog 约定一次 Escape 关闭最上层对话框，可以省略 Tooltip；必须保留完整 `aria-label`，也不要在按钮上显示会被 Tooltip 自己延迟兑现的 Escape 提示。此例外仅用于避免焦点提示挡住 Dialog 的单次 Escape 行为。
 
 ## 标准写法
 

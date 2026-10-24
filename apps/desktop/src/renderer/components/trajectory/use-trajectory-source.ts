@@ -31,13 +31,22 @@ export function useFrameCoalesced<T>(value: T, immediate: (committed: T, next: T
   return commitNow ? value : committed;
 }
 
-/** Fixture (dev/test only) → explicit snapshot prop → the selected session's projection. */
-export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | undefined) {
+/**
+ * Fixture (dev/test only) → explicit snapshot prop → the selected session's projection.
+ * With `sessionId` (a child agent shown in the right panel) it watches that Session through the bridge
+ * instead, without changing the selected conversation, and never loads fixtures.
+ */
+export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | undefined, sessionId?: string) {
   const projection = useOptionalSessionProjection();
-  const cell = useFrameCoalesced(projection?.cell ?? null, (committed, next) => committed === null || next === null || committed.sessionId !== next.sessionId);
+  const bridge = projection?.bridge;
+  useEffect(() => sessionId && bridge ? bridge.watch(sessionId) : undefined, [sessionId, bridge]);
+  // `peek`, not `get`: `get` fabricates a new empty cell on every call until the Session loads.
+  const target = sessionId === undefined ? projection?.cell ?? null : projection?.store.peek(sessionId) ?? null;
+  const cell = useFrameCoalesced(target, (committed, next) => committed === null || next === null || committed.sessionId !== next.sessionId);
   const projected = cell ? selectTrajectory(cell) : null;
   const [fixture, setFixture] = useState<RuntimeV2TrajectorySnapshot | null>(null);
   useEffect(() => {
+    if (sessionId !== undefined) return;
     if (!import.meta.env.DEV && import.meta.env.MODE !== 'test') return;
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -65,6 +74,6 @@ export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | 
       restoreTheme = () => { if (previous === null) document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', previous); };
     });
     return () => { cancelled = true; if (timer !== null) clearInterval(timer); restoreTheme?.(); };
-  }, []);
+  }, [sessionId]);
   return { snapshot: fixture ?? (input !== undefined ? input : projected), isFixture: fixture !== null, projection, cell };
 }

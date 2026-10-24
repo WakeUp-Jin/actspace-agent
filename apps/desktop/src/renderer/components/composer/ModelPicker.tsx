@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { ModelSelectionId } from "@actspace/shared";
 import type { CatalogModel, ModelCatalog, ModelCatalogGroup } from "../../target/use-model-catalog";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/Popover";
+import { Button } from "../ui/Button";
 import {
   currentModelRuntimeOptions,
   isModelEditable,
@@ -19,7 +20,12 @@ const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
 // 外框（边框、背景、阴影、层级）来自 ui/Popover；滚动放在里面一层，Options 浮层才能伸到外框之外。
 const MODEL_MENU_BASE_CLASS =
   "model-menu relative w-[244px] transition-[opacity,transform] duration-(--motion-fast) ease-out motion-reduce:transition-none";
-const MODEL_MENU_SCROLL_CLASS = "max-h-[290px] overflow-y-auto rounded-act-lg p-1";
+// 展开动画从贴着按钮的那个角缩放出来。
+const MODEL_MENU_ORIGIN_CLASS = {
+  top: { start: "origin-bottom-left", end: "origin-bottom-right" },
+  bottom: { start: "origin-top-left", end: "origin-top-right" },
+} as const;
+const MODEL_MENU_SCROLL_CLASS ="max-h-[290px] overflow-y-auto rounded-act-lg p-1";
 const MODEL_SEARCH_WRAP_CLASS =
   "sticky top-0 z-10 flex h-9 items-center gap-2 rounded-act-md bg-surface-raised px-2 text-text-faint";
 const MODEL_SEARCH_INPUT_CLASS =
@@ -83,6 +89,15 @@ type ModelListProps = {
   options?: ModelPickerOptions;
 };
 
+export type ModelPickerMenuProps = ModelListProps & {
+  /** 浮层相对按钮的位置；输入框在底部所以默认向上展开。 */
+  side?: "top" | "bottom";
+  align?: "start" | "end";
+  ariaLabel?: string;
+  /** 列在分组之前、不属于任何供应商的项（例如设置里的「未配置」）；搜索时隐藏。 */
+  pinned?: readonly CatalogModel[];
+};
+
 export type ModelPickerProps = ModelListProps & {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -141,7 +156,10 @@ export function ModelPicker({ open, onOpenChange, triggerLabel, triggerTitle, di
 }
 
 // 只在打开时挂载：搜索词、正在编辑的模型这些状态随浮层关闭一起丢掉。
-function ModelPickerMenu({ catalog, selectedModelId, onSelect, options }: ModelListProps) {
+// 设置页的模型下拉也复用这个菜单，外面自己包 Popover 和触发器。
+export function ModelPickerMenu({
+  catalog, selectedModelId, onSelect, options, side = "top", align = "start", ariaLabel = "模型", pinned = [],
+}: ModelPickerMenuProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredModelId, setHoveredModelId] = useState<string | null>(null);
   const [focusedModelId, setFocusedModelId] = useState<string | null>(null);
@@ -169,6 +187,8 @@ function ModelPickerMenu({ catalog, selectedModelId, onSelect, options }: ModelL
   const filteredGroups = filterModelGroups(catalog, searchQuery);
   const emptyText = modelListEmptyText(catalog);
   const editingSpec = editingModelId === null ? undefined : options?.find(editingModelId);
+  const pinnedRows = searchQuery.trim() ? [] : pinned;
+  const originClass = MODEL_MENU_ORIGIN_CLASS[side][align];
 
   const menuMotionClass = menuEntered
     ? "translate-y-0 scale-100 opacity-100"
@@ -185,13 +205,13 @@ function ModelPickerMenu({ catalog, selectedModelId, onSelect, options }: ModelL
   return (
     <PopoverContent
       ref={menuRef}
-      className={`${MODEL_MENU_BASE_CLASS} ${menuMotionClass} origin-bottom-left`}
+      className={`${MODEL_MENU_BASE_CLASS} ${menuMotionClass} ${originClass}`}
       radius="lg"
-      side="top"
-      align="start"
+      side={side}
+      align={align}
       sideOffset={8}
       role="menu"
-      aria-label="模型"
+      aria-label={ariaLabel}
       data-composer-floating=""
       onOpenAutoFocus={(event) => {
         event.preventDefault();
@@ -214,6 +234,23 @@ function ModelPickerMenu({ catalog, selectedModelId, onSelect, options }: ModelL
             }}
           />
         </label>
+        {pinnedRows.map((spec) => {
+          const selected = spec.id === selectedModelId;
+          return (
+            <div className={`${MODEL_MENU_ROW_CLASS} ${selected ? MODEL_MENU_ROW_SELECTED_CLASS : ""}`} key={`pinned:${spec.id}`}>
+              <Button
+                variant="ghost"
+                className={`model-select-button min-w-0 flex-1 justify-start text-left ${selected ? "pr-[58px]" : "pr-[46px]"}`}
+                onClick={() => onSelect(spec.id)}
+              >
+                <span className="block min-w-0 truncate">{spec.label}</span>
+              </Button>
+              <div className={`${MODEL_ROW_ACTIONS_CLASS} ${selected ? MODEL_ROW_ACTIONS_SELECTED_CLASS : ""}`}>
+                {selected ? <Check className={MODEL_CHECK_ICON_CLASS} size={14} strokeWidth={2.2} /> : null}
+              </div>
+            </div>
+          );
+        })}
         {filteredGroups.map((group) => (
           <div
             className={MODEL_PROVIDER_GROUP_CLASS}

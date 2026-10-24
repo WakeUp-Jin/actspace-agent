@@ -21,6 +21,7 @@ import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
 import { emptyRuntimePromptSource } from "@actspace/prompt";
 import { ManagedRuns } from "./managed-runs.js";
 import { RuntimeSessionController } from "../session/session-controller.js";
+import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
 
 it("executes the default Loop from its fixed closure with Harness-owned policies", async () => {
   const directory = await mkdtemp(join(tmpdir(), "actspace-default-harness-"));
@@ -38,6 +39,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     "agent.registry": agentRegistry,
     ...Object.fromEntries(["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
     "session.runtime": sessions,
+    "llm.auxiliary-requests": createAuxiliaryRequestRecorder(sessions),
     "session.journal": { registry },
     "session.projection": {},
     "actspace.host.session": { dataRoot: directory, runtimeId: "test" },
@@ -83,7 +85,19 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       return (async function* () { yield { type: "done" as const, stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text" as const, text: '{"approved":true,"reason":"User requested inspection"}' }] }; })();
     } } });
     try {
-      expect(await reviewer!.review({ sessionId: "conversation", callId: "review-fixture", model: "test", snapshot: { user: "inspect", action: "ls" }, signal: new AbortController().signal })).toMatchObject({ approved: true });
+      const session = sessions.getOpen("conversation")!;
+      const priorTurn = (await sessions.inspectEvents("conversation")).find(event => event.type === "turn/start")!;
+      const reviewOwner = { agentRunId: (priorTurn.data as Record<string, unknown>).agentRunId as string, turnId: "review-turn", stepId: "review-step", callId: "review-fixture" };
+      expect(reviewOwner.agentRunId).toBeTruthy();
+      const appendReview = (type: string, data: import("@actspace/session-journal").SessionEventCandidateV1["data"]) => session.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
+      await appendReview("turn/start", reviewOwner);
+      await appendReview("step/start", reviewOwner);
+      await appendReview("tool/call", { ...reviewOwner, name: "shell" });
+      expect(await reviewer!.review({ ...reviewOwner, sessionId: "conversation", logicalRequestId: "review-logical", model: "test", snapshot: { user: "inspect", action: "ls" }, signal: new AbortController().signal })).toMatchObject({ approved: true });
+      expect(session.journal.events.filter(event => event.type === "llm/auxiliary-end").map(event => event.data)).toContainEqual(expect.objectContaining({ ...reviewOwner, purpose: "auto-review", status: "completed" }));
+      await appendReview("tool/result", { ...reviewOwner, name: "shell", status: "completed" });
+      await appendReview("step/end", reviewOwner);
+      await appendReview("turn/end", reviewOwner);
       await sessions.create("route-regression", undefined, "chat");
       await app.submit("route-regression", "chat-route", "Use the main model, not the reviewer");
       await app.waitForIdle("route-regression");

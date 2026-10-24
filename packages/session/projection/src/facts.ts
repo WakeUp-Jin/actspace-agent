@@ -76,7 +76,7 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
       }
     },
   });
-  registry.register<UsageState>({ key: "providerUsage", stateVersion: 2, init: () => ({ activeStep: null, requests: {}, selected: {}, knownCosts: 0, total: emptyUsage() }), apply: applyUsage, view: state => state.total });
+  registry.register<UsageState>({ key: "providerUsage", stateVersion: 3, init: () => ({ activeStep: null, requests: {}, selected: {}, knownCosts: 0, total: emptyUsage() }), apply: applyUsage, view: state => state.total });
   registry.register<SessionFacts["pendingInbox"]>({
     key: "pendingInbox", stateVersion: 1, init: () => [], view: state => state,
     apply: (state, event) => {
@@ -140,8 +140,8 @@ function applyUsageValue(state: UsageState, event: SessionEventEnvelopeV1): Usag
   const step = text(data.stepId) ?? state.activeStep;
   if (event.type === "request/header" && step && typeof data.requestId === "string") return { ...state, requests: { ...state.requests, [step]: data.requestId } };
   const raw = record(data.usage);
-  if (!["assistant/message", "step/end", "llm/retry"].includes(event.type) || !Object.keys(raw).length) return state;
-  const key = text(data.requestId) ?? (step ? state.requests[step] ?? `step:${step}` : `event:${event.seq}`);
+  if (!["assistant/message", "step/end", "llm/retry", "llm/auxiliary-end"].includes(event.type) || !Object.keys(raw).length) return state;
+  const key = event.type === "llm/auxiliary-end" ? `auxiliary:${data.attemptId}` : text(data.requestId) ?? (step ? state.requests[step] ?? `step:${step}` : `event:${event.seq}`);
   const previous = state.selected[key]; const assistant = event.type === "assistant/message";
   if (previous?.assistant && !assistant) return state;
   const provenance = record(raw.costProvenance);

@@ -56,7 +56,8 @@ import type { ModelStoreService } from "../model-store-service";
 import type { BrowserBridgeService } from "../browser-bridge-service";
 import type { QuickOpenShortcutController } from "../quick-open-shortcut-controller";
 import type { SettingsService } from "../settings-service";
-import { createWorkspaceFolder, resolveWorkspaceSelection, setWorkspaceHidden } from "../workspace-registry-service";
+import { createWorkspaceFolder, resolveWorkspaceSelection, resolveRegisteredWorkspaceSelection, setWorkspaceHidden } from "../workspace-registry-service";
+import { isDelegatedSession } from "@actspace/shared/session-list-page";
 import { createWorkspaceAccessDeps, registeredWorkspaceRoot, resolveWorkspaceAccess, workspaceRegistryOptions, WORKSPACE_NOT_REGISTERED } from "../workspace-access";
 import { getWorkspaceGitContext } from "../workspace-git-context-service";
 import { openWorkspaceInIde } from "../workspace-ide-service";
@@ -130,7 +131,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   ipc.handle(contract.sessions.getPage, (input) => options.registry.readSessionProjection(input));
   ipc.handle(contract.sessions.list, async (input = {}) => {
     const items = await options.registry.listSessions();
-    const selected = items.filter((item) => item.metadata.archived === (input.archived === true));
+    const selected = items.filter((item) => item.metadata.archived === (input.archived === true) && !isDelegatedSession(item.lineage));
     return Promise.all(selected.map((item) => toSessionListItem(item, options.registry)));
   });
   ipc.handle(contract.sessions.get, async (input) => {
@@ -192,7 +193,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
   ipc.handle(contract.sessions.setWorkspace, async (input) => {
     const snapshot = await options.registry.inspectSession(input.sessionId);
-    const next = await registeredWorkspaceRoot(workspaceRegistryOptions(options.roots), input.workspaceRoot);
+    const selection = await resolveRegisteredWorkspaceSelection(workspaceRegistryOptions(options.roots), input);
+    if (selection.ok === false) throw new Error(selection.error);
+    const next = selection.workspaceRoot;
     if (snapshot.workspaceRoot === next) return { ok: true };
     await options.registry.updateSessionWorkspace(input.sessionId, next);
     return { ok: true };
@@ -512,7 +515,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
 
   ipc.handle(contract.workspaces.getEnvironment, async (input = {}) => {
-    const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
+    const workspaceRoot = await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot ?? options.roots.defaultWorkspaceRoot }, workspaceAccess);
     return getWorkspaceEnvironment({ ...input, workspaceRoot }, options.roots);
   });
   ipc.handle(contract.workspaces.createBranch, async (input) => {
@@ -649,7 +652,7 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
     title: item.metadata.title ?? "New chat",
     updatedAt: item.updatedAt,
     accessState: item.accessState,
-    isChildSession: item.lineage !== null,
+    isChildSession: isDelegatedSession(item.lineage),
     agentRunCount,
     agentForm: item.agentForm,
     agentMode: item.agentMode,

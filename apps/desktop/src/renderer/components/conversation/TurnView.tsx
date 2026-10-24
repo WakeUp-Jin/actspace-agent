@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
 import { ResponseAnnotationPill } from "../composer/ResponseAnnotationPill";
 import { TodoListBlock } from "../messages/TodoListBlock";
@@ -126,7 +126,7 @@ type TurnViewProps = {
 };
 
 /** 一轮对话：用户输入（吸顶）、过程和最终回复、轮尾（改动卡、交付卡、图片）、回复操作。 */
-export function TurnView({
+export const TurnView = memo(function TurnView({
   turn,
   isActive,
   isLatest = false,
@@ -170,4 +170,22 @@ export function TurnView({
       </div>
     </section>
   );
+}, sameTurnViewProps);
+
+/**
+ * 每次投影都会重新分组出新的 turn 对象，但历史轮次里的消息块引用不变：
+ * 按消息逐个比引用，流式时只有最后一轮重渲染。
+ */
+function sameTurnViewProps(previous: TurnViewProps, next: TurnViewProps): boolean {
+  for (const key of Object.keys(next) as (keyof TurnViewProps)[]) {
+    if (key !== "turn" && !Object.is(previous[key], next[key])) return false;
+  }
+  if (Object.keys(previous).length !== Object.keys(next).length) return false;
+  const before = previous.turn;
+  const after = next.turn;
+  if (before === after) return true;
+  return before.id === after.id
+    && before.user === after.user
+    && before.messages.length === after.messages.length
+    && before.messages.every((message, index) => message === after.messages[index]);
 }

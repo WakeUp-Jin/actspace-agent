@@ -11,7 +11,9 @@ import type { TurnChanges } from "../turn-tail/turn-tail-data";
  * 文件内容是打开那一刻的快照，磁盘随后可能被 Agent、外部编辑器或 git 改掉，
  * 所以必须能判断「手里这份是不是过期了」。检测机制见 `useFileFreshness.ts`。
  */
-export type WorkspaceFileMeta = {
+export type WorkspaceFileTarget = { workspaceRoot?: string; hostId?: string };
+
+export type WorkspaceFileMeta = WorkspaceFileTarget & {
   relativePath?: string;
   /** 读取时的 mtime（epoch 毫秒），用于与磁盘现值比对。 */
   mtimeMs?: number;
@@ -29,7 +31,8 @@ export type RightPanelTab = { id: string } & (
   | ({ kind: "image"; title: string; src: string } & WorkspaceFileMeta)
   | ({ kind: "csv"; title: string; content: string } & WorkspaceFileMeta)
   | ({ kind: "text"; title: string; content: string; language?: string } & WorkspaceFileMeta)
-  | { kind: "subagents"; title: string; sessionId: string; selected?: Extract<import("@actspace/shared").MessageBlock, { kind: "agent" }> }
+  // focus：从轨迹详情「查看轨迹」打开时定位到这个子会话并停在指定视图；revision 每次点击递增，让已打开的 Tab 再次定位。
+  | { kind: "subagents"; title: string; sessionId: string; selected?: Extract<import("@actspace/shared").MessageBlock, { kind: "agent" }>; focus?: SubagentFocus }
   | { kind: "context"; title: string }
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   // 某一轮的改动快照（轮尾改动卡点开）；index 是要选中的文件，revision 每次点击递增，让同一 Tab 重新跳到该文件。
@@ -39,6 +42,8 @@ export type RightPanelTab = { id: string } & (
   | { kind: "terminalError"; title: string; sessionId: string; message: string }
   | { kind: "terminal"; title: string; terminalId: string; sessionId: string; shellName: string }
 );
+
+export type SubagentFocus = { childSessionId: string; view: "chat" | "trajectory"; revision: number };
 
 export type RightPanelTabKind = RightPanelTab["kind"];
 
@@ -65,8 +70,12 @@ export function isWorkspaceFileTab(tab: RightPanelTab | null | undefined): boole
 }
 
 /** 工作区文件 Tab 的稳定 id，renderer 各处必须用同一个函数生成，避免拼错导致去重失效。 */
-export function workspaceFileTabId(relativePath: string): string {
-  return `file:${relativePath}`;
+export function workspaceFileTabId(relativePath: string, target?: WorkspaceFileTarget): string {
+  return target ? `file:${JSON.stringify([target.hostId ?? "local", target.workspaceRoot ?? null, relativePath])}` : `file:${relativePath}`;
+}
+
+export function workspaceDirCacheKey(relativePath: string, workspaceRoot?: string): string {
+  return JSON.stringify(["local", workspaceRoot ?? null, relativePath]);
 }
 
 type RightPanelContextValue = {
@@ -81,7 +90,7 @@ type RightPanelContextValue = {
   closePanel: () => void;
   togglePanel: () => void;
   /** 把某个工作区文件 Tab 标记为「磁盘已变化」；不存在该 Tab 时静默忽略。 */
-  markFileTabStale: (relativePath: string) => void;
+  markFileTabStale: (relativePath: string, target?: WorkspaceFileTarget) => void;
   /** 用重新读盘的结果替换 Tab 内容（同时清掉 stale 标记）。 */
   replaceTab: (tab: RightPanelTab) => void;
   /**
@@ -104,7 +113,7 @@ type RightPanelContextValue = {
   expandedDirs: ReadonlySet<string>;
   toggleDir: (relativePath: string) => void;
   dirCache: ReadonlyMap<string, WorkspaceDirEntry[]>;
-  cacheDir: (relativePath: string, entries: WorkspaceDirEntry[]) => void;
+  cacheDir: (relativePath: string, entries: WorkspaceDirEntry[], workspaceRoot?: string) => void;
   /** 强制文件树重新拉取目录（清缓存 + 递增 key），展开层级保留。 */
   fileTreeRefreshKey: number;
   refreshFileTree: () => void;
@@ -187,8 +196,8 @@ export function RightPanelProvider({
     });
   }, []);
 
-  const markFileTabStale = useCallback((relativePath: string) => {
-    const id = workspaceFileTabId(relativePath);
+  const markFileTabStale = useCallback((relativePath: string, target?: WorkspaceFileTarget) => {
+    const id = workspaceFileTabId(relativePath, target);
     setTabs((current) => {
       const index = current.findIndex((item) => item.id === id);
       if (index === -1) return current;
@@ -267,10 +276,10 @@ export function RightPanelProvider({
     });
   }, []);
 
-  const cacheDir = useCallback((relativePath: string, entries: WorkspaceDirEntry[]) => {
+  const cacheDir = useCallback((relativePath: string, entries: WorkspaceDirEntry[], workspaceRoot?: string) => {
     setDirCache((current) => {
       const next = new Map(current);
-      next.set(relativePath, entries);
+      next.set(workspaceDirCacheKey(relativePath, workspaceRoot), entries);
       return next;
     });
   }, []);
@@ -317,7 +326,7 @@ export function RightPanelProvider({
           shellName: terminal.shellName,
         };
       });
-      const next = [...current.filter((tab) => tab.kind !== "terminal"), ...visibleTerminalTabs];
+      const next = [...current.filter((tab) => tab.kind !== "terminal" || tab.sessionId !== sessionId), ...visibleTerminalTabs];
       setActiveTabId((activeId) => activeId && next.some((tab) => tab.id === activeId) ? activeId : null);
       return next;
     });

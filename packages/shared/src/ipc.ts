@@ -1004,6 +1004,10 @@ export type UsageActivityRow = {
   stepId?: string;
   requestId?: string;
   callId?: string;
+  /** Auxiliary attempts remain separate from main Agent requests. */
+  purpose?: "image-inspection" | "auto-review" | "session-title" | "compaction";
+  logicalRequestId?: string;
+  routeId?: string;
   retryId?: string;
   retryOfRequestId?: string;
   providerId?: string;
@@ -1045,6 +1049,15 @@ export type UsageActivitySummary = {
   cacheWriteTokens: number;
   reasoningTokens: number;
   totalTokens: number;
+  /** LLM requests whose corresponding token fact was not reported; explicit zero remains known. */
+  unknownTokenRequestCounts: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    reasoning: number;
+    total: number;
+  };
   costUsd: number | null;
   costUnavailableCount: number;
 };
@@ -1076,6 +1089,8 @@ export type UsageActivityAggregate = {
   count: number;
   errorCount: number;
   totalTokens: number;
+  /** LLM requests in this provider/model group with unknown total token usage. Always zero for tools. */
+  unknownTokenRequestCount: number;
   durationMs: number;
   costSummary: UsageCostSummary;
 };

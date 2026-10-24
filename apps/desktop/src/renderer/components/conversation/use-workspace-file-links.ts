@@ -1,4 +1,5 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { localExecutionRoot } from "../../target/run-target";
 import { workspacesApi } from "../../api/workspaces";
 import { openRemoteFile } from "../../hooks/remoteArtifact";
 import { useActiveSession } from "../../session/active-session-context";
@@ -23,32 +24,41 @@ export function isSafeWorkspaceRelativePath(filePath: string): boolean {
 export function useWorkspaceFileLinks() {
   const { sessionId } = useActiveSession();
   const { target, selectedWorkspaceRoot } = useRunTargetContext();
+  const workspaceRoot = localExecutionRoot(target, selectedWorkspaceRoot)?.trim();
   const isRemoteTarget = target.kind === "remote";
   const { openTab } = useRightPanel();
+  const owner = useRef(0);
+  useEffect(() => {
+    owner.current += 1;
+    return () => { owner.current += 1; };
+  }, [sessionId, workspaceRoot, target.kind === "remote" ? target.hostId : target.kind]);
   const openReadFile = useCallback(async (message: ReadMessageBlock) => {
-    const workspaceRoot = selectedWorkspaceRoot?.trim();
+    const requestOwner = owner.current;
+    const openIfCurrent = (tab: Parameters<typeof openTab>[0]) => {
+      if (requestOwner === owner.current) openTab(tab);
+    };
     const relativePath = message.filePath.trim();
     if (isRemoteTarget && sessionId) {
-      try { await openRemoteFile(sessionId, relativePath, openTab); }
-      catch { openTab({ id: `remote-error:${sessionId}:${relativePath}`, kind: "text", title: relativePath.split("/").at(-1) || "远端文件", content: "远端文件读取失败，请确认连接后重试。" }); }
+      try { await openRemoteFile(sessionId, relativePath, openIfCurrent); }
+      catch { openIfCurrent({ id: `remote-error:${sessionId}:${relativePath}`, kind: "text", title: relativePath.split("/").at(-1) || "远端文件", content: "远端文件读取失败，请确认连接后重试。" }); }
       return;
     }
     if (!workspaceRoot || !isSafeWorkspaceRelativePath(relativePath)) return;
     try {
-      openTab(tabFromFile(await workspacesApi.readFile({ workspaceRoot, relativePath })));
+      openIfCurrent(tabFromFile(await workspacesApi.readFile({ workspaceRoot, relativePath }), { workspaceRoot }));
     } catch {
       const title = relativePath.split(/[\\/]/).pop() || relativePath;
-      openTab(readFailureTab(relativePath, title));
+      openIfCurrent(readFailureTab(relativePath, title, { workspaceRoot }));
     }
-  }, [isRemoteTarget, sessionId, openTab, selectedWorkspaceRoot]);
+  }, [isRemoteTarget, sessionId, openTab, workspaceRoot]);
   const openWorkspaceFile = useCallback((path: string) => {
     const normalizedPath = path.replace(/^file:\/\//i, "").replace(/\\/g, "/");
-    const root = selectedWorkspaceRoot?.replace(/\\/g, "/").replace(/\/+$/, "");
+    const root = workspaceRoot?.replace(/\\/g, "/").replace(/\/+$/, "");
     const relativePath = normalizedPath.startsWith(`${root ?? ""}/`)
       ? normalizedPath.slice((root ?? "").length + 1)
       : normalizedPath;
     if (!isSafeWorkspaceRelativePath(relativePath)) return;
     void openReadFile({ filePath: relativePath } as ReadMessageBlock);
-  }, [openReadFile, selectedWorkspaceRoot]);
+  }, [openReadFile, workspaceRoot]);
   return { openReadFile, openWorkspaceFile };
 }

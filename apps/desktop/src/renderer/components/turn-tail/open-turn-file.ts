@@ -20,7 +20,7 @@ export async function openTurnFile({ sessionId, workspaceRoot, relativePath, ope
     if (!workspaceRoot) return "该文件不在当前工作区内，暂时不能预览。";
     const result = await workspacesApi.readFile({ workspaceRoot, relativePath });
     if (result.error === "not_found" || result.error === "escapes_root") return READ_ERROR_TEXT[result.error];
-    openTab(tabFromFile(result));
+    openTab(tabFromFile(result, { workspaceRoot }));
     return null;
   } catch {
     return "文件读取失败。";

@@ -4,7 +4,7 @@ import { SessionError, snapshotSessionJson, type SessionEventCandidateV1 } from 
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { TaskError, type TaskSnapshot, type TaskRecord, type TaskReceipt, type HarnessIdentity, type RunOutcome } from "./contracts.js";
-import { TASK_EVENT, RUN_EVENT, QUEUE_EVENT, eventCandidate } from "./task-events.js";
+import { TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT, eventCandidate } from "./task-events.js";
 import { projectTasks } from "./task-projection.js";
 
 /** One ledger per owned Session writer. All scheduling mutations share its serial lane. */
@@ -23,7 +23,10 @@ export class TaskLedger {
     // Finish prior acceptance before acknowledging even a duplicate request.
     await session.flush();
     if (ledger.#snapshot.queue.length || ledger.#snapshot.tasks.some(task => task.state === "claimed")) {
-      await ledger.#commit([eventCandidate(QUEUE_EVENT, { sessionId: session.header.sessionId, op: "recover" })]);
+      await ledger.#commit([
+        ...ledger.#snapshot.runs.filter(run => run.state === "running").flatMap(run => ledger.#returnEvents(run.runId)),
+        eventCandidate(QUEUE_EVENT, { sessionId: session.header.sessionId, op: "recover" }),
+      ]);
     }
     return ledger;
   }
@@ -48,12 +51,14 @@ export class TaskLedger {
 
   designate(taskId: string, runId: string | null, expectedRevision: number): Promise<TaskSnapshot> {
     return this.#serialize(async () => {
-      this.#revision(expectedRevision); this.#pending(taskId);
+      this.#revision(expectedRevision); const task = this.#pending(taskId);
       if (runId !== null) {
         this.#active(runId);
         if (taskOperation(this.#task(taskId).content)) this.#error("QUEUE_ORDER");
       }
-      await this.#commit([eventCandidate(TASK_EVENT, { op: "designate", sessionId: this.session.header.sessionId, taskId, runId })]);
+      await this.#commit(runId === null && task.targetRunId !== null
+        ? this.#returnEvents(task.targetRunId, taskId)
+        : [eventCandidate(TASK_EVENT, { op: "designate", sessionId: this.session.header.sessionId, taskId, runId })]);
       return this.#snapshot;
     });
   }
@@ -123,11 +128,20 @@ export class TaskLedger {
   finish(runId: string, outcome: RunOutcome, result: RuntimeV2JsonValue = null): Promise<TaskSnapshot> {
     return this.#serialize(async () => {
       this.#active(runId);
-      await this.#commit([eventCandidate(RUN_EVENT, { op: "finish", sessionId: this.session.header.sessionId, runId, outcome, result })]);
+      await this.#commit([
+        ...this.#returnEvents(runId),
+        eventCandidate(RUN_EVENT, { op: "finish", sessionId: this.session.header.sessionId, runId, outcome, result }),
+      ]);
       return this.#snapshot;
     });
   }
 
+  #returnEvents(runId: string, onlyTaskId?: string): readonly SessionEventCandidateV1[] {
+    const taskIds = this.#snapshot.queue.filter(id => this.#task(id).targetRunId === runId && (onlyTaskId === undefined || id === onlyTaskId));
+    return taskIds.length ? [eventCandidate(QUEUE_RETURN_EVENT, {
+      op: "return-steering", sessionId: this.session.header.sessionId, runId, taskIds, placement: "front",
+    })] : [];
+  }
   #claimEvents(task: TaskRecord, runId: string): readonly SessionEventCandidateV1[] {
     return [eventCandidate(TASK_EVENT, { op: "claim", sessionId: this.session.header.sessionId, taskId: task.taskId, runId }), {
       type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: task.taskId, agentRunId: runId },

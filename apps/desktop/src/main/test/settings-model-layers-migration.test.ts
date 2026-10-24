@@ -53,7 +53,7 @@ describe("migrateModelLayers", () => {
     // 目录里没有这个模型：和「未知」比，填过的字段全算用户修改。
     expect(migrated.models.overrides?.[bigger]).toMatchObject({ label: "Big Sonnet", contextWindow: 1_000_000, maxOutput: 64_000 });
     expect(migrated.models.connections.relay).not.toHaveProperty("billingMode");
-    expect(migrated.models.layersVersion).toBe(1);
+    expect(migrated.models.layersVersion).toBe(2);
   });
 
   it("turns reference and manual prices into hand-entered prices and drops token-mode prices", () => {
@@ -123,5 +123,32 @@ describe("migrateModelLayers", () => {
     const migrated = migrateModelLayers(settings, catalog, hints())!;
     expect(migrateModelLayers(migrated, catalog, hints())).toBeNull();
     expect(settings.models.layersVersion).toBe(0);
+  });
+
+  it("drops disabled models with their changes and purpose bindings, and only that step runs for version 1", () => {
+    const settings = settingsV4();
+    addConnection(settings, "relay", "reference");
+    const kept = addModel(settings, "relay", "claude-sonnet-5");
+    const off = addModel(settings, "relay", "relay-old", { label: "Old" });
+    settings.models.installed[off]!.enabled = false;
+    settings.models.overrides = { [off]: { contextWindow: 64_000 } };
+    settings.models.taskBindings.utility = off;
+    settings.models.taskBindings.defaultChat = kept;
+    settings.models.layersVersion = 1;
+    const migrated = migrateModelLayers(settings, catalog, hints())!;
+    expect(migrated.models.installed[off]).toBeUndefined();
+    expect(migrated.models.definitions[off]).toBeUndefined();
+    expect(migrated.models.overrides?.[off]).toBeUndefined();
+    expect(migrated.models.taskBindings).toMatchObject({ utility: null, defaultChat: kept });
+    expect(migrated.models.installed[kept]).toMatchObject({ enabled: true });
+    expect(migrated.models.layersVersion).toBe(2);
+  });
+
+  it("keeps built-in definitions when a disabled built-in model is dropped", () => {
+    const settings = settingsV4();
+    const builtin = Object.keys(settings.models.installed).find((key) => key.startsWith("deepseek:")) as ModelKey;
+    settings.models.installed[builtin]!.enabled = false;
+    const migrated = migrateModelLayers(settings, catalog, hints())!;
+    expect(migrated.models.installed[builtin]).toBeUndefined();
   });
 });

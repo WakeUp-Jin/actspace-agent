@@ -1,5 +1,7 @@
 /**
- * 四层模型迁移（layersVersion 0 → 1），纯函数，只跑一次。
+ * 四层模型迁移，纯函数，每一步只跑一次。
+ *
+ * layersVersion 0 → 1：
  * - I5：旧的自定义模型只把「和不带修改时算出的值不一样」的字段写进 overrides；手动推理配置转成思考档位修改。
  * - I6：计费模式去掉。reference 下单独填的价格、manual 下填的价格（当时会乘倍率，这里乘好）转成手填价；token 下的价格丢掉，改按参考价 × 倍率。
  * - I7：看图只在白名单模型已安装时迁到用途表，否则跟随会话默认。
@@ -8,6 +10,8 @@
  * - 旧目录模型（provider-catalog）自带的字段转成服务商数据；installed.customLabel 转成名称修改。
  * 多 Key（D11）在 sanitize 里直接丢弃，这里不用处理。
  * 旧文件里的看图模型和计费方式不再进设置类型，由 legacyModelHints 在读文件时从原始 JSON 里取出，只给本次迁移用。
+ *
+ * layersVersion 1 → 2：模型去掉「启用」开关，在列表里就是在用。停用的模型连同定义和修改一起移除，用到它们的用途改为跟随。
  */
 import {
   capabilitiesToThinking,
@@ -53,8 +57,33 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 export function migrateModelLayers(input: SettingsV4, catalog: Pick<ModelCatalogSnapshot, "entries">, hints: LegacyModelHints = NO_HINTS): SettingsV4 | null {
-  if ((input.models.layersVersion ?? 0) >= MODEL_LAYERS_VERSION) return null;
+  const version = input.models.layersVersion ?? 0;
+  if (version >= MODEL_LAYERS_VERSION) return null;
   const settings = cloneJson(input);
+  if (version < 1) migrateToLayers(settings, catalog, hints);
+  dropDisabledModels(settings);
+  settings.models.layersVersion = MODEL_LAYERS_VERSION;
+  return settings;
+}
+
+function dropDisabledModels(settings: SettingsV4): void {
+  const models = settings.models;
+  const disabled = new Set(Object.entries(models.installed).filter(([, installed]) => installed && !installed.enabled).map(([key]) => key));
+  if (disabled.size === 0) return;
+  for (const key of disabled) {
+    const typed = key as ModelKey;
+    delete models.installed[typed];
+    if (models.overrides) delete models.overrides[typed];
+    const source = models.definitions[typed]?.source;
+    if (source !== "builtin" && source !== "curated") delete models.definitions[typed];
+  }
+  for (const field of ["defaultChat", "utility", "autoReview", "explore", "vision"] as const) {
+    const bound = models.taskBindings[field];
+    if (bound && disabled.has(bound)) models.taskBindings[field] = null;
+  }
+}
+
+function migrateToLayers(settings: SettingsV4, catalog: Pick<ModelCatalogSnapshot, "entries">, hints: LegacyModelHints): void {
   const models = settings.models;
   const overrides: Partial<Record<ModelKey, ModelOverrides>> = { ...(models.overrides ?? {}) };
   const modes = new Map<string, "reference" | "token" | "manual">();
@@ -99,8 +128,6 @@ export function migrateModelLayers(input: SettingsV4, catalog: Pick<ModelCatalog
   if (!models.taskBindings.explore && mirroredExplore && models.installed[mirroredExplore]) models.taskBindings.explore = mirroredExplore;
   delete settings.subagents.routes.explore;
   models.overrides = overrides;
-  models.layersVersion = MODEL_LAYERS_VERSION;
-  return settings;
 }
 
 function customModelOverrides(definition: ModelDefinition, context: {

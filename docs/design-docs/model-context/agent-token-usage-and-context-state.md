@@ -32,6 +32,7 @@ sessions-v2/<sessionId>/journal.jsonl
 - `request/context`：与同一 requestId 关联、dispatch 前冻结的逻辑 request snapshot；
 - `assistant/message`：请求终态与 provider usage；`step/end` 提供步骤终态及工具步骤的 usage 回退；
 - `llm/retry` / `llm/retry-started`：失败尝试与下一次重试；
+- `llm/auxiliary-start` / `llm/auxiliary-end`：工具内部真实辅助模型尝试及其父工具、实际模型、终态与 nullable usage；不创建助手消息；
 - `compaction/start` / `compaction/summary` / `surface/replaced` / `compaction/end`：压缩过程与 Surface 替换。
 
 旧 v2 草案中的 `request/snapshot`、`llm/usage`、`llm/ended` 不是当前默认 Loop 的事件词汇；不能据此新增 producer 或解释当前 Journal。事件目录见 [DSH 事件模型](../agent-plugin-runtime/agent-spec-dsh-event-model.md)。
@@ -124,6 +125,8 @@ costProvenance?
 - 新请求的 cost 连同 `costProvenance.pricingSnapshot` 保存当时所用模型的价格、币种、倍率及目录来源，不保存完整目录；历史没有依据的零值按未知展示，更新价目不重算历史，详见[目录与费用设计](agent-model-catalog-and-usage-cost.md)；
 - 自定义模型手动价格使用 `source: configured`，并把缓存读取和缓存写入作为独立计费桶；关闭手动价格后，新请求的费用为未知，但 Token 统计仍保留；
 - retry 的每次真实 request 都有独立 request ID、snapshot 和 usage，不能把多次尝试覆盖为一条。
+
+辅助请求按 `attemptId` 独立计量，归属真实发生的工作：图像识别和自动审核保留 Session、Run、Turn、Step 与父工具身份；标题仅归属 Session，压缩归属 Session 并可关联实际 Turn。后台请求计入会话及全局请求数、Token 和费用，但不生成或增加 Run。回复轮尾仅累加所属真实 Run 中已终结辅助尝试的已知 Token，包括失败或取消前已报告的消耗。显式零值保留，全未知或尚未终结的辅助尝试不伪造零值，Activity 与轨迹仍保留其未知状态。辅助用量不得重复加入主请求的 `step/end`，也不得生成额外助手气泡或 Context 内容。费用是否已知由独立的成本来源决定，业务解析失败不能抹去已经发生的模型用量。
 
 Durable Session projection 聚合：
 

@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { appendFile } from "node:fs/promises";
 
 /** Loopback-only real HTTP fixture. Never logs Authorization or reads user settings. */
-export async function startAgentProvider({ scenario = "success", logPath, onRequest, port = 0, initialRequestId = 0, heartbeatMs = 20_000 } = {}) {
+export async function startAgentProvider({ scenario = "success", logPath, onRequest, port = 0, initialRequestId = 0, heartbeatMs = 20_000, toolCommand, toolBlockMs = 600_000, errorMessage } = {}) {
   const requests = [];
   const waiting = new Map();
   let hold = false;
@@ -36,7 +36,7 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
         reasoning: body.reasoning_effort ?? body.reasoning ?? body.thinking, hasImage: raw.includes("image_url"), hasSkill: raw.includes("ACTSPACE_FIXTURE_SKILL_BODY"), hasSkillCatalog: raw.includes("ACTSPACE_FIXTURE_SKILL"), stream: body.stream };
       requests.push(entry);
       if (logPath) await appendFile(logPath, JSON.stringify(entry) + "\n");
-      onRequest?.(entry);
+      onRequest?.(entry, body);
       const retryThisRun = retryNextRun && !isSummary && !isTitle;
       if (retryThisRun) retryNextRun = false;
       const status = scenario === "terminal-error" || (isSummary && summaryError) ? 400
@@ -44,12 +44,14 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
         : retryThisRun || (scenario === "retry-once" && requests.length === 1) ? 429 : 200;
       if (status !== 200) {
         response.writeHead(status, { "content-type": "application/json", "retry-after": scenario === "retry-wait" ? "30" : "0" });
-        response.end(JSON.stringify({ error: { message: `${status} fixture ${scenario}`, type: "fixture_error", code: "fixture_failure" } }));
+        response.end(JSON.stringify({ error: { message: errorMessage ?? `${status} fixture ${scenario}`, type: "fixture_error", code: "fixture_failure" } }));
         return;
       }
       let delta = { role: "assistant", content: `Fixture completed: ${body.model}.\n\n[查看结果](result.txt)` };
       let finish = "stop";
       const tool = (name, args) => { delta = { role: "assistant", tool_calls: [{ index: 0, id: `fixture-${entry.id}`, type: "function", function: { name, arguments: JSON.stringify(args) } }] }; finish = "tool_calls"; };
+      if (toolCommand && body.tools?.length && toolResults.length === 0)
+        tool("bash", { command: toolCommand, intent: "Owned process cleanup fixture", blockMs: toolBlockMs, requiredPermissions: ["no_sandbox"] });
       if (body.tools?.length && content.includes("FIXTURE_TOOL") && toolResults.length < 2)
         tool(toolResults.length ? "write_file" : "bash", toolResults.length ? { path: "result.txt", content: "Fixture result.\n" } : { command: "pwd", intent: "隔离验收审批", requiredPermissions: ["no_sandbox"] });
       if (body.tools?.length && content.includes("FIXTURE_LONG") && toolResults.length < 12)

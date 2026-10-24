@@ -82,6 +82,8 @@ export class SessionObserver {
   #loadingOlder = false;
   #tasks: TaskSnapshot | null = null;
   #approvals: readonly ApprovalRequest[] = [];
+  #approvalRevision = 0;
+  #refreshRevision = 0;
   #runStartedAt: number | null = null;
   #cell: ClientSessionCell | null = null;
   #session: SessionRecord | null = null;
@@ -132,8 +134,17 @@ export class SessionObserver {
 
   /** 重新读最新一页并合并（run 结束、投影出现空洞时）。 */
   async refresh(): Promise<void> {
-    const observation = await this.connection.client.call("sessions.page", { sessionId: this.sessionId }) as RuntimeV2SessionObservation;
-    if (!this.#disposed) this.store.applyEnvelope(toEnvelope(observation));
+    const revision = this.#approvalRevision;
+    const refreshRevision = ++this.#refreshRevision;
+    const [observation, approvals] = await Promise.all([
+      this.connection.client.call("sessions.page", { sessionId: this.sessionId }) as Promise<RuntimeV2SessionObservation>,
+      this.connection.client.call("approvals.list", { sessionId: this.sessionId }) as Promise<ApprovalRequest[]>,
+    ]);
+    if (!this.#disposed && refreshRevision === this.#refreshRevision) {
+      this.store.applyEnvelope(toEnvelope(observation));
+      if (revision === this.#approvalRevision) this.#approvals = approvals.filter(item => item.sessionId === this.sessionId);
+      this.#schedule();
+    }
   }
 
   async loadOlder(): Promise<void> {
@@ -209,7 +220,7 @@ export class SessionObserver {
         if (isRecord(value.snapshot) && value.snapshot.sessionId === this.sessionId) this.applyTasks(value.snapshot as unknown as TaskSnapshot);
         return;
       case "approvals":
-        if (Array.isArray(value.requests)) { this.#approvals = (value.requests as ApprovalRequest[]).filter(item => item.sessionId === this.sessionId); this.#schedule(); }
+        if (Array.isArray(value.requests)) { this.#approvalRevision++; this.#approvals = (value.requests as ApprovalRequest[]).filter(item => item.sessionId === this.sessionId); this.#schedule(); }
         return;
     }
   }

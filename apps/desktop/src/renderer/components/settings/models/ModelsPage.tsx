@@ -7,11 +7,10 @@ import { PurposesSection } from "./PurposesSection";
 import { ConnectionListSection } from "./ConnectionListSection";
 import { TemplateCatalogPage } from "./TemplateCatalogPage";
 import { ConnectionSetupPage } from "./ConnectionSetupPage";
-import { ModelSelectPage } from "./ModelSelectPage";
 import { ConnectionDetailPage } from "./ConnectionDetailPage";
 
 /**
- * 设置 › 模型。一个页面里的几步：列表 → 选服务商 → 填 Key → 选模型；列表 → 连接详情。
+ * 设置 › 模型。一个页面里的几步：列表 → 选服务商 → 填 Key → 连接详情（弹出选择窗口）；列表 → 连接详情。
  * 数据都来自 `modelConnections` 的整份视图，页面只保存路由和添加连接时的草稿。
  */
 
@@ -19,8 +18,8 @@ export type ModelsRoute =
   | { name: "list" }
   | { name: "catalog" }
   | { name: "setup" }
-  | { name: "select" }
-  | { name: "detail"; connectionId: string; expand?: string };
+  /** probe：刚建好的连接带着这次的探测结果，详情页直接弹出选择窗口。 */
+  | { name: "detail"; connectionId: string; expand?: string; probe?: ConnectionProbeResult };
 
 export type ConnectionDraft = {
   templateId: string;
@@ -28,7 +27,6 @@ export type ConnectionDraft = {
   protocol: ModelApi;
   baseUrl: string;
   proxyUrl: string;
-  probe: ConnectionProbeResult | null;
 };
 
 type ModelsContextValue = {
@@ -82,10 +80,8 @@ export function ModelsPage({ onChanged }: { onChanged?: () => void }) {
     page = <TemplateCatalogPage />;
   } else if (route.name === "setup" && draft) {
     page = <ConnectionSetupPage draft={draft} />;
-  } else if (route.name === "select" && draft?.probe) {
-    page = <ModelSelectPage draft={draft} probe={draft.probe} />;
   } else if (route.name === "detail" && controller.view.connections.some((item) => item.connectionId === route.connectionId)) {
-    page = <ConnectionDetailPage key={route.connectionId} connectionId={route.connectionId} initialExpanded={route.expand ?? null} />;
+    page = <ConnectionDetailPage key={route.connectionId} connectionId={route.connectionId} initialExpanded={route.expand ?? null} initialProbe={route.probe ?? null} />;
   } else {
     page = (
       <>

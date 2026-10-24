@@ -6,7 +6,7 @@ import { insertUsageActivities } from "./usage-activity-write";
 import { projectQueryCatalog } from "./usage-catalog-projection";
 import { projectUsageJournalBatch, type UsageJournalSource } from "./usage-journal-projection";
 
-export type JournalBatch = { catalogOnly?: boolean; source: UsageJournalSource; events: readonly SessionEventEnvelopeV1[]; cursor: string; first: boolean; final: boolean; reset: boolean; resetAt?: string };
+export type JournalBatch = { catalogOnly?: boolean; source: UsageJournalSource; events: readonly SessionEventEnvelopeV1[]; cursor: string; first: boolean; final: boolean; reset: boolean };
 export type JournalState = { revision: number | null; cursor?: string; stamp?: string; codecSetDigest?: string; building?: boolean };
 type Build = { target: number; stamp: string; codec: string; revision: number; cursor: string | null };
 const tables = ["session_catalog", "catalog_pending_tasks", "usage_activity", "usage_projection_events", "usage_projection_requests", "usage_projection_groups", "usage_projection_turns", "session_excerpt_search", "session_search"] as const;
@@ -104,7 +104,7 @@ export async function commitJournalBatch(db: DatabaseSync, message: JournalBatch
     }
     if (!catalog) await projectUsageJournalBatch(projection, source, message.events, async rows => {
       for (const row of rows) prepare(projection, "DELETE FROM usage_activity WHERE activity_id=?").run(row.activityId);
-      insertUsageActivities(projection, { ...source, rows: message.resetAt ? rows.filter(row => Date.parse(row.startedAt) >= Date.parse(message.resetAt!)) : rows });
+      insertUsageActivities(projection, { ...source, rows });
       await yieldBatch();
     });
     const revision = message.final ? source.throughJournalSeq : message.events.at(-1)?.seq ?? build?.revision ?? -1;
@@ -122,6 +122,17 @@ async function publish(db: DatabaseSync, source: UsageJournalSource, cursor: str
   const id = source.sessionId; const prefix = namespace(catalog);
   const copy = async (table: string) => {
     let after = 0;
+    // Generated token-knowledge columns are visible to SELECT *, but SQLite
+    // excludes them from INSERT's implicit writable-column list. Keep the
+    // published and staging activity projections aligned during publication.
+    const activityColumns = table === "usage_activity"
+      ? (prepare(db, "PRAGMA table_xinfo(usage_activity)").all() as { name: string; hidden: number }[])
+        .filter(column => column.hidden === 0)
+        .map(column => column.name)
+      : undefined;
+    const projection = activityColumns
+      ? `(${activityColumns.join(",")}) SELECT ${activityColumns.join(",")}`
+      : "SELECT *";
     for (;;) {
       // Session indexes sort by logical keys, making every rowid page rescan
       // the entire Session. Seek the physical rowid range; staging is bounded
@@ -129,7 +140,7 @@ async function publish(db: DatabaseSync, source: UsageJournalSource, cursor: str
       const ids = prepare(db, `SELECT rowid AS id FROM ${prefix}${table} NOT INDEXED WHERE session_id=? AND rowid>? ORDER BY rowid LIMIT 256`).all(id, after) as { id: number }[];
       if (!ids.length) break;
       const end = ids.at(-1)!.id;
-      const insert = () => { prepare(db, `INSERT INTO ${table} SELECT * FROM ${prefix}${table} NOT INDEXED WHERE session_id=? AND rowid>? AND rowid<=?`).run(id, after, end); };
+      const insert = () => { prepare(db, `INSERT INTO ${table} ${projection} FROM ${prefix}${table} NOT INDEXED WHERE session_id=? AND rowid>? AND rowid<=?`).run(id, after, end); };
       if (table === "usage_activity") writeUsageBatch(db, insert); else insert();
       after = end; await yieldBatch();
     }

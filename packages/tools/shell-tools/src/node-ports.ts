@@ -28,6 +28,7 @@ let sandboxProbe: Promise<boolean> | undefined;
 export type NodeBashToolPorts = Pick<ToolPorts, "bash" | "bash_output" | "bash_kill"> & {
   readonly hasRunningBackgroundTask: (sessionId: string) => boolean;
   readonly dispose: () => Promise<void>;
+  readonly forceTerminate: () => void;
 };
 
 export function createNodeBashToolPorts(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly sandbox?: boolean }): NodeBashToolPorts {
@@ -38,6 +39,7 @@ export function createNodeBashToolPorts(options: { readonly workspaceRoot: strin
     bash_kill: (args, context) => registry.kill(stringArg(args, "taskId"), context.sessionId),
     hasRunningBackgroundTask: (sessionId) => registry.running(sessionId) > 0,
     dispose: () => registry.dispose(),
+    forceTerminate: () => registry.forceTerminate(),
   });
 }
 
@@ -70,6 +72,7 @@ async function executeBash(
   if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
   const monitor = new OutputMonitor(subscription);
   const processHandle = new ProcessHandle(spawnSpec.command, spawnSpec.args, realCwd, spawnSpec.env, outputPath, monitor.handleChunk);
+  registry.own(processHandle);
   const abort = () => processHandle.kill();
   context.signal.addEventListener("abort", abort, { once: true });
   const blockMs = clampInteger(args.blockMs, DEFAULT_BLOCK_MS, 0, MAX_BLOCK_MS);
@@ -143,6 +146,12 @@ class ProcessHandle {
     this.#killTimer = setTimeout(() => signalProcess(this.child, "SIGKILL"), KILL_GRACE_MS);
     this.#killTimer.unref?.();
   }
+
+  forceTerminate(): void {
+    if (this.#settled) return;
+    if (this.#killTimer !== undefined) clearTimeout(this.#killTimer);
+    signalProcess(this.child, "SIGKILL");
+  }
 }
 
 function signalProcess(child: ChildProcessByStdio<null, Readable, Readable>, signal: NodeJS.Signals): void {
@@ -176,7 +185,15 @@ type BashTask = {
 
 class BashTaskRegistry {
   readonly #tasks = new Map<string, BashTask>();
+  readonly #processes = new Set<ProcessHandle>();
   constructor(readonly outputRoot: string) {}
+
+  own(process: ProcessHandle): void {
+    this.#processes.add(process);
+    void process.wait.then(() => this.#processes.delete(process));
+  }
+
+  forceTerminate(): void { for (const process of this.#processes) process.forceTerminate(); }
 
   register(input: Omit<BashTask, "taskId" | "startedAt" | "status" | "lastReadOffset" | "timer" | "completion" | "notifications">): BashTask {
     const task = { ...input, taskId: `bash_${randomUUID()}`, startedAt: Date.now(), status: "running" as const, lastReadOffset: 0, notifications: new Set<Promise<void>>() } as BashTask;
@@ -225,9 +242,12 @@ class BashTaskRegistry {
   }
 
   async dispose(): Promise<void> {
+    const owned = [...this.#processes];
+    for (const process of owned) process.kill();
     const running = [...this.#tasks.values()].filter((task) => task.status === "running");
     for (const task of running) { task.status = "killed"; task.process.kill(); }
     await Promise.all([...this.#tasks.values()].map((task) => task.completion));
+    await Promise.all(owned.map((process) => process.wait));
     for (const task of this.#tasks.values()) { clearTimeout(task.timer); task.monitor.dispose(); }
     await rm(this.outputRoot, { force: true, recursive: true });
     this.#tasks.clear();

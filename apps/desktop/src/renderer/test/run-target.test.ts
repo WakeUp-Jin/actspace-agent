@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { capabilitiesOf, type RunTarget } from "../target/run-target";
+import { capabilitiesOf, localExecutionRoot, type RunTarget } from "../target/run-target";
 
 const local: RunTarget = { kind: "local", workspaceRoot: "/repo", branch: "main" };
 const worktree: RunTarget = { kind: "local", workspaceRoot: "/repo-wt", branch: "feature", worktree: { kind: "worktree", sourceWorkspaceRoot: "/repo", workspaceRoot: "/repo-wt", baseBranch: "main", branch: "feature", baseCommit: "abc", createdAt: "2026-10-06T00:00:00Z" } };
 const remote: RunTarget = { kind: "remote", hostId: "server", hostName: "Cloud", workspaceId: "w1", workspaceName: "api" };
 
 describe("capabilitiesOf", () => {
+  it("uses the worktree execution root and never a local fallback for a remote target", () => {
+    expect(localExecutionRoot({ ...worktree, workspaceRoot: "/repo" }, "/source")).toBe("/repo-wt");
+    expect(localExecutionRoot(local, "/source")).toBe("/repo");
+    expect(localExecutionRoot(remote, "/source")).toBeUndefined();
+    expect(localExecutionRoot({ kind: "invalid", key: "broken" }, "/source")).toBeUndefined();
+  });
   it("enables everything for a local Git workspace and keeps attachments to images", () => {
     const capabilities = capabilitiesOf(local, { gitStatus: "ready" });
     for (const key of ["newWorktree", "branchSwitch", "localFileOpen", "terminal", "review"] as const) expect(capabilities[key]).toEqual({ enabled: true });

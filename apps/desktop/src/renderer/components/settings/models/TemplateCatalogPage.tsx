@@ -35,7 +35,6 @@ export function TemplateCatalogPage() {
       protocol: template.protocol ?? "openai-completions",
       baseUrl: isRelayTemplate(template) ? "" : template.defaultBaseUrl ?? "",
       proxyUrl: "",
-      probe: null,
     });
     go({ name: "setup" });
   };

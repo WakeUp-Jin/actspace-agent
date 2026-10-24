@@ -20,9 +20,12 @@ export function createDesktopToolHostServices(options: { readonly workspaceRoot:
       get credentials() { return options.modelRuntime.getToolEnvironment().searchCredentials; },
     }) },
     [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => ({ generate_image: (...args: Parameters<NonNullable<import("@actspace/tools-image-generation").ToolPorts["generate_image"]>>) => createImagegeneration({ generation: options.modelRuntime.getToolEnvironment().imageGeneration }).generate_image!(...args) }) },
-    [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmService) => {
-      const inspection = options.modelRuntime.resolveImageInspectionModel();
-      return createImageinspection({ readArtifact: options.readArtifact, ...(inspection.ok ? { inspect: createLlmImageInspector({ llm, routeId: "default", model: inspection.model.key, credentialRef: IMAGE_INSPECTION_CREDENTIAL_REF }) } : {}) });
-    } },
+    [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmService, recorder: import("@actspace/llm-service").AuxiliaryRequestRecorder) => ({
+      inspect_image: (...args: Parameters<NonNullable<import("@actspace/tools-image-inspection").ToolPorts["inspect_image"]>>) => {
+        // The Harness outlives Settings edits; resolve the binding for each call.
+        const inspection = options.modelRuntime.resolveImageInspectionModel();
+        return createImageinspection({ readArtifact: options.readArtifact, ...(inspection.ok ? { inspect: createLlmImageInspector({ llm, recorder, routeId: "default", model: inspection.model.key, credentialRef: IMAGE_INSPECTION_CREDENTIAL_REF }) } : {}) }).inspect_image!(...args);
+      },
+    }) },
   });
 }

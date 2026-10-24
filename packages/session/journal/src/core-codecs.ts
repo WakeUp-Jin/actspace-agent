@@ -1,6 +1,7 @@
 import { isCommandPrefixSelector, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { EventCodecRegistry, type EventCodec } from "./codec-registry.js";
 import { SessionError } from "./errors.js";
+import { validateAuxiliaryRequest } from "./auxiliary-codec.js";
 
 /** The DSH SessionEventMap: the only events the Agent Loop must know about. */
 export const CORE_EVENT_TYPES = [
@@ -47,6 +48,8 @@ export const PERSISTED_EXTENSION_EVENT_TYPES = [
   "hook/result",
   "llm/retry",
   "llm/retry-started",
+  "llm/auxiliary-start",
+  "llm/auxiliary-end",
   "plan/mode",
   "sandbox/mode",
   "schedule/change",
@@ -102,6 +105,7 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
       if (data === null || typeof data !== "object" || Array.isArray(data)) {
         throw invalid(type, "data must be an object");
       }
+      if (type === "llm/auxiliary-start" || type === "llm/auxiliary-end") validateAuxiliaryRequest(type, record(data));
       if (type === "agent/mode-set") {
         const mode = (data as Readonly<Record<string, RuntimeV2JsonValue>>).mode;
         const revision = (data as Readonly<Record<string, RuntimeV2JsonValue>>).revision;

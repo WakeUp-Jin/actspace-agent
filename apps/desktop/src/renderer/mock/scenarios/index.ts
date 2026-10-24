@@ -8,8 +8,9 @@ import { remoteHostScenario } from "./remote-host";
 import { sidebarScenario } from "./sidebar";
 import { streamingScenario } from "./streaming";
 import { turnDeliverablesScenario } from "./turn-deliverables";
+import { subagentTrajectoryScenario } from "./subagent-trajectory";
 
-export type MockScenario = "empty" | "streaming" | "long-session" | "approval-pending" | "remote-host" | "approval-prefix" | "context-pagination" | "turn-deliverables" | "no-workspace" | "sidebar";
+export type MockScenario = "empty" | "streaming" | "long-session" | "approval-pending" | "remote-host" | "approval-prefix" | "context-pagination" | "turn-deliverables" | "no-workspace" | "sidebar" | "subagent-trajectory";
 
 /** 场景只负责写入种子数据，必要时覆盖少量 handler（如流式回放的触发时机）。 */
 export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) => MockHandlers | void>> = {
@@ -23,6 +24,7 @@ export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) =>
   "remote-host": remoteHostScenario,
   "turn-deliverables": turnDeliverablesScenario,
   sidebar: sidebarScenario,
+  "subagent-trajectory": subagentTrajectoryScenario,
 };
 
 export function isMockScenario(value: string | null): value is MockScenario {

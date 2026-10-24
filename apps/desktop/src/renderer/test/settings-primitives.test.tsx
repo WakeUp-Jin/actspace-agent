@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, act, waitFor } from "@testing-library/react";
+import { render, screen, act, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   MultiSelect,
@@ -16,6 +16,117 @@ import {
 } from "../components/settings/SettingsPrimitives";
 
 describe("SettingsPrimitives", () => {
+  it.each(["Escape", "取消", "保存"])("returns inline editor focus after %s, including StrictMode", async (action) => {
+    function Fixture() {
+      const [open, setOpen] = useState(false);
+      return <>
+        <SettingLinkRow title="名称" ariaLabel="编辑名称" controlsId="name-editor" onClick={() => setOpen(true)} />
+        {open ? <SettingEditor id="name-editor" onCancel={() => setOpen(false)} onSave={() => setOpen(false)}>
+          <input autoFocus aria-label="名称输入" />
+        </SettingEditor> : null}
+      </>;
+    }
+    render(<StrictMode><Fixture /></StrictMode>);
+    const trigger = screen.getByRole("button", { name: "编辑名称" });
+    await userEvent.click(trigger);
+    expect(screen.getByLabelText("名称输入")).toHaveFocus();
+    if (action === "Escape") await userEvent.keyboard("{Escape}");
+    else await userEvent.click(screen.getByRole("button", { name: action }));
+    expect(screen.queryByLabelText("名称输入")).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("returns focus to a stable management button after a menu-opened editor closes", async () => {
+    function Fixture() {
+      const [open, setOpen] = useState(false);
+      return <>
+        <SettingsMenuButton id="key-management" label="管理" ariaLabel="管理密钥"
+          items={[{ label: "更换密钥", onSelect: () => setOpen(true) }]} />
+        {open ? <SettingEditor returnFocusId="key-management" onCancel={() => setOpen(false)} onSave={() => {}}>
+          <input aria-label="新密钥" />
+        </SettingEditor> : null}
+      </>;
+    }
+    render(<Fixture />);
+    const trigger = screen.getByRole("button", { name: "管理密钥" });
+    await userEvent.click(trigger);
+    await userEvent.click(screen.getByRole("menuitem", { name: "更换密钥" }));
+    await userEvent.click(screen.getByLabelText("新密钥"));
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByLabelText("新密钥")).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it.each([false, true])("restores focus after asynchronous saving without overriding another control (%s)", async (moveOutside) => {
+    let finishSave!: () => void;
+    function Fixture() {
+      const [open, setOpen] = useState(false);
+      const [saving, setSaving] = useState(false);
+      return <>
+        <SettingLinkRow title="名称" ariaLabel="编辑名称" controlsId="name-editor" onClick={() => setOpen(true)} />
+        {open ? <SettingEditor id="name-editor" saving={saving} onCancel={() => setOpen(false)} onSave={() => {
+          setSaving(true);
+          finishSave = () => setOpen(false);
+        }}><input autoFocus aria-label="名称输入" /></SettingEditor> : null}
+        <button type="button">其他设置</button>
+      </>;
+    }
+    render(<StrictMode><Fixture /></StrictMode>);
+    const trigger = screen.getByRole("button", { name: "编辑名称" });
+    const other = screen.getByRole("button", { name: "其他设置" });
+    await userEvent.click(trigger);
+    const save = screen.getByRole("button", { name: "保存" });
+    await userEvent.click(save);
+    expect(save).toBeDisabled();
+    // Chromium blurs a newly disabled focused button; jsdom needs this transition explicitly.
+    act(() => {
+      (save as HTMLButtonElement).disabled = false;
+      save.blur();
+      (save as HTMLButtonElement).disabled = true;
+    });
+    expect(document.body).toHaveFocus();
+    if (moveOutside) await userEvent.click(other);
+    act(() => finishSave());
+    expect(screen.queryByLabelText("名称输入")).not.toBeInTheDocument();
+    await waitFor(() => expect(moveOutside ? other : trigger).toHaveFocus());
+  });
+
+  it("does not steal focus when another control closes the editor", async () => {
+    function Fixture() {
+      const [open, setOpen] = useState(false);
+      return <>
+        <SettingLinkRow title="名称" ariaLabel="编辑名称" controlsId="name-editor" onClick={() => setOpen(true)} />
+        {open ? <SettingEditor id="name-editor" onCancel={() => setOpen(false)} onSave={() => {}}>
+          <input autoFocus aria-label="名称输入" />
+        </SettingEditor> : null}
+        <button type="button" onClick={() => setOpen(false)}>转到其他设置</button>
+      </>;
+    }
+    render(<Fixture />);
+    await userEvent.click(screen.getByRole("button", { name: "编辑名称" }));
+    const other = screen.getByRole("button", { name: "转到其他设置" });
+    await userEvent.click(other);
+    expect(screen.queryByLabelText("名称输入")).not.toBeInTheDocument();
+    expect(other).toHaveFocus();
+  });
+
+  it("keeps Escape inside a saving editor and leaves IME composition intact", () => {
+    const cancel = vi.fn();
+    const back = vi.fn();
+    const view = render(<div onKeyDown={back}>
+      <SettingEditor saving onCancel={cancel} onSave={() => {}}><input aria-label="名称输入" /></SettingEditor>
+    </div>);
+    fireEvent.keyDown(screen.getByLabelText("名称输入"), { key: "Escape" });
+    expect(cancel).not.toHaveBeenCalled();
+    expect(back).not.toHaveBeenCalled();
+    view.rerender(<div onKeyDown={back}>
+      <SettingEditor onCancel={cancel} onSave={() => {}}><input aria-label="名称输入" /></SettingEditor>
+    </div>);
+    fireEvent.keyDown(screen.getByLabelText("名称输入"), { key: "Escape", isComposing: true });
+    expect(cancel).not.toHaveBeenCalled();
+    expect(back).not.toHaveBeenCalled();
+  });
+
   it("SettingLinkRow responds to Enter and Space", async () => {
     const onClick = vi.fn();
     render(<SettingLinkRow title="显示名称" value="Jin" onClick={onClick} ariaLabel="编辑显示名称" />);

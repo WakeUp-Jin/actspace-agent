@@ -5,7 +5,8 @@ import { registerPerformanceIpc } from "./performance-ipc";
 import { ModelCatalogService } from "./model-catalog-service";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
-import { app, BrowserWindow, globalShortcut, safeStorage, webContents, net } from "electron";
+import { app, BrowserWindow, globalShortcut, safeStorage, webContents, net, screen } from "electron";
+import { presentQuickOpenWindow } from "./quick-open-window";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { AppDataRoots } from "./app-paths";
@@ -172,10 +173,9 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   quickOpenShortcutController = new QuickOpenShortcutController(globalShortcut, () => {
     const window = getMainWindow();
     if (!window) return;
-    if (window.isMinimized()) window.restore();
-    window.show();
-    window.focus();
-    fixedRendererIpc?.requestQuickOpen();
+    void presentQuickOpenWindow(window, screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea)
+      .then((presented) => { if (presented) fixedRendererIpc?.requestQuickOpen(); })
+      .catch((error) => void logMain("quick open presentation failed", { error: String(error) }));
   }, quickOpenSettings.accelerator);
   await logMain("v2 quick open initialized", quickOpenShortcutController.activate(quickOpenSettings));
   browserBridgeService = new BrowserBridgeService({

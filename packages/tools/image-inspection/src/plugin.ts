@@ -7,7 +7,7 @@ export type ToolName = (typeof IMAGE_INSPECTION_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly dispose?: () => Promise<void> };
 export const IMAGE_INSPECTION_HOST_PORT_ID = "actspace.host.tools.image-inspection" as const;
-export type HostPort = { readonly createPorts: (llm: import("@actspace/llm-service").LlmService) => ToolPorts | Promise<ToolPorts> };
+export type HostPort = { readonly createPorts: (llm: import("@actspace/llm-service").LlmService, recorder: import("@actspace/llm-service").AuxiliaryRequestRecorder) => ToolPorts | Promise<ToolPorts> };
 export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntime["register"]> };
 
 export async function apply(ctx: CordisContext): Promise<void> {
@@ -16,7 +16,9 @@ export async function apply(ctx: CordisContext): Promise<void> {
   if (!runtime || !host) throw new Error("image-inspection requires tools.runtime and actspace.host.tools.image-inspection.");
   const llm = ctx.get?.("llm.service") as import("@actspace/llm-service").LlmService | undefined;
   if (!llm) throw new Error("image-inspection requires llm.service.");
-  const ports = await host.createPorts(llm);
+  const recorder = ctx.get?.("llm.auxiliary-requests") as import("@actspace/llm-service").AuxiliaryRequestRecorder | undefined;
+  if (!recorder) throw new Error("image-inspection requires llm.auxiliary-requests.");
+  const ports = await host.createPorts(llm, recorder);
   let registrations: readonly ToolRegistration[];
   try { registrations = registerTools(runtime, ports); }
   catch (error) { await ports.dispose?.(); throw error; }

@@ -15,7 +15,7 @@
           "lastConnection": {
             "status": "untested"
           },
-          "installedModelCount": 1,
+          "installedModelCount": 0,
           "enabledModelCount": 0,
           "defaultPricingMultiplier": 1
         },
@@ -52,11 +52,6 @@
         }
       },
       "installedModels": {
-        "deepseek:deepseek-flash": {
-          "enabled": false,
-          "addedAt": "2026-07-25T00:00:00.000Z",
-          "connectionId": "deepseek:default"
-        },
         "kimi:kimi-k2.6": {
           "enabled": true,
           "addedAt": "2026-07-24T00:00:00.000Z",
@@ -73,7 +68,7 @@
         "defaultChatModel": "kimi:kimi-k2.6",
         "utilityModel": null,
         "autoReviewModel": null,
-        "exploreModel": "deepseek:deepseek-flash",
+        "exploreModel": null,
         "visionModel": null,
         "thinking": {
           "utility": "off",
@@ -110,7 +105,7 @@
           "bash"
         ],
         "bashAlwaysAsk": false,
-        "exploreModelId": "deepseek-v4-flash"
+        "exploreModelId": null
       },
       "skills": {
         "disabled": [
@@ -207,11 +202,6 @@
           },
           "definitions": {},
           "installed": {
-            "deepseek:deepseek-flash": {
-              "connectionId": "deepseek:default",
-              "enabled": false,
-              "addedAt": "2026-07-25T00:00:00.000Z"
-            },
             "kimi:kimi-k2.6": {
               "connectionId": "kimi:default",
               "enabled": true,
@@ -227,7 +217,7 @@
             "defaultChat": "kimi:kimi-k2.6",
             "utility": null,
             "autoReview": null,
-            "explore": "deepseek:deepseek-flash",
+            "explore": null,
             "vision": null,
             "thinking": {
               "utility": "off",
@@ -235,7 +225,7 @@
             }
           },
           "overrides": {},
-          "layersVersion": 1
+          "layersVersion": 2
         },
         "tools": {
           "disabledTools": [
@@ -379,11 +369,6 @@
         },
         "definitions": {},
         "installed": {
-          "deepseek:deepseek-flash": {
-            "connectionId": "deepseek:default",
-            "enabled": false,
-            "addedAt": "2026-07-25T00:00:00.000Z"
-          },
           "kimi:kimi-k2.6": {
             "connectionId": "kimi:default",
             "enabled": true,
@@ -399,7 +384,7 @@
           "defaultChat": "kimi:kimi-k2.6",
           "utility": null,
           "autoReview": null,
-          "explore": "deepseek:deepseek-flash",
+          "explore": null,
           "vision": null,
           "thinking": {
             "utility": "off",
@@ -407,7 +392,7 @@
           }
         },
         "overrides": {},
-        "layersVersion": 1
+        "layersVersion": 2
       },
       "tools": {
         "disabledTools": [

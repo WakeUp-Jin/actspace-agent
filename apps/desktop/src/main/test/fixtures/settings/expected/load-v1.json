@@ -237,7 +237,7 @@
             }
           },
           "overrides": {},
-          "layersVersion": 1
+          "layersVersion": 2
         },
         "tools": {
           "disabledTools": [
@@ -411,7 +411,7 @@
           }
         },
         "overrides": {},
-        "layersVersion": 1
+        "layersVersion": 2
       },
       "tools": {
         "disabledTools": [

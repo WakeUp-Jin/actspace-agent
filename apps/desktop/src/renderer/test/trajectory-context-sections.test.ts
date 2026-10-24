@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import type { RuntimeV2JsonValue, RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
 import { buildTrajectorySnapshot, deriveLayout } from '../trajectory';
-import { attachSubagentTools, trajectoryDelegations } from '../trajectory/subagents';
+import { trajectoryDelegations } from '../trajectory/subagents';
 
 function snapshot(events: [string, Record<string, RuntimeV2JsonValue>][], sessionId = 's'): RuntimeV2TrajectorySnapshot {
   return { kind: 'trajectory', schemaVersion: 1, sessionId, throughJournalSeq: events.length - 1, nodes: events.map(([eventType, data], eventSeq) => ({ key: `${sessionId}:${eventSeq}`, sessionId, eventSeq, eventType, data, surface: null, source: null, time: new Date(1700000000000 + eventSeq * 1000).toISOString(), kind: 'other', state: 'observed', callId: typeof data.callId === 'string' ? data.callId : null })) };
@@ -35,25 +35,16 @@ it('keeps skill catalog distinct from loaded skills and does not infer sources f
   expect(old.records.map(row => row.kind)).toEqual(['system']);
 });
 
-it('attaches real child tools with their own Schema and namespaced identity without merging request usage', () => {
+it('keeps the delegated agent call as one parent row and exposes its child session link', () => {
   const parentSnapshot = snapshot([
     ['turn/start', { turnId: 't' }], ['step/start', { turnId: 't', stepId: 'p' }],
-    ['request/context', { turnId: 't', stepId: 'p', requestId: 'r', snapshot: { renderedSystemPrompt: 'parent', tools: [{ name: 'read_file', description: 'WRONG PARENT SCHEMA' }] } }],
-    ['tool/call', { turnId: 't', stepId: 'p', callId: 'same', name: 'agent', args: {} }],
-    ['delegation/requested', { parentCallId: 'same', childSessionId: 'child' }],
+    ['request/context', { turnId: 't', stepId: 'p', requestId: 'r', snapshot: { renderedSystemPrompt: 'parent', tools: [] } }],
+    ['tool/call', { turnId: 't', stepId: 'p', callId: 'same', name: 'agent', args: { description: 'Read storage' } }],
+    ['delegation/requested', { parentCallId: 'same', childSessionId: 'child', presetId: 'explore' }],
+    ['delegation/requested', { parentCallId: 'self', childSessionId: 's' }],
+    ['tool/result', { callId: 'same', status: 'completed', result: 'agent completed' }],
   ]);
-  const child = buildTrajectorySnapshot(snapshot([
-    ['turn/start', { turnId: 't' }], ['step/start', { turnId: 't', stepId: 'p' }],
-    ['request/context', { turnId: 't', stepId: 'p', requestId: 'r', snapshot: { renderedSystemPrompt: 'child', tools: [{ name: 'read_file', description: 'CHILD SCHEMA', inputSchema: { type: 'object' } }] } }],
-    ['tool/call', { turnId: 't', stepId: 'p', requestId: 'r', callId: 'same', name: 'read_file', args: { path: 'a' } }],
-    ['tool/result', { callId: 'same', status: 'completed', result: 'read' }],
-  ], 'child'));
-  const combined = attachSubagentTools(buildTrajectorySnapshot(parentSnapshot), trajectoryDelegations(parentSnapshot), new Map([['child', child]]));
-  const layout = deriveLayout(combined);
-  const nested = layout.cells.find(cell => cell.kind === 'subtool')!;
-  expect(nested.record.schemaDetail).toMatchObject({ description: 'CHILD SCHEMA' });
-  expect(nested.record.callId).not.toBe('same');
-  expect(nested.record.parentCallId).toBe('same');
-  expect(nested.requestKey).toBeNull();
-  expect(nested.record.messageSource).toMatchObject({ sessionId: 'child', callId: 'same', requestId: 'r' });
+  expect(trajectoryDelegations(parentSnapshot)).toEqual([{ parentCallId: 'same', childSessionId: 'child', presetId: 'explore' }]);
+  const layout = deriveLayout(buildTrajectorySnapshot(parentSnapshot));
+  expect(layout.cells.filter(cell => cell.kind === 'tool' || cell.kind === 'subtool').map(cell => [cell.kind, cell.record.toolName])).toEqual([['tool', 'agent']]);
 });

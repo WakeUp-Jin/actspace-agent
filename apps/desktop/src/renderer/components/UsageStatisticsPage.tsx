@@ -60,8 +60,18 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
   }, [range, status, tab, search, details, saved, onUpdateNamespace]);
   const summary = data?.summary;
   const cost = data?.costSummary;
+  const unknownTokens = summary?.unknownTokenRequestCounts;
+  const requestCount = summary?.requestCount ?? 0;
   const totalInput = (summary?.inputTokens ?? 0) + (summary?.cacheReadTokens ?? 0) + (summary?.cacheWriteTokens ?? 0);
-  const hitRate = totalInput ? `${((summary?.cacheReadTokens ?? 0) / totalInput * 100).toFixed(1)}%` : "—";
+  const cacheRateIncomplete = Boolean(unknownTokens && (unknownTokens.input || unknownTokens.cacheRead || unknownTokens.cacheWrite));
+  const hitRate = !cacheRateIncomplete && totalInput ? `${((summary?.cacheReadTokens ?? 0) / totalInput * 100).toFixed(1)}%` : "—";
+  const totalUnknown = unknownTokens?.total ?? 0;
+  const totalLabel = totalUnknown > 0 && totalUnknown < requestCount ? "已知 Token 合计" : "Token 用量";
+  const totalDetail = [
+    tokenPart("输入", summary?.inputTokens, unknownTokens?.input ?? 0, requestCount),
+    tokenPart("输出", summary?.outputTokens, unknownTokens?.output ?? 0, requestCount),
+    totalUnknown > 0 ? `${totalUnknown} 次请求 Token 用量未知` : "",
+  ].filter(Boolean).join(" · ");
   const rows = data?.rows ?? [];
   const counts = { requests: data?.tabCounts?.requests ?? data?.rowsPage.totalRows ?? 0, providers: data?.tabCounts?.providers ?? data?.aggregates?.providers.length ?? 0, models: data?.tabCounts?.models ?? data?.aggregates?.models.length ?? 0, tools: data?.tabCounts?.tools ?? data?.aggregates?.tools.length ?? 0 };
   const page = data?.rowsPage;
@@ -87,9 +97,9 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
       </div> : null}
       {isLoading && !data ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-act-sm text-text-faint">正在读取使用记录…</div> : <section aria-label="使用概览" className="-mt-5 grid grid-cols-4 gap-2.5 max-[800px]:grid-cols-2 max-[400px]:grid-cols-1">
         <Metric label="请求数" value={number(summary?.requestCount)} detail="模型调用" />
-        <Metric label="Token 用量" value={number(summary?.totalTokens)} detail={`输入 ${number(summary?.inputTokens)} · 输出 ${number(summary?.outputTokens)}`} />
+        <Metric label={totalLabel} value={aggregateTokenValue(summary?.totalTokens, totalUnknown, requestCount)} detail={totalDetail} warn={totalUnknown > 0} />
         <Metric label={cost?.knownCostRequestCount && cost.unknownCostRequestCount ? "已知费用" : "费用"} value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unknownCostRequestCount ? `${cost.knownCostRequestCount ? "另有 " : ""}${cost.unknownCostRequestCount} 次请求缺少费用依据` : cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : "按请求记录 · USD 汇总"} warn={Boolean(cost?.unknownCostRequestCount || cost?.unverifiedHistoricalRequestCount)} />
-        <Metric label="缓存命中率" value={hitRate} detail={`${number(summary?.cacheReadTokens)} 缓存 Token`} />
+        <Metric label="缓存命中率" value={hitRate} detail={tokenPart("缓存", summary?.cacheReadTokens, unknownTokens?.cacheRead ?? 0, requestCount)} warn={Boolean(unknownTokens && (unknownTokens.cacheRead || unknownTokens.input || unknownTokens.cacheWrite))} />
       </section>}
       <section className="flex min-w-0 flex-col gap-3">
         <div className="mt-1 flex gap-5 overflow-x-auto border-b border-line" role="tablist" aria-label="统计分类">{tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} className={`-mb-px shrink-0 border-b-2 px-0.5 pb-2.5 text-act-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${tab === value ? "border-text-main text-text-main" : "border-transparent text-text-faint hover:text-text-main"}`} onClick={() => { setTab(value); setSearch(""); }}>{label} <span className="ml-1 text-act-xs font-normal tabular-nums text-text-subtle">{counts[value] ?? "—"}</span></button>)}</div>
@@ -134,9 +144,20 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
 function Metric({ label, value, detail, warn = false }: { label: string; value: string; detail: string; warn?: boolean }) {
   return <div className="min-w-0 rounded-act-group border border-line bg-surface px-3.5 py-3"><div className="text-act-xs text-text-muted">{label}</div><div className="mb-0.5 mt-1 break-words text-act-xl font-semibold leading-tight tracking-tight tabular-nums">{value}</div><div className={`flex items-start gap-1.5 text-act-xxs leading-relaxed ${warn ? "text-warning" : "text-text-faint"}`}>{warn ? <span aria-hidden="true" className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" /> : null}<span>{detail}</span></div></div>;
 }
+function aggregateTokenValue(value: number | undefined, unknownCount: number, requestCount: number) {
+  return unknownCount > 0 && requestCount > 0 && unknownCount >= requestCount ? "—" : number(value);
+}
+function tokenPart(label: string, value: number | undefined, unknownCount: number, requestCount: number) {
+  const suffix = unknownCount > 0 ? `（${unknownCount} 次未知）` : "";
+  return `${label} ${aggregateTokenValue(value, unknownCount, requestCount)}${suffix}`;
+}
 function Empty({ search }: { search?: string }) { return <p className="py-12 text-center text-act-sm text-text-faint">{search ? "没有符合筛选条件的记录" : "所选时间范围内暂无使用记录"}</p>; }
 function AggregateTable({ rows, tools, search, pending }: { rows: UsageActivityAggregate[]; tools: boolean; search: string; pending: boolean }) {
-  return <div className={tableFrame}><table className="w-full text-act-sm"><thead className={tableHead}><tr><th className={cell}>{tools ? "工具" : "名称"}</th><th className={numberCell}>调用数</th><th className={numberCell}>{tools ? "失败数" : "Token"}</th><th className={numberCell}>{tools ? "耗时" : "费用"}</th></tr></thead><tbody className="divide-y divide-line/60">{rows.map((row) => <tr key={row.key} className="hover:bg-hover-overlay"><td className={cell}><div tabIndex={0} className="max-w-[230px] truncate font-medium" title={row.label}>{row.label}</div>{<div className="text-text-faint">{row.connectionId ?? row.providerId ?? ""}{row.costSummary.unknownCostRequestCount ? ` · ${row.costSummary.unknownCostRequestCount} 次费用未知` : ""}</div>}</td><td className={numberCell}>{number(row.count)}</td><td className={numberCell}>{number(tools ? row.errorCount : row.totalTokens)}</td><td className={numberCell}>{tools ? `${(row.durationMs / 1000).toFixed(1)} 秒` : money(row.costSummary)}</td></tr>)}</tbody></table>{!rows.length && !pending ? <Empty search={search} /> : null}</div>;
+  return <div className={tableFrame}><table className="w-full text-act-sm"><thead className={tableHead}><tr><th className={cell}>{tools ? "工具" : "名称"}</th><th className={numberCell}>调用数</th><th className={numberCell}>{tools ? "失败数" : "Token"}</th><th className={numberCell}>{tools ? "耗时" : "费用"}</th></tr></thead><tbody className="divide-y divide-line/60">{rows.map((row) => {
+    const unknownTokenCount = tools ? 0 : row.unknownTokenRequestCount;
+    const tokenValue = tools ? row.errorCount : aggregateTokenValue(row.totalTokens, unknownTokenCount, row.count);
+    return <tr key={row.key} className="hover:bg-hover-overlay"><td className={cell}><div tabIndex={0} className="max-w-[230px] truncate font-medium" title={row.label}>{row.label}</div><div className="text-text-faint">{row.connectionId ?? row.providerId ?? ""}{row.costSummary.unknownCostRequestCount ? ` · ${row.costSummary.unknownCostRequestCount} 次费用未知` : ""}</div></td><td className={numberCell}>{number(row.count)}</td><td className={numberCell}>{tools ? number(row.errorCount) : <><div>{tokenValue}</div>{unknownTokenCount ? <div className="text-act-xxs text-text-faint">{unknownTokenCount} 次请求用量未知</div> : null}</>}</td><td className={numberCell}>{tools ? `${(row.durationMs / 1000).toFixed(1)} 秒` : money(row.costSummary)}</td></tr>;
+  })}</tbody></table>{!rows.length && !pending ? <Empty search={search} /> : null}</div>;
 }
 
 function CellHint({ text, children }: { text: string; children: React.ReactNode }) {

@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type InputHTMLAttributes,
@@ -331,6 +332,7 @@ export function SettingSubhead({ children, indent = false }: { children: ReactNo
 /** 行下方的编辑区：内容 + 左侧提示 / 右侧「取消 / 保存」。Esc 取消。 */
 export function SettingEditor({
   id,
+  returnFocusId,
   children,
   hint,
   error,
@@ -342,6 +344,8 @@ export function SettingEditor({
   saveAriaLabel,
 }: {
   id?: string;
+  /** 菜单打开编辑器时，指定稳定的菜单按钮；普通行使用 aria-controls 关联。 */
+  returnFocusId?: string;
   children: ReactNode;
   hint?: ReactNode;
   error?: string | null;
@@ -352,14 +356,41 @@ export function SettingEditor({
   saveLabel?: string;
   saveAriaLabel?: string;
 }) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    let ownsFocus = editor.contains(document.activeElement);
+    const trackFocus = (event: FocusEvent) => {
+      ownsFocus = event.target instanceof Node && editor.contains(event.target);
+    };
+    document.addEventListener("focusin", trackFocus);
+    return () => {
+      document.removeEventListener("focusin", trackFocus);
+      if (!ownsFocus && !editor.contains(document.activeElement)) return;
+      // 异步保存禁用当前按钮时 Chromium 会失焦到 body，但不会产生新的 focusin。
+      // 记住最后的焦点归属；用户主动聚焦其他控件后则不再恢复。
+      // 卸载后再恢复，避免抢走主动移到别处的焦点，也兼容 StrictMode 的效果重放。
+      queueMicrotask(() => {
+        const active = document.activeElement;
+        if (editor.isConnected || (active && active !== document.body && active !== document.documentElement)) return;
+        const trigger = returnFocusId
+          ? document.getElementById(returnFocusId)
+          : id ? Array.from(document.querySelectorAll<HTMLElement>("[aria-controls]"))
+            .find((element) => element.getAttribute("aria-controls") === id) : undefined;
+        trigger?.focus();
+      });
+    };
+  }, [id, returnFocusId]);
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape" && !saving) {
-      event.stopPropagation();
-      onCancel();
-    }
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    event.stopPropagation();
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    if (!saving) onCancel();
   };
   return (
-    <div id={id} className="bg-surface-subtle px-4 pb-3.5 pt-3" onKeyDown={onKeyDown}>
+    <div ref={editorRef} id={id} className="bg-surface-subtle px-4 pb-3.5 pt-3" onKeyDown={onKeyDown}>
       {children}
       <div className="mt-2.5 flex items-center justify-between gap-3 max-[600px]:flex-col max-[600px]:items-start">
         {error ? (
@@ -673,11 +704,13 @@ export type SettingsMenuItem = { label: string; onSelect: () => void; danger?: b
 
 /** 「管理」这类按钮打开的动作菜单。 */
 export function SettingsMenuButton({
+  id,
   label,
   ariaLabel,
   items,
   disabled = false,
 }: {
+  id?: string;
   label: ReactNode;
   ariaLabel: string;
   items: SettingsMenuItem[];
@@ -686,7 +719,7 @@ export function SettingsMenuButton({
   return (
     <Menu>
       <MenuTrigger asChild>
-        <Button variant="ghost" aria-label={ariaLabel} disabled={disabled}>
+        <Button id={id} variant="ghost" aria-label={ariaLabel} disabled={disabled}>
           {label}
         </Button>
       </MenuTrigger>

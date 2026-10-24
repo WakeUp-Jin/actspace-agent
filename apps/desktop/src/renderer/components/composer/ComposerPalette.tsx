@@ -8,11 +8,11 @@ import { Popover, PopoverAnchor, PopoverContent } from "../ui/Popover";
 // `+` 面板（09 §3）：与输入框同宽，贴在输入框上方，空间不够时由 Radix 翻到下方。
 // 焦点一直留在搜索框里（组合框模式），↑↓ 移动的是 aria-activedescendant。
 const PALETTE_CLASS =
-  "composer-palette w-(--radix-popper-anchor-width) p-1 transition-[opacity,transform] duration-(--motion-fast) ease-out motion-reduce:transition-none";
-const SEARCH_ROW_CLASS = "flex h-8 items-center gap-2 px-2 text-text-faint";
+  "composer-palette flex max-h-(--radix-popover-content-available-height) w-(--radix-popper-anchor-width) flex-col overflow-hidden p-1 transition-[opacity,transform] duration-(--motion-fast) ease-out motion-reduce:transition-none";
+const SEARCH_ROW_CLASS = "flex h-8 shrink-0 items-center gap-2 px-2 text-text-faint";
 const SEARCH_INPUT_CLASS =
   "min-w-0 flex-1 border-0 bg-transparent p-0 text-act-sm leading-5 text-text-main outline-none placeholder:text-text-subtle";
-const LIST_CLASS = "max-h-[280px] overflow-y-auto";
+const LIST_CLASS = "min-h-0 max-h-[280px] overflow-y-auto";
 const GROUP_LABEL_CLASS = "px-2 pb-1 pt-2 text-act-xxs font-semibold leading-4 text-text-faint";
 const SEPARATOR_CLASS = "mx-1 my-1 h-px bg-line";
 const ROW_CLASS =

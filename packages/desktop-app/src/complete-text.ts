@@ -1,12 +1,16 @@
-import type { LlmMessage, LlmService, LlmUsage } from "@actspace/llm-service";
+import { completeAuxiliaryText, type AuxiliaryRequestOwner, type AuxiliaryRequestRecorder, type LlmMessage, type LlmService, type LlmUsage } from "@actspace/llm-service";
 
-export async function completeText(llm: LlmService, input: { readonly messages: readonly LlmMessage[]; readonly model?: string; readonly purpose?: "chat" | "utility"; readonly sessionId?: string; readonly signal?: AbortSignal }) {
+export async function completeText(llm: LlmService, input: { readonly messages: readonly LlmMessage[]; readonly model?: string; readonly purpose?: "chat" | "utility"; readonly sessionId?: string; readonly signal?: AbortSignal; readonly auxiliary?: { readonly recorder: AuxiliaryRequestRecorder; readonly owner: AuxiliaryRequestOwner } }) {
   const model = input.model ?? "default";
   const routes = llm.routes.list();
   const chatRoute = routes.find(route => route.routeId === "default")
     ?? routes.find(route => !["auto-review", "utility", "explore"].includes(route.routeId));
   const routeId = input.purpose === "utility" ? "utility" : chatRoute?.routeId ?? "default";
   const prepared = llm.prepare({ routeId, model, messages: input.messages, ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), ...(input.signal === undefined ? {} : { signal: input.signal }) });
+  if (input.auxiliary) {
+    const result = await completeAuxiliaryText(prepared, { ...input.auxiliary, ...(input.signal ? { signal: input.signal } : {}) });
+    return Object.freeze({ ...result, model: prepared.request.model, provider: prepared.request.routeId });
+  }
   let text = "";
   let usage: LlmUsage = { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, cost: null, costCurrency: null, source: "unknown" };
   let stopReason: string | null = null;

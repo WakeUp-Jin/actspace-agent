@@ -12,6 +12,8 @@ import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
 export async function runToolStreamFixture(options: {
   toolEnvironment?: Partial<import("@actspace/tools-runtime").ToolPreparedEnvironment>;
   stream?: () => AsyncIterable<LlmStreamEvent>;
+  retryPolicy?: import("@actspace/llm-service").LlmRetryPolicy;
+  credential?: import("@actspace/llm-service").LlmCredential;
   subagent?: boolean;
   createContextEngine?: import("./loop.js").AgentLoopOptions["createContextEngine"];
   contextSources?: import("@actspace/context-engine").ContextSourceRegistry;
@@ -58,7 +60,7 @@ export async function runToolStreamFixture(options: {
   let requests = 0;
   const args = options.args ?? '{"path":"fixture.txt"}';
   const routes = new LlmRouteRegistry();
-  const handle = routes.register({ routeId: "test", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: {
+  const handle = routes.register({ routeId: "test", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, retryPolicy: options.retryPolicy, adapter: {
     adapterVersion: "test", resolveModelFacts: () => ({ contextWindow: options.contextWindow ?? null }), dispatch: async (input) => (async function* (): AsyncGenerator<LlmStreamEvent> {
       options.onRequest?.(input.request.options);
       options.onTools?.(input.request.tools);
@@ -87,7 +89,7 @@ export async function runToolStreamFixture(options: {
   const loop = new AgentLoop({ createContextEngine: options.createContextEngine, contextSources: options.contextSources, session, tools, inbox, inputSource: options.inputSource,
     descriptor: { ...MAIN_AGENT_DESCRIPTOR, ...(options.subagent ? { kind: "subagent" as const, maxSteps: 2 } : {}), routeId: "test", model: "test" }, scope: new AgentScope("main:test", undefined, "main:test"),
     assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
-    llm: new LlmService(routes, { resolve: async () => ({ apiKey: "fixture" }) }),
+    llm: new LlmService(routes, { resolve: async () => options.credential ?? ({ apiKey: "fixture" }) }),
     compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },
     toolEnvironment: () => ({ ...options.toolEnvironment, resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: async () => { throw new Error("not used"); } }),
     onLiveEvent: (event) => { events.push(event); options.onLiveEvent?.(event); },

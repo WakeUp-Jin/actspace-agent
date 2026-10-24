@@ -56,11 +56,28 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
   const splitHint = !hasFiles ? fileActionHint : !splitAvailable ? "加宽审查面板后可使用并排差异" : diffMode === "split" ? "切换为单栏差异" : "切换为并排差异";
   return (
     <div className="relative z-20 shrink-0 border-b border-line bg-surface-raised [pointer-events:auto] [-webkit-app-region:no-drag]" aria-label="审查工具栏">
-      <div className="flex min-h-11 min-w-0 items-center gap-1 overflow-x-auto px-2.5 scrollbar-none" data-review-toolbar-scroll>
-        <div className="min-w-0 shrink">
+      <div
+        className="flex min-h-11 min-w-0 items-center gap-1 overflow-x-auto px-2.5 scrollbar-none"
+        data-review-toolbar-scroll
+        onFocusCapture={(event) => {
+          const scroll = event.currentTarget;
+          const target = event.target;
+          // Portal 菜单的 React 焦点事件也会冒泡到这里，不能滚动背景工具栏。
+          if (!(target instanceof HTMLElement) || !scroll.contains(target) || scroll.scrollWidth <= scroll.clientWidth) return;
+          const left = scroll.getBoundingClientRect().left + scroll.clientLeft;
+          const right = left + scroll.clientWidth;
+          const bounds = target.getBoundingClientRect();
+          // 为 base.css 的 3px focus-visible 轮廓保留空间，只移动本容器。
+          const delta = bounds.left - 3 < left ? bounds.left - 3 - left : Math.max(0, bounds.right + 3 - right);
+          // Chromium 会按设备像素舍入 scrollLeft，向显露方向取整以免再次裁掉轮廓。
+          const next = delta < 0 ? Math.floor(scroll.scrollLeft + delta) : Math.ceil(scroll.scrollLeft + delta);
+          if (delta) scroll.scrollLeft = Math.max(0, Math.min(scroll.scrollWidth - scroll.clientWidth, next));
+        }}
+      >
+        <div className="shrink-0">
           <Popover open={menu === "scope"} onOpenChange={openChange("scope")}>
             <PopoverTrigger asChild>
-              <button type="button" className="inline-flex h-8 max-w-[140px] items-center gap-1 rounded-act-sm px-1.5 text-act-sm font-medium text-text-main hover:bg-surface-subtle" aria-label="审查范围">
+              <button type="button" className="inline-flex h-8 min-w-[76px] max-w-[140px] items-center gap-1 whitespace-nowrap rounded-act-sm px-1.5 text-act-sm font-medium text-text-main hover:bg-surface-subtle" aria-label="审查范围">
                 <span className="truncate">{scopeLabel}</span><ChevronDown size={13} />
               </button>
             </PopoverTrigger>

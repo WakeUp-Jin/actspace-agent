@@ -5,11 +5,14 @@ import { createUsageJournalSchema } from "./usage-journal-projection";
 import { createUsageRollups } from "./usage-rollups";
 import type { DatabaseSync } from "node:sqlite";
 
-/** Shared schema for the durable index and bounded in-memory Session fallback. */
+/** Shared schema for the durable index and bounded in-memory Session fallback.
+ * v10 replays history omitted by the former automatic Usage reset boundary;
+ * v13 adds indexed unknown-token dimensions to activity and aggregate rollups;
+ * v14 excludes Session-owned auxiliary usage from derived Run counts. */
 export function createReadModelSchema(db: DatabaseSync): void {
   db.exec(`
     PRAGMA application_id = 0x41555332;
-    PRAGMA user_version = 9;
+    PRAGMA user_version = 14;
     CREATE TABLE IF NOT EXISTS usage_write_mode(batching INTEGER NOT NULL) STRICT;
     INSERT INTO usage_write_mode SELECT 0 WHERE NOT EXISTS(SELECT 1 FROM usage_write_mode);
     CREATE TABLE IF NOT EXISTS session_catalog (
@@ -60,6 +63,12 @@ export function createReadModelSchema(db: DatabaseSync): void {
       cache_write_tokens INTEGER,
       reasoning_tokens INTEGER,
       total_tokens INTEGER,
+      input_tokens_unknown INTEGER GENERATED ALWAYS AS (input_tokens IS NULL) STORED,
+      output_tokens_unknown INTEGER GENERATED ALWAYS AS (output_tokens IS NULL) STORED,
+      cache_read_tokens_unknown INTEGER GENERATED ALWAYS AS (cache_read_tokens IS NULL) STORED,
+      cache_write_tokens_unknown INTEGER GENERATED ALWAYS AS (cache_write_tokens IS NULL) STORED,
+      reasoning_tokens_unknown INTEGER GENERATED ALWAYS AS (reasoning_tokens IS NULL) STORED,
+      total_tokens_unknown INTEGER GENERATED ALWAYS AS (total_tokens IS NULL) STORED,
       cost_usd REAL,
       cost_amount REAL,
       cost_currency TEXT,

@@ -110,6 +110,16 @@
   color: var(--color-text-muted);
 }
 
+.tool-result-disclosure.is-error :is(.tool-result-toggle, .tool-result-toggle svg, .tool-summary-target, .tool-summary-meta, .tool-result-item) {
+  color: var(--color-danger);
+}
+
+.tool-result-disclosure.is-error .tool-result-item {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 /* Reserve chevron space so hover never shifts the tool text. */
 :is(.tool-result-toggle, .web-tool-toggle, .thinking-toggle, .bash-run-toggle) .lucide-chevron-right,
 :is(.tool-result-toggle, .web-tool-toggle, .thinking-toggle, .bash-run-toggle) .lucide-chevron-down {

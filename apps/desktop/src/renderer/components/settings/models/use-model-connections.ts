@@ -5,7 +5,7 @@ import { useSettingsSaveNotice } from "../SettingsPrimitives";
 
 /**
  * 设置 › 模型的数据：读整份视图，所有修改走 `run`。
- * 修改成功换成返回的新视图并提示「已保存」；失败把原因放进 error，由页面顶部显示。
+ * 修改成功换成返回的新视图并提示「已保存」（savedText 为 null 时不提示，由调用方就地显示）；失败把原因放进 error，由页面顶部显示。
  */
 export function useModelConnections(onChanged?: () => void) {
   const [view, setView] = useState<ModelConnectionsView | null>(null);
@@ -27,7 +27,7 @@ export function useModelConnections(onChanged?: () => void) {
     void reload();
   }, [reload]);
 
-  const run = useCallback(async (mutation: () => Promise<ModelConnectionsResult>, savedText?: string): Promise<ModelConnectionsResult> => {
+  const run = useCallback(async (mutation: () => Promise<ModelConnectionsResult>, savedText?: string | null): Promise<ModelConnectionsResult> => {
     let result: ModelConnectionsResult;
     try {
       result = await mutation();
@@ -41,7 +41,7 @@ export function useModelConnections(onChanged?: () => void) {
     }
     setView(result.view);
     setError(null);
-    notify(savedText);
+    if (savedText !== null) notify(savedText);
     changed.current?.();
     return result;
   }, [notify]);

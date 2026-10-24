@@ -20,7 +20,7 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
   const failed = terminal && state !== undefined && state !== "completed";
   const resultPreview = terminal && !failed ? outputPreview(output) : undefined;
   if (localName === "read_file") return { kind: "read", filePath: displayPath(string(args.path) ?? ""), ...(typeof args.offset === "number" || typeof args.limit === "number" ? { range: `${nonNegative(args.offset) || 1}-${(nonNegative(args.offset) || 1) + Math.max(0, nonNegative(args.limit) - 1)}` } : {}), displayText: summary, resultPreview };
-  if (localName === "list_directory") return { kind: "directory_list", path: displayPath(string(args.path) ?? "."), entryCount: countOutputLines(output), displayText: summary, resultPreview };
+  if (localName === "list_directory") return { kind: "directory_list", path: displayPath(string(args.path) ?? "."), entryCount: terminal && !failed ? directoryEntryCount(output) : undefined, displayText: summary, resultPreview };
   if (localName === "grep") return { kind: "grep", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "glob") return { kind: "glob", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "web" || localName === "web_search" || localName === "web_fetch") { const open = localName === "web_fetch" || string(args.action) === "open"; return { kind: "web_search", mode: open ? "url" : "query", ...(open ? { url: string(args.url) ?? "" } : { query: string(args.query) ?? "" }), displayText: summary, contentPreview: output.slice(0, 2_000) }; }
@@ -53,7 +53,7 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
     const approval = data.approvalMode === "auto" ? "自动审批" : data.approvalMode === "manual" ? "人工审批" : data.approvalMode === "session" ? "会话授权" : undefined;
     const approvalDetail = approval ? `${approval}${typeof data.approvalReason === "string" && data.approvalReason ? `：${data.approvalReason}` : ""}` : undefined;
     const detail = terminal ? [approvalDetail, summary, errorMessage].filter((value, index, all) => value && all.indexOf(value) === index && !output.includes(value)).join("\n") : undefined;
-    return { kind: "bash", ...(backgroundTaskId ? { backgroundTaskId, backgroundStatus: "running" as const } : {}), status: !terminal ? "running" : state === "denied" ? "denied" : state === "aborted" ? "cancelled" : failed ? "failed" : "success", title: "Bash command", command: string(args.command) ?? localName, commandPreview: string(args.command) ?? localName, cwd: string(args.cwd) ?? undefined, stdout: failed ? undefined : output, stderr: failed ? output || errorMessage : undefined, reason: detail || undefined, durationMs: tool?.durationMs ?? undefined, intent: string(args.intent) ?? undefined };
+    return { kind: "bash", ...(backgroundTaskId ? { backgroundTaskId, backgroundStatus: "running" as const } : {}), status: !terminal ? "running" : state === "denied" ? "denied" : state === "aborted" ? "cancelled" : failed ? "failed" : "success", title: "Bash command", command: string(args.command) ?? "", commandPreview: string(args.command) ?? "", cwd: string(args.cwd) ?? undefined, stdout: failed ? undefined : output, stderr: failed ? output || errorMessage : undefined, reason: detail || undefined, durationMs: tool?.durationMs ?? undefined, intent: string(args.intent) ?? undefined };
   }
   if (localName === "inspect_image") return { kind: "media_analysis", mediaName: string(args.artifact_id) ?? "image", mediaKind: "image", displayText: summary };
   if (localName === "generate_image") { const images = tool?.artifacts.filter((artifact) => artifact.kind === "image").map((artifact) => ({ type: "image" as const, name: artifact.label, path: artifact.artifactId, mimeType: artifact.mimeType })) ?? (Array.isArray(data.artifacts) ? data.artifacts.map(record).filter((artifact) => string(artifact.mediaType)?.startsWith("image/")).map((artifact) => ({ type: "image" as const, name: string(artifact.artifactId) ?? "image", path: string(artifact.artifactId) ?? "", mimeType: string(artifact.mediaType) ?? undefined })) : []); return { kind: "image_generation", status: !terminal ? "running" : failed ? "failed" : images.length > 0 ? "completed" : "partial", promptPreview: string(args.prompt)?.slice(0, 240) ?? "", requestedCount: Math.max(1, nonNegative(args.n) || 1), generatedCount: images.length, size: string(args.size) ?? "1024x1024", displayText: summary, images, ...(errorMessage ? { errorMessage } : {}) }; }
@@ -64,7 +64,12 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
 }
 
 function resultCount(summary: string): number | undefined { const match = /(?:Found|Listed)\s+(\d+)/i.exec(summary); return match ? Number(match[1]) : undefined; }
-function countOutputLines(output: string): number | undefined { const lines = output.split("\n").filter((line) => line.trim()); return lines.length === 0 ? undefined : lines.length; }
+function directoryEntryCount(output: string): number | undefined {
+  // filesystem-read prefixes real names with [file]/[dir]; this sentinel is not an entry.
+  if (output.trim() === "(empty directory)") return 0;
+  const lines = output.split("\n").filter((line) => line.trim());
+  return lines.length === 0 ? undefined : lines.length;
+}
 function outputPreview(output: string): string[] | undefined { const lines = output.split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 8).map((line) => line.length > 240 ? `${line.slice(0, 237)}…` : line); return lines.length ? lines : undefined; }
 
 function detailValue(data: EventRecord, label: string): RuntimeV2JsonValue { if (!Array.isArray(data.detail)) return null; for (const entry of data.detail) { const detail = record(entry); if (detail.label === label) return detail.value ?? null; } return null; }

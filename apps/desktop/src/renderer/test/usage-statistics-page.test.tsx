@@ -25,6 +25,42 @@ describe("使用统计", () => {
     await userEvent.click(screen.getByRole("button", { name: "显示记录" }));
     expect(screen.getByRole("table", { name: "请求日志" })).toBeInTheDocument();
   });
+  it("shows unknown token usage as unknown while keeping an explicit zero visible", async () => {
+    const allUnknown = {
+      ...data,
+      summary: { ...data.summary, requestCount: 1, totalTokens: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, unknownTokenRequestCounts: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1, reasoning: 1, total: 1 } },
+      aggregates: { providers: [{ key: "deepseek", label: "DeepSeek", providerId: "deepseek", count: 1, errorCount: 0, totalTokens: 0, unknownTokenRequestCount: 1, durationMs: 0, costSummary: data.costSummary! }], models: [], tools: [] },
+    } as unknown as UsageActivitySnapshot;
+    const view = render(<UsageStatisticsPage snapshot={null} activitySnapshot={allUnknown} />);
+    const metric = screen.getByText("Token 用量").parentElement;
+    expect(metric).toHaveTextContent("—");
+    expect(metric).toHaveTextContent("1 次请求 Token 用量未知");
+    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("—");
+
+    await userEvent.click(screen.getByRole("tab", { name: /服务商/ }));
+    const providerRow = within(screen.getByRole("table")).getByRole("row", { name: /DeepSeek/ });
+    expect(providerRow).toHaveTextContent("—");
+    expect(providerRow).toHaveTextContent("1 次请求用量未知");
+
+    const knownZero = { ...allUnknown, summary: { ...allUnknown.summary, unknownTokenRequestCounts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, total: 0 } }, aggregates: { ...allUnknown.aggregates, providers: [{ ...allUnknown.aggregates!.providers[0]!, unknownTokenRequestCount: 0 }] } } as unknown as UsageActivitySnapshot;
+    view.rerender(<UsageStatisticsPage snapshot={null} activitySnapshot={knownZero} />);
+    expect(screen.getByText("Token 用量").parentElement).toHaveTextContent("0");
+    expect(within(screen.getByRole("table")).getByRole("row", { name: /DeepSeek/ })).toHaveTextContent("0");
+    view.unmount();
+  });
+  it("labels mixed token totals as a known subtotal and hides incomplete cache rates", () => {
+    const mixed = {
+      ...data,
+      summary: { ...data.summary, requestCount: 2, totalTokens: 12, inputTokens: 4, outputTokens: 8, cacheReadTokens: 0, cacheWriteTokens: 0, unknownTokenRequestCounts: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1, reasoning: 1, total: 1 } },
+      aggregates: { providers: [{ key: "deepseek", label: "DeepSeek", providerId: "deepseek", count: 2, errorCount: 0, totalTokens: 12, unknownTokenRequestCount: 1, durationMs: 0, costSummary: data.costSummary! }], models: [], tools: [] },
+    } as unknown as UsageActivitySnapshot;
+    render(<UsageStatisticsPage snapshot={null} activitySnapshot={mixed} />);
+    const totalMetric = screen.getByText("已知 Token 合计").parentElement;
+    expect(totalMetric).toHaveTextContent("12");
+    expect(totalMetric).toHaveTextContent("1 次请求 Token 用量未知");
+    const cacheMetric = screen.getByText("缓存命中率").parentElement;
+    expect(cacheMetric).toHaveTextContent("—");
+  });
   it("sends search to the full query and preserves status and search on pagination", async () => {
     const refresh = vi.fn(); const next = vi.fn();
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, rowsPage: { page: 1, pageSize: 10, totalRows: 21, totalPages: 3 } }} onRefresh={refresh} onRequestPageChange={next} />);

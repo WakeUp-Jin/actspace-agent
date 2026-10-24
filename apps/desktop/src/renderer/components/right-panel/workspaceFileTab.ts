@@ -1,5 +1,5 @@
 import type { WorkspaceReadFileResult } from "@actspace/shared";
-import { workspaceFileTabId, type RightPanelTab } from "./RightPanelContext";
+import { workspaceFileTabId, type RightPanelTab, type WorkspaceFileTarget } from "./RightPanelContext";
 
 /**
  * 读盘结果 → 右侧面板 Tab。
@@ -16,10 +16,13 @@ export const READ_ERROR_TEXT: Record<NonNullable<WorkspaceReadFileResult["error"
   escapes_root: "路径超出工作区范围，已拒绝读取。",
 };
 
-export function tabFromFile(result: WorkspaceReadFileResult): RightPanelTab {
-  const id = workspaceFileTabId(result.relativePath);
+export function tabFromFile(result: WorkspaceReadFileResult, target?: WorkspaceFileTarget): RightPanelTab {
+  const id = workspaceFileTabId(result.relativePath, target);
   const title = result.relativePath.split("/").pop() || result.relativePath;
   const meta = {
+    // 调用方可直接传入旧 Tab；目标只提供身份，不能把旧正文或渲染类型带回新结果。
+    workspaceRoot: target?.workspaceRoot,
+    hostId: target?.hostId,
     relativePath: result.relativePath,
     mtimeMs: result.mtimeMs,
     size: result.size,
@@ -52,9 +55,11 @@ export function tabFromFile(result: WorkspaceReadFileResult): RightPanelTab {
   }
 }
 
-export function readFailureTab(relativePath: string, title: string): RightPanelTab {
+export function readFailureTab(relativePath: string, title: string, target?: WorkspaceFileTarget): RightPanelTab {
   return {
-    id: workspaceFileTabId(relativePath),
+    id: workspaceFileTabId(relativePath, target),
+    workspaceRoot: target?.workspaceRoot,
+    hostId: target?.hostId,
     kind: "text",
     title,
     content: "读取文件失败。",

@@ -11,7 +11,7 @@ import type {
 } from "@actspace/shared";
 import { writeBackupOnce, writeJsonAtomic, writeSettingsV2Backup, writeSettingsV3Backup } from "./atomic-io";
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
-import { ALL_SETTINGS_V4_NAMESPACES, SECRETS_FILE, SETTINGS_FILE, SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE, SETTINGS_V1_BACKUP_FILE } from "./constants";
+import { ALL_SETTINGS_V4_NAMESPACES, SECRETS_FILE, SETTINGS_FILE, SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE, SETTINGS_PRE_MODEL_LIST_BACKUP_FILE, SETTINGS_V1_BACKUP_FILE } from "./constants";
 import { legacyModelHints, migrateModelLayers } from "./model-layers-migration";
 import { blockingSettings, defaultSettingsFromEnv, defaultSettingsV4Metadata } from "./defaults";
 import { applyToEnv as applySettingsToEnv } from "./env";
@@ -119,7 +119,8 @@ export class SettingsStore {
       } else if (loaded.source === "missing" || loaded.source === "legacy-removed") {
         await this.writeSettingsFile();
       } else if (layered) {
-        await writeBackupOnce(join(this.dataRoot, SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE), loaded.rawV4 ?? `${JSON.stringify(beforeLayers, null, 2)}\n`);
+        const backup = (beforeLayers.models.layersVersion ?? 0) >= 1 ? SETTINGS_PRE_MODEL_LIST_BACKUP_FILE : SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE;
+        await writeBackupOnce(join(this.dataRoot, backup), loaded.rawV4 ?? `${JSON.stringify(beforeLayers, null, 2)}\n`);
         await this.writeSettingsFile();
       }
     } catch {

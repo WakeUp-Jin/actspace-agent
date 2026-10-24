@@ -17,6 +17,7 @@ import type {
 import type { ManagedContextProjection } from "@actspace/shared";
 
 export type ApplicationSessionService = {
+  creationProvenance(mode?: RuntimeV2AgentMode): SessionHandle["header"]["createdWith"];
   readProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput): Promise<import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection>;
   readObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput): Promise<import("@actspace/shared/runtime-v2").RuntimeV2SessionObservation>;
   subscribeProjection(listener: (update: import("@actspace/shared/runtime-v2").RuntimeV2SessionUpdate) => void): () => void;
@@ -98,7 +99,6 @@ export class AgentApplication implements AgentApplicationContract {
   readonly #runs: ApplicationRunService;
   readonly #subagents: { readonly activeCount: number } | undefined;
   readonly #hasRunningBackgroundTask: (sessionId: string) => boolean | Promise<boolean>;
-  readonly #manifestDigest: string;
   readonly #modeWriter = new SessionModeWriter();
 
   constructor(private readonly ctx: CordisContext, private readonly source = "application") {
@@ -107,7 +107,6 @@ export class AgentApplication implements AgentApplicationContract {
     this.#runs = agentRuntime.runs;
     this.#subagents = agentRuntime.subagents;
     this.#hasRunningBackgroundTask = (sessionId) => this.#runs.inspectCapability<{ readonly hasRunningBackgroundTask?: (sessionId: string) => boolean }, boolean>("tools.shell-tools", service => service?.hasRunningBackgroundTask?.(sessionId) ?? false, sessionId);
-    this.#manifestDigest = (ctx.get?.("actspace.host.session") as { readonly manifestDigest?: string } | undefined)?.manifestDigest ?? "desktop-app";
   }
 
   async browserAvailable(): Promise<boolean> {
@@ -196,7 +195,7 @@ export class AgentApplication implements AgentApplicationContract {
       boundarySeq,
       newSessionId,
       createdAt: new Date().toISOString(),
-      createdWith: { ...parent.header.createdWith, manifestDigest: this.#manifestDigest },
+      createdWith: this.#sessions.creationProvenance(parent.header.createdWith.initialAgentMode),
     });
     // Store.fork owns a temporary writer. Reopen through the controller so the
     // run, projection callbacks and shutdown all share one managed handle.

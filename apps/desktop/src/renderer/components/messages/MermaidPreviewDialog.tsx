@@ -169,7 +169,7 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
             <IconButton size="sm" label="下载 PNG" onClick={onDownload}>
               <Download size={15} aria-hidden="true" />
             </IconButton>
-            <IconButton ref={closeRef} size="sm" label="关闭预览" tooltip="关闭（Esc）" onClick={onClose}>
+            <IconButton ref={closeRef} size="sm" label="关闭预览" tooltip={false} onClick={onClose}>
               <X size={15} aria-hidden="true" />
             </IconButton>
           </div>

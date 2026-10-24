@@ -25,6 +25,13 @@ const KIND_CLASS: Record<TrajectoryCellKind, string> = {
 };
 
 const REQUEST_STATUS = { completed: undefined, running: 'running', failed: 'error' } as const;
+const REQUEST_PURPOSE_LABEL: Record<TrajectoryRequestView['purpose'], string> = {
+  assistant: T.assistantMessage,
+  compaction: T.compactionPurpose,
+  'image-inspection': T.imageInspectionPurpose,
+  'session-title': T.sessionTitlePurpose,
+  'auto-review': T.autoReviewPurpose,
+};
 const compactionRequestLabel = (request: number) => `${requestLabel(request)} · 压缩`;
 const sectionLabel = (turn: number | null) => turn === null ? T.betweenTurns : turnLabel(turn);
 const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim();
@@ -101,7 +108,7 @@ function TrajectoryRowView(props: TrajectoryRowProps) {
   const ariaLabel = collapsed
     ? collapsedRowAria(collapsed.kind, collapsed.summary)
     : requestOnly
-      ? `请求 ${request?.number ?? ''}，${T.compactionPurpose}`
+      ? `请求 ${request?.number ?? ''}，${request === undefined ? T.notRecorded : REQUEST_PURPOSE_LABEL[request.purpose]}`
       : rowAria(request?.number ?? null, KIND_LABEL[cell.kind], text?.list ?? '');
   return <tr
     ref={props.measureRef}

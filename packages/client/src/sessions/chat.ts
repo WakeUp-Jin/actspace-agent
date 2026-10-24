@@ -19,8 +19,10 @@ import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
 type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
 
-export function projectChatWindow(projection: import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection, workspaceRoot = ""): SessionRecord {
-  const record = projectChatSession(projection.snapshot, projection.window.events, workspaceRoot);
+export type ChatProjectionOptions = { readonly includePendingChunks?: boolean };
+
+export function projectChatWindow(projection: import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection, workspaceRoot = "", options: ChatProjectionOptions = {}): SessionRecord {
+  const record = projectChatSession(projection.snapshot, projection.window.events, workspaceRoot, options);
   const deferred = new Set(projection.deferredToolCalls);
   for (const block of record.messageBlocks ?? []) {
     const event = record.events.find(event => event.id === block.id);
@@ -54,8 +56,9 @@ export function projectChatSession(
   snapshot: RuntimeV2SessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
   fallbackWorkspaceRoot: string,
+  options: ChatProjectionOptions = {},
 ): SessionRecord {
-  const events = projectChatEvents(snapshot, journal);
+  const events = projectChatEvents(snapshot, journal, options);
   return {
     meta: {
       schemaVersion: 2,
@@ -82,11 +85,18 @@ export function projectChatSession(
 export function projectChatEvents(
   snapshot: RuntimeV2SessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
+  options: ChatProjectionOptions = {},
 ): SessionEvent[] {
   const index = buildIndex(snapshot, journal);
+  const pendingChunks = options.includePendingChunks ? projectPendingChunks(snapshot, journal, index) : null;
   const activeSurface = indexActiveSurface(snapshot, journal);
   const projected: SessionEvent[] = [];
   for (const event of journal) {
+    if (event.type === "assistant/chunk") {
+      const pending = pendingChunks?.get(eventId(event));
+      if (pending) projected.push(pending);
+      continue;
+    }
     const data = record(event.data);
     const identity = identityFor(event, data, index);
     const base = {
@@ -116,6 +126,12 @@ export function projectChatEvents(
       const tool = index.toolByCall.get(callId);
       if (tool?.state !== "running" && !activeSurface.showsToolCall(callId)) continue;
       projected.push({ ...base, id: eventId(event), type: "tool_call", payload: { id: callId, name: string(data.name) ?? "tool", arguments: record(data.args) } });
+      if (tool?.state === "running") {
+        projected.push({ ...base, id: `${eventId(event)}-running`, type: "tool_result", payload: {
+          toolCallId: callId, toolName: tool.name, status: "running",
+          uiPreview: toolPreview(tool.name, tool, {}, data, index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "running", snapshot.workspaceRoot ?? undefined),
+        } });
+      }
       continue;
     }
     if (isToolTerminal(event.type)) {
@@ -148,12 +164,15 @@ export function projectChatEvents(
     }
     if (event.type === "surface/replaced") continue;
     // 每次请求的用量记一次：成功的落在 step/end（assistant/message 带的是同一份，上面已 continue），
-    // 失败重试的落在 llm/retry。没有 usage 的 step/end（中断、失败）不记。
-    if (event.type === "step/end" || event.type === "llm/retry") {
+    // 失败重试的落在 llm/retry；辅助尝试只消费独立终结事实，不生成聊天消息。
+    const auxiliary = event.type === "llm/auxiliary-end";
+    if (event.type === "step/end" || event.type === "llm/retry" || auxiliary) {
       const usage = record(data.usage);
       if (Object.keys(usage).length === 0) continue;
+      // 轮尾只累加已报告的 Token；全未知和未终结尝试仍由 activity/轨迹展示未知。
+      if (auxiliary && activityTokens(usage).totalTokens === null) continue;
       const stepId = string(data.stepId);
-      const requestId = string(data.requestId) ?? (stepId ? index.lastRequestByStep.get(stepId) : undefined) ?? `request-${event.seq}`;
+      const requestId = (auxiliary ? string(data.attemptId) : string(data.requestId) ?? (stepId ? index.lastRequestByStep.get(stepId) : undefined)) ?? `request-${event.seq}`;
       const request = index.requestById.get(requestId);
       const promptTokens = nonNegative(usage.inputTokens);
       const completionTokens = nonNegative(usage.outputTokens);
@@ -163,7 +182,9 @@ export function projectChatEvents(
       const cost = activityCost(usage);
       // request/context 里的 route 常是 "default"；计价快照里有真实的提供方和模型。
       const pricing = cost.costProvenance?.pricingSnapshot;
-      projected.push({ ...base, id: eventId(event), llmCallId: requestId, type: "llm_usage", payload: { llmCallId: requestId, attempt: 1, durationMs: 0, provider: pricing?.providerId ?? request?.provider ?? "default", model: pricing?.apiModel ?? request?.model ?? "default", promptTokens, completionTokens, totalTokens: promptTokens + completionTokens + cacheHitTokens + cacheMissTokens, reasoningTokens, cacheHitTokens, cacheMissTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: cost.costUsd ?? 0, currency: "USD" }, costBasis: cost.costBasis === "unavailable" ? "unavailable" : cost.costBasis === "estimated" ? "estimated" : "priced" } });
+      const provider = pricing?.providerId ?? (auxiliary ? string(data.routeId) : request?.provider) ?? "default";
+      const model = pricing?.apiModel ?? (auxiliary ? string(data.model) : request?.model) ?? "default";
+      projected.push({ ...base, id: eventId(event), llmCallId: requestId, type: "llm_usage", payload: { llmCallId: requestId, attempt: auxiliary ? finiteInteger(data.attempt) ?? 1 : 1, durationMs: 0, provider, model, promptTokens, completionTokens, totalTokens: promptTokens + completionTokens + cacheHitTokens + cacheMissTokens, reasoningTokens, cacheHitTokens, cacheMissTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: cost.costUsd ?? 0, currency: "USD" }, costBasis: cost.costBasis === "unavailable" ? "unavailable" : cost.costBasis === "estimated" ? "estimated" : "priced" } });
       continue;
     }
     if (event.type === "agent/error" || (event.type === "turn/end" && string(data.reason) === "failed")) {
@@ -269,9 +290,8 @@ export function projectContextSnapshot(snapshot: RuntimeV2SessionSnapshot, journ
 
 export { projectContextState } from "@actspace/shared";
 
-export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): SessionEvent[] {
-  const events = projectChatEvents(snapshot, journal);
-  const index = buildIndex(snapshot, journal);
+/** Pending text is Journal-derived during recovery; completed messages replace their chunks. */
+function projectPendingChunks(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], index: EventIndex): Map<string, SessionEvent> {
   const completedMessages = new Set(journal.filter((event) => event.type === "assistant/message").map((event) => string(record(event.data).messageId)));
   const chunks = new Map<string, SessionEvent>();
   for (const event of journal) {
@@ -281,12 +301,22 @@ export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, jo
     const key = `${string(data.messageId)}:${string(data.kind)}`;
     const previous = chunks.get(key);
     const identity = identityFor(event, data, index);
-    chunks.set(key, { id: previous?.id ?? eventId(event), sessionId: snapshot.sessionId, agentRunId: identity.agentRunId, timestamp: event.time,
+    chunks.set(key, { id: previous?.id ?? eventId(event), sessionId: snapshot.sessionId, agentRunId: identity.agentRunId,
+      ...(identity.turnId === null ? {} : { turnId: identity.turnId }),
+      ...(identity.requestId === null ? {} : { llmCallId: identity.requestId }),
+      timestamp: previous?.timestamp ?? event.time,
       type: data.kind === "reasoning-delta" ? "thinking" : "assistant_message",
       payload: { content: String((previous?.payload as { content?: string } | undefined)?.content ?? "") + String(data.content ?? "") } } as SessionEvent);
   }
-  events.push(...chunks.values());
+  // A combined event spans multiple envelopes, so it has no single sourceSeq.
+  return new Map([...chunks.values()].map(event => [event.id, event]));
+}
+
+export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): SessionEvent[] {
+  const events = projectChatEvents(snapshot, journal, { includePendingChunks: true });
+  const index = buildIndex(snapshot, journal);
   for (const tool of snapshot.tools.filter((tool) => tool.state === "running")) {
+    if (events.some(event => event.type === "tool_result" && (event.payload as { toolCallId?: string }).toolCallId === tool.callId)) continue;
     const call = index.callData.get(tool.callId);
     events.push({ id: `live-tool:${tool.callId}`, sessionId: snapshot.sessionId, agentRunId: "subagent-live", timestamp: tool.startedAt ?? new Date(0).toISOString(), type: "tool_result",
       payload: { toolCallId: tool.callId, status: "running", uiPreview: toolPreview(tool.name, tool, {}, call, index.childByCall.get(tool.callId), snapshot.sessionId, "subagent-live", "running", snapshot.workspaceRoot ?? undefined) } } as SessionEvent);
@@ -347,9 +377,21 @@ export function projectSessionUsageActivities(snapshot: UsageSession, journal: r
   const retries = new Map<string, SessionEventEnvelopeV1>();
   const retryStarted = new Map<string, SessionEventEnvelopeV1>();
   const tools = new Map<string, { call: SessionEventEnvelopeV1; terminal?: SessionEventEnvelopeV1 }>();
+  const auxiliary = new Map<string, { start: SessionEventEnvelopeV1; end?: SessionEventEnvelopeV1 }>();
 
   for (const event of journal) {
     const data = record(event.data);
+    if (event.type === "llm/auxiliary-start") {
+      const attemptId = string(data.attemptId);
+      if (attemptId) auxiliary.set(attemptId, { start: event });
+      continue;
+    }
+    if (event.type === "llm/auxiliary-end") {
+      const attemptId = string(data.attemptId);
+      const attempt = attemptId ? auxiliary.get(attemptId) : undefined;
+      if (attempt) attempt.end = event;
+      continue;
+    }
     if (event.type === "request/header") {
       const requestId = string(data.requestId);
       const turnId = string(data.turnId);
@@ -432,10 +474,47 @@ export function projectSessionUsageActivities(snapshot: UsageSession, journal: r
 
   const rows: UsageActivityRow[] = [];
   for (const state of requests.values()) rows.push(activityRowForRequest(snapshot, state));
+  const previousAttempts = new Map<string, string>();
+  for (const { start, end } of auxiliary.values()) {
+    const row = activityRowForAuxiliary(snapshot, start, end);
+    const previous = previousAttempts.get(row.logicalRequestId!);
+    if (previous) row.retryOfRequestId = previous;
+    previousAttempts.set(row.logicalRequestId!, row.requestId!);
+    rows.push(row);
+  }
   for (const { call, terminal } of tools.values()) rows.push(activityRowForTool(snapshot, call, terminal, runByTurn));
   for (const row of rows) row.sessionTitle = snapshot.metadata.title ?? undefined;
   activityRowsCache.set(journal, { revision: snapshot.throughJournalSeq, sessionId: snapshot.sessionId, rows });
   return rows;
+}
+
+function activityRowForAuxiliary(snapshot: UsageSession, start: SessionEventEnvelopeV1, end: SessionEventEnvelopeV1 | undefined): UsageActivityRow {
+  const data = record(start.data);
+  const terminal = record(end?.data);
+  const usage = record(terminal.usage);
+  const cost = activityCost(usage);
+  const pricing = cost.costProvenance?.pricingSnapshot;
+  const providerId = pricing?.providerId ?? string(data.routeId) ?? undefined;
+  const model = pricing?.apiModel ?? string(data.model) ?? undefined;
+  const startedAt = string(data.startedAt) ?? start.time;
+  const endedAt = end ? string(terminal.finishedAt) ?? end.time : undefined;
+  return {
+    activityId: `${snapshot.sessionId}:auxiliary:${data.attemptId}`,
+    kind: "llm_request", sessionId: snapshot.sessionId,
+    agentRunId: string(data.agentRunId) ?? "system",
+    turnId: string(data.turnId) ?? undefined, stepId: string(data.stepId) ?? undefined,
+    requestId: string(data.attemptId) ?? undefined, callId: string(data.callId) ?? undefined,
+    logicalRequestId: string(data.logicalRequestId) ?? undefined, purpose: data.purpose as UsageActivityRow["purpose"],
+    routeId: string(data.routeId) ?? undefined, providerId, model,
+    modelKey: modelKeyFor(providerId, model),
+    ...(pricing?.connectionId ? { connectionId: pricing.connectionId } : {}),
+    ...(snapshot.workspaceRoot ? { workspaceRoot: snapshot.workspaceRoot } : {}),
+    startedAt, ...(endedAt ? { endedAt, durationMs: duration(startedAt, endedAt) } : {}),
+    attempt: finiteInteger(data.attempt) ?? undefined,
+    tokens: activityTokens(usage), ...cost,
+    status: end ? requestActivityStatus(string(terminal.status)) : "running",
+    sourceEventSeq: start.seq, relatedEventSeqs: [start.seq, ...(end ? [end.seq] : [])],
+  };
 }
 
 function activityRowForRequest(snapshot: UsageSession, state: ActivityRequestState): UsageActivityRow {

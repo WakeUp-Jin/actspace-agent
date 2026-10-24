@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createMessageBlocks } from "@actspace/shared";
 import type { RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { projectChatEvents } from "../sessions/chat.js";
 
@@ -43,5 +44,47 @@ describe("chat projection turn usage", () => {
     ];
     const [usage] = projectChatEvents(snapshot(), journal).filter((event) => event.type === "llm_usage");
     expect(usage?.payload).toMatchObject({ model: "deepseek-flash", costBasis: "unavailable", cost: { total: 0 } });
+  });
+
+  it("includes two vision attempts in the owning reply's seven-main-request total without extra messages", () => {
+    const journal = [envelope(1, "turn/start", { turnId: "t1", agentRunId: "run-1" })];
+    for (let i = 0; i < 7; i++) {
+      journal.push(context(journal.length + 1, `main-${i}`));
+      journal.push(envelope(journal.length + 1, "step/end", { turnId: "t1", stepId: "step-1", usage: { inputTokens: 100, outputTokens: 20 } }));
+      if (i >= 2) continue;
+      const identity = { agentRunId: "run-1", turnId: "t1", stepId: "step-1", callId: `inspect-${i}`, logicalRequestId: `vision-${i}`, attemptId: `vision-${i}-1`, attempt: 1, purpose: "image-inspection", routeId: "vision-route", model: "vision-model" };
+      journal.push(envelope(journal.length + 1, "llm/auxiliary-start", identity));
+      journal.push(envelope(journal.length + 1, "llm/auxiliary-end", { ...identity, status: "completed", usage: { inputTokens: 100, outputTokens: 20, cost: null } }));
+    }
+    const assistant = envelope(journal.length + 1, "assistant/message", { agentRunId: "run-1", messageId: "answer" });
+    journal.push({ ...assistant, surface: { kind: "append", node: { kind: "assistant", messageId: "answer", content: "Done" } } });
+    const state = { ...snapshot(), messages: [{ kind: "assistant" as const, messageId: "answer", content: "Done" }] };
+    const events = projectChatEvents(state, journal);
+    const usage = events.filter(event => event.type === "llm_usage");
+    expect(usage).toHaveLength(9);
+    expect(usage.filter(event => event.llmCallId?.startsWith("vision-"))).toEqual([
+      expect.objectContaining({ agentRunId: "run-1", turnId: "t1", llmCallId: "vision-0-1", payload: expect.objectContaining({ provider: "vision-route", model: "vision-model", totalTokens: 120, costBasis: "unavailable" }) }),
+      expect.objectContaining({ agentRunId: "run-1", turnId: "t1", llmCallId: "vision-1-1", payload: expect.objectContaining({ provider: "vision-route", model: "vision-model", totalTokens: 120, costBasis: "unavailable" }) }),
+    ]);
+    const blocks = createMessageBlocks(events);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ kind: "assistant", content: "Done", usage: { totalTokens: 1080, inputTokens: 900, outputTokens: 180, unpricedRequestCount: 9, routes: expect.arrayContaining(["vision-route/vision-model"]) } });
+    expect(createMessageBlocks(projectChatEvents(state, [...journal]))).toEqual(blocks);
+  });
+
+  it("counts reported failed/cancelled vision attempts, retaining zero but not inventing unknown usage", () => {
+    const terminal = (seq: number, attempt: number, status: string, usage: SessionEventEnvelopeV1["data"]) => envelope(seq, "llm/auxiliary-end", { agentRunId: "run-1", turnId: "t1", attemptId: `vision-${attempt}`, attempt, routeId: "vision-route", model: "vision-model", status, usage });
+    const journal = [
+      terminal(1, 1, "failed", { inputTokens: 12, outputTokens: null }),
+      terminal(2, 2, "aborted", { inputTokens: 0, outputTokens: 0 }),
+      terminal(3, 3, "completed", { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null }),
+      envelope(4, "llm/auxiliary-start", { attemptId: "pending", agentRunId: "run-1" }),
+    ];
+    const usage = projectChatEvents(snapshot(), journal).filter(event => event.type === "llm_usage");
+    expect(usage).toHaveLength(2);
+    expect(usage.map(event => event.payload)).toEqual([
+      expect.objectContaining({ attempt: 1, totalTokens: 12 }),
+      expect.objectContaining({ attempt: 2, totalTokens: 0 }),
+    ]);
   });
 });

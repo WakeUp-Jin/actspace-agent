@@ -87,7 +87,7 @@ export class RuntimeSessionController {
     const boundaries = live?.journal.project(HISTORY_BOUNDARIES, () => ({ floor: 0, starts: [] as number[], requests: [] as number[] }), (state, event) => {
       if (event.type === "turn/start") return { ...state, starts: [...state.starts, state.floor] };
       if (event.type === "turn/end") return { ...state, floor: event.seq + 1 };
-      if (event.type === "request/header") return { ...state, requests: [...state.requests, event.seq] };
+      if (event.type === "request/header" || event.type === "llm/auxiliary-start") return { ...state, requests: [...state.requests, event.seq] };
       return state;
     });
     const end = snapshot.throughJournalSeq + 1;
@@ -245,8 +245,25 @@ export class RuntimeSessionController {
       if (live && model) this.#globalIndex.replace(this.summary(model.snapshot(live.journal.validation.accessState), this.options.profileId));
       }
   }; }
-  async create(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent", worktree?: import("@actspace/shared").SessionWorktreeContext): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), ...(worktree ? { worktree } : {}), lineage: null, createdWith: { profileId: this.options.profileId, presetId: "actspace.main", agentFormId: "actspace.main", agentFormVersion: 1, agentCompositionDigest: mainAgentFormComposition(this.options.plugins).digest, agentMembers: mainAgentFormComposition(this.options.plugins).members, initialAgentMode: agentForm === "chat" ? "chat" : "agent", runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); const model = this.liveModel(session); if (this.#globalIndexReady) { this.#globalIndex.replace(this.summary(model.snapshot(session.journal.validation.accessState), this.options.profileId)); } await this.options.onCreated?.(sessionId); return session; }
-  async createEphemeral(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, presetId: "actspace.main", agentFormId: "actspace.main", agentFormVersion: 1, agentCompositionDigest: mainAgentFormComposition(this.options.plugins).digest, agentMembers: mainAgentFormComposition(this.options.plugins).members, initialAgentMode: agentForm === "chat" ? "chat" : "agent", runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.liveModel(session); this.#ephemeral.add(sessionId); await this.options.onCreated?.(sessionId); return session; }
+  /** New headers describe this runtime; inherited events retain their original provenance. */
+  creationProvenance(mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode = "agent"): import("@actspace/session-journal").SessionCreatedWithV1 {
+    const composition = mainAgentFormComposition(this.options.plugins);
+    return {
+      profileId: this.options.profileId,
+      presetId: "actspace.main",
+      agentFormId: "actspace.main",
+      agentFormVersion: 1,
+      agentCompositionDigest: composition.digest,
+      agentMembers: composition.members,
+      initialAgentMode: mode,
+      runtimeContractVersion: "actspace.runtime.v2",
+      manifestDigest: this.options.manifestDigest,
+      plugins: this.options.plugins,
+      codecSetDigest: this.options.registry.digest,
+    };
+  }
+  async create(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent", worktree?: import("@actspace/shared").SessionWorktreeContext): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), ...(worktree ? { worktree } : {}), lineage: null, createdWith: this.creationProvenance(agentForm) }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); const model = this.liveModel(session); if (this.#globalIndexReady) { this.#globalIndex.replace(this.summary(model.snapshot(session.journal.validation.accessState), this.options.profileId)); } await this.options.onCreated?.(sessionId); return session; }
+  async createEphemeral(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: this.creationProvenance(agentForm) }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.liveModel(session); this.#ephemeral.add(sessionId); await this.options.onCreated?.(sessionId); return session; }
   async resume(sessionId: string): Promise<SessionHandle> { const existing = this.#open.get(sessionId); if (existing !== undefined) return existing; const session = await this.store.open(sessionId, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); try { this.liveModel(session); await this.options.beforeRecovery?.(session, this.store); await applySessionRecovery(session); this.#open.set(sessionId, session); this.liveModel(session); await this.options.onCreated?.(sessionId); return session; } catch (error) { await session.close().catch(() => undefined); throw error; } }
   /** Provider-owned sessions participate in checkpoints without transferring close ownership. */
   registerExternal(session: SessionHandle): () => void {
@@ -397,6 +414,8 @@ function publicValues(values: RuntimeV2ProjectionValues): RuntimeV2ProjectionVal
 }
 
 function boundToolEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
+  // Auxiliary facts share the parent callId but carry no deferred tool body.
+  if (event.type === "llm/auxiliary-start" || event.type === "llm/auxiliary-end") return event;
   const data = eventData(event);
   if (!data) return event;
   const bounded: Record<string, RuntimeV2JsonValue> = { deferredDetail: true };

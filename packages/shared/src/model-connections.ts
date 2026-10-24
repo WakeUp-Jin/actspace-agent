@@ -18,12 +18,9 @@ export type PurposesView = Record<PurposeId, PurposeBinding>;
 export type ConnectionModelView = {
   key: ModelKey;
   apiModel: string;
-  enabled: boolean;
   effective: EffectiveModel;
   /** 用户修改；null = 没有修改。 */
   overrides: ModelOverrides | null;
-  /** 内置模型只能停用，不能移除。 */
-  removable: boolean;
   usedBy: PurposeId[];
 };
 
@@ -63,7 +60,6 @@ export type ModelConnectionsErrorCode =
   | "connection_exists"
   | "model_missing"
   | "model_exists"
-  | "model_not_removable"
   | "model_unusable"
   | "secret_storage_unavailable"
   | "write_failed";
@@ -91,7 +87,7 @@ export type ProbedModel = {
   /** 连接 /models 返回的字段；拿不到列表、退回目录时为空。 */
   providerFacts: ModelFacts;
   effective: EffectiveModel;
-  /** 已经在这个连接里了（只对 saved 探测有意义）。 */
+  /** 已经在这个连接里了（只对 saved 探测有意义），弹窗里打勾置灰。 */
   added: boolean;
 };
 
@@ -107,11 +103,11 @@ export type ConnectionProbeResult = {
   models: ProbedModel[];
 };
 
+/** 加进连接的模型。连接里的模型都在用，没有「启用」开关；不要就移除。 */
 export type ConnectionModelInput = {
   apiModel: string;
   providerFacts?: ModelFacts;
   overrides?: ModelOverrides;
-  enabled?: boolean;
 };
 
 export type ConnectionCreateInput = ConnectionDraftInput & {
@@ -139,7 +135,7 @@ export type ConnectionIdInput = { connectionId: string };
 export type ConnectionModelsAddInput = { connectionId: string; models: ConnectionModelInput[] };
 
 /** overrides：整份替换；null = 恢复目录值（清掉全部修改）。 */
-export type ConnectionModelPatch = { key: ModelKey; enabled?: boolean; overrides?: ModelOverrides | null };
+export type ConnectionModelPatch = { key: ModelKey; overrides: ModelOverrides | null };
 
 export type ModelKeyInput = { key: ModelKey };
 

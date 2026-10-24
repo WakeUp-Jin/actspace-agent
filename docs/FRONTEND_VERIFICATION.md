@@ -91,8 +91,17 @@ http://127.0.0.1:5173/
 | `remote-host` | 三台 Host：devbox 已连接、GPU 服务器离线、旧笔记本已撤销；本机 / devbox / GPU 各一个会话 | 侧栏 Host 分组与离线标记、运行位置菜单、Host 删除 / 重连后的列表 | `hosts.call`（`host.describe`、`files.reference`）、`hosts.preview` / `download` 在 mock 中未实现，会 reject；因此 Host 工作区和模型显示为「等待 Host …」，远端读文件和下载产物只能由单测和真实 Host 覆盖 |
 | `sidebar` | 三个工作区，15 个未归档会话按真实「现在」分布在今天、昨天、近 7 天、本月更早、往月、往年；2 个置顶、2 个已归档 | 侧栏视图选项（按工作区 / 单列表 / 按时间、手动排序、归档筛选、恢复默认）、拖拽排序与「已切换为手动排序」、标题行搜索、取消归档、每组 5 条与「展开其余」 | 运行中、待审批、失败、跑完未看四种状态点和「需要处理」（状态来自真实运行，由单测覆盖） |
 | `turn-deliverables` | 一个会话三轮：第 1 轮改 2 个文件、交付 1 个；第 2 轮最终改 6 个文件（另有新建后删除的临时脚本）、交付 5 个；第 3 轮只改报告 1 个文件（+1/-1）、交付 1 个；三轮回复都带用量，第 2 轮没有价格 | 轮尾改动卡与交付卡的单文件 / 多文件形态与折叠、悬停 diff 浮层、「第 N 轮改动」标签、交付卡网格与打开方式菜单、设置开关「显示本轮代码改动」；回复尾部的「用量 … tok」胶囊与本轮用量弹窗（预估花费、花费未知）；`workspaces.readFile` 只认识 `docs/report.md` 和 `docs/summary.csv` | 真实 `present` 工具调用、原生关联应用列表与图标、远端 Host 下载（见 [front-中间消息区规范.md](design-docs/frontend/front-中间消息区规范.md) §轮尾改动卡与交付文件卡） |
+| `subagent-trajectory` | 父会话「查看pi-durable设计」：bash、一次 `agent` 委派（带 `delegation/requested`，preset `explore`）、两次 read_file；子会话（不进侧栏）有任务、4 条助手消息和 7 次读工具；`getSubagents` 返回一个已完成的 Explore | 父轨迹只留 `agent` 一行；详情「子智能体」一栏的「查看轨迹」→ 右侧子 Agent 面板停在子轨迹；面板标题前对话 / 轨迹切换；窄面板详情从下半部分弹出；浅色 / 深色、320–480px 面板 | 子 Agent 对话页的执行记录（`getSubAgentTranscript` 返回空，约 20 秒后退回摘要）；运行中子智能体的实时轨迹（需真实运行） |
 
 mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`，包括终端创建、新建工作树和 Git 写操作。界面上看到的报错属于 mock 的边界，不是缺陷。如需新增场景，按规范 §7 处理，并同步更新本表。
+
+#### ModelPicker pinned 组件验收
+
+开发服务器打开 `/src/renderer/test/fixtures/model-picker-pinned-preview.html`，可用 `?theme=dark` 或页面按钮切换主题。页面直接复用 `ModelPickerMenu`，提供两条 pinned 行、普通模型、选择次数与意外表单提交计数，用于鼠标选择、Tab/Enter、搜索隐藏特殊行和 Escape 回焦。它不调用 IPC、不发模型请求、不持久化；当前产品没有传入非空 pinned 的调用入口，因此结果只能作为组件代表场景，不能签收产品入口。
+
+#### Composer `+` 面板布局回归
+
+`ACTSPACE_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs pnpm --filter @actspace/desktop test:composer-palette-layout` 使用真实Chromium加载现有面板组件和样式，不读应用数据、调用IPC或Provider。覆盖合法最小窗口中实测的空/多行草稿锚点、480/1440px浅深主题，以及下方有空间的组件翻转样例；检查整卡和搜索边界、内部滚动/键盘活动行、搜索/返回/Esc回焦。组件样例不代签真实Electron入口或原生条件性翻转验收。
 
 #### 轨迹页 fixture（只在开发构建和测试中加载）
 
@@ -142,6 +151,8 @@ pnpm dev
 ```
 
 启动器先完成依赖与本轮 Electron main/preload 构建，成功后才启动并行 watch、renderer 和 Electron。即使磁盘已有旧的 `dist-electron`，本轮构建失败也会停止启动。`dev:electron:run` 是内部运行阶段，文件存在检查不能替代上述构建屏障；请从 `pnpm dev` / `pnpm dev:log` 启动。
+
+对 Runtime 内置行为包做修复后，单独构建该 package 仍不足以验证 Desktop：执行实现会被打入 `packages/runtime/dist/default-harness/`。隔离验收启动器若直接运行已构建入口，必须先重建 Runtime Harness（依赖已构建时运行 `pnpm --filter @actspace/runtime build`），确认对应制品包含本轮改动，再正常重启应用。只检查源文件或依赖包 `dist` 不能证明运行中的 Harness 已更新；旧制品的失败记录要保留并注明实际版本。
 
 macOS 开发启动不会直接暴露依赖目录里的默认 `Electron.app`。启动器会在系统临时目录缓存一份当前 workspace 专属的开发 runtime，并为它设置唯一的应用名、bundle ID 与可执行文件名。启动日志中的 `[dev-runtime]` JSON 是本次运行的事实来源，例如：
 
@@ -209,6 +220,8 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 2026-10-18 核对：transcript、readiness、run-location-menu、composer-ime 及 Composer 系列测试已经落地。仍带 `*` 的 app-earlier-history、window-navigation、ui-layering 专项测试未找到同名文件，保留缺口；不能用相邻测试推定完整覆盖。
 
 相关自动检查：`pnpm check:ipc-channels`（IPC 以契约为准）、`pnpm check:renderer-bridge`（renderer 只经 `api/<域>` 访问 bridge）、`pnpm check:frontend-tokens`、`pnpm check:frontend-theme`。其中 `check:renderer-bridge`、`check:ipc-channels` 和这些检查脚本自己的测试（`test:renderer-bridge`、`test:ipc-channels`、`test:frontend-tokens`）已包含在 `pnpm test` 里；`check:frontend-tokens`、`check:frontend-theme` 由 CI 的仓库卫生检查（`scripts/check-repo-hygiene.sh`）运行。
+
+文件授权范围含长路径时，选项弹层必须受可用视口宽度约束，并换行保留完整路径、读写权限与“本会话”信息。不能只用触发器省略或悬停提示代替展开后的可读性。可选的真实 Chromium 布局回归：`ACTSPACE_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs pnpm --filter @actspace/desktop test:file-grant-scope-layout`。该脚本需要本地已安装 Playwright 和 Chromium，使用临时 Vite 场景，不读取应用数据或调用 Provider；覆盖 480/1280px 浅深主题、全文边界、键盘选择与焦点返回。它不代替真实 Electron 授权、目录复用和撤销验收。
 
 ## Web 客户端验证边界
 

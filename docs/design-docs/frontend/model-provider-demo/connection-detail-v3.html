@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>连接详情 V3</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+/* 连接详情 V3
+   - 模型列表 = 这个连接里你要用的模型。加进来就能用，不要就移除；没有「启用」开关。
+   - 新建的连接（官方、聚合平台、中转都一样）模型列表是空的，由用户自己挑。
+   - 「获取可用模型」弹窗：搜索 + 勾选 + 添加所选（DeepSeek Harness 的做法）；已添加的打勾置灰，天然去重。
+   - 「手动添加」：输入模型 ID，认得出来就把上下文、思考、价格帮忙填好。获取失败或中转站没开放列表时自动打开。
+   - 每个模型一张细边小卡片，整行可点，逐级展开：三项关键字段 → 显示更多。
+   - 删除在卡片行内，悬停或展开时出现；移除后原位给「撤销」，不弹确认框。
+   - 连接分组全部用输入框，失焦即保存，框内短暂显示「已保存」。 */
+.page { max-width: 760px; }
+.ibtn { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: var(--r-sm); color: var(--faint); }
+.ibtn:hover { background: var(--hover-soft); color: var(--text); }
+.ibtn.danger:hover { background: var(--danger-soft); color: var(--on-danger); }
+.chev svg { transition: transform .14s; }
+.chev.open svg { transform: rotate(90deg); }
+.tbtn { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 6px; margin-left: -6px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; }
+.tbtn:hover { background: var(--hover-soft); color: var(--text); }
+.tbtn svg { transition: transform .14s; }
+.tbtn.open svg { transform: rotate(180deg); }
+.spin { display: inline-block; width: 12px; height: 12px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 连接分组：左标签 + 右输入框，全部同高同形 */
+.kv { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 16px; }
+.kv .k { width: 72px; flex: none; color: var(--muted); font-size: 12.5px; }
+.kv .v { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.kv .v > .input, .kv .v > .keybox { flex: 1; min-width: 0; }
+.keybox { position: relative; display: flex; }
+.keybox .input { flex: 1; padding-right: 120px; }
+.keybox .in-acts { position: absolute; right: 4px; top: 0; bottom: 0; display: flex; align-items: center; gap: 4px; }
+.saved { position: absolute; right: 10px; top: 0; bottom: 0; display: inline-flex; align-items: center; gap: 4px; color: var(--ok); font-size: 12px; pointer-events: none; animation: fadeout 1.8s forwards; }
+select.input + .saved { right: 30px; }
+@keyframes fadeout { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 模型卡片 */
+.mlist { display: flex; flex-direction: column; gap: 8px; }
+.mcard { border: .5px solid var(--line); border-radius: var(--r-lg); background: var(--surface); padding: 6px; }
+.mcard.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { from { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 28%, transparent); border-color: var(--ok); } to { box-shadow: 0 0 0 3px transparent; } }
+.mrow { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 2px 0 6px; border-radius: var(--r-md); cursor: pointer; }
+.mrow:hover { background: var(--hover-soft); }
+.mlogo { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 6px; background: var(--surface-subtle); }
+.mlogo img { width: 60%; height: 60%; }
+.mlogo img.mono { filter: brightness(0); opacity: .85; }
+[data-theme="dark"] .mlogo img.mono { filter: brightness(0) invert(1); opacity: .85; }
+.mname { font-size: 13px; font-weight: 500; white-space: nowrap; }
+.mid { color: var(--faint); font: 11.5px var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mtag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--warn); font-size: 11.5px; white-space: nowrap; }
+.mrow .sp { flex: 1; }
+.mrow .meta { color: var(--faint); font-size: 12px; white-space: nowrap; }
+.mrow .rm { opacity: 0; }
+.mcard:hover .rm, .mcard:focus-within .rm, .mcard.is-open .rm { opacity: 1; }
+
+.mbody { padding: 10px 6px 2px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.f.wide { grid-column: 1 / -1; }
+.fl { display: flex; align-items: center; gap: 6px; color: var(--faint); font-size: 12px; }
+.fl .tag { color: var(--info); font-size: 11px; }
+.fl .reset { margin-left: auto; color: var(--faint); font-size: 11.5px; text-decoration: underline; text-underline-offset: 2px; }
+.fl .reset:hover { color: var(--text); }
+.pair { display: flex; gap: 6px; }
+.unit { position: relative; flex: 1; min-width: 0; }
+.unit .input { padding-right: 52px; }
+.unit .input.left { padding-right: 10px; padding-left: 60px; }
+.unit .u { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; color: var(--subtle); font-size: 11.5px; pointer-events: none; }
+.unit .u.r { right: 10px; }
+.unit .u.l { left: 10px; }
+select.input { appearance: none; padding-right: 28px; background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: .5px solid var(--line); border-radius: var(--r-md); color: var(--muted); font-size: 12.5px; }
+.chip:hover { background: var(--hover-soft); }
+.chip .check { width: 14px; height: 14px; border-radius: 4px; }
+.chip[aria-checked="true"] { color: var(--text); }
+.mfoot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.mfoot .sp { flex: 1; }
+.note { padding: 8px 10px; border-radius: var(--r-md); background: var(--warn-soft); color: var(--warn); font-size: 12px; margin-bottom: 12px; }
+
+/* 列表下方的两个入口 */
+.list-acts { display: flex; align-items: center; gap: 8px; }
+.fail { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: var(--r-md); background: var(--warn-soft); color: var(--warn); font-size: 12.5px; line-height: 1.5; }
+.fail .sp { flex: 1; }
+
+/* 移除后的撤销条：占在原来的位置 */
+.undo { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 8px 0 14px; border: .5px dashed var(--line-strong); border-radius: var(--r-lg); color: var(--muted); font-size: 12.5px; }
+.undo b { color: var(--text); font-weight: 500; }
+.undo .sp { flex: 1; }
+
+/* 手动添加：一张草稿卡片 */
+.draft { border-color: var(--line-strong); }
+.drow { display: flex; gap: 6px; }
+.drow .input { height: 34px; }
+.drow .id { flex: 1.4; min-width: 0; }
+.drow .nm { flex: 1; min-width: 0; }
+.fill { display: flex; align-items: center; gap: 6px; padding: 8px 4px 0; font-size: 12px; color: var(--faint); }
+.fill.ok { color: var(--ok); }
+.fill.warnt { color: var(--warn); }
+.empty { padding: 26px 16px; border: .5px dashed var(--line-strong); border-radius: var(--r-lg); color: var(--faint); font-size: 12.5px; text-align: center; line-height: 1.7; }
+
+/* 获取可用模型：弹窗 */
+.scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, .28); animation: fadein .12s; }
+@keyframes fadein { from { opacity: 0; } }
+.dlg { display: flex; flex-direction: column; width: min(560px, 100%); max-height: min(640px, 86vh); border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-pop); overflow: hidden; }
+.dlg-h { padding: 18px 20px 6px; }
+.dlg-h h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.dlg-h p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+.dlg-tools { display: flex; align-items: center; gap: 8px; padding: 10px 20px; }
+.dlg-tools .search { position: relative; flex: 1; }
+.dlg-tools .search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--faint); }
+.dlg-tools .search .input { padding-left: 32px; }
+.cands { flex: 1; min-height: 120px; overflow: auto; padding: 2px 12px 8px; border-top: .5px solid var(--line-soft); }
+.cand { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 8px; border-radius: var(--r-md); cursor: pointer; }
+.cand:hover { background: var(--hover-soft); }
+.cand.added { cursor: default; }
+.cand.added:hover { background: none; }
+.cand.added .mname, .cand.added .meta { color: var(--faint); }
+.cand .box { display: grid; place-items: center; flex: none; width: 16px; height: 16px; border: 1px solid var(--line-strong); border-radius: 4px; color: transparent; }
+.cand .box.on { border-color: var(--action); background: var(--action); color: var(--on-action); }
+.cand.added .box { border-color: var(--line); background: var(--surface-subtle); color: var(--faint); }
+.cand .sp { flex: 1; }
+.cand .meta { color: var(--faint); font-size: 12px; white-space: nowrap; }
+.cand .addedtag { color: var(--faint); font-size: 11.5px; }
+.cempty { padding: 28px 10px; color: var(--faint); font-size: 12.5px; text-align: center; }
+.dlg-f { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: .5px solid var(--line-soft); color: var(--faint); font-size: 12px; }
+.dlg-f .sp { flex: 1; }
+
+@media (max-width: 640px) {
+  .shell-side { display: none; }
+  .page { padding: 24px 16px 120px; }
+  .grid { grid-template-columns: 1fr; }
+  .kv { flex-wrap: wrap; }
+  .kv .k { width: 100%; }
+  .drow { flex-direction: column; }
+  .mrow .meta, .cand .meta { display: none; }
+  .mrow .rm { opacity: 1; }
+  .scrim { padding: 12px; }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const MARKS = '../../../../apps/desktop/src/renderer/assets/provider-marks/';
+const LV = { off: '关', low: '低', medium: '中', high: '高', xhigh: '超高', max: '最高' };
+const ALL_LV = Object.keys(LV);
+const I = {
+  chevR: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3.5 10.5 8 6 12.5"/></svg>',
+  chevL: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3.5 5.5 8 10 12.5"/></svg>',
+  chevD: '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3.5 6 8 10.5 12.5 6"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/></svg>',
+  plus: '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>',
+  down: '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>',
+  x: '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  search: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>',
+  check: '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m3.5 8.5 3 3 6-7"/></svg>',
+  ok: '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m3.5 8.5 3 3 6-7"/></svg>',
+};
+
+/* 目录（模拟） */
+const CATALOG = {
+  'kimi-k2.6': { name: 'Kimi K2.6', ctx: 256000, max: 8192, levels: ['off', 'high'], def: 'high', image: true, rates: [0.95, 4, 0.13, null] },
+  'kimi-k2.7-code': { name: 'Kimi K2.7 Code', ctx: 256000, max: 32768, levels: ['off', 'low', 'medium', 'high'], def: 'medium', image: false, rates: [1.2, 5, 0.15, null] },
+  'kimi-k2-turbo': { name: 'Kimi K2 Turbo', ctx: 128000, max: 16384, levels: [], image: false, rates: [2.4, 10, 0.3, null] },
+  'kimi-k2.5': { name: 'Kimi K2.5', ctx: 256000, max: 8192, levels: ['off', 'high'], def: 'high', image: true, rates: [0.6, 2.5, 0.1, null] },
+  'moonshot-v1-128k': { name: 'Moonshot V1 128K', ctx: 128000, max: 4096, levels: [], image: false, rates: [8.4, 8.4, null, null] },
+  'claude-sonnet-4-5': { name: 'Claude Sonnet 4.5', ctx: 200000, max: 64000, levels: ['off', 'low', 'medium', 'high'], def: 'high', image: true, rates: [3, 15, 0.3, 3.75] },
+  'claude-haiku-4-5': { name: 'Claude Haiku 4.5', ctx: 200000, max: 64000, levels: ['off', 'low', 'medium', 'high'], def: 'off', image: true, rates: [1, 5, 0.1, 1.25] },
+  'claude-opus-4-1': { name: 'Claude Opus 4.1', ctx: 200000, max: 32000, levels: ['off', 'low', 'medium', 'high'], def: 'high', image: true, rates: [15, 75, 1.5, 18.75] },
+  'gpt-5': { name: 'GPT-5', ctx: 400000, max: 128000, levels: ['low', 'medium', 'high'], def: 'medium', image: true, rates: [1.25, 10, 0.125, null] },
+  'gpt-5-mini': { name: 'GPT-5 mini', ctx: 400000, max: 128000, levels: ['low', 'medium', 'high'], def: 'low', image: true, rates: [0.25, 2, 0.025, null] },
+  'deepseek-v3-2': { name: 'DeepSeek V3.2', ctx: 128000, max: 8192, levels: ['off', 'high'], def: 'off', image: false, rates: [0.28, 0.42, 0.028, null] },
+  'gemini-2-5-pro': { name: 'Gemini 2.5 Pro', ctx: 1048576, max: 65536, levels: ['low', 'high'], def: 'high', image: true, rates: [1.25, 10, 0.31, null] },
+  'gemini-2-5-flash': { name: 'Gemini 2.5 Flash', ctx: 1048576, max: 65536, levels: ['off', 'low', 'high'], def: 'off', image: true, rates: [0.3, 2.5, 0.075, null] },
+  'glm-4-6': { name: 'GLM-4.6', ctx: 200000, max: 128000, levels: ['off', 'high'], def: 'high', image: false, rates: [0.6, 2.2, 0.11, null] },
+  'grok-4': { name: 'Grok 4', ctx: 256000, max: 64000, levels: ['high'], def: 'high', image: true, rates: [3, 15, 0.75, null] },
+};
+/* 认模型：去掉 vendor/ 前缀，点和横线一视同仁；完全一样 = 认识，前缀一样 = 变体（按它填） */
+const norm = (s) => s.trim().toLowerCase().replace(/^[^/]+\//, '').replace(/\./g, '-');
+function match(id) {
+  const n = norm(id); if (!n) return null;
+  const keys = Object.keys(CATALOG);
+  const exact = keys.find((k) => norm(k) === n); if (exact) return { cat: exact, how: 'exact' };
+  const near = keys.filter((k) => n.startsWith(norm(k))).sort((a, b) => b.length - a.length)[0];
+  return near ? { cat: near, how: 'variant' } : null;
+}
+
+/* 各连接 /models 的回复（模拟）。OpenRouter 自带名称、上下文和价格，中转站没开放列表。 */
+const OR = (id, name, ctx, i, o) => ({ id, name, ctx, rates: [i, o, null, null] });
+const CONNS = {
+  kimi: {
+    mark: 'moonshot', kind: '官方', status: '已连接 · 余额 ¥28.32', proto: false, mult: false,
+    f: { name: 'Kimi', url: '', proxy: '', mult: '1' }, urlDefault: 'https://api.moonshot.cn/v1', idPh: '例如 kimi-k2-turbo',
+    models: [
+      { id: 'kimi-k2.6', cat: 'kimi-k2.6', ov: {}, purpose: '会话默认' },
+      { id: 'kimi-k2.7-code', cat: 'kimi-k2.7-code', ov: { def: 'high' }, purpose: '轻量任务' },
+      { id: 'kimi-k3-preview', cat: null, ov: {} },
+    ],
+    fetch: { ok: true, list: ['kimi-k2.6', 'kimi-k2.7-code', 'kimi-k2.7-code-highspeed', 'kimi-k2-turbo', 'kimi-k2.5', 'kimi-k3-preview', 'moonshot-v1-128k'].map((id) => ({ id })) },
+  },
+  relay: {
+    mark: null, kind: '自定义中转', status: '已连接', proto: true, mult: true,
+    f: { name: 'Claude 中转', url: 'https://relay.example.com', proxy: 'http://127.0.0.1:7890', proto: 'anthropic', mult: '0.6' }, idPh: '例如 claude-opus-4-1',
+    models: [
+      { id: 'claude-sonnet-4-5', cat: 'claude-sonnet-4-5', ov: {}, purpose: '会话默认' },
+      { id: 'claude-haiku-4-5', cat: 'claude-haiku-4-5', ov: {}, purpose: '子 Agent 探索' },
+      { id: 'qwen3-coder-plus', cat: null, ov: { ctx: 1000000, rates: [1, 5, null, null], levels: [] } },
+    ],
+    fetch: { ok: false, reason: '这个中转站没有开放模型列表（/models 返回 404）。' },
+  },
+  openrouter: {
+    mark: 'openrouter', kind: '聚合平台', status: '已连接 · 余额 $12.40', proto: false, mult: false, fresh: true,
+    f: { name: 'OpenRouter', url: '', proxy: '', mult: '1' }, urlDefault: 'https://openrouter.ai/api/v1', idPh: '例如 anthropic/claude-sonnet-4.5',
+    models: [],
+    fetch: { ok: true, total: 342, list: [
+      OR('anthropic/claude-sonnet-4.5', 'Anthropic: Claude Sonnet 4.5', 1000000, 3, 15),
+      OR('anthropic/claude-haiku-4.5', 'Anthropic: Claude Haiku 4.5', 200000, 1, 5),
+      OR('anthropic/claude-opus-4.1', 'Anthropic: Claude Opus 4.1', 200000, 15, 75),
+      OR('openai/gpt-5', 'OpenAI: GPT-5', 400000, 1.25, 10),
+      OR('openai/gpt-5-mini', 'OpenAI: GPT-5 Mini', 400000, 0.25, 2),
+      OR('google/gemini-2.5-pro', 'Google: Gemini 2.5 Pro', 1048576, 1.25, 10),
+      OR('google/gemini-2.5-flash', 'Google: Gemini 2.5 Flash', 1048576, 0.3, 2.5),
+      OR('deepseek/deepseek-v3.2', 'DeepSeek: V3.2', 163840, 0.27, 0.4),
+      OR('moonshotai/kimi-k2.6', 'MoonshotAI: Kimi K2.6', 262144, 0.6, 2.5),
+      OR('z-ai/glm-4.6', 'Z.AI: GLM 4.6', 202752, 0.5, 1.75),
+      OR('qwen/qwen3-coder-plus', 'Qwen: Qwen3 Coder Plus', 1000000, 1, 5),
+      OR('x-ai/grok-4', 'xAI: Grok 4', 256000, 3, 15),
+      OR('meta-llama/llama-4-maverick', 'Meta: Llama 4 Maverick', 1048576, 0.15, 0.6),
+      OR('mistralai/mistral-medium-3.1', 'Mistral: Mistral Medium 3.1', 131072, 0.4, 2),
+    ] },
+  },
+};
+
+const S = { theme: 'light', conn: 'kimi', open: { 'kimi-k2.6': 1 }, draft: null, flash: new Set(), undo: null, saved: null, keyDraft: '', delArm: false, fetching: false, fail: null, pick: null };
+const C = () => CONNS[S.conn];
+
+/* 有效值：用户修改 > 服务商 /models > 目录 */
+function eff(m) {
+  const c = m.cat ? CATALOG[m.cat] : null; const o = m.ov; const p = m.prov || {};
+  return {
+    name: o.name ?? c?.name ?? p.name ?? m.id,
+    ctx: o.ctx ?? p.ctx ?? c?.ctx ?? null, max: o.max ?? p.max ?? c?.max ?? null,
+    levels: o.levels ?? c?.levels ?? null, def: o.def ?? c?.def ?? null,
+    image: o.image ?? c?.image ?? false,
+    rates: o.rates ?? p.rates ?? c?.rates ?? [null, null, null, null],
+    known: Boolean(c) || Object.keys(o).length > 0 || Boolean(m.prov),
+  };
+}
+const fmtK = (n) => n == null ? '' : n >= 1e6 && n % 1e6 === 0 ? `${n / 1e6}M` : n >= 1048576 && n % 1048576 === 0 ? `${n / 1048576}M` : n >= 1000 ? `${Math.round(n / 1000)}K` : String(n);
+const fmt$ = (n) => n == null ? '' : String(n);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const VENDOR = { anthropic: 'anthropic', openai: 'openai', deepseek: 'deepseek', moonshotai: 'moonshot', 'z-ai': 'zai', qwen: 'alibaba', 'x-ai': 'grok', mistralai: 'mistral' };
+const familyMark = (id) => {
+  if (id.includes('/')) return VENDOR[id.split('/')[0]] ?? null;
+  const n = norm(id);
+  return n.startsWith('claude') ? 'anthropic' : n.startsWith('kimi') || n.startsWith('moonshot') ? 'moonshot' : n.startsWith('qwen') ? 'alibaba' : n.startsWith('gpt') ? 'openai' : n.startsWith('deepseek') ? 'deepseek' : null;
+};
+/* 没有标识的厂商用首字母占位，不借用别家的 Logo */
+const mlogo = (id) => { const k = familyMark(id); const ch = id.replace(/^[^/]+\//, '').slice(0, 1).toUpperCase(); return `<span class="mlogo">${k ? `<img class="mono" src="${MARKS}${k}.svg" alt="">` : `<span style="color:var(--muted);font-size:11px;font-weight:600">${esc(ch)}</span>`}</span>`; };
+const thinkLabel = (e) => !e.levels?.length ? '' : e.levels.length === 2 && e.levels[0] === 'off' ? (e.def === 'off' ? '思考关' : '思考开') : `思考${LV[e.def] || ''}`;
+
+function field(label, control, { wide = false, edited = false, key = '', mid = '' } = {}) {
+  return `<label class="f ${wide ? 'wide' : ''}"><span class="fl">${label}${edited ? `<span class="tag">已修改</span><button class="reset" data-act="reset" data-m="${mid}" data-k="${key}">恢复</button>` : ''}</span>${control}</label>`;
+}
+const unitInput = (val, unit, ph = '') => `<span class="unit"><input class="input num" value="${esc(val)}" placeholder="${esc(ph)}"><span class="u r">${unit}</span></span>`;
+function levelSelect(e) {
+  if (!e.levels) return `<select class="input" disabled><option>先在「显示更多」里勾档位</option></select>`;
+  if (e.levels.length === 0) return `<select class="input" disabled><option>不支持思考</option></select>`;
+  const name = (l) => e.levels.length === 2 && e.levels[0] === 'off' ? (l === 'off' ? '关' : '开') : LV[l];
+  return `<select class="input">${e.levels.map((l) => `<option ${l === e.def ? 'selected' : ''}>${name(l)}</option>`).join('')}</select>`;
+}
+function keyFields(m, e) {
+  const k = C().mult ? (+C().f.mult || 1) : 1;
+  const multTag = k !== 1 && !m.ov.rates ? ` <span style="color:var(--subtle)">· 已 ×${C().f.mult}</span>` : '';
+  const r = m.ov.rates ? e.rates : e.rates.map((v) => v == null ? null : +(v * k).toFixed(3));
+  return `<div class="grid">
+    ${field('上下文', unitInput(fmtK(e.ctx), 'tokens', '例如 128K'), { edited: m.ov.ctx != null && m.cat, key: 'ctx', mid: m.id })}
+    ${field('默认思考', levelSelect(e), { edited: m.ov.def != null && m.cat, key: 'def', mid: m.id })}
+    ${field(`价格 · 每百万 token${multTag}`, `<span class="pair">${unitInput(fmt$(r[0]), '入', '$')}${unitInput(fmt$(r[1]), '出', '$')}</span>`, { edited: m.ov.rates != null && m.cat, key: 'rates', mid: m.id })}
+  </div>`;
+}
+function moreFields(m, e) {
+  const lv = e.levels || [];
+  return `<div class="grid" style="margin-top:12px">
+    ${field('显示名称', `<input class="input" value="${esc(e.name)}">`, { edited: m.ov.name != null, key: 'name', mid: m.id })}
+    ${field('最大输出', unitInput(fmtK(e.max), 'tokens', '例如 32K'))}
+    ${field('缓存价格 · 每百万 token', `<span class="pair">${unitInput(fmt$(e.rates[2]), '读', '—')}${unitInput(fmt$(e.rates[3]), '写', '—')}</span>`)}
+    ${field('思考档位', `<span class="chips">${ALL_LV.map((l) => `<button class="chip" role="checkbox" aria-checked="${lv.includes(l)}" data-act="lv" data-m="${m.id}" data-l="${l}"><span class="check" aria-checked="${lv.includes(l)}">${I.check}</span>${LV[l]}</button>`).join('')}</span>`, { wide: true })}
+    ${field('输入类型', `<span class="chips"><button class="chip" aria-checked="true" disabled><span class="check" aria-checked="true">${I.check}</span>文本</button><button class="chip" role="checkbox" aria-checked="${e.image}" data-act="img" data-m="${m.id}"><span class="check" aria-checked="${e.image}">${I.check}</span>图片</button></span>`, { wide: true })}
+  </div>`;
+}
+
+function modelCard(m) {
+  const e = eff(m); const lvl = S.open[m.id] || 0;
+  const tag = e.known ? '' : '不在模型目录中';
+  const meta = e.known ? [fmtK(e.ctx), thinkLabel(e), e.image ? '看图' : ''].filter(Boolean).join(' · ') : '';
+  let body = '';
+  if (lvl > 0) {
+    const note = !e.known ? '<div class="note">没认出这个模型。填上上下文和价格，用量和费用才算得准；不填也能用。</div>' : '';
+    body = `<div class="mbody">${note}${keyFields(m, e)}${lvl === 2 ? moreFields(m, e) : ''}
+      <div class="mfoot"><button class="tbtn ${lvl === 2 ? 'open' : ''}" data-act="more" data-m="${m.id}">${lvl === 2 ? '收起' : '显示更多'} ${I.chevD}</button></div></div>`;
+  }
+  return `<div class="mcard ${lvl ? 'is-open' : ''} ${S.flash.has(m.id) ? 'flash' : ''}">
+    <div class="mrow" data-act="toggle" data-m="${m.id}">
+      ${mlogo(m.id)}
+      <span class="mname">${esc(e.name)}</span>
+      ${e.name !== m.id ? `<span class="mid">${esc(m.id)}</span>` : ''}
+      ${tag ? `<span class="mtag">${tag}</span>` : ''}
+      <span class="sp"></span>
+      ${lvl === 0 ? `<span class="meta">${meta}</span>` : ''}
+      <button class="ibtn danger rm" data-act="remove" data-m="${m.id}" title="移除" aria-label="移除 ${esc(e.name)}">${I.trash}</button>
+      <button class="ibtn chev ${lvl ? 'open' : ''}" data-act="toggle" data-m="${m.id}" aria-label="展开 ${esc(e.name)}" aria-expanded="${lvl > 0}">${I.chevR}</button>
+    </div>${body}
+  </div>`;
+}
+
+function undoBar() {
+  const u = S.undo; if (!u) return '';
+  const name = eff(u.model).name;
+  const effect = u.model.purpose ? (u.model.purpose === '会话默认' ? '，「会话默认」需要重新选一个模型' : `，「${u.model.purpose}」改为跟随会话默认`) : '';
+  return `<div class="undo"><span>已移除 <b>${esc(name)}</b>${effect}。</span><span class="sp"></span><button class="btn sm" data-act="undo">撤销</button><button class="ibtn" data-act="undoClose" aria-label="关闭">${I.x}</button></div>`;
+}
+
+function draftCard() {
+  const d = S.draft; if (!d) return '';
+  const id = d.id.trim();
+  const dup = id && C().models.some((m) => norm(m.id) === norm(id));
+  const hit = match(id);
+  const fake = { id: id || 'draft', cat: hit?.cat ?? null, ov: d.name.trim() ? { name: d.name.trim() } : {} };
+  const fill = !id ? '' : dup ? '<div class="fill warnt">这个模型已经在列表里了。</div>'
+    : hit?.how === 'exact' ? `<div class="fill ok">${I.ok} 认出来了，是 ${CATALOG[hit.cat].name}，下面已经帮你填好</div>`
+    : hit?.how === 'variant' ? `<div class="fill ok">${I.ok} 按 ${CATALOG[hit.cat].name} 填好了，不对可以改</div>`
+    : '<div class="fill">没认出来。填上上下文和价格，用量和费用才算得准；不填也能添加。</div>';
+  const fields = id && !dup ? `<div class="mbody">${keyFields(fake, eff(fake))}${d.more ? moreFields(fake, eff(fake)) : ''}</div>` : '';
+  return `<div class="mcard draft">
+    <div class="drow">
+      <input class="input mono id" placeholder="模型 ID，${esc(C().idPh)}" value="${esc(d.id)}" data-in="did">
+      <input class="input nm" placeholder="显示名称（可选）" value="${esc(d.name)}" data-in="dname">
+    </div>
+    ${fill}${fields}
+    <div class="mfoot" style="padding:0 6px 2px">
+      ${id && !dup ? `<button class="tbtn ${d.more ? 'open' : ''}" data-act="dmore">${d.more ? '收起' : '显示更多'} ${I.chevD}</button>` : ''}
+      <span class="sp"></span>
+      <button class="btn sm ghost" data-act="dcancel">取消</button>
+      <button class="btn sm primary" data-act="dsave" ${id && !dup ? '' : 'disabled'}>添加</button>
+    </div>
+  </div>`;
+}
+
+/* 获取可用模型的弹窗 */
+function pickDialog() {
+  const p = S.pick; if (!p) return '';
+  const c = C(); const have = new Set(c.models.map((m) => norm(m.id)));
+  const q = p.q.trim().toLowerCase();
+  const all = c.fetch.list;
+  const vis = all.filter((x) => !q || x.id.toLowerCase().includes(q) || (x.name || CATALOG[match(x.id)?.cat]?.name || '').toLowerCase().includes(q));
+  const pickable = vis.filter((x) => !have.has(norm(x.id)));
+  const allOn = pickable.length > 0 && pickable.every((x) => p.sel.has(x.id));
+  const row = (x) => {
+    const added = have.has(norm(x.id)); const on = added || p.sel.has(x.id);
+    const hit = match(x.id); const cat = hit ? CATALOG[hit.cat] : null;
+    const name = cat && hit.how === 'exact' ? cat.name : x.name ? x.name.replace(/^[^:]+:\s*/, '') : null;
+    const ctx = x.ctx ?? cat?.ctx; const r = x.rates ?? cat?.rates;
+    const meta = [ctx ? fmtK(ctx) : '', r?.[0] != null ? `$${r[0]} / $${r[1]}` : ''].filter(Boolean).join(' · ');
+    return `<div class="cand ${added ? 'added' : ''}" ${added ? '' : `data-act="ptoggle" data-id="${esc(x.id)}"`} role="checkbox" aria-checked="${on}" aria-disabled="${added}">
+      <span class="box ${on && !added ? 'on' : ''}">${on ? I.check : ''}</span>${mlogo(x.id)}
+      <span class="mname">${esc(name || x.id)}</span>${name ? `<span class="mid">${esc(x.id)}</span>` : ''}
+      <span class="sp"></span>${added ? '<span class="addedtag">已添加</span>' : `<span class="meta">${meta}</span>`}
+    </div>`;
+  };
+  const n = p.sel.size;
+  const fresh = !c.models.length;
+  return `<div class="scrim" data-act="pclose-scrim">
+    <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t">
+      <div class="dlg-h"><h3 id="dlg-t">选择要添加的模型</h3><p>${fresh ? `连接好了。${esc(c.f.name)} 一共有 ${c.fetch.total ?? all.length} 个模型，勾选你要用的。` : `以下是 ${esc(c.f.name)} 的可用模型，已添加的不会重复添加。`}</p></div>
+      <div class="dlg-tools">
+        <span class="search">${I.search}<input class="input" placeholder="搜索模型名称或 ID" value="${esc(p.q)}" data-in="pq"></span>
+        <button class="btn sm ghost" data-act="pall" ${pickable.length ? '' : 'disabled'}>${allOn ? '取消全选' : '全选'}</button>
+      </div>
+      <div class="cands">${vis.length ? vis.map(row).join('') : `<div class="cempty">没有匹配「${esc(p.q)}」的模型。也可以关掉窗口，用「手动添加」按 ID 添加。</div>`}</div>
+      <div class="dlg-f"><span>${n ? `已选 ${n} 个` : '还没选'}</span><span class="sp"></span><button class="btn sm ghost" data-act="pclose">取消</button><button class="btn sm primary" data-act="padd" ${n ? '' : 'disabled'}>${n ? `添加 ${n} 个` : '添加所选'}</button></div>
+    </div>
+  </div>`;
+}
+
+function connGroup() {
+  const c = C(); const f = c.f;
+  const saved = (k) => S.saved === k ? `<span class="saved">${I.ok}已保存</span>` : '';
+  const row = (k, label, control) => `<div class="kv"><span class="k">${label}</span><span class="v">${control}${saved(k)}</span></div>`;
+  const keyActs = S.keyDraft ? `<span class="in-acts"><button class="btn sm ghost" data-act="keyCancel">取消</button><button class="btn sm primary" data-act="keySave">保存</button></span>` : '';
+  const rows = [
+    row('name', '名称', `<input class="input" value="${esc(f.name)}" data-ch="name">`),
+    c.proto ? row('proto', '协议', `<select class="input" data-ch="proto">${[['openai-chat', 'OpenAI Chat Completions'], ['openai-responses', 'OpenAI Responses'], ['anthropic', 'Anthropic Messages']].map(([v, n]) => `<option value="${v}" ${f.proto === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`) : '',
+    row('url', '服务地址', `<input class="input mono" value="${esc(f.url)}" placeholder="${esc(c.urlDefault || '')}" data-ch="url">`),
+    row('key', 'API Key', `<span class="keybox"><input class="input mono" type="password" value="${esc(S.keyDraft)}" placeholder="••••••••••••••••  已保存在本机，粘贴新的 Key 可替换" data-in="key">${keyActs}</span>`),
+    row('proxy', '代理', `<input class="input mono" value="${esc(f.proxy)}" placeholder="留空走系统代理" data-ch="proxy">`),
+  ];
+  return `<section class="sec"><div class="sec-h"><div><div class="t">连接</div></div></div><div class="group">${rows.join('')}</div></section>`;
+}
+
+function render() {
+  document.documentElement.dataset.theme = S.theme;
+  const c = C();
+  const nav = [['偏好', ['通用', '外观']], ['能力', ['远端 Host', '模型', '搜索与网页读取', '工具', '子 Agent']], ['活动', ['使用统计', '归档会话']], ['系统', ['更新']]];
+  const focus = document.activeElement?.dataset?.in; const caret = document.activeElement?.selectionStart;
+  const cards = c.models.map(modelCard);
+  if (S.undo) cards.splice(Math.min(S.undo.index, cards.length), 0, undoBar());
+  const head = c.mark ? `<span class="logo"><img class="mono" src="${MARKS}${c.mark}.svg" alt="" style="width:56%;height:56%"></span>` : `<span class="logo" style="font-weight:600;color:var(--muted)">${esc(c.f.name.slice(0, 1))}</span>`;
+  const desc = c.models.length ? `${c.models.length} 个，都会出现在对话框和「用途」里` : '加进来的模型会出现在对话框和「用途」里';
+  const empty = !c.models.length && !S.undo && !S.draft && !S.fail ? '<div class="empty">还没有模型。<br>点「获取可用模型」勾选要用的，或者手动添加。</div>' : '';
+  const fail = S.fail ? `<div class="fail"><span>没拿到模型列表：${esc(S.fail)}<br>可以按模型 ID 手动添加，下面已经帮你打开了。</span><span class="sp"></span><button class="ibtn" data-act="failClose" aria-label="关闭">${I.x}</button></div>` : '';
+  const fetchBtn = `<button class="btn sm" data-act="fetch" ${S.fetching ? 'disabled' : ''}>${S.fetching ? '<span class="spin"></span> 正在获取…' : `${I.down} 获取可用模型`}</button>`;
+  const billing = c.mult ? `<div class="kv"><span class="k">价格倍率</span><span class="v"><span class="unit" style="flex:none;width:150px"><input class="input num left" value="${esc(c.f.mult)}" data-ch="mult"><span class="u l">官方价 ×</span></span><span class="faint" style="font-size:12px">中转站打几折就填几，手填的价格不乘倍率。</span>${S.saved === 'mult' ? `<span class="saved">${I.ok}已保存</span>` : ''}</span></div>` : '';
+  document.getElementById('app').innerHTML = `
+  <aside class="shell-side"><div class="shell-back">${I.chevL} 返回应用</div>${nav.map(([s, items]) => `<div class="shell-sec">${s}</div>${items.map((n) => `<button class="shell-item ${n === '模型' ? 'on' : ''}">${n}</button>`).join('')}`).join('')}</aside>
+  <main class="shell-main"><div class="page">
+    <div class="ph"><button class="ph-back" aria-label="返回模型">${I.chevL}</button>${head}
+      <div><h2>${esc(c.f.name)}</h2><div class="ph-desc">${c.kind}<span class="dot"></span>${c.status}</div></div></div>
+    <div class="stack">
+      ${connGroup()}
+      <section class="sec">
+        <div class="sec-h"><div><div class="t">模型</div><div class="d">${desc}</div></div><div class="acts">${fetchBtn}</div></div>
+        <div class="mlist">
+          ${fail}${cards.join('')}${empty}
+          ${draftCard()}
+          ${S.draft ? '' : `<div class="list-acts"><button class="btn sm" data-act="add">${I.plus} 手动添加</button></div>`}
+        </div>
+      </section>
+      <section class="sec">
+        <div class="sec-h"><div><div class="t">${c.mult ? '计费与删除' : '删除'}</div></div></div>
+        <div class="group">
+          ${billing}
+          <div class="kv"><span class="k">删除连接</span><span class="v"><span class="faint" style="font-size:12px">${S.delArm ? '再点一次确认。历史会话和用量记录会保留。' : '这个连接和它的模型都会移除，历史会话不受影响。'}</span><span class="sp grow"></span><button class="btn sm danger" data-act="del">${S.delArm ? '确认删除' : '删除'}</button></span></div>
+        </div>
+      </section>
+    </div>
+  </div></main>
+  ${pickDialog()}
+  <div class="demo-ctl">
+    <span class="seg"><button aria-pressed="${S.conn === 'kimi'}" data-act="conn" data-v="kimi">Kimi 官方</button><button aria-pressed="${S.conn === 'relay'}" data-act="conn" data-v="relay">中转（无列表）</button><button aria-pressed="${S.conn === 'openrouter'}" data-act="conn" data-v="openrouter">OpenRouter 刚添加</button></span>
+    <span class="seg"><button aria-pressed="${S.theme === 'light'}" data-act="theme" data-v="light">浅色</button><button aria-pressed="${S.theme === 'dark'}" data-act="theme" data-v="dark">深色</button></span>
+  </div>`;
+  if (focus) { const el = document.querySelector(`[data-in="${focus}"]`); if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch {} } }
+  else if (S.focus) { const el = document.querySelector(`[data-in="${S.focus}"]`); S.focus = null; el?.focus(); }
+}
+
+const find = (id) => C().models.find((m) => m.id === id);
+let undoTimer, flashTimer, savedTimer, delTimer;
+function flashSaved(k) { S.saved = k; clearTimeout(savedTimer); savedTimer = setTimeout(() => { S.saved = null; }, 1900); }
+function flashCards(ids) { S.flash = new Set(ids); clearTimeout(flashTimer); flashTimer = setTimeout(() => { S.flash = new Set(); }, 1500); }
+function startFetch() {
+  S.fetching = true; S.fail = null; render();
+  setTimeout(() => {
+    S.fetching = false;
+    const f = C().fetch;
+    if (f.ok) { S.pick = { q: '', sel: new Set() }; S.focus = 'pq'; }
+    else { S.fail = f.reason; S.draft = S.draft ?? { id: '', name: '', more: false }; S.focus = 'did'; }
+    render();
+  }, 650);
+}
+const ACT = {
+  toggle: ({ m }) => { S.open[m] = S.open[m] ? 0 : 1; },
+  more: ({ m }) => { S.open[m] = S.open[m] === 2 ? 1 : 2; },
+  reset: ({ m, k }) => { delete find(m).ov[k]; },
+  lv: ({ m, l }) => { const x = find(m); if (!x) return; const cur = eff(x).levels || []; const next = cur.includes(l) ? cur.filter((v) => v !== l) : ALL_LV.filter((v) => cur.includes(v) || v === l); x.ov.levels = next; if (!next.includes(x.ov.def ?? eff(x).def)) x.ov.def = next.find((v) => v !== 'off') ?? next[0]; },
+  img: ({ m }) => { const x = find(m); if (x) x.ov.image = !eff(x).image; },
+  remove: ({ m }) => {
+    const ms = C().models; const index = ms.findIndex((x) => x.id === m);
+    S.undo = { model: ms[index], index }; ms.splice(index, 1); delete S.open[m];
+    clearTimeout(undoTimer); undoTimer = setTimeout(() => { S.undo = null; render(); }, 8000);
+  },
+  undo: () => { C().models.splice(S.undo.index, 0, S.undo.model); flashCards([S.undo.model.id]); S.undo = null; clearTimeout(undoTimer); },
+  undoClose: () => { S.undo = null; },
+  fetch: () => { startFetch(); return 'skip'; },
+  failClose: () => { S.fail = null; },
+  ptoggle: ({ id }) => { const s = S.pick.sel; s.has(id) ? s.delete(id) : s.add(id); },
+  pall: () => {
+    const have = new Set(C().models.map((m) => norm(m.id))); const q = S.pick.q.trim().toLowerCase();
+    const vis = C().fetch.list.filter((x) => !have.has(norm(x.id)) && (!q || x.id.toLowerCase().includes(q) || (x.name || '').toLowerCase().includes(q)));
+    if (vis.length && vis.every((x) => S.pick.sel.has(x.id))) S.pick.sel = new Set(); else vis.forEach((x) => S.pick.sel.add(x.id));
+  },
+  pclose: () => { S.pick = null; },
+  'pclose-scrim': (_, ev) => { if (ev.target.classList.contains('scrim')) S.pick = null; },
+  padd: () => {
+    const list = C().fetch.list.filter((x) => S.pick.sel.has(x.id));
+    for (const x of list) {
+      const hit = match(x.id);
+      C().models.push({ id: x.id, cat: hit?.how === 'exact' || hit?.how === 'variant' ? hit.cat : null, ov: {}, prov: x.ctx ? { name: x.name?.replace(/^[^:]+:\s*/, ''), ctx: x.ctx, rates: x.rates } : null });
+    }
+    flashCards(list.map((x) => x.id)); S.pick = null;
+  },
+  add: () => { S.draft = { id: '', name: '', more: false }; S.focus = 'did'; },
+  dmore: () => { S.draft.more = !S.draft.more; },
+  dcancel: () => { S.draft = null; S.fail = null; },
+  dsave: () => {
+    const id = S.draft.id.trim(); if (!id || C().models.some((m) => norm(m.id) === norm(id))) return;
+    const hit = match(id);
+    C().models.push({ id, cat: hit?.cat ?? null, ov: S.draft.name.trim() ? { name: S.draft.name.trim() } : {} });
+    flashCards([id]); S.draft = null; S.fail = null;
+  },
+  keyCancel: () => { S.keyDraft = ''; },
+  keySave: () => { S.keyDraft = ''; flashSaved('key'); },
+  del: () => { S.delArm = !S.delArm; clearTimeout(delTimer); if (S.delArm) delTimer = setTimeout(() => { S.delArm = false; render(); }, 3000); },
+  conn: ({ v }) => {
+    S.conn = v; S.open = {}; S.undo = null; S.keyDraft = ''; S.delArm = false; S.draft = null; S.fail = null; S.pick = null;
+    // 刚添加的连接列表是空的：进来就自动去获取，弹出选择窗口
+    if (C().fresh && !C().models.length) { startFetch(); return 'skip'; }
+  },
+  theme: ({ v }) => { S.theme = v; },
+};
+const INPUT = { key: (v) => { S.keyDraft = v; }, did: (v) => { S.draft.id = v; }, dname: (v) => { S.draft.name = v; }, pq: (v) => { S.pick.q = v; } };
+document.addEventListener('click', (ev) => {
+  if (ev.target.closest('input, select')) return;
+  const t = ev.target.closest('[data-act]'); if (!t || t.disabled) return;
+  ev.preventDefault(); if (ACT[t.dataset.act]?.(t.dataset, ev) !== 'skip') render();
+});
+document.addEventListener('input', (ev) => { const k = ev.target.dataset?.in; if (k && INPUT[k]) { INPUT[k](ev.target.value); render(); } });
+document.addEventListener('change', (ev) => { const k = ev.target.dataset?.ch; if (!k) return; C().f[k] = ev.target.value; flashSaved(k); render(); });
+document.addEventListener('keydown', (ev) => {
+  const k = ev.target.dataset?.in;
+  if (ev.key === 'Escape' && S.pick) { S.pick = null; render(); return; }
+  if (ev.key === 'Enter' && ev.target.dataset?.ch) ev.target.blur();
+  if (k === 'did' || k === 'dname') {
+    if (ev.key === 'Escape') { ACT.dcancel(); render(); }
+    if (ev.key === 'Enter') { ev.preventDefault(); ACT.dsave(); render(); }
+  }
+  if (k === 'key') {
+    if (ev.key === 'Escape') { ACT.keyCancel(); render(); }
+    if (ev.key === 'Enter' && S.keyDraft) { ACT.keySave(); render(); }
+  }
+});
+render();
+</script>
+</body>
+</html>

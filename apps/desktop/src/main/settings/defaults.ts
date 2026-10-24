@@ -40,7 +40,7 @@ export function defaultInstalledModels(): Partial<Record<ModelKey, InstalledMode
 }
 
 /** 四层模型迁移版本，见 model-layers-migration.ts。新装直接是最新版本。 */
-export const MODEL_LAYERS_VERSION = 1;
+export const MODEL_LAYERS_VERSION = 2;
 
 export function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
   const env = {

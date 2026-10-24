@@ -59,7 +59,12 @@ export async function projectUsageJournalBatch(db: ProjectionDatabase, source: U
     const reduced = compactUsageEvent(event);
     if (!reduced) continue;
     let groupKey: string | undefined;
-    if (event.type === "request/header") {
+    if (event.type === "llm/auxiliary-start" || event.type === "llm/auxiliary-end") {
+      // Keep retry attempts in one independent request group. Using the parent
+      // step would mix vision usage into the main model; per-attempt groups
+      // would lose retry links when the terminal arrives in another batch.
+      if (typeof data.logicalRequestId === "string") groupKey = `auxiliary:${data.logicalRequestId}`;
+    } else if (event.type === "request/header") {
       if (typeof data.requestId !== "string" || typeof data.stepId !== "string" || typeof data.turnId !== "string") continue;
       groupKey = `step:${data.stepId}`;
       prepare(db, "INSERT INTO usage_projection_requests VALUES(?,?,?) ON CONFLICT(session_id,request_id) DO UPDATE SET group_key=excluded.group_key").run(source.sessionId, data.requestId, groupKey);
@@ -126,6 +131,8 @@ export function compactUsageEvent(event: SessionEventEnvelopeV1): SessionEventEn
     "assistant/message": ["requestId", "finishReason", "reason", "usage"],
     "llm/retry": ["requestId", "nextAttempt", "retryId", "usage"],
     "llm/retry-started": ["requestId"],
+    "llm/auxiliary-start": ["sessionId", "agentRunId", "turnId", "stepId", "callId", "logicalRequestId", "attemptId", "attempt", "purpose", "routeId", "model", "startedAt"],
+    "llm/auxiliary-end": ["sessionId", "agentRunId", "turnId", "stepId", "callId", "logicalRequestId", "attemptId", "attempt", "purpose", "routeId", "model", "startedAt", "finishedAt", "status", "usage"],
     "step/end": ["stepId", "finishReason", "reason", "usage"],
     "tool/call": ["callId", "toolCallId", "turnId", "stepId", "agentRunId", "name"],
     "tool/result": ["callId", "toolCallId", "status"],

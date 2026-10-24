@@ -3,11 +3,11 @@ import type { ContextState } from "@actspace/shared";
 import type { ClientLiveOverlay } from "./live-overlay.js";
 import type { ClientSessionCell } from "./session-snapshot.js";
 import { projectTrajectoryWindow } from "./trajectory.js";
-import { projectChatWindow } from "./chat.js";
+import { projectChatWindow, type ChatProjectionOptions } from "./chat.js";
 
-export function selectChatSession(cell: ClientSessionCell, workspaceRoot = ""): import("@actspace/shared").SessionRecord | null {
+export function selectChatSession(cell: ClientSessionCell, workspaceRoot = "", options: ChatProjectionOptions = {}): import("@actspace/shared").SessionRecord | null {
   if (!cell.snapshot || !cell.window || !cell.projectionValues.requestContext) return null;
-  return projectChatWindow({ kind: "session-projection", schemaVersion: 1, sessionId: cell.sessionId, throughJournalSeq: cell.snapshot.throughJournalSeq, snapshot: cell.snapshot, values: cell.projectionValues, window: cell.window, activeMessageIds: cell.snapshot.messages.map(message => message.messageId), deferredToolCalls: cell.deferredToolCalls }, workspaceRoot);
+  return projectChatWindow({ kind: "session-projection", schemaVersion: 1, sessionId: cell.sessionId, throughJournalSeq: cell.snapshot.throughJournalSeq, snapshot: cell.snapshot, values: cell.projectionValues, window: cell.window, activeMessageIds: cell.snapshot.messages.map(message => message.messageId), deferredToolCalls: cell.deferredToolCalls }, workspaceRoot, options);
 }
 
 export function selectToolViews(cell: ClientSessionCell): readonly import("@actspace/shared/runtime-v2").RuntimeV2ToolView[] {

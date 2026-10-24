@@ -30,7 +30,7 @@ const SYSTEM_PROMPT = "你是 ActSpace 的主 Agent。\n- 先理解需求，再�
 
 /** 分页视图建立在 `sessions.list` 之上：测试只覆盖 `sessions.list` 时，侧栏分页读到的是同一份数据。 */
 async function listPage(clock: MockClock, input: SessionListPageInput): Promise<SessionListPage> {
-  const items = (await clock.bridge.sessions.list({})).filter((item) =>
+  const items = (await clock.bridge.sessions.list({})).filter((item) => !item.isChildSession &&
     (!input.search || (!item.hostId && item.title.toLowerCase().includes(input.search.toLowerCase()))) &&
     (input.hostId === undefined || item.hostId === input.hostId) &&
     (input.workspaceRoot === undefined || item.workspaceRoot === input.workspaceRoot) &&

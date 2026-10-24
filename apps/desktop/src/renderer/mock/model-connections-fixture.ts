@@ -20,9 +20,10 @@ import type { DesktopBridge } from "@actspace/shared/desktop-bridge";
 /**
  * 设置 › 模型的有状态 mock：有效值用 shared 的 resolveEffectiveModel 现算，和 main 同一套优先级。
  * 探测按 Key 切场景：含 badkey → 401；含 nolist → 拿不到列表；含 catalog → 退回目录；其余拿到模板的模型列表。
+ * 已保存的连接：名称里带「无列表」的中转模拟没开放 /models。
  */
 
-type MockModel = { key: ModelKey; apiModel: string; enabled: boolean; providerFacts: ModelFacts; overrides: ModelOverrides | null; removable: boolean };
+type MockModel = { key: ModelKey; apiModel: string; providerFacts: ModelFacts; overrides: ModelOverrides | null };
 type MockConnection = Omit<ConnectionView, "models" | "defaultBaseUrl"> & { models: MockModel[] };
 
 function entry(sourceProviderId: string, apiModel: string, name: string, contextWindow: number, maxOutput: number, rates: [number, number, number | null], reasoning: boolean, image = false): ModelCatalogEntry {
@@ -62,8 +63,15 @@ const PROVIDER_LISTS: Record<string, string[]> = {
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
   kimi: ["kimi-k2-0905-preview"],
   zai: ["glm-4.6"],
-  openrouter: ["anthropic/claude-sonnet-4-5", "openai/gpt-5", "deepseek/deepseek-chat"],
+  openrouter: ["anthropic/claude-sonnet-4-5", "anthropic/claude-haiku-4-5", "openai/gpt-5", "openai/gpt-5-mini", "google/gemini-2.5-pro", "deepseek/deepseek-chat", "moonshotai/kimi-k2-0905", "z-ai/glm-4.6", "qwen/qwen3-coder-plus"],
   custom: ["claude-sonnet-4-5", "claude-sonnet-4-5-20250929", "gpt-5-mini", "qwen3-coder-plus"],
+};
+
+/** OpenRouter 的 /models 自带名称、上下文和价格。 */
+const OPENROUTER_FACTS: Record<string, ModelFacts> = {
+  "google/gemini-2.5-pro": { label: "Gemini 2.5 Pro", contextWindow: 1_048_576, rates: { input: 1.25, output: 10, cacheRead: null, cacheWrite: null } },
+  "moonshotai/kimi-k2-0905": { label: "Kimi K2 0905", contextWindow: 262_144, rates: { input: 0.6, output: 2.5, cacheRead: null, cacheWrite: null } },
+  "qwen/qwen3-coder-plus": { label: "Qwen3 Coder Plus", contextWindow: 1_000_000, rates: { input: 1, output: 5, cacheRead: null, cacheWrite: null } },
 };
 
 const keyFor = (connectionId: string, apiModel: string) => `${connectionId.split(":")[0]}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}` as ModelKey;
@@ -72,7 +80,7 @@ const checkedAt = () => new Date().toISOString();
 function seed(): { connections: MockConnection[]; purposes: PurposesView } {
   const relay = "custom:relay-1";
   const model = (connectionId: string, apiModel: string, patch: Partial<MockModel> = {}): MockModel =>
-    ({ key: keyFor(connectionId, apiModel), apiModel, enabled: true, providerFacts: {}, overrides: null, removable: true, ...patch });
+    ({ key: keyFor(connectionId, apiModel), apiModel, providerFacts: {}, overrides: null, ...patch });
   const connections: MockConnection[] = [
     {
       connectionId: "deepseek:default",
@@ -88,8 +96,8 @@ function seed(): { connections: MockConnection[]; purposes: PurposesView } {
       proxy: { enabled: false, url: null },
       balance: true,
       models: [
-        model("deepseek:default", "deepseek-chat", { removable: false }),
-        model("deepseek:default", "deepseek-reasoner", { removable: false }),
+        model("deepseek:default", "deepseek-chat"),
+        model("deepseek:default", "deepseek-reasoner"),
       ],
     },
     {
@@ -109,7 +117,7 @@ function seed(): { connections: MockConnection[]; purposes: PurposesView } {
         model(relay, "claude-sonnet-4-5"),
         model(relay, "claude-haiku-4-5", { overrides: { thinking: { levels: ["off", "high"], default: "off" } } }),
         model(relay, "claude-sonnet-4-5-20250929"),
-        model(relay, "qwen3-coder-plus", { enabled: false }),
+        model(relay, "qwen3-coder-plus"),
       ],
     },
     {
@@ -165,10 +173,8 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       models: models.map((model) => ({
         key: model.key,
         apiModel: model.apiModel,
-        enabled: model.enabled,
         effective: effectiveFor(connection, model.apiModel, model.providerFacts, model.overrides),
         overrides: model.overrides ? structuredClone(model.overrides) : null,
-        removable: model.removable,
         usedBy: PURPOSE_IDS.filter((purpose) => state.purposes[purpose].model === model.key),
       })),
     })),
@@ -196,10 +202,8 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       connection.models.push({
         key: keyFor(connection.connectionId, input.apiModel),
         apiModel: input.apiModel,
-        enabled: input.enabled ?? true,
         providerFacts: structuredClone(input.providerFacts ?? {}),
         overrides: input.overrides ? structuredClone(input.overrides) : null,
-        removable: true,
       });
     }
   };
@@ -213,7 +217,10 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       ok: true,
       message: "连接成功",
       listSource: source,
-      models: ids.map((apiModel) => ({ apiModel, providerFacts: {}, effective: effectiveFor(scope, apiModel), added: Boolean(existing?.models.some((model) => model.apiModel === apiModel)) })),
+      models: ids.map((apiModel) => {
+        const providerFacts = source === "provider" ? OPENROUTER_FACTS[apiModel] ?? {} : {};
+        return { apiModel, providerFacts, effective: effectiveFor(scope, apiModel, providerFacts), added: Boolean(existing?.models.some((model) => model.apiModel === apiModel)) };
+      }),
     });
     if (apiKey.includes("nolist")) return { ...base, ok: true, message: "连接成功", listSource: "none", models: [] };
     const catalogProvider = findProviderTemplate(templateId)?.catalogProvider;
@@ -230,7 +237,7 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       }
       const connection = find(input.connectionId);
       if (!connection) return { ok: false, message: "连接不存在。", checkedAt: checkedAt(), listSource: "none", models: [] };
-      const result = probe(connection.templateId, connection.protocol, connection.multiplier, connection.hasApiKey ? "saved" : "badkey", connection);
+      const result = probe(connection.templateId, connection.protocol, connection.multiplier, connection.hasApiKey ? (connection.label.includes("无列表") ? "nolist" : "saved") : "badkey", connection);
       connection.lastConnection = result.ok ? { status: "available", checkedAt: result.checkedAt } : { status: "unavailable", checkedAt: result.checkedAt, errorKind: result.errorKind, message: result.message };
       return result;
     },
@@ -239,7 +246,10 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       if (!template) return fail("未知的模板。");
       const relay = isRelayTemplate(template);
       const connectionId = relay ? `custom:relay-${nextId++}` : `${template.id}:default`;
-      if (find(connectionId)) return { ok: false, error: { code: "connection_exists", message: `${template.label} 已经添加过了。` } };
+      // 内置连接还没填 Key 时只是个空位，填 Key 等于第一次添加。
+      const placeholder = find(connectionId);
+      if (placeholder?.hasApiKey) return { ok: false, error: { code: "connection_exists", message: `${template.label} 已经添加过了。` } };
+      if (placeholder) state.connections = state.connections.filter((item) => item !== placeholder);
       const connection: MockConnection = {
         connectionId,
         templateId: template.id,
@@ -281,18 +291,15 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       addModels(connection, models);
       return ok(connectionId);
     },
-    updateModel: async ({ key, enabled, overrides }) => {
+    updateModel: async ({ key, overrides }) => {
       const found = findModel(key);
       if (!found) return fail("模型不存在。");
-      if (enabled !== undefined) found.model.enabled = enabled;
-      if (overrides !== undefined) found.model.overrides = overrides && Object.keys(overrides).length > 0 ? structuredClone(overrides) : null;
-      if (enabled === false) clearPurposes([key]);
+      found.model.overrides = overrides && Object.keys(overrides).length > 0 ? structuredClone(overrides) : null;
       return ok();
     },
     removeModel: async ({ key }) => {
       const found = findModel(key);
       if (!found) return fail("模型不存在。");
-      if (!found.model.removable) return { ok: false, error: { code: "model_not_removable", message: "内置模型只能停用。" } };
       found.connection.models = found.connection.models.filter((model) => model !== found.model);
       clearPurposes([key]);
       return ok();

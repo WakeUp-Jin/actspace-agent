@@ -1,13 +1,19 @@
 import type { SessionListItem, SessionListPage, SessionListPageInput } from './ipc';
 import type { RuntimeV2BrowseList } from './runtime-v2';
 
+/** Only explicit delegation creates a child session. Forks and legacy origins stay accessible. */
+export function isDelegatedSession(lineage: unknown): boolean {
+  return typeof lineage === 'object' && lineage !== null && !Array.isArray(lineage) &&
+    'origin' in lineage && lineage.origin === 'delegation';
+}
+
 export function paginateSessionSummaries(result: RuntimeV2BrowseList, input: SessionListPageInput): SessionListPage {
   const grouped = new Map<string, SessionListItem[]>();
-  const sorted = [...result.items].filter(s => !s.metadata.archived).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
+  const sorted = [...result.items].filter(s => !s.metadata.archived && !isDelegatedSession(s.lineage)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
   for (const item of sorted) {
     const key = JSON.stringify([item.worktree?.sourceWorkspaceRoot ?? item.workspaceRoot ?? '', item.metadata.pinned]);
     const group = grouped.get(key) ?? [];
-    group.push({ id: item.sessionId, title: item.metadata.title ?? 'New chat', updatedAt: item.updatedAt, workspaceRoot: item.workspaceRoot ?? undefined, ...(item.worktree ? { worktree: item.worktree } : {}), pinned: item.metadata.pinned, archived: false, accessState: item.accessState, isChildSession: item.lineage !== null, agentRunCount: item.completedTurnCount ?? 0 });
+    group.push({ id: item.sessionId, title: item.metadata.title ?? 'New chat', updatedAt: item.updatedAt, workspaceRoot: item.workspaceRoot ?? undefined, ...(item.worktree ? { worktree: item.worktree } : {}), pinned: item.metadata.pinned, archived: false, accessState: item.accessState, isChildSession: false, agentRunCount: item.completedTurnCount ?? 0 });
     grouped.set(key, group);
   }
   const groups: SessionListPage['groups'] = [];
