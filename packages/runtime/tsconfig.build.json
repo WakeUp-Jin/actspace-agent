@@ -16,6 +16,9 @@
       "path": "./../auto-review/tsconfig.build.json"
     },
     {
+      "path": "./../background-tasks/tsconfig.build.json"
+    },
+    {
       "path": "./../boot/tsconfig.build.json"
     },
     {
@@ -23,6 +26,9 @@
     },
     {
       "path": "./../composition/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/background-tasks/tsconfig.build.json"
     },
     {
       "path": "./../context/compaction/tsconfig.build.json"
@@ -122,6 +128,9 @@
     },
     {
       "path": "./../tools/approval/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/background-tasks/tsconfig.build.json"
     },
     {
       "path": "./../tools/browser-tools/tsconfig.build.json"

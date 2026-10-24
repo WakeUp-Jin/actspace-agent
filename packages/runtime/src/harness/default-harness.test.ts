@@ -57,7 +57,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   await root.mount("host", ctx => { for (const [name, value] of Object.entries(ports)) ctx.provide(name, value); }, { provides: Object.keys(ports) });
   root.context.provide?.("session.checkpoint", { flush: async (value: { sessionId: string; throughSeq: number }) => { await sessions.getOpen(value.sessionId)!.flush(value.throughSeq); } });
   const runtime = new AgentRuntimeService(root.context);
-  await root.mount("subagent-host", ctx => { ctx.provide("actspace.host.subagents", runtime.subagents); }, { provides: ["actspace.host.subagents"] });
+  await root.mount("subagent-host", ctx => { ctx.provide("actspace.host.subagents", runtime.subagents); ctx.provide("actspace.host.background-tasks", runtime.backgroundTasks); }, { provides: ["actspace.host.subagents", "actspace.host.background-tasks"] });
   await runtime.initialize(root.context);
   const harnesses = runtime.harnesses;
   // Existing core checkpoint policy stays a Host durability service.

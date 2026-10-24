@@ -22,7 +22,9 @@ import type { MainAgentInbox } from "@actspace/core-agent";
 import type { RunTurnResult } from "@actspace/core-agent";
 import { type CordisContext, type AgentLoopIntervention, type AgentNotification } from "@actspace/cordis-adapter";
 
-export type RunTurnInput = { readonly content: RuntimeV2JsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeV2AgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[] };
+export type RunTurnInput = { readonly content: RuntimeV2JsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeV2AgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[];
+  /** Host wake turn: no user message; the first Step claims pending background notifications. */
+  readonly wake?: boolean };
 type LiveIdentity = {
   readonly parentSessionId?: string;
   readonly parentCallId?: string;
@@ -104,6 +106,8 @@ export class AgentLoop {
     const controller = new AbortController(); this.#active = controller; this.#idle = new Promise<void>((resolve) => { this.#resolveIdle = resolve; });
     const agentRunId = input.agentRunId ?? randomUUID(); const turnId = randomUUID(); let stepCount = 0; let finalText = "";
     try {
+      // A notification read by an earlier Run leaves nothing to deliver; settle without a turn.
+      if (input.wake && !this.options.inbox.hasPendingNotifications()) return Object.freeze({ agentRunId, turnId, reason: "completed", steps: 0, finalText });
       this.notify("agent/session-start", { agentRunId, turnId, sessionId: this.options.session.header.sessionId });
       this.notify("agent/status", { agentRunId, turnId, status: "started" });
       this.emitLive({ kind: "run-state", agentRunId, turnId, message: "started" });
@@ -121,7 +125,7 @@ export class AgentLoop {
         await this.options.session.append(core("permission/mode-set", { mode: configuredPermissionMode, changedAt: new Date().toISOString(), source: "host" }));
       }
       const persistedContent = this.options.contextSources ? input.content : appendRuntimeContext(input.content, mode, modeRevision);
-      if (!hasUserMessage(this.options.session, messageId)) await this.options.session.append(core("user/message", { messageId, agentRunId, turnId }, { surface: { kind: "append", node: { kind: "user", messageId, content: persistedContent } } }));
+      if (!input.wake && !hasUserMessage(this.options.session, messageId)) await this.options.session.append(core("user/message", { messageId, agentRunId, turnId }, { surface: { kind: "append", node: { kind: "user", messageId, content: persistedContent } } }));
       // 旧 journal 的插入记录不能进入新 Run；当前用户输入仅由 Host Task 管理。
       for (const item of this.options.inbox.pending()) if (item.source === "steer" || item.target === "next-turn") await this.options.inbox.discard(item.messageId, "stale-steer");
       while (stepCount < this.options.descriptor.maxSteps) {
@@ -131,7 +135,8 @@ export class AgentLoop {
           if (consumed.messageIds.length) configuration = consumed.configuration;
           for (const messageId of consumed.messageIds) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId, source: "steer" });
         }
-        for (const item of await this.options.inbox.claim()) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId: item.messageId, ...(item.source === undefined ? {} : { source: item.source }) });
+        const opensTurn = input.wake === true && stepCount === 0;
+        for (const item of await this.options.inbox.claim({ opensTurn })) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId: item.messageId, ...(item.source === undefined ? {} : { source: item.source }), ...(opensTurn && item.notice ? { notice: item.notice, content: typeof item.content === "string" ? item.content : JSON.stringify(item.content) } : {}) });
         const stepId = randomUUID(); stepCount += 1;
         const preStep = await this.waterfall("agent/pre-step", { agentRunId, turnId, stepId, stepIndex: stepCount, mode });
         this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "step-started" });
@@ -285,8 +290,8 @@ export class AgentLoop {
           }
         }
         controller.signal.throwIfAborted();
-        // 模型写最后回复时用户插入了消息：回合不结束，下一步开头读到它（仍受 maxSteps 约束）。
-        const steerPending = this.options.inputSource?.hasPending(agentRunId);
+        // 模型写最后回复时用户插入了消息或后台任务发来通知：回合不结束，下一步开头读到它（仍受 maxSteps 约束）。
+        const steerPending = this.options.inputSource?.hasPending(agentRunId) || this.options.inbox.hasPendingNotifications();
         if (output.toolCalls.length === 0 && !budgetSummary && !steerPending) {
           await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "completed", stepCount });
           await this.options.session.append(core("turn/end", { turnId, reason: "completed" }));

@@ -5,18 +5,20 @@ import type { SessionHandle } from "@actspace/session-persistence";
 export type InboxTarget = "next-step" | "next-turn";
 /** 读侧保留旧 journal 的 steer/next-turn；新写入仅用于后台任务通知。 */
 export type InboxSource = "task_notification" | "steer";
-export type InboxItem = { readonly messageId: string; readonly target: InboxTarget; readonly content: RuntimeV2JsonValue; readonly enqueuedSeq: number; readonly source?: InboxSource };
+/** Display metadata for a background task notification; the model reads only `content`. */
+export type InboxNotice = { readonly taskId: string; readonly kind: string; readonly title: string; readonly status: string };
+export type InboxItem = { readonly messageId: string; readonly target: InboxTarget; readonly content: RuntimeV2JsonValue; readonly enqueuedSeq: number; readonly source?: InboxSource; readonly notice?: InboxNotice };
 
 const INBOX_STATE = Symbol("inbox-state");
 
 export class MainAgentInbox {
   constructor(private readonly session: SessionHandle) {}
-  async enqueue(content: RuntimeV2JsonValue): Promise<InboxItem> {
+  async enqueue(content: RuntimeV2JsonValue, notice?: InboxNotice): Promise<InboxItem> {
     const messageId = randomUUID();
     const target = "next-step";
     const source = "task_notification";
-    const event = await this.session.append(core("agent/inbox/spliced", { operation: "enqueue", messageId, target, content, source }));
-    return Object.freeze({ messageId, target, content, enqueuedSeq: event.seq, source });
+    const event = await this.session.append(core("agent/inbox/spliced", { operation: "enqueue", messageId, target, content, source, ...(notice === undefined ? {} : { notice }) }));
+    return Object.freeze({ messageId, target, content, enqueuedSeq: event.seq, source, ...(notice === undefined ? {} : { notice }) });
   }
   pending(): readonly InboxItem[] {
     const pending = this.session.journal.project(INBOX_STATE, () => new Map<string, InboxItem>(), (previous, event) => {
@@ -25,18 +27,21 @@ export class MainAgentInbox {
       if (messageId === null || (target !== "next-step" && target !== "next-turn")) return previous;
       const next = new Map(previous);
       if (data.operation === "enqueue") {
-        const source = inboxSource(data.source);
-        next.set(messageId, { messageId, target, content: data.content ?? null, enqueuedSeq: event.seq, ...(source === undefined ? {} : { source }) });
+        const source = inboxSource(data.source), notice = inboxNotice(data.notice);
+        next.set(messageId, { messageId, target, content: data.content ?? null, enqueuedSeq: event.seq, ...(source === undefined ? {} : { source }), ...(notice === undefined ? {} : { notice }) });
       }
       if (data.operation === "claim" || data.operation === "discard") next.delete(messageId);
       return next;
     });
     return Object.freeze([...pending.values()].sort((a, b) => a.enqueuedSeq - b.enqueuedSeq));
   }
-  async claim(): Promise<readonly InboxItem[]> {
+  /** Undelivered background notifications keep a finished turn going and can wake an idle Session. */
+  hasPendingNotifications(): boolean { return this.pending().some((item) => item.target === "next-step" && item.source === "task_notification"); }
+  /** `opensTurn` marks claims that are the first input of a Host wake turn. */
+  async claim(options: { readonly opensTurn?: boolean } = {}): Promise<readonly InboxItem[]> {
     const items = this.pending().filter((item) => item.target === "next-step" && item.source !== "steer");
     for (const item of items) {
-      await this.session.append(core("agent/inbox/spliced", { operation: "claim", messageId: item.messageId, target: item.target, ...(item.source === undefined ? {} : { source: item.source }) }, {
+      await this.session.append(core("agent/inbox/spliced", { operation: "claim", messageId: item.messageId, target: item.target, ...(item.source === undefined ? {} : { source: item.source }), ...(item.notice === undefined ? {} : { notice: item.notice }), ...(options.opensTurn ? { opensTurn: true } : {}) }, {
         surface: { kind: "append", node: { kind: "user", messageId: item.messageId, content: item.content } },
         provenance: { sourceEventSeqs: [item.enqueuedSeq], contributorIds: ["core/inbox"], runtimeSelectionSeq: null },
       }));
@@ -47,10 +52,15 @@ export class MainAgentInbox {
     const item = this.pending().find((candidate) => candidate.messageId === messageId); if (item === undefined) return false;
     await this.session.append(core("agent/inbox/spliced", { operation: "discard", messageId, target: item.target, reason })); return true;
   }
-  async discardAll(reason: string): Promise<void> { for (const item of this.pending()) await this.discard(item.messageId, reason); }
+  /** Background notifications survive an aborted or failed turn and reach the next Run. */
+  async discardAll(reason: string): Promise<void> { for (const item of this.pending()) if (item.source !== "task_notification") await this.discard(item.messageId, reason); }
 }
 
 function core(type: string, data: RuntimeV2JsonValue, extra: Record<string, unknown> = {}) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null, ...extra } as never; }
 function record(value: RuntimeV2JsonValue): Readonly<Record<string, RuntimeV2JsonValue>> { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }
 function text(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" ? value : null; }
+function inboxNotice(value: RuntimeV2JsonValue | undefined): InboxNotice | undefined {
+  const data = record(value ?? null), taskId = text(data.taskId), kind = text(data.kind), title = text(data.title), status = text(data.status);
+  return taskId === null || kind === null || title === null || status === null ? undefined : { taskId, kind, title, status };
+}
 function inboxSource(value: RuntimeV2JsonValue | undefined): InboxSource | undefined { return value === "task_notification" || value === "steer" ? value : undefined; }

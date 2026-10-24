@@ -78,12 +78,12 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
   });
   registry.register<UsageState>({ key: "providerUsage", stateVersion: 3, init: () => ({ activeStep: null, requests: {}, selected: {}, knownCosts: 0, total: emptyUsage() }), apply: applyUsage, view: state => state.total });
   registry.register<SessionFacts["pendingInbox"]>({
-    key: "pendingInbox", stateVersion: 1, init: () => [], view: state => state,
+    key: "pendingInbox", stateVersion: 2, init: () => [], view: state => state,
     apply: (state, event) => {
       if (event.type !== "agent/inbox/spliced") return state;
       const data = record(event.data); const messageId = text(data.messageId);
       if (!messageId || (data.target !== "next-step" && data.target !== "next-turn")) return state;
-      if (data.operation === "enqueue") return [...state.filter(item => item.messageId !== messageId), { messageId, target: data.target }];
+      if (data.operation === "enqueue") return [...state.filter(item => item.messageId !== messageId), { messageId, target: data.target, ...(data.source === "task_notification" || data.source === "steer" ? { source: data.source } : {}) }];
       if (data.operation === "claim" || data.operation === "discard") return state.filter(item => item.messageId !== messageId);
       return state;
     },

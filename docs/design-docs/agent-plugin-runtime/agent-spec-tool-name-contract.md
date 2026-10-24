@@ -199,7 +199,7 @@ Adapter 只负责协议形状转换，不负责 namespace mapping。这样可以
 
 - `read_file` / `list_directory` 的路径限制、排序、截断、编码和错误语义；
 - `edit_file` / `write_file` / `delete_file` 的副作用和 artifact 行为；
-- `bash` / `bash_output` / `bash_kill` 的 subprocess 协议；
+- `bash` 的 subprocess 协议与后台任务工具 `task_list` / `task_output` / `task_stop` / `task_wait`；
 - Browser Bridge 工具的命令映射和 Host capability 协议；
 - 既有 redaction、结果归一化、fixture 和行为测试。
 

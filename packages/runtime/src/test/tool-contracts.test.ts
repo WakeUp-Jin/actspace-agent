@@ -8,7 +8,7 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 const args: Readonly<Record<string, Record<string, RuntimeV2JsonValue>>> = {
   read_file: { path: "file.txt" }, list_directory: { path: "." }, present: { files: [{ path: "file.txt" }] }, grep: { pattern: "x" }, glob: { pattern: "*" },
   edit_file: { path: "file.txt", old_string: "x", new_string: "y" }, write_file: { path: "file.txt", content: "x" }, delete_file: { path: "file.txt" },
-  bash: { command: "printf x", intent: "test" }, bash_output: { taskId: "task" }, bash_kill: { taskId: "task" },
+  bash: { command: "printf x", intent: "test" },
   web: { action: "search", query: "test" }, web_search: { query: "test" }, web_fetch: { url: "https://example.com" },
   generate_image: { prompt: "test" }, inspect_image: { artifact_id: "image", question: "test" },
 };

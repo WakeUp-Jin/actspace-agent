@@ -18,6 +18,7 @@ import type { RuntimeSessionController } from "../session/session-controller.js"
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
 import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
+import { isBackgroundWake } from "@actspace/shared/runtime-v2";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
 
 const PURPOSE_ROUTE_IDS = new Set(["utility", "auto-review", "explore"]);
@@ -61,7 +62,8 @@ export function apply(ctx: CordisContext): AgentFactoryService {
 
   const createSources = (scope: AgentScope, agent: import("@actspace/core-agent").AgentDescriptor, workspaceRoot: string) => {
     const sources = new ContextSourceRegistry(["context-system", "context-conversation"]);
-    for (const kind of ["system", "rules", "skills", "runtime", "conversation", "tools"]) {
+    // 后台任务清单只给主 Agent：子智能体不能发起后台任务。
+    for (const kind of ["system", "rules", "skills", "runtime", "conversation", "tools", ...(agent.kind === "main" ? ["background-tasks"] : [])]) {
       const factory = ctx.get?.(`context.source.${kind}`) as SourceFactory | undefined;
       if (!factory && (kind === "system" || kind === "conversation")) throw new Error(`Required context source ${kind} is unavailable.`);
       if (factory) scope.disposer.add(sources.register(factory.create({ scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt })));
@@ -191,7 +193,7 @@ export function apply(ctx: CordisContext): AgentFactoryService {
       return {
         execute: async () => {
           input.signal.throwIfAborted();
-          const result = await assembly.loop.runTurn({ ...input.configuration, content: taskContent(input.initial.content), messageId: input.initial.taskId, agentRunId: input.runId });
+          const result = await assembly.loop.runTurn({ ...input.configuration, content: taskContent(input.initial.content), messageId: input.initial.taskId, agentRunId: input.runId, ...(isBackgroundWake(input.initial.content) ? { wake: true } : {}) });
           return { outcome: result.reason === "aborted" ? "cancelled" : result.reason === "completed" ? "completed" : "failed", value: result };
         },
         dispose: async () => {

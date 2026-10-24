@@ -45,16 +45,13 @@ export function BashRunBlock({ message, replyCompleted = false, onExpand }: { me
   return <BashExecutionBlock message={message} replyCompleted={replyCompleted} onExpand={onExpand} />;
 }
 
-const BASH_BACKGROUND_BADGE_CLASS =
-  "bash-background-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
+/** 后台 Bash 与后台子 Agent 共用的「后台」标签；状态仍由卡片自身的状态表达。 */
+export const BACKGROUND_TAG_CLASS =
+  "background-tag inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
 
-const BACKGROUND_BADGE_TEXT: Record<NonNullable<BashMessage["backgroundStatus"]>, string> = {
-  running: "后台运行中",
-  completed: "后台完成",
-  failed: "后台失败",
-  killed: "已终止",
-  stalled: "疑似等待输入",
-};
+export function BackgroundTag() {
+  return <span className={BACKGROUND_TAG_CLASS}>后台</span>;
+}
 
 // 沙盒标签：沙盒是默认态弱化显示；真实环境是例外态，醒目提示用户命令未受沙盒约束
 const BASH_SANDBOX_BADGE_CLASS =
@@ -81,9 +78,7 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
   const summary = getExecutionSummary(message);
   const target = message.commandPreview || message.command || "Bash command";
   // 前台执行中 / 后台仍在跑：标题走 shimmer 高光，让用户看出命令正在执行
-  const isActive =
-    message.status === "running" &&
-    (message.backgroundStatus === undefined || message.backgroundStatus === "running");
+  const isActive = message.status === "running";
 
   return (
     <article className={`${BASH_RUN_CLASS} is-${message.status}`}>
@@ -106,9 +101,7 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
         <span className={BASH_COMMAND_PREVIEW_CLASS} title={target}>{target}</span>
         <span className={BASH_RUN_TRAILING_CLASS}>
           <EnvironmentBadge sandboxed={message.sandboxed === false ? false : undefined} notExecuted={message.notExecuted} />
-          {message.backgroundStatus ? (
-            <span className={BASH_BACKGROUND_BADGE_CLASS}>{BACKGROUND_BADGE_TEXT[message.backgroundStatus]}</span>
-          ) : null}
+          {message.background ? <BackgroundTag /> : null}
           {chevron}
         </span>
       </button>

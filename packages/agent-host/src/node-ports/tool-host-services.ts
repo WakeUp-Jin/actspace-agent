@@ -15,7 +15,7 @@ export function createNodeToolHostServices(options: { readonly onShellProcesses?
     [FILESYSTEM_READ_HOST_PORT_ID]: { createPorts: () => createFilesystemread(options) },
     [FILESYSTEM_SEARCH_HOST_PORT_ID]: { createPorts: () => createFilesystemsearch(options) },
     [FILESYSTEM_WRITE_HOST_PORT_ID]: { createPorts: () => createFilesystemwrite(options) },
-    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: () => { const ports = createShelltools(options); options.onShellProcesses?.(ports); return ports; } },
+    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: (background?: Parameters<typeof createShelltools>[0]["background"]) => { const ports = createShelltools({ ...options, background }); options.onShellProcesses?.(ports); return ports; } },
     [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({ credentials, deepseekFetchApiKey: process.env.ACTSPACE_DEEPSEEK_FETCH === "1" ? process.env.DEEPSEEK_API_KEY : undefined }) },
     [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => createImagegeneration({ generation: apiKey && baseUrl && model ? { apiKey, baseUrl, model } : undefined }) },
     [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmService, recorder: import("@actspace/llm-service").AuxiliaryRequestRecorder) => createImageinspection({ readArtifact: options.readArtifact, inspect: createLlmImageInspector({ llm, recorder, routeId: "default", model: options.model }) }) },

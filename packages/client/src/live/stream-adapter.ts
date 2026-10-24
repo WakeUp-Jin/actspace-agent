@@ -102,6 +102,10 @@ export class FixedRendererStreamAdapter {
     if (event.kind === "inbox-claimed") {
       // 任务通知只给模型看；用户插入的消息要立刻出现在当前回合里。
       if (event.source === "steer") this.#emit({ type: "user_message_steered", ...ids, messageId: event.messageId });
+      const notice = event.notice;
+      if (event.source === "task_notification" && notice && (notice.kind === "bash" || notice.kind === "agent")) {
+        this.#emit({ type: "background_notice_claimed", ...ids, messageId: event.messageId, content: event.content ?? "", notice: { taskId: notice.taskId, taskKind: notice.kind, title: notice.title, status: notice.status } });
+      }
       return;
     }
     const key = this.#key(event.sessionId, event.agentRunId, event.callId);

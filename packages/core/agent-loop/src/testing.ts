@@ -44,6 +44,7 @@ export async function runToolStreamFixture(options: {
   usage?: import("@actspace/llm-service").LlmUsage;
   contextWindow?: number;
   onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void;
+  wake?: boolean;
 } = {}) {
   const registry = createCoreCodecRegistry();
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({
@@ -98,7 +99,7 @@ export async function runToolStreamFixture(options: {
   });
   options.onLoop?.(loop, inbox);
   try {
-    const result = await loop.runTurn({ content: options.content ?? "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test" });
+    const result = await loop.runTurn({ content: options.content ?? "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test", ...(options.wake ? { wake: true } : {}) });
     if (options.followup) await loop.runTurn({ content: "Continue without tools", mode: options.mode });
     return { result, events, journal: [...session.journal.events], header: session.header, registry };
   } finally { options.onJournal?.([...session.journal.events]); await session.close(); await handle.dispose(100); }

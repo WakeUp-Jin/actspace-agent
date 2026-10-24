@@ -33,13 +33,14 @@ function BlockView({ block, sessionId }: { readonly block: MessageBlock; readonl
     case "todo": return <TodoCard todos={block.todos} completedCount={block.completedCount} />;
     case "error": return <ErrorRow title={block.title} content={block.content} />;
     case "status":
-    case "context_compaction": return <EventRow block={block} />;
+    case "context_compaction":
+    case "background_notice": return <EventRow block={block} />;
     default: return <GenericToolRow block={block} />;
   }
 }
 
 // 单行过程（工具行、思考）之间 5px，其余块之间 14px。
-const LINE_KINDS: ReadonlySet<string> = new Set(["assistant", "todo", "error", "status", "context_compaction", "user"]);
+const LINE_KINDS: ReadonlySet<string> = new Set(["assistant", "todo", "error", "status", "context_compaction", "background_notice", "user"]);
 const isLine = (item: TranscriptItem) => item.type === "explore" || !LINE_KINDS.has(item.block.kind);
 
 export function ItemView({ item, sessionId }: { readonly item: TranscriptItem; readonly sessionId: string }) {

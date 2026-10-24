@@ -238,7 +238,7 @@ export class SessionObserver {
   }
 
   #onStream(event: RuntimeStreamEvent): void {
-    if (event.type === "bash_task_update" || event.sessionId !== this.sessionId) return;
+    if (event.sessionId !== this.sessionId) return;
     const stream = event as StreamEvent, id = stream.agentRunId, terminal = TERMINAL.has(stream.type);
     if (stream.type === "agent_run_started" && this.#live.isTerminal(id)) return;
     if (terminal) this.#live.markTerminal(id);

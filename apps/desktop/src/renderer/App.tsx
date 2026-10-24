@@ -95,7 +95,6 @@ const selectComposerState = (state: SessionLocalState) => state.composer;
 const selectApprovalPending = (state: SessionLocalState) => state.approvalPending;
 const selectFailed = (state: SessionLocalState) => state.failed;
 const selectUnread = (state: SessionLocalState) => state.unread;
-const selectBashUpdates = (state: SessionLocalState) => state.bashUpdates;
 const selectDraft = (state: SessionLocalState) => state.draft ?? null;
 const selectCompactionFailure = (state: SessionLocalState) => state.compactionFailure ?? null;
 const selectMessageQueue = (state: SessionLocalState) => state.messageQueue;
@@ -220,7 +219,6 @@ export function App() {
   // 流式增量按帧通知：一帧里来多少个 delta，App 都只渲染一次。
   const [liveRuns] = useState(() => createLiveRunStore(TERMINAL_RUN_LIMIT, { scheduleNotify: scheduleFrame }));
   const [taskQueue] = useState(createTaskQueueStore);
-  // 后台 bash 任务状态（taskId → 最新状态）；bash_task_update 事件驱动，覆写块显示
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
   const [composerFocusRequestId, setComposerFocusRequestId] = useState(0);
   const [defaultModelId, setDefaultModelId] = useState<ModelSelectionId | undefined>(undefined);
@@ -260,7 +258,6 @@ export function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const { blocks: streamingBlocks, isStreaming, isAborting, runId: activeAgentRunId, recovered: isRecoveredRun } = useLiveRunView(liveRuns, selectedSessionId);
   // 当前会话的本地状态直接从 store 选取；切换会话不再需要逐项复制（14 T6）。
-  const bashTaskUpdates = useSessionLocalState(localStore, selectedSessionId, selectBashUpdates);
   const composerDraftRestore = useSessionLocalState(localStore, selectedSessionId, selectDraft);
   const compactionFailure = useSessionLocalState(localStore, selectedSessionId, selectCompactionFailure);
   const messageQueue = useSessionLocalState(localStore, selectedSessionId, selectMessageQueue);
@@ -756,7 +753,7 @@ export function App() {
         run.recovered = false;
         void refreshTaskQueue(event.sessionId);
       }
-      if (event.type !== "bash_task_update" && run && run.agentRunId !== event.agentRunId) return;
+      if (run && run.agentRunId !== event.agentRunId) return;
       if ((event.type === "tool_approval_required" || event.type === "tool_approval_resolved") &&
         run?.agentRunId === event.agentRunId && run.state.activeTools.get(event.toolCallId)?.terminalStatus) return;
       if (event.type === "tool_approval_required") {
@@ -779,12 +776,6 @@ export function App() {
         if (event.type === "agent_run_finished" && activeSessionIdRef.current !== event.sessionId) setLocalFlag(event.sessionId, "unread", true);
       } else if (event.type === "agent_run_failed") {
         setFailedForSession(event.sessionId, true);
-      }
-
-      if (event.type === "bash_task_update") {
-        const updates = { ...localStore.get(event.sessionId).bashUpdates, [event.taskId]: { status: event.status, exitCode: event.exitCode } };
-        patchLocal(event.sessionId, { bashUpdates: updates });
-        return;
       }
 
       handleStreamEvent(event);
@@ -1121,8 +1112,8 @@ export function App() {
   const messages = useMemo<MessageBlock[]>(() => mergeTranscript(
     { blocks: sessionRecord?.messageBlocks, events: persistedEvents },
     { blocks: streamingBlocks, runId: activeAgentRunId, recovered: isRecoveredRun },
-    { compactionFailure, isStreaming, bashUpdates: bashTaskUpdates },
-  ), [sessionRecord?.messageBlocks, persistedEvents, streamingBlocks, activeAgentRunId, isRecoveredRun, compactionFailure, isStreaming, bashTaskUpdates]);
+    { compactionFailure, isStreaming },
+  ), [sessionRecord?.messageBlocks, persistedEvents, streamingBlocks, activeAgentRunId, isRecoveredRun, compactionFailure, isStreaming]);
   const isCompacting = streamingBlocks.some((block) => block.kind === "context_compaction" && block.status === "running");
 
   const contextSnapshot: ContextUsageSnapshot | null =

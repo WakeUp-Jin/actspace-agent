@@ -83,6 +83,15 @@ describe("live run store", () => {
       ["user", "turn:run-1:user:0"], ["assistant", "turn:run-1:assistant:0"], ["user", "turn:run-1:steer:m-1"], ["status", "turn:run-1:model-wait"],
     ]);
   });
+
+  it("puts the background notice divider first in a wake run and keys it like the durable block", () => {
+    const store = createLiveRunStore();
+    store.start(run("s1", "run-w"));
+    const notice = { taskId: "bash_1", taskKind: "bash", title: "pnpm test", status: "completed" };
+    store.applyStreamEvent({ type: "assistant_text_delta", sessionId: "s1", agentRunId: "run-w", delta: "done" } as never, () => undefined);
+    store.applyStreamEvent({ type: "background_notice_claimed", sessionId: "s1", agentRunId: "run-w", messageId: "n-1", notice, content: "<task_notification/>" } as never, () => undefined);
+    expect(store.view("s1").blocks[0]).toMatchObject({ kind: "background_notice", id: "turn:run-w:background-notice:0", renderKey: "turn:run-w:background-notice:0", ...notice });
+  });
 });
 
 describe("task queue store", () => {

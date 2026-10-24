@@ -81,17 +81,17 @@ describe("BashRunBlock tooltips", () => {
       kind: "bash",
       createdAt: "2026-07-03T00:00:00.000Z",
       title: "Bash command (background)",
-      status: "running",
       command: "pnpm build",
       backgroundTaskId: "bash_ghi789",
-      backgroundStatus: "completed",
+      background: true,
+      status: "success",
     });
 
-    const summary = screen.getByText("Running");
+    const summary = screen.getByText("Ran");
     expect(summary).not.toHaveClass("tool-log-text-running");
   });
 
-  it("shows a background badge for backgrounded commands", () => {
+  it("shows a single background tag for backgrounded commands", () => {
     renderBash({
       id: "bash-bg-1",
       kind: "bash",
@@ -100,27 +100,11 @@ describe("BashRunBlock tooltips", () => {
       status: "running",
       command: "pnpm dev",
       backgroundTaskId: "bash_abc123",
-      backgroundStatus: "running",
+      background: true,
       outputFilePath: "/tmp/tool-output/s1/x-bash.txt",
     });
 
-    expect(screen.getByText("后台运行中")).toBeInTheDocument();
-  });
-
-  it("shows the terminal background state after a task update", () => {
-    renderBash({
-      id: "bash-bg-2",
-      kind: "bash",
-      createdAt: "2026-07-03T00:00:00.000Z",
-      title: "Bash command (background)",
-      status: "running",
-      command: "pnpm build",
-      backgroundTaskId: "bash_def456",
-      backgroundStatus: "completed",
-      exitCode: 0,
-    });
-
-    expect(screen.getByText("后台完成")).toBeInTheDocument();
+    expect(screen.getByText("后台")).toBeInTheDocument();
   });
 
   it("keeps routine sandbox metadata in execution details", async () => {

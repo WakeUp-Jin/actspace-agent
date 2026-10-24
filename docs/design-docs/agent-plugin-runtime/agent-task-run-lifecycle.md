@@ -22,6 +22,16 @@ Task 保存内容、稳定 taskId/submissionId、顺序和消费目标，不保�
 
 指定插入、撤回及结束时未读归队都保留 taskId。已领取输入不能撤回或重放。取消/排序使用 revision；并发领取和编辑只有一个获胜。停止、失败、Host 恢复暂停队列；发送新输入不解除暂停。`/compact` 占同一调度槽，但没有 Loop Run。
 
+### 后台任务唤醒（2026-10-22）
+
+后台任务完成通知进入收件箱后，Host 可能提交一个唤醒任务 `{ "kind": "background-wake" }`（`isBackgroundWake`），规则见 [后台任务](../collaboration/agent-background-tasks.md)「唤醒」：
+
+- 只在会话调度器已打开、未暂停、未 drain、没有运行中 Run 或维护操作、队列为空、收件箱有待读通知、且没有尚未执行的唤醒任务时提交；Run 与维护操作结算后在 `kick()` 前再检查一次。
+- 用户停止导致的暂停不唤醒；唤醒 Run 未正常完成时暂缓后续唤醒，直到用户提交新任务。
+- TaskLedger 领取唤醒任务不写 `user/message`；RunFactory 以 `runTurn({ wake: true })` 执行，Loop 第一步领取通知并在 claim 事件上标 `opensTurn`；什么都没领到就以 `completed` 结束、不调模型。
+- 客户端队列、运行中用户块和会话标题都跳过唤醒任务；聊天里该回合以分隔行开头。
+- `background/task` 是 required codec 的 core 扩展事件，旧二进制不能继续写入含它的 Journal。
+
 ## 持久化与客户端
 
 `plugin/actspace.agent-service/{task,run,queue}` 使用 required codec。每次成功提交后才发布新快照；flush 失败不会把内存 Journal 当成持久事实回复。Fork 按 sessionId 隔离调度记录。

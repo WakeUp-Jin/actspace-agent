@@ -22,7 +22,7 @@ export type LiveRunView = {
   readonly recovered: boolean;
 };
 
-export type StreamEvent = Exclude<RuntimeStreamEvent, { type: "bash_task_update" }>;
+export type StreamEvent = RuntimeStreamEvent;
 
 export interface LiveRunStore {
   get(sessionId: string): SessionRunState | undefined;
@@ -132,6 +132,14 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
           },
         });
         state.waitingForModel = true;
+        break;
+      }
+
+      case "background_notice_claimed": {
+        // id 与 durable 选择器的 renderKey 一致，run 结束后由 durable 块接手同一行。
+        const id = `turn:${event.agentRunId}:background-notice:0`;
+        if (state.segments.some((segment) => segment.type === "background_notice")) break;
+        state.segments.unshift({ type: "background_notice", block: { kind: "background_notice", id, renderKey: id, runId: event.agentRunId, content: event.content, createdAt: new Date().toISOString(), ...event.notice } });
         break;
       }
 

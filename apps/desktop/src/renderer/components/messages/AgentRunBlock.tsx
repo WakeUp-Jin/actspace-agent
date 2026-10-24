@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import "./agent-activity.css";
 import { AgentAvatar, AgentStatus } from "./AgentIdentity";
+import { BackgroundTag } from "./BashRunBlock";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 
@@ -77,6 +78,7 @@ export function AgentRunBlock({
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className={HEADER_CLASS}>
             <span className={`${NAME_CLASS} flex-1`} title={message.description}>{message.description || message.displayText || kindLabel(message)}</span>
+            {message.background ? <BackgroundTag /> : null}
             <AgentStatus status={message.status} />
           </div>
           <div className="flex min-w-0 items-center gap-1.5">

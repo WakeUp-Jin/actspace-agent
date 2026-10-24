@@ -29,6 +29,7 @@
 
 - [子智能体轨迹](completed/20261021-subagent-trajectory.md)：父轨迹只留 `agent` 一行，详情「查看轨迹」在右侧子 Agent 面板打开子会话轨迹（对话 / 轨迹切换，窄面板详情在下半部分）；desktop 1920 项测试通过，浏览器 mock 截图完成；Electron 真实子智能体未验证，见[执行摘要](../exec-runs/20261021-subagent-trajectory/execution-summary.md)与[验收交接](../exec-runs/20261021-subagent-trajectory/acceptance-handoff.md)。
 
+- [后台任务：后台 Bash、后台子智能体与任务工具](completed/20261022-background-tasks.md)：T1–T10 完成（feat/background-tasks 已合并入 fix/settings-model-select）；统一登记表、空闲唤醒、`task_*` 四个工具、后台子 Agent、任务清单上下文、「后台」标签与唤醒分隔行；浏览器 mock 截图完成；Electron 未验证，见[执行摘要](../exec-runs/20261022-background-tasks/execution-summary.md)。
 - [设置 › 模型：四层数据模型与页面重做](completed/20261021-model-provider-redesign.md)：A–E 完成，旧 provider 页面、多 Key、billingMode 与旧 IPC 删除；desktop main 512、renderer 1388、shared 179 通过，浏览器 mock 截图完成；Electron 与真实 Key 未验证，见[执行摘要](../exec-runs/20261021-model-provider-redesign/execution-summary.md)。
 - [设置 › 模型：获取可用模型与连接详情重做](completed/20261021-model-acquisition-picker.md)：去掉启用开关（迁移删掉停用模型）、所有连接用「获取可用模型」弹窗手动勾选、新连接为空并自动弹窗、手动添加按 ID 自动补全、行内移除 + 8 秒撤销、连接字段失焦即保存；desktop 1926 项测试通过，浏览器 mock 截图完成；Electron 与真实 Key 未验证，见[执行摘要](../exec-runs/20261021-model-acquisition-picker/execution-summary.md)与[验收交接](../exec-runs/20261021-model-acquisition-picker/acceptance-handoff.md)。
 

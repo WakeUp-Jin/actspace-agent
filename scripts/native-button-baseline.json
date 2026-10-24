@@ -28,6 +28,7 @@
   "components/extensions/ExtensionsPage.tsx": 2,
   "components/extensions/SkillsSection.tsx": 1,
   "components/messages/AgentRunBlock.tsx": 1,
+  "components/messages/BackgroundNoticeRow.tsx": 1,
   "components/messages/BashRunBlock.tsx": 2,
   "components/messages/CompactCommandBlock.tsx": 3,
   "components/messages/FileDiffBlock.tsx": 2,

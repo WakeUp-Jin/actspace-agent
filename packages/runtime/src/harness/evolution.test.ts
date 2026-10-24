@@ -64,7 +64,7 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
   await root.mount("host", ctx => { for (const [name, value] of Object.entries(ports)) ctx.provide(name, value); }, { provides: Object.keys(ports) });
   root.context.provide?.("session.checkpoint", { flush: async (value: { sessionId: string; throughSeq: number }) => sessions.getOpen(value.sessionId)!.flush(value.throughSeq) });
   runtime = new AgentRuntimeService(root.context);
-  await root.mount("subagent-host", ctx => ctx.provide("actspace.host.subagents", runtime.subagents), { provides: ["actspace.host.subagents"] });
+  await root.mount("subagent-host", ctx => { ctx.provide("actspace.host.subagents", runtime.subagents); ctx.provide("actspace.host.background-tasks", runtime.backgroundTasks); }, { provides: ["actspace.host.subagents", "actspace.host.background-tasks"] });
   await runtime.initialize(root.context);
   try {
     await sessions.create("local", undefined, "agent");
@@ -92,7 +92,7 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
     await root.mount("host", ctx => { for (const [name, value] of Object.entries(ports)) ctx.provide(name, value); }, { provides: Object.keys(ports) });
     root.context.provide?.("session.checkpoint", { flush: async (value: { sessionId: string; throughSeq: number }) => sessions.getOpen(value.sessionId)!.flush(value.throughSeq) });
     runtime = new AgentRuntimeService(root.context);
-    await root.mount("subagent-host", ctx => ctx.provide("actspace.host.subagents", runtime.subagents), { provides: ["actspace.host.subagents"] });
+    await root.mount("subagent-host", ctx => { ctx.provide("actspace.host.subagents", runtime.subagents); ctx.provide("actspace.host.background-tasks", runtime.backgroundTasks); }, { provides: ["actspace.host.subagents", "actspace.host.background-tasks"] });
     await runtime.initialize(root.context);
     expect(await runtime.hmr.inspect("local")).toEqual(binding);
     phase = "recovered"; step = 0;

@@ -708,7 +708,7 @@ describe("session selectors", () => {
           title: "Bash command (background)",
           command: "pnpm dev",
           backgroundTaskId: "bash_abc123",
-          backgroundStatus: "running",
+          background: true,
           outputFilePath: "/tmp/tool-output/s1/x-bash.txt",
           sandboxed: true,
         },
@@ -719,7 +719,7 @@ describe("session selectors", () => {
       kind: "bash",
       status: "running",
       backgroundTaskId: "bash_abc123",
-      backgroundStatus: "running",
+      background: true,
       outputFilePath: "/tmp/tool-output/s1/x-bash.txt",
       sandboxed: true,
     });
