@@ -33,6 +33,31 @@
   - 可选依赖作为 T5 的子任务补进准入：组合里有提供者时照常注入（保证启动顺序），没有时不注入，并把该名字隔离，防止拿到 Host 上的同名服务。
 - **验证**：上述命令输出见本步骤结论；实验脚本在 `tmp/sandbox-spike/scripts/`。
 
+### 步骤 2：T1 沙箱管理器 `@actspace/sandbox`
+
+- **操作**：新建 `packages/sandbox/manager`：契约（`types.ts`）、策略合并与指纹（`policy.ts`）、后端选择（`select.ts`）、执行生命周期（`execution.ts`）、服务（`service.ts`）、Host 端 Node 实现（`node-ports.ts`）、清单与插件。
+- **影响文件**：`packages/sandbox/manager/**`。
+- **验证**：`pnpm --filter @actspace/sandbox test` 24 个通过；`typecheck` 通过。提交 `db6b1521`。
+
+### 步骤 3：T2 Seatbelt 后端 `@actspace/sandbox-seatbelt`
+
+- **操作**：把 shell-tools 的 SBPL 生成与探测搬进 `packages/sandbox/seatbelt`，路径来自策略，断网时去掉 `(allow network*)`。
+- **影响文件**：`packages/sandbox/seatbelt/**`。
+- **验证**：`pnpm --filter @actspace/sandbox-seatbelt test` 6 个通过，含本机真实执行：写工作区成功，写 HOME、`.git/hooks`、`.git/config` 失败，`~/.ssh` 读不到，断网生效。提交 `65800f78`。
+
+### 步骤 4：T3 nono 后端 `@actspace/sandbox-nono`
+
+- **操作**：新建 `packages/sandbox/nono`：`cover.ts`（拆分覆盖，文件系统可注入）、`config.ts`（macOS profile / Linux 权限清单）、`backend.ts`（探测、准备、去掉 `NONO_*`）、清单与插件。
+- **影响文件**：`packages/sandbox/nono/**`。
+- **实现中的发现**：
+  1. **按计划把 `denyRead` 全部拆开，macOS 上每次执行约 900ms。** 模板的禁止读取列表含十几个 `~/Library` 下的路径，拆开后本机约 1100 条授权；nono 的准备时间随条目数增长（约 110 条时 40ms）。改为 macOS 只围绕 nono 受保护目录拆分，`denyRead` 写成 `(deny file-read* …)` 规则。实测：规则拒绝生效（包括 nono 自带规则组不覆盖的路径），经 `/System/Volumes/Data/...` 访问同样被拒；`zsh -lc true` 端到端 57–87ms。
+  2. **单独授权的符号链接按目标生效。** 若链接指向排除路径之内或之上（如 `~/x -> ~/.ssh`），授权它就绕过了排除，因此跳过；整体授权的目录里的链接不受影响（访问时按真实路径判断）。
+  3. **nono 的 CLI 模式会自动加入系统读取组**（macOS 含 `/private/var`）。测试若把假 HOME 放在系统临时目录下，nono 会因“授权覆盖受保护目录”拒绝启动；测试的假 HOME 改放包内 `node_modules/.cache`。真实 HOME 在 `/Users` 下不受影响。
+  4. **准备阶段提前拒绝 nono 必然失败的策略**：环境变量缺 `HOME`、可写路径与 nono 受保护目录重叠、可写路径不存在，都在 `prepare` 抛错（结果为 `prepare_failed`），不留到运行时。
+- **验证**：
+  - macOS（本机 Darwin 25.3.0 arm64，nono 0.80.0）：`ACTSPACE_NONO_PATH=tmp/sandbox-spike/ex/nono pnpm --filter @actspace/sandbox-nono test` 14 个通过。
+  - Linux（Docker `node:22-bookworm-slim`，内核 6.12.76-linuxkit，arm64，nono 0.80.0，root 运行）：13 个通过、1 个按平台跳过（`.git` 写入拒绝仅 macOS）。
+
 ## 遇到的问题
 
 - **问题**：权限清单的 `deny` 不生效。

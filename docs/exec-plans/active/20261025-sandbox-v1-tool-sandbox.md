@@ -170,8 +170,8 @@ export interface SandboxService {
 
 ### T3 `packages/sandbox/nono`（`@actspace/sandbox-nono`）
 
-- `src/cover.ts`：`coverReadable(excluded, fs)` 实现 T0 的拆分覆盖：从 `/` 开始，不是排除路径上级的目录整体授权，是上级的展开子项递归，排除路径本身跳过，符号链接按目标类型授权、目标不存在的跳过。排除集合为 `denyRead` 加 nono 受保护目录（`~/.nono`、`$XDG_STATE_HOME/nono`，默认 `~/.local/state/nono`）。文件系统访问通过参数注入，便于测试。
-- `src/config.ts`：纯函数。macOS 生成 profile：`filesystem.read` / `read_file` 为拆分覆盖结果，`allow` 为 `readWrite`，`allow_file` 为 `/dev/null`，`bypass_protection` 为登录 shell 会读取的配置文件（zsh：`~/.zshenv` `~/.zprofile` `~/.zlogin`；bash：`~/.bash_profile` `~/.bash_login` `~/.profile`），`unsafe_macos_seatbelt_rules` 为 `denyWrite` 的 `(deny file-write* …)`（路径做 SBPL 字符串转义），`network.block` 按策略设置。Linux 生成权限清单：`grants` 为拆分覆盖结果加 `readWrite`，`network.mode` 为 `unrestricted` / `blocked`，`rollback.enabled: false`，不写 `deny`（nono 清单模式忽略它）。
+- `src/cover.ts`：`coverReadable(roots, excluded, fs)` 实现 T0 的拆分覆盖：从 `/` 开始，不是排除路径上级的目录整体授权，是上级的展开子项递归，排除路径本身跳过，符号链接按目标类型授权、目标不存在的跳过。符号链接的目标落在排除路径之内或之上时也跳过（nono 按目标授权，否则会绕过排除）。排除集合：Linux 为 `denyRead` 加 nono 受保护目录（`~/.nono`、`$XDG_STATE_HOME/nono`，默认 `~/.local/state/nono`）；macOS 只排除受保护目录（`denyRead` 改用 Seatbelt 规则，见下）。文件系统访问通过参数注入，便于测试。
+- `src/config.ts`：纯函数。macOS 生成 profile：`filesystem.read` / `read_file` 为拆分覆盖结果，`allow` 为 `readWrite`，`allow_file` 为 `/dev/null`，`bypass_protection` 为登录 shell 会读取的配置文件（zsh：`~/.zshenv` `~/.zprofile` `~/.zlogin`；bash：`~/.bash_profile` `~/.bash_login` `~/.profile`），`unsafe_macos_seatbelt_rules` 为 `denyRead` 的 `(deny file-read* …)` 与 `denyWrite` 的 `(deny file-write* …)`（路径做 SBPL 字符串转义；读取限制用规则而不靠拆分，授权条目从约 1100 条降到约 110 条，单次耗时从约 900ms 降到约 40ms），`network.block` 按策略设置。Linux 生成权限清单：`grants` 为拆分覆盖结果加 `readWrite`，`network.mode` 为 `unrestricted` / `blocked`，`rollback.enabled: false`，不写 `deny`（nono 清单模式忽略它）。
 - `src/backend.ts`：`createNonoBackend(host)`，`priority: 100`，`id: "nono"`。没有 `host.resources.nonoPath` 时不可用（原因写明“未找到打包的 nono”）。`probe()` 执行 `<nonoPath> --version`（3 秒超时）解析版本，并执行一次 `wrap` 空命令确认可用（Linux 上同时确认 Landlock）。`prepare()` 把配置写到 `scratchDir`，macOS 返回 `["wrap", "-s", "--no-diagnostics", "-p", profilePath, "--", ...argv]`，Linux 返回 `["wrap", "-s", "--no-diagnostics", "-c", manifestPath, "--", ...argv]`；传给 nono 的环境变量去掉所有 `NONO_*`；`dispose` 删除配置文件。
 - 能力：`filesystem.write`、`filesystem.read-deny`、`network.blocked`、`process.inherit` 为 `full`；`filesystem.write-deny` 在 macOS 为 `full`、Linux 为 `unsupported`（因此第一期 Linux 的 bash 走审批）；`network.allowlist` 为 `unsupported`（第二期由 `run` 模式提供）。
 - `src/plugin.ts`：同 T2。
@@ -279,9 +279,9 @@ T0 → T1 →（T2、T3、T4 可并行）→ T5 → T6 →（T7 可与 T6 并行
 ## 进度记录
 
 - [x] T0 实测（结论见执行过程步骤 1）
-- [ ] T1 manager
-- [ ] T2 seatbelt
-- [ ] T3 nono
+- [x] T1 manager
+- [x] T2 seatbelt
+- [x] T3 nono
 - [ ] T4 nono 获取与打包
 - [ ] T5 注册与 Host 端口
 - [ ] T6 shell-tools 接入
@@ -296,6 +296,7 @@ T0 → T1 →（T2、T3、T4 可并行）→ T5 → T6 →（T7 可与 T6 并行
 - 2026-10-25：用户否决“沙箱放在 Host”与“第一期只做准备启动”，确认 D1–D6：沙箱是可替换的 Harness 插件；第一期打完整地基；nono > Seatbelt；缺失或不可用时转审批；只用打包的 nono；继承模式只能由显式配置打开。
 
 - 2026-10-25：T0 实测后用户确认：`filesystem.write-deny`（`.git/hooks`、`.git/config`）列为 `tool` 模板必需能力，Linux 上 nono 不合格，第一期 Linux 的 bash 走审批；接受 nono 拦截钥匙串，沙箱内推送需申请沙箱外执行。nono 在 macOS 用 profile 模式、Linux 用权限清单模式，读取限制用拆分覆盖表达。
+- 2026-10-25：T3 实现中发现 macOS 上把 `denyRead` 的上级全部拆开会产生约 1100 条授权，nono 每次启动约 900ms；改为 macOS 只围绕 nono 受保护目录拆分，`denyRead` 写成 `(deny file-read* …)` 规则（实测拒绝生效，经 `/System/Volumes/Data` 访问同样被拒），约 40ms。Linux 仍靠不授权表达。语义不变，执行摘要记录。
 
 ## 执行模式
 
