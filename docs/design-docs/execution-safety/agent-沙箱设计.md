@@ -82,6 +82,7 @@ flowchart TD
 |---|---|
 | `filesystem.write` | 限制写入范围 |
 | `filesystem.read-deny` | 禁止读取指定路径 |
+| `filesystem.write-deny` | 在可写目录中禁止写入指定路径（如工作区的 `.git/hooks`、`.git/config`） |
 | `network.blocked` | 完全断网 |
 | `network.allowlist` | 只放行指定域名 |
 | `process.inherit` | 后代进程继承限制 |
@@ -111,7 +112,10 @@ flowchart TD
 
 - 工具沙箱用 `nono wrap`：nono 施加限制后直接变成目标命令，不留常驻进程。用户在 Mac 上实测，比直接用 Seatbelt 每次多 4–5ms。我们拿到的进程号就是目标命令本身，终止进程组即可覆盖后代进程。
 - `nono run` 留给评估沙箱：supervisor 在 Mac 上让短命令多出约 200ms、多占约 17MB，但能提供域名代理、凭证注入、审计和回滚。后端契约里同时有两种模式，第一期只实现 `wrap`。
-- 策略用权限清单（`-c manifest.json`）一次性给出，不拼命令行参数。
+- 策略用配置文件一次性给出，不拼命令行参数：Linux 用权限清单（`-c`），macOS 用 profile（`-p`）。原因是 nono 权限清单的 `deny` 不生效，只有 macOS profile 的 Seatbelt 规则能在可写的工作区里禁止写入 `.git/hooks`、`.git/config`。
+- “全部可读，减去凭据目录”用拆分覆盖表达：从 `/` 开始，不含排除路径的目录整体授权，含排除路径的展开子项。nono 不允许授权它自己状态目录的上级（`/`、`$HOME`），拆分覆盖同时绕开这个限制。
+- Linux（Landlock）无法在可写目录里挖出只读子目录，`filesystem.write-deny` 报告 `unsupported`，第一期 Linux 上 nono 不合格，bash 走审批。
+- 启动 nono 时去掉所有 `NONO_*` 环境变量，它们会改变 nono 的授权。
 - 分发：打包 `aarch64/x86_64-apple-darwin` 与 `aarch64/x86_64-unknown-linux-gnu` 四个版本，锁定版本号、校验 SHA256，macOS 上随应用签名。nono 采用 Apache-2.0 许可证。
 - 只按明确的路径查找 nono：打包路径 → `ACTSPACE_NONO_PATH` → 仓库 `dist/sandbox-components/`。不在 PATH 里查找，系统里装的也不用：版本无法保证一致，也无法确认是否被替换过。
 - 不使用 Node SDK `nono-ts`：它只能对当前进程施加限制，而且撤不回来；它也将于 2026-11-01 归档。
@@ -152,9 +156,12 @@ Windows 后端在能力表里如实报告 `partial` / `unsupported`。初步方�
 - **沙箱不可用时悄悄执行**：调用方会误以为命令是受限的。
 - **用环境变量判断嵌套**：原因见 4.6。
 
-## 8. 需要实测确认的问题
+## 8. 实测结论（2026-10-25，nono 0.80.0）
 
-- 现有 Seatbelt 规则是“允许读全部、禁止读 `~/.ssh` `~/.aws` `~/.gnupg`”。nono 权限清单的 `deny` 在 macOS 上优先于授权，可以表达；在 Linux（Landlock）上只能靠“不授权”表达，无法在已授权目录里挖掉子目录，需要改为列出允许读取的目录。
-- nono 自带的保护规则是否会拦截常用命令（例如读取 `~/.gitconfig`）。
+详见[执行过程](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-process.md)步骤 1。
+
+- nono 权限清单的 `deny` 不生效；禁止读取改用拆分覆盖，禁止写入只有 macOS profile 能表达（见 5.1）。
+- macOS 上 nono 会拦截钥匙串，沙箱内 `git push`、`gh` 需要申请沙箱外执行；用户接受这个更严格的行为。
+- 每次 `wrap` 的额外耗时：权限清单模式约 31ms，profile 模式约 55ms（授权条目约 110 条）。
 - Linux 需要 Landlock（内核 5.13+）；不支持时 nono 后端报告不可用。
-- Cordis 准入是否按可选依赖处理 shell-tools 对 `sandbox` 的依赖；不支持时需要补准入逻辑。
+- Cordis 准入原本不支持可选依赖，第一期补上。

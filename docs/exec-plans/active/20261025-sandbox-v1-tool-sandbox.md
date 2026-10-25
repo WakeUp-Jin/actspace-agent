@@ -80,7 +80,7 @@ export interface SandboxHostPort {
 
 // —— 执行请求 ——
 export type SandboxNetwork = { readonly mode: "unrestricted" } | { readonly mode: "blocked" } | { readonly mode: "allowlist"; readonly domains: readonly string[] };
-export type SandboxCapability = "filesystem.write" | "filesystem.read-deny" | "network.blocked" | "network.allowlist" | "process.inherit";
+export type SandboxCapability = "filesystem.write" | "filesystem.read-deny" | "filesystem.write-deny" | "network.blocked" | "network.allowlist" | "process.inherit";
 export type CapabilityLevel = "full" | "partial" | "unsupported";
 export type SandboxRequest = {
   readonly purpose: "tool" | "evaluation";
@@ -128,7 +128,7 @@ export interface SandboxService {
 ```
 
 - 策略合并：`默认策略 → purpose 模板（第一期只有 tool）→ 本次请求`，结果冻结并计算 `fingerprint`（规范化 JSON 的 sha256）。本次请求只能收窄：`readWrite` 必须落在模板允许的根目录内，否则 `prepare_failed`。
-- `tool` 模板：`network: unrestricted`；`denyRead` 为 `~/.ssh` `~/.aws` `~/.gnupg`；`requiredCapabilities` 为 `filesystem.write`、`filesystem.read-deny`、`process.inherit`。
+- `tool` 模板：`network: unrestricted`；`denyRead` 显式列出凭据、钥匙串、浏览器数据、macOS 私有数据、shell 历史路径（取自 nono 必选规则组，只保留当前平台的条目）；`denyWrite` 为工作区的 `.git/hooks` 与 `.git/config`；`requiredCapabilities` 为 `filesystem.write`、`filesystem.read-deny`、`filesystem.write-deny`、`process.inherit`。
 - 继承模式：`status()` 返回 `isolation: "inherited"`，`run()` 不选后端、直接启动，`facts.isolation = "inherited"`。
 
 ## 任务
@@ -163,18 +163,19 @@ export interface SandboxService {
 ### T2 `packages/sandbox/seatbelt`（`@actspace/sandbox-seatbelt`）
 
 - 把 `shell-tools/src/node-ports.ts:284-315` 的 SBPL 生成与探测搬到 `src/backend.ts`，导出 `createSeatbeltBackend(host)`，`priority: 50`。规则文本保持不变，路径来自 `SandboxPolicy.filesystem`；`network.blocked` 时在规则中把 `(allow network*)` 换成 `(deny network*)`。
-- 能力：`filesystem.write`、`filesystem.read-deny`、`network.blocked`、`process.inherit` 为 `full`，`network.allowlist` 为 `unsupported`。非 darwin 或 `/usr/bin/sandbox-exec` 探测失败时不可用。
+- 能力：`filesystem.write`、`filesystem.read-deny`、`filesystem.write-deny`、`network.blocked`、`process.inherit` 为 `full`，`network.allowlist` 为 `unsupported`。非 darwin 或 `/usr/bin/sandbox-exec` 探测失败时不可用。
 - `src/plugin.ts`：注入 `sandbox` 与 `actspace.host.sandbox`，`register` 后在 `ctx.effect` 中注销。
 - 测试：规则逐条断言（与原实现一致）；darwin 上真实执行写工作区成功、写工作区外失败、断网时 `curl` 失败（非 darwin 用 `it.skipIf`）。
 - 验证：`pnpm --filter @actspace/sandbox-seatbelt test`。
 
 ### T3 `packages/sandbox/nono`（`@actspace/sandbox-nono`）
 
-- `src/manifest.ts`：纯函数 `buildNonoManifest(policy, platform)`，按 T0 结论生成 `version`、`filesystem.grants`、`filesystem.deny`、`network.mode`（`unrestricted` / `blocked`）、`rollback.enabled: false`。Linux 上 `denyRead` 改为“不授权”，授权列表为 `/usr` `/bin` `/lib` `/lib64` `/etc` `/opt` 以及 `$HOME` 下除 `denyRead` 外的一级子项只读，最终以 T9 Linux 实测为准。
-- `src/backend.ts`：`createNonoBackend(host)`，`priority: 100`，`id: "nono"`。没有 `host.resources.nonoPath` 时不可用（原因写明“未找到打包的 nono”）。`probe()` 执行 `<nonoPath> --version`（3 秒超时）解析版本，并执行一次 `wrap` 空命令确认可用（Linux 上同时确认 Landlock）。`prepare()` 把清单写到 `scratchDir/nono-manifest.json`，返回 `{ command: nonoPath, args: ["wrap", "-s", "--no-diagnostics", "-c", manifestPath, "--", ...argv] }`，`dispose` 删除清单文件。
-- 能力：`network.allowlist` 为 `unsupported`（第二期由 `run` 模式提供）；Linux 上 `filesystem.read-deny` 按 T0 结论报告 `full` 或 `partial`，报告 `partial` 时 `tool` 模板不会选中它，需要在执行摘要说明。
+- `src/cover.ts`：`coverReadable(excluded, fs)` 实现 T0 的拆分覆盖：从 `/` 开始，不是排除路径上级的目录整体授权，是上级的展开子项递归，排除路径本身跳过，符号链接按目标类型授权、目标不存在的跳过。排除集合为 `denyRead` 加 nono 受保护目录（`~/.nono`、`$XDG_STATE_HOME/nono`，默认 `~/.local/state/nono`）。文件系统访问通过参数注入，便于测试。
+- `src/config.ts`：纯函数。macOS 生成 profile：`filesystem.read` / `read_file` 为拆分覆盖结果，`allow` 为 `readWrite`，`allow_file` 为 `/dev/null`，`bypass_protection` 为登录 shell 会读取的配置文件（zsh：`~/.zshenv` `~/.zprofile` `~/.zlogin`；bash：`~/.bash_profile` `~/.bash_login` `~/.profile`），`unsafe_macos_seatbelt_rules` 为 `denyWrite` 的 `(deny file-write* …)`（路径做 SBPL 字符串转义），`network.block` 按策略设置。Linux 生成权限清单：`grants` 为拆分覆盖结果加 `readWrite`，`network.mode` 为 `unrestricted` / `blocked`，`rollback.enabled: false`，不写 `deny`（nono 清单模式忽略它）。
+- `src/backend.ts`：`createNonoBackend(host)`，`priority: 100`，`id: "nono"`。没有 `host.resources.nonoPath` 时不可用（原因写明“未找到打包的 nono”）。`probe()` 执行 `<nonoPath> --version`（3 秒超时）解析版本，并执行一次 `wrap` 空命令确认可用（Linux 上同时确认 Landlock）。`prepare()` 把配置写到 `scratchDir`，macOS 返回 `["wrap", "-s", "--no-diagnostics", "-p", profilePath, "--", ...argv]`，Linux 返回 `["wrap", "-s", "--no-diagnostics", "-c", manifestPath, "--", ...argv]`；传给 nono 的环境变量去掉所有 `NONO_*`；`dispose` 删除配置文件。
+- 能力：`filesystem.write`、`filesystem.read-deny`、`network.blocked`、`process.inherit` 为 `full`；`filesystem.write-deny` 在 macOS 为 `full`、Linux 为 `unsupported`（因此第一期 Linux 的 bash 走审批）；`network.allowlist` 为 `unsupported`（第二期由 `run` 模式提供）。
 - `src/plugin.ts`：同 T2。
-- 测试：macOS / Linux 清单快照；无 `nonoPath` 时不可用；真实执行与 T2 相同的读写和断网断言（`describe.skipIf(!process.env.ACTSPACE_NONO_PATH)`，执行摘要必须写明在哪台机器、哪个 nono 版本上跑过）。
+- 测试：拆分覆盖（假文件系统：排除路径、上级展开、符号链接、目标不存在）；macOS profile 与 Linux 清单快照；SBPL 转义；`NONO_*` 被去掉；无 `nonoPath` 时不可用；真实执行与 T2 相同的读写和断网断言（`describe.skipIf(!process.env.ACTSPACE_NONO_PATH)`，执行摘要必须写明在哪台机器、哪个 nono 版本上跑过）。
 - 验证：`ACTSPACE_NONO_PATH=$(pwd)/dist/sandbox-components/darwin-arm64/nono pnpm --filter @actspace/sandbox-nono test`。
 
 ### T4 nono 程序获取与打包
@@ -186,6 +187,8 @@ export interface SandboxService {
 - 验证：`node --test scripts/test/fetch-nono.test.mjs`；`pnpm sandbox:fetch-nono` 后 `dist/sandbox-components/darwin-arm64/nono --version` 输出 `nono 0.80.0`。
 
 ### T5 注册进默认 Harness，Host 提供端口
+
+- **准入支持可选依赖**（T0 结论 11）：`DEFAULT_HARNESS_ENTRIES` 条目增加第四项 `optionalInjects`；清单 `contracts.services.requires` 为它们写 `optional: true` 与 `fallback`；`PluginBehaviorDescriptor`、组合条目、`IsolatedCordisEntry` 增加 `optionalInjects`，`harness-mount.ts` 一并校验。`mountIsolatedCordisTree`：可选依赖由组合提供或属于共享服务时并入 Cordis `inject`（保证启动顺序），否则不注入，并把该名字加入隔离表，使 `ctx.get` 返回 `undefined` 而不是 Host 上的同名服务。测试：有提供者时注入且先启动；没有时准入通过、`ctx.get` 为 `undefined`；Host 上存在同名服务时仍为 `undefined`。
 
 - `packages/runtime/src/harness/default-harness-definition.ts`：增加三条条目 `["sandbox", ["sandbox"], ["actspace.host.sandbox"]]`、`["sandbox-nono", [], ["sandbox", "actspace.host.sandbox"]]`、`["sandbox-seatbelt", [], ["sandbox", "actspace.host.sandbox"]]`；`defaultHarnessEntrySource` 加特殊映射到 `@actspace/sandbox/plugin`、`@actspace/sandbox-nono/plugin`、`@actspace/sandbox-seatbelt/plugin`。
 - `packages/runtime/src/profiles/composition.ts`：导入三个清单并加入 `baseBundle.manifests`。
@@ -275,7 +278,7 @@ T0 → T1 →（T2、T3、T4 可并行）→ T5 → T6 →（T7 可与 T6 并行
 
 ## 进度记录
 
-- [ ] T0 实测
+- [x] T0 实测（结论见执行过程步骤 1）
 - [ ] T1 manager
 - [ ] T2 seatbelt
 - [ ] T3 nono
@@ -291,6 +294,8 @@ T0 → T1 →（T2、T3、T4 可并行）→ T5 → T6 →（T7 可与 T6 并行
 
 - 2026-10-25：用户确认 macOS / Linux 用 nono，Windows 第三期原生实现；打包 nono 命令行程序而不用 `nono-ts`；工具沙箱用 `nono wrap`。
 - 2026-10-25：用户否决“沙箱放在 Host”与“第一期只做准备启动”，确认 D1–D6：沙箱是可替换的 Harness 插件；第一期打完整地基；nono > Seatbelt；缺失或不可用时转审批；只用打包的 nono；继承模式只能由显式配置打开。
+
+- 2026-10-25：T0 实测后用户确认：`filesystem.write-deny`（`.git/hooks`、`.git/config`）列为 `tool` 模板必需能力，Linux 上 nono 不合格，第一期 Linux 的 bash 走审批；接受 nono 拦截钥匙串，沙箱内推送需申请沙箱外执行。nono 在 macOS 用 profile 模式、Linux 用权限清单模式，读取限制用拆分覆盖表达。
 
 ## 执行模式
 
