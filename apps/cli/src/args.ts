@@ -70,6 +70,12 @@ export function parseCliArgs(argv: string[]): ParsedCli {
         options.resume = readValue(rest, ++i, arg);
         options.persist = true;
         break;
+      case "--sandbox-inherited":
+        options.sandboxInherited = true;
+        break;
+      case "--harness":
+        options.harness = readValue(rest, ++i, arg);
+        break;
       case "--help":
       case "-h":
         return { command: "help", options };
@@ -121,5 +127,9 @@ export function usage(): string {
     "  --resume <session-id> (implies --persist)",
     "  --model <model-id>",
     "  --mock",
+    "  --harness <selection.json> (boot this Harness selection; needs a --data-dir without selection history",
+    "                              that holds its artifacts in harness-artifacts/)",
+    "  --sandbox-inherited (only for the evaluation sandbox launcher: Bash runs without its own sandbox,",
+    "                       relying on the outer one)",
   ].join("\n");
 }

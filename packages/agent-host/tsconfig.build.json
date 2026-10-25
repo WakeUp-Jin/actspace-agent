@@ -13,10 +13,16 @@
       "path": "./../cordis-adapter/tsconfig.build.json"
     },
     {
+      "path": "./../harness-evaluation/tsconfig.build.json"
+    },
+    {
       "path": "./../llm/pi-ai/tsconfig.build.json"
     },
     {
       "path": "./../llm/service/tsconfig.build.json"
+    },
+    {
+      "path": "./../sandbox/manager/tsconfig.build.json"
     },
     {
       "path": "./../session/jsonl/tsconfig.build.json"

@@ -1,0 +1,67 @@
+/* A 同纸：去掉灰色侧栏板，整页一张暖纸；正文收窄、加深，右侧目录有当前位置。改动最小、最像首页的延续。 */
+.layout { width: var(--site-page); margin-inline: auto; display: grid; grid-template-columns: 224px minmax(0, 1fr) 200px; gap: 48px; }
+.sidebar { position: sticky; top: var(--site-header-height); height: calc(100vh - var(--site-header-height)); overflow: auto; padding: 40px 8px 80px 0; scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.sidebar:hover { scrollbar-color: var(--site-line) transparent; }
+.nav-group { margin-bottom: 28px; }
+.nav-label { font-size: 12px; color: var(--site-muted); margin: 0 0 6px 12px; letter-spacing: .02em; }
+.nav-items a { display: block; padding: 6px 12px; border-radius: 8px; font-size: 14px; line-height: 1.55; color: var(--site-body); transition: color 120ms, background 120ms; }
+.nav-items a:hover { color: var(--site-ink); background: color-mix(in srgb, var(--site-line) 45%, transparent); }
+.nav-items a[aria-current] { color: var(--site-ink); font-weight: 500; background: var(--site-paper); box-shadow: 0 0 0 1px var(--site-line); }
+
+.article { min-width: 0; max-width: 720px; width: 100%; justify-self: center; padding: 56px 0 120px; }
+.crumb { font: 12px var(--mono); color: var(--site-muted); display: flex; gap: 8px; }
+.crumb span:last-child { color: var(--site-body); }
+h1 { font: 500 44px/1.2 var(--display); margin: 18px 0 16px; letter-spacing: 0; }
+.lead { font-size: 19px; line-height: 1.75; color: var(--site-body); margin: 0 0 20px; }
+.meta { display: flex; gap: 16px; align-items: center; font: 12px var(--mono); color: var(--site-muted); padding-bottom: 36px; border-bottom: 1px solid var(--site-line); margin-bottom: 40px; }
+.meta .copy { margin-left: auto; font: 13px var(--sans); color: var(--site-body); background: none; border: 1px solid var(--site-line); border-radius: 999px; padding: 5px 12px; }
+.meta .copy:hover { border-color: var(--site-line-strong); color: var(--site-ink); }
+
+.prose { color: #45423c; font-size: 16.5px; line-height: 1.9; }
+.prose > :first-child { margin-top: 0; }
+.prose p, .prose ul { margin: 0 0 20px; }
+.prose ul { padding-left: 1.2em; }
+.prose li { margin: 8px 0; }
+.prose li::marker { color: var(--site-line-strong); }
+.prose strong { color: var(--site-ink); font-weight: 600; }
+.prose h2 { font: 500 28px/1.4 var(--display); color: var(--site-ink); margin: 56px 0 16px; scroll-margin-top: 96px; }
+.prose h3 { font: 600 18px/1.5 var(--sans); color: var(--site-ink); margin: 36px 0 10px; scroll-margin-top: 96px; }
+.prose a { color: var(--site-ink); text-decoration: underline; text-decoration-color: var(--site-accent-line); text-underline-offset: 4px; }
+.prose a:hover { text-decoration-color: var(--site-accent); }
+.prose :not(pre) > code { font: .86em var(--mono); background: var(--site-canvas-soft); border-radius: 5px; padding: 2px 6px; color: var(--site-ink); }
+.shot { margin: 32px 0; }
+.shot-frame { border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px var(--site-line), 0 18px 36px -28px rgba(29,28,26,.45); }
+.shot figcaption { font-size: 13px; color: var(--site-muted); margin-top: 12px; }
+.note { margin: 28px 0; padding: 16px 20px; background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 12px; font-size: 15px; }
+.note p { margin: 0; }
+.note strong { display: block; font-size: 13px; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; margin: 24px 0; }
+th { text-align: left; font: 500 12px var(--mono); color: var(--site-muted); padding: 0 12px 10px 0; border-bottom: 1px solid var(--site-line-strong); }
+td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--site-line); }
+td:first-child { color: var(--site-ink); font-weight: 500; }
+.code-block { margin: 24px 0; background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 12px; overflow: hidden; }
+.code-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px 8px 16px; border-bottom: 1px solid var(--site-line); }
+.code-lang { font: 11.5px var(--mono); color: var(--site-muted); }
+.code-copy { font-size: 12px; color: var(--site-body); background: none; border: 0; padding: 4px 8px; border-radius: 6px; }
+.code-copy:hover { background: var(--site-canvas-soft); color: var(--site-ink); }
+pre { margin: 0; padding: 16px 18px; overflow: auto; font: 13.5px/1.75 var(--mono); color: var(--site-ink); }
+
+.pager { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 72px; }
+.pager a { display: grid; gap: 6px; padding: 18px 20px; border: 1px solid var(--site-line); border-radius: 14px; background: var(--site-paper); transition: border-color 150ms, transform 150ms; }
+.pager a:hover { border-color: var(--site-accent-line); transform: translateY(-2px); }
+.pager-next { text-align: right; }
+.pager-dir { font: 12px var(--mono); color: var(--site-muted); }
+.pager-title { font: 500 17px var(--display); }
+.foot { margin-top: 48px; display: flex; justify-content: space-between; font-size: 13px; color: var(--site-muted); }
+.foot a { text-decoration: underline; text-decoration-color: var(--site-line-strong); text-underline-offset: 4px; }
+
+.toc { position: sticky; top: var(--site-header-height); align-self: start; padding: 64px 0 24px; }
+.toc-label { font: 12px var(--mono); color: var(--site-muted); margin: 0 0 12px; }
+.toc nav { border-left: 1px solid var(--site-line); }
+.toc a { display: block; margin-left: -1px; padding: 5px 0 5px 14px; border-left: 2px solid transparent; font-size: 13px; line-height: 1.5; color: var(--site-muted); transition: color 120ms; }
+.toc a.nested { padding-left: 26px; }
+.toc a:hover { color: var(--site-ink); }
+.toc a.is-active { color: var(--site-ink); border-left-color: var(--site-accent); }
+
+@media (max-width: 1180px) { .layout { grid-template-columns: 210px minmax(0, 1fr); } .toc { display: none; } }
+@media (max-width: 760px) { .layout { display: block; } .sidebar { position: static; height: auto; padding: 16px 0; border-bottom: 1px solid var(--site-line); } .sidebar .nav-group:not(.is-open) { display: none; } .article { padding-top: 32px; } h1 { font-size: 34px; } .pager { grid-template-columns: 1fr; } }

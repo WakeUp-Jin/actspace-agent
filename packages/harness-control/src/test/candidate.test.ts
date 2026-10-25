@@ -12,7 +12,7 @@ it("validates configuration through a fixed pure entry and reports declared opti
     const sourceRoot = join(directory, "source"); await mkdir(sourceRoot);
     await writeFile(join(sourceRoot, "plugin.js"), "throw new Error('behavior must not load during validation');");
     await writeFile(join(sourceRoot, "validate.js"), "export const validate = value => Number.isInteger(value.limit) && value.limit > 0;");
-    const base = defineBuiltinPluginManifest({ pluginId: "validated", version: "1", name: "validated", entry: { entryId: "validated", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, contributions: { services: ["reader"], events: [], tools: [], prompts: [] } });
+    const base = defineBuiltinPluginManifest({ pluginId: "validated", version: "1", name: "validated", entry: { entryId: "validated", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, optionalInjects: ["cache"], contributions: { services: ["reader"], events: [], tools: [], prompts: [] } });
     const plugin = { ...base, behaviors: base.behaviors.map(b => ({ ...b, config: { limit: 1 }, contracts: { configValidator: "./validate.js", services: { provides: [{ id: "reader", version: 1 }], requires: [{ id: "cache", version: 1, optional: true, fallback: "read directly" }] }, events: { provides: [], requires: [] } } })) };
     const artifact = await publishPluginArtifact({ sourceRoot, artifactRoot: join(directory, "artifacts"), files: ["plugin.js", "validate.js"], plugin });
     const composition = composeRuntime({ profile: { id: "main", runtimeContract: "actspace.runtime.v2", orderedBundleIds: ["base"] }, bundles: [{ id: "base", version: "1", provenance: "test", manifests: [plugin] }], hostCapabilities: [] });

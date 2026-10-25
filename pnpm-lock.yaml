@@ -115,6 +115,9 @@ importers:
       '@actspace/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox/manager
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../../packages/session/journal
@@ -430,12 +433,18 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
+      '@actspace/harness-evaluation':
+        specifier: workspace:*
+        version: link:../harness-evaluation
       '@actspace/llm-pi-ai':
         specifier: workspace:*
         version: link:../llm/pi-ai
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../llm/service
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/manager
       '@actspace/session-jsonl':
         specifier: workspace:*
         version: link:../session/jsonl
@@ -1141,6 +1150,31 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/harness-evaluation:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/harness-control':
+        specifier: workspace:*
+        version: link:../harness-control
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/manager
+    devDependencies:
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../sandbox/nono
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/harness-hmr:
     dependencies:
       '@actspace/boot':
@@ -1425,6 +1459,15 @@ importers:
       '@actspace/prompt':
         specifier: workspace:*
         version: link:../prompt
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/manager
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../sandbox/nono
+      '@actspace/sandbox-seatbelt':
+        specifier: workspace:*
+        version: link:../sandbox/seatbelt
       '@actspace/session-checkpoint-policy':
         specifier: workspace:*
         version: link:../session/checkpoint-policy
@@ -1495,6 +1538,60 @@ importers:
       esbuild:
         specifier: 0.21.5
         version: 0.21.5
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/sandbox/manager:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/sandbox/nono:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../manager
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/sandbox/seatbelt:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../manager
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
@@ -1941,6 +2038,9 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../cordis-adapter
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../../sandbox/manager
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../shared
@@ -1948,6 +2048,12 @@ importers:
         specifier: workspace:*
         version: link:../runtime
     devDependencies:
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../../sandbox/nono
+      '@actspace/sandbox-seatbelt':
+        specifier: workspace:*
+        version: link:../../sandbox/seatbelt
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4

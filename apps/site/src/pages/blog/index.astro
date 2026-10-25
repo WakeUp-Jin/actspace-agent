@@ -1,84 +1,60 @@
 ---
+import type {ImageMetadata} from 'astro';
+import {Image} from 'astro:assets';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import {blogHref,getPublicPosts} from '../../lib/blog';
-import {presentationFor} from '../../lib/blog-presentation';
+import {coverColors,presentationFor} from '../../lib/blog-presentation';
+import {spaceCjk} from '../../lib/markdown/cjk-spacing.mjs';
 import {sitePath} from '../../lib/site-path';
-import {Image} from 'astro:assets';
 import '../../styles/blog.css';
 const posts=await getPublicPosts();
-const categories=[...new Set(posts.map(p=>presentationFor(p.id)?.category??p.data.tags[0]))];
+const categoryOf=(post:(typeof posts)[number])=>presentationFor(post.id)?.category??post.data.tags[0];
+const categories=[...new Set(posts.map(categoryOf))];
 const images=import.meta.glob<{default:ImageMetadata}>('../../assets/blog/covers/*.png',{eager:true});
-import type {ImageMetadata} from 'astro';
 ---
 <BaseLayout title="ActSpace 博客" description="关于 Agent 的设计、工程与实践。">
-<main id="main-content">
-<h1 class="sr-only">博客</h1>
-<section class="wrap blog-browser">
-<aside class="blog-filters">
-<h2>筛选与排序</h2>
-<div class="blog-sort-field">
-<label for="blog-sort" id="blog-sort-label">排序</label>
-<select id="blog-sort">
-<option value="new">最新发布</option>
-<option value="old">最早发布</option>
-</select>
-<div class="sort-picker" hidden>
-<button class="sort-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="sort-options" aria-labelledby="blog-sort-label sort-value">
-<span id="sort-value">最新发布</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-</button>
-<div id="sort-options" class="sort-options" role="listbox" aria-labelledby="blog-sort-label" hidden>
-{[['new','最新发布'],['old','最早发布']].map(([value,label])=><button type="button" role="option" aria-selected={value==='new'?'true':'false'} tabindex="-1" data-value={value}><span>{label}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>)}
+<main id="main-content" class="blog-page">
+<header class="blog-head">
+<h1>博客</h1>
+<div class="blog-filters" role="group" aria-label="按分类筛选">
+<button type="button" data-category="" aria-pressed="true">全部</button>
+{categories.map(category=><button type="button" data-category={category} aria-pressed="false">{category}</button>)}
 </div>
-</div>
-</div>
-<details class="blog-filter-group" open>
-<summary>分类</summary>
-<div class="blog-filter-options">{categories.map(category=>
-<label>
-<input type="checkbox" name="blog-category" value={category}/>
-<span>{category}</span>
-</label>)}</div>
-</details>
-<p id="blog-count" aria-live="polite">{posts.length} 篇文章</p>
-</aside>
-<div class="blog-results">
-<div class="blog-toolbar">
-<input id="blog-search" type="search" aria-label="搜索文章" placeholder="搜索文章…"/>
-<div class="blog-views" role="group" aria-label="文章布局">
-<button data-blog-view="grid" aria-pressed="true">▦ 网格</button>
-<button data-blog-view="list" aria-pressed="false">☰ 列表</button>
-</div>
-</div>
+</header>
 <div class="blog-grid">
-{posts.map(post=>{const meta=presentationFor(post.id);const image=images[`../../assets/blog/covers/character-${meta?.cover}.png`]?.default;return <a class="blog-card" href={sitePath(blogHref(post))} data-category={meta?.category??post.data.tags[0]} data-date={post.data.publishedAt.toISOString()}>
-<div class="blog-cover image-loading-frame" data-image-frame data-image-state="loading">
-{image
-  ? <Image src={image} alt="" format="webp" quality={90} widths={[480,800,1254]} sizes="(max-width: 600px) calc(100vw - 48px), (max-width: 1280px) 50vw, 33vw" loading="lazy" data-image-loading />
-  : <img src={sitePath(post.data.cover)} width="1254" height="1254" alt="" loading="lazy" decoding="async" data-image-loading/>}
+{posts.map((post,index)=>{
+  const meta=presentationFor(post.id);
+  const cover=meta?.cover??'01';
+  const colors=coverColors[cover];
+  const image=images[`../../assets/blog/covers/character-${cover}.png`]?.default;
+  const date=post.data.publishedAt.toISOString().slice(0,10);
+  return <a class:list={['blog-item',{'is-lead':index===0}]} href={sitePath(blogHref(post))} data-category={categoryOf(post)}>
+<div class:list={['blog-tile',{'is-light':colors.light}]} style={`--tile-bg:${colors.bg};--tile-ink:${colors.ink}`}>
+{image&&<Image class="blog-tile-character" src={image} alt="" format="webp" quality={90} widths={[480,800,1254]} sizes="(max-width: 640px) 100vw, (max-width: 1000px) 50vw, 520px" loading={index<3?'eager':'lazy'}/>}
+<div class="blog-tile-top"><span>{categoryOf(post)}</span><time datetime={date}>{date.slice(5)}</time></div>
+<div class="blog-tile-key" aria-hidden="true">{meta?.key??''}</div>
 </div>
-<div class="blog-card-copy">
-<time datetime={post.data.publishedAt.toISOString()}>{post.data.publishedAt.toISOString().slice(0,10)}</time>
-<h2>{post.data.title}</h2>
-<p class="blog-card-summary">{post.data.description}</p>
-<span class="blog-category">{meta?.category??post.data.tags[0]}</span>
-</div>
+<h2>{spaceCjk(post.data.title)}</h2>
 </a>})}
 </div>
-<p id="blog-empty" hidden>没有匹配的文章，试试其他关键词或分类。</p>
-</div>
-</section>
 </main>
 </BaseLayout>
 <script>
-import { initializeBlogSort } from '../../scripts/blog-sort';
-initializeBlogSort();
-const grid=document.querySelector<HTMLElement>('.blog-grid')!;
-const cards=[...grid.querySelectorAll<HTMLElement>('.blog-card')];
-const search=document.querySelector<HTMLInputElement>('#blog-search')!;
-const sort=document.querySelector<HTMLSelectElement>('#blog-sort')!;
-const checks=[...document.querySelectorAll<HTMLInputElement>('input[name="blog-category"]')];
-function filter(){const selected=checks.filter(c=>c.checked).map(c=>c.value);const query=search.value.trim().toLocaleLowerCase();let count=0;[...cards].sort((a,b)=>(sort.value==='old'?1:-1)*(a.dataset.date??'').localeCompare(b.dataset.date??'')).forEach(card=>{card.hidden=!(selected.length===0||selected.includes(card.dataset.category??''))||!card.textContent?.toLocaleLowerCase().includes(query);if(!card.hidden)count++;grid.append(card)});document.querySelector('#blog-count')!.textContent=count+' 篇文章';document.querySelector<HTMLElement>('#blog-empty')!.hidden=count!==0;}
-checks.forEach(c=>c.addEventListener('change',filter));search.addEventListener('input',filter);sort.addEventListener('change',filter);
-const category=new URLSearchParams(location.search).get('category');if(category){checks.forEach(c=>c.checked=c.value===category);filter();}
-document.querySelectorAll<HTMLButtonElement>('[data-blog-view]').forEach(button=>button.addEventListener('click',()=>{grid.dataset.view=button.dataset.blogView;document.querySelectorAll('[data-blog-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)))}));
+// 分类单选；?category= 可直达，切换时同步地址。可见的第一篇做头条。
+const buttons=[...document.querySelectorAll<HTMLButtonElement>('.blog-filters button')];
+const items=[...document.querySelectorAll<HTMLElement>('.blog-item')];
+function select(category:string){
+  buttons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.category===category)));
+  let lead=true;
+  items.forEach(item=>{item.hidden=category!==''&&item.dataset.category!==category;item.classList.toggle('is-lead',!item.hidden&&lead);if(!item.hidden)lead=false;});
+}
+buttons.forEach(button=>button.addEventListener('click',()=>{
+  const category=button.dataset.category??'';
+  select(category);
+  const url=new URL(location.href);
+  if(category)url.searchParams.set('category',category);else url.searchParams.delete('category');
+  history.replaceState(null,'',url);
+}));
+const initial=new URLSearchParams(location.search).get('category');
+if(initial&&buttons.some(button=>button.dataset.category===initial))select(initial);
 </script>

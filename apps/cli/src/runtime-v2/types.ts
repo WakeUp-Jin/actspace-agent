@@ -18,6 +18,8 @@ export type RuntimeV2RunCommandOptions = {
   readonly dataDir?: string;
   readonly persist?: boolean;
   readonly resume?: string;
+  readonly sandboxInherited?: boolean;
+  readonly harness?: string;
 };
 
 export type RuntimeV2CliArtifactResult = {
@@ -44,6 +46,8 @@ export type RuntimeV2CliArtifactResult = {
   readonly endedAt: string;
   readonly error?: { readonly code: string; readonly message: string };
   readonly persistent?: boolean;
+  /** Present for `--harness` runs: the Harness that actually ran under this Host. */
+  readonly harness?: { readonly harnessId: string; readonly revision: number; readonly executionDigest: string };
 };
 
 export type RuntimeV2RunCommandControl = {

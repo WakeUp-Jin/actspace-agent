@@ -68,6 +68,8 @@ export type ApprovalResourceSummary =
       readonly commandDigest: string;
       readonly cwd: string;
       readonly dynamic: boolean;
+      /** Set by Bash: approving runs the command outside the sandbox. */
+      readonly noSandbox?: boolean;
     };
 
 export type GrantSuggestion = {

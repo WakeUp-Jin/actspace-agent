@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>更新日志 U1 · 时间轴</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="updates-shared.css">
+<style>
+/* U1 时间轴：像 Linear 的 changelog。左边日期跟着滚动停住，中间一条细线串起每次发布；每次发布里按「新功能 / 改进 / 修复」分组，组名是带色点的小标签。 */
+.page { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 56px 0 160px; }
+.month { display: flex; align-items: center; gap: 16px; margin: 64px 0 8px; font: 600 13px var(--r-font); color: var(--site-muted); }
+.month::after { content: ""; flex: 1; height: 1px; background: var(--site-line); }
+.month:first-of-type { margin-top: 8px; }
+.rel { display: grid; grid-template-columns: 160px 1px minmax(0, 1fr); gap: 0 36px; }
+.rel-date { position: sticky; top: calc(var(--site-header-height) + 28px); align-self: start; padding-top: 34px; text-align: right; }
+.rel-date b { display: block; font: 600 15px var(--r-font); color: var(--site-ink); }
+.rel-date span { font: 12px var(--mono); color: var(--site-muted); }
+.rel-rail { position: relative; background: var(--site-line); }
+.rel-rail::before { content: ""; position: absolute; left: 50%; top: 40px; width: 9px; height: 9px; border-radius: 50%; translate: -50% 0; background: var(--site-canvas); border: 2px solid var(--site-line-strong); }
+.rel:first-of-type .rel-rail::before, .is-latest .rel-rail::before { border-color: var(--site-accent); background: var(--site-accent); }
+.rel-body { padding: 28px 0 40px; max-width: 700px; }
+.rel-body h2 { font: 650 24px/1.4 var(--r-font); margin: 0 0 18px; letter-spacing: -.01em; }
+.latest { display: inline-flex; vertical-align: 4px; margin-left: 10px; height: 22px; padding: 0 9px; align-items: center; border-radius: 999px; background: var(--site-accent-soft); color: var(--site-accent); font: 600 11.5px var(--r-font); }
+.grp + .grp { margin-top: 16px; }
+.grp .tlabel { margin-bottom: 4px; }
+@media (max-width: 760px) { .rel { grid-template-columns: 1fr; } .rel-date { position: static; text-align: left; padding-top: 24px; display: flex; gap: 10px; align-items: baseline; } .rel-rail { display: none; } .rel-body { padding-top: 8px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+<main class="page">
+  <div class="upd-head"><div><h1>更新日志</h1><p class="sub">只记录用得到的新功能、改进和问题修复。</p></div><div class="filters" id="filters"></div></div>
+  <div id="list"></div>
+</main>
+<script src="vendor/marked.min.js"></script>
+<script src="shared.js"></script>
+<script src="md-pipeline.js"></script>
+<script src="updates-source.js"></script>
+<script src="updates-shared.js"></script>
+<script>
+let html = "", last = "";
+RELEASES.forEach((r, i) => {
+  if (r.month !== last) { html += `<p class="month">${fmtMonth(r.month)}</p>`; last = r.month; }
+  html += `<article class="rel${i === 0 ? " is-latest" : ""}" data-release id="${r.date}">
+    <div class="rel-date"><b>${fmtMD(r.date)}</b><span>${r.date.slice(0, 4)}</span></div><div class="rel-rail"></div>
+    <div class="rel-body"><h2>${r.title}${i === 0 ? '<span class="latest">最新</span>' : ""}</h2>
+    ${r.sections.map((s) => `<section class="grp" data-type="${s.type}"><p class="tlabel t-${s.type}"><i class="dot t-${s.type}"></i>${TYPES[s.type].label}</p><ul class="items">${s.items.map((x) => `<li>${x}</li>`).join("")}</ul></section>`).join("")}
+    </div></article>`;
+});
+document.getElementById("list").innerHTML = html;
+filterBar(document.getElementById("filters"));
+bootUpd("U1");
+</script>
+</body>
+</html>

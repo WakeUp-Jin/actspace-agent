@@ -6,14 +6,16 @@ import { createNodeWebToolPorts as createWebtools, WEB_TOOLS_HOST_PORT_ID } from
 import { createNodeToolPorts as createImagegeneration, IMAGE_GENERATION_HOST_PORT_ID } from "@actspace/tools-image-generation";
 import { createNodeToolPorts as createImageinspection, IMAGE_INSPECTION_HOST_PORT_ID } from "@actspace/tools-image-inspection";
 import { createLlmImageInspector, type SessionArtifactReader } from "@actspace/tools-image-inspection";
+import { createNodeSandboxHostPort, SANDBOX_HOST_PORT_ID } from "@actspace/sandbox";
 import { IMAGE_INSPECTION_CREDENTIAL_REF } from "./credential-resolver";
 import type { DesktopRuntimeV2ModelPort } from "./model-port";
-export function createDesktopToolHostServices(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly modelRuntime: DesktopRuntimeV2ModelPort; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver }) {
+export function createDesktopToolHostServices(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly modelRuntime: DesktopRuntimeV2ModelPort; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver; readonly nonoPath?: string }) {
   return Object.freeze({
+    [SANDBOX_HOST_PORT_ID]: createNodeSandboxHostPort({ nonoPath: options.nonoPath }),
     [FILESYSTEM_READ_HOST_PORT_ID]: { createPorts: () => createFilesystemread(options) },
     [FILESYSTEM_SEARCH_HOST_PORT_ID]: { createPorts: () => createFilesystemsearch(options) },
     [FILESYSTEM_WRITE_HOST_PORT_ID]: { createPorts: () => createFilesystemwrite(options) },
-    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: (background?: Parameters<typeof createShelltools>[0]["background"]) => createShelltools({ ...options, background }) },
+    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: (background?: Parameters<typeof createShelltools>[0]["background"], sandbox?: Parameters<typeof createShelltools>[0]["sandbox"]) => createShelltools({ ...options, background, sandbox }) },
     [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({
       // Ports live as long as the Harness; each search must observe settings changes.
       get deepseekFetchApiKey() { return options.modelRuntime.getToolEnvironment().deepseekFetchApiKey; },

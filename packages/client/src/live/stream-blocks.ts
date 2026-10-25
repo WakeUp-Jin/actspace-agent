@@ -108,6 +108,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       reason: tool.approvalReason ?? tool.preview.reason,
       approvalRequestId: tool.approvalRequestId,
       intent: tool.preview.intent,
+      justification: tool.preview.justification,
       backgroundTaskId: tool.preview.backgroundTaskId,
       background: tool.preview.background,
       outputFilePath: tool.preview.outputFilePath,

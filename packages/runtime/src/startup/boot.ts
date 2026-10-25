@@ -5,6 +5,7 @@ import { PromptExtensionRegistry, emptyRuntimePromptSource, type RuntimePromptSo
 import { DiagnosticsCollector } from "../projection/diagnostics.js";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import type { DiagnosticInput } from "../projection/diagnostics.js";
+import { sandboxStatusDiagnostic } from "./sandbox-status.js";
 import { SESSION_CODEC_HOST_PORT_ID } from "@actspace/session-journal";
 import { loadBuiltinToolCodec, toolTransportPatches } from "../profiles/composition.js";
 import type { EventCodec } from "@actspace/session-journal";
@@ -24,6 +25,7 @@ import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "../harnes
 import type { AgentRuntimeService } from "../harness/agent-runtime-plugin.js";
 import { HEADLESS_HOST_PORT_ID } from "@actspace/headless";
 import { BACKGROUND_TASK_HOST_SERVICE, createBackgroundTaskHost } from "@actspace/background-tasks";
+import { createNodeSandboxHostPort, SANDBOX_HOST_PORT_ID } from "@actspace/sandbox";
 import { RuntimeStateController } from "./runtime-state.js";
 import { settleWithinDeadline } from "./shutdown.js";
 
@@ -49,6 +51,8 @@ export type BootRuntimeOptions = {
   readonly rendererAllowlist?: RendererAllowlist;
   /** Host-owned facts normalized before the Cordis config tree is mounted. */
   readonly hostServices?: RuntimeHostServices;
+  /** Boot this Harness selection instead of the built-in one; the data root must hold no selection history. */
+  readonly pinnedHarness?: import("../harness/agent-host-port.js").PinnedHarness;
 };
 
 export type BootedRuntimeProfile = {
@@ -133,9 +137,12 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     [SESSION_CODEC_HOST_PORT_ID]: pluginCodecs,
     [SESSION_RUNTIME_HOST_PORT_ID]: runtimeHost,
     [HEADLESS_HOST_PORT_ID]: hostServices.services[HEADLESS_HOST_PORT_ID] ?? Object.freeze({ enabled: false }),
+    // Without a bundled nono only the macOS Seatbelt backend can probe available; Bash otherwise goes to approval.
+    [SANDBOX_HOST_PORT_ID]: hostServices.services[SANDBOX_HOST_PORT_ID] ?? createNodeSandboxHostPort(),
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
       disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...(options.host.capabilityCeiling.includes("browser") ? [] : ["browser-tools"])],
       authorizeHarness: options.authorizeHarness,
+      ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),
       evolution: {
         inspect: (context: import("@actspace/tools-runtime").ToolExecutionContext) => {
           const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
@@ -149,6 +156,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
         },
       },
       onHarnessDiagnostic: (error: unknown) => diagnostics.record({ severity: "error", source: "boot", code: "HARNESS_RECOVERY_BLOCKED", message: error instanceof Error ? error.message : String(error) }),
+      onSandboxStatus: (status: import("@actspace/sandbox").SandboxStatus | undefined) => diagnostics.record(sandboxStatusDiagnostic(status)),
       host: options.host,
       toolEnvironment: options.toolEnvironment,
       contextDisclosure: createContextHost(() => runtimeContext?.get?.("session.runtime") as RuntimeSessionController | undefined, options.toolEnvironment),

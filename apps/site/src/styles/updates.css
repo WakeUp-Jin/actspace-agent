@@ -1,0 +1,68 @@
+/* 更新日志 U1 时间轴（DESIGN.md「更新日志」）：日期吸顶、细线串起每次发布，按新功能 / 改进 / 修复分组。 */
+.updates-page {
+  --t-feature: #2f7d5b; --t-feature-soft: #e1efe6;
+  --t-improvement: #6d4fc2; --t-improvement-soft: #f0ebfb;
+  --t-fix: #a0661c; --t-fix-soft: #f5ead6;
+  width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 56px 0 160px;
+}
+.updates-page .t-feature { --t: var(--t-feature); }
+.updates-page .t-improvement { --t: var(--t-improvement); }
+.updates-page .t-fix { --t: var(--t-fix); }
+
+.updates-head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px 24px; flex-wrap: wrap; margin-bottom: 36px; }
+.updates-head h1 { font: 650 40px/1.1 var(--sans); color: var(--site-ink); margin: 0; }
+.updates-head p { font-size: 14px; color: var(--site-muted); margin: 10px 0 0; }
+.updates-filters { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--site-canvas-soft); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.updates-filters button { display: inline-flex; flex: none; align-items: center; gap: 7px; height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; font: 13.5px var(--sans); color: var(--site-body); cursor: pointer; transition: color 120ms; }
+.updates-filters button:hover { color: var(--site-ink); }
+.updates-filters button[aria-pressed="true"] { background: var(--site-paper); color: var(--site-ink); font-weight: 500; box-shadow: 0 1px 2px rgba(29, 28, 26, .08); }
+.updates-filters i, .update-type i { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--t); }
+
+.update-month[hidden], .update-release[hidden] { display: none; }
+.update-month-label { display: flex; align-items: center; gap: 16px; margin: 64px 0 8px; font: 600 13px var(--sans); color: var(--site-muted); }
+.update-month-label::after { content: ""; flex: 1; height: 1px; background: var(--site-line); }
+.update-month:first-of-type .update-month-label { margin-top: 8px; }
+
+.update-release { display: grid; grid-template-columns: 160px 1px minmax(0, 1fr); gap: 0 36px; scroll-margin-top: calc(var(--site-header-height) + 20px); }
+.update-date { position: sticky; top: calc(var(--site-header-height) + 28px); align-self: start; padding-top: 34px; text-align: right; }
+.update-date time { display: block; font: 600 15px var(--sans); color: var(--site-ink); }
+.update-date span { font: 12px var(--mono); color: var(--site-muted); }
+.update-rail { position: relative; background: var(--site-line); }
+.update-rail::before { content: ""; position: absolute; left: 50%; top: 40px; width: 9px; height: 9px; border-radius: 50%; translate: -50% 0; background: var(--site-canvas); border: 2px solid var(--site-line-strong); }
+.update-release.is-latest .update-rail::before { border-color: var(--site-accent); background: var(--site-accent); }
+.update-body { padding: 28px 0 40px; max-width: 700px; border-radius: 14px; }
+.update-body h2 { font: 650 24px/1.4 var(--sans); letter-spacing: -.01em; color: var(--site-ink); margin: 0 0 18px; }
+.update-latest { display: inline-flex; vertical-align: 4px; margin-left: 10px; height: 22px; padding: 0 9px; align-items: center; border-radius: 999px; background: var(--site-accent-soft); color: var(--site-accent); font: 600 11.5px var(--sans); letter-spacing: 0; }
+.update-group + .update-group { margin-top: 16px; }
+.update-type { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 4px; font: 600 12px var(--sans); letter-spacing: .02em; color: var(--t); }
+.update-group ul { list-style: none; margin: 0; padding: 0; font: 15.5px/1.8 var(--sans); color: #45423c; }
+.update-group li { position: relative; padding-left: 1.4em; margin: .4em 0; overflow-wrap: anywhere; }
+.update-group li::before { content: ""; position: absolute; left: .2em; top: .72em; width: 6px; height: 6px; border-radius: 2px; background: var(--site-line-strong); }
+.update-group code { font: .86em var(--mono); background: var(--site-accent-soft); color: #5a3fae; border-radius: 5px; padding: .15em .4em; }
+.update-group strong { color: var(--site-ink); font-weight: 600; }
+.update-group a { color: var(--site-ink); text-decoration: underline; text-decoration-color: var(--site-accent-line); text-underline-offset: 4px; }
+.update-group a:hover { text-decoration-color: var(--site-accent); }
+
+/* 筛选：只留对应分组 */
+.updates-page[data-filter="feature"] .update-group:not([data-type="feature"]),
+.updates-page[data-filter="improvement"] .update-group:not([data-type="improvement"]),
+.updates-page[data-filter="fix"] .update-group:not([data-type="fix"]) { display: none; }
+
+/* 从首页更新条跳过来时，短暂标出落点；底色向两侧外扩，文字不移动。 */
+.update-release:target .update-body { margin-inline: -20px; padding-inline: 20px; animation: update-target 2.4s ease-out; }
+@keyframes update-target {
+  0%, 50% { background: color-mix(in srgb, var(--site-accent-soft) 70%, transparent); }
+  100% { background: transparent; }
+}
+
+@media (max-width: 760px) {
+  .update-release { grid-template-columns: 1fr; }
+  .update-date { position: static; display: flex; gap: 10px; align-items: baseline; padding-top: 24px; text-align: left; }
+  .update-rail { display: none; }
+  .update-body { padding-top: 8px; }
+}
+@media (max-width: 640px) {
+  .updates-page { padding-top: 36px; }
+  .updates-head h1 { font-size: 32px; }
+  .update-body h2 { font-size: 21px; }
+}

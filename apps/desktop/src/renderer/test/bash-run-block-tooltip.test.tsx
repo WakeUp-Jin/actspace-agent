@@ -242,6 +242,32 @@ describe("BashRunBlock tooltips", () => {
     expect(screen.queryByText("Allowlist")).toBeNull();
   });
 
+  it("shows the escalation justification under the command only while approval is pending", () => {
+    const pending = {
+      id: "bash-approval-escalated",
+      kind: "bash" as const,
+      createdAt: "2026-06-02T00:00:00.000Z",
+      title: "Run Bash command: git",
+      intent: "推送分支",
+      status: "pending" as const,
+      command: "git push",
+      justification: "Pushing over HTTPS needs the keychain.",
+      sandboxed: false,
+      approvalRequestId: "approval-escalated",
+    };
+    const { unmount } = renderBash(pending);
+    const card = screen.getByRole("article");
+    expect(card.querySelector(".bash-approval-command + .bash-approval-justification")).toHaveTextContent("Pushing over HTTPS needs the keychain.");
+    expect(screen.getByText("真实环境")).toBeInTheDocument();
+    unmount();
+    for (const message of [{ ...pending, justification: undefined }, { ...pending, status: "running" as const, approvalRequestId: undefined }]) {
+      const view = renderBash(message);
+      expect(document.querySelector(".bash-approval-justification")).toBeNull();
+      expect(document.body).not.toHaveTextContent("needs the keychain");
+      view.unmount();
+    }
+  });
+
   it("keeps the Bash approval actionable when the bridge rejects the decision", async () => {
     const submitApproval = vi.fn(async () => ({ ok: false, reason: "expired" }));
     overrideBridge({ "approvals.submit": submitApproval });

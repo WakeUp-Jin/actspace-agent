@@ -31,12 +31,16 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --globals --passWithNoTests"
   },
-  "dependencies": { "@actspace/background-tasks": "workspace:*",
+  "dependencies": {
+    "@actspace/background-tasks": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/tools-runtime": "workspace:*",
-    "@actspace/shared": "workspace:*"
+    "@actspace/shared": "workspace:*",
+    "@actspace/sandbox": "workspace:*"
   },
   "devDependencies": {
+    "@actspace/sandbox-nono": "workspace:*",
+    "@actspace/sandbox-seatbelt": "workspace:*",
     "@types/node": "^24.0.3",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"

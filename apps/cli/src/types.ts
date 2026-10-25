@@ -18,6 +18,10 @@ export interface RunCommandOptions {
   dataDir?: string;
   persist?: boolean;
   resume?: string;
+  /** Only the evaluation sandbox's launcher passes this: the CLI already runs inside an outer sandbox. */
+  sandboxInherited?: boolean;
+  /** Selection file: boot this Harness instead of the built-in one. */
+  harness?: string;
 }
 
 export interface CliArtifactResult {

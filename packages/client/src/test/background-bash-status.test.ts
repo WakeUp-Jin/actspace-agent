@@ -37,3 +37,12 @@ describe("background Bash card status", () => {
     expect(liveStatus(bashPreview({ status: "aborted", summary: "aborted" }), { finished: true, isError: true })).toMatchObject({ status: "cancelled" });
   });
 });
+
+describe("Bash escalation justification", () => {
+  it("carries the model's justification from the call arguments to the approval block", () => {
+    const preview = toolPreview("bash", undefined, {} as never, { args: { command: "git push", sandbox_permissions: "require_escalated", justification: "Pushing needs the keychain." } }, undefined, "session", "run", "prepared");
+    expect(preview).toMatchObject({ kind: "bash", justification: "Pushing needs the keychain." });
+    expect(toolEntryToBlock("call", { toolName: "bash", preview, approvalPending: true }, "now", "run")).toMatchObject({ status: "pending", justification: "Pushing needs the keychain." });
+    expect(bashPreview({ status: "completed", summary: "ok" })).not.toHaveProperty("justification", expect.anything());
+  });
+});

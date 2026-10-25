@@ -28,6 +28,7 @@ Desktop 启动必须初始化：
 - Desktop 与 CLI 共享 `bootRuntime()`、Profile / Bundle / Patch、领域插件和 shutdown 语义，不实现第二套 Agent engine。
 - Cordis 管理插件 Service / Effect 生命周期；Host 管理 credentials、filesystem、shell、browser 和 UI ports。
 - 配置或插件集合变化采用 restart-only。运行中的实例不热替换 Plugin Entry；diagnostics 必须能报告 `restartRequired`。
+- 沙箱继承模式只能由 Host 的显式启动参数打开（CLI `--sandbox-inherited` 写进 Host 沙箱端口），不读环境变量，也不来自插件配置。CLI `--harness` 按指定选择启动，要求 `--data-dir` 下没有选择历史，挂载失败以 `HARNESS_SELECTION_INVALID`（退出码 3）结束，不回退到默认 Harness。
 - Boot 中途失败时必须按逆序释放已经激活的资源。`dispose()` 应可重复等待同一个关闭结果，不能重复执行 finalizer。
 
 ## Provider 与工具

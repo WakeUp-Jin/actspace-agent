@@ -562,6 +562,8 @@ export type BashPreview = {
   policyLabel?: string;
   approvalRequestId?: string;
   intent?: string;
+  /** 申请出沙箱时模型给的理由，显示在审批卡上。 */
+  justification?: string;
   /** 命令已转后台运行时的任务 id。 */
   backgroundTaskId?: string;
   /** 命令走了后台路径；卡片只多一个「后台」标签，status 跟随后台任务的真实结果。 */

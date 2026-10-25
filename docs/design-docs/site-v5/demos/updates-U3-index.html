@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>更新日志 U3 · 索引折叠</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="updates-shared.css">
+<style>
+/* U3 索引折叠：先给一张目录——每次发布一行（日期、标题、各类条数），一眼扫完三个月；点哪行展开哪行，最近三次默认展开。最省篇幅的一版。 */
+.page { width: min(900px, calc(100% - 40px)); margin: 0 auto; padding: 56px 0 160px; }
+.month { font: 600 13px var(--r-font); color: var(--site-muted); margin: 44px 0 6px; padding-bottom: 10px; border-bottom: 1px solid var(--site-ink); }
+.month:first-child { margin-top: 0; }
+.row { border-bottom: 1px solid var(--site-line); }
+.row > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 84px minmax(0, 1fr) auto 20px; gap: 18px; align-items: center; padding: 16px 4px; }
+.row > summary::-webkit-details-marker { display: none; }
+.row > summary:hover h2 { color: var(--site-accent); }
+.row time { font: 12.5px var(--mono); color: var(--site-muted); }
+.row h2 { font: 600 16.5px/1.5 var(--r-font); margin: 0; transition: color 150ms; }
+.counts { display: flex; gap: 12px; font: 12px var(--mono); color: var(--site-body); }
+.counts span { display: inline-flex; align-items: center; gap: 5px; }
+.chev { width: 8px; height: 8px; border-right: 1.5px solid var(--site-muted); border-bottom: 1.5px solid var(--site-muted); rotate: 45deg; translate: 0 -3px; transition: rotate 200ms, translate 200ms; justify-self: center; }
+.row[open] .chev { rotate: 225deg; translate: 0 2px; }
+.detail { padding: 0 4px 24px 106px; }
+.grp + .grp { margin-top: 14px; }
+.grp .tlabel { margin-bottom: 2px; }
+.latest { margin-left: 8px; font: 600 11px var(--r-font); color: var(--site-accent); background: var(--site-accent-soft); padding: 2px 8px; border-radius: 999px; vertical-align: 2px; }
+@media (max-width: 640px) { .row > summary { grid-template-columns: 1fr 20px; gap: 4px 12px; } .row time { grid-column: 1; } .row h2 { grid-column: 1; } .counts { grid-column: 1; } .chev { grid-row: 1 / 4; grid-column: 2; } .detail { padding-left: 4px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+<main class="page">
+  <div class="upd-head"><div><h1>更新日志</h1><p class="sub">共 <span id="n"></span> 次发布 · 点任意一行展开。</p></div><div class="filters" id="filters"></div></div>
+  <div id="list"></div>
+</main>
+<script src="vendor/marked.min.js"></script>
+<script src="shared.js"></script>
+<script src="md-pipeline.js"></script>
+<script src="updates-source.js"></script>
+<script src="updates-shared.js"></script>
+<script>
+document.getElementById("n").textContent = RELEASES.length;
+let html = "", last = "";
+RELEASES.forEach((r, i) => {
+  if (r.month !== last) { html += `<p class="month">${fmtMonth(r.month)}</p>`; last = r.month; }
+  const counts = Object.keys(TYPES).map((t) => countOf(r, t) ? `<span data-type="${t}"><i class="dot t-${t}"></i>${countOf(r, t)}</span>` : "").join("");
+  html += `<details class="row" data-release id="${r.date}"${i < 3 ? " open" : ""}><summary><time>${fmtDot(r.date).slice(5)}</time><h2>${r.title}${i === 0 ? '<span class="latest">最新</span>' : ""}</h2><span class="counts">${counts}</span><i class="chev"></i></summary>
+  <div class="detail">${r.sections.map((s) => `<section class="grp" data-type="${s.type}"><p class="tlabel t-${s.type}">${TYPES[s.type].label}</p><ul class="items">${s.items.map((x) => `<li>${x}</li>`).join("")}</ul></section>`).join("")}</div></details>`;
+});
+document.getElementById("list").innerHTML = html;
+filterBar(document.getElementById("filters"));
+bootUpd("U3");
+</script>
+</body>
+</html>
