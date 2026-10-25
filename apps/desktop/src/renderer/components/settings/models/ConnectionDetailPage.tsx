@@ -430,13 +430,33 @@ function DeleteRow({ onDelete }: { onDelete: () => Promise<void> }) {
 
 function BalanceNote({ connection }: { connection: ConnectionView }) {
   const [balance, setBalance] = useState<ProviderBalanceSnapshot | null>(null);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(false);
+    setBalance(null);
     void modelConnectionsApi.getBalance({ connectionId: connection.connectionId })
       .then((result) => { if (!cancelled) setBalance(result); })
-      .catch(() => undefined);
+      .catch(() => { if (!cancelled) setError(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [connection.connectionId, connection.hasApiKey, connection.hasManagementKey]);
+  }, [connection.connectionId, connection.hasApiKey, connection.hasManagementKey, attempt]);
+  if (loading || error) {
+    return (
+      <>
+        <span aria-hidden="true">·</span>
+        {error ? <span role="alert" className="text-on-danger">余额读取失败</span> : <span role="status">余额读取中…</span>}
+        {error || attempt > 0 ? (
+          <Button variant="ghost" size="xs" aria-label="重试余额" busy={loading} disabled={loading} onClick={() => setAttempt((value) => value + 1)}>
+            重试
+          </Button>
+        ) : null}
+      </>
+    );
+  }
   const display = balance?.displayBalance;
   if (!display) return null;
   return (

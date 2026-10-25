@@ -219,6 +219,42 @@ describe("设置 › 模型", () => {
     expect(screen.queryByRole("button", { name: /^我的中转/ })).not.toBeInTheDocument();
   });
 
+  it("余额读取失败时就地反馈，并可重试恢复", async () => {
+    api.getBalance.mockRejectedValueOnce(new Error("deepseek balance request failed."));
+    await openConnection(/^DeepSeek/);
+    expect(await screen.findByRole("alert")).toHaveTextContent("余额读取失败");
+    expect(screen.queryByText(/deepseek balance request failed/)).not.toBeInTheDocument();
+    expect(screen.queryByText("余额 ¥86.52")).not.toBeInTheDocument();
+
+    const restored = await (createModelConnectionsMock() as Api).getBalance({ connectionId: "deepseek:default" });
+    let finishRetry!: (value: typeof restored) => void;
+    api.getBalance.mockImplementationOnce(() => new Promise((resolve) => { finishRetry = resolve; }));
+    await userEvent.click(screen.getByRole("button", { name: "重试余额" }));
+    const retry = screen.getByRole("button", { name: "重试余额" });
+    expect(retry).toBeDisabled();
+    expect(retry).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("余额读取中…")).toHaveAttribute("role", "status");
+    await userEvent.click(retry);
+    expect(api.getBalance).toHaveBeenCalledTimes(2);
+    finishRetry(restored);
+    expect(await screen.findByText("余额 ¥86.52")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(api.getBalance).toHaveBeenCalledTimes(2);
+  });
+
+  it("离开连接详情后忽略迟到的余额失败", async () => {
+    let failBalance!: (reason: Error) => void;
+    api.getBalance.mockImplementationOnce(() => new Promise((_resolve, reject) => { failBalance = reject; }));
+    await openConnection(/^DeepSeek/);
+    expect(screen.getByText("余额读取中…")).toHaveAttribute("role", "status");
+    await userEvent.click(screen.getByRole("button", { name: "返回模型" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^OpenRouter/ }));
+    failBalance(new Error("late balance failure"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "OpenRouter", level: 2 })).toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(/余额读取/)).not.toBeInTheDocument();
+  });
+
   it("官方连接显示余额、名称只读、没有计费；OpenRouter 可以填管理 Key", async () => {
     await openConnection(/^DeepSeek/);
     expect(await screen.findByText("余额 ¥86.52")).toBeInTheDocument();
