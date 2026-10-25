@@ -72,10 +72,11 @@ export interface SandboxHostPort { /* 第一期字段不变 */ readonly inherite
 
 export type SandboxNetwork =
   | { readonly mode: "unrestricted" } | { readonly mode: "blocked" }
-  | { readonly mode: "allowlist"; readonly domains: readonly string[]; readonly upstreamProxy?: string; readonly credentials?: readonly SandboxCredential[] };
+  | { readonly mode: "allowlist"; readonly domains: readonly string[]; readonly localPorts?: readonly number[]; readonly upstreamProxy?: string; readonly credentials?: readonly SandboxCredential[] };
 export type SandboxCredential = { readonly domain: string; readonly header: string; readonly source: { readonly env: string } }; // 预留
 export type SandboxRequest = { /* 第一期字段不变 */ readonly limits?: { readonly memoryBytes?: number; readonly cpuSeconds?: number } }; // 预留
 // 新能力
+//   network.local-ports            localPorts 非空时派生（T0：本机地址不经代理，必须按端口放行）
 //   network.upstream-proxy         upstreamProxy 存在时派生
 //   network.credential-injection   credentials 非空时派生；第二期所有后端 unsupported
 //   process.resource-limits        limits 存在时派生；第二期所有后端 unsupported
@@ -96,7 +97,7 @@ export interface HarnessEvaluationHostPort {
   /** 主应用的产物目录（只读来源）。 */
   readonly artifactRoot: string;
   /** Host 解析模型连接：给候选的环境变量、放行域名、上游代理。密钥只经这里流出。 */
-  modelEnvironment(model: string | undefined): Promise<{ readonly env: Readonly<Record<string, string>>; readonly domains: readonly string[]; readonly upstreamProxy?: string }>;
+  modelEnvironment(model: string | undefined): Promise<{ readonly env: Readonly<Record<string, string>>; readonly domains: readonly string[]; readonly localPorts?: readonly number[]; readonly upstreamProxy?: string }>;
 }
 export type HarnessEvaluationRequest = { readonly selection: SelectionDescription; readonly task: { readonly input: string; readonly model?: string }; readonly workspace: string; readonly timeoutMs?: number };
 export type HarnessEvaluationResult =
@@ -108,7 +109,7 @@ export interface HarnessEvaluationService {
 }
 ```
 
-一次评估：创建临时根目录（`data/`、`workspace/`、`out/`、`tmp/`、`scratch/`）→ 把 `selection.artifactIds` 从 `artifactRoot` 复制到 `data/harness-artifacts/` → 复制工作区 → 写选择文件与任务文件 → `sandbox.run({ purpose: "evaluation", argv: [...launcher, "run", "--data-dir", …, "--workspace", …, "--harness", …, "--sandbox-inherited", "--permission-mode", "full-access", "--input-file", …, "--out", …, "--json"], network: { mode: "allowlist", domains, upstreamProxy }, filesystem: { readWrite: [临时根目录] }, timeoutMs })` → 沙箱退出后读取并校验 `out/` 的结果 → 删除临时根目录（失败只记在结果里）。
+一次评估：创建临时根目录（`data/`、`workspace/`、`out/`、`tmp/`、`scratch/`）→ 把 `selection.artifactIds` 从 `artifactRoot` 复制到 `data/harness-artifacts/` → 复制工作区 → 写选择文件与任务文件 → `sandbox.run({ purpose: "evaluation", argv: [...launcher, "run", "--data-dir", …, "--workspace", …, "--harness", …, "--sandbox-inherited", "--permission-mode", "full-access", "--input-file", …, "--out", …, "--json"], network: { mode: "allowlist", domains, localPorts, upstreamProxy }, filesystem: { readWrite: [临时根目录] }, timeoutMs })` → 沙箱退出后读取并校验 `out/` 的结果 → 删除临时根目录（失败只记在结果里）。
 
 ## 任务
 
@@ -136,7 +137,7 @@ export interface HarnessEvaluationService {
 ### T2 nono 后端：`run` 模式
 
 - `nonoCapabilities`：`network.allowlist`、`network.upstream-proxy` 为 `full`（macOS / Linux），`network.credential-injection`、`process.resource-limits` 为 `unsupported`。
-- `prepare`：`allowlist` 时用 `run`（参数按 T0 结论），每个域名一个 `--allow-domain`，有 `upstreamProxy` 时加 `--upstream-proxy`；profile / 权限清单的网络段按 T0 结论写；仍去掉 `NONO_*`；`run` 的代理变量由 nono 设置，后端不自己拼。
+- `prepare`：`allowlist` 时两个平台都用 `run -s --no-diagnostics --no-audit --no-rollback -p <profile>`（T0：Linux 权限清单会忽略上游代理，`-c` 也不能带参数）；profile 的 `network` 写 `allow_domain`、`open_port`（`localPorts`）、`upstream_proxy`；Linux profile 用拆分覆盖授权生成 `read` / `read_file` / `allow` / `allow_file`；仍去掉 `NONO_*`；`run` 的代理变量由 nono 设置，后端不自己拼。`nonoCapabilities` 加 `network.local-ports` 为 `full`。
 - Seatbelt 能力表补齐三项 `unsupported`，`network.allowlist` 仍 `unsupported`。
 - 验证：sandbox-nono 真实测试（macOS 本机）新增：白名单内成功、白名单外失败、上游代理经过、终止无残留；Linux Docker 复验。`pnpm --filter @actspace/sandbox-seatbelt test`。
 
@@ -149,7 +150,7 @@ export interface HarnessEvaluationService {
 
 ### T4 CLI `--harness <选择文件>`
 
-- 按 T0 第 7 项的结论实现；选择文件内容为 `SelectionDescription`（加 `executionDigest`）。
+- 按 T0 第 7 项的结论实现（方案 b）：`AgentRuntimeHostPort.pinnedHarness`；agent-runtime 的 `builtin` 改为加载固定选择，不传 `upgradePristineBuiltin`；启动后检查 `main` 未被阻塞且 `executionDigest` 一致；`--data-dir` 下 `harness-state` 非空时拒绝。选择文件内容为 `SelectionDescription`（加 `executionDigest`）。
 - 启动前校验：每个产物用 `loadArtifact` 验证、`validateCandidate` 检查兼容性；任何一项失败就以明确的错误码退出，不回退到内置组合。
 - 不写入持久选择，不改 `harness-state`。
 - 验证：CLI 测试覆盖正常启动（结果里能看到候选版本的 `executionDigest`）、产物缺失、摘要不符、兼容性失败。
@@ -210,7 +211,7 @@ T0 → T1 →（T2、T3 可并行）→ T4 → T5 → T6 → T7 → T8。
 
 ## 进度记录
 
-- [ ] T0 实测
+- [x] T0 实测（结论见执行过程步骤 1）
 - [ ] T1 管理器：评估模板与契约加法
 - [ ] T2 nono 后端：`run` 模式
 - [ ] T3 Host 端口与 CLI `--sandbox-inherited`
@@ -224,6 +225,7 @@ T0 → T1 →（T2、T3 可并行）→ T4 → T5 → T6 → T7 → T8。
 
 - 2026-10-25：用户确认 E1–E11（范围拆分、候选启动参数、文件系统、网络与上游代理、密钥预留、评分在外、候选 full-access、无 nono 即拒绝、最小使用方、临时测试工作区、超时与资源）。
 - 2026-10-25：读代码后用户确认 E12–E14：继承模式由 Host 端口告知并移除插件配置 `mode`（取代第一期 D6）；打包版入口留给自进化 V2；新包 `packages/harness-evaluation`。
+- 2026-10-25：T0 后调整（计划内的实现细节，不改已确认的决策）：`allowlist` 加 `localPorts` 与能力 `network.local-ports`；nono `run` 两个平台都用 profile 模式并加 `--no-audit --no-rollback`；“按选择启动”用方案 b，不改 harness-control 语义。
 
 ## 执行模式
 
