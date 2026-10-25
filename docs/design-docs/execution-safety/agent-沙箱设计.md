@@ -1,6 +1,6 @@
 # 沙箱设计
 
-> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二期（评估沙箱）已实施，见 [20261025-sandbox-v2-evaluation-sandbox](../../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)。工具沙箱的出沙箱与回退（第 9 节）2026-10-25 确认，计划见 [20261025-sandbox-escape-fallback](../../exec-plans/active/20261025-sandbox-escape-fallback.md)。第三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
+> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二期（评估沙箱）已实施，见 [20261025-sandbox-v2-evaluation-sandbox](../../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)。工具沙箱的出沙箱与回退（第 9 节）已实施，端到端验证中，计划见 [20261025-sandbox-escape-fallback](../../exec-plans/active/20261025-sandbox-escape-fallback.md)。第三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
 
 ## 1. 结论
 
@@ -215,6 +215,12 @@ flowchart LR
 - 白名单、本机端口、上游代理在 macOS 与 Linux（Docker，Landlock V6）上都生效：不放行的域名 CONNECT 403，去掉代理变量直连也被拦。
 - 集成测试（真实 nono + 真实 CLI + 本机假模型服务）发现了 5.1 里的两处 nono 默认行为：系统写入组让候选能写原工作区所在的临时目录；空的 `allow_domain` 让网络完全放开。两处都已修正，并有用例覆盖。
 - Linux 上候选能正常跑通，但 Docker Desktop 的 virtiofs 挂载目录与 Landlock 不兼容：`nono why` 说允许、读取却报 EACCES。在 Docker 里测要把仓库复制进容器自己的文件系统，并用 `docker run --init` 回收僵尸进程。
+
+出沙箱与回退实施时补充（macOS，nono 与 Seatbelt，详见[执行过程](../../exec-runs/20261025-sandbox-escape-fallback/execution-process.md)步骤 1）：
+
+- 沙箱拦截写入一律报 `Operation not permitted`（EPERM），命令自己的权限错误是 `Permission denied`（EACCES），可以区分；被拦命令的退出码有 1、4、255，所以识别时只排除 2、126、127。
+- npm 被拦时 `EPERM` 出现在较前面，最后几行是误导性的 “sudo chown” 建议，所以要看输出末尾 8KB，不能只看最后几行。
+- 钥匙串没有稳定特征：`gh` 在两个后端都只报 “token 无效”；nono 下 `security`、`git credential-osxkeychain` 报 `-50` 参数错误，Seatbelt 下与沙箱外相同。所以钥匙串不做匹配，只在工具描述与参数描述里点名 `git push`（HTTPS）和 `gh`。
 
 ## 9. 工具沙箱的出沙箱与回退（2026-10-25 确认）
 

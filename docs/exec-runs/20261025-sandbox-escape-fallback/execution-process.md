@@ -85,9 +85,20 @@
 - **结果**：client 49 通过（新增：参数里的理由进入预览与待审批消息块）；shared 179 通过；renderer `bash-run-block-tooltip`、`approval-parts` 25 通过（新增：待审批时命令下方显示理由并带“真实环境”，没有理由或已执行时不显示）。
 - **影响文件**：`packages/shared/src/{session.ts,session-selectors.ts}`、`packages/client/src/{sessions/tool-card.ts,live/stream-blocks.ts,test/background-bash-status.test.ts}`、`apps/desktop/src/renderer/{components/messages/BashRunBlock.tsx,test/bash-run-block-tooltip.test.tsx}`。
 
+### 步骤 6：T5 文档与检查
+
+- **操作**：
+  - 执行安全入口“Bash 当前边界”、`docs/SECURITY.md` 的 Bash 边界、`packages/tools/shell-tools/README.md`（新增“沙箱”一节，前缀授权一句改为“申请出沙箱”）改为新行为。
+  - 沙箱设计：状态改为已实施；第 8 节补 T0 实测结论。
+  - 工具定义没有 snapshot，`pnpm test:contract-matrix` 不需要改。
+- **顺序调整**：先做 T6 端到端，再写执行摘要、history、移动计划，让收尾文档带上端到端结果。
+- **结果**：`pnpm check:packages`、`pnpm test:contract-matrix`（4）、`pnpm test:current-docs`（7）、`pnpm typecheck`、`pnpm test` 全部通过。
+- **影响文件**：`docs/design-docs/execution-safety/{README.md,agent-沙箱设计.md}`、`docs/SECURITY.md`、`packages/tools/shell-tools/README.md`。
+
 ## 遇到的问题
 
 - T1 新测试起初只期望三次提取，实际每次准入都会在执行前复查一次（`full-access` 也一样），改为四次。
+- 设计文档状态先写了 `completed/` 的计划链接，计划还在 `active/`，`pnpm test:current-docs` 报断链；改回 `active/`，收尾移动计划时再改。
 - 第二轮实测没有设置代理，`git ls-remote` 连不上 github.com，与沙箱无关。第一轮设置了代理，沙箱内外都成功（公开仓库，不需要凭据），说明工具沙箱不限网络。
 
 ## 跳过或推迟的事项
