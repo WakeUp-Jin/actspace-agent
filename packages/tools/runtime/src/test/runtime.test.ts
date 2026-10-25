@@ -572,6 +572,7 @@ describe("process Session Grant execution", () => {
     const options = { sessionGrants: grants, sessionGrantCapability: true, trustedGrantAudiences, permissionRecords: records };
     const broker: ApprovalBroker = { async requestApproval(request) {
       expect(request.grantSuggestions).toHaveLength(1);
+      expect(request.resources).toMatchObject([{ kind: "process", noSandbox: false }]);
       return { requestId: request.requestId, kind: "session", suggestionId: request.grantSuggestions[0]!.suggestionId, decidedAt: new Date().toISOString() };
     } };
     const run = (id: string, value: string, env = environment([], options)) => runtime.executeBatch([call(id, { value })], env);

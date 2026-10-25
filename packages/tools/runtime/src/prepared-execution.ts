@@ -650,7 +650,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 function summarizeResource(resource: ToolResource): ApprovalResourceSummary {
   return resource.kind === "file"
     ? { kind: "file", access: resource.access, path: redactToolText(resource.canonicalPath), targetKind: resource.targetKind }
-    : { kind: "process", access: "execute", commandDigest: resource.commandDigest, cwd: redactToolText(resource.cwd), dynamic: resource.dynamic };
+    : { kind: "process", access: "execute", commandDigest: resource.commandDigest, cwd: redactToolText(resource.cwd), dynamic: resource.dynamic, ...(resource.noSandbox === undefined ? {} : { noSandbox: resource.noSandbox }) };
 }
 
 function isOnceApproval(value: OnceApproval | ToolFailure): value is OnceApproval {

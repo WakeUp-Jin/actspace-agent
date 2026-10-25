@@ -95,6 +95,15 @@
 - **影响文件**：`packages/tools/shell-tools/{package.json,src/manifest.ts,src/plugin.ts,src/node-ports.ts,src/test/*}`、`packages/runtime/src/harness/default-harness-definition.ts`、`apps/desktop/src/main/runtime-v2/tool-host-services.ts`、`apps/desktop/src/main/test/runtime-v2-output-reference-flow.test.ts`、`packages/agent-host/src/node-ports/tool-host-services.ts`、`tsconfig` 依赖图。
 - **验证**：shell-tools 109 通过（含 Seatbelt、nono 真实后端各 1 个），`typecheck` 通过；tools-runtime 47、runtime 84、agent-host 58、agent-cli 13 通过；Desktop 2025 通过 / 7 跳过，`typecheck` 通过；`check:packages`、`check:desktop-build-graph` 通过。
 
+### 步骤 8：T7 审批卡显示“真实环境”
+
+- **操作**：`ApprovalResourceSummary` 的进程摘要增加可选 `noSandbox`，`summarizeResource` 原样带上；Desktop `approval-broker.ts` 导出 `executionEnvironment(resources)`（`true` → `"real"`，`false` → `"sandbox"`，没有该字段时不设置），本机审批与远程 Host 审批（`remote-hosts/desktop-adapter.ts`）都用它填 `executionEnvironment`。
+- **与计划的差异**：
+  1. 计划只改 `approval-broker.ts`；实际审批请求里的资源摘要原本不含 `noSandbox`，所以先在共享类型和 `summarizeResource` 中补上。
+  2. 远程 Host 审批同样补上环境，避免远端沙箱外执行显示成沙箱内。Web 客户端（`apps/web`）审批卡目前不显示执行环境，不在本期范围，记入推迟事项。
+- **影响文件**：`packages/shared/src/runtime-v2/permission.ts`、`packages/tools/runtime/src/{prepared-execution.ts,test/runtime.test.ts}`、`apps/desktop/src/main/runtime-v2/approval-broker.ts`、`apps/desktop/src/main/remote-hosts/desktop-adapter.ts`、`apps/desktop/src/main/test/runtime-v2-approval-broker.test.ts`。
+- **验证**：tools-runtime 47 通过（审批请求资源断言 `noSandbox: false`）；approval broker 测试三种取值通过；Desktop 2028 通过 / 7 跳过，`typecheck` 通过；runtime 84 通过。
+
 ## 遇到的问题
 
 - **问题**：权限清单的 `deny` 不生效。
@@ -103,4 +112,4 @@
 
 ## 跳过或推迟的事项
 
-- 无。
+- Web 客户端审批卡不显示“沙箱 / 真实环境”（T7 只覆盖 Desktop 本机与远程 Host 审批）。
