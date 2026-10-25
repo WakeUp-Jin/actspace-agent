@@ -101,6 +101,7 @@ export function SpeechSettingsSection() {
             <>
               <StatusDot tone="ok">已配置</StatusDot>
               <SettingsMenuButton
+                id="speech-key-trigger"
                 label="管理"
                 ariaLabel="管理 MiniMax Key"
                 disabled={busy}
@@ -113,12 +114,14 @@ export function SpeechSettingsSection() {
           ) : (
             <>
               <StatusDot tone="off">未配置</StatusDot>
-              <Button aria-label="设置 MiniMax Key" aria-expanded={keyEditorOpen} disabled={busy} onClick={() => setKeyEditorOpen((open) => !open)}>设置 Key</Button>
+              <Button id="speech-key-trigger" aria-label="设置 MiniMax Key" aria-expanded={keyEditorOpen} aria-controls="speech-key-editor" disabled={busy} onClick={() => setKeyEditorOpen((open) => !open)}>设置 Key</Button>
             </>
           )}
         />
         {keyEditorOpen ? (
           <SettingEditor
+            id="speech-key-editor"
+            returnFocusId="speech-key-trigger"
             hint="使用 MiniMax 中国站 Key，只保存在本机。"
             saving={busy}
             saveDisabled={!key.trim()}

@@ -1,9 +1,9 @@
-import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection } from "../workspace-registry-service";
+import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { ReviewCoordinator } from "../review-coordinator";
 import { ReviewGitEngine } from "../review-git-engine";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -116,6 +116,53 @@ describe("workspace admission from the native picker", () => {
 });
 
 describe("renderer-supplied workspace roots", () => {
+  it("reads a local session worktree environment without admitting it to Recents and rejects unrelated roots", async () => {
+    const dataRoot = await mkdtemp(join(tmpdir(), "workspace-environment-ipc-"));
+    const source = join(dataRoot, "source");
+    const worktree = join(dataRoot, "worktree");
+    const outside = join(dataRoot, "outside");
+    for (const path of [source, worktree, outside]) await mkdir(path);
+    await promisify(execFile)("git", ["init", "-b", "actspace/test", worktree]);
+    const roots = { dataRoot, workspaceRoot: source, defaultWorkspaceRoot: source };
+    const registration = registerFixedRendererIpc({ roots, registry: {
+      subscribe: () => () => {}, subscribeRendererStream: () => () => {},
+      listSessions: async () => [{ sessionId: "tree", workspaceRoot: worktree }],
+    }, settings: { subscribeV4Changes: () => () => {} }, getMainWindow: () => trusted.window } as unknown as FixedRendererIpcOptions);
+    const call = (workspaceRoot?: string) => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getWorkspaceEnvironment)!(trusted.event, { workspaceRoot });
+    try {
+      await expect(call(worktree)).resolves.toMatchObject({ workspaceRoot: await realpath(worktree), git: { branch: "actspace/test" } });
+      await expect(call()).resolves.toMatchObject({ workspaceRoot: await realpath(source) });
+      await expect(call(outside)).rejects.toThrow("workspace_not_registered");
+      const registry = await readWorkspaceRegistry({ ...roots, fallbackWorkspaceRoot: source });
+      expect(registry.items.map(item => item.path)).toEqual([source]);
+    } finally { registration.dispose(); await rm(dataRoot, { recursive: true, force: true }); }
+  });
+  it('resolves setWorkspace IDs and rejects conflicting, unknown or empty selections without updating', async () => {
+    const dataRoot = await mkdtemp(join(tmpdir(), 'workspace-id-ipc-'));
+    const roots = { dataRoot, workspaceRoot: join(dataRoot, 'default'), defaultWorkspaceRoot: join(dataRoot, 'default') };
+    const options = { ...roots, fallbackWorkspaceRoot: roots.workspaceRoot };
+    const target = await resolveWorkspaceSelection(options, { workspaceRoot: join(dataRoot, 'target') });
+    if (!target.ok) throw new Error(target.error);
+    const updateSessionWorkspace = vi.fn(async () => undefined);
+    const registration = registerFixedRendererIpc({ roots, registry: {
+      subscribe: () => () => {}, subscribeRendererStream: () => () => {},
+      inspectSession: async () => ({ workspaceRoot: roots.workspaceRoot }), updateSessionWorkspace,
+    }, settings: { subscribeV4Changes: () => () => {} }, getMainWindow: () => trusted.window } as unknown as FixedRendererIpcOptions);
+    const call = (input: object) => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionWorkspace)!(trusted.event, { sessionId: 's1', ...input });
+    try {
+      for (const selection of [{ workspaceId: target.workspaceId }, { workspaceRoot: target.workspaceRoot }, { workspaceId: target.workspaceId, workspaceRoot: target.workspaceRoot }]) {
+        await expect(call(selection)).resolves.toEqual({ ok: true });
+        expect(updateSessionWorkspace).toHaveBeenLastCalledWith('s1', target.workspaceRoot);
+      }
+      updateSessionWorkspace.mockClear();
+      for (const selection of [{ workspaceId: 'missing' }, { workspaceId: target.workspaceId, workspaceRoot: roots.workspaceRoot }, {}]) {
+        await expect(call(selection)).rejects.toThrow();
+      }
+      expect(updateSessionWorkspace).not.toHaveBeenCalled();
+      updateSessionWorkspace.mockRejectedValueOnce(new Error('session is busy'));
+      await expect(call({ workspaceId: target.workspaceId })).rejects.toThrow('session is busy');
+    } finally { registration.dispose(); await rm(dataRoot, { recursive: true, force: true }); }
+  });
   async function setup() {
     const dataRoot = await mkdtemp(join(tmpdir(), "workspace-access-ipc-"));
     const defaultRoot = join(dataRoot, "default");

@@ -127,8 +127,10 @@ describe("TrajectoryView", () => {
     const view = render(<TrajectoryView snapshot={snapshot} onAbort={onAbort} />);
     const toolbar = screen.getByRole("toolbar", { name: "轨迹工具栏" });
     const buttons = within(toolbar).getAllByRole("button");
-    expect(buttons.at(-1)).toHaveAccessibleName("停止");
-    await userEvent.click(buttons.at(-1)!);
+    const stopButton = buttons.at(-1)!;
+    expect(stopButton).toHaveAccessibleName("停止");
+    expect(stopButton).toHaveClass("tjb-stop");
+    await userEvent.click(stopButton);
     expect(onAbort).toHaveBeenCalledTimes(1);
     view.rerender(<TrajectoryView snapshot={snapshot} onAbort={onAbort} isAborting />);
     expect(within(toolbar).getByRole("button", { name: "正在停止…" })).toBeDisabled();

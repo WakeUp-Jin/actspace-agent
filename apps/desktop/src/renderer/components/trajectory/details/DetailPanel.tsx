@@ -10,6 +10,7 @@ import { SystemPromptDiff, SystemPromptView, ToolCatalog } from './SystemBody';
 import { RecordTiming } from './TimingFields';
 import { RecordPayload, RecordSchema } from './ToolBody';
 import { RawFragment } from './shared';
+import type { TrajectoryDelegation } from '../../../trajectory/subagents';
 
 export type DetailSelection =
   | { readonly kind: 'record'; readonly cell: TrajectoryCell }
@@ -24,6 +25,10 @@ export type DetailPanelProps = {
   onSelectRecord(recordId: string): void;
   onSelectRequest(requestKey: string): void;
   onClose(): void;
+  /** 这次工具调用委派出的子智能体；没有时返回 null。 */
+  subagentFor?(callId: string): TrajectoryDelegation | null;
+  /** 在右侧面板打开子智能体的轨迹；不传时概述只显示子智能体名称，不给按钮。 */
+  onOpenSubagent?(childSessionId: string): void;
 };
 
 const MIN_WIDTH = 320;
@@ -81,7 +86,7 @@ function Header({ layout, selection, onClose }: Pick<DetailPanelProps, 'layout' 
 
 /** 事件详情：头部、页签栏、可拖拽宽度；内容按选中对象和页签分派。 */
 export function DetailPanel(props: DetailPanelProps) {
-  const { layout, selection, tab, onTab, onSelectRecord, onSelectRequest, onClose } = props;
+  const { layout, selection, tab, onTab, onSelectRecord, onSelectRequest, onClose, subagentFor, onOpenSubagent } = props;
   const [width, setWidth] = useState<number | null>(null);
   // DSH: a message with thinking opens expanded; a toggle holds only for the record it was made on.
   const [thinkingDisclosure, setThinkingDisclosure] = useState<{ recordId: string; expanded: boolean } | null>(null);
@@ -123,7 +128,7 @@ export function DetailPanel(props: DetailPanelProps) {
 
   const body = selection.kind === 'request'
     ? <RequestBody layout={layout} request={selection.request} tab={tab} onTab={onTab} onSelectRecord={onSelectRecord} />
-    : <RecordBody {...{ layout, cell: selection.cell, tab, onTab, onSelectRecord, onSelectRequest, thinkingExpanded, onThinkingExpanded: setThinkingExpanded }} />;
+    : <RecordBody {...{ layout, cell: selection.cell, tab, onTab, onSelectRecord, onSelectRequest, thinkingExpanded, onThinkingExpanded: setThinkingExpanded, subagentFor, onOpenSubagent }} />;
 
   return (
     <aside className="tj-details" aria-label={T.details} style={width === null ? undefined : { width }}>
@@ -179,7 +184,7 @@ type RecordBodyInputs = {
   tab: DetailTab;
   thinkingExpanded: boolean;
   onThinkingExpanded(expanded: boolean): void;
-} & Pick<DetailPanelProps, 'onTab' | 'onSelectRecord' | 'onSelectRequest'>;
+} & Pick<DetailPanelProps, 'onTab' | 'onSelectRecord' | 'onSelectRequest' | 'subagentFor' | 'onOpenSubagent'>;
 
 function RecordBody(props: RecordBodyInputs) {
   const { layout, cell, tab, onSelectRecord } = props;

@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
-import type { AppSettings, SettingsV4NamespacePatch, SettingsV4Snapshot, TaskModelSettings, ModelKey, UsableModelView } from "@actspace/shared";
+import type { SettingsV4NamespacePatch, SettingsV4Snapshot } from "@actspace/shared";
 import type { SettingsSectionId } from "../SettingsNav";
 import { SettingGroup, SettingLinkRow, SettingsInput, useSettingsSaveNotice, SettingRow, Stepper } from "../SettingsPrimitives";
-import { ModelPurposeSelect } from "../ModelPurposeSelect";
-import { modelsApi } from "../../../api/models";
-
-const EMPTY_TASK_MODELS: TaskModelSettings = {
-  defaultChatModel: null,
-  utilityModel: null,
-  exploreModel: null,
-};
 
 type GenerationDefaults = { temperature: string; maxOutputTokens: string; compactionPercent: number };
 
@@ -25,39 +17,23 @@ function parseMaxOutputTokens(raw: string): number | null | "invalid" {
   return Number.isInteger(value) && value >= 1 && value <= 1_000_000 ? value : "invalid";
 }
 
+/** 生成参数。各用途用哪个模型在「模型」页设置，这里只留入口。 */
 export function TaskModelDefaultsSection({
-  settings,
   settingsV4,
   onUpdateNamespace,
-  onChanged,
   onNavigate,
 }: {
-  settings: AppSettings;
   settingsV4?: SettingsV4Snapshot | null;
   onUpdateNamespace?: (input: SettingsV4NamespacePatch) => Promise<SettingsV4Snapshot | null>;
-  onChanged?: () => void | Promise<void>;
   onNavigate?: (section: SettingsSectionId) => void;
 }) {
   const notifySaved = useSettingsSaveNotice();
-  const [taskModels, setTaskModels] = useState<TaskModelSettings>(settings.taskModels ?? EMPTY_TASK_MODELS);
-  const [usable, setUsable] = useState<Record<"chat" | "utility" | "explore", UsableModelView[]>>({ chat: [], utility: [], explore: [] });
   const [draft, setDraft] = useState<GenerationDefaults>({ temperature: "", maxOutputTokens: "", compactionPercent: 80 });
   const [fieldError, setFieldError] = useState<{ temperature?: string; maxOutputTokens?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const v4Ready = Boolean(settingsV4 && onUpdateNamespace);
   const savedDefaults = settingsV4?.settings.general.taskDefaults;
 
-  const load = async () => {
-    const [chat, utility, explore] = await Promise.all([
-      modelsApi.listUsable({ purpose: "chat" }),
-      modelsApi.listUsable({ purpose: "utility" }),
-      modelsApi.listUsable({ purpose: "explore" }),
-    ]);
-    setUsable({ chat: chat.models, utility: utility.models, explore: explore.models });
-  };
-
-  useEffect(() => { void load(); }, []);
-  useEffect(() => { if (settings.taskModels) setTaskModels(settings.taskModels); }, [settings.taskModels]);
   useEffect(() => {
     if (!savedDefaults) return;
     setDraft({
@@ -66,18 +42,6 @@ export function TaskModelDefaultsSection({
       compactionPercent: Math.round((savedDefaults.chatCompactionTriggerRatio ?? 0.8) * 100),
     });
   }, [savedDefaults]);
-
-  const updateTask = async (field: keyof TaskModelSettings, value: ModelKey | null) => {
-    setError(null);
-    try {
-      const result = await modelsApi.updateTaskModels({ [field]: value });
-      setTaskModels(result.taskModels);
-      notifySaved();
-      await onChanged?.();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "任务默认模型保存失败。");
-    }
-  };
 
   /** 失焦或步进时保存；只提交合法且与已保存值不同的生成参数。 */
   const commitDefaults = async (next: GenerationDefaults) => {
@@ -106,25 +70,17 @@ export function TaskModelDefaultsSection({
     }
   };
 
-  const exploreModel = taskModels.exploreModel;
-  const exploreLabel = exploreModel
-    ? usable.explore.find((model) => model.key === exploreModel)?.label ?? exploreModel
-    : "跟随会话模型";
   const fieldDescription = (message: string | undefined, fallback?: string) =>
     message ? <span className="text-on-danger">{message}</span> : fallback;
 
   return (
     <SettingGroup title="模型与生成" headingLevel={3} description="新请求使用的模型和生成参数，只影响之后的请求。">
-      <ModelPurposeSelect label="默认会话模型" description="新会话和未手动选择模型时使用。" value={taskModels.defaultChatModel} models={usable.chat} onChange={(value) => void updateTask("defaultChatModel", value)} />
-      <ModelPurposeSelect label="轻量任务模型" description="标题、工具摘要和上下文压缩。" value={taskModels.utilityModel} models={usable.utility} onChange={(value) => void updateTask("utilityModel", value)} />
-      <ModelPurposeSelect label="自动审批模型" emptyLabel="跟随会话模型" description="用于「替我审批」；未选择时跟随当前会话模型，判断失败时交回人工。" value={taskModels.autoReviewModel ?? null} models={usable.utility} onChange={(value) => void updateTask("autoReviewModel", value)} />
       <SettingLinkRow
-        title="Explore 模型"
-        description="在「子 Agent」中管理。"
-        value={exploreLabel}
-        ariaLabel="前往子 Agent 设置 Explore 模型"
+        title="用途模型"
+        description="会话默认、轻量任务、自动审批、子 Agent 探索和看图，在「模型」中设置。"
+        ariaLabel="前往模型设置用途模型"
         disabled={!onNavigate}
-        onClick={() => onNavigate?.("subagents")}
+        onClick={() => onNavigate?.("model")}
       />
       <SettingRow
         title="温度"

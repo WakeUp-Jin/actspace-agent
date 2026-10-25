@@ -141,7 +141,7 @@ Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布
 
 ### `+` 面板
 
-点击 `+` 打开与输入框同宽的面板（`ui/Popover` 锚在整个 panel 上，`side="top"`、间距 8px；上方放不下时由 Radix 翻到下方）。外观：`rounded-act-lg`、`bg-surface-raised`、`shadow-act-popover`；行高 28px、行圆角 8px；每行是图标、名称（muted，高亮时 main）和紧跟其后的 faint 说明；高亮行 `bg-hover-overlay`；列表最高 280px。
+点击 `+` 打开与输入框同宽的面板（`ui/Popover` 锚在整个 panel 上，`side="top"`、间距 8px；上方放不下时由 Radix 翻到下方）。外观：`rounded-act-lg`、`bg-surface-raised`、`shadow-act-popover`；行高 28px、行圆角 8px；每行是图标、名称（muted，高亮时 main）和紧跟其后的 faint 说明；高亮行 `bg-hover-overlay`；列表最高 280px。 两侧均放不下自然高度时，整张面板遵守 Radix 给出的可用高度，搜索/返回行保持可见且不收缩，列表在剩余高度内滚动；不能只限制列表280px而让整卡顶部越出视口。
 
 主页：
 

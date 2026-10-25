@@ -16,8 +16,8 @@ const LEFT_HIDE_SNAP_WIDTH = 148;
 export const MAIN_MIN_WIDTH = 560;
 const RIGHT_DEFAULT_WIDTH = 390;
 export const RIGHT_MIN_WIDTH = 320;
-/** 低于该宽度时，左右面板改为覆盖层，避免继续挤压主聊天区。 */
-const COMPACT_LAYOUT_MAX_WIDTH = 820;
+/** 主区与右栏都取最小宽时仍放不下（< 880px），左右面板就改为覆盖层；阈值与并排容量同源，避免出现两种布局都打不开右栏的空档。 */
+const SIDE_BY_SIDE_MIN_WIDTH = MAIN_MIN_WIDTH + RIGHT_MIN_WIDTH;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -78,7 +78,7 @@ export type PanelLayoutRightPanel = {
 
 /**
  * 工作台左右面板的布局（16 T15，从 WorkbenchLayout 搬出）：宽度与收起状态的持久化、窄窗口自动收起、
- * 紧凑布局（≤ 820px）下的覆盖层和 Esc 关闭，以及分隔条拖拽 / 键盘调整。右侧面板的开关状态由 RightPanelContext 持有。
+ * 紧凑布局（< 880px）下的覆盖层和 Esc 关闭，以及分隔条拖拽 / 键盘调整。右侧面板的开关状态由 RightPanelContext 持有。
  */
 export function usePanelLayout({ isOpen: isRightPanelOpen, openPanel: openRightPanel, closePanel: closeRightPanel }: PanelLayoutRightPanel) {
   const [storedLayout] = useState(loadStoredLayout);
@@ -90,7 +90,7 @@ export function usePanelLayout({ isOpen: isRightPanelOpen, openPanel: openRightP
   const [rightWidth, setRightWidth] = useState(storedLayout.rightWidth);
   const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
 
-  const isCompactLayout = containerWidth > 0 && containerWidth <= COMPACT_LAYOUT_MAX_WIDTH;
+  const isCompactLayout = containerWidth > 0 && containerWidth < SIDE_BY_SIDE_MIN_WIDTH;
   const isSidebarHidden = leftMode === "hidden";
   const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
   const rightMaxWidth = getRightMaxWidth(containerWidth, displayedLeftWidth);

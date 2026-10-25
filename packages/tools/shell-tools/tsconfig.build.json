@@ -7,6 +7,9 @@
   },
   "references": [
     {
+      "path": "./../../background-tasks/tsconfig.build.json"
+    },
+    {
       "path": "./../../cordis-adapter/tsconfig.build.json"
     },
     {

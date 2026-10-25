@@ -92,8 +92,9 @@ export function ContextPopup({
           event.preventDefault();
           (event.currentTarget as HTMLElement).focus();
         }}
+        // 点浮层外任何地方都关闭；只放过圆环按钮本身，由它的 onClick 切换，免得先关掉又被重新打开。
         onInteractOutside={(event) => {
-          if (anchorRef.current?.contains(event.target as Node | null)) event.preventDefault();
+          if ((event.target as Element | null)?.closest?.("[data-context-usage-toggle]")) event.preventDefault();
         }}
       >
         <header className={`context-popover-header ${CONTEXT_ROW_CLASS}`}>

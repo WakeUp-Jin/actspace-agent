@@ -2,6 +2,7 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { EventCodecRegistry } from "./codec-registry.js";
 import { validateEventEnvelopeShape, type SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
+import { AUXILIARY_IDENTITY_FIELDS } from "./auxiliary-codec.js";
 
 export type SessionAccessState = "read-write" | "degraded" | "browse-only" | "corrupt";
 
@@ -30,6 +31,9 @@ export type SessionValidationResult = {
 type MutableRelations = {
   openTurnId: string | null;
   openStepId: string | null;
+  openAgentRunId: string | null;
+  auxiliary: Map<string, Readonly<Record<string, RuntimeV2JsonValue>>>;
+  auxiliaryIds: Set<string>;
   requests: Map<string, { header: boolean; context: boolean; terminal: boolean }>;
   tools: Map<string, { terminal: boolean; order: number }>;
   inbox: Map<string, { status: "pending" | "claimed" | "discarded"; target: "next-step" | "next-turn"; seq: number }>;
@@ -127,7 +131,7 @@ export function validateSessionEvents(events: readonly SessionEventEnvelopeV1[],
 /** Preserve duplicate-ID checks without retaining settled request/tool payloads. */
 function relationUndo(state: MutableRelations, dataValue: RuntimeV2JsonValue): () => void {
   const data = asRecord(dataValue, "relation");
-  const turn = state.openTurnId, step = state.openStepId, repair = state.activeRepairId;
+  const turn = state.openTurnId, step = state.openStepId, repair = state.activeRepairId, run = state.openAgentRunId;
   const restores: Array<() => void> = [];
   const save = <T extends object>(map: Map<string, T>, key: unknown) => {
     if (typeof key !== "string") return;
@@ -136,8 +140,9 @@ function relationUndo(state: MutableRelations, dataValue: RuntimeV2JsonValue): (
   };
   const saveSet = (set: Set<string>, key: unknown) => { if (typeof key === "string" && !set.has(key)) restores.push(() => { set.delete(key); }); };
   save(state.requests, data.requestId); save(state.tools, data.callId ?? data.toolCallId); save(state.inbox, data.messageId);
+  save(state.auxiliary, data.attemptId); saveSet(state.auxiliaryIds, data.attemptId);
   saveSet(state.requestIds, data.requestId); saveSet(state.toolIds, data.callId ?? data.toolCallId); saveSet(state.inboxIds, data.messageId); saveSet(state.committedRepairIds, data.repairId);
-  return () => { state.openTurnId = turn; state.openStepId = step; state.activeRepairId = repair; restores.forEach(restore => restore()); };
+  return () => { state.openTurnId = turn; state.openStepId = step; state.activeRepairId = repair; state.openAgentRunId = run; restores.forEach(restore => restore()); };
 }
 
 export function effectiveSessionEvents(events: readonly SessionEventEnvelopeV1[]): readonly SessionEventEnvelopeV1[] {
@@ -172,7 +177,7 @@ export function assertSessionCanClose(result: SessionValidationResult): void {
 }
 
 function createRelations(): MutableRelations {
-  return { openTurnId: null, openStepId: null, requests: new Map(), tools: new Map(), inbox: new Map(), requestIds: new Set(), toolIds: new Set(), inboxIds: new Set(), activeRepairId: null, committedRepairIds: new Set() };
+  return { openTurnId: null, openStepId: null, openAgentRunId: null, auxiliary: new Map(), auxiliaryIds: new Set(), requests: new Map(), tools: new Map(), inbox: new Map(), requestIds: new Set(), toolIds: new Set(), inboxIds: new Set(), activeRepairId: null, committedRepairIds: new Set() };
 }
 
 function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, dataValue: RuntimeV2JsonValue): void {
@@ -182,6 +187,7 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
       const turnId = id(data.turnId, event.type);
       if (state.openTurnId !== null) invalid(`Cannot start Turn ${turnId} while ${state.openTurnId} is open.`);
       state.openTurnId = turnId;
+      state.openAgentRunId = typeof data.agentRunId === "string" ? data.agentRunId : null;
       break;
     }
     case "turn/end": {
@@ -190,6 +196,7 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
       if ([...state.tools.values()].some((tool) => !tool.terminal)) invalid(`Turn ${turnId} has an open tool call.`);
       if ([...state.requests.values()].some((request) => !request.terminal)) invalid(`Turn ${turnId} has an open request.`);
       state.openTurnId = null;
+      state.openAgentRunId = null;
       break;
     }
     case "step/start": {
@@ -246,8 +253,27 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
       state.tools.set(callId, { terminal: false, order: event.seq });
       break;
     }
+    case "llm/auxiliary-start":
+    case "llm/auxiliary-end": {
+      if (event.surface !== null) invalid("Auxiliary requests cannot modify Surface.");
+      if (data.purpose === "image-inspection" || data.purpose === "auto-review") {
+        if (data.turnId !== state.openTurnId || data.stepId !== state.openStepId || !state.tools.has(id(data.callId, event.type)) || (state.openAgentRunId !== null && data.agentRunId !== state.openAgentRunId)) invalid("Auxiliary request requires its active parent run, Turn, Step and tool call.");
+      } else if (event.type === "llm/auxiliary-start" && data.turnId !== undefined && data.turnId !== state.openTurnId) invalid("Compaction requires its active Turn.");
+      const attemptId = id(data.attemptId, event.type);
+      if (event.type === "llm/auxiliary-start") {
+        if (state.auxiliaryIds.has(attemptId)) invalid(`Duplicate auxiliary attempt ${attemptId}.`);
+        state.auxiliaryIds.add(attemptId);
+        state.auxiliary.set(attemptId, data);
+      } else {
+        const start = state.auxiliary.get(attemptId);
+        if (start === undefined || AUXILIARY_IDENTITY_FIELDS.some(field => start[field] !== data[field])) invalid(`Auxiliary terminal ${attemptId} requires its matching open start.`);
+        state.auxiliary.delete(attemptId);
+      }
+      break;
+    }
     case "tool/result": {
       const callId = id(data.callId ?? data.toolCallId, event.type);
+      if ([...state.auxiliary.values()].some(attempt => attempt.callId === callId)) invalid(`Tool ${callId} has an unfinished auxiliary request.`);
       const tool = state.tools.get(callId);
       if (tool === undefined || tool.terminal) invalid(`Tool call ${callId} has no open result slot.`);
       const earliest = [...state.tools].filter(([, candidate]) => !candidate.terminal).sort((left, right) => left[1].order - right[1].order)[0]?.[0];

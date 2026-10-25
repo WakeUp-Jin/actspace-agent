@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { snapshotSessionJson } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue, RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
+import { BACKGROUND_WAKE_KIND, isBackgroundWake, type RuntimeV2JsonValue, type RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
 import { TaskError, type HarnessIdentity, type RunOutcome, type TaskRecord, type TaskReceipt } from "./contracts.js";
 import { RunBudget } from "./execution-budget.js";
 import { TaskLedger } from "./task-ledger.js";
@@ -45,6 +45,8 @@ export type RunManagerOptions = {
   readonly runIdForTask?: (task: TaskRecord) => string | undefined;
   readonly acquire: (harnessId: string, signal?: AbortSignal) => RunLease | Promise<RunLease>;
   readonly readConfiguration: () => ExecutionConfiguration | Promise<ExecutionConfiguration>;
+  /** Undelivered background notifications in the Session Inbox. */
+  readonly hasPendingNotifications?: () => boolean;
   readonly onFailure?: (error: unknown) => void;
 };
 type ActiveRun = { readonly runId: string; readonly taskId: string; readonly controller: AbortController; readonly done: Promise<void> };
@@ -61,11 +63,15 @@ export class SessionRunManager {
   #closing: Promise<void> | undefined;
   #failure: unknown;
   #failed = false;
+  #waking = false;
+  /** A wake Run that did not complete must not retry itself; the next user action re-arms it. */
+  #wakeSuspended = false;
   constructor(private readonly options: RunManagerOptions) { this.ledger = options.ledger; }
   get failure(): unknown { return this.#failure; }
 
   async submit(submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
     this.#assertOpen();
+    if (!isBackgroundWake(content)) this.#wakeSuspended = false;
     const receipt = await this.ledger.submit(submissionId, content, continuationOf);
     this.kick();
     return receipt;
@@ -74,6 +80,8 @@ export class SessionRunManager {
     this.#assertOpen();
     if (this.#failed) throw this.#failure;
     await this.ledger.setPaused(false, expectedRevision);
+    this.#wakeSuspended = false;
+    this.wake();
     this.kick();
   }
   async stop(runId: string): Promise<boolean> {
@@ -102,7 +110,7 @@ export class SessionRunManager {
     if (this.#active || this.#maintenance) return Promise.reject(new TaskError("SESSION_BUSY", this.ledger.snapshot()));
     const work = Promise.resolve().then(operation);
     this.#maintenance = work;
-    return work.finally(() => { this.#maintenance = undefined; this.kick(); });
+    return work.finally(() => { this.#maintenance = undefined; this.wake(); this.kick(); });
   }
   dispose(): Promise<void> {
     if (this.#closing) return this.#closing;
@@ -112,6 +120,20 @@ export class SessionRunManager {
       for (const listener of this.#failureListeners) { try { listener(new Error("Agent service is closed")); } catch { /* observer */ } }
       if (this.#failed) throw this.#failure;
     });
+  }
+
+  /**
+   * Deliver background notifications to an idle Session. User work, a pause
+   * (the user stopped the last Run) or drain all take precedence.
+   */
+  wake(): void {
+    if (this.#waking || this.#wakeSuspended || this.#closed || this.#maintenance || this.#active || this.#failed || this.ledger.blocked || this.options.canStart?.() === false) return;
+    const snapshot = this.ledger.snapshot();
+    if (snapshot.paused || snapshot.queue.length || snapshot.runs.some(run => run.state === "running") || !this.options.hasPendingNotifications?.()) return;
+    this.#waking = true;
+    void this.submit(`background-wake:${randomUUID()}`, { kind: BACKGROUND_WAKE_KIND })
+      .catch(error => { try { this.options.onFailure?.(error); } catch { /* observer */ } })
+      .finally(() => { this.#waking = false; });
   }
 
   /** Called after queue edits or initial acceptance; never blocks an acceptance receipt. */
@@ -129,7 +151,11 @@ export class SessionRunManager {
       this.#failure = error; this.#failed = true;
       for (const listener of this.#failureListeners) { try { listener(error); } catch { /* observer */ } }
       try { this.options.onFailure?.(error); } catch { /* observation cannot restart work */ }
-    }).finally(() => { this.#active = undefined; this.kick(); });
+    }).finally(() => {
+      this.#active = undefined;
+      if (isBackgroundWake(task.content) && this.ledger.snapshot().runs.find(run => run.runId === runId)?.state !== "completed") this.#wakeSuspended = true;
+      this.wake(); this.kick();
+    });
     this.#active = { runId, taskId: task.taskId, controller, done };
   }
 

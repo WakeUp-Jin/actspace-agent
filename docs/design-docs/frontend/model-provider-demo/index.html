@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>模型设置</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+/* 模型设置（定稿方向，源自 V2）：模型只列名称和开关，详情就地展开；用途选择器是双栏浮层 */
+.anchor { position: relative; }
+.faintnum { color: var(--faint); }
+.warnt { color: var(--warn); }
+.pill { display: inline-flex; align-items: center; gap: 6px; max-width: 320px; height: 28px; padding: 0 8px 0 10px; border-radius: var(--r-md); font-size: 12.5px; white-space: nowrap; }
+.pill:hover, .pill.open { background: var(--hover-soft); }
+.pill .lv { color: var(--muted); }
+.pill .follow { color: var(--faint); }
+.pill.bad { color: var(--on-danger); }
+
+/* 紧凑行（用途、连接、供应商目录共用） */
+.crow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 8px 16px; }
+button.crow:hover, .crow.click:hover { background: var(--hover-soft); cursor: pointer; }
+.crow .l { flex: 1; min-width: 0; }
+.crow .t { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+.crow .d { margin-top: 1px; color: var(--muted); font-size: 12px; }
+.crow .r { display: flex; align-items: center; gap: 10px; flex: none; color: var(--muted); font-size: 12.5px; }
+.chev { color: var(--subtle); }
+.chev.open { transform: rotate(90deg); }
+
+/* 表单行：左标签 + 右控件 */
+.kv { display: flex; align-items: center; gap: 14px; min-height: 46px; padding: 8px 16px; }
+.kv .k { width: 88px; flex: none; color: var(--muted); font-size: 12.5px; }
+.kv .v { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.kv .v .end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.keymask { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+.keynote { color: var(--faint); font-size: 12px; }
+.formfoot { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+.disclose { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; color: var(--muted); font-size: 12px; }
+
+.notice { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--r-md); background: var(--warn-soft); color: var(--warn); font-size: 12.5px; }
+.notice.info { background: var(--info-soft); color: var(--info); }
+.result { display: flex; align-items: center; gap: 6px; color: var(--ok); font-size: 12.5px; }
+.result.warn { color: var(--warn); }
+
+.lvs { display: inline-flex; padding: 2px; gap: 2px; border: .5px solid var(--line); border-radius: var(--r-md); background: var(--surface-subtle); }
+.lvb { height: 24px; min-width: 40px; padding: 0 9px; border-radius: var(--r-sm); color: var(--faint); font-size: 12px; text-align: center; }
+.lvb:hover { color: var(--text); }
+.lvb[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+:root[data-theme="dark"] .lvb[aria-pressed="true"] { background: var(--selected); }
+.pfs { display: flex; flex-wrap: wrap; gap: 6px; }
+.pf { display: flex; align-items: center; gap: 3px; width: 94px; height: 30px; padding: 0 6px; border: .5px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
+.pf span { color: var(--faint); font-size: 11px; white-space: nowrap; }
+.pf input { width: 100%; min-width: 0; border: 0; background: none; outline: none; text-align: right; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.pf.ro { background: var(--surface-subtle); }
+.pf.ro b { margin-left: auto; font-weight: 400; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.match { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+.match.ok { color: var(--ok); }
+.match.warn { color: var(--warn); }
+.dimmed { opacity: .5; }
+
+/* 选择器：双栏 */
+.picker2 { width: 580px; display: flex; flex-direction: column; overflow: hidden; }
+.picker2.up { bottom: calc(100% + 8px); left: 0; }
+.picker2.down { top: calc(100% + 6px); right: 0; }
+.pk-body { display: flex; height: 352px; }
+.pk-l { width: 240px; flex: none; display: flex; flex-direction: column; border-right: .5px solid var(--line-soft); }
+.pk-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 38px; border-bottom: .5px solid var(--line-soft); color: var(--subtle); }
+.pk-search input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: 13px; }
+.pk-list { flex: 1; overflow-y: auto; padding: 4px 6px 8px; }
+.pk-g { padding: 10px 8px 3px; color: var(--faint); font-size: 11.5px; }
+.pk-row { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px; border-radius: var(--r-md); font-size: 13px; }
+.pk-row:hover { background: var(--hover); }
+.pk-row.focus { background: var(--selected); }
+.pk-row .ck { width: 14px; display: grid; place-items: center; color: var(--text); }
+.pk-row .n { flex: 1; min-width: 0; }
+.pk-row .meta { color: var(--faint); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.pk-r { flex: 1; min-width: 0; overflow-y: auto; padding: 14px 16px; }
+.pk-r .pn { font-size: 14px; font-weight: 600; }
+.pk-r .pid { margin-top: 1px; color: var(--faint); font-size: 11.5px; font-family: var(--font-mono); }
+.facts { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 10px; margin: 12px 0 14px; padding: 10px 0; border-top: .5px solid var(--line-soft); border-bottom: .5px solid var(--line-soft); }
+.facts dt { color: var(--faint); font-size: 11.5px; }
+.facts dd { margin: 1px 0 0; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.pk-r .pt { margin-bottom: 4px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; margin-left: -8px; width: calc(100% + 16px); border-radius: var(--r-md); font-size: 13px; }
+.opt:hover { background: var(--hover-soft); }
+.opt .rd { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line-strong); display: grid; place-items: center; }
+.opt.on .rd { border-color: var(--action); }
+.opt.on .rd::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--action); }
+.opt .ol { width: 44px; flex: none; font-weight: 500; }
+.opt .od { flex: 1; color: var(--muted); font-size: 12px; }
+.opt .om { color: var(--faint); font-size: 11.5px; }
+.pk-r .empty { color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.pk-foot { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: .5px solid var(--line-soft); color: var(--faint); font-size: 11.5px; }
+/* 模型列表：一行 = mark + 名称 + 开关；点开是浅灰展开区（参考 DSH 的模型目录） */
+.mlist { border: .5px solid var(--line); border-radius: var(--r-group); background: var(--surface); overflow: hidden; }
+.mlist > * + * { border-top: .5px solid var(--line-soft); }
+.mtool { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 10px 0 16px; }
+.mtool .search { position: relative; flex: 1; }
+.mtool .search svg { position: absolute; left: 0; top: 9px; color: var(--subtle); }
+.mtool .search input { width: 100%; height: 32px; padding-left: 22px; border: 0; background: none; outline: none; font-size: 13px; }
+.mrow { display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 0 16px; cursor: pointer; }
+.mrow:hover { background: var(--hover-soft); }
+.mrow .nm { font-size: 13px; font-weight: 500; }
+.mrow.off .nm, .mrow.off .fam { opacity: .5; }
+.mrow .chev { display: grid; place-items: center; color: var(--subtle); transition: transform .12s; }
+.mrow .chev.up { transform: rotate(180deg); }
+.mtag { color: var(--warn); font-size: 12px; white-space: nowrap; }
+.fam { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 6px; background: var(--surface-subtle); color: var(--subtle); }
+.mi.open .mrow:hover { background: var(--hover-soft); }
+/* 展开区：不再套灰框，内容贴着名称那一列往下排 */
+.panel { display: flex; flex-direction: column; gap: 14px; padding: 0 16px 16px 50px; }
+.panel.add { padding: 14px 16px 16px; }
+.kf { display: flex; align-items: flex-end; gap: 36px; }
+.kf .it { min-width: 0; }
+.kf .it .l { margin-bottom: 4px; color: var(--faint); font-size: 11.5px; }
+.kf .it .v { display: flex; align-items: center; height: 26px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.kf .it .v small { margin-left: 4px; color: var(--faint); font-size: 11.5px; }
+.kf .acts { display: flex; align-items: center; gap: 4px; margin: 0 -9px 0 auto; }
+.msel { position: relative; display: inline-flex; }
+.msel select { appearance: none; -webkit-appearance: none; height: 26px; padding: 0 24px 0 9px; border: .5px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: 12.5px; outline: none; cursor: pointer; }
+.msel select:hover { border-color: var(--line-strong); }
+.msel svg { position: absolute; right: 7px; top: 7px; color: var(--subtle); pointer-events: none; }
+.pnote { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; color: var(--muted); font-size: 12.5px; }
+.pnote.ok { color: var(--ok); }
+.pnote.ok svg { flex: none; }
+.pnote.warn { color: var(--warn); }
+.ef { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 12px 12px; }
+.ef .k { color: var(--muted); font-size: 12.5px; }
+.ef .v { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.ef .unit { color: var(--faint); font-size: 12px; }
+.ef .input { height: 30px; }
+.cb { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.cb.dis { color: var(--faint); }
+.cb.dis .check { opacity: .45; }
+.arow { display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px; }
+.pfoot { display: flex; align-items: center; gap: 6px; margin: 0 -9px; }
+.btn.ghost.danger { color: var(--on-danger); }
+.sep-h { height: 0; border-top: .5px solid var(--line-soft); }
+.addrow { display: flex; align-items: center; gap: 8px; width: 100%; padding: 13px 16px; color: var(--muted); font-size: 12.5px; }
+.addrow:hover { background: var(--hover-soft); color: var(--text); }
+.ph-acts { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+select.input.proto { width: auto; min-width: 200px; }
+</style>
+</head>
+<body>
+<div id="app"></div><div id="ctl"></div><div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+(() => {
+const D = window.Demo; const I = D.ICON; const esc = D.esc;
+const back = (r, label) => `<button class="ph-back" data-act="go" data-r="${r}" title="返回${label}">${I.chevL}</button>`;
+
+/* ── 模型行小件 ── */
+const FAM = [[/^claude/, 'anthropic'], [/^(gpt|o\d)/, 'openai'], [/^deepseek/, 'deepseek'], [/^kimi/, 'moonshot'], [/^glm/, 'zai'], [/^minimax/, 'minimax'], [/^mimo/, 'xiaomi'], [/^doubao/, 'volc']];
+const CUBE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2 13.5 5v6L8 14 2.5 11V5z"/><path d="M2.5 5 8 8l5.5-3M8 8v6"/></svg>';
+/** 模型家族 mark：按目录 id（或原始 id）前缀认，认不出用一个灰色方块。 */
+function famLogo(m) {
+  const id = String(m.canonical || m.id).split('/').pop();
+  const hit = FAM.find(([re]) => re.test(id));
+  if (!hit) return `<span class="fam">${CUBE}</span>`;
+  return D.logo(hit[1], 24).replace('class="logo"', 'class="logo fam"');
+}
+/** 没有任何能力信息的模型，在名字后面跟一句灰黄小字。 */
+function unknownTag(e, m) {
+  if (e.known || e.think.src !== 'unknown' || e.ctx.src !== 'unknown') return '';
+  return `<span class="mtag">${m.suggest ? `像是 ${D.CATALOG[m.suggest].name} 的日期版本` : '不在模型目录中'}</span>`;
+}
+const src = (s) => `<span class="src ${s}">${s === 'user' ? '已手动修改' : s === 'catalog' ? '来自目录' : '未知'}</span>`;
+
+/* ── 选择器（双栏） ── */
+const LVDESC = { off: '不思考，直接回答', low: '少量推理，较快', medium: '均衡', high: '复杂任务', xhigh: '更深入，更慢更贵', max: '最多推理，最慢' };
+function picker(S, dir) {
+  const ctx = S.pk.ctx; const sel = D.selOf(ctx); const purpose = D.PURPOSES.find((p) => p.id === ctx);
+  const groups = D.pickerGroups(ctx, S.pk.q);
+  const follow = purpose && purpose.follow ? `<button class="pk-row ${!sel.key ? 'focus' : ''}" data-act="pkFollow"><span class="ck">${!sel.key ? I.check : ''}</span><span class="n">跟随${D.PURPOSES.find((p) => p.id === purpose.follow).label}</span></button>` : '';
+  const list = groups.map((g) => `<div class="pk-g">${esc(g.conn.name)}</div>` + g.items.map((e) =>
+    `<button class="pk-row ${S.pk.focus === e.key ? 'focus' : ''}" data-act="pkModel" data-k="${esc(e.key)}"><span class="ck">${sel.key === e.key ? I.check : ''}</span><span class="n truncate">${esc(e.name)}</span><span class="meta">${e.ctx.v ? D.fmtK(e.ctx.v) : ''}</span></button>`).join('')).join('');
+  const e = D.findModel(S.pk.focus);
+  let right;
+  if (!e) right = '<div class="empty">选一个模型。不选就跟随上一级。</div>';
+  else {
+    const isSel = sel.key === e.key; let body;
+    if (e.kind === 'unknown') body = `<div class="empty">还没有这个模型的思考信息，选择时不会出现档位。<br><button class="faint" style="text-decoration:underline" data-act="gotoModel" data-k="${esc(e.key)}">去补充</button></div>`;
+    else if (e.kind === 'none') body = '<div class="empty">这个模型不支持思考。</div>';
+    else if (e.kind === 'always') body = '<div class="empty">这个模型始终思考，没有可调档位。</div>';
+    else body = (e.kind === 'toggle' ? '' : '') + e.think.v.levels.map((l) => {
+      const lab = e.kind === 'toggle' ? (l === 'off' ? '关' : '开') : D.LV[l];
+      return `<button class="opt ${isSel && sel.effort === l ? 'on' : ''}" data-act="pkLevel" data-l="${l}"><span class="rd"></span><span class="ol">${lab}</span><span class="od">${LVDESC[l]}</span>${e.think.v.def === l ? '<span class="om">模型默认</span>' : ''}</button>`;
+    }).join('');
+    right = `<div class="pn">${esc(e.name)}</div><div class="pid">${esc(e.id)}</div>
+      <dl class="facts"><div><dt>上下文</dt><dd>${e.ctx.v ? D.fmtK(e.ctx.v) : '—'}</dd></div><div><dt>图片</dt><dd>${e.image ? '支持' : '不支持'}</dd></div><div><dt>价格（入 / 出）</dt><dd>${e.priceFinal ? D.fmt$(e.priceFinal.in) + ' / ' + D.fmt$(e.priceFinal.out) : '—'}</dd></div></dl>
+      <div class="pt">思考</div>${body}`;
+  }
+  const foot = ctx === 'composer'
+    ? `<div class="pk-foot"><span class="grow">只对本会话生效</span><button class="btn sm" data-act="setDefault" ${S.session.key === S.purposes.chat.key && S.session.effort === S.purposes.chat.effort ? 'disabled' : ''}>设为新会话默认</button></div>`
+    : purpose && purpose.needImage ? '<div class="pk-foot">只列出能看图的模型</div>' : '';
+  return `<div class="pop picker2 ${dir} js-picker"><div class="pk-body"><div class="pk-l"><div class="pk-search">${I.search}<input data-in="pkQ" data-f="pkq" placeholder="搜索模型" value="${esc(S.pk.q)}"></div>
+    <div class="pk-list">${follow}${list || '<div class="pk-g">没有匹配的模型</div>'}</div></div><div class="pk-r">${right}</div></div>${foot}</div>`;
+}
+
+/* ── list ── */
+function pageList(S) {
+  const purposes = D.PURPOSES.map((p) => {
+    const sel = S.purposes[p.id]; const e = D.findModel(sel.key); let label;
+    if (!sel.key) label = `<span class="follow">跟随${D.PURPOSES.find((x) => x.id === p.follow).label}</span>`;
+    else if (!e) label = '模型已不可用，重新选择';
+    else label = `${esc(e.name)}${D.levelLabel(e, sel.effort) ? ` <span class="lv">· ${D.levelLabel(e, sel.effort)}</span>` : ''}`;
+    const open = S.pk && S.pk.ctx === p.id;
+    return `<div class="crow"><div class="l"><div class="t">${p.label}</div><div class="d">${p.desc}</div></div>
+      <div class="anchor"><button class="pill ${open ? 'open' : ''} ${sel.key && !e ? 'bad' : ''}" data-act="openPicker" data-ctx="${p.id}">${label} ${I.chevD}</button>${open ? picker(S, 'down') : ''}</div></div>`;
+  }).join('');
+  const conns = S.conns.map((c) => {
+    const on = c.models.filter((m) => m.enabled).length;
+    const unk = c.models.filter((m) => m.enabled && !D.eff(c, m).known && !m.ov.think).length;
+    return `<button class="crow" data-act="openConn" data-c="${c.id}">${D.logo(c.tpl, 28)}<div class="l"><div class="t">${esc(c.name)}${c.tpl === 'custom' ? '<span class="badge">中转</span>' : ''}</div>
+      <div class="d">${D.PROTO[c.protocol]}</div></div><div class="r"><span class="num">${on} / ${c.models.length} 个模型</span>${unk ? `<span class="warnt">${unk} 个待补充</span>` : ''}<span class="status">已连接</span><span class="chev">${I.chevR}</span></div></button>`;
+  }).join('');
+  return `<div class="page"><div class="ph"><div><h2>模型</h2><div class="ph-desc">模型连接、各用途的默认模型与思考档位。</div></div></div><div class="stack">
+    <section class="sec"><div class="sec-h"><div><div class="t">用途</div><div class="d">每类任务用哪个模型，以及默认的思考档位。</div></div></div><div class="group" style="overflow:visible">${purposes}</div></section>
+    <section class="sec"><div class="sec-h"><div><div class="t">模型连接</div></div><div class="acts"><button class="btn primary" data-act="go" data-r="catalog">${I.plus} 添加连接</button></div></div><div class="group">${conns}</div></section>
+  </div></div>`;
+}
+
+/* ── catalog ── */
+function pageCatalog(S) {
+  const q = S.catQ.toLowerCase();
+  const groups = ['官方', '聚合平台', '自定义'].map((g) => {
+    const items = D.TEMPLATES.filter((t) => t.group === g && (!q || t.name.toLowerCase().includes(q)));
+    if (!items.length) return '';
+    return `<section class="sec"><div class="sec-h"><div class="t">${g}</div></div><div class="group">${items.map((t) => {
+      const exists = t.id !== 'custom' && S.conns.find((c) => c.tpl === t.id);
+      return `<button class="crow" data-act="pickTpl" data-t="${t.id}">${D.logo(t.id, 28)}<div class="l"><div class="t">${t.name}</div><div class="d">${t.desc || D.host(t.baseURL)}</div></div>
+        <div class="r">${exists ? '<span class="badge ok">已添加</span>' : ''}<span class="chev">${I.chevR}</span></div></button>`;
+    }).join('')}</div></section>`;
+  }).join('');
+  return `<div class="page"><div class="ph">${back('list', '模型')}<div><h2>添加连接</h2><div class="ph-desc">选一个供应商。官方服务只要填 Key。</div></div></div>
+    <div class="stack" style="gap:24px"><div class="tbl"><div class="tr tool"><div class="search">${I.search}<input data-in="catQ" data-f="catq" placeholder="搜索供应商" value="${esc(S.catQ)}"></div></div></div>${groups}</div></div>`;
+}
+
+/* ── setup ── */
+function pageSetup(S) {
+  const d = S.draft; const t = D.tplOf(d.tpl); const relay = t.id === 'custom';
+  const url = `<div class="kv"><div class="k">服务地址</div><div class="v"><input class="input mono" data-in="draftURL" data-f="durl" placeholder="https://your-relay.com" value="${esc(d.baseURL)}"></div></div>`;
+  return `<div class="page"><div class="ph">${back('catalog', '添加连接')}${D.logo(t.id, 36)}<div><h2>${relay ? '自定义中转' : t.name}</h2><div class="ph-desc">${relay ? '填协议、地址和 Key。' : '填入 API Key，模型会自动获取。'}</div></div></div>
+    <div class="stack"><section class="sec"><div class="group">
+      ${relay ? `<div class="kv"><div class="k">协议</div><div class="v"><div class="seg">${Object.keys(D.PROTO).map((p) => `<button data-act="draftProto" data-p="${p}" aria-pressed="${d.protocol === p}">${D.PROTO[p]}</button>`).join('')}</div><span class="hint">按中转站文档选</span></div></div>${url}` : ''}
+      <div class="kv"><div class="k">API Key</div><div class="v"><input class="input mono" data-in="draftKey" data-f="dkey" placeholder="粘贴 Key" value="${esc(d.key)}"><span class="keynote" style="white-space:nowrap">只保存在本机</span></div></div>
+      ${d.adv ? `${relay ? '' : url}<div class="kv"><div class="k">代理</div><div class="v"><input class="input mono" data-in="draftProxy" data-f="dproxy" placeholder="http://127.0.0.1:7890" value="${esc(d.proxy)}"><span class="keynote" style="white-space:nowrap">留空走系统代理</span></div></div>` : ''}
+      <div class="formfoot"><button class="disclose" style="margin:0" data-act="draftAdv"><span class="chev ${d.adv ? 'open' : ''}">${I.chevR}</span>高级设置</button><span class="grow ${d.err ? 'err' : 'hint'}" style="text-align:right">${d.err || '会请求一次 /models，拿到这个 Key 能用的模型。'}</span>
+        <button class="btn primary" data-act="testFetch" ${d.busy ? 'disabled' : ''}>${d.busy ? '<span class="spinner"></span> 正在连接' : '测试并获取模型'}</button></div>
+    </div></section></div></div>`;
+}
+
+/* ── select ── */
+function pageSelect(S) {
+  const d = S.draft; const t = D.tplOf(d.tpl); const relay = t.id === 'custom';
+  const rows = D.draftRows(); const q = S.stepQ.toLowerCase(); const known = rows.filter((e) => e.known).length;
+  const list = rows.filter((e) => !q || e.id.toLowerCase().includes(q) || e.name.toLowerCase().includes(q)).map((e) =>
+    `<div class="mi"><div class="mrow" data-act="draftPick" data-id="${esc(e.id)}"><span class="check" aria-checked="${e.picked}">${I.check}</span>${famLogo(e.m)}
+      <span class="nm truncate" title="${esc(e.id)}">${esc(e.name)}</span>${unknownTag(e, e.m)}<span class="grow"></span></div></div>`).join('');
+  const head = d.fallback
+    ? `<div class="result warn">${relay ? '这个服务没有开放模型列表，手动添加要用的模型。' : `${t.name} 的模型列表没响应，先列出模型目录里的模型。`}</div>`
+    : `<div class="result">${I.check} 连接成功。拿到 ${rows.length} 个模型，${known} 个已从模型目录补全。</div>`;
+  return `<div class="page"><div class="ph"><button class="ph-back" data-act="backSetup">${I.chevL}</button>${D.logo(t.id, 36)}<div><h2>选择模型</h2><div class="ph-desc">勾选的模型会出现在模型选择器里，之后随时能改。</div></div></div>
+    <div class="stack" style="gap:20px">${head}
+    <div class="mlist"><div class="mtool"><div class="search">${I.search}<input data-in="stepQ" data-f="stepq" placeholder="搜索模型" value="${esc(S.stepQ)}"></div><button class="btn ghost sm" data-act="draftAll">全选</button><button class="btn ghost sm" data-act="draftNone">清空</button></div>
+      ${list}${manualPanel(S, 'draft')}</div>
+    ${relay ? `<div class="group"><div class="crow"><div class="l"><div class="t">价格倍率</div><div class="d">按官方价折算。中转站打几折就填几，比如 6 折填 0.6。</div></div><div class="r">官方价 × <input class="input num" style="width:72px" data-in="draftMult" data-f="dmult" value="${esc(d.mult)}"></div></div></div>` : ''}
+    <div class="row"><span class="grow hint">已选 ${d.picked.length} 个模型</span><button class="btn primary lg" data-act="saveConn" ${d.picked.length ? '' : 'disabled'}>保存连接</button></div></div></div>`;
+}
+
+/* ── detail ── */
+function pageDetail(S) {
+  const c = S.conns.find((x) => x.id === S.route.c); if (!c) return pageList(S);
+  const relay = c.tpl === 'custom'; const on = c.models.filter((m) => m.enabled).length;
+  const rows = c.models.map((m) => {
+    const e = D.eff(c, m); const open = S.expanded === c.id + '/' + m.id; const adj = Object.keys(m.ov).length;
+    return `<div class="mi ${open ? 'open' : ''}"><div class="mrow ${m.enabled ? '' : 'off'}" data-act="expand" data-c="${c.id}" data-m="${esc(m.id)}">${famLogo(m)}
+      <span class="nm truncate" title="${esc(m.id)}">${esc(e.name)}</span>${adj ? '<span class="adj" title="已手动调整"></span>' : ''}${unknownTag(e, m)}<span class="grow"></span>
+      <span class="chev ${open ? 'up' : ''}">${I.chevD}</span><button class="switch" role="switch" aria-checked="${m.enabled}" data-act="toggleModel" data-c="${c.id}" data-m="${esc(m.id)}"></button></div>
+      ${open ? modelPanel(S, c, m, e) : ''}</div>`;
+  }).join('');
+  const keyRow = S.keyEdit === c.id
+    ? `<div class="kv"><div class="k">API Key</div><div class="v"><input class="input mono" data-in="keyVal" data-f="ckey" placeholder="粘贴新的 Key"><span class="end"><button class="btn primary" data-act="keySave" data-c="${c.id}">保存</button><button class="btn ghost" data-act="keyEdit" data-c="${c.id}">取消</button></span></div></div>`
+    : `<div class="kv"><div class="k">API Key</div><div class="v"><span class="keymask">${esc(c.key)}</span><span class="keynote">已保存在本机</span><span class="end"><button class="btn" data-act="keyEdit" data-c="${c.id}">更换</button></span></div></div>`;
+  return `<div class="page"><div class="ph">${back('list', '模型')}${D.logo(c.tpl, 36)}<div><h2>${esc(c.name)}</h2><div class="ph-desc">${relay ? '自定义中转' : '官方'}<span class="dot"></span>已连接</div></div></div>
+  <div class="stack" style="gap:28px">
+    <section class="sec"><div class="sec-h"><div class="t">连接</div></div><div class="group">
+      <div class="kv"><div class="k">名称</div><div class="v"><input class="input" style="max-width:300px" data-in="connName" data-f="cname" data-c="${c.id}" value="${esc(c.name)}"></div></div>
+      ${relay ? `<div class="kv"><div class="k">协议</div><div class="v"><select class="input proto" data-in="connProtoSel" data-f="cproto" data-c="${c.id}">${Object.keys(D.PROTO).map((p) => `<option value="${p}" ${c.protocol === p ? 'selected' : ''}>${D.PROTO[p]}</option>`).join('')}</select><span class="hint">按中转站文档选，改了会重新测试</span></div></div>` : ''}
+      <div class="kv"><div class="k">服务地址</div><div class="v"><input class="input mono" data-in="connURL" data-f="curl" data-c="${c.id}" value="${esc(c.baseURL)}"></div></div>
+      ${keyRow}
+    </div></section>
+    <section class="sec"><div class="sec-h"><div><div class="t">模型</div><div class="d">${on} / ${c.models.length} 个启用。点开可以看上下文、价格，改默认思考。</div></div>
+      <div class="acts"><button class="btn ghost" data-act="refetch" data-c="${c.id}">${I.refresh} 重新获取</button></div></div>
+      <div class="mlist">${rows || '<div class="addrow" style="cursor:default">还没有模型。</div>'}${manualPanel(S, c.id)}</div></section>
+    <section class="sec"><div class="sec-h"><div class="t">计费与删除</div></div><div class="group">
+      <div class="crow"><div class="l"><div class="t">价格倍率</div><div class="d">${relay ? '中转站打几折就填几。单个模型手动填的价格不再乘倍率。' : '官方连接一般是 1，有企业折扣再改。'}</div></div><div class="r">官方价 × <input class="input num" style="width:72px" data-in="connMult" data-f="cmult" data-c="${c.id}" value="${c.mult}"></div></div>
+      <div class="crow"><div class="l"><div class="t">删除连接</div><div class="d">用到它的用途会提示重新选择，历史会话不受影响。</div></div><div class="r"><button class="btn danger ${S.armed === c.id ? 'armed' : ''}" data-act="delConn" data-c="${c.id}">${S.armed === c.id ? '确认删除' : '删除'}</button></div></div>
+    </div></section>
+  </div></div>`;
+}
+
+/* ── 展开区：共用小件 ── */
+const lvName = (levels, l) => (levels.length === 2 && levels.includes('off') ? (l === 'off' ? '关' : '开') : D.LV[l]);
+function priceFields(vals, editable, attrs, cls) {
+  return `<div class="pfs">${[['in', '输入'], ['out', '输出'], ['cr', '缓存读'], ['cw', '缓存写']].map(([k, l]) => editable
+    ? `<label class="pf"><span>${l}</span><input class="${cls || ''}" data-in="${attrs.in}" data-f="${attrs.f}${k}" data-k="${k}" ${attrs.extra || ''} value="${vals[k] ?? ''}" placeholder="—"></label>`
+    : `<div class="pf ro"><span>${l}</span><b>${D.fmt$(vals[k])}</b></div>`).join('')}</div>`;
+}
+/** 小下拉：选默认思考档位、沿用已知模型都用它。 */
+const msel = (attrs, opts, cur, ph) => `<span class="msel"><select ${attrs}>${ph ? `<option value="">${ph}</option>` : ''}${opts.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select>${I.chevD}</span>`;
+const canonOpts = () => Object.keys(D.CATALOG).map((k) => [k, D.CATALOG[k].name]);
+/** 三项关键信息：上下文 / 默认思考 / 价格。 */
+function keyFacts(o) {
+  const think = o.levels && o.levels.length > 1
+    ? msel(o.defAttrs, o.levels.map((l) => [l, lvName(o.levels, l)]), o.def)
+    : `<span class="faint">${o.levels && o.levels.length === 1 ? '始终思考' : '不支持'}</span>`;
+  const price = o.price && o.price.in != null && o.price.in !== '' ? `${D.fmt$(o.price.in)} / ${D.fmt$(o.price.out)}${o.mult && o.mult !== 1 ? `<small>×${o.mult}</small>` : ''}` : '<span class="faint">—</span>';
+  return `<div class="it"><div class="l">上下文</div><div class="v">${o.ctx ? D.fmtK(o.ctx) : '<span class="faint">—</span>'}</div></div>
+    <div class="it"><div class="l">默认思考</div><div class="v">${think}</div></div>
+    <div class="it"><div class="l">价格 · 每百万 token</div><div class="v">${price}</div></div>`;
+}
+
+/* ── 模型展开区：平时只给三项关键信息，其余收进「更多设置」 ── */
+function modelPanel(S, c, m, e) {
+  const a = `data-c="${c.id}" data-m="${esc(m.id)}"`; const key = c.id + '/' + m.id; const th = e.think.v;
+  const more = S.ui.full === key;
+  const moreBtn = `<button class="btn ghost sm" data-act="ui" data-k="full" data-v="${esc(key)}">${more ? '收起' : '更多设置'}</button>`;
+  if (e.known && !more) {
+    return `<div class="panel"><div class="kf">${keyFacts({ ctx: e.ctx.v, levels: th && th.levels, def: th && th.def, defAttrs: `data-in="mDefSel" data-f="mdef" ${a}`, price: e.priceFinal, mult: e.price.src === 'user' ? 1 : e.mult })}<div class="acts">${moreBtn}</div></div></div>`;
+  }
+  const pv = e.priceFinal || {}; const manualPrice = e.price.src === 'user' || !e.known;
+  const f = {
+    name: `<div class="k">显示名称</div><div class="v"><input class="input" style="width:240px" data-in="mName" data-f="mname" ${a} value="${esc(e.name)}"></div>`,
+    ctx: `<div class="k">上下文</div><div class="v"><input class="input num" style="width:112px" data-in="mCtx" data-f="mctx" ${a} value="${e.ctx.v ?? ''}" placeholder="128000"><span class="unit">tokens</span></div>`,
+    out: `<div class="k">最大输出</div><div class="v"><input class="input num" style="width:112px" data-in="mOut" data-f="mout" ${a} value="${e.out.v ?? ''}" placeholder="32000"><span class="unit">tokens</span></div>`,
+    lv: `<div class="k">思考档位</div><div class="v"><div class="lvs">${D.LEVELS.map((l) => `<button class="lvb" aria-pressed="${!!(th && th.levels.includes(l))}" data-act="lvToggle" ${a} data-l="${l}">${D.LV[l]}</button>`).join('')}</div></div>`,
+    def: th && th.levels.length > 1 ? `<div class="k">默认思考</div><div class="v">${msel(`data-in="mDefSel" data-f="mdef" ${a}`, th.levels.map((l) => [l, lvName(th.levels, l)]), th.def)}</div>` : '',
+    img: `<div class="k">看图</div><div class="v"><button class="switch" role="switch" aria-checked="${e.image}" data-act="imgToggle" ${a}></button></div>`,
+    price: `<div class="k">价格</div><div class="v">${priceFields(pv, manualPrice, { in: 'mPrice', f: 'mp', extra: a })}${e.known ? `<button class="btn ghost sm" data-act="priceManual" ${a}>${manualPrice ? '用目录价' : '手动填'}</button>` : ''}</div>`,
+  };
+  const head = e.known ? '' : `<div class="pnote"><span class="grow">沿用一个已知模型，就不用自己填。</span>${m.suggest ? `<button class="btn sm" data-act="useCanon" ${a} data-k="${m.suggest}">沿用 ${D.CATALOG[m.suggest].name}</button>` : msel(`data-in="mCanon" data-f="mcanon2" ${a}`, canonOpts(), '', '沿用已知模型…')}</div>`;
+  const fields = e.known || more
+    ? [f.name, f.ctx, f.out, f.lv, f.def, f.img, f.price]
+    : [f.ctx, f.lv, f.def, f.img];
+  const foot = `<div class="pfoot">${e.known && Object.keys(m.ov).length ? `<button class="btn ghost sm" data-act="resetModel" ${a}>恢复目录值</button>` : ''}${e.aliased ? `<button class="btn ghost sm" data-act="dropCanon" ${a}>取消沿用 ${D.CATALOG[m.canonical].name}</button>` : ''}<button class="btn ghost sm danger" data-act="removeModel" ${a}>移除模型</button><span class="grow"></span>${moreBtn}</div>`;
+  return `<div class="panel">${head}<div class="ef">${fields.join('')}</div>${foot}</div>`;
+}
+
+/* ── 添加模型：就地展开，先填 ID；命中目录就只给三项关键信息 ── */
+function manualPanel(S, target) {
+  if (!S.manual || S.manual.target !== target) return `<button class="addrow" data-act="openManual" data-target="${target}">${I.plus} 添加模型</button>`;
+  const M = S.manual; const f = M.f; const typed = !!M.id.trim(); const hit = M.matched || M.canon;
+  const mult = +(target === 'draft' ? S.draft.mult : (S.conns.find((c) => c.id === target) || {}).mult) || 1;
+  const price = f.price.in == null || f.price.in === '' ? null : { in: f.price.in * mult, out: f.price.out * mult };
+  let note = '<div class="pnote">填服务商文档里的模型 ID。在模型目录里的，会自动补全上下文、思考和价格。</div>';
+  if (hit) note = `<div class="pnote ok">${I.check}<span class="grow">${M.matched ? `在模型目录中找到 ${D.CATALOG[M.matched].name}` : `沿用 ${D.CATALOG[M.canon].name}`}</span>${M.canon ? '<button class="btn ghost sm" data-act="manualCanon" data-k="">改为自己填</button>' : ''}</div>
+    <div class="kf">${keyFacts({ ctx: f.ctx, levels: f.levels, def: f.def, defAttrs: 'data-in="manualDefSel" data-f="mfdef"', price, mult })}</div>`;
+  else if (typed) note = `<div class="pnote"><span class="grow">不在模型目录中。沿用一个已知模型，或者自己填下面几项。</span>${M.near ? `<button class="btn sm" data-act="manualCanon" data-k="${M.near}">沿用 ${D.CATALOG[M.near].name}</button>` : msel('data-in="manualCanon" data-f="mcanon"', canonOpts(), M.canon, '沿用已知模型…')}</div>`;
+  const fields = typed && !hit ? `<div class="ef">
+    <div class="k">上下文</div><div class="v"><input class="input num" style="width:112px" data-in="manualCtx" data-f="mfc" value="${f.ctx}" placeholder="128000"><span class="unit">tokens</span></div>
+    <div class="k">思考档位</div><div class="v"><div class="lvs">${D.LEVELS.map((l) => `<button class="lvb" aria-pressed="${f.levels.includes(l)}" data-act="manualLevel" data-l="${l}">${D.LV[l]}</button>`).join('')}</div></div>
+    ${f.levels.length > 1 ? `<div class="k">默认思考</div><div class="v">${msel('data-in="manualDefSel" data-f="mfdef"', f.levels.map((l) => [l, lvName(f.levels, l)]), f.def)}</div>` : ''}
+    <div class="k">看图</div><div class="v"><button class="switch" role="switch" aria-checked="${f.image}" data-act="manualImage"></button></div>
+    ${M.more ? `<div class="k">最大输出</div><div class="v"><input class="input num" style="width:112px" data-in="manualOut" data-f="mfo" value="${f.out}" placeholder="32000"><span class="unit">tokens</span></div>
+    <div class="k">价格</div><div class="v">${priceFields(f.price, true, { in: 'manualPrice', f: 'mfp' })}</div>` : ''}
+  </div>` : '';
+  return `<div class="mi open"><div class="panel add">
+    <div class="arow"><input class="input mono" data-in="manualId" data-f="mid" placeholder="模型 ID，例如 glm-5" value="${esc(M.id)}" autofocus><input class="input js-fill" data-in="manualName" data-f="mfn" value="${esc(f.name)}" placeholder="显示名称（可选）"></div>
+    ${note}${fields}
+    <div class="pfoot">${fields ? `<button class="btn ghost sm" data-act="manualMore">${M.more ? '收起' : '更多设置'}</button>` : ''}<span class="grow"></span>
+      <button class="btn sm ghost" data-act="manualClose">取消</button><button class="btn sm primary" data-act="manualSave" ${typed ? '' : 'disabled'}>添加</button></div>
+  </div></div>`;
+}
+
+window.View = {
+  name: '模型设置',
+  about: '模型列表只有名称和开关；点开看详情：目录命中的只给一句概括和默认思考档位，没命中的才展开完整字段。添加模型就地展开，先填 ID。',
+  page(S) { return { list: pageList, catalog: pageCatalog, setup: pageSetup, select: pageSelect, detail: pageDetail }[S.route.name](S); },
+  overlay() { return ''; },
+};
+})();
+</script>
+</body>
+</html>

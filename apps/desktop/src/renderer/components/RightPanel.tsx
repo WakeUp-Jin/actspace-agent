@@ -108,7 +108,7 @@ export function RightPanel({
             />
           )}
         </div>
-        {showTree ? <WorkspaceFileTree workspaceRoot={workspaceRoot} /> : null}
+        {showTree ? <WorkspaceFileTree key={workspaceRoot ?? ""} workspaceRoot={workspaceRoot} /> : null}
       </div>
     </aside>
   );
@@ -238,7 +238,7 @@ function RightPanelBody({
     );
   }
 
-  if (tab.kind === "subagents") return <SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} selected={tab.sessionId === sessionId ? tab.selected : undefined} />;
+  if (tab.kind === "subagents") return <SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} selected={tab.sessionId === sessionId ? tab.selected : undefined} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
 
   if (tab.kind === "replyHtml") {
     return <ReplyHtmlRenderView sessionId={tab.sessionId} />;
@@ -247,7 +247,7 @@ function RightPanelBody({
   if (tab.kind === "review") {
     return (
       <ReviewRenderView
-        workspaceRoot={workspaceRoot}
+        workspaceRoot={tab.workspaceRoot ?? workspaceRoot}
         sessionId={sessionId}
         refreshKey={tab.refreshKey}
         onReviewChanged={onReviewChanged}

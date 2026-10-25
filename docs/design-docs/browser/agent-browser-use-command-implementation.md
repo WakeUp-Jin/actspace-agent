@@ -83,3 +83,7 @@ Chrome DevTools Protocol 是所有浏览器操作的最底层。页面操作主�
 - `packages/tools/browser-tools/src/node-capability.ts`：Socket adapter、batch preflight、结果与 artifact 转换。
 
 修改命令时先更新 Go registry，再通过 `node scripts/check-browser-command-registry.mjs` 校验 metadata 与文档标题。Registry 的 implemented 状态不等于所有真实浏览器场景已验收；当前验收缺口见 [连接体验计划](../../exec-plans/active/20260928-chrome-connect-experience.md)。
+
+### iframe坐标的测量时序
+
+Locator 的点动作和 `set_checked` 必须先准备frame路径并完成叶节点滚动，再重新测量各层frame当前偏移后转换为顶层坐标。叶节点的 `scrollIntoView` 也可能滚动祖先，进入frame时缓存的偏移不能复用。最终测量使用 `frame_offset` 的 `scrollIntoView:false`，只读布局；测量失败则停止动作，不能发出过期坐标。Go回归覆盖单/双层frame及两类动作，runtime回归断言最终测量不会再次滚动。Runtime版本6，生成文件由源码统一再生成。

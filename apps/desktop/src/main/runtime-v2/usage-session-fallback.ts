@@ -39,7 +39,7 @@ export class UsageSessionFallback {
       }
     }
   }
-  materialize(resetAt?: string): DatabaseSync {
+  materialize(): DatabaseSync {
     const database = new DatabaseSync(":memory:");
     try {
       createReadModelSchema(database);
@@ -47,7 +47,7 @@ export class UsageSessionFallback {
       for (const { source, events } of this.#sources.values()) {
         const inserted = prepare(database, "INSERT INTO session_catalog(session_id,title,revision,workspace_root) VALUES(?,?,?,?)").run(source.sessionId, source.title, source.throughJournalSeq, source.workspaceRoot);
         prepare(database, "INSERT INTO session_search(rowid,session_id,content) VALUES(?,?,?)").run(inserted.lastInsertRowid, source.sessionId, source.title ?? "");
-        const rows = projectSessionUsageActivities({ ...source, metadata: { title: source.title, pinned: false, archived: false } }, events).filter(row => !resetAt || Date.parse(row.startedAt) >= Date.parse(resetAt));
+        const rows = projectSessionUsageActivities({ ...source, metadata: { title: source.title, pinned: false, archived: false } }, events);
         insertUsageActivities(database, { ...source, rows });
         prepare(database, "INSERT INTO index_state(key,value) VALUES(?,?)").run(`session:${source.sessionId}`, String(source.throughJournalSeq));
       }

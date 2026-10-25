@@ -8,6 +8,8 @@ import { resolveRuntimeV2DataRoot } from "./data-root";
 import type { RuntimeV2CliArtifactResult, RuntimeV2RunCommandControl, RuntimeV2RunCommandOptions } from "./types";
 
 export type RunV2Io = {
+  readonly interruptionExitCode?: () => 130 | 143 | undefined;
+  readonly onForceCleanup?: (cleanup: () => void) => void;
   readonly stdinIsTTY?: boolean; readonly readStdin?: () => Promise<string>; readonly isInterrupted?: () => boolean;
   readonly onDiagnostic?: (code: string, message: string) => void; readonly onLiveEvent?: (event: RuntimeV2LiveEvent) => void; readonly env?: NodeJS.ProcessEnv; readonly cwd?: () => string; readonly now?: () => Date;
   readonly onControl?: (control: RuntimeV2RunCommandControl) => void;
@@ -19,7 +21,7 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
   let liveSeq = 0; let runtimeInstanceId = "booting"; let throughJournalSeq = -1;
   let activeSessionId: string | undefined;
   let activeAbort: (() => boolean) | undefined;
-  const booted = await bootCliV2({ kind: "cli-run", workspace, dataRoot, persistentArtifacts: persistent, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, mock: options.mock, model: options.model, headlessInput: input, headlessSessionId: options.resume, env: io.env, onHeadlessSession: (sessionId, abort) => { activeSessionId = sessionId; activeAbort = abort; io.onControl?.({ sessionId, agentRunId: sessionId, abort }); }, onLiveEvent: (event) => io.onLiveEvent?.({ ...event, schemaVersion: 1, runtimeInstanceId, liveSeq: liveSeq++, throughJournalSeq }) });
+  const booted = await bootCliV2({ onForceCleanup: io.onForceCleanup, kind: "cli-run", workspace, dataRoot, persistentArtifacts: persistent, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, mock: options.mock, model: options.model, headlessInput: input, headlessSessionId: options.resume, env: io.env, onHeadlessSession: (sessionId, abort) => { activeSessionId = sessionId; activeAbort = abort; io.onControl?.({ sessionId, agentRunId: sessionId, abort }); }, onLiveEvent: (event) => io.onLiveEvent?.({ ...event, schemaVersion: 1, runtimeInstanceId, liveSeq: liveSeq++, throughJournalSeq }) });
   runtimeInstanceId = booted.profile.getState().runtimeInstanceId;
   try {
     if (io.isInterrupted?.()) activeAbort?.();
@@ -31,7 +33,7 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
       const sessions = booted.profile.context.get?.("session.runtime") as { inspectEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]> } | undefined;
       const durableEvents = result.outcome === "failed" || options.out ? await sessions?.inspectEvents(result.sessionId) : undefined;
       const failure = result.outcome === "failed" ? failedRunDiagnostic(durableEvents ?? [], result.taskId) : undefined;
-      const output = projectCliArtifactResult(result, { failure, workspace, startedAt, endedAt: (io.now?.() ?? new Date()).toISOString(), persistent, interrupted: io.isInterrupted?.() ?? false, approvalName: approval?.toolName });
+      const output = projectCliArtifactResult(result, { failure, workspace, startedAt, endedAt: (io.now?.() ?? new Date()).toISOString(), persistent, interrupted: io.isInterrupted?.() ?? false, interruptionExitCode: io.interruptionExitCode?.(), approvalName: approval?.toolName });
       if (output.error) io.onDiagnostic?.(output.error.code, output.error.message);
       if (options.out) {
         if (durableEvents === undefined) throw new Error("Session service is not available for the selected Profile.");
@@ -42,7 +44,7 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
       return output;
     } catch (error) {
       if (!(io.isInterrupted?.() ?? false)) throw error;
-      return { schemaVersion: 1, ok: false, status: "aborted", exitCode: 130, sessionId: activeSessionId ?? options.resume ?? "unknown", agentRunId: activeSessionId ?? options.resume ?? "unknown", finalText: "", messageCount: 0, eventCount: 0, permissionMode: options.permissionMode, workspace, startedAt, endedAt: (io.now?.() ?? new Date()).toISOString(), persistent, error: { code: "ABORTED", message: error instanceof Error ? error.message : String(error) } };
+      return { schemaVersion: 1, ok: false, status: "aborted", exitCode: io.interruptionExitCode?.() ?? 130, sessionId: activeSessionId ?? options.resume ?? "unknown", agentRunId: activeSessionId ?? options.resume ?? "unknown", finalText: "", messageCount: 0, eventCount: 0, permissionMode: options.permissionMode, workspace, startedAt, endedAt: (io.now?.() ?? new Date()).toISOString(), persistent, error: { code: "ABORTED", message: error instanceof Error ? error.message : String(error) } };
     }
   } finally {
     await booted.profile.shutdown().catch((error) => io.onDiagnostic?.("SHUTDOWN_INCOMPLETE", error instanceof Error ? error.message : String(error)));
@@ -55,14 +57,15 @@ export function projectCliArtifactResult(result: RuntimeV2RunTurnResponse, conte
   readonly endedAt: string;
   readonly persistent: boolean;
   readonly interrupted: boolean;
+  readonly interruptionExitCode?: 130 | 143;
   readonly approvalName?: string;
   readonly failure?: { readonly code: string; readonly message: string };
 }): RuntimeV2CliArtifactResult {
-  const exitCode = context.approvalName !== undefined ? 4 : result.outcome === "completed" ? 0 : context.interrupted || result.outcome === "cancelled" ? 130 : 1;
+  const exitCode = context.interrupted ? context.interruptionExitCode ?? 130 : context.approvalName !== undefined ? 4 : result.outcome === "completed" ? 0 : result.outcome === "cancelled" ? 130 : 1;
   return Object.freeze({
     schemaVersion: 1,
     ok: exitCode === 0,
-    status: context.approvalName !== undefined ? "approval_required" : result.outcome === "completed" ? "completed" : result.outcome === "cancelled" ? "aborted" : "failed",
+    status: context.interrupted ? "aborted" : context.approvalName !== undefined ? "approval_required" : result.outcome === "completed" ? "completed" : result.outcome === "cancelled" ? "aborted" : "failed",
     exitCode,
     sessionId: result.sessionId,
     agentRunId: result.agentRunId ?? result.taskId,

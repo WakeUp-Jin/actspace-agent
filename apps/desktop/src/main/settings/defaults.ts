@@ -5,7 +5,6 @@ import {
   BUILTIN_MODEL_LIST,
   DEFAULT_IMAGE_GENERATION_BASE_URL,
   DEFAULT_IMAGE_GENERATION_MODEL,
-  DEFAULT_IMAGE_INSPECTION_MODEL_KEY,
   DEFAULT_QUICK_OPEN_ACCELERATOR,
   PROVIDER_IDS,
   SEARCH_PROVIDER_IDS,
@@ -30,7 +29,6 @@ export function defaultProviderSettings(): ProviderConnectionSettings {
     proxy: { enabled: false, url: null },
     lastConnection: { status: "untested" },
     defaultPricingMultiplier: 1,
-    additionalCredentials: [],
   };
 }
 
@@ -40,6 +38,9 @@ export function defaultInstalledModels(): Partial<Record<ModelKey, InstalledMode
     { enabled: true, addedAt: BUILTIN_MODEL_ADDED_AT },
   ])) as Partial<Record<ModelKey, InstalledModelSettings>>;
 }
+
+/** 四层模型迁移版本，见 model-layers-migration.ts。新装直接是最新版本。 */
+export const MODEL_LAYERS_VERSION = 2;
 
 export function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
   const env = {
@@ -59,9 +60,9 @@ export function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
     providers: Object.fromEntries(PROVIDER_IDS.map((id) => [id, defaultProviderSettings()])) as PersistedSettingsV3["providers"],
     installedModels: defaultInstalledModels(),
     customModels: {},
-    taskModels: { defaultChatModel: null, utilityModel: null, autoReviewModel: null, exploreModel: null },
+    modelOverrides: {},
+    taskModels: { defaultChatModel: null, utilityModel: null, autoReviewModel: null, exploreModel: null, visionModel: null, thinking: { utility: "off", autoReview: "off" } },
     imageGeneration,
-    imageInspection: { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY },
     agent: {
       systemPromptPath: defaultSystemPromptPath(dataRoot),
       temperature: env.LLM_TEMPERATURE !== LLM_TEMPERATURE_DEFAULT ? env.LLM_TEMPERATURE : null,
@@ -87,7 +88,8 @@ export function defaultSettingsV4Metadata(): SettingsV4Metadata {
       connections: {},
       definitions: {},
       installed: {},
-      taskBindings: { defaultChat: null, utility: null, autoReview: null, explore: null },
+      taskBindings: { defaultChat: null, utility: null, autoReview: null, explore: null, vision: null, thinking: { utility: "off", autoReview: "off" } },
+      layersVersion: MODEL_LAYERS_VERSION,
     },
     general: {
       performanceMonitoring: false,

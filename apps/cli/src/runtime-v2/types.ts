@@ -2,7 +2,7 @@ import type { PermissionMode, RuntimeV2SessionSnapshot } from "@actspace/shared/
 
 export type RuntimeV2PermissionMode = PermissionMode;
 
-export type RuntimeV2CliExitCode = 0 | 1 | 2 | 3 | 4 | 130;
+export type RuntimeV2CliExitCode = 0 | 1 | 2 | 3 | 4 | 130 | 143;
 export type RuntimeV2CliOutputFormat = "text" | "json" | "jsonl";
 
 export type RuntimeV2RunCommandOptions = {

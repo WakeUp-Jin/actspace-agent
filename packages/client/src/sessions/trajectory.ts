@@ -40,6 +40,7 @@ function trajectoryKind(type: string): RuntimeV2TrajectoryNode["kind"] {
   if (type.startsWith("turn/")) return "turn";
   if (type.startsWith("step/")) return "step";
   if (type.startsWith("request/")) return "request";
+  if (type === "llm/auxiliary-start" || type === "llm/auxiliary-end") return "request";
   if (type === "user/message" || type === "agent/inbox/spliced") return "user";
   if (type.startsWith("assistant/")) return "assistant";
   if (type.startsWith("tool")) return "tool";
@@ -53,8 +54,8 @@ function trajectoryKind(type: string): RuntimeV2TrajectoryNode["kind"] {
 function trajectoryState(type: string, status: RuntimeV2JsonValue | undefined, reason: RuntimeV2JsonValue | undefined): RuntimeV2TrajectoryNode["state"] {
   if (type.includes("error") || status === "failed" || status === "denied" || reason === "failed") return "failed";
   if (reason === "aborted" || status === "aborted") return "aborted";
-  if (type.endsWith("/start") || type.endsWith("/asked") || type.endsWith("/requested")) return "started";
-  if (type.endsWith("/end") || type.endsWith("/completed") || type.endsWith("/decided") || type === "assistant/message" || type === "tool/result") return "completed";
+  if (type.endsWith("/start") || type.endsWith("/asked") || type.endsWith("/requested") || type === "llm/auxiliary-start") return "started";
+  if (type.endsWith("/end") || type.endsWith("/completed") || type.endsWith("/decided") || type === "assistant/message" || type === "tool/result" || type === "llm/auxiliary-end") return "completed";
   if (type.endsWith("/chunk") || type.endsWith("/summary") || type.endsWith("/change") || type.endsWith("/write")) return "updated";
   return "observed";
 }

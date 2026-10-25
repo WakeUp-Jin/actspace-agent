@@ -31,7 +31,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --globals --passWithNoTests"
   },
-  "dependencies": {
+  "dependencies": { "@actspace/background-tasks": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/tools-runtime": "workspace:*",
     "@actspace/shared": "workspace:*"

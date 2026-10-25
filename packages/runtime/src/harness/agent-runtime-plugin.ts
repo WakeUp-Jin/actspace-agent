@@ -12,6 +12,7 @@ import type { AgentRuntimeHostPort } from "./agent-host-port.js";
 import type { RuntimeSessionHostPort } from "../session/session-plugin.js";
 import { prepareDefaultHarnessArtifact, defaultHarnessSharedModules, DEFAULT_HARNESS_SHARED_SERVICES } from "./default-harness.js";
 import { TaskLedger } from "@actspace/agent-service";
+import { BackgroundTaskRegistry } from "@actspace/background-tasks";
 import { ManagedRuns } from "./managed-runs.js";
 
 export const inject = Object.freeze([...new Set([...DEFAULT_HARNESS_SHARED_SERVICES.filter(name => name !== "actspace.host.tools.browser"), "actspace.host.session"])]);
@@ -20,6 +21,7 @@ export const inject = Object.freeze([...new Set([...DEFAULT_HARNESS_SHARED_SERVI
 export class AgentRuntimeService {
   readonly runs: ManagedRuns;
   readonly subagents: OneShotSubagentProvider;
+  readonly backgroundTasks: BackgroundTaskRegistry;
   harnesses!: HarnessControl;
   hmr!: HarnessHmr;
   evolution!: PluginManager;
@@ -28,7 +30,8 @@ export class AgentRuntimeService {
     const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
     const sessions = get<RuntimeSessionController>(ctx, "session.runtime");
     this.registry = get(ctx, "agent.registry");
-    this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal), acquireSession: (id, signal) => this.hmr.acquire(id, signal), acquireVersion: (id, generationId) => this.harnesses.acquire(id, undefined, generationId) }, snapshot => { emitNotification(ctx, "agent/tasks-updated", snapshot); });
+    this.backgroundTasks = new BackgroundTaskRegistry({ openSession: async id => sessions.getOpen(id) ?? await sessions.resume(id), wake: id => this.runs.service.wake(id), onError: error => host.onHarnessDiagnostic?.(error) });
+    this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal), acquireSession: (id, signal) => this.hmr.acquire(id, signal), acquireVersion: (id, generationId) => this.harnesses.acquire(id, undefined, generationId) }, snapshot => { emitNotification(ctx, "agent/tasks-updated", snapshot); }, this.backgroundTasks);
     this.subagents = new OneShotSubagentProvider({
       store: sessions.store, presets: createBuiltInPresets(["read_file", "list_directory", "grep", "glob"]),
       manifestDigest: host.compositionDigest, plugins: host.plugins,
@@ -92,6 +95,7 @@ export class AgentRuntimeService {
   }
   async dispose(): Promise<void> {
     this.runs.quiesce();
+    await this.backgroundTasks.dispose();
     await this.subagents.dispose();
     await this.runs.dispose();
     await this.evolution?.close();

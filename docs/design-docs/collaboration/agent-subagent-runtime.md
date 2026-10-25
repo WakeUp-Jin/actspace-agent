@@ -136,9 +136,20 @@ outcome-unknown
 
 父 Agent 的 tool result 只包含完成任务所需的结构化摘要和 child reference，不展开复制 child Journal 全部工具过程。
 
+## 后台模式
+
+`agent` / `explore` 的参数 `background: true` 让子 Agent 在后台运行，详见 [后台任务](agent-background-tasks.md)：
+
+- `OneShotSubagentProvider.launch()` 完成 `delegation/requested`、创建 child Session、取得 Harness 租约并登记 child Ledger 后立即返回；`invoke()` 是 `launch()` 加等待结果，前台行为不变。
+- 后台调用不接父工具调用的中断信号；只有 `task_stop`（映射为 `aborted` → 登记表 `stopped`）、超时或 Host 关闭会停止它。
+- 每个会话最多 4 个运行中的后台子 Agent，超出时工具返回 `BACKGROUND_TASK_LIMIT`，不创建 child Session。
+- 工具立即返回 `task_id`、`child_session_id` 与「完成后自动通知、不要轮询」；`detail.delegation.background` 为 `true`。
+- 完成通知内联最终文本（UTF-8 超过 8KB 截断并附 child 引用）；运行中的 `task_output` 给步数、工具调用数和最近 3 次工具调用。
+- `delegation/completed` 仍在 child 结束时写入父会话，父卡片状态取它而不是工具结果。
+- 重启后不恢复后台子 Agent，会话打开时标为 `lost` 并提醒模型。
+
 ## 当前不提供
 
-- 后台 Subagent 和异步完成通知；
 - 用户对 child Session 继续追问；
 - continuable Subagent；
 - 多层递归委托；

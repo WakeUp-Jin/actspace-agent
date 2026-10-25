@@ -153,6 +153,7 @@ Header 后的每条记录使用统一 envelope：
 | User message | 用户输入、durable attachment refs 和 Surface append |
 | Logical request | 完整 request snapshot、实际 route/model/defaults/retry policy、system、tools、messages 和 contributor provenance |
 | LLM execution | dispatch boundary、stream chunk、assembled assistant message、usage、stop/error/abort |
+| Auxiliary LLM execution | `llm/auxiliary-start`、`llm/auxiliary-end`，父工具归属、逻辑调用及独立尝试、实际 route/model、终态和 nullable usage；required codec、surface null，不伪造主 Step 或助手消息 |
 | Tool execution | call、prepared registration identity、dispatch boundary、result、denied、aborted 和 recovery outcome |
 | Approval | request、decision、Host policy 和对应 tool call |
 | Task 与后台通知 | 主用户内容由 TaskLedger 接纳、领取和结算；Inbox 仅承担后台通知，不能作为第二套用户队列 |
@@ -186,7 +187,7 @@ Surface operation 只有两种：
 
 ## 8. Logical request snapshot
 
-每次 LLM dispatch 前必须追加完整、不可变的逻辑 request snapshot，至少包含：
+主 Agent 循环的每次 LLM dispatch 前必须追加完整、不可变的逻辑 request snapshot，至少包含：
 
 - Provider route、exact model 和 capability selection；
 - reasoning、max tokens、stop 和其他 Agent-facing call config；
@@ -211,6 +212,8 @@ assemble request candidate
 prepare 之前不能写一条猜测 exact Adapter/defaults 的 snapshot；checkpoint 之后不能重新解析 route。credential、proxy object、HTTP transport、`AbortSignal` 和最终 Provider wire payload 不进入 Session。
 
 snapshot append、flush 或 pre-dispatch abort 失败时，调用边界必须释放尚未 dispatch 的 PreparedCall lease，并且不得发起 wire request。
+
+工具内部的辅助 LLM 请求使用独立生命周期：dispatch 前持久化 `llm/auxiliary-start`，终止后持久化 `llm/auxiliary-end`。记录实际 PreparedCall 的 route/model/requestId、父工具归属、逻辑调用与尝试身份、终态及 nullable usage，不复制完整图片或请求正文，不伪造主循环 request snapshot 或 Surface 消息。两处 flush 都是持久化屏障；缺失开始事实时不得 dispatch，终结持久化失败时不得重发已执行的调用。具体字段与关系见[事件模型 §5.2](agent-spec-dsh-event-model.md#52-辅助请求生命周期)。
 
 ## 9. EventCodecRegistry
 
@@ -331,6 +334,7 @@ Execution fork 只允许从 `read-write` 或满足所需 codec/能力的 `degrad
 Fork：
 
 - 创建新的 Session id 和 Header；
+- 新 Header 的 `createdWith` 由当前运行环境生成，记录当前 Profile、Composition、manifest 和 codec set；不得照抄父会话的创建快照。父会话的历史 Header 保持不变，来源由 lineage 和继承事件的 provenance 保留；
 - 在新 Header 的 lineage 中记录 parent Session 和 boundary seq；
 - 复制或重放到该边界的逻辑 prefix，保持 source provenance；
 - 不复制 API credential、进程内 Registry、Cordis Fiber、activation lease 或 writer lease；

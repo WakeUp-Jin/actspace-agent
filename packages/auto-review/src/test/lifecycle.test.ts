@@ -1,3 +1,4 @@
+import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
 import { describe, it, expect } from "vitest";
 import { CordisContextClass } from "@actspace/cordis-adapter";
 import { parseReview } from "../review.js";
@@ -11,6 +12,7 @@ describe("auto reviewer", () => {
   it.each(['true', '{"approved":"true"}', '```json\n{"approved":true}\n```', '{"approved":true,"risk":0}', '{"approved":true,"reason":1}'])("rejects malformed result: %s", value => expect(() => parseReview(value)).toThrow());
   it("loads the service without tools or event codecs", async () => {
     const ctx = new CordisContextClass();
+    ctx.provide("llm.auxiliary-requests", { start: async () => ({ finish: async () => {} }) });
     expect(() => apply(ctx)).toThrow("llm.service");
     ctx.provide?.("llm.service", {});
     await ctx.plugin({ inject: ["llm.service"], apply: inner => apply(inner as never) });
@@ -38,9 +40,9 @@ it("makes a tool-free bounded model request and releases the prepared call", asy
   const { createAutoReviewer } = await import("../review.js");
   let request: unknown;
   let released = false;
-  const reviewer = createAutoReviewer({ prepareAsync: async (input: unknown) => { request = input; return { dispatch: async () => (async function* () { yield { type: "done", content: [{ type: "text", text: '{"approved":true,"reason":"Task matches"}' }] }; })(), release: () => { released = true; } }; } } as never);
-  expect(await reviewer.review({ sessionId: "s", callId: "c", model: "current-main", snapshot: { action: { command: "ls" } }, signal: new AbortController().signal })).toEqual({ approved: true, reason: "Task matches" });
+  const reviewer = createAutoReviewer({ prepareAsync: async (input: unknown) => { request = input; return { request: { requestId: "fixture-request", routeId: "auto-review", model: "current-main" }, dispatch: async () => (async function* () { yield { type: "done", usage: EMPTY_LLM_USAGE, stopReason: "stop", content: [{ type: "text", text: '{"approved":true,"reason":"Task matches"}' }] }; })(), release: () => { released = true; } }; } } as never, { start: async () => ({ finish: async () => {} }) });
+  expect(await reviewer.review({ sessionId: "s", agentRunId: "r", turnId: "t", stepId: "step", callId: "c", logicalRequestId: "logical", model: "current-main", snapshot: { action: { command: "ls" } }, signal: new AbortController().signal })).toEqual({ approved: true, reason: "Task matches" });
   expect(request).toMatchObject({ routeId: "auto-review", model: "current-main", tools: [] });
   expect(released).toBe(true);
-  await expect(reviewer.review({ sessionId: "s", callId: "c", model: "m", snapshot: "x".repeat(96_001), signal: new AbortController().signal })).rejects.toThrow("exceeds limit");
+  await expect(reviewer.review({ sessionId: "s", agentRunId: "r", turnId: "t", stepId: "step", callId: "c", logicalRequestId: "logical", model: "m", snapshot: "x".repeat(96_001), signal: new AbortController().signal })).rejects.toThrow("exceeds limit");
 });

@@ -30,23 +30,6 @@ export interface ProviderDefinition {
   readonly supportsBalance: boolean;
 }
 
-export interface ProviderCatalogDefinition {
-  readonly id: string;
-  readonly label: string;
-  readonly description: string;
-  readonly logoKey: ProviderLogoKey;
-  readonly category: ProviderCategory;
-  readonly auth: { readonly kind: ProviderAuthKind };
-  /** Legacy storage namespace; protocol independently selects the wire adapter. */
-  readonly runtimeProviderId?: ProviderId;
-  /** 缺省表示协议由用户在创建时选择（「自定义服务」）。 */
-  readonly protocol?: ModelApi;
-  /** 不在添加列表里显示；已保存连接仍能按 catalogId 查到名称和图标。 */
-  readonly hidden?: boolean;
-  readonly defaultBaseUrl?: string;
-  readonly defaultModel?: string;
-}
-
 export interface ProviderSpec {
   id: ProviderId;
   label: string;
@@ -134,21 +117,6 @@ export const PROVIDER_DEFINITIONS: readonly ProviderDefinition[] = [
   },
 ];
 
-/** User-approved add-connection catalog. Retired presets never delete saved connections. */
-export const PROVIDER_CATALOG: readonly ProviderCatalogDefinition[] = [
-  { id: "minimax", label: "MiniMax", description: "MiniMax 官方 API", logoKey: "minimax", category: "direct", auth: { kind: "api-key" }, protocol: "openai-completions", defaultBaseUrl: "https://api.minimax.io/v1", defaultModel: "MiniMax-M2.7" },
-  { id: "openai", label: "OpenAI", description: "OpenAI 官方 API", logoKey: "openai", category: "direct", auth: { kind: "api-key" }, protocol: "openai-responses", defaultBaseUrl: "https://api.openai.com/v1", defaultModel: "gpt-4o-mini" },
-  { id: "anthropic", label: "Anthropic", description: "Anthropic 官方 API", logoKey: "anthropic", category: "direct", auth: { kind: "api-key" }, protocol: "anthropic-messages", defaultBaseUrl: "https://api.anthropic.com" },
-  { id: "zai", label: "Z.AI", description: "智谱官方接入，GLM 系列模型", logoKey: "zai", category: "direct", auth: { kind: "api-key" }, protocol: "openai-completions", defaultBaseUrl: "https://api.z.ai/api/paas/v4", defaultModel: "glm-4.5" },
-  { id: "xiaomi", label: "Xiaomi", description: "小米官方接入，MiMo 系列模型", logoKey: "xiaomi", category: "direct", auth: { kind: "api-key" }, protocol: "openai-completions", defaultBaseUrl: "https://api.xiaomimimo.com/v1" },
-  { id: "volcengine-coding-plan", label: "火山方舟 Coding Plan", description: "火山方舟 Coding Plan 专用 Key 接入", logoKey: "volcengine", category: "coding", auth: { kind: "api-key" }, protocol: "openai-completions", defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/coding/v3" },
-  { id: "openai-compatible", hidden: true, label: "自定义服务（OpenAI Chat）", description: "兼容 Chat Completions 的中转服务或自部署网关", logoKey: "openai", category: "custom", auth: { kind: "api-key" }, protocol: "openai-completions" },
-  { id: "openai-responses-compatible", hidden: true, label: "自定义服务（OpenAI Responses）", description: "兼容 Responses API 的中转服务或自部署网关", logoKey: "openai", category: "custom", auth: { kind: "api-key" }, protocol: "openai-responses" },
-  { id: "anthropic-compatible", hidden: true, label: "自定义服务（Anthropic）", description: "兼容 Messages API 的中转服务或自部署网关", logoKey: "anthropic", category: "custom", auth: { kind: "api-key" }, protocol: "anthropic-messages" },
-  { id: "custom", label: "自定义服务", description: "中转站、自部署网关 · Anthropic / OpenAI 协议", logoKey: "generic", category: "custom", auth: { kind: "api-key" } },
-];
-
-export const PROVIDER_CATALOG_ORDER = ["kimi", "deepseek", "minimax", "openai", "anthropic", "zai", "xiaomi", "volcengine-coding-plan", "openrouter", "custom"] as const;
 export function isConnectionProtocol(value: unknown): value is ModelApi {
   return value === "openai-completions" || value === "openai-responses" || value === "anthropic-messages";
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { isWorkspaceFileTab, useRightPanel, type WorkspaceFileMeta } from "./RightPanelContext";
+import { isWorkspaceFileTab, useRightPanel, type WorkspaceFileMeta, type WorkspaceFileTarget } from "./RightPanelContext";
 import { readFailureTab, tabFromFile } from "./workspaceFileTab";
 import { workspacesApi } from "../../api/workspaces";
 
@@ -46,7 +46,7 @@ export function useFileFreshness({
       if (!isWorkspaceFileTab(tab)) return false;
       const meta = tab as WorkspaceFileMeta;
       // 已经标记过期的不用再查；没有基线 mtime 的（旧 Tab / 读失败）也无从比对。
-      return !meta.isStale && typeof meta.mtimeMs === "number" && meta.mtimeMs > 0;
+      return !meta.hostId && !meta.isStale && typeof meta.mtimeMs === "number" && meta.mtimeMs > 0;
     });
     if (targets.length === 0) return;
 
@@ -55,13 +55,12 @@ export function useFileFreshness({
         const meta = tab as WorkspaceFileMeta;
         const relativePath = meta.relativePath as string;
         try {
-          const result = await api({ workspaceRoot, relativePath });
-          if (result.error) return;
-          if (result.mtimeMs !== meta.mtimeMs || result.size !== meta.size) {
-            markFileTabStale(relativePath);
+          const result = await api({ workspaceRoot: meta.workspaceRoot ?? workspaceRoot, relativePath });
+          if (result.error || result.mtimeMs !== meta.mtimeMs || result.size !== meta.size) {
+            markFileTabStale(relativePath, meta.workspaceRoot !== undefined || meta.hostId ? meta : undefined);
           }
         } catch {
-          // 读不到就当没变化：这里只负责提示新鲜度，不该把偶发 IPC 失败升级成错误 UI。
+          // 明确的文件失效结果会标记过期；偶发 IPC 失败保留快照，等下次触发重查。
         }
       }),
     );
@@ -104,7 +103,7 @@ export function useFileFreshness({
  * `editedPaths` 可能是绝对路径也可能是工作区相对路径（取决于工具 preview 怎么给），
  * 所以按「相等或以 `/<relativePath>` 结尾」匹配，两种形式都能命中。
  */
-export function useAgentEditSignals(editedPaths: readonly string[]) {
+export function useAgentEditSignals(editedPaths: readonly string[], workspaceRoot?: string) {
   const { tabs, markFileTabStale } = useRightPanel();
 
   const tabsRef = useRef(tabs);
@@ -120,13 +119,13 @@ export function useAgentEditSignals(editedPaths: readonly string[]) {
       if (!isWorkspaceFileTab(tab)) continue;
       const meta = tab as WorkspaceFileMeta;
       const relativePath = meta.relativePath as string;
-      if (meta.isStale) continue;
+      if (meta.isStale || meta.hostId || (meta.workspaceRoot !== undefined && meta.workspaceRoot !== workspaceRoot)) continue;
       const hit = edited.some(
-        (path) => path === relativePath || path.endsWith(`/${relativePath}`),
+        (path) => path === relativePath || path === `${meta.workspaceRoot ?? workspaceRoot}/${relativePath}`,
       );
-      if (hit) markFileTabStale(relativePath);
+      if (hit) markFileTabStale(relativePath, meta.workspaceRoot !== undefined || meta.hostId ? meta : undefined);
     }
-  }, [signature, markFileTabStale]);
+  }, [signature, markFileTabStale, workspaceRoot]);
 }
 
 function editedPathsOf(signature: string): string[] {
@@ -138,12 +137,14 @@ export function useReloadFileTab(workspaceRoot?: string) {
   const { replaceTab } = useRightPanel();
 
   return useCallback(
-    async (relativePath: string, title: string) => {
+    async (relativePath: string, title: string, target?: WorkspaceFileTarget) => {
+      if (target?.hostId) return;
+      const root = target?.workspaceRoot ?? workspaceRoot;
       const api = workspacesApi.readFile;
       try {
-        replaceTab(tabFromFile(await api({ workspaceRoot, relativePath })));
+        replaceTab(tabFromFile(await api({ workspaceRoot: root, relativePath }), target));
       } catch {
-        replaceTab(readFailureTab(relativePath, title));
+        replaceTab(readFailureTab(relativePath, title, target));
       }
     },
     [workspaceRoot, replaceTab],

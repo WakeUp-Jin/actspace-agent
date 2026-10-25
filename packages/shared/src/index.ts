@@ -6,8 +6,6 @@ export {
   PROVIDER_IDS,
   PROVIDER_REGISTRY,
   PROVIDER_DEFINITIONS,
-  PROVIDER_CATALOG,
-  PROVIDER_CATALOG_ORDER,
   isConnectionProtocol,
   isProviderId,
   type ProviderId as LlmProviderId,
@@ -15,14 +13,11 @@ export {
   type ProviderDefinition,
   type ProviderFieldDefinition,
   type ProviderLogoKey,
-  type ProviderCatalogDefinition,
   type ProviderCategory,
   type ProviderAuthKind,
 } from "./provider-config";
 export * from "./model-config";
 export * from "./model-resolver";
-export * from "./openrouter-catalog";
-export * from "./image-inspection-config";
 export * from "./browser-bridge";
 export * from "./skills";
 export * from "./settings";
@@ -46,11 +41,16 @@ export * from "./english-learning";
 export * from "./model-catalog";
 export * from "./model-catalog-normalize";
 export * from "./model-pricing";
+export * from "./model-thinking-profiles";
+export * from "./model-catalog-match";
+export * from "./model-layers";
+export * from "./provider-model-facts";
+export * from "./provider-templates";
+export * from "./model-connections";
 
 export * from "./deepseek-model-facts";
 
 export * from "./custom-model-reasoning";
-export * from "./custom-model-input";
 export * from "./custom-connection-address";
 
 export * from "./context-projection";

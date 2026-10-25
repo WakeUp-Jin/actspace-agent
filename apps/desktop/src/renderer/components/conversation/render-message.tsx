@@ -7,6 +7,7 @@ import { AssistantReply } from "../messages/AssistantReply";
 import { AgentRunBlock } from "../messages/AgentRunBlock";
 import { BashRunBlock } from "../messages/BashRunBlock";
 import { BrowserApprovalBlock } from "../messages/BrowserApprovalBlock";
+import { BackgroundNoticeRow } from "../messages/BackgroundNoticeRow";
 import { CompactCommandBlock } from "../messages/CompactCommandBlock";
 import { DeleteFileBlock } from "../messages/DeleteFileBlock";
 import { FileDiffBlock } from "../messages/FileDiffBlock";
@@ -71,6 +72,8 @@ export function renderMessage(
       return <BashRunBlock key={renderKey} message={message} replyCompleted={replyCompleted} onExpand={onExpand} />;
     case "context_compaction":
       return <CompactCommandBlock key={renderKey} message={message} className={className} />;
+    case "background_notice":
+      return <BackgroundNoticeRow key={renderKey} message={message} />;
     case "workspace_preparation":
       return <WorkspacePreparationBlock key={renderKey} message={message} />;
     case "todo":

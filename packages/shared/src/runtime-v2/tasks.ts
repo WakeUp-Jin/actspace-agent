@@ -71,3 +71,11 @@ export function taskOperation(content: RuntimeV2JsonValue): "compact" | undefine
   }
   return typeof text === "string" && text.trim() === "/compact" ? "compact" : undefined;
 }
+
+/** Host-submitted task that opens a Run only to deliver pending background notifications. */
+export const BACKGROUND_WAKE_KIND = "background-wake";
+export type BackgroundWakeContent = { readonly kind: typeof BACKGROUND_WAKE_KIND };
+
+export function isBackgroundWake(content: RuntimeV2JsonValue | undefined): boolean {
+  return !!content && typeof content === "object" && !Array.isArray(content) && "kind" in content && content.kind === BACKGROUND_WAKE_KIND;
+}

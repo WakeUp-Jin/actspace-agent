@@ -15,6 +15,7 @@ describe("desktop app plugin", () => {
 it("mounts the title behavior before publishing the Desktop application and releases it with the plugin", async () => {
   const { CordisContextClass } = await import("@actspace/cordis-adapter");
   const ctx = new CordisContextClass();
+    ctx.provide("llm.auxiliary-requests", { start: async () => ({ finish: async () => {} }) });
   ctx.provide("actspace.host.desktop", {});
   ctx.provide("session.runtime", { snapshot: () => ({ metadata: { title: null } }) });
   ctx.provide("agent.runtime", { runs: {} });

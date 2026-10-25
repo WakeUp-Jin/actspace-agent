@@ -39,16 +39,9 @@ export function legacyMergeTranscript(durable: DurableTranscript, live: LiveTran
     return [];
   })();
 
-  const { compactionFailure, isStreaming, bashUpdates: bashTaskUpdates } = local;
+  const { compactionFailure, isStreaming } = local;
   const durableUserKeys = new Set(persistedMessages.filter(block => block.kind === "user").map(block => block.renderKey ?? block.id));
   const visibleStreaming = streamingBlocks.filter(block => block.kind !== "user" || !durableUserKeys.has(block.renderKey ?? block.id));
   const withStreaming = visibleStreaming.length === 0 ? persistedMessages : [...persistedMessages, ...visibleStreaming];
-  const merged = compactionFailure && !isStreaming ? [...withStreaming, compactionFailure] : withStreaming;
-  if (Object.keys(bashTaskUpdates).length === 0) return merged;
-  return merged.map((block) => {
-    if (block.kind !== "bash" || !block.backgroundTaskId) return block;
-    const update = bashTaskUpdates[block.backgroundTaskId];
-    if (!update) return block;
-    return { ...block, backgroundStatus: update.status, exitCode: update.exitCode ?? block.exitCode };
-  });
+  return compactionFailure && !isStreaming ? [...withStreaming, compactionFailure] : withStreaming;
 }

@@ -17,7 +17,7 @@ export function createRuntime(version: string, buildHash: string): RuntimeAPI {
       case "point": return actionPoint(normalizeTarget(params), params.timeoutMs, params.localCoordinates);
       case "frame_element": return waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs });
       case "frame_offset": {
-        const frame = await waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs, actionable: true });
+        const frame = await waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs, actionable: params.scrollIntoView !== false });
         if (frame.tagName.toLowerCase() !== "iframe") throw new Error("frame_not_found");
         const rect = frame.getBoundingClientRect();
         return {

@@ -1,33 +1,61 @@
 import { Check, Copy } from "lucide-react";
-import { Children, createContext, isValidElement, useContext, useState, type AnchorHTMLAttributes, type ComponentPropsWithoutRef, type ReactNode } from "react";
-import Markdown from "react-markdown";
+import { Children, createContext, isValidElement, memo, useContext, useId, useMemo, useRef, useState, type AnchorHTMLAttributes, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { LANGUAGE_MODULES } from "../right-panel/highlight";
 import { loadAppearance } from "../../appearance/storage";
 import { MermaidDiagramBlock } from "./MermaidDiagramBlock";
 import { isFenceClosed, isMermaidLanguage } from "./mermaid-renderer";
+import { splitMarkdownBlocks, type MarkdownBlock, type MarkdownBlockSplit } from "./markdown-blocks";
 
-/** Raw markdown of the message, so fence handlers can tell whether a streaming fence has closed. */
+/** Raw markdown of the block being rendered, so fence handlers can tell whether a streaming fence has closed. */
 const MarkdownSourceContext = createContext("");
+/** 工作区链接的打开方式走 context，components 映射因此保持稳定，冻结块不用跟着重渲染。 */
+const WorkspaceFileContext = createContext<((path: string) => void) | undefined>(undefined);
+const FootnotePrefixContext = createContext("user-content-");
 
-function MarkdownLink({ href, children, onOpenWorkspaceFile, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { onOpenWorkspaceFile?: (path: string) => void }) {
+function MarkdownLink({ href, children, node: _node, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown }) {
+  const onOpenWorkspaceFile = useContext(WorkspaceFileContext);
+  const footnotePrefix = useContext(FootnotePrefixContext);
+  const isFragment = href?.startsWith("#");
   const isWorkspacePath = Boolean(href && onOpenWorkspaceFile && !/^(?:[a-z][a-z0-9+.-]*:|#)/i.test(href));
   return (
     <a
       {...rest}
       href={href}
-      target={isWorkspacePath ? undefined : "_blank"}
-      rel={isWorkspacePath ? undefined : "noreferrer noopener"}
+      target={isWorkspacePath || isFragment ? undefined : "_blank"}
+      rel={isWorkspacePath || isFragment ? undefined : "noreferrer noopener"}
+      aria-describedby={rest["aria-describedby"]?.split(/\s+/).map((id) => id === "footnote-label" ? `${footnotePrefix}footnote-label` : id).join(" ")}
       onClick={(event) => {
         rest.onClick?.(event);
-        if (!event.defaultPrevented && isWorkspacePath && href) {
+        if (event.defaultPrevented) return;
+        if (isFragment && href) {
+          event.preventDefault();
+          let id: string;
+          try { id = decodeURIComponent(href.slice(1)); } catch { return; }
+          // Resolve within this reply; never navigate the Electron file URL or another reply.
+          const reply = event.currentTarget.closest(".markdown-prose");
+          const target = Array.from(reply?.querySelectorAll<HTMLElement>("[id]") ?? []).find((element) => element.id === id);
+          if (!target) return;
+          target.scrollIntoView({ block: "center" });
+          if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) {
+            target.setAttribute("tabindex", "-1");
+            target.addEventListener("blur", () => target.removeAttribute("tabindex"), { once: true });
+          }
+          target.focus({ preventScroll: true });
+        } else if (isWorkspacePath && href) {
           event.preventDefault();
           onOpenWorkspaceFile?.(href);
         }
       }}
     >{children}</a>
   );
+}
+
+function MarkdownHeading({ id, node: _node, ...props }: ComponentPropsWithoutRef<"h2"> & { node?: unknown }) {
+  const footnotePrefix = useContext(FootnotePrefixContext);
+  return <h2 {...props} id={id === "footnote-label" ? `${footnotePrefix}footnote-label` : id} />;
 }
 
 function codeText(children: ReactNode): string {
@@ -91,23 +119,45 @@ function MarkdownCodeBlock({ children, ...rest }: ComponentPropsWithoutRef<"pre"
   );
 }
 
-/** Chat replies use the same GFM and highlight.js pipeline as the file preview. */
-export function MarkdownProse({ content, onOpenWorkspaceFile }: { content: string; onOpenWorkspaceFile?: (path: string) => void }) {
+const REMARK_PLUGINS = [remarkGfm];
+// 语言自动识别要把每个高亮器都跑一遍：还在写的代码围栏每帧都会变，只按标注的语言高亮，闭合后再识别。
+const HIGHLIGHT_OPTIONS = { ignoreMissing: true, languages: LANGUAGE_MODULES };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SETTLED_REHYPE_PLUGINS = [[rehypeHighlight, { ...HIGHLIGHT_OPTIONS, detect: true }]] as any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const OPEN_FENCE_REHYPE_PLUGINS = [[rehypeHighlight, { ...HIGHLIGHT_OPTIONS, detect: false }]] as any;
+const COMPONENTS: Components = { a: MarkdownLink, pre: MarkdownPre, h2: MarkdownHeading };
+
+function isOpenFence(source: string): boolean {
+  const block = source.trimStart();
+  return /^(`{3,}|~{3,})/.test(block) && !isFenceClosed(block);
+}
+
+/** 一个顶层块单独解析渲染；块对象没变时整块跳过。 */
+const MarkdownBlockView = memo(function MarkdownBlockView({ block }: { block: MarkdownBlock }) {
+  const clobberPrefix = useContext(FootnotePrefixContext);
+  const remarkRehypeOptions = useMemo(() => ({ clobberPrefix }), [clobberPrefix]);
+  return (
+    <MarkdownSourceContext.Provider value={block.source}>
+      <Markdown remarkPlugins={REMARK_PLUGINS} remarkRehypeOptions={remarkRehypeOptions} rehypePlugins={isOpenFence(block.source) ? OPEN_FENCE_REHYPE_PLUGINS : SETTLED_REHYPE_PLUGINS} components={COMPONENTS}>
+        {block.source}
+      </Markdown>
+    </MarkdownSourceContext.Provider>
+  );
+});
+
+/** Chat replies use the same GFM and highlight.js pipeline as the file preview, split into blocks so streaming only re-parses the tail. */
+export const MarkdownProse = memo(function MarkdownProse({ content, onOpenWorkspaceFile }: { content: string; onOpenWorkspaceFile?: (path: string) => void }) {
+  const id = useId();
+  const split = useRef<MarkdownBlockSplit | undefined>(undefined);
+  split.current = splitMarkdownBlocks(content, split.current);
   return (
     <div className="markdown-prose act-code-hl">
-      <MarkdownSourceContext.Provider value={content}>
-        <Markdown
-          remarkPlugins={[remarkGfm]}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true, languages: LANGUAGE_MODULES }]] as any}
-          components={{
-            a: (props) => <MarkdownLink {...props} onOpenWorkspaceFile={onOpenWorkspaceFile} />,
-            pre: MarkdownPre,
-          }}
-        >
-          {content}
-        </Markdown>
-      </MarkdownSourceContext.Provider>
+      <WorkspaceFileContext.Provider value={onOpenWorkspaceFile}>
+        <FootnotePrefixContext.Provider value={`user-content-${id.replace(/:/g, "")}-`}>
+          {split.current.blocks.map((block) => <MarkdownBlockView key={block.start} block={block} />)}
+        </FootnotePrefixContext.Provider>
+      </WorkspaceFileContext.Provider>
     </div>
   );
-}
+});

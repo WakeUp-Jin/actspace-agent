@@ -13,7 +13,6 @@ export type {
   ModelStorageMutationInput,
   PersistedSettingsV3,
   ProviderConnectionMutationInput,
-  ProviderCredentialMutationResult,
   ProviderRuntimeError,
   SecretCrypto,
   SettingsServiceOptions,

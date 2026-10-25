@@ -1,7 +1,7 @@
 import { COMPACTION_SYSTEM, COMPACTION_TEMPLATE, PRIOR_SUMMARY_RULES } from "./prompts.js";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionSurfaceEntry } from "@actspace/session-journal";
-import type { LlmService } from "@actspace/llm-service";
+import { completeAuxiliaryText, type AuxiliaryRequestRecorder, type LlmService } from "@actspace/llm-service";
 
 export type CompactionSummary = { readonly content: string; readonly pathlist?: readonly string[]; readonly metadata?: RuntimeV2JsonValue };
 
@@ -17,14 +17,12 @@ export class DeterministicCompactionSummarizer implements CompactionSummarizer {
 }
 
 export class LlmCompactionSummarizer implements CompactionSummarizer {
-  constructor(private readonly options: { readonly llm: LlmService; readonly routeId: string; readonly model: string }) {}
+  constructor(private readonly options: { readonly llm: LlmService; readonly recorder: AuxiliaryRequestRecorder; readonly routeId: string; readonly model: string }) {}
 
   async summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string; readonly summaryIds?: readonly string[]; readonly signal?: AbortSignal }): Promise<CompactionSummary> {
-    const requestId = `compaction:${context.sessionId}:${context.turnId ?? "between-turns"}`;
     const prior = entries.filter(entry => context.summaryIds?.includes(entry.node.messageId));
     const conversation = entries.filter(entry => !context.summaryIds?.includes(entry.node.messageId));
     const prepared = await this.options.llm.prepareAsync({
-      requestId,
       routeId: this.options.routeId,
       model: this.options.model,
       messages: [
@@ -35,19 +33,13 @@ export class LlmCompactionSummarizer implements CompactionSummarizer {
       sessionId: context.sessionId,
       signal: context.signal ?? new AbortController().signal,
     });
-    try {
-      const stream = await prepared.dispatch(); let text = ""; let terminal = false;
-      for await (const event of stream) {
-        if (event.type === "text-delta") text += event.text;
-        if (event.type === "done") { terminal = true; if (text.length === 0) text = event.content.filter((block) => block.type === "text").map((block) => block.text).join(""); }
-        if (event.type === "error") throw new Error(`Compaction LLM failed: ${event.failure.message}`);
-        if (event.type === "aborted") throw new Error(`Compaction LLM aborted: ${event.reason}`);
-      }
-      if (!terminal || text.trim().length === 0) throw new Error("Compaction LLM returned no terminal summary.");
-      return { content: text.trim(), metadata: { routeId: prepared.request.routeId, model: prepared.request.model, registrationId: prepared.registration.registrationId, adapterVersion: prepared.registration.adapter.adapterVersion } };
-    } finally {
-      prepared.release();
-    }
+    const { text } = await completeAuxiliaryText(prepared, {
+      recorder: this.options.recorder,
+      owner: { sessionId: context.sessionId, purpose: "compaction", ...(context.turnId === undefined ? {} : { turnId: context.turnId }) },
+      ...(context.signal ? { signal: context.signal } : {}),
+    });
+    if (!text.trim()) throw new Error("Compaction LLM returned no terminal summary.");
+    return { content: text.trim(), metadata: { attemptId: prepared.request.requestId, routeId: prepared.request.routeId, model: prepared.request.model, registrationId: prepared.registration.registrationId, adapterVersion: prepared.registration.adapter.adapterVersion } };
   }
 }
 

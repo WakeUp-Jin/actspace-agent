@@ -9,6 +9,11 @@ export type RunTarget =
   | { readonly kind: "remote"; readonly hostId: string; readonly hostName: string; readonly workspaceId?: string; readonly workspaceName?: string }
   | { readonly kind: "invalid"; readonly key: string };
 
+/** Source workspace groups do not identify a worktree execution directory. */
+export function localExecutionRoot(target: RunTarget, fallback?: string | null): string | undefined {
+  return target.kind === "local" ? target.worktree?.workspaceRoot ?? target.workspaceRoot ?? fallback ?? undefined : undefined;
+}
+
 export type Capability = { readonly enabled: boolean; readonly reason?: string };
 
 /** 每一项都对应一处被替换的「是不是远端」分支。 */

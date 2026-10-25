@@ -149,6 +149,13 @@ describe("ComposerStatsPills", () => {
     expect(dialog).toHaveTextContent("12,240 tok");
     expect(dialog).toHaveTextContent("未缓存输入1,967 tok");
     expect(pill).toHaveAttribute("aria-expanded", "true");
+
+    // 点面板外任何地方都收起，不必再点胶囊。
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    await userEvent.click(outside);
+    expect(screen.queryByRole("dialog", { name: "Token 用量" })).toBeNull();
+    outside.remove();
   });
 
   it("reports panel toggles to the composer overlay instead of opening on its own", async () => {

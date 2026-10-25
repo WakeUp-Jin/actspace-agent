@@ -75,6 +75,7 @@
 - 历史 session 中的 Anthropic server `server_tool_use`、`web_search_tool_result` 属于 provider 响应协议，不应当作为本地 ToolManager 执行日志写入；session / run log 只保留 `serverToolUse` 请求计数，不应将未裁剪网页全文或 provider tool result 原文写入 session。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。
+- LLM 错误脱敏必须使用实际出站请求的凭据：Host 或 Desktop 在路由中延迟绑定凭据时，`PreparedLlmCall` 的早期解析结果可能为空。共用 PiAiAdapter 在最终凭据绑定后，对两种传输引擎的错误事件、取消原因和同步/异步异常执行请求级脱敏；正常回复内容不改写。脱敏器不跨请求共享密钥，不保留原始 cause、stack、headers 或任意 Provider 属性；通用格式匹配仅作补充，不能代替实际凭据匹配。
 
 ## 沙箱执行
 

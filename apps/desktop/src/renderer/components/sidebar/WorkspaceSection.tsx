@@ -169,9 +169,9 @@ export function WorkspaceSection({
             在 IDE 中打开
           </ContextMenuItem>
           <ContextMenuItem
-            disabled={archiveDisabled || !group.workspaceId || !onArchiveWorkspace}
+            disabled={archiveDisabled || !onArchiveWorkspace}
             title={archiveTitle}
-            onSelect={() => { if (group.workspaceId) onArchiveWorkspace?.(group.workspaceId, group.workspaceRoot); }}
+            onSelect={() => { onArchiveWorkspace?.(group.key, group.workspaceRoot); }}
           >
             <Archive size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
             归档全部

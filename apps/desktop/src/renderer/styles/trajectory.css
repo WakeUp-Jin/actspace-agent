@@ -204,6 +204,16 @@
   color: var(--act-trajectory-label-tertiary);
   font: 14px/14px var(--act-font-mono);
 }
+.tjb-stop {
+  border: 1px solid var(--act-trajectory-border-l4);
+}
+.tjb-stop:hover {
+  border-color: var(--act-trajectory-label-tertiary);
+}
+.tjb-stop:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
 .tjb-search {
   display: flex;
   flex: 0 1 164px;
@@ -1163,6 +1173,28 @@
   border-left: 0.5px solid var(--act-trajectory-border-l2);
   background: var(--act-trajectory-bg-layer-1);
 }
+/* 右侧子 Agent 面板里的轨迹：太窄放不下左右分栏，详情从下半部分弹出，不能拖宽。 */
+.tjv-root[data-variant='panel'] .tj-split {
+  flex-direction: column;
+}
+.tjv-root[data-variant='panel'] .tj-tablePane {
+  min-height: 0;
+}
+/* 窄窗口媒体查询会把详情改成右侧抽屉，面板里一律保持下半部分。 */
+.tjv-root[data-variant='panel'] .tj-details {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: auto;
+  max-width: none;
+  height: 56%;
+  border-top: 0.5px solid var(--act-trajectory-border-l2);
+  border-left: 0;
+  box-shadow: var(--act-trajectory-shadow-panel);
+}
+.tjv-root[data-variant='panel'] .tj-detailsResizeHandle {
+  display: none;
+}
 .tj-detailsResizeHandle {
   position: absolute;
   z-index: 6;
@@ -1369,6 +1401,21 @@
   min-height: 22px;
   padding: 0 14px;
   align-items: center;
+}
+.tj-overview > .tj-overviewSubagent {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.tj-overviewSubagent dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tj-overviewSubagentName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tj-overview > .tj-requestTokenDetail dt {
   padding-left: 12px;

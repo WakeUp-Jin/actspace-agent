@@ -74,6 +74,21 @@ describe('DetailPanel', () => {
     expect(handlers.onSelectRecord).toHaveBeenLastCalledWith(cellOf(cell => cell.kind === 'message').recordId);
   });
 
+  it('offers the delegated child trajectory from a delegated call overview only', async () => {
+    const user = userEvent.setup();
+    const onOpenSubagent = vi.fn();
+    const subagentFor = (callId: string) => callId === 'c1' ? { parentCallId: 'c1', childSessionId: 'child-1', presetId: 'explore' } : null;
+    const handlers = { onTab: vi.fn(), onSelectRecord: vi.fn(), onSelectRequest: vi.fn(), onClose: vi.fn() };
+    const { rerender } = render(<DetailPanel layout={layout} selection={record(cellOf(cell => cell.kind === 'tool'))} tab="overview" subagentFor={subagentFor} onOpenSubagent={onOpenSubagent} {...handlers} />);
+    expect(screen.getByText('子智能体')).toBeInTheDocument();
+    expect(screen.getByText('explore')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '在右侧查看子智能体轨迹' }));
+    expect(onOpenSubagent).toHaveBeenCalledWith('child-1');
+    rerender(<DetailPanel layout={layout} selection={record(cellOf(cell => cell.kind === 'subtool'))} tab="overview" subagentFor={subagentFor} onOpenSubagent={onOpenSubagent} {...handlers} />);
+    expect(screen.queryByText('子智能体')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '在右侧查看子智能体轨迹' })).not.toBeInTheDocument();
+  });
+
   it('opens thinking expanded and keeps the toggle on the record it was made on', async () => {
     const user = userEvent.setup();
     const thinking = cellOf(cell => cell.kind === 'message' && cell.record.messageId === 'a');

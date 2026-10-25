@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useSyncExternalStore } from "react";
-import type { BashBackgroundStatus, ComposerAttachment, ComposerMode, ResponseAnnotationReference } from "@actspace/shared";
+import type { ComposerAttachment, ComposerMode, ResponseAnnotationReference } from "@actspace/shared";
 import type { ComposerDraftRestore, ComposerSendOptions } from "../components/Composer";
 import { revokeAttachmentPreviews } from "../components/composer/attachment-preview";
 import type { CompactionBlock } from "./live-runs/stream-blocks";
@@ -8,7 +8,6 @@ import { EMPTY_MESSAGE_QUEUE, type SessionMessageQueue } from "./message-queue";
 // 按会话的本地状态（02 §3.1）：只存在于本窗口、没有 durable 事实源的那部分。
 // 归档 / 删除会话、移除 Host 时用 evict 释放（连同草稿附件的预览 URL）；没有条目的会话读到 DEFAULT_SESSION_LOCAL_STATE。
 
-export type BashTaskUpdate = { status: BashBackgroundStatus; exitCode?: number | null };
 export type ComposerSessionState = { mode: ComposerMode; selectedSkills: string[] };
 
 export type SessionLocalState = {
@@ -21,7 +20,6 @@ export type SessionLocalState = {
   draft?: ComposerDraftRestore;
   composer?: ComposerSessionState;
   compactionFailure?: CompactionBlock;
-  bashUpdates: Readonly<Record<string, BashTaskUpdate>>;
   lastSendOptions?: ComposerSendOptions;
   approvalPending: boolean;
   failed: boolean;
@@ -34,7 +32,6 @@ export type SessionLocalState = {
 };
 
 export const DEFAULT_SESSION_LOCAL_STATE: SessionLocalState = Object.freeze({
-  bashUpdates: Object.freeze({}),
   approvalPending: false,
   failed: false,
   unread: false,

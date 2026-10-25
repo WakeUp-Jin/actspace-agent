@@ -34,13 +34,19 @@ export type MockMessage = {
   readonly tool?: MockToolCall;
   /** role 为 assistant 时：这次请求的用量，紧跟着投影成一条带 usage 的 step/end。 */
   readonly usage?: Readonly<Record<string, RuntimeV2JsonValue>>;
+  /** 原样写入的 journal 事件（如 background/task、delegation/*、收件箱领取），排在本条消息的事件之前。 */
+  readonly events?: readonly MockRawEvent[];
 };
+
+export type MockRawEvent = { readonly type: string; readonly data: Readonly<Record<string, RuntimeV2JsonValue>>; readonly surface?: SessionEventEnvelopeV1["surface"] };
 
 export type MockToolCall = {
   readonly name: string;
   readonly args: Readonly<Record<string, RuntimeV2JsonValue>>;
   /** tool/result 的 data（除 callId 外），例如 status、summary、modelOutput、detail。 */
   readonly result: Readonly<Record<string, RuntimeV2JsonValue>>;
+  /** 这次调用委派出的子会话：紧跟 tool/call 投影一条 delegation/requested。 */
+  readonly delegation?: { readonly childSessionId: string; readonly presetId: string };
 };
 
 export type MockSession = {
@@ -56,6 +62,8 @@ export type MockSession = {
   archived: boolean;
   hostId?: string;
   hostName?: string;
+  /** 子智能体的会话：和真实 listPage 一样不进侧栏。 */
+  parentSessionId?: string;
   messages: MockMessage[];
 };
 
@@ -165,6 +173,7 @@ export function sessionListItem(session: MockSession, db: MockDb): SessionListIt
     workspaceRoot: session.workspaceRoot,
     pinned: session.pinned,
     archived: session.archived,
+    ...(session.parentSessionId ? { isChildSession: true } : {}),
     ...(session.hostId ? { hostId: session.hostId, hostName: session.hostName ?? host?.name, connectionState: host?.state ?? "offline" } : {}),
   };
 }
@@ -187,9 +196,14 @@ function journal(session: MockSession): SessionEventEnvelopeV1[] {
     provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
   });
   for (const message of session.messages) {
+    for (const raw of message.events ?? []) events.push({ ...base(message), seq: events.length, type: raw.type, data: { agentRunId: message.agentRunId, ...raw.data }, surface: raw.surface ?? null });
     if (message.role === "tool" && message.tool) {
       const callId = message.id;
       events.push({ ...base(message), seq: events.length, type: "tool/call", data: { agentRunId: message.agentRunId, callId, name: message.tool.name, args: message.tool.args }, surface: null });
+      if (message.tool.delegation) {
+        const { childSessionId, presetId } = message.tool.delegation;
+        events.push({ ...base(message), seq: events.length, type: "delegation/requested", data: { invocationId: `${callId}:delegation`, presetId, parentCallId: callId, childSessionId }, surface: null });
+      }
       events.push({ ...base(message), seq: events.length, type: "tool/result", data: { agentRunId: message.agentRunId, callId, ...message.tool.result }, surface: null });
       continue;
     }
@@ -225,9 +239,13 @@ function snapshot(session: MockSession, throughJournalSeq: number): RuntimeV2Ses
     sessionGrants: [],
     accessState: "read-write",
     metadata: { title: session.title, pinned: session.pinned, archived: session.archived },
-    messages: session.messages.map((message) => message.role === "tool"
-      ? { kind: "tool-result" as const, messageId: message.id, content: message.content, callId: message.id }
-      : { kind: message.role, messageId: message.id, content: message.content }),
+    messages: session.messages.flatMap((message) => [
+      // 原始事件里的 surface append（如唤醒回合领取的任务通知）也是可见消息。
+      ...(message.events ?? []).flatMap((raw) => raw.surface?.kind === "append" && raw.surface.node.kind === "user" ? [{ kind: "user" as const, messageId: raw.surface.node.messageId, content: raw.surface.node.content }] : []),
+      ...(message.role === "tool" && !message.tool ? [] : [message.role === "tool"
+        ? { kind: "tool-result" as const, messageId: message.id, content: message.content, callId: message.id }
+        : { kind: message.role, messageId: message.id, content: message.content }]),
+    ]),
     tools: [],
     pendingInbox: [],
     todos: [],
@@ -248,7 +266,7 @@ export function sessionProjection(session: MockSession): RuntimeV2DesktopSession
     sessionId: session.id,
     throughJournalSeq,
     snapshot: snap,
-    activeMessageIds: session.messages.map((message) => message.id),
+    activeMessageIds: snap.messages.map((message) => message.messageId),
     deferredToolCalls: [],
     values: {
       metadata: snap.metadata,

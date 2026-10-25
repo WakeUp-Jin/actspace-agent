@@ -191,6 +191,29 @@ svg {
   }
 }
 
+/* 设置里输入框内的「已保存」：停留一会儿再淡出。 */
+@keyframes settings-saved-fade {
+  0%, 60% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 撤销移除、刚添加的模型卡片：描边亮一下再退回。 */
+@keyframes settings-card-flash {
+  from {
+    border-color: var(--act-color-operational);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--act-color-operational) 24%, transparent);
+  }
+
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
 @keyframes session-status-pulse {
   0%, 100% {
     transform: scale(0.85);

@@ -49,6 +49,8 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
   onMutation: (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">) => void;
 }) {
   const parentRef = useRef<HTMLElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(600);
+  const observeElementRect = useCallback((instance: Virtualizer<HTMLElement, Element>, callback: (rect: { width: number; height: number }) => void) => observeReviewElementRect(instance, callback, setViewportWidth), []);
   const visibleSignature = useRef("");
   const rows = useMemo(() => buildRows(files, diffs, fileRequests, fileContents, expandedFileIds, mode, loadFullFiles, richPreview), [diffs, expandedFileIds, fileContents, fileRequests, files, loadFullFiles, mode, richPreview]);
   const canvasColumns = useMemo(() => estimateCanvasColumns(rows), [rows]);
@@ -64,7 +66,7 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
     getItemKey,
     estimateSize: (index) => estimateRowSize(rows[index], wrap),
     initialRect: { width: 600, height: 800 },
-    observeElementRect: observeReviewElementRect,
+    observeElementRect,
     overscan: 18,
     useFlushSync: false,
   });
@@ -93,6 +95,7 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
         {virtualItems.map((item) => {
           const row = rows[item.index];
           if (!row) return null;
+          const isCodeRow = row.kind === "line" || row.kind === "split-line";
           return (
             <div
               key={row.key}
@@ -101,29 +104,33 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
               data-review-row={row.kind}
               style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${item.start}px)` }}
             >
-              <RowView
-                row={row}
-                workspaceRoot={workspaceRoot}
-                capabilities={capabilities}
-                selected={selectedFileId === row.file.id}
-                expanded={expandedFileIds.has(row.file.id)}
-                wrap={wrap}
-                wordDiff={wordDiff}
-                richPreview={richPreview}
-                loadFullFiles={loadFullFiles}
-                onToggle={() => onToggleFile(row.file.id)}
-                onSelect={() => onSelectFile(row.file.id)}
-                onExpandContext={() => onExpandContext(row.file.id)}
-                onRetry={() => onRetryDiff(row.file.id)}
-                onViewed={() => onViewed(row.file.id, !row.file.viewed)}
-                onMutation={onMutation}
-              />
+              <div className={isCodeRow ? undefined : "sticky left-0"} style={isCodeRow ? undefined : { width: viewportWidth }}>
+                <RowView
+                  row={row}
+                  workspaceRoot={workspaceRoot}
+                  capabilities={capabilities}
+                  selected={selectedFileId === row.file.id}
+                  expanded={expandedFileIds.has(row.file.id)}
+                  wrap={wrap}
+                  wordDiff={wordDiff}
+                  richPreview={richPreview}
+                  loadFullFiles={loadFullFiles}
+                  onToggle={() => onToggleFile(row.file.id)}
+                  onSelect={() => onSelectFile(row.file.id)}
+                  onExpandContext={() => onExpandContext(row.file.id)}
+                  onRetry={() => onRetryDiff(row.file.id)}
+                  onViewed={() => onViewed(row.file.id, !row.file.viewed)}
+                  onMutation={onMutation}
+                />
+              </div>
             </div>
           );
         })}
         {singleFileMode ? (
-          <div className="absolute inset-x-0 flex h-[34px] items-center gap-2 border-t border-line bg-surface px-3 text-act-xxs text-text-faint" style={{ top: virtualizer.getTotalSize() }}>
-            <span aria-hidden="true">ⓘ</span><span>变更较多，每次显示一个文件</span>
+          <div className="absolute inset-x-0" style={{ top: virtualizer.getTotalSize() }}>
+            <div className="sticky left-0 flex h-[34px] items-center gap-2 border-t border-line bg-surface px-3 text-act-xxs text-text-faint" style={{ width: viewportWidth }}>
+              <span aria-hidden="true">ⓘ</span><span>变更较多，每次显示一个文件</span>
+            </div>
           </div>
         ) : null}
       </div>
@@ -131,15 +138,17 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
   );
 }
 
-function observeReviewElementRect(instance: Virtualizer<HTMLElement, Element>, callback: (rect: { width: number; height: number }) => void): (() => void) | undefined {
+function observeReviewElementRect(instance: Virtualizer<HTMLElement, Element>, callback: (rect: { width: number; height: number }) => void, onWidth: (width: number) => void): (() => void) | undefined {
   const element = instance.scrollElement;
   if (!element) return undefined;
   const publish = () => {
     const bounds = element.getBoundingClientRect();
-    callback({
+    const rect = {
       width: Math.round(element.clientWidth || bounds.width || 600),
       height: Math.round(element.clientHeight || bounds.height || 800),
-    });
+    };
+    callback(rect);
+    onWidth(rect.width);
   };
   publish();
   if (typeof ResizeObserver === "undefined") return undefined;

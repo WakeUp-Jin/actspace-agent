@@ -1,4 +1,4 @@
-import type { TaskSnapshot } from "@actspace/shared/runtime-v2";
+import { isBackgroundWake, type TaskSnapshot } from "@actspace/shared/runtime-v2";
 
 export type PrimaryAction = "send" | "stop" | "disabled";
 
@@ -27,7 +27,7 @@ export function queuedMessages(tasks: TaskSnapshot | null): QueuedMessage[] {
   const items: QueuedMessage[] = [];
   for (const taskId of tasks.queue) {
     const task = byId.get(taskId);
-    if (task && task.state === "pending") items.push({ taskId, text: taskText(task.content) });
+    if (task && task.state === "pending" && !isBackgroundWake(task.content)) items.push({ taskId, text: taskText(task.content) });
   }
   return items;
 }

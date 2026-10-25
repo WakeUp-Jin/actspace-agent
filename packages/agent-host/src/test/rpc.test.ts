@@ -44,3 +44,13 @@ it("paginates each workspace and pin group without duplicating the next page", a
   expect(second.items).toHaveLength(5); expect(second.groups[0]?.hasMore).toBe(false);
   expect(new Set([...first.items, ...second.items].map(item => item.id)).size).toBe(15);
 });
+
+it("revokes a session-owned grant through the typed Host API, including while draining", async () => {
+  const revokeSessionGrant = vi.fn(async () => {});
+  const publish = vi.fn();
+  const rpc = new HostRpc({ state: () => "draining", application: { revokeSessionGrant }, observations: { publish } } as unknown as HostRpcOptions);
+  await expect(rpc.dispatch("sessions.revokeGrant", { sessionId: "s1", grantId: "g1" }, context)).resolves.toEqual({ ok: true });
+  expect(revokeSessionGrant).toHaveBeenCalledWith("s1", "g1");
+  await expect(rpc.dispatch("sessions.revokeGrant", { sessionId: "s1", grantId: "g1", selector: {} }, context)).rejects.toThrow("Unexpected");
+  expect(revokeSessionGrant).toHaveBeenCalledOnce();
+});

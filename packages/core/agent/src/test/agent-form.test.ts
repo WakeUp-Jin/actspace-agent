@@ -44,8 +44,8 @@ describe("main Agent form", () => {
   it("records a stable member digest separate from Host plugin provenance", () => {
     const required = mainAgentFormComposition([]);
     const browser = mainAgentFormComposition([{ id: "actspace.browser-tools", version: "2.0.0" }]);
-    expect(required.members).toHaveLength(11);
-    expect(browser.members).toHaveLength(12);
+    expect(required.members).toHaveLength(12);
+    expect(browser.members).toHaveLength(13);
     expect(browser.digest).not.toBe(required.digest);
     expect(mainAgentFormComposition([{ id: "unrelated.host-plugin", version: "1.0.0" }]).digest).toBe(required.digest);
   });

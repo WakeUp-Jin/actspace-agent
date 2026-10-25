@@ -22,13 +22,14 @@ import {
   sanitizeAgentV2,
   sanitizeCustomModels,
   sanitizeImageGenerationSettings,
-  sanitizeImageInspectionSettings,
   sanitizeInstalledModel,
   sanitizeInstalledModels,
   sanitizeNullableInteger,
   sanitizeNullableNumber,
+  sanitizeModelOverridesMap,
   sanitizeNumber,
   sanitizeProviderSettings,
+  sanitizePurposeThinking,
   sanitizeShortcuts,
   sanitizeSkills,
   sanitizeSpeechSettings,
@@ -39,6 +40,17 @@ import {
 import type { PersistedSettingsV3, ReadSettingsResult, SettingsV4Metadata } from "./types";
 import { cloneJson, isRecord } from "./utils";
 
+function taskBindingsFromTaskModels(taskModels: PersistedSettingsV3["taskModels"]): SettingsV4["models"]["taskBindings"] {
+  return {
+    defaultChat: taskModels.defaultChatModel,
+    utility: taskModels.utilityModel,
+    autoReview: taskModels.autoReviewModel ?? null,
+    explore: taskModels.exploreModel,
+    vision: taskModels.visionModel ?? null,
+    ...(taskModels.thinking ? { thinking: cloneJson(taskModels.thinking) } : {}),
+  };
+}
+
 export function metadataFromSettingsV3(settings: PersistedSettingsV3): SettingsV4Metadata {
   const defaults = defaultSettingsV4Metadata();
   return {
@@ -47,7 +59,7 @@ export function metadataFromSettingsV3(settings: PersistedSettingsV3): SettingsV
       connections: {},
       definitions: cloneJson(settings.customModels),
       installed: {},
-      taskBindings: { defaultChat: settings.taskModels.defaultChatModel, utility: settings.taskModels.utilityModel, autoReview: settings.taskModels.autoReviewModel ?? null, explore: settings.taskModels.exploreModel },
+      taskBindings: taskBindingsFromTaskModels(settings.taskModels),
     },
     general: {
       ...defaults.general,
@@ -64,11 +76,7 @@ export function metadataFromSettingsV3(settings: PersistedSettingsV3): SettingsV
       disabledTools: [...settings.agent.disabledTools],
       bash: { alwaysAsk: settings.agent.bashAlwaysAsk },
     },
-    subagents: {
-      routes: settings.taskModels.exploreModel
-        ? { explore: { enabled: true, model: settings.taskModels.exploreModel } }
-        : {},
-    },
+    subagents: { routes: {} },
     activity: defaults.activity,
   };
 }
@@ -95,10 +103,8 @@ export function toSettingsV4(settings: PersistedSettingsV3, metadata: SettingsV4
   const tools = cloneJson(metadata.tools);
   if (tools.disabledTools.length === 0 && settings.agent.disabledTools.length > 0) tools.disabledTools = [...settings.agent.disabledTools];
   if (!tools.bash.alwaysAsk && settings.agent.bashAlwaysAsk) tools.bash.alwaysAsk = true;
+  // 探索模型只存在 taskBindings.explore；subagents.routes.explore 是旧的镜像，四层迁移时并入后删除。
   const subagents = cloneJson(metadata.subagents);
-  if (!subagents.routes.explore && settings.taskModels.exploreModel) {
-    subagents.routes.explore = { enabled: true, model: settings.taskModels.exploreModel };
-  }
   return {
     version: 4,
     general,
@@ -116,17 +122,14 @@ export function toSettingsV4(settings: PersistedSettingsV3, metadata: SettingsV4
         modelKey,
         { connectionId: `${modelKey.split(":")[0]}:default`, ...cloneJson(model) },
       ])),
-      taskBindings: {
-        defaultChat: settings.taskModels.defaultChatModel,
-        utility: settings.taskModels.utilityModel, autoReview: settings.taskModels.autoReviewModel ?? null,
-        explore: settings.taskModels.exploreModel,
-      },
+      taskBindings: taskBindingsFromTaskModels(settings.taskModels),
+      overrides: cloneJson(settings.modelOverrides),
+      ...(metadata.models.layersVersion !== undefined ? { layersVersion: metadata.models.layersVersion } : {}),
     },
     tools,
     media: {
       speech: cloneJson(metadata.speech),
       imageGeneration: cloneJson(settings.imageGeneration),
-      imageInspection: cloneJson(settings.imageInspection),
     },
     skills: cloneJson(settings.skills),
     subagents,
@@ -145,23 +148,24 @@ export function legacySettingsFromV4(settings: SettingsV4, dataRoot: string): Pe
     addedAt: model.addedAt,
     ...(model.connectionId ? { connectionId: model.connectionId } : {}),
     ...(model.customLabel !== undefined && { customLabel: model.customLabel }),
-    ...(model.credentialId !== undefined && { credentialId: model.credentialId }),
   }])) as PersistedSettingsV3["installedModels"];
-  const explore = settings.models.taskBindings.explore ?? settings.subagents.routes.explore?.model ?? null;
+  const explore = settings.models.taskBindings.explore ?? null;
   const general = settings.general;
   return {
     version: 3,
     providers,
     installedModels,
     customModels: cloneJson(settings.models.definitions),
+    modelOverrides: cloneJson(settings.models.overrides ?? {}),
     taskModels: {
       defaultChatModel: settings.models.taskBindings.defaultChat,
       utilityModel: settings.models.taskBindings.utility,
       autoReviewModel: settings.models.taskBindings.autoReview ?? null,
       exploreModel: explore,
+      visionModel: settings.models.taskBindings.vision ?? null,
+      ...(settings.models.taskBindings.thinking ? { thinking: cloneJson(settings.models.taskBindings.thinking) } : {}),
     },
     imageGeneration: sanitizeImageGenerationSettings(settings.media.imageGeneration, seed.imageGeneration),
-    imageInspection: sanitizeImageInspectionSettings(settings.media.imageInspection),
     agent: sanitizeAgentV2({
       systemPromptPath: general.agentInstructions.systemPromptPath,
       temperature: general.taskDefaults.temperature,
@@ -237,7 +241,6 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
           ),
           ...(isCustomConnectionAuthMode(value.authMode) ? { authMode: value.authMode } : {}),
           ...(value.authMode === "auto" && isResolvedAuth(value.resolvedAuth) ? { resolvedAuth: value.resolvedAuth } : {}),
-          ...(value.billingMode === "reference" || value.billingMode === "token" || value.billingMode === "manual" ? { billingMode: value.billingMode } : {}),
           ...sanitizeProviderSettings(value, seed.providers[value.providerId], value.providerId),
         } satisfies SettingsV4["models"]["connections"][string]]];
       })),
@@ -256,7 +259,11 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
         utility: normalizeModelKeyOrNull(taskBindings.utility),
         autoReview: normalizeModelKeyOrNull(taskBindings.autoReview),
         explore: normalizeModelKeyOrNull(taskBindings.explore),
+        vision: normalizeModelKeyOrNull(taskBindings.vision),
+        ...(sanitizePurposeThinking(taskBindings.thinking) ?? {}),
       },
+      overrides: sanitizeModelOverridesMap(models.overrides),
+      ...(typeof models.layersVersion === "number" && Number.isInteger(models.layersVersion) ? { layersVersion: models.layersVersion } : {}),
     },
     tools: {
       disabledTools: Array.isArray(tools.disabledTools) ? tools.disabledTools.filter((value): value is string => typeof value === "string").slice(0, 200) : [],
@@ -271,7 +278,6 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
     media: {
       speech: sanitizeSpeechSettings(media.speech),
       imageGeneration: sanitizeImageGenerationSettings(media.imageGeneration, seed.imageGeneration),
-      imageInspection: sanitizeImageInspectionSettings(media.imageInspection),
     },
     skills: sanitizeSkills(raw.skills),
     subagents: {
@@ -334,7 +340,6 @@ export function mergePersistedSettingsV3(raw: Record<string, unknown>, dataRoot:
   seed.customModels = sanitizeCustomModels(raw.customModels);
   seed.taskModels = sanitizeTaskModels(raw.taskModels);
   seed.imageGeneration = sanitizeImageGenerationSettings(raw.imageGeneration, seed.imageGeneration);
-  seed.imageInspection = sanitizeImageInspectionSettings(raw.imageInspection);
   seed.agent = sanitizeAgentV2(isRecord(raw.agent) ? raw.agent : {}, seed.agent);
   seed.skills = sanitizeSkills(isRecord(raw.skills) ? raw.skills : {});
   seed.shortcuts = sanitizeShortcuts(raw.shortcuts);

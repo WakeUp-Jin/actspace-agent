@@ -20,8 +20,9 @@ export function describeContextContent(context: Context): { manifest: ContextCon
   const add = (entry: Omit<ContextPanelEntry, "estimatedTokens">, value: unknown) => {
     const text = contextText(value);
     if (!text) return;
-    const browseable = entry.bucket !== "conversation" && entry.bucket !== "summarizedConversation";
-    entries.push({ ...entry, title: entry.title.slice(0, 80), estimatedTokens: estimateContextTokens(text), ...(browseable ? { preview: text.slice(0, 600), fullTextAvailable: true } : {}) });
+    const previewable = entry.bucket !== "conversation";
+    const browseable = previewable && entry.bucket !== "summarizedConversation";
+    entries.push({ ...entry, title: entry.title.slice(0, 80), estimatedTokens: estimateContextTokens(text), ...(previewable ? { preview: text.slice(0, 600) } : {}), ...(browseable ? { fullTextAvailable: true } : {}) });
     if (browseable) texts.set(entry.key, text);
   };
   for (const section of [...context.content.system.sections].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))) {

@@ -6,13 +6,14 @@ import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { Readable } from "node:stream";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { BackgroundTaskHost, BackgroundTaskTerminal } from "@actspace/background-tasks";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tools-runtime";
 import { redactToolText } from "@actspace/tools-runtime";
 import type { ToolPorts } from "./plugin.js";
 
 const INLINE_OUTPUT_CHARS = 8_000;
 const OUTPUT_DISK_CAP_CHARS = 5 * 1024 * 1024;
-const OUTPUT_READ_CAP_CHARS = 64_000;
+const OUTPUT_PREVIEW_BYTES = 32 * 1024;
 const DEFAULT_BLOCK_MS = 30_000;
 const MAX_BLOCK_MS = 600_000;
 const MAX_RUNTIME_MS = 30 * 60_000;
@@ -25,19 +26,20 @@ const MAX_MONITOR_LINE_CHARS = 4_000;
 const NOTIFICATION_TAIL_CHARS = 2_000;
 let sandboxProbe: Promise<boolean> | undefined;
 
-export type NodeBashToolPorts = Pick<ToolPorts, "bash" | "bash_output" | "bash_kill"> & {
+export type NodeBashToolPorts = Pick<ToolPorts, "bash"> & {
   readonly hasRunningBackgroundTask: (sessionId: string) => boolean;
   readonly dispose: () => Promise<void>;
+  readonly forceTerminate: () => void;
 };
 
-export function createNodeBashToolPorts(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly sandbox?: boolean }): NodeBashToolPorts {
-  const registry = new BashTaskRegistry(join(options.tmpRoot, "bash-v2", randomUUID()));
+/** `background` is the Host task registry; it owns notifications, `task_*` queries and persisted status. */
+export function createNodeBashToolPorts(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly sandbox?: boolean; readonly background?: BackgroundTaskHost }): NodeBashToolPorts {
+  const registry = new BashTaskRegistry(join(options.tmpRoot, "bash-v2", randomUUID()), options.background);
   return Object.freeze({
     bash: (args, context) => executeBash(args, context, options, registry),
-    bash_output: (args, context) => registry.output(stringArg(args, "taskId"), context.sessionId, integerArg(args, "tailLines")),
-    bash_kill: (args, context) => registry.kill(stringArg(args, "taskId"), context.sessionId),
     hasRunningBackgroundTask: (sessionId) => registry.running(sessionId) > 0,
     dispose: () => registry.dispose(),
+    forceTerminate: () => registry.forceTerminate(),
   });
 }
 
@@ -70,6 +72,7 @@ async function executeBash(
   if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
   const monitor = new OutputMonitor(subscription);
   const processHandle = new ProcessHandle(spawnSpec.command, spawnSpec.args, realCwd, spawnSpec.env, outputPath, monitor.handleChunk);
+  registry.own(processHandle);
   const abort = () => processHandle.kill();
   context.signal.addEventListener("abort", abort, { once: true });
   const blockMs = clampInteger(args.blockMs, DEFAULT_BLOCK_MS, 0, MAX_BLOCK_MS);
@@ -80,7 +83,7 @@ async function executeBash(
       boundary.promise,
     ]);
     if (completedInTime || processHandle.settled) { monitor.dispose(); return foreground(command, realCwd, await processHandle.wait, processHandle.outputPath, sandboxed, context); }
-    const task = registry.register({ sessionId: context.sessionId, command, cwd: realCwd, outputPath, process: processHandle, sandboxed, monitor, subscription, notifyAgent: context.notifyAgent, reportProgress: context.reportProgress });
+    const task = await registry.register({ sessionId: context.sessionId, callId: context.callId, command, intent: stringArg(args, "intent") || undefined, cwd: realCwd, outputPath, process: processHandle, sandboxed, monitor, subscription, reportProgress: context.reportProgress });
     return backgrounded(task, blockMs === 0 ? "explicit" : "block_timeout");
   } finally {
     boundary.cancel();
@@ -143,6 +146,12 @@ class ProcessHandle {
     this.#killTimer = setTimeout(() => signalProcess(this.child, "SIGKILL"), KILL_GRACE_MS);
     this.#killTimer.unref?.();
   }
+
+  forceTerminate(): void {
+    if (this.#settled) return;
+    if (this.#killTimer !== undefined) clearTimeout(this.#killTimer);
+    signalProcess(this.child, "SIGKILL");
+  }
 }
 
 function signalProcess(child: ChildProcessByStdio<null, Readable, Readable>, signal: NodeJS.Signals): void {
@@ -163,29 +172,39 @@ type BashTask = {
   readonly startedAt: number;
   readonly monitor: OutputMonitor;
   readonly subscription?: OutputSubscription;
-  readonly notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>;
+  readonly callId: string;
+  readonly intent?: string;
   readonly reportProgress: ToolExecutionContext["reportProgress"];
   status: "running" | "completed" | "failed" | "killed";
+  timedOut: boolean;
   exitCode?: number | null;
   endedAt?: number;
-  lastReadOffset: number;
   timer: ReturnType<typeof setTimeout>;
-  completion: Promise<void>;
-  readonly notifications: Set<Promise<void>>;
+  completion: Promise<BackgroundTaskTerminal>;
 };
 
+/** Owns the processes; the Host registry owns delivery. Unloading the Harness still kills them. */
 class BashTaskRegistry {
   readonly #tasks = new Map<string, BashTask>();
-  constructor(readonly outputRoot: string) {}
+  readonly #processes = new Set<ProcessHandle>();
+  constructor(readonly outputRoot: string, private readonly background?: BackgroundTaskHost) {}
 
-  register(input: Omit<BashTask, "taskId" | "startedAt" | "status" | "lastReadOffset" | "timer" | "completion" | "notifications">): BashTask {
-    const task = { ...input, taskId: `bash_${randomUUID()}`, startedAt: Date.now(), status: "running" as const, lastReadOffset: 0, notifications: new Set<Promise<void>>() } as BashTask;
-    task.timer = setTimeout(() => { if (task.status === "running") { task.status = "killed"; task.process.kill(); } }, MAX_RUNTIME_MS);
+  own(process: ProcessHandle): void {
+    this.#processes.add(process);
+    void process.wait.then(() => this.#processes.delete(process));
+  }
+
+  forceTerminate(): void { for (const process of this.#processes) process.forceTerminate(); }
+
+  async register(input: Omit<BashTask, "taskId" | "startedAt" | "status" | "timedOut" | "timer" | "completion">): Promise<BashTask> {
+    const task = { ...input, taskId: `bash_${randomUUID()}`, startedAt: Date.now(), status: "running" as const, timedOut: false } as BashTask;
+    task.timer = setTimeout(() => { if (task.status === "running") { task.status = "killed"; task.timedOut = true; task.process.kill(); } }, MAX_RUNTIME_MS);
     task.timer.unref?.();
     this.#tasks.set(task.taskId, task);
     task.monitor.attach((line) => {
-      task.reportProgress({ message: `Background Bash output matched: ${task.subscription?.reason ?? "subscription"}` });
-      this.#scheduleNotification(task, "output_match", line);
+      const reason = task.subscription?.reason ?? "requested output";
+      task.reportProgress({ message: `Background Bash output matched: ${reason}` });
+      void this.background?.notifyOutputMatch(task.taskId, `Background command output matched the subscription (${reason}).`, redactToolText(line)).catch(() => undefined);
     });
     task.completion = task.process.wait.then(async (status) => {
       clearTimeout(task.timer);
@@ -194,71 +213,45 @@ class BashTaskRegistry {
       if (task.status === "running") task.status = status.signal !== null ? "killed" : status.exitCode === 0 ? "completed" : "failed";
       task.monitor.dispose();
       task.reportProgress({ message: `Background Bash task ${task.taskId} ${task.status}.` });
-      this.#scheduleNotification(task, task.status, await readFile(task.outputPath, "utf8").then((value) => value.slice(-NOTIFICATION_TAIL_CHARS)).catch(() => ""));
-      await Promise.all([...task.notifications]);
-    }).catch(() => undefined);
+      return terminal(task, await readFile(task.outputPath, "utf8").then((value) => value.slice(-NOTIFICATION_TAIL_CHARS)).catch(() => ""));
+    });
+    await this.background?.register({
+      taskId: task.taskId, kind: "bash", sessionId: task.sessionId, callId: task.callId, description: task.intent ?? task.command, done: task.completion,
+      output: async () => ({ text: await readTail(task.outputPath), outputPath: task.outputPath }),
+      stop: async () => { this.#kill(task); await task.completion; },
+    });
     return task;
   }
 
   find(sessionId: string, cwd: string, command: string): BashTask | undefined { return [...this.#tasks.values()].find((task) => task.sessionId === sessionId && task.cwd === cwd && task.command === command && task.status === "running"); }
   running(sessionId: string): number { return [...this.#tasks.values()].filter((task) => task.sessionId === sessionId && task.status === "running").length; }
 
-  async output(taskId: string, sessionId: string, tailLines?: number): Promise<ToolBodyResult> {
-    const task = this.#owned(taskId, sessionId);
-    if (task === undefined) return failed("BASH_TASK_NOT_FOUND", `Unknown background task: ${taskId || "(missing taskId)"}`, false);
-    const full = await readFile(task.outputPath, "utf8").catch(() => "");
-    let output: string;
-    let mode: string;
-    if (tailLines !== undefined) { output = full.split("\n").slice(-tailLines).join("\n"); mode = `tail ${tailLines} lines`; }
-    else { output = full.slice(task.lastReadOffset); mode = `delta from offset ${task.lastReadOffset}`; task.lastReadOffset = full.length; }
-    if (output.length > OUTPUT_READ_CAP_CHARS) output = `[Earlier output omitted]\n${output.slice(-OUTPUT_READ_CAP_CHARS)}`;
-    return completed(`${describe(task)}\nread mode: ${mode}\n\n${output || "(no new output)"}`, describe(task));
-  }
-
-  async kill(taskId: string, sessionId: string): Promise<ToolBodyResult> {
-    const task = this.#owned(taskId, sessionId);
-    if (task === undefined) return failed("BASH_TASK_NOT_FOUND", `Unknown background task: ${taskId || "(missing taskId)"}`, false);
-    if (task.status === "running") { task.status = "killed"; task.process.kill(); }
-    await task.completion;
-    const full = await readFile(task.outputPath, "utf8").catch(() => "");
-    return completed(`${describe(task)}\n${full ? `\noutput tail:\n${full.slice(-2_000)}` : ""}`, describe(task));
-  }
-
   async dispose(): Promise<void> {
-    const running = [...this.#tasks.values()].filter((task) => task.status === "running");
-    for (const task of running) { task.status = "killed"; task.process.kill(); }
-    await Promise.all([...this.#tasks.values()].map((task) => task.completion));
+    const owned = [...this.#processes];
+    for (const process of owned) process.kill();
+    for (const task of this.#tasks.values()) this.#kill(task);
+    await Promise.allSettled([...this.#tasks.values()].map((task) => task.completion));
+    await Promise.all(owned.map((process) => process.wait));
     for (const task of this.#tasks.values()) { clearTimeout(task.timer); task.monitor.dispose(); }
     await rm(this.outputRoot, { force: true, recursive: true });
     this.#tasks.clear();
   }
 
-  #scheduleNotification(task: BashTask, status: BashTask["status"] | "output_match", output: string): void {
-    const notification = this.#notify(task, status, output);
-    task.notifications.add(notification);
-    void notification.finally(() => task.notifications.delete(notification));
-  }
+  #kill(task: BashTask): void { if (task.status === "running") { task.status = "killed"; task.process.kill(); } }
+}
 
-  async #notify(task: BashTask, status: BashTask["status"] | "output_match", output: string): Promise<void> {
-    if (task.notifyAgent === undefined) return;
-    const summary = status === "output_match"
-      ? `Background command output matched the subscription (${task.subscription?.reason ?? "requested output"}).`
-      : `Background command ${status}${task.exitCode === undefined ? "" : ` with exit code ${task.exitCode}`}.`;
-    const text = [
-      "<task_notification>",
-      `<task_id>${escapeXml(task.taskId)}</task_id>`,
-      `<status>${escapeXml(status)}</status>`,
-      `<summary>${escapeXml(summary)}</summary>`,
-      ...(output ? ["<output_tail>", escapeXml(redactToolText(output.slice(-NOTIFICATION_TAIL_CHARS))), "</output_tail>"] : []),
-      "</task_notification>",
-    ].join("\n");
-    await task.notifyAgent(text).catch(() => undefined);
-  }
+function terminal(task: BashTask, tail: string): BackgroundTaskTerminal {
+  const exit = task.exitCode === undefined || task.exitCode === null ? "" : ` with exit code ${task.exitCode}`;
+  const body = redactToolText(tail);
+  if (task.timedOut) return { status: "failed", summary: `Background command timed out after ${MAX_RUNTIME_MS / 60_000} minutes and was killed.`, body, exitCode: task.exitCode ?? null };
+  if (task.status === "killed") return { status: "stopped", summary: "Background command was stopped.", body, exitCode: task.exitCode ?? null };
+  return { status: task.status === "completed" ? "completed" : "failed", summary: `Background command ${task.status}${exit}.`, body, exitCode: task.exitCode ?? null };
+}
 
-  #owned(taskId: string, sessionId: string): BashTask | undefined {
-    const task = this.#tasks.get(taskId);
-    return task?.sessionId === sessionId ? task : undefined;
-  }
+async function readTail(path: string): Promise<string> {
+  const bytes = await readFile(path).catch(() => Buffer.alloc(0));
+  if (bytes.length <= OUTPUT_PREVIEW_BYTES) return redactToolText(bytes.toString("utf8"));
+  return `[Earlier output omitted; read the output file for the full log]\n${redactToolText(bytes.subarray(-OUTPUT_PREVIEW_BYTES).toString("utf8").replace(/^[^\n]*\n/, ""))}`;
 }
 
 async function foreground(command: string, cwd: string, status: ProcessStatus, outputPath: string, sandboxed: boolean, context: ToolExecutionContext): Promise<ToolBodyResult> {
@@ -284,7 +277,8 @@ async function foreground(command: string, cwd: string, status: ProcessStatus, o
 
 function backgrounded(task: BashTask, reason: "explicit" | "block_timeout" | "already_running"): ToolBodyResult {
   const summary = `Bash task ${task.taskId} is running in the background (${reason}).`;
-  return { ...completed(`${summary}\nUse bash_output for a bounded delta or bash_kill to stop it. Do not poll with sleep loops.`, summary), detail: [{ label: "background-task", value: { taskId: task.taskId, status: "running" } }] };
+  const next = "You will be notified automatically when it finishes; continue with other work. Use task_output to inspect output or task_stop to stop it. Do not poll with sleep loops or repeated task_output.";
+  return { ...completed(`${summary}\noutput_path: ${task.outputPath}\n${next}`, summary), detail: [{ label: "background-task", value: { taskId: task.taskId, status: "running" } }] };
 }
 
 async function sandboxSpawn(command: string, workspaceRoot: string, outputRoot: string): Promise<{ readonly command: string; readonly args: readonly string[]; readonly env: NodeJS.ProcessEnv; readonly sandboxed: boolean }> {
@@ -368,11 +362,8 @@ function backgroundBoundary(blockMs: number): { readonly promise: Promise<false>
 
 function within(root: string, candidate: string): boolean { const nested = relative(resolve(root), resolve(candidate)); return nested === "" || (!nested.startsWith("..") && !isAbsolute(nested)); }
 function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, name: string): string { return typeof args[name] === "string" ? args[name] : ""; }
-function integerArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, name: string): number | undefined { const value = args[name]; return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined; }
 function clampInteger(value: RuntimeV2JsonValue | undefined, fallback: number, min: number, max: number): number { return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.trunc(value))) : fallback; }
 function arrayStrings(value: RuntimeV2JsonValue | undefined): readonly string[] { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
 function dataImage(output: string): { readonly mediaType: string; readonly data: string } | undefined { const match = output.trim().match(/^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i); return match?.[1] && match[2] ? { mediaType: match[1].toLowerCase(), data: match[2].replace(/\s/g, "") } : undefined; }
-function escapeXml(value: string): string { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
-function describe(task: BashTask): string { return `Task ${task.taskId} status=${task.status} runtime=${Math.round(((task.endedAt ?? Date.now()) - task.startedAt) / 1_000)}s${task.exitCode === undefined ? "" : ` exitCode=${task.exitCode}`}`; }
 function completed(text: string, summary: string): ToolBodyResult { return { status: "completed", summary, modelOutput: [{ type: "text", text }] }; }
 function failed(code: string, message: string, retryable: boolean): ToolBodyResult { return { status: "failed", summary: message, modelOutput: [{ type: "text", text: message }], failure: { code, message, retryable } }; }

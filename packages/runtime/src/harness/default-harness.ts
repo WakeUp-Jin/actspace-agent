@@ -21,7 +21,7 @@ import { DEFAULT_HARNESS_ENTRIES as rows } from "./default-harness-definition.js
 /** Host modules supply data contracts, persistence, and scope identity, not execution policy. */
 const hostModules = ["@actspace/cordis-adapter", "@actspace/core-scope", "@actspace/shared", "@actspace/shared/runtime-v2", "@actspace/session-journal", "@actspace/session-persistence", "@actspace/session-projection"];
 export const DEFAULT_HARNESS_SHARED_SERVICES = Object.freeze([
-  "actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "agent.registry", "session.runtime", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.browser",
+  "actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "actspace.host.background-tasks", "agent.registry", "session.runtime", "llm.auxiliary-requests", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.browser",
   ...["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => `actspace.host.tools.${id}`),
 ]);
 

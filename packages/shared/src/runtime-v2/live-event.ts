@@ -29,5 +29,6 @@ export type AgentLiveEvent = LiveIdentity & (
   | { readonly kind: "compaction-started" }
   | { readonly kind: "compaction-finished"; readonly removedCount: number; readonly durationMs: number }
   | { readonly kind: "compaction-failed"; readonly message: string }
-  | { readonly kind: "inbox-claimed"; readonly messageId: string; readonly source?: "task_notification" | "steer" }
+  /** 唤醒回合第一步领取的任务通知带 `notice` 与正文，前端据此在回合开头画分隔行。 */
+  | { readonly kind: "inbox-claimed"; readonly messageId: string; readonly source?: "task_notification" | "steer"; readonly notice?: { readonly taskId: string; readonly kind: string; readonly title: string; readonly status: string }; readonly content?: string }
 );

@@ -11,9 +11,7 @@ import { resolve as resolvePath } from "node:path";
 import { dialog, nativeImage, nativeTheme, shell, type BrowserWindow } from "electron";
 import { spawn } from "node:child_process";
 import {
-  PROVIDER_IDS,
   fileReferenceBlocks,
-  normalizeModelKey,
   responseExcerptBlocks,
   type ComposerReferenceIssue,
   type FileReference,
@@ -24,11 +22,6 @@ import {
   type BootstrapState,
   type ComposerAttachment,
   type PendingApprovalInfo,
-  type ModelMutationResult,
-  type ProviderBalanceSnapshot,
-  type ProviderCredentialOperationResult,
-  type ProviderOperationResult,
-  type ProviderTestResult,
   type SessionListItem,
   type SessionRecord,
   type SelectWorkspaceDirectoryResult,
@@ -39,9 +32,6 @@ import {
   type SettingsV4Snapshot,
   type SettingsV4UpdateResult,
   type SettingsV4UpdateInput,
-  type CustomConnectionInput,
-  type CustomConnectionTestInput,
-  type CustomConnectionProbeInput,
   projectManagedContextState,
 } from "@actspace/shared";
 import {
@@ -52,7 +42,6 @@ import {
   type RuntimeV2DesktopSessionProjection,
   type TaskSubmissionResult,
 } from "@actspace/shared/runtime-v2";
-import type { RuntimeV2UpdateCustomConnectionInput } from "@actspace/shared/runtime-v2";
 import type { AppDataRoots } from "../app-paths";
 import { createIpcRegistrar, type IpcRegistrar } from "../ipc/registry";
 import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
@@ -61,21 +50,21 @@ import { showArtifactContextMenu, showResolvedArtifactContextMenu } from "../art
 import { importComposerImage } from "../composer-attachment-service";
 import { resolveWorkspaceFileReference } from "../workspace-file-reference";
 import type { LocalUpdateService } from "../local-update-service";
+import { ModelConnectionsService } from "../model-connections-service";
 import type { ModelRuntimeService } from "../model-runtime-service";
-import type { ModelStoreService, ModelStoreResult } from "../model-store-service";
+import type { ModelStoreService } from "../model-store-service";
 import type { BrowserBridgeService } from "../browser-bridge-service";
 import type { QuickOpenShortcutController } from "../quick-open-shortcut-controller";
 import type { SettingsService } from "../settings-service";
-import { createWorkspaceFolder, resolveWorkspaceSelection, setWorkspaceHidden } from "../workspace-registry-service";
+import { createWorkspaceFolder, resolveWorkspaceSelection, resolveRegisteredWorkspaceSelection, setWorkspaceHidden } from "../workspace-registry-service";
+import { isDelegatedSession } from "@actspace/shared/session-list-page";
 import { createWorkspaceAccessDeps, registeredWorkspaceRoot, resolveWorkspaceAccess, workspaceRegistryOptions, WORKSPACE_NOT_REGISTERED } from "../workspace-access";
 import { getWorkspaceGitContext } from "../workspace-git-context-service";
 import { openWorkspaceInIde } from "../workspace-ide-service";
 import { initializeGitRepository } from "../review-git-service";
 import { commitAndPushWorkspaceChanges, commitWorkspaceChanges, createWorkspaceBranch, getWorkspaceEnvironment, pushWorkspaceBranch, switchWorkspaceBranch } from "../workspace-environment-service";
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "../workspace-open-service";
-import { selectModelCatalog, type RuntimeV2OpenRouterCatalogService } from "./openrouter-catalog-service";
 import type { ProviderNetworkService } from "./provider-network-service";
-import { probeCustomConnection } from "./custom-connection-probe";
 import { ChatAttachmentValidationError, type DesktopRuntimeV2Registry } from "./runtime-registry";
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
 import {
@@ -97,9 +86,6 @@ export type FixedRendererIpcOptions = {
   readonly modelRuntime: ModelRuntimeService;
   readonly providerNetwork: ProviderNetworkService;
   readonly pricingCatalog?: import("../model-catalog-service").ModelCatalogService;
-  readonly catalog: RuntimeV2OpenRouterCatalogService;
-  readonly deepSeekCatalog?: RuntimeV2OpenRouterCatalogService;
-  readonly kimiCatalog?: RuntimeV2OpenRouterCatalogService;
   readonly approvals: PendingApprovalRegistry;
   readonly browserBridge: BrowserBridgeService;
   readonly quickOpen: QuickOpenShortcutController;
@@ -145,7 +131,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   ipc.handle(contract.sessions.getPage, (input) => options.registry.readSessionProjection(input));
   ipc.handle(contract.sessions.list, async (input = {}) => {
     const items = await options.registry.listSessions();
-    const selected = items.filter((item) => item.metadata.archived === (input.archived === true));
+    const selected = items.filter((item) => item.metadata.archived === (input.archived === true) && !isDelegatedSession(item.lineage));
     return Promise.all(selected.map((item) => toSessionListItem(item, options.registry)));
   });
   ipc.handle(contract.sessions.get, async (input) => {
@@ -207,7 +193,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
   ipc.handle(contract.sessions.setWorkspace, async (input) => {
     const snapshot = await options.registry.inspectSession(input.sessionId);
-    const next = await registeredWorkspaceRoot(workspaceRegistryOptions(options.roots), input.workspaceRoot);
+    const selection = await resolveRegisteredWorkspaceSelection(workspaceRegistryOptions(options.roots), input);
+    if (selection.ok === false) throw new Error(selection.error);
+    const next = selection.workspaceRoot;
     if (snapshot.workspaceRoot === next) return { ok: true };
     await options.registry.updateSessionWorkspace(input.sessionId, next);
     return { ok: true };
@@ -319,6 +307,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   registerFixedRendererSettings(options, ipc);
+  registerModelConnections(options, ipc);
   unsubscribeSettingsV4 = options.settings.subscribeV4Changes((notification: SettingsV4ChangedNotification) => {
     const target = options.getMainWindow();
     if (target !== undefined && !target.isDestroyed()) {
@@ -377,17 +366,6 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, ipc: Ip
       throw error;
     }
   });
-  ipc.handle(contract.settings.createCustomConnection, (input) => options.settings.createCustomConnection(input));
-  ipc.handle(contract.settings.removeCustomConnection, (input) => options.settings.removeCustomConnection(input.connectionId));
-  ipc.handle(contract.settings.updateCustomConnection, (input) => options.settings.updateCustomConnection(input));
-  ipc.handle(contract.settings.testCustomConnection, async (input) => {
-    const runtime = options.settings.getCustomConnectionRuntimeConfig(input.connectionId);
-    if ("code" in runtime) return { ok: false, message: runtime.message, checkedAt: new Date().toISOString(), errorKind: "invalid_request" as const };
-    const result = await options.providerNetwork.testCustomConnection(runtime);
-    await options.settings.markCustomConnectionResult(input.connectionId, result);
-    return result;
-  });
-  ipc.handle(contract.settings.probeCustomConnection, (input) => probeCustomConnection(options.settings, options.providerNetwork, input));
   ipc.handle(contract.settings.update, (input) => options.settings.update(input));
   ipc.handle(contract.providers.setKey, (input) => options.settings.setProviderKey(input.provider, input.apiKey));
   ipc.handle(contract.providers.clearKey, (input) => options.settings.clearProviderKey(input.provider));
@@ -398,159 +376,29 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, ipc: Ip
       return { ok: false, error: safeErrorMessage(error) };
     }
   });
-  ipc.handle(contract.providers.testConnection, async (input) => {
-    if (!isProviderId(input?.provider)) return { ok: false, message: "未知服务商。" };
-    const runtime = options.settings.getProviderRuntimeConfig(input.provider);
-    if ("code" in runtime) return { ok: false, message: runtime.message };
-    const result = await options.providerNetwork.testConnection(runtime);
-    await options.settings.markProviderConnectionResult(input.provider, result);
-    return { ok: result.ok, message: result.message };
-  });
   ipc.handle(contract.settings.getSearchUsage, () => options.settings.getSearchUsage());
   ipc.handle(contract.settings.readSystemPrompt, () => options.settings.readAgentSystemPrompt());
   ipc.handle(contract.settings.writeSystemPrompt, (input) => options.settings.writeAgentSystemPrompt(typeof input?.content === "string" ? input.content : ""));
 
-  ipc.handle(contract.providers.list, () => ({
-    providers: options.settings.getV2().providers,
-    credentialStorage: options.settings.getCredentialStorageView(),
-  }));
-  ipc.handle(contract.providers.connect, async (input): Promise<ProviderOperationResult> => {
-    if (!isProviderId(input?.provider)) return providerFailure("invalid_provider", "未知服务商。");
-    try {
-      await options.settings.updateProviderConnection({ ...input, enabled: true });
-      return { ok: true, provider: options.settings.getV2().providers[input.provider] };
-    } catch (error) {
-      return providerFailure("write_failed", safeErrorMessage(error));
-    }
-  });
-  ipc.handle(contract.providers.update, async (input): Promise<ProviderOperationResult> => {
-    if (!isProviderId(input?.provider)) return providerFailure("invalid_provider", "未知服务商。");
-    try {
-      await options.settings.updateProviderConnection(input);
-      return { ok: true, provider: options.settings.getV2().providers[input.provider] };
-    } catch (error) {
-      return providerFailure("write_failed", safeErrorMessage(error));
-    }
-  });
-  ipc.handle(contract.providers.test, async (input): Promise<ProviderTestResult> => {
-    if (!isProviderId(input?.provider)) return {
-      ok: false,
-      provider: emptyProviderView(),
-      message: "未知服务商。",
-      checkedAt: new Date().toISOString(),
-      errorKind: "invalid_request",
-    };
-    const runtime = options.settings.getProviderRuntimeConfig(input.provider);
-    if ("code" in runtime) return {
-      ok: false,
-      provider: options.settings.getV2().providers[input.provider],
-      message: runtime.message,
-      checkedAt: new Date().toISOString(),
-      errorKind: "invalid_request",
-    };
-    const result = await options.providerNetwork.testConnection(runtime);
-    await options.settings.markProviderConnectionResult(input.provider, result);
-    return result.ok
-      ? { ok: true, provider: options.settings.getV2().providers[input.provider], message: result.message, checkedAt: result.checkedAt }
-      : { ok: false, provider: options.settings.getV2().providers[input.provider], message: result.message, checkedAt: result.checkedAt, errorKind: result.errorKind ?? "network", ...(result.statusCode ? { statusCode: result.statusCode } : {}) };
-  });
-  ipc.handle(contract.providers.disconnect, async (input): Promise<ProviderOperationResult> => {
-    if (!isProviderId(input?.provider)) return providerFailure("invalid_provider", "未知服务商。");
-    try {
-      await options.settings.updateProviderConnection({ provider: input.provider, apiKey: null, ...(input.provider === "openrouter" ? { managementKey: null } : {}) });
-      return { ok: true, provider: options.settings.getV2().providers[input.provider] };
-    } catch (error) {
-      return providerFailure("write_failed", safeErrorMessage(error));
-    }
-  });
-  ipc.handle(contract.providers.remove, async (input): Promise<ProviderOperationResult> => {
-    if (!isProviderId(input?.provider)) return providerFailure("invalid_provider", "未知服务商。");
-    try {
-      await options.settings.removeProvider(input.provider);
-      return { ok: true, provider: options.settings.getV2().providers[input.provider] };
-    } catch (error) {
-      return providerFailure("write_failed", safeErrorMessage(error));
-    }
-  });
-
-  ipc.handle(contract.providers.addCredential, async (input): Promise<ProviderCredentialOperationResult> => {
-    try {
-      await options.settings.addProviderCredential(input);
-      return { ok: true, provider: options.settings.getV2().providers[input.provider] };
-    } catch (error) {
-      return { ok: false, error: { code: "write_failed", message: safeErrorMessage(error) } };
-    }
-  });
-  ipc.handle(contract.providers.updateCredential, async (input): Promise<ProviderCredentialOperationResult> => {
-    const result = await options.settings.updateProviderCredential(input.provider, input.credentialId, input.label, input.pricingMultiplier);
-    return "code" in result
-      ? { ok: false, error: { code: result.code, message: result.message, references: result.references } }
-      : { ok: true, provider: options.settings.getV2().providers[input.provider] };
-  });
-  ipc.handle(contract.providers.testCredential, async (input): Promise<ProviderCredentialOperationResult> => {
-    const runtime = options.settings.getProviderRuntimeConfigForCredential(input.provider, input.credentialId);
-    if ("code" in runtime) return { ok: false, error: { code: "credential_not_found", message: runtime.message } };
-    const probe = await options.providerNetwork.testConnection(runtime);
-    const marked = await options.settings.markProviderCredentialConnectionResult(input.provider, input.credentialId, probe);
-    if ("code" in marked) return { ok: false, error: { code: marked.code, message: marked.message } };
-    return probe.ok
-      ? { ok: true, provider: options.settings.getV2().providers[input.provider] }
-      : { ok: false, error: { code: "connection_failed", message: probe.message, errorKind: probe.errorKind } };
-  });
-  ipc.handle(contract.providers.removeCredential, async (input): Promise<ProviderCredentialOperationResult> => {
-    const result = await options.settings.removeProviderCredential(input.provider, input.credentialId);
-    return "code" in result
-      ? { ok: false, error: { code: result.code, message: result.message, references: result.references } }
-      : { ok: true, provider: options.settings.getV2().providers[input.provider] };
-  });
-
-  ipc.handle(contract.providers.getBalance, (input) => providerBalance(options, input.provider));
-  ipc.handle(contract.providers.getDeepSeekBalance, () => providerBalance(options, "deepseek"));
-  ipc.handle(contract.providers.getKimiBalance, () => providerBalance(options, "kimi"));
-
-  ipc.handle(contract.models.listInstalled, () => ({ models: options.models.listInstalledModels() }));
   ipc.handle(contract.models.listUsable, (input) => ({ models: options.modelRuntime.listUsableModels(input?.purpose ?? "chat") }));
   ipc.handle(contract.models.getPricingCatalog, () => options.pricingCatalog?.status() ?? null);
   ipc.handle(contract.models.refreshPricingCatalog, (input = {}) => options.pricingCatalog?.refresh(input.force === true) ?? null);
-  ipc.handle(contract.models.listCatalog, (input) => {
-    const { provider, catalog } = selectModelCatalog(input?.provider, options.catalog, options.deepSeekCatalog, options.kimiCatalog);
-    return { provider, ...catalog.list(input?.query) };
-  });
-  ipc.handle(contract.models.reloadCatalog, async (input) => {
-    const { provider, catalog } = selectModelCatalog(input?.provider, options.catalog, options.deepSeekCatalog, options.kimiCatalog);
-    const runtime = options.settings.getProviderRuntimeConfig(provider);
-    if ("code" in runtime) return { provider, ...catalog.list(), error: { code: runtime.code, message: runtime.message } };
-    const result = await catalog.reload(runtime);
-    if (!result.error && result.state === "fresh") await options.models.refreshInstalledCatalogModels(provider);
-    return { provider, ...result };
-  });
-  ipc.handle(contract.models.add, async (input): Promise<ModelMutationResult> => {
-    if ((input?.provider !== "openrouter" && input?.provider !== "deepseek" && input?.provider !== "kimi") || typeof input.apiModel !== "string") return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
-    return toModelMutationResult(await options.models.addCatalogModel(input.provider, input.apiModel));
-  });
-  ipc.handle(contract.models.addCustom, async (input) => {
-    return toModelMutationResult(await options.models.addCustomModel(input));
-  });
-  ipc.handle(contract.models.editCustom, async (input) => {
-    return toModelMutationResult(await options.models.editCustomModel(input));
-  });
-  ipc.handle(contract.models.setCustomConnectionDefault, async (input) => {
-    return toModelMutationResult(await options.models.setCustomConnectionDefaultModel(input));
-  });
-  ipc.handle(contract.models.update, async (input): Promise<ModelMutationResult> => {
-    const key = normalizeModelKey(input?.modelKey);
-    if (!key) return { ok: false, error: { code: "invalid_model", message: "模型标识无效。" } };
-    return toModelMutationResult(await options.models.updateModelSettings(key, input));
-  });
-  ipc.handle(contract.models.remove, async (input): Promise<ModelMutationResult> => {
-    const key = normalizeModelKey(input?.modelKey);
-    if (!key) return { ok: false, error: { code: "invalid_model", message: "模型标识无效。" } };
-    return toModelMutationResult(await options.models.removeModel(key));
-  });
-  ipc.handle(contract.models.updateTaskModels, async (input) => {
-    const next = await options.settings.updateV2({ taskModels: input });
-    return { taskModels: next.taskModels };
-  });
+}
+
+/** 设置 › 模型：连接、连接下的模型、用途表。入参校验在 ModelConnectionsService 里。 */
+function registerModelConnections(options: FixedRendererIpcOptions, ipc: IpcRegistrar): void {
+  const connections = new ModelConnectionsService(options.settings, options.models, options.providerNetwork);
+  ipc.handle(contract.modelConnections.list, () => connections.list());
+  ipc.handle(contract.modelConnections.probe, (input) => connections.probe(input));
+  ipc.handle(contract.modelConnections.create, (input) => connections.create(input));
+  ipc.handle(contract.modelConnections.update, (input) => connections.update(input));
+  ipc.handle(contract.modelConnections.remove, (input) => connections.remove(input));
+  ipc.handle(contract.modelConnections.addModels, (input) => connections.addModels(input));
+  ipc.handle(contract.modelConnections.updateModel, (input) => connections.updateModel(input));
+  ipc.handle(contract.modelConnections.removeModel, (input) => connections.removeModel(input));
+  ipc.handle(contract.modelConnections.preview, (input) => connections.preview(input));
+  ipc.handle(contract.modelConnections.updatePurposes, (input) => connections.updatePurposes(input));
+  ipc.handle(contract.modelConnections.getBalance, (input) => connections.getBalance(input));
 }
 
 function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, ipc: IpcRegistrar, contextPanel: ContextPanelService): void {
@@ -667,7 +515,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
 
   ipc.handle(contract.workspaces.getEnvironment, async (input = {}) => {
-    const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
+    const workspaceRoot = await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot ?? options.roots.defaultWorkspaceRoot }, workspaceAccess);
     return getWorkspaceEnvironment({ ...input, workspaceRoot }, options.roots);
   });
   ipc.handle(contract.workspaces.createBranch, async (input) => {
@@ -804,7 +652,7 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
     title: item.metadata.title ?? "New chat",
     updatedAt: item.updatedAt,
     accessState: item.accessState,
-    isChildSession: item.lineage !== null,
+    isChildSession: isDelegatedSession(item.lineage),
     agentRunCount,
     agentForm: item.agentForm,
     agentMode: item.agentMode,
@@ -876,53 +724,6 @@ async function toRunContent(
   return { content: blocks, importedArtifactIds };
 }
 
-async function providerBalance<P extends "deepseek" | "kimi" | "openrouter">(options: FixedRendererIpcOptions, provider: P): Promise<ProviderBalanceSnapshot & { provider: P }> {
-  const runtime = provider === "openrouter"
-    ? options.settings.getOpenRouterManagementRuntimeConfig()
-    : options.settings.getProviderRuntimeConfig(provider);
-  if ("code" in runtime) {
-    if (runtime.code === "api_key_missing") return options.providerNetwork.getBalance(provider, undefined) as Promise<ProviderBalanceSnapshot & { provider: P }>;
-    throw new Error(runtime.message);
-  }
-  return options.providerNetwork.getBalance(provider, runtime) as Promise<ProviderBalanceSnapshot & { provider: P }>;
-}
-
-function providerFailure(code: "invalid_provider" | "write_failed", message: string): ProviderOperationResult {
-  return { ok: false, error: { code, message } };
-}
-
-function emptyProviderView(): AppSettings["providers"]["deepseek"] {
-  return {
-    hasApiKey: false,
-    enabled: false,
-    baseUrl: null,
-    proxy: { enabled: false, url: null },
-    lastConnection: { status: "untested" },
-    installedModelCount: 0,
-    enabledModelCount: 0,
-    additionalCredentials: [],
-  };
-}
-
-/** model-store 的引用只会是任务模型槽位名；渲染层契约按槽位联合声明（旧 preload 以断言收窄）。 */
-type ModelMutationReferences = NonNullable<Extract<ModelMutationResult, { ok: false }>["error"]["references"]>;
-
-function toModelMutationResult(result: ModelStoreResult): ModelMutationResult {
-  if (result.ok === true) return { ok: true as const, ...(result.model ? { model: result.model } : {}) };
-  const code = result.code === "model_not_found" || result.code === "model_not_installed"
-    ? "model_missing"
-    : result.code === "model_in_use"
-      ? "model_in_use"
-      : result.code === "model_not_removable"
-        ? "model_not_removable"
-        : result.code === "credential_missing"
-          ? "credential_missing"
-          : result.code === "invalid_model" || result.code === "invalid_provider"
-            ? "invalid_model"
-            : result.code;
-  return { ok: false as const, error: { code, message: result.message, ...(result.references ? { references: result.references as ModelMutationReferences } : {}) } };
-}
-
 async function createUsageStatistics(
   registry: DesktopRuntimeV2Registry,
   dataRoot: string,
@@ -948,10 +749,6 @@ async function imagePreviewDataUrl(path: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
-}
-
-function isProviderId(value: unknown): value is (typeof PROVIDER_IDS)[number] {
-  return PROVIDER_IDS.includes(value as (typeof PROVIDER_IDS)[number]);
 }
 
 function isSupportedSessionImageMime(value: string): value is "image/png" | "image/jpeg" | "image/webp" {

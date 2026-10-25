@@ -22,7 +22,7 @@ export type LiveRunView = {
   readonly recovered: boolean;
 };
 
-export type StreamEvent = Exclude<RuntimeStreamEvent, { type: "bash_task_update" }>;
+export type StreamEvent = RuntimeStreamEvent;
 
 export interface LiveRunStore {
   get(sessionId: string): SessionRunState | undefined;
@@ -61,14 +61,33 @@ export function createBoundedSet(limit: number) {
   };
 }
 
-export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT): LiveRunStore {
+export type LiveRunStoreOptions = {
+  /**
+   * 文本 / 思考 / 工具参数的流式增量改由它延后通知（例如按帧合并），其余事件仍立即通知。
+   * 不传时每个事件都立即通知。
+   */
+  readonly scheduleNotify?: (flush: () => void) => void;
+};
+
+/** 高频的流式增量：一个回复可能有上千个，按帧合并通知即可。 */
+const DEFERRABLE_STREAM_EVENTS: ReadonlySet<StreamEvent["type"]> = new Set(["assistant_text_delta", "assistant_thinking_delta", "tool_call_streaming"]);
+
+export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: LiveRunStoreOptions = {}): LiveRunStore {
   const runs = new Map<string, SessionRunState>();
   const views = new Map<string, LiveRunView>();
   const terminal = createBoundedSet(terminalLimit);
   const listeners = new Set<() => void>();
   let busy = new Set<string>();
-  const notify = () => { for (const listener of [...listeners]) listener(); };
+  let notifyScheduled = false;
+  const notify = () => { notifyScheduled = false; for (const listener of [...listeners]) listener(); };
   const refresh = (sessionId: string) => { views.delete(sessionId); notify(); };
+  const refreshSoon = (sessionId: string) => {
+    views.delete(sessionId);
+    if (!options.scheduleNotify) { notify(); return; }
+    if (notifyScheduled) return;
+    notifyScheduled = true;
+    options.scheduleNotify(() => { if (notifyScheduled) notify(); });
+  };
   const setBusy = (sessionId: string, included: boolean) => {
     if (busy.has(sessionId) === included) return;
     const next = new Set(busy);
@@ -113,6 +132,14 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT): LiveRunS
           },
         });
         state.waitingForModel = true;
+        break;
+      }
+
+      case "background_notice_claimed": {
+        // id 与 durable 选择器的 renderKey 一致，run 结束后由 durable 块接手同一行。
+        const id = `turn:${event.agentRunId}:background-notice:0`;
+        if (state.segments.some((segment) => segment.type === "background_notice")) break;
+        state.segments.unshift({ type: "background_notice", block: { kind: "background_notice", id, renderKey: id, runId: event.agentRunId, content: event.content, createdAt: new Date().toISOString(), ...event.notice } });
         break;
       }
 
@@ -338,7 +365,8 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT): LiveRunS
         break;
     }
 
-    refresh(event.sessionId);
+    if (DEFERRABLE_STREAM_EVENTS.has(event.type)) refreshSoon(event.sessionId);
+    else refresh(event.sessionId);
   }
 
   return {

@@ -8,7 +8,7 @@ import (
 
 func TestEmbeddedRuntimeHasStableVersionAndNoModelEvaluateEntry(t *testing.T) {
 	source := RuntimeSource()
-	for _, want := range []string{"window.__actspaceLocator", `var VERSION = "5"`, "normalizeTarget", "setNativeValue", "visible_dom", "paginate", "waitForState", "accessibleName", "computedRole", "queryCSSComposed", "receivesEvents"} {
+	for _, want := range []string{"window.__actspaceLocator", `var VERSION = "6"`, "normalizeTarget", "setNativeValue", "visible_dom", "paginate", "waitForState", "accessibleName", "computedRole", "queryCSSComposed", "receivesEvents"} {
 		if !strings.Contains(source, want) {
 			t.Fatalf("runtime missing %q", want)
 		}

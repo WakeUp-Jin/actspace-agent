@@ -6,7 +6,7 @@
 
 Terminal 是聊天态工作台右侧对象面板中的用户交互式 shell。它绑定当前 Agent 会话的真实 workspace / Git worktree，让用户在不离开 ActSpace 的情况下运行本机命令、查看服务日志和操作交互式 CLI。
 
-Terminal 是**用户直接操作的本机能力**，不是 Agent 工具，不与 `bash` / `bash_output` / `bash_kill` 共用运行时、审批流、沙盒或任务注册表。Agent 后台命令未来如果需要终端化展示，只能提供独立的只读输出视图，不能默认接管用户 Terminal。
+Terminal 是**用户直接操作的本机能力**，不是 Agent 工具，不与 `bash` 和后台任务工具（`task_list` / `task_output` / `task_stop` / `task_wait`）共用运行时、审批流、沙盒或任务登记表。Agent 后台命令未来如果需要终端化展示，只能提供独立的只读输出视图，不能默认接管用户 Terminal。
 
 本文是右侧 Terminal 的长期事实来源，覆盖产品语义、PTY 架构、IPC 契约、会话归属、输出背压、进程收割、环境注入、原生模块打包和分阶段边界。右侧面板通用 Tab 与文件渲染规则仍见 `front-右侧面板与文件渲染规范.md`；面板宽度和紧凑覆盖规则见 `front-工作台布局与面板交互规范.md`；当前 Agent Bash 边界见 `docs/design-docs/execution-safety/README.md`。
 

@@ -3,7 +3,7 @@ const { pathToFileURL } = require("node:url");
 
 const runtimeEntry = path.resolve(
   __dirname,
-  "../../../../packages/agent-runtime/dist/index.js",
+  "../../../packages/runtime/dist/index.js",
 );
 
 let runtimePromise;

@@ -32,6 +32,7 @@
     "test": "vitest run --globals --passWithNoTests"
   },
   "dependencies": {
+    "@actspace/background-tasks": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/core-agent": "workspace:*",
     "@actspace/core-agent-loop": "workspace:*",

@@ -1,4 +1,4 @@
-import { accessibleName, computedRole, labelsFor } from "./accessibility";
+import { accessibleName, computedRole, labelsFor, labelText } from "./accessibility";
 import {
   allComposedElements,
   composedText,
@@ -169,7 +169,7 @@ function resolveWithin(root: Document | ShadowRoot | Element, target: LocatorTar
     case "label": {
       const expected = target.value ?? target.name;
       if (!expected) throw new Error("invalid_locator_target: label target requires value");
-      return allComposedElements(root).filter((element) => labelsFor(element).some((label) => textMatches(composedText(label), expected, target.exact)));
+      return allComposedElements(root).filter((element) => labelsFor(element).some((label) => textMatches(labelText(label, element), expected, target.exact)));
     }
     case "placeholder": {
       const expected = target.value ?? target.name;

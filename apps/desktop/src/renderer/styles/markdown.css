@@ -62,8 +62,25 @@
   padding-left: 1.35rem;
 }
 
+/* Tailwind Preflight 把 ul/ol 的 list-style 清成 none，这里补回圆点和序号。 */
+.markdown-prose ul {
+  list-style: disc;
+}
+
+.markdown-prose ol {
+  list-style: decimal;
+}
+
+.markdown-prose ul ul {
+  list-style: circle;
+}
+
 .markdown-prose li {
   padding-left: 2px;
+}
+
+.markdown-prose li::marker {
+  color: var(--color-text-faint);
 }
 
 .markdown-prose blockquote {

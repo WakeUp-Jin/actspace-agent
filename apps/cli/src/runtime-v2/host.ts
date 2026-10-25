@@ -35,12 +35,12 @@ export async function startRemoteHost(config: HostConfig, options: { mock?: bool
       try {
         const application = profile.context.get?.("host.application") as AgentApplicationContract | undefined;
         if (!application) throw new Error("Host application plugin unavailable");
-        const agentRuntime = profile.context.get?.("agent.runtime") as { runs: { service: AgentService; inspectCapability<T, R>(name: string, read: (service: T | undefined) => R): R | Promise<R> }; subagents: { activeCount: number }; harnesses: { inspect(): { blocked: string; instances: readonly { state: string }[] } } };
+        const agentRuntime = profile.context.get?.("agent.runtime") as { runs: { service: AgentService; inspectCapability<T, R>(name: string, read: (service: T | undefined) => R): R | Promise<R> }; subagents: { activeCount: number }; backgroundTasks: { hasRunning(sessionId?: string): boolean }; harnesses: { inspect(): { blocked: string; instances: readonly { state: string }[] } } };
         return {
           application,
           beginDrain: () => agentRuntime.runs.service.beginDrain(),
           waitForOwnedRuns: () => agentRuntime.runs.service.waitForOwnedRuns(),
-          backgroundTask: async sessionId => agentRuntime.runs.inspectCapability<{ hasRunningBackgroundTask?: (id: string) => boolean }, boolean>("tools.shell-tools", tools => tools?.hasRunningBackgroundTask?.(sessionId) ?? false),
+          backgroundTask: async sessionId => agentRuntime.backgroundTasks.hasRunning(sessionId),
           activeSubagents: () => agentRuntime.subagents.activeCount,
           recovery: () => agentRuntime.harnesses.inspect(),
           subscribeTasks: listener => {

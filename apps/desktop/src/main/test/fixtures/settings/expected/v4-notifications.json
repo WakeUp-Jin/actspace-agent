@@ -1,7 +1,17 @@
 [
   [
     "load",
-    []
+    [
+      [
+        "general",
+        "models",
+        "tools",
+        "media",
+        "skills",
+        "subagents",
+        "activity"
+      ]
+    ]
   ],
   [
     "update",
@@ -90,28 +100,6 @@
     [
       [
         "media"
-      ]
-    ]
-  ],
-  [
-    "addProviderCredential",
-    [
-      [
-        "general",
-        "models",
-        "tools",
-        "media",
-        "skills",
-        "subagents",
-        "activity"
-      ]
-    ]
-  ],
-  [
-    "createCustomConnection",
-    [
-      [
-        "models"
       ]
     ]
   ],

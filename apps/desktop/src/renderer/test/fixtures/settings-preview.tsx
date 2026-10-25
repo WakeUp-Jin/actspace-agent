@@ -55,41 +55,12 @@ const usableModels = [
   { key: "deepseek:deepseek-v4-flash", modelKey: "deepseek:deepseek-v4-flash", provider: "deepseek", apiModel: "deepseek-v4-flash", label: "DeepSeek V4 Flash", enabled: true, contextWindow: 128000, thinkingDefault: true, capabilities: {} },
   { key: "kimi:kimi-k3", modelKey: "kimi:kimi-k3", provider: "kimi", apiModel: "kimi-k3", label: "Kimi K3", enabled: true, contextWindow: 256000, thinkingDefault: false, capabilities: {} },
 ];
-const installedModels = [
-  { key: "deepseek:deepseek-v4-flash", apiModel: "deepseek-v4-flash", label: "DeepSeek V4 Flash", enabled: true, contextWindow: 128000 },
-  { key: "deepseek:deepseek-v4-pro", apiModel: "deepseek-v4-pro", label: "DeepSeek V4 Pro", enabled: true, contextWindow: 128000 },
-  { key: "deepseek:deepseek-coder-v3", apiModel: "deepseek-coder-v3", label: "DeepSeek Coder V3", enabled: false, contextWindow: 64000 },
-  { key: "kimi:kimi-k3", apiModel: "kimi-k3", label: "Kimi K3", enabled: true, contextWindow: 256000 },
-].map((model) => ({
-  definition: {
-    key: model.key, provider: model.key.split(":")[0], api: "openai-completions", apiModel: model.apiModel, label: model.label,
-    source: "builtin", contextWindow: model.contextWindow, maxTokens: 65536, thinkingDefault: true, capabilities: {},
-  },
-  settings: { enabled: model.enabled, addedAt: "2026-09-01T00:00:00.000Z" },
-  unavailableReasons: {},
-}));
-const providerView = (provider: string, hasApiKey: boolean, installedModelCount: number, enabledModelCount: number) => ({
-  provider, hasApiKey, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount, enabledModelCount,
-});
-
 const bridge: BridgeOverrides = {
   "settings.get": async () => settings,
   "settings.getV4": async () => settingsV4,
   "settings.update": async () => settings,
   "settings.updateV4": async () => ({ ok: true, snapshot: settingsV4 }),
   "settings.readSystemPrompt": async () => ({ path: promptPath, content: "你是 ActSpace 的主 Agent。\n- 先理解需求，再动手修改。" }),
-  "providers.list": async () => ({
-    credentialStorage: { status: "ready" },
-    providers: {
-      deepseek: providerView("deepseek", true, 3, 2),
-      kimi: providerView("kimi", true, 2, 2),
-      openrouter: providerView("openrouter", false, 0, 0),
-    },
-  }),
-  "providers.getBalance": async ({ provider }: { provider: string }) => ({
-    provider, isConfigured: true, isAvailable: true, generatedAt: "2026-09-25T08:00:00.000Z", displayBalance: { amount: "31.11", currency: "CNY" },
-  }),
-  "models.listInstalled": async () => ({ models: installedModels }),
   "models.listUsable": async () => ({ models: usableModels }),
   "updates.getState": async () => ({
     sourceRoot: "/Users/me/code/actspace-agent", sourceValid: true, appExecutablePath: "/Applications/Actspace.app/Contents/MacOS/Actspace",

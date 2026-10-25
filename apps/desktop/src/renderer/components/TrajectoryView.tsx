@@ -1,5 +1,3 @@
-import { useSubagentTrajectories } from './trajectory/use-subagent-trajectories';
-import { attachSubagentTools } from '../trajectory/subagents';
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
@@ -27,6 +25,7 @@ import { TrajectoryTimeline } from './trajectory/TrajectoryTimeline';
 import { TrajectoryToolbar } from './trajectory/TrajectoryToolbar';
 import { TrajectoryTable } from './trajectory/TrajectoryTable';
 import { DetailPanel } from './trajectory/details/DetailPanel';
+import { trajectoryDelegations } from '../trajectory/subagents';
 import { useTrajectoryNavigation } from './trajectory/TrajectoryNavigation';
 import { useTrajectorySource } from './trajectory/use-trajectory-source';
 import { useTrajectorySelection } from './trajectory/use-trajectory-selection';
@@ -49,24 +48,30 @@ export type TrajectoryViewProps = {
   /** Present while the session runs; the toolbar shows 停止 at its right edge. */
   readonly onAbort?: () => void;
   readonly isAborting?: boolean;
+  /** Show this Session instead of the selected one (a child agent in the right panel). */
+  readonly sessionId?: string;
+  /** `panel`: right-panel layout, details stacked below the table; Context-panel jumps stay with the main view. */
+  readonly variant?: 'main' | 'panel';
+  /** Opens a delegated child agent's own trajectory (the right panel); the parent trajectory keeps only the `agent` row. */
+  readonly onOpenSubagent?: (childSessionId: string) => void;
 };
 
 /** 轨迹视图：只做装配 —— 数据源、搜索、折叠、时间轴范围、选中与跳转。 */
-export function TrajectoryView({ snapshot, onAbort, isAborting }: TrajectoryViewProps) {
-  const source = useTrajectorySource(snapshot);
+export function TrajectoryView({ snapshot, onAbort, isAborting, sessionId: watchedSessionId, variant = 'main', onOpenSubagent }: TrajectoryViewProps) {
+  const source = useTrajectorySource(snapshot, watchedSessionId);
   const bridge = source.projection?.bridge;
   const projectionCell = source.projection?.cell;
   // 定稿层（DSH finalized）：正在输出的助手只留空占位。流式时只有 chunk 在长，定稿键不变，builder 和布局都不重算。
   const split = useMemo(() => source.snapshot ? splitLiveChunks(source.snapshot) : null, [source.snapshot]);
   const splitRef = useRef(split);
   splitRef.current = split;
-  const ownRuntime = useMemo(() => {
+  const runtime = useMemo(() => {
     const current = splitRef.current;
     return current ? buildTrajectorySnapshot(current.settled(), { placeholders: new Set(current.live.keys()) }) : null;
   }, [split?.settledKey]);
-  const subagents = useSubagentTrajectories(source.snapshot, source.projection, !source.isFixture && snapshot === undefined);
-  const runtime = useMemo(() => ownRuntime ? attachSubagentTools(ownRuntime, subagents.delegations, subagents.children) : null, [ownRuntime, subagents.delegations, subagents.children]);
   const layout = useMemo(() => runtime ? deriveLayout(runtime) : null, [runtime]);
+  const delegations = useMemo(() => new Map(trajectoryDelegations(source.snapshot ?? null).map(item => [item.parentCallId, item])), [source.snapshot]);
+  const subagentFor = useCallback((callId: string) => delegations.get(callId) ?? null, [delegations]);
   const cellsById = useMemo(() => new Map((layout?.cells ?? []).map(cell => [cell.recordId, cell])), [layout]);
   // 流式层（DSH streamingCells）：累加器只折叠新到的 chunk，表格和详情按 recordId 把占位换成流式 cell。
   const accumulator = useRef(createLiveAccumulator()).current;
@@ -155,13 +160,14 @@ export function TrajectoryView({ snapshot, onAbort, isAborting }: TrajectoryView
   }, [selection.selectRecord]);
   const openRelated = useCallback((recordId: string) => { reveal(recordId, 'overview'); }, [reveal]);
   const onTimelineSelect = useCallback((recordId: string) => { reveal(recordId); }, [reveal]);
-  const onTableSelect = useCallback((recordId: string) => selection.selectRecord(recordId), [selection.selectRecord]);
+  // 面板里详情从下半部分弹出、表格变矮，点中的行可能被挡住，要滚回可见区域。
+  const onTableSelect = useCallback((recordId: string) => selection.selectRecord(recordId, { scroll: variant === 'panel' }), [selection.selectRecord, variant]);
   const onToggleTurn = useCallback((turn: number) => setCollapsedTurns(set => toggled(set, turn)), []);
   const onToggleAssistant = useCallback((recordId: string) => setCollapsedAssistants(set => toggled(set, recordId)), []);
 
   // 从 Context 面板等处跳进来：记录就绪后定位并选中；找不到时在顶部留一行说明。
   const navigation = useTrajectoryNavigation();
-  const pendingReveal = navigation?.pending ?? null;
+  const pendingReveal = variant === 'main' ? navigation?.pending ?? null : null;
   useEffect(() => {
     if (!pendingReveal || !runtime) return;
     const record = findRevealRecord(runtime.records, pendingReveal.target);
@@ -170,6 +176,9 @@ export function TrajectoryView({ snapshot, onAbort, isAborting }: TrajectoryView
   }, [pendingReveal, runtime, navigation, reveal]);
 
   const hasEarlier = historyStart > 0 || remoteHistory?.previousFromSeq != null;
+  // 加载返回时视图可能已换到别的会话（切换会话、右侧换了子智能体），只给发起时的那个会话写状态。
+  const shownSession = useRef<string | null>(null);
+  shownSession.current = runtime?.sessionId ?? null;
   const loadEarlier = useCallback(async (anchor: string | null) => {
     if (!remoteHistory) {
       setHistoryLimit(limit => limit + HISTORY_PAGE);
@@ -182,9 +191,9 @@ export function TrajectoryView({ snapshot, onAbort, isAborting }: TrajectoryView
     try {
       await bridge.loadEarlierHistory(sessionId);
     } catch (error) {
-      if (bridge.store.selectedSessionId === sessionId) setHistoryError(error instanceof Error ? error.message : '无法加载历史记录。');
+      if (shownSession.current === sessionId) setHistoryError(error instanceof Error ? error.message : '无法加载历史记录。');
     } finally {
-      if (bridge.store.selectedSessionId === sessionId) setLoadingHistory(false);
+      if (shownSession.current === sessionId) setLoadingHistory(false);
     }
   }, [remoteHistory, runtime?.sessionId, bridge, selection.selectRecord]);
   const onLoadEarlier = useCallback((anchor: string | null) => { void loadEarlier(anchor); }, [loadEarlier]);
@@ -192,10 +201,10 @@ export function TrajectoryView({ snapshot, onAbort, isAborting }: TrajectoryView
   const allTurnsCollapsed = foldableTurns.size > 0 && [...foldableTurns].every(turn => collapsedTurns.has(turn));
   const allAssistantsCollapsed = foldableAssistants.size > 0 && [...foldableAssistants].every(id => collapsedAssistants.has(id));
   const empty = !runtime
-    ? projectionCell?.status === 'loading' ? T.loadingTrajectory : projectionCell?.error ? null : '当前会话暂无可展示的 Agent 轨迹。'
+    ? projectionCell?.status === 'loading' || (watchedSessionId !== undefined && !projectionCell) ? T.loadingTrajectory : projectionCell?.error ? null : '当前会话暂无可展示的 Agent 轨迹。'
     : runtime.records.length === 0 ? '当前会话尚未产生可展示的 Agent Loop 事件。' : null;
 
-  return <section className="tjv-root" data-testid="trajectory-view" data-trajectory-source={source.isFixture ? 'mock' : 'projection'} aria-label="会话轨迹">
+  return <section className="tjv-root" data-variant={variant} data-testid="trajectory-view" data-trajectory-source={source.isFixture ? 'mock' : 'projection'} aria-label="会话轨迹">
     <TrajectoryToolbar
       actualDuration={actualDuration}
       onActualDurationChange={actual => { setActualDuration(actual); setRange(null); }}
@@ -210,12 +219,8 @@ export function TrajectoryView({ snapshot, onAbort, isAborting }: TrajectoryView
     />
     {projectionCell?.error && <div role="alert" className="tjv-notice">
       <span className="tjv-noticeText">{projectionCell.error}</span>
-      <Button size="xs" onClick={() => { if (bridge) void bridge.open(projectionCell.sessionId).catch(() => undefined); }}>重试</Button>
+      <Button size="xs" onClick={() => { if (bridge) void (variant === 'panel' ? bridge.refreshRelated(projectionCell.sessionId) : bridge.open(projectionCell.sessionId)).catch(() => undefined); }}>重试</Button>
     </div>}
-    {subagents.notices.map(notice => <div key={notice.id} role={notice.error ? "alert" : "status"} className="tjv-notice">
-      <span className="tjv-noticeText">子工具：{notice.error ?? (notice.loading ? '正在加载' : '还有更早的历史未加载')}</span>
-      {!notice.loading && <Button size="xs" onClick={() => { void (notice.error ? subagents.bridge?.refreshRelated(notice.id) : subagents.bridge?.loadEarlierHistory(notice.id))?.catch(() => undefined); }}>{notice.error ? '重试' : '加载更早的子工具'}</Button>}
-    </div>)}
     {revealMissed && <div role="status" className="tjv-notice">
       <span className="tjv-noticeText">没有在已加载的轨迹里找到这条记录。{hasEarlier ? `它可能在更早的历史里，可以点「${T.loadEarlier}」后再试。` : ''}</span>
       <IconButton label="关闭说明" size="xs" onClick={() => setRevealMissed(false)}><X size={12} /></IconButton>
@@ -267,6 +272,8 @@ export function TrajectoryView({ snapshot, onAbort, isAborting }: TrajectoryView
             onSelectRecord={openRelated}
             onSelectRequest={selection.selectRequest}
             onClose={selection.clear}
+            subagentFor={subagentFor}
+            onOpenSubagent={onOpenSubagent}
           />}
         </div>
       </div>

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { ClientSessionStore, type ClientLiveOverlay, type ClientSessionCell } from "@actspace/client/sessions";
 import { createDesktopSessionBridge, type DesktopSessionBridge } from "./desktop-session-bridge";
 import { liveEvents } from "../api/live-events";
+import { scheduleFrame } from "./frame-batch";
 import { sessionsApi } from "../api/sessions";
 
 export type SessionProjectionContextValue = {
@@ -40,7 +41,7 @@ export function SessionProjectionProvider({
     const bridge = createDesktopSessionBridge({
       getSessionProjectionSnapshot: sessionsApi.getProjectionSnapshot,
       onSessionLiveEvent: liveEvents.subscribe,
-    }, store);
+    }, store, { scheduleStreamFlush: scheduleFrame });
     bridgeRef.current = bridge;
     bridge.start();
     return () => {

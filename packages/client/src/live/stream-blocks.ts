@@ -6,7 +6,7 @@ export function getStreamingBashStatus(tool: {
   isError?: boolean;
   finished?: boolean;
   approvalPending?: boolean;
-}, previewStatus?: BashStatus): BashStatus {
+}, previewStatus?: BashStatus, background?: boolean): BashStatus {
   if (tool.approvalPending) {
     return "pending";
   }
@@ -15,6 +15,10 @@ export function getStreamingBashStatus(tool: {
   }
 
   if (previewStatus === "denied" || previewStatus === "expired" || previewStatus === "cancelled") {
+    return previewStatus;
+  }
+  // The launcher returning is not the task ending: a background command keeps the task status from its preview.
+  if (background && !tool.isError && previewStatus) {
     return previewStatus;
   }
 
@@ -92,7 +96,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
     return {
       kind: "bash",
       id: blockId,
-      status: getStreamingBashStatus(tool, tool.preview.status),
+      status: getStreamingBashStatus(tool, tool.preview.status, tool.preview.background),
       title: tool.approvalPending
         ? (tool.approvalSummary ?? "Bash command needs approval")
         : tool.preview.title,
@@ -105,7 +109,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       approvalRequestId: tool.approvalRequestId,
       intent: tool.preview.intent,
       backgroundTaskId: tool.preview.backgroundTaskId,
-      backgroundStatus: tool.preview.backgroundStatus,
+      background: tool.preview.background,
       outputFilePath: tool.preview.outputFilePath,
       sandboxed: tool.preview.sandboxed,
       notExecuted: tool.preview.notExecuted,
@@ -321,6 +325,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       status: tool.finished ? tool.preview.status : "running",
       subagentType: tool.preview.subagentType,
       agentKind: tool.preview.agentKind,
+      background: tool.preview.background,
       displayText: tool.preview.displayText,
       summary: tool.preview.summary,
       recentEvents: tool.preview.recentEvents,
@@ -417,7 +422,7 @@ export function streamingStateToBlocks(state: StreamingState, agentRunId?: strin
     } else if (seg.type === "workspace_preparation") {
       const block = state.activeWorkspacePreparations.get(seg.agentRunId);
       if (block) blocks.push(block);
-    } else if (seg.type === "user_message") {
+    } else if (seg.type === "user_message" || seg.type === "background_notice") {
       blocks.push(seg.block);
     }
   }

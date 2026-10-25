@@ -7,6 +7,8 @@ export const TASK_OWNER = "actspace.agent-service";
 export const TASK_EVENT = `plugin/${TASK_OWNER}/task`;
 export const RUN_EVENT = `plugin/${TASK_OWNER}/run`;
 export const QUEUE_EVENT = `plugin/${TASK_OWNER}/queue`;
+// A new required fact keeps historical designate/finish/recover replay unchanged.
+export const QUEUE_RETURN_EVENT = `plugin/${TASK_OWNER}/queue-return`;
 type Owned = { readonly sessionId: string };
 export type TaskEvent = Owned & (
   | { readonly op: "accept"; readonly taskId: string; readonly submissionId: string; readonly content: RuntimeV2JsonValue; readonly continuationOf: string | null }
@@ -24,10 +26,16 @@ export type QueueEvent = Owned & (
   | { readonly op: "pause" | "resume" | "recover" }
   | { readonly op: "move"; readonly taskId: string; readonly beforeTaskId: string }
 );
-export type SchedulingEvent = TaskEvent | RunEvent | QueueEvent;
+export type QueueReturnEvent = Owned & {
+  readonly op: "return-steering";
+  readonly runId: string;
+  readonly taskIds: readonly string[];
+  readonly placement: "front";
+};
+export type SchedulingEvent = TaskEvent | RunEvent | QueueEvent | QueueReturnEvent;
 
 /** Pure codec entry: no behavior, filesystem, Host or Loop activation. */
-export const taskCodecs: readonly EventCodec[] = [TASK_EVENT, RUN_EVENT, QUEUE_EVENT].map(type => ({
+export const taskCodecs: readonly EventCodec[] = [TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT].map(type => ({
   type, ownerPluginId: TASK_OWNER, currentVersion: 1, criticality: "required" as const,
   validate: (value: RuntimeV2JsonValue) => validateSchedulingEvent(type, value),
 }));
@@ -74,6 +82,13 @@ export function validateSchedulingEvent(type: string, value: unknown): asserts v
     if (op === "move") { text(value.taskId); text(value.beforeTaskId); keys = ["taskId", "beforeTaskId"]; }
     else if (op === "pause" || op === "resume" || op === "recover") keys = [];
     else invalid();
+  } else if (type === QUEUE_RETURN_EVENT) {
+    if (op !== "return-steering" || value.placement !== "front") invalid();
+    text(value.runId);
+    if (!Array.isArray(value.taskIds) || !value.taskIds.length) invalid();
+    value.taskIds.forEach(text);
+    if (new Set(value.taskIds).size !== value.taskIds.length) invalid();
+    keys = ["runId", "taskIds", "placement"];
   } else invalid();
   const allowed = new Set(["op", "sessionId", ...keys]);
   if (Object.keys(value).some(key => !allowed.has(key))) invalid();

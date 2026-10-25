@@ -3,6 +3,7 @@ import type { PermissionMode } from "@actspace/shared/runtime-v2";
 import { Check, ChevronDown, ShieldCheck } from "lucide-react";
 import { sessionsApi } from "../../api/sessions";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
+import { SessionGrantsDialog } from "./SessionGrantsDialog";
 
 const PERMISSION_MODES = ["default", "auto-review", "full-access"] as const satisfies readonly PermissionMode[];
 
@@ -14,9 +15,10 @@ function permissionModeLabel(mode: PermissionMode): string {
 export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: { sessionId: string; mode: PermissionMode; disabled: boolean; onChanged: () => void | Promise<void> }) {
   const [submitting, setSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
+  const [manage, setManage] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const refocusTrigger = useRef(false);
-  useEffect(() => { setOpen(false); }, [sessionId]);
+  useEffect(() => { setOpen(false); setManage(false); }, [sessionId]);
   // 保存期间按钮是禁用的，菜单关闭时 Radix 还焦点会落空；等按钮恢复可用后再还。
   useEffect(() => {
     if (submitting || !refocusTrigger.current) return;
@@ -38,14 +40,14 @@ export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: 
     }
   };
   return (
-    <Menu open={open} onOpenChange={setOpen}>
+    <><Menu open={open} onOpenChange={setOpen}>
       <MenuTrigger asChild>
         <button
           ref={trigger}
           type="button"
           className="inline-flex h-7 items-center gap-1 rounded-act-sm border-0 bg-transparent px-1.5 text-act-xs text-text-muted hover:bg-surface-subtle hover:text-text-main disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="会话权限模式"
-          disabled={disabled || submitting}
+          disabled={submitting}
           title={`权限：${permissionModeLabel(mode)}。替我审批由所选模型判断，未允许时交回人工。完全权限扩大文件范围并自动批准通过策略检查的 Bash；沙箱和禁止规则仍生效，文件删除及敏感文件仍按策略审批。`}
         >
           <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
@@ -71,7 +73,10 @@ export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: 
             {mode === next ? <Check size={14} className="shrink-0 text-text-main" aria-hidden="true" /> : null}
           </MenuItem>
         ))}
+        <MenuItem onSelect={() => setManage(true)}>管理会话授权</MenuItem>
       </MenuContent>
     </Menu>
+    {manage ? <SessionGrantsDialog key={sessionId} sessionId={sessionId} onClose={() => setManage(false)} onChanged={onChanged} returnFocus={trigger} /> : null}
+    </>
   );
 }

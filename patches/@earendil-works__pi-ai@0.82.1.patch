@@ -1,0 +1,137 @@
+diff --git a/dist/api/anthropic-messages.js b/dist/api/anthropic-messages.js
+index 70ead54dbbbea64daff7350b70ce1c23352cd208..3e7a8750bdf4bba3d4ff671ed431a37ff93e1d93 100644
+--- a/dist/api/anthropic-messages.js
++++ b/dist/api/anthropic-messages.js
+@@ -1,3 +1,4 @@
++import { captureWireUsage } from "../utils/actspace-wire-usage.js";
+ import Anthropic from "@anthropic-ai/sdk";
+ import { calculateCost } from "../models.js";
+ import { splitDeferredTools } from "../utils/deferred-tools.js";
+@@ -381,13 +382,15 @@ export const stream = (model, context, options) => {
+             for await (const event of iterateAnthropicEvents(response, options?.signal)) {
+                 if (event.type === "message_start") {
+                     output.responseId = event.message.id;
++                    output.usage.actspaceWireUsage = captureWireUsage(undefined, event.message.usage, "anthropic-messages");
++                    const initialUsage = event.message.usage ?? {};
+                     // Capture initial token usage from message_start event
+                     // This ensures we have input token counts even if the stream is aborted early
+-                    output.usage.input = event.message.usage.input_tokens || 0;
+-                    output.usage.output = event.message.usage.output_tokens || 0;
+-                    output.usage.cacheRead = event.message.usage.cache_read_input_tokens || 0;
+-                    output.usage.cacheWrite = event.message.usage.cache_creation_input_tokens || 0;
+-                    output.usage.cacheWrite1h = event.message.usage.cache_creation?.ephemeral_1h_input_tokens || 0;
++                    output.usage.input = initialUsage.input_tokens || 0;
++                    output.usage.output = initialUsage.output_tokens || 0;
++                    output.usage.cacheRead = initialUsage.cache_read_input_tokens || 0;
++                    output.usage.cacheWrite = initialUsage.cache_creation_input_tokens || 0;
++                    output.usage.cacheWrite1h = initialUsage.cache_creation?.ephemeral_1h_input_tokens || 0;
+                     // Anthropic doesn't provide total_tokens, compute from components
+                     output.usage.totalTokens =
+                         output.usage.input + output.usage.output + output.usage.cacheRead + output.usage.cacheWrite;
+@@ -535,6 +538,7 @@ export const stream = (model, context, options) => {
+                     // Only update usage fields if present (not null).
+                     // Preserves input_tokens from message_start when proxies omit it in message_delta.
+                     if (event.usage) {
++                        output.usage.actspaceWireUsage = captureWireUsage(output.usage.actspaceWireUsage, event.usage, "anthropic-messages");
+                         if (event.usage.input_tokens != null) {
+                             output.usage.input = event.usage.input_tokens;
+                         }
+diff --git a/dist/api/openai-completions.js b/dist/api/openai-completions.js
+index ed81baa3860fa20cf9d38885f9dd4b6b2f639045..931bbc2365cd6ea0d7fe19db56dfdbb669374bee 100644
+--- a/dist/api/openai-completions.js
++++ b/dist/api/openai-completions.js
+@@ -1,3 +1,4 @@
++import { captureWireUsage } from "../utils/actspace-wire-usage.js";
+ import OpenAI from "openai";
+ import { calculateCost, clampThinkingLevel } from "../models.js";
+ import { formatProviderError, normalizeProviderError } from "../utils/error-body.js";
+@@ -315,7 +316,7 @@ export const stream = (model, context, options) => {
+                     output.responseModel ||= chunk.model;
+                 }
+                 if (chunk.usage) {
+-                    output.usage = parseChunkUsage(chunk.usage, model);
++                    output.usage = parseChunkUsage(chunk.usage, model, output.usage.actspaceWireUsage);
+                 }
+                 const choice = Array.isArray(chunk.choices) ? chunk.choices[0] : undefined;
+                 if (!choice)
+@@ -323,7 +324,7 @@ export const stream = (model, context, options) => {
+                 // Fallback: some providers (e.g., Moonshot) return usage
+                 // in choice.usage instead of the standard chunk.usage
+                 if (!chunk.usage && choice.usage) {
+-                    output.usage = parseChunkUsage(choice.usage, model);
++                    output.usage = parseChunkUsage(choice.usage, model, output.usage.actspaceWireUsage);
+                 }
+                 if (choice.finish_reason) {
+                     const finishReasonResult = mapStopReason(choice.finish_reason);
+@@ -1054,7 +1055,7 @@ function convertTools(tools, compat) {
+         };
+     });
+ }
+-function parseChunkUsage(rawUsage, model) {
++function parseChunkUsage(rawUsage, model, previousWireUsage) {
+     const promptTokens = rawUsage.prompt_tokens || 0;
+     const cacheReadTokens = rawUsage.prompt_tokens_details?.cached_tokens ?? rawUsage.prompt_cache_hit_tokens ?? 0;
+     const cacheWriteTokens = rawUsage.prompt_tokens_details?.cache_write_tokens || 0;
+@@ -1070,6 +1071,7 @@ function parseChunkUsage(rawUsage, model) {
+     // OpenAI completion_tokens already includes reasoning_tokens.
+     const outputTokens = rawUsage.completion_tokens || 0;
+     const usage = {
++        actspaceWireUsage: captureWireUsage(previousWireUsage, rawUsage, "openai-completions"),
+         input,
+         output: outputTokens,
+         cacheRead: cacheReadTokens,
+diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
+index 254156f94cb83eab1fefe8690269478497977e8d..1c2db4efbf6551e6dcc0e9fce1a099c07c102f28 100644
+--- a/dist/api/openai-responses-shared.js
++++ b/dist/api/openai-responses-shared.js
+@@ -1,3 +1,4 @@
++import { captureWireUsage } from "../utils/actspace-wire-usage.js";
+ import { calculateCost } from "../models.js";
+ import { shortHash } from "../utils/hash.js";
+ import { parseStreamingJson } from "../utils/json-parse.js";
+@@ -418,6 +419,7 @@ export async function processResponsesStream(openaiStream, output, stream, model
+             const cachedTokens = inputDetails?.cached_tokens || 0;
+             const cacheWriteTokens = inputDetails?.cache_write_tokens || 0;
+             output.usage = {
++                actspaceWireUsage: captureWireUsage(output.usage.actspaceWireUsage, response.usage, "openai-responses"),
+                 // OpenAI includes cached and cache-write tokens in input_tokens, so subtract both.
+                 input: Math.max(0, (response.usage.input_tokens || 0) - cachedTokens - cacheWriteTokens),
+                 output: response.usage.output_tokens || 0,
+@@ -604,6 +606,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+         }
+         else if (event.type === "response.failed") {
+             sawTerminalResponseEvent = true;
++            if (event.response?.usage) {
++                output.usage.actspaceWireUsage = captureWireUsage(output.usage.actspaceWireUsage, event.response.usage, "openai-responses");
++            }
+             const error = event.response?.error;
+             const details = event.response?.incomplete_details;
+             const msg = error
+diff --git a/dist/utils/actspace-wire-usage.js b/dist/utils/actspace-wire-usage.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..76969423cb8682443fc1aab9ce9b9e886933a76e
+--- /dev/null
++++ b/dist/utils/actspace-wire-usage.js
+@@ -0,0 +1,22 @@
++// ActSpace's pinned integration metadata. SDK counters include synthetic zeroes;
++// these nullable counters retain only facts actually present on the wire.
++export function captureWireUsage(previous, raw, protocol) {
++    const usage = raw ?? {};
++    const completions = protocol === "openai-completions";
++    const anthropic = protocol === "anthropic-messages";
++    const inputDetails = usage[completions ? "prompt_tokens_details" : "input_tokens_details"];
++    const outputDetails = usage[completions ? "completion_tokens_details" : "output_tokens_details"];
++    const fields = {
++        input: usage[completions ? "prompt_tokens" : "input_tokens"],
++        output: usage[completions ? "completion_tokens" : "output_tokens"],
++        cacheRead: anthropic ? usage.cache_read_input_tokens : inputDetails?.cached_tokens ?? usage.prompt_cache_hit_tokens ?? usage.cached_tokens,
++        cacheWrite: anthropic ? usage.cache_creation_input_tokens : inputDetails?.cache_write_tokens ?? usage.prompt_cache_write_tokens,
++        reasoning: anthropic ? outputDetails?.thinking_tokens : outputDetails?.reasoning_tokens,
++    };
++    const result = { version: 1 };
++    for (const [key, value] of Object.entries(fields)) {
++        result[key] = typeof value === "number" && Number.isFinite(value) && value >= 0
++            ? value : previous?.[key] ?? null;
++    }
++    return result;
++}

@@ -12,7 +12,7 @@ import { legacyMergeTranscript } from "../../../test-fixtures/legacy-transcript"
 
 const SESSION = "s-transcript";
 const TIME = "2026-10-06T00:00:00.000Z";
-const NO_LOCAL: LocalTranscript = { compactionFailure: undefined, isStreaming: false, bashUpdates: {} };
+const NO_LOCAL: LocalTranscript = { compactionFailure: undefined, isStreaming: false };
 
 function event(id: string, agentRunId: string, type: SessionEvent["type"], payload: Record<string, unknown>): SessionEvent {
   return { id, sessionId: SESSION, agentRunId, type, timestamp: TIME, schemaVersion: 2, payload } as SessionEvent;
@@ -171,14 +171,12 @@ describe("mergeTranscript matches the legacy merge", () => {
     compare(durable, liveOf(null, createEmptyStreamingState()));
   });
 
-  it("appends a compaction failure only when idle and applies background bash updates", () => {
+  it("appends a compaction failure only when idle", () => {
     const failure = createCompactionBlock({ agentRunId: "compact-task", status: "failed" });
-    const bash: MessageBlock = { kind: "bash", id: "bash-1", runId: "run-b", title: "sleep 9", command: "sleep 9", status: "success", backgroundTaskId: "task-1", backgroundStatus: "running", createdAt: TIME };
-    const durable: DurableTranscript = { blocks: [...(durableOf(turnEvents("run-b", "b", "go", "started")).blocks ?? []), bash], events: [] };
-    const idle = compare(durable, liveOf(null, createEmptyStreamingState()), { compactionFailure: failure, isStreaming: false, bashUpdates: { "task-1": { status: "completed", exitCode: 0 } } });
+    const durable = durableOf(turnEvents("run-b", "b", "go", "started"));
+    const idle = compare(durable, liveOf(null, createEmptyStreamingState()), { compactionFailure: failure, isStreaming: false });
     expect(idle.at(-1)).toBe(failure);
-    expect(idle.find((block) => block.kind === "bash")).toMatchObject({ backgroundStatus: "completed", exitCode: 0 });
-    const busy = compare(durable, liveOf("run-c", streaming("x")), { compactionFailure: failure, isStreaming: true, bashUpdates: { "task-2": { status: "failed" } } });
+    const busy = compare(durable, liveOf("run-c", streaming("x")), { compactionFailure: failure, isStreaming: true });
     expect(busy).not.toContain(failure);
   });
 });

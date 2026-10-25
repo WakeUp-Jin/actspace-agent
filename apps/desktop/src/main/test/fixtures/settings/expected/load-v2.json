@@ -15,10 +15,9 @@
           "lastConnection": {
             "status": "untested"
           },
-          "installedModelCount": 1,
+          "installedModelCount": 0,
           "enabledModelCount": 0,
-          "defaultPricingMultiplier": 1,
-          "additionalCredentials": []
+          "defaultPricingMultiplier": 1
         },
         "kimi": {
           "hasApiKey": false,
@@ -33,18 +32,7 @@
           },
           "installedModelCount": 2,
           "enabledModelCount": 2,
-          "defaultPricingMultiplier": 1.5,
-          "additionalCredentials": [
-            {
-              "id": "extra1",
-              "label": "Team key",
-              "pricingMultiplier": 2,
-              "lastConnection": {
-                "status": "untested"
-              },
-              "hasApiKey": false
-            }
-          ]
+          "defaultPricingMultiplier": 1.5
         },
         "openrouter": {
           "hasApiKey": false,
@@ -60,22 +48,19 @@
           },
           "installedModelCount": 0,
           "enabledModelCount": 0,
-          "defaultPricingMultiplier": 1,
-          "additionalCredentials": []
+          "defaultPricingMultiplier": 1
         }
       },
       "installedModels": {
-        "deepseek:deepseek-flash": {
-          "enabled": false,
-          "addedAt": "2026-07-25T00:00:00.000Z"
-        },
         "kimi:kimi-k2.6": {
           "enabled": true,
-          "addedAt": "2026-07-24T00:00:00.000Z"
+          "addedAt": "2026-07-24T00:00:00.000Z",
+          "connectionId": "kimi:default"
         },
         "kimi:kimi-k2.7-code": {
           "enabled": true,
-          "addedAt": "2026-07-24T00:00:00.000Z"
+          "addedAt": "2026-07-24T00:00:00.000Z",
+          "connectionId": "kimi:default"
         }
       },
       "customModels": {},
@@ -83,7 +68,12 @@
         "defaultChatModel": "kimi:kimi-k2.6",
         "utilityModel": null,
         "autoReviewModel": null,
-        "exploreModel": "deepseek:deepseek-flash"
+        "exploreModel": null,
+        "visionModel": null,
+        "thinking": {
+          "utility": "off",
+          "autoReview": "off"
+        }
       },
       "searchProviders": {
         "deepseek": {
@@ -107,9 +97,6 @@
         "baseUrl": "https://images.example/v1",
         "model": "image-model-x"
       },
-      "imageInspection": {
-        "modelKey": "openrouter:openai/gpt-5.6-luna"
-      },
       "agent": {
         "systemPromptPath": "<root>/prompts/v2-agent.md",
         "temperature": 0.7,
@@ -118,7 +105,7 @@
           "bash"
         ],
         "bashAlwaysAsk": false,
-        "exploreModelId": "deepseek-v4-flash"
+        "exploreModelId": null
       },
       "skills": {
         "disabled": [
@@ -182,8 +169,7 @@
               "lastConnection": {
                 "status": "untested"
               },
-              "defaultPricingMultiplier": 1,
-              "additionalCredentials": []
+              "defaultPricingMultiplier": 1
             },
             "kimi:default": {
               "connectionId": "kimi:default",
@@ -197,17 +183,7 @@
               "lastConnection": {
                 "status": "untested"
               },
-              "defaultPricingMultiplier": 1.5,
-              "additionalCredentials": [
-                {
-                  "id": "extra1",
-                  "label": "Team key",
-                  "pricingMultiplier": 2,
-                  "lastConnection": {
-                    "status": "untested"
-                  }
-                }
-              ]
+              "defaultPricingMultiplier": 1.5
             },
             "openrouter:default": {
               "connectionId": "openrouter:default",
@@ -221,17 +197,11 @@
               "lastConnection": {
                 "status": "untested"
               },
-              "defaultPricingMultiplier": 1,
-              "additionalCredentials": []
+              "defaultPricingMultiplier": 1
             }
           },
           "definitions": {},
           "installed": {
-            "deepseek:deepseek-flash": {
-              "connectionId": "deepseek:default",
-              "enabled": false,
-              "addedAt": "2026-07-25T00:00:00.000Z"
-            },
             "kimi:kimi-k2.6": {
               "connectionId": "kimi:default",
               "enabled": true,
@@ -247,8 +217,15 @@
             "defaultChat": "kimi:kimi-k2.6",
             "utility": null,
             "autoReview": null,
-            "explore": "deepseek:deepseek-flash"
-          }
+            "explore": null,
+            "vision": null,
+            "thinking": {
+              "utility": "off",
+              "autoReview": "off"
+            }
+          },
+          "overrides": {},
+          "layersVersion": 2
         },
         "tools": {
           "disabledTools": [
@@ -287,9 +264,6 @@
           "imageGeneration": {
             "baseUrl": "https://images.example/v1",
             "model": "image-model-x"
-          },
-          "imageInspection": {
-            "modelKey": "openrouter:openai/gpt-5.6-luna"
           }
         },
         "skills": {
@@ -298,12 +272,7 @@
           ]
         },
         "subagents": {
-          "routes": {
-            "explore": {
-              "enabled": true,
-              "model": "deepseek:deepseek-flash"
-            }
-          }
+          "routes": {}
         },
         "activity": {
           "usage": {
@@ -367,8 +336,7 @@
             "lastConnection": {
               "status": "untested"
             },
-            "defaultPricingMultiplier": 1,
-            "additionalCredentials": []
+            "defaultPricingMultiplier": 1
           },
           "kimi:default": {
             "connectionId": "kimi:default",
@@ -382,17 +350,7 @@
             "lastConnection": {
               "status": "untested"
             },
-            "defaultPricingMultiplier": 1.5,
-            "additionalCredentials": [
-              {
-                "id": "extra1",
-                "label": "Team key",
-                "pricingMultiplier": 2,
-                "lastConnection": {
-                  "status": "untested"
-                }
-              }
-            ]
+            "defaultPricingMultiplier": 1.5
           },
           "openrouter:default": {
             "connectionId": "openrouter:default",
@@ -406,17 +364,11 @@
             "lastConnection": {
               "status": "untested"
             },
-            "defaultPricingMultiplier": 1,
-            "additionalCredentials": []
+            "defaultPricingMultiplier": 1
           }
         },
         "definitions": {},
         "installed": {
-          "deepseek:deepseek-flash": {
-            "connectionId": "deepseek:default",
-            "enabled": false,
-            "addedAt": "2026-07-25T00:00:00.000Z"
-          },
           "kimi:kimi-k2.6": {
             "connectionId": "kimi:default",
             "enabled": true,
@@ -432,8 +384,15 @@
           "defaultChat": "kimi:kimi-k2.6",
           "utility": null,
           "autoReview": null,
-          "explore": "deepseek:deepseek-flash"
-        }
+          "explore": null,
+          "vision": null,
+          "thinking": {
+            "utility": "off",
+            "autoReview": "off"
+          }
+        },
+        "overrides": {},
+        "layersVersion": 2
       },
       "tools": {
         "disabledTools": [
@@ -472,9 +431,6 @@
         "imageGeneration": {
           "baseUrl": "https://images.example/v1",
           "model": "image-model-x"
-        },
-        "imageInspection": {
-          "modelKey": "openrouter:openai/gpt-5.6-luna"
         }
       },
       "skills": {
@@ -483,12 +439,7 @@
         ]
       },
       "subagents": {
-        "routes": {
-          "explore": {
-            "enabled": true,
-            "model": "deepseek:deepseek-flash"
-          }
-        }
+        "routes": {}
       },
       "activity": {
         "usage": {

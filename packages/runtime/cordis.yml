@@ -28,7 +28,7 @@
   name: "@actspace/core-agent/plugin"
 - id: agent-runtime
   name: "@actspace/runtime/agent-runtime"
-  inject: [actspace.host.llm, actspace.host.prompt, actspace.host.agent, actspace.host.subagents, agent.registry, session.runtime, session.checkpoint, session.journal, session.projection, actspace.host.tools.filesystem-read, actspace.host.tools.filesystem-search, actspace.host.tools.filesystem-write, actspace.host.tools.shell-tools, actspace.host.tools.web-tools, actspace.host.tools.image-generation, actspace.host.tools.image-inspection, actspace.host.session]
+  inject: [actspace.host.llm, actspace.host.prompt, actspace.host.agent, actspace.host.subagents, actspace.host.background-tasks, agent.registry, session.runtime, llm.auxiliary-requests, session.checkpoint, session.journal, session.projection, actspace.host.tools.filesystem-read, actspace.host.tools.filesystem-search, actspace.host.tools.filesystem-write, actspace.host.tools.shell-tools, actspace.host.tools.web-tools, actspace.host.tools.image-generation, actspace.host.tools.image-inspection, actspace.host.session]
 - id: headless-runner
   name: "@actspace/headless/plugin"
   inject: [actspace.host.headless, session.runtime, agent.runtime]

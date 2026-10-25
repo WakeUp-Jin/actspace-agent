@@ -19,11 +19,12 @@ export const MAIN_AGENT_FORM = Object.freeze({
     Object.freeze({ id: "actspace.filesystem-read", version: 2, required: true, toolNames: Object.freeze(["read_file", "list_directory", "present"]) }),
     Object.freeze({ id: "actspace.filesystem-search", version: 2, required: true, toolNames: Object.freeze(["grep", "glob"]) }),
     Object.freeze({ id: "actspace.filesystem-write", version: 2, required: true, toolNames: Object.freeze(["edit_file", "write_file", "delete_file"]) }),
-    Object.freeze({ id: "actspace.shell-tools", version: 2, required: true, toolNames: Object.freeze(["bash", "bash_output", "bash_kill"]) }),
+    Object.freeze({ id: "actspace.shell-tools", version: 3, required: true, toolNames: Object.freeze(["bash"]) }),
     Object.freeze({ id: "actspace.web-tools", version: 2, required: true, toolNames: Object.freeze(["web", "web_search", "web_fetch"]) }),
     Object.freeze({ id: "actspace.image-generation", version: 2, required: true, toolNames: Object.freeze(["generate_image"]) }),
     Object.freeze({ id: "actspace.image-inspection", version: 2, required: true, toolNames: Object.freeze(["inspect_image"]) }),
     Object.freeze({ id: "actspace.todo", version: 1, required: true, toolNames: Object.freeze(["todo_read", "todo_write"]) }),
+    Object.freeze({ id: "actspace.background-tasks", version: 1, required: true, toolNames: Object.freeze(["task_list", "task_output", "task_stop", "task_wait"]) }),
     Object.freeze({ id: "actspace.subagent", version: 1, required: true, toolNames: Object.freeze(["agent", "explore"]) }),
     Object.freeze({ id: "actspace.compaction", version: 1, required: true, toolNames: Object.freeze([]) }),
     Object.freeze({ id: "actspace.browser-tools", version: 2, required: false, toolNames: Object.freeze([

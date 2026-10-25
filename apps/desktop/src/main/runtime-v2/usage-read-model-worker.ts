@@ -6,7 +6,7 @@ import { UsageCatalogFallback } from "./usage-catalog-fallback";
 import { prepare } from "./usage-sql";
 import { projectQueryCatalog } from "./usage-catalog-projection";
 import { enableUsageBatchWrites } from "./usage-batch-write";
-import { metricsSource, runCountsSource, metricSql, searchMetricsSource, clearSearchMetricsCache } from "./usage-rollups";
+import { metricsSource, runCountsSource, countableRunSql, metricSql, searchMetricsSource, clearSearchMetricsCache } from "./usage-rollups";
 import { UsageSessionFallback } from "./usage-session-fallback";
 import type { UsageJournalSource } from "./usage-journal-projection";
 import { commitJournalBatch, resumableState, discardSessionBuilds, pruneSyncIndexes } from "./read-model-sync";
@@ -26,17 +26,17 @@ type Message =
   | { id: string; type: "context-source-state"; source: import("@actspace/session-storage").SessionQuerySource }
   | { id: string; type: "context-journal"; source: import("@actspace/session-storage").SessionQuerySource; events: readonly SessionEventEnvelopeV1[]; cursor: string; first: boolean; final: boolean; reset: boolean }
   | { id: string; type: "sync"; sources: readonly IndexedUsageSource[]; catalog?: readonly CatalogRow[]; continuation?: boolean; final?: boolean; replaceSessionIds?: readonly string[]; activeSessionIds?: readonly string[] }
-  | { id: string; type: "query"; request: "activity" | "statistics" | "sessions"; input: UsageStatisticsGetInput | SessionListPageInput; resetAt?: string }
+  | { id: string; type: "query"; request: "activity" | "statistics" | "sessions"; input: UsageStatisticsGetInput | SessionListPageInput }
   | { id: string; type: "catalog-fallback-begin" | "catalog-fallback-end" }
   | { id: string; type: "catalog-fallback-append"; row: CatalogRow; events: readonly SessionEventEnvelopeV1[]; first: boolean }
   | { id: string; type: "catalog-fallback-query"; input: SessionListPageInput }
   | { id: string; type: "fallback-begin" | "fallback-end" }
   | { id: string; type: "fallback-append"; source: UsageJournalSource; events: readonly SessionEventEnvelopeV1[] }
-  | { id: string; type: "fallback-query"; request: "activity" | "statistics"; input: UsageStatisticsGetInput; resetAt?: string }
+  | { id: string; type: "fallback-query"; request: "activity" | "statistics"; input: UsageStatisticsGetInput }
   | { id: string; type: "reset-database" }
   | { id: string; type: "source-state"; sessionId: string; catalogOnly?: boolean; target?: { throughSeq: number; stamp?: string; codecSetDigest?: string } }
   | { id: string; type: "abort-sync" }
-  | { id: string; type: "journal"; catalogOnly?: boolean; source: UsageJournalSource; events: readonly SessionEventEnvelopeV1[]; cursor: string; first: boolean; final: boolean; reset: boolean; resetAt?: string }
+  | { id: string; type: "journal"; catalogOnly?: boolean; source: UsageJournalSource; events: readonly SessionEventEnvelopeV1[]; cursor: string; first: boolean; final: boolean; reset: boolean }
   | { id: string; type: "diagnostics" };
 type DbRow = { row_json: string; activity_id: string; session_id: string; session_title: string | null; started_at: string; kind: string; status: string; model: string | null; provider_id: string | null; connection_id: string | null; tool_name: string | null; agent_run_id: string };
 type Source = IndexedUsageSource & { querySource?: UsageJournalSource["querySource"] };
@@ -57,7 +57,7 @@ parentPort?.on("message", (message: Message) => {
   chain = chain.then(async () => {
     activeMessageId = message.id;
     try {
-      const result = message.type === "context-fallback" ? await contextFallback(message.source, message.events) : message.type === "context-query" ? queryContextHistory(await open(), message.sessionId) : message.type === "context-source-state" ? contextSourceState(await open(), message.source) : message.type === "context-journal" ? await commitContextBatch(await open(), message.source, message.events, message.cursor, message.first, message.final, message.reset, async () => { parentPort?.postMessage({ id: message.id, heartbeat: true }); await yieldWorker(); }) : message.type.startsWith("catalog-fallback-") ? catalogFallbackMessage(message) : message.type === "reset-database" ? await resetDatabase() : message.type.startsWith("fallback-") ? await fallbackMessage(message) : message.type === "source-state" ? await sourceState(message.sessionId, message.catalogOnly, message.target) : message.type === "journal" ? await syncJournal(message) : message.type === "abort-sync" ? abortSync() : message.type === "sync" ? await sync(message.sources, message.catalog, message.replaceSessionIds, message.activeSessionIds, message.final, message.continuation) : message.type === "query" ? await query(message.request, message.input, undefined, message.resetAt) : { memory: { ...process.memoryUsage(), heapSizeLimit: getHeapStatistics().heap_size_limit }, sqlite: db ? prepare(db, "PRAGMA temp_store").get() : null };
+      const result = message.type === "context-fallback" ? await contextFallback(message.source, message.events) : message.type === "context-query" ? queryContextHistory(await open(), message.sessionId) : message.type === "context-source-state" ? contextSourceState(await open(), message.source) : message.type === "context-journal" ? await commitContextBatch(await open(), message.source, message.events, message.cursor, message.first, message.final, message.reset, async () => { parentPort?.postMessage({ id: message.id, heartbeat: true }); await yieldWorker(); }) : message.type.startsWith("catalog-fallback-") ? catalogFallbackMessage(message) : message.type === "reset-database" ? await resetDatabase() : message.type.startsWith("fallback-") ? await fallbackMessage(message) : message.type === "source-state" ? await sourceState(message.sessionId, message.catalogOnly, message.target) : message.type === "journal" ? await syncJournal(message) : message.type === "abort-sync" ? abortSync() : message.type === "sync" ? await sync(message.sources, message.catalog, message.replaceSessionIds, message.activeSessionIds, message.final, message.continuation) : message.type === "query" ? await query(message.request, message.input) : { memory: { ...process.memoryUsage(), heapSizeLimit: getHeapStatistics().heap_size_limit }, sqlite: db ? prepare(db, "PRAGMA temp_store").get() : null };
       if (result && Buffer.byteLength(JSON.stringify(result)) > 1024 * 1024) throw new Error("Usage result exceeds 1 MiB; narrow the query.");
       parentPort?.postMessage({ id: message.id, ok: true, result });
     } catch (error) {
@@ -81,7 +81,7 @@ async function fallbackMessage(message: Message) {
   if (!fallback) throw new Error("Session fallback is not initialized.");
   if (message.type === "fallback-append") { fallback.append(message.source, message.events); return null; }
   if (message.type === "fallback-query") {
-    const database = fallback.materialize(message.resetAt);
+    const database = fallback.materialize();
     try { return await query(message.request, message.input, database); }
     finally { database.close(); fallback = undefined; }
   }
@@ -118,7 +118,7 @@ async function open(): Promise<DatabaseSync> {
   try {
   const appId = Number((prepare(db, "PRAGMA application_id").get() as { application_id: number }).application_id);
   const version = Number((prepare(db, "PRAGMA user_version").get() as { user_version: number }).user_version);
-  if ((appId !== 0 && appId !== 0x41555332) || (version !== 0 && version !== 9)) throw new Error("Usage read model schema mismatch; rebuild required.");
+  if ((appId !== 0 && appId !== 0x41555332) || (version !== 0 && version !== 14)) throw new Error("Usage read model schema mismatch; rebuild required.");
   await chmod(databasePath, 0o600).catch(() => undefined);
   db.exec("PRAGMA temp_store = FILE; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA cache_size = -32768; PRAGMA wal_autocheckpoint = 4096;");
   memoryTemp = false;
@@ -237,7 +237,7 @@ async function removeSessionActivities(database: DatabaseSync, sessionId: string
   }
 }
 
-async function query(kind: "activity" | "statistics" | "sessions", input: UsageStatisticsGetInput | SessionListPageInput, scratch?: DatabaseSync, resetAt?: string): Promise<UsageActivitySnapshot | UsageStatisticsSnapshot | SessionListPage | null> {
+async function query(kind: "activity" | "statistics" | "sessions", input: UsageStatisticsGetInput | SessionListPageInput, scratch?: DatabaseSync): Promise<UsageActivitySnapshot | UsageStatisticsSnapshot | SessionListPage | null> {
   const database = scratch ?? await open();
   if (syncing && !scratch) throw new Error("Usage synchronization is not committed.");
   // Large sorts, DISTINCT, and title aggregates may spill to disk. Changing
@@ -250,11 +250,7 @@ async function query(kind: "activity" | "statistics" | "sessions", input: UsageS
   const selected = scope === "session" ? prepare(database, "SELECT session_id,title FROM session_catalog WHERE session_id = ?").get(usageInput.sessionId ?? "") as { session_id: string; title: string | null } | undefined : undefined;
   if (scope === "session" && !selected) return null;
   const range = usageInput.range ?? "month";
-  const rangeSince = range === "total" ? undefined : new Date(Date.now() - (range === "day" ? 1 : range === "week" ? 7 : 31) * 86_400_000).toISOString();
-  // Reset is a read boundary too: unchanged Journal cursors do not replay old
-  // rows when the user advances it. Context has its own unfiltered history.
-  const resetSince = resetAt && Number.isFinite(Date.parse(resetAt)) ? new Date(resetAt).toISOString() : undefined;
-  const since = rangeSince && resetSince ? (rangeSince > resetSince ? rangeSince : resetSince) : rangeSince ?? resetSince;
+  const since = range === "total" ? undefined : new Date(Date.now() - (range === "day" ? 1 : range === "week" ? 7 : 31) * 86_400_000).toISOString();
   const where: string[] = []; const args: (string | number)[] = [];
   if (scope === "session") { where.push("a.session_id = ?"); args.push(usageInput.sessionId ?? ""); }
   if (since) { where.push("a.started_at >= ?"); args.push(since); }
@@ -292,7 +288,7 @@ function sessionPage(database: DatabaseSync, input: SessionListPageInput): Sessi
     if (input.search.length > 300) throw new Error("Usage search exceeds 300 characters.");
     const term = toFtsQuery(input.search);
     const limit = boundedInteger(input.limit, 50, 500);
-    const conditions = ["archived=0", "(session_id IN (SELECT session_id FROM session_search WHERE session_search MATCH ?) OR session_id IN (SELECT session_id FROM session_excerpt_search WHERE session_excerpt_search MATCH ?))"];
+    const conditions = ["archived=0", "is_child_session=0", "(session_id IN (SELECT session_id FROM session_search WHERE session_search MATCH ?) OR session_id IN (SELECT session_id FROM session_excerpt_search WHERE session_excerpt_search MATCH ?))"];
     const args: (string | number)[] = [term, term];
     if (input.workspaceRoot !== undefined) { conditions.push("COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,'')=?"); args.push(input.workspaceRoot); }
     if (input.pinned !== undefined) { conditions.push("pinned=?"); args.push(Number(input.pinned)); }
@@ -305,7 +301,8 @@ function sessionPage(database: DatabaseSync, input: SessionListPageInput): Sessi
     return { items: rows.slice(0, limit).map(toSessionListItem), groups: [], indexing: false, failed: 0, ...(rows.length > limit ? { nextCursor: String(rows[limit - 1]!.session_id) } : {}) };
   }
   const groupRoot = "COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,'')";
-  const conditions = ["archived=0"];
+  // 子 Agent 的会话只在父会话的「Agent」面板里看，不进侧栏列表。
+  const conditions = ["archived=0", "is_child_session=0"];
   const args: (string | number)[] = [];
   if (input.workspaceRoot !== undefined) { conditions.push(`${groupRoot}=?`); args.push(input.workspaceRoot); }
   if (input.pinned !== undefined) { conditions.push("pinned=?"); args.push(input.pinned ? 1 : 0); }
@@ -328,7 +325,7 @@ function sessionPage(database: DatabaseSync, input: SessionListPageInput): Sessi
       pageArgs.push(after.updated_at, after.updated_at, after.session_id);
     }
     // Only this group's visible page crosses from SQLite into JavaScript.
-    const rows = boundedRows(prepare(database, `SELECT * FROM session_catalog WHERE archived=0 AND ${groupRoot}=? AND pinned=?${cursorWhere} ORDER BY updated_at DESC,session_id ASC LIMIT ?`).iterate(...pageArgs, limit + 1), pageBudget) as Record<string, string | number | null>[];
+    const rows = boundedRows(prepare(database, `SELECT * FROM session_catalog WHERE archived=0 AND is_child_session=0 AND ${groupRoot}=? AND pinned=?${cursorWhere} ORDER BY updated_at DESC,session_id ASC LIMIT ?`).iterate(...pageArgs, limit + 1), pageBudget) as Record<string, string | number | null>[];
     items.push(...rows.slice(0, limit).map(toSessionListItem));
     groups.push({ workspaceRoot: group.group_root, pinned: group.pinned === 1, hasMore: rows.length > limit });
   }
@@ -342,8 +339,13 @@ function toSessionListItem(row: Record<string, string | number | null>) {
 }
 
 function activitySql(database: DatabaseSync, input: UsageStatisticsGetInput, scope: "session" | "global", range: UsageStatisticsGetInput["range"], title: string, rangeWhere: string, rangeArgs: (string | number)[], filterWhere: string, filterArgs: (string | number)[], rangeCount: number, selected?: { session_id: string; title: string | null }, metricSource?: string, rangeMetricSource?: string): UsageActivitySnapshot {
-  const summaryRow = prepare(database, metricSql(`SELECT COUNT(*) AS activity_count, SUM(CASE WHEN a.kind='llm_request' THEN 1 ELSE 0 END) AS request_count, SUM(CASE WHEN a.kind='tool_invocation' THEN 1 ELSE 0 END) AS tool_count, SUM(CASE WHEN a.status='success' THEN 1 ELSE 0 END) AS success_count, SUM(CASE WHEN a.status='error' THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN a.status='aborted' THEN 1 ELSE 0 END) AS aborted_count, SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END) AS running_count, SUM(CASE WHEN a.status='unknown' THEN 1 ELSE 0 END) AS unknown_count, COALESCE(SUM(a.input_tokens),0) AS input_tokens, COALESCE(SUM(a.output_tokens),0) AS output_tokens, COALESCE(SUM(a.cache_read_tokens),0) AS cache_read_tokens, COALESCE(SUM(a.cache_write_tokens),0) AS cache_write_tokens, COALESCE(SUM(a.reasoning_tokens),0) AS reasoning_tokens, COALESCE(SUM(a.total_tokens),0) AS total_tokens, SUM(a.cost_usd) AS cost_usd, SUM(CASE WHEN a.kind='llm_request' AND a.cost_amount IS NULL THEN 1 ELSE 0 END) AS cost_unavailable_count FROM usage_activity a ${filterWhere}`, metricSource)).get(...filterArgs) as Record<string, number | null>;
-  const summary: UsageActivitySummary = { activityCount: Number(summaryRow.activity_count ?? 0), requestCount: Number(summaryRow.request_count ?? 0), toolCount: Number(summaryRow.tool_count ?? 0), successCount: Number(summaryRow.success_count ?? 0), errorCount: Number(summaryRow.error_count ?? 0), abortedCount: Number(summaryRow.aborted_count ?? 0), runningCount: Number(summaryRow.running_count ?? 0), unknownCount: Number(summaryRow.unknown_count ?? 0), inputTokens: Number(summaryRow.input_tokens ?? 0), outputTokens: Number(summaryRow.output_tokens ?? 0), cacheReadTokens: Number(summaryRow.cache_read_tokens ?? 0), cacheWriteTokens: Number(summaryRow.cache_write_tokens ?? 0), reasoningTokens: Number(summaryRow.reasoning_tokens ?? 0), totalTokens: Number(summaryRow.total_tokens ?? 0), costUsd: summaryRow.cost_usd == null ? null : Number(summaryRow.cost_usd), costUnavailableCount: Number(summaryRow.cost_unavailable_count ?? 0) };
+  const summaryRow = prepare(database, metricSql(`SELECT COUNT(*) AS activity_count, SUM(CASE WHEN a.kind='llm_request' THEN 1 ELSE 0 END) AS request_count, SUM(CASE WHEN a.kind='tool_invocation' THEN 1 ELSE 0 END) AS tool_count, SUM(CASE WHEN a.status='success' THEN 1 ELSE 0 END) AS success_count, SUM(CASE WHEN a.status='error' THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN a.status='aborted' THEN 1 ELSE 0 END) AS aborted_count, SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END) AS running_count, SUM(CASE WHEN a.status='unknown' THEN 1 ELSE 0 END) AS unknown_count, COALESCE(SUM(a.input_tokens),0) AS input_tokens, COALESCE(SUM(a.output_tokens),0) AS output_tokens, COALESCE(SUM(a.cache_read_tokens),0) AS cache_read_tokens, COALESCE(SUM(a.cache_write_tokens),0) AS cache_write_tokens, COALESCE(SUM(a.reasoning_tokens),0) AS reasoning_tokens, COALESCE(SUM(a.total_tokens),0) AS total_tokens, SUM(CASE WHEN a.kind='llm_request' AND a.input_tokens IS NULL THEN 1 ELSE 0 END) AS input_tokens_unknown, SUM(CASE WHEN a.kind='llm_request' AND a.output_tokens IS NULL THEN 1 ELSE 0 END) AS output_tokens_unknown, SUM(CASE WHEN a.kind='llm_request' AND a.cache_read_tokens IS NULL THEN 1 ELSE 0 END) AS cache_read_tokens_unknown, SUM(CASE WHEN a.kind='llm_request' AND a.cache_write_tokens IS NULL THEN 1 ELSE 0 END) AS cache_write_tokens_unknown, SUM(CASE WHEN a.kind='llm_request' AND a.reasoning_tokens IS NULL THEN 1 ELSE 0 END) AS reasoning_tokens_unknown, SUM(CASE WHEN a.kind='llm_request' AND a.total_tokens IS NULL THEN 1 ELSE 0 END) AS total_tokens_unknown, SUM(a.cost_usd) AS cost_usd, SUM(CASE WHEN a.kind='llm_request' AND a.cost_amount IS NULL THEN 1 ELSE 0 END) AS cost_unavailable_count FROM usage_activity a ${filterWhere}`, metricSource)).get(...filterArgs) as Record<string, number | null>;
+  const summary: UsageActivitySummary = {
+    activityCount: Number(summaryRow.activity_count ?? 0), requestCount: Number(summaryRow.request_count ?? 0), toolCount: Number(summaryRow.tool_count ?? 0), successCount: Number(summaryRow.success_count ?? 0), errorCount: Number(summaryRow.error_count ?? 0), abortedCount: Number(summaryRow.aborted_count ?? 0), runningCount: Number(summaryRow.running_count ?? 0), unknownCount: Number(summaryRow.unknown_count ?? 0),
+    inputTokens: Number(summaryRow.input_tokens ?? 0), outputTokens: Number(summaryRow.output_tokens ?? 0), cacheReadTokens: Number(summaryRow.cache_read_tokens ?? 0), cacheWriteTokens: Number(summaryRow.cache_write_tokens ?? 0), reasoningTokens: Number(summaryRow.reasoning_tokens ?? 0), totalTokens: Number(summaryRow.total_tokens ?? 0),
+    unknownTokenRequestCounts: { input: Number(summaryRow.input_tokens_unknown ?? 0), output: Number(summaryRow.output_tokens_unknown ?? 0), cacheRead: Number(summaryRow.cache_read_tokens_unknown ?? 0), cacheWrite: Number(summaryRow.cache_write_tokens_unknown ?? 0), reasoning: Number(summaryRow.reasoning_tokens_unknown ?? 0), total: Number(summaryRow.total_tokens_unknown ?? 0) },
+    costUsd: summaryRow.cost_usd == null ? null : Number(summaryRow.cost_usd), costUnavailableCount: Number(summaryRow.cost_unavailable_count ?? 0),
+  };
   const pageSize = boundedInteger(input.requestRowsPage?.limit, 10, 500);
   const page = boundedInteger(input.requestRowsPage?.page, 1, 1_000_000);
   const cursor = decodeCursor(input.requestRowsPage?.cursor);
@@ -361,7 +363,7 @@ function activitySql(database: DatabaseSync, input: UsageStatisticsGetInput, sco
 
 function buildStatistics(database: DatabaseSync, input: UsageStatisticsGetInput, scope: "session" | "global", range: UsageStatisticsGetInput["range"], title: string, where: string, args: (string | number)[], rangeCount: number, metricSource?: string, runSource?: string): UsageStatisticsSnapshot {
   const requestWhere = `${where}${where ? " AND" : "WHERE"} a.kind = 'llm_request'`;
-  const stats = prepare(database, metricSql(`SELECT COALESCE(SUM(a.total_tokens),0) AS total_tokens, COALESCE(SUM(a.input_tokens),0) AS prompt_tokens, COALESCE(SUM(a.output_tokens),0) AS completion_tokens, COALESCE(SUM(a.cache_read_tokens),0) AS cache_hit_tokens, COALESCE(SUM(a.cache_write_tokens),0) AS cache_miss_tokens, COALESCE(SUM(a.reasoning_tokens),0) AS reasoning_tokens, COALESCE(SUM(a.cost_usd),0) AS cost_usd, COUNT(*) AS request_count, ${runSource ? '0' : "COUNT(DISTINCT a.session_id || ':' || a.agent_run_id)"} AS conversation_count FROM usage_activity a ${requestWhere}`, metricSource)).get(...args) as Record<string, number | null>;
+  const stats = prepare(database, metricSql(`SELECT COALESCE(SUM(a.total_tokens),0) AS total_tokens, COALESCE(SUM(a.input_tokens),0) AS prompt_tokens, COALESCE(SUM(a.output_tokens),0) AS completion_tokens, COALESCE(SUM(a.cache_read_tokens),0) AS cache_hit_tokens, COALESCE(SUM(a.cache_write_tokens),0) AS cache_miss_tokens, COALESCE(SUM(a.reasoning_tokens),0) AS reasoning_tokens, COALESCE(SUM(a.cost_usd),0) AS cost_usd, COUNT(*) AS request_count, ${runSource ? '0' : `COUNT(DISTINCT CASE WHEN ${countableRunSql("a")} THEN a.session_id || ':' || a.agent_run_id END)`} AS conversation_count FROM usage_activity a ${requestWhere}`, metricSource)).get(...args) as Record<string, number | null>;
   const toolCount = Number((prepare(database, metricSql(`SELECT COUNT(*) AS count FROM usage_activity a ${where ? `${where} AND` : "WHERE"} a.kind='tool_invocation'`, metricSource)).get(...args) as { count: number }).count);
   const totalTokens = Number(stats.total_tokens ?? 0); const cacheHitTokens = Number(stats.cache_hit_tokens ?? 0);
   const modelDistribution = (boundedRows(prepare(database, metricSql(`SELECT COALESCE(a.model,'default') AS name, COALESCE(a.provider_id,'default') AS provider, COALESCE(SUM(a.total_tokens),0) AS total_tokens, COUNT(*) AS call_count, COALESCE(SUM(a.cost_usd),0) AS cost_usd FROM usage_activity a ${requestWhere} GROUP BY COALESCE(a.provider_id,'default'), COALESCE(a.model,'default') ORDER BY total_tokens DESC`, metricSource)).iterate(...args)) as Record<string, string | number | null>[]).map(row => ({ name: String(row.name), provider: String(row.provider), totalTokens: Number(row.total_tokens ?? 0), percent: totalTokens === 0 ? 0 : Number(row.total_tokens ?? 0) / totalTokens * 100, callCount: Number(row.call_count ?? 0), costUsd: Number(row.cost_usd ?? 0) }));
@@ -388,7 +390,7 @@ function toStatisticsRequestRow(row: UsageActivityRow) {
 function buildDailyStatistics(database: DatabaseSync, where: string, args: (string | number)[], metricSource?: string, runSource?: string) {
   if (metricSource === "usage_total_rollups") metricSource = "usage_daily_rollups";
   if (runSource === "usage_run_totals") runSource = "usage_run_days";
-  const rows = boundedRows(prepare(database, metricSql(`SELECT substr(a.started_at,1,10) AS date, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.total_tokens ELSE 0 END),0) AS total_tokens, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.input_tokens ELSE 0 END),0) AS prompt_tokens, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.output_tokens ELSE 0 END),0) AS completion_tokens, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.cache_read_tokens ELSE 0 END),0) AS cache_hit_tokens, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.reasoning_tokens ELSE 0 END),0) AS reasoning_tokens, ${runSource ? '0' : "COUNT(DISTINCT a.session_id || ':' || a.agent_run_id)"} AS conversation_count, SUM(CASE WHEN a.kind='tool_invocation' THEN 1 ELSE 0 END) AS tool_call_count, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.cost_usd ELSE 0 END),0) AS cost_usd FROM usage_activity a ${where} GROUP BY substr(a.started_at,1,10) ORDER BY date`, metricSource)).iterate(...args)) as Record<string, string | number | null>[];
+  const rows = boundedRows(prepare(database, metricSql(`SELECT substr(a.started_at,1,10) AS date, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.total_tokens ELSE 0 END),0) AS total_tokens, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.input_tokens ELSE 0 END),0) AS prompt_tokens, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.output_tokens ELSE 0 END),0) AS completion_tokens, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.cache_read_tokens ELSE 0 END),0) AS cache_hit_tokens, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.reasoning_tokens ELSE 0 END),0) AS reasoning_tokens, ${runSource ? '0' : `COUNT(DISTINCT CASE WHEN ${countableRunSql("a")} THEN a.session_id || ':' || a.agent_run_id END)`} AS conversation_count, SUM(CASE WHEN a.kind='tool_invocation' THEN 1 ELSE 0 END) AS tool_call_count, COALESCE(SUM(CASE WHEN a.kind='llm_request' THEN a.cost_usd ELSE 0 END),0) AS cost_usd FROM usage_activity a ${where} GROUP BY substr(a.started_at,1,10) ORDER BY date`, metricSource)).iterate(...args)) as Record<string, string | number | null>[];
   const models = boundedRows(prepare(database, metricSql(`SELECT substr(a.started_at,1,10) AS date, COALESCE(a.model,'default') AS name, COALESCE(SUM(a.total_tokens),0) AS total_tokens FROM usage_activity a ${where ? `${where} AND` : "WHERE"} a.kind='llm_request' GROUP BY substr(a.started_at,1,10), COALESCE(a.model,'default') ORDER BY date, total_tokens DESC`, metricSource)).iterate(...args)) as Record<string, string | number | null>[];
   if (runSource) {
     const countRows = runSource === "usage_run_days"
@@ -415,8 +417,8 @@ function aggregateSql(database: DatabaseSync, where: string, args: (string | num
     const condition = kind === "tools" ? `${where}${where ? " AND" : " WHERE"} a.kind='tool_invocation'` : `${where}${where ? " AND" : " WHERE"} a.kind='llm_request'`;
     const key = kind === "tools" ? "COALESCE(a.tool_name,'未知工具')" : kind === "models" ? "COALESCE(a.provider_id,'未知服务商') || '/' || COALESCE(a.connection_id,'') || '/' || COALESCE(a.model,'未知模型')" : "COALESCE(a.provider_id,'未知服务商') || '/' || COALESCE(a.connection_id,'')";
     const label = kind === "tools" ? "COALESCE(a.tool_name,'未知工具')" : kind === "models" ? "COALESCE(a.model,'未知模型')" : "COALESCE(a.provider_id,'未知服务商')";
-    const rows = boundedRows(prepare(database, metricSql(`SELECT ${key} AS key, ${label} AS label, MAX(a.provider_id) AS provider_id, MAX(a.connection_id) AS connection_id, COUNT(*) AS count, SUM(CASE WHEN a.status='error' THEN 1 ELSE 0 END) AS error_count, COALESCE(SUM(a.total_tokens),0) AS total_tokens, COALESCE(SUM(a.duration_ms),0) AS duration_ms, COALESCE(SUM(CASE WHEN a.kind='llm_request' AND a.cost_amount IS NOT NULL AND a.cost_currency='USD' THEN a.cost_amount ELSE 0 END),0) AS cost_usd, SUM(CASE WHEN a.kind='llm_request' AND a.cost_amount IS NOT NULL AND a.cost_currency='USD' THEN 1 ELSE 0 END) AS known_cost_count, SUM(CASE WHEN a.kind='llm_request' AND (a.cost_amount IS NULL OR COALESCE(a.cost_currency,'')!='USD') THEN 1 ELSE 0 END) AS unknown_cost_count, SUM(CASE WHEN a.kind='llm_request' AND a.historical_unverified=1 AND a.cost_amount IS NOT NULL AND a.cost_currency='USD' THEN 1 ELSE 0 END) AS unverified_count FROM usage_activity a ${condition} GROUP BY ${key} ORDER BY count DESC, key`, metricSource)).iterate(...args)) as Record<string, string | number | null>[];
-    return rows.map(row => ({ key: String(row.key), label: String(row.label), ...(row.provider_id ? { providerId: String(row.provider_id) } : {}), ...(row.connection_id ? { connectionId: String(row.connection_id) } : {}), count: Number(row.count), errorCount: Number(row.error_count ?? 0), totalTokens: Number(row.total_tokens ?? 0), durationMs: Number(row.duration_ms ?? 0), costSummary: { costUsd: Number(row.cost_usd ?? 0), knownCostRequestCount: Number(row.known_cost_count ?? 0), unknownCostRequestCount: Number(row.unknown_cost_count ?? 0), unverifiedHistoricalRequestCount: Number(row.unverified_count ?? 0) } }));
+    const rows = boundedRows(prepare(database, metricSql(`SELECT ${key} AS key, ${label} AS label, MAX(a.provider_id) AS provider_id, MAX(a.connection_id) AS connection_id, COUNT(*) AS count, SUM(CASE WHEN a.status='error' THEN 1 ELSE 0 END) AS error_count, COALESCE(SUM(a.total_tokens),0) AS total_tokens, SUM(CASE WHEN a.kind='llm_request' AND a.total_tokens IS NULL THEN 1 ELSE 0 END) AS unknown_token_request_count, COALESCE(SUM(a.duration_ms),0) AS duration_ms, COALESCE(SUM(CASE WHEN a.kind='llm_request' AND a.cost_amount IS NOT NULL AND a.cost_currency='USD' THEN a.cost_amount ELSE 0 END),0) AS cost_usd, SUM(CASE WHEN a.kind='llm_request' AND a.cost_amount IS NOT NULL AND a.cost_currency='USD' THEN 1 ELSE 0 END) AS known_cost_count, SUM(CASE WHEN a.kind='llm_request' AND (a.cost_amount IS NULL OR COALESCE(a.cost_currency,'')!='USD') THEN 1 ELSE 0 END) AS unknown_cost_count, SUM(CASE WHEN a.kind='llm_request' AND a.historical_unverified=1 AND a.cost_amount IS NOT NULL AND a.cost_currency='USD' THEN 1 ELSE 0 END) AS unverified_count FROM usage_activity a ${condition} GROUP BY ${key} ORDER BY count DESC, key`, metricSource)).iterate(...args)) as Record<string, string | number | null>[];
+    return rows.map(row => ({ key: String(row.key), label: String(row.label), ...(row.provider_id ? { providerId: String(row.provider_id) } : {}), ...(row.connection_id ? { connectionId: String(row.connection_id) } : {}), count: Number(row.count), errorCount: Number(row.error_count ?? 0), totalTokens: Number(row.total_tokens ?? 0), unknownTokenRequestCount: Number(row.unknown_token_request_count ?? 0), durationMs: Number(row.duration_ms ?? 0), costSummary: { costUsd: Number(row.cost_usd ?? 0), knownCostRequestCount: Number(row.known_cost_count ?? 0), unknownCostRequestCount: Number(row.unknown_cost_count ?? 0), unverifiedHistoricalRequestCount: Number(row.unverified_count ?? 0) } }));
   };
   return { providers: read("providers"), models: read("models"), tools: read("tools") };
 }

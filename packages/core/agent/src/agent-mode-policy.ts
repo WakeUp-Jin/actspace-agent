@@ -3,10 +3,10 @@ import type { RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
 /** Explicit builtin policy; approved evolved tools are supplied separately for Agent mode. */
 export const AGENT_MODE_TOOLS: Readonly<Record<RuntimeV2AgentMode, readonly string[]>> = Object.freeze({
   chat: Object.freeze(["web", "generate_image"]),
-  plan: Object.freeze(["read_file", "list_directory", "grep", "glob", "web_search", "web_fetch", "inspect_image", "explore", "todo_read", "todo_write"]),
+  plan: Object.freeze(["read_file", "list_directory", "grep", "glob", "web_search", "web_fetch", "inspect_image", "explore", "todo_read", "todo_write", "task_list", "task_output", "task_stop", "task_wait"]),
   agent: Object.freeze([
     "read_file", "list_directory", "grep", "glob", "edit_file", "write_file", "delete_file", "present",
-    "bash", "bash_output", "bash_kill", "web_search", "web_fetch", "generate_image", "inspect_image",
+    "bash", "task_list", "task_output", "task_stop", "task_wait", "web_search", "web_fetch", "generate_image", "inspect_image",
     "todo_read", "todo_write", "agent", "explore", "plugin_manager", "harness_inspect",
     "browser_cua", "browser_dom", "browser_locator", "browser_navigation", "browser_tabs",
     "browser_user", "browser_wait", "browser_io", "browser_debug", "browser_help", "browser_run",

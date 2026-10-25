@@ -54,10 +54,11 @@ export function WorkspaceOperationBar({
   workspaceRoot?: string;
 }) {
   const { isFileTreeCollapsed, toggleFileTreeCollapsed, isSourceShown, setSourceShown } = useRightPanel();
-  const reloadFile = useReloadFileTab(workspaceRoot);
-  const path = relativePathOf(activeTab);
-  const rootLabel = workspaceLabelOf(workspaceRoot);
   const meta = activeTab as WorkspaceFileMeta | null;
+  const boundRoot = meta?.workspaceRoot ?? workspaceRoot;
+  const reloadFile = useReloadFileTab(boundRoot);
+  const path = relativePathOf(activeTab);
+  const rootLabel = workspaceLabelOf(boundRoot);
   const isStale = Boolean(meta?.isStale);
   const isTruncated = Boolean(meta?.truncated);
   // 只有「渲染态之外还有源码可看」的文件类型才给切换按钮：markdown 与 html。
@@ -68,7 +69,7 @@ export function WorkspaceOperationBar({
 
   const reload = () => {
     if (!path || !activeTab) return;
-    void reloadFile(path, activeTab.kind === "context" ? path : (activeTab as { title: string }).title);
+    void reloadFile(path, activeTab.kind === "context" ? path : (activeTab as { title: string }).title, meta?.workspaceRoot !== undefined || meta?.hostId ? meta : undefined);
   };
 
   return (
@@ -78,7 +79,7 @@ export function WorkspaceOperationBar({
           <span className={WORKSPACE_BAR_CRUMBS_CLASS}>
             {rootLabel ? (
               <>
-                <span className={WORKSPACE_BAR_ROOT_CLASS} title={workspaceRoot}>
+                <span className={WORKSPACE_BAR_ROOT_CLASS} title={boundRoot}>
                   {rootLabel}
                 </span>
                 <ChevronRight size={12} strokeWidth={1.8} className="shrink-0 text-text-faint" aria-hidden="true" />
@@ -97,7 +98,7 @@ export function WorkspaceOperationBar({
             onChange={(next) => setSourceShown(dualViewTab.id, next === "source")}
           />
         ) : null}
-        {path ? <OpenInAppMenu workspaceRoot={workspaceRoot} relativePath={path} /> : null}
+        {path && !meta?.hostId ? <OpenInAppMenu workspaceRoot={boundRoot} relativePath={path} /> : null}
         <Tooltip>
           <TooltipTrigger asChild>
             <button

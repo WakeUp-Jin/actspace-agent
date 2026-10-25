@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createCoreCodecRegistry, createSessionHeader, validateSessionEvents } from "@actspace/session-journal";
 import { SessionHandle, SessionStore } from "@actspace/session-persistence";
 import { TaskLedger } from "../task-ledger.js";
-import { taskCodecs, TASK_EVENT } from "../task-events.js";
+import { taskCodecs, TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT, eventCandidate } from "../task-events.js";
+import { projectTasks } from "../task-projection.js";
 
 const resources: Array<() => Promise<unknown>> = [];
 afterEach(async () => { for (const dispose of resources.splice(0).reverse()) await dispose(); });
@@ -108,6 +109,44 @@ describe("durable content queue", () => {
     expect(ledger.snapshot().runs[1].harness.revision).toBe(2);
   });
 
+  it("returns withdrawn steering to the ordinary queue front without replacing its identity", async () => {
+    const { ledger } = await fixture();
+    const initial = await ledger.submit("initial", "initial");
+    await ledger.start(initial.task.taskId, "run", harness, {});
+    const first = await ledger.submit("first", "FIRST");
+    const second = await ledger.submit("second", "SECOND");
+    const third = await ledger.submit("third", "THIRD");
+    await ledger.designate(second.task.taskId, "run", ledger.snapshot().revision);
+    await ledger.designate(second.task.taskId, null, ledger.snapshot().revision);
+    expect(ledger.snapshot().queue).toEqual([second.task.taskId, first.task.taskId, third.task.taskId]);
+    expect((await ledger.submit("second", "SECOND")).task.taskId).toBe(second.task.taskId);
+    expect(await ledger.claimSupplement("run")).toEqual([]);
+    await ledger.finish("run", "completed");
+    const consumed: unknown[] = [];
+    for (const task of [second, first, third]) {
+      consumed.push((await ledger.start(task.task.taskId, `run-${task.task.submissionId}`, harness, {})).content);
+      await ledger.finish(`run-${task.task.submissionId}`, "completed");
+    }
+    expect(consumed).toEqual(["SECOND", "FIRST", "THIRD"]);
+    expect(ledger.snapshot().queue).toEqual([]);
+  });
+
+  it.each(["completed", "failed", "cancelled", "interrupted"] as const)("returns unread steering together in queue order on %s", async outcome => {
+    const { ledger } = await fixture();
+    const initial = await ledger.submit("initial", "initial");
+    await ledger.start(initial.task.taskId, "run", harness, {});
+    const receipts = [];
+    for (const id of ["first", "second", "third", "fourth"]) receipts.push(await ledger.submit(id, id));
+    const ids = receipts.map(receipt => receipt.task.taskId);
+    // Designation order is deliberately different from the durable queue order.
+    await ledger.designate(ids[3]!, "run", ledger.snapshot().revision);
+    await ledger.designate(ids[1]!, "run", ledger.snapshot().revision);
+    await ledger.finish("run", outcome);
+    expect(ledger.snapshot().queue).toEqual([ids[1], ids[3], ids[0], ids[2]]);
+    expect(ledger.snapshot().paused).toBe(outcome !== "completed");
+    expect(ledger.snapshot().tasks.filter(task => task.state === "pending").every(task => task.targetRunId === null)).toBe(true);
+  });
+
   it("serializes claim against withdrawal and never requeues consumed input", async () => {
     const { ledger } = await fixture();
     const a = await ledger.submit("a", "a"); const b = await ledger.submit("b", "b");
@@ -125,6 +164,73 @@ describe("durable content queue", () => {
     const continuation = await ledger.submit("continue", "please continue", a.task.taskId);
     expect(continuation.task.taskId).not.toBe(a.task.taskId);
     expect(ledger.snapshot().paused).toBe(true);
+  });
+
+  it("durably returns unread steering before recovery, pauses it and preserves the order on reopen", async () => {
+    const { ledger, session, store } = await fixture();
+    const initial = await ledger.submit("initial", "initial");
+    await ledger.start(initial.task.taskId, "run", harness, {});
+    const first = await ledger.submit("first", "FIRST");
+    const second = await ledger.submit("second", "SECOND");
+    const third = await ledger.submit("third", "THIRD");
+    await ledger.designate(third.task.taskId, "run", ledger.snapshot().revision);
+    await ledger.designate(second.task.taskId, "run", ledger.snapshot().revision);
+    await session.close();
+    const reopened = await store.open("tasks"); resources.push(() => reopened.close());
+    const recovered = await TaskLedger.open(reopened);
+    expect(recovered.snapshot().queue).toEqual([second.task.taskId, third.task.taskId, first.task.taskId]);
+    expect(recovered.snapshot().paused).toBe(true);
+    expect(recovered.snapshot().runs[0].state).toBe("interrupted");
+    await expect(recovered.start(second.task.taskId, "too-early", harness, {})).rejects.toMatchObject({ code: "QUEUE_PAUSED" });
+    await recovered.setPaused(false, recovered.snapshot().revision);
+    await recovered.start(second.task.taskId, "next", harness, {});
+    expect(recovered.snapshot().tasks.find(task => task.taskId === second.task.taskId)?.state).toBe("claimed");
+    expect(reopened.journal.events.filter(event => event.type === QUEUE_RETURN_EVENT)).toHaveLength(1);
+  });
+
+  it.each(["withdraw", "finish", "recover"] as const)("keeps legacy %s ordering and makes new returns browse-only for old readers", async operation => {
+    const { ledger, session } = await fixture();
+    const initial = await ledger.submit("initial", "initial");
+    await ledger.start(initial.task.taskId, "run", harness, {});
+    const first = await ledger.submit("first", "FIRST");
+    const second = await ledger.submit("second", "SECOND");
+    await ledger.designate(second.task.taskId, "run", ledger.snapshot().revision);
+    const legacy = operation === "withdraw"
+      ? eventCandidate(TASK_EVENT, { op: "designate", sessionId: "tasks", taskId: second.task.taskId, runId: null })
+      : operation === "finish"
+        ? eventCandidate(RUN_EVENT, { op: "finish", sessionId: "tasks", runId: "run", outcome: "completed", result: null })
+        : eventCandidate(QUEUE_EVENT, { op: "recover", sessionId: "tasks" });
+    const last = session.journal.events.at(-1)!;
+    const events = [...session.journal.events, { ...last, ...legacy, seq: last.seq + 1 }];
+    expect(projectTasks("tasks", events).queue).toEqual([first.task.taskId, second.task.taskId]);
+    await ledger.designate(second.task.taskId, null, ledger.snapshot().revision);
+    const oldReader = createCoreCodecRegistry();
+    taskCodecs.filter(codec => codec.type !== QUEUE_RETURN_EVENT).forEach(codec => oldReader.register(codec));
+    expect(validateSessionEvents(session.journal.events, oldReader).accessState).toBe("browse-only");
+  });
+
+  it("rejects forged return facts for consumed tasks, other runs, duplicate IDs and reversed order", async () => {
+    const { ledger, session } = await fixture();
+    const initial = await ledger.submit("initial", "initial");
+    await ledger.start(initial.task.taskId, "run", harness, {});
+    const first = await ledger.submit("first", "FIRST");
+    const second = await ledger.submit("second", "SECOND");
+    await ledger.designate(first.task.taskId, "run", ledger.snapshot().revision);
+    await ledger.designate(second.task.taskId, "run", ledger.snapshot().revision);
+    const base = { op: "return-steering" as const, sessionId: "tasks", runId: "run", placement: "front" as const };
+    for (const taskIds of [[], [first.task.taskId, first.task.taskId]]) {
+      expect(() => eventCandidate(QUEUE_RETURN_EVENT, { ...base, taskIds })).toThrow();
+    }
+    for (const data of [
+      { ...base, taskIds: [initial.task.taskId] },
+      { ...base, runId: "other", taskIds: [first.task.taskId] },
+      { ...base, taskIds: [second.task.taskId, first.task.taskId] },
+    ]) {
+      const candidate = eventCandidate(QUEUE_RETURN_EVENT, data);
+      const last = session.journal.events.at(-1)!;
+      expect(() => projectTasks("tasks", [...session.journal.events, { ...last, ...candidate, seq: last.seq + 1 }])).toThrow();
+    }
+    expect(ledger.snapshot().queue).toEqual([first.task.taskId, second.task.taskId]);
   });
 
   it("persists ordering, rejects stale edits and leaves new submissions paused", async () => {
@@ -169,9 +275,16 @@ it("keeps a failed terminal flush uncommitted and blocks the following Run", asy
   const ledger = await TaskLedger.open(session);
   const task = await ledger.submit("one", "one");
   await ledger.start(task.task.taskId, "run", harness, {});
+  const first = await ledger.submit("first", "first");
+  const steering = await ledger.submit("steering", "steering");
+  await ledger.designate(steering.task.taskId, "run", ledger.snapshot().revision);
+  const before = ledger.snapshot();
   fail = true;
   await expect(ledger.finish("run", "completed")).rejects.toMatchObject({ code: "DURABILITY_BLOCKED" });
   expect(ledger.snapshot().runs[0].state).toBe("running");
+  expect(ledger.snapshot().queue).toEqual([first.task.taskId, steering.task.taskId]);
+  expect(ledger.snapshot()).toEqual(before);
+  expect(ledger.snapshot().tasks.find(item => item.taskId === steering.task.taskId)?.targetRunId).toBe("run");
   await expect(ledger.submit("two", "two")).rejects.toMatchObject({ code: "DURABILITY_BLOCKED" });
   fail = false; await session.close();
 });

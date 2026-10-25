@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceListDirInput, WorkspaceListDirResult, WorkspaceReadFileResult } from "@actspace/shared";
@@ -38,6 +38,25 @@ function installBridge(overrides: {
 }
 
 describe("WorkspaceFileTree", () => {
+  it("discards an old root's pending file read and loads the new root's own directory", async () => {
+    let finishRead!: (result: WorkspaceReadFileResult) => void;
+    const pending = new Promise<WorkspaceReadFileResult>((resolve) => { finishRead = resolve; });
+    const listWorkspaceDir = vi.fn(async (input: WorkspaceListDirInput): Promise<WorkspaceListDirResult> => ({
+      root: input.workspaceRoot!, relativePath: "",
+      entries: [{ name: input.workspaceRoot === "/a" ? "old.txt" : "new.txt", relativePath: "same.txt", kind: "file" }],
+    }));
+    installBridge({ listWorkspaceDir, readWorkspaceFile: () => pending });
+    const view = (root: string) => <RightPanelProvider><WorkspaceFileTree workspaceRoot={root} /><ActiveTabProbe /></RightPanelProvider>;
+    const rendered = render(view("/a"));
+    await userEvent.click(await screen.findByText("old.txt"));
+    rendered.rerender(view("/b"));
+    expect(await screen.findByText("new.txt")).toBeInTheDocument();
+    expect(screen.queryByText("old.txt")).not.toBeInTheDocument();
+    await act(async () => { finishRead({ relativePath: "same.txt", renderKind: "text", size: 1, mtimeMs: 1, content: "old" }); });
+    expect(screen.getByTestId("active-tab")).toHaveTextContent("none");
+    expect(listWorkspaceDir).toHaveBeenCalledWith({ workspaceRoot: "/b", relativePath: "" });
+  });
+
   it("lists root entries and lazily loads a directory's children on expand", async () => {
     const listWorkspaceDir = vi.fn(async (input: WorkspaceListDirInput): Promise<WorkspaceListDirResult> => {
       if (!input.relativePath) {
