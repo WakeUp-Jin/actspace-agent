@@ -25,7 +25,7 @@ it("runs large Bash output through storage, the next request, and paginated read
     createArtifact: (input) => store.create({ ...input, owner: { sessionId, callId: "read-1", pluginId: "core", name: "bash" } }),
   };
   try {
-    const body = await ports.bash!({ command: "for ((i=1;i<=3000;i++)); do printf 'line-%s needle\\n' \"$i\"; done", intent: "output regression", blockMs: 1000, requiredPermissions: ["no_sandbox"] }, context);
+    const body = await ports.bash!({ command: "for ((i=1;i<=3000;i++)); do printf 'line-%s needle\\n' \"$i\"; done", intent: "output regression", blockMs: 1000, sandbox_permissions: "require_escalated", justification: "Output regression." }, context);
     expect(body.status).toBe("completed");
     expect(body.artifacts?.[0].mediaType).toBe("text/plain");
     const requests: (readonly LlmMessage[])[] = [];

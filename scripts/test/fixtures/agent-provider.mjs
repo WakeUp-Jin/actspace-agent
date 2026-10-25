@@ -51,9 +51,9 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
       let finish = "stop";
       const tool = (name, args) => { delta = { role: "assistant", tool_calls: [{ index: 0, id: `fixture-${entry.id}`, type: "function", function: { name, arguments: JSON.stringify(args) } }] }; finish = "tool_calls"; };
       if (toolCommand && body.tools?.length && toolResults.length === 0)
-        tool("bash", { command: toolCommand, intent: "Owned process cleanup fixture", blockMs: toolBlockMs, requiredPermissions: ["no_sandbox"] });
+        tool("bash", { command: toolCommand, intent: "Owned process cleanup fixture", blockMs: toolBlockMs, sandbox_permissions: "require_escalated", justification: "Fixture runs outside the sandbox." });
       if (body.tools?.length && content.includes("FIXTURE_TOOL") && toolResults.length < 2)
-        tool(toolResults.length ? "write_file" : "bash", toolResults.length ? { path: "result.txt", content: "Fixture result.\n" } : { command: "pwd", intent: "隔离验收审批", requiredPermissions: ["no_sandbox"] });
+        tool(toolResults.length ? "write_file" : "bash", toolResults.length ? { path: "result.txt", content: "Fixture result.\n" } : { command: "pwd", intent: "隔离验收审批", sandbox_permissions: "require_escalated", justification: "Fixture runs outside the sandbox." });
       if (body.tools?.length && content.includes("FIXTURE_LONG") && toolResults.length < 12)
         tool("write_file", { path: "history-result.txt", content: `History step ${toolResults.length}` });
       if (body.tools?.length && content.includes("FIXTURE_BASH_PAIR") && toolResults.length < 2)

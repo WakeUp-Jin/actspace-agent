@@ -52,8 +52,8 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts, sandbox?: 
 }
 
 /**
- * `noSandbox` on the process resource is what the user approves: the explicit `no_sandbox` request, or a sandbox that
- * is missing or cannot serve the tool template. Execution follows the admitted value, never a later status.
+ * `noSandbox` on the process resource is what the user approves: `full-access`, an escalation request, or a sandbox that
+ * is missing or cannot serve the tool template. Execution follows the admitted value, never a later mode or status.
  */
 function permissionContract(name: ToolName, sandbox: SandboxService | undefined): ToolPermissionContract {
   if (name !== "bash") return { extractResources: () => [], evaluate: () => ({ kind: "allow" as const }) };
@@ -63,7 +63,7 @@ function permissionContract(name: ToolName, sandbox: SandboxService | undefined)
       const command = typeof args.command === "string" ? args.command : "";
       const workspaceRoot = await realpath(context.workspaceRoot);
       const cwd = await realpath(resolve(context.workspaceRoot, typeof args.cwd === "string" ? args.cwd : "."));
-      const noSandbox = (Array.isArray(args.requiredPermissions) && args.requiredPermissions.includes("no_sandbox")) || !(await sandbox?.status("tool"))?.available;
+      const noSandbox = context.mode === "full-access" || escalation(args) === "requested" || !(await sandbox?.status("tool"))?.available;
       let analysis = !noSandbox && isPathWithin(workspaceRoot, cwd) ? analyzeCommandPrefixGrant(command) : undefined;
       if (analysis && !await queryPathsWithinWorkspace(analysis, cwd, workspaceRoot)) analysis = undefined;
       return [{ kind: "process" as const, access: "execute" as const, commandDigest: createHash("sha256").update(command).digest("hex"), cwd, workspaceRoot, noSandbox, dynamic: false, ...(analysis ? { argv: analysis.argv, grantPrefix: analysis.prefix } : {}) }];
@@ -73,7 +73,10 @@ function permissionContract(name: ToolName, sandbox: SandboxService | undefined)
       const cwd = typeof args.cwd === "string" ? resolve(context.workspaceRoot, args.cwd) : context.workspaceRoot;
       const reason = getBashHardRejectReason(command, cwd, context.workspaceRoot);
       if (reason) return { kind: "deny" as const, code: "BASH_COMMAND_DENIED", reason };
+      const escalated = escalation(args);
+      if (escalated === "invalid") return { kind: "deny" as const, code: "BASH_ESCALATION_INVALID", reason: "sandbox_permissions and justification must be given together." };
       if (context.mode === "full-access") return { kind: "allow" as const };
+      if (escalated === "requested") return { kind: "ask" as const, reason: args.justification as string, risk: "high" as const, reusable: false };
       return { kind: "ask" as const, reason: "Allow Bash to run this command once?", risk: "high" as const, reusable: resources.some(resource => resource.kind === "process" && resource.grantPrefix !== undefined) };
     },
     suggestGrants: (_args, resources) => resources.flatMap(resource => resource.kind === "process" && resource.grantPrefix && resource.workspaceRoot && resource.noSandbox === false ? [{
@@ -84,10 +87,16 @@ function permissionContract(name: ToolName, sandbox: SandboxService | undefined)
   };
   return Object.freeze(contract);
 }
+/** The schema checks each field; asking without saying why, or saying why without asking, is a malformed call in every mode. */
+function escalation(args: Readonly<Record<string, RuntimeV2JsonValue>>): "none" | "requested" | "invalid" {
+  const requested = args.sandbox_permissions === "require_escalated";
+  const justified = typeof args.justification === "string" && args.justification.trim() !== "";
+  return requested && justified ? "requested" : requested || "justification" in args ? "invalid" : "none";
+}
 type DefinitionEntry = { readonly localName: ToolName; readonly definition: ToolDefinition };
 const SHELL = ["process"] as const;
 export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
-  definition("bash", "Run one non-interactive command in the workspace. Large output returns a bounded head plus a full output file reference. Read the resolved output path with read_file offset/limit or grep; do not rerun the command with head to recover output. Use dedicated file and search tools instead of shell equivalents.", SHELL, "exclusive", objectSchema({ command: stringSchema("Shell command."), cwd: stringSchema("Working directory."), blockMs: { type: "integer", minimum: 0, maximum: 600_000, default: 30_000 }, intent: { type: "string", minLength: 1, maxLength: 120 }, notifyOnOutput: { type: "object", properties: { pattern: stringSchema("Regular expression matched against output lines."), reason: { type: "string", minLength: 1, maxLength: 80 }, debounceMs: { type: "integer", minimum: 5_000, default: 5_000 } }, required: ["pattern", "reason"], additionalProperties: false }, requiredPermissions: { type: "array", items: { type: "string", enum: ["no_sandbox"] }, maxItems: 1 } }, ["command", "intent"]), ["/command"]),
+  definition("bash", "Run one non-interactive command in the workspace. Large output returns a bounded head plus a full output file reference. Read the resolved output path with read_file offset/limit or grep; do not rerun the command with head to recover output. Use dedicated file and search tools instead of shell equivalents. Unless the session is in full-access, the command runs in a sandbox: the workspace, the output directory and the temp directory are writable; writes outside the workspace or to .git/hooks and .git/config are blocked, and so is the keychain (git push over HTTPS, gh); credential directories are not readable; the network is open.", SHELL, "exclusive", objectSchema({ command: stringSchema("Shell command."), cwd: stringSchema("Working directory."), blockMs: { type: "integer", minimum: 0, maximum: 600_000, default: 30_000 }, intent: { type: "string", minLength: 1, maxLength: 120 }, notifyOnOutput: { type: "object", properties: { pattern: stringSchema("Regular expression matched against output lines."), reason: { type: "string", minLength: 1, maxLength: 80 }, debounceMs: { type: "integer", minimum: 5_000, default: 5_000 } }, required: ["pattern", "reason"], additionalProperties: false }, sandbox_permissions: { type: "string", enum: ["require_escalated"], description: "Run this command outside the sandbox. Requires justification and asks the user to approve this one run. Request it only after the sandbox blocked the command, or when the command clearly must write outside the workspace or use the keychain (git push over HTTPS, gh; in the sandbox gh misreports its token as invalid). Do not request it up front." }, justification: { type: "string", minLength: 1, maxLength: 200, description: "One sentence shown to the user on the approval card: why this command must run outside the sandbox. Only with sandbox_permissions." } }, ["command", "intent"]), ["/command"]),
 ]);
 function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
   return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: SHELL_TOOLS_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });

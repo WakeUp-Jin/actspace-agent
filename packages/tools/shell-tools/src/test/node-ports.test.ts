@@ -133,15 +133,15 @@ describe("shell-tools ports", () => {
     } finally { await rm(outside, { force: true }); await ports.dispose(); }
   }, 30_000);
 
-  it("follows the admitted resource over the arguments and falls back to an explicit no_sandbox request", async () => {
+  it("follows the admitted resource over the arguments and falls back to an explicit escalation request", async () => {
     const root = await workspace(); const tmpRoot = await workspace();
     const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
     try {
-      const smuggled = await ports.bash!({ command: "printf hi", requiredPermissions: ["no_sandbox"], blockMs: 2_000 }, context("session", undefined, "", false));
+      const smuggled = await ports.bash!({ command: "printf hi", sandbox_permissions: "require_escalated", justification: "x", blockMs: 2_000 }, context("session", undefined, "", false));
       expect(smuggled.failure?.code).toBe("SANDBOX_PREPARE_FAILED");
       const { admittedResources: _, ...direct } = context();
       expect((await ports.bash!({ command: "printf hi", blockMs: 2_000 }, direct)).failure?.code).toBe("SANDBOX_PREPARE_FAILED");
-      expect(await ports.bash!({ command: "printf hi", requiredPermissions: ["no_sandbox"], blockMs: 2_000 }, direct)).toMatchObject({ status: "completed" });
+      expect(await ports.bash!({ command: "printf hi", sandbox_permissions: "require_escalated", justification: "x", blockMs: 2_000 }, direct)).toMatchObject({ status: "completed" });
     } finally { await ports.dispose(); }
   });
 

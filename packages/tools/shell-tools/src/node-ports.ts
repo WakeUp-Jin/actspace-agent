@@ -66,7 +66,7 @@ async function executeBash(
   if (registry.running(context.sessionId) >= MAX_BACKGROUND_PER_SESSION) return failed("BASH_TASK_LIMIT", `Background task limit reached (${MAX_BACKGROUND_PER_SESSION}).`, false);
 
   const noSandbox = admittedNoSandbox(args, context);
-  if (!noSandbox && !options.sandbox) return failed("SANDBOX_PREPARE_FAILED", "Bash needs the sandbox, but the sandbox plugin is not loaded. The command did not run; request no_sandbox to run it outside the sandbox after approval.", false);
+  if (!noSandbox && !options.sandbox) return failed("SANDBOX_PREPARE_FAILED", "Bash needs the sandbox, but the sandbox plugin is not loaded. The command did not run; retry with sandbox_permissions: require_escalated and a justification to run it outside the sandbox after approval.", false);
 
   const outputRoot = registry.outputRoot;
   await mkdir(outputRoot, { recursive: true, mode: 0o700 });
@@ -202,7 +202,7 @@ async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceR
 /** The admitted process resource is what the user approved; direct callers without one only get an explicit request. */
 function admittedNoSandbox(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext): boolean {
   const resource = context.admittedResources?.find((item) => item.kind === "process");
-  return resource?.kind === "process" ? resource.noSandbox === true : arrayStrings(args.requiredPermissions).includes("no_sandbox");
+  return resource?.kind === "process" ? resource.noSandbox === true : args.sandbox_permissions === "require_escalated";
 }
 
 type BashTask = {
@@ -381,7 +381,6 @@ function backgroundBoundary(blockMs: number): { readonly promise: Promise<false>
 function within(root: string, candidate: string): boolean { const nested = relative(resolve(root), resolve(candidate)); return nested === "" || (!nested.startsWith("..") && !isAbsolute(nested)); }
 function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, name: string): string { return typeof args[name] === "string" ? args[name] : ""; }
 function clampInteger(value: RuntimeV2JsonValue | undefined, fallback: number, min: number, max: number): number { return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.trunc(value))) : fallback; }
-function arrayStrings(value: RuntimeV2JsonValue | undefined): readonly string[] { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
 function dataImage(output: string): { readonly mediaType: string; readonly data: string } | undefined { const match = output.trim().match(/^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i); return match?.[1] && match[2] ? { mediaType: match[1].toLowerCase(), data: match[2].replace(/\s/g, "") } : undefined; }
 function completed(text: string, summary: string): ToolBodyResult { return { status: "completed", summary, modelOutput: [{ type: "text", text }] }; }
 function failed(code: string, message: string, retryable: boolean): ToolBodyResult { return { status: "failed", summary: message, modelOutput: [{ type: "text", text: message }], failure: { code, message, retryable } }; }

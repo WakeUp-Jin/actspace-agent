@@ -49,6 +49,21 @@
   - `pnpm --filter @actspace/tools-runtime test` 48 通过，`@actspace/sandbox` 30 通过，`@actspace/tools-shell-tools` 109 通过，`pnpm typecheck` 通过。
 - **影响文件**：`packages/tools/runtime/src/{permission/types.ts,prepared-execution.ts,test/runtime.test.ts}`、`packages/sandbox/manager/src/{execution.ts,test/execution.test.ts}`、`packages/tools/shell-tools/src/test/lifecycle.test.ts`。
 
+### 步骤 3：T2 shell-tools 参数与进沙箱判断
+
+- **操作**：
+  - bash schema 删除 `requiredPermissions`，加入 `sandbox_permissions`（enum `["require_escalated"]`）与 `justification`（1–200 字），参数描述与工具描述按设计第 9 节写（英文）。
+  - `extractResources`：`noSandbox = mode === "full-access" || 申请了出沙箱 || 沙箱不可用`。
+  - `evaluate`：硬拒绝之后检查参数是否成对，不成对（含 `justification` 只有空白）返回 `deny`、`BASH_ESCALATION_INVALID`；然后 `full-access` 放行；申请出沙箱时 ask 的原因是 `justification`，`reusable: false`。
+  - `admittedNoSandbox` 的参数回落改读 `sandbox_permissions`；`SANDBOX_PREPARE_FAILED` 提示改为新参数名。
+  - 用到旧参数的测试与夹具一并改：shell-tools 两个测试文件、Desktop `runtime-v2-output-reference-flow.test.ts`、`scripts/test/host-tools-process.test.mjs`、`scripts/test/fixtures/agent-provider.mjs`。
+- **决定**：参数不成对在所有模式下都拒绝，`full-access` 也一样。设计说的“`full-access` 下带了也照常执行”指成对的参数；不成对是调用写错了，各模式行为一致更好懂。
+- **结果**：
+  - shell-tools 111 通过（新增：出沙箱成对与不成对、`full-access` 下 `noSandbox: true`、审批原因是 `justification`、没有前缀授权建议；schema 拒绝旧参数、非法取值与超长理由）。
+  - `@actspace/agent-cli` 16 通过（含继承模式加 `full-access` 标 `sandbox=inherited`）；Desktop 大输出流程测试通过（要先重新构建 shell-tools）；`pnpm test:agent-host:process` 7 通过（要先重新构建 CLI）。
+  - `pnpm test:agent-cli:process` 中 SIGINT、SIGTERM 两条 “drains background descendants” 失败（恢复后请求数为 2，期望 1）；在 HEAD 上（暂存改动、重新构建）同样失败，与本次改动无关。
+- **影响文件**：`packages/tools/shell-tools/src/{plugin.ts,node-ports.ts,test/lifecycle.test.ts,test/node-ports.test.ts}`、`apps/desktop/src/main/test/runtime-v2-output-reference-flow.test.ts`、`scripts/test/{host-tools-process.test.mjs,fixtures/agent-provider.mjs}`。
+
 ## 遇到的问题
 
 - T1 新测试起初只期望三次提取，实际每次准入都会在执行前复查一次（`full-access` 也一样），改为四次。
@@ -57,3 +72,4 @@
 ## 跳过或推迟的事项
 
 - Linux 拦截特征（EACCES）：Linux 工具沙箱可用时再补。
+- `pnpm test:agent-cli:process` 的两条后台任务恢复测试在 HEAD 上就失败，不在本计划范围，没有处理。
