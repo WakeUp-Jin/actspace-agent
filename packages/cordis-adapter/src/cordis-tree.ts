@@ -10,6 +10,11 @@ export interface IsolatedCordisEntry {
   readonly config: unknown;
   readonly provides: readonly string[];
   readonly injects: readonly string[];
+  /**
+   * Services the entry uses when present. Provided ones are injected (so they start first and restart the entry);
+   * absent ones are isolated so `ctx.get` returns undefined instead of reaching a same-named Host service.
+   */
+  readonly optionalInjects?: readonly string[];
 }
 export interface IsolatedCordisTree {
   readonly context: CordisContext;
@@ -43,9 +48,17 @@ export async function mountIsolatedCordisTree(options: {
     if (provided.has(name) || options.sharedServices.includes(name)) throw new Error(`Conflicting Harness provider: ${name}`);
     provided.add(name);
   }
+  for (const entry of options.entries) for (const name of entry.optionalInjects ?? []) {
+    if (entry.injects.includes(name)) throw new Error(`Harness dependency is both required and optional: ${entry.id}/${name}`);
+  }
   for (const entry of options.entries) for (const name of entry.injects) {
     if (!provided.has(name) && !options.sharedServices.includes(name)) throw new Error(`Undeclared Harness dependency: ${entry.id}/${name}`);
     if (!provided.has(name) && parent.get(name) === undefined) throw new Error(`Missing Host service: ${name}`);
+  }
+  const available = (name: string) => provided.has(name) || (options.sharedServices.includes(name) && parent.get(name) !== undefined);
+  const absentOptional = new Set<string>();
+  for (const entry of options.entries) for (const name of entry.optionalInjects ?? []) {
+    if (!available(name)) absentOptional.add(name);
   }
   const modules = new Map<string, Plugin>();
   const rows: EntryOptions[] = options.entries.map(entry => {
@@ -56,15 +69,16 @@ export async function mountIsolatedCordisTree(options: {
     // Manifest injection is authoritative. Do not permit a module to reach a hidden Host service.
     const declared = behavior.inject;
     const names = Array.isArray(declared) ? declared : declared && typeof declared === "object" ? Object.keys(declared) : [];
-    if (names.some(name => !entry.injects.includes(String(name)))) throw new Error(`Behavior injection differs from manifest: ${entry.id}`);
-    modules.set(entry.id, { name: entry.id, inject: [...entry.injects], apply: (ctx: Context, config: unknown) => {
+    if (names.some(name => !entry.injects.includes(String(name)) && !entry.optionalInjects?.includes(String(name)))) throw new Error(`Behavior injection differs from manifest: ${entry.id}`);
+    const inject = [...entry.injects, ...(entry.optionalInjects ?? []).filter(available)];
+    modules.set(entry.id, { name: entry.id, inject, apply: (ctx: Context, config: unknown) => {
       const guarded = ctx.extend({ provide: (name: string, value?: unknown) => {
         if (!entry.provides.includes(name)) throw new Error(`Undeclared Harness service: ${entry.id}/${name}`);
         return ctx.provide(name, value);
       } });
       return behavior.apply(guarded, config);
     } } as Plugin);
-    return { id: entry.id, name: entry.id, config: structuredClone(entry.config), inject: [...entry.injects] };
+    return { id: entry.id, name: entry.id, config: structuredClone(entry.config), inject };
   });
   const ownership = Symbol("harness-tree");
   const token = {};
@@ -91,7 +105,7 @@ export async function mountIsolatedCordisTree(options: {
     if (errors.length) throw new AggregateError(errors, "Harness tree cleanup failed");
   })();
   try {
-    await tree.root.update([{ id: "harness", name: "cordis:group", group: true, isolate: Object.fromEntries([...provided].map(name => [name, true as const])), config: rows }]);
+    await tree.root.update([{ id: "harness", name: "cordis:group", group: true, isolate: Object.fromEntries([...provided, ...absentOptional].map(name => [name, true as const])), config: rows }]);
     await tree.await();
     for (const entry of tree.entries()) {
       if (!entry.fiber || entry.fiber.state !== 2) throw new Error(`Harness entry not active: ${entry.id}`);

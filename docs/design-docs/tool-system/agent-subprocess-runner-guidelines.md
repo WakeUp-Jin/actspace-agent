@@ -24,8 +24,8 @@
 
 入口为 `packages/tools/shell-tools/src/plugin.ts`、`command-rules.ts`、`node-ports.ts`。
 
-- Bash permission 合同先提取 process resource，再应用命令 hard guard；通过后 default 请求审批或匹配已有会话前缀授权，full-access 自动放行。模式切换会撤销旧等待并重新评估，硬拒绝与沙箱保持生效。
-- macOS 使用 `/bin/zsh -lc`，其他平台使用 `/bin/bash -lc`；macOS 可经 `sandbox-exec` 包装。这是 Bash 工具专用 shell 边界。
+- Bash permission 合同先提取 process resource，再应用命令 hard guard；通过后 default 请求审批或匹配已有会话前缀授权，full-access 自动放行。模式切换会撤销旧等待并重新评估；硬拒绝在所有模式下生效，沙箱只在 `default`、`auto-review` 下生效，`full-access` 不进沙箱（见[沙箱设计](../execution-safety/agent-沙箱设计.md)第 9 节）。
+- macOS 使用 `/bin/zsh -lc`，其他平台使用 `/bin/bash -lc`；沙箱经 Harness `sandbox` 服务（macOS：nono，其次 Seatbelt）。这是 Bash 工具专用 shell 边界。
 - block 等待默认 30 秒；超过等待边界转为后台任务，不等于命令失败；后台任务登记到 Host 的后台任务登记表，完成时自动通知 Agent，Agent 用 `task_output` / `task_stop` / `task_wait` 查看和管理（见 [后台任务](../collaboration/agent-background-tasks.md)）。
 - 每 Session 最多 8 个后台任务，运行上限 30 分钟；进程注册表属于 Host 端口并在 dispose 时关闭。
 - 内存输出头部最多 8,000 字符，磁盘上限 5 Mi 字符，超限终止进程并标记截断。长前台输出经受管 artifact 回读。

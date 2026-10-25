@@ -4,6 +4,7 @@ import { toolPreview } from "@actspace/client/sessions";
 import { RemoteArtifacts } from "./artifacts";
 import { PendingSubmissions } from "./pending-submissions";
 import { FixedRendererStreamAdapter } from "../runtime-v2/fixed-renderer-stream-adapter";
+import { executionEnvironment } from "../runtime-v2/approval-broker";
 import { randomUUID } from "node:crypto";
 import type { BrowserWindow } from "electron";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C, type RuntimeV2SessionListItem, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
@@ -99,7 +100,7 @@ export class RemoteDesktopAdapter {
     for (const request of requests) {
       const ref = { hostId, sessionId: request.sessionId }, requestId = remoteApprovalId(hostId, request.requestId);
       this.#approvalRefs.set(requestId, { ref, requestId: request.requestId });
-      this.#send(C.agentStream, { type: "tool_approval_required", sessionId: remoteSessionKey(ref), agentRunId: request.agentRunId, toolCallId: request.callId, toolName: request.toolName, requestId, hostId, summary: JSON.stringify(request.resources), reason: request.reasons.join(", ") });
+      this.#send(C.agentStream, { type: "tool_approval_required", sessionId: remoteSessionKey(ref), agentRunId: request.agentRunId, toolCallId: request.callId, toolName: request.toolName, requestId, hostId, summary: JSON.stringify(request.resources), reason: request.reasons.join(", "), executionEnvironment: executionEnvironment(request.resources) });
     }
   }
   #send(channel: string, value: unknown) { const window = this.getWindow(); if (window && !window.isDestroyed()) window.webContents.send(channel, value); }

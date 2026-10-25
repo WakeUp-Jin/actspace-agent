@@ -22,7 +22,7 @@ type PermissionMode = "default" | "auto-review" | "full-access";
 type FileScope = "workspace" | "all";
 ```
 
-`default` 映射为 workspace 文件范围，`full-access` 映射为 Host ceiling 内的全部文件范围。通过硬规则检查的 Bash 在 `full-access` 下自动执行；文件删除、敏感资源仍按各自策略审批，Host ceiling 与 Bash sandbox 不变。
+`default` 映射为 workspace 文件范围，`full-access` 映射为 Host ceiling 内的全部文件范围。通过硬规则检查的 Bash 在 `full-access` 下自动执行，并且不进沙箱（见[沙箱设计](agent-沙箱设计.md)第 9 节）；文件删除、敏感资源仍按各自策略审批，Host ceiling 不变。
 
 ## 2. 非目标
 
@@ -444,7 +444,7 @@ Session Journal 是 Session Grant 的唯一持久事实源，不增加独立 Hos
 - 空命令、控制字符、不可安全解释的 pipe/redirection/expansion 直接拒绝；
 - `eval`、不可信 `source`、动态执行和危险删除直接拒绝；
 - 其余命令在 `default` 下请求审批（Desktop 可建议严格 command_prefix 会话授权），`full-access` 下允许；
-- `full-access` 不改变 Bash sandbox；
+- `full-access` 下 Bash 不进沙箱，硬拒绝仍生效；其他模式下出沙箱须带 `justification` 并每次批准（[沙箱设计](agent-沙箱设计.md)第 9 节）；
 - 批准 Bash 不隐式批准外部目录；
 - 不生成自由命令 pattern；符合既有前缀分析规则的命令可生成限定 workspace 的 Session Grant；
 - sandbox 或 executor 无法表达请求边界时 fail-closed。

@@ -13,6 +13,9 @@
       "path": "./../../cordis-adapter/tsconfig.build.json"
     },
     {
+      "path": "./../../sandbox/manager/tsconfig.build.json"
+    },
+    {
       "path": "./../../shared/tsconfig.build.json"
     },
     {

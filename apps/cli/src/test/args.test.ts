@@ -50,6 +50,8 @@ describe("parseCliArgs", () => {
     expect(parseCliArgs(["run", "--input", "next", "--persist"])).toMatchObject({ command: "run", options: { persist: true } });
     expect(parseCliArgs(["run", "--input", "next", "--resume", "session-1"])).toMatchObject({ command: "run", options: { persist: true, resume: "session-1" } });
     expect(() => parseCliArgs(["run", "--resume"])).toThrow("Missing value");
+    expect(parseCliArgs(["run", "--input", "x", "--sandbox-inherited"])).toMatchObject({ command: "run", options: { sandboxInherited: true } });
+    expect((parseCliArgs(["run", "--input", "x"]) as { options: { sandboxInherited?: boolean } }).options.sandboxInherited).toBeUndefined();
   });
 
   it("documents optional workspace and valid stdin piping", () => {

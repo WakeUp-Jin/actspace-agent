@@ -1,5 +1,6 @@
 import type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/tools-approval";
-import type { DesktopRuntimeV2ApprovalPort } from "./host-ports";
+import type { ApprovalResourceSummary } from "@actspace/shared/runtime-v2";
+import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2ApprovalRequest } from "./host-ports";
 
 export class DesktopApprovalBroker implements ApprovalBroker {
   constructor(private readonly approvals: DesktopRuntimeV2ApprovalPort) {}
@@ -15,6 +16,7 @@ export class DesktopApprovalBroker implements ApprovalBroker {
       summary: primaryReason?.message ?? "Approval required",
       reason: request.reasons.map((reason) => reason.message).join("\n"),
       riskLevel: highestRisk(request.reasons.map((reason) => reason.risk)),
+      executionEnvironment: executionEnvironment(request.resources),
       sessionId: request.sessionId,
       agentRunId: request.agentRunId,
       createdAt: Date.parse(request.requestedAt),
@@ -45,6 +47,12 @@ export class DesktopApprovalBroker implements ApprovalBroker {
       signal.removeEventListener("abort", onAbort);
     }
   }
+}
+
+/** Where an approved process runs: the card shows "real environment" when Bash leaves the sandbox. */
+export function executionEnvironment(resources: readonly ApprovalResourceSummary[]): DesktopRuntimeV2ApprovalRequest["executionEnvironment"] {
+  const process = resources.find((resource) => resource.kind === "process");
+  return process?.kind !== "process" || process.noSandbox === undefined ? undefined : process.noSandbox ? "real" : "sandbox";
 }
 
 function denied(requestId: string, code: Extract<ApprovalDecision, { kind: "deny" }>["code"]): ApprovalDecision {

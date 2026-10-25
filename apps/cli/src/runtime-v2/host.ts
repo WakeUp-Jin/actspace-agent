@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { loadRuntimeV2 } from "./loader";
 import type { HostConfig } from "@actspace/agent-host";
 import type { AgentApplicationContract, AgentService } from "@actspace/agent-service";
-import { HostModelRouter, createNodeToolHostServices } from "@actspace/agent-host/node-ports";
+import { HostModelRouter, createNodeToolHostServices, resolveNodeHostNonoPath } from "@actspace/agent-host/node-ports";
+import { CLI_REPO_ROOT } from "./host-adapter";
 const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<typeof import("@actspace/agent-host")>;
 
 export async function startRemoteHost(config: HostConfig, options: { mock?: boolean; forceExit?: () => void } = {}) {
@@ -24,7 +25,7 @@ export async function startRemoteHost(config: HostConfig, options: { mock?: bool
         [runtime.LLM_HOST_PORT_ID]: { credentials, routes },
         [runtime.HEADLESS_HOST_PORT_ID]: { enabled: false },
         [runtime.PROMPT_HOST_PORT_ID]: { workspaceRoot, resolveUserSource: () => runtime.prepareUserPromptSource(config.dataRoot), resolveSource: (root: string) => runtime.prepareRuntimePromptSource({ dataRoot: config.dataRoot, workspaceRoot: root }) },
-        ...createNodeToolHostServices({ workspaceRoot, tmpRoot: join(config.dataRoot, "runtime/tmp"), model: config.defaultModel, readArtifact, resolveArtifact }),
+        ...createNodeToolHostServices({ nonoPath: resolveNodeHostNonoPath(process.env, CLI_REPO_ROOT), workspaceRoot, tmpRoot: join(config.dataRoot, "runtime/tmp"), model: config.defaultModel, readArtifact, resolveArtifact }),
       } });
       const profile = await runtime.bootProfileRuntime({ host, dataRoot: config.dataRoot, hostServices, gracefulShutdownMs: 10000, finalShutdownMs: 4000,
         composition: runtime.createProfileComposition(runtime.RUNTIME_PROFILE_IDS.host, host),

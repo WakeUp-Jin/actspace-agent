@@ -258,6 +258,7 @@ function messageBlockFromToolPreview(
         command: preview.command,
         commandPreview: preview.commandPreview,
         intent: preview.intent,
+        justification: preview.justification,
         cwd: preview.cwd,
         stdout: preview.stdout,
         stderr: preview.stderr,

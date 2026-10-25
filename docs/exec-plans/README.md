@@ -29,6 +29,9 @@
 
 ## 最近完成
 
+- [工具沙箱的出沙箱与回退](completed/20261025-sandbox-escape-fallback.md)：T0–T6 完成（分支 `feat/sandbox-refactor`，提 PR 合入 main）；`full-access` 下 bash 不进沙箱，出沙箱改为 `sandbox_permissions` 加 `justification` 并每次批准，审批卡显示理由，被沙箱拦了在结果里提示；真实 Host 端到端、全仓检查与 Codex 验收通过（验收发现的完全权限提示过时已修复）；审批卡理由行与深色主题未经实机完整复验，见[执行摘要](../exec-runs/20261025-sandbox-escape-fallback/execution-summary.md)。
+- [沙箱第二期：评估沙箱](completed/20261025-sandbox-v2-evaluation-sandbox.md)：T0–T8 完成（分支 `feat/sandbox-refactor`，提 PR 合入 main）；nono `run` 域名白名单（本机端口、上游代理），继承模式改由 Host 告知，CLI `--harness` / `--sandbox-inherited`，新包 `harness-evaluation` 在评估沙箱里跑 CLI 候选；真实 nono + CLI 集成测试（macOS、Linux Docker）与全仓检查通过；工具沙箱是否排除系统写入组待用户决定，见[执行摘要](../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)。
+- [沙箱第一期：地基 + 工具沙箱](completed/20261025-sandbox-v1-tool-sandbox.md)：T0–T10 完成（分支 `feat/sandbox-refactor`，提 PR 合入 main）；沙箱管理器与 nono / Seatbelt 后端作为 Harness 插件进入默认组合，bash 经 `sandbox` 服务执行，缺失或不可用时转“真实环境”审批；全仓检查、真实 Host 端到端（nono / Seatbelt）、Linux Docker 与打包签名通过；Desktop 界面未验证，见[执行摘要](../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。
 - [官网 V5：文档、博客与更新日志改版](completed/20261025-site-v5-docs-blog-updates.md)：文档 A4 小舞台、博客 Q2 列表 + R3 头部 + M2 正文、更新日志 U1 时间轴；Markdown 改为构建期 Sätteri 插件；check / test / build 通过，用户视觉验收通过，见[执行摘要](../exec-runs/20261025-site-v5-docs-blog-updates/execution-summary.md)。真实浏览器剪贴板复制未单独验证。
 - [子智能体轨迹](completed/20261021-subagent-trajectory.md)：父轨迹只留 `agent` 一行，详情「查看轨迹」在右侧子 Agent 面板打开子会话轨迹（对话 / 轨迹切换，窄面板详情在下半部分）；desktop 1920 项测试通过，浏览器 mock 截图完成；Electron 真实子智能体未验证，见[执行摘要](../exec-runs/20261021-subagent-trajectory/execution-summary.md)与[验收交接](../exec-runs/20261021-subagent-trajectory/acceptance-handoff.md)。
 

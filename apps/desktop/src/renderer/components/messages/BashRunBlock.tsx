@@ -29,6 +29,9 @@ const BASH_APPROVAL_HEADS_CLASS = "bash-approval-heads min-w-0 shrink-[2] trunca
 // act-code-hl 提供随主题翻转的语法色（markdown.css）；命令名用红橙、连接符用蓝，接近终端里的常见配色。
 const BASH_APPROVAL_COMMAND_CLASS =
   "bash-approval-command act-code-hl m-0 max-h-[168px] overflow-auto whitespace-pre-wrap px-3 pt-2.5 pb-0.5 font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.6] text-text-main [overflow-wrap:anywhere]";
+// 申请出沙箱的理由：命令下面一行次要文字，和底部的「真实环境」一起说明为什么要离开沙盒。
+const BASH_APPROVAL_JUSTIFICATION_CLASS =
+  "bash-approval-justification m-0 px-3 pt-1 pb-0.5 text-act-sm leading-[1.5] text-text-muted [overflow-wrap:anywhere]";
 const SHELL_TOKEN_CLASS: Record<ShellTokenKind, string | undefined> = {
   command: "text-(--md-hl-variable)",
   operator: "text-(--md-hl-function)",
@@ -181,6 +184,7 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
           return className ? <span key={index} className={className}>{token.text}</span> : token.text;
         })}
       </pre>
+      {message.justification ? <p className={BASH_APPROVAL_JUSTIFICATION_CLASS}>{message.justification}</p> : null}
     </ApprovalCard>
   );
 }
