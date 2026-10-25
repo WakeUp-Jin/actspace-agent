@@ -17,7 +17,7 @@
   background: var(--surface);
 }
 .prose-image-frame { display: block; width: fit-content; max-width: 100%; }
-.docs-prose .prose-image-frame img { display: block; border-radius: 0; box-shadow: none; }
+.prose .prose-image-frame img { display: block; border-radius: 0; box-shadow: none; }
 .image-loading-frame[data-image-enhanced][data-image-state="loading"] {
   animation: none;
 }

@@ -54,6 +54,19 @@ describe("parseReleaseNotes", () => {
     expect(dangerous).not.toContain("javascript:");
   });
 
+  it("spaces CJK next to Latin text without touching inline code", () => {
+    const [entry] = parseReleaseNotes(`## 2026-07
+
+### 2026-07-27 — Context 更新
+
+#### 改进
+
+- 修复Bash工具在\`中文cwd\`下的问题。
+`, source);
+
+    expect(entry?.sections[0]?.itemsHtml).toEqual(["修复 Bash 工具在 <code>中文cwd</code> 下的问题。"]);
+  });
+
   it.each([
     {
       name: "invalid date",
