@@ -215,7 +215,7 @@ T0 → T1 →（T2、T3 可并行）→ T4 → T5 → T6 → T7 → T8。
 - [x] T1 管理器：评估模板与契约加法
 - [x] T2 nono 后端：`run` 模式
 - [x] T3 Host 端口与 CLI `--sandbox-inherited`
-- [ ] T4 CLI `--harness`
+- [x] T4 CLI `--harness`
 - [ ] T5 `harness-evaluation` 包
 - [ ] T6 集成测试
 - [ ] T7 生成物与检查
@@ -226,6 +226,7 @@ T0 → T1 →（T2、T3 可并行）→ T4 → T5 → T6 → T7 → T8。
 - 2026-10-25：用户确认 E1–E11（范围拆分、候选启动参数、文件系统、网络与上游代理、密钥预留、评分在外、候选 full-access、无 nono 即拒绝、最小使用方、临时测试工作区、超时与资源）。
 - 2026-10-25：读代码后用户确认 E12–E14：继承模式由 Host 端口告知并移除插件配置 `mode`（取代第一期 D6）；打包版入口留给自进化 V2；新包 `packages/harness-evaluation`。
 - 2026-10-25：T0 后调整（计划内的实现细节，不改已确认的决策）：`allowlist` 加 `localPorts` 与能力 `network.local-ports`；nono `run` 两个平台都用 profile 模式并加 `--no-audit --no-rollback`；“按选择启动”用方案 b，不改 harness-control 语义。
+- 2026-10-25：T4 实现时把选择文件的 `executionDigest` 改为可选（摘要绑定 Host 契约，Desktop 与 CLI 不同），兼容性由 `validateCandidate` 判断，结果报告实际运行的摘要。
 
 ## 执行模式
 

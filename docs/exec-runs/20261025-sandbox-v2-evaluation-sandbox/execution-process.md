@@ -98,6 +98,37 @@
   - `apps/cli/src/test/sandbox-inherited.test.ts`：真实 CLI 启动（非 mock）连接假模型服务，以 `full-access` 执行 `bash echo probe`。带参数时，模型收到的结果摘要含 `sandboxed=false, sandbox=inherited`；不带参数时不含。
   - `pnpm --filter @actspace/agent-cli test` 14 个通过，`pnpm --filter @actspace/agent-host test` 58 个通过，两者 `typecheck` 都通过；`sandbox-status.test.ts` 通过。
 
+### 步骤 5：T4 CLI `--harness <选择文件>`
+
+- **操作**：
+  - harness-control 的 index 导出 `loadArtifact`，这是唯一的改动。
+  - runtime：`AgentRuntimeHostPort.pinnedHarness`、`BootRuntimeOptions.pinnedHarness`。新增 `PinnedHarnessError`，错误码 `HARNESS_SELECTION_INVALID`。
+  - agent-runtime-plugin：有固定选择时，`builtin` 改为用 `loadArtifact` 加载选择里的产物，并且不传 `upgradePristineBuiltin`。`HarnessControl.initialize()` 之后检查三件事，任一不满足就抛错，不回退到内置组合：
+    1. `main` 没有被阻塞；
+    2. 挂载的组合与产物和选择文件一致；
+    3. 如果选择文件给了 `executionDigest`，它与挂载结果一致。
+  - CLI `run --harness <文件>` 的处理顺序：
+    - 读取并校验文件形状。
+    - `--data-dir` 下已有 `harness-state/selections.jsonl` 时以 `HARNESS_STATE_EXISTS` 退出（退出码 2）。
+    - 启动失败时沿 `cause` 链找到 `HARNESS_SELECTION_INVALID`，转为 CLI 错误（退出码 3）。Cordis 启动会把插件错误包两层。
+    - 结果里加 `harness: { harnessId, revision, executionDigest }`，表示在本 Host 下实际运行的 Harness。
+- **与计划的差异**：
+  - 计划写的是“选择文件为 `SelectionDescription` 加 `executionDigest`”。实现时 `executionDigest` 改为可选。
+  - 原因：`executionDigest` 包含 `hostContractDigest`，bootstrap 会把它换成当前 Host 的值，而 Desktop 与 CLI 的 Host 契约不同（能力上限等）。Desktop 的选择在 CLI 下挂载后摘要必然不同，强制相等会让来自 Desktop 的选择永远无法评估。
+  - 现在的规则：给了摘要就严格比较（用于同一种 Host 下的复现）；不给就不比较。兼容性由 `validateCandidate` 判断，实际运行的摘要写进结果交给打分方。
+  - 由此带来的后续事项：Desktop 选择里如果启用了只有 Desktop 才有的条目（如 `browser-tools`），在 CLI Host 下会因缺少 Host 端口而无法挂载。这属于 E13（打包版入口）与自进化 V2 的范围，已记入“跳过或推迟的事项”。
+- **影响文件**：`packages/harness-control/src/index.ts`、`packages/runtime/src/{harness/agent-host-port,harness/agent-runtime-plugin,startup/boot}.ts`、`apps/cli/src/{args,types}.ts`、`apps/cli/src/runtime-v2/{run,host-adapter,types}.ts`，以及测试。
+- **验证**：
+  - `apps/cli/src/test/pinned-harness.test.ts` 正常路径：先用 mock 运行生成一个选择，再复制产物到新的 dataRoot 并用 `--harness` 启动。结果 `harness.executionDigest` 与原记录一致；不带摘要时同样成功。
+  - 拒绝路径：
+    - 产物缺失：cannot mount；
+    - 摘要不符：execution digest differs；
+    - 扩大共享服务：Candidate expands Host shared services；
+    - 文件不是 JSON；
+    - 字段缺失；
+    - 已有选择历史：`HARNESS_STATE_EXISTS`。
+  - `pnpm --filter @actspace/agent-cli test` 16 个通过，`@actspace/runtime` 84 个通过，`@actspace/harness-control` 28 个通过；CLI 与 runtime 的 `typecheck` 都通过。
+
 ## 遇到的问题
 
 - Linux 容器里第一次复验“终止无残留”失败：`ps` 显示两个 `sleep` 处于 `Z` 状态，父进程是 PID 1。容器里的 PID 1 是 `node`，它不回收被转交过来的孤儿进程，`kill(-pgid, 0)` 对僵尸进程也会成功。加 `docker run --init` 后通过。真实主机上由 init 或 systemd 回收，不受影响；Docker 复验统一加 `--init`。
@@ -105,4 +136,5 @@
 
 ## 跳过或推迟的事项
 
+- Desktop 产生的选择在 CLI Host 下评估：Host 契约不同，只有 Desktop 才有的条目（如 `browser-tools`）会无法挂载。留给 E13 与自进化 V2，届时决定由 Desktop 侧提供评估入口，还是在选择进入评估前按 CLI Host 改写组合。
 - CLI 在 Linux `nono run` 里启动：推迟到 T6，用集成测试在 Docker 里复验。macOS 上构建的 `node_modules` 在 Linux 容器里不一定能直接用，到时按第一期的 Linux 复验方式处理。

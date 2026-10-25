@@ -51,6 +51,8 @@ export type BootRuntimeOptions = {
   readonly rendererAllowlist?: RendererAllowlist;
   /** Host-owned facts normalized before the Cordis config tree is mounted. */
   readonly hostServices?: RuntimeHostServices;
+  /** Boot this Harness selection instead of the built-in one; the data root must hold no selection history. */
+  readonly pinnedHarness?: import("../harness/agent-host-port.js").PinnedHarness;
 };
 
 export type BootedRuntimeProfile = {
@@ -140,6 +142,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
       disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...(options.host.capabilityCeiling.includes("browser") ? [] : ["browser-tools"])],
       authorizeHarness: options.authorizeHarness,
+      ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),
       evolution: {
         inspect: (context: import("@actspace/tools-runtime").ToolExecutionContext) => {
           const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
