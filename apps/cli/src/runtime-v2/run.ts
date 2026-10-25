@@ -21,7 +21,7 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
   let liveSeq = 0; let runtimeInstanceId = "booting"; let throughJournalSeq = -1;
   let activeSessionId: string | undefined;
   let activeAbort: (() => boolean) | undefined;
-  const booted = await bootCliV2({ onForceCleanup: io.onForceCleanup, kind: "cli-run", workspace, dataRoot, persistentArtifacts: persistent, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, mock: options.mock, model: options.model, headlessInput: input, headlessSessionId: options.resume, env: io.env, onHeadlessSession: (sessionId, abort) => { activeSessionId = sessionId; activeAbort = abort; io.onControl?.({ sessionId, agentRunId: sessionId, abort }); }, onLiveEvent: (event) => io.onLiveEvent?.({ ...event, schemaVersion: 1, runtimeInstanceId, liveSeq: liveSeq++, throughJournalSeq }) });
+  const booted = await bootCliV2({ onForceCleanup: io.onForceCleanup, kind: "cli-run", workspace, dataRoot, persistentArtifacts: persistent, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, sandboxInherited: options.sandboxInherited, mock: options.mock, model: options.model, headlessInput: input, headlessSessionId: options.resume, env: io.env, onHeadlessSession: (sessionId, abort) => { activeSessionId = sessionId; activeAbort = abort; io.onControl?.({ sessionId, agentRunId: sessionId, abort }); }, onLiveEvent: (event) => io.onLiveEvent?.({ ...event, schemaVersion: 1, runtimeInstanceId, liveSeq: liveSeq++, throughJournalSeq }) });
   runtimeInstanceId = booted.profile.getState().runtimeInstanceId;
   try {
     if (io.isInterrupted?.()) activeAbort?.();

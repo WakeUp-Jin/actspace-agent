@@ -70,6 +70,9 @@ export function parseCliArgs(argv: string[]): ParsedCli {
         options.resume = readValue(rest, ++i, arg);
         options.persist = true;
         break;
+      case "--sandbox-inherited":
+        options.sandboxInherited = true;
+        break;
       case "--help":
       case "-h":
         return { command: "help", options };
@@ -121,5 +124,7 @@ export function usage(): string {
     "  --resume <session-id> (implies --persist)",
     "  --model <model-id>",
     "  --mock",
+    "  --sandbox-inherited (only for the evaluation sandbox launcher: Bash runs without its own sandbox,",
+    "                       relying on the outer one)",
   ].join("\n");
 }

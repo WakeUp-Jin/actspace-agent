@@ -14,7 +14,7 @@ export const CLI_REPO_ROOT = join(__dirname, "../../../..");
 let testCordis: BootRuntimeOptions["cordis"] | undefined;
 export function setCliV2CordisForTest(value?: BootRuntimeOptions["cordis"]): void { testCordis = value; }
 
-export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: () => void) => void; readonly kind: "cli-run"; readonly workspace: string; readonly dataRoot: string; readonly persistentArtifacts?: boolean; readonly permissionMode: RuntimeV2PermissionMode; readonly permissionModeExplicit?: boolean; readonly mock: boolean; readonly model?: string; readonly input?: TerminalLineInput; readonly headlessInput?: string; readonly headlessSessionId?: string; readonly writeApproval?: (text: string) => void; readonly env?: NodeJS.ProcessEnv; readonly onLiveEvent?: (event: Omit<RuntimeV2LiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">) => void; readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void }) {
+export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: () => void) => void; readonly kind: "cli-run"; readonly workspace: string; readonly dataRoot: string; readonly persistentArtifacts?: boolean; readonly permissionMode: RuntimeV2PermissionMode; readonly permissionModeExplicit?: boolean; readonly sandboxInherited?: boolean; readonly mock: boolean; readonly model?: string; readonly input?: TerminalLineInput; readonly headlessInput?: string; readonly headlessSessionId?: string; readonly writeApproval?: (text: string) => void; readonly env?: NodeJS.ProcessEnv; readonly onLiveEvent?: (event: Omit<RuntimeV2LiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">) => void; readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void }) {
   const runtime = await loadRuntimeV2(); const provider = resolveCliProvider(options.env ?? process.env);
   const host = { hostKind: options.kind, capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const, runtimeContract: "actspace.runtime.v2" as const, invocationId: randomUUID(), workspaceRef: options.workspace };
   // The trusted CLI assembly is now a checked-in cordis.yml tree. External
@@ -26,6 +26,7 @@ export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: (
   const llmAdapter = new NodeLlmAdapter({ mock: options.mock, model: options.model, provider, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId) });
   const credentials = { resolve: async () => ({ apiKey: provider.apiKey, baseUrl: provider.baseUrl, ...(provider.proxyUrl === undefined ? {} : { proxyUrl: provider.proxyUrl }) }) };
   const disposeResources = onceAsync(async () => { await artifacts.dispose(); });
+  const sandbox = { nonoPath: toolModule.resolveNodeHostNonoPath(process.env, CLI_REPO_ROOT), sandboxInherited: options.sandboxInherited === true };
   try {
     const approval = new CliV2ApprovalBroker(options.input, options.writeApproval);
     const capabilities = host.capabilityCeiling;
@@ -45,7 +46,7 @@ export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: (
         "host.approval": approval,
         "host.artifacts": artifacts,
         [runtime.LLM_HOST_PORT_ID]: Object.freeze({ credentials, routes: Object.freeze([{ routeId: "default", providerId: provider.providerId, modelPattern: "*", adapter: llmAdapter, credentialRef: "cli-env", defaults: {} }]) }),
-        ...(options.mock ? toolModule.createUnavailableToolHostServices() : toolModule.createNodeToolHostServices({ nonoPath: toolModule.resolveNodeHostNonoPath(process.env, CLI_REPO_ROOT), onShellProcesses: (control) => options.onForceCleanup?.(control.forceTerminate), workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) })),
+        ...(options.mock ? { ...toolModule.createUnavailableToolHostServices(), ...toolModule.createNodeSandboxHostServices(sandbox) } : toolModule.createNodeToolHostServices({ ...sandbox, onShellProcesses: (control) => options.onForceCleanup?.(control.forceTerminate), workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) })),
         [runtime.PROMPT_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspace, resolveUserSource: async () => runtime.prepareUserPromptSource(options.dataRoot), resolveSource: async (workspaceRoot: string) => runtime.prepareRuntimePromptSource({ dataRoot: options.dataRoot, workspaceRoot }) }),
         [runtime.HEADLESS_HOST_PORT_ID]: options.headlessInput === undefined
           ? Object.freeze({ enabled: false })

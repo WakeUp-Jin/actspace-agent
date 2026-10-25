@@ -85,6 +85,19 @@
   - Linux（Docker `node:22 --init`，arm64）：`tmp/sandbox-v2-e2e/linux-run.mjs` 复现上述用例，并确认 `status("evaluation")` 可用，5 项全部通过。
   - `pnpm --filter @actspace/sandbox-nono typecheck` 通过。
 
+### 步骤 4：T3 Host 端口与 CLI `--sandbox-inherited`
+
+- **操作**：
+  - agent-host 新增 `createNodeSandboxHostServices({ nonoPath, sandboxInherited })`，`createNodeToolHostServices` 也改用它。Desktop 仍自己组装沙箱端口，不设置继承模式。
+  - CLI `run` 解析 `--sandbox-inherited`，并在帮助文本里说明它只给评估沙箱的启动方使用；参数经 `runV2Command` 传到 `bootCliV2`。
+  - `--mock` 原来不提供沙箱端口，由 `boot.ts` 兜底，这样拿不到继承模式；现在 `--mock` 也提供沙箱端口。
+  - 启动诊断 `SANDBOX_STATUS` 的继承模式文案改为 “Tool sandbox is inherited (--sandbox-inherited); commands rely on the outer sandbox.”。
+  - 新增测试辅助 `apps/cli/src/test/fake-openai.ts`：一个 OpenAI 兼容的流式假模型服务，每个请求按脚本返回一步（文本或工具调用），并记录模型收到的工具结果。
+- **影响文件**：`apps/cli/src/{args,types}.ts`、`apps/cli/src/runtime-v2/{host-adapter,run,types}.ts`、`packages/agent-host/src/node-ports/tool-host-services.ts`、`packages/runtime/src/startup/sandbox-status.ts`，以及测试。
+- **验证**：
+  - `apps/cli/src/test/sandbox-inherited.test.ts`：真实 CLI 启动（非 mock）连接假模型服务，以 `full-access` 执行 `bash echo probe`。带参数时，模型收到的结果摘要含 `sandboxed=false, sandbox=inherited`；不带参数时不含。
+  - `pnpm --filter @actspace/agent-cli test` 14 个通过，`pnpm --filter @actspace/agent-host test` 58 个通过，两者 `typecheck` 都通过；`sandbox-status.test.ts` 通过。
+
 ## 遇到的问题
 
 - Linux 容器里第一次复验“终止无残留”失败：`ps` 显示两个 `sleep` 处于 `Z` 状态，父进程是 PID 1。容器里的 PID 1 是 `node`，它不回收被转交过来的孤儿进程，`kill(-pgid, 0)` 对僵尸进程也会成功。加 `docker run --init` 后通过。真实主机上由 init 或 systemd 回收，不受影响；Docker 复验统一加 `--init`。

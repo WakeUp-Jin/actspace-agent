@@ -16,12 +16,19 @@ import { createNodeSandboxHostPort, findBundledNono, repoNonoPath, SANDBOX_HOST_
 export function resolveNodeHostNonoPath(env: NodeJS.ProcessEnv = process.env, repoRoot?: string): string | undefined {
   return findBundledNono([env.ACTSPACE_NONO_PATH, repoRoot === undefined ? undefined : repoNonoPath(repoRoot)]);
 }
-export function createNodeToolHostServices(options: { readonly onShellProcesses?: (control: { readonly forceTerminate: () => void }) => void; readonly workspaceRoot: string; readonly tmpRoot: string; readonly model: string; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver; readonly nonoPath?: string }) {
+/**
+ * The sandbox Host port on its own (the CLI's `--mock` has no tool ports). `sandboxInherited` comes only from an
+ * explicit launch flag; Desktop never sets it.
+ */
+export function createNodeSandboxHostServices(options: { readonly nonoPath?: string; readonly sandboxInherited?: boolean }) {
+  return Object.freeze({ [SANDBOX_HOST_PORT_ID]: createNodeSandboxHostPort({ nonoPath: options.nonoPath ?? resolveNodeHostNonoPath(), inherited: options.sandboxInherited === true }) });
+}
+export function createNodeToolHostServices(options: { readonly onShellProcesses?: (control: { readonly forceTerminate: () => void }) => void; readonly workspaceRoot: string; readonly tmpRoot: string; readonly model: string; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver; readonly nonoPath?: string; readonly sandboxInherited?: boolean }) {
   const keys = { deepseek: process.env.ACTSPACE_DEEPSEEK_SEARCH === "1" ? process.env.DEEPSEEK_API_KEY : undefined, zhipu: process.env.ZHIPU_API_KEY, tavily: process.env.TAVILY_API_KEY, tinyfish: process.env.TINYFISH_API_KEY, exa: process.env.EXA_API_KEY };
   const credentials = Object.fromEntries(Object.entries(keys).filter((entry): entry is [keyof WebSearchCredentials, string] => Boolean(entry[1]))) as WebSearchCredentials;
   const apiKey = process.env.IMAGE_GENERATION_API_KEY; const baseUrl = process.env.IMAGE_GENERATION_BASE_URL; const model = process.env.IMAGE_GENERATION_MODEL;
   return Object.freeze({
-    [SANDBOX_HOST_PORT_ID]: createNodeSandboxHostPort({ nonoPath: options.nonoPath ?? resolveNodeHostNonoPath() }),
+    ...createNodeSandboxHostServices(options),
     [FILESYSTEM_READ_HOST_PORT_ID]: { createPorts: () => createFilesystemread(options) },
     [FILESYSTEM_SEARCH_HOST_PORT_ID]: { createPorts: () => createFilesystemsearch(options) },
     [FILESYSTEM_WRITE_HOST_PORT_ID]: { createPorts: () => createFilesystemwrite(options) },

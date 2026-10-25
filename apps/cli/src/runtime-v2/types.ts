@@ -18,6 +18,7 @@ export type RuntimeV2RunCommandOptions = {
   readonly dataDir?: string;
   readonly persist?: boolean;
   readonly resume?: string;
+  readonly sandboxInherited?: boolean;
 };
 
 export type RuntimeV2CliArtifactResult = {
