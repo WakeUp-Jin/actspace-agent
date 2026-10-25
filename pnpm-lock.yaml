@@ -115,6 +115,9 @@ importers:
       '@actspace/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox/manager
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../../packages/session/journal
@@ -436,6 +439,9 @@ importers:
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../llm/service
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/manager
       '@actspace/session-jsonl':
         specifier: workspace:*
         version: link:../session/jsonl
@@ -1425,6 +1431,15 @@ importers:
       '@actspace/prompt':
         specifier: workspace:*
         version: link:../prompt
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/manager
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../sandbox/nono
+      '@actspace/sandbox-seatbelt':
+        specifier: workspace:*
+        version: link:../sandbox/seatbelt
       '@actspace/session-checkpoint-policy':
         specifier: workspace:*
         version: link:../session/checkpoint-policy

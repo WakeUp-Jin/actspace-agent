@@ -65,6 +65,21 @@
 - **影响文件**：`scripts/sandbox/*`、`scripts/test/fetch-nono.test.mjs`、`scripts/release-package.sh`、`package.json`。
 - **验证**：`node --test scripts/test/fetch-nono.test.mjs` 4 个通过（本地 fixture，不访问网络）；`pnpm sandbox:fetch-nono --all` 四个平台下载并校验通过，`dist/sandbox-components/darwin-arm64/nono --version` 输出 `nono 0.80.0`，`codesign --verify --strict` 通过；用它跑 `@actspace/sandbox-nono` 真实测试 14 个通过。完整 `release-package.sh` 留到 T9 验证。
 
+### 步骤 6：T5 注册进默认 Harness，Host 提供端口
+
+- **操作**：
+  - 准入支持可选依赖：`IsolatedCordisEntry`、`PluginBehaviorDescriptor`、`BuiltinPluginManifestInput`、组合条目增加 `optionalInjects`；清单校验服务名合法、与 `injects` 不重叠；`harness-compatibility` 要求 `optionalInjects` 与 `optional: true` 的契约一致；`harness-mount` 一并比对。`mountIsolatedCordisTree` 对有提供者（组合内或共享服务）的可选依赖并入 Cordis `inject`，没有的加入隔离表。
+  - `DEFAULT_HARNESS_ENTRIES` 增加 `sandbox`、`sandbox-nono`、`sandbox-seatbelt`，条目类型 `DefaultHarnessEntry` 带可选第四项 `{ id, fallback }`（T6 的 shell-tools 用）；`actspace.host.sandbox` 加入共享服务、`agent-runtime` 的 inject（`composition.ts` 与 `cordis.yml`）；三个清单加入 `baseBundle`；服务注册表登记 `sandbox`。
+  - Host 端口：`boot.ts` 在 Host 未提供时用不带 nono 的 `createNodeSandboxHostPort()`；`@actspace/sandbox` 新增 `findBundledNono`（只认绝对路径的可执行文件）与 `repoNonoPath`；Desktop `resolveDesktopNonoPath`（打包版只认 `resources/app/sandbox-components/bin/nono`，开发版依次 `ACTSPACE_NONO_PATH`、仓库 `dist/sandbox-components/<platform>-<arch>/nono`）经注册表、启动选项传到 `createDesktopToolHostServices`；agent-host / CLI 用 `resolveNodeHostNonoPath`。
+  - 启动状态：`agent-runtime-plugin` 在 Harness 初始化后异步取 main Harness 的 `sandbox.status("tool")`，经 `onSandboxStatus` 记一条 `SANDBOX_STATUS` 诊断（有后端为 info，其余为 warning）；Desktop 另在主进程日志记录 nono 路径解析结果。
+  - 三个沙箱包补 `lifecycle.test.ts`（包边界检查要求）。
+- **与计划的差异**：
+  1. 计划写的是打包版也按“打包路径 → 环境变量 → 仓库”依次找；实现为打包版只认随包的 nono，环境变量和仓库副本只在开发版生效，更符合“只用我们打包的 nono”。
+  2. `actspace.host.sandbox` Host 端口没有登记进服务注册表：注册表只登记服务定义，现有 Host 端口（如 `actspace.host.background-tasks`）也不在其中。
+  3. 状态日志写成运行时诊断而不是一行文本日志：沙箱服务在 Harness 里，Host 只能经回调拿到状态，诊断是现有的记录渠道。
+- **影响文件**：`packages/cordis-adapter/src/{cordis-tree,manifest,service-contract}.ts`、`packages/{bundle,composition,boot}/src/*`、`packages/runtime/{cordis.yml,package.json,tsconfig.build.json}`、`packages/runtime/src/{harness,profiles,startup}/*`、`packages/sandbox/*/src/{node-ports,index}.ts` 与 `test/lifecycle.test.ts`、`packages/agent-host/src/node-ports/tool-host-services.ts`、`apps/desktop/src/main/{index,sandbox-resources}.ts`、`apps/desktop/src/main/runtime-v2/{tool-host-services,desktop-host-adapter,runtime-registry}.ts`。
+- **验证**：cordis-adapter 39 通过 / 1 跳过；composition 15、boot 22、runtime 84、agent-host 58、agent-cli 13 通过；Desktop 2025 通过 / 7 跳过，`typecheck` 通过；sandbox 27、sandbox-nono 11 通过 / 4 跳过（无 `ACTSPACE_NONO_PATH`）、sandbox-seatbelt 7 通过；`check:packages`、`check:desktop-build-graph` 通过。默认 Harness 构建产出 `sandbox*.js` 三个入口，`@actspace/sandbox/types` 被打进共享块。`test:contract-matrix` 仍有失败（矩阵未登记三个沙箱包），按计划在 T8 处理。
+
 ## 遇到的问题
 
 - **问题**：权限清单的 `deny` 不生效。

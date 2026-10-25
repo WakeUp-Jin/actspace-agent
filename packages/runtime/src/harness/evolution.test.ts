@@ -20,6 +20,7 @@ import { AgentRuntimeService } from "./agent-runtime-plugin.js";
 import { RuntimeSessionController } from "../session/session-controller.js";
 import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
 import { createContextHost } from "./context-host.js";
+import { createNodeSandboxHostPort } from "@actspace/sandbox";
 
 it("runs the model/tool pipeline: explicit development, next-message activation, session isolation and restart", async () => {
   const directory = await mkdtemp(join(tmpdir(), "runtime-evolution-"));
@@ -33,6 +34,7 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
   let phase = "develop"; let step = 0; let workspaceId = "";
   const seen: Array<{ phase: string; tools: string[] }> = [];
   const ports = {
+    "actspace.host.sandbox": createNodeSandboxHostPort(),
     "agent.registry": new AgentRegistry(),
     ...Object.fromEntries(["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
     "session.runtime": sessions,

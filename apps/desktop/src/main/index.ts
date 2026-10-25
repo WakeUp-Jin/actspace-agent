@@ -17,6 +17,7 @@ import type { RuntimeStreamEvent } from "@actspace/shared";
 import { resolveAppDataRoots } from "./app-paths";
 import { PendingApprovalRegistry } from "./approval-registry";
 import { BrowserBridgeService } from "./browser-bridge-service";
+import { resolveDesktopNonoPath } from "./sandbox-resources";
 import { SettingsService, type SecretCrypto } from "./settings-service";
 import { ModelStoreService } from "./model-store-service";
 import { ModelRuntimeService } from "./model-runtime-service";
@@ -192,6 +193,9 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     onReadyToReplace: () => app.quit(),
   });
   await localUpdateService.load();
+  const packagedResources = app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID;
+  const nonoPath = resolveDesktopNonoPath({ packaged: packagedResources, resourcesPath: process.resourcesPath, repoRoot: join(roots.logRoot, ".."), env: process.env });
+  await logMain("sandbox nono resolved", { nonoPath: nonoPath ?? null });
   const speech = new DesktopSpeechPlayback(roots.tmpRoot, settingsService);
   speechPlayback = speech;
   runtimeV2Registry = new DesktopRuntimeV2Registry({
@@ -200,6 +204,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     models: modelRuntimeService,
     approvals: approvalRegistry,
     browser: browserBridgeService,
+    nonoPath,
     disabledSkillIds: () => settingsService?.get().skills.disabled ?? [],
     chatCompactionTriggerRatio: () => settingsService?.getV4().settings.general.taskDefaults.chatCompactionTriggerRatio ?? 0.8,
     log: (message, details) => void logMain(message, details),

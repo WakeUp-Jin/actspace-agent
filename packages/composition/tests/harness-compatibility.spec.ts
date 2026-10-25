@@ -27,3 +27,13 @@ it("checks capabilities against the current Host rather than the persisted compo
   const old = { ...composition, hostCapabilities: ["network"], entries: composition.entries.map(e => ({ ...e, requiredCapabilities: ["network"] })) };
   expect(checkHarnessCompatibility(old, [], { ...host, capabilities: [] })[0]?.message).toContain("Missing Host capability network");
 });
+
+it("admits an absent optional service only when the entry declares it as an optional inject", () => {
+  const optional = defineBuiltinPluginManifest({ pluginId: "reader", version: "1", name: "reader", entry: { entryId: "reader", behavior: "./reader.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["storage"], optionalInjects: ["cache"], contributions: { services: ["reader"], events: [], tools: [], prompts: [] } });
+  const withCache: HarnessBehaviorContracts = { ...contracts, services: { ...contracts.services, requires: [...contracts.services.requires, { id: "cache", version: 1, optional: true, fallback: "reads go to storage" }] } };
+  const compose = (plugin: typeof optional) => composeRuntime({ profile: { id: "main", runtimeContract: "actspace.runtime.v2", orderedBundleIds: ["base"] }, bundles: [{ id: "base", version: "1", provenance: "test", manifests: [{ ...plugin, behaviors: plugin.behaviors.map(b => ({ ...b, contracts: withCache })) }] }], hostCapabilities: [] });
+  expect(compose(optional).entries[0]?.optionalInjects).toEqual(["cache"]);
+  expect(checkHarnessCompatibility(compose(optional), [], host)).toEqual([]);
+  expect(checkHarnessCompatibility(compose(optional), [], { ...host, services: [...host.services, { id: "cache", version: 2 }] })[0]?.message).toContain("cache");
+  expect(checkHarnessCompatibility(compose(manifest), [], host)[0]?.message).toContain("Service declarations differ");
+});

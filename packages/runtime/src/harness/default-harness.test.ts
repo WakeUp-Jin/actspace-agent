@@ -22,6 +22,8 @@ import { emptyRuntimePromptSource } from "@actspace/prompt";
 import { ManagedRuns } from "./managed-runs.js";
 import { RuntimeSessionController } from "../session/session-controller.js";
 import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
+import { createNodeSandboxHostPort, type SandboxStatus } from "@actspace/sandbox";
+import { DEFAULT_HARNESS_ENTRIES } from "./default-harness-definition.js";
 
 it("executes the default Loop from its fixed closure with Harness-owned policies", async () => {
   const directory = await mkdtemp(join(tmpdir(), "actspace-default-harness-"));
@@ -35,7 +37,10 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   let holdRequest = false;
   let requestEntered!: () => void;
   const entered = new Promise<void>(resolve => { requestEntered = resolve; });
+  let reportSandbox!: (status: SandboxStatus | undefined) => void;
+  const sandboxStatus = new Promise<SandboxStatus | undefined>(resolve => { reportSandbox = resolve; });
   const ports = {
+    "actspace.host.sandbox": createNodeSandboxHostPort(),
     "agent.registry": agentRegistry,
     ...Object.fromEntries(["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
     "session.runtime": sessions,
@@ -43,7 +48,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     "session.journal": { registry },
     "session.projection": {},
     "actspace.host.session": { dataRoot: directory, runtimeId: "test" },
-    "actspace.host.agent": { authorizeHarness: async (r: import("@actspace/harness-control").AuthorizationRequest) => ({ ...r, actor: "test-host", decisionId: "approved", expiresAt: Date.now() + 10000 }), disabledHarnessEntries: ["browser-tools"], contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
+    "actspace.host.agent": { authorizeHarness: async (r: import("@actspace/harness-control").AuthorizationRequest) => ({ ...r, actor: "test-host", decisionId: "approved", expiresAt: Date.now() + 10000 }), disabledHarnessEntries: ["browser-tools"], onSandboxStatus: reportSandbox, contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
     "actspace.host.prompt": { workspaceRoot: directory, resolveSource: async () => emptyRuntimePromptSource() },
     "actspace.host.llm": { credentials: { resolve: async () => ({}) }, routes: [{ routeId: "default", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async (input: { signal?: AbortSignal }) => (async function* () {
       if (holdRequest) {
@@ -66,6 +71,8 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   try {
     await sessions.create("conversation", undefined, "chat");
     expect(agentRegistry.list()).toHaveLength(0);
+    // Without a bundled nono only Seatbelt can serve, so the status is platform-dependent but always reported.
+    expect(await sandboxStatus).toMatchObject(process.platform === "darwin" ? { available: true, isolation: "sandboxed", backend: { id: "seatbelt" } } : { available: false, isolation: "sandboxed" });
     await app.submit("conversation", "one", "Hello"); await app.waitForIdle("conversation");
     const state = await app.snapshot("conversation");
     expect(failures).toEqual([]);
@@ -179,4 +186,11 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
 it("keeps Host compatibility modules in the persisted artifact canonical order", async () => {
   const modules = await defaultHarnessSharedModules();
   expect(modules.map(module => module.specifier)).toEqual(modules.map(module => module.specifier).sort((a, b) => a.localeCompare(b)));
+});
+
+it("registers the sandbox manager and both backends as replaceable Harness entries", () => {
+  const rows = new Map(DEFAULT_HARNESS_ENTRIES.map(row => [row[0], row]));
+  expect(rows.get("sandbox")).toEqual(["sandbox", ["sandbox"], ["actspace.host.sandbox"]]);
+  expect(rows.get("sandbox-nono")).toEqual(["sandbox-nono", [], ["sandbox", "actspace.host.sandbox"]]);
+  expect(rows.get("sandbox-seatbelt")).toEqual(["sandbox-seatbelt", [], ["sandbox", "actspace.host.sandbox"]]);
 });

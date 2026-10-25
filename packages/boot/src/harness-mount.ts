@@ -41,7 +41,7 @@ export async function mountHarness(parent: CordisContext, request: HarnessMountR
     if (entry.artifactId && entry.artifactId !== selectedArtifact.artifactId) throw new Error(`Harness artifact differs from entry: ${entry.entryId}`);
     const manifest = selectedArtifact.manifest.plugin;
     const descriptor = manifest.behaviors.find(item => item.entryId === (entry.manifestEntryId ?? entry.entryId));
-    if (!descriptor || descriptor.module !== entry.module || manifest.version !== entry.pluginVersion || stable(descriptor.provides ?? []) !== stable(entry.provides) || stable(descriptor.injects ?? []) !== stable(entry.injects)) throw new Error(`Harness entry differs from manifest: ${entry.entryId}`);
+    if (!descriptor || descriptor.module !== entry.module || manifest.version !== entry.pluginVersion || stable(descriptor.provides ?? []) !== stable(entry.provides) || stable(descriptor.injects ?? []) !== stable(entry.injects) || stable(descriptor.optionalInjects ?? []) !== stable(entry.optionalInjects ?? [])) throw new Error(`Harness entry differs from manifest: ${entry.entryId}`);
     for (const capability of new Set([...descriptor.host.required, ...entry.requiredCapabilities])) {
       if (!composition.hostCapabilities.includes(capability)) throw new Error(`Missing Harness Host capability: ${entry.entryId}/${capability}`);
     }
@@ -58,7 +58,7 @@ export async function mountHarness(parent: CordisContext, request: HarnessMountR
     if (!codecs.some(codec => codec.type === type)) throw new Error(`Missing Harness codec: ${type}`);
   }
   const rows = [];
-  for (const entry of entries) rows.push({ id: entry.entryId, module: await importArtifactModule(artifacts.get(entry.pluginId)!, entry.module), config: entry.config, provides: entry.provides, injects: entry.injects });
+  for (const entry of entries) rows.push({ id: entry.entryId, module: await importArtifactModule(artifacts.get(entry.pluginId)!, entry.module), config: entry.config, provides: entry.provides, injects: entry.injects, optionalInjects: entry.optionalInjects ?? [] });
   const scope = new AgentScope("harness");
   try {
     const tree = await mountIsolatedCordisTree({ parent, entries: rows, sharedServices, decorate: ctx => scopeContext(ctx, scope.scopeKey, scope.disposer) });

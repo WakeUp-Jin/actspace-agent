@@ -36,6 +36,48 @@ describe("codec-first Cordis lifecycle", () => {
     } finally { await root.dispose(); }
   });
 
+  it("injects a provided optional dependency so the consumer starts after its provider", async () => {
+    const root = await createCordisRoot();
+    try {
+      let seen: unknown;
+      const tree = await mountIsolatedCordisTree({ parent: root.context, sharedServices: [], entries: [
+        { id: "consumer", config: {}, provides: [], injects: [], optionalInjects: ["opt.service"], module: { inject: ["opt.service"], apply: (ctx: any) => { seen = ctx.get("opt.service"); } } },
+        { id: "provider", config: {}, provides: ["opt.service"], injects: [], module: { apply: (ctx: any) => { ctx.provide("opt.service", { from: "harness" }); } } },
+      ] });
+      expect(seen).toEqual({ from: "harness" });
+      await tree.dispose();
+    } finally { await root.dispose(); }
+  });
+
+  it("isolates an absent optional dependency from a same-named Host service", async () => {
+    const root = await createCordisRoot();
+    try {
+      await root.context.plugin({ apply: (ctx: any) => { ctx.provide("opt.service", { from: "host" }); } } as any);
+      expect(root.context.get("opt.service")).toEqual({ from: "host" });
+      let seen: unknown = "unset";
+      const tree = await mountIsolatedCordisTree({ parent: root.context, sharedServices: [], entries: [
+        { id: "consumer", config: {}, provides: [], injects: [], optionalInjects: ["opt.service"], module: { apply: (ctx: any) => { seen = ctx.get("opt.service"); } } },
+      ] });
+      expect(seen).toBeUndefined();
+      await tree.dispose();
+      await expect(mountIsolatedCordisTree({ parent: root.context, sharedServices: [], entries: [
+        { id: "consumer", config: {}, provides: [], injects: ["opt.service"], optionalInjects: ["opt.service"], module: { apply: () => undefined } },
+      ] })).rejects.toThrow("both required and optional");
+    } finally { await root.dispose(); }
+  });
+
+  it("injects an optional shared Host service only when the Host provides it", async () => {
+    const root = await createCordisRoot();
+    try {
+      const seen: unknown[] = [];
+      const entries = [{ id: "consumer", config: {}, provides: [], injects: [], optionalInjects: ["host.optional"], module: { apply: (ctx: any) => { seen.push(ctx.get("host.optional")); } } }];
+      await (await mountIsolatedCordisTree({ parent: root.context, sharedServices: ["host.optional"], entries })).dispose();
+      await root.context.plugin({ apply: (ctx: any) => { ctx.provide("host.optional", { from: "host" }); } } as any);
+      await (await mountIsolatedCordisTree({ parent: root.context, sharedServices: ["host.optional"], entries })).dispose();
+      expect(seen).toEqual([undefined, { from: "host" }]);
+    } finally { await root.dispose(); }
+  });
+
   it("stops Cordis-owned timers during disposal", async () => {
     const ctx = new CordisContextClass();
     let ticks = 0;

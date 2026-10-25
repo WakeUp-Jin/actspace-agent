@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
+import { accessSync, constants, statSync } from "node:fs";
 import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import type { HostProcess, HostProcessExit, HostProcessSpec, OutputChunk, SandboxHostPort } from "./types.js";
 
@@ -12,6 +14,23 @@ export function createNodeSandboxHostPort(options: { readonly nonoPath?: string 
     spawn: spawnHostProcess,
     run: runBounded,
   });
+}
+
+/**
+ * The first candidate that is an executable file. Hosts list only our pinned nono (packaged resource, or in
+ * development `ACTSPACE_NONO_PATH` and the repo's fetched copy); a nono on PATH is never considered.
+ */
+export function findBundledNono(candidates: readonly (string | undefined)[]): string | undefined {
+  return candidates.find((candidate): candidate is string => candidate !== undefined && isAbsolute(candidate) && isExecutableFile(candidate));
+}
+
+/** Where `pnpm sandbox:fetch-nono` puts the pinned build for this machine. */
+export function repoNonoPath(repoRoot: string, platform: NodeJS.Platform = process.platform, arch: string = process.arch): string {
+  return join(repoRoot, "dist", "sandbox-components", `${platform}-${arch}`, "nono");
+}
+
+function isExecutableFile(path: string): boolean {
+  try { accessSync(path, constants.X_OK); return statSync(path).isFile(); } catch { return false; }
 }
 
 export function spawnHostProcess(spec: HostProcessSpec): HostProcess {

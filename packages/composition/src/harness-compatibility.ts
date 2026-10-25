@@ -24,7 +24,7 @@ export function checkHarnessCompatibility(composition: ResolvedComposition, arti
     const behavior = composition.manifests.find(m => m.pluginId === entry.pluginId)?.behaviors.find(b => b.entryId === (entry.manifestEntryId ?? entry.entryId));
     const contracts = behavior?.contracts;
     if (!contracts) { fail("Missing behavior contracts", entry.entryId); continue; }
-    if (canonical([...entry.provides].sort()) !== canonical(contracts.services.provides.map(c => c.id).sort()) || canonical([...entry.injects].sort()) !== canonical(contracts.services.requires.filter(c => !c.optional).map(c => c.id).sort())) fail("Service declarations differ from behavior", entry.entryId);
+    if (canonical([...entry.provides].sort()) !== canonical(contracts.services.provides.map(c => c.id).sort()) || canonical([...entry.injects].sort()) !== canonical(contracts.services.requires.filter(c => !c.optional).map(c => c.id).sort()) || canonical([...entry.optionalInjects ?? []].sort()) !== canonical(contracts.services.requires.filter(c => c.optional).map(c => c.id).sort())) fail("Service declarations differ from behavior", entry.entryId);
     for (const capability of entry.requiredCapabilities) if (!(host.capabilities ?? composition.hostCapabilities).includes(capability)) fail(`Missing Host capability ${capability}`, entry.entryId);
     if (entry.frontendRequired) fail("Plugin frontend unsupported", entry.entryId);
     for (const kind of ["services", "events"] as const) for (const contract of contracts[kind].provides) {

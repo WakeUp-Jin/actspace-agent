@@ -19,6 +19,9 @@
       "path": "./../llm/service/tsconfig.build.json"
     },
     {
+      "path": "./../sandbox/manager/tsconfig.build.json"
+    },
+    {
       "path": "./../session/jsonl/tsconfig.build.json"
     },
     {

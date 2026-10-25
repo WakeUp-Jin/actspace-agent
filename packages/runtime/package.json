@@ -107,7 +107,10 @@
     "@actspace/official-skills": "workspace:*",
     "@actspace/plugin-manager": "workspace:*",
     "@actspace/harness-hmr": "workspace:*",
-    "@actspace/auto-review": "workspace:*"
+    "@actspace/auto-review": "workspace:*",
+    "@actspace/sandbox": "workspace:*",
+    "@actspace/sandbox-nono": "workspace:*",
+    "@actspace/sandbox-seatbelt": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

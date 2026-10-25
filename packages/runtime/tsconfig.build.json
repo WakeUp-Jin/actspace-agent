@@ -103,6 +103,15 @@
       "path": "./../prompt/tsconfig.build.json"
     },
     {
+      "path": "./../sandbox/manager/tsconfig.build.json"
+    },
+    {
+      "path": "./../sandbox/nono/tsconfig.build.json"
+    },
+    {
+      "path": "./../sandbox/seatbelt/tsconfig.build.json"
+    },
+    {
       "path": "./../session/checkpoint-policy/tsconfig.build.json"
     },
     {

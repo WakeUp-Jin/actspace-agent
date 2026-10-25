@@ -14,6 +14,7 @@ import { prepareDefaultHarnessArtifact, defaultHarnessSharedModules, DEFAULT_HAR
 import { TaskLedger } from "@actspace/agent-service";
 import { BackgroundTaskRegistry } from "@actspace/background-tasks";
 import { ManagedRuns } from "./managed-runs.js";
+import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
 
 export const inject = Object.freeze([...new Set([...DEFAULT_HARNESS_SHARED_SERVICES.filter(name => name !== "actspace.host.tools.browser"), "actspace.host.session"])]);
 
@@ -77,6 +78,7 @@ export class AgentRuntimeService {
       onDiagnostic: error => { host.onHarnessDiagnostic?.(error); },
     });
     await this.harnesses.initialize();
+    void this.reportSandboxStatus(host);
     ctx.provide?.("harness.control", this.harnesses);
     this.hmr = new HarnessHmr({ dataRoot: sessionHost.dataRoot, control: this.harnesses });
     this.evolution = new PluginManager({ dataRoot: sessionHost.dataRoot, artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), control: this.harnesses, hmr: this.hmr,
@@ -92,6 +94,15 @@ export class AgentRuntimeService {
     });
     ctx.provide?.("harness.hmr", this.hmr);
     ctx.provide?.("harness.plugin-manager", this.evolution);
+  }
+  /** Probing runs the backends, so it stays off the startup path; a blocked Harness is already reported. */
+  private async reportSandboxStatus(host: AgentRuntimeHostPort): Promise<void> {
+    if (!host.onSandboxStatus) return;
+    let lease;
+    try { lease = await this.harnesses.acquire("main"); } catch { return; }
+    try { host.onSandboxStatus(await lease.getService<SandboxService>(SANDBOX_SERVICE_ID)?.status("tool")); }
+    catch (error) { host.onHarnessDiagnostic?.(error); }
+    finally { await lease.release().catch(() => undefined); }
   }
   async dispose(): Promise<void> {
     this.runs.quiesce();
