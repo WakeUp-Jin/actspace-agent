@@ -1,6 +1,6 @@
 # 沙箱设计
 
-> 状态：2026-10-25 用户确认的设计，尚未实施。第一期执行计划见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/active/20261025-sandbox-v1-tool-sandbox.md)。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
+> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二、三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
 
 ## 1. 结论
 
@@ -118,12 +118,12 @@ flowchart TD
 - Linux（Landlock）无法在可写目录里挖出只读子目录，`filesystem.write-deny` 报告 `unsupported`，第一期 Linux 上 nono 不合格，bash 走审批。
 - 启动 nono 时去掉所有 `NONO_*` 环境变量，它们会改变 nono 的授权。
 - 分发：打包 `aarch64/x86_64-apple-darwin` 与 `aarch64/x86_64-unknown-linux-gnu` 四个版本，锁定版本号、校验 SHA256，macOS 上随应用签名。nono 采用 Apache-2.0 许可证。
-- 只按明确的路径查找 nono：打包路径 → `ACTSPACE_NONO_PATH` → 仓库 `dist/sandbox-components/`。不在 PATH 里查找，系统里装的也不用：版本无法保证一致，也无法确认是否被替换过。
+- 只按明确的路径查找 nono：打包版只认随包的 `resources/app/sandbox-components/bin/nono`；开发版依次是 `ACTSPACE_NONO_PATH`、仓库 `dist/sandbox-components/<platform>-<arch>/nono`（`pnpm sandbox:fetch-nono` 获取）。不在 PATH 里查找，系统里装的也不用：版本无法保证一致，也无法确认是否被替换过。
 - 不使用 Node SDK `nono-ts`：它只能对当前进程施加限制，而且撤不回来；它也将于 2026-11-01 归档。
 
 ### 5.2 Seatbelt（macOS）
 
-现有 `packages/tools/shell-tools/src/node-ports.ts` 中 `sandboxSpawn` 的 SBPL 规则搬入 `sandbox-seatbelt`，行为不变，注册优先级低于 nono。`sandbox-exec` 已被 Apple 标为弃用，以后可以去掉这个插件。
+原 shell-tools 里 `sandboxSpawn` 的 SBPL 规则已搬入 `sandbox-seatbelt`（shell-tools 不再自己起 `sandbox-exec`），注册优先级低于 nono。`sandbox-exec` 已被 Apple 标为弃用，以后可以去掉这个插件。
 
 ### 5.3 Windows（第三期）
 
@@ -165,4 +165,10 @@ Windows 后端在能力表里如实报告 `partial` / `unsupported`。初步方�
 - macOS 上 nono 会拦截钥匙串，沙箱内 `git push`、`gh` 需要申请沙箱外执行；用户接受这个更严格的行为。
 - 每次 `wrap` 的额外耗时：权限清单模式约 31ms，profile 模式约 55ms（授权条目约 110 条）。
 - Linux 需要 Landlock（内核 5.13+）；不支持时 nono 后端报告不可用。
-- Cordis 准入原本不支持可选依赖，第一期补上。
+- Cordis 准入原本不支持可选依赖，第一期补上：组合条目的 `optionalInjects` 必须与 `optional: true` 的契约一致。
+
+第一期实施后补充：
+
+- shell-tools 的权限判断按 `sandbox.status("tool")` 决定进程资源的 `noSandbox`；执行端只认批准时的 `noSandbox`，不在执行时重新判断。批准时有沙箱、执行时沙箱不可用，结果是 `SANDBOX_PREPARE_FAILED`，命令不执行。
+- 经真实 Host 端到端（`touch`）：nono 约 60ms，Seatbelt 约 14ms；工作区内写入、`git status`、`pnpm --version` 成功，`~` 下写入、读取 `~/.ssh` 失败，后台任务停止后无残留进程。
+- Linux 在 Docker Desktop（arm64，内核 6.12，Landlock V6）中实测：nono 拦截工作区外写入、凭据读取与网络；`tool` 沙箱因 `filesystem.write-deny` 不支持而不可用，bash 转审批。

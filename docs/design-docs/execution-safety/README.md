@@ -5,7 +5,7 @@
 ## 当前状态
 
 - [`agent-tool-permission-model.md`](./agent-tool-permission-model.md)：权限模型事实源；支持 `default/auto-review/full-access`，once 与 Desktop 文件、限定 Bash Session Grant 已实施。
-- [`agent-沙箱设计.md`](./agent-沙箱设计.md)：沙箱设计（2026-10-25 确认，未实施）；工具沙箱 / 评估沙箱、Host 侧管理器、nono 与 Windows 分期。
+- [`agent-沙箱设计.md`](./agent-沙箱设计.md)：沙箱设计（2026-10-25 确认）；第一期工具沙箱已实施（Harness 插件 `sandbox` + nono / Seatbelt 后端），评估沙箱与 Windows 在后续分期。
 - [`permission-runtime-foundation`](../../exec-plans/completed/permission-runtime-foundation.md)：权限 Runtime、文件/Bash once、mode、Journal 与 Host 直接切换计划，自动化实施已完成。
 - [`session-scope-grants`](../../exec-plans/completed/session-scope-grants.md)：Desktop 文件 Session Grant、恢复、管理与撤销计划；真实 Electron 主题/重启矩阵保留人工验收。
 
@@ -70,7 +70,7 @@ checkpoint 之前失败可以安全报告 not-started；checkpoint 之后如果�
 - 无显式目标、使用 glob、命中关键目录或逃出 workspace 的删除；
 - 删除或移动 `.git` 元数据。
 
-Bash executor 通过 Host port 启动进程，可选使用 macOS sandbox profile；当前进程环境仍可能被子命令读取，因此 provider credential 不应通过 Desktop 环境变量提供。提高 Bash 能力前应先定义更窄的环境白名单和明确的 shell 语法分类器。
+Bash executor 经 Harness 的 `sandbox` 服务执行：macOS 优先 nono、其次 Seatbelt；工作区、输出目录和系统临时目录可写，`.git/hooks`、`.git/config` 与凭据目录受保护，网络不限制。组合里没有沙箱、或者沙箱不能满足 `tool` 模板（Linux 缺少禁止写入、Windows 没有后端）时，bash 按“沙箱外执行”走审批，审批卡显示“真实环境”，没有前缀授权选项；执行端只认批准时的选择，沙箱中途不可用会拒绝执行而不是改为沙箱外执行。沙箱不过滤环境变量，子命令仍能读到完整的进程环境，因此 provider credential 不应通过 Desktop 环境变量提供。提高 Bash 能力前应先定义更窄的环境白名单和明确的 shell 语法分类器。
 
 ## Host 边界
 

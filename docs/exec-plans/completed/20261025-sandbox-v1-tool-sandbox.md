@@ -288,7 +288,7 @@ T0 → T1 →（T2、T3、T4 可并行）→ T5 → T6 →（T7 可与 T6 并行
 - [x] T7 审批卡真实环境
 - [x] T8 生成物与检查
 - [x] T9 端到端验证（Desktop 界面项留人工验收）
-- [ ] T10 文档与收尾
+- [x] T10 文档与收尾（结果见[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)）
 
 ## 决策记录
 
