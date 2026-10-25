@@ -64,6 +64,17 @@
   - `pnpm test:agent-cli:process` 中 SIGINT、SIGTERM 两条 “drains background descendants” 失败（恢复后请求数为 2，期望 1）；在 HEAD 上（暂存改动、重新构建）同样失败，与本次改动无关。
 - **影响文件**：`packages/tools/shell-tools/src/{plugin.ts,node-ports.ts,test/lifecycle.test.ts,test/node-ports.test.ts}`、`apps/desktop/src/main/test/runtime-v2-output-reference-flow.test.ts`、`scripts/test/{host-tools-process.test.mjs,fixtures/agent-provider.mjs}`。
 
+### 步骤 4：T3 被拦识别与提示
+
+- **操作**：
+  - `node-ports.ts` 加 `sandboxDenial(status, output)`（导出给测试）：`isolation === "sandboxed"`、退出码不为 0 或 null、不是 2/126/127，输出小写后含 `operation not permitted` 或 `eperm`。
+  - `sandboxDenialHint`：只在沙箱内失败时读输出文件末尾 8KB 判断，命中返回一行英文提示。
+  - 前台：提示接在 `modelOutput` 文字末尾（输出之后），`summary`、`failure.message`、退出码与 `sandboxed=…, sandbox=…` 不变。
+  - 后台：`terminal()` 在 `Background command failed with exit code N.` 后接同一行提示。
+- **与计划不同**：计划写后台用“通知末尾”判断，通知末尾只有 2000 字，npm 的 `EPERM` 在更前面；改为前后台都读输出文件末尾 8KB，规则一致。
+- **结果**：shell-tools 113 通过。新增：判定表（命中、`Permission denied` 不命中、退出码 0/2/126/127/null 不命中、`none`/`inherited` 不命中）；假沙箱前台命中且摘要不变、沙箱外与退出码 2、0 不提示、后台通知命中；真实 nono、Seatbelt 写工作区外的结果带提示。
+- **影响文件**：`packages/tools/shell-tools/src/{node-ports.ts,test/node-ports.test.ts}`。
+
 ## 遇到的问题
 
 - T1 新测试起初只期望三次提取，实际每次准入都会在执行前复查一次（`full-access` 也一样），改为四次。

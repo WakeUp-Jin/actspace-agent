@@ -45,7 +45,7 @@ const MODES: readonly Mode[] = [
   { label: "sandbox service, sandboxed", noSandbox: false, sandbox: () => recordingSandbox(), summary: "sandboxed=true, sandbox=fake" },
 ];
 
-import { createNodeBashToolPorts } from "../node-ports.js";
+import { createNodeBashToolPorts, sandboxDenial } from "../node-ports.js";
 
 /** Records what Bash hands to the Host registry. */
 function fakeHost() {
@@ -126,12 +126,44 @@ describe("shell-tools ports", () => {
       const inside = await run("printf ok > inside.txt && git status --short");
       expect(inside.summary).toContain(`sandboxed=true, sandbox=${id}`);
       expect(await readFile(join(root, "inside.txt"), "utf8")).toBe("ok");
-      expect((await run(`printf no > '${outside}'`)).status).toBe("failed");
+      const blocked = await run(`printf no > '${outside}'`);
+      expect(blocked.status).toBe("failed");
+      expect(JSON.stringify(blocked.modelOutput)).toContain("require_escalated");
       expect(existsSync(outside)).toBe(false);
       expect((await run("printf no > .git/hooks/pre-commit")).status).toBe("failed");
       expect(existsSync(join(root, ".git", "hooks", "pre-commit"))).toBe(false);
     } finally { await rm(outside, { force: true }); await ports.dispose(); }
   }, 30_000);
+
+  it("recognises a sandbox denial only for a failed sandboxed run that reports EPERM", () => {
+    const sandboxed = (exitCode: number | null) => ({ isolation: "sandboxed" as const, exitCode });
+    expect(sandboxDenial(sandboxed(1), "touch: /x: Operation not permitted")).toBe(true);
+    expect(sandboxDenial(sandboxed(255), "npm error code EPERM\n... sudo chown -R")).toBe(true);
+    expect(sandboxDenial(sandboxed(4), "error: could not write config file .git/config: Operation not permitted")).toBe(true);
+    expect(sandboxDenial(sandboxed(1), "cat: locked.txt: Permission denied")).toBe(false);
+    for (const exitCode of [0, 2, 126, 127, null]) expect(sandboxDenial(sandboxed(exitCode), "Operation not permitted")).toBe(false);
+    for (const isolation of ["none", "inherited"] as const) expect(sandboxDenial({ isolation, exitCode: 1 }, "Operation not permitted")).toBe(false);
+  });
+
+  it("tells the model it may retry outside the sandbox, in the foreground result and the background notification", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, sandbox: recordingSandbox().sandbox });
+    const denied = "printf 'touch: /x: Operation not permitted\\n' >&2; exit 1";
+    try {
+      const hinted = await invoke(ports.bash, { command: denied, blockMs: 2_000 }, "session", undefined, "", false);
+      expect(hinted).toMatchObject({ status: "failed", failure: { code: "BASH_EXIT_NONZERO" } });
+      expect(JSON.stringify(hinted.modelOutput)).toContain('sandbox_permissions: \\"require_escalated\\"');
+      // What the user sees is unchanged.
+      expect(hinted.summary).not.toContain("sandbox_permissions");
+      expect(hinted.summary).toContain("exit 1, sandboxed=true, sandbox=fake");
+      for (const [command, noSandbox] of [[denied, true], ["printf 'Operation not permitted\\n'; exit 2", false], ["printf 'Operation not permitted\\n'", false]] as const) {
+        expect(JSON.stringify((await invoke(ports.bash, { command, blockMs: 2_000 }, "session", undefined, "", noSandbox)).modelOutput), command).not.toContain("sandbox_permissions");
+      }
+      const background = await invoke(ports.bash, { command: "sleep 0.1; printf 'EPERM: operation not permitted, mkdir'; exit 255", intent: "denied later", blockMs: 0 }, "session", undefined, "", false);
+      const taskId = JSON.stringify(background).match(/bash_[0-9a-f-]+/)![0];
+      await vi.waitFor(() => expect(lastHost.terminals.get(taskId)?.summary).toMatch(/^Background command failed with exit code 255\. The sandbox may have blocked/), { timeout: 3_000 });
+    } finally { await ports.dispose(); }
+  });
 
   it("follows the admitted resource over the arguments and falls back to an explicit escalation request", async () => {
     const root = await workspace(); const tmpRoot = await workspace();

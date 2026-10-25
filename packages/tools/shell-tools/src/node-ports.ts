@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
@@ -23,6 +23,11 @@ const MAX_SUBSCRIPTION_PATTERN_LENGTH = 500;
 const MIN_SUBSCRIPTION_DEBOUNCE_MS = 5_000;
 const MAX_MONITOR_LINE_CHARS = 4_000;
 const NOTIFICATION_TAIL_CHARS = 2_000;
+/** Measured on macOS (nono, Seatbelt): a blocked write reports EPERM. A command's own EACCES ("Permission denied") is not one. */
+const SANDBOX_DENIAL_SIGNATURES = ["operation not permitted", "eperm"] as const;
+/** npm prints EPERM early and a misleading "sudo chown" advice last, so look further back than the last lines. */
+const SANDBOX_DENIAL_TAIL_BYTES = 8 * 1024;
+const SANDBOX_DENIAL_HINT = "The sandbox may have blocked this command: it ran in the sandbox and the output reports \"operation not permitted\". If it really needs to write outside the workspace or use the keychain, retry the same command once with sandbox_permissions: \"require_escalated\" and a one-sentence justification; the user will be asked to approve. If it should not need that, change the approach instead.";
 
 export type NodeBashToolPorts = Pick<ToolPorts, "bash"> & {
   readonly hasRunningBackgroundTask: (sessionId: string) => boolean;
@@ -259,7 +264,7 @@ class BashTaskRegistry {
       task.notStarted = status.notStarted;
       task.monitor.dispose();
       task.reportProgress({ message: `Background Bash task ${task.taskId} ${task.status}.` });
-      return terminal(task, await readFile(task.outputPath, "utf8").then((value) => value.slice(-NOTIFICATION_TAIL_CHARS)).catch(() => ""));
+      return terminal(task, await readFile(task.outputPath, "utf8").then((value) => value.slice(-NOTIFICATION_TAIL_CHARS)).catch(() => ""), await sandboxDenialHint(status, task.outputPath));
     });
     await this.background?.register({
       taskId: task.taskId, kind: "bash", sessionId: task.sessionId, callId: task.callId, description: task.intent ?? task.command, done: task.completion,
@@ -286,13 +291,37 @@ class BashTaskRegistry {
   #kill(task: BashTask): void { if (task.status === "running") { task.status = "killed"; task.process.kill(); } }
 }
 
-function terminal(task: BashTask, tail: string): BackgroundTaskTerminal {
+function terminal(task: BashTask, tail: string, hint?: string): BackgroundTaskTerminal {
   const exit = task.exitCode === undefined || task.exitCode === null ? "" : ` with exit code ${task.exitCode}`;
   const body = redactToolText(tail);
   if (task.notStarted) return { status: "failed", summary: `Background command did not start: ${task.notStarted.join(" ")}`, body, exitCode: null };
   if (task.timedOut) return { status: "failed", summary: `Background command timed out after ${MAX_RUNTIME_MS / 60_000} minutes and was killed.`, body, exitCode: task.exitCode ?? null };
   if (task.status === "killed") return { status: "stopped", summary: "Background command was stopped.", body, exitCode: task.exitCode ?? null };
-  return { status: task.status === "completed" ? "completed" : "failed", summary: `Background command ${task.status}${exit}.`, body, exitCode: task.exitCode ?? null };
+  return { status: task.status === "completed" ? "completed" : "failed", summary: `Background command ${task.status}${exit}.${hint === undefined ? "" : ` ${hint}`}`, body, exitCode: task.exitCode ?? null };
+}
+
+/** A guess, as in Codex and DSH: a failed sandboxed run whose output names EPERM. Usage errors (2) and missing or non-executable commands (126, 127) are the command's own. */
+export function sandboxDenial(status: Pick<ProcessStatus, "isolation" | "exitCode">, output: string): boolean {
+  if (status.isolation !== "sandboxed" || status.exitCode === null || [0, 2, 126, 127].includes(status.exitCode)) return false;
+  const text = output.toLowerCase();
+  return SANDBOX_DENIAL_SIGNATURES.some((signature) => text.includes(signature));
+}
+
+/** Reads the output file only for a failed sandboxed run. */
+async function sandboxDenialHint(status: ProcessStatus, outputPath: string): Promise<string | undefined> {
+  if (status.isolation !== "sandboxed" || !status.exitCode) return undefined;
+  return sandboxDenial(status, await readEnd(outputPath, SANDBOX_DENIAL_TAIL_BYTES)) ? SANDBOX_DENIAL_HINT : undefined;
+}
+
+async function readEnd(path: string, bytes: number): Promise<string> {
+  const file = await open(path, "r").catch(() => undefined);
+  if (file === undefined) return "";
+  try {
+    const { size } = await file.stat();
+    const buffer = Buffer.alloc(Math.min(size, bytes));
+    await file.read(buffer, 0, buffer.length, size - buffer.length);
+    return buffer.toString("utf8");
+  } catch { return ""; } finally { await file.close(); }
 }
 
 async function readTail(path: string): Promise<string> {
@@ -320,7 +349,10 @@ async function foreground(command: string, cwd: string, status: ProcessStatus, o
     try { artifact = await context.createArtifact({ bytes: await readFile(outputPath), mediaType: "text/plain" }); }
     catch (error) { return failed("BASH_ARTIFACT_FAILED", `${text}\n\nFull output could not be preserved: ${error instanceof Error ? error.message : String(error)}`, false); }
   }
-  const modelOutput = artifact === undefined ? [{ type: "text" as const, text }] : [{ type: "text" as const, text }, { type: "artifact" as const, artifact, label: "Full Bash output" }];
+  // The hint is for the model; the summary, exit code and sandbox marker the user sees stay the same.
+  const hint = await sandboxDenialHint(status, outputPath);
+  const modelText = hint === undefined ? text : `${text}\n\n${hint}`;
+  const modelOutput = artifact === undefined ? [{ type: "text" as const, text: modelText }] : [{ type: "text" as const, text: modelText }, { type: "artifact" as const, artifact, label: "Full Bash output" }];
   return status.exitCode === 0
     ? { status: "completed", summary, modelOutput, ...(artifact === undefined ? {} : { artifacts: [artifact] }) }
     : { status: "failed", summary: text, modelOutput, ...(artifact === undefined ? {} : { artifacts: [artifact] }), failure: { code: "BASH_EXIT_NONZERO", message: text, retryable: false } };
