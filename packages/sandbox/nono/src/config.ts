@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { SandboxPolicy } from "@actspace/sandbox/types";
+import type { SandboxNetwork, SandboxPolicy } from "@actspace/sandbox/types";
 import type { ReadCover } from "./cover.js";
 
 /** Grants already resolved against the filesystem; `readWrite` is split by type because nono grants files separately. */
@@ -33,7 +33,34 @@ export function buildMacosProfile(policy: SandboxPolicy, grants: NonoGrants, hom
       ...denyRead.length ? [`(deny file-read* ${subpaths(denyRead)})`] : [],
       ...denyWrite.length ? [`(deny file-write* ${subpaths(denyWrite)})`] : [],
     ],
-    network: policy.network.mode === "blocked" ? { block: true } : {},
+    network: profileNetwork(policy.network),
+  };
+}
+
+/**
+ * Linux allowlists need `nono run`, and only profile mode carries `upstream_proxy` there (the manifest silently
+ * drops it, and `-c` refuses every other flag). Grants are the same split cover as the manifest.
+ */
+export function buildLinuxProfile(policy: SandboxPolicy, grants: NonoGrants): Record<string, unknown> {
+  if (policy.filesystem.denyWrite.length) throw new Error("nono on Linux cannot deny writes inside a writable directory.");
+  return {
+    meta: { name: "actspace-sandbox", description: `ActSpace ${policy.purpose} sandbox ${policy.fingerprint}` },
+    filesystem: { read: grants.read.directories, read_file: grants.read.files, allow: grants.readWrite.directories, allow_file: [...grants.readWrite.files, "/dev/null"] },
+    network: profileNetwork(policy.network),
+  };
+}
+
+/**
+ * Allowlisted traffic goes through nono's proxy; clients connect to 127.0.0.1 and localhost directly (nono sets
+ * NO_PROXY for them), so local ports are opened separately and adding those hosts to the domain list does nothing.
+ */
+function profileNetwork(network: SandboxNetwork): Record<string, unknown> {
+  if (network.mode === "blocked") return { block: true };
+  if (network.mode === "unrestricted") return {};
+  return {
+    allow_domain: network.domains,
+    ...network.localPorts?.length ? { open_port: network.localPorts } : {},
+    ...network.upstreamProxy ? { upstream_proxy: network.upstreamProxy } : {},
   };
 }
 

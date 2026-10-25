@@ -72,8 +72,22 @@
   - `@actspace/sandbox-seatbelt` 7 个测试通过；`@actspace/sandbox-nono` 11 个通过、4 个跳过（没设 `ACTSPACE_NONO_PATH`）；`@actspace/tools-shell-tools` 109 个通过。
   - 仓库里没有任何组合用到插件配置 `mode`。
 
+### 步骤 3：T2 nono 后端的 `run` 模式
+
+- **操作**：
+  - `backend.ts`：网络是 `allowlist` 时，两个平台都用 `run -s --no-diagnostics --no-audit --no-rollback -p <profile>`，其他情况仍用 `wrap`。白名单下会去掉调用方环境里的 `HTTP(S)_PROXY`、`ALL_PROXY`、`NO_PROXY`、`NODE_USE_ENV_PROXY`（不区分大小写），这些变量改由 nono 设置；调用方自己的代理会绕过 nono 的代理。
+  - 能力表中 `network.allowlist`、`network.local-ports`、`network.upstream-proxy` 在 macOS 与 Linux 上改为 `full`。
+  - `config.ts`：新增 `buildLinuxProfile`，授权与 Linux 权限清单相同（拆分覆盖），遇到需要禁止写入的策略就拒绝。macOS profile 与 Linux profile 共用 `profileNetwork`：`blocked` 写成 `{ block: true }`；`allowlist` 写成 `allow_domain`，有本机端口时加 `open_port`，有上游代理时加 `upstream_proxy`。
+  - Seatbelt 能力表在 T1 已补齐，`network.allowlist` 仍是 `unsupported`。
+- **影响文件**：`packages/sandbox/nono/src/{backend,config}.ts` 及测试。
+- **验证**：
+  - macOS（本机，nono 0.80.0）：`ACTSPACE_NONO_PATH=… vitest run` 21 个通过。新增的真实执行用例使用评估模板，覆盖四点：只有放行的本机端口能连上（调用方传入的 `HTTPS_PROXY`、`NO_PROXY=*` 已被去掉）；工作区可写、HOME 不可写；上游代理只收到 `example.com:443`、没有收到 `github.com`；终止后 supervisor 所在进程组没有残留。
+  - Linux（Docker `node:22 --init`，arm64）：`tmp/sandbox-v2-e2e/linux-run.mjs` 复现上述用例，并确认 `status("evaluation")` 可用，5 项全部通过。
+  - `pnpm --filter @actspace/sandbox-nono typecheck` 通过。
+
 ## 遇到的问题
 
+- Linux 容器里第一次复验“终止无残留”失败：`ps` 显示两个 `sleep` 处于 `Z` 状态，父进程是 PID 1。容器里的 PID 1 是 `node`，它不回收被转交过来的孤儿进程，`kill(-pgid, 0)` 对僵尸进程也会成功。加 `docker run --init` 后通过。真实主机上由 init 或 systemd 回收，不受影响；Docker 复验统一加 `--init`。
 - 第一版代理实验在代理服务所在的进程里用 `execFileSync` 启动 nono，事件循环被阻塞，代理无法响应，请求一直挂起。改用异步 `execFile` 加每次调用的 `timeout` 后正常。
 
 ## 跳过或推迟的事项

@@ -2,8 +2,8 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolvePolicy, sandboxTemplate, type SandboxHostPort, type SandboxPolicy, type SandboxRequest } from "@actspace/sandbox";
-import { createNonoBackend, nonoStateRoots, withoutNonoVariables } from "../backend.js";
-import { buildLinuxManifest, buildMacosProfile, sbplString } from "../config.js";
+import { createNonoBackend, nonoStateRoots, withoutNonoVariables, withoutProxyVariables } from "../backend.js";
+import { buildLinuxManifest, buildLinuxProfile, buildMacosProfile, sbplString } from "../config.js";
 import { coverReadable, type CoverFs } from "../cover.js";
 
 type Node = "dir" | "file" | { readonly link: string };
@@ -93,8 +93,26 @@ describe("nono configuration", () => {
     expect(() => buildLinuxManifest(darwin, grants)).toThrow(/cannot deny writes/);
   });
 
-  it("strips NONO_ variables and locates nono state like nono does", () => {
+  it("writes allowlists as profile network fields, on Linux too", async () => {
+    const evaluation = sandboxTemplate("evaluation", { homeDir: "/Users/agent", platform: "linux" })!;
+    const resolved = await resolvePolicy(request({ purpose: "evaluation", network: { mode: "allowlist", domains: ["api.example.com"], localPorts: [8080], upstreamProxy: "127.0.0.1:7897" } }), evaluation);
+    if (!resolved.ok) throw new Error(resolved.reasons.join());
+    const network = { allow_domain: ["api.example.com"], open_port: [8080], upstream_proxy: "127.0.0.1:7897" };
+    expect(buildLinuxProfile(resolved.policy, grants)).toEqual({
+      meta: { name: "actspace-sandbox", description: `ActSpace evaluation sandbox ${resolved.policy.fingerprint}` },
+      filesystem: { read: ["/bin"], read_file: ["/.file"], allow: ["/work"], allow_file: ["/work.log", "/dev/null"] },
+      network,
+    });
+    expect(buildMacosProfile(resolved.policy, grants, "/Users/agent").network).toEqual(network);
+    const plain = { ...resolved.policy, network: { mode: "allowlist" as const, domains: ["a.com"] } };
+    expect(buildLinuxProfile(plain, grants).network).toEqual({ allow_domain: ["a.com"] });
+    const darwin = await policyFor("darwin");
+    expect(() => buildLinuxProfile(darwin, grants)).toThrow(/cannot deny writes/);
+  });
+
+  it("strips NONO_ and proxy variables and locates nono state like nono does", () => {
     expect(withoutNonoVariables({ PATH: "/bin", NONO_ALLOW: "/", nono_profile: "x", HOME: "/h" })).toEqual({ PATH: "/bin", HOME: "/h" });
+    expect(withoutProxyVariables({ PATH: "/bin", https_proxy: "x", HTTP_PROXY: "x", all_proxy: "x", NO_PROXY: "x", NODE_USE_ENV_PROXY: "1", PROXY_OTHER: "kept" })).toEqual({ PATH: "/bin", PROXY_OTHER: "kept" });
     expect(nonoStateRoots({}, "/h")).toEqual(["/h/.nono", "/h/.local/state/nono"]);
     expect(nonoStateRoots({ XDG_STATE_HOME: "/state" }, "/h")).toEqual(["/h/.nono", "/state/nono"]);
     expect(nonoStateRoots({ XDG_STATE_HOME: "relative" }, "/h")).toEqual(["/h/.nono", "/h/.local/state/nono"]);
@@ -116,7 +134,7 @@ describe("nono backend", () => {
 
   it("reports the version and platform capabilities after a real wrap", async () => {
     const host = fakeHost("linux", "/n");
-    expect(await createNonoBackend(host).probe()).toMatchObject({ available: true, version: "0.80.0", capabilities: { "filesystem.write-deny": "unsupported", "network.blocked": "full" } });
+    expect(await createNonoBackend(host).probe()).toMatchObject({ available: true, version: "0.80.0", capabilities: { "filesystem.write-deny": "unsupported", "network.blocked": "full", "network.allowlist": "full", "network.local-ports": "full", "network.upstream-proxy": "full", "network.credential-injection": "unsupported", "process.resource-limits": "unsupported" } });
     expect(host.runs).toEqual([["/n", "--version"], ["/n", "wrap", "-s", "--no-diagnostics", "--read", "/usr", "--block-net", "--", "/usr/bin/true"]]);
     expect(await createNonoBackend(fakeHost("darwin", "/n")).probe()).toMatchObject({ capabilities: { "filesystem.write-deny": "full" } });
   });
@@ -145,6 +163,21 @@ describe("nono backend", () => {
     await expect(backend.prepare({ ...policy, env: {} })).rejects.toThrow(/absolute HOME/);
     await expect(backend.prepare({ ...policy, env: { HOME: "/Users/agent" }, filesystem: { ...policy.filesystem, readWrite: ["/Users/agent/.local"] } })).rejects.toThrow(/overlaps nono state/);
     await expect(backend.prepare({ ...policy, env: { HOME: "/Users/agent" }, filesystem: { ...policy.filesystem, readWrite: ["/missing"] } })).rejects.toThrow(/does not exist/);
-    await expect(backend.prepare({ ...policy, network: { mode: "allowlist", domains: ["a.com"] } })).rejects.toThrow(/allowlists/);
+  });
+
+  it.each(["darwin", "linux"] as const)("uses nono run with a profile for allowlists on %s and drops the caller's proxy", async platform => {
+    const scratch = await mkdtemp(join(tmpdir(), "nono-run-"));
+    const tree = { ...TREE, "/work": "dir" as const, [scratch]: "dir" as const };
+    const evaluation = sandboxTemplate("evaluation", { homeDir: "/Users/agent", platform })!;
+    const resolved = await resolvePolicy(request({ purpose: "evaluation", scratchDir: scratch, filesystem: { readWrite: ["/work"] }, env: { HOME: "/Users/agent", HTTPS_PROXY: "http://corp:8080", NONO_ALLOW: "/" }, network: { mode: "allowlist", domains: ["a.com"] } }), evaluation);
+    if (!resolved.ok) throw new Error(resolved.reasons.join());
+    const launch = await createNonoBackend(fakeHost(platform, "/n"), fakeFs(tree)).prepare(resolved.policy);
+    const configPath = launch.spawn.args[6]!;
+    expect(launch.spawn).toEqual({ command: "/n", args: ["run", "-s", "--no-diagnostics", "--no-audit", "--no-rollback", "-p", configPath, "--", "/bin/zsh", "-lc", "true"], cwd: "/work", env: { HOME: "/Users/agent" } });
+    const profile = JSON.parse(await readFile(configPath, "utf8"));
+    expect(profile.network).toEqual({ allow_domain: ["a.com"] });
+    expect(profile.filesystem.allow).toEqual(["/work"]);
+    expect(profile.version).toBeUndefined();
+    await launch.dispose();
   });
 });

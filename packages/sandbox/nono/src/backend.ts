@@ -3,14 +3,20 @@ import { rm, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import type { CapabilityLevels, SandboxBackend, SandboxHostPort, SandboxPolicy } from "@actspace/sandbox/types";
 import { contains, coverReadable, nodeCoverFs, type CoverFs, type ReadCover } from "./cover.js";
-import { buildLinuxManifest, buildMacosProfile } from "./config.js";
+import { buildLinuxManifest, buildLinuxProfile, buildMacosProfile } from "./config.js";
 
 const PROBE_TIMEOUT_MS = 3_000;
 const WRAP = ["wrap", "-s", "--no-diagnostics"] as const;
+/** `run` keeps a supervisor with its proxy; audit and rollback would write to ~/.nono, outside the policy. */
+const RUN = ["run", "-s", "--no-diagnostics", "--no-audit", "--no-rollback"] as const;
+const PROXY_VARIABLES = new Set(["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "NODE_USE_ENV_PROXY"]);
 
-/** Landlock cannot deny inside an allowed directory, so Linux lacks `filesystem.write-deny`. */
+/**
+ * Landlock cannot deny inside an allowed directory, so Linux lacks `filesystem.write-deny`. Allowlists use
+ * `nono run`'s proxy on both platforms; credential injection and resource limits are not wired up yet.
+ */
 export function nonoCapabilities(platform: NodeJS.Platform): CapabilityLevels {
-  return Object.freeze({ "filesystem.write": "full", "filesystem.read-deny": "full", "filesystem.write-deny": platform === "darwin" ? "full" : "unsupported", "network.blocked": "full", "network.allowlist": "unsupported", "network.local-ports": "unsupported", "network.upstream-proxy": "unsupported", "network.credential-injection": "unsupported", "process.inherit": "full", "process.resource-limits": "unsupported" });
+  return Object.freeze({ "filesystem.write": "full", "filesystem.read-deny": "full", "filesystem.write-deny": platform === "darwin" ? "full" : "unsupported", "network.blocked": "full", "network.allowlist": "full", "network.local-ports": "full", "network.upstream-proxy": "full", "network.credential-injection": "unsupported", "process.inherit": "full", "process.resource-limits": "unsupported" });
 }
 
 /** The bundled nono (Seatbelt on macOS, Landlock on Linux). Never falls back to a nono found on PATH. */
@@ -36,8 +42,9 @@ export function createNonoBackend(host: SandboxHostPort, fs: CoverFs = nodeCover
     prepare: async (policy: SandboxPolicy) => {
       const nonoPath = host.resources.nonoPath;
       if (!nonoPath) throw new Error("The bundled nono binary was not found.");
-      if (policy.network.mode === "allowlist") throw new Error("Network allowlists are not supported by nono wrap.");
-      const env = withoutNonoVariables(policy.env);
+      const run = policy.network.mode === "allowlist";
+      // Under an allowlist nono sets the proxy variables itself; a caller's own proxy would point past it.
+      const env = run ? withoutProxyVariables(withoutNonoVariables(policy.env)) : withoutNonoVariables(policy.env);
       const home = env.HOME;
       if (!home || !isAbsolute(home)) throw new Error("nono needs an absolute HOME in the environment.");
       const stateRoots = await Promise.all(nonoStateRoots(env, home).map(path => canonical(path, fs)));
@@ -52,11 +59,11 @@ export function createNonoBackend(host: SandboxHostPort, fs: CoverFs = nodeCover
         read: await coverReadable(read.mode === "all" ? ["/"] : read.paths, darwin ? stateRoots : [...denyRead, ...stateRoots], fs),
         readWrite: await splitByType(readWrite, fs),
       };
-      const config = darwin ? buildMacosProfile(policy, grants, home) : buildLinuxManifest(policy, grants);
+      const config = darwin ? buildMacosProfile(policy, grants, home) : run ? buildLinuxProfile(policy, grants) : buildLinuxManifest(policy, grants);
       const configPath = join(policy.scratchDir, `nono-${randomUUID()}.json`);
       await writeFile(configPath, JSON.stringify(config), { encoding: "utf8", mode: 0o600 });
       return {
-        spawn: { command: nonoPath, args: [...WRAP, darwin ? "-p" : "-c", configPath, "--", ...policy.argv], cwd: policy.cwd, env },
+        spawn: { command: nonoPath, args: [...run ? RUN : WRAP, darwin || run ? "-p" : "-c", configPath, "--", ...policy.argv], cwd: policy.cwd, env },
         dispose: () => rm(configPath, { force: true }),
       };
     },
@@ -66,6 +73,10 @@ export function createNonoBackend(host: SandboxHostPort, fs: CoverFs = nodeCover
 /** `NONO_*` variables change nono's own behavior (extra grants, profiles, network), so they never reach it. */
 export function withoutNonoVariables(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([key]) => !key.toUpperCase().startsWith("NONO_")));
+}
+
+export function withoutProxyVariables(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !PROXY_VARIABLES.has(key.toUpperCase())));
 }
 
 /** Directories nono refuses to grant (`~/.nono`, `$XDG_STATE_HOME/nono`), computed the way nono computes them. */

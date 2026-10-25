@@ -1,4 +1,6 @@
+import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,7 +22,7 @@ describe.skipIf(!nonoPath)("nono enforcement", () => {
     await writeFile(join(home, "notes.txt"), "visible");
   });
 
-  async function run(command: string, options: { readonly network?: SandboxRequest["network"]; readonly env?: NodeJS.ProcessEnv } = {}) {
+  async function run(command: string, options: { readonly network?: SandboxRequest["network"]; readonly env?: NodeJS.ProcessEnv; readonly purpose?: SandboxRequest["purpose"]; readonly started?: (execution: ReturnType<typeof startExecution>) => void } = {}) {
     const workspace = await realpath(await mkdtemp(join(tmpdir(), "nono-ws-")));
     const scratch = await realpath(await mkdtemp(join(tmpdir(), "nono-scratch-")));
     await mkdir(join(workspace, ".git", "hooks"), { recursive: true });
@@ -28,14 +30,16 @@ describe.skipIf(!nonoPath)("nono enforcement", () => {
     const registry = new BackendRegistry();
     registry.register(createNonoBackend(host));
     // Linux has no write-deny, so it runs the tool template without the git protection the manager would require.
-    const base = sandboxTemplate("tool", { homeDir: home, platform: host.platform })!;
+    const purpose = options.purpose ?? "tool";
+    const base = sandboxTemplate(purpose, { homeDir: home, platform: host.platform })!;
     const template = host.platform === "darwin" ? base : { ...base, denyWriteWithinWritable: [], requiredCapabilities: base.requiredCapabilities.filter(cap => cap !== "filesystem.write-deny") };
     const execution = startExecution({
-      request: { purpose: "tool", isolation: "sandboxed", argv: ["/bin/sh", "-c", command], cwd: workspace, env: { ...process.env, HOME: home, TMPDIR: scratch, ...options.env }, scratchDir: scratch, filesystem: { readWrite: [workspace, scratch] }, ...options.network ? { network: options.network } : {} },
+      request: { purpose, isolation: "sandboxed", argv: ["/bin/sh", "-c", command], cwd: workspace, env: { ...process.env, HOME: home, TMPDIR: scratch, ...options.env }, scratchDir: scratch, filesystem: { readWrite: [workspace, scratch] }, ...options.network ? { network: options.network } : {} },
       mode: "sandboxed", host, registry, template, timing: DEFAULT_EXECUTION_TIMING,
     });
     let output = "";
     execution.onOutput(chunk => { output += chunk.text; });
+    options.started?.(execution);
     return { result: await execution.result, output, workspace };
   }
 
@@ -65,5 +69,50 @@ describe.skipIf(!nonoPath)("nono enforcement", () => {
   it("blocks the network when requested", async () => {
     const script = `${process.execPath} -e "fetch('https://example.com',{signal:AbortSignal.timeout(5000)}).then(()=>console.log('online'),()=>console.log('offline'))"`;
     expect((await run(script, { network: { mode: "blocked" } })).output.trim().split("\n").at(-1)).toBe("offline");
+  });
+
+  describe("allowlist (nono run)", () => {
+    const servers: Server[] = [];
+    afterAll(() => { for (const server of servers) server.close(); });
+    async function listen(server: Server): Promise<number> {
+      servers.push(server);
+      server.listen(0, "127.0.0.1");
+      await once(server, "listening");
+      return (server.address() as { port: number }).port;
+    }
+    const fetchScript = (url: string) => `${process.execPath} -e "fetch('${url}',{signal:AbortSignal.timeout(5000)}).then(r=>r.text()).then(t=>console.log('ok',t),e=>console.log('fail'))" 2>/dev/null`;
+    const last = (output: string) => output.trim().split("\n").at(-1);
+
+    it("reaches opened local ports only, with the evaluation template", async () => {
+      const open = await listen(createServer((_, res) => res.end("model")));
+      const closed = await listen(createServer((_, res) => res.end("other")));
+      const network = { mode: "allowlist" as const, domains: ["example.com"], localPorts: [open] };
+      const allowed = await run(fetchScript(`http://127.0.0.1:${open}/`), { purpose: "evaluation", network, env: { HTTPS_PROXY: "http://127.0.0.1:1", NO_PROXY: "*" } });
+      expect(allowed.result.outcome).toEqual({ status: "exited", exitCode: 0, signal: null });
+      expect(last(allowed.output)).toBe("ok model");
+      expect(last((await run(fetchScript(`http://127.0.0.1:${closed}/`), { purpose: "evaluation", network })).output)).toBe("fail");
+      // The workspace copy stays writable; everything else does not.
+      const write = await run(`touch inside && touch ${join(home, "escape")} 2>/dev/null; ls inside`, { purpose: "evaluation", network });
+      expect(write.output.trim()).toBe("inside");
+      await expect(readFile(join(home, "escape"))).rejects.toThrow(/ENOENT/);
+    });
+
+    it("sends only allowlisted domains to the upstream proxy", async () => {
+      const seen: string[] = [];
+      const upstream = createServer();
+      upstream.on("connect", (req, socket) => { seen.push(req.url ?? ""); socket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n"); });
+      const port = await listen(upstream);
+      const network = { mode: "allowlist" as const, domains: ["example.com"], upstreamProxy: `127.0.0.1:${port}` };
+      await run(`${fetchScript("https://example.com/")}; ${fetchScript("https://github.com/")}`, { purpose: "evaluation", network });
+      expect(seen).toEqual(["example.com:443"]);
+    });
+
+    it("terminates the supervisor's whole group without residue", async () => {
+      let stop: (() => void) | undefined;
+      const pending = run("sleep 301 & sleep 302 & wait", { purpose: "evaluation", network: { mode: "allowlist", domains: ["example.com"] }, started: execution => { stop = () => execution.terminate(); } });
+      await new Promise(resolve => setTimeout(resolve, 1_500));
+      stop!();
+      expect((await pending).result.outcome).toMatchObject({ status: "cancelled", residual: false });
+    });
   });
 });
