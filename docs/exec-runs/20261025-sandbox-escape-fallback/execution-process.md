@@ -75,6 +75,16 @@
 - **结果**：shell-tools 113 通过。新增：判定表（命中、`Permission denied` 不命中、退出码 0/2/126/127/null 不命中、`none`/`inherited` 不命中）；假沙箱前台命中且摘要不变、沙箱外与退出码 2、0 不提示、后台通知命中；真实 nono、Seatbelt 写工作区外的结果带提示。
 - **影响文件**：`packages/tools/shell-tools/src/{node-ports.ts,test/node-ports.test.ts}`。
 
+### 步骤 5：T4 审批卡显示理由
+
+- **操作**：
+  - `packages/shared/src/session.ts` 的 `BashPreview` 加 `justification?`；`session-selectors.ts` 透传。
+  - `packages/client`：`tool-card.ts` 从调用参数读出 `justification`；`live/stream-blocks.ts` 透传到消息块。
+  - Desktop `BashApprovalBlock`：有理由时在命令下面显示一行（`text-act-sm`、`text-text-muted`，可换行），执行后的卡片不显示。
+  - 确认 auto-review：`prepared-execution.ts` 把完整 `args` 与 `reasons` 交给审查，`justification` 两处都在，不需要改。
+- **结果**：client 49 通过（新增：参数里的理由进入预览与待审批消息块）；shared 179 通过；renderer `bash-run-block-tooltip`、`approval-parts` 25 通过（新增：待审批时命令下方显示理由并带“真实环境”，没有理由或已执行时不显示）。
+- **影响文件**：`packages/shared/src/{session.ts,session-selectors.ts}`、`packages/client/src/{sessions/tool-card.ts,live/stream-blocks.ts,test/background-bash-status.test.ts}`、`apps/desktop/src/renderer/{components/messages/BashRunBlock.tsx,test/bash-run-block-tooltip.test.tsx}`。
+
 ## 遇到的问题
 
 - T1 新测试起初只期望三次提取，实际每次准入都会在执行前复查一次（`full-access` 也一样），改为四次。
