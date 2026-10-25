@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 P4 · 小舞台</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-prose.css">
+<style>
+/* P4 小舞台：和文档 A4 同一种语言。列表顶部一块淡舞台放标题和分类；下面两列横向卡片（左小图右文字）。文章页顶部小舞台按分类取一种颜色，角色小图坐在舞台右侧。 */
+.page { width: var(--site-page); margin-inline: auto; padding: 28px 0 120px; }
+.stage { position: relative; isolation: isolate; overflow: hidden; border-radius: 26px; }
+.stage::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--stage-grain); opacity: .15; mix-blend-mode: multiply; pointer-events: none; }
+.list-stage { padding: 52px 52px 40px; margin-bottom: 40px;
+  background: radial-gradient(60% 90% at 90% 0%, color-mix(in srgb, var(--stage-peach) 50%, var(--site-canvas)), transparent 62%),
+              color-mix(in srgb, var(--stage-peach-soft) 55%, var(--site-canvas)); }
+.list-stage h1 { font: 500 50px/1.1 var(--display); margin: 0 0 12px; }
+.list-stage > p { margin: 0 0 32px; font-size: 17px; color: #5c4a3e; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { height: 34px; padding: 0 14px; border-radius: 999px; border: 0; background: color-mix(in srgb, var(--site-paper) 60%, transparent); color: #5c4a3e; font-size: 14px; }
+.chip:hover { background: var(--site-paper); }
+.chip[aria-pressed="true"] { background: var(--site-ink); color: #fff; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.card { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 24px; align-items: center; padding: 16px 24px 16px 16px; border-radius: 20px; background: var(--site-paper); border: 1px solid var(--site-line); transition: border-color 150ms, transform 150ms; }
+.card:hover { border-color: var(--site-accent-line); transform: translateY(-2px); }
+.card img { width: 132px; height: 132px; object-fit: cover; border-radius: 14px; }
+.card .meta { font-size: 12px; color: var(--site-muted); display: flex; gap: 12px; }
+.card .meta b { font-weight: 400; color: var(--site-body); }
+.card h3 { font: 500 20px/1.4 var(--display); margin: 8px 0 6px; }
+.card p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--site-body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* 文章页 */
+.post { width: var(--site-page); margin-inline: auto; padding: 28px 0 120px; }
+.post-stage { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 40px; align-items: center; max-width: 1000px; margin: 0 auto; padding: 44px 48px; background: linear-gradient(160deg, var(--t-soft), var(--t-base)); }
+.post-stage .crumb { font-size: 13px; color: var(--t-muted); display: flex; gap: 8px; }
+.post-stage h1 { font: 500 40px/1.3 var(--display); margin: 16px 0 14px; }
+.post-stage .desc { font-size: 17px; line-height: 1.75; color: var(--t-body); margin: 0 0 22px; }
+.post-stage .meta { display: flex; gap: 16px; align-items: center; font: 12px var(--mono); color: var(--t-muted); }
+.post-stage .meta button { font: 13px var(--sans); background: color-mix(in srgb, var(--site-paper) 65%, transparent); border: 0; border-radius: 999px; padding: 5px 12px; color: var(--t-ink); }
+.post-stage .art { width: 180px; aspect-ratio: 1; border-radius: 26px; overflow: hidden; box-shadow: 0 24px 44px -26px rgba(29,28,26,.45); transform: rotate(3deg); }
+.post-stage .art img { width: 100%; height: 100%; object-fit: cover; }
+.post-body { display: grid; grid-template-columns: minmax(0, 680px) 200px; gap: 72px; justify-content: center; padding-top: 56px; }
+.toc { position: sticky; top: calc(var(--site-header-height) + 32px); align-self: start; font-size: 13px; }
+.toc p { color: var(--site-muted); margin: 0 0 10px; font-size: 12px; }
+.toc a { display: block; padding: 6px 0 6px 12px; border-left: 2px solid var(--site-line); color: var(--site-muted); line-height: 1.5; }
+.toc a:hover { color: var(--site-ink); }
+.toc a.is-active { color: var(--site-ink); border-left-color: var(--t-ink); }
+.bprose li::marker { color: var(--t-deep); }
+.bprose blockquote { border-left-color: var(--t-deep); background: color-mix(in srgb, var(--t-soft) 60%, transparent); padding: 14px 18px; border-radius: 0 10px 10px 0; }
+
+@media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } .post-body { grid-template-columns: minmax(0, 680px); } .toc { display: none; } }
+@media (max-width: 680px) { .list-stage { padding: 32px 22px; } .list-stage h1 { font-size: 38px; } .card { grid-template-columns: 88px minmax(0,1fr); gap: 16px; padding: 12px; } .card img { width: 88px; height: 88px; } .post-stage { grid-template-columns: 1fr; padding: 28px 22px; } .post-stage .art { width: 96px; order: -1; } .post-stage h1 { font-size: 30px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list">
+  <section class="stage list-stage">
+    <h1>博客</h1>
+    <p>开发 ActSpace 时的设计笔记与踩坑记录。</p>
+    <div class="chips" id="chips"></div>
+  </section>
+  <div class="grid" id="grid"></div>
+</main>
+
+<div class="post" data-view="post" hidden>
+  <header class="stage post-stage">
+    <div>
+      <p class="crumb"><a href="#">博客</a><span>/</span><span data-post-fill="cat"></span></p>
+      <h1 data-post-fill="title"></h1>
+      <p class="desc" data-post-fill="desc"></p>
+      <p class="meta"><span>WakeUp-Jin</span><span data-post-fill="date"></span><span>约 9 分钟</span><button type="button">复制链接</button></p>
+    </div>
+    <div class="art"><img id="post-art" alt=""></div>
+  </header>
+  <div class="post-body">
+    <article class="bprose" data-post-body></article>
+    <aside class="toc"><p>本文目录</p><nav data-post-toc></nav></aside>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script src="blog-shared.js"></script>
+<script>
+// 分类 → 舞台单色：上下文工程=薄荷、评估=柠檬、多智能体=灰蓝、工具=桃、模型=淡紫
+const TONES = {
+  "上下文工程": { base: "#d5e6d6", soft: "#e3ede1", deep: "#9cc5ae", ink: "#2f5a43", body: "#44514a", muted: "#5f6e63" },
+  "评估与质量": { base: "#efe7bf", soft: "#f5f0d6", deep: "#d9c877", ink: "#6b5a1c", body: "#5a5236", muted: "#7f7556" },
+  "多智能体": { base: "#d6dee7", soft: "#e5eaf0", deep: "#a7b8ca", ink: "#34465a", body: "#475260", muted: "#677485" },
+  "工具与扩展": { base: "#f2dccb", soft: "#f7e9de", deep: "#e8b997", ink: "#7a4a2c", body: "#5c4a3e", muted: "#86705f" },
+  "模型与运行时": { base: "#e4ddf5", soft: "#eeeaf8", deep: "#bfaeea", ink: "#4b3a8c", body: "#4d4763", muted: "#6d6685" },
+};
+const t = TONES[POST.cat];
+for (const k in t) document.documentElement.style.setProperty(`--t-${k}`, t[k]);
+document.getElementById("chips").innerHTML = ["全部", ...CATS].map((c, i) => `<button class="chip" aria-pressed="${i === 0}">${c}</button>`).join("");
+document.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => document.querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", x === b))));
+document.getElementById("grid").innerHTML = POSTS.map((p) => `<a class="card" href="#post"><img src="${coverSrc(p.cover)}" alt=""><div><p class="meta"><b>${p.cat}</b><span>${p.date}</span></p><h3>${besc(p.title)}</h3><p>${besc(p.desc)}</p></div></a>`).join("");
+document.getElementById("post-art").src = coverSrc(POST.cover);
+bootBlog("P4");
+</script>
+</body>
+</html>

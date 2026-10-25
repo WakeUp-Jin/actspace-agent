@@ -1,0 +1,35 @@
+/* 博客第三轮正文底子：全无衬线，40 字左右一行；资料列表拆成标题 + 域名，emoji 段落变提示块。各版在自己文件里改气质。 */
+.rprose { --rp-accent: var(--site-accent); font: 16.5px/1.9 var(--r-font); color: #3b3934; overflow-wrap: anywhere; }
+.rprose > :first-child { margin-top: 0; }
+.rprose p { margin: 0 0 1.15em; }
+.rprose ul, .rprose ol { margin: 0 0 1.3em; padding-left: 1.4em; }
+.rprose li { margin: .45em 0; padding-left: .2em; }
+.rprose ul > li::marker { color: var(--site-line-strong); }
+.rprose ol > li::marker { color: var(--site-muted); font: 500 .9em var(--mono); }
+.rprose strong { color: var(--site-ink); font-weight: 600; }
+.rprose h2 { font: 650 23px/1.45 var(--r-font); color: var(--site-ink); margin: 2.6em 0 .8em; scroll-margin-top: 96px; letter-spacing: -.005em; }
+.rprose a { color: inherit; text-decoration: underline; text-decoration-color: var(--site-accent-line); text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.rprose a:hover { text-decoration-color: var(--rp-accent); }
+.rprose :not(pre) > code { font: .86em var(--mono); background: var(--site-canvas-soft); border-radius: 5px; padding: .15em .45em; color: var(--site-ink); }
+.rprose blockquote { margin: 1.6em 0; padding: 0 0 0 1.1em; border-left: 3px solid var(--site-line); color: var(--site-body); }
+.rprose blockquote p { margin: 0; }
+.rprose .pimg { margin: 2.2em 0; }
+.rprose .pimg img { width: 100%; height: auto; border-radius: 12px; background: #fff; box-shadow: 0 0 0 1px var(--site-line); }
+.rprose .pimg figcaption { margin-top: .8em; font-size: 13px; color: var(--site-muted); text-align: center; }
+.rprose .callout { display: flex; gap: 12px; margin: 1.6em 0; padding: 14px 18px; border-radius: 12px; background: var(--site-paper); border: 1px solid var(--site-line); color: var(--site-ink); }
+.rprose .callout .ico { flex: none; font-size: 18px; line-height: 1.6; }
+.rprose .callout > div { line-height: 1.75; }
+.rprose .refs { list-style: none; padding: 0; display: grid; gap: 8px; }
+.rprose .refs li { margin: 0; padding: 0; }
+.rprose .ref { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--site-line); background: var(--site-paper); text-decoration: none; transition: border-color 150ms; }
+.rprose .ref-t { font-size: 15px; line-height: 1.55; color: var(--site-ink); }
+.rprose .ref-h { flex: none; font: 12px var(--mono); color: var(--site-muted); }
+.rprose .ref:hover { border-color: var(--site-line-strong); }
+.rprose .ref:hover .ref-h { color: var(--rp-accent); }
+.rprose .code-block { margin: 1.6em 0; background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 12px; overflow: hidden; }
+.rprose .code-bar { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px 6px 16px; border-bottom: 1px solid var(--site-line); }
+.rprose .code-lang { font: 11.5px var(--mono); color: var(--site-muted); }
+.rprose .code-copy { font-size: 12px; color: var(--site-body); background: none; border: 0; padding: 4px 8px; border-radius: 6px; }
+.rprose .code-copy:hover { background: var(--site-canvas-soft); color: var(--site-ink); }
+.rprose pre { margin: 0; padding: 14px 18px; overflow: auto; font: 13.5px/1.75 var(--mono); color: var(--site-ink); }
+@media (max-width: 640px) { .rprose .ref { flex-direction: column; gap: 2px; } }

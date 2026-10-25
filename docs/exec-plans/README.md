@@ -29,6 +29,7 @@
 
 ## 最近完成
 
+- [官网 V5：文档、博客与更新日志改版](completed/20261025-site-v5-docs-blog-updates.md)：文档 A4 小舞台、博客 Q2 列表 + R3 头部 + M2 正文、更新日志 U1 时间轴；Markdown 改为构建期 Sätteri 插件；check / test / build 通过，用户视觉验收通过，见[执行摘要](../exec-runs/20261025-site-v5-docs-blog-updates/execution-summary.md)。真实浏览器剪贴板复制未单独验证。
 - [子智能体轨迹](completed/20261021-subagent-trajectory.md)：父轨迹只留 `agent` 一行，详情「查看轨迹」在右侧子 Agent 面板打开子会话轨迹（对话 / 轨迹切换，窄面板详情在下半部分）；desktop 1920 项测试通过，浏览器 mock 截图完成；Electron 真实子智能体未验证，见[执行摘要](../exec-runs/20261021-subagent-trajectory/execution-summary.md)与[验收交接](../exec-runs/20261021-subagent-trajectory/acceptance-handoff.md)。
 
 - [后台任务：后台 Bash、后台子智能体与任务工具](completed/20261022-background-tasks.md)：T1–T10 完成（feat/background-tasks 已合并入 fix/settings-model-select）；统一登记表、空闲唤醒、`task_*` 四个工具、后台子 Agent、任务清单上下文、「后台」标签与唤醒分隔行；浏览器 mock 截图完成；Electron 未验证，见[执行摘要](../exec-runs/20261022-background-tasks/execution-summary.md)。

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 Q1 · 工程手记</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-prose.css">
+<style>
+/* Q1 工程手记：像大厂工程博客。封面换成每篇文章自己的架构图（纸片斜插在淡色台面上），标题全部改无衬线粗体，不用宋体；卡片不加边框，靠留白排。 */
+:root { --q-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+.page { width: var(--site-page); margin-inline: auto; padding: 56px 0 140px; }
+.head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 40px; }
+.head h1 { font: 650 40px/1.1 var(--q-font); margin: 0; }
+.tabs { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--site-canvas-soft); overflow-x: auto; }
+.tabs button { border: 0; background: none; height: 32px; padding: 0 14px; border-radius: 999px; font-size: 13.5px; color: var(--site-body); white-space: nowrap; }
+.tabs button:hover { color: var(--site-ink); }
+.tabs button[aria-pressed="true"] { background: var(--site-paper); color: var(--site-ink); font-weight: 500; box-shadow: 0 1px 2px rgba(29,28,26,.08); }
+
+.cover { position: relative; overflow: hidden; border-radius: 16px; aspect-ratio: 16 / 10; background: var(--tone); }
+.cover::after { content: ""; position: absolute; inset: 0; background: var(--stage-grain); opacity: .12; mix-blend-mode: multiply; pointer-events: none; }
+.cover img { position: absolute; left: 12%; top: 14%; width: 92%; max-width: none; border-radius: 10px; background: #fff; box-shadow: 0 0 0 1px rgba(29,28,26,.08), 0 24px 48px -24px rgba(29,28,26,.35); transition: transform 300ms ease; }
+a:hover .cover img { transform: translate(-6px, -6px); }
+.meta { display: flex; gap: 10px; font-size: 13px; color: var(--site-muted); }
+.meta b { font-weight: 500; color: var(--site-ink); }
+
+.feature { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 56px; align-items: center; padding-bottom: 56px; margin-bottom: 56px; border-bottom: 1px solid var(--site-line); }
+.feature h2 { font: 650 34px/1.3 var(--q-font); margin: 16px 0 14px; }
+.feature p { font-size: 17px; line-height: 1.8; color: var(--site-body); margin: 0 0 24px; }
+.author { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--site-body); }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--site-ink); color: #fff; display: grid; place-items: center; font: 600 12px var(--q-font); }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 32px; }
+.post-card h3 { font: 600 19px/1.45 var(--q-font); margin: 16px 0 8px; transition: color 150ms; }
+.post-card:hover h3 { color: var(--site-accent); }
+.post-card p { margin: 0; font-size: 14.5px; line-height: 1.7; color: var(--site-body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.post-card .meta { margin-top: 18px; }
+
+/* 文章页 */
+.post { width: min(760px, calc(100vw - 40px)); margin: 0 auto; padding: 56px 0 140px; }
+.post .meta { margin-bottom: 18px; }
+.post h1 { font: 650 42px/1.3 var(--q-font); margin: 0 0 18px; }
+.post .desc { font-size: 19px; line-height: 1.75; color: var(--site-body); margin: 0 0 28px; }
+.post .author { margin-bottom: 40px; }
+.post .author button { margin-left: auto; background: none; border: 1px solid var(--site-line); border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--site-body); }
+.hero { width: min(1040px, calc(100vw - 40px)); aspect-ratio: 2 / 1; margin: 0 0 56px 50%; translate: -50% 0; }
+.hero img { left: 50%; top: 12%; width: 78%; translate: -50% 0; }
+.bprose { font-size: 17px; color: #3d3a35; }
+.bprose h2 { font: 650 25px/1.45 var(--q-font); margin-top: 60px; }
+.bprose .pimg img { box-shadow: 0 0 0 1px var(--site-line); }
+
+@media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .feature { grid-template-columns: 1fr; gap: 28px; } .head { flex-direction: column; align-items: start; } .tabs { max-width: 100%; } }
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } .post h1 { font-size: 31px; } .head h1 { font-size: 32px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list">
+  <div class="head"><h1>博客</h1><div class="tabs" id="tabs"></div></div>
+  <a class="feature" href="#post" id="feature"></a>
+  <div class="grid" id="grid"></div>
+</main>
+
+<main class="post" data-view="post" hidden>
+  <p class="meta"><b data-post-fill="cat"></b><span data-post-fill="date"></span><span>约 9 分钟</span></p>
+  <h1 data-post-fill="title"></h1>
+  <p class="desc" data-post-fill="desc"></p>
+  <div class="author"><span class="avatar">W</span><span>WakeUp-Jin</span><button type="button">复制链接</button></div>
+  <div class="cover hero" id="hero"></div>
+  <article class="bprose" data-post-body></article>
+</main>
+
+<script src="shared.js"></script>
+<script src="blog-shared.js"></script>
+<script>
+const TONE = { "上下文工程": "#dfe9dc", "评估与质量": "#efe9cc", "多智能体": "#dfe4ea", "工具与扩展": "#f1e3d6", "模型与运行时": "#e7e2f1" };
+const cover = (p) => `<div class="cover" style="--tone:${TONE[p.cat]}"><img src="${p.img}" alt=""></div>`;
+document.getElementById("tabs").innerHTML = ["全部", ...CATS].map((c, i) => `<button aria-pressed="${i === 0}">${c}</button>`).join("");
+document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-pressed", x === b))));
+const [first, ...rest] = POSTS;
+document.getElementById("feature").innerHTML = `${cover(first)}<div><p class="meta"><b>${first.cat}</b><span>${first.date}</span></p><h2>${besc(first.title)}</h2><p>${besc(first.desc)}</p><div class="author"><span class="avatar">W</span>WakeUp-Jin · ${first.min} 分钟</div></div>`;
+document.getElementById("grid").innerHTML = rest.map((p) => `<a class="post-card" href="#post">${cover(p)}<h3>${besc(p.title)}</h3><p>${besc(p.desc)}</p><p class="meta"><b>${p.cat}</b><span>${p.date}</span></p></a>`).join("");
+const hero = document.getElementById("hero"); hero.style.setProperty("--tone", TONE[POST.cat]); hero.innerHTML = `<img src="${POST.img}" alt="">`;
+bootBlog("Q1");
+</script>
+</body>
+</html>
