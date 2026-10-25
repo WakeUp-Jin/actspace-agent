@@ -30,6 +30,19 @@ describe("auto compaction live events", () => {
     expect(result.reason).toBe("completed");
   });
 
+  it("carries the recorded trigger and token counts on the finish event", async () => {
+    const outcome = { compactionId: "c-1", trigger: "auto", entryCount: 3, durationMs: 1200, beforeTokens: 91_000, afterTokens: 9_000 };
+    const compaction = { maybeCompact: async (_session: unknown, _usage: unknown, observer?: import("@actspace/context-engine").CompactionObserver) => {
+      observer?.onStarted?.({ entryCount: 3 });
+      observer?.onFinished?.(outcome as import("@actspace/context-engine").CompactionOutcome);
+      return true;
+    } } as unknown as CompactionPlugin;
+    const { events } = await runToolStreamFixture({ terminalOnly: true, usage, compaction });
+    const finished = events.find((event) => event.kind === "compaction-finished");
+    expect(finished).toMatchObject({ removedCount: 3, durationMs: 1200, compactionId: "c-1", trigger: "auto", beforeTokens: 91_000, afterTokens: 9_000 });
+    expect(finished).not.toHaveProperty("entryCount");
+  });
+
   it("stays silent when no compaction is needed", async () => {
     const { events } = await runToolStreamFixture({ terminalOnly: true, usage, compaction: stubCompaction(async () => false) });
     expect(events.some((event) => event.kind.startsWith("compaction-"))).toBe(false);

@@ -102,4 +102,28 @@ describe("Compaction", () => {
     expect(await plugin.maybeCompact(session, { inputTokens: 80, outputTokens: 0, contextWindow: 100 })).toBe(true);
     await session.close();
   });
+
+  it("records auto trigger with measured before tokens and estimated after tokens", async () => {
+    const session = await compactionSession();
+    const finished = vi.fn();
+    const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, { summarize: async () => ({ content: "summary" }) });
+    expect(await plugin.maybeCompact(session, { inputTokens: 90_000, outputTokens: 1_000, contextWindow: 100_000 }, { onFinished: finished })).toBe(true);
+    const start = session.journal.events.find(event => event.type === "compaction/start")!.data as { start: number; end: number };
+    // Each fixture message is "message-N" (9 chars → 3 tokens); "summary" is 7 chars → 2 tokens.
+    const afterTokens = 91_000 - 3 * (start.end - start.start) + 2;
+    expect(session.journal.events.at(-1)).toMatchObject({ type: "compaction/end", data: { trigger: "auto", beforeTokens: 91_000, afterTokens } });
+    expect(finished).toHaveBeenCalledWith(expect.objectContaining({ trigger: "auto", beforeTokens: 91_000, afterTokens, entryCount: start.end - start.start }));
+    await session.close();
+  });
+
+  it("records manual trigger without tokens before any request has usage", async () => {
+    const session = await compactionSession();
+    const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, { summarize: async () => ({ content: "summary" }) });
+    expect(await plugin.compact(session)).toBe(true);
+    const end = session.journal.events.at(-1)!;
+    expect(end).toMatchObject({ type: "compaction/end", data: { trigger: "manual" } });
+    expect(end.data).not.toHaveProperty("beforeTokens");
+    expect(end.data).not.toHaveProperty("afterTokens");
+    await session.close();
+  });
 });

@@ -45,7 +45,7 @@ export type AgentLoopLiveEvent = LiveIdentity & (
   | { readonly kind: "tool-started"; readonly requestId: string; readonly callId: string; readonly name: string }
   | { readonly kind: "tool-finished"; readonly requestId: string; readonly callId: string; readonly name: string; readonly result: ToolExecutionResult; readonly resultEventId: string }
   | { readonly kind: "compaction-started" }
-  | { readonly kind: "compaction-finished"; readonly removedCount: number; readonly durationMs: number }
+  | { readonly kind: "compaction-finished"; readonly removedCount: number; readonly durationMs: number; readonly compactionId?: string; readonly trigger?: "manual" | "auto"; readonly beforeTokens?: number; readonly afterTokens?: number }
   | { readonly kind: "compaction-failed"; readonly message: string }
   | { readonly kind: "inbox-claimed"; readonly messageId: string; readonly source?: import("@actspace/core-agent").InboxSource }
 );
@@ -397,6 +397,7 @@ export class AgentLoop {
   private async autoCompact(compaction: ContextCompactor, usage: import("@actspace/context-engine").CompactionUsage, ids: { agentRunId: string; turnId: string }, signal: AbortSignal): Promise<boolean> {
     let startedAt: number | null = null;
     let removedCount = 0;
+    let outcome: import("@actspace/context-engine").CompactionOutcome | null = null;
     try {
       const compacted = await compaction.maybeCompact(this.options.session, usage, {
         signal,
@@ -405,8 +406,12 @@ export class AgentLoop {
           removedCount = entryCount;
           this.emitLive({ kind: "compaction-started", ...ids });
         },
+        onFinished: (value) => { outcome = value; },
       });
-      if (compacted && startedAt !== null) this.emitLive({ kind: "compaction-finished", ...ids, removedCount, durationMs: Date.now() - startedAt });
+      if (compacted && startedAt !== null) {
+        const { entryCount: _entryCount, ...recorded } = (outcome ?? {}) as Partial<import("@actspace/context-engine").CompactionOutcome>;
+        this.emitLive({ kind: "compaction-finished", ...ids, removedCount, durationMs: Date.now() - startedAt, ...recorded });
+      }
       return compacted;
     } catch (error) {
       if (signal.aborted || this.options.session.durabilityState === "blocked") throw error;
