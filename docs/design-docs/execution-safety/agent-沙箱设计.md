@@ -1,6 +1,6 @@
 # 沙箱设计
 
-> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二期（评估沙箱）已实施，见 [20261025-sandbox-v2-evaluation-sandbox](../../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)；第三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
+> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二期（评估沙箱）已实施，见 [20261025-sandbox-v2-evaluation-sandbox](../../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)。工具沙箱的出沙箱与回退（第 9 节）2026-10-25 确认，计划见 [20261025-sandbox-escape-fallback](../../exec-plans/active/20261025-sandbox-escape-fallback.md)。第三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
 
 ## 1. 结论
 
@@ -8,7 +8,7 @@
 
 - macOS / Linux：nono 后端。nono 命令行程序随应用打包，只用我们自己打包的那份，系统里装了也不用。
 - Windows：第三期做原生后端，参考 DSH 与 Anthropic sandbox-runtime（srt）；也可以直接加一个 `sandbox-srt` 后端，到时再定。
-- **不能悄悄改为不加沙箱执行**：组合里没有沙箱，或者沙箱不可用时，bash 调用一律按“沙箱外执行”走审批。
+- **不能悄悄改为不加沙箱执行**：组合里没有沙箱，或者沙箱不可用时，bash 调用一律按“沙箱外执行”走审批。`full-access` 模式下 bash 按设计不进沙箱；其他模式下 Agent 只能带理由申请出沙箱，每次都要批准（第 9 节）。
 
 **第一期打地基，后两期只做扩展。** 契约、策略合并、能力模型、执行生命周期、结果状态在第一期一次做完整；功能可以少，例如网络只实现“不限制 / 断网”，但第二、三期不应该需要改契约。
 
@@ -51,7 +51,7 @@ flowchart TD
 | `sandbox-nono` | 向管理器注册 nono 后端 | `sandbox`、Host 进程端口（含 nono 路径） |
 | `sandbox-seatbelt` | 向管理器注册 Seatbelt 后端 | `sandbox`、Host 进程端口 |
 | 以后的 `sandbox-windows` / `sandbox-srt` | 同上 | 同上 |
-| `harness-evaluation`（第二期，使用方） | `harnessEvaluation` 服务：在评估沙箱里启动候选 Harness，取回结果 | `sandbox`（必需，拿不到就拒绝）、Host 评估端口（启动入口、模型连接） |
+| `harness-evaluation`（第二期，使用方） | `harness.evaluation` 服务：在评估沙箱里启动候选 Harness，取回结果 | `sandbox`（必需，拿不到就拒绝）、Host 评估端口（启动入口、模型连接） |
 
 - **Host 只提供资源，不决定用不用沙箱。** Host 进程端口提供最基础的能力：起进程、按进程组发信号、告诉插件 nono 程序在哪里。仓库约定只有 Host 侧代码直接起子进程，Harness 插件通过端口获得能力，沙箱插件也遵守这一点。
 - **后端可以热插拔。** 后端插件启动时调用 `sandbox.register(backend)`，插件释放时自动注销。
@@ -190,6 +190,7 @@ flowchart LR
 - **用环境变量判断嵌套**、**用管理器插件配置打开继承模式**：原因见 4.6。
 - **评分器放在评估沙箱里**：候选可能改分数；改为候选只写结果文件，v1 在沙箱外读取。
 - **没有 nono 时转审批、在真实环境里评估**：评估跑的是整个 Harness，直接拒绝。
+- **让 Agent 每次自己选进不进沙箱**、**沙箱内失败后自动弹窗重试**、**出沙箱的批准记住（会话内同一条命令、前缀规则）**：原因见第 9 节。
 
 ## 8. 实测结论（2026-10-25，nono 0.80.0）
 
@@ -214,3 +215,32 @@ flowchart LR
 - 白名单、本机端口、上游代理在 macOS 与 Linux（Docker，Landlock V6）上都生效：不放行的域名 CONNECT 403，去掉代理变量直连也被拦。
 - 集成测试（真实 nono + 真实 CLI + 本机假模型服务）发现了 5.1 里的两处 nono 默认行为：系统写入组让候选能写原工作区所在的临时目录；空的 `allow_domain` 让网络完全放开。两处都已修正，并有用例覆盖。
 - Linux 上候选能正常跑通，但 Docker Desktop 的 virtiofs 挂载目录与 Landlock 不兼容：`nono why` 说允许、读取却报 EACCES。在 Docker 里测要把仓库复制进容器自己的文件系统，并用 `docker run --init` 回收僵尸进程。
+
+## 9. 工具沙箱的出沙箱与回退（2026-10-25 确认）
+
+调研了 Codex（CLI 与 App 共用 `codex-rs`）、Cursor、DSH、OpenCode 的做法后确认（调研结论见[计划](../../exec-plans/active/20261025-sandbox-escape-fallback.md)背景一节）。
+
+**结论：每条 bash 默认进沙箱；Agent 只能申请出去，出去要过审批；命令被沙箱拦了，结果里告诉 Agent 可以申请。**
+
+```mermaid
+flowchart LR
+    A["bash 调用"] --> M{"权限模式"}
+    M -->|full-access| R["沙箱外执行<br/>（继承模式下标 inherited）"]
+    M -->|"default / auto-review"| P{"带 sandbox_permissions?"}
+    P -->|否| S["沙箱内执行"]
+    P -->|"require_escalated + justification"| AP["审批：真实环境<br/>卡片显示理由"] -->|批准一次| R
+    S --> D{"像是被沙箱拦了?"}
+    D -->|是| H["结果末尾加提示：<br/>可以带参数重试一次"]
+    D -->|否| OK["正常返回"]
+```
+
+- **何时进沙箱**：`default` 与 `auto-review` 模式下每条 bash 都进沙箱。`full-access` 不进：这个模式本来就自动批准出沙箱的申请，进沙箱只会多失败一次，Codex、DSH、Cursor 在完全放开时也都不用沙箱。沙箱不可用时（组合里没有沙箱、Linux、Windows）照旧按“沙箱外执行”走审批。决定在批准时作出、记在进程资源的 `noSandbox` 上，执行端只认它：切换模式从下一条命令起生效，已在后台跑的任务保持启动时的状态。
+- **出沙箱的参数**：`sandbox_permissions: "require_escalated"`，必须同时给 `justification`（一句话，显示在审批卡上）；只给其中一个就拒绝，不弹审批。取值只有一个，因为工具沙箱只有“进”和“不进”两档；DSH 有多档模式，所以它的取值是模式名。`full-access` 下或沙箱不可用时带了也照常执行。原来的 `requiredPermissions: ["no_sandbox"]` 删除，不保留兼容。
+- **告诉模型的话**：bash 工具描述写明沙箱的范围（工作区、输出与临时目录可写；工作区外、`.git/hooks`、`.git/config`、钥匙串被拦；凭据目录不可读；网络不限）。参数描述写明：被拦了才申请，或者明确知道要写工作区外、要用钥匙串（如 `git push`）时申请；不要一开始就申请；申请会请求用户批准。Cursor 的教训是提示写得太宽，模型会一上来就申请出沙箱；没有提示，模型又会反复重试同一条命令。
+- **识别“被沙箱拦了”**：命令在沙箱里运行（结果为 `sandboxed`）、退出码不为 0 也不是 2、126、127（命令自己的用法错误与“找不到命令”），并且输出里有该后端的拦截特征串。特征串按 nono、Seatbelt 实测确定（写工作区外、写 `.git/hooks`、钥匙串、写工作区外的包缓存）。这是猜测，普通命令自己报 `permission denied` 也会带上提示；Codex 与 DSH 都接受这个代价。只在命中时提示，不是每次失败都提示，避免模型一上来就申请。
+- **提示怎么给**：命中时在工具结果末尾加一行，说明可能被沙箱拦了、可以带 `sandbox_permissions` 与 `justification` 重试一次并会请求批准、不该需要这些权限就换做法。后台任务结束的通知同样处理。沙箱没准备好、命令根本没跑（`SANDBOX_PREPARE_FAILED`）的提示不变。
+- **回退由模型驱动**：不自动弹“失败了，要不要沙箱外重跑”。Codex 只在最严的审批模式下这么做，默认也交给模型；模型知道这条命令是否真的需要那些权限，自动弹窗会把每次误判都变成一次打扰。
+- **批准只对这一次有效**：出沙箱的批准不记住，也没有前缀授权（前缀授权仍只用于沙箱内的命令）。用一段时间、看实际申请频率再决定要不要做会话内记住或前缀规则（Codex、Cursor 的做法）。
+- **auto-review 模式**：出沙箱的申请照常交给自动审查，审查看到的调用参数里包含 `justification`。
+- **继承模式的标记**：评估沙箱里候选以 `full-access` 运行，bash 不再自己进沙箱，但外层沙箱仍在，结果标 `inherited` 而不是 `none`：管理器在继承模式下优先报告 `inherited`。
+- **系统写入组不变**：工具沙箱保留 nono 默认的系统写入组（`/tmp`、macOS 的 `/private/var/folders`），与 Cursor、Codex 默认放行临时目录一致；用户的 `$TMPDIR` 本来就由 shell-tools 显式放行。以后要收紧再加设置项。
