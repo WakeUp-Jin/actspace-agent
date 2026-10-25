@@ -104,7 +104,19 @@
 - **影响文件**：`packages/shared/src/runtime-v2/permission.ts`、`packages/tools/runtime/src/{prepared-execution.ts,test/runtime.test.ts}`、`apps/desktop/src/main/runtime-v2/approval-broker.ts`、`apps/desktop/src/main/remote-hosts/desktop-adapter.ts`、`apps/desktop/src/main/test/runtime-v2-approval-broker.test.ts`。
 - **验证**：tools-runtime 47 通过（审批请求资源断言 `noSandbox: false`）；approval broker 测试三种取值通过；Desktop 2028 通过 / 7 跳过，`typecheck` 通过；runtime 84 通过。
 
+### 步骤 9：T8 生成物与仓库检查
+
+- **操作**：`scripts/contract-matrix/source-registry.mjs` 登记三个沙箱包的清单与 `package.json`，执行 `pnpm gen:contract-matrix`。全仓测试暴露两处前序任务的问题并修复：
+  1. agent-host 另打一个 CommonJS 包（`dist/node-ports.cjs`），其中 `import.meta.url` 为空，T5 的 `resolveNodeHostNonoPath` 默认参数 `new URL(..., import.meta.url)` 让真实 Host 启动报 `Invalid URL`。改为 agent-host 默认只认 `ACTSPACE_NONO_PATH`，仓库副本的根目录由调用方传入；CLI（CommonJS）用 `__dirname` 推出 `CLI_REPO_ROOT` 后传给 `createNodeToolHostServices`。
+  2. `harness-control` 的测试夹具声明了可选契约却没声明 `optionalInjects`，T5 收紧准入后被拒；夹具补上 `optionalInjects: ["cache"]`。
+- **影响文件**：`scripts/contract-matrix/source-registry.mjs`、`artifacts/agent-contract-matrix.json`、`docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md`、`packages/agent-host/src/node-ports/tool-host-services.ts`、`apps/cli/src/runtime-v2/{host-adapter,host}.ts`、`packages/harness-control/src/test/candidate.test.ts`。
+- **验证**：`pnpm check:packages`、`pnpm check:desktop-build-graph`、`pnpm test:contract-matrix`（4 通过）、`pnpm typecheck`、`pnpm test` 全部通过；`test:agent-host:process` 7 通过；CLI 解析到 `dist/sandbox-components/darwin-arm64/nono`。
+
 ## 遇到的问题
+
+- **问题**：真实 Host 启动报 `Invalid URL`。
+  - **原因**：agent-host 的 CommonJS 包里没有 `import.meta.url`。
+  - **应对**：库不再自己推算仓库位置，由 CLI 传入（步骤 9）。
 
 - **问题**：权限清单的 `deny` 不生效。
   - **原因**：nono 0.80.0 清单分支不处理 `deny`。
