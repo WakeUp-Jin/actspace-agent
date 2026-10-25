@@ -15,7 +15,6 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [沙箱第二期：评估沙箱](active/20261025-sandbox-v2-evaluation-sandbox.md) | 2026-10-25 立项（分支 `feat/sandbox-refactor`），E1–E14 已确认；计划待用户审阅，通过后从 T0（nono `run`、代理、按选择启动）开始。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
@@ -30,6 +29,7 @@
 
 ## 最近完成
 
+- [沙箱第二期：评估沙箱](completed/20261025-sandbox-v2-evaluation-sandbox.md)：T0–T8 完成（分支 `feat/sandbox-refactor`，未推送）；nono `run` 域名白名单（本机端口、上游代理），继承模式改由 Host 告知，CLI `--harness` / `--sandbox-inherited`，新包 `harness-evaluation` 在评估沙箱里跑 CLI 候选；真实 nono + CLI 集成测试（macOS、Linux Docker）与全仓检查通过；工具沙箱是否排除系统写入组待用户决定，见[执行摘要](../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)。
 - [沙箱第一期：地基 + 工具沙箱](completed/20261025-sandbox-v1-tool-sandbox.md)：T0–T10 完成（分支 `feat/sandbox-refactor`，未推送）；沙箱管理器与 nono / Seatbelt 后端作为 Harness 插件进入默认组合，bash 经 `sandbox` 服务执行，缺失或不可用时转“真实环境”审批；全仓检查、真实 Host 端到端（nono / Seatbelt）、Linux Docker 与打包签名通过；Desktop 界面未验证，见[执行摘要](../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。
 
 - [子智能体轨迹](completed/20261021-subagent-trajectory.md)：父轨迹只留 `agent` 一行，详情「查看轨迹」在右侧子 Agent 面板打开子会话轨迹（对话 / 轨迹切换，窄面板详情在下半部分）；desktop 1920 项测试通过，浏览器 mock 截图完成；Electron 真实子智能体未验证，见[执行摘要](../exec-runs/20261021-subagent-trajectory/execution-summary.md)与[验收交接](../exec-runs/20261021-subagent-trajectory/acceptance-handoff.md)。

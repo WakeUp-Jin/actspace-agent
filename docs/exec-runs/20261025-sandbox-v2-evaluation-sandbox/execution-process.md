@@ -2,10 +2,10 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261025-sandbox-v2-evaluation-sandbox.md`
+- **关联计划**：`docs/exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md`
 - **执行模式**：交互
 - **开始时间**：2026-10-25
-- **结束时间**：进行中
+- **结束时间**：2026-10-25
 
 ## 执行时间线
 
@@ -215,7 +215,15 @@
 - **验证**：
   - `pnpm test:contract-matrix` 通过；`pnpm check:packages` 通过（65 个包）；`pnpm check:desktop-build-graph` 通过（59 个项目）。
   - `pnpm typecheck` 通过；`pnpm test` 全部通过（61 个包，没有失败；没设 `ACTSPACE_NONO_PATH` 时 sandbox-nono 跳过 9 个真实执行用例）。
-  - 第一期 Host 端到端（`tmp/sandbox-v1-e2e/host-e2e.mjs nono`）复跑，结果与第一期相同：工作区写入成功；`~` 下写入、写 `.git` 失败；后台任务停止后没有残留进程。
+  - 第一期 Host 端到端（`tmp/sandbox-v1-e2e/host-e2e.mjs nono`）复跑，结果与第一期相同：工作区写入成功；`~` 下写入失败（探测文件不存在）；后台任务停止后没有残留进程。
+
+### 步骤 9：T8 文档与收尾
+
+- **操作**：
+  - 沙箱设计：状态改为第二期已实施；4.1、4.3 补本机端口；5.1 补 `run` 的参数、本机端口、空白名单与系统写入组；第 6 节补选择文件、服务、网络与环境变量的实际做法；第 8 节补第二期实测结论。
+  - 执行安全入口、`packages/README.md`（`harness-evaluation/` 一行）、设计文档索引、`docs/RELIABILITY.md`（继承模式与 `--harness` 的约束）、自进化设计目录（评估入口已就绪）。CLI 帮助文本已在 T3、T4 补上；CLI 没有单独的 README。
+  - 学习文档 `docs/learnings/2026-10/20261025-sandbox-defaults-widen-silently.md`；history；执行摘要；计划移到 `completed/`。
+- **验证**：只改文档；`pnpm test:contract-matrix` 通过。
 
 ## 遇到的问题
 

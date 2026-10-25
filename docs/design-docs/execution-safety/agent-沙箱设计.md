@@ -1,6 +1,6 @@
 # 沙箱设计
 
-> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二期（评估沙箱）设计 2026-10-25 确认，计划见 [20261025-sandbox-v2-evaluation-sandbox](../../exec-plans/active/20261025-sandbox-v2-evaluation-sandbox.md)；第三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
+> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二期（评估沙箱）已实施，见 [20261025-sandbox-v2-evaluation-sandbox](../../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)；第三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
 
 ## 1. 结论
 
@@ -67,7 +67,7 @@ flowchart TD
 | `purpose` | `tool` / `evaluation` | 模板只实现 `tool` | 实现 `evaluation` 模板 |
 | `argv`、`cwd`、`env` | 程序与参数（数组）、工作目录、环境变量 | 实现 | — |
 | `filesystem` | 读写、只读、禁止读取、禁止写入的路径 | 实现 | — |
-| `network` | `unrestricted` / `blocked` / `allowlist`（域名列表，可带上游代理 `upstreamProxy`） | 实现前两种 | 实现 `allowlist` 与上游代理（nono `run`） |
+| `network` | `unrestricted` / `blocked` / `allowlist`（域名列表，可带本机端口 `localPorts` 与上游代理 `upstreamProxy`） | 实现前两种 | 实现 `allowlist`、本机端口与上游代理（nono `run`） |
 | `network.credentials` | 由沙箱外代理注入的凭据（候选只拿到替身 token） | — | 契约预留，后端报告 `unsupported` |
 | `limits` | 内存、CPU 时间上限 | — | 契约预留，后端报告 `unsupported` |
 | `timeoutMs` | 整次执行的最长时间 | 实现 | — |
@@ -91,6 +91,7 @@ flowchart TD
 | `network.blocked` | 完全断网 |
 | `network.allowlist` | 只放行指定域名 |
 | `process.inherit` | 后代进程继承限制 |
+| `network.local-ports` | 白名单之外放行本机（`127.0.0.1`）的指定端口（第二期） |
 | `network.upstream-proxy` | 放行的流量再转给上游代理（第二期） |
 | `network.credential-injection` | 沙箱外注入凭据（契约预留） |
 | `process.resource-limits` | 内存、CPU 时间上限（契约预留） |
@@ -122,7 +123,10 @@ flowchart TD
 ### 5.1 nono（macOS、Linux）
 
 - 工具沙箱用 `nono wrap`：nono 施加限制后直接变成目标命令，不留常驻进程。用户在 Mac 上实测，比直接用 Seatbelt 每次多 4–5ms。我们拿到的进程号就是目标命令本身，终止进程组即可覆盖后代进程。
-- 评估沙箱用 `nono run`：supervisor 在 Mac 上让短命令多出约 200ms、多占约 17MB，但能提供域名代理、凭证注入、审计和回滚。请求的网络为 `allowlist` 时后端改用 `run`：`--allow-domain` 逐个放行，`--upstream-proxy` 把放行的流量转给上游代理。nono 会给子进程设置 `HTTPS_PROXY` 与 `NODE_USE_ENV_PROXY`；Node 22.22（系统 Node 与 Electron 39 自带的 Node）的 `fetch` 实测会走这个代理。
+- 评估沙箱用 `nono run`：supervisor 在 Mac 上让短命令多出约 200ms、多占约 17MB，但能提供域名代理、凭证注入、审计和回滚。请求的网络为 `allowlist` 时后端改用 `run -s --no-diagnostics --no-audit --no-rollback -p <profile>`（不加后两个参数，nono 会往 `~/.nono` 写审计与回滚数据），两个平台都用 profile 模式：Linux 权限清单会静默忽略上游代理，`-c` 又不能和命令行参数一起用。域名写进 `allow_domain`，本机端口写进 `open_port`，上游代理写进 `upstream_proxy`。nono 会给子进程设置 `HTTPS_PROXY` 与 `NODE_USE_ENV_PROXY`；Node 22.22（系统 Node 与 Electron 39 自带的 Node）的 `fetch` 实测会走这个代理。调用方环境里的代理变量在白名单下会被去掉，否则会绕过 nono 的代理。
+- 本机服务要单独放行端口：nono 设置的 `NO_PROXY` 让本机地址直连、不经过代理，把 `127.0.0.1` 写进域名白名单不起作用。
+- `allow_domain` 为空时 nono 不启动代理、网络完全放开。所以只有本机端口、没有域名的白名单写成 `block: true` 加 `open_port`。
+- nono profile 默认带系统写入组：macOS 的 `system_write_macos` 放行 `/tmp`、`/private/tmp`、整个 `/private/var/folders`（所有临时目录）与 `$TMPDIR`，Linux 的 `system_write_linux` 放行 `/tmp`。评估沙箱用 `groups.exclude` 排除它们，候选只能写本次评估的临时根目录；工具沙箱仍保留这两个组。
 - 策略用配置文件一次性给出，不拼命令行参数：Linux 用权限清单（`-c`），macOS 用 profile（`-p`）。原因是 nono 权限清单的 `deny` 不生效，只有 macOS profile 的 Seatbelt 规则能在可写的工作区里禁止写入 `.git/hooks`、`.git/config`。
 - “全部可读，减去凭据目录”用拆分覆盖表达：从 `/` 开始，不含排除路径的目录整体授权，含排除路径的展开子项。nono 不允许授权它自己状态目录的上级（`/`、`$HOME`），拆分覆盖同时绕开这个限制。单独授权的符号链接若指向排除路径之内或之上就跳过，因为 nono 按链接目标授权。
 - macOS 上拆分只绕开 nono 状态目录，禁止读取写成 `(deny file-read* …)` 规则：把禁止读取的路径也拆开会让授权条目从约 110 条涨到约 1100 条，nono 每次启动从约 40ms 涨到约 900ms。Linux 只能靠不授权来禁止读取。
@@ -163,10 +167,12 @@ flowchart LR
 
 - **为什么要整体放进沙箱**：自进化会整体替换 Harness，候选版本可能带新的插件代码和依赖，所以整个候选 Harness 进程都要受限。
 - **层级**：v1 的 `harness-evaluation` 通过 `sandbox` 服务，以 `purpose: evaluation` 启动候选 v2 的子进程。v2 与主应用平级，不包在主应用外面。
-- **启动方式**：CLI `run` 加两个参数：`--harness <选择文件>` 用指定的候选组合与产物启动（不写入持久选择）；`--sandbox-inherited` 打开继承模式（4.6）。启动入口与 Node 程序由 Host 评估端口提供；打包版 Desktop 暂不带 CLI，第二期只在开发环境与 CLI 中可用，打包版入口随自进化 V2 一起做。
+- **启动方式**：CLI `run` 加两个参数：`--harness <选择文件>` 用指定的候选组合与产物启动（不写入持久选择）；`--sandbox-inherited` 打开继承模式（4.6）。启动入口与 Node 程序由 Host 评估端口（`actspace.host.harness-evaluation`）提供；打包版 Desktop 暂不带 CLI，第二期只在开发环境与 CLI 中可用，打包版入口随自进化 V2 一起做。
+- **选择文件**：Harness `SelectionDescription`，可带期望的 `executionDigest`。带了就要求候选启动后实际挂载的摘要与它相同，不同就以退出码 3（`HARNESS_SELECTION_INVALID`）结束。它是可选的，因为摘要包含 Host 契约摘要：Desktop 下选出的组合在 CLI Host 里摘要不同，兼容性由 `validateCandidate` 判断，结果里报告实际运行的摘要。
+- **服务**：`harness-evaluation` 插件提供 `harness.evaluation` 服务（`status()`、`run(request, signal)`），不在默认组合里。结果状态是 `completed` / `failed` / `timed_out` / `cancelled` / `unavailable`，附候选写的结果、沙箱事实、输出末尾 8000 字符与临时目录的清理情况。
 - **文件系统**：候选只能写本次评估的临时目录：独立的 dataRoot（候选需要的产物复制进去）、工作区副本、结果目录、临时目录。原工作区与主应用数据只读，凭据目录不能读。不禁止写入 `.git`，所以不需要 `filesystem.write-deny`，Linux 上也能用。第二期的使用方只用临时测试工作区；真实工作区怎么复制留给自进化 V2（git worktree 会写原仓库的 `.git`，多半要用文件复制）。
-- **网络**：`network.allowlist` 只放行模型服务域名，由 Host 根据模型连接的 `baseUrl` 推出。模型连接配置了代理时，代理地址交给 nono 的 `--upstream-proxy`，候选环境里去掉代理配置。
-- **环境变量**：评估不继承 v1 的进程环境，只给最小集合（`PATH`、`HOME`、语言设置）加 Host 给出的模型连接变量。
+- **网络**：`network.allowlist` 只放行模型服务域名，由 Host 根据模型连接的 `baseUrl` 推出；`baseUrl` 指向本机时推出本机端口。模型连接配置了代理（`LLM_PROXY_URL`，只支持 `http://`）时，代理地址交给 nono 的上游代理，候选环境里去掉代理配置。
+- **环境变量**：评估不继承 v1 的进程环境，只给 `PATH`、`HOME`、`LANG`、`LC_ALL`，加 Host 给出的模型连接变量，`TMPDIR` 指向临时根目录下的 `tmp/`。`HOME` 是真实的 HOME，候选只能读（凭据目录除外）不能写：nono 的状态目录在 `~/.nono`，可写目录不能覆盖它。
 - **密钥**：第二期通过环境变量传给候选，候选能读到它。契约里预留 `network.credentials`，以后改由 nono 反向代理注入，候选只拿到替身 token。
 - **权限**：候选以 `full-access` 运行，无人值守不能弹审批；外层是评估沙箱，里面的 bash 处于继承模式直接执行，结果标为 `inherited`。
 - **评分**：候选只写结果文件（CLI `--out`），v1 在沙箱退出后读取并校验。第二期不打分，只返回结果；打分属于自进化 V2，且放在沙箱外。
@@ -200,3 +206,11 @@ flowchart LR
 - shell-tools 的权限判断按 `sandbox.status("tool")` 决定进程资源的 `noSandbox`；执行端只认批准时的 `noSandbox`，不在执行时重新判断。批准时有沙箱、执行时沙箱不可用，结果是 `SANDBOX_PREPARE_FAILED`，命令不执行。
 - 经真实 Host 端到端（`touch`）：nono 约 60ms，Seatbelt 约 14ms；工作区内写入、`git status`、`pnpm --version` 成功，`~` 下写入、读取 `~/.ssh` 失败，后台任务停止后无残留进程。
 - Linux 在 Docker Desktop（arm64，内核 6.12，Landlock V6）中实测：nono 拦截工作区外写入、凭据读取与网络；`tool` 沙箱因 `filesystem.write-deny` 不支持而不可用，bash 转审批。
+
+第二期实施后补充（详见[执行过程](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-process.md)步骤 1、7）：
+
+- `run` 的额外耗时（`/usr/bin/true`，5 次中位数）：macOS 上 `run` 158ms、`wrap` 45ms；Linux 上 `run` 41ms、`wrap` 7ms。多出来的是代理启动，一次评估只启动一次。
+- supervisor 是进程组长，对进程组终止后没有残留；只终止组长会留下子进程。退出码原样透传。
+- 白名单、本机端口、上游代理在 macOS 与 Linux（Docker，Landlock V6）上都生效：不放行的域名 CONNECT 403，去掉代理变量直连也被拦。
+- 集成测试（真实 nono + 真实 CLI + 本机假模型服务）发现了 5.1 里的两处 nono 默认行为：系统写入组让候选能写原工作区所在的临时目录；空的 `allow_domain` 让网络完全放开。两处都已修正，并有用例覆盖。
+- Linux 上候选能正常跑通，但 Docker Desktop 的 virtiofs 挂载目录与 Landlock 不兼容：`nono why` 说允许、读取却报 EACCES。在 Docker 里测要把仓库复制进容器自己的文件系统，并用 `docker run --init` 回收僵尸进程。

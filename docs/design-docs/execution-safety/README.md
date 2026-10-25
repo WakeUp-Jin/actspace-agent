@@ -5,7 +5,7 @@
 ## 当前状态
 
 - [`agent-tool-permission-model.md`](./agent-tool-permission-model.md)：权限模型事实源；支持 `default/auto-review/full-access`，once 与 Desktop 文件、限定 Bash Session Grant 已实施。
-- [`agent-沙箱设计.md`](./agent-沙箱设计.md)：沙箱设计（2026-10-25 确认）；第一期工具沙箱已实施（Harness 插件 `sandbox` + nono / Seatbelt 后端），评估沙箱与 Windows 在后续分期。
+- [`agent-沙箱设计.md`](./agent-沙箱设计.md)：沙箱设计（2026-10-25 确认）；第一期工具沙箱已实施（Harness 插件 `sandbox` + nono / Seatbelt 后端）；第二期评估沙箱已实施（nono `run` 域名白名单 + `packages/harness-evaluation`，开发环境与 CLI 可用，不在默认组合里）；Windows 在第三期。
 - [`permission-runtime-foundation`](../../exec-plans/completed/permission-runtime-foundation.md)：权限 Runtime、文件/Bash once、mode、Journal 与 Host 直接切换计划，自动化实施已完成。
 - [`session-scope-grants`](../../exec-plans/completed/session-scope-grants.md)：Desktop 文件 Session Grant、恢复、管理与撤销计划；真实 Electron 主题/重启矩阵保留人工验收。
 
