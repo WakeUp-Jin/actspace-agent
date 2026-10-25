@@ -467,6 +467,7 @@ export function createCompactionBlock(input: {
   trigger?: CompactionBlock["trigger"];
   beforeTokens?: number;
   afterTokens?: number;
+  beforeEstimated?: true;
   errorMessage?: string;
 }): CompactionBlock {
   return {
@@ -481,6 +482,7 @@ export function createCompactionBlock(input: {
     ...(input.trigger ? { trigger: input.trigger } : {}),
     ...(input.beforeTokens !== undefined ? { beforeTokens: input.beforeTokens } : {}),
     ...(input.afterTokens !== undefined ? { afterTokens: input.afterTokens } : {}),
+    ...(input.beforeEstimated ? { beforeEstimated: true } : {}),
     ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
     createdAt: new Date().toISOString(),
   };

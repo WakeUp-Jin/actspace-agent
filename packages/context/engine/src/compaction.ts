@@ -11,7 +11,10 @@ export interface CompactionSession extends ContextSession {
 export type CompactionRegion = { readonly start: number; readonly end: number };
 export type CompactionResult = { readonly content: string; readonly metadata?: RuntimeV2JsonValue; readonly pathlist?: readonly string[] };
 export type CompactionTrigger = "manual" | "auto";
-/** What a committed compaction recorded on `compaction/end`. Tokens are absent when no request usage exists yet. */
+/**
+ * What a committed compaction recorded on `compaction/end`. Tokens are absent when no measured baseline exists yet;
+ * `beforeEstimated` marks a before count that includes estimates (content appended after the last measured request).
+ */
 export type CompactionOutcome = {
   readonly compactionId: string;
   readonly trigger: CompactionTrigger;
@@ -19,6 +22,7 @@ export type CompactionOutcome = {
   readonly durationMs: number;
   readonly beforeTokens?: number;
   readonly afterTokens?: number;
+  readonly beforeEstimated?: true;
 };
 export type CompactionObserver = {
   readonly onStarted?: (info: { readonly entryCount: number }) => void;
@@ -61,17 +65,17 @@ export class ContextCompactionCoordinator implements ContextCompactor {
     return () => { if (this.disclosure === disclosure) this.disclosure = undefined; };
   }
   withStrategy(strategy: ContextCompactionStrategy): ContextCompactor {
-    return { threshold: capacity => strategy.threshold?.(capacity) ?? null, compact: (session, observer) => this.perform(session, strategy, observer, { trigger: "manual" }), maybeCompact: (session, usage, observer) => strategy.shouldCompact(usage) ? this.perform(session, strategy, observer, { trigger: "auto", usage }) : Promise.resolve(false) };
+    return { threshold: capacity => strategy.threshold?.(capacity) ?? null, compact: (session, observer) => this.perform(session, strategy, observer, "manual"), maybeCompact: (session, usage, observer) => strategy.shouldCompact(usage) ? this.perform(session, strategy, observer, "auto") : Promise.resolve(false) };
   }
   threshold(capacity: number | null): number | null { return this.strategy?.threshold?.(capacity) ?? null; }
   async maybeCompact(session: CompactionSession, usage: CompactionUsage, observer?: CompactionObserver): Promise<boolean> {
-    return this.strategy?.shouldCompact(usage) ? this.perform(session, this.strategy, observer, { trigger: "auto", usage }) : false;
+    return this.strategy?.shouldCompact(usage) ? this.perform(session, this.strategy, observer, "auto") : false;
   }
   async compact(session: CompactionSession, observer?: CompactionObserver): Promise<boolean> {
     if (!this.strategy) throw new Error("Context compaction capability is unavailable.");
-    return this.perform(session, this.strategy, observer, { trigger: "manual" });
+    return this.perform(session, this.strategy, observer, "manual");
   }
-  private perform(session: CompactionSession, strategy: ContextCompactionStrategy, observer: CompactionObserver | undefined, cause: { readonly trigger: CompactionTrigger; readonly usage?: CompactionUsage }): Promise<boolean> {
+  private perform(session: CompactionSession, strategy: ContextCompactionStrategy, observer: CompactionObserver | undefined, trigger: CompactionTrigger): Promise<boolean> {
     const previous = this.pending.get(session) ?? Promise.resolve();
     const next = previous.then(async () => {
       if (await this.disclosure?.recover(session)) return true;
@@ -95,7 +99,8 @@ export class ContextCompactionCoordinator implements ContextCompactor {
       await this.disclosure?.prepare(session, context, region, result, compactionId);
       if (surface.replaceGeneration !== session.journal.surface.replaceGeneration || JSON.stringify(surface.entries) !== JSON.stringify(session.journal.surface.entries)) return false;
       const durationMs = Math.max(0, Date.now() - started);
-      const stats = { trigger: cause.trigger, ...compactionTokens(cause.usage ?? latestRequestUsage(session), surface.entries.slice(region.start, region.end).map(entry => entry.node.content), content) };
+      // The trigger's pressure value mixes estimates, so both manual and auto runs recount from the journal.
+      const stats = { trigger, ...compactionTokens(session, surface.entries, region, content) };
       const transaction = createCompactionTransaction({ surface, ...region, summary: { kind: "user", messageId: `compaction-${randomUUID()}`, content }, compactionId,
         contributorIds: ["core/compaction"], summaryDigest: createHash("sha256").update(JSON.stringify(content)).digest("hex"), durationMs, stats });
       await session.appendMany(transaction);
@@ -111,21 +116,42 @@ export class ContextCompactionCoordinator implements ContextCompactor {
   }
 }
 
-/** Measured context size of the latest request (input incl. cache buckets, plus output); null before any request. */
-function latestRequestUsage(session: ContextSession): CompactionUsage | null {
-  const usage = latestContextEvent(session, "assistant/message")?.data;
-  const record = usage !== null && typeof usage === "object" && !Array.isArray(usage) ? (usage as Record<string, unknown>).usage : undefined;
-  if (record === null || typeof record !== "object" || Array.isArray(record)) return null;
-  const value = (key: string) => { const number = (record as Record<string, unknown>)[key]; return typeof number === "number" && Number.isFinite(number) && number >= 0 ? number : 0; };
-  const inputTokens = value("inputTokens") + value("cacheReadTokens") + value("cacheWriteTokens");
-  const outputTokens = value("outputTokens");
-  return inputTokens + outputTokens > 0 ? { inputTokens, outputTokens, contextWindow: null } : null;
+/** The newest token count the journal can vouch for: a request's reported usage, or a later compaction's after count. */
+function tokenBaseline(session: ContextSession): { readonly tokens: number; readonly seq: number; readonly estimated: boolean } | null {
+  let request: { tokens: number; seq: number } | null = null;
+  for (let event = latestContextEvent(session, "assistant/message"); event; event = latestContextEvent(session, "assistant/message", event.seq - 1)) {
+    const tokens = requestTokens(event.data);
+    if (tokens > 0) { request = { tokens, seq: event.seq }; break; }
+  }
+  const compaction = latestContextEvent(session, "compaction/end");
+  if (compaction && compaction.seq > (request?.seq ?? -1)) {
+    const after = record(compaction.data)?.afterTokens;
+    return typeof after === "number" && Number.isFinite(after) && after >= 0 ? { tokens: after, seq: compaction.seq, estimated: true } : null;
+  }
+  return request && { ...request, estimated: false };
 }
 
-/** Before is measured; after swaps the replaced entries' estimate for the summary's, so it is available at commit time. */
-function compactionTokens(usage: CompactionUsage | null, replaced: readonly unknown[], summary: unknown): { beforeTokens?: number; afterTokens?: number } {
-  if (usage === null) return {};
-  const beforeTokens = usage.inputTokens + usage.outputTokens;
-  const removed = replaced.reduce<number>((sum, value) => sum + estimateContextTokens(value), 0);
-  return { beforeTokens, afterTokens: Math.max(0, beforeTokens - removed + estimateContextTokens(summary)) };
+/** Measured context size of one request: input incl. cache buckets, plus output. Missing or unknown usage counts as 0. */
+function requestTokens(data: unknown): number {
+  const usage = record(record(data)?.usage);
+  if (!usage) return 0;
+  const value = (key: string) => { const number = usage[key]; return typeof number === "number" && Number.isFinite(number) && number >= 0 ? number : 0; };
+  return value("inputTokens") + value("cacheReadTokens") + value("cacheWriteTokens") + value("outputTokens");
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+/**
+ * Before = baseline + estimate of entries appended after it (tool results the model has not seen yet), flagged when
+ * any estimate is included. After swaps the replaced entries' estimate for the summary's, so it is available at commit time.
+ */
+function compactionTokens(session: ContextSession, entries: ContextSession["journal"]["surface"]["entries"], region: CompactionRegion, summary: unknown): { beforeTokens?: number; afterTokens?: number; beforeEstimated?: true } {
+  const baseline = tokenBaseline(session);
+  if (baseline === null) return {};
+  const appended = entries.filter(entry => entry.sourceEventSeqs.some(seq => seq > baseline.seq)).reduce((sum, entry) => sum + estimateContextTokens(entry.node.content), 0);
+  const beforeTokens = baseline.tokens + appended;
+  const removed = entries.slice(region.start, region.end).reduce((sum, entry) => sum + estimateContextTokens(entry.node.content), 0);
+  return { beforeTokens, afterTokens: Math.max(0, beforeTokens - removed + estimateContextTokens(summary)), ...(baseline.estimated || appended > 0 ? { beforeEstimated: true as const } : {}) };
 }

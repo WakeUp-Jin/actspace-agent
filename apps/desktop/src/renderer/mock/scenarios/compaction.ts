@@ -25,7 +25,7 @@ function insertCompaction(session: MockSession, afterMessages: number): void {
       { type: "compaction/start", data: { compactionId, start: 0, end: afterMessages } },
       { type: "compaction/summary", data: { compactionId, summaryDigest: "mock" } },
       { type: "surface/replaced", data: { compactionId, sourceEventSeqs: sources }, surface: { kind: "replace", start: 0, end: afterMessages, node: { kind: "user", messageId: "mock-compaction-summary", content: SUMMARY }, sourceEventSeqs: sources } },
-      { type: "compaction/end", data: { compactionId, summaryDigest: "mock", durationMs: 23_000, trigger: "auto", beforeTokens: 182_400, afterTokens: 9_100 } },
+      { type: "compaction/end", data: { compactionId, summaryDigest: "mock", durationMs: 23_000, trigger: "auto", beforeTokens: 182_400, afterTokens: 9_100, beforeEstimated: true } },
       ...(next.events ?? []),
     ],
   };

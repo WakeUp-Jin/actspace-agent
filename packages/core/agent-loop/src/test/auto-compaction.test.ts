@@ -31,7 +31,7 @@ describe("auto compaction live events", () => {
   });
 
   it("carries the recorded trigger and token counts on the finish event", async () => {
-    const outcome = { compactionId: "c-1", trigger: "auto", entryCount: 3, durationMs: 1200, beforeTokens: 91_000, afterTokens: 9_000 };
+    const outcome = { compactionId: "c-1", trigger: "auto", entryCount: 3, durationMs: 1200, beforeTokens: 91_000, afterTokens: 9_000, beforeEstimated: true };
     const compaction = { maybeCompact: async (_session: unknown, _usage: unknown, observer?: import("@actspace/context-engine").CompactionObserver) => {
       observer?.onStarted?.({ entryCount: 3 });
       observer?.onFinished?.(outcome as import("@actspace/context-engine").CompactionOutcome);
@@ -39,7 +39,7 @@ describe("auto compaction live events", () => {
     } } as unknown as CompactionPlugin;
     const { events } = await runToolStreamFixture({ terminalOnly: true, usage, compaction });
     const finished = events.find((event) => event.kind === "compaction-finished");
-    expect(finished).toMatchObject({ removedCount: 3, durationMs: 1200, compactionId: "c-1", trigger: "auto", beforeTokens: 91_000, afterTokens: 9_000 });
+    expect(finished).toMatchObject({ removedCount: 3, durationMs: 1200, compactionId: "c-1", trigger: "auto", beforeTokens: 91_000, afterTokens: 9_000, beforeEstimated: true });
     expect(finished).not.toHaveProperty("entryCount");
   });
 

@@ -787,6 +787,7 @@ function compactionFacts(previous: TrajectoryCompactionFacts | undefined, eventT
     messageCount: eventType === "compaction/start" && start !== null && end !== null && end > start ? end - start : previous?.messageCount ?? null,
     beforeTokens: (ended ? count(data.beforeTokens) : null) ?? previous?.beforeTokens ?? null,
     afterTokens: (ended ? count(data.afterTokens) : null) ?? previous?.afterTokens ?? null,
+    beforeEstimated: (ended && data.beforeEstimated === true) || (previous?.beforeEstimated ?? false),
   };
 }
 

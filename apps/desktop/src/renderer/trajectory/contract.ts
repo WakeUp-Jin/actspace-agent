@@ -140,6 +140,8 @@ export type TrajectoryCompactionFacts = {
   readonly messageCount: number | null;
   readonly beforeTokens: number | null;
   readonly afterTokens: number | null;
+  /** `beforeTokens` includes estimates (content appended after the last measured request). */
+  readonly beforeEstimated: boolean;
 };
 
 export type TrajectoryStep = {

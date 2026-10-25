@@ -626,6 +626,7 @@ describe("session selectors", () => {
         trigger: "auto",
         beforeTokens: 182_000,
         afterTokens: 9_100,
+        beforeEstimated: true,
       }),
     ]);
 
@@ -639,6 +640,7 @@ describe("session selectors", () => {
       trigger: "auto",
       beforeTokens: 182_000,
       afterTokens: 9_100,
+      beforeEstimated: true,
       createdAt: expect.any(String),
       runId: "turn-compact",
       renderKey: "turn:turn-compact:context-compaction:0",

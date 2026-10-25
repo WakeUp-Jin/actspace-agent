@@ -352,6 +352,7 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
       ...(payload.trigger ? { trigger: payload.trigger } : {}),
       ...(typeof payload.beforeTokens === "number" ? { beforeTokens: payload.beforeTokens } : {}),
       ...(typeof payload.afterTokens === "number" ? { afterTokens: payload.afterTokens } : {}),
+      ...(payload.beforeEstimated === true ? { beforeEstimated: true as const } : {}),
       createdAt: getDisplayTime(event.timestamp),
     }
   ];

@@ -30,7 +30,8 @@
 
 ## Token 口径（2026-10-25 用户确认）
 
-- `beforeTokens`：实测。自动压缩取触发判断时的用量（`usage.inputTokens + usage.outputTokens`）；手动压缩取 journal 里最近一条带 usage 的 `assistant/message`（input + cacheRead + cacheWrite + output）。拿不到就不写。
+- `beforeTokens`（2026-10-25 验收 B1/B2 后修订，手动、自动同一算法）：基准取 journal 里最近一条用量有效的 `assistant/message`（input + cacheRead + cacheWrite + output > 0，往前跳过无 usage / 全 null 的回复）；若之后还有 `compaction/end`，基准改为那次的 `afterTokens`。再加上基准之后新加 Surface 条目的估算。都拿不到就不写。自动压缩触发用的压力值只用于判断是否压缩。
+- `beforeEstimated: true`：基准来自上一次压缩，或加了新条目估算时写，界面给压缩前也加「约」。
 - `afterTokens`：`max(0, beforeTokens − Σ estimateContextTokens(被替换条目) + estimateContextTokens(摘要))`，只在有 `beforeTokens` 时写。界面显示为「约 9K」。
 - `trigger`：`maybeCompact` 路径为 `auto`，`compact` 路径为 `manual`。
 
@@ -75,6 +76,7 @@
 - 2026-10-25：进行中不显示条数，保证手动、自动一致。
 - 2026-10-25：轨迹压缩行的时长改取 `compaction/end.durationMs`（事务事件同时写入，时间差约为 0）。
 - 2026-10-25：窄窗时分隔线中间换行，不截断数据。
+- 2026-10-25（验收 B1/B2）：压缩前改为「最近有效实测 + 之后新增内容估算」，含估算时标 `beforeEstimated` 并显示「约」；不再用自动触发的压力值（用户选方案 B）。
 
 ## 执行模式
 

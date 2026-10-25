@@ -14,7 +14,7 @@ const records = [
   record("req", { kind: "request", callId: "c1", requestOnly: true }),
   record("tool1", { kind: "tool", callId: "c1" }),
   record("a1", { kind: "assistant", messageId: "m2" }),
-  record("compact", { kind: "compaction", compaction: { compactionId: "k1", trigger: "auto", messageCount: 4, beforeTokens: null, afterTokens: null } }),
+  record("compact", { kind: "compaction", compaction: { compactionId: "k1", trigger: "auto", messageCount: 4, beforeTokens: null, afterTokens: null, beforeEstimated: false } }),
   record("u2", { kind: "user", messageId: "m3" }),
   record("tool2", { kind: "tool", callId: "c2" }),
   record("hidden", { kind: "assistant", messageId: "m4", visible: false }),

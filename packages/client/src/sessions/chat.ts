@@ -221,6 +221,7 @@ export function projectChatEvents(
         ...(trigger ? { trigger } : {}),
         ...(beforeTokens === null ? {} : { beforeTokens }),
         ...(afterTokens === null ? {} : { afterTokens }),
+        ...(beforeTokens !== null && data.beforeEstimated === true ? { beforeEstimated: true as const } : {}),
       } });
     }
   }

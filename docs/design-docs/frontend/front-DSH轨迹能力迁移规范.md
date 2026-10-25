@@ -152,7 +152,7 @@ RuntimeV2TrajectorySnapshot（projectTrajectoryWindow，同一事件对象只转
 
 换选中对象时，回到最近用过且新对象也有的页签。不做 `run_code` 代码页签。
 
-**已压缩的概述**：状态、触发方式（手动 / 自动）、时长、压缩消息数、Token（`182400 tok → 约 9100 tok`），下面是摘要正文。builder 把 `compaction/start` 的区间和 `compaction/end` 的 `trigger` / `beforeTokens` / `afterTokens` 合进记录的 `compaction` 字段；旧 journal 没有触发方式时不显示那一行，没有 token 时 Token 显示「—」。对话里压缩分隔线的「在轨迹中查看」按 `compactionId` 选中这一行。
+**已压缩的概述**：状态、触发方式（手动 / 自动）、时长、压缩消息数、Token（`182400 tok → 约 9100 tok`，压缩前含估算时为 `约 182400 tok → 约 9100 tok`），下面是摘要正文。builder 把 `compaction/start` 的区间和 `compaction/end` 的 `trigger` / `beforeTokens` / `afterTokens` / `beforeEstimated` 合进记录的 `compaction` 字段；旧 journal 没有触发方式时不显示那一行，没有 token 时 Token 显示「—」。对话里压缩分隔线的「在轨迹中查看」按 `compactionId` 选中这一行。
 
 **样式**：DSH 的 CSS module 移植成全局的 `styles/trajectory.css`（前缀 `tjv-`、`tjb-`、`tjl-`、`tj-`）和 `styles/json-tree.css`。原因是 DSH 依赖伪元素、容器查询和属性选择器，用 Tailwind 类无法一比一还原。
 

@@ -62,11 +62,12 @@ function completedTitle(message: CompactMessage): string {
   return typeof message.removedCount === "number" && message.removedCount > 0 ? `以上 ${message.removedCount} 条消息已压缩` : "上下文已压缩";
 }
 
-/** 「182K → 约 9.1K tokens · 23s」；旧会话没有 token 时只留耗时。 */
+/** 「182K → 约 9.1K tokens · 23s」；压缩前含估算时也带「约」，旧会话没有 token 时只留耗时。 */
 function completedStats(message: CompactMessage): string {
   const parts: string[] = [];
   if (typeof message.beforeTokens === "number" && typeof message.afterTokens === "number") {
-    parts.push(`${formatTokenCount(message.beforeTokens)} → 约 ${formatTokenCount(message.afterTokens)} tokens`);
+    const before = `${message.beforeEstimated ? "约 " : ""}${formatTokenCount(message.beforeTokens)}`;
+    parts.push(`${before} → 约 ${formatTokenCount(message.afterTokens)} tokens`);
   }
   if (typeof message.durationMs === "number") parts.push(formatCompactionDuration(message.durationMs));
   return parts.join(" · ");

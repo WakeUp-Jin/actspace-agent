@@ -110,8 +110,8 @@ export function RecordOverview(props: OverviewProps) {
   if (cell.kind === 'compacted') {
     const summary = markdownSource(cell);
     const facts = record.compaction;
-    // 压缩前是实测，压缩后是估算，所以后者带「约」；旧 journal 没有这两项时显示「—」。
-    const tokens = facts?.beforeTokens != null && facts.afterTokens != null ? `${formatTokens(facts.beforeTokens)} → 约 ${formatTokens(facts.afterTokens)}` : '—';
+    // 压缩后总是估算；压缩前纯实测时不带「约」，含估算时也带。旧 journal 没有这两项时显示「—」。
+    const tokens = facts?.beforeTokens != null && facts.afterTokens != null ? `${facts.beforeEstimated ? '约 ' : ''}${formatTokens(facts.beforeTokens)} → 约 ${formatTokens(facts.afterTokens)}` : '—';
     return (
       <>
         <dl className="tj-overview tj-summaryScrollRegion" data-summary-scroll-region="">

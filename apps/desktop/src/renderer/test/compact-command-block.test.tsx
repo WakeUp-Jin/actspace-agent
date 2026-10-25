@@ -47,6 +47,12 @@ describe("CompactCommandBlock", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("marks the before count approximate when it includes estimates", () => {
+    render(<CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 12, durationMs: 9_000, beforeTokens: 5_157, afterTokens: 126, beforeEstimated: true })} />);
+
+    expect(screen.getByRole("separator", { name: "以上 12 条消息已压缩 · 约 5.2K → 约 126 tokens · 9s" })).toBeInTheDocument();
+  });
+
   it("shows only count and duration for compactions recorded before token counts", () => {
     render(<CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 5, durationMs: 4_000 })} />);
 

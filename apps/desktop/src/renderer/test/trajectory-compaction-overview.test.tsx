@@ -27,7 +27,7 @@ const row = (label: string) => screen.getByText(label, { selector: 'dt' }).nextE
 describe('trajectory compaction overview', () => {
   it('merges span and recorded stats into the compaction record', () => {
     const { cell } = compactedLayout({ trigger: 'auto', beforeTokens: 182_400, afterTokens: 9_100 });
-    expect(cell.record.compaction).toEqual({ compactionId: 'k1', trigger: 'auto', messageCount: 3, beforeTokens: 182_400, afterTokens: 9_100 });
+    expect(cell.record.compaction).toEqual({ compactionId: 'k1', trigger: 'auto', messageCount: 3, beforeTokens: 182_400, afterTokens: 9_100, beforeEstimated: false });
     // 事务里的事件同一时刻写入，时长取 compaction/end 记录的 durationMs。
     expect(cell.record.durationMs).toBe(23_000);
   });
@@ -37,6 +37,11 @@ describe('trajectory compaction overview', () => {
     expect(row('触发方式')).toBe('手动');
     expect(row('压缩消息数')).toBe('3 条');
     expect(row('Token')).toBe('182400 tok → 约 9100 tok');
+  });
+
+  it('marks an estimated before count as approximate', () => {
+    renderOverview({ trigger: 'auto', beforeTokens: 182_400, afterTokens: 9_100, beforeEstimated: true });
+    expect(row('Token')).toBe('约 182400 tok → 约 9100 tok');
   });
 
   it('keeps the old rows for journals written before stats were recorded', () => {

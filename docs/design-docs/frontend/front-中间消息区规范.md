@@ -342,7 +342,7 @@ Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接
 - running：中间是小转圈 + `正在压缩上下文` + 已用时间（`8s`，每秒刷新，来自 `startedAt`）；两侧细线各有一道 `operational` 色的光从外端收向中间文字（`compact-divider-running`，减少动态效果时不显示）。进行中不显示条数，手动和自动一致。手动 `/compact` 被任务服务领取后进入 running，等待时显示在队列中，不再显示淡色 `/compact` 命令行。
 - completed：中间是归档图标 + `以上 48 条消息已压缩` + `182K → 约 9.1K tokens · 23s` + `·` + `在轨迹中查看 ›`。
   - 条数来自压缩区间大小。
-  - token 来自 `compaction/end.data.beforeTokens` / `afterTokens`：压缩前是实测（自动压缩取触发判断时的用量，手动压缩取最近一次请求的用量），压缩后是「压缩前 − 被替换条目估算 + 摘要估算」，所以写「约」。旧 journal 没有这两项时只显示条数和耗时。
+  - token 来自 `compaction/end.data.beforeTokens` / `afterTokens` / `beforeEstimated`。手动、自动压缩同一算法：压缩前 = 最近一次有效实测用量（往前跳过没有 usage 或 usage 全空的回复；若之后又发生过压缩，改用那次压缩的压缩后数）+ 之后新加内容的估算。压缩后 = 压缩前 − 被替换条目估算 + 摘要估算，总是写「约」。压缩前含估算时 `beforeEstimated: true`，也写「约」（如「约 182K → 约 9.1K tokens」）。自动压缩触发判断用的压力值不再参与显示。旧 journal 没有这两项时只显示条数和耗时。
   - 耗时优先来自 `compaction/end.data.durationMs`，包含事务提交前的模型摘要等待；旧 journal 缺少该值时回退 `compaction/start` 与 `compaction/end` 的时间差，历史回放同样显示。
   - `在轨迹中查看` 调用 `revealInTrajectory({ compactionId })`，切到轨迹并选中这次压缩的行；没有 `compactionId` 或不在工作台里（没有轨迹导航）时不显示。
   - 摘要不在消息流里展开，只在轨迹详情里看。

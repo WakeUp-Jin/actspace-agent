@@ -22,3 +22,9 @@
 
 - 后端四个包、shared、client、web、desktop 2029 项测试通过；三项前端检查通过；浏览器截图见[执行摘要](../../exec-runs/20261025-compaction-display/execution-summary.md)。
 - 未验证：Electron 里手动 `/compact` 与长会话自动压缩的真实数据。
+
+### 验收修复（B1 / B2）
+
+- **B1**：手动压缩只看最近一条回复的 usage，它没有 usage 或全为 null 时整组 token 丢失；改为往前找最近一条有效用量。
+- **B2**：自动压缩把触发判断用的压力值（混了估算）当实测写入；改为手动、自动统一从 journal 计算「最近实测 + 之后新增内容估算」，含估算时写 `beforeEstimated`，对话分隔线和轨迹的压缩前也显示「约」。连续两次压缩之间无请求时以上一次的压缩后数为基准。
+- 验证：context-compaction 23、context-engine 27、session-journal 37、agent-loop 54、shared 179、client 51、web 124、desktop 2037 项通过；desktop typecheck 与三项前端检查通过。

@@ -270,10 +270,12 @@ export type ContextCompactionPayload = {
   summary?: string;
   /** journal 里的压缩事务 id，用于在轨迹里定位压缩行 */
   compactionId?: string;
-  /** 压缩前上下文 token（实测）；没有请求用量时缺省 */
+  /** 压缩前上下文 token：最近一次实测用量 + 之后新增内容的估算；没有实测基准时缺省 */
   beforeTokens?: number;
   /** 压缩后上下文 token（压缩前 − 估算被替换条目 + 估算摘要） */
   afterTokens?: number;
+  /** 压缩前 token 含估算（实测之后又追加了内容，或基准是上一次压缩的估算结果），显示时带「约」 */
+  beforeEstimated?: true;
 };
 
 export type SessionWorktreeContext = {
@@ -957,6 +959,8 @@ export type MessageBlock = {
       /** completed：压缩前 / 后上下文 token；旧会话没有 */
       beforeTokens?: number;
       afterTokens?: number;
+      /** completed：压缩前 token 含估算，显示带「约」 */
+      beforeEstimated?: true;
       /** failed：失败原因 */
       errorMessage?: string;
       createdAt: string;

@@ -35,8 +35,8 @@ export function createCompactionTransaction(options: {
   readonly summaryDigest: string;
   /** Elapsed compaction work, including summarization before the transaction commits. */
   readonly durationMs?: number;
-  /** Display facts recorded on `compaction/end`: measured tokens before, estimated tokens after. */
-  readonly stats?: { readonly trigger: "manual" | "auto"; readonly beforeTokens?: number; readonly afterTokens?: number };
+  /** Display facts recorded on `compaction/end`: tokens before (flagged when it includes estimates), estimated tokens after. */
+  readonly stats?: { readonly trigger: "manual" | "auto"; readonly beforeTokens?: number; readonly afterTokens?: number; readonly beforeEstimated?: true };
 }): readonly SessionEventCandidateV1[] {
   const makeControl = (type: "compaction/start" | "compaction/summary" | "compaction/end", data: SessionEventCandidateV1["data"]): SessionEventCandidateV1 => ({
     type,

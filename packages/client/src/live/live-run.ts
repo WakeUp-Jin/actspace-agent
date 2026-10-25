@@ -203,6 +203,7 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
           trigger: event.payload.trigger,
           beforeTokens: event.payload.beforeTokens,
           afterTokens: event.payload.afterTokens,
+          beforeEstimated: event.payload.beforeEstimated,
           errorMessage: event.payload.reason,
         }));
         break;
