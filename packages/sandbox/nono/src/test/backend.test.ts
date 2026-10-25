@@ -100,12 +100,21 @@ describe("nono configuration", () => {
     const network = { allow_domain: ["api.example.com"], open_port: [8080], upstream_proxy: "127.0.0.1:7897" };
     expect(buildLinuxProfile(resolved.policy, grants)).toEqual({
       meta: { name: "actspace-sandbox", description: `ActSpace evaluation sandbox ${resolved.policy.fingerprint}` },
+      groups: { exclude: ["system_write_linux"] },
       filesystem: { read: ["/bin"], read_file: ["/.file"], allow: ["/work"], allow_file: ["/work.log", "/dev/null"] },
       network,
     });
     expect(buildMacosProfile(resolved.policy, grants, "/Users/agent").network).toEqual(network);
     const plain = { ...resolved.policy, network: { mode: "allowlist" as const, domains: ["a.com"] } };
     expect(buildLinuxProfile(plain, grants).network).toEqual({ allow_domain: ["a.com"] });
+    // nono reads an empty domain list as "no proxy": the network would be open.
+    const portsOnly = { ...resolved.policy, network: { mode: "allowlist" as const, domains: [], localPorts: [8080] } };
+    expect(buildLinuxProfile(portsOnly, grants).network).toEqual({ block: true, open_port: [8080] });
+    expect(buildMacosProfile(portsOnly, grants, "/Users/agent").network).toEqual({ block: true, open_port: [8080] });
+    // Only evaluations drop nono's system temp write groups.
+    expect(buildMacosProfile(resolved.policy, grants, "/Users/agent").groups).toEqual({ exclude: ["system_write_macos"] });
+    const tool = await policyFor("darwin");
+    expect(buildMacosProfile(tool, grants, "/Users/agent").groups).toBeUndefined();
     const darwin = await policyFor("darwin");
     expect(() => buildLinuxProfile(darwin, grants)).toThrow(/cannot deny writes/);
   });

@@ -10,5 +10,5 @@
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" }, "./manifest": { "types": "./dist/manifest.d.ts", "import": "./dist/manifest.js", "default": "./dist/manifest.js" }, "./plugin": { "types": "./dist/plugin.d.ts", "import": "./dist/plugin.js", "default": "./dist/plugin.js" }, "./types": { "types": "./dist/types.d.ts", "import": "./dist/types.js", "default": "./dist/types.js" } },
   "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc --noEmit -p tsconfig.json", "test": "vitest run --globals --passWithNoTests" },
   "dependencies": { "@actspace/cordis-adapter": "workspace:*", "@actspace/harness-control": "workspace:*", "@actspace/sandbox": "workspace:*" },
-  "devDependencies": { "@types/node": "^24.0.3", "typescript": "^5.8.3", "vitest": "^3.2.4" }
+  "devDependencies": { "@actspace/sandbox-nono": "workspace:*", "@types/node": "^24.0.3", "typescript": "^5.8.3", "vitest": "^3.2.4" }
 }

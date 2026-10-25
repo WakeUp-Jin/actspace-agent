@@ -24,7 +24,7 @@ describe("harness evaluation service", () => {
   const request = (overrides: Partial<HarnessEvaluationRequest> = {}): HarnessEvaluationRequest => ({ selection, task: { input: "fix the bug" }, workspace, ...overrides });
   function service(candidate: FakeCandidate, model?: Parameters<typeof fakeHost>[1]) {
     const sandbox = fakeSandbox(candidate); const host = fakeHost(artifactRoot, model);
-    return { sandbox, host, evaluation: createHarnessEvaluationService({ sandbox, host, tempRoot, env: { PATH: "/usr/bin:/bin", LANG: "en_US.UTF-8", SECRET_SENTINEL: "leak", DEEPSEEK_API_KEY: "sk-v1" } }) };
+    return { sandbox, host, evaluation: createHarnessEvaluationService({ sandbox, host, tempRoot, env: { PATH: "/usr/bin:/bin", HOME: "/Users/agent", LANG: "en_US.UTF-8", SECRET_SENTINEL: "leak", DEEPSEEK_API_KEY: "sk-v1" } }) };
   }
 
   it("runs the candidate CLI in the evaluation sandbox over copies, then removes the temp root", async () => {
@@ -47,7 +47,7 @@ describe("harness evaluation service", () => {
     expect(sent!.network).toEqual({ mode: "allowlist", domains: [], localPorts: [4100], upstreamProxy: "127.0.0.1:7897" });
     expect(sent!.argv).toEqual(["/usr/bin/node", "/repo/apps/cli/dist/cli.js", "run", "--data-dir", join(root, "data"), "--workspace", join(root, "workspace"), "--harness", join(root, "selection.json"), "--sandbox-inherited", "--permission-mode", "full-access", "--input-file", join(root, "task.md"), "--out", join(root, "out"), "--json", "--model", "fake/model"]);
     // Only the allowed variables of this process, plus the model connection from the Host port.
-    expect(sent!.env).toEqual({ PATH: "/usr/bin:/bin", LANG: "en_US.UTF-8", LLM_PROVIDER: "fake", FAKE_API_KEY: "sk-test", FAKE_BASE_URL: "http://127.0.0.1:4100", HOME: join(root, "home"), TMPDIR: join(root, "tmp") });
+    expect(sent!.env).toEqual({ PATH: "/usr/bin:/bin", HOME: "/Users/agent", LANG: "en_US.UTF-8", LLM_PROVIDER: "fake", FAKE_API_KEY: "sk-test", FAKE_BASE_URL: "http://127.0.0.1:4100", TMPDIR: join(root, "tmp") });
     expect(JSON.parse(seen.selection!)).toEqual({ ...selection, executionDigest: "sha256-pinned" });
     expect(seen).toMatchObject({ task: "fix the bug", copy: "original", artifact: ARTIFACT });
     expect(await readFile(join(workspace, "README.md"), "utf8")).toBe("original");

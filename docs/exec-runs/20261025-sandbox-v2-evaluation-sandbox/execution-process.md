@@ -176,12 +176,46 @@
   - agent-host 61 个通过，其中新增 3 个；CLI 16 个通过，`typecheck` 通过。
   - `pnpm check:packages` 通过（65 个包）；`pnpm check:desktop-build-graph` 通过。
 
+### 步骤 7：T6 集成测试（真实 nono + 真实 CLI 候选）
+
+- **操作**：
+  - `packages/harness-evaluation/src/test/integration.test.ts`：
+    - 真实的沙箱管理器加 nono 后端；
+    - 已构建的 CLI（`apps/cli/dist/cli.js`）作为候选，先用一次 mock 运行生成真实的选择与产物；
+    - 本机上的脚本化假模型（`fake-openai.ts`，复制自 CLI 的测试辅助，因为包不能依赖应用，另加了“挂起”步骤）；
+    - 没有 nono 或 CLI 未构建时跳过（先执行 `pnpm --filter "@actspace/agent-cli..." build`）。
+  - CLI 的 Bash 规则会拒绝含引号、`$`、括号、重定向的命令（“cannot be safely classified”），所以探测写成工作区里的 `probe.mjs`，随工作区一起复制，模型只让候选执行 `node probe.mjs <项>`。
+  - Host 端口在测试里直接构造：agent-host 依赖本包，反过来引用会形成循环依赖。agent-host 的端口另有单测。
+- **发现与修正**（第一版测试有 4 项失败）：
+  1. **候选 `HOME` 不能指向临时根目录。** nono 后端会拒绝覆盖 `$HOME/.nono`（nono 状态目录）的可写目录。改为沿用真实 HOME：可读、不可写，凭据目录仍禁止读取。
+  2. **nono profile 默认带系统写入组。**
+     - `nono why` 显示 `group:system_write_macos` 放行 `/private/tmp`、`/tmp`、整个 `/private/var/folders`（本用户所有应用的 `$TMPDIR`）与 `/dev`；Linux 的 `system_write_linux` 放行 `/tmp`。
+     - 测试里原工作区也在系统临时目录下，于是被候选写入。
+     - 修正：评估用途的 profile 写 `groups: { exclude: ["system_write_<平台>"] }`。实测两个平台上只有临时根目录可写，`/dev/null` 与 Node 正常。
+     - 工具沙箱（第一期，`wrap` 与 `run` 都受影响）保持原样，待用户决定，见“跳过或推迟的事项”。
+  3. **`allow_domain` 为空等于不过滤。** nono 此时关闭代理，所有域名都 `network_allowed`；`allow_domain` 非空时只放行列出的域名，没有额外默认域名。只有本机端口的白名单改写成 `{ block: true, open_port }`，实测本机端口可达、其他都不可达（两个平台）。
+- **影响文件**：`packages/sandbox/nono/src/config.ts` 及其两个测试，`packages/harness-evaluation/{package.json,src/service.ts,src/test/**}`，`pnpm-lock.yaml`。
+- **验证**：
+  - macOS（本机，nono 0.80.0）：
+    - `pnpm --filter @actspace/harness-evaluation test` 15 个通过，其中集成测试 5 个：
+      - 正常路径：完成、后端 nono、固定摘要一致、候选 Bash 为 `inherited`、副本可写、白名单外 `offline`、哨兵变量没有传入、HOME 不可写、原工作区不变、临时根目录已删除；
+      - 写原工作区得到 `EPERM`；
+      - 摘要不符时候选以退出码 3 拒绝，`outputTail` 含 `HARNESS_SELECTION_INVALID`；
+      - 产物缺失时不启动；
+      - 超时后 `timed_out` 且没有残留进程。
+    - `@actspace/sandbox-nono` 真实测试 23 个通过，新增“只有本机端口时其余网络关闭”“评估不能写其他临时目录、工具沙箱仍可以”。
+  - Linux（Docker `node:22 --init`，arm64）：
+    - `tmp/sandbox-v2-e2e/linux-evaluation.mjs` 复现集成测试，12 项全部通过，另加 `/tmp` 不可写一项。
+    - 第二期 T2 的 `linux-run.mjs` 复跑，5 项通过。
+
 ## 遇到的问题
 
 - Linux 容器里第一次复验“终止无残留”失败：`ps` 显示两个 `sleep` 处于 `Z` 状态，父进程是 PID 1。容器里的 PID 1 是 `node`，它不回收被转交过来的孤儿进程，`kill(-pgid, 0)` 对僵尸进程也会成功。加 `docker run --init` 后通过。真实主机上由 init 或 systemd 回收，不受影响；Docker 复验统一加 `--init`。
 - 第一版代理实验在代理服务所在的进程里用 `execFileSync` 启动 nono，事件循环被阻塞，代理无法响应，请求一直挂起。改用异步 `execFile` 加每次调用的 `timeout` 后正常。
+- Linux 复验第一次全部失败：候选读不到 `/repo/apps/cli/dist/cli.js`（EACCES），`nono why` 却显示允许。`/repo` 是从 macOS 绑定挂载进 Docker 的目录（virtiofs），Landlock 在这类挂载上匹配不到路径规则；容器自己文件系统里的 `/usr/local/bin/node` 读取正常。把仓库（不含 `dist`、`tmp`、`.git`、Desktop、官网）复制到容器内的 `/work` 后通过。这是测试环境的问题，不影响真实 Linux 主机；之后需要在沙箱里读取仓库文件的 Docker 复验都先复制。
 
 ## 跳过或推迟的事项
 
 - Desktop 产生的选择在 CLI Host 下评估：Host 契约不同，只有 Desktop 才有的条目（如 `browser-tools`）会无法挂载。留给 E13 与自进化 V2，届时决定由 Desktop 侧提供评估入口，还是在选择进入评估前按 CLI Host 改写组合。
-- CLI 在 Linux `nono run` 里启动：推迟到 T6，用集成测试在 Docker 里复验。macOS 上构建的 `node_modules` 在 Linux 容器里不一定能直接用，到时按第一期的 Linux 复验方式处理。
+- CLI 在 Linux `nono run` 里启动：已在 T6 复验通过（见步骤 7）。
+- **待用户决定：工具沙箱是否也排除 nono 的系统写入组。** 现在工具沙箱里的命令可以写 `/tmp`；在 macOS 上还可以写整个 `/private/var/folders`，也就是本用户所有应用的临时目录。排除后命令只能写工作区与 scratch（`TMPDIR` 指向哪里，取决于 shell-tools 传入的环境变量），有些工具可能因此失败。这会改变第一期的行为，没有擅自修改。

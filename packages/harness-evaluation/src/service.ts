@@ -7,8 +7,12 @@ import { HARNESS_EVALUATION_HOST_PORT_ID, type HarnessEvaluationCliResult, type 
 export const DEFAULT_EVALUATION_TIMEOUT_MS = 10 * 60_000;
 const OUTPUT_TAIL_CHARS = 8_000;
 const ARTIFACT_ID = /^sha256-[a-f0-9]{64}$/;
-/** The only variables of this process the candidate sees; the model connection comes from the Host port. */
-const INHERITED_VARIABLES = ["PATH", "LANG", "LC_ALL"] as const;
+/**
+ * The only variables of this process the candidate sees; the model connection comes from the Host port. HOME stays the
+ * real one: nono keeps its state under it and refuses a writable root that covers it, so the candidate can read HOME
+ * (minus credentials) but not write it.
+ */
+const INHERITED_VARIABLES = ["PATH", "HOME", "LANG", "LC_ALL"] as const;
 
 export type HarnessEvaluationServiceOptions = {
   readonly sandbox: SandboxService;
@@ -47,8 +51,8 @@ export function createHarnessEvaluationService(options: HarnessEvaluationService
 }
 
 async function evaluate(root: string, request: HarnessEvaluationRequest, host: HarnessEvaluationHostPort, options: HarnessEvaluationServiceOptions, signal: AbortSignal | undefined): Promise<Outcome> {
-  const dirs = { data: join(root, "data"), workspace: join(root, "workspace"), out: join(root, "out"), tmp: join(root, "tmp"), scratch: join(root, "scratch"), home: join(root, "home") };
-  for (const dir of [dirs.data, dirs.tmp, dirs.scratch, dirs.home]) await mkdir(dir);
+  const dirs = { data: join(root, "data"), workspace: join(root, "workspace"), out: join(root, "out"), tmp: join(root, "tmp"), scratch: join(root, "scratch") };
+  for (const dir of [dirs.data, dirs.tmp, dirs.scratch]) await mkdir(dir);
   for (const id of request.selection.artifactIds) {
     if (!ARTIFACT_ID.test(id)) throw new Error(`Invalid Harness artifact identity: ${id}`);
     await cp(join(host.artifactRoot, id), join(dirs.data, "harness-artifacts", id), { recursive: true, errorOnExist: true, force: false })
@@ -70,7 +74,7 @@ async function evaluate(root: string, request: HarnessEvaluationRequest, host: H
     isolation: "sandboxed",
     argv: [...host.launcher, "run", "--data-dir", dirs.data, "--workspace", dirs.workspace, "--harness", selectionFile, "--sandbox-inherited", "--permission-mode", "full-access", "--input-file", taskFile, "--out", dirs.out, "--json", ...(request.task.model === undefined ? [] : ["--model", request.task.model])],
     cwd: dirs.workspace,
-    env: { ...inherited, ...model.env, HOME: dirs.home, TMPDIR: dirs.tmp },
+    env: { ...inherited, ...model.env, TMPDIR: dirs.tmp },
     scratchDir: dirs.scratch,
     filesystem: { readWrite: [root] },
     network: { mode: "allowlist", domains: model.domains, ...(model.localPorts?.length ? { localPorts: model.localPorts } : {}), ...(model.upstreamProxy === undefined ? {} : { upstreamProxy: model.upstreamProxy }) },

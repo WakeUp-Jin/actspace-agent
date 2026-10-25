@@ -97,6 +97,20 @@ describe.skipIf(!nonoPath)("nono enforcement", () => {
       await expect(readFile(join(home, "escape"))).rejects.toThrow(/ENOENT/);
     });
 
+    it("keeps the network closed apart from local ports when no domain is allowed", async () => {
+      const open = await listen(createServer((_, res) => res.end("model")));
+      const result = await run(`${fetchScript(`http://127.0.0.1:${open}/`)}; ${fetchScript("https://example.com/")}`, { purpose: "evaluation", network: { mode: "allowlist", domains: [], localPorts: [open] } });
+      expect(result.output.trim().split("\n").filter(line => /^(ok|fail)/.test(line))).toEqual(["ok model", "fail"]);
+    });
+
+    it("does not let an evaluation write other temp directories", async () => {
+      const sibling = await realpath(await mkdtemp(join(tmpdir(), "nono-sibling-")));
+      const probe = `touch ${sibling}/x 2>/dev/null && echo sibling-written; touch /tmp/nono-eval-$$ 2>/dev/null && echo tmp-written; touch inside && echo inside-written`;
+      expect((await run(probe, { purpose: "evaluation", network: { mode: "allowlist", domains: ["example.com"] } })).output.trim()).toBe("inside-written");
+      // The tool sandbox keeps nono's system temp grants.
+      expect((await run(probe)).output.trim()).toContain("sibling-written");
+    });
+
     it("sends only allowlisted domains to the upstream proxy", async () => {
       const seen: string[] = [];
       const upstream = createServer();
