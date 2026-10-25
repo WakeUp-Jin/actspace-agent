@@ -1,0 +1,183 @@
+/* Markdown 渲染五种风格。结构由 md-render.html 统一生成：figure / .callout / .code（.code-bar + .code-gutter + pre）/ h2·h3 内 .hn 编号 + .ht 文字。 */
+.md { overflow-wrap: anywhere; font-family: var(--r-font); }
+.md > :first-child { margin-top: 0; }
+.md img { display: block; width: 100%; height: auto; }
+.md .hn::after { content: "、"; }
+.md li > p { margin: 0; }
+.md pre { margin: 0; overflow: auto; }
+.md pre code { font-family: var(--mono); }
+.md .code-bar { display: flex; align-items: center; gap: 10px; }
+.md .code-lines { margin-right: auto; }
+.md .code-copy { all: unset; cursor: pointer; }
+.md .code-body { display: flex; }
+.md .code-gutter { display: none; flex: none; text-align: right; user-select: none; white-space: pre; font-family: var(--mono); }
+.md .code-body pre { flex: 1; min-width: 0; }
+.md .callout { display: flex; gap: 12px; }
+.md .callout .ico { flex: none; }
+
+/* ───────── M1 GitHub 清爽：大家最熟悉的读法。h2 带底线，代码浅底 github-light，引用只留一道灰线。 ───────── */
+.m1 { font-size: 16px; line-height: 1.8; color: #2f2d29; }
+.m1 p { margin: 0 0 16px; }
+.m1 h2 { font-size: 24px; font-weight: 650; line-height: 1.4; color: var(--site-ink); margin: 44px 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--site-line); }
+.m1 h3 { font-size: 19px; font-weight: 600; line-height: 1.45; color: var(--site-ink); margin: 32px 0 12px; }
+.m1 ul, .m1 ol { margin: 0 0 16px; padding-left: 1.6em; }
+.m1 li { margin: 6px 0; }
+.m1 strong { color: var(--site-ink); font-weight: 600; }
+.m1 :not(pre) > code { font: .86em var(--mono); background: rgba(29, 28, 26, .06); border-radius: 5px; padding: .18em .4em; }
+.m1 blockquote { margin: 0 0 16px; padding: 0 16px; border-left: 4px solid #d6d2c8; color: var(--site-body); }
+.m1 blockquote p { margin: 0; }
+.m1 figure { margin: 24px 0; }
+.m1 figure img { border-radius: 8px; border: 1px solid var(--site-line); background: #fff; }
+.m1 figcaption { margin-top: 8px; text-align: center; font-size: 13px; color: var(--site-muted); }
+.m1 .callout { margin: 0 0 16px; padding: 12px 16px; border-radius: 8px; background: var(--site-paper); border: 1px solid var(--site-line); }
+.m1 .code { margin: 0 0 16px; background: #f6f5f1; border: 1px solid var(--site-line); border-radius: 10px; overflow: hidden; }
+.m1 .code-bar { padding: 6px 12px 6px 16px; border-bottom: 1px solid var(--site-line); font: 12px var(--mono); color: var(--site-muted); }
+.m1 .code-lines { visibility: hidden; }
+.m1 .code-copy { font-size: 12px; padding: 2px 6px; border-radius: 5px; }
+.m1 .code-copy:hover { background: rgba(29, 28, 26, .06); color: var(--site-ink); }
+.m1 pre { padding: 14px 16px; font-size: 13.5px; line-height: 1.7; color: #24292f; }
+.m1 .hljs-keyword, .m1 .hljs-meta .hljs-keyword { color: #cf222e; }
+.m1 .hljs-string { color: #0a3069; }
+.m1 .hljs-comment { color: #6e7781; }
+.m1 .hljs-number, .m1 .hljs-literal, .m1 .hljs-attr, .m1 .hljs-property { color: #0550ae; }
+.m1 .hljs-title, .m1 .hljs-title.function_ { color: #8250df; }
+.m1 .hljs-built_in, .m1 .hljs-type, .m1 .hljs-params { color: #953800; }
+
+/* ───────── M2 精致卡片：Stripe / Linear 那种。正文略大、标题更紧；代码块是白卡 + 行号 + 语言胶囊，配色用品牌紫 / 绿 / 琥珀；有序列表编号是紫色等宽数字。 ───────── */
+.m2 { font-size: 17px; line-height: 1.85; color: #45423c; }
+.m2 p { margin: 0 0 1.2em; }
+.m2 h2 { font-size: 27px; font-weight: 650; line-height: 1.35; letter-spacing: -.012em; color: var(--site-ink); margin: 2.4em 0 .7em; }
+.m2 h3 { font-size: 20px; font-weight: 600; line-height: 1.45; color: var(--site-ink); margin: 1.9em 0 .6em; }
+.m2 .hn { color: var(--site-accent); margin-right: .1em; }
+.m2 .hn::after { content: "."; }
+.m2 ul, .m2 ol { margin: 0 0 1.3em; padding-left: 0; list-style: none; }
+.m2 ol { counter-reset: n; }
+.m2 li { position: relative; padding-left: 2em; margin: .55em 0; }
+.m2 ol > li { counter-increment: n; }
+.m2 ol > li::before { content: counter(n, decimal-leading-zero); position: absolute; left: 0; top: .12em; font: 500 .8em/1.85 var(--mono); color: var(--site-accent); }
+.m2 ul > li::before { content: ""; position: absolute; left: .45em; top: .78em; width: 6px; height: 6px; border-radius: 2px; background: var(--site-accent-line); }
+.m2 strong { color: var(--site-ink); font-weight: 600; }
+.m2 :not(pre) > code { font: .84em var(--mono); background: var(--site-accent-soft); color: #5a3fae; border-radius: 6px; padding: .2em .45em; }
+.m2 blockquote { margin: 1.6em 0; padding: 18px 22px 18px 24px; border-radius: 14px; background: var(--site-paper); border: 1px solid var(--site-line); box-shadow: inset 3px 0 0 var(--site-accent); color: var(--site-ink); }
+.m2 blockquote p { margin: 0; }
+.m2 figure { margin: 2em 0; }
+.m2 figure img { border-radius: 14px; border: 1px solid var(--site-line); background: #fff; }
+.m2 figcaption { margin-top: 10px; text-align: center; font-size: 13px; color: var(--site-muted); }
+.m2 .callout { margin: 1.6em 0; padding: 14px 18px; border-radius: 12px; background: var(--site-accent-soft); color: var(--site-ink); }
+.m2 .code { margin: 1.6em 0; background: #fff; border: 1px solid var(--site-line); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(29, 28, 26, .04), 0 14px 32px -24px rgba(29, 28, 26, .3); }
+.m2 .code-bar { padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--site-line); background: var(--site-paper); }
+.m2 .code-lang { font: 500 11px var(--mono); color: var(--site-accent); background: var(--site-accent-soft); padding: 3px 9px; border-radius: 999px; }
+.m2 .code-lines { font: 11.5px var(--mono); color: var(--site-muted); }
+.m2 .code-copy { font-size: 12px; color: var(--site-body); padding: 3px 9px; border-radius: 6px; border: 1px solid var(--site-line); background: #fff; }
+.m2 .code-copy:hover { color: var(--site-ink); border-color: var(--site-line-strong); }
+.m2 .code-gutter { display: block; padding: 16px 0 16px 16px; font-size: 12.5px; line-height: 23.5px; color: #c9c5bc; }
+.m2 pre { padding: 16px 18px 16px 16px; font-size: 13.5px; line-height: 23.5px; color: #2f2d29; }
+.m2 .hljs-keyword { color: #7c4dcc; }
+.m2 .hljs-string { color: #2f7d5b; }
+.m2 .hljs-comment { color: #a39f96; }
+.m2 .hljs-number, .m2 .hljs-literal { color: #b5651d; }
+.m2 .hljs-title, .m2 .hljs-title.function_ { color: #2856b8; }
+.m2 .hljs-attr, .m2 .hljs-property, .m2 .hljs-built_in, .m2 .hljs-type, .m2 .hljs-params { color: #8a5a12; }
+
+/* ───────── M3 暗色代码：正文是纸，代码是一块深色石板，对比最强。h2 上方一道短紫线，引用加粗不加底，图片比正文宽一点。 ───────── */
+.m3 { font-size: 16.5px; line-height: 1.9; color: #3a3833; }
+.m3 p { margin: 0 0 1.15em; }
+.m3 h2 { font-size: 25px; font-weight: 700; line-height: 1.4; color: var(--site-ink); margin: 2.6em 0 .8em; }
+.m3 h2::before { content: ""; display: block; width: 28px; height: 3px; border-radius: 2px; background: var(--site-accent); margin-bottom: 16px; }
+.m3 h3 { font-size: 19px; font-weight: 650; line-height: 1.45; color: var(--site-ink); margin: 2em 0 .6em; }
+.m3 ul, .m3 ol { margin: 0 0 1.2em; padding-left: 1.5em; }
+.m3 li { margin: .5em 0; padding-left: .2em; }
+.m3 ol > li::marker { font-weight: 650; color: var(--site-ink); }
+.m3 ul > li::marker { color: var(--site-line-strong); }
+.m3 strong { color: var(--site-ink); font-weight: 650; }
+.m3 :not(pre) > code { font: .84em var(--mono); background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 5px; padding: .12em .4em; color: var(--site-ink); }
+.m3 blockquote { margin: 1.6em 0; padding: 2px 0 2px 18px; border-left: 3px solid var(--site-ink); color: var(--site-ink); font-weight: 500; }
+.m3 blockquote p { margin: 0; }
+.m3 figure { margin: 2.2em -40px; }
+.m3 figure img { border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px var(--site-line), 0 20px 40px -30px rgba(29, 28, 26, .5); }
+.m3 figcaption { margin-top: 10px; text-align: center; font-size: 13px; color: var(--site-muted); }
+.m3 .callout { margin: 1.6em 0; padding: 12px 16px; border-left: 3px solid #e0a34a; border-radius: 0 10px 10px 0; background: #fbf3e4; color: var(--site-ink); }
+.m3 .code { margin: 1.6em 0; background: #1d1c1a; border-radius: 14px; overflow: hidden; }
+.m3 .code-bar { padding: 8px 12px 0 18px; font: 11.5px var(--mono); color: #8f8b83; }
+.m3 .code-lines { visibility: hidden; }
+.m3 .code-copy { font-size: 12px; color: #b9b5ab; padding: 3px 8px; border-radius: 6px; }
+.m3 .code-copy:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+.m3 .code-gutter { display: block; padding: 10px 0 18px 18px; font-size: 12.5px; line-height: 23.5px; color: #57544d; }
+.m3 pre { padding: 10px 20px 18px 16px; font-size: 13.5px; line-height: 23.5px; color: #e8e4dc; }
+.m3 .hljs-keyword { color: #ff9a85; }
+.m3 .hljs-string { color: #a8d48a; }
+.m3 .hljs-comment { color: #7d786f; }
+.m3 .hljs-number, .m3 .hljs-literal, .m3 .hljs-attr, .m3 .hljs-property { color: #f2c36b; }
+.m3 .hljs-title, .m3 .hljs-title.function_ { color: #8ab6ff; }
+.m3 .hljs-built_in, .m3 .hljs-type, .m3 .hljs-params { color: #d7a8ff; }
+@media (max-width: 820px) { .m3 figure { margin-inline: 0; } }
+
+/* ───────── M4 中文阅读：照中文长文的习惯排。字大、行距 2、两端对齐、段距宽；h2 左侧紫条，加粗是荧光笔划线，图注带 ▲，代码浅灰无框。 ───────── */
+.m4 { font-size: 17px; line-height: 2; letter-spacing: .02em; color: #333230; text-align: justify; }
+.m4 p { margin: 0 0 1.4em; }
+.m4 h2 { font-size: 23px; font-weight: 700; line-height: 1.45; color: var(--site-ink); margin: 2.4em 0 1em; padding-left: 14px; border-left: 4px solid var(--site-accent); text-align: left; letter-spacing: .01em; }
+.m4 h3 { font-size: 19px; font-weight: 700; line-height: 1.5; color: var(--site-ink); margin: 2em 0 .8em; text-align: left; }
+.m4 ul, .m4 ol { margin: 0 0 1.4em; padding-left: 1.5em; }
+.m4 li { margin: .5em 0; }
+.m4 li::marker { color: var(--site-accent); }
+.m4 strong { color: var(--site-ink); font-weight: 600; background: linear-gradient(transparent 60%, #f7e7a1 60%); padding: 0 1px; }
+.m4 :not(pre) > code { font: .86em var(--mono); background: var(--site-accent-soft); color: #5a3fae; border-radius: 4px; padding: .12em .4em; letter-spacing: 0; }
+.m4 blockquote { margin: 1.6em 0; padding: 14px 20px; border-left: 4px solid var(--site-line-strong); border-radius: 4px; background: var(--site-paper); color: var(--site-body); }
+.m4 blockquote p { margin: 0; }
+.m4 figure { margin: 2em 0; }
+.m4 figure img { border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--site-line); }
+.m4 figcaption { margin-top: 10px; text-align: center; font-size: 13px; color: var(--site-muted); letter-spacing: 0; }
+.m4 figcaption::before { content: "▲ "; font-size: 10px; }
+.m4 .callout { margin: 1.6em 0; padding: 12px 18px; border-radius: 8px; background: #fdf8e6; border: 1px solid #f0e3b4; color: var(--site-ink); text-align: left; }
+.m4 .code { margin: 1.6em 0; background: #f5f4f0; border-radius: 8px; overflow: hidden; letter-spacing: 0; text-align: left; }
+.m4 .code-bar { padding: 8px 12px 0 18px; font: 11.5px var(--mono); color: var(--site-muted); }
+.m4 .code-lines { visibility: hidden; }
+.m4 .code-copy { font-size: 12px; padding: 2px 6px; border-radius: 5px; }
+.m4 .code-copy:hover { background: rgba(29, 28, 26, .06); color: var(--site-ink); }
+.m4 pre { padding: 6px 18px 16px; font-size: 14px; line-height: 1.75; color: #24292f; }
+.m4 .hljs-keyword { color: #cf222e; }
+.m4 .hljs-string { color: #0a3069; }
+.m4 .hljs-comment { color: #8b8f94; }
+.m4 .hljs-number, .m4 .hljs-literal, .m4 .hljs-attr, .m4 .hljs-property { color: #0550ae; }
+.m4 .hljs-title, .m4 .hljs-title.function_ { color: #8250df; }
+.m4 .hljs-built_in, .m4 .hljs-type, .m4 .hljs-params { color: #953800; }
+
+/* ───────── M5 技术手册：结构感最强。标题统一自动编号（不用正文里手写的 2、3.1），图自动「图 1」，引用变成带标签的说明框，代码块带行号和行数。 ───────── */
+.m5 { font-size: 16px; line-height: 1.85; color: #3a3833; counter-reset: h2 fig; }
+.m5 p { margin: 0 0 1.1em; }
+.m5 .hn { display: none; }
+.m5 h2 { counter-increment: h2; counter-reset: h3; display: flex; align-items: baseline; gap: 14px; font-size: 23px; font-weight: 650; line-height: 1.4; color: var(--site-ink); margin: 2.6em 0 .8em; padding-top: 1.2em; border-top: 1px solid var(--site-line); }
+.m5 h2::before { content: counter(h2, decimal-leading-zero); flex: none; font: 500 13px var(--mono); color: var(--site-accent); transform: translateY(-3px); }
+.m5 h3 { counter-increment: h3; display: flex; align-items: baseline; gap: 12px; font-size: 18px; font-weight: 600; line-height: 1.45; color: var(--site-ink); margin: 1.8em 0 .6em; }
+.m5 h3::before { content: counter(h2) "." counter(h3); flex: none; font: 500 12.5px var(--mono); color: var(--site-muted); }
+.m5 ul, .m5 ol { margin: 0 0 1.2em; padding-left: 0; list-style: none; }
+.m5 ol { counter-reset: n; }
+.m5 li { position: relative; padding: 0 0 0 1.9em; margin: .5em 0; }
+.m5 ol > li { counter-increment: n; }
+.m5 ol > li::before { content: counter(n) "."; position: absolute; left: 0; font: 500 .85em/2.15 var(--mono); color: var(--site-ink); }
+.m5 ul > li::before { content: "–"; position: absolute; left: .3em; color: var(--site-muted); }
+.m5 strong { color: var(--site-ink); font-weight: 650; }
+.m5 :not(pre) > code { font: .84em var(--mono); background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 4px; padding: .1em .38em; color: var(--site-ink); }
+.m5 blockquote { position: relative; margin: 1.6em 0; padding: 30px 18px 14px; border: 1px solid var(--site-line); border-radius: 10px; background: var(--site-paper); color: var(--site-ink); }
+.m5 blockquote::before { content: "说明"; position: absolute; left: 18px; top: 10px; font: 600 11px var(--mono); letter-spacing: .08em; color: var(--site-accent); }
+.m5 blockquote p { margin: 0; }
+.m5 figure { counter-increment: fig; margin: 2em 0; padding: 10px; border: 1px solid var(--site-line); border-radius: 12px; background: #fff; }
+.m5 figure img { border-radius: 6px; }
+.m5 figcaption { margin: 10px 4px 2px; font-size: 13px; color: var(--site-body); }
+.m5 figcaption::before { content: "图 " counter(fig) "　"; font: 500 12px var(--mono); color: var(--site-accent); }
+.m5 .callout { margin: 1.6em 0; padding: 12px 16px; border: 1px dashed var(--site-line-strong); border-radius: 10px; color: var(--site-ink); }
+.m5 .code { margin: 1.6em 0; background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 10px; overflow: hidden; }
+.m5 .code-bar { padding: 6px 10px 6px 14px; border-bottom: 1px solid var(--site-line); font: 11.5px var(--mono); color: var(--site-muted); }
+.m5 .code-lang { color: var(--site-ink); }
+.m5 .code-lines::before { content: "· "; }
+.m5 .code-copy { font-size: 12px; padding: 2px 6px; border-radius: 5px; }
+.m5 .code-copy:hover { background: var(--site-canvas-soft); color: var(--site-ink); }
+.m5 .code-gutter { display: block; padding: 14px 12px 14px 14px; font-size: 12.5px; line-height: 23px; color: #bdb9b0; border-right: 1px solid var(--site-line); }
+.m5 pre { padding: 14px 16px; font-size: 13.5px; line-height: 23px; color: #24292f; }
+.m5 .hljs-keyword { color: #cf222e; }
+.m5 .hljs-string { color: #0a3069; }
+.m5 .hljs-comment { color: #6e7781; }
+.m5 .hljs-number, .m5 .hljs-literal, .m5 .hljs-attr, .m5 .hljs-property { color: #0550ae; }
+.m5 .hljs-title, .m5 .hljs-title.function_ { color: #8250df; }
+.m5 .hljs-built_in, .m5 .hljs-type, .m5 .hljs-params { color: #953800; }
+.m5 > h2:first-child { border-top: 0; padding-top: 0; }

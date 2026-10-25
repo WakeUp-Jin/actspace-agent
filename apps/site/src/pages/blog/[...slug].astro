@@ -1,9 +1,13 @@
 ---
+import type { ImageMetadata } from "astro";
+import { Image } from "astro:assets";
 import { render, type CollectionEntry } from "astro:content";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { blogHref, getPublicPosts, readingTime } from "../../lib/blog";
+import { coverColors, presentationFor, type CoverId } from "../../lib/blog-presentation";
+import { spaceCjk } from "../../lib/markdown/cjk-spacing.mjs";
 import { sitePath } from "../../lib/site-path";
-import "../../styles/prose.css";
+import "../../styles/blog-article.css";
 
 interface Props {
   entry: CollectionEntry<"blog">;
@@ -20,11 +24,7 @@ export async function getStaticPaths() {
 const { entry } = Astro.props;
 const { Content } = await render(entry);
 const minutes = readingTime(entry.body ?? "");
-const publishedAt = entry.data.publishedAt.toLocaleDateString("zh-CN", {
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-});
+const publishedAt = entry.data.publishedAt.toISOString().slice(0, 10);
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).toString() : Astro.url.toString();
 const jsonLd = JSON.stringify({
   "@context": "https://schema.org",
@@ -38,56 +38,61 @@ const jsonLd = JSON.stringify({
   mainEntityOfPage: canonical,
 });
 
-import {presentationFor} from "../../lib/blog-presentation";
-import "../../styles/editorial.css";
-const category=presentationFor(entry.id)?.category??entry.data.tags[0];
+const images = import.meta.glob<{ default: ImageMetadata }>("../../assets/blog/covers/*.png", { eager: true });
+const coverOf = (post: CollectionEntry<"blog">): CoverId => presentationFor(post.id)?.cover ?? "01";
+const imageOf = (cover: CoverId) => images[`../../assets/blog/covers/character-${cover}.png`]?.default;
+const cover = coverOf(entry);
+const colors = coverColors[cover];
+const coverImage = imageOf(cover);
+const category = presentationFor(entry.id)?.category ?? entry.data.tags[0];
+
+// 列表按发布时间倒序：上一篇是更早的一篇，下一篇是更新的一篇。
+const posts = await getPublicPosts();
+const index = posts.findIndex((post) => post.id === entry.id);
+const neighbours = [
+  { post: posts[index + 1], label: "上一篇" },
+  { post: posts[index - 1], label: "下一篇" },
+];
 ---
 <BaseLayout title={`${entry.data.title} — ActSpace 博客`} description={entry.data.description} image={entry.data.cover} type="article">
 <script slot="head" type="application/ld+json" is:inline set:html={jsonLd}>
 </script>
 <main id="main-content">
-<article class="post-reading">
-<nav class="post-breadcrumb" aria-label="面包屑">
-<a href={sitePath('/blog/')}>博客</a>
-<span>/</span>
-<span>{entry.data.title}</span>
-</nav>
-<div class="post-intro">
-<header>
-<h1>{entry.data.title}</h1>
-<p class="reading-lead">{entry.data.description}</p>
+<header class:list={["post-hero", { "is-light": colors.light }]} style={`--cv-bg:${colors.bg};--cv-ink:${colors.ink}`}>
+<div class="post-hero-in">
+<div>
+<a class="post-back" href={sitePath("/blog/")}>← 博客</a>
+<p class="post-meta">
+<span>{category}</span>
+<time datetime={publishedAt}>{publishedAt}</time>
+<span>{entry.data.authors.join("、")}</span>
+<span>约 {minutes} 分钟</span>
+</p>
+<h1>{spaceCjk(entry.data.title)}</h1>
+<p class="post-desc">{spaceCjk(entry.data.description)}</p>
+</div>
+{coverImage && <Image class="post-hero-character" src={coverImage} alt="" format="webp" quality={90} widths={[480, 840]} sizes="(max-width: 900px) 240px, 420px" loading="eager" />}
+</div>
 </header>
-<aside class="post-meta" aria-label="文章信息">
-<div>
-<span>分类</span>
-<a href={`${sitePath('/blog/')}?category=${encodeURIComponent(category)}`}>{category}</a>
-</div>
-<div>
-<span>产品</span>
-<a href={sitePath('/')}>ActSpace</a>
-</div>
-<div>
-<span>发布日期</span>
-<time datetime={entry.data.publishedAt.toISOString()}>{publishedAt}</time>
-</div>
-<div>
-<span>预计阅读</span>
-<p>{minutes} 分钟</p>
-</div>
-<div>
-<span>分享</span>
-<button id="copy-link" aria-live="polite">复制链接 ↗</button>
-</div>
-</aside>
-</div>
-<div class="reading-body docs-prose">
+<article class="post-body">
+<div class="prose md-m2">
 <Content/>
 </div>
-<nav class="reading-next">
-<a href={sitePath('/blog/')}>← 返回博客</a>
-<a href={sitePath('/docs/')}>探索文档 →</a>
+<nav class="post-next" aria-label="上一篇与下一篇">
+{neighbours.map(({ post, label }) => {
+  if (!post) return <span></span>;
+  const thumb = coverOf(post);
+  const thumbImage = imageOf(thumb);
+  return <a class="post-next-card" href={sitePath(blogHref(post))}>
+<span class="post-next-cover" style={`background:${coverColors[thumb].bg}`}>{thumbImage && <Image src={thumbImage} alt="" format="webp" width={112} height={112} loading="lazy" />}</span>
+<span><small>{label}</small><b>{spaceCjk(post.data.title)}</b></span>
+</a>;
+})}
 </nav>
 </article>
 </main>
 </BaseLayout>
-<script>document.querySelector<HTMLButtonElement>('#copy-link')?.addEventListener('click',async event=>{const button=event.currentTarget as HTMLButtonElement;try{await navigator.clipboard.writeText(location.href);button.textContent='链接已复制'}catch{button.textContent='复制失败，请复制地址栏'}setTimeout(()=>button.textContent='复制链接 ↗',2200)});</script>
+<script>
+import { initializeCodeCopy } from "../../scripts/code-copy";
+initializeCodeCopy();
+</script>

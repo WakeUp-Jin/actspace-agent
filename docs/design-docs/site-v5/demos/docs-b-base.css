@@ -1,0 +1,27 @@
+/* 第三轮：A4 为底，一页只用一种颜色（--t-*），用在标题小舞台、截图台、目录选中项与目录指示上。 */
+.article { padding-top: 40px; }
+.head-stage { position: relative; isolation: isolate; overflow: hidden; border-radius: 22px; padding: 36px 36px 30px; margin-bottom: 44px; background: linear-gradient(160deg, var(--t-soft), var(--t-base)); }
+.head-stage::after, .shot-frame::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--stage-grain); opacity: .14; mix-blend-mode: multiply; border-radius: inherit; pointer-events: none; }
+.head-stage .crumb { color: var(--t-muted); }
+.head-stage .crumb span:last-child { color: var(--t-ink); }
+.head-stage h1 { margin: 14px 0 10px; font-size: 40px; }
+.head-stage .lead { color: var(--t-body); margin-bottom: 22px; font-size: 18px; }
+.head-stage .meta { border: 0; padding: 0; margin: 0; color: var(--t-muted); }
+.head-stage .meta .copy { background: color-mix(in srgb, var(--site-paper) 65%, transparent); border-color: transparent; color: var(--t-ink); }
+.head-stage .meta .copy:hover { background: var(--site-paper); }
+
+/* 截图台：单色底 + 纸纹，界面从底边探出 */
+.shot-frame { position: relative; isolation: isolate; padding: 36px 40px 0; border-radius: 18px; box-shadow: none; background: var(--t-soft); }
+.shot-frame img { margin: 0 auto; border-radius: 10px 10px 0 0; box-shadow: 0 0 0 1px rgba(29,28,26,.1), 0 24px 44px -28px rgba(29,28,26,.4); }
+.shot:first-of-type .shot-frame img { max-width: 460px; }
+.shot figcaption { margin-top: 10px; }
+
+/* 目录选中项与本页指示用同一种颜色 */
+.nav-items a[aria-current] { background: color-mix(in srgb, var(--t-base) 80%, var(--site-paper)); box-shadow: none; color: var(--t-ink); }
+.toc a.is-active { border-left-color: var(--t-ink); }
+.prose li::marker { color: var(--t-deep); }
+.note { background: color-mix(in srgb, var(--t-soft) 70%, var(--site-paper)); border-color: transparent; }
+.prose a { text-decoration-color: var(--t-deep); }
+.prose a:hover { text-decoration-color: var(--t-ink); }
+
+@media (max-width: 760px) { .head-stage { padding: 26px 20px 22px; } .head-stage h1 { font-size: 30px; } .shot-frame { padding: 20px 16px 0; } }

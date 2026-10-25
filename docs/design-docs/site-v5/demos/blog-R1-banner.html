@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 R1 · 封面横幅</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-r.css">
+<link rel="stylesheet" href="blog-r-prose.css">
+<style>
+/* R1 封面横幅：点进来先看到和列表同一张封面放大成横幅，再是标题。正文是最克制的一版：只靠字号、留白和细线分层，所有块都是浅纸色、细边。 */
+.band { position: relative; isolation: isolate; overflow: hidden; width: var(--site-page); height: 320px; margin: 28px auto 0; border-radius: 26px; background: var(--cv-bg); color: var(--cv-ink); }
+.band::after { content: ""; position: absolute; inset: 0; z-index: 1; background: var(--stage-grain); opacity: .14; mix-blend-mode: multiply; pointer-events: none; }
+.cv-light .band { box-shadow: inset 0 0 0 1px rgba(29, 28, 26, .07); }
+.band img { -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); position: absolute; z-index: -1; right: 6%; top: 50%; translate: 0 -50%; height: 136%; width: auto; max-width: none; }
+.band .t-top { position: absolute; left: 44px; right: 44px; top: 28px; display: flex; justify-content: space-between; font: 11.5px var(--mono); opacity: .72; }
+.band .key { position: absolute; left: 40px; bottom: 30px; font: 500 clamp(72px, 10vw, 148px)/1 var(--display); letter-spacing: -.01em; }
+.post { width: min(700px, calc(100vw - 40px)); margin: 0 auto; padding: 52px 0 140px; }
+.p-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--site-muted); margin: 0 0 16px; }
+.p-meta b { color: var(--site-ink); font-weight: 500; }
+.post h1 { font: 650 40px/1.32 var(--r-font); margin: 0 0 16px; letter-spacing: -.01em; }
+.post .desc { font-size: 18.5px; line-height: 1.75; color: var(--site-body); margin: 0 0 44px; padding-bottom: 36px; border-bottom: 1px solid var(--site-line); }
+.rprose h2 { margin-top: 2.8em; }
+@media (max-width: 640px) { .band { height: 200px; border-radius: 18px; } .band .t-top { left: 20px; right: 20px; top: 16px; } .band .key { left: 18px; bottom: 16px; } .post h1 { font-size: 30px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list" data-r-list></main>
+
+<div data-view="post" hidden>
+  <div class="band"><img data-cover-img alt=""><div class="t-top"><span data-post-fill="cat"></span><span data-post-fill="date"></span></div><div class="key" data-cover-key></div></div>
+  <main class="post">
+    <p class="p-meta"><b data-post-fill="cat"></b><span data-post-fill="date"></span><span>WakeUp-Jin</span><span>约 9 分钟</span></p>
+    <h1 data-post-fill="title"></h1>
+    <p class="desc" data-post-fill="desc"></p>
+    <article class="rprose" data-post-body></article>
+    <nav class="r-next" data-post-next></nav>
+  </main>
+</div>
+
+<script src="shared.js"></script>
+<script src="blog-shared.js"></script>
+<script src="blog-r.js"></script>
+<script>bootR("R1");</script>
+</body>
+</html>

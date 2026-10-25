@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 Q3 · 黑白报刊</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-prose.css">
+<style>
+/* Q3 黑白报刊：像一份报纸头版。粗黑无衬线大标题 + 粗墨线分栏，头条配文章架构图（黑白，悬停变彩色），其余按栏排；只有分类小字用品牌紫。文章页首字下沉。 */
+:root { --q-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+.page { width: var(--site-page); margin-inline: auto; padding: 40px 0 140px; }
+.mast { display: flex; justify-content: space-between; align-items: end; padding-bottom: 14px; border-bottom: 4px solid var(--site-ink); }
+.mast h1 { font: 800 88px/0.95 var(--q-font); margin: 0; letter-spacing: -.01em; }
+.mast .side { text-align: right; font: 12px/1.8 var(--mono); color: var(--site-body); }
+.subbar { display: flex; gap: 22px; padding: 10px 0; border-bottom: 1px solid var(--site-ink); font-size: 13.5px; overflow-x: auto; }
+.subbar button { background: none; border: 0; padding: 0; color: var(--site-body); white-space: nowrap; }
+.subbar button[aria-pressed="true"] { color: var(--site-ink); font-weight: 700; }
+.kicker { font: 600 12px var(--q-font); color: var(--site-accent); letter-spacing: .04em; }
+.front { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); border-bottom: 1px solid var(--site-ink); }
+.lead { padding: 28px 32px 32px 0; border-right: 1px solid var(--site-ink); }
+.lead h2 { font: 800 48px/1.18 var(--q-font); margin: 10px 0 16px; }
+.lead p { font-size: 17px; line-height: 1.8; color: var(--site-body); margin: 0 0 22px; max-width: 40em; }
+.lead img { width: 100%; aspect-ratio: 2 / 1; object-fit: cover; object-position: top; border: 1px solid var(--site-ink); filter: grayscale(1) contrast(1.05); transition: filter 300ms; }
+.lead:hover img { filter: none; }
+.lead:hover h2, .story:hover h3, .cell:hover h4 { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 6px; }
+.stack { display: flex; flex-direction: column; }
+.story { padding: 28px 0 24px 28px; border-bottom: 1px solid var(--site-line); }
+.story:last-child { border-bottom: 0; }
+.story h3 { font: 750 22px/1.35 var(--q-font); margin: 8px 0 8px; }
+.story p { margin: 0; font-size: 14.5px; line-height: 1.7; color: var(--site-body); }
+.story time, .cell time { display: block; margin-top: 10px; font: 12px var(--mono); color: var(--site-muted); }
+.cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cell { padding: 24px 22px 28px; border-right: 1px solid var(--site-line); border-bottom: 1px solid var(--site-line); }
+.cell:nth-child(4n+1) { padding-left: 0; }
+.cell:nth-child(4n) { border-right: 0; padding-right: 0; }
+.cell h4 { font: 700 18px/1.4 var(--q-font); margin: 8px 0 8px; }
+.cell p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--site-body); }
+
+/* 文章页 */
+.post { width: min(760px, calc(100vw - 40px)); margin: 0 auto; padding: 48px 0 140px; }
+.post .back { font: 12px var(--mono); color: var(--site-body); display: inline-block; margin-bottom: 28px; }
+.post h1 { font: 800 50px/1.2 var(--q-font); margin: 12px 0 18px; }
+.post .desc { font: 600 20px/1.65 var(--q-font); color: var(--site-body); margin: 0 0 26px; }
+.byline { display: flex; gap: 18px; padding: 12px 0; border-top: 4px solid var(--site-ink); border-bottom: 1px solid var(--site-ink); font-size: 13px; color: var(--site-body); margin-bottom: 40px; }
+.byline b { color: var(--site-ink); }
+.byline button { margin-left: auto; background: none; border: 0; font: inherit; color: var(--site-ink); text-decoration: underline; text-underline-offset: 3px; }
+.bprose { font-size: 17.5px; color: #2f2d29; }
+.bprose > p:first-child::first-letter { float: left; font: 800 64px/0.9 var(--q-font); margin: 6px 10px 0 0; color: var(--site-ink); }
+.bprose h2 { font: 800 28px/1.35 var(--q-font); padding-top: 18px; border-top: 1px solid var(--site-ink); }
+.bprose blockquote { border-left: 4px solid var(--site-ink); font-weight: 600; color: var(--site-ink); }
+.bprose .pimg img { border-radius: 0; box-shadow: none; border: 1px solid var(--site-ink); }
+.bprose .code-block { border-radius: 0; border-color: var(--site-ink); }
+.bprose .code-bar { border-bottom-color: var(--site-ink); }
+
+@media (max-width: 1000px) { .front { grid-template-columns: 1fr; } .lead { border-right: 0; padding-right: 0; border-bottom: 1px solid var(--site-ink); } .story { padding-left: 0; } .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cell:nth-child(n) { padding: 22px 18px 24px; border-right: 1px solid var(--site-line); } .cell:nth-child(2n+1) { padding-left: 0; } .cell:nth-child(2n) { border-right: 0; padding-right: 0; } }
+@media (max-width: 640px) { .mast h1 { font-size: 56px; } .mast .side { display: none; } .lead h2 { font-size: 32px; } .cols { grid-template-columns: 1fr; } .cell:nth-child(n) { padding: 20px 0; border-right: 0; } .post h1 { font-size: 34px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list">
+  <div class="mast"><h1>博客</h1><div class="side">ActSpace 设计笔记与踩坑记录<br>共 11 篇 · 最近更新 2026-07-27</div></div>
+  <div class="subbar" id="subbar"></div>
+  <section class="front">
+    <a class="lead" href="#post" id="lead"></a>
+    <div class="stack" id="stack"></div>
+  </section>
+  <div class="cols" id="cols"></div>
+</main>
+
+<main class="post" data-view="post" hidden>
+  <a class="back" href="#">← 博客</a>
+  <p class="kicker" data-post-fill="cat"></p>
+  <h1 data-post-fill="title"></h1>
+  <p class="desc" data-post-fill="desc"></p>
+  <div class="byline"><span>文 / <b>WakeUp-Jin</b></span><span data-post-fill="date"></span><span>约 9 分钟</span><button type="button">复制链接</button></div>
+  <article class="bprose" data-post-body></article>
+</main>
+
+<script src="shared.js"></script>
+<script>document.addEventListener("click", (e) => { if (e.target.closest(".back")) { e.preventDefault(); history.pushState(null, "", location.pathname); syncBlogView(); scrollTo(0, 0); } });</script>
+<script src="blog-shared.js"></script>
+<script>
+document.getElementById("subbar").innerHTML = ["全部", ...CATS].map((c, i) => `<button aria-pressed="${i === 0}">${c}</button>`).join("");
+document.querySelectorAll(".subbar button").forEach((b) => b.addEventListener("click", () => document.querySelectorAll(".subbar button").forEach((x) => x.setAttribute("aria-pressed", x === b))));
+const [a, b, c, d, ...rest] = POSTS;
+document.getElementById("lead").innerHTML = `<p class="kicker">${a.cat}</p><h2>${besc(a.title)}</h2><p>${besc(a.desc)}</p><img src="${a.img}" alt="">`;
+document.getElementById("stack").innerHTML = [b, c, d].map((p) => `<a class="story" href="#post"><p class="kicker">${p.cat}</p><h3>${besc(p.title)}</h3><p>${besc(p.desc)}</p><time>${p.date}</time></a>`).join("");
+document.getElementById("cols").innerHTML = rest.map((p) => `<a class="cell" href="#post"><p class="kicker">${p.cat}</p><h4>${besc(p.title)}</h4><p>${besc(p.desc)}</p><time>${p.date}</time></a>`).join("");
+bootBlog("Q3");
+</script>
+</body>
+</html>

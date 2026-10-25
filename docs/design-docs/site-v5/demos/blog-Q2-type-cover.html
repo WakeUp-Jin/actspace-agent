@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 Q2 · 排印封面</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-prose.css">
+<style>
+/* Q2 排印封面：封面不用任何图片，用文章的关键词做大字海报（像书脊 / 演讲卡），底色取首页舞台色但每张只用一种。标题用无衬线，封面上的大字用衬线英文，两种字各管一件事。 */
+:root { --q-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+.page { width: var(--site-page); margin-inline: auto; padding: 56px 0 140px; }
+.head { display: flex; align-items: baseline; gap: 32px; margin-bottom: 36px; flex-wrap: wrap; }
+.head h1 { font: 650 40px/1.1 var(--q-font); margin: 0; }
+.filters { display: flex; gap: 20px; font-size: 14px; color: var(--site-muted); flex-wrap: wrap; }
+.filters button { background: none; border: 0; padding: 0; color: inherit; }
+.filters button:hover { color: var(--site-ink); }
+.filters button[aria-pressed="true"] { color: var(--site-ink); font-weight: 500; }
+
+.tile { position: relative; isolation: isolate; overflow: hidden; border-radius: 18px; aspect-ratio: 4 / 3; padding: 20px 22px; display: flex; flex-direction: column; justify-content: space-between; background: radial-gradient(90% 90% at 85% 15%, color-mix(in srgb, var(--hi) 70%, transparent), transparent 70%), var(--bg); color: var(--ink); }
+.tile::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--stage-grain); opacity: .18; mix-blend-mode: multiply; }
+.tile .t-top { display: flex; justify-content: space-between; font: 11.5px var(--mono); opacity: .7; }
+.tile .key { font: 500 clamp(40px, 4.6vw, 64px)/1 var(--display); letter-spacing: -.01em; transition: transform 300ms ease; transform-origin: left bottom; }
+a:hover .tile .key { transform: scale(1.04); }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 44px 28px; }
+.grid .wide { grid-column: span 3; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 44px; align-items: center; }
+.grid .wide .tile { aspect-ratio: 16 / 9; padding: 28px 32px; }
+.grid .wide .key { font-size: clamp(64px, 8vw, 120px); }
+.grid .wide h3 { font-size: 32px; margin-top: 0; }
+.grid .wide p { -webkit-line-clamp: 4; font-size: 16.5px; }
+.item h3 { font: 600 19px/1.45 var(--q-font); margin: 16px 0 8px; }
+.item p { margin: 0; font-size: 14.5px; line-height: 1.7; color: var(--site-body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.item:hover h3 { text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 5px; }
+
+/* 文章页 */
+.post-tile { width: var(--site-page); margin: 28px auto 0; aspect-ratio: auto; height: 340px; padding: 32px 44px; border-radius: 26px; }
+.post-tile .key { font-size: clamp(80px, 12vw, 168px); }
+.post { width: min(720px, calc(100vw - 40px)); margin: 0 auto; padding: 48px 0 140px; }
+.post .meta { display: flex; gap: 12px; font-size: 13px; color: var(--site-muted); margin-bottom: 16px; }
+.post .meta b { color: var(--site-ink); font-weight: 500; }
+.post h1 { font: 650 40px/1.32 var(--q-font); margin: 0 0 16px; }
+.post .desc { font-size: 19px; line-height: 1.75; color: var(--site-body); margin: 0 0 44px; padding-bottom: 36px; border-bottom: 1px solid var(--site-line); }
+.bprose h2 { font: 650 24px/1.45 var(--q-font); }
+
+@media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid .wide { grid-column: span 2; grid-template-columns: 1fr; gap: 20px; } }
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } .grid .wide { grid-column: span 1; } .post-tile { height: 220px; padding: 22px; } .post h1 { font-size: 30px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list">
+  <div class="head"><h1>博客</h1><div class="filters" id="filters"></div></div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<div data-view="post" hidden>
+  <div class="tile post-tile" id="post-tile"></div>
+  <main class="post">
+    <p class="meta"><b data-post-fill="cat"></b><span data-post-fill="date"></span><span>WakeUp-Jin</span><span>约 9 分钟</span></p>
+    <h1 data-post-fill="title"></h1>
+    <p class="desc" data-post-fill="desc"></p>
+    <article class="bprose" data-post-body></article>
+  </main>
+</div>
+
+<script src="shared.js"></script>
+<script src="blog-shared.js"></script>
+<script>
+// 分类 → 一种舞台色（底 / 高光 / 字色）
+const T = {
+  "上下文工程": { bg: "#cfe3d2", hi: "#efe3a0", ink: "#1f3a2b" },
+  "评估与质量": { bg: "#efe3a0", hi: "#fbf4cf", ink: "#3d3412" },
+  "多智能体": { bg: "#b7c5d3", hi: "#dfe6ee", ink: "#1d2a38" },
+  "工具与扩展": { bg: "#efc3a6", hi: "#f8e2d2", ink: "#3f2414" },
+  "模型与运行时": { bg: "#d6cdef", hi: "#efeafb", ink: "#2a1f4f" },
+};
+const vars = (p) => `--bg:${T[p.cat].bg};--hi:${T[p.cat].hi};--ink:${T[p.cat].ink}`;
+const tile = (p) => `<div class="tile" style="${vars(p)}"><div class="t-top"><span>${p.cat}</span><span>${p.date.slice(5)}</span></div><div class="key">${besc(p.key)}</div></div>`;
+document.getElementById("filters").innerHTML = ["全部", ...CATS].map((c, i) => `<button aria-pressed="${i === 0}">${c}</button>`).join("");
+document.querySelectorAll(".filters button").forEach((b) => b.addEventListener("click", () => document.querySelectorAll(".filters button").forEach((x) => x.setAttribute("aria-pressed", x === b))));
+document.getElementById("grid").innerHTML = POSTS.map((p, i) => `<a class="item${i === 0 ? " wide" : ""}" href="#post">${tile(p)}<div><h3>${besc(p.title)}</h3><p>${besc(p.desc)}</p></div></a>`).join("");
+const pt = document.getElementById("post-tile"); pt.setAttribute("style", vars(POST)); pt.innerHTML = `<div class="t-top"><span>${POST.cat}</span><span>${POST.date}</span></div><div class="key">${besc(POST.key)}</div>`;
+bootBlog("Q2");
+</script>
+</body>
+</html>

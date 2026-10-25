@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>更新日志 U2 · 月份侧栏</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="updates-shared.css">
+<style>
+/* U2 月份侧栏：左边按月份导航（带发布次数，当前月展开本月各次发布），右边每次发布一张纸卡。条目多的卡默认只露前 6 条，点「展开其余」再看全。 */
+.page { width: min(1160px, calc(100% - 40px)); margin: 0 auto; padding: 56px 0 160px; }
+.split { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; align-items: start; }
+.nav { position: sticky; top: calc(var(--site-header-height) + 32px); font-size: 13.5px; }
+.nav .m { display: flex; justify-content: space-between; padding: 8px 12px; border-radius: 10px; color: var(--site-body); }
+.nav .m small { font: 12px var(--mono); color: var(--site-muted); }
+.nav .m:hover { color: var(--site-ink); }
+.nav .m.is-on { background: var(--site-paper); color: var(--site-ink); font-weight: 500; box-shadow: 0 0 0 1px var(--site-line); }
+.nav .sub-list { display: none; margin: 6px 0 10px 12px; border-left: 1px solid var(--site-line); }
+.nav .m.is-on + .sub-list { display: block; }
+.nav .sub-list a { display: block; padding: 4px 0 4px 14px; font-size: 12.5px; line-height: 1.5; color: var(--site-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav .sub-list a:hover { color: var(--site-ink); }
+.mhead { font: 650 22px var(--r-font); margin: 56px 0 18px; scroll-margin-top: 96px; }
+.mhead:first-child { margin-top: 0; }
+.card { padding: 26px 30px 24px; border-radius: 18px; background: var(--site-paper); border: 1px solid var(--site-line); scroll-margin-top: 96px; }
+.card + .card { margin-top: 16px; }
+.card-top { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font: 12.5px var(--mono); color: var(--site-muted); }
+.card-top .counts { margin-left: auto; display: flex; gap: 12px; font-family: var(--r-font); }
+.card-top .counts span { display: inline-flex; align-items: center; gap: 6px; }
+.card h2 { font: 650 21px/1.45 var(--r-font); margin: 0 0 16px; }
+.grp { padding-top: 14px; border-top: 1px solid var(--site-line); }
+.grp + .grp { margin-top: 14px; }
+.grp .tpill { margin-bottom: 6px; }
+.card.is-clamped .items li.more { display: none; }
+.more-btn { all: unset; cursor: pointer; margin-top: 14px; font-size: 13px; color: var(--site-accent); }
+.more-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 900px) { .split { grid-template-columns: 1fr; } .nav { display: none; } .card { padding: 20px; } .card-top .counts { display: none; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+<main class="page">
+  <div class="upd-head"><div><h1>更新日志</h1><p class="sub">只记录用得到的新功能、改进和问题修复。</p></div><div class="filters" id="filters"></div></div>
+  <div class="split"><nav class="nav" id="nav"></nav><div id="list"></div></div>
+</main>
+<script src="vendor/marked.min.js"></script>
+<script src="shared.js"></script>
+<script src="md-pipeline.js"></script>
+<script src="updates-source.js"></script>
+<script src="updates-shared.js"></script>
+<script>
+const LIMIT = 6;
+document.getElementById("nav").innerHTML = MONTHS.map((m) => { const rs = RELEASES.filter((r) => r.month === m); return `<a class="m" href="#m-${m}" data-m="${m}">${fmtMonth(m)}<small>${rs.length} 次</small></a><div class="sub-list">${rs.map((r) => `<a href="#${r.date}">${fmtMD(r.date)} · ${r.title}</a>`).join("")}</div>`; }).join("");
+document.getElementById("list").innerHTML = MONTHS.map((m) => `<h2 class="mhead" id="m-${m}" data-mhead="${m}">${fmtMonth(m)}</h2>` + RELEASES.filter((r) => r.month === m).map((r) => {
+  let n = 0; const total = r.sections.reduce((a, s) => a + s.items.length, 0);
+  const counts = Object.keys(TYPES).map((t) => countOf(r, t) ? `<span><i class="dot t-${t}"></i>${countOf(r, t)} ${TYPES[t].short}</span>` : "").join("");
+  return `<article class="card${total > LIMIT ? " is-clamped" : ""}" data-release id="${r.date}"><div class="card-top"><span>${fmtDot(r.date)}</span><span class="counts">${counts}</span></div><h2>${r.title}</h2>
+  ${r.sections.map((s) => `<section class="grp" data-type="${s.type}"><span class="tpill t-${s.type}">${TYPES[s.type].label}</span><ul class="items">${s.items.map((x) => `<li${++n > LIMIT ? ' class="more"' : ""}>${x}</li>`).join("")}</ul></section>`).join("")}
+  ${total > LIMIT ? `<button class="more-btn" type="button">展开其余 ${total - LIMIT} 条</button>` : ""}</article>`;
+}).join("")).join("");
+document.addEventListener("click", (e) => { const b = e.target.closest(".more-btn"); if (!b) return; const c = b.closest(".card"); const on = c.classList.toggle("is-clamped"); b.textContent = on ? `展开其余 ${c.querySelectorAll("li.more").length} 条` : "收起"; });
+// 当前月份高亮
+const heads = [...document.querySelectorAll("[data-mhead]")], links = [...document.querySelectorAll(".nav .m")];
+const spy = () => { let cur = heads[0].dataset.mhead; for (const h of heads) if (h.getBoundingClientRect().top < 160) cur = h.dataset.mhead; links.forEach((a) => a.classList.toggle("is-on", a.dataset.m === cur)); };
+addEventListener("scroll", spy, { passive: true }); spy();
+filterBar(document.getElementById("filters"), (f) => document.querySelectorAll(".card").forEach((c) => { if (f !== "all") c.classList.remove("is-clamped"); }));
+bootUpd("U2");
+</script>
+</body>
+</html>

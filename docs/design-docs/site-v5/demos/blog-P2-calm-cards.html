@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 P2 · 收敛卡片</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-prose.css">
+<style>
+/* P2 收敛卡片：保留三列卡片，但封面从「满版色块」缩成卡片里一块带留白的小画框；去掉左侧筛选栏，分类和排序收到顶部一行。文章页标题右边放这篇的角色小图，正文右侧有目录。 */
+.page { width: var(--site-page); margin-inline: auto; padding-bottom: 120px; }
+.list-head { padding: 64px 0 32px; }
+.list-head h1 { font: 500 48px/1.1 var(--display); margin: 0; }
+.toolbar { display: flex; align-items: center; gap: 24px; padding: 0 0 28px; }
+.tabs { display: flex; gap: 22px; font-size: 14px; color: var(--site-body); overflow-x: auto; }
+.tabs button { background: none; border: 0; padding: 8px 0; color: inherit; position: relative; white-space: nowrap; }
+.tabs button:hover { color: var(--site-ink); }
+.tabs button[aria-pressed="true"] { color: var(--site-ink); font-weight: 500; }
+.tabs button[aria-pressed="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 2px; background: var(--site-accent); }
+.toolbar .right { margin-left: auto; display: flex; gap: 10px; }
+.field { height: 36px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--site-line); border-radius: 10px; background: var(--site-paper); color: var(--site-muted); font-size: 13.5px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.card { display: flex; flex-direction: column; padding: 12px; border-radius: 22px; background: var(--site-paper); border: 1px solid var(--site-line); transition: border-color 150ms, transform 150ms; }
+.card:hover { border-color: var(--site-accent-line); transform: translateY(-2px); }
+.card .frame { position: relative; aspect-ratio: 16 / 10; border-radius: 14px; overflow: hidden; }
+.card .frame img { position: absolute; left: 50%; top: 11%; height: 78%; width: auto; max-width: none; aspect-ratio: 1; object-fit: cover; translate: -50% 0; transition: transform 250ms; }
+.card:hover .frame img { transform: scale(1.04); }
+.card .txt { padding: 18px 10px 10px; display: flex; flex-direction: column; flex: 1; }
+.card .meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--site-muted); }
+.card .meta b { font-weight: 400; color: var(--site-body); }
+.card h3 { font: 500 20px/1.4 var(--display); margin: 10px 0 8px; }
+.card p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--site-body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* 文章页 */
+.post-wrap { width: var(--site-page); margin-inline: auto; padding: 48px 0 120px; }
+.post-head { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 48px; align-items: center; max-width: 1000px; margin: 0 auto; padding-bottom: 40px; border-bottom: 1px solid var(--site-line); }
+.crumb { font-size: 13px; color: var(--site-muted); display: flex; gap: 8px; }
+.post-head h1 { font: 500 42px/1.3 var(--display); margin: 18px 0 16px; }
+.post-head .desc { font-size: 18px; line-height: 1.75; color: var(--site-body); margin: 0 0 22px; }
+.meta-line { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--site-muted); }
+.meta-line b { color: var(--site-ink); font-weight: 500; }
+.post-head .art { width: 220px; aspect-ratio: 1; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px var(--site-line); }
+.post-head .art img { width: 100%; height: 100%; object-fit: cover; }
+.post-body { display: grid; grid-template-columns: minmax(0, 680px) 200px; gap: 72px; justify-content: center; padding-top: 48px; }
+.toc { position: sticky; top: calc(var(--site-header-height) + 32px); align-self: start; font-size: 13px; }
+.toc p { color: var(--site-muted); margin: 0 0 10px; font-size: 12px; }
+.toc a { display: block; padding: 6px 0 6px 12px; border-left: 2px solid var(--site-line); color: var(--site-muted); line-height: 1.5; }
+.toc a:hover { color: var(--site-ink); }
+.toc a.is-active { color: var(--site-ink); border-left-color: var(--site-accent); }
+.toc button { margin-top: 18px; background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 8px; padding: 6px 12px; font-size: 13px; color: var(--site-body); }
+.bprose h2 { font-size: 26px; }
+
+@media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .post-body { grid-template-columns: minmax(0, 680px); } .toc { display: none; } }
+@media (max-width: 680px) { .grid { grid-template-columns: 1fr; } .toolbar { flex-wrap: wrap; } .toolbar .right { margin-left: 0; } .post-head { grid-template-columns: 1fr; } .post-head .art { width: 120px; order: -1; border-radius: 20px; } .post-head h1 { font-size: 32px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list">
+  <div class="list-head"><h1>博客</h1></div>
+  <div class="toolbar">
+    <div class="tabs" id="tabs"></div>
+    <div class="right"><span class="field"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索文章</span><span class="field">最新发布 ⌄</span></div>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<div class="post-wrap" data-view="post" hidden>
+  <header class="post-head">
+    <div>
+      <p class="crumb"><a href="#">博客</a><span>/</span><span data-post-fill="cat"></span></p>
+      <h1 data-post-fill="title"></h1>
+      <p class="desc" data-post-fill="desc"></p>
+      <p class="meta-line"><b>WakeUp-Jin</b><span data-post-fill="date"></span><span>约 9 分钟</span></p>
+    </div>
+    <div class="art"><img id="post-art" alt=""></div>
+  </header>
+  <div class="post-body">
+    <article class="bprose" data-post-body></article>
+    <aside class="toc"><p>本文目录</p><nav data-post-toc></nav><button type="button">复制链接</button></aside>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script src="blog-shared.js"></script>
+<script>
+document.getElementById("tabs").innerHTML = ["全部", ...CATS].map((c, i) => `<button aria-pressed="${i === 0}">${c}</button>`).join("");
+document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-pressed", x === b))));
+document.getElementById("grid").innerHTML = POSTS.map((p) => `<a class="card" href="#post"><div class="frame" style="background:${COVER_BG[p.cover]}"><img src="${coverSrc(p.cover)}" alt=""></div><div class="txt"><p class="meta"><b>${p.cat}</b><span>${p.date}</span></p><h3>${besc(p.title)}</h3><p>${besc(p.desc)}</p></div></a>`).join("");
+document.getElementById("post-art").src = coverSrc(POST.cover);
+bootBlog("P2");
+</script>
+</body>
+</html>

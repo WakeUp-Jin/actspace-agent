@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 R3 · 封面色贯穿</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-r.css">
+<link rel="stylesheet" href="blog-r-prose.css">
+<style>
+/* R3 封面色贯穿：文章顶部整条铺满封面底色，角色站在右边，标题直接写在色块上；正文里的强调色（小节方块、步骤编号、引用线、提示块）都取自这张封面的角色色，每篇文章自带一套颜色。 */
+.hero { position: relative; isolation: isolate; overflow: hidden; background: var(--cv-bg); color: var(--cv-ink); }
+.cv-light .hero { border-bottom: 1px solid var(--site-line); }
+.hero::after { content: ""; position: absolute; inset: 0; z-index: 1; background: var(--stage-grain); opacity: .14; mix-blend-mode: multiply; pointer-events: none; }
+.hero-in { width: min(1120px, calc(100vw - 40px)); margin: 0 auto; min-height: 440px; display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 40px; align-items: center; }
+.hero .back { font-size: 13px; opacity: .7; }
+.hero .back:hover { opacity: 1; }
+.hero .p-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; opacity: .78; margin: 28px 0 14px; }
+.hero h1 { font: 650 46px/1.28 var(--r-font); margin: 0 0 16px; letter-spacing: -.01em; }
+.hero .desc { font-size: 18.5px; line-height: 1.75; margin: 0; opacity: .82; max-width: 34em; }
+.hero img { -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); width: 440px; max-width: none; margin: -20px -20px -20px 0; justify-self: end; }
+.post { width: min(700px, calc(100vw - 40px)); margin: 0 auto; padding: 60px 0 140px; }
+.rprose { --rp-accent: var(--cv-accent); }
+.rprose a { text-decoration-color: color-mix(in srgb, var(--cv-accent) 40%, transparent); }
+.rprose h2::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--cv-accent); margin-right: 12px; vertical-align: .18em; }
+.rprose ol { list-style: none; counter-reset: step; padding-left: 0; }
+.rprose ol > li { counter-increment: step; position: relative; padding-left: 38px; margin: .9em 0; }
+.rprose ol > li::before { content: counter(step); position: absolute; left: 0; top: .28em; width: 24px; height: 24px; border-radius: 50%; background: var(--cv-accent); color: #fff; font: 600 12px/24px var(--mono); text-align: center; }
+.rprose blockquote { border-left-color: var(--cv-accent); color: var(--site-ink); }
+.rprose .callout { background: color-mix(in srgb, var(--cv-accent) 9%, var(--site-paper)); border-color: transparent; }
+.rprose .ref { background: color-mix(in srgb, var(--cv-accent) 5%, var(--site-paper)); }
+.rprose .ref:hover { border-color: color-mix(in srgb, var(--cv-accent) 40%, transparent); }
+.rprose :not(pre) > code { background: color-mix(in srgb, var(--cv-accent) 8%, var(--site-canvas-soft)); }
+@media (max-width: 900px) { .hero-in { grid-template-columns: 1fr; padding: 32px 0 0; } .hero img { width: 260px; margin: 0 auto -30px; justify-self: center; } .hero h1 { font-size: 32px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list" data-r-list></main>
+
+<div data-view="post" hidden>
+  <section class="hero">
+    <div class="hero-in">
+      <div>
+        <a class="back" href="#">← 博客</a>
+        <p class="p-meta"><span data-post-fill="cat"></span><span data-post-fill="date"></span><span>WakeUp-Jin</span><span>约 9 分钟</span></p>
+        <h1 data-post-fill="title"></h1>
+        <p class="desc" data-post-fill="desc"></p>
+      </div>
+      <img data-cover-img alt="">
+    </div>
+  </section>
+  <main class="post">
+    <article class="rprose" data-post-body></article>
+    <nav class="r-next" data-post-next></nav>
+  </main>
+</div>
+
+<script src="shared.js"></script>
+<script src="blog-shared.js"></script>
+<script src="blog-r.js"></script>
+<script>bootR("R3");</script>
+</body>
+</html>

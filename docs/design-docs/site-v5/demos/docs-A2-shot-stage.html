@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文档 A2 · 截图台</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="docs-a-base.css">
+<style>
+/* A2 截图台：A 的骨架，标题区不加颜色；只有截图摆在一块低饱和小舞台上（首页「产品界面放在舞台上」的同一种说法）。颜色只跟着产品界面出现。 */
+.shot-frame { position: relative; isolation: isolate; padding: 36px 40px 0; border-radius: 18px; box-shadow: none;
+  background: radial-gradient(70% 90% at 92% 0%, color-mix(in srgb, var(--stage-lemon) 60%, var(--site-canvas)), transparent 62%),
+              radial-gradient(80% 120% at 0% 100%, color-mix(in srgb, var(--stage-mint) 60%, var(--site-canvas)), transparent 68%),
+              color-mix(in srgb, var(--stage-mint-base) 55%, var(--site-canvas)); }
+.shot-frame::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--stage-grain); opacity: .16; mix-blend-mode: multiply; border-radius: inherit; }
+.shot-frame img { margin: 0 auto; border-radius: 10px 10px 0 0; box-shadow: 0 0 0 1px rgba(29,28,26,.1), 0 24px 44px -28px rgba(29,28,26,.45); }
+.shot:first-of-type .shot-frame img { max-width: 460px; }
+.shot figcaption { margin-top: 10px; }
+@media (max-width: 760px) { .shot-frame { padding: 20px 16px 0; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+<div class="layout">
+  <aside class="sidebar"><nav data-nav aria-label="文档目录"></nav></aside>
+  <main class="article">
+    <p class="crumb"><span>文档</span><span>/</span><span data-fill="group"></span></p>
+    <h1 data-fill="title"></h1>
+    <p class="lead" data-fill="lead"></p>
+    <div class="meta"><span>更新于 <span data-fill="updated"></span></span><span>约 <span data-fill="minutes"></span> 分钟</span><button class="copy" type="button">复制页面</button></div>
+    <div class="prose" data-body></div>
+    <nav class="pager" data-pager></nav>
+    <div class="foot"><span>这页有帮助吗？</span><a href="#">在 GitHub 上编辑 ↗</a></div>
+  </main>
+  <aside class="toc"><p class="toc-label">本页内容</p><nav data-toc-list></nav></aside>
+</div>
+<script src="shared.js"></script>
+<script>bootDoc("A2");</script>
+</body>
+</html>

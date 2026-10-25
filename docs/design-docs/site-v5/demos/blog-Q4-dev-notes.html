@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 Q4 · 开发者笔记</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-prose.css">
+<style>
+/* Q4 开发者笔记：给做 Agent 的开发者看的工作笔记。列表像文件清单（等宽日期 + 标题 + 标签），右侧固定预览当前悬停那篇的架构图；文章页把 frontmatter 原样亮出来，h2 前带 ##，代码块深色。 */
+:root { --q-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+.page { width: var(--site-page); margin-inline: auto; padding: 48px 0 140px; }
+.path { font: 13px var(--mono); color: var(--site-muted); margin: 0 0 10px; }
+.path b { color: var(--site-accent); font-weight: 400; }
+.head h1 { font: 650 40px/1.1 var(--q-font); margin: 0 0 22px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 28px; }
+.tags button { font: 12.5px var(--mono); height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--site-line); background: transparent; color: var(--site-body); }
+.tags button:hover { border-color: var(--site-line-strong); color: var(--site-ink); }
+.tags button[aria-pressed="true"] { background: var(--site-ink); color: #fff; border-color: var(--site-ink); }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 40px; align-items: start; }
+.list { border-top: 1px solid var(--site-line); }
+.row { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 20px; align-items: baseline; padding: 15px 12px; margin: 0 -12px; border-bottom: 1px solid var(--site-line); border-radius: 0; transition: background 120ms; }
+.row time { font: 12.5px var(--mono); color: var(--site-muted); }
+.row .t { font: 500 16px/1.5 var(--q-font); color: var(--site-ink); }
+.row .tag { font: 11.5px var(--mono); color: var(--site-muted); white-space: nowrap; }
+.row.is-on { background: var(--site-paper); border-radius: 10px; border-bottom-color: transparent; }
+.row.is-on .t { color: var(--site-accent); }
+.row.is-on .tag::before { content: "→ "; color: var(--site-accent); }
+.preview { position: sticky; top: calc(var(--site-header-height) + 24px); padding: 18px; border-radius: 18px; background: var(--site-paper); border: 1px solid var(--site-line); }
+.preview .shot { aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden; background: #fff; border: 1px solid var(--site-line); }
+.preview .shot img { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.preview .file { font: 12px var(--mono); color: var(--site-muted); margin: 16px 0 6px; }
+.preview h2 { font: 650 22px/1.4 var(--q-font); margin: 0 0 10px; }
+.preview p { margin: 0 0 16px; font-size: 14.5px; line-height: 1.75; color: var(--site-body); }
+.preview .open { font: 13px var(--mono); color: var(--site-ink); }
+.preview .open:hover { color: var(--site-accent); }
+
+/* 文章页 */
+.post { width: min(760px, calc(100vw - 40px)); margin: 0 auto; padding: 40px 0 140px; }
+.post .path a:hover { color: var(--site-ink); }
+.front { margin: 18px 0 36px; padding: 16px 20px; border-radius: 12px; background: var(--site-paper); border: 1px solid var(--site-line); font: 13px/1.9 var(--mono); color: var(--site-body); }
+.front .dash { color: var(--site-line-strong); }
+.front .k { color: var(--site-accent); display: inline-block; min-width: 92px; }
+.front .v { color: var(--site-ink); }
+.post h1 { font: 650 40px/1.32 var(--q-font); margin: 0 0 16px; }
+.post .desc { font-size: 18.5px; line-height: 1.75; color: var(--site-body); margin: 0 0 40px; }
+.bprose { font-size: 16.5px; color: #3a3833; }
+.bprose h2 { font: 650 24px/1.45 var(--q-font); }
+.bprose h2::before { content: "## "; font: 400 .8em var(--mono); color: var(--site-line-strong); }
+.bprose .code-block { background: #1f1e1c; border: 0; }
+.bprose .code-bar { border-bottom: 1px solid rgba(255,255,255,.08); }
+.bprose .code-lang { color: #8f8b83; }
+.bprose .code-copy { color: #c9c5bc; }
+.bprose .code-copy:hover { background: rgba(255,255,255,.08); color: #fff; }
+.bprose pre { color: #ece8e0; }
+.bprose :not(pre) > code { background: var(--site-paper); border: 1px solid var(--site-line); }
+.bprose .emoji { background: var(--site-paper); border-radius: 10px; padding: 10px 14px; border: 1px dashed var(--site-line-strong); }
+
+@media (max-width: 1100px) { .split { grid-template-columns: 1fr; } .preview { display: none; } }
+@media (max-width: 640px) { .row { grid-template-columns: 1fr; gap: 4px; } .row .tag { order: 3; } .post h1 { font-size: 30px; } .front .k { min-width: 64px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list">
+  <div class="head"><p class="path">~/actspace/<b>blog</b>  ·  11 篇</p><h1>博客</h1></div>
+  <div class="tags" id="tags"></div>
+  <div class="split">
+    <div class="list" id="list"></div>
+    <aside class="preview" id="preview"></aside>
+  </div>
+</main>
+
+<main class="post" data-view="post" hidden>
+  <p class="path"><a href="#" class="back">~/actspace/blog</a> / <b>agent-team-and-agent-room.md</b></p>
+  <div class="front">
+    <div class="dash">---</div>
+    <div><span class="k">date</span><span class="v" data-post-fill="date"></span></div>
+    <div><span class="k">category</span><span class="v" data-post-fill="cat"></span></div>
+    <div><span class="k">tags</span><span class="v">Multi-Agent, Product Design</span></div>
+    <div><span class="k">author</span><span class="v">WakeUp-Jin</span></div>
+    <div><span class="k">reading</span><span class="v">约 9 分钟</span></div>
+    <div class="dash">---</div>
+  </div>
+  <h1 data-post-fill="title"></h1>
+  <p class="desc" data-post-fill="desc"></p>
+  <article class="bprose" data-post-body></article>
+</main>
+
+<script src="shared.js"></script>
+<script>document.addEventListener("click", (e) => { if (e.target.closest(".back")) { e.preventDefault(); history.pushState(null, "", location.pathname); syncBlogView(); scrollTo(0, 0); } });</script>
+<script src="blog-shared.js"></script>
+<script>
+document.getElementById("tags").innerHTML = ["全部", ...CATS].map((c, i) => `<button aria-pressed="${i === 0}">${i ? "#" : ""}${c}</button>`).join("");
+document.querySelectorAll(".tags button").forEach((b) => b.addEventListener("click", () => document.querySelectorAll(".tags button").forEach((x) => x.setAttribute("aria-pressed", x === b))));
+const list = document.getElementById("list"), pv = document.getElementById("preview");
+list.innerHTML = POSTS.map((p, i) => `<a class="row" href="#post" data-i="${i}"><time>${p.date}</time><span class="t">${besc(p.title)}</span><span class="tag">#${p.cat}</span></a>`).join("");
+const show = (i) => {
+  const p = POSTS[i];
+  list.querySelectorAll(".row").forEach((r) => r.classList.toggle("is-on", +r.dataset.i === i));
+  pv.innerHTML = `<div class="shot"><img src="${p.img}" alt=""></div><p class="file">${p.slug}.md · ${p.min} min</p><h2>${besc(p.title)}</h2><p>${besc(p.desc)}</p><a class="open" href="#post">打开全文 →</a>`;
+};
+list.addEventListener("mouseover", (e) => { const r = e.target.closest(".row"); if (r) show(+r.dataset.i); });
+list.addEventListener("focusin", (e) => { const r = e.target.closest(".row"); if (r) show(+r.dataset.i); });
+show(0);
+bootBlog("Q4");
+</script>
+</body>
+</html>
