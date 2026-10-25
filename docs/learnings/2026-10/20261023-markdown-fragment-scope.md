@@ -16,4 +16,4 @@
 
 验证时放两条包含同名脚注的回复，点击第二条的引用和回链，并在流式追加后检查目标身份不变；同时确认HTTPS仍正确外开、应用窗口与URL保持稳定。原生界面测试补齐安全策略与真实滚动环境，组件测试只证明自身行为。
 
-本次实例见[BUG-040](../../exec-runs/20261021-actspace-full-acceptance/bugs/BUG-040.md)与[变更记录](../../histories/2026-10/20261022-0746-acceptance-small-fixes.md)。
+本次实例见[BUG-040](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#bug-040)与[变更记录](../../histories/2026-10/20261022-0746-acceptance-small-fixes.md)。

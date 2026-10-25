@@ -35,4 +35,4 @@ function convert(newContent: string, target: FileTarget) {
 
 自检：参数变窄后对象里还会不会有额外字段？转换函数允许哪些字段来自旧对象？测试中的输入形状是否与真实调用方一致？
 
-来源：[BUG-044](../../exec-runs/20261021-actspace-full-acceptance/bugs/BUG-044.md)、[本轮 history](../../histories/2026-10/20261022-0746-acceptance-small-fixes.md)。
+来源：[BUG-044](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#bug-044)、[本轮 history](../../histories/2026-10/20261022-0746-acceptance-small-fixes.md)。

@@ -29,4 +29,4 @@ Radix 的碰撞处理解决放置位置；调用方仍需让内容适应可用�
 
 至少覆盖“一侧足够”和“两侧都不足”。前者验证翻转，后者验证整卡适应空间、固定搜索行与内部滚动。jsdom 没有真实布局，不能证明几何通过；真实浏览器组件回归可以稳定检查边界，但原生应用的窗口、锚点和焦点仍要实际复验。
 
-本次来源：[BUG-050](../../exec-runs/20261021-actspace-full-acceptance/bugs/BUG-050.md)。
+本次来源：[BUG-050](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#bug-050)。

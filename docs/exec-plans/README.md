@@ -15,8 +15,6 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [验收问题集中修复方案](active/20261022-acceptance-bugfix-review.md) | 2026-10-22 用户要求集中审核：30条记录，3条已关闭，27条未关闭；建议26条分批修复，016范围单列。方案待审核，尚未实施。 |
-| [ActSpace 两阶段验收计划](active/20261021-actspace-full-acceptance.md) | 103/165个编号已有结论（62.4%），70通过、33失败、62未覆盖；尚未全面签收。用户随后要求先集中审核修复方案，续验仍按原编号及剩余前提推进。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
@@ -24,6 +22,10 @@
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；DropdownMenu（及 Popover、Dialog、Select、ContextMenu）由 Desktop 前端重构 16 接手；剩 Switch、Textarea、Tabs 及对应迁移。 |
 
 六个早期后端计划已移出执行导航，短页仅保留历史链接。独有目标与未完成项见[结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)，当前验证见本轮清理摘要。
+
+## 已停止的本轮验收
+
+2026-10-25 用户决定本轮验收到此为止，因暂时没有时间，未验证部分留待对外发版时完整验收。原 165 项中 104 项历史通过、61 项部分或未覆盖；52 个 Bug 中 51 个关闭，BUG-039 保留未关闭。两份旧验收/集中修复 active 计划退出执行入口，131 份过程文档合并为[唯一结算与未验证清单](../exec-runs/20261021-actspace-full-acceptance/execution-summary.md)，完整原文保存在清理前提交 `8dbc68a5`；不代表验收全部完成。
 
 ## 最近完成
 

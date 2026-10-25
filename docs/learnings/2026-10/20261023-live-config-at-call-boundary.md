@@ -24,4 +24,4 @@ return {
 
 清空显式绑定与禁用能力的含义需要分开。如果解析器允许回退到其他可用模型，选择“跟随”仍能看图是合法行为；测试应控制全部候选配置，而非只清空一个字段。
 
-本次实例见 [BUG-038](../../exec-runs/20261021-actspace-full-acceptance/bugs/BUG-038.md) 与[变更记录](../../histories/2026-10/20261022-0746-acceptance-small-fixes.md)。
+本次实例见 [BUG-038](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#bug-038) 与[变更记录](../../histories/2026-10/20261022-0746-acceptance-small-fixes.md)。

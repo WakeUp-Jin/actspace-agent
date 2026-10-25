@@ -12,4 +12,4 @@
 
 自检时可以问：解析失败后还能查到真实usage吗？未知和明确0能区分吗？后台请求会凭空增加Run吗？旧数据库无需人工删除就能恢复正确汇总吗？
 
-本次经验来自[BUG-045工程修复](../../exec-runs/20261021-actspace-full-acceptance/bugs/BUG-045.md)。
+本次经验来自[BUG-045工程修复](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#bug-045)。

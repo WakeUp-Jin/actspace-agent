@@ -5,7 +5,7 @@
 - BUG-001：Markdown分块测试两处NodeList展开依赖DOM.Iterable，阻断当前Desktop类型检查。使用Array.from收集节点，保持断言及项目lib配置不变。
 - BUG-003：旧前端总计划链接已退役demo目录，改到现有迁出索引与Git恢复入口。
 - 验证：先重现类型错误；修后Desktop renderer/electron类型检查与Markdown7项测试通过。文档两项门禁及current-docs7项测试通过。没有修改产品运行行为，没有提交或推送。
-- 详细版本、修前失败和修后证据见[验收记录](../../exec-runs/20261021-actspace-full-acceptance/engineering-20261022.md)。
+- 详细版本、修前失败和修后证据见[验收记录](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#source-engineering-20261022-md)。
 - 学习沉淀判断：两处均为局部API用法/导航修正，未同时命中新概念、深度等两项，不另建学习文档。
 
 - BUG-006：Browser 验收 helper 的相对路径越出仓库且引用退役 agent-runtime，改为当前 runtime facade；加载及两项导出断言通过，同一 helper 向真实隔离 Native Host ping 成功。不改产品协议或工具权限，未将全部 smoke 声称通过。此处是局部路径修正，不新增学习文档。
@@ -15,7 +15,7 @@
 - BUG-004同步workspace/manifest注册表及生成矩阵；4项回归通过。
 - BUG-012把跨frame偏移测量移到叶节点滚动之后，最终测量不再滚动；覆盖单/双层及point/set_checked红绿回归。Go全包、Browser检查及真实扩展链路两次reload通过。
 - BUG-035为Review工具栏补容器内焦点显露，排除portal，预留3px环并按方向取整；20项回归及真实Electron390px/480px浅深键盘路线通过。精确高度及水平设备输入仍未覆盖。
-- 修正测试时钟、模态选择器扫描误拦和无关长文本逐字输入负载，保留行为断言；完整测试状态见[执行记录](../../exec-runs/20261022-acceptance-bugfix/execution-summary.md)。
+- 修正测试时钟、模态选择器扫描误拦和无关长文本逐字输入负载，保留行为断言；完整测试状态见[执行记录](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#old-bugfix-summary)。
 - 本轮frame坐标时序涉及可迁移原理和反直觉陷阱，已形成[学习速记](../../learnings/2026-10/20261023-frame-coordinate-measurement.md)。未提交、推送或修改用户配置。
 
 ## 2026-10-23 全部 Bug 授权与继续验收
@@ -116,7 +116,7 @@ SQLite新增3项修前失败回归，修复单条触发器、批量写入、删�
 
 ### BUG-045 复验与全量回归补记
 
-真实原生7请求/546 Token/3个真实Run、正常重开及双主题对账通过；另在隔离副本完成schema13标记→14生产索引重建，HTTP、Journal、SQLite和公开统计一致，未冒称真实旧版升级。BUG-045关闭，F1-07勾选；当前165项96通过/1失败/68部分或未覆盖，45条Bug中43关闭。详见[辅助计量证据](../../exec-runs/20261021-actspace-full-acceptance/auxiliary-usage-20261023.md)。
+真实原生7请求/546 Token/3个真实Run、正常重开及双主题对账通过；另在隔离副本完成schema13标记→14生产索引重建，HTTP、Journal、SQLite和公开统计一致，未冒称真实旧版升级。BUG-045关闭，F1-07勾选；当前165项96通过/1失败/68部分或未覆盖，45条Bug中43关闭。详见[辅助计量证据](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#source-auxiliary-usage-20261023-md)。
 
 同步生成的Agent契约矩阵后根测试检查链通过，workspace类型检查通过。默认并行测试发生资源竞争超时，保留其非零结果；pi-ai独立108/108、Desktop三文件82/82，逐包串行通过Desktop前所有包后，Desktop限制2 worker的完整套件2005通过/7跳过。没有更改测试超时或全局worker配置；相关日志见修复执行记录。本段为验证与既有计量学习文档的补记，不另写重复学习文档。未提交或推送。
 
@@ -165,13 +165,13 @@ BUG-039系统派发仍未覆盖，不能关闭；当前165项99通过/0失败/66
 
 F3空子样本准备通过真实CLI暴露正常空响应被当成无消息跳过，request保持open、Step结束被拒绝，子工具失败。共享AgentLoop现在对每个正常完成的请求都写唯一assistant/message，空content照实保留usage与finishReason，不更改存储格式或补造正文。主/子两项新回归修前均复现原不变量错误，原partial-output四项仍通过；修后Core全包51、当前Runtime定向6、CLI真实进程19通过，Core/Runtime类型检查与构建、58个包边界检查通过。实际消费固定Harness的真实CLI父explore→子空结果→父完成通过；独立冷Node进程再次空主轮正常完成，旧父前缀和旧子字节不变。独立只读审查通过，BUG-049关闭、P2-C02恢复通过；F3原生故障空态另验。事件规范同步明确空内容不等于无请求终态。同形排查没有其他Journal终态条件遗漏；本轮未提交或推送。
 
-本次空内容与生命周期终态的区别命中可迁移模式、深度和陷阱，补[空响应终态学习速记](../../learnings/2026-10/20261023-empty-response-terminal-events.md)。详见[证据闭环](../../exec-runs/20261021-actspace-full-acceptance/empty-response-evidence-20261023.md)。
+本次空内容与生命周期终态的区别命中可迁移模式、深度和陷阱，补[空响应终态学习速记](../../learnings/2026-10/20261023-empty-response-terminal-events.md)。详见[证据闭环](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#source-empty-response-evidence-20261023-md)。
 
 ### BUG-050 Skills 浮层适应可用高度
 
 合法最小窗口中正常多行草稿抬高输入面板，Skills完整卡片在上下两侧都放不下，搜索和返回越出屏幕。ComposerPalette现在让整卡消费Radix可用高度，搜索行不收缩，列表按剩余空间收缩并滚动；保留原锚点、翻转和键盘规则，不修改共享Popover或产品最小窗口。
 
-新增真实Chromium组件布局回归：修前在原生实测锚点重现top−51，修后3种几何×2宽度×浅深主题12组通过，覆盖搜索可见、内部滚动、键盘活动项、过滤/返回/Esc回焦。相关Composer/UserMessage120项和Desktop双端类型检查、前端门禁通过；首次Desktop全量断言2007通过但批注HoverCard有1个环境销毁后的异常，保留失败结果，随后2 worker完整复测253文件/2007项通过、2文件/7项跳过且exit0。当前构建真实Electron R50-1–5及独立证据/296源码2342制品/112原文件主审通过，BUG-050关闭。09-P3-4条件性翻转仍未覆盖；1px尺寸恢复精度与manifest保存顺序说明如实保留，见[主审证据](../../exec-runs/20261021-actspace-full-acceptance/palette-evidence-20261024.md)。
+新增真实Chromium组件布局回归：修前在原生实测锚点重现top−51，修后3种几何×2宽度×浅深主题12组通过，覆盖搜索可见、内部滚动、键盘活动项、过滤/返回/Esc回焦。相关Composer/UserMessage120项和Desktop双端类型检查、前端门禁通过；首次Desktop全量断言2007通过但批注HoverCard有1个环境销毁后的异常，保留失败结果，随后2 worker完整复测253文件/2007项通过、2文件/7项跳过且exit0。当前构建真实Electron R50-1–5及独立证据/296源码2342制品/112原文件主审通过，BUG-050关闭。09-P3-4条件性翻转仍未覆盖；1px尺寸恢复精度与manifest保存顺序说明如实保留，见[主审证据](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#source-palette-evidence-20261024-md)。
 
 同步输入框设计与前端验证入口；本次可用空间公布与内容适配的区别命中可迁移模式、陷阱，补[浮层可用高度学习速记](../../learnings/2026-10/20261024-popover-available-height.md)。无暂存、提交或推送。
 
@@ -185,7 +185,7 @@ F3空子样本准备通过真实CLI暴露正常空响应被当成无消息跳过
 同步中间消息区的持久引用边界；该生命周期错位命中可迁移、深度与陷阱，补[上下文与附件授权学习速记](../../learnings/2026-10/20261024-context-compaction-and-artifact-authority.md)。无暂存、提交或推送。
 
 
-BUG-051真实原生B51-1–4和独立授权/事实主审通过：同历史实际开图、工具摘要往返、原源缺席冷启开图、正常退出及Journal/298源码/2342制品保护均通过。原2×2图保持intrinsic尺寸，不夸称大图；原Journal248874B逐字不变、HTTP仍7，源先恢复原字节再只清自有fixture。BUG-051关闭，P2-D17恢复通过；当前104/0/61、51Bug50关闭仅039待OS触发，Goal仍未完成。证据见[闭环](../../exec-runs/20261021-actspace-full-acceptance/historical-image-evidence-20261024.md)，无暂存、提交、推送。
+BUG-051真实原生B51-1–4和独立授权/事实主审通过：同历史实际开图、工具摘要往返、原源缺席冷启开图、正常退出及Journal/298源码/2342制品保护均通过。原2×2图保持intrinsic尺寸，不夸称大图；原Journal248874B逐字不变、HTTP仍7，源先恢复原字节再只清自有fixture。BUG-051关闭，P2-D17恢复通过；当前104/0/61、51Bug50关闭仅039待OS触发，Goal仍未完成。证据见[闭环](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#source-historical-image-evidence-20261024-md)，无暂存、提交、推送。
 
 ## 2026-10-24 BUG-052：余额失败反馈与同页重试
 
@@ -193,4 +193,4 @@ BUG-051真实原生B51-1–4和独立授权/事实主审通过：同历史实际
 
 2026-10-25补充BUG-052前端窄窗回归：真实原生480px浅深正常/错误/焦点与重试、恢复和CmdQ全部通过，固定源码/制品无漂移；受控长流CT12三完整轮仍partial，R3完整链与正文逐字核对通过，未扩签商业或整体验收。详见ct12-controlled-evidence及BUG052最新证据。
 
-2026-10-25续验最终增量：CT13同A/PID三完整轮、按正式§8 CT14同实例一次三轮确认及12条HTTP/Journal/warm正文对账完成；原生CmdQ exit0、owned资源清理、2356源码/2350制品不变。有限资源未证明平台或泄漏，14-A5及商业/OS缺口保留，原165行104/0/61、52Bug51关闭仅039未关闭。可自主执行路线已用尽而Goal未完成，逐编号条件和证据见[本轮交接](../../exec-runs/20261021-actspace-full-acceptance/closeout-20261025.md)。不自动新批、无暂存提交推送。
+2026-10-25续验最终增量：CT13同A/PID三完整轮、按正式§8 CT14同实例一次三轮确认及12条HTTP/Journal/warm正文对账完成；原生CmdQ exit0、owned资源清理、2356源码/2350制品不变。有限资源未证明平台或泄漏，14-A5及商业/OS缺口保留，原165行104/0/61、52Bug51关闭仅039未关闭。可自主执行路线已用尽而Goal未完成，逐编号条件和证据见[本轮交接](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#source-closeout-20261025-md)。不自动新批、无暂存提交推送。

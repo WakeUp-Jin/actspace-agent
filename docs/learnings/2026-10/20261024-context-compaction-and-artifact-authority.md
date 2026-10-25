@@ -10,4 +10,4 @@
 
 回归应覆盖正反两侧：压缩后仍可读取；无引用、跨会话、媒体不符或字节篡改仍被拒绝；清理保留历史附件并删除确实未提交的暂存。只验证“文件存在”或只验证新上传，都抓不到这个生命周期错位。
 
-本次来源：[验收修复 history](../../histories/2026-10/20261022-0746-acceptance-small-fixes.md)、[BUG-051](../../exec-runs/20261021-actspace-full-acceptance/bugs/BUG-051.md)。
+本次来源：[验收修复 history](../../histories/2026-10/20261022-0746-acceptance-small-fixes.md)、[BUG-051](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#bug-051)。

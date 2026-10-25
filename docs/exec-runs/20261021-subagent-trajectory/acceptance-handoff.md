@@ -117,4 +117,4 @@
 | E4 | 通过 | 真实Electron+Runtime+本地受控Provider，同一脚本20.173秒，无手动刷新；子轨迹从仅用户行到系统/轮次/Context/助手0–29片段，前后均运行中。证据为总执行tmp目录 `stage1/electron-cdp-20261022/E4-trajectory20.json`、before/after.png及rowids/Journal。另有上文真实DeepSeek128秒增长；受控样本未触发新增工具，不声称该20秒内也新增工具。原文“工具调用 / 助手消息”按已有助手更新判定，不额外要求两类同时出现。 |
 | E11 | 通过 | 旧 `f8-E11-return-child.png` 及原操作记录证明Context跳主轨迹后右栏仍为原只读Explore与README/sample.csv/sample.html工具记录；新 `E11-specific-ref.json`、`E11-specific-journal.json`、`E11-specific-selected.png`证明实际具体工具结果trajectoryRef.callId与主轨迹data-current/aria-selected和Journal匹配。同固定构建合并两项行为证据；原清单没有要求同一次采样的scroll数值完全一致。 |
 
-上述补证方法均为Playwright/Electron CDP，不称原生AX；不涉及系统剪贴板，不改产品。最后一次临时实例正常关闭、settings恢复，完整过程与误停共享本地Provider后恢复的工具操作偏差见[总执行交互报告](../20261021-actspace-full-acceptance/cu-electron-20261022.md)。该偏差发生在前一轮独立流结束后的清理，未拼接到E4证据。F3子对话流式等待观察、读取故障fallback、多子滚动及侧边对话整合属于其他验收点，继续按台账记录。
+上述补证方法均为Playwright/Electron CDP，不称原生AX；不涉及系统剪贴板，不改产品。最后一次临时实例正常关闭、settings恢复，完整过程与误停共享本地Provider后恢复的工具操作偏差见[总执行交互报告](../20261021-actspace-full-acceptance/execution-summary.md#source-cu-electron-20261022-md)。该偏差发生在前一轮独立流结束后的清理，未拼接到E4证据。F3子对话流式等待观察、读取故障fallback、多子滚动及侧边对话整合属于其他验收点，继续按台账记录。
