@@ -208,6 +208,15 @@
     - `tmp/sandbox-v2-e2e/linux-evaluation.mjs` 复现集成测试，12 项全部通过，另加 `/tmp` 不可写一项。
     - 第二期 T2 的 `linux-run.mjs` 复跑，5 项通过。
 
+### 步骤 8：T7 生成物与仓库检查
+
+- **操作**：`scripts/contract-matrix/source-registry.mjs` 登记 `packages/harness-evaluation` 的清单与 `package.json`，执行 `pnpm gen:contract-matrix`。生成的矩阵新增服务 `harness.evaluation`（状态 `declared`，与 `harness.control` 相同）、插件 `actspace.harness-evaluation`、包 `@actspace/harness-evaluation`，agent-host 的依赖里多了这个包。
+- **影响文件**：`scripts/contract-matrix/source-registry.mjs`、`docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md`。
+- **验证**：
+  - `pnpm test:contract-matrix` 通过；`pnpm check:packages` 通过（65 个包）；`pnpm check:desktop-build-graph` 通过（59 个项目）。
+  - `pnpm typecheck` 通过；`pnpm test` 全部通过（61 个包，没有失败；没设 `ACTSPACE_NONO_PATH` 时 sandbox-nono 跳过 9 个真实执行用例）。
+  - 第一期 Host 端到端（`tmp/sandbox-v1-e2e/host-e2e.mjs nono`）复跑，结果与第一期相同：工作区写入成功；`~` 下写入、写 `.git` 失败；后台任务停止后没有残留进程。
+
 ## 遇到的问题
 
 - Linux 容器里第一次复验“终止无残留”失败：`ps` 显示两个 `sleep` 处于 `Z` 状态，父进程是 PID 1。容器里的 PID 1 是 `node`，它不回收被转交过来的孤儿进程，`kill(-pgid, 0)` 对僵尸进程也会成功。加 `docker run --init` 后通过。真实主机上由 init 或 systemd 回收，不受影响；Docker 复验统一加 `--init`。

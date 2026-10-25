@@ -1,14 +1,14 @@
 # Agent Contract Matrix
 
 > Generated artifact; edit source declarations instead. Do not hand-edit this file.
-> Generator 1.0.0; source digest `33f68c225fb717ec36f7fb6a151e02bcadb97719fc4d8b019d3b67b35c015b91`.
+> Generator 1.0.0; source digest `88f795cdc997e2a542b679024183da4413237a5e395d9b90c1f9c0fe74a51e43`.
 
 This document is an audit view of the current ActSpace v2 declarations. It never activates Runtime services, plugins, Session persistence, tools or Cordis entries.
 
-- Services: 48
+- Services: 49
 - Events: 81 (Session core 12, Loop interventions 8, notifications 7)
-- Plugins: 46
-- Packages: 64
+- Plugins: 47
+- Packages: 65
 
 ## Services
 
@@ -36,6 +36,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | desktop.app | actspace.desktop-app | declared |  | desktop.app | - | packages/desktop-app/src/manifest.ts | cordis-adapter/service-contract |
 | english-learning | actspace.english-learning | declared |  | english-learning | - | packages/english-learning/src/manifest.ts | cordis-adapter/service-contract |
 | harness.control | actspace.harness-control | declared |  | harness.control | - | packages/harness-control/src/manifest.ts | cordis-adapter/service-contract |
+| harness.evaluation | actspace.harness-evaluation | declared |  | harness-evaluation | - | packages/harness-evaluation/src/manifest.ts | cordis-adapter/service-contract |
 | harness.hmr | actspace.harness-hmr | declared |  | harness.hmr | - | packages/harness-hmr/src/manifest.ts | cordis-adapter/service-contract |
 | headless.runner | actspace.headless | declared |  | headless.runner | - | packages/headless/src/manifest.ts | cordis-adapter/service-contract |
 | host.application | actspace.agent-host | declared |  | host.application | - | packages/agent-host/src/manifest.ts | cordis-adapter/service-contract |
@@ -168,11 +169,11 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | credential | active | true | actspace.english-learning | - | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
 | filesystem.read | active | true | actspace.filesystem-read<br>actspace.filesystem-search | - | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
 | filesystem.session | active | true | actspace.session.journal<br>actspace.session.jsonl | - | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
-| filesystem.write | active | true | actspace.filesystem-write<br>actspace.image-generation | - | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
+| filesystem.write | active | true | actspace.filesystem-write<br>actspace.harness-evaluation<br>actspace.image-generation | - | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
 | headless | optional | false | - | actspace.headless | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
 | network | active | true | actspace.english-learning<br>actspace.image-generation<br>actspace.image-inspection<br>actspace.web-tools | - | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
 | network.provider | active | true | actspace.llm.pi-ai | actspace.llm.service | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
-| process | active | true | actspace.english-learning<br>actspace.plugin-manager<br>actspace.sandbox<br>actspace.sandbox-nono<br>actspace.sandbox-seatbelt<br>actspace.shell-tools | - | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
+| process | active | true | actspace.english-learning<br>actspace.harness-evaluation<br>actspace.plugin-manager<br>actspace.sandbox<br>actspace.sandbox-nono<br>actspace.sandbox-seatbelt<br>actspace.shell-tools | - | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
 | proxy.scoped | optional | false | - | actspace.llm.pi-ai | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
 | renderer | active | true | actspace.english-learning | - | @actspace/cordis-adapter | packages/cordis-adapter/src/manifest.ts#PluginHostRequirement | composition/admission-contract |
 
@@ -204,6 +205,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | actspace.filesystem-search | ActSpace Filesystem Search | 2.0.0 | tools.filesystem-search | active | true | tools.filesystem-search | actspace.host.tools.filesystem-search<br>tools.runtime | filesystem.read | packages/tools/filesystem-search/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.filesystem-write | ActSpace Filesystem Write | 2.0.0 | tools.filesystem-write | active | true | tools.filesystem-write | actspace.host.tools.filesystem-write<br>tools.runtime | filesystem.write | packages/tools/filesystem-write/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.harness-control | Harness control | 1 | harness.control | active | true | harness.control | actspace.host.harness-control | - | packages/harness-control/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
+| actspace.harness-evaluation | ActSpace Harness Evaluation | 0.1.0 | harness-evaluation | active | true | harness.evaluation | sandbox | filesystem.write<br>process | packages/harness-evaluation/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.harness-hmr | Harness version coordinator | 1 | harness.hmr | active | true | harness.hmr | actspace.host.hmr | - | packages/harness-hmr/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.headless | ActSpace Headless Runner | 0.1.0 | headless.runner | active | true | headless.runner | actspace.host.headless<br>agent.runtime<br>session.runtime | - | packages/headless/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.image-generation | ActSpace Image Generation | 2.0.0 | tools.image-generation | active | true | tools.image-generation | actspace.host.tools.image-generation<br>tools.runtime | filesystem.write<br>network | packages/tools/image-generation/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
@@ -232,7 +234,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | id | packageRole | status | exports | dependencies | sourceRefs | tests |
 | --- | --- | --- | --- | --- | --- | --- |
 | @actspace/agent-cli | host | active | - | @actspace/agent-host<br>@actspace/agent-service<br>@actspace/llm-pi-ai<br>@actspace/llm-service<br>@actspace/runtime<br>@actspace/shared<br>@actspace/tools-approval<br>@actspace/tools-filesystem-read<br>@actspace/tools-filesystem-search<br>@actspace/tools-filesystem-write<br>@actspace/tools-image-generation<br>@actspace/tools-image-inspection<br>@actspace/tools-runtime<br>@actspace/tools-shell-tools<br>@actspace/tools-web-tools | apps/cli/package.json#package.json | composition/admission-contract |
-| @actspace/agent-host | domain | active | .<br>./manifest<br>./node-ports<br>./plugin | @actspace/agent-service<br>@actspace/cordis-adapter<br>@actspace/llm-pi-ai<br>@actspace/llm-service<br>@actspace/sandbox<br>@actspace/session-jsonl<br>@actspace/session-persistence<br>@actspace/shared<br>@actspace/tools-approval<br>@actspace/tools-filesystem-read<br>@actspace/tools-filesystem-search<br>@actspace/tools-filesystem-write<br>@actspace/tools-image-generation<br>@actspace/tools-image-inspection<br>@actspace/tools-runtime<br>@actspace/tools-shell-tools<br>@actspace/tools-web-tools<br>ws | packages/agent-host/package.json#package.json | composition/admission-contract |
+| @actspace/agent-host | domain | active | .<br>./manifest<br>./node-ports<br>./plugin | @actspace/agent-service<br>@actspace/cordis-adapter<br>@actspace/harness-evaluation<br>@actspace/llm-pi-ai<br>@actspace/llm-service<br>@actspace/sandbox<br>@actspace/session-jsonl<br>@actspace/session-persistence<br>@actspace/shared<br>@actspace/tools-approval<br>@actspace/tools-filesystem-read<br>@actspace/tools-filesystem-search<br>@actspace/tools-filesystem-write<br>@actspace/tools-image-generation<br>@actspace/tools-image-inspection<br>@actspace/tools-runtime<br>@actspace/tools-shell-tools<br>@actspace/tools-web-tools<br>ws | packages/agent-host/package.json#package.json | composition/admission-contract |
 | @actspace/agent-service | domain | active | .<br>./codec<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/core-scope<br>@actspace/session-journal<br>@actspace/session-persistence<br>@actspace/session-storage<br>@actspace/shared | packages/agent-service/package.json#package.json | composition/admission-contract |
 | @actspace/auto-review | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/llm-service<br>@actspace/session-journal<br>@actspace/shared | packages/auto-review/package.json#package.json | composition/admission-contract |
 | @actspace/background-tasks | domain | active | . | @actspace/core-agent<br>@actspace/session-persistence<br>@actspace/shared | packages/background-tasks/package.json#package.json | composition/admission-contract |
@@ -259,6 +261,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | @actspace/diagnostics | domain | active | . | @actspace/cordis-adapter | packages/diagnostics/package.json#package.json | composition/admission-contract |
 | @actspace/english-learning | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/core-agent<br>@actspace/core-scope<br>@actspace/prompt<br>@actspace/session-journal<br>@actspace/shared | packages/english-learning/package.json#package.json | composition/admission-contract |
 | @actspace/harness-control | domain | active | .<br>./manifest<br>./plugin | @actspace/boot<br>@actspace/bundle<br>@actspace/composition<br>@actspace/cordis-adapter<br>@actspace/session-jsonl<br>@actspace/session-persistence | packages/harness-control/package.json#package.json | composition/admission-contract |
+| @actspace/harness-evaluation | domain | active | .<br>./manifest<br>./plugin<br>./types | @actspace/cordis-adapter<br>@actspace/harness-control<br>@actspace/sandbox | packages/harness-evaluation/package.json#package.json | composition/admission-contract |
 | @actspace/harness-hmr | domain | active | .<br>./manifest<br>./plugin | @actspace/boot<br>@actspace/cordis-adapter<br>@actspace/harness-control | packages/harness-hmr/package.json#package.json | composition/admission-contract |
 | @actspace/headless | domain | active | .<br>./manifest<br>./plugin | @actspace/agent-service<br>@actspace/cordis-adapter<br>@actspace/core-agent-loop<br>@actspace/session-persistence<br>@actspace/shared | packages/headless/package.json#package.json | composition/admission-contract |
 | @actspace/llm-pi-ai | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/llm-service<br>@actspace/shared<br>@anthropic-ai/sdk<br>@earendil-works/pi-ai<br>openai | packages/llm/pi-ai/package.json#package.json | composition/admission-contract |

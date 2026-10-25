@@ -220,7 +220,7 @@ T0 → T1 →（T2、T3 可并行）→ T4 → T5 → T6 → T7 → T8。
 - [x] T4 CLI `--harness`
 - [x] T5 `harness-evaluation` 包
 - [x] T6 集成测试
-- [ ] T7 生成物与检查
+- [x] T7 生成物与检查
 - [ ] T8 文档与收尾
 
 ## 决策记录
