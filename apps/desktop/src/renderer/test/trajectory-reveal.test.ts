@@ -14,6 +14,7 @@ const records = [
   record("req", { kind: "request", callId: "c1", requestOnly: true }),
   record("tool1", { kind: "tool", callId: "c1" }),
   record("a1", { kind: "assistant", messageId: "m2" }),
+  record("compact", { kind: "compaction", compaction: { compactionId: "k1", trigger: "auto", messageCount: 4, beforeTokens: null, afterTokens: null } }),
   record("u2", { kind: "user", messageId: "m3" }),
   record("tool2", { kind: "tool", callId: "c2" }),
   record("hidden", { kind: "assistant", messageId: "m4", visible: false }),
@@ -26,6 +27,11 @@ describe("findRevealRecord", () => {
 
   it("matches a message id", () => {
     expect(findRevealRecord(records, { messageId: "m2" })?.id).toBe("a1");
+  });
+
+  it("matches a compaction id only on compaction records", () => {
+    expect(findRevealRecord(records, { compactionId: "k1" })?.id).toBe("compact");
+    expect(findRevealRecord(records, { compactionId: "missing" })).toBeNull();
   });
 
   it("finds the latest record of a kind; tool call and result both map to tool", () => {

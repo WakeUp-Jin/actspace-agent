@@ -403,13 +403,14 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 
 ### 跳到轨迹
 
-- 会话行和「在轨迹中打开」调用 `revealInTrajectory(target)`。它由 `WorkbenchLayout` 通过 Context 提供，作用是把中间区域切到轨迹视图，用的是和标题栏「查看执行轨迹」按钮同一份按会话记忆的状态。右侧面板保持打开。
+- 会话行、「在轨迹中打开」和对话里压缩分隔线的「在轨迹中查看」调用 `revealInTrajectory(target)`。它由 `WorkbenchLayout` 通过 Context 提供，作用是把中间区域切到轨迹视图，用的是和标题栏「查看执行轨迹」按钮同一份按会话记忆的状态。右侧面板保持打开。
 - 目标与轨迹记录的对应关系：
 
 | 面板目标 | 轨迹记录 |
 | --- | --- |
 | `{ callId }`（工具调用 / 工具结果） | `kind === "tool"` 且 `callId` 相同 |
 | `{ messageId }`（用户 / 助手 / 思考） | `messageId` 相同 |
+| `{ compactionId }`（对话里的压缩分隔线） | `kind === "compaction"` 且 `compaction.compactionId` 相同 |
 | `{ latest: "user" \| "assistant" }` | 最后一条该 kind 的记录 |
 | `{ latest: "tool-call" \| "tool-result" }` | 最后一条 `kind === "tool"` 的记录 |
 | `{ latest: null }` | 最后一条可见记录 |

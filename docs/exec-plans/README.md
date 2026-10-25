@@ -15,7 +15,6 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [压缩的前端回显（A1）](active/20261025-compaction-display.md) | 2026-10-25 设计已定（A1）；T1–T6 执行中，分支 `feat/compaction-display`。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
@@ -30,6 +29,7 @@
 
 ## 最近完成
 
+- [压缩的前端回显（A1）](completed/20261025-compaction-display.md)：对话里压缩改为居中分隔线（条数、压缩前 → 约压缩后 tokens、耗时、「在轨迹中查看」），摘要只在轨迹看；后端在 `compaction/end` 记录触发方式与前后 token，轨迹概述补齐；desktop 2029 项测试通过，`?mock=compaction` 截图完成；Electron 未验证，见[执行摘要](../exec-runs/20261025-compaction-display/execution-summary.md)。
 - [子智能体轨迹](completed/20261021-subagent-trajectory.md)：父轨迹只留 `agent` 一行，详情「查看轨迹」在右侧子 Agent 面板打开子会话轨迹（对话 / 轨迹切换，窄面板详情在下半部分）；desktop 1920 项测试通过，浏览器 mock 截图完成；Electron 真实子智能体未验证，见[执行摘要](../exec-runs/20261021-subagent-trajectory/execution-summary.md)与[验收交接](../exec-runs/20261021-subagent-trajectory/acceptance-handoff.md)。
 
 - [后台任务：后台 Bash、后台子智能体与任务工具](completed/20261022-background-tasks.md)：T1–T10 完成（feat/background-tasks 已合并入 fix/settings-model-select）；统一登记表、空闲唤醒、`task_*` 四个工具、后台子 Agent、任务清单上下文、「后台」标签与唤醒分隔行；浏览器 mock 截图完成；Electron 未验证，见[执行摘要](../exec-runs/20261022-background-tasks/execution-summary.md)。

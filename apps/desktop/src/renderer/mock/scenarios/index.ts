@@ -1,4 +1,5 @@
 import { backgroundTasksScenario } from "./background-tasks";
+import { compactionScenario } from "./compaction";
 import { contextPaginationScenario } from "./context-pagination";
 import type { MockClock } from "../clock";
 import type { MockHandlers } from "../handlers";
@@ -11,7 +12,7 @@ import { streamingScenario } from "./streaming";
 import { turnDeliverablesScenario } from "./turn-deliverables";
 import { subagentTrajectoryScenario } from "./subagent-trajectory";
 
-export type MockScenario = "empty" | "streaming" | "long-session" | "approval-pending" | "remote-host" | "approval-prefix" | "context-pagination" | "turn-deliverables" | "no-workspace" | "sidebar" | "subagent-trajectory" | "background-tasks";
+export type MockScenario = "empty" | "streaming" | "long-session" | "approval-pending" | "remote-host" | "approval-prefix" | "context-pagination" | "turn-deliverables" | "no-workspace" | "sidebar" | "subagent-trajectory" | "background-tasks" | "compaction";
 
 /** 场景只负责写入种子数据，必要时覆盖少量 handler（如流式回放的触发时机）。 */
 export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) => MockHandlers | void>> = {
@@ -27,6 +28,7 @@ export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) =>
   sidebar: sidebarScenario,
   "subagent-trajectory": subagentTrajectoryScenario,
   "background-tasks": backgroundTasksScenario,
+  compaction: compactionScenario,
 };
 
 export function isMockScenario(value: string | null): value is MockScenario {

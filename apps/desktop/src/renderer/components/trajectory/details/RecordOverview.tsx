@@ -109,12 +109,17 @@ export function RecordOverview(props: OverviewProps) {
   const failed = status === 'failed';
   if (cell.kind === 'compacted') {
     const summary = markdownSource(cell);
+    const facts = record.compaction;
+    // 压缩前是实测，压缩后是估算，所以后者带「约」；旧 journal 没有这两项时显示「—」。
+    const tokens = facts?.beforeTokens != null && facts.afterTokens != null ? `${formatTokens(facts.beforeTokens)} → 约 ${formatTokens(facts.afterTokens)}` : '—';
     return (
       <>
         <dl className="tj-overview tj-summaryScrollRegion" data-summary-scroll-region="">
           <OverviewRow label={T.status} error={failed}>{STATUS_LABEL[status]}</OverviewRow>
+          {facts?.trigger != null && <OverviewRow label={T.compactionTrigger}>{facts.trigger === 'manual' ? T.compactionManual : T.compactionAuto}</OverviewRow>}
           <OverviewRow label={T.duration}>{formatDurationMs(cell.durationMs)}</OverviewRow>
-          <OverviewRow label={T.tokens}>—</OverviewRow>
+          {facts?.messageCount != null && <OverviewRow label={T.compactedMessages}>{`${facts.messageCount} 条`}</OverviewRow>}
+          <OverviewRow label={T.tokens}>{tokens}</OverviewRow>
         </dl>
         {summary !== '' && <div className="tj-compactedSummary tj-summaryScrollRegion" data-summary-scroll-region=""><MarkdownFragment text={summary} /></div>}
       </>

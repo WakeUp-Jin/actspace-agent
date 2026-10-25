@@ -1366,7 +1366,6 @@ sessionId,
       expect(compactContext).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText("正在压缩上下文")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "上下文压缩进度" })).toBeInTheDocument();
     expect(screen.getByLabelText("正在压缩上下文，压缩完成后可继续")).toHaveAttribute("aria-disabled", "true");
     expect(screen.queryByText("/compact")).not.toBeInTheDocument();
     expect(execute).not.toHaveBeenCalled();
@@ -1390,7 +1389,7 @@ sessionId,
     await userEvent.type(composer, "/compact");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByText("上下文压缩失败 · 模型请求超时")).toBeInTheDocument();
+    expect(await screen.findByText("模型请求超时")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "重试" }));
 
     await waitFor(() => {
@@ -1398,7 +1397,7 @@ sessionId,
     });
     expect(compactContext.mock.calls[1]?.[0]).toMatchObject({ sessionId: "session-compact-failed" });
     await waitFor(() => {
-      expect(screen.queryByText("上下文压缩失败 · 模型请求超时")).not.toBeInTheDocument();
+      expect(screen.queryByText("模型请求超时")).not.toBeInTheDocument();
     });
   });
 
@@ -1422,13 +1421,13 @@ sessionId,
         ? { ...identity, type, error: { code: "TEST", message: "自动压缩超时", recoverable: true } }
         : { ...identity, type, payload: { triggerTokens: 100, thresholdTokens: 90, summaryChars: 0, historyRefPath: "session.jsonl", status: "failed", beforeCount: 10, afterCount: 10, reason: "自动压缩超时" } });
     });
-    expect(await screen.findByText("上下文压缩失败 · 自动压缩超时")).toBeInTheDocument();
+    expect(await screen.findByText("自动压缩超时")).toBeInTheDocument();
     await act(async () => { finish(); });
     await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
-    expect(screen.getByText("上下文压缩失败 · 自动压缩超时")).toBeInTheDocument();
+    expect(screen.getByText("自动压缩超时")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "重试" }));
     await waitFor(() => expect(compact).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByText("上下文压缩失败 · 自动压缩超时")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("自动压缩超时")).not.toBeInTheDocument());
   });
 
   it("aborts an Agent while automatic compaction is running", async () => {

@@ -610,7 +610,7 @@ describe("session selectors", () => {
     ]);
   });
 
-  it("carries duration and summary into completed compaction blocks", () => {
+  it("carries duration, trigger and token counts into completed compaction blocks", () => {
     const [block] = createMessageBlocks([
       contextCompactionEvent({
         triggerTokens: 0,
@@ -622,16 +622,27 @@ describe("session selectors", () => {
         removedCount: 29,
         durationMs: 12_400,
         summary: "目标：改游标分页",
+        compactionId: "c1",
+        trigger: "auto",
+        beforeTokens: 182_000,
+        afterTokens: 9_100,
       }),
     ]);
 
-    expect(block).toEqual(expect.objectContaining({
+    expect(block).toEqual({
       kind: "context_compaction",
+      id: "evt-legacy",
       status: "completed",
       removedCount: 29,
       durationMs: 12_400,
-      summary: "目标：改游标分页",
-    }));
+      compactionId: "c1",
+      trigger: "auto",
+      beforeTokens: 182_000,
+      afterTokens: 9_100,
+      createdAt: expect.any(String),
+      runId: "turn-compact",
+      renderKey: "turn:turn-compact:context-compaction:0",
+    });
   });
 
   it("drops skipped compaction payloads from the message flow", () => {

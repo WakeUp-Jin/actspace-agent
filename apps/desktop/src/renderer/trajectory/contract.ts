@@ -129,6 +129,17 @@ export type TrajectoryRecord = {
   readonly contextPresentation?: { readonly category: string; readonly title: string; readonly action: string; readonly placement: string; readonly previousText?: string };
   /** Resolved owner from explicit message/call identity, never row proximity. */
   readonly assistantRecordId?: string | null;
+  /** Compaction facts merged from `compaction/start` and `compaction/end`; fields are null in journals that predate them. */
+  readonly compaction?: TrajectoryCompactionFacts;
+};
+
+export type TrajectoryCompactionFacts = {
+  readonly compactionId: string | null;
+  readonly trigger: "manual" | "auto" | null;
+  /** Surface entries replaced by the summary (`end − start` on `compaction/start`). */
+  readonly messageCount: number | null;
+  readonly beforeTokens: number | null;
+  readonly afterTokens: number | null;
 };
 
 export type TrajectoryStep = {

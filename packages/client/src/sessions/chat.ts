@@ -208,11 +208,19 @@ export function projectChatEvents(
         ? data.durationMs
         : started === undefined ? undefined : Date.parse(event.time) - Date.parse(started.time);
       const summary = compactionSummaryText(journal, compactionId);
+      const trigger = data.trigger === "manual" || data.trigger === "auto" ? data.trigger : undefined;
+      // 旧 journal 没有压缩前后 token，这里不再拿会话当前用量充数。
+      const beforeTokens = nullableNonNegative(data.beforeTokens);
+      const afterTokens = beforeTokens === null ? null : nullableNonNegative(data.afterTokens);
       projected.push({ ...base, id: eventId(event), type: "context_compaction", payload: {
-        triggerTokens: snapshot.usage.totalTokens, thresholdTokens: snapshot.usage.totalTokens, beforeCount: end, afterCount: Math.max(1, start + 1),
+        triggerTokens: beforeTokens ?? 0, thresholdTokens: 0, beforeCount: end, afterCount: Math.max(1, start + 1),
         summaryChars: summary?.length ?? 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: Math.max(0, end - start),
         ...(durationMs !== undefined && Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}),
         ...(summary ? { summary } : {}),
+        ...(compactionId ? { compactionId } : {}),
+        ...(trigger ? { trigger } : {}),
+        ...(beforeTokens === null ? {} : { beforeTokens }),
+        ...(afterTokens === null ? {} : { afterTokens }),
       } });
     }
   }

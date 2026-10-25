@@ -334,19 +334,24 @@ Edit File 和 Write File 是文件修改类工具消息。后端工具名为 `ed
 
 ## Context Compaction 组件
 
-Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接输入 `/compact` 手动触发，或回合结束后由后端自动触发；两者使用同一套 UI，不区分、不标注触发方式，都落到消息流中的 `context_compaction` 消息块。原压缩设计稿已迁出，当前生命周期展示以本节和正式应用为准。
+Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接输入 `/compact` 手动触发，或回合结束后由后端自动触发；两者使用同一套 UI，消息流里不区分、不标注触发方式（触发方式只在轨迹详情里显示），都落到消息流中的 `context_compaction` 消息块。样式是一条居中分隔线（设计稿 `compaction-display-demo.html` 的 A1），当前展示以本节和正式应用为准。
 
 ### 结构
 
-- running：独立系统执行段。第一行 `正在压缩上下文 · 8s`（已用时间每秒刷新，来自 `startedAt`），下方一条 3px 不确定进度条，再下方一行说明 `正在总结较早的消息。`。手动 `/compact` 被任务服务领取后进入 running，等待时显示在队列中，不再显示淡色 `/compact` 命令行。
-- completed：独立 timeline divider，左右细线，居中文案 `上下文已压缩 · 29 条消息 · 12s`。条数来自压缩区间大小，耗时优先来自 journal 的 `compaction/end.data.durationMs`，包含事务提交前的模型摘要等待；旧 journal 缺少该值时回退 `compaction/start` 与 `compaction/end` 的时间差，历史回放同样显示。有摘要时文案是按钮，右侧带一个 chevron，点击展开摘要面板；运行中刚完成、摘要尚未投影时显示为纯分隔线。
-- 摘要面板：分隔线下方的浅底面板（`bg-surface-subtle`），头部 `压缩摘要 · N 字` + `复制`；正文用 Markdown 渲染，字号收敛到正文档位，最高 240px 内滚动；底部说明 `分隔线以上的消息仍然显示，但模型之后只通过这段摘要了解它们。`
-- failed：红色分隔线（`text-on-danger` + `bg-danger-soft` 细线），文案 `上下文压缩失败 · 原因`，右侧带下划线文字按钮 `重试`，重试走同一 `/compact` 路径。任务失败状态由 TaskSnapshot 恢复；压缩未成功不提交摘要事务，失败展示可由任务结果恢复。
+- 共同结构：一条居中分隔线，左右两段 1px 细线，线色比普通分隔线深一档（`border-strong` 40% 混入 `border`，类名 `compact-divider-line`），中间一组图标 + 文字，字号 `text-act-xs`。
+- running：中间是小转圈 + `正在压缩上下文` + 已用时间（`8s`，每秒刷新，来自 `startedAt`）；两侧细线各有一道 `operational` 色的光从外端收向中间文字（`compact-divider-running`，减少动态效果时不显示）。进行中不显示条数，手动和自动一致。手动 `/compact` 被任务服务领取后进入 running，等待时显示在队列中，不再显示淡色 `/compact` 命令行。
+- completed：中间是归档图标 + `以上 48 条消息已压缩` + `182K → 约 9.1K tokens · 23s` + `·` + `在轨迹中查看 ›`。
+  - 条数来自压缩区间大小。
+  - token 来自 `compaction/end.data.beforeTokens` / `afterTokens`：压缩前是实测（自动压缩取触发判断时的用量，手动压缩取最近一次请求的用量），压缩后是「压缩前 − 被替换条目估算 + 摘要估算」，所以写「约」。旧 journal 没有这两项时只显示条数和耗时。
+  - 耗时优先来自 `compaction/end.data.durationMs`，包含事务提交前的模型摘要等待；旧 journal 缺少该值时回退 `compaction/start` 与 `compaction/end` 的时间差，历史回放同样显示。
+  - `在轨迹中查看` 调用 `revealInTrajectory({ compactionId })`，切到轨迹并选中这次压缩的行；没有 `compactionId` 或不在工作台里（没有轨迹导航）时不显示。
+  - 摘要不在消息流里展开，只在轨迹详情里看。
+- failed：红色分隔线（`text-on-danger` + `bg-danger-soft` 细线），中间是警告图标 + `上下文压缩失败` + 原因 + 下划线文字按钮 `重试`，重试走同一 `/compact` 路径。任务失败状态由 TaskSnapshot 恢复；压缩未成功不提交摘要事务，失败展示可由任务结果恢复。
 - skipped（对话太短）：不进入消息流，只在 Composer 输入框顶部显示一行 `对话还很短，暂时不需要压缩`，约 3 秒后消失。
 
 ### 交互
 
-- 被压缩的旧消息、工具调用继续在分隔线上方照常显示，不置灰；摘要不再投影成一张用户消息卡片，只在分隔线展开后出现。
+- 被压缩的旧消息、工具调用继续在分隔线上方照常显示，不置灰；摘要不再投影成一张用户消息卡片，只在轨迹的压缩行详情里显示。
 - `/compact` 经统一 `submitTask` 接纳，由 Task 服务解释为压缩操作；繁忙时排队，不作为普通用户消息写入模型历史。任务契约见[Task/Run 规范](../agent-plugin-runtime/agent-task-run-lifecycle.md)。
 - 自动压缩属于当前 Agent Run：输入框为空时停止按钮可用，沿用 Run 的取消信号；取消请求处理中或 Host 不可达时禁用。独立 `/compact` 操作没有可取消的 Loop Run，停止按钮仍置灰并提示 `压缩完成后可继续`。压缩期间输入的消息进入消息队列（见下一节），后续执行遵守 Task 服务的暂停与恢复规则。
 - 自动压缩在工具批次全部完成后的 Step 安全点判断阈值，触发时先完成压缩再发下一模型请求；无工具的最终回复仍保留 Turn 收尾检查。非取消类压缩失败不使主运行失败；失败分隔线在 live run 结束后转由对应会话本地状态显示，直到下一次发送或压缩状态更新。该提示不跨应用重启持久化，不能等同于手动压缩的 Task 失败结果。

@@ -268,6 +268,12 @@ export type ContextCompactionPayload = {
   durationMs?: number;
   /** 模型之后看到的摘要正文 */
   summary?: string;
+  /** journal 里的压缩事务 id，用于在轨迹里定位压缩行 */
+  compactionId?: string;
+  /** 压缩前上下文 token（实测）；没有请求用量时缺省 */
+  beforeTokens?: number;
+  /** 压缩后上下文 token（压缩前 − 估算被替换条目 + 估算摘要） */
+  afterTokens?: number;
 };
 
 export type SessionWorktreeContext = {
@@ -942,8 +948,13 @@ export type MessageBlock = {
       removedCount?: number;
       /** completed：压缩耗时，来自 journal 时间差 */
       durationMs?: number;
-      /** completed：模型之后看到的摘要正文，分隔线展开后显示 */
-      summary?: string;
+      /** completed：压缩事务 id，「在轨迹中查看」按它定位 */
+      compactionId?: string;
+      /** completed：手动 /compact 或自动压缩 */
+      trigger?: "manual" | "auto";
+      /** completed：压缩前 / 后上下文 token；旧会话没有 */
+      beforeTokens?: number;
+      afterTokens?: number;
       /** failed：失败原因 */
       errorMessage?: string;
       createdAt: string;
