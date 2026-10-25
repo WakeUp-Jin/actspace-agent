@@ -112,6 +112,21 @@
 - **影响文件**：`scripts/contract-matrix/source-registry.mjs`、`artifacts/agent-contract-matrix.json`、`docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md`、`packages/agent-host/src/node-ports/tool-host-services.ts`、`apps/cli/src/runtime-v2/{host-adapter,host}.ts`、`packages/harness-control/src/test/candidate.test.ts`。
 - **验证**：`pnpm check:packages`、`pnpm check:desktop-build-graph`、`pnpm test:contract-matrix`（4 通过）、`pnpm typecheck`、`pnpm test` 全部通过；`test:agent-host:process` 7 通过；CLI 解析到 `dist/sandbox-components/darwin-arm64/nono`。
 
+### 步骤 10：T9 端到端验证
+
+- **操作与结果**：
+  1. **真实 Host 端到端（macOS，无界面）**：`apps/cli` 的 `host serve` + 假的 OpenAI 兼容服务依次发出 bash 调用，客户端逐个批准。脚本在 `tmp/sandbox-v1-e2e/host-e2e.mjs`（不进仓库）。nono 与 Seatbelt（临时移开仓库 nono）两轮结果一致：
+     - `touch a.txt` 成功（`sandboxed=true, sandbox=nono` 约 60ms / `sandbox=seatbelt` 约 14ms），文件存在；
+     - `touch ~/actspace-sandbox-probe-*.txt` 失败，文件不存在；`ls ~/.ssh` 失败；
+     - `git status --short`、`pnpm --version` 成功；
+     - `sleep 300` 后台任务经 `task_stop` 停止，之后没有 `sleep 300` 进程；
+     - 6 次审批的进程资源 `noSandbox` 均为 `false`。
+     计划里的 `echo hi > a.txt` 被 bash 原有的命令规则（重定向）硬拒绝，与沙箱无关，改用 `touch`。
+  2. **Linux**：Docker Desktop `node:22`（arm64，内核 6.12.76-linuxkit，`nono setup --check-only` 报告 Landlock V6）挂载仓库与 Linux nono，运行 `tmp/sandbox-v1-e2e/linux-check.mjs`（vitest 依赖 macOS 原生二进制，容器内改用脚本复现 T3 的真实断言）：工作区写入成功、工作区外写入失败、凭据读取失败而其他文件可读、断网生效；`sandbox.status("tool")` 不可用，原因 `nono 0.80.0: filesystem.write-deny=unsupported`；bash 资源 `noSandbox: true` 且无前缀授权；按沙箱内批准的调用返回 `SANDBOX_PREPARE_FAILED`，按沙箱外批准的调用以 `sandbox=none` 完成。7 项全部通过。
+  3. **打包**：在独立 worktree `../actspace-agent-sandbox-package` 运行 `ACTSPACE_MAC_ADHOC_SIGN=true ./scripts/release-package.sh`（脚本开头会删除 `dist/`，主仓库 `dist/` 里有其他验收产物）。`ActSpace.app/Contents/Resources/app/sandbox-components/bin/nono` 存在、`--version` 为 `nono 0.80.0`，保留上游 Developer ID 签名（TeamIdentifier `54DFBSV5GX`），`codesign --verify --strict` 通过；App 的 ad-hoc 签名校验通过。应用资源从 278M 增至 297M（nono 22M）。该 worktree 的 Electron 运行时安装时展开了框架符号链接，导致包体积翻倍，属于环境问题，与本次改动无关。
+- **未验证**：Desktop 界面操作（`pnpm dev:log` 下的审批卡、摘要显示、`logs/latest-dev.log` 的沙箱状态行），以及“组合中去掉三个沙箱插件”的界面表现（无服务路径已由 shell-tools 单测与 Linux 检查覆盖）。留给人工验收。
+- **影响文件**：无代码改动。
+
 ## 遇到的问题
 
 - **问题**：真实 Host 启动报 `Invalid URL`。
