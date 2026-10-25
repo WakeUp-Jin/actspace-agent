@@ -87,22 +87,24 @@ export type SandboxManagerConfig = Record<string, never>; // 移除 mode
 - 收窄规则不变：请求不能比模板宽。`evaluation` 请求的网络只能是 `allowlist`（或 `blocked`）。
 - 继承模式：`host.inherited === true` 时 `status()` 返回 `isolation: "inherited"`，`run()` 直接启动；`purpose: evaluation` 在继承模式下返回 `prepare_failed`（候选内不应再启动评估）。
 
-## `harness-evaluation` 接口（草案，T5 定稿）
+## `harness-evaluation` 接口（T5 定稿）
 
 ```ts
 export const HARNESS_EVALUATION_HOST_PORT_ID = "actspace.host.harness-evaluation";
+export const HARNESS_EVALUATION_SERVICE_ID = "harness.evaluation"; // 服务 ID 只能是小写加点
 export interface HarnessEvaluationHostPort {
   /** 启动 CLI 的命令前缀，如 [node, <repo>/apps/cli/dist/cli.js]。 */
   readonly launcher: readonly string[];
   /** 主应用的产物目录（只读来源）。 */
   readonly artifactRoot: string;
-  /** Host 解析模型连接：给候选的环境变量、放行域名、上游代理。密钥只经这里流出。 */
-  modelEnvironment(model: string | undefined): Promise<{ readonly env: Readonly<Record<string, string>>; readonly domains: readonly string[]; readonly localPorts?: readonly number[]; readonly upstreamProxy?: string }>;
+  /** Host 解析模型连接：给候选的环境变量、放行域名、本机端口、上游代理。密钥只经这里流出。 */
+  modelEnvironment(model: string | undefined): Promise<HarnessModelEnvironment>;
 }
-export type HarnessEvaluationRequest = { readonly selection: SelectionDescription; readonly task: { readonly input: string; readonly model?: string }; readonly workspace: string; readonly timeoutMs?: number };
+export type HarnessModelEnvironment = { readonly env: Readonly<Record<string, string>>; readonly domains: readonly string[]; readonly localPorts?: readonly number[]; readonly upstreamProxy?: string };
+export type HarnessEvaluationRequest = { readonly selection: SelectionDescription; readonly executionDigest?: string; readonly task: { readonly input: string; readonly model?: string }; readonly workspace: string; readonly timeoutMs?: number };
 export type HarnessEvaluationResult =
   | { readonly status: "unavailable"; readonly reasons: readonly string[] }
-  | { readonly status: "completed" | "failed" | "timed_out" | "cancelled"; readonly result?: CliRunResult; readonly sandbox: SandboxResult; readonly outputTail: string };
+  | { readonly status: "completed" | "failed" | "timed_out" | "cancelled"; readonly result?: HarnessEvaluationCliResult; readonly sandbox?: SandboxResult; readonly outputTail: string; readonly error?: string; readonly cleanup: "ok" | { readonly failed: string } };
 export interface HarnessEvaluationService {
   status(): Promise<{ readonly available: boolean; readonly reasons: readonly string[] }>;
   run(request: HarnessEvaluationRequest, signal?: AbortSignal): Promise<HarnessEvaluationResult>;
@@ -216,7 +218,7 @@ T0 → T1 →（T2、T3 可并行）→ T4 → T5 → T6 → T7 → T8。
 - [x] T2 nono 后端：`run` 模式
 - [x] T3 Host 端口与 CLI `--sandbox-inherited`
 - [x] T4 CLI `--harness`
-- [ ] T5 `harness-evaluation` 包
+- [x] T5 `harness-evaluation` 包
 - [ ] T6 集成测试
 - [ ] T7 生成物与检查
 - [ ] T8 文档与收尾
@@ -227,6 +229,7 @@ T0 → T1 →（T2、T3 可并行）→ T4 → T5 → T6 → T7 → T8。
 - 2026-10-25：读代码后用户确认 E12–E14：继承模式由 Host 端口告知并移除插件配置 `mode`（取代第一期 D6）；打包版入口留给自进化 V2；新包 `packages/harness-evaluation`。
 - 2026-10-25：T0 后调整（计划内的实现细节，不改已确认的决策）：`allowlist` 加 `localPorts` 与能力 `network.local-ports`；nono `run` 两个平台都用 profile 模式并加 `--no-audit --no-rollback`；“按选择启动”用方案 b，不改 harness-control 语义。
 - 2026-10-25：T4 实现时把选择文件的 `executionDigest` 改为可选（摘要绑定 Host 契约，Desktop 与 CLI 不同），兼容性由 `validateCandidate` 判断，结果报告实际运行的摘要。
+- 2026-10-25：T5 定稿接口：服务 ID 为 `harness.evaluation`；请求加可选 `executionDigest`；结果加 `error`、`cleanup`，复制失败时没有 `sandbox`。候选的 `HOME` 指向临时根目录下的 `home/`。CLI 的模型环境变量解析移到 agent-host（`resolveEnvModelProvider`），CLI 与评估端口共用。
 
 ## 执行模式
 

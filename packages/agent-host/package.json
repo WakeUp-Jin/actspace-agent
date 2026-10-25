@@ -55,7 +55,8 @@
     "@actspace/tools-image-inspection": "workspace:*",
     "@actspace/agent-service": "workspace:*",
     "@actspace/session-jsonl": "workspace:*",
-    "@actspace/sandbox": "workspace:*"
+    "@actspace/sandbox": "workspace:*",
+    "@actspace/harness-evaluation": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

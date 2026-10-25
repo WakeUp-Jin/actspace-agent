@@ -129,6 +129,53 @@
     - 已有选择历史：`HARNESS_STATE_EXISTS`。
   - `pnpm --filter @actspace/agent-cli test` 16 个通过，`@actspace/runtime` 84 个通过，`@actspace/harness-control` 28 个通过；CLI 与 runtime 的 `typecheck` 都通过。
 
+### 步骤 6：T5 `harness-evaluation` 包与 Host 评估端口
+
+- **操作**：
+  - 新包 `packages/harness-evaluation`（`@actspace/harness-evaluation`）：
+    - 清单：必需依赖 `sandbox`；Host 端口 `actspace.host.harness-evaluation` 是可选依赖，缺少时服务照常加载，`status()` 报告不可用。
+    - 插件提供服务 `harness.evaluation`。
+  - 一次评估的流程：
+    1. 先检查 `status()`：Host 端口存在，并且 `sandbox.status("evaluation")` 可用；不满足就返回 `unavailable` 及原因，不创建任何文件。
+    2. 在系统临时目录下建临时根目录，含 `data/`、`workspace/`、`out/`、`tmp/`、`scratch/`、`home/`。
+    3. 按 `sha256-…` 格式校验每个产物 ID（防止路径穿越），再从 `artifactRoot` 复制到 `data/harness-artifacts/`。
+    4. 复制工作区（符号链接原样保留，沙箱不允许写到临时根目录以外）。
+    5. 写选择文件（有 `executionDigest` 才写这个字段）和任务文件。
+    6. 调用 `sandbox.run`：
+       - `purpose: "evaluation"`；
+       - 可写目录只有临时根目录；
+       - 网络为白名单，域名、本机端口、上游代理都来自 `modelEnvironment`；
+       - 环境变量只有本进程的 `PATH`、`LANG`、`LC_ALL`，加上模型连接变量，`HOME` 与 `TMPDIR` 都指向临时根目录；
+       - 默认超时 10 分钟；`signal` 触发 `terminate()`。
+    7. 退出后读取 `out/result.json`，只校验形状（`schemaVersion`、`ok`、`status`、`exitCode`、`finalText`）。
+    8. 删除临时根目录；删除失败只记在 `cleanup` 里。
+  - agent-host 新增 `node-ports/harness-evaluation.ts`：
+    - `resolveEnvModelProvider` 从 CLI 的 `host-adapter.ts` 移过来，CLI 改为调用它，两边只保留一份解析。
+    - `evaluationModelEnvironment` 只把模型连接变量（`LLM_PROVIDER`、`LLM_API`、`<P>_BASE_URL`、`<P>_API_KEY`）传给候选：
+      - 远程模型给出 `baseUrl` 的主机名作为放行域名；
+      - 本机模型（`127.*`、`localhost`、`::1`）改为给出端口；
+      - `LLM_PROXY_URL` 转成上游代理的 `host:port`，只接受 `http://`，不传给候选。
+    - `createNodeHarnessEvaluationHostPort({ cliEntry, artifactRoot, env })`：`launcher` 为当前 Node 加上 CLI 入口。这个包不能依赖应用，所以 CLI 路径由调用方给出。第二期没有 Host 装配它，只在 T6 集成测试里使用。
+- **与计划的差异**：
+  - 服务 ID 从 `harnessEvaluation` 改为 `harness.evaluation`，因为 cordis-adapter 只接受小写加点的服务 ID，与 `harness.control` 一致。
+  - 结果加了 `error`（失败原因）和 `cleanup` 两个字段；复制阶段失败时还没有启动沙箱，所以没有 `sandbox` 字段。
+  - 候选的 `HOME` 用临时根目录下的 `home/`，不用真实 HOME：候选需要写 HOME 时只会写进临时根目录。读取限制仍按 Host 端口的真实 `homeDir` 计算，凭据目录照样禁止读取。
+- **影响文件**：`packages/harness-evaluation/**`，`packages/agent-host/{package.json,tsconfig.build.json,src/node-ports/{harness-evaluation,index}.ts,src/test/harness-evaluation-port.test.ts}`，`apps/cli/src/runtime-v2/host-adapter.ts`，`pnpm-lock.yaml`。
+- **验证**：
+  - `pnpm --filter @actspace/harness-evaluation test` 10 个通过（用假的 `SandboxService`），覆盖：
+    - 请求形状：参数、可写目录、白名单、环境变量里没有哨兵变量和 v1 的密钥；
+    - 读取的是副本，原工作区不变，结束后临时根目录为空；
+    - 摘要与 `--model` 按需传入；
+    - 候选失败、没有结果、结果不是 JSON、结果形状不对；
+    - 超时与沙箱拒绝原样返回；
+    - 中途取消与开始前已取消；
+    - 产物缺失、产物 ID 非法、工作区缺失时不启动沙箱；
+    - 不可用；
+    - 清理失败只记录。
+  - `typecheck` 通过。
+  - agent-host 61 个通过，其中新增 3 个；CLI 16 个通过，`typecheck` 通过。
+  - `pnpm check:packages` 通过（65 个包）；`pnpm check:desktop-build-graph` 通过。
+
 ## 遇到的问题
 
 - Linux 容器里第一次复验“终止无残留”失败：`ps` 显示两个 `sleep` 处于 `Z` 状态，父进程是 PID 1。容器里的 PID 1 是 `node`，它不回收被转交过来的孤儿进程，`kill(-pgid, 0)` 对僵尸进程也会成功。加 `docker run --init` 后通过。真实主机上由 init 或 systemd 回收，不受影响；Docker 复验统一加 `--init`。

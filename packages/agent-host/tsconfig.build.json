@@ -13,6 +13,9 @@
       "path": "./../cordis-adapter/tsconfig.build.json"
     },
     {
+      "path": "./../harness-evaluation/tsconfig.build.json"
+    },
+    {
       "path": "./../llm/pi-ai/tsconfig.build.json"
     },
     {

@@ -433,6 +433,9 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
+      '@actspace/harness-evaluation':
+        specifier: workspace:*
+        version: link:../harness-evaluation
       '@actspace/llm-pi-ai':
         specifier: workspace:*
         version: link:../llm/pi-ai
@@ -1136,6 +1139,28 @@ importers:
       '@actspace/session-persistence':
         specifier: workspace:*
         version: link:../session/persistence
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/harness-evaluation:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/harness-control':
+        specifier: workspace:*
+        version: link:../harness-control
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/manager
     devDependencies:
       '@types/node':
         specifier: ^24.0.3

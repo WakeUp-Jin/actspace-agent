@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { RuntimeV2LiveEvent } from "@actspace/shared/runtime-v2";
 import type { TerminalLineInput } from "../terminal-input";
 import { CliV2ApprovalBroker } from "./approval";
-import { NodeArtifactStore, NodeLlmAdapter, type NodePiAiProvider } from "@actspace/agent-host/node-ports";
+import { NodeArtifactStore, NodeLlmAdapter, resolveEnvModelProvider } from "@actspace/agent-host/node-ports";
 import { loadRuntimeV2 } from "./loader";
 import type { BootRuntimeOptions } from "@actspace/runtime";
 import type { RuntimeV2PermissionMode } from "./types";
@@ -15,7 +15,7 @@ let testCordis: BootRuntimeOptions["cordis"] | undefined;
 export function setCliV2CordisForTest(value?: BootRuntimeOptions["cordis"]): void { testCordis = value; }
 
 export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: () => void) => void; readonly kind: "cli-run"; readonly workspace: string; readonly dataRoot: string; readonly persistentArtifacts?: boolean; readonly permissionMode: RuntimeV2PermissionMode; readonly permissionModeExplicit?: boolean; readonly sandboxInherited?: boolean; readonly pinnedHarness?: import("@actspace/runtime").PinnedHarness; readonly mock: boolean; readonly model?: string; readonly input?: TerminalLineInput; readonly headlessInput?: string; readonly headlessSessionId?: string; readonly writeApproval?: (text: string) => void; readonly env?: NodeJS.ProcessEnv; readonly onLiveEvent?: (event: Omit<RuntimeV2LiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">) => void; readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void }) {
-  const runtime = await loadRuntimeV2(); const provider = resolveCliProvider(options.env ?? process.env);
+  const runtime = await loadRuntimeV2(); const provider = resolveEnvModelProvider(options.env ?? process.env);
   const host = { hostKind: options.kind, capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const, runtimeContract: "actspace.runtime.v2" as const, invocationId: randomUUID(), workspaceRef: options.workspace };
   // The trusted CLI assembly is now a checked-in cordis.yml tree. External
   // plugin admission remains an explicit future surface; the default run does
@@ -75,14 +75,6 @@ export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: (
 function titleFromInput(value: string): string {
   const normalized = value.trim().replace(/\s+/g, " ");
   return normalized.length <= 48 ? normalized : `${normalized.slice(0, 47)}...`;
-}
-
-function resolveCliProvider(env: NodeJS.ProcessEnv): NodePiAiProvider {
-  const providerId = (env.LLM_PROVIDER ?? "deepseek").toLowerCase();
-  const route = env.LLM_API === "openai-responses" || env.LLM_API === "anthropic-messages" ? env.LLM_API : "openai-completions";
-  const prefix = providerId.toUpperCase();
-  const baseUrl = env[`${prefix}_BASE_URL`] ?? (providerId === "kimi" ? "https://api.moonshot.cn/v1" : providerId === "openrouter" ? "https://openrouter.ai/api/v1" : "https://api.deepseek.com");
-  return Object.freeze({ providerId, route, baseUrl, apiKey: env[`${prefix}_API_KEY`], ...(env.LLM_PROXY_URL === undefined ? {} : { proxyUrl: env.LLM_PROXY_URL }) });
 }
 
 function onceAsync(dispose: () => Promise<void>): () => Promise<void> {
