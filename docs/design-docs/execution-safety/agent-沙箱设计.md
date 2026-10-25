@@ -1,6 +1,6 @@
 # 沙箱设计
 
-> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二、三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
+> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二期（评估沙箱）设计 2026-10-25 确认，计划见 [20261025-sandbox-v2-evaluation-sandbox](../../exec-plans/active/20261025-sandbox-v2-evaluation-sandbox.md)；第三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
 
 ## 1. 结论
 
@@ -24,7 +24,7 @@
 | 期 | 范围 | 平台 | 后端 |
 |---|---|---|---|
 | 第一期 | 全部地基 + 工具沙箱 | macOS、Linux | nono（`wrap`）、Seatbelt |
-| 第二期 | 评估沙箱 | macOS、Linux | nono（`run`，域名代理） |
+| 第二期 | 评估沙箱（沙箱能力 + 最小使用方；评估用例、打分与 apply 门槛属于自进化 V2） | macOS、Linux | nono（`run`，域名代理） |
 | 第三期 | Windows 的工具沙箱与评估沙箱 | Windows | 原生后端或 `sandbox-srt` |
 
 第三期之前，Windows 上没有可用后端，bash 调用按“沙箱外执行”走审批。
@@ -42,7 +42,7 @@ flowchart TD
     HOST --> N
     HOST --> S
     BASH["shell-tools<br/>可选依赖 sandbox"] -->|run| M
-    EVAL["自进化评估（第二期）"] -.->|run| M
+    EVAL["harness-evaluation（第二期）<br/>启动候选 Harness"] -->|run| M
 ```
 
 | 插件 | 提供 | 依赖 |
@@ -51,6 +51,7 @@ flowchart TD
 | `sandbox-nono` | 向管理器注册 nono 后端 | `sandbox`、Host 进程端口（含 nono 路径） |
 | `sandbox-seatbelt` | 向管理器注册 Seatbelt 后端 | `sandbox`、Host 进程端口 |
 | 以后的 `sandbox-windows` / `sandbox-srt` | 同上 | 同上 |
+| `harness-evaluation`（第二期，使用方） | `harnessEvaluation` 服务：在评估沙箱里启动候选 Harness，取回结果 | `sandbox`（必需，拿不到就拒绝）、Host 评估端口（启动入口、模型连接） |
 
 - **Host 只提供资源，不决定用不用沙箱。** Host 进程端口提供最基础的能力：起进程、按进程组发信号、告诉插件 nono 程序在哪里。仓库约定只有 Host 侧代码直接起子进程，Harness 插件通过端口获得能力，沙箱插件也遵守这一点。
 - **后端可以热插拔。** 后端插件启动时调用 `sandbox.register(backend)`，插件释放时自动注销。
@@ -61,14 +62,18 @@ flowchart TD
 
 ### 4.1 执行请求描述需求
 
-| 字段 | 含义 | 第一期 |
-|---|---|---|
-| `purpose` | `tool` / `evaluation` | 两个取值都在契约里，模板只实现 `tool` |
-| `argv`、`cwd`、`env` | 程序与参数（数组）、工作目录、环境变量 | 实现 |
-| `filesystem` | 读写、只读、禁止读取、禁止写入的路径 | 实现 |
-| `network` | `unrestricted` / `blocked` / `allowlist`（域名列表） | 实现前两种；`allowlist` 在契约中，后端都报告 `unsupported` |
-| `timeoutMs` | 整次执行的最长时间 | 实现 |
-| `requiredCapabilities` | 缺了就不能执行的能力 | 实现 |
+| 字段 | 含义 | 第一期 | 第二期 |
+|---|---|---|---|
+| `purpose` | `tool` / `evaluation` | 模板只实现 `tool` | 实现 `evaluation` 模板 |
+| `argv`、`cwd`、`env` | 程序与参数（数组）、工作目录、环境变量 | 实现 | — |
+| `filesystem` | 读写、只读、禁止读取、禁止写入的路径 | 实现 | — |
+| `network` | `unrestricted` / `blocked` / `allowlist`（域名列表，可带上游代理 `upstreamProxy`） | 实现前两种 | 实现 `allowlist` 与上游代理（nono `run`） |
+| `network.credentials` | 由沙箱外代理注入的凭据（候选只拿到替身 token） | — | 契约预留，后端报告 `unsupported` |
+| `limits` | 内存、CPU 时间上限 | — | 契约预留，后端报告 `unsupported` |
+| `timeoutMs` | 整次执行的最长时间 | 实现 | — |
+| `requiredCapabilities` | 缺了就不能执行的能力 | 实现 | — |
+
+第二期只做加法：新字段都是可选的，没有用到它们的第一期调用不受影响。
 
 ### 4.2 策略合并
 
@@ -86,6 +91,9 @@ flowchart TD
 | `network.blocked` | 完全断网 |
 | `network.allowlist` | 只放行指定域名 |
 | `process.inherit` | 后代进程继承限制 |
+| `network.upstream-proxy` | 放行的流量再转给上游代理（第二期） |
+| `network.credential-injection` | 沙箱外注入凭据（契约预留） |
+| `process.resource-limits` | 内存、CPU 时间上限（契约预留） |
 
 只有覆盖全部必需能力（`full`）的后端才会被选中，选择顺序按注册优先级（nono 先于 Seatbelt）。没有合格的后端就返回“不可用”和每个后端不合格的原因。
 
@@ -104,18 +112,21 @@ flowchart TD
 
 ### 4.6 继承外层沙箱
 
-管理器支持“继承”模式：已经运行在外层沙箱里（第二期的评估沙箱）时，不再启动新沙箱，命令直接执行，结果标明 `inherited`。这个模式**只能由显式配置打开**（管理器插件配置，第二期由 CLI 启动参数传入），不读取环境变量。如果读取环境变量，用户环境里设了同名变量就能关掉沙箱。
+管理器支持“继承”模式：已经运行在外层沙箱里（第二期的评估沙箱）时，不再启动新沙箱，命令直接执行，结果标明 `inherited`。这个模式**只能由 Host 的显式启动参数打开**：CLI 的 `--sandbox-inherited` 写进 Host 沙箱端口（`inherited: true`），管理器从端口读取。
+
+- 不读取环境变量：否则用户环境里设了同名变量就能关掉沙箱。
+- 不放在管理器插件配置里（第一期的做法，第二期移除）：插件配置属于 Harness 组合，自进化产生的候选组合可以带上它，在普通 App 里悄悄关掉工具沙箱；而且启动候选时改写它的配置，评估的版本就和最终 apply 的版本不一致了。“是否已在外层沙箱里”是 Host 知道的事实，由 Host 告知。
 
 ## 5. 后端
 
 ### 5.1 nono（macOS、Linux）
 
 - 工具沙箱用 `nono wrap`：nono 施加限制后直接变成目标命令，不留常驻进程。用户在 Mac 上实测，比直接用 Seatbelt 每次多 4–5ms。我们拿到的进程号就是目标命令本身，终止进程组即可覆盖后代进程。
-- `nono run` 留给评估沙箱：supervisor 在 Mac 上让短命令多出约 200ms、多占约 17MB，但能提供域名代理、凭证注入、审计和回滚。后端契约里同时有两种模式，第一期只实现 `wrap`。
+- 评估沙箱用 `nono run`：supervisor 在 Mac 上让短命令多出约 200ms、多占约 17MB，但能提供域名代理、凭证注入、审计和回滚。请求的网络为 `allowlist` 时后端改用 `run`：`--allow-domain` 逐个放行，`--upstream-proxy` 把放行的流量转给上游代理。nono 会给子进程设置 `HTTPS_PROXY` 与 `NODE_USE_ENV_PROXY`；Node 22.22（系统 Node 与 Electron 39 自带的 Node）的 `fetch` 实测会走这个代理。
 - 策略用配置文件一次性给出，不拼命令行参数：Linux 用权限清单（`-c`），macOS 用 profile（`-p`）。原因是 nono 权限清单的 `deny` 不生效，只有 macOS profile 的 Seatbelt 规则能在可写的工作区里禁止写入 `.git/hooks`、`.git/config`。
 - “全部可读，减去凭据目录”用拆分覆盖表达：从 `/` 开始，不含排除路径的目录整体授权，含排除路径的展开子项。nono 不允许授权它自己状态目录的上级（`/`、`$HOME`），拆分覆盖同时绕开这个限制。单独授权的符号链接若指向排除路径之内或之上就跳过，因为 nono 按链接目标授权。
 - macOS 上拆分只绕开 nono 状态目录，禁止读取写成 `(deny file-read* …)` 规则：把禁止读取的路径也拆开会让授权条目从约 110 条涨到约 1100 条，nono 每次启动从约 40ms 涨到约 900ms。Linux 只能靠不授权来禁止读取。
-- Linux（Landlock）无法在可写目录里挖出只读子目录，`filesystem.write-deny` 报告 `unsupported`，第一期 Linux 上 nono 不合格，bash 走审批。
+- Linux（Landlock）无法在可写目录里挖出只读子目录，`filesystem.write-deny` 报告 `unsupported`，第一期 Linux 上 nono 不合格，bash 走审批。评估沙箱只写副本与临时目录，不需要这项能力，Linux 上可以使用。
 - 启动 nono 时去掉所有 `NONO_*` 环境变量，它们会改变 nono 的授权。
 - 分发：打包 `aarch64/x86_64-apple-darwin` 与 `aarch64/x86_64-unknown-linux-gnu` 四个版本，锁定版本号、校验 SHA256，macOS 上随应用签名。nono 采用 Apache-2.0 许可证。
 - 只按明确的路径查找 nono：打包版只认随包的 `resources/app/sandbox-components/bin/nono`；开发版依次是 `ACTSPACE_NONO_PATH`、仓库 `dist/sandbox-components/<platform>-<arch>/nono`（`pnpm sandbox:fetch-nono` 获取）。不在 PATH 里查找，系统里装的也不用：版本无法保证一致，也无法确认是否被替换过。
@@ -139,14 +150,29 @@ Windows 后端在能力表里如实报告 `partial` / `unsupported`。初步方�
 
 ## 6. 评估沙箱（第二期）
 
+第二期只做评估沙箱这套能力，加一个最小的使用方 `harness-evaluation` 把它跑通。评估哪些用例、怎么打分、怎么拦住 apply，属于自进化 V2，另行立项。
+
+```mermaid
+flowchart LR
+    V1["v1：harness-evaluation<br/>准备临时目录 · 复制产物 · 写选择文件"] -->|"sandbox.run(purpose: evaluation)"| NONO["nono run<br/>域名白名单 · 上游代理"]
+    NONO --> CLI["候选 v2：CLI run<br/>--harness · --sandbox-inherited · full-access"]
+    CLI -->|模型请求| PROXY["nono 代理"] --> MODEL["模型服务"]
+    CLI -->|"写 --out 结果文件"| OUT["临时目录"]
+    OUT -->|"沙箱退出后读取"| V1
+```
+
 - **为什么要整体放进沙箱**：自进化会整体替换 Harness，候选版本可能带新的插件代码和依赖，所以整个候选 Harness 进程都要受限。
-- **层级**：正在运行的 Harness（v1）通过自己的 `sandbox` 服务，以 `purpose: evaluation` 启动候选版本 v2 的子进程。v2 与主应用平级，不包在主应用外面。
-- **启动方式**：通过 CLI（`packages/headless`）启动候选 Harness，并传入“继承外层沙箱”参数（4.6）。
-- **嵌套**：v2 内的管理器处于继承模式，bash 不再另起沙箱。
-- **网络**：用 `network.allowlist` 只放行模型服务，由 nono `run` 的代理实现。
-- **密钥**：通过环境变量注入。候选进程能读到它，所以建议使用单独的、设了额度上限的 key。
-- **评分器**：先放在评估沙箱里面。风险已知：候选版本可能修改评分器或分数。以后可以改为由 v1 在沙箱退出后读取结果文件打分。
-- **接入点**：自进化 V1 已经实现（`packages/plugin-manager`、`packages/harness-hmr`，见[自进化的方案设计](../自进化的方案设计/README.md)），流程是 build → prepare → apply。评估沙箱插在 prepare 与 apply 之间：评估通过才允许 apply。
+- **层级**：v1 的 `harness-evaluation` 通过 `sandbox` 服务，以 `purpose: evaluation` 启动候选 v2 的子进程。v2 与主应用平级，不包在主应用外面。
+- **启动方式**：CLI `run` 加两个参数：`--harness <选择文件>` 用指定的候选组合与产物启动（不写入持久选择）；`--sandbox-inherited` 打开继承模式（4.6）。启动入口与 Node 程序由 Host 评估端口提供；打包版 Desktop 暂不带 CLI，第二期只在开发环境与 CLI 中可用，打包版入口随自进化 V2 一起做。
+- **文件系统**：候选只能写本次评估的临时目录：独立的 dataRoot（候选需要的产物复制进去）、工作区副本、结果目录、临时目录。原工作区与主应用数据只读，凭据目录不能读。不禁止写入 `.git`，所以不需要 `filesystem.write-deny`，Linux 上也能用。第二期的使用方只用临时测试工作区；真实工作区怎么复制留给自进化 V2（git worktree 会写原仓库的 `.git`，多半要用文件复制）。
+- **网络**：`network.allowlist` 只放行模型服务域名，由 Host 根据模型连接的 `baseUrl` 推出。模型连接配置了代理时，代理地址交给 nono 的 `--upstream-proxy`，候选环境里去掉代理配置。
+- **环境变量**：评估不继承 v1 的进程环境，只给最小集合（`PATH`、`HOME`、语言设置）加 Host 给出的模型连接变量。
+- **密钥**：第二期通过环境变量传给候选，候选能读到它。契约里预留 `network.credentials`，以后改由 nono 反向代理注入，候选只拿到替身 token。
+- **权限**：候选以 `full-access` 运行，无人值守不能弹审批；外层是评估沙箱，里面的 bash 处于继承模式直接执行，结果标为 `inherited`。
+- **评分**：候选只写结果文件（CLI `--out`），v1 在沙箱退出后读取并校验。第二期不打分，只返回结果；打分属于自进化 V2，且放在沙箱外。
+- **超时与资源**：默认 10 分钟；超时与取消复用第一期的进程组终止与残留检查。内存、CPU 上限 nono 做不了，报告 `unsupported`，第二期不实现。
+- **不可用时**：Seatbelt 做不了域名白名单，没有可用的 nono 时评估沙箱不可用，直接拒绝评估，不转审批：评估跑的是整个 Harness，风险比单条 bash 大得多。
+- **接入点**：自进化 V1 已经实现（`packages/plugin-manager`、`packages/harness-hmr`，见[自进化的方案设计](../自进化的方案设计/README.md)），流程是 build → prepare → apply。自进化 V2 把评估插在 prepare 与 apply 之间：评估通过才允许 apply。
 
 ## 7. 排除的方案
 
@@ -155,7 +181,9 @@ Windows 后端在能力表里如实报告 `partial` / `unsupported`。初步方�
 - **Windows 上用 nono**：nono 没有原生 Windows 后端，上游方案 NEP-0005 还是草案。通过 WSL2 使用要求用户安装 WSL2，而且 bash 会在 Linux 环境里执行，用不上用户的 Windows 工具链。
 - **`nono-ts`**、**在 PATH 中查找 nono**：原因见 5.1。
 - **沙箱不可用时悄悄执行**：调用方会误以为命令是受限的。
-- **用环境变量判断嵌套**：原因见 4.6。
+- **用环境变量判断嵌套**、**用管理器插件配置打开继承模式**：原因见 4.6。
+- **评分器放在评估沙箱里**：候选可能改分数；改为候选只写结果文件，v1 在沙箱外读取。
+- **没有 nono 时转审批、在真实环境里评估**：评估跑的是整个 Harness，直接拒绝。
 
 ## 8. 实测结论（2026-10-25，nono 0.80.0）
 
