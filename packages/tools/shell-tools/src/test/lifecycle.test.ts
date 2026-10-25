@@ -4,8 +4,14 @@ import { join } from "node:path";
 import { CordisContextClass } from "@actspace/cordis-adapter";
 import { describe, expect, it } from "vitest";
 import { ToolRuntime } from "@actspace/tools-runtime";
+import type { SandboxService } from "@actspace/sandbox/types";
 import { apply, registerTools, TOOL_DEFINITIONS } from "../plugin.js";
 import { manifest } from "../manifest.js";
+
+/** Only `status` matters for permissions; running is covered in node-ports.test.ts. */
+function sandboxWithStatus(available: boolean): SandboxService {
+  return { register: () => () => undefined, status: async () => ({ available, isolation: "sandboxed", reasons: available ? [] : ["no backend"] }), run: () => { throw new Error("unused"); } };
+}
 
 describe("shell-tools lifecycle", () => {
   it("allows full-access Bash after hard guards while default mode still asks", async () => {
@@ -20,6 +26,22 @@ describe("shell-tools lifecycle", () => {
       expect(await policy.evaluate({ command: "rm -rf /" }, [], { ...context, mode })).toMatchObject({ kind: "deny" });
     }
     for (const item of registrations) await item.handle.dispose();
+  });
+  it.each([["no sandbox service", undefined], ["an unavailable sandbox", sandboxWithStatus(false)]] as const)("asks to run outside the sandbox with %s", async (_label, sandbox) => {
+    const dir = await mkdtemp(join(tmpdir(), "bash-nosandbox-"));
+    try {
+      const root = await realpath(dir);
+      const runtime = new ToolRuntime(); registerTools(runtime, {}, sandbox);
+      const policy = runtime.registry.capture("bash").permission;
+      const args = { command: "pnpm test" };
+      const resources = await policy.extractResources(args, { workspaceRoot: root, canonicalizeFile: async () => { throw new Error("unused"); } });
+      expect(resources).toMatchObject([{ kind: "process", noSandbox: true }]);
+      expect(resources[0]).not.toHaveProperty("grantPrefix");
+      const permissionContext = { workspaceRoot: root, hostCapabilities: ["process"] };
+      expect(await policy.evaluate(args, resources, { ...permissionContext, mode: "default" })).toMatchObject({ kind: "ask", reusable: false });
+      expect(await policy.evaluate(args, resources, { ...permissionContext, mode: "full-access" })).toMatchObject({ kind: "allow" });
+      expect(await policy.suggestGrants!(args, resources, { ...permissionContext, mode: "default" })).toEqual([]);
+    } finally { await rm(dir, { recursive: true, force: true }); }
   });
   it("owns its manifest, registers exactly its tools, rejects duplicates and disposes", async () => {
     const runtime = new ToolRuntime();
@@ -42,12 +64,13 @@ it("offers grants only for canonical in-workspace literal commands and retains h
     const root = join(dir, "workspace");
     const outside = join(dir, "outside");
     await mkdir(root); await mkdir(outside); await symlink(outside, join(root, "escape"));
-    const runtime = new ToolRuntime(); registerTools(runtime, {});
+    const runtime = new ToolRuntime(); registerTools(runtime, {}, sandboxWithStatus(true));
     const policy = runtime.registry.capture("bash").permission;
     const context = { workspaceRoot: root, canonicalizeFile: async () => { throw new Error("unused"); } };
     const permissionContext = { workspaceRoot: root, mode: "default" as const, hostCapabilities: ["process"] };
     for (const args of [{ command: "pnpm test" }, { command: "pnpm test", cwd: "escape" }, { command: "pnpm test", requiredPermissions: ["no_sandbox"] }, { command: "pnpm test && pnpm build" }, { command: "pnpm dlx x" }]) {
       const resources = await policy.extractResources(args, context);
+      expect(resources).toMatchObject([{ noSandbox: "requiredPermissions" in args }]);
       const suggestions = await policy.suggestGrants!(args, resources, permissionContext);
       expect(suggestions.length).toBe(Object.keys(args).length === 1 && args.command === "pnpm test" ? 1 : 0);
       if (suggestions.length) expect(suggestions[0]?.selector).toMatchObject({ cwdRoot: await realpath(root) });

@@ -19,7 +19,7 @@ export const DEFAULT_HARNESS_ENTRIES = [
   ["context-disclosure", ["context.disclosure"], ["context.engine", "actspace.host.agent"]],
   ["compaction-runtime", ["compaction.runtime", "compaction.surface"], ["llm.service", "context.engine", "llm.auxiliary-requests"]],
   ...["filesystem-read", "filesystem-search", "filesystem-write", "web-tools", "image-generation"].map((id): DefaultHarnessEntry => [id, [`tools.${id}`], ["tools.runtime", `actspace.host.tools.${id}`]]),
-  ["shell-tools", ["tools.shell-tools"], ["tools.runtime", "actspace.host.tools.shell-tools", "actspace.host.background-tasks"]],
+  ["shell-tools", ["tools.shell-tools"], ["tools.runtime", "actspace.host.tools.shell-tools", "actspace.host.background-tasks"], [{ id: "sandbox", fallback: "bash runs outside the sandbox after approval" }]],
   ["image-inspection", ["tools.image-inspection"], ["tools.runtime", "llm.service", "llm.auxiliary-requests", "actspace.host.tools.image-inspection"]],
   ["todo-tools", ["tools.todo"], ["tools.runtime", "session.runtime"]],
   ["browser-tools", ["tools.browser"], ["tools.runtime"]],

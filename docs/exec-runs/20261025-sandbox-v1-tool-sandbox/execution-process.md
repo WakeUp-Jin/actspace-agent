@@ -80,6 +80,21 @@
 - **影响文件**：`packages/cordis-adapter/src/{cordis-tree,manifest,service-contract}.ts`、`packages/{bundle,composition,boot}/src/*`、`packages/runtime/{cordis.yml,package.json,tsconfig.build.json}`、`packages/runtime/src/{harness,profiles,startup}/*`、`packages/sandbox/*/src/{node-ports,index}.ts` 与 `test/lifecycle.test.ts`、`packages/agent-host/src/node-ports/tool-host-services.ts`、`apps/desktop/src/main/{index,sandbox-resources}.ts`、`apps/desktop/src/main/runtime-v2/{tool-host-services,desktop-host-adapter,runtime-registry}.ts`。
 - **验证**：cordis-adapter 39 通过 / 1 跳过；composition 15、boot 22、runtime 84、agent-host 58、agent-cli 13 通过；Desktop 2025 通过 / 7 跳过，`typecheck` 通过；sandbox 27、sandbox-nono 11 通过 / 4 跳过（无 `ACTSPACE_NONO_PATH`）、sandbox-seatbelt 7 通过；`check:packages`、`check:desktop-build-graph` 通过。默认 Harness 构建产出 `sandbox*.js` 三个入口，`@actspace/sandbox/types` 被打进共享块。`test:contract-matrix` 仍有失败（矩阵未登记三个沙箱包），按计划在 T8 处理。
 
+### 步骤 7：T6 shell-tools 接入沙箱
+
+- **操作**：
+  - 清单 `optionalInjects: ["sandbox"]`，默认 Harness 条目带回退说明 `bash runs outside the sandbox after approval`；`HostPort.createPorts(background, sandbox)`，Desktop 与 agent-host 把服务传给 `createNodeBashToolPorts`。
+  - 权限：进程资源的 `noSandbox` = 显式 `no_sandbox` 或 `!(await sandbox?.status("tool"))?.available`；为 `true` 时没有前缀授权建议。
+  - 执行：`createNodeBashToolPorts` 删除 `sandbox?: boolean`，改收 `SandboxService`。`noSandbox` 取自 `context.admittedResources` 里批准的进程资源（没有资源的直接调用方只认显式 `no_sandbox`）。沙箱内执行走 `sandbox.run({ isolation: "sandboxed", readWrite: [工作区, 输出目录, 系统临时目录], TMPDIR=输出目录, scratchDir=输出目录 })`，路径都取真实路径；`.git/hooks`、`.git/config` 的禁止写入由 `tool` 模板派生。批准在沙箱外执行时，有服务走 `isolation: "none"`，没有服务用 `spawnHostProcess` 直接启动并自带进程组终止。需要沙箱但没有服务、没有可用后端或后端准备失败时，返回 `SANDBOX_PREPARE_FAILED` 并列出原因，命令不执行；后台任务把原因写进输出文件并作为结束摘要。
+  - `ProcessHandle` 改为消费执行接口的输出与结果，保留输出文件、头部截断与磁盘上限；摘要为 `sandboxed=…, sandbox=<backendId|inherited|none>`。删除 `sandboxSpawn`、`probeSandbox`、`SANDBOX_PROBE_TIMEOUT_MS`、`signalProcess`。
+- **与计划的差异**：
+  1. 计划要求插件在 `apply` 中缓存一次 `status`；实现为每次提取资源时调用 `status("tool")`。探测结果已由管理器按后端缓存，后端注册或注销时自然更新，不需要插件再维护一份缓存。
+  2. 计划写的是执行时用“有效 noSandbox”；实现为执行端只认批准时的进程资源。这样批准时有沙箱、执行时沙箱不可用的情况会返回 `SANDBOX_PREPARE_FAILED`，不会静默在沙箱外执行；参数里夹带 `no_sandbox` 也不能绕过批准结果。
+  3. `terminate()` 不带参数（管理器接口如此，取消与超时由调用方区分）。
+  4. 计划之外补了真实后端集成测试：macOS 上经 shell-tools 用 Seatbelt 与仓库内 nono 执行，工作区内写入与 `git status` 成功，写 `~` 下文件与 `.git/hooks/pre-commit` 失败且文件不存在。
+- **影响文件**：`packages/tools/shell-tools/{package.json,src/manifest.ts,src/plugin.ts,src/node-ports.ts,src/test/*}`、`packages/runtime/src/harness/default-harness-definition.ts`、`apps/desktop/src/main/runtime-v2/tool-host-services.ts`、`apps/desktop/src/main/test/runtime-v2-output-reference-flow.test.ts`、`packages/agent-host/src/node-ports/tool-host-services.ts`、`tsconfig` 依赖图。
+- **验证**：shell-tools 109 通过（含 Seatbelt、nono 真实后端各 1 个），`typecheck` 通过；tools-runtime 47、runtime 84、agent-host 58、agent-cli 13 通过；Desktop 2025 通过 / 7 跳过，`typecheck` 通过；`check:packages`、`check:desktop-build-graph` 通过。
+
 ## 遇到的问题
 
 - **问题**：权限清单的 `deny` 不生效。

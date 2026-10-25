@@ -1,11 +1,11 @@
-import { spawn, type ChildProcessByStdio } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { createWriteStream, existsSync } from "node:fs";
+import { createWriteStream } from "node:fs";
 import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import type { Readable } from "node:stream";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { spawnHostProcess } from "@actspace/sandbox/node-ports";
+import type { HostProcessSpec, SandboxExecution, SandboxRequest, SandboxResult, SandboxService } from "@actspace/sandbox/types";
 import type { BackgroundTaskHost, BackgroundTaskTerminal } from "@actspace/background-tasks";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tools-runtime";
 import { redactToolText } from "@actspace/tools-runtime";
@@ -19,12 +19,10 @@ const MAX_BLOCK_MS = 600_000;
 const MAX_RUNTIME_MS = 30 * 60_000;
 const MAX_BACKGROUND_PER_SESSION = 8;
 const KILL_GRACE_MS = 500;
-const SANDBOX_PROBE_TIMEOUT_MS = 3_000;
 const MAX_SUBSCRIPTION_PATTERN_LENGTH = 500;
 const MIN_SUBSCRIPTION_DEBOUNCE_MS = 5_000;
 const MAX_MONITOR_LINE_CHARS = 4_000;
 const NOTIFICATION_TAIL_CHARS = 2_000;
-let sandboxProbe: Promise<boolean> | undefined;
 
 export type NodeBashToolPorts = Pick<ToolPorts, "bash"> & {
   readonly hasRunningBackgroundTask: (sessionId: string) => boolean;
@@ -32,8 +30,13 @@ export type NodeBashToolPorts = Pick<ToolPorts, "bash"> & {
   readonly forceTerminate: () => void;
 };
 
-/** `background` is the Host task registry; it owns notifications, `task_*` queries and persisted status. */
-export function createNodeBashToolPorts(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly sandbox?: boolean; readonly background?: BackgroundTaskHost }): NodeBashToolPorts {
+type BashOptions = { readonly workspaceRoot: string; readonly tmpRoot: string; readonly sandbox?: SandboxService; readonly background?: BackgroundTaskHost };
+
+/**
+ * `background` is the Host task registry; it owns notifications, `task_*` queries and persisted status.
+ * `sandbox` is the Harness sandbox service. Without it only commands admitted with `noSandbox` run.
+ */
+export function createNodeBashToolPorts(options: BashOptions): NodeBashToolPorts {
   const registry = new BashTaskRegistry(join(options.tmpRoot, "bash-v2", randomUUID()), options.background);
   return Object.freeze({
     bash: (args, context) => executeBash(args, context, options, registry),
@@ -46,7 +49,7 @@ export function createNodeBashToolPorts(options: { readonly workspaceRoot: strin
 async function executeBash(
   args: Readonly<Record<string, RuntimeV2JsonValue>>,
   context: ToolExecutionContext,
-  options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly sandbox?: boolean },
+  options: BashOptions,
   registry: BashTaskRegistry,
 ): Promise<ToolBodyResult> {
   const command = stringArg(args, "command");
@@ -62,16 +65,23 @@ async function executeBash(
   if (duplicate !== undefined) return backgrounded(duplicate, "already_running");
   if (registry.running(context.sessionId) >= MAX_BACKGROUND_PER_SESSION) return failed("BASH_TASK_LIMIT", `Background task limit reached (${MAX_BACKGROUND_PER_SESSION}).`, false);
 
+  const noSandbox = admittedNoSandbox(args, context);
+  if (!noSandbox && !options.sandbox) return failed("SANDBOX_PREPARE_FAILED", "Bash needs the sandbox, but the sandbox plugin is not loaded. The command did not run; request no_sandbox to run it outside the sandbox after approval.", false);
+
   const outputRoot = registry.outputRoot;
   await mkdir(outputRoot, { recursive: true, mode: 0o700 });
   const outputPath = join(outputRoot, `${randomUUID()}.log`);
   await writeFile(outputPath, "", { encoding: "utf8", mode: 0o600 });
-  const wantsSandbox = options.sandbox !== false && !arrayStrings(args.requiredPermissions).includes("no_sandbox");
-  const spawnSpec = wantsSandbox ? await sandboxSpawn(command, workspaceRoot, outputRoot) : { command: process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", args: ["-lc", command], env: process.env, sandboxed: false };
-  const sandboxed = spawnSpec.sandboxed;
   if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
+  const argv = [process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", "-lc", command];
+  const run = !options.sandbox
+    ? directRun({ command: argv[0]!, args: argv.slice(1), cwd: realCwd, env: process.env })
+    : options.sandbox.run(noSandbox
+      ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env: process.env, scratchDir: outputRoot }
+      : await sandboxedRequest(argv, realCwd, workspaceRoot, outputRoot));
+  const sandboxed = !noSandbox;
   const monitor = new OutputMonitor(subscription);
-  const processHandle = new ProcessHandle(spawnSpec.command, spawnSpec.args, realCwd, spawnSpec.env, outputPath, monitor.handleChunk);
+  const processHandle = new ProcessHandle(run, outputPath, monitor.handleChunk);
   registry.own(processHandle);
   const abort = () => processHandle.kill();
   context.signal.addEventListener("abort", abort, { once: true });
@@ -82,7 +92,7 @@ async function executeBash(
       processHandle.wait.then(() => true),
       boundary.promise,
     ]);
-    if (completedInTime || processHandle.settled) { monitor.dispose(); return foreground(command, realCwd, await processHandle.wait, processHandle.outputPath, sandboxed, context); }
+    if (completedInTime || processHandle.settled) { monitor.dispose(); return foreground(command, realCwd, await processHandle.wait, processHandle.outputPath, context); }
     const task = await registry.register({ sessionId: context.sessionId, callId: context.callId, command, intent: stringArg(args, "intent") || undefined, cwd: realCwd, outputPath, process: processHandle, sandboxed, monitor, subscription, reportProgress: context.reportProgress });
     return backgrounded(task, blockMs === 0 ? "explicit" : "block_timeout");
   } finally {
@@ -91,28 +101,40 @@ async function executeBash(
   }
 }
 
-type ProcessStatus = { readonly exitCode: number | null; readonly signal: NodeJS.Signals | null; readonly output: string; readonly totalChars: number; readonly truncated: boolean; readonly durationMs: number; readonly startError?: string; readonly outputError?: string };
+type ProcessStatus = {
+  readonly exitCode: number | null;
+  readonly signal: NodeJS.Signals | null;
+  /** Stopped by cancellation, a limit, or the Harness unloading. */
+  readonly stopped: boolean;
+  /** The command never started; for sandboxed runs these are the sandbox's reasons. */
+  readonly notStarted?: readonly string[];
+  readonly isolation: SandboxResult["facts"]["isolation"];
+  /** `<backend id>`, `inherited` or `none`, as reported in summaries. */
+  readonly sandbox: string;
+  readonly output: string;
+  readonly totalChars: number;
+  readonly truncated: boolean;
+  readonly durationMs: number;
+  readonly outputError?: string;
+};
+type BashRun = Pick<SandboxExecution, "onOutput" | "terminate" | "forceTerminate" | "result">;
 
+/** Output file, inline head and disk cap over one run, sandboxed or not. */
 class ProcessHandle {
-  readonly child: ChildProcessByStdio<null, Readable, Readable>;
   readonly wait: Promise<ProcessStatus>;
   #settled = false;
-  #killTimer: ReturnType<typeof setTimeout> | undefined;
   get settled(): boolean { return this.#settled; }
 
-  constructor(command: string, args: readonly string[], cwd: string, env: NodeJS.ProcessEnv, readonly outputPath: string, onChunk?: (text: string) => void) {
+  constructor(private readonly run: BashRun, readonly outputPath: string, onChunk?: (text: string) => void) {
     const startedAt = Date.now();
-    this.child = spawn(command, [...args], { cwd, env, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
     this.wait = new Promise((resolveStatus) => {
       let head = "";
       let totalChars = 0;
       let truncated = false;
-      let startError: string | undefined;
       let outputError: string | undefined;
       let writtenChars = 0;
       const output = createWriteStream(this.outputPath, { flags: "a", encoding: "utf8" });
-      const chunk = (value: Buffer) => {
-        const text = value.toString("utf8");
+      run.onOutput(({ text }) => {
         onChunk?.(text);
         totalChars += text.length;
         if (head.length < INLINE_OUTPUT_CHARS) head += text.slice(0, INLINE_OUTPUT_CHARS - head.length);
@@ -123,42 +145,64 @@ class ProcessHandle {
           writtenChars += slice.length;
         }
         if (text.length > room) { truncated = true; this.kill(); }
-      };
-      this.child.stdout.on("data", chunk);
-      this.child.stderr.on("data", chunk);
-      this.child.once("error", (error) => { startError = error.message; });
+      });
       output.once("error", (error) => { outputError = error.message; this.kill(); });
-      this.child.once("close", (exitCode, signal) => {
-        if (this.#settled) return;
+      void run.result.catch((error: unknown): SandboxResult => ({ outcome: { status: "prepare_failed", reasons: [error instanceof Error ? error.message : String(error)] }, facts: { isolation: "none", cleanup: "ok" } })).then(({ outcome, facts }) => {
         this.#settled = true;
-        if (this.#killTimer !== undefined) clearTimeout(this.#killTimer);
-        const finish = () => resolveStatus({ exitCode, signal, output: head, totalChars, truncated, durationMs: Date.now() - startedAt, ...(startError === undefined ? {} : { startError }), ...(outputError === undefined ? {} : { outputError }) });
+        const notStarted = outcome.status === "prepare_failed" ? outcome.reasons : undefined;
+        // task_output and the completion notice read the file, so a run that never started explains itself there.
+        if (notStarted && !output.destroyed) output.write(`[command did not start]\n${notStarted.join("\n")}\n`);
+        const exit = outcome.status === "prepare_failed" ? { exitCode: null, signal: null } : { exitCode: outcome.exitCode, signal: outcome.signal };
+        const sandbox = facts.isolation === "sandboxed" ? facts.backend?.id ?? "unselected" : facts.isolation;
+        const finish = () => resolveStatus({ ...exit, stopped: outcome.status === "cancelled" || outcome.status === "timed_out", isolation: facts.isolation, sandbox, output: head, totalChars, truncated, durationMs: Date.now() - startedAt, ...(notStarted === undefined ? {} : { notStarted }), ...(outputError === undefined ? {} : { outputError }) });
         if (output.destroyed) finish();
         else output.end(finish);
       });
     });
   }
 
-  kill(): void {
-    if (this.#settled) return;
-    signalProcess(this.child, "SIGTERM");
-    if (this.#killTimer !== undefined) return;
-    this.#killTimer = setTimeout(() => signalProcess(this.child, "SIGKILL"), KILL_GRACE_MS);
-    this.#killTimer.unref?.();
-  }
-
-  forceTerminate(): void {
-    if (this.#settled) return;
-    if (this.#killTimer !== undefined) clearTimeout(this.#killTimer);
-    signalProcess(this.child, "SIGKILL");
-  }
+  kill(): void { if (!this.#settled) this.run.terminate(); }
+  forceTerminate(): void { if (!this.#settled) this.run.forceTerminate(); }
 }
 
-function signalProcess(child: ChildProcessByStdio<null, Readable, Readable>, signal: NodeJS.Signals): void {
-  try {
-    if (process.platform !== "win32" && child.pid !== undefined) process.kill(-child.pid, signal);
-    else child.kill(signal);
-  } catch { /* Process already exited. */ }
+/** Approved runs outside the sandbox when the sandbox plugin is absent: same process-group lifecycle, no policy. */
+function directRun(spec: HostProcessSpec): BashRun {
+  const child = spawnHostProcess(spec);
+  let stopped = false;
+  let killTimer: ReturnType<typeof setTimeout> | undefined;
+  const result = child.exited.then((exit): SandboxResult => {
+    if (killTimer !== undefined) clearTimeout(killTimer);
+    const facts = { isolation: "none" as const, cleanup: "ok" as const };
+    if (exit.startError !== undefined) return { outcome: { status: "prepare_failed", reasons: [`spawn failed: ${exit.startError}`] }, facts };
+    if (!stopped) return { outcome: { status: "exited", exitCode: exit.exitCode, signal: exit.signal }, facts };
+    const residual = child.groupAlive();
+    if (residual) child.signalGroup("SIGKILL");
+    return { outcome: { status: "cancelled", exitCode: exit.exitCode, signal: exit.signal, residual }, facts };
+  });
+  return Object.freeze({
+    onOutput: (listener: Parameters<BashRun["onOutput"]>[0]) => child.onOutput(listener),
+    terminate: () => {
+      if (stopped) return;
+      stopped = true;
+      child.signalGroup("SIGTERM");
+      killTimer = setTimeout(() => child.signalGroup("SIGKILL"), KILL_GRACE_MS);
+      killTimer.unref?.();
+    },
+    forceTerminate: () => { stopped = true; if (killTimer !== undefined) clearTimeout(killTimer); child.signalGroup("SIGKILL"); },
+    result,
+  });
+}
+
+/** Canonical paths, so the policy, TMPDIR and the output file all name the same directory. The tool template adds the .git denies. */
+async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceRoot: string, outputRoot: string): Promise<SandboxRequest> {
+  const scratch = await realpath(outputRoot);
+  return { purpose: "tool", isolation: "sandboxed", argv, cwd, env: { ...process.env, TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [await realpath(workspaceRoot), scratch, await realpath(tmpdir())] } };
+}
+
+/** The admitted process resource is what the user approved; direct callers without one only get an explicit request. */
+function admittedNoSandbox(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext): boolean {
+  const resource = context.admittedResources?.find((item) => item.kind === "process");
+  return resource?.kind === "process" ? resource.noSandbox === true : arrayStrings(args.requiredPermissions).includes("no_sandbox");
 }
 
 type BashTask = {
@@ -178,6 +222,7 @@ type BashTask = {
   status: "running" | "completed" | "failed" | "killed";
   timedOut: boolean;
   exitCode?: number | null;
+  notStarted?: readonly string[];
   endedAt?: number;
   timer: ReturnType<typeof setTimeout>;
   completion: Promise<BackgroundTaskTerminal>;
@@ -210,7 +255,8 @@ class BashTaskRegistry {
       clearTimeout(task.timer);
       task.endedAt = Date.now();
       task.exitCode = status.exitCode;
-      if (task.status === "running") task.status = status.signal !== null ? "killed" : status.exitCode === 0 ? "completed" : "failed";
+      if (task.status === "running") task.status = status.stopped || status.signal !== null ? "killed" : status.exitCode === 0 ? "completed" : "failed";
+      task.notStarted = status.notStarted;
       task.monitor.dispose();
       task.reportProgress({ message: `Background Bash task ${task.taskId} ${task.status}.` });
       return terminal(task, await readFile(task.outputPath, "utf8").then((value) => value.slice(-NOTIFICATION_TAIL_CHARS)).catch(() => ""));
@@ -243,6 +289,7 @@ class BashTaskRegistry {
 function terminal(task: BashTask, tail: string): BackgroundTaskTerminal {
   const exit = task.exitCode === undefined || task.exitCode === null ? "" : ` with exit code ${task.exitCode}`;
   const body = redactToolText(tail);
+  if (task.notStarted) return { status: "failed", summary: `Background command did not start: ${task.notStarted.join(" ")}`, body, exitCode: null };
   if (task.timedOut) return { status: "failed", summary: `Background command timed out after ${MAX_RUNTIME_MS / 60_000} minutes and was killed.`, body, exitCode: task.exitCode ?? null };
   if (task.status === "killed") return { status: "stopped", summary: "Background command was stopped.", body, exitCode: task.exitCode ?? null };
   return { status: task.status === "completed" ? "completed" : "failed", summary: `Background command ${task.status}${exit}.`, body, exitCode: task.exitCode ?? null };
@@ -254,10 +301,14 @@ async function readTail(path: string): Promise<string> {
   return `[Earlier output omitted; read the output file for the full log]\n${redactToolText(bytes.subarray(-OUTPUT_PREVIEW_BYTES).toString("utf8").replace(/^[^\n]*\n/, ""))}`;
 }
 
-async function foreground(command: string, cwd: string, status: ProcessStatus, outputPath: string, sandboxed: boolean, context: ToolExecutionContext): Promise<ToolBodyResult> {
-  if (status.startError !== undefined) return failed("BASH_START_FAILED", `Failed to start Bash command: ${status.startError}`, true);
+async function foreground(command: string, cwd: string, status: ProcessStatus, outputPath: string, context: ToolExecutionContext): Promise<ToolBodyResult> {
+  if (status.notStarted !== undefined) {
+    return status.isolation === "none"
+      ? failed("BASH_START_FAILED", `Failed to start Bash command: ${status.notStarted.join(" ")}`, true)
+      : failed("SANDBOX_PREPARE_FAILED", `The sandbox could not run this command, so it did not run (sandbox=${status.sandbox}):\n- ${status.notStarted.join("\n- ")}`, false);
+  }
   if (status.outputError !== undefined) return failed("BASH_OUTPUT_FAILED", `Failed to persist Bash output: ${status.outputError}`, true);
-  const summary = `Bash ${status.exitCode === 0 ? "completed" : "failed"} in ${status.durationMs}ms (exit ${status.exitCode ?? "signal"}, sandboxed=${sandboxed}).`;
+  const summary = `Bash ${status.exitCode === 0 ? "completed" : "failed"} in ${status.durationMs}ms (exit ${status.exitCode ?? "signal"}, sandboxed=${status.isolation === "sandboxed"}, sandbox=${status.sandbox}).`;
   const image = status.exitCode === 0 && status.totalChars <= INLINE_OUTPUT_CHARS ? dataImage(status.output) : undefined;
   if (image !== undefined) {
     const artifact = await context.createArtifact({ bytes: Buffer.from(image.data, "base64"), mediaType: image.mediaType });
@@ -279,39 +330,6 @@ function backgrounded(task: BashTask, reason: "explicit" | "block_timeout" | "al
   const summary = `Bash task ${task.taskId} is running in the background (${reason}).`;
   const next = "You will be notified automatically when it finishes; continue with other work. Use task_output to inspect output or task_stop to stop it. Do not poll with sleep loops or repeated task_output.";
   return { ...completed(`${summary}\noutput_path: ${task.outputPath}\n${next}`, summary), detail: [{ label: "background-task", value: { taskId: task.taskId, status: "running" } }] };
-}
-
-async function sandboxSpawn(command: string, workspaceRoot: string, outputRoot: string): Promise<{ readonly command: string; readonly args: readonly string[]; readonly env: NodeJS.ProcessEnv; readonly sandboxed: boolean }> {
-  if (!await probeSandbox()) return { command: process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", args: ["-lc", command], env: process.env, sandboxed: false };
-  const [workspace, temp, home] = await Promise.all([realpath(workspaceRoot), realpath(tmpdir()), realpath(homedir())]);
-  const profilePath = join(outputRoot, "sandbox.sb");
-  const profile = [
-    "(version 1)",
-    "(deny default)",
-    "(allow process*)", "(allow signal)", "(allow network*)", "(allow sysctl-read)", "(allow mach-lookup)", "(allow ipc-posix*)", "(allow file-ioctl)",
-    "(allow file-read*)",
-    '(deny file-read* (subpath (param "SSH")) (subpath (param "AWS")) (subpath (param "GNUPG")))',
-    '(allow file-write* (subpath (param "WORKSPACE")) (subpath (param "OUTPUT")) (subpath (param "TEMP")) (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr"))',
-    '(deny file-write* (subpath (param "GIT_HOOKS")) (literal (param "GIT_CONFIG")))',
-  ].join("\n");
-  await writeFile(profilePath, profile, "utf8");
-  const params = { WORKSPACE: workspace, OUTPUT: outputRoot, TEMP: temp, SSH: join(home, ".ssh"), AWS: join(home, ".aws"), GNUPG: join(home, ".gnupg"), GIT_HOOKS: join(workspace, ".git", "hooks"), GIT_CONFIG: join(workspace, ".git", "config") };
-  const injected = Object.entries(params).flatMap(([key, value]) => ["-D", `${key}=${value}`]);
-  return { command: "/usr/bin/sandbox-exec", args: ["-f", profilePath, ...injected, "/bin/zsh", "-lc", command], env: { ...process.env, TMPDIR: outputRoot }, sandboxed: true };
-}
-
-function probeSandbox(): Promise<boolean> {
-  if (process.platform !== "darwin" || !existsSync("/usr/bin/sandbox-exec")) return Promise.resolve(false);
-  sandboxProbe ??= new Promise((resolveProbe) => {
-    const child = spawn("/usr/bin/sandbox-exec", ["-p", "(version 1)(allow default)", "/usr/bin/true"], { stdio: "ignore" });
-    let settled = false;
-    const finish = (value: boolean) => { if (settled) return; settled = true; clearTimeout(timer); resolveProbe(value); };
-    const timer = setTimeout(() => { child.kill("SIGKILL"); finish(false); }, SANDBOX_PROBE_TIMEOUT_MS);
-    timer.unref?.();
-    child.once("error", () => finish(false));
-    child.once("close", (code) => finish(code === 0));
-  });
-  return sandboxProbe;
 }
 
 type OutputSubscription = { readonly pattern: string; readonly reason: string; readonly debounceMs: number };

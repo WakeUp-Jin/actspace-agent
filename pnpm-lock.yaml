@@ -2010,6 +2010,9 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../cordis-adapter
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../../sandbox/manager
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../shared
@@ -2017,6 +2020,12 @@ importers:
         specifier: workspace:*
         version: link:../runtime
     devDependencies:
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../../sandbox/nono
+      '@actspace/sandbox-seatbelt':
+        specifier: workspace:*
+        version: link:../../sandbox/seatbelt
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4

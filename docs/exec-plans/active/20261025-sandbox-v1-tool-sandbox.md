@@ -284,7 +284,7 @@ T0 → T1 →（T2、T3、T4 可并行）→ T5 → T6 →（T7 可与 T6 并行
 - [x] T3 nono
 - [x] T4 nono 获取与打包
 - [x] T5 注册与 Host 端口
-- [ ] T6 shell-tools 接入
+- [x] T6 shell-tools 接入
 - [ ] T7 审批卡真实环境
 - [ ] T8 生成物与检查
 - [ ] T9 端到端验证
@@ -298,6 +298,7 @@ T0 → T1 →（T2、T3、T4 可并行）→ T5 → T6 →（T7 可与 T6 并行
 - 2026-10-25：T0 实测后用户确认：`filesystem.write-deny`（`.git/hooks`、`.git/config`）列为 `tool` 模板必需能力，Linux 上 nono 不合格，第一期 Linux 的 bash 走审批；接受 nono 拦截钥匙串，沙箱内推送需申请沙箱外执行。nono 在 macOS 用 profile 模式、Linux 用权限清单模式，读取限制用拆分覆盖表达。
 - 2026-10-25：T3 实现中发现 macOS 上把 `denyRead` 的上级全部拆开会产生约 1100 条授权，nono 每次启动约 900ms；改为 macOS 只围绕 nono 受保护目录拆分，`denyRead` 写成 `(deny file-read* …)` 规则（实测拒绝生效，经 `/System/Volumes/Data` 访问同样被拒），约 40ms。Linux 仍靠不授权表达。语义不变，执行摘要记录。
 - 2026-10-25：T5 实现时打包版 nono 路径只认随包的程序，`ACTSPACE_NONO_PATH` 与仓库副本只在开发版生效；沙箱启动状态记为运行时诊断 `SANDBOX_STATUS`。
+- 2026-10-25：T6 执行端只认批准时进程资源的 `noSandbox`，不在执行时重新判断沙箱是否可用；需要沙箱而不可用时返回 `SANDBOX_PREPARE_FAILED`。权限判断每次读取管理器已缓存的 `status("tool")`，插件不另做缓存。
 
 ## 执行模式
 

@@ -9,22 +9,25 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tools-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import type { BackgroundTaskHost } from "@actspace/background-tasks";
+import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
 import { SHELL_TOOLS_PLUGIN_ID, SHELL_TOOLS_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof SHELL_TOOLS_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly hasRunningBackgroundTask?: (sessionId: string) => boolean; readonly dispose?: () => Promise<void> };
 export const SHELL_TOOLS_HOST_PORT_ID = "actspace.host.tools.shell-tools" as const;
-export type HostPort = { readonly createPorts: (background?: BackgroundTaskHost) => ToolPorts | Promise<ToolPorts> };
+/** `sandbox` is absent when the sandbox plugin is not loaded; the ports then only run commands approved for outside the sandbox. */
+export type HostPort = { readonly createPorts: (background?: BackgroundTaskHost, sandbox?: SandboxService) => ToolPorts | Promise<ToolPorts> };
 export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntime["register"]> };
 
 export async function apply(ctx: CordisContext): Promise<void> {
   const runtime = ctx.get?.("tools.runtime") as ToolRuntime | undefined;
   const host = ctx.get?.(SHELL_TOOLS_HOST_PORT_ID) as HostPort | undefined;
   if (!runtime || !host) throw new Error("shell-tools requires tools.runtime and actspace.host.tools.shell-tools.");
-  const ports = await host.createPorts(ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined);
+  const sandbox = ctx.get?.(SANDBOX_SERVICE_ID) as SandboxService | undefined;
+  const ports = await host.createPorts(ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined, sandbox);
   let registrations: readonly ToolRegistration[];
-  try { registrations = registerTools(runtime, ports); }
+  try { registrations = registerTools(runtime, ports, sandbox); }
   catch (error) { await ports.dispose?.(); throw error; }
   ctx.provide?.("tools.shell-tools", Object.freeze({ registrations, definitions: TOOL_DEFINITIONS, hasRunningBackgroundTask: ports.hasRunningBackgroundTask ?? (() => false) }));
   ctx.effect?.(() => async () => {
@@ -34,12 +37,12 @@ export async function apply(ctx: CordisContext): Promise<void> {
     if (failures.length) throw new AggregateError(failures.map((item) => item.reason), "shell-tools cleanup failed.");
   }, "shell-tools");
 }
-export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly ToolRegistration[] {
+export function registerTools(runtime: ToolRuntime, ports: ToolPorts, sandbox?: SandboxService): readonly ToolRegistration[] {
   const registrations: ToolRegistration[] = [];
   try {
     for (const item of TOOL_DEFINITIONS) {
       const handler = ports[item.localName] ?? (async () => ({ status: "failed" as const, modelOutput: [{ type: "text" as const, text: `${item.localName} Host capability is unavailable.` }], summary: `${item.localName} unavailable`, failure: { code: "CAPABILITY_UNAVAILABLE", message: `${item.localName} Host capability is unavailable.`, retryable: false } }));
-      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract(item.localName) }) }));
+      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract(item.localName, sandbox) }) }));
     }
     return Object.freeze(registrations);
   } catch (error) {
@@ -48,7 +51,11 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly 
   }
 }
 
-function permissionContract(name: ToolName): ToolPermissionContract {
+/**
+ * `noSandbox` on the process resource is what the user approves: the explicit `no_sandbox` request, or a sandbox that
+ * is missing or cannot serve the tool template. Execution follows the admitted value, never a later status.
+ */
+function permissionContract(name: ToolName, sandbox: SandboxService | undefined): ToolPermissionContract {
   if (name !== "bash") return { extractResources: () => [], evaluate: () => ({ kind: "allow" as const }) };
   const contract: ToolPermissionContract = {
     grantAudience: { pluginId: SHELL_TOOLS_PLUGIN_ID, permissionDomain: "bash", policyVersion: 1 },
@@ -56,7 +63,7 @@ function permissionContract(name: ToolName): ToolPermissionContract {
       const command = typeof args.command === "string" ? args.command : "";
       const workspaceRoot = await realpath(context.workspaceRoot);
       const cwd = await realpath(resolve(context.workspaceRoot, typeof args.cwd === "string" ? args.cwd : "."));
-      const noSandbox = Array.isArray(args.requiredPermissions) && args.requiredPermissions.includes("no_sandbox");
+      const noSandbox = (Array.isArray(args.requiredPermissions) && args.requiredPermissions.includes("no_sandbox")) || !(await sandbox?.status("tool"))?.available;
       let analysis = !noSandbox && isPathWithin(workspaceRoot, cwd) ? analyzeCommandPrefixGrant(command) : undefined;
       if (analysis && !await queryPathsWithinWorkspace(analysis, cwd, workspaceRoot)) analysis = undefined;
       return [{ kind: "process" as const, access: "execute" as const, commandDigest: createHash("sha256").update(command).digest("hex"), cwd, workspaceRoot, noSandbox, dynamic: false, ...(analysis ? { argv: analysis.argv, grantPrefix: analysis.prefix } : {}) }];

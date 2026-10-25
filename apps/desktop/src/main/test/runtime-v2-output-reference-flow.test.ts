@@ -17,7 +17,7 @@ it("runs large Bash output through storage, the next request, and paginated read
   const store = new DesktopArtifactStore(join(root, "data"));
   const sessionId = "output-flow";
   const resolveArtifact = (session: string, id: string) => store.resolveForSession(session, id);
-  const ports = { ...createReadPorts({ workspaceRoot, resolveArtifact }), ...createSearchPorts({ workspaceRoot, resolveArtifact }), ...createNodeBashToolPorts({ workspaceRoot, tmpRoot: join(root, "tmp"), sandbox: false }) };
+  const ports = { ...createReadPorts({ workspaceRoot, resolveArtifact }), ...createSearchPorts({ workspaceRoot, resolveArtifact }), ...createNodeBashToolPorts({ workspaceRoot, tmpRoot: join(root, "tmp") }) };
   const context: ToolExecutionContext = {
     sessionId, workspaceRoot, callId: "read-1", agentRunId: "run", turnId: "turn", stepId: "step", name: "bash", pluginId: "core",
     signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("unused"); } },
@@ -25,7 +25,7 @@ it("runs large Bash output through storage, the next request, and paginated read
     createArtifact: (input) => store.create({ ...input, owner: { sessionId, callId: "read-1", pluginId: "core", name: "bash" } }),
   };
   try {
-    const body = await ports.bash!({ command: "for ((i=1;i<=3000;i++)); do printf 'line-%s needle\\n' \"$i\"; done", intent: "output regression", blockMs: 1000 }, context);
+    const body = await ports.bash!({ command: "for ((i=1;i<=3000;i++)); do printf 'line-%s needle\\n' \"$i\"; done", intent: "output regression", blockMs: 1000, requiredPermissions: ["no_sandbox"] }, context);
     expect(body.status).toBe("completed");
     expect(body.artifacts?.[0].mediaType).toBe("text/plain");
     const requests: (readonly LlmMessage[])[] = [];
