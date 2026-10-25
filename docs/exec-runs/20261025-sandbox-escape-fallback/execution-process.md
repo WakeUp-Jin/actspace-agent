@@ -2,10 +2,10 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261025-sandbox-escape-fallback.md`
+- **关联计划**：`docs/exec-plans/completed/20261025-sandbox-escape-fallback.md`
 - **执行模式**：交互
 - **开始时间**：2026-10-25
-- **结束时间**：进行中
+- **结束时间**：2026-10-25
 
 ## 执行时间线
 
@@ -94,6 +94,18 @@
 - **顺序调整**：先做 T6 端到端，再写执行摘要、history、移动计划，让收尾文档带上端到端结果。
 - **结果**：`pnpm check:packages`、`pnpm test:contract-matrix`（4）、`pnpm test:current-docs`（7）、`pnpm typecheck`、`pnpm test` 全部通过。
 - **影响文件**：`docs/design-docs/execution-safety/{README.md,agent-沙箱设计.md}`、`docs/SECURITY.md`、`packages/tools/shell-tools/README.md`。
+
+### 步骤 7：T6 端到端
+
+- **操作**：`tmp/sandbox-escape-spike/host-e2e.mjs`（照第一期 Host 端到端改写，第一期脚本不动）：真实 CLI Host + 假模型，同一会话先在 `default` 下跑三步，再切 `full-access` 跑一步。
+- **结果**（nono）：
+  - 沙箱内 `touch ~/…`：`Bash failed (exit 1, sandboxed=true, sandbox=nono)`，紧接着的模型请求起带提示；
+  - 同一命令带参数：审批 `noSandbox: true`、原因为理由、授权建议 0，批准后 `Bash completed (exit 0, sandboxed=false, sandbox=none)`，文件存在；
+  - 只给 `sandbox_permissions`：`denied`、`BASH_ESCALATION_INVALID`，审批只有前两步各一次，文件不存在；
+  - `full-access`：没有审批，`sandbox=none`，文件存在。
+  - harness-evaluation 复跑 15 通过，5 个真实集成用例中候选 bash 为 `sandbox=inherited`。
+- **问题**：脚本第一版等待任务结束时拿到了上一个已完成的运行，第二个任务没跑；改为等运行数增加。
+- **影响文件**：只有 `tmp/sandbox-escape-spike/`；探测文件与临时工作区已删除。
 
 ## 遇到的问题
 

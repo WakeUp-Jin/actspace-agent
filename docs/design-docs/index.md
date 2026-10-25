@@ -5,7 +5,7 @@
 - [Tool 插件边界与 Todo 领域事件](agent-plugin-runtime/agent-tool-plugin-boundaries.md)：独立工具包、Host port、Projection Contributor、scope 和不兼容旧 Todo 的事件断点。
 
 
-- [沙箱设计](execution-safety/agent-沙箱设计.md)：2026-10-25 确认，第一期工具沙箱、第二期评估沙箱已实施；工具沙箱 / 评估沙箱，可替换的 Harness 插件（管理器 + 后端），macOS / Linux 用打包的 nono，Windows 第三期原生；第一期计划见 [20261025-sandbox-v1-tool-sandbox](../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md)；第二期评估沙箱已实施，计划见 [20261025-sandbox-v2-evaluation-sandbox](../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md)。
+- [沙箱设计](execution-safety/agent-沙箱设计.md)：2026-10-25 确认，第一期工具沙箱、第二期评估沙箱已实施；工具沙箱 / 评估沙箱，可替换的 Harness 插件（管理器 + 后端），macOS / Linux 用打包的 nono，Windows 第三期原生；第一期计划见 [20261025-sandbox-v1-tool-sandbox](../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md)；第二期评估沙箱已实施，计划见 [20261025-sandbox-v2-evaluation-sandbox](../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md)；工具沙箱的出沙箱与回退已实施，计划见 [20261025-sandbox-escape-fallback](../exec-plans/completed/20261025-sandbox-escape-fallback.md)。
 
 - [Agent 工具权限模型](execution-safety/agent-tool-permission-model.md)：当前权限事实源；定义已实施的 `default/full-access`、结构化资源、once 与 Desktop 文件 Session Grant。
 
