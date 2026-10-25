@@ -348,7 +348,11 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
       status: "completed",
       removedCount: payload.removedCount ?? Math.max(payload.beforeCount - payload.afterCount, 0),
       ...(typeof payload.durationMs === "number" ? { durationMs: payload.durationMs } : {}),
-      ...(payload.summary ? { summary: payload.summary } : {}),
+      ...(payload.compactionId ? { compactionId: payload.compactionId } : {}),
+      ...(payload.trigger ? { trigger: payload.trigger } : {}),
+      ...(typeof payload.beforeTokens === "number" ? { beforeTokens: payload.beforeTokens } : {}),
+      ...(typeof payload.afterTokens === "number" ? { afterTokens: payload.afterTokens } : {}),
+      ...(payload.beforeEstimated === true ? { beforeEstimated: true as const } : {}),
       createdAt: getDisplayTime(event.timestamp),
     }
   ];

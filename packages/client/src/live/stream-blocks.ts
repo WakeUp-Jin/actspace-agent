@@ -456,13 +456,18 @@ export function streamingStateToBlocks(state: StreamingState, agentRunId?: strin
 
 export type CompactionBlock = Extract<MessageBlock, { kind: "context_compaction" }>;
 
-// 手动 /compact 与自动压缩共用同一个块；完成后的可展开摘要以 durable 投影为准，这里只负责本次运行期间的状态。
+// 手动 /compact 与自动压缩共用同一个块；完成后以 durable 投影为准，这里只负责本次运行期间的状态。
 export function createCompactionBlock(input: {
   agentRunId: string;
   status: CompactionBlock["status"];
   startedAt?: string;
   removedCount?: number;
   durationMs?: number;
+  compactionId?: string;
+  trigger?: CompactionBlock["trigger"];
+  beforeTokens?: number;
+  afterTokens?: number;
+  beforeEstimated?: true;
   errorMessage?: string;
 }): CompactionBlock {
   return {
@@ -473,6 +478,11 @@ export function createCompactionBlock(input: {
     ...(input.startedAt ? { startedAt: input.startedAt } : {}),
     ...(input.removedCount !== undefined ? { removedCount: input.removedCount } : {}),
     ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
+    ...(input.compactionId ? { compactionId: input.compactionId } : {}),
+    ...(input.trigger ? { trigger: input.trigger } : {}),
+    ...(input.beforeTokens !== undefined ? { beforeTokens: input.beforeTokens } : {}),
+    ...(input.afterTokens !== undefined ? { afterTokens: input.afterTokens } : {}),
+    ...(input.beforeEstimated ? { beforeEstimated: true } : {}),
     ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
     createdAt: new Date().toISOString(),
   };

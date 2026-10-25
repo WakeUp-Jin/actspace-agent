@@ -60,21 +60,22 @@ describe("compaction plugin lifecycle", () => {
       const chat = service.withTriggerRatio(() => ratio);
       expect(chat).toBeInstanceOf(CompactionPlugin);
       expect(chat).not.toBe(service.runtime);
-      const compact = vi.spyOn(chat, "compact").mockResolvedValue(true);
-      const baseCompact = vi.spyOn(service.runtime, "compact").mockResolvedValue(true);
-      // No session access occurs unless compaction triggers; compact is stubbed above.
-      const session = {} as Parameters<CompactionPlugin["maybeCompact"]>[0];
+      // Selecting nothing ends the run right after the trigger gate, so `select` marks a triggered compaction.
+      const select = vi.spyOn(chat, "select").mockReturnValue(null);
+      const baseSelect = vi.spyOn(service.runtime, "select").mockReturnValue(null);
+      const session = { header: { sessionId: "s" }, lastSeq: 0, journal: { surface: { entries: [], replaceGeneration: 0 } } } as unknown as Parameters<CompactionPlugin["maybeCompact"]>[0];
       const usage = { inputTokens: 70_000, outputTokens: 0, contextWindow: 128_000 };
       expect(await chat.maybeCompact(session, usage)).toBe(false);
-      expect(compact).not.toHaveBeenCalled();
+      expect(select).not.toHaveBeenCalled();
       ratio = 0.5;
-      expect(await chat.maybeCompact(session, usage)).toBe(true);
-      expect(compact).toHaveBeenCalledExactlyOnceWith(session, undefined);
+      expect(await chat.maybeCompact(session, usage)).toBe(false);
+      expect(select).toHaveBeenCalledOnce();
       expect(await service.maybeCompact(session, usage)).toBe(false);
-      expect(baseCompact).not.toHaveBeenCalled();
+      expect(baseSelect).not.toHaveBeenCalled();
       const fixed = service.withTriggerRatio(0.5);
-      vi.spyOn(fixed, "compact").mockResolvedValue(true);
-      expect(await fixed.maybeCompact(session, usage)).toBe(true);
+      const fixedSelect = vi.spyOn(fixed, "select").mockReturnValue(null);
+      await fixed.maybeCompact(session, usage);
+      expect(fixedSelect).toHaveBeenCalledOnce();
     } finally {
       vi.restoreAllMocks();
       await ctx.fiber.dispose();

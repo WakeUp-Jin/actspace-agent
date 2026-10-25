@@ -92,7 +92,10 @@ export class FixedRendererStreamAdapter {
       return;
     }
     if (event.kind === "compaction-finished") {
-      this.#emit({ type: "context_compaction_finished", sessionId: event.sessionId, agentRunId: event.agentRunId, payload: { triggerTokens: 0, thresholdTokens: 0, beforeCount: event.removedCount, afterCount: 1, summaryChars: 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: event.removedCount, durationMs: event.durationMs } });
+      this.#emit({ type: "context_compaction_finished", sessionId: event.sessionId, agentRunId: event.agentRunId, payload: { triggerTokens: event.beforeTokens ?? 0, thresholdTokens: 0, beforeCount: event.removedCount, afterCount: 1, summaryChars: 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: event.removedCount, durationMs: event.durationMs,
+        ...(event.compactionId ? { compactionId: event.compactionId } : {}), ...(event.trigger ? { trigger: event.trigger } : {}),
+        ...(event.beforeTokens === undefined ? {} : { beforeTokens: event.beforeTokens }), ...(event.afterTokens === undefined ? {} : { afterTokens: event.afterTokens }),
+        ...(event.beforeEstimated ? { beforeEstimated: true } : {}) } });
       return;
     }
     if (event.kind === "compaction-failed") {

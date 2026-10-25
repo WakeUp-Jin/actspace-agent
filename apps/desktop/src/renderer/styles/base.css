@@ -181,13 +181,53 @@ svg {
   }
 }
 
-@keyframes compact-progress {
-  0% {
-    transform: translateX(-110%);
+/* 压缩分隔线：线色比普通分隔线深一档；进行中两侧各有一道光从外端收向中间文字。 */
+.compact-divider-line {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--act-color-border-strong) 40%, var(--act-color-border));
+}
+
+.compact-divider-running .compact-divider-line::after {
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  content: "";
+  background: linear-gradient(90deg, transparent, var(--act-color-operational), transparent);
+  animation: compact-sweep-in-right 1.6s ease-in-out infinite;
+}
+
+.compact-divider-running .compact-divider-line:last-child::after {
+  animation-name: compact-sweep-in-left;
+}
+
+.compact-divider-failed .compact-divider-line {
+  background: var(--act-color-danger-soft);
+}
+
+@keyframes compact-sweep-in-right {
+  from {
+    transform: translateX(-100%);
   }
 
-  100% {
-    transform: translateX(220%);
+  to {
+    transform: translateX(260%);
+  }
+}
+
+@keyframes compact-sweep-in-left {
+  from {
+    transform: translateX(260%);
+  }
+
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compact-divider-running .compact-divider-line::after {
+    display: none;
   }
 }
 

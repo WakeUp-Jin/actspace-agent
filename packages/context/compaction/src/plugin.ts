@@ -84,7 +84,7 @@ export class CompactionPlugin implements ContextCompactionStrategy {
   }
   // Compatibility for direct package callers; production uses the Harness engine coordinator.
   async maybeCompact(session: SessionHandle, usage: TokenUsage, observer?: CompactionObserver): Promise<boolean> {
-    return this.shouldCompact(usage) ? this.compact(session, observer) : false;
+    return this.coordinator.withStrategy(this).maybeCompact(session, usage, observer);
   }
   async compact(session: SessionHandle, observer?: CompactionObserver): Promise<boolean> {
     return this.coordinator.withStrategy(this).compact(session, observer);

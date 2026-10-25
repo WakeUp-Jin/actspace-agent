@@ -58,11 +58,11 @@ describe("real AgentLoop to fixed renderer stream", () => {
     const run = { sessionId: "session", agentRunId: "run", turnId: "turn" };
     try {
       adapter.accept({ ...run, kind: "compaction-started" });
-      adapter.accept({ ...run, kind: "compaction-finished", removedCount: 29, durationMs: 12_000 });
+      adapter.accept({ ...run, kind: "compaction-finished", removedCount: 29, durationMs: 12_000, compactionId: "c1", trigger: "auto", beforeTokens: 182_000, afterTokens: 9_100, beforeEstimated: true });
       adapter.accept({ ...run, kind: "compaction-failed", message: "summary request timed out" });
       expect(events).toEqual([
         { type: "context_compaction_started", sessionId: "session", agentRunId: "run", startedAt: expect.any(String) },
-        expect.objectContaining({ type: "context_compaction_finished", payload: expect.objectContaining({ removedCount: 29, durationMs: 12_000 }) }),
+        expect.objectContaining({ type: "context_compaction_finished", payload: expect.objectContaining({ removedCount: 29, durationMs: 12_000, compactionId: "c1", trigger: "auto", beforeTokens: 182_000, afterTokens: 9_100, beforeEstimated: true }) }),
         expect.objectContaining({ type: "context_compaction_failed", error: expect.objectContaining({ message: "summary request timed out" }) }),
       ]);
     } finally { adapter.dispose(); }

@@ -199,6 +199,11 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
           status: event.payload.status === "failed" ? "failed" : "completed",
           removedCount: event.payload.removedCount ?? Math.max(event.payload.beforeCount - event.payload.afterCount, 0),
           durationMs: event.payload.durationMs,
+          compactionId: event.payload.compactionId,
+          trigger: event.payload.trigger,
+          beforeTokens: event.payload.beforeTokens,
+          afterTokens: event.payload.afterTokens,
+          beforeEstimated: event.payload.beforeEstimated,
           errorMessage: event.payload.reason,
         }));
         break;

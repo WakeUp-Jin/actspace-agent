@@ -2,6 +2,7 @@ import { contextCategory, contextSectionRecords, fixedSystemText } from "./conte
 import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import type {
   TrajectoryAssistantMetrics,
+  TrajectoryCompactionFacts,
   TrajectoryDetail,
   TrajectoryPromptDetail,
   TrajectoryRecord,
@@ -572,13 +573,16 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
       const content = valueText(summaryContent);
       const ended = node.eventType === "compaction/end" || node.eventType === "compaction/completed";
       const start = previous?.startedAt ?? node.time;
+      const compaction = compactionFacts(previous?.compaction, node.eventType, data, compactionId);
       const next = baseRecord(node, node.eventSeq, [...(previous?.sourceSequences ?? []), node.eventSeq], {
         id: previous?.id ?? `${node.sessionId}:compaction:${compactionId ?? node.eventSeq}`, kind: "compaction", visible: true,
         raw: previous?.raw ?? node.data, summary: content || previous?.summary || "",
         requestId: previous?.requestId ?? pick(asRecord(asRecord(summaryContent).metadata), ["attemptId"]),
         preview: content || previous?.preview || "", outputDetail: content || previous?.outputDetail || null,
-        startedAt: start, completedAt: ended ? node.time : null, durationMs: ended ? duration(start, node.time) : null,
-        state: ended ? "completed" : "running",
+        // The transaction commits all events at once, so start→end time is ~0; `compaction/end` records the real work time.
+        startedAt: start, completedAt: ended ? node.time : null,
+        durationMs: ended ? (typeof data.durationMs === "number" && Number.isFinite(data.durationMs) && data.durationMs >= 0 ? data.durationMs : duration(start, node.time)) : null,
+        state: ended ? "completed" : "running", compaction,
       });
       if (index < 0) records.push(next); else records[index] = next;
       continue;
@@ -768,6 +772,22 @@ export function buildTrajectorySnapshot(snapshot: RuntimeV2TrajectorySnapshot, o
     rawRecords: merged.rawRecords,
     turns: assigned.turns,
     partial: merged.partial,
+  };
+}
+
+/** Merges the facts each compaction event carries: span on `compaction/start`, trigger and tokens on `compaction/end`. */
+function compactionFacts(previous: TrajectoryCompactionFacts | undefined, eventType: string, data: Data, compactionId: string | null): TrajectoryCompactionFacts {
+  const count = (value: RuntimeV2JsonValue | undefined) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+  const start = count(data.start);
+  const end = count(data.end);
+  const ended = eventType === "compaction/end";
+  return {
+    compactionId: previous?.compactionId ?? compactionId,
+    trigger: (ended && (data.trigger === "manual" || data.trigger === "auto") ? data.trigger : null) ?? previous?.trigger ?? null,
+    messageCount: eventType === "compaction/start" && start !== null && end !== null && end > start ? end - start : previous?.messageCount ?? null,
+    beforeTokens: (ended ? count(data.beforeTokens) : null) ?? previous?.beforeTokens ?? null,
+    afterTokens: (ended ? count(data.afterTokens) : null) ?? previous?.afterTokens ?? null,
+    beforeEstimated: (ended && data.beforeEstimated === true) || (previous?.beforeEstimated ?? false),
   };
 }
 

@@ -30,3 +30,28 @@ describe("durable compaction duration", () => {
     ]);
   });
 });
+
+describe("durable compaction stats", () => {
+  it("projects trigger and token counts recorded on compaction/end", () => {
+    const journal = [
+      event("compaction/start", 0, "2026-10-25T00:00:00.000Z", { compactionId: "c", start: 2, end: 30 }),
+      event("compaction/end", 1, "2026-10-25T00:00:23.000Z", { compactionId: "c", durationMs: 23_000, trigger: "auto", beforeTokens: 182_000, afterTokens: 9_100, beforeEstimated: true }),
+    ];
+    const [projected] = projectChatEvents(snapshot("s", 1), journal);
+    expect(projected?.payload).toEqual(expect.objectContaining({ compactionId: "c", trigger: "auto", beforeTokens: 182_000, afterTokens: 9_100, beforeEstimated: true, triggerTokens: 182_000, removedCount: 28 }));
+  });
+
+  it("leaves token counts out for journals written before they were recorded", () => {
+    const journal = [
+      event("compaction/start", 0, "2026-09-30T00:00:00.000Z", { compactionId: "c", start: 0, end: 4 }),
+      event("compaction/end", 1, "2026-09-30T00:00:01.000Z", { compactionId: "c", durationMs: 1000 }),
+    ];
+    const current = { ...snapshot("s", 1), usage: { ...snapshot("s", 1).usage, totalTokens: 500_000 } };
+    const payload = projectChatEvents(current, journal)[0]?.payload as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("beforeTokens");
+    expect(payload).not.toHaveProperty("afterTokens");
+    expect(payload).not.toHaveProperty("trigger");
+    expect(payload).not.toHaveProperty("beforeEstimated");
+    expect(payload.triggerTokens).toBe(0);
+  });
+});
