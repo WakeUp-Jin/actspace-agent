@@ -2,7 +2,7 @@ function loadingFrameFor(image: HTMLImageElement): HTMLElement | null {
   const explicitFrame = image.closest<HTMLElement>('[data-image-frame]');
   if (explicitFrame) return explicitFrame;
 
-  if (!image.closest('.docs-prose')) return null;
+  if (!image.closest('.prose')) return null;
   const frame = document.createElement('span');
   frame.className = 'image-loading-frame prose-image-frame';
   frame.dataset.imageFrame = '';
@@ -38,7 +38,7 @@ function addLoadingStatus(frame: HTMLElement) {
 }
 
 export function initializeImageLoading(root: ParentNode = document) {
-  const images = root.querySelectorAll<HTMLImageElement>('[data-image-loading], .docs-prose img');
+  const images = root.querySelectorAll<HTMLImageElement>('[data-image-loading], .prose img');
 
   images.forEach((image) => {
     const frame = loadingFrameFor(image);

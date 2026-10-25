@@ -2,17 +2,48 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import UpdateTimeline from "../../components/updates/UpdateTimeline.astro";
 import { groupReleaseNotes, loadReleaseNotes } from "../../lib/releases/parse-release-notes";
+import "../../styles/updates.css";
 
 const months = groupReleaseNotes(await loadReleaseNotes());
+const filters = [
+  { type: "all", label: "全部" },
+  { type: "feature", label: "新功能" },
+  { type: "improvement", label: "改进" },
+  { type: "fix", label: "修复" },
+];
 ---
 
 <BaseLayout title="ActSpace 更新日志" description="ActSpace 的最新功能、改进与问题修复。">
-  <main id="main-content" class="changelog wrap">
-    <section aria-label="ActSpace 更新日志">
-      <header class="changelog-heading">
-<h1>更新日志</h1>
-</header>
-<UpdateTimeline {months} />
-    </section>
+  <main id="main-content" class="updates-page" data-filter="all">
+    <header class="updates-head">
+      <div>
+        <h1>更新日志</h1>
+        <p>只记录用得到的新功能、改进和问题修复。</p>
+      </div>
+      <div class="updates-filters" role="group" aria-label="按分类筛选">
+        {filters.map(({ type, label }) => (
+          <button type="button" data-filter-type={type} aria-pressed={type === "all" ? "true" : "false"}>
+            {type !== "all" && <i class={`t-${type}`} aria-hidden="true"></i>}{label}
+          </button>
+        ))}
+      </div>
+    </header>
+    <UpdateTimeline {months} />
   </main>
 </BaseLayout>
+<script>
+// 分类筛选：只留对应分组；没有该分类的发布和整月一起隐藏。
+const page = document.querySelector<HTMLElement>(".updates-page")!;
+const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-filter-type]")];
+buttons.forEach((button) => button.addEventListener("click", () => {
+  const type = button.dataset.filterType ?? "all";
+  page.dataset.filter = type;
+  buttons.forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+  document.querySelectorAll<HTMLElement>("[data-release]").forEach((release) => {
+    release.hidden = type !== "all" && !release.querySelector(`[data-type="${type}"]`);
+  });
+  document.querySelectorAll<HTMLElement>("[data-month]").forEach((month) => {
+    month.hidden = !month.querySelector("[data-release]:not([hidden])");
+  });
+}));
+</script>

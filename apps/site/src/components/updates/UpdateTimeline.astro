@@ -1,20 +1,26 @@
 ---
-import type {ReleaseMonth} from '../../lib/releases/model';
-import '../../styles/prose.css';
-interface Props {months:ReleaseMonth[];compact?:boolean;}
-const {months}=Astro.props;const labels={feature:'新功能',improvement:'改进',fix:'问题修复'};
+import type {ReleaseMonth,ReleaseSectionType} from '../../lib/releases/model';
+interface Props {months:ReleaseMonth[];}
+const {months}=Astro.props;
+const labels:Record<ReleaseSectionType,string>={feature:'新功能',improvement:'改进',fix:'问题修复'};
+const latestDate=months[0]?.entries[0]?.date;
+const monthLabel=(month:string)=>{const [year,value]=month.split('-');return `${year} 年 ${Number(value)} 月`;};
+const dayLabel=(date:string)=>{const [,month,day]=date.split('-');return `${Number(month)}月${Number(day)}日`;};
 ---
-{months.flatMap(month=>month.entries).map(entry=>
-<article class="release-entry" id={entry.anchor}>
-<aside>
-<time datetime={entry.date}>{entry.date.replaceAll('-','.')}</time>
-<p><span class="site-tag">产品更新</span></p>
-</aside>
-<div class="release-content">
-<h2>{entry.title}</h2>{entry.sections.map(section=>
-<section>
-<h3>{labels[section.type]}</h3>
-<ul class="docs-prose">{section.itemsHtml.map(html=>
-<li set:html={html}/>)}</ul>
-</section>)}</div>
+{months.map(month=>
+<section class="update-month" data-month>
+<p class="update-month-label">{monthLabel(month.month)}</p>
+{month.entries.map(entry=>
+<article class:list={['update-release',{'is-latest':entry.date===latestDate}]} id={entry.anchor} data-release>
+<div class="update-date"><time datetime={entry.date}>{dayLabel(entry.date)}</time><span>{entry.date.slice(0,4)}</span></div>
+<div class="update-rail" aria-hidden="true"></div>
+<div class="update-body">
+<h2>{entry.title}{entry.date===latestDate&&<span class="update-latest">最新</span>}</h2>
+{entry.sections.map(section=>
+<section class="update-group" data-type={section.type}>
+<p class:list={['update-type',`t-${section.type}`]}><i aria-hidden="true"></i>{labels[section.type]}</p>
+<ul>{section.itemsHtml.map(html=><li set:html={html}/>)}</ul>
+</section>)}
+</div>
 </article>)}
+</section>)}

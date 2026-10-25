@@ -1,6 +1,8 @@
 import sitemap from "@astrojs/sitemap";
 import { satteri } from "@astrojs/markdown-satteri";
 import { docsLinks } from "./src/lib/docs-links.mjs";
+import { proseCjkSpacing, proseStructure } from "./src/lib/markdown/prose-plugins.mjs";
+import { actspacePaperTheme } from "./src/lib/markdown/shiki-theme.mjs";
 import { defineConfig } from "astro/config";
 
 const site = process.env.SITE_URL ?? "https://wakeup-jin.github.io";
@@ -16,12 +18,12 @@ export default defineConfig({
   trailingSlash: "always",
   integrations: [sitemap()],
   markdown: {
-    processor: satteri({ mdastPlugins: [docsLinks({ base })] }),
+    processor: satteri({
+      mdastPlugins: [docsLinks({ base })],
+      hastPlugins: [proseStructure(), proseCjkSpacing()],
+    }),
     shikiConfig: {
-      themes: {
-        light: "github-light",
-        dark: "github-dark",
-      },
+      theme: actspacePaperTheme,
       wrap: false,
     },
   },
