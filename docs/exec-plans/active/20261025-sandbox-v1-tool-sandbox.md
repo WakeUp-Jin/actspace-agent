@@ -182,7 +182,7 @@ export interface SandboxService {
 
 - `scripts/sandbox/nono-version.json`：`{ "version": "0.80.0", "assets": { "darwin-arm64": { "file": "nono-v0.80.0-aarch64-apple-darwin.tar.gz", "sha256": "…" }, … } }`，哈希取自上游 `SHA256SUMS.txt`，四个平台齐全。
 - `scripts/sandbox/fetch-nono.mjs`：按当前平台（或 `--all`）下载到 `dist/sandbox-components/<platform>/nono`，校验 SHA256，不一致时失败并删除文件，`chmod 755`。根 `package.json` 增加 `"sandbox:fetch-nono"`。
-- `scripts/release-package.sh`：在 browser-components 步骤旁把 `dist/sandbox-components/<platform>/nono` 复制到 `${deploy_dir}/sandbox-components/bin/nono`；在 macOS 签名步骤中单独签名该程序（方式同 `package-browser-components.mjs`）；程序缺失时打包失败。
+- `scripts/release-package.sh`：在 browser-components 步骤旁用 `fetch-nono.mjs --out` 把 nono 直接装到 `${deploy_dir}/sandbox-components/bin/nono`（脚本开头会删掉整个 `dist/`，不能从 `dist/sandbox-components` 复制；压缩包缓存在 `.cache/sandbox/nono/`）；在 macOS 签名步骤中单独签名该程序（方式同 `package-browser-components.mjs`）；程序缺失时打包失败。
 - 测试：`scripts/test/fetch-nono.test.mjs`，用本地 fixture 验证哈希不符时失败、平台映射正确，不访问网络。
 - 验证：`node --test scripts/test/fetch-nono.test.mjs`；`pnpm sandbox:fetch-nono` 后 `dist/sandbox-components/darwin-arm64/nono --version` 输出 `nono 0.80.0`。
 
@@ -282,7 +282,7 @@ T0 → T1 →（T2、T3、T4 可并行）→ T5 → T6 →（T7 可与 T6 并行
 - [x] T1 manager
 - [x] T2 seatbelt
 - [x] T3 nono
-- [ ] T4 nono 获取与打包
+- [x] T4 nono 获取与打包
 - [ ] T5 注册与 Host 端口
 - [ ] T6 shell-tools 接入
 - [ ] T7 审批卡真实环境

@@ -58,6 +58,13 @@
   - macOS（本机 Darwin 25.3.0 arm64，nono 0.80.0）：`ACTSPACE_NONO_PATH=tmp/sandbox-spike/ex/nono pnpm --filter @actspace/sandbox-nono test` 14 个通过。
   - Linux（Docker `node:22-bookworm-slim`，内核 6.12.76-linuxkit，arm64，nono 0.80.0，root 运行）：13 个通过、1 个按平台跳过（`.git` 写入拒绝仅 macOS）。
 
+### 步骤 5：T4 nono 获取与打包
+
+- **操作**：`scripts/sandbox/nono-version.json` 锁定 0.80.0 四个平台的压缩包与 SHA256；`scripts/sandbox/fetch-nono.mjs` 下载（`curl`，走 `https_proxy`）、校验、解压到 `dist/sandbox-components/<platform>-<arch>/nono` 或 `--out` 指定位置，压缩包缓存在 `.cache/sandbox/nono/`，每次使用都重新校验；根 `package.json` 增加 `sandbox:fetch-nono` 与 `test:fetch-nono`（并入 `pnpm test`）；`release-package.sh` 在 macOS / Linux 打包时把 nono 装进 `sandbox-components/bin/nono`，macOS 有签名身份时单独签名 nono，所有情况都校验签名与版本号。
+- **与计划的差异**：计划写的是从 `dist/sandbox-components/` 复制，但 `release-package.sh` 开头会 `rm -rf dist`，所以改为打包时直接调用 `fetch-nono.mjs --out`。上游 macOS 程序已带 Developer ID 签名与 hardened runtime，未签名 / ad-hoc 包保留上游签名，不再 ad-hoc 重签。
+- **影响文件**：`scripts/sandbox/*`、`scripts/test/fetch-nono.test.mjs`、`scripts/release-package.sh`、`package.json`。
+- **验证**：`node --test scripts/test/fetch-nono.test.mjs` 4 个通过（本地 fixture，不访问网络）；`pnpm sandbox:fetch-nono --all` 四个平台下载并校验通过，`dist/sandbox-components/darwin-arm64/nono --version` 输出 `nono 0.80.0`，`codesign --verify --strict` 通过；用它跑 `@actspace/sandbox-nono` 真实测试 14 个通过。完整 `release-package.sh` 留到 T9 验证。
+
 ## 遇到的问题
 
 - **问题**：权限清单的 `deny` 不生效。
