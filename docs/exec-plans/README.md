@@ -29,7 +29,7 @@
 
 ## 最近完成
 
-- [工具沙箱的出沙箱与回退](completed/20261025-sandbox-escape-fallback.md)：T0–T6 完成（分支 `feat/sandbox-refactor`，未推送）；`full-access` 下 bash 不进沙箱，出沙箱改为 `sandbox_permissions` 加 `justification` 并每次批准，审批卡显示理由，被沙箱拦了在结果里提示；真实 Host 端到端与全仓检查通过；Desktop 审批卡实机未验证，见[执行摘要](../exec-runs/20261025-sandbox-escape-fallback/execution-summary.md)。
+- [工具沙箱的出沙箱与回退](completed/20261025-sandbox-escape-fallback.md)：T0–T6 完成（分支 `feat/sandbox-refactor`，未推送）；`full-access` 下 bash 不进沙箱，出沙箱改为 `sandbox_permissions` 加 `justification` 并每次批准，审批卡显示理由，被沙箱拦了在结果里提示；真实 Host 端到端、全仓检查与 Codex 验收通过（验收发现的完全权限提示过时已修复）；审批卡理由行与深色主题未经实机完整复验，见[执行摘要](../exec-runs/20261025-sandbox-escape-fallback/execution-summary.md)。
 - [沙箱第二期：评估沙箱](completed/20261025-sandbox-v2-evaluation-sandbox.md)：T0–T8 完成（分支 `feat/sandbox-refactor`，未推送）；nono `run` 域名白名单（本机端口、上游代理），继承模式改由 Host 告知，CLI `--harness` / `--sandbox-inherited`，新包 `harness-evaluation` 在评估沙箱里跑 CLI 候选；真实 nono + CLI 集成测试（macOS、Linux Docker）与全仓检查通过；工具沙箱是否排除系统写入组待用户决定，见[执行摘要](../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)。
 - [沙箱第一期：地基 + 工具沙箱](completed/20261025-sandbox-v1-tool-sandbox.md)：T0–T10 完成（分支 `feat/sandbox-refactor`，未推送）；沙箱管理器与 nono / Seatbelt 后端作为 Harness 插件进入默认组合，bash 经 `sandbox` 服务执行，缺失或不可用时转“真实环境”审批；全仓检查、真实 Host 端到端（nono / Seatbelt）、Linux Docker 与打包签名通过；Desktop 界面未验证，见[执行摘要](../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。
 

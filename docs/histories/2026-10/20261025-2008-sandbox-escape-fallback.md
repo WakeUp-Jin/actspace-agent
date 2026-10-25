@@ -22,3 +22,4 @@
 
 - 包测试、全仓 `typecheck` 与 `test` 通过；真实 Host 端到端覆盖被拦提示、带理由的出沙箱审批、参数不成对被拒、`full-access` 直接执行；harness-evaluation 集成测试复跑，候选仍为 `inherited`。详见[执行摘要](../../exec-runs/20261025-sandbox-escape-fallback/execution-summary.md)。
 - 未做：Desktop 审批卡的实机外观、Web 审批卡显示理由、Linux 拦截特征。
+- Codex 验收（Computer Use + Host 端到端）：运行时各项通过；发现权限按钮悬停提示仍写“完全权限下沙箱仍生效”，已修复并同步两份权限文档；审批附近的 Computer Use 超时判断为验收通道问题。
