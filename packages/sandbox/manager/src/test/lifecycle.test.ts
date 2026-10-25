@@ -18,9 +18,10 @@ describe("sandbox plugin lifecycle", () => {
     expect(ctx.get(SANDBOX_SERVICE_ID)).toBeUndefined();
   });
 
-  it("rejects an unknown mode", () => {
+  it("rejects plugin config, so a composition cannot switch to inherited mode", () => {
     const ctx = new CordisContextClass();
     ctx.provide(SANDBOX_HOST_PORT_ID, createNodeSandboxHostPort());
-    expect(() => apply(ctx as never, { mode: "off" as never })).toThrow("Invalid sandbox mode");
+    expect(() => apply(ctx as never, { mode: "inherited" } as never)).toThrow("sandbox takes no configuration");
+    expect(() => apply(ctx as never, {})).not.toThrow();
   });
 });

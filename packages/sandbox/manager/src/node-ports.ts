@@ -6,11 +6,12 @@ import { StringDecoder } from "node:string_decoder";
 import type { HostProcess, HostProcessExit, HostProcessSpec, OutputChunk, SandboxHostPort } from "./types.js";
 
 /** Host side of the sandbox: spawning and process-group signals. Whether to sandbox is decided in the Harness. */
-export function createNodeSandboxHostPort(options: { readonly nonoPath?: string } = {}): SandboxHostPort {
+export function createNodeSandboxHostPort(options: { readonly nonoPath?: string; readonly inherited?: boolean } = {}): SandboxHostPort {
   return Object.freeze({
     platform: process.platform,
     homeDir: homedir(),
     resources: Object.freeze(options.nonoPath === undefined ? {} : { nonoPath: options.nonoPath }),
+    ...options.inherited ? { inherited: true as const } : {},
     spawn: spawnHostProcess,
     run: runBounded,
   });

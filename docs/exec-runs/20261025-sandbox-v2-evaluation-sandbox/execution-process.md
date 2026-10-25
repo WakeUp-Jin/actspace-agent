@@ -56,6 +56,22 @@
   - T4 按结论 7 实现。
 - **验证**：上述输出来自 `tmp/sandbox-v2-spike/{run-mode,run-mode-2,linux-profile,cli-in-run}.mjs`。
 
+### 步骤 2：T1 管理器的评估模板与契约改动
+
+- **操作**：
+  - `types.ts`：Host 沙箱端口加 `inherited?: true`；`allowlist` 加 `localPorts`、`upstreamProxy`，以及预留的 `credentials`；请求与策略加预留的 `limits`；新增四项能力 `network.local-ports`、`network.upstream-proxy`、`network.credential-injection`、`process.resource-limits`；`SandboxManagerConfig` 改为空对象。
+  - `policy.ts`：新增 `evaluation` 模板。网络写成 `{ mode: "allowlist", domains: "requested" }`，表示模式最宽到白名单、域名由请求给出；请求没写网络时按 `blocked` 处理。白名单会被规范化（小写、去掉末尾的点、去重、排序），并校验域名、端口、`host:port`。至少要有一个域名或本机端口，否则提示改用 `blocked`。模板若是固定白名单，请求的域名、端口、凭据必须是模板的子集，上游代理必须与模板相同。按需派生新能力。指纹包含 `limits`。
+  - `service.ts` / `execution.ts`：继承模式改为读 `host.inherited`。继承模式下 `status("evaluation")` 返回不可用，`run` 一个评估请求返回 `prepare_failed`（`INHERITED_EVALUATION`）。
+  - `plugin.ts`：带任何配置都直接抛错。
+  - `node-ports.ts`：`createNodeSandboxHostPort({ inherited })`。
+  - nono 与 Seatbelt 的能力表先把四项新能力都标为 `unsupported`，nono 在 T2 再改。
+- **影响文件**：`packages/sandbox/manager/src/**`，`packages/sandbox/{nono,seatbelt}/src/backend.ts`。
+- **验证**：
+  - `pnpm --filter @actspace/sandbox test`：30 个通过。新增的用例覆盖评估模板、白名单规范化与非法输入、固定白名单的上限、Host 端口打开继承模式、继承模式拒绝评估、预留能力导致 `prepare_failed`、插件配置被拒绝。
+  - 三个沙箱包的 `typecheck` 都通过。
+  - `@actspace/sandbox-seatbelt` 7 个测试通过；`@actspace/sandbox-nono` 11 个通过、4 个跳过（没设 `ACTSPACE_NONO_PATH`）；`@actspace/tools-shell-tools` 109 个通过。
+  - 仓库里没有任何组合用到插件配置 `mode`。
+
 ## 遇到的问题
 
 - 第一版代理实验在代理服务所在的进程里用 `execFileSync` 启动 nono，事件循环被阻塞，代理无法响应，请求一直挂起。改用异步 `execFile` 加每次调用的 `timeout` 后正常。

@@ -1,3 +1,4 @@
+import { INHERITED_EVALUATION } from "../execution.js";
 import { createSandboxService } from "../service.js";
 import { BackendRegistry } from "../select.js";
 import type { SandboxRequest } from "../types.js";
@@ -190,20 +191,34 @@ describe("sandbox service status", () => {
     expect(await service.status()).toEqual({ available: false, isolation: "sandboxed", reasons: ["No sandbox backend is registered."] });
     const unregister = service.register(fakeBackend("seatbelt", 50));
     expect(await service.status()).toEqual({ available: true, isolation: "sandboxed", backend: { id: "seatbelt", version: "1.0.0" }, reasons: [] });
+    expect(await service.status("evaluation")).toMatchObject({ available: false, reasons: ["seatbelt 1.0.0: network.allowlist=unsupported"] });
     unregister();
     expect((await service.status()).available).toBe(false);
-    expect(await service.status("evaluation")).toMatchObject({ available: false, reasons: ['No sandbox template for purpose "evaluation".'] });
   });
 
-  it("inherits the outer sandbox only when configured, without any backend", async () => {
-    const host = fakeHost();
-    const service = createSandboxService({ host, config: { mode: "inherited" }, timing });
+  it("inherits the outer sandbox only when the Host port says so, without any backend", async () => {
+    const host = { ...fakeHost(), inherited: true as const };
+    const service = createSandboxService({ host, timing });
     expect(await service.status()).toEqual({ available: true, isolation: "inherited", reasons: [] });
     const execution = service.run(request());
     while (!host.processes[0]) await tick();
     expect(host.processes[0].spec.command).toBe("/bin/zsh");
     host.processes[0].exit({ exitCode: 0 });
     expect((await execution.result).facts.isolation).toBe("inherited");
-    expect(() => createSandboxService({ host, config: { mode: "off" as never } })).toThrow(/Invalid sandbox mode/);
+    // A candidate never starts a nested evaluation.
+    expect(await service.status("evaluation")).toEqual({ available: false, isolation: "inherited", reasons: [INHERITED_EVALUATION] });
+    const nested = await service.run(request({ purpose: "evaluation", network: { mode: "allowlist", domains: ["api.example.com"] } })).result;
+    expect(nested.outcome).toEqual({ status: "prepare_failed", reasons: [INHERITED_EVALUATION] });
+    expect(host.processes).toHaveLength(1);
+  });
+
+  it("refuses evaluation when the backend lacks a reserved capability", async () => {
+    const service = createSandboxService({ host: fakeHost(), timing });
+    service.register(fakeBackend("nono", 100, { available: true, version: "1", capabilities: { ...FULL, "network.allowlist": "full" } }));
+    expect(await service.status("evaluation")).toMatchObject({ available: true, backend: { id: "nono" } });
+    const evaluation = (overrides: Partial<SandboxRequest>) => service.run(request({ purpose: "evaluation", network: { mode: "allowlist", domains: ["api.example.com"] }, ...overrides })).result;
+    expect((await evaluation({ limits: { memoryBytes: 1 << 30 } })).outcome).toEqual({ status: "prepare_failed", reasons: ["nono 1: process.resource-limits=unsupported"] });
+    expect((await evaluation({ network: { mode: "allowlist", domains: ["api.example.com"], credentials: [{ domain: "api.example.com", header: "Authorization", source: { env: "KEY" } }] } })).outcome)
+      .toEqual({ status: "prepare_failed", reasons: ["nono 1: network.credential-injection=unsupported"] });
   });
 });

@@ -10,7 +10,7 @@ const WRAP = ["wrap", "-s", "--no-diagnostics"] as const;
 
 /** Landlock cannot deny inside an allowed directory, so Linux lacks `filesystem.write-deny`. */
 export function nonoCapabilities(platform: NodeJS.Platform): CapabilityLevels {
-  return Object.freeze({ "filesystem.write": "full", "filesystem.read-deny": "full", "filesystem.write-deny": platform === "darwin" ? "full" : "unsupported", "network.blocked": "full", "network.allowlist": "unsupported", "process.inherit": "full" });
+  return Object.freeze({ "filesystem.write": "full", "filesystem.read-deny": "full", "filesystem.write-deny": platform === "darwin" ? "full" : "unsupported", "network.blocked": "full", "network.allowlist": "unsupported", "network.local-ports": "unsupported", "network.upstream-proxy": "unsupported", "network.credential-injection": "unsupported", "process.inherit": "full", "process.resource-limits": "unsupported" });
 }
 
 /** The bundled nono (Seatbelt on macOS, Landlock on Linux). Never falls back to a nono found on PATH. */

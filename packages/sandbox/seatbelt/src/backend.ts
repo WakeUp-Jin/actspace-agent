@@ -5,7 +5,7 @@ import type { CapabilityLevels, SandboxBackend, SandboxHostPort, SandboxPolicy }
 
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 const PROBE_TIMEOUT_MS = 3_000;
-export const SEATBELT_CAPABILITIES: CapabilityLevels = Object.freeze({ "filesystem.write": "full", "filesystem.read-deny": "full", "filesystem.write-deny": "full", "network.blocked": "full", "network.allowlist": "unsupported", "process.inherit": "full" });
+export const SEATBELT_CAPABILITIES: CapabilityLevels = Object.freeze({ "filesystem.write": "full", "filesystem.read-deny": "full", "filesystem.write-deny": "full", "network.blocked": "full", "network.allowlist": "unsupported", "network.local-ports": "unsupported", "network.upstream-proxy": "unsupported", "network.credential-injection": "unsupported", "process.inherit": "full", "process.resource-limits": "unsupported" });
 
 /** macOS sandbox-exec. Apple marks it deprecated; it stays as the fallback below nono. */
 export function createSeatbeltBackend(host: SandboxHostPort): SandboxBackend {

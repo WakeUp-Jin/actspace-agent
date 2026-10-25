@@ -3,6 +3,7 @@ import type { BackendRegistry } from "./select.js";
 import type { HostProcess, HostProcessExit, HostProcessSpec, OutputChunk, PreparedLaunch, SandboxExecution, SandboxFacts, SandboxHostPort, SandboxIsolation, SandboxOutcome, SandboxRequest, SandboxResult } from "./types.js";
 
 export type ExecutionTiming = { readonly killGraceMs: number; readonly residualWaitMs: number };
+export const INHERITED_EVALUATION = "An evaluation cannot start inside an inherited sandbox.";
 export const DEFAULT_EXECUTION_TIMING: ExecutionTiming = Object.freeze({ killGraceMs: 2_000, residualWaitMs: 1_000 });
 const RESIDUAL_POLL_MS = 50;
 
@@ -36,6 +37,7 @@ export function startExecution(input: { readonly request: SandboxRequest; readon
 
   const result = (async (): Promise<SandboxResult> => {
     const isolation: SandboxIsolation = input.request.isolation === "none" ? "none" : input.mode === "inherited" ? "inherited" : "sandboxed";
+    if (isolation === "inherited" && input.request.purpose === "evaluation") return { outcome: { status: "prepare_failed", reasons: [INHERITED_EVALUATION] }, facts: { isolation, cleanup: "ok" } };
     const resolved = await resolvePolicy(input.request, input.template);
     if (!resolved.ok) return { outcome: { status: "prepare_failed", reasons: resolved.reasons }, facts: { isolation, cleanup: "ok" } };
     const policy = resolved.policy;

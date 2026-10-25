@@ -19,15 +19,32 @@ export interface SandboxHostPort {
   readonly platform: NodeJS.Platform;
   readonly homeDir: string;
   readonly resources: { readonly nonoPath?: string };
+  /** Set only by an explicit Host launch flag: this process already runs inside an outer sandbox. */
+  readonly inherited?: true;
   spawn(spec: HostProcessSpec): HostProcess;
   /** Bounded helper for backend probes. */
   run(spec: HostProcessSpec & { readonly timeoutMs: number }): Promise<{ readonly exitCode: number | null; readonly stdout: string; readonly stderr: string; readonly error?: string }>;
 }
 
 export type SandboxPurpose = "tool" | "evaluation";
-export type SandboxNetwork = { readonly mode: "unrestricted" } | { readonly mode: "blocked" } | { readonly mode: "allowlist"; readonly domains: readonly string[] };
+export type SandboxNetwork =
+  | { readonly mode: "unrestricted" }
+  | { readonly mode: "blocked" }
+  | {
+    readonly mode: "allowlist";
+    readonly domains: readonly string[];
+    /** Loopback ports reachable directly; clients bypass the proxy for 127.0.0.1 and localhost. */
+    readonly localPorts?: readonly number[];
+    /** `host:port` of the proxy that allowed connections go through. */
+    readonly upstreamProxy?: string;
+    /** Reserved: no backend injects credentials yet. */
+    readonly credentials?: readonly SandboxCredential[];
+  };
+export type SandboxCredential = { readonly domain: string; readonly header: string; readonly source: { readonly env: string } };
+/** Reserved: no backend enforces limits yet. */
+export type SandboxLimits = { readonly memoryBytes?: number; readonly cpuSeconds?: number };
 export type SandboxRead = { readonly mode: "all" } | { readonly mode: "only"; readonly paths: readonly string[] };
-export const SANDBOX_CAPABILITIES = Object.freeze(["filesystem.write", "filesystem.read-deny", "filesystem.write-deny", "network.blocked", "network.allowlist", "process.inherit"] as const);
+export const SANDBOX_CAPABILITIES = Object.freeze(["filesystem.write", "filesystem.read-deny", "filesystem.write-deny", "network.blocked", "network.allowlist", "network.local-ports", "network.upstream-proxy", "network.credential-injection", "process.inherit", "process.resource-limits"] as const);
 export type SandboxCapability = (typeof SANDBOX_CAPABILITIES)[number];
 export type CapabilityLevel = "full" | "partial" | "unsupported";
 export type CapabilityLevels = Readonly<Record<SandboxCapability, CapabilityLevel>>;
@@ -43,6 +60,7 @@ export type SandboxRequest = {
   readonly filesystem?: { readonly read?: SandboxRead; readonly readWrite?: readonly string[]; readonly denyRead?: readonly string[]; readonly denyWrite?: readonly string[] };
   readonly network?: SandboxNetwork;
   readonly timeoutMs?: number;
+  readonly limits?: SandboxLimits;
   readonly requiredCapabilities?: readonly SandboxCapability[];
   /** Private directory for this execution; backends write their policy files here. */
   readonly scratchDir: string;
@@ -60,6 +78,7 @@ export type SandboxPolicy = {
   readonly network: SandboxNetwork;
   readonly requiredCapabilities: readonly SandboxCapability[];
   readonly timeoutMs?: number;
+  readonly limits?: SandboxLimits;
   /** sha256 over the limits only (not argv/env), stable across equal policies. */
   readonly fingerprint: string;
 };
@@ -102,4 +121,5 @@ export interface SandboxService {
   status(purpose?: SandboxPurpose): Promise<SandboxStatus>;
   run(request: SandboxRequest): SandboxExecution;
 }
-export type SandboxManagerConfig = { readonly mode?: "sandboxed" | "inherited" };
+/** No options: inherited mode comes from the Host port, so a Harness composition cannot turn the sandbox off. */
+export type SandboxManagerConfig = Record<string, never>;

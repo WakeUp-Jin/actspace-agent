@@ -1,6 +1,6 @@
 import type { BackendProbe, CapabilityLevels, HostProcess, HostProcessExit, HostProcessSpec, OutputChunk, SandboxBackend, SandboxHostPort, SandboxPolicy } from "../types.js";
 
-export const FULL: CapabilityLevels = Object.freeze({ "filesystem.write": "full", "filesystem.read-deny": "full", "filesystem.write-deny": "full", "network.blocked": "full", "network.allowlist": "unsupported", "process.inherit": "full" });
+export const FULL: CapabilityLevels = Object.freeze({ "filesystem.write": "full", "filesystem.read-deny": "full", "filesystem.write-deny": "full", "network.blocked": "full", "network.allowlist": "unsupported", "network.local-ports": "unsupported", "network.upstream-proxy": "unsupported", "network.credential-injection": "unsupported", "process.inherit": "full", "process.resource-limits": "unsupported" });
 
 export type FakeProcess = HostProcess & { readonly spec: HostProcessSpec; readonly signals: string[]; emit(chunk: OutputChunk): void; exit(exit?: Partial<HostProcessExit>): void; alive: boolean };
 /** A process that reacts to signals according to `behavior`. */

@@ -212,7 +212,7 @@ T0 → T1 →（T2、T3 可并行）→ T4 → T5 → T6 → T7 → T8。
 ## 进度记录
 
 - [x] T0 实测（结论见执行过程步骤 1）
-- [ ] T1 管理器：评估模板与契约加法
+- [x] T1 管理器：评估模板与契约加法
 - [ ] T2 nono 后端：`run` 模式
 - [ ] T3 Host 端口与 CLI `--sandbox-inherited`
 - [ ] T4 CLI `--harness`
