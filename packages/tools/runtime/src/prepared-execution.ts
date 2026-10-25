@@ -174,6 +174,7 @@ export class PreparedToolExecution {
         this.#onceApproval = undefined;
         this.#admittedBySessionGrant = false;
         this.#resources = Object.freeze(await this.registration.permission.extractResources(this.#args, {
+          mode,
           workspaceRoot: this.environment.workspaceRoot,
           canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot),
         }));
@@ -485,7 +486,7 @@ export class PreparedToolExecution {
     this.#checkToolScope();
     enforceCoreToolGuards({ definition: this.registration.definition, args: this.#args ?? {}, hostCapabilities: this.environment.hostCapabilities, lease: this.#lease, signal: this.#controller.signal, executorConcurrencySafe: this.registration.executor.concurrencySafe === true });
     if (this.#permissionMode() !== expectedMode) throw new ToolRuntimeError({ code: "PERMISSION_STATE_CHANGED", message: "Permission mode changed while approval was pending.", retryable: true, phase: "guard" });
-    const resources = Object.freeze(await this.registration.permission.extractResources(this.#args ?? {}, { workspaceRoot: this.environment.workspaceRoot, canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot) }));
+    const resources = Object.freeze(await this.registration.permission.extractResources(this.#args ?? {}, { mode: expectedMode, workspaceRoot: this.environment.workspaceRoot, canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot) }));
     if (canonicalJson(resources) !== canonicalJson(this.#resources)) throw new ToolRuntimeError({ code: "RESOURCE_SCOPE_CHANGED", message: "Tool resources changed while approval was pending.", retryable: true, phase: "guard" });
     if (this.#admittedBySessionGrant) {
       const audience = this.registration.permission.grantAudience;

@@ -36,7 +36,8 @@ export function startExecution(input: { readonly request: SandboxRequest; readon
   };
 
   const result = (async (): Promise<SandboxResult> => {
-    const isolation: SandboxIsolation = input.request.isolation === "none" ? "none" : input.mode === "inherited" ? "inherited" : "sandboxed";
+    // An inherited sandbox still confines a command the caller runs without its own sandbox.
+    const isolation: SandboxIsolation = input.mode === "inherited" ? "inherited" : input.request.isolation === "none" ? "none" : "sandboxed";
     if (isolation === "inherited" && input.request.purpose === "evaluation") return { outcome: { status: "prepare_failed", reasons: [INHERITED_EVALUATION] }, facts: { isolation, cleanup: "ok" } };
     const resolved = await resolvePolicy(input.request, input.template);
     if (!resolved.ok) return { outcome: { status: "prepare_failed", reasons: resolved.reasons }, facts: { isolation, cleanup: "ok" } };

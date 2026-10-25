@@ -148,6 +148,19 @@ describe("Tool Runtime execution contract", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("extracts resources under the mode the call is admitted in, also on the pre-execution recheck", async () => {
+    const seen: string[] = [];
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute: async () => success() }, permission: {
+      extractResources: (_args, context) => { seen.push(context.mode); return []; },
+      evaluate: (_a, _r, c) => c.mode === "full-access" ? { kind: "allow" } : { kind: "ask", reason: "risk", risk: "high" },
+    } });
+    const once = { approvalBroker: { requestApproval: async (request: { requestId: string }) => ({ requestId: request.requestId, kind: "once" as const, decidedAt: new Date().toISOString() }) } };
+    await runtime.executeBatch([call("mode-full")], { ...environment([]), permissionMode: () => "full-access" });
+    await runtime.executeBatch([call("mode-default")], { ...environment([], once), permissionMode: () => "default" });
+    expect(seen).toEqual(["full-access", "full-access", "default", "default"]);
+  });
+
   it("re-evaluates a pending approval on mode change and cleans up its request", async () => {
     let mode: "default" | "full-access" = "default";
     let listener: (() => void) | undefined;

@@ -205,11 +205,16 @@ describe("sandbox service status", () => {
     expect(host.processes[0].spec.command).toBe("/bin/zsh");
     host.processes[0].exit({ exitCode: 0 });
     expect((await execution.result).facts.isolation).toBe("inherited");
+    // A command run without its own sandbox (full-access) is still confined by the outer one.
+    const unsandboxed = service.run(request({ isolation: "none" }));
+    while (!host.processes[1]) await tick();
+    host.processes[1].exit({ exitCode: 0 });
+    expect((await unsandboxed.result).facts.isolation).toBe("inherited");
     // A candidate never starts a nested evaluation.
     expect(await service.status("evaluation")).toEqual({ available: false, isolation: "inherited", reasons: [INHERITED_EVALUATION] });
     const nested = await service.run(request({ purpose: "evaluation", network: { mode: "allowlist", domains: ["api.example.com"] } })).result;
     expect(nested.outcome).toEqual({ status: "prepare_failed", reasons: [INHERITED_EVALUATION] });
-    expect(host.processes).toHaveLength(1);
+    expect(host.processes).toHaveLength(2);
   });
 
   it("refuses evaluation when the backend lacks a reserved capability", async () => {

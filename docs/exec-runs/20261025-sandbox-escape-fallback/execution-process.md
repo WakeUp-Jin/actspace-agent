@@ -38,8 +38,20 @@
   4. **退出码**：被拦截的命令退出码有 1、4、255，所以只排除 2、126、127。
 - **影响文件**：只有 `tmp/sandbox-escape-spike/`。实验在 `~` 下建的临时工作区已删除。
 
+### 步骤 2：T1 tools-runtime 与管理器
+
+- **操作**：
+  - `ResourceExtractionContext` 加 `mode`。`prepared-execution.ts` 的首次提取传入当前模式；执行前复查（`#recheck`）传入准入时的模式。
+  - 管理器 `execution.ts`：继承模式下，`isolation` 一律报 `inherited`，请求为 `none` 时也一样。
+- **结果**：
+  - 新增测试：tools-runtime 断言提取资源拿到的模式（`full-access` 与 `default` 各一次调用，首次提取加复查共四次）；管理器断言继承模式加 `isolation: "none"` 报 `inherited`。
+  - shell-tools 的 lifecycle 测试补上 `mode`（T2 会重写这些用例）。
+  - `pnpm --filter @actspace/tools-runtime test` 48 通过，`@actspace/sandbox` 30 通过，`@actspace/tools-shell-tools` 109 通过，`pnpm typecheck` 通过。
+- **影响文件**：`packages/tools/runtime/src/{permission/types.ts,prepared-execution.ts,test/runtime.test.ts}`、`packages/sandbox/manager/src/{execution.ts,test/execution.test.ts}`、`packages/tools/shell-tools/src/test/lifecycle.test.ts`。
+
 ## 遇到的问题
 
+- T1 新测试起初只期望三次提取，实际每次准入都会在执行前复查一次（`full-access` 也一样），改为四次。
 - 第二轮实测没有设置代理，`git ls-remote` 连不上 github.com，与沙箱无关。第一轮设置了代理，沙箱内外都成功（公开仓库，不需要凭据），说明工具沙箱不限网络。
 
 ## 跳过或推迟的事项

@@ -34,7 +34,7 @@ describe("shell-tools lifecycle", () => {
       const runtime = new ToolRuntime(); registerTools(runtime, {}, sandbox);
       const policy = runtime.registry.capture("bash").permission;
       const args = { command: "pnpm test" };
-      const resources = await policy.extractResources(args, { workspaceRoot: root, canonicalizeFile: async () => { throw new Error("unused"); } });
+      const resources = await policy.extractResources(args, { mode: "default", workspaceRoot: root, canonicalizeFile: async () => { throw new Error("unused"); } });
       expect(resources).toMatchObject([{ kind: "process", noSandbox: true }]);
       expect(resources[0]).not.toHaveProperty("grantPrefix");
       const permissionContext = { workspaceRoot: root, hostCapabilities: ["process"] };
@@ -66,7 +66,7 @@ it("offers grants only for canonical in-workspace literal commands and retains h
     await mkdir(root); await mkdir(outside); await symlink(outside, join(root, "escape"));
     const runtime = new ToolRuntime(); registerTools(runtime, {}, sandboxWithStatus(true));
     const policy = runtime.registry.capture("bash").permission;
-    const context = { workspaceRoot: root, canonicalizeFile: async () => { throw new Error("unused"); } };
+    const context = { mode: "default" as const, workspaceRoot: root, canonicalizeFile: async () => { throw new Error("unused"); } };
     const permissionContext = { workspaceRoot: root, mode: "default" as const, hostCapabilities: ["process"] };
     for (const args of [{ command: "pnpm test" }, { command: "pnpm test", cwd: "escape" }, { command: "pnpm test", requiredPermissions: ["no_sandbox"] }, { command: "pnpm test && pnpm build" }, { command: "pnpm dlx x" }]) {
       const resources = await policy.extractResources(args, context);
