@@ -26,7 +26,7 @@ describe("timeout wording", () => {
   it.each(["Request timed out.", "request timeout", "connect time-out", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT", "Timed out"])("recognises %s", text => {
     expect(TIMEOUT_PATTERN.test(text)).toBe(true);
   });
-  it("does not match unrelated text", () => { expect(TIMEOUT_PATTERN.test("Connection error.")).toBe(false); });
+  it.each(["Connection error.", "invalid runtime output", "lifetime outage", "timeouts_config missing"])("does not match unrelated text %s", text => { expect(TIMEOUT_PATTERN.test(text)).toBe(false); });
 });
 
 describe("pi-ai transport failures", () => {

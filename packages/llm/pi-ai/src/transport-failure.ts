@@ -1,7 +1,10 @@
 import type { LlmFailureKind } from "@actspace/llm-service";
 
-/** Matches timeout, timed out, time-out and undici/Node codes such as UND_ERR_CONNECT_TIMEOUT or ETIMEDOUT. */
-export const TIMEOUT_PATTERN = /time(?:d)?[\s_-]*out/i;
+/**
+ * Matches timeout, timed out, time-out and undici/Node codes such as UND_ERR_CONNECT_TIMEOUT or ETIMEDOUT.
+ * Word boundaries keep text such as "runtime output" from being read as a timeout and retried.
+ */
+export const TIMEOUT_PATTERN = /\btime(?:d)?[\s-]*out\b|\bETIMEDOUT\b|_TIMEOUT\b/i;
 const NETWORK_CODE = /^(?:ECONN\w*|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|EPIPE|UND_ERR_SOCKET)$/;
 
 /** Walk the `cause` chain: SDKs wrap undici errors, and the code only survives on the inner error. */
