@@ -2535,7 +2535,7 @@ sessionId: input.sessionId,
     await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByRole("button", { name: "会话状态： 等待审批" })).toBeTruthy();
-    expect(screen.getByText("沙盒")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "沙盒" })).toBeInTheDocument();
 
     await act(async () => {
       approvalPending = false;
