@@ -15,6 +15,11 @@ import type { CordisContext } from "@actspace/cordis-adapter";
 import { waterfallDispatch } from "@actspace/cordis-adapter";
 import { grantCoversProcess, matchingProcessGrant, canonicalizeFileResource, combinePermissionDecisions, evaluateGlobalBoundary, isPathWithin, sessionGrantsCoverResources, type OnceApproval, type ToolGrantSuggestion, type ToolPermissionDecision, type ToolResource } from "./permission/index.js";
 
+/** 3 hours: a user who steps away should still find the approval card when they return. */
+const DEFAULT_APPROVAL_TIMEOUT_MS = 3 * 60 * 60_000;
+/** The model reads this as the tool result; it must not look like a command failure worth retrying. */
+const APPROVAL_TIMEOUT_MESSAGE = "用户未在时限内响应审批，不要换个命令重试，可以先说明需要什么权限后结束本轮。";
+
 export type ToolCallInput = {
   readonly callId: string;
   readonly name: string;
@@ -348,7 +353,7 @@ export class PreparedToolExecution {
       return { code: "APPROVAL_REQUIRED", message: "Host approval is required but no ApprovalBroker is available.", retryable: false, phase: "approval" };
     }
     const requestedAt = new Date();
-    const expiresAt = new Date(requestedAt.getTime() + (this.environment.approvalTimeoutMs ?? 10 * 60_000));
+    const expiresAt = new Date(requestedAt.getTime() + (this.environment.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS));
     const normalizedArgsDigest = createHash("sha256").update(canonicalJson(this.#args)).digest("hex");
     const grantSuggestions = await this.#grantSuggestions(reasons);
     const request: ApprovalRequest = {
@@ -435,11 +440,12 @@ export class PreparedToolExecution {
         await this.#recordPermission("permission/decided", decision as unknown as Readonly<Record<string, RuntimeV2JsonValue>>);
       }
       if (this.#approvalReason) this.#approvalReason += decision.kind === "once" || decision.kind === "session" ? "；人工允许" : "；人工未允许";
+      if (decision.kind === "deny" && decision.code === "timeout") return { code: "APPROVAL_TIMEOUT", message: APPROVAL_TIMEOUT_MESSAGE, retryable: false, phase: "approval" };
       if (decision.kind !== "once" && decision.kind !== "session") return { code: decision.code === "broker-unavailable" ? "APPROVAL_REQUIRED" : "APPROVAL_DENIED", message: decision.code, retryable: false, phase: "approval" };
       return { kind: "once", requestId: request.requestId, callId: this.callId, sessionId: this.input.sessionId, agentRunId: this.input.agentRunId, pluginId: this.pluginId, toolName: this.name, definitionDigest: this.definitionDigest, normalizedArgsDigest, issuedAt: decision.decidedAt, expiresAt: request.expiresAt };
     } catch (error) {
       await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: this.#controller.signal.aborted ? "aborted" : "timeout", decidedAt: new Date().toISOString() });
-      return { code: "APPROVAL_TIMEOUT", message: this.#controller.signal.aborted ? "Approval was aborted." : "Approval timed out.", retryable: true, phase: "approval" };
+      return { code: "APPROVAL_TIMEOUT", message: this.#controller.signal.aborted ? "Approval was aborted." : APPROVAL_TIMEOUT_MESSAGE, retryable: !!this.#controller.signal.aborted, phase: "approval" };
     } finally {
       unsubscribe?.();
       this.#controller.signal.removeEventListener("abort", abort);

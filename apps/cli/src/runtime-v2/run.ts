@@ -135,6 +135,10 @@ function failedRunDiagnostic(events: readonly SessionEventEnvelopeV1[], taskId: 
       const failure = record(data.failure);
       if (typeof failure.message === "string") return { code: typeof failure.kind === "string" ? failure.kind : "RUN_FAILED", message: failure.message };
     }
+    if (event.type === "turn/end" && data.reason === "step-limit") {
+      const steps = events.slice(start + 1).filter(item => item.type === "step/start" && record(item.data).turnId === data.turnId).length;
+      return { code: "STEP_LIMIT", message: `The turn reached its ${steps > 0 ? `${steps}-step ` : "step "}limit and stopped. Send a follow-up to continue.` };
+    }
   }
   return { code: "RUN_FAILED", message: "Agent task failed. Inspect the Session journal for details." };
 }

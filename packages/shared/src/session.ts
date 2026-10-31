@@ -132,7 +132,9 @@ export type SessionEventType =
   | "context_compaction"
   | "workspace_preparation"
   | "error"
-  | "agent_run_aborted";
+  | "agent_run_aborted"
+  /** 回合正常停下但需要提醒用户（例如步数上限）；中性提示，不是错误。 */
+  | "agent_run_notice";
 
 export type SessionEvent<TPayload = unknown> = {
   id: EventId;

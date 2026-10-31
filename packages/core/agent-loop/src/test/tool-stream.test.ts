@@ -41,6 +41,19 @@ describe("AgentLoop tool live events", () => {
     expect(events.every((event) => event.parentSessionId === "parent" && event.parentCallId === "delegate")).toBe(true);
     expect(journal.at(-1)).toMatchObject({ type: "turn/end", data: { reason: "step-limit" } });
   });
+  it("reserves the last main step for a tool-free summary addressed to the user", async () => {
+    const tools: string[][] = [];
+    const messages: string[] = [];
+    const { result, journal } = await runToolStreamFixture({ maxSteps: 2,
+      onTools: (definitions) => tools.push(definitions.map((tool) => tool.name)),
+      onMessages: (values) => messages.push(JSON.stringify(values)),
+    });
+    expect(tools).toEqual([["read_file"], []]);
+    expect(messages.at(-1)).toContain("for the user now");
+    expect(messages.at(-1)).not.toContain("for the parent");
+    expect(result).toMatchObject({ reason: "step-limit", steps: 2, finalText: expect.stringContaining("Done.") });
+    expect(journal.at(-1)).toMatchObject({ type: "turn/end", data: { reason: "step-limit" } });
+  });
   it.each([true, false])("separates arguments and emits each tool lifecycle (deltas=%s)", async (deltas) => {
     const { events, journal } = await runToolStreamFixture({ deltas });
     expect(events.filter((e) => e.kind === "assistant-delta").map((e) => e.message).join("")).toBe('Read now. Done. {"valid":"body JSON"}');

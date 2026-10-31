@@ -10,7 +10,7 @@
 
 import type { DesktopRuntimeV2ApprovalDecision, DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2ApprovalRequest } from "./runtime-v2/host-ports";
 
-const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_TIMEOUT_MS = 3 * 60 * 60 * 1000;
 
 interface PendingEntry {
   resolve: (decision: DesktopRuntimeV2ApprovalDecision) => void;

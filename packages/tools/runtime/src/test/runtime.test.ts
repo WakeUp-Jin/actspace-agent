@@ -405,6 +405,15 @@ describe("Tool Runtime execution contract", () => {
     const [result] = await runtime.executeBatch([call(`approval-${code}`)], environment([], { approvalBroker: broker, approvalTimeoutMs: 5, permissionEvents }));
     expect(result).toMatchObject({ status: "denied", failure: { code } });
     expect(permissionEvents).toEqual(["permission/asked", "permission/decided"]);
+    if (code === "APPROVAL_TIMEOUT") expect(result).toMatchObject({ failure: { message: expect.stringContaining("不要换个命令重试"), retryable: false } });
+  });
+
+  it("tells the model not to retry when the Host reports a timed-out approval", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { async execute() { return success(); } }, permission: { extractResources: () => [], evaluate: () => ({ kind: "ask", reason: "risk", risk: "medium" }) } });
+    const broker = { async requestApproval(request: { requestId: string }) { return { requestId: request.requestId, kind: "deny" as const, code: "timeout" as const, decidedAt: new Date().toISOString() }; } };
+    const [result] = await runtime.executeBatch([call("approval-host-timeout")], environment([], { approvalBroker: broker, approvalTimeoutMs: 1000 }));
+    expect(result).toMatchObject({ status: "denied", failure: { code: "APPROVAL_TIMEOUT", message: expect.stringContaining("不要换个命令重试"), retryable: false } });
   });
 
   it("rejects invalid args with a field path and no body invocation", async () => {

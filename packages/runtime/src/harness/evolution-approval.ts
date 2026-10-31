@@ -23,7 +23,7 @@ export class EvolutionApproval {
     const requestApproval = context.requestApproval ?? this.host.toolEnvironment.approvalBroker?.requestApproval.bind(this.host.toolEnvironment.approvalBroker);
     if (!requestApproval) throw new Error("Harness changes require a Host approval broker");
     const requestId = randomUUID();
-    const expiresAt = Date.now() + (this.host.toolEnvironment.approvalTimeoutMs ?? 600000);
+    const expiresAt = Date.now() + (this.host.toolEnvironment.approvalTimeoutMs ?? 3 * 60 * 60_000);
     const digest = createHash("sha256").update(JSON.stringify(input)).digest("hex");
     const request: ApprovalRequest = { schemaVersion: 1, requestId, callId: context.callId, sessionId: context.sessionId, agentRunId: context.agentRunId, agentId: `main:${context.sessionId}`, pluginId: "actspace.plugin-manager", toolName: "plugin_manager", definitionDigest: "evolution-v1", normalizedArgsDigest: digest,
       reasons: [{ code: "HARNESS_EVOLUTION", message: `${input.phase === "initialize" ? "加载并初始化候选插件（同进程可信代码）" : "为当前会话的后续消息启用新 Harness"}：${input.purpose}\n版本：${input.candidate?.executionDigest ?? input.artifactId ?? input.executionDigest ?? "historical selection"}`, risk: "high" }], resources: [], grantSuggestions: [], supportedLifetimes: ["once"], requestedAt: new Date().toISOString(), expiresAt: new Date(expiresAt).toISOString() };

@@ -141,7 +141,8 @@ export class AgentLoop {
         const preStep = await this.waterfall("agent/pre-step", { agentRunId, turnId, stepId, stepIndex: stepCount, mode });
         this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "step-started" });
         await this.options.session.append(core("step/start", { turnId, stepId, agentRunId, stepIndex: stepCount, ...(isRecord(preStep) ? { metadata: preStep as RuntimeV2JsonValue } : {}) }));
-        const budgetSummary = this.options.descriptor.kind === "subagent" && stepCount === this.options.descriptor.maxSteps;
+        // 最后一步（main 与 subagent 一样）不给工具，留给总结，避免步数打满后没有任何回复。
+        const budgetSummary = stepCount === this.options.descriptor.maxSteps;
         const tools = budgetSummary ? [] : this.toolDefinitions(mode);
         const visibleToolNames = new Set(tools.map((tool) => tool.name));
         let candidate = await this.candidate(assembler, {
@@ -160,7 +161,7 @@ export class AgentLoop {
         for (const tool of llmInput.tools) visibleToolNames.add(tool.name);
         const requestMessages = Object.freeze([
           ...llmInput.messages,
-          ...(budgetSummary && !this.options.contextSources ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
+          ...(budgetSummary && !this.options.contextSources ? [{ role: "user" as const, content: budgetSummaryNotice(this.options.descriptor.kind) }] : []),
         ]);
         const requestPlan = await this.waterfall("agent/request", { requestId, turnId, stepId, routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model, messages: requestMessages, tools: llmInput.tools });
         const requestRecord: Readonly<Record<string, unknown>> = isRecord(requestPlan) ? requestPlan : {};
@@ -248,7 +249,7 @@ export class AgentLoop {
           converted = await this.contextInput(candidate, requestId, llmInput.options, { mode, selectedSkillIds: configuration.selectedSkillIds ?? [], budgetSummary });
           requestMessageList = Object.freeze([
             ...converted.input.messages,
-            ...(budgetSummary && !this.options.contextSources ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
+            ...(budgetSummary && !this.options.contextSources ? [{ role: "user" as const, content: budgetSummaryNotice(this.options.descriptor.kind) }] : []),
           ]);
           activePrepared = await this.options.llm.prepareCapturedAsync(prepared.registration, {
             ...prepared.request,
@@ -357,7 +358,7 @@ export class AgentLoop {
       resolveArtifact: this.options.toolEnvironment(this.options.session).resolveArtifact,
     };
     const engine = this.options.createContextEngine?.(configuration) ?? new ContextEngine(configuration);
-    if (runtime.budgetSummary && this.options.contextSources) await engine.insert("actspace.context-conversation", `execution-budget:${candidate.stepId}`, "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete.", "request", candidate.turnId);
+    if (runtime.budgetSummary && this.options.contextSources) await engine.insert("actspace.context-conversation", `execution-budget:${candidate.stepId}`, budgetSummaryNotice(this.options.descriptor.kind), "request", candidate.turnId);
     const replayThrough = this.options.session.durableSeq ?? this.options.session.lastSeq;
     const context = engine.getInstance(request) === undefined ? await engine.getContext(request) : await engine.reconcile(request, replayThrough);
     return { context, engine, input: await engine.toLlmInput(context) };
@@ -575,3 +576,8 @@ function currentPermissionMode(events: readonly import("@actspace/session-journa
   return mode;
 }
 function core(type: string, data: RuntimeV2JsonValue, extra: Record<string, unknown> = {}) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null, ...extra } as never; }
+
+/** 最后一步的收尾提示：subagent 写给父 Agent，main 写给用户。 */
+function budgetSummaryNotice(kind: "main" | "subagent"): string {
+  return `Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for ${kind === "subagent" ? "the parent" : "the user"} now. Do not claim unperformed work is complete.`;
+}
