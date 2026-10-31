@@ -5,6 +5,7 @@ import { SessionHandle } from "@actspace/session-persistence";
 import { taskCodecs } from "../task-events.js";
 import { TaskLedger } from "../task-ledger.js";
 import { SessionRunManager, type RunFactory } from "../run-manager.js";
+import { BACKGROUND_WAKE_KIND } from "@actspace/shared/runtime-v2";
 import { ExecutionBudget, RunBudget } from "../execution-budget.js";
 
 function gate() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
@@ -236,4 +237,54 @@ it("drains an active Run without abort and leaves the next task pending", async 
   expect(executions).toBe(1);
   expect(ledger.snapshot().tasks.map(task => task.state)).toEqual(["completed", "pending"]);
   await manager.dispose(); await session.close();
+});
+
+describe("send after stop or failure", () => {
+  const completes = { create: async () => ({ execute: async () => ({ outcome: "completed" as const, value: "ok" }), dispose: async () => {} }) };
+
+  it("runs a new user message at once when the pause was left by a failed Run", async () => {
+    let fail = true;
+    const { manager, ledger, session } = await fixture({ create: async () => { if (fail) throw new Error("boom"); return completes.create(); } });
+    await manager.submit("one", "one"); await manager.waitForIdle();
+    expect(ledger.snapshot().paused).toBe(true);
+    fail = false;
+    await manager.submit("two", "two"); await manager.waitForIdle();
+    expect(ledger.snapshot()).toMatchObject({ paused: false, queue: [], tasks: [{ state: "failed" }, { state: "completed" }] });
+    await manager.dispose().catch(() => {}); await session.close();
+  });
+
+  it("keeps the queue paused and appends behind work left over from a stop", async () => {
+    const entered = gate();
+    const { manager, ledger, session } = await fixture({ create: async input => ({
+      execute: async () => { entered.resolve(); await new Promise<void>(resolve => { input.signal.addEventListener("abort", () => resolve(), { once: true }); }); return { outcome: "cancelled", value: null }; },
+      dispose: async () => {},
+    }) });
+    await manager.submit("one", "one"); await entered.promise;
+    await manager.submit("two", "two");
+    await manager.stop(ledger.snapshot().runs.find(run => run.state === "running")!.runId);
+    await manager.waitForIdle();
+    expect(ledger.snapshot().paused).toBe(true);
+    await manager.submit("three", "three"); await manager.waitForIdle();
+    const snapshot = ledger.snapshot();
+    expect(snapshot.paused).toBe(true);
+    expect(snapshot.queue.map(id => snapshot.tasks.find(task => task.taskId === id)!.content)).toEqual(["two", "three"]);
+    await manager.dispose().catch(() => {}); await session.close();
+  });
+
+  it("does not resume a paused queue for a background wake", async () => {
+    const { manager, ledger, session } = await fixture({ create: async () => { throw new Error("boom"); } });
+    await manager.submit("one", "one"); await manager.waitForIdle();
+    await manager.submit("background-wake:test", { kind: BACKGROUND_WAKE_KIND });
+    expect(ledger.snapshot().paused).toBe(true);
+    await manager.dispose().catch(() => {}); await session.close();
+  });
+
+  it("resumes the first send of a recovered (forked) Session", async () => {
+    const { manager, ledger, session } = await fixture(completes);
+    await ledger.submit("stale", "stale"); await ledger.cancel(ledger.snapshot().tasks[0]!.taskId, ledger.snapshot().revision);
+    await ledger.setPaused(true, ledger.snapshot().revision);
+    await manager.submit("first-after-fork", "hello"); await manager.waitForIdle();
+    expect(ledger.snapshot()).toMatchObject({ paused: false, tasks: [{ state: "cancelled" }, { state: "completed" }] });
+    await manager.dispose(); await session.close();
+  });
 });

@@ -71,8 +71,10 @@ export class SessionRunManager {
 
   async submit(submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
     this.#assertOpen();
-    if (!isBackgroundWake(content)) this.#wakeSuspended = false;
-    const receipt = await this.ledger.submit(submissionId, content, continuationOf);
+    const userMessage = !isBackgroundWake(content);
+    if (userMessage) this.#wakeSuspended = false;
+    // A new user message after a stop/failure runs at once; stale queued work keeps the pause.
+    const receipt = await this.ledger.submit(submissionId, content, continuationOf, { resumeWhenIdle: userMessage && !this.#active && !this.#maintenance });
     this.kick();
     return receipt;
   }
