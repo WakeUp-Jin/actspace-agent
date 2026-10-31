@@ -2,13 +2,15 @@ import { useShallowStable } from "./hooks/useShallowStable";
 import { remoteSessionPrefs } from "./target/remote-session-prefs";
 import { useRunTarget } from "./target/use-run-target";
 import type { RunTargetValue } from "./target/run-target-context";
+import type { SideChatRuntimeValue } from "./components/right-panel/side-chat/side-chat-runtime";
+import { sideChatOpenError } from "./components/right-panel/side-chat/use-open-side-chat";
 import { createEmptyStreamingState } from "./session/session-run-state";
 import { upsertStreamingTool } from "./session/live-runs/stream-state";
 import type { CompactionBlock } from "./session/live-runs/stream-blocks";
 import { getSessionTitle } from "./session/session-title";
-import { createSessionCellRetention, useChatSessionRecord } from "./session/session-store";
-import { mergeTranscript } from "./session/transcript";
-import { createLiveRunStore, TERMINAL_RUN_LIMIT, useBusySessionIds, useLiveRunView, type StreamEvent } from "./session/live-runs/live-run-store";
+import { createSessionCellRetention } from "./session/session-store";
+import { useSessionTranscript } from "./session/use-session-transcript";
+import { createLiveRunStore, TERMINAL_RUN_LIMIT, useBusySessionIds, type StreamEvent } from "./session/live-runs/live-run-store";
 import { scheduleFrame } from "./session/frame-batch";
 import { applyTaskSnapshot as applyHostTaskSnapshot, createTaskQueueStore } from "./session/task-queue";
 import { loadEarlier } from "./session/session-pages";
@@ -96,7 +98,6 @@ const selectApprovalPending = (state: SessionLocalState) => state.approvalPendin
 const selectFailed = (state: SessionLocalState) => state.failed;
 const selectUnread = (state: SessionLocalState) => state.unread;
 const selectDraft = (state: SessionLocalState) => state.draft ?? null;
-const selectCompactionFailure = (state: SessionLocalState) => state.compactionFailure ?? null;
 const selectMessageQueue = (state: SessionLocalState) => state.messageQueue;
 const DEFAULT_COMPOSER_STATE: ComposerSessionState = {
   mode: "agent",
@@ -256,13 +257,12 @@ export function App() {
   const continueQueueRef = useRef<(sessionId: string, outcome: SessionRunOutcome) => Promise<void>>(async () => {});
   const activeSessionIdRef = useRef<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const { blocks: streamingBlocks, isStreaming, isAborting, runId: activeAgentRunId, recovered: isRecoveredRun } = useLiveRunView(liveRuns, selectedSessionId);
   // 当前会话的本地状态直接从 store 选取；切换会话不再需要逐项复制（14 T6）。
   const composerDraftRestore = useSessionLocalState(localStore, selectedSessionId, selectDraft);
-  const compactionFailure = useSessionLocalState(localStore, selectedSessionId, selectCompactionFailure);
   const messageQueue = useSessionLocalState(localStore, selectedSessionId, selectMessageQueue);
   // durable 历史从 store 的 cell 派生；cell 不放进 App 的作用域，见 useChatSessionRecord。
-  const { sessionRecord, historyBefore } = useChatSessionRecord(sessionStore, selectedSessionId, bootstrapState?.workspaceRoot, isRecoveredRun);
+  const { sessionRecord, historyBefore, live: liveView, messages, isCompacting } = useSessionTranscript({ sessionStore, liveRuns, localStore }, selectedSessionId, bootstrapState?.workspaceRoot);
+  const { blocks: streamingBlocks, isStreaming, isAborting } = liveView;
   const runTarget = useRunTarget({
     sessionId: selectedSessionId,
     sessionWorkspacePath: sessionRecord?.meta.workspaceRoot,
@@ -551,11 +551,22 @@ export function App() {
       if (location.kind === "remote" && location.hostId === hostId) evictSession(item.id);
     }
   }), [evictSession]);
-  // cell 保留：当前会话和运行中的会话常驻，其余只留最近查看的几个（14 T9 / T10）。
+  // 右栏打开着的侧边对话（按打开次数计数）：和当前会话一样常驻 store。
+  const [openSideChatIds, setOpenSideChatIds] = useState<ReadonlyMap<string, number>>(() => new Map());
+  const retainSideChat = useCallback((sessionId: string) => {
+    setOpenSideChatIds((current) => new Map(current).set(sessionId, (current.get(sessionId) ?? 0) + 1));
+    return () => setOpenSideChatIds((current) => {
+      const next = new Map(current);
+      const count = (next.get(sessionId) ?? 1) - 1;
+      if (count > 0) next.set(sessionId, count); else next.delete(sessionId);
+      return next;
+    });
+  }, []);
+  // cell 保留：当前会话、运行中的会话和右栏打开着的侧边对话常驻，其余只留最近查看的几个（14 T9 / T10）。
   useEffect(() => {
-    cellRetention.retain(new Set(selectedSessionId ? [...busySessionIds, selectedSessionId] : busySessionIds));
+    cellRetention.retain(new Set([...busySessionIds, ...openSideChatIds.keys(), ...(selectedSessionId ? [selectedSessionId] : [])]));
     if (selectedSessionId) cellRetention.viewed(selectedSessionId);
-  }, [cellRetention, busySessionIds, selectedSessionId]);
+  }, [cellRetention, busySessionIds, selectedSessionId, openSideChatIds]);
 
   useEffect(() => {
     Promise.all([
@@ -881,6 +892,36 @@ export function App() {
     now: Date.now,
   }), [createSessionForInput, taskCommand, taskQueue, patchLocal]);
 
+  // 向一个已存在的会话提交（主会话和右栏的侧边对话共用）：pending 记录、configure、提交和队列刷新。
+  const sendToSession = useCallback(async (
+    sessionId: string,
+    text: string,
+    options: ComposerSendOptions,
+    resumeAfterAcceptance = false,
+  ) => {
+    patchLocal(sessionId, { lastSendOptions: options });
+    setFailedForSession(sessionId, false);
+    setCompactionFailureForSession(sessionId, null);
+    let result: import("@actspace/shared/runtime-v2").TaskSubmissionResult;
+    const inFlight = sendsInFlightRef.current;
+    inFlight.set(sessionId, (inFlight.get(sessionId) ?? 0) + 1);
+    try {
+      result = await sessionGateway.submit(sessionId, text, options, !isLocalSession(sessionId) ? targetChoices.modelId : options.model);
+    } finally {
+      const remaining = (inFlight.get(sessionId) ?? 1) - 1;
+      if (remaining > 0) inFlight.set(sessionId, remaining); else inFlight.delete(sessionId);
+    }
+    patchLocal(sessionId, { draft: undefined });
+    if (activeSessionIdRef.current === sessionId) setSendScrollRequestId(value => value + 1);
+    // Receipt already proves acceptance; a failed refresh must not restore a sent draft.
+    await refreshTaskQueue(sessionId).catch(reportSessionFailure(sessionId, QUEUE_REFRESH_FAILED));
+    const snapshot = taskQueue.snapshot(sessionId);
+    const acceptedTaskId = "task" in result ? result.task.taskId : null;
+    if (resumeAfterAcceptance && snapshot?.paused && snapshot.tasks.some(task => task.taskId === acceptedTaskId && task.state === "pending")) {
+      await taskCommand({ op: "resume", sessionId, revision: snapshot.revision });
+    }
+  }, [sessionGateway, targetChoices, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, refreshTaskQueue, reportSessionFailure, patchLocal]);
+
   const handleSend = useCallback(async (
     text: string,
     options: ComposerSendOptions,
@@ -900,29 +941,8 @@ export function App() {
       const result = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
       if (!result.ok) throw new Error(result.error ?? "无法更新会话工作区");
     }
-    patchLocal(sessionId, { lastSendOptions: options });
-    setFailedForSession(sessionId, false);
-    setCompactionFailureForSession(sessionId, null);
-    let result: import("@actspace/shared/runtime-v2").TaskSubmissionResult;
-    const inFlight = sendsInFlightRef.current;
-    inFlight.set(visibleSessionId, (inFlight.get(visibleSessionId) ?? 0) + 1);
-    try {
-      result = await sessionGateway.submit(visibleSessionId, text, options, !isLocalSession(visibleSessionId) ? targetChoices.modelId : options.model);
-    } finally {
-      const remaining = (inFlight.get(visibleSessionId) ?? 1) - 1;
-      if (remaining > 0) inFlight.set(visibleSessionId, remaining); else inFlight.delete(visibleSessionId);
-    }
-    patchLocal(visibleSessionId, { draft: undefined });
-    if (activeSessionIdRef.current === visibleSessionId) setSendScrollRequestId(value => value + 1);
-    // Receipt already proves acceptance; a failed refresh must not restore a sent draft.
-    await refreshTaskQueue(visibleSessionId).catch(reportSessionFailure(visibleSessionId, QUEUE_REFRESH_FAILED));
-    const snapshot = taskQueue.snapshot(visibleSessionId);
-    const acceptedTaskId = "task" in result ? result.task.taskId : null;
-    if (resumeAfterAcceptance && snapshot?.paused && snapshot.tasks.some(task => task.taskId === acceptedTaskId && task.state === "pending")) {
-      await taskCommand({ op: "resume", sessionId: visibleSessionId, revision: snapshot.revision });
-    }
-    return;
-  }, [sessionGateway, runTarget, targetChoices, sessionRecord, selectedWorkspaceRoot, runLocation, selectedBranch, fallbackWorkspaceRoot, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, liveRuns, refreshTaskQueue, reportSessionFailure, patchLocal]);
+    await sendToSession(visibleSessionId, text, options, resumeAfterAcceptance);
+  }, [sessionGateway, runTarget, targetChoices, sessionRecord, selectedWorkspaceRoot, runLocation, selectedBranch, fallbackWorkspaceRoot, liveRuns, patchLocal, sendToSession]);
 
   useEffect(() => {
     return hostDirectory.onHostsChanged(hosts => {
@@ -956,10 +976,9 @@ export function App() {
     });
   }, [localStore, handleSend, selectedChatModelId]);
 
-  const handleAbort = useCallback(async () => {
-    const sessionId = activeSessionIdRef.current;
-    const run = sessionId ? liveRuns.get(sessionId) : undefined;
-    if (!run || !sessionId) return;
+  const abortSession = useCallback(async (sessionId: string) => {
+    const run = liveRuns.get(sessionId);
+    if (!run) return;
 
     const input: AbortAgentRunInput = {
       sessionId,
@@ -980,6 +999,10 @@ export function App() {
       liveRuns.refresh(sessionId);
     }
   }, [liveRuns]);
+  const handleAbort = useCallback(async () => {
+    const sessionId = activeSessionIdRef.current;
+    if (sessionId) await abortSession(sessionId);
+  }, [abortSession]);
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
     // Create only on first send, after workspace / branch / worktree selection.
@@ -1108,13 +1131,6 @@ export function App() {
   }, [handleCreateSession, handleSelectSession, sessionBootstrapComplete]);
 
   const persistedEvents = sessionRecord?.events ?? EMPTY_EVENTS;
-  // durable 与 live 按块的 runId 合并（14 S5），规则见 session/transcript.ts。
-  const messages = useMemo<MessageBlock[]>(() => mergeTranscript(
-    { blocks: sessionRecord?.messageBlocks, events: persistedEvents },
-    { blocks: streamingBlocks, runId: activeAgentRunId, recovered: isRecoveredRun },
-    { compactionFailure, isStreaming },
-  ), [sessionRecord?.messageBlocks, persistedEvents, streamingBlocks, activeAgentRunId, isRecoveredRun, compactionFailure, isStreaming]);
-  const isCompacting = streamingBlocks.some((block) => block.kind === "context_compaction" && block.status === "running");
 
   const contextSnapshot: ContextUsageSnapshot | null =
     sessionRecord?.contextSnapshot ??
@@ -1499,8 +1515,45 @@ export function App() {
     onArchiveSession: handleArchiveSession, onRestoreSession: handleRestoreSession, onOpenWorkspace: handleOpenWorkspace, onArchiveWorkspace: handleArchiveWorkspace, onRemoveWorkspace: handleRemoveWorkspace,
   });
 
+  const openSideChat = useCallback(async (parentSessionId: string) => {
+    let result: import("@actspace/shared").SideChatOpenResult;
+    try { result = await sessionsApi.openSideChat({ parentSessionId }); }
+    catch (error) {
+      // 从 + 菜单、启动页或 /side 打开都在主会话输入框上方提示原因。
+      console.error("Failed to open side chat", error);
+      setComposerNotice({ sessionId: parentSessionId, text: sideChatOpenError(error) });
+      throw error;
+    }
+    sessionStore.applyEnvelope(result.session);
+    // 主会话行上的侧边对话数量随之变化。
+    void readSidebarSessions().then(setSessions).catch(console.error);
+    return result;
+  }, [sessionStore, readSidebarSessions]);
+  const listSideChats = useCallback((parentSessionId: string) => sessionsApi.listSideChats({ parentSessionId }), []);
+  const abortSideChat = useCallback((sessionId: string) => { void abortSession(sessionId); }, [abortSession]);
+  const setSideChatMode = useCallback(async (sessionId: string, mode: ComposerMode) => {
+    if (busySessionIds.has(sessionId)) throw new Error("侧边对话正在执行，请等这一轮结束后再切换模式");
+    const expectedRevision = sessionStore.peek(sessionId)?.snapshot?.agentModeRevision;
+    const result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision });
+    if (!result.ok) {
+      await readSessionPage(sessionId);
+      throw new Error(result.error === "SESSION_BUSY" ? "侧边对话仍有运行或审批，请稍后再切换模式。" : result.error === "AGENT_MODE_CONFLICT" ? "模式已更新，请重新选择。" : result.error ?? "模式切换失败");
+    }
+    await readSessionPage(sessionId);
+  }, [busySessionIds, sessionStore, readSessionPage]);
+  const markSideChatRead = useCallback((sessionId: string) => setLocalFlag(sessionId, "unread", false), [setLocalFlag]);
+  const renameSideChat = useCallback(async (sessionId: string, title: string) => {
+    const result = await sessionsApi.rename({ sessionId, title });
+    if (!result.ok) throw new Error(result.error);
+  }, []);
+  const sideChat = useShallowStable<SideChatRuntimeValue>({
+    sessionStore, liveRuns, localStore, statuses: sessionStatuses, models: usableChatModels, defaultModelId, parentModelId: selectedChatModelId,
+    available: isLocalTarget, notice: composerNotice, open: openSideChat, list: listSideChats, send: sendToSession, abort: abortSideChat,
+    setMode: setSideChatMode, markRead: markSideChatRead, rename: renameSideChat, retain: retainSideChat,
+  });
+
   return (
-    <AppProviders sessionStore={sessionStore} browse={browse} localStore={localStore} activeSession={activeSession} composer={composer} sessionActions={sessionActions} runTarget={runTargetValue}>
+    <AppProviders sessionStore={sessionStore} browse={browse} localStore={localStore} activeSession={activeSession} composer={composer} sessionActions={sessionActions} runTarget={runTargetValue} sideChat={sideChat}>
       <WorkbenchLayout
         sessions={visibleSessions}
         busySessionIds={busySessionIds}

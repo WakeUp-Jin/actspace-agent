@@ -1,14 +1,16 @@
 import { SubagentsPanel } from "./right-panel/SubagentsPanel";
 import { terminalDisplayTitle } from "./right-panel/terminal-title";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useContext, useEffect, useState } from "react";
 import {
   Eye,
   FolderTree,
   GitBranch,
+  GitFork,
   Loader2,
   MessageSquare,
   SquareTerminal,
 } from "lucide-react";
+import type { SessionListItem } from "@actspace/shared";
 import type { ContextState, TerminalSessionSnapshot } from "@actspace/shared";
 import { CodeRenderView } from "./right-panel/CodeRenderView";
 import { ContextPanel } from "./right-panel/context/ContextPanel";
@@ -21,6 +23,12 @@ import { TurnReviewView } from "./turn-tail/TurnReviewView";
 import { WorkspaceFileTree } from "./right-panel/WorkspaceFileTree";
 import { RightPanelTabStrip } from "./right-panel/RightPanelTabStrip";
 import { RightPanelLauncherList, type RightPanelLauncherItem } from "./right-panel/RightPanelLauncherList";
+import { SideChatView } from "./right-panel/side-chat/SideChatView";
+import { useSideChatRuntime } from "./right-panel/side-chat/side-chat-runtime";
+import { sideChatAge, sideChatListTitle } from "./right-panel/side-chat/side-chat-transcript";
+import { useOpenSideChat } from "./right-panel/side-chat/use-open-side-chat";
+import { SESSION_STATUS_META, type SessionUiStatusKind } from "./sidebar/session-status";
+import { ActiveSessionContext } from "../session/active-session-context";
 import {
   isWorkspaceFileTab,
   useRightPanel,
@@ -82,13 +90,15 @@ export function RightPanel({
   // - 工作区文件 Tab → 进入 shell（树 + 文件预览区），多个文件 Tab 间切换只换 shell 内的内容；
   // - 浏览态显式打开（isFileTreeOpen，例如刚点 + 菜单还没选文件）→ 也进入 shell，但内容区显示占位；
   // - 否则（对象 Tab）→ 走整面板，展示它自己的视图。
+  // 侧边对话只在它的主会话下出现；切到别的会话时它的 tab 隐藏，激活的那个退回启动页。
+  const visibleActiveTab = activeTab && !isVisibleTab(activeTab, sessionId ?? null) ? null : activeTab;
   const isFileTab = isWorkspaceFileTab(activeTab);
   const showShell = developmentEnabled && (isFileTab || isFileTreeOpen);
   const showTree = showShell && !isFileTreeCollapsed;
 
   return (
     <aside className={RIGHT_PANEL_CLASS}>
-      <RightPanelTabs developmentEnabled={developmentEnabled} />
+      <RightPanelTabs developmentEnabled={developmentEnabled} sessionId={sessionId ?? null} />
       {showShell ? <WorkspaceOperationBar activeTab={activeTab} workspaceRoot={workspaceRoot} /> : null}
       <div className={RIGHT_PANEL_SPLIT_CLASS}>
         <div className={RIGHT_PANEL_CONTENT_CLASS}>
@@ -96,7 +106,7 @@ export function RightPanel({
             <WorkspaceFileEmpty />
           ) : (
             <RightPanelBody
-              tab={!developmentEnabled && activeTab && isDevelopmentTab(activeTab) ? null : activeTab}
+              tab={!developmentEnabled && visibleActiveTab && isDevelopmentTab(visibleActiveTab) ? null : visibleActiveTab}
               developmentEnabled={developmentEnabled}
               contextState={contextState}
               contextRevision={contextRevision}
@@ -126,14 +136,26 @@ function WorkspaceFileEmpty() {
   );
 }
 
+function isVisibleTab(tab: RightPanelTab, sessionId: string | null): boolean {
+  return tab.kind !== "sideChat" || tab.parentSessionId === sessionId;
+}
+
+/** 侧边对话 tab 前的状态：运行中转圈，待审批、未读、失败是小圆点，空闲是分叉图标。 */
+function SideChatTabIcon({ status }: { status: SessionUiStatusKind | undefined }) {
+  if (!status || status === "idle") return <GitFork size={12} strokeWidth={2} aria-hidden="true" />;
+  const meta = SESSION_STATUS_META[status];
+  return <span className={`inline-block ${meta.dotClass}`} role="img" aria-label={meta.label} />;
+}
+
 function isDevelopmentTab(tab: RightPanelTab): boolean {
   return isWorkspaceFileTab(tab) || ["review", "turnReview", "subagents", "terminal", "terminalStarting", "terminalError"].includes(tab.kind);
 }
 
 // 展示部分在 RightPanelTabStrip；这里只管普通会话的 Tab 来源和终端的异步关闭。
-function RightPanelTabs({ developmentEnabled }: { developmentEnabled: boolean }) {
+function RightPanelTabs({ developmentEnabled, sessionId }: { developmentEnabled: boolean; sessionId: string | null }) {
   const { tabs: allTabs, activeTabId, setActiveTab, closeTab, isFileTreeOpen } = useRightPanel();
-  const tabs = developmentEnabled ? allTabs : allTabs.filter((tab) => !isDevelopmentTab(tab));
+  const sideChat = useSideChatRuntime();
+  const tabs = allTabs.filter((tab) => isVisibleTab(tab, sessionId) && (developmentEnabled || !isDevelopmentTab(tab)));
   const [closeErrors, setCloseErrors] = useState<Record<string, string>>({});
   const [closingTabIds, setClosingTabIds] = useState<Set<string>>(() => new Set());
 
@@ -195,6 +217,7 @@ function RightPanelTabs({ developmentEnabled }: { developmentEnabled: boolean })
           label: isClosing ? "正在关闭…" : tab.kind === "terminalStarting" ? "正在启动…" : tab.title,
           closing: isClosing,
           closeHint: closeErrors[tab.id],
+          ...(tab.kind === "sideChat" ? { icon: <SideChatTabIcon status={sideChat?.statuses[tab.sessionId]} />, closeVerb: "收起" } : {}),
         };
       })}
       onSelect={setActiveTab}
@@ -237,6 +260,8 @@ function RightPanelBody({
       />
     );
   }
+
+  if (tab.kind === "sideChat") return <SideChatView tab={tab} />;
 
   if (tab.kind === "subagents") return <SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} selected={tab.sessionId === sessionId ? tab.selected : undefined} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
 
@@ -349,9 +374,21 @@ function RightPanelLauncher({
   sessionId: string | null;
   onOpenReview?: () => void;
 }) {
-  const { openFileTree, openTab } = useRightPanel();
+  const { openFileTree, openTab, tabs } = useRightPanel();
   const { openTerminal, creatingTerminal } = useOpenTerminal(sessionId);
+  const sideChat = useOpenSideChat(sessionId);
+  const collapsedSideChats = useCollapsedSideChats(sessionId, tabs);
   const items: RightPanelLauncherItem[] = [];
+  if (sideChat.available || sideChat.error) {
+    items.push({
+      id: "side-chat",
+      label: sideChat.opening ? "正在打开…" : "侧边对话",
+      description: sideChat.error ?? "另起一条线问，带上目前为止的上下文",
+      icon: <GitFork size={15} strokeWidth={1.8} />,
+      disabled: !sideChat.available || sideChat.opening,
+      onClick: () => void sideChat.open().catch(() => undefined),
+    });
+  }
   if (developmentEnabled) {
     items.push(
       {
@@ -406,7 +443,41 @@ function RightPanelLauncher({
     onClick: () => openTab({ id: "reply", kind: "replyHtml", title: "可视化回复", sessionId }),
   });
 
-  return <RightPanelLauncherList label="右侧面板对象" items={items} />;
+  return (
+    <RightPanelLauncherList
+      label="右侧面板对象"
+      items={items}
+      groups={[{
+        id: "side-chats",
+        caption: "本会话的侧边对话 · 已收起",
+        items: collapsedSideChats.map(({ item, title }) => ({
+          id: `side-chat:${item.id}`,
+          label: title,
+          description: sideChatAge(item.updatedAt),
+          icon: <GitFork size={15} strokeWidth={1.8} />,
+          onClick: () => sideChat.reopen(item, title),
+        })),
+      }]}
+    />
+  );
+}
+
+/** 当前主会话下、没有开着 tab 的侧边对话，按创建先后编号。 */
+function useCollapsedSideChats(sessionId: string | null, tabs: readonly RightPanelTab[]) {
+  const runtime = useSideChatRuntime();
+  const parentTitle = useContext(ActiveSessionContext)?.title;
+  const [items, setItems] = useState<SessionListItem[]>([]);
+  const list = runtime?.available ? runtime.list : null;
+  useEffect(() => {
+    if (!sessionId || !list) { setItems([]); return; }
+    let cancelled = false;
+    void list(sessionId).then((next) => { if (!cancelled) setItems(next); }, (error: unknown) => console.error("Failed to list side chats", error));
+    return () => { cancelled = true; };
+  }, [sessionId, list, tabs.length]);
+  const open = new Set(tabs.flatMap((tab) => tab.kind === "sideChat" ? [tab.sessionId] : []));
+  return items
+    .map((item, index) => ({ item, title: sideChatListTitle(item, parentTitle, index) }))
+    .filter(({ item }) => !open.has(item.id));
 }
 
 function TerminalStartingView() {

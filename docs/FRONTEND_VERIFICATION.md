@@ -90,6 +90,7 @@ http://127.0.0.1:5173/
 | `approval-prefix` | pnpm test 待审批，含正式 command_prefix 建议 | 三按钮、会话授权文案和主题布局 | 真实授权复用、持久化与工具执行 |
 | `remote-host` | 三台 Host：devbox 已连接、GPU 服务器离线、旧笔记本已撤销；本机 / devbox / GPU 各一个会话 | 侧栏 Host 分组与离线标记、运行位置菜单、Host 删除 / 重连后的列表 | `hosts.call`（`host.describe`、`files.reference`）、`hosts.preview` / `download` 在 mock 中未实现，会 reject；因此 Host 工作区和模型显示为「等待 Host …」，远端读文件和下载产物只能由单测和真实 Host 覆盖 |
 | `sidebar` | 三个工作区，15 个未归档会话按真实「现在」分布在今天、昨天、近 7 天、本月更早、往月、往年；2 个置顶、2 个已归档 | 侧栏视图选项（按工作区 / 单列表 / 按时间、手动排序、归档筛选、恢复默认）、拖拽排序与「已切换为手动排序」、标题行搜索、取消归档、每组 5 条与「展开其余」 | 运行中、待审批、失败、跑完未看四种状态点和「需要处理」（状态来自真实运行，由单测覆盖） |
+| `side-chat` | 主会话「梳理 runtime 插件加载」三轮已完成、第 4 轮约 300ms 后开始流式且停在运行态；它下面有两个收起的侧边对话（各一问一答），另有一个普通会话 | 侧栏「⑂ 2」角标与侧边对话不进侧栏；右栏启动页「侧边对话」与「本会话的侧边对话 · 已收起」；分隔线「继承主会话 3 轮，不含进行中的第 4 轮」；侧边对话里发送（回复以「（侧边对话）」开头）、停止、收起后重开、切换主会话时 tab 隐藏；主会话输入框 `/side 问题` | 真实 Journal 复制与分叉点、插件提示词、Plan 权限拦截、重启后恢复（由 runtime / agent-service 单测和 Electron 验收覆盖） |
 | `turn-deliverables` | 一个会话三轮：第 1 轮改 2 个文件、交付 1 个；第 2 轮最终改 6 个文件（另有新建后删除的临时脚本）、交付 5 个；第 3 轮只改报告 1 个文件（+1/-1）、交付 1 个；三轮回复都带用量，第 2 轮没有价格 | 轮尾改动卡与交付卡的单文件 / 多文件形态与折叠、悬停 diff 浮层、「第 N 轮改动」标签、交付卡网格与打开方式菜单、设置开关「显示本轮代码改动」；回复尾部的「用量 … tok」胶囊与本轮用量弹窗（预估花费、花费未知）；`workspaces.readFile` 只认识 `docs/report.md` 和 `docs/summary.csv` | 真实 `present` 工具调用、原生关联应用列表与图标、远端 Host 下载（见 [front-中间消息区规范.md](design-docs/frontend/front-中间消息区规范.md) §轮尾改动卡与交付文件卡） |
 | `subagent-trajectory` | 父会话「查看pi-durable设计」：bash、一次 `agent` 委派（带 `delegation/requested`，preset `explore`）、两次 read_file；子会话（不进侧栏）有任务、4 条助手消息和 7 次读工具；`getSubagents` 返回一个已完成的 Explore | 父轨迹只留 `agent` 一行；详情「子智能体」一栏的「查看轨迹」→ 右侧子 Agent 面板停在子轨迹；面板标题前对话 / 轨迹切换；窄面板详情从下半部分弹出；浅色 / 深色、320–480px 面板 | 子 Agent 对话页的执行记录（`getSubAgentTranscript` 返回空，约 20 秒后退回摘要）；运行中子智能体的实时轨迹（需真实运行） |
 | `compaction` | 三个会话：「会话列表改游标分页」48 条消息后有一次已提交的自动压缩（182.4K → 约 9.1K tokens · 23s）；打开「压缩进行中」后停在压缩中；打开「压缩失败」后约 0.4s 压缩失败 | A1 压缩分隔线三态、两侧扫光、窄窗换行、「在轨迹中查看」选中轨迹压缩行、轨迹概述的触发方式 / 压缩消息数 / Token、浅深主题 | 手动 `/compact` 任务流程、重试后的真实压缩（mock 不处理压缩操作） |
@@ -210,6 +211,7 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 | 远端会话中读文件、下载产物 | remoteArtifact | —（mock 未实现 `hosts.call` / `preview` / `download`） | 需要真实 Host |
 | Host 删除后历史会话显示 | app-remote-host-refresh | `?mock=remote-host` | ✓ |
 | 新建工作树（Git / 无提交 / 非 Git） | run-location-menu | `?mock=empty`（只看菜单） | ✓ |
+| 侧边对话：运行中主会话分出 → 分隔线 → 问早前内容 → Plan 只读 → 两条同时流式 → 收起再从启动页重开 → 重启恢复 → 侧栏只显示角标 | side-chat 相关单测 | `?mock=side-chat`（只看界面，不含上下文继承、Plan 拦截、重启恢复） | ✓（需要模型 key；按序检查：运行中主会话打开侧边对话看分隔线；问早前内容它能答；Plan 下让它改文件无写入工具、退出 Plan 后可改；两个侧边对话同时流式；收起后从启动页列表重开；重启应用后仍在且边界提示词仍生效；侧栏只显示数量） |
 | Composer：inline ↔ stacked、`+` 面板、模型、模式 chip | composer / composer-toolbar / composer-palette | ✓ | ✓ |
 | 中文输入法 | composer-ime | — | ✓（必须真机） |
 | 外链点击不导航主窗口 | window-security（window-navigation* 补全） | — | ✓（系统浏览器是否打开需真机） |

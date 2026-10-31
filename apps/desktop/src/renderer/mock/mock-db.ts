@@ -62,6 +62,8 @@ export type MockSession = {
   archived: boolean;
   hostId?: string;
   hostName?: string;
+  /** 侧边对话：所属主会话与继承的消息数（这些消息不在侧边面板里显示）。 */
+  sideChat?: { parentId: string; inheritedMessages: number };
   /** 子智能体的会话：和真实 listPage 一样不进侧栏。 */
   parentSessionId?: string;
   messages: MockMessage[];
@@ -146,6 +148,33 @@ export function forkMockSession(db: MockDb, sourceId: string): MockSession {
   return fork;
 }
 
+/**
+ * 侧边对话：复制主会话到最后一个已完成轮（以助手回复结尾）为止的消息，默认 Plan，与真实 fork 一样带 lineage。
+ * 之后还没有回复的那一轮算进行中，不复制。
+ */
+export function openMockSideChat(db: MockDb, parentId: string): { session: MockSession; inheritedTurnCount: number; runningTurnExcluded: boolean } {
+  const parent = requireSession(db, parentId);
+  const lastAnswer = parent.messages.findLastIndex((message) => message.role === "assistant");
+  const inherited = parent.messages.slice(0, lastAnswer + 1);
+  const runs = new Set(inherited.map((message) => message.agentRunId));
+  if (runs.size === 0) throw new Error("SIDE_CHAT_NO_COMPLETED_TURN");
+  const now = new Date().toISOString();
+  const session: MockSession = {
+    ...parent,
+    id: db.nextId("mock-side-chat"),
+    createdAt: now,
+    updatedAt: now,
+    agentMode: parent.agentMode === "chat" ? "chat" : "plan",
+    agentModeRevision: parent.agentModeRevision + 1,
+    pinned: false,
+    archived: false,
+    sideChat: { parentId, inheritedMessages: inherited.length },
+    messages: inherited.map((message) => ({ ...message })),
+  };
+  db.sessions.set(session.id, session);
+  return { session, inheritedTurnCount: runs.size, runningTurnExcluded: inherited.length < parent.messages.length };
+}
+
 export function requireSession(db: MockDb, sessionId: string): MockSession {
   const session = db.sessions.get(sessionId);
   if (!session) throw new Error(`Mock session not found: ${sessionId}`);
@@ -174,8 +203,16 @@ export function sessionListItem(session: MockSession, db: MockDb): SessionListIt
     pinned: session.pinned,
     archived: session.archived,
     ...(session.parentSessionId ? { isChildSession: true } : {}),
+    ...(session.sideChat ? { sideChatParentId: session.sideChat.parentId } : {}),
+    ...(sideChatCount(db, session.id) ? { sideChatCount: sideChatCount(db, session.id) } : {}),
     ...(session.hostId ? { hostId: session.hostId, hostName: session.hostName ?? host?.name, connectionState: host?.state ?? "offline" } : {}),
   };
+}
+
+function sideChatCount(db: MockDb, parentId: string): number {
+  let count = 0;
+  for (const session of db.sessions.values()) if (session.sideChat?.parentId === parentId && !session.archived) count++;
+  return count;
 }
 
 export function listMockSessions(db: MockDb, archived = false): SessionListItem[] {
@@ -195,7 +232,13 @@ function journal(session: MockSession): SessionEventEnvelopeV1[] {
     source: { ownerPluginId: "@actspace/core" },
     provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
   });
+  let currentRun: string | null = null;
   for (const message of session.messages) {
+    // 每个 agentRun 开头一条 turn/start，和真实 Journal 一样能数出轮数。
+    if (message.agentRunId !== currentRun) {
+      currentRun = message.agentRunId;
+      events.push({ ...base(message), seq: events.length, type: "turn/start", data: { agentRunId: message.agentRunId }, surface: null });
+    }
     for (const raw of message.events ?? []) events.push({ ...base(message), seq: events.length, type: raw.type, data: { agentRunId: message.agentRunId, ...raw.data }, surface: raw.surface ?? null });
     if (message.role === "tool" && message.tool) {
       const callId = message.id;
@@ -250,7 +293,12 @@ function snapshot(session: MockSession, throughJournalSeq: number): RuntimeV2Ses
     pendingInbox: [],
     todos: [],
     delegations: [],
-    lineage: null,
+    lineage: session.sideChat ? {
+      parentSessionId: session.sideChat.parentId,
+      parentBoundarySeq: journal({ ...session, messages: session.messages.slice(0, session.sideChat.inheritedMessages) }).length - 1,
+      origin: "side-chat",
+      delegationDepth: 0,
+    } : null,
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
     activity: { turnCount: runs, completedTurnCount: runs, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } },
   };

@@ -2,7 +2,8 @@ import { taskOperation } from "@actspace/shared/runtime-v2";
 
 import { SessionModeWriter } from "./session-commands.js";
 import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
-import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import type { EventCodecRegistry, SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import { resolveSideChatBoundary } from "@actspace/side-chat";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type {
@@ -29,6 +30,7 @@ export type ApplicationSessionService = {
       readonly newSessionId: string;
       readonly createdAt: string;
       readonly createdWith: SessionHandle["header"]["createdWith"];
+      readonly origin?: "fork" | "side-chat";
     }): Promise<SessionHandle>;
   };
   create(sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm, worktree?: import("@actspace/shared").SessionWorktreeContext): Promise<SessionHandle>;
@@ -84,6 +86,7 @@ export type AgentApplicationContract = {
   readonly createMainSession: (sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm, worktree?: import("@actspace/shared").SessionWorktreeContext) => Promise<RuntimeV2SessionSnapshot>;
   readonly resumeMainSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly forkMainSession: (parentSessionId: string, boundarySeq: number, newSessionId: string) => Promise<RuntimeV2SessionSnapshot>;
+  readonly openSideChat: (parentSessionId: string, newSessionId: string) => Promise<SideChatOpened>;
   readonly abortRun: (sessionId: string, reason?: string) => boolean;
   readonly isRunActive: (sessionId: string) => boolean;
   readonly flushSession: (sessionId: string) => Promise<void>;
@@ -92,6 +95,13 @@ export type AgentApplicationContract = {
   readonly updateSessionPermissionMode: (sessionId: string, mode: import("@actspace/shared/runtime-v2").PermissionMode) => Promise<RuntimeV2SessionSnapshot>;
   readonly updateSessionAgentMode: (sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number) => Promise<RuntimeV2SessionSnapshot>;
   readonly revokeSessionGrant: (sessionId: string, grantId: string) => Promise<RuntimeV2SessionSnapshot>;
+};
+
+/** A side chat forked from the parent's last completed Turn. */
+export type SideChatOpened = {
+  readonly snapshot: RuntimeV2SessionSnapshot;
+  readonly inheritedTurnCount: number;
+  readonly runningTurnExcluded: boolean;
 };
 
 export class AgentApplication implements AgentApplicationContract {
@@ -191,12 +201,34 @@ export class AgentApplication implements AgentApplicationContract {
   async forkMainSession(parentSessionId: string, boundarySeq: number, newSessionId: string): Promise<RuntimeV2SessionSnapshot> {
     const parent = await this.#sessions.store.inspect(parentSessionId);
     if (parent.header === null) throw new Error(`Parent Session ${parentSessionId} has no header.`);
+    return this.#sessions.snapshot(await this.#fork(parent.header, boundarySeq, newSessionId, "fork"));
+  }
+
+  /**
+   * Fork a side chat at the parent's last completed Turn, so a running Turn
+   * stays with the parent. Side chats start in Plan mode when the parent has
+   * tools and a workspace; Chat-form parents stay Chat.
+   */
+  async openSideChat(parentSessionId: string, newSessionId: string): Promise<SideChatOpened> {
+    await this.#sessions.getOpen(parentSessionId)?.flush();
+    const parent = await this.#sessions.store.inspect(parentSessionId);
+    if (parent.header === null) throw new Error(`Parent Session ${parentSessionId} has no header.`);
+    if (parent.header.lineage?.origin === "side-chat" || parent.header.lineage?.origin === "delegation") throw new Error("SIDE_CHAT_PARENT_NOT_MAIN");
+    const { boundarySeq, inheritedTurnCount, runningTurnExcluded } = resolveSideChatBoundary(parent.events, required<{ readonly registry: EventCodecRegistry }>(this.ctx, "session.journal").registry);
+    const session = await this.#fork(parent.header, boundarySeq, newSessionId, "side-chat");
+    const forked = this.#sessions.snapshot(session);
+    const snapshot = forked.agentMode !== "chat" && forked.workspaceRoot !== null ? await this.#changeAgentMode(session, "plan") : forked;
+    return { snapshot, inheritedTurnCount, runningTurnExcluded };
+  }
+
+  async #fork(parentHeader: SessionHandle["header"], boundarySeq: number, newSessionId: string, origin: "fork" | "side-chat"): Promise<SessionHandle> {
     const fork = await this.#sessions.store.fork({
-      parentSessionId,
+      parentSessionId: parentHeader.sessionId,
       boundarySeq,
       newSessionId,
       createdAt: new Date().toISOString(),
-      createdWith: this.#sessions.creationProvenance(parent.header.createdWith.initialAgentMode),
+      createdWith: this.#sessions.creationProvenance(parentHeader.createdWith.initialAgentMode),
+      origin,
     });
     // Store.fork owns a temporary writer. Reopen through the controller so the
     // run, projection callbacks and shutdown all share one managed handle.
@@ -204,7 +236,7 @@ export class AgentApplication implements AgentApplicationContract {
     const session = await this.#sessions.resume(newSessionId);
     await session.flush();
     await this.#runs.initialize(session.header.sessionId);
-    return this.#sessions.snapshot(session);
+    return session;
   }
 
   async updateSessionAgentMode(sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number): Promise<RuntimeV2SessionSnapshot> {

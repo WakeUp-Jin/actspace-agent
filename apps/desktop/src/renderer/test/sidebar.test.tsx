@@ -143,6 +143,19 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.getByText("⌘N")).toBeInTheDocument();
   });
 
+  it("keeps side chats out of the list and counts them on their main session", () => {
+    renderSidebar({
+      sessions: [
+        makeSession({ id: "s-main", title: "主会话", workspaceRoot: "/Users/me/projects/actspace-agent", sideChatCount: 2 }),
+        makeSession({ id: "s-side", title: "侧边问题", workspaceRoot: "/Users/me/projects/actspace-agent", sideChatParentId: "s-main", isChildSession: true }),
+      ],
+    });
+
+    expect(screen.getByText("主会话")).toBeInTheDocument();
+    expect(screen.queryByText("侧边问题")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("2 个侧边对话")).toHaveTextContent("2");
+  });
+
   it("does not render the unavailable Scheduled section", () => {
     renderSidebar();
 

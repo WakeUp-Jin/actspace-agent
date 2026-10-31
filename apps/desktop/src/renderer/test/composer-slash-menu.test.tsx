@@ -28,6 +28,7 @@ function renderSlash(initial: Partial<SlashMenuOptions> = {}) {
     inputLocked: false,
     isChatForm: false,
     isStreaming: false,
+    allowSideChat: false,
     skills: [],
     composerRef: createRef<HTMLElement>(),
     inputRef: createRef<HTMLTextAreaElement>(),
@@ -55,6 +56,19 @@ describe("useSlashMenu", () => {
     expect(functionIds(result.current.results)).not.toContain("plan");
     expect(functionIds(result.current.results)).not.toContain("agent");
     expect(functionIds(result.current.results)).toContain("compact");
+  });
+
+  it("lists /side only where a side chat can be opened", () => {
+    expect(functionIds(renderSlash().result.current.results)).not.toContain("side");
+    expect(functionIds(renderSlash({ allowSideChat: true }).result.current.results)).toContain("side");
+    expect(functionIds(renderSlash({ allowSideChat: true, isStreaming: true }).result.current.results)).toContain("side");
+  });
+
+  it("gives each menu instance its own id", () => {
+    const first = renderSlash().result.current.menuId;
+    const second = renderSlash().result.current.menuId;
+    expect(first).toMatch(/^composer-slash-menu-/);
+    expect(first).not.toBe(second);
   });
 
   it("closes on Escape pressed outside the input", () => {

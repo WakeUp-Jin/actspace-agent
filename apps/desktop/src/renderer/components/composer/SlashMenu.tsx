@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
-import { Asterisk, BookOpen, Bot, ChartPie, Check, GitBranch, ListTodo, Loader2, type LucideIcon } from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useState, type RefObject } from "react";
+import { Asterisk, BookOpen, Bot, ChartPie, Check, GitBranch, GitFork, ListTodo, Loader2, type LucideIcon } from "lucide-react";
 import type { ComposerMode, SkillCatalogItem } from "@actspace/shared";
 import {
   composerSlashFunctionOptionId,
@@ -11,9 +11,6 @@ import {
   type ComposerSlashFunctionId,
 } from "../composer-slash-commands";
 
-export const SLASH_MENU_ID = "composer-slash-command-menu";
-const SLASH_FUNCTIONS_LABEL_ID = "composer-slash-functions-label";
-const SLASH_SKILLS_LABEL_ID = "composer-slash-skills-label";
 const SLASH_MENU_BASE_CLASS =
   "slash-command-menu absolute left-0 z-40 w-[min(520px,calc(100vw_-_36px))] max-w-full overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover transition-[opacity,transform] duration-(--motion-fast) ease-out motion-reduce:transition-none max-[600px]:right-0 max-[600px]:w-auto";
 const SLASH_MENU_POSITION_CLASS: Record<"followup" | "initial", string> = {
@@ -40,6 +37,7 @@ const SLASH_FUNCTION_ICONS: Record<ComposerSlashFunctionId, LucideIcon> = {
   compact: Asterisk,
   status: ChartPie,
   review: GitBranch,
+  side: GitFork,
 };
 
 export type ComposerSlashResult =
@@ -75,6 +73,9 @@ export function runSlashFunction(id: ComposerSlashFunctionId, handlers: SlashFun
     case "review":
       handlers.openReview?.();
       return true;
+    case "side":
+      // 不在这里执行：Composer 把输入框换成 `/side `，等用户接着写问题再发。
+      return false;
   }
 }
 
@@ -90,6 +91,8 @@ export type SlashMenuOptions = {
   readonly isChatForm: boolean;
   /** 运行中不切模式：去掉 /plan 和 /agent（/compact 会进入队列）。 */
   readonly isStreaming: boolean;
+  /** 能开侧边对话时才列出 /side（主会话、本机、非 Chat）。 */
+  readonly allowSideChat: boolean;
   readonly skills: readonly SkillCatalogItem[];
   /** 点在 Composer 外面（浮层除外）关菜单。 */
   readonly composerRef: RefObject<HTMLElement | null>;
@@ -104,7 +107,9 @@ export type SlashMenuOptions = {
  * 09 T28：斜杠菜单的状态。输入框内容是 `/xxx` 就打开，Esc、点外面、打开别的浮层时收起（`dismiss`），
  * 内容一改又允许打开（`reset`）。高亮项随结果变化回到第一项，并滚进可见区。
  */
-export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, skills, composerRef, inputRef, setDraftText, onDraftReplaced }: SlashMenuOptions) {
+export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, allowSideChat, skills, composerRef, inputRef, setDraftText, onDraftReplaced }: SlashMenuOptions) {
+  // 主会话和侧边对话各有一个 Composer，菜单 id 按实例生成。
+  const menuId = `composer-slash-menu-${useId().replace(/:/g, "")}`;
   const [dismissed, setDismissed] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [entered, setEntered] = useState(false);
@@ -113,7 +118,8 @@ export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, sk
   const open = query !== null && !dismissed;
   const functions = query === null ? [] : filterComposerSlashFunctions(query)
     .filter((item) => !isChatForm || ["compact", "status"].includes(item.id))
-    .filter((item) => !isStreaming || (item.id !== "plan" && item.id !== "agent"));
+    .filter((item) => !isStreaming || (item.id !== "plan" && item.id !== "agent"))
+    .filter((item) => allowSideChat || item.id !== "side");
   const matchedSkills = query === null || isChatForm ? [] : filterComposerSlashSkills([...skills], query);
   const results: ComposerSlashResult[] = [
     ...functions.map((item): ComposerSlashResult => ({ kind: "function", item })),
@@ -173,6 +179,7 @@ export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, sk
   }, []);
 
   return {
+    menuId,
     query,
     open,
     entered,
@@ -219,6 +226,8 @@ export type SlashMenuProps = {
 
 export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading, skillsError, skillCount, onSelect, onRetrySkills }: SlashMenuProps) {
   if (!slash.open || slash.query === null) return null;
+  const functionsLabelId = `${slash.menuId}-functions`;
+  const skillsLabelId = `${slash.menuId}-skills`;
   const motionClass = slash.entered
     ? "translate-y-0 scale-100 opacity-100"
     : `pointer-events-none ${surface === "initial" ? "-translate-y-1" : "translate-y-1"} scale-[0.985] opacity-0`;
@@ -237,13 +246,13 @@ export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading,
   return (
     <div
       className={`${SLASH_MENU_BASE_CLASS} ${SLASH_MENU_POSITION_CLASS[surface]} ${motionClass}`}
-      id={SLASH_MENU_ID}
+      id={slash.menuId}
       role="listbox"
       aria-label="斜杠命令"
     >
       {slash.functions.length > 0 ? (
-        <div role="group" aria-labelledby={SLASH_FUNCTIONS_LABEL_ID}>
-          <div className={SLASH_GROUP_LABEL_CLASS} id={SLASH_FUNCTIONS_LABEL_ID}>功能</div>
+        <div role="group" aria-labelledby={functionsLabelId}>
+          <div className={SLASH_GROUP_LABEL_CLASS} id={functionsLabelId}>功能</div>
           {slash.functions.map((item) => {
             const Icon = SLASH_FUNCTION_ICONS[item.id];
             const commandDisplayName = getSlashCommandDisplayName(item.command);
@@ -276,8 +285,8 @@ export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading,
       ) : null}
 
       {showSkillsGroup ? (
-        <div role="group" aria-labelledby={SLASH_SKILLS_LABEL_ID}>
-          <div className={SLASH_GROUP_LABEL_CLASS} id={SLASH_SKILLS_LABEL_ID}>Skills</div>
+        <div role="group" aria-labelledby={skillsLabelId}>
+          <div className={SLASH_GROUP_LABEL_CLASS} id={skillsLabelId}>Skills</div>
           {skillsLoading ? (
             <div className={`${SLASH_STATUS_CLASS} flex items-center gap-2`}>
               <Loader2 className="animate-spin" size={15} aria-hidden="true" /> 正在加载 Skills…

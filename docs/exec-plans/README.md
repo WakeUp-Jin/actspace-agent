@@ -29,6 +29,7 @@
 
 ## 最近完成
 
+- [侧边对话](completed/20261021-side-chat.md)：插件 `@actspace/side-chat`、`openSideChat` IPC、右栏 `sideChat` tab、`/side` 与侧栏数量完成；desktop 1986 项测试与前端检查通过；Electron 实机 1–7 未执行，见[执行摘要](../exec-runs/20261021-side-chat/execution-summary.md)。
 - [压缩的前端回显（A1）](completed/20261025-compaction-display.md)：对话里压缩改为居中分隔线（条数、压缩前 → 约压缩后 tokens、耗时、「在轨迹中查看」），摘要只在轨迹看；后端在 `compaction/end` 记录触发方式与前后 token，轨迹概述补齐；desktop 2029 项测试通过，`?mock=compaction` 截图完成；Electron 未验证，见[执行摘要](../exec-runs/20261025-compaction-display/execution-summary.md)。
 - [工具沙箱的出沙箱与回退](completed/20261025-sandbox-escape-fallback.md)：T0–T6 完成（分支 `feat/sandbox-refactor`，提 PR 合入 main）；`full-access` 下 bash 不进沙箱，出沙箱改为 `sandbox_permissions` 加 `justification` 并每次批准，审批卡显示理由，被沙箱拦了在结果里提示；真实 Host 端到端、全仓检查与 Codex 验收通过（验收发现的完全权限提示过时已修复）；审批卡理由行与深色主题未经实机完整复验，见[执行摘要](../exec-runs/20261025-sandbox-escape-fallback/execution-summary.md)。
 - [沙箱第二期：评估沙箱](completed/20261025-sandbox-v2-evaluation-sandbox.md)：T0–T8 完成（分支 `feat/sandbox-refactor`，提 PR 合入 main）；nono `run` 域名白名单（本机端口、上游代理），继承模式改由 Host 告知，CLI `--harness` / `--sandbox-inherited`，新包 `harness-evaluation` 在评估沙箱里跑 CLI 候选；真实 nono + CLI 集成测试（macOS、Linux Docker）与全仓检查通过；工具沙箱是否排除系统写入组待用户决定，见[执行摘要](../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)。

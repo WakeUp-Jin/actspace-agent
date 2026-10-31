@@ -80,6 +80,27 @@ export function SessionProjectionProvider({
   return <SessionProjectionContext.Provider value={value}>{children}</SessionProjectionContext.Provider>;
 }
 
+/**
+ * 给非当前会话（右栏的侧边对话）一份投影：沿用外层 Provider 的 store 和 bridge，用 `bridge.watch`
+ * 拉取并跟随它，不改 store 的选中会话。scope 里的 Composer、上下文胶囊和统计读到的是这个会话。
+ */
+export function SessionProjectionScope({ sessionId, children }: { readonly sessionId: string; readonly children: ReactNode }) {
+  const outer = useContext(SessionProjectionContext);
+  const bridge = outer?.bridge ?? null;
+  useEffect(() => bridge?.watch(sessionId), [bridge, sessionId]);
+  const store = outer?.store ?? null;
+  // 外层 value 随 store 每次变化而更新，这里跟着它重算。
+  const value = useMemo<SessionProjectionContextValue | null>(() => store ? {
+    sessionId,
+    cell: store.get(sessionId),
+    overlay: store.getOverlay(sessionId),
+    store,
+    bridge,
+  } : null, [outer, sessionId, store, bridge]);
+  if (!value) return <>{children}</>;
+  return <SessionProjectionContext.Provider value={value}>{children}</SessionProjectionContext.Provider>;
+}
+
 /** Optional form for isolated renderer component tests and non-chat surfaces. */
 export function useOptionalSessionProjection(): SessionProjectionContextValue | null {
   return useContext(SessionProjectionContext);

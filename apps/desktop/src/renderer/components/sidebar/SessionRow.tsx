@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Archive, ArchiveRestore, MoreHorizontal, Pin, PinOff } from "lucide-react";
+import { Archive, ArchiveRestore, GitFork, MoreHorizontal, Pin, PinOff } from "lucide-react";
 import type { SessionListItem } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { IconButton } from "../ui/IconButton";
@@ -288,6 +288,12 @@ export function SessionRow({
                   <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS} ${status === "unread" ? SESSION_ROW_UNREAD_TITLE_CLASS : ""}`}>{displayTitle}</span>
                   {workspaceLabel ? <span className={SESSION_ROW_WORKSPACE_CLASS}>{workspaceLabel}</span> : null}
                   {session.hostName ? <span className="shrink-0 text-act-xxs text-text-faint" title={session.connectionState}>{session.hostName}{session.connectionState !== "connected" ? " · 离线" : ""}</span> : null}
+                  {session.sideChatCount ? (
+                    <span className="inline-flex shrink-0 items-center gap-0.5 text-act-xxs tabular-nums text-text-faint" aria-label={`${session.sideChatCount} 个侧边对话`} title={`${session.sideChatCount} 个侧边对话`}>
+                      <GitFork size={11} strokeWidth={2} aria-hidden="true" />
+                      {session.sideChatCount}
+                    </span>
+                  ) : null}
                 </button>
               )}
               <div className={SESSION_ROW_END_CLASS}>

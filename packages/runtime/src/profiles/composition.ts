@@ -122,6 +122,7 @@ export const TRUSTED_LOADER_ENTRIES = Object.freeze([
   Object.freeze({ id: "agent-host", name: "@actspace/agent-host/plugin", inject: ["session.runtime", "agent.runtime"] }),
   Object.freeze({ id: "desktop-app", name: "@actspace/desktop-app/plugin", inject: ["session.runtime", "agent.runtime", "llm.service"] }),
   Object.freeze({ id: "english-learning", name: "@actspace/english-learning/plugin", inject: ["agent.registry", "session.runtime"] }),
+  Object.freeze({ id: "side-chat", name: "@actspace/side-chat/plugin", inject: ["session.runtime"] }),
 ]);
 
 export function resolveRuntimeProfile(profileId: RuntimeProfileId): Profile {

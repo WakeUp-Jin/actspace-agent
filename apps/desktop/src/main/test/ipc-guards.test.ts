@@ -21,6 +21,8 @@ const CASES: Record<string, Case> = {
   "workspaces.openFile": { spec: contract.workspaces.openFile, valid: [{ relativePath: "a.docx", action: "open" }, { workspaceRoot: "/w", relativePath: "a.docx", action: "open", applicationId: "/Applications/Pages.app" }, { relativePath: "a.docx", action: "reveal" }], invalid: [{ relativePath: "a.docx" }, { relativePath: "a.docx", action: "run" }, { relativePath: "a.docx", action: "open", applicationId: 1 }] },
   "workspaces.listDir": { spec: contract.workspaces.listDir, valid: [{}, { workspaceRoot: "/w", relativePath: "" }], invalid: [null, { relativePath: 0 }] },
   "sessions.readArtifact": { spec: contract.sessions.readArtifact, valid: [{ sessionId: "s", artifactPath: "out.png" }], invalid: [{ sessionId: "s" }] },
+  "sessions.openSideChat": { spec: contract.sessions.openSideChat, valid: [{ parentSessionId: "s" }], invalid: [{ parentSessionId: 1 }, {}] },
+  "sessions.listSideChats": { spec: contract.sessions.listSideChats, valid: [{ parentSessionId: "s" }], invalid: [{ sessionId: "s" }] },
   "workspaces.createFolder": { spec: contract.workspaces.createFolder, valid: [{ parentRoot: "/w", name: "new" }], invalid: [{ parentRoot: "/w" }, "new"] },
   "workspaces.openInIde": { spec: contract.workspaces.openInIde, valid: [{ workspaceId: "w1" }], invalid: [{ workspaceId: 1 }] },
   "workspaces.setVisibility": { spec: contract.workspaces.setVisibility, valid: [{ workspaceId: "w1", hidden: true }], invalid: [{ workspaceId: "w1", hidden: "yes" }] },

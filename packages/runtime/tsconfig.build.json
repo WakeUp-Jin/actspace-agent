@@ -133,6 +133,9 @@
       "path": "./../shared/tsconfig.build.json"
     },
     {
+      "path": "./../side-chat/tsconfig.build.json"
+    },
+    {
       "path": "./../subagent/tsconfig.build.json"
     },
     {

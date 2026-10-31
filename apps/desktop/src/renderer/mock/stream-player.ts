@@ -58,3 +58,10 @@ export const MOCK_REPLY = [
   "- 会话、工作区和设置都保存在内存里，刷新页面后重置。",
   "- 用 `?mock=streaming`、`?mock=long-session`、`?mock=approval-pending`、`?mock=remote-host` 切换场景。",
 ].join("\n");
+
+/** 侧边对话里的回复：和主会话区分开，一眼能看出消息发到了哪边。 */
+export const MOCK_SIDE_CHAT_REPLY = [
+  "（侧边对话）这条回复只在右侧面板里，主会话看不到。",
+  "",
+  "我带着分叉时主会话的上下文回答；之后两边各聊各的，不会互相写回。",
+].join("\n");

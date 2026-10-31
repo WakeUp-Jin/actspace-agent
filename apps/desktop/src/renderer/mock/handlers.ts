@@ -12,13 +12,14 @@ import {
   createMockSession,
   emptyTaskSnapshot,
   forkMockSession,
+  openMockSideChat,
   listMockSessions,
   requireSession,
   sessionObservation,
   sessionProjection,
 } from "./mock-db";
 import { emitLiveMessage, type MockClock } from "./clock";
-import { MOCK_REPLY, playReply, type ReplyPlayback } from "./stream-player";
+import { MOCK_REPLY, MOCK_SIDE_CHAT_REPLY, playReply, type ReplyPlayback } from "./stream-player";
 import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView, mockContextState } from "./context-panel-fixture";
 import { mockContextPathsPage } from "./context-paths-fixture";
 import { createModelConnectionsMock } from "./model-connections-fixture";
@@ -30,7 +31,7 @@ const SYSTEM_PROMPT = "你是 ActSpace 的主 Agent。\n- 先理解需求，再�
 
 /** 分页视图建立在 `sessions.list` 之上：测试只覆盖 `sessions.list` 时，侧栏分页读到的是同一份数据。 */
 async function listPage(clock: MockClock, input: SessionListPageInput): Promise<SessionListPage> {
-  const items = (await clock.bridge.sessions.list({})).filter((item) => !item.isChildSession &&
+  const items = (await clock.bridge.sessions.list({})).filter((item) => !item.isChildSession && !item.sideChatParentId &&
     (!input.search || (!item.hostId && item.title.toLowerCase().includes(input.search.toLowerCase()))) &&
     (input.hostId === undefined || item.hostId === input.hostId) &&
     (input.workspaceRoot === undefined || item.workspaceRoot === input.workspaceRoot) &&
@@ -77,7 +78,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         };
         publishTasks({ ...current, tasks: [...current.tasks, task] });
         appendMockMessage(db, session, "user", input.userInput, agentRunId);
-        const playback = playReply(clock, { sessionId: input.sessionId, agentRunId, text: MOCK_REPLY });
+        const playback = playReply(clock, { sessionId: input.sessionId, agentRunId, text: session.sideChat ? MOCK_SIDE_CHAT_REPLY : MOCK_REPLY });
         playbacks.set(input.sessionId, playback);
         return { task, revision: taskSnapshot(input.sessionId).revision, durableSeq: null };
       },
@@ -162,6 +163,11 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       getSubAgentTranscript: async () => [],
       create: async (input) => sessionProjection(createMockSession(db, input)),
       fork: async ({ sessionId }) => sessionProjection(forkMockSession(db, sessionId)),
+      openSideChat: async ({ parentSessionId }) => {
+        const { session, inheritedTurnCount, runningTurnExcluded } = openMockSideChat(db, parentSessionId);
+        return { session: sessionProjection(session), inheritedTurnCount, runningTurnExcluded };
+      },
+      listSideChats: async ({ parentSessionId }) => listMockSessions(db).filter((item) => item.sideChatParentId === parentSessionId).reverse(),
       pin: async ({ sessionId, pinned }) => { touchSession(sessionId, (session) => { session.pinned = pinned; }); return { ok: true }; },
       rename: async ({ sessionId, title }) => { touchSession(sessionId, (session) => { session.title = title; }); return { ok: true }; },
       setWorkspace: async ({ sessionId, workspaceRoot }) => { requireSession(db, sessionId).workspaceRoot = workspaceRoot; return { ok: true }; },

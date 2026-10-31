@@ -43,6 +43,7 @@ Functions 使用固定顺序，不按字母排序。当前模式项显示勾选�
 | `/compact` | Compact context | 通过统一 Task 入口提交压缩操作，空闲执行、繁忙排队 | 清除 Slash 查询；不消费已选 Skill 和已有附件 |
 | `/status` | Context status | 调用现有 `onExpandContext`，打开 Context 视图 | 清除 Slash 查询并恢复焦点 |
 | `/review` | Review changes | 调用现有 `onOpenReview`，打开 Review 视图 | 清除 Slash 查询并恢复焦点 |
+| `/side` | 侧边对话 | 在右侧另起一条线问，不打断当前会话（图标 GitFork） | 菜单选择只把输入替换为 `/side `，不执行 |
 
 选择 `/compact` 是一次明确的立即操作。它只发送命令本身与当前模型运行选项，不把图片、普通文件或 Skill 正文当作压缩命令输入；Composer 中已经附加的内容保持原样，供用户后续正常发送。
 
@@ -90,6 +91,13 @@ Slash 菜单中的项目分成两种行为，但视觉上仍只属于 `Functions
 1. 状态切换：Plan / Agent，立即调用现有模式回调。Chat 从 `+` 模式菜单选择，不在 Slash catalog 中。
 2. 产品动作：Compact / Context / Review，立即复用现有动作链。
 菜单层不得直接访问文件系统、Skill 文件或 Agent Runtime。Renderer 只传递现有回调、Skill name 和已有命令文本；`/compact` 的真实执行经 App / IPC 的统一 submitTask 入口，由 Host Task 服务负责。
+
+### `/side`（2026-10-21）
+
+- 说明：「在右侧另起一条线问，不打断当前会话。」
+- 从主 Composer 发送 `/side 问题`：打开新的侧边对话并把问题发到那里，不发给主会话；只发 `/side` 则只打开一个。失败时恢复草稿并显示错误。
+- 仅在 Composer 收到 `onOpenSideChat` 时提供（主对话 Composer、本地运行目标），Chat 形态不提供；侧边对话自己的 Composer 不提供。主会话流式中仍可用。
+- 页面可能同时挂载两个 Composer，Slash 菜单 DOM id 按实例用 `useId` 生成（`composer-slash-menu-<id>`）。
 
 ## 与 `+` 菜单的关系
 

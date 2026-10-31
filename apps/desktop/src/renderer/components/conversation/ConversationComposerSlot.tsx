@@ -3,6 +3,7 @@ import { useActiveSession } from "../../session/active-session-context";
 import { useRunTargetContext } from "../../target/run-target-context";
 import { Composer } from "../Composer";
 import { useComposerContext } from "../composer/composer-context";
+import { useOpenSideChat } from "../right-panel/side-chat/use-open-side-chat";
 
 type ComposerProps = ComponentProps<typeof Composer>;
 
@@ -35,6 +36,7 @@ export function ConversationComposerSlot(props: ConversationComposerSlotProps) {
     selectedSkills, onSelectedSkillsChange, models, draftRestore, draftKey, readDraft, writeDraft, readAttachmentDraft, writeAttachmentDraft,
   } = useComposerContext();
   const { workspaceOptions, selectedWorkspaceRoot, onSelectWorkspace, execution: executionContext } = useRunTargetContext();
+  const sideChat = useOpenSideChat(sessionId);
   return (
     <Composer
       {...props}
@@ -45,6 +47,7 @@ export function ConversationComposerSlot(props: ConversationComposerSlotProps) {
       statusNotice={composerNotice}
       onSend={onSend}
       onAbort={onAbort}
+      onOpenSideChat={sideChat.available ? sideChat.open : undefined}
       defaultModelId={defaultModelId}
       selectedModelId={selectedModelId}
       onSelectedModelChange={onSelectedModelChange}

@@ -1,7 +1,7 @@
 import type { EventCodecRegistry } from "./codec-registry.js";
 import type { SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
-import { createSessionHeader, type SessionCreatedWithV1, type SessionHeaderV1 } from "./header.js";
+import { createSessionHeader, type SessionCreatedWithV1, type SessionHeaderV1, type SessionLineageOrigin } from "./header.js";
 import { validateSessionEvents } from "./invariant-validator.js";
 
 export type SessionForkSeed = {
@@ -17,7 +17,7 @@ export function createSessionForkSeed(options: {
   readonly createdAt: string;
   readonly createdWith: SessionCreatedWithV1;
   readonly registry: EventCodecRegistry;
-  readonly origin?: "fork" | "delegation";
+  readonly origin?: SessionLineageOrigin;
 }): SessionForkSeed {
   if (!Number.isSafeInteger(options.boundarySeq) || options.boundarySeq < -1 || options.boundarySeq >= options.parentEvents.length) {
     throw new SessionError("INVALID_FORK_BOUNDARY", `Fork boundary ${options.boundarySeq} is outside the persisted Journal.`);

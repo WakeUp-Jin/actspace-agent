@@ -684,7 +684,7 @@ describe("Composer follow-up bar", () => {
     expect(skillOption).toHaveTextContent("frontend-designBuild polished interfaces");
     expect(listSkills).toHaveBeenCalledWith({ workspaceRoot: "/work" });
     expect(input).toHaveAttribute("aria-expanded", "true");
-    expect(input).toHaveAttribute("aria-controls", "composer-slash-command-menu");
+    expect(input).toHaveAttribute("aria-controls", menu.id);
     expect(menu).toHaveClass("w-[min(520px,calc(100vw_-_36px))]");
   });
 
@@ -796,6 +796,53 @@ describe("Composer follow-up bar", () => {
 
     expect(onSend).not.toHaveBeenCalled();
     expect(screen.getByLabelText("斜杠命令")).toBeInTheDocument();
+  });
+
+  it("turns /side into a side chat question instead of sending it to the current session", async () => {
+    const user = userEvent.setup();
+    setupBridge({ "skills.list": vi.fn(async () => ({ items: [], warnings: [] })) });
+    const onOpenSideChat = vi.fn(async () => {});
+    const { onSend } = renderComposer({ onOpenSideChat });
+    const input = screen.getByLabelText("消息输入框");
+
+    await user.type(input, "/side");
+    await user.keyboard("{Enter}");
+    expect(input).toHaveValue("/side ");
+    expect(screen.queryByLabelText("斜杠命令")).not.toBeInTheDocument();
+
+    await user.type(input, "这个函数为什么慢？");
+    await user.keyboard("{Enter}");
+
+    expect(onOpenSideChat).toHaveBeenCalledWith("这个函数为什么慢？", expect.objectContaining({ mode: "agent" }));
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input).toHaveValue("");
+  });
+
+  it("puts the /side draft back when the side chat does not open", async () => {
+    const user = userEvent.setup();
+    setupBridge({ "skills.list": vi.fn(async () => ({ items: [], warnings: [] })) });
+    const onOpenSideChat = vi.fn(async () => { throw new Error("主会话还没有完成的一轮，暂时不能开侧边对话。"); });
+    renderComposer({ onOpenSideChat });
+    const input = screen.getByLabelText("消息输入框");
+
+    await user.type(input, "/side 问一下");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(input).toHaveValue("/side 问一下"));
+    expect(screen.getByText("主会话还没有完成的一轮，暂时不能开侧边对话。")).toBeInTheDocument();
+  });
+
+  it("does not offer /side without a side chat handler or in Chat", async () => {
+    const user = userEvent.setup();
+    setupBridge({ "skills.list": vi.fn(async () => ({ items: [], warnings: [] })) });
+    const { onSend, rerender } = renderComposer();
+    const input = screen.getByLabelText("消息输入框");
+
+    await user.type(input, "/si");
+    expect(screen.queryByRole("option", { name: /^side:/ })).not.toBeInTheDocument();
+
+    rerender(<TooltipProvider delayDuration={0}><Composer contextSnapshot={mockContextSnapshot} onSend={onSend} mode="chat" onOpenSideChat={vi.fn(async () => {})} /></TooltipProvider>);
+    expect(screen.queryByRole("option", { name: /^side:/ })).not.toBeInTheDocument();
   });
 
   it("opens Context and Review from slash functions and binds a filtered Skill", async () => {

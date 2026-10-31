@@ -300,6 +300,10 @@ export type SessionListItem = {
   pinned?: boolean;
   /** 用户是否把该会话归档。 */
   archived?: boolean;
+  /** 侧边对话所属的主会话；左侧会话栏不单独列出这类会话。 */
+  sideChatParentId?: string;
+  /** 主会话下未归档的侧边对话数量；0 时省略。 */
+  sideChatCount?: number;
 };
 
 export type SessionListPageInput = { hostId?: string; workspaceRoot?: string; pinned?: boolean; after?: string; search?: string; limit?: number };
@@ -730,6 +734,17 @@ export type SessionCreateInput = {
 export type SessionForkInput = {
   sessionId: string;
 };
+
+/** 从主会话分出侧边对话：截到上一轮结束，默认 Plan 模式。 */
+export type SideChatOpenInput = { parentSessionId: string };
+export type SideChatOpenResult = {
+  /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
+  session: import("./runtime-v2").RuntimeV2DesktopSessionProjection;
+  inheritedTurnCount: number;
+  /** 分出时主会话正在运行，那一轮没有带过来。 */
+  runningTurnExcluded: boolean;
+};
+export type SideChatListInput = { parentSessionId: string };
 
 export type SessionPinInput = {
   sessionId: string;

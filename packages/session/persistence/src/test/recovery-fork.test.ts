@@ -127,6 +127,13 @@ describe("cold fork and compaction provenance", () => {
     expect(child.header.lineage).toMatchObject({ parentSessionId: "parent", parentBoundarySeq: 1, origin: "fork" });
     expect(child.journal.events).toHaveLength(2);
     await child.close();
+
+    const side = await store.fork({ parentSessionId: "parent", boundarySeq: 1, newSessionId: "side", createdAt: "2026-08-22T12:03:00.000Z", createdWith: createdWith(registry), origin: "side-chat" });
+    expect(side.header.lineage).toMatchObject({ parentSessionId: "parent", origin: "side-chat" });
+    await side.close();
+    const reopened = await store.open("side");
+    expect(reopened.header.lineage?.origin).toBe("side-chat");
+    await reopened.close();
   });
 
   it("compacts Surface by appending one provenance-complete replacement", async () => {

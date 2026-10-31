@@ -1,5 +1,5 @@
 import type { ContextHistoryResult } from "./context-history-query";
-import { isDelegatedSession } from "@actspace/shared/session-list-page";
+import { isDelegatedSession, sideChatParentId } from "@actspace/shared/session-list-page";
 import type { ContextHistoryState } from "./context-history-projection";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { ReadModelScheduler } from "./read-model-scheduler";
@@ -32,6 +32,7 @@ type CatalogRow = {
   archived: boolean;
   accessState: string;
   isChildSession: boolean;
+  sideChatParentId?: string;
   agentRunCount: number;
   agentForm?: string;
   agentMode?: string;
@@ -576,5 +577,5 @@ function fingerprintCatalog(summary: Summary): string {
 }
 
 function toCatalogRow(summary: Summary): CatalogRow {
-  return { sessionId: summary.sessionId, title: summary.title, revision: summary.throughJournalSeq, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), pinned: summary.pinned, archived: summary.archived, accessState: summary.accessState, isChildSession: isDelegatedSession(summary.lineage), agentRunCount: summary.completedTurnCount, agentForm: summary.agentForm, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, querySource: summary.querySource };
+  return { sessionId: summary.sessionId, title: summary.title, revision: summary.throughJournalSeq, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), pinned: summary.pinned, archived: summary.archived, accessState: summary.accessState, isChildSession: isDelegatedSession(summary.lineage), ...(sideChatParentId(summary.lineage) ? { sideChatParentId: sideChatParentId(summary.lineage) } : {}), agentRunCount: summary.completedTurnCount, agentForm: summary.agentForm, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, querySource: summary.querySource };
 }

@@ -80,6 +80,8 @@ export type ComposerProps = {
   /** 输入框上方的一次性状态提示（由上层负责定时清除）。 */
   statusNotice?: string | null;
   onSend?: (text: string, options: ComposerSendOptions) => void | Promise<void>;
+  /** `/side 问题`：开一个侧边对话并把问题发过去。不传时没有 /side。 */
+  onOpenSideChat?: (question: string, options: ComposerSendOptions) => Promise<void>;
   onAbort?: () => void;
   /** 运行位置菜单的「连接远端机器…」「连接新机器…」：打开 设置 › 远端 Host。 */
   onConnectHost?: () => void;

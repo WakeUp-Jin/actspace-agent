@@ -57,7 +57,7 @@ import type { BrowserBridgeService } from "../browser-bridge-service";
 import type { QuickOpenShortcutController } from "../quick-open-shortcut-controller";
 import type { SettingsService } from "../settings-service";
 import { createWorkspaceFolder, resolveWorkspaceSelection, resolveRegisteredWorkspaceSelection, setWorkspaceHidden } from "../workspace-registry-service";
-import { isDelegatedSession } from "@actspace/shared/session-list-page";
+import { isDelegatedSession, sideChatParentId } from "@actspace/shared/session-list-page";
 import { createWorkspaceAccessDeps, registeredWorkspaceRoot, resolveWorkspaceAccess, workspaceRegistryOptions, WORKSPACE_NOT_REGISTERED } from "../workspace-access";
 import { getWorkspaceGitContext } from "../workspace-git-context-service";
 import { openWorkspaceInIde } from "../workspace-ide-service";
@@ -182,6 +182,16 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       newSessionId: randomUUID(),
     });
     return options.registry.readSessionProjection({ sessionId: forked.sessionId });
+  });
+  ipc.handle(contract.sessions.openSideChat, async (input) => {
+    const opened = await options.registry.openSideChat(input.parentSessionId);
+    const session = await options.registry.readSessionProjection({ sessionId: opened.snapshot.sessionId });
+    return { session, inheritedTurnCount: opened.inheritedTurnCount, runningTurnExcluded: opened.runningTurnExcluded };
+  });
+  ipc.handle(contract.sessions.listSideChats, async (input) => {
+    const items = await options.registry.listSessions();
+    const selected = items.filter((item) => !item.metadata.archived && sideChatParentId(item.lineage) === input.parentSessionId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return Promise.all(selected.map((item) => toSessionListItem(item, options.registry)));
   });
   ipc.handle(contract.sessions.pin, async (input) => {
     await options.registry.updateSessionMetadata(input);
@@ -653,6 +663,7 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
     updatedAt: item.updatedAt,
     accessState: item.accessState,
     isChildSession: isDelegatedSession(item.lineage),
+    ...(sideChatParentId(item.lineage) ? { sideChatParentId: sideChatParentId(item.lineage) } : {}),
     agentRunCount,
     agentForm: item.agentForm,
     agentMode: item.agentMode,

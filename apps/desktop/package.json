@@ -35,6 +35,7 @@
     "@actspace/client": "workspace:*",
     "@actspace/desktop-app": "workspace:*",
     "@actspace/english-learning": "workspace:*",
+    "@actspace/side-chat": "workspace:*",
     "@actspace/llm-pi-ai": "workspace:*",
     "@actspace/llm-service": "workspace:*",
     "@actspace/runtime": "workspace:*",

@@ -25,6 +25,7 @@ export const SERVICE_SOURCE = Object.freeze({
 export const MANIFEST_PATHS = Object.freeze([
   "packages/auto-review/src/manifest.ts",
   "packages/english-learning/src/manifest.ts",
+  "packages/side-chat/src/manifest.ts",
   "packages/harness-control/src/manifest.ts",
   "packages/harness-evaluation/src/manifest.ts",
   "packages/harness-hmr/src/manifest.ts",
@@ -90,6 +91,7 @@ export const PACKAGE_PATHS = Object.freeze([
   "packages/session/projection-cache/package.json",
   "packages/session/storage/package.json",
   "packages/english-learning/package.json",
+  "packages/side-chat/package.json",
   "packages/session/checkpoint-policy/package.json",
   "packages/harness-control/package.json",
   "packages/harness-evaluation/package.json",

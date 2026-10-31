@@ -70,11 +70,11 @@ export function SidebarSessions({
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const closeSearch = (restoreFocus: boolean) => { setSearchOpen(false); setQuery(""); if (restoreFocus) searchButtonRef.current?.focus(); };
 
-  // 已归档的只在筛选要求时拉，并且只放进还在侧栏里的工作区。
+  // 已归档的只在筛选要求时拉，并且只放进还在侧栏里的工作区。侧边对话不进侧栏，只在主会话的右侧面板里出现。
   const archivedPool = useArchivedSessions(options.archived !== "hide", sessions);
   const pool = useMemo(() => {
-    const live = sessions.filter((session) => !session.archived && !isOrphanSession(session, workspaces));
-    const archived = archivedPool.filter((session) => isInRegisteredWorkspace(session, workspaces));
+    const live = sessions.filter((session) => !session.archived && !session.sideChatParentId && !isOrphanSession(session, workspaces));
+    const archived = archivedPool.filter((session) => !session.sideChatParentId && isInRegisteredWorkspace(session, workspaces));
     if (options.archived === "only") return archived;
     return options.archived === "all" ? [...live, ...archived] : live;
   }, [archivedPool, options.archived, sessions, workspaces]);

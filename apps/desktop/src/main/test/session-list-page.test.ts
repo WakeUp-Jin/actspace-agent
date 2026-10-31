@@ -23,3 +23,17 @@ it('returns ten summaries per workspace and loads only the requested next page',
   const last = paginateSessionSummaries(result, { workspaceRoot: '/a', after: next.items.at(-1)!.id });
   expect(last.items).toHaveLength(3); expect(last.groups[0]!.hasMore).toBe(false);
 });
+
+it('hides side chats from the page and counts them on their parent', () => {
+  const base = { createdAt: '', workspaceRoot: '/a', profileId: 'test', accessState: 'read-write' as const, completedTurnCount: 1 };
+  const side = (id: string, archived = false) => ({ ...base, sessionId: id, updatedAt: '2026-10-21T02:00:00.000Z', metadata: { title: id, pinned: false, archived }, lineage: { parentSessionId: 'main', parentBoundarySeq: 4, origin: 'side-chat', delegationDepth: 0 } });
+  const result: RuntimeV2BrowseList = { indexing: false, failed: 0, items: [
+    { ...base, sessionId: 'main', updatedAt: '2026-10-21T01:00:00.000Z', metadata: { title: 'main', pinned: false, archived: false }, lineage: null },
+    { ...base, sessionId: 'fork', updatedAt: '2026-10-21T00:00:00.000Z', metadata: { title: 'fork', pinned: false, archived: false }, lineage: { parentSessionId: 'main', parentBoundarySeq: 4, origin: 'fork', delegationDepth: 0 } },
+    side('side-1'), side('side-2'), side('side-old', true),
+  ] };
+  const page = paginateSessionSummaries(result, {});
+  expect(page.items.map(item => item.id)).toEqual(['main', 'fork']);
+  expect(page.items[0]).toMatchObject({ sideChatCount: 2 });
+  expect(page.items[1]).not.toHaveProperty('sideChatCount');
+});

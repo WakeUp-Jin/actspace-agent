@@ -11,10 +11,13 @@ export type SessionPluginProvenance = {
   readonly version: string;
 };
 
+/** How a Session was derived: a user fork, a subagent delegation, or a side chat opened from the right panel. */
+export type SessionLineageOrigin = "fork" | "delegation" | "side-chat";
+
 export type SessionLineageV1 = {
   readonly parentSessionId: string;
   readonly parentBoundarySeq: number;
-  readonly origin: "fork" | "delegation";
+  readonly origin: SessionLineageOrigin;
   readonly delegationDepth: number;
   readonly parentCallId?: string;
   readonly seedDigest?: string;
@@ -131,8 +134,8 @@ function validateLineage(value: unknown): asserts value is SessionLineageV1 {
   if (!Number.isSafeInteger(value.parentBoundarySeq) || (value.parentBoundarySeq as number) < -1) {
     throw invalidHeader("lineage.parentBoundarySeq must be an integer >= -1.");
   }
-  if (value.origin !== "fork" && value.origin !== "delegation") {
-    throw invalidHeader("lineage.origin must be fork or delegation.");
+  if (value.origin !== "fork" && value.origin !== "delegation" && value.origin !== "side-chat") {
+    throw invalidHeader("lineage.origin must be fork, delegation or side-chat.");
   }
   if (!Number.isSafeInteger(value.delegationDepth) || (value.delegationDepth as number) < 0) {
     throw invalidHeader("lineage.delegationDepth must be a non-negative integer.");

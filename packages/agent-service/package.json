@@ -42,7 +42,8 @@
     "@actspace/shared": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/core-scope": "workspace:*",
-    "@actspace/session-storage": "workspace:*"
+    "@actspace/session-storage": "workspace:*",
+    "@actspace/side-chat": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

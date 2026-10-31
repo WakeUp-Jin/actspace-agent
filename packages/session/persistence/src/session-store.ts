@@ -1,4 +1,4 @@
-import { SessionError, createSessionForkSeed, validateSessionEvents, type EventCodecRegistry, type CreateSessionHeaderInput, type SessionValidationResult } from "@actspace/session-journal";
+import { SessionError, createSessionForkSeed, validateSessionEvents, type EventCodecRegistry, type CreateSessionHeaderInput, type SessionValidationResult, type SessionLineageOrigin } from "@actspace/session-journal";
 import type { SessionStorage, SessionStorageHandle, SessionStorageSnapshot } from "@actspace/session-storage";
 import { Service, type CordisServiceContext } from "@actspace/cordis-adapter";
 import { SessionHandle } from "./session.js";
@@ -41,7 +41,7 @@ export class SessionStore {
     catch (error) { return this.cleanupFailure(error, [() => handle.close()]); }
   }
 
-  async fork(options: { readonly parentSessionId: string; readonly boundarySeq: number; readonly newSessionId: string; readonly createdAt: string; readonly createdWith: CreateSessionHeaderInput["createdWith"]; readonly origin?: "fork" | "delegation" }): Promise<SessionHandle> {
+  async fork(options: { readonly parentSessionId: string; readonly boundarySeq: number; readonly newSessionId: string; readonly createdAt: string; readonly createdWith: CreateSessionHeaderInput["createdWith"]; readonly origin?: SessionLineageOrigin }): Promise<SessionHandle> {
     const parent = await this.inspect(options.parentSessionId);
     if (!parent.header || !parent.validation || parent.integrity !== "complete") throw new SessionError("INVALID_FORK_BOUNDARY", "Parent session requires repair.");
     const seed = createSessionForkSeed({ parentHeader: parent.header, parentEvents: parent.events, registry: this.options.registry, ...options });

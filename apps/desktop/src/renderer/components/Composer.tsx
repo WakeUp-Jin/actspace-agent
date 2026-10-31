@@ -10,7 +10,8 @@ import { ComposerStatusRow } from "./composer/ComposerStatusRow";
 import { ComposerAttachments, useComposerAttachments } from "./composer/ComposerAttachments";
 import { ComposerInput, composerPlaceholder, useComposerLayout, type ComposerLayout } from "./composer/ComposerInput";
 import { useComposerKeyboard } from "./composer/use-composer-keyboard";
-import { SLASH_MENU_ID, SlashMenu, runSlashFunction, useSlashMenu, type ComposerSlashResult } from "./composer/SlashMenu";
+import { SlashMenu, runSlashFunction, useSlashMenu, type ComposerSlashResult } from "./composer/SlashMenu";
+import { parseSideChatCommand } from "./composer-slash-commands";
 import { useComposerSkills } from "./composer/use-composer-skills";
 import { ComposerToolbar } from "./composer/ComposerToolbar";
 import { ReviewStrip } from "./composer/ReviewStrip";
@@ -67,7 +68,7 @@ function getComposerPanelClass(surface: ComposerSurface, layout: ComposerLayout,
 
 export function Composer({
   surface = "followup", sessionId, contextSnapshot, contextState, statusNotice = null, permissionControl, placeholder, statusRow,
-  isStreaming = false, isAborting = false, isCompacting = false, messageQueue, onSend, onAbort,
+  isStreaming = false, isAborting = false, isCompacting = false, messageQueue, onSend, onAbort, onOpenSideChat,
   models, defaultModelId, selectedModelId: controlledSelectedModelId, onSelectedModelChange,
   mode = "agent", onModeChange, selectedSkills = [], onSelectedSkillsChange,
   workspaceOptions = [], selectedWorkspaceRoot, onSelectWorkspace, executionContext, onConnectHost,
@@ -76,6 +77,7 @@ export function Composer({
   responseAnnotations = EMPTY_RESPONSE_ANNOTATIONS, onResponseAnnotationsChange, responseAnnotationNotice,
 }: ComposerProps) {
   const isChatForm = mode === "chat";
+  const openSideChat = isChatForm ? undefined : onOpenSideChat;
   const { target, capabilities, readiness, choices } = useRunTargetContext();
   const isRemoteTarget = target.kind === "remote";
   const remoteHost = target.kind === "remote" ? choices?.hosts.find((host) => host.hostId === target.hostId) : undefined;
@@ -140,7 +142,11 @@ export function Composer({
     sessionId,
     draftKey,
     writeDraft,
-    onSend,
+    // `/side 问题` 不发到当前会话：开一个侧边对话，问题发到那边。失败时和普通发送一样放回草稿。
+    onSend: onSend && ((text, options) => {
+      const question = openSideChat ? parseSideChatCommand(text) : null;
+      return question === null ? onSend(text, options) : openSideChat!(question, options);
+    }),
     remote: isRemoteTarget,
     ready: Boolean(message.trim() || attachments.length > 0 || responseAnnotations.length > 0) && model.available && readiness.state === "ready",
     text: message,
@@ -164,6 +170,7 @@ export function Composer({
     inputLocked,
     isChatForm,
     isStreaming,
+    allowSideChat: Boolean(openSideChat),
     skills: skills.items,
     composerRef,
     inputRef,
@@ -245,6 +252,12 @@ export function Composer({
 
   function selectSlashResult(result: ComposerSlashResult | undefined) {
     if (!result) return;
+    if (result.kind === "function" && result.item.id === "side") {
+      setDraftText("/side ");
+      keyboard.resetHistory();
+      inputRef.current?.focus();
+      return;
+    }
     if (result.kind === "skill") skills.toggle(result.item.id ?? result.item.name);
     // /compact 在运行中锁定输入或模型不可用时不执行，菜单保持打开。
     else if (!runSlashFunction(result.item.id, {
@@ -269,7 +282,7 @@ export function Composer({
         placeholder={placeholder ?? composerPlaceholder(mode, surface, isStreaming && Boolean(messageQueue))}
         value={message}
         disabled={inputLocked}
-        slash={{ open: slash.open, menuId: SLASH_MENU_ID, activeOptionId: slash.activeOptionId }}
+        slash={{ open: slash.open, menuId: slash.menuId, activeOptionId: slash.activeOptionId }}
         onChange={(text) => {
           setDraftText(text);
           keyboard.resetHistory();

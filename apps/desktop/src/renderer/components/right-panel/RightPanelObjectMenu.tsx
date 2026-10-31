@@ -1,8 +1,9 @@
-import { Eye, FolderTree, GitBranch, MessageSquare, Plus, SquareTerminal } from "lucide-react";
+import { Eye, FolderTree, GitBranch, GitFork, MessageSquare, Plus, SquareTerminal } from "lucide-react";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { useRightPanel } from "./RightPanelContext";
 import { useOpenTerminal } from "./useOpenTerminal";
 import { preloadTerminalRenderView } from "./terminal-render-loader";
+import { useOpenSideChat } from "./side-chat/use-open-side-chat";
 
 /**
  * 右侧面板「+ 新建对象」菜单（参考 Cursor 顶栏的 +）。
@@ -12,6 +13,7 @@ import { preloadTerminalRenderView } from "./terminal-render-loader";
  * - Review：打开当前 workspace 的 Git Review。
  * - Reply：当前会话生成过的可视化回复浏览器。
  * - Context：完整只读上下文视图。
+ * - 侧边对话：从当前会话分出一条新对话（本机运行目标才有）。
  */
 
 export function RightPanelObjectMenu({
@@ -25,6 +27,7 @@ export function RightPanelObjectMenu({
 }) {
   const { openFileTree, openTab } = useRightPanel();
   const { openTerminal, creatingTerminal } = useOpenTerminal(sessionId);
+  const sideChat = useOpenSideChat(sessionId);
 
   return (
     <div className="flex items-center [-webkit-app-region:no-drag]">
@@ -35,6 +38,13 @@ export function RightPanelObjectMenu({
           </button>
         </MenuTrigger>
         <MenuContent align="end" className="w-[188px]">
+          {sideChat.available ? (
+            // 打开失败时 App 在主会话输入框上方提示原因。
+            <MenuItem disabled={sideChat.opening} onSelect={() => void sideChat.open().catch(() => undefined)}>
+              <GitFork size={15} strokeWidth={2} />
+              侧边对话
+            </MenuItem>
+          ) : null}
           {developmentEnabled ? (
             <>
               <MenuItem onSelect={openFileTree}>

@@ -29,7 +29,7 @@
 
 右侧面板没有打开对象时，不默认塞入业务 Tab，而是展示一个参考 Cursor 空面板入口密度的对象启动页。启动页只借用“方块入口 + 大留白”的形式，入口名称与数量由 Actspace 当前真实对象决定。
 
-当前固定展示五个入口：
+当前固定展示五个入口，另有「侧边对话」入口与已收起列表（见「侧边对话」一节）：
 
 - `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
 - `Terminal`：创建或聚焦绑定当前会话 workspace / worktree 的交互式 shell；详见 `front-右侧终端与会话生命周期规范.md`。
@@ -68,11 +68,12 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `Context`：Context 面板；见本文「Context 面板」一节。
 - `Reply`：当前会话已生成的可视化回复浏览器（见下文）；内部当前由 HTML 产物承载。
 - `Terminal`：用户交互式 shell；Tab 只保存 terminalId / sessionId / title，不保存 PTY、xterm 实例或输出缓冲。
+- `sideChat`：侧边对话；见「侧边对话」一节。
 
 ## 「+ 新建对象」菜单（2026-05-30，2026-06-04 补 Review）
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
-- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Terminal` / `Review` / `Reply` / `Context`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
+- 点开是一个轻量菜单，可往右侧面板新增对象：`侧边对话`（排第一，仅本地运行目标）/ `工作区文件` / `Terminal` / `Review` / `Reply` / `Context`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
 - `Review` 入口复用 Composer 的 Review 打开逻辑，首次默认选择当前 workspace 的 Git `Uncommitted` scope；后续打开恢复该 workspace 最近 selection。
 - 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。
@@ -477,3 +478,28 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 右侧对象面板新增 Subagents tab，按当前 Session 隔离列表，分 Running / Done；任务行显示描述、状态、持续时间。点击在同一个 tab 内打开执行详情，顶部返回列表。聊天中的 Agent 条目也打开此视图；本轮首次出现子任务时自动打开，用户关闭后不因后续更新重复抢焦点。
 
 列表通过 `getSubagents` 每秒更新；详情通过 `getSubAgentTranscript` 读取规范 SessionEvent，运行中每 750ms 更新。组件卸载、切任务或切会话时取消后续刷新，迟到响应不更新新视图。详情复用会话 MessageBlock 渲染，支持正文、Thinking 和工具，不再附着在 Composer 上方。
+
+## 侧边对话（2026-10-21）
+
+设计见 `docs/design-docs/collaboration/side-chat-design.md`。右侧面板 Tab 类型 `sideChat`：`{ id: "side-chat:<sessionId>", title, sessionId, parentSessionId, inheritedTurnCount?, runningTurnExcluded? }`。视图为 `right-panel/side-chat/SideChatView.tsx`，外包 `SessionProjectionScope`（`session/SessionProjectionContext.tsx`）：通过 `bridge.watch` 给非选中会话一份投影，复用外层 store / bridge，不改变当前选中会话。
+
+### 启动页与 `+` 菜单
+
+- 启动页入口「侧边对话」，说明「另起一条线问，带上目前为止的上下文」；`+` 菜单里「侧边对话」排第一。
+- 启动页另有分组「本会话的侧边对话 · 已收起」，列出本主会话下当前没有打开 Tab 的侧边对话（`sessions.listSideChats`），每项带「N 分钟前更新」等相对时间；点击重新打开为 Tab。
+- 仅本地运行目标显示；远端目标隐藏入口。
+- 打开失败时错误显示在主 Composer 的 notice：「主会话还没有完成的一轮…」/「侧边对话里不能再开侧边对话。」/「主会话暂时不能分出侧边对话，请稍后再试。」/「侧边对话没有打开，请重试。」
+
+### Tab 规则
+
+- Tab 栏只显示 `parentSessionId` 等于当前主会话的侧边对话；切换主会话后它们隐藏，若激活的是侧边对话则回到启动页。
+- 图标：空闲为 GitFork，否则显示会话状态点（running / approval / unread / failed，复用 `SESSION_STATUS_META`）。
+- 标题：侧边对话自己的会话标题（与父标题、`New chat` 不同时）；否则首个用户问题（最多 40 字）；再否则「侧边对话 N」。首次提问时视图会把会话重命名为该问题（`runtime.rename`），让已收起列表能认出它。
+- 关闭按钮动词为「收起」：只收起 Tab，侧边对话仍保存。
+
+### 面板内容
+
+- 消息流顶部是居中的小分隔线（随内容滚走，不做框和按钮）：「继承主会话 N 轮」；打开时主会话正在运行则为「继承主会话 N 轮，不含进行中的第 N+1 轮」；重新打开的 Tab 从窗口计数（无后缀），数不出时为「继承主会话的上下文」。
+- 继承的消息不显示：隐藏 `sourceSeq ≤ lineage.parentBoundarySeq` 的 block 及这些 run 的合成 block。
+- 空状态「在这里另起一条线问，不打断主会话」，附 Plan 提示。「加载更早的消息」只针对分叉后的历史。
+- Composer：surface 为 followup，默认 Plan（只读）模式；模型初始为主会话模型，可按侧边对话单独切换（存 `SessionLocalStore.selectedModelId`）；有权限模式控件；无消息队列（运行中输入锁定，按钮变停止）；无轮次导航、轨迹和批注。

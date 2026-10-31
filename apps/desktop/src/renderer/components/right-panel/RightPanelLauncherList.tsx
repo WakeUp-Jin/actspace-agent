@@ -28,20 +28,35 @@ const LAUNCHER_ICON_CLASS =
 const LAUNCHER_DESCRIPTION_CLASS =
   "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-act-xs font-normal text-text-faint";
 
+export type RightPanelLauncherGroup = {
+  id: string;
+  caption: string;
+  items: readonly RightPanelLauncherItem[];
+};
+
 export function RightPanelLauncherList({
   label,
   caption,
   items,
+  groups = [],
 }: {
   /** 导航区域的可读名称。 */
   label: string;
   caption?: ReactNode;
   items: readonly RightPanelLauncherItem[];
+  /** 列在对象之后的分组，例如「本会话的侧边对话 · 已收起」；空分组不显示。 */
+  groups?: readonly RightPanelLauncherGroup[];
 }) {
   return (
     <nav className={LAUNCHER_CLASS} aria-label={label}>
       {caption ? <p className={LAUNCHER_CAPTION_CLASS}>{caption}</p> : null}
       {items.map((item) => <LauncherItem key={item.id} item={item} />)}
+      {groups.filter((group) => group.items.length > 0).map((group) => (
+        <section key={group.id} className="mt-3 flex flex-col gap-px" aria-label={group.caption}>
+          <p className={LAUNCHER_CAPTION_CLASS}>{group.caption}</p>
+          {group.items.map((item) => <LauncherItem key={item.id} item={item} />)}
+        </section>
+      ))}
     </nav>
   );
 }
