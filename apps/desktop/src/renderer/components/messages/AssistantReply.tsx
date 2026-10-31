@@ -4,7 +4,7 @@ import { MarkdownProse } from "./MarkdownProse";
 import { useResponseAnnotations } from "./response-annotation-context";
 import { ResponseAnnotationMarkers, type DraftAnnotationMark } from "./ResponseAnnotationMarkers";
 
-const ASSISTANT_REPLY_CLASS = "message-row assistant-reply block animate-[rise-in_260ms_ease_both]";
+const ASSISTANT_REPLY_CLASS = "message-row assistant-reply block animate-[fade-in_260ms_ease_both]";
 const ASSISTANT_CONTENT_CLASS =
   "assistant-content relative max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)] font-normal leading-[1.65] text-text-main";
 const NO_MARKS: readonly DraftAnnotationMark[] = [];

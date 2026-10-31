@@ -1,4 +1,5 @@
 // 把流式状态生成为 MessageBlock：live 块的 id / renderKey 规则在这里（14 T1 从 App 迁出）。
+import { hasVisibleText } from "@actspace/shared";
 import type { BashStatus, MessageBlock, ToolUiPreview } from "@actspace/shared";
 import type { StreamingState, ToolEntry } from "./run-state.js";
 
@@ -392,7 +393,7 @@ export function streamingStateToBlocks(state: StreamingState, agentRunId?: strin
 
   for (const [segmentIndex, seg] of state.segments.entries()) {
     if (seg.type === "thinking") {
-      if (!seg.text.trim()) continue;
+      if (!hasVisibleText(seg.text)) continue;
       const index = thinkingIdx++;
       blocks.push({
         kind: "thinking",

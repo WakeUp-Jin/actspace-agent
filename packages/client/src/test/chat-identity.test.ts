@@ -58,6 +58,14 @@ describe("chat projection identity", () => {
     expect(blocks).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "bash", command, status: "running" })]));
     expect(projectSubagentTranscript(pending, journal).filter(event => event.type === "tool_result")).toHaveLength(1);
   });
+  it("drops a reasoning block that only holds a zero-width space", () => {
+    const journal = [
+      envelope(7, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: "answer" },
+        { kind: "append", node: { kind: "assistant", messageId: "a-1", content: [{ type: "reasoning", text: "\u200B" }, { type: "text", text: "answer" }] } }),
+    ];
+    const events = projectChatEvents(snapshot(["a-1"]), journal);
+    expect(events.map((event) => event.type)).toEqual(["assistant_message"]);
+  });
   it("stamps each projected event with the seq of the envelope it came from", () => {
     const journal = [
       envelope(4, "user/message", { agentRunId: "run-1", messageId: "u-1", content: "question" }, { kind: "append", node: { kind: "user", messageId: "u-1", content: "question" } }),

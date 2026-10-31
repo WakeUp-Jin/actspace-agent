@@ -109,3 +109,27 @@ it("reads indexed ranges from legacy JSONL containing empty lines and non-ASCII 
     await writer.close();
   } finally { await storage.close(); await rm(dataRoot, { recursive: true, force: true }); }
 });
+
+it("inspection carries a content digest instead of the raw Journal bytes, and repair re-verifies it", async () => {
+  const { createHash } = await import("node:crypto");
+  const { readFile, writeFile, appendFile } = await import("node:fs/promises");
+  const { inspectJsonlSession } = await import("../jsonl-reader.js");
+  const { repairTornJsonlSession } = await import("../repair.js");
+  const dataRoot = await mkdtemp(join(tmpdir(), "storage-inspection-digest-"));
+  const registry = createCoreCodecRegistry();
+  const storage = new JsonlSessionStorage({ dataRoot, runtimeId: "test", registry });
+  try {
+    const handle = await storage.create(createSessionHeader({ sessionId: "digest", createdAt: "2026-10-11T00:00:00.000Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }));
+    await handle.close();
+    const path = storage.journalPath("digest");
+    const inspection = await inspectJsonlSession(path, registry, "digest");
+    expect(inspection).not.toHaveProperty("rawBytes");
+    expect(inspection.contentDigest).toBe(createHash("sha256").update(await readFile(path)).digest("hex"));
+    expect((await storage.inspect("digest")).revision).toBe(inspection.contentDigest);
+
+    await appendFile(path, '{"partial":');
+    const torn = await inspectJsonlSession(path, registry, "digest");
+    await writeFile(path, `${await readFile(path, "utf8")}x`);
+    await expect(repairTornJsonlSession({ inspection: torn, registry, runtimeId: "repair" })).rejects.toThrow("changed after inspection");
+  } finally { await storage.close(); await rm(dataRoot, { recursive: true, force: true }); }
+});

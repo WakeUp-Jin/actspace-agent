@@ -28,6 +28,7 @@ export * from "./session";
 export * from "./session-transcript";
 export * from "./session-locator";
 export * from "./usage-cost";
+export * from "./visible-text";
 export * from "./session-selectors";
 export {
   createMessageBlocks,

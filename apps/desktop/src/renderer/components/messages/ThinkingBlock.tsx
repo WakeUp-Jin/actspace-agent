@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type { MessageBlock } from "@actspace/shared";
+import { hasVisibleText, type MessageBlock } from "@actspace/shared";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
 } from "./toolLogStyles";
 
 const THINKING_BLOCK_CLASS =
-  "message-row thinking-block max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)] animate-[rise-in_260ms_ease_both]";
+  "message-row thinking-block max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)] animate-[fade-in_260ms_ease_both]";
 const THINKING_TOGGLE_CLASS =
   "thinking-toggle flex items-center gap-2 border-0 bg-transparent p-0 text-act-md font-normal leading-[22px] text-text-faint";
 const THINKING_CONTENT_CLASS =
@@ -26,6 +26,8 @@ export function ThinkingBlock({ message, className, replyCompleted = false }: {
   }, [replyCompleted]);
   const blockClassName = `${THINKING_BLOCK_CLASS} ${className ?? ""}`;
   const running = message.status === "running";
+  // Projections already drop invisible thinking; this guards any other source from rendering an empty body.
+  if (!hasVisibleText(message.content)) return null;
 
   return (
     <article className={blockClassName}>

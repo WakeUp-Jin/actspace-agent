@@ -339,6 +339,21 @@ describe("session selectors", () => {
     ]);
   });
 
+  it("hides thinking whose content is only zero-width characters", () => {
+    const blocks = createMessageBlocks([
+      {
+        id: "thinking-zwsp",
+        sessionId: "session-thinking",
+        agentRunId: "turn-thinking",
+        timestamp: "2026-07-28T04:10:00.000Z",
+        schemaVersion: 2 as const,
+        type: "thinking" as const,
+        payload: { content: "\u200B \u2060\uFEFF" },
+      },
+    ]);
+    expect(blocks).toEqual([]);
+  });
+
   it("attaches the full turn usage to the final visible assistant reply", () => {
     const base = {
       sessionId: "session-usage",

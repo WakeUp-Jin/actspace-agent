@@ -3,6 +3,7 @@ import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
 import { ResponseAnnotationPill } from "../composer/ResponseAnnotationPill";
 import { BackgroundNoticeRow } from "../messages/BackgroundNoticeRow";
 import { TodoListBlock } from "../messages/TodoListBlock";
+import { ReplyStreamingContext } from "../messages/reply-streaming-context";
 import { ToolActivityGroup } from "../messages/ToolActivityGroup";
 import { USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "../messages/UserMessage";
 import { renderMessageList, type AgentTranscriptHandler, type ReadMessageBlock } from "./render-message";
@@ -150,9 +151,11 @@ export const TurnView = memo(function TurnView({
     >
       <TurnPrompt turn={turn} onOpenAttachmentPreview={onOpenAttachmentPreview} sessionId={sessionId} />
       <div className={ASSISTANT_TURN_GROUP_CLASS}>
-        <div className={TURN_BODY_CLASS}>
-          {renderTurnBody(turn, isActive, onOpenAgentTranscript, onOpenReadFile, onOpenWorkspaceFile)}
-        </div>
+        <ReplyStreamingContext.Provider value={isActive}>
+          <div className={TURN_BODY_CLASS}>
+            {renderTurnBody(turn, isActive, onOpenAgentTranscript, onOpenReadFile, onOpenWorkspaceFile)}
+          </div>
+        </ReplyStreamingContext.Provider>
         {splitTurnMessages(turn.messages).finalReply.length > 0 && !isActive ? (
           <TurnTail
             turnId={turn.id}

@@ -18,11 +18,11 @@ export async function repairTornJsonlSession(options: {
   const recoveryDir = join(sessionDir, "recovery");
   await mkdir(recoveryDir, { recursive: true });
   const lease = await SessionWriterLease.acquire({ sessionDir, sessionId: inspection.header.sessionId, runtimeId: options.runtimeId });
-  const digest = createHash("sha256").update(inspection.rawBytes).digest("hex");
+  const digest = inspection.contentDigest;
   const forensicPath = join(recoveryDir, `${digest}.journal.jsonl`);
   const temporaryPath = join(sessionDir, `.repair-${randomUUID()}.tmp`);
   try {
-    if (!(await readFile(inspection.journalPath)).equals(inspection.rawBytes)) throw new Error("Journal changed after inspection; inspect again before repair.");
+    if (createHash("sha256").update(await readFile(inspection.journalPath)).digest("hex") !== digest) throw new Error("Journal changed after inspection; inspect again before repair.");
     await copyFile(inspection.journalPath, forensicPath);
     await syncFile(forensicPath);
     const journal = new SessionJournal({ registry: options.registry, seed: inspection.events, now: () => new Date().toISOString() });

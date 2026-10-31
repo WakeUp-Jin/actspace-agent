@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MarkdownProse } from "../components/messages/MarkdownProse";
+import { ReplyStreamingContext } from "../components/messages/reply-streaming-context";
 import { resetMermaidRendererForTests } from "../components/messages/mermaid-renderer";
 
 vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn() } }));
@@ -116,6 +117,21 @@ describe("MarkdownProse Mermaid fences", () => {
 
     rerender(<MarkdownProse content={`\`\`\`mermaid\n${FLOW}\n\`\`\``} />);
     expect(await screen.findByRole("img", { name: /Mermaid 图表/ })).toBeInTheDocument();
+  });
+
+  it("keeps a closed mermaid fence as a code block until the turn finishes streaming", async () => {
+    const closed = `\`\`\`mermaid\n${FLOW}\n\`\`\``;
+    const view = (streaming: boolean) => (
+      <ReplyStreamingContext.Provider value={streaming}><MarkdownProse content={closed} /></ReplyStreamingContext.Provider>
+    );
+    const { rerender, container } = render(view(true));
+    expect(screen.getByRole("button", { name: "复制代码" })).toBeInTheDocument();
+    expect(container.querySelector(".markdown-prose")).toHaveAttribute("data-streaming", "true");
+    expect(await mermaidRender()).not.toHaveBeenCalled();
+
+    rerender(view(false));
+    expect(await screen.findByRole("img", { name: /Mermaid 图表/ })).toBeInTheDocument();
+    expect(container.querySelector(".markdown-prose")).not.toHaveAttribute("data-streaming");
   });
 
   it("isolates a failing diagram, shows its source, and still renders the others", async () => {

@@ -15,6 +15,7 @@ import type {
   WorkspacePreparationPayload,
 } from "./session";
 import { convertUsageCostToUsd } from "./usage-cost";
+import { hasVisibleText } from "./visible-text";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -510,7 +511,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       case "thinking": {
         const payload = event.payload as ThinkingPayload;
         // Signature-only thinking events are provider replay state, not visible content.
-        if (!payload.content.trim()) return [];
+        if (!hasVisibleText(payload.content)) return [];
         return [
           {
             kind: "thinking",

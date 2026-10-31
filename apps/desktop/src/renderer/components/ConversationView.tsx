@@ -29,9 +29,9 @@ import { useWorkspaceFileLinks } from "./conversation/use-workspace-file-links";
 const CONVERSATION_SHELL_CLASS =
   "conversation-shell grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] bg-surface pt-[var(--window-chrome-strip-height)]";
 const MESSAGE_VIEWPORT_CLASS = "conversation-message-viewport relative col-start-1 row-start-1 min-h-0 min-w-0";
-const MESSAGE_SCROLL_CLASS = "message-scroll h-full min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
+const MESSAGE_SCROLL_CLASS = "message-scroll h-full min-h-0 overflow-auto bg-surface pb-6 [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_SCROLL_INITIAL_CLASS =
-  "message-scroll message-scroll-initial h-full min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
+  "message-scroll message-scroll-initial h-full min-h-0 overflow-auto bg-surface pb-6 [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_STACK_CLASS =
   "message-stack mx-auto flex min-w-0 w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col gap-7 pb-7";
 // Composer 只挂一处（16 T14）：空会话时这一格叠在消息区上、居中显示（滚动与留白和原来放在消息区里时相同）；
@@ -137,8 +137,10 @@ export function ConversationView({
   const focusRequestId = composerFocusRequestId + annotationFocusRequest + focusRequest;
   const updateConversationViewportRef = useRef<() => void>(() => {});
   // 是否「贴底自动跟随」：流式输出时保持视图贴底；用户向上滚动阅读历史则暂停，
-  // 滚回接近底部时恢复（类似 Cursor 的聊天滚动）。
+  // 滚回接近底部时恢复（类似 Cursor 的聊天滚动）。只由用户的滚动意图改写：程序写 scrollTop
+  // 之后内容可能又涨了，离底部的距离不能反推出「用户离开了底部」。
   const stickToBottomRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
   const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const turnNavigator = useTurnNavigator(turnNavigationItems);
   const { sync: syncTurnNavigator, scrollToTurn } = turnNavigator;
@@ -178,8 +180,10 @@ export function ConversationView({
     const scrollable = el.scrollHeight > el.clientHeight + 1;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     const atBottom = !scrollable || distanceFromBottom < SCROLL_BOTTOM_THRESHOLD_PX;
-    stickToBottomRef.current = atBottom;
-    setIsAwayFromBottom(scrollable && !atBottom);
+    // 放不满视口时没有可离开的位置，重新跟随；其余情况不碰贴底状态。
+    if (!scrollable) stickToBottomRef.current = true;
+    // 贴底跟随中，内容比滚动写入涨得更快只是暂时落后，不算离开底部，按钮不闪。
+    setIsAwayFromBottom(scrollable && !atBottom && !stickToBottomRef.current);
     syncTurnNavigator(el, scrollable, atBottom);
   }, [syncTurnNavigator]);
 
@@ -196,11 +200,24 @@ export function ConversationView({
     void browse.loadEarlier();
   }, [browse, sessionId]);
   const handleMessagesScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      const top = el.scrollTop;
+      const previousTop = lastScrollTopRef.current;
+      lastScrollTopRef.current = top;
+      const distanceFromBottom = el.scrollHeight - top - el.clientHeight;
+      // 程序写入只会往底部滚（或内容缩短后被夹回底部，距离≈0），向上移动的位置变化一定来自用户
+      // （滚轮、触摸、键盘、拖滚动条），向下滚回底部附近则恢复跟随。
+      if (top < previousTop - 1 && distanceFromBottom >= 1) stickToBottomRef.current = false;
+      else if (top > previousTop && distanceFromBottom < SCROLL_BOTTOM_THRESHOLD_PX) stickToBottomRef.current = true;
+    }
     updateConversationViewport();
     if ((scrollContainerRef.current?.scrollTop ?? Infinity) < EARLIER_PRELOAD_THRESHOLD_PX && !browse?.earlierError) requestEarlier();
   }, [updateConversationViewport, requestEarlier, browse?.earlierError]);
   // 已停在顶部时继续向上滚不会产生 scroll 事件，用 wheel 兜底。
   const handleMessagesWheel = useCallback((event: ReactWheelEvent<HTMLElement>) => {
+    // 向上滚轮的意图立刻生效：它的 scroll 事件可能晚于同一帧里的跟随写入。
+    if (event.deltaY < 0) stickToBottomRef.current = false;
     if (event.deltaY >= 0 || (scrollContainerRef.current?.scrollTop ?? Infinity) > 0 || browse?.earlierError) return;
     requestEarlier();
   }, [requestEarlier, browse?.earlierError]);
@@ -210,8 +227,9 @@ export function ConversationView({
     if (!stickToBottomRef.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
+    // 已经在底部就不写：同一帧里 layout effect 和 ResizeObserver 都会来，每帧只留一次真正的滚动写入。
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 1) return;
     el.scrollTop = el.scrollHeight;
-    updateConversationViewportRef.current();
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -271,6 +289,8 @@ export function ConversationView({
 
   // 同一条 running 消息内部变高时（例如 write_file 持续追加 code preview），
   // messages 引用可能不变；观察消息栈尺寸，保持贴底状态继续跟随尾部。
+  // 只在滚动容器 / 消息栈挂载或换掉时重建；最新的回调经 ref 读取，流式每帧更新 messages 不重建观察者。
+  const messageScrollMounted = !(messages.length === 0 && (browse?.messageLoading || waitingForInitialList || sessionError));
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") return;
     const viewport = scrollContainerRef.current;
@@ -279,12 +299,12 @@ export function ConversationView({
 
     const observer = new ResizeObserver(() => {
       scrollToBottomIfStuck();
-      updateConversationViewport();
+      updateConversationViewportRef.current();
     });
     observer.observe(viewport);
     if (stack) observer.observe(stack);
     return () => observer.disconnect();
-  }, [messages, scrollToBottomIfStuck, updateConversationViewport]);
+  }, [messageScrollMounted, isInitialComposer, scrollToBottomIfStuck]);
 
   const composerSlotProps = {
     contextSnapshot: effectiveContextSnapshot,
@@ -300,7 +320,7 @@ export function ConversationView({
     onConnectHost,
   };
 
-  if (messages.length === 0 && (browse?.messageLoading || waitingForInitialList || sessionError)) {
+  if (!messageScrollMounted) {
     return <main className={CONVERSATION_SHELL_CLASS}><p role={sessionError ? 'alert' : 'status'} className="px-5 py-4 text-act-md leading-5 text-text-muted">
       {sessionError ?? (browse?.messageLoading ? '正在加载消息…' : '正在加载会话…')}
       {sessionError && !locatorError && <button type="button" onClick={retrySession}>重试</button>}

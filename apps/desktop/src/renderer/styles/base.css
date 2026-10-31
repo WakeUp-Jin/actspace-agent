@@ -109,6 +109,17 @@ svg {
   }
 }
 
+/* 流式期间新出现的块只做透明度：位移会临时撑大 scrollHeight，贴底跟随时每个新块都会往回弹几个像素。 */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes tool-log-text-shimmer {
   from {
     background-position: 100% 0;

@@ -25,6 +25,12 @@ describe("live block identity", () => {
     expect(blocks.some((block) => "sourceSeq" in block)).toBe(false);
   });
 
+  it("skips a streaming thinking segment that only holds a zero-width space", () => {
+    const state = createEmptyStreamingState();
+    state.segments.push({ type: "thinking", text: "\u200B" }, { type: "text", text: "reply" });
+    expect(streamingStateToBlocks(state, "run-1").map((block) => block.kind)).toEqual(["assistant"]);
+  });
+
   it("keeps a compaction block's own runId, and leaves blocks unstamped without a run", () => {
     expect(createCompactionBlock({ agentRunId: "compact-task", status: "failed" }).runId).toBe("compact-task");
     const state = createEmptyStreamingState();

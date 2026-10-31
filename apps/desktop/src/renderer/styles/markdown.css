@@ -181,6 +181,11 @@
   overflow-x: auto;
 }
 
+/* 流式期间用固定列宽：自动布局每加一行就重排列宽，整张表跟着抖；结束后恢复自动布局。 */
+.markdown-prose[data-streaming="true"] table {
+  table-layout: fixed;
+}
+
 .markdown-prose table {
   width: 100%;
   min-width: 420px;

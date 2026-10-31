@@ -1,5 +1,5 @@
 import { JsonlEventHistory } from "./event-history.js";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { SessionError, SessionEventValidator, validateSessionHeader, type EventCodecRegistry, type SessionHeaderV1 } from "@actspace/session-journal";
@@ -55,7 +55,7 @@ export class JsonlSessionStorage implements SessionStorage {
     this.#assertOpen();
     const inspection = await inspectJsonlSession(sessionFileLayout(this.options.dataRoot, sessionId).journalPath, this.options.registry, sessionId);
     return Object.freeze({ header: inspection.header, events: inspection.events,
-      revision: createHash("sha256").update(inspection.rawBytes).digest("hex"),
+      revision: inspection.contentDigest,
       integrity: inspection.tornTail === null && inspection.validation !== null ? "complete" : "repair-required",
       ...(inspection.tornTail !== null || inspection.validation === null ? { problem: inspection.diagnostics.map(item => item.message).join("; ") } : {}),
     });
