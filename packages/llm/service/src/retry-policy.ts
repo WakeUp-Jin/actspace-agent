@@ -13,7 +13,12 @@ export type LlmRetryPolicySnapshot = {
   readonly maxDelayMs: number;
 };
 
-export const DEFAULT_LLM_RETRY_POLICY: LlmRetryPolicy = Object.freeze({ maxAttempts: 1, baseDelayMs: 250, maxDelayMs: 30_000, shouldRetry: (failure) => failure.retryable });
+/**
+ * Connection-level failures (timeout/network) are retried twice by default (3 attempts, 1s then 2s).
+ * The loop never retries once any output was observed, so a retry can only replace a request that
+ * produced nothing. Rate limits and provider errors stay a visible failure unless a route opts in.
+ */
+export const DEFAULT_LLM_RETRY_POLICY: LlmRetryPolicy = Object.freeze({ maxAttempts: 3, baseDelayMs: 1_000, maxDelayMs: 30_000, shouldRetry: (failure) => failure.retryable && (failure.kind === "timeout" || failure.kind === "network") });
 
 export function retryPolicySnapshot(policy: LlmRetryPolicy): LlmRetryPolicySnapshot {
   return Object.freeze({ maxAttempts: policy.maxAttempts, baseDelayMs: policy.baseDelayMs, maxDelayMs: policy.maxDelayMs });
@@ -24,7 +29,7 @@ export function normalizeRetryPolicy(policy: LlmRetryPolicy | undefined): LlmRet
   if (!Number.isSafeInteger(value.maxAttempts) || value.maxAttempts < 1) throw new Error("LLM retry maxAttempts must be a positive integer.");
   if (!Number.isFinite(value.baseDelayMs) || value.baseDelayMs < 0) throw new Error("LLM retry baseDelayMs must be non-negative.");
   if (!Number.isFinite(value.maxDelayMs) || value.maxDelayMs < value.baseDelayMs) throw new Error("LLM retry maxDelayMs must be >= baseDelayMs.");
-  return Object.freeze({ ...value, shouldRetry: value.shouldRetry ?? ((failure: LlmFailure) => failure.retryable) });
+  return Object.freeze({ ...value, shouldRetry: value.shouldRetry ?? DEFAULT_LLM_RETRY_POLICY.shouldRetry });
 }
 
 export function retryDelay(policy: LlmRetryPolicy, failure: LlmFailure, attempt: number): number | null {

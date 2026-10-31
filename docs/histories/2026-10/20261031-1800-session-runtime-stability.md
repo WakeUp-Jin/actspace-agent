@@ -19,6 +19,7 @@
 - **停止/失败后发送**：`SessionRunManager.submit` 在没有运行中的回合、队列暂停且没有遗留待发任务时，让 `TaskLedger.submit` 在同一次提交里写入 accept 与 resume；遗留旧消息时整条队列保持暂停。
 
 - **步数与审批超时**：main/chat/子 Agent 预设步数上限改为 1000；审批等待改为 3 小时；审批超时返回「不要换个命令重试」的明确文案；main 最后一步也走无工具收尾轮；chat 投影新增中性的 `agent_run_notice` 步数上限提示（Desktop/Web 复用 status 块），CLI 失败诊断补 `STEP_LIMIT`。
+- **连接超时**：新增 `transport-failure.ts`，pi-ai 与 legacy 两个 wire engine 统一识别 timeout/timed out/time-out 与 `cause` 错误码，failure message 写出主机；默认 retry policy 改为 3 次尝试，仅 timeout/network 重试。
 
 ### 🧠 Design Intent (Why)
 
@@ -33,4 +34,6 @@
 - `packages/core/agent-loop/src/loop.ts`、`packages/core/agent/src/main-preset.ts`、`packages/subagent/src/preset.ts`
 - `packages/tools/runtime/src/prepared-execution.ts`、`apps/desktop/src/main/approval-registry.ts`、`packages/runtime/src/harness/evolution-approval.ts`
 - `packages/client/src/sessions/chat.ts`、`packages/shared/src/session.ts`、`packages/shared/src/session-selectors.ts`、`apps/cli/src/runtime-v2/run.ts`
+- `packages/llm/pi-ai/src/transport-failure.ts`、`pi-ai-stream.ts`、`legacy-proxy-wire-engine.ts`、`packages/llm/service/src/retry-policy.ts`
+- `docs/design-docs/agent-plugin-runtime/agent-llm-core-pi.md`
 - `docs/releases/feature-release-notes.md`

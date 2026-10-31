@@ -364,6 +364,11 @@ dispatch 通过绑定的 credentialRef 获取同一连接的秘密材料。允�
 
 Provider 缓存不得闭包捕获某一次调用的 API Key。可复用的 Provider 使用 request-scoped auth resolver；缺少该能力时不复用含凭据的实例。并发请求必须证明 key、endpoint 和 proxy 不串用。
 
+### 默认重试与连接失败说明
+
+- 默认 retry policy 为 3 次尝试（退避 1 秒、2 秒），只对 `timeout`、`network` 两类失败生效；`rate-limit`、`provider` 等仍需路由自己声明 `shouldRetry`。Agent Loop 看到任何可见输出后不再重试，所以重试只会替换一次什么都没产出的请求。每次重试写 `llm/retry` / `llm/retry-started`。
+- 两个 wire engine 用同一个 `transport-failure.ts` 识别 timeout / timed out / time-out 以及 `UND_ERR_CONNECT_TIMEOUT`、`ECONNREFUSED` 等 `cause` 里的 Node 错误码，并在 failure message 里写出目标主机，例如「请求 cn.aiapi.bot 超时，请检查网络或中转站。原始错误：Request timed out.」，同时记录 `causeCode`。pi-ai 的终态 error 事件只带 `errorMessage`，拿不到 `cause`，此时主机取自 baseUrl。
+
 ## 13. 重试 generation 所有权
 
 选择保持旧 generation：一个逻辑请求的 durable retry 链创建 `LlmRetryScope`，先取得 registration owner lease，覆盖首次准备、所有 attempt 和 backoff。每个 attempt 仍是独立 requestId、独立一次性 PreparedCall 和独立 snapshot。

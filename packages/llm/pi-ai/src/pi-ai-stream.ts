@@ -8,6 +8,7 @@ import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { LlmRuntimeError, providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
 import type { LlmContentBlock, LlmMessage, LlmReplayEnvelope } from "@actspace/llm-service";
 import { redactLlmText } from "@actspace/llm-service";
+import { describeTransportFailure, transportCauseOf, transportKind } from "./transport-failure.js";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
 import type { DeepSeekFileUploader } from "./deepseek-files.js";
@@ -72,10 +73,10 @@ export async function streamPiAi(options: PiAiConnectionOptions, input: LlmAdapt
         { provider: options.providerId, protocol: options.route, model: modelId },
       );
       const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), sessionId: input.request.sessionId, cacheRetention: options.cacheRetention, onPayload: (payload: Record<string, unknown>) => { const body = withReasoningPayload(payload, options.route, options.providerId, input.request.options); if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
-      return fromPiAiEvents(events, input.request.requestId, options.pricing ?? null, { providerId: options.providerId, protocol: options.route, modelId });
+      return fromPiAiEvents(events, input.request.requestId, options.pricing ?? null, { providerId: options.providerId, protocol: options.route, modelId, endpoint: baseUrl });
     } catch (error) {
       if (error instanceof LlmRuntimeError) throw error;
-      throw new LlmRuntimeError(classifyFailure(error), error);
+      throw new LlmRuntimeError(classifyFailure(error, input.credential.baseUrl ?? options.baseUrl), error);
     }
 }
 
@@ -134,7 +135,7 @@ async function toPiUserContent(message: LlmMessage, sessionId?: string, readArti
   return content;
 }
 
-async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: string, pricing: ModelPricingSnapshot | null, identity: { readonly providerId: string; readonly protocol: string; readonly modelId: string }): AsyncGenerator<LlmStreamEvent> {
+async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: string, pricing: ModelPricingSnapshot | null, identity: { readonly providerId: string; readonly protocol: string; readonly modelId: string; readonly endpoint?: string }): AsyncGenerator<LlmStreamEvent> {
   const calls = new Map<number, { callId: string; name: string }>();
   for await (const event of events) {
     if (event.type === "text_delta") yield { type: "text-delta", text: event.delta ?? "" };
@@ -142,7 +143,7 @@ async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: stri
     else if (event.type === "toolcall_start") { const block = event.partial?.content[event.contentIndex ?? -1] as { id?: string; name?: string } | undefined; calls.set(event.contentIndex ?? -1, { callId: block?.id ?? `${requestId}:${event.contentIndex ?? 0}`, name: block?.name ?? "unknown" }); }
     else if (event.type === "toolcall_delta") { const call = calls.get(event.contentIndex ?? -1) ?? { callId: `${requestId}:${event.contentIndex ?? 0}`, name: "unknown" }; yield { type: "tool-call-delta", callId: call.callId, name: call.name, argumentsDelta: event.delta ?? "" }; }
     else if (event.type === "done" && event.message !== undefined) { yield { type: "done", stopReason: mapStopReason(event.message.stopReason), usage: calculateUsageCost(mapUsage(event.message.usage, identity.protocol), pricing), content: toActSpaceContent(event.message.content, identity) }; return; }
-    else if (event.type === "error") { const terminal = event.error; if (terminal?.stopReason === "aborted") yield { type: "aborted", usage: calculateUsageCost(mapUsage(terminal.usage, identity.protocol), pricing), reason: terminal.errorMessage ?? "pi-ai request aborted" }; else yield { type: "error", usage: calculateUsageCost(mapUsage(terminal?.usage, identity.protocol), pricing), failure: classifyFailure(terminal ?? new Error("pi-ai stream failed")) }; return; }
+    else if (event.type === "error") { const terminal = event.error; if (terminal?.stopReason === "aborted") yield { type: "aborted", usage: calculateUsageCost(mapUsage(terminal.usage, identity.protocol), pricing), reason: terminal.errorMessage ?? "pi-ai request aborted" }; else yield { type: "error", usage: calculateUsageCost(mapUsage(terminal?.usage, identity.protocol), pricing), failure: classifyFailure(terminal ?? new Error("pi-ai stream failed"), identity.endpoint) }; return; }
   }
   yield { type: "error", failure: { kind: "malformed-stream", message: "pi-ai stream ended without a terminal event.", retryable: false, attempt: 1 } };
 }
@@ -170,12 +171,14 @@ function mapStopReason(reason: string): string { return reason === "toolUse" ? "
 function messageText(message: LlmMessage): string { if (typeof message.content === "string") return message.content; return message.content.map((block) => block.type === "text" ? block.text : block.type === "reasoning" ? block.text : block.type === "tool-result" ? block.content : "").join(""); }
 function parseArguments(value: string): RuntimeV2JsonValue { try { return JSON.parse(value) as RuntimeV2JsonValue; } catch { return { $raw: value }; } }
 function failure(kind: LlmFailureKind, message: string): LlmRuntimeError { return new LlmRuntimeError({ kind, message, retryable: false, attempt: 1 }); }
-function classifyFailure(error: unknown): LlmFailure {
+function classifyFailure(error: unknown, endpoint?: string): LlmFailure {
   const rawMessage = error instanceof Error
     ? error.message
     : typeof error === "object" && error !== null && typeof (error as { errorMessage?: unknown }).errorMessage === "string"
       ? (error as { errorMessage: string }).errorMessage
       : String(error);
+  const cause = transportCauseOf(error);
+  const transport = transportKind(rawMessage, cause.code);
   const message = redactLlmText(rawMessage);
   const statusValue = typeof error === "object" && error !== null ? (error as { status?: unknown }).status : undefined;
   const status = Number(statusValue ?? /\b(400|401|402|403|404|422|429|5\d\d)\b/.exec(message)?.[1]);
@@ -198,18 +201,19 @@ function classifyFailure(error: unknown): LlmFailure {
                 ? "provider"
                 : /abort/i.test(message)
                   ? "abort"
-                  : /timeout/i.test(message)
+                  : transport === "timeout"
                     ? "timeout"
                     : /proxy/i.test(message)
                       ? "proxy"
-                      : /network|fetch|socket|ECONN|ENOTFOUND|EAI_AGAIN/i.test(message)
+                      : transport === "network" || /network|fetch|socket|ECONN|ENOTFOUND|EAI_AGAIN|connection error/i.test(message)
                         ? "network"
                         : "unknown";
   const retryAfterMs = retryAfterMsFromUnknown(error);
   return {
     kind,
-    message,
+    message: describeTransportFailure(kind, message, cause, endpoint),
     retryable: kind === "rate-limit" || kind === "provider" || kind === "network" || kind === "timeout",
+    ...(cause.code === undefined || (kind !== "timeout" && kind !== "network") ? {} : { causeCode: cause.code }),
     ...(httpStatus === undefined ? {} : { httpStatus }),
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
     ...(providerCode === undefined ? {} : { providerCode }),
