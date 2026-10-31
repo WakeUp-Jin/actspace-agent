@@ -87,6 +87,12 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
   - 其余情况 → `missing`，渲染「无法连接桌面服务 / Desktop bridge missing」致命页，不渲染 App。
 - App 没有 mock 分支：浏览器里跑的是同一套 App 代码，只是 bridge 换成了 mock。
 
+## 6.1 侧边对话 IPC（2026-10-21）
+
+- `sessions.openSideChat({ parentSessionId })` → `{ session, inheritedTurnCount, runningTurnExcluded }`。
+- `sessions.listSideChats({ parentSessionId })` → `SessionListItem[]`。
+- mock 两者都实现；场景 `?mock=side-chat`：主会话「梳理 runtime 插件加载」3 轮完成、第 4 轮流式并保持运行，下有两个已收起的侧边对话，另有一个普通会话；侧边对话回复以「（侧边对话）」开头。
+
 ## 7. Mock bridge 约定
 
 - `createMockBridge({ scenario?, handlers? })` 用同一个 `buildBridge(desktopBridgeContract, …)` 生成 bridge，只是把 transport 换成内存实现：

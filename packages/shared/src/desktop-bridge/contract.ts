@@ -109,6 +109,9 @@ export const desktopBridgeContract = {
     create: invokeWithDefault<S.SessionCreateInput, RV2.RuntimeV2DesktopSessionProjection>(CH.createSession, {}),
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
     fork: invoke<S.SessionForkInput, RV2.RuntimeV2DesktopSessionProjection>(CH.forkSession),
+    /** 侧边对话：分出与按主会话列出（含已收起的）。 */
+    openSideChat: invoke<S.SideChatOpenInput, S.SideChatOpenResult>(CH.openSideChat),
+    listSideChats: invoke<S.SideChatListInput, S.SessionListItem[]>(CH.listSideChats),
     pin: invoke<S.SessionPinInput, S.SessionPinResult>(CH.pinSession),
     rename: invoke<S.SessionRenameInput, S.SessionRenameResult>(CH.renameSession),
     setWorkspace: invoke<S.SessionWorkspaceInput, S.SessionWorkspaceResult>(CH.setSessionWorkspace),

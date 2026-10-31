@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useSyncExternalStore } from "react";
-import type { BashBackgroundStatus, ComposerAttachment, ComposerMode, ResponseAnnotationReference } from "@actspace/shared";
+import type { BashBackgroundStatus, ComposerAttachment, ComposerMode, ModelSelectionId, ResponseAnnotationReference } from "@actspace/shared";
 import type { ComposerDraftRestore, ComposerSendOptions } from "../components/Composer";
 import { revokeAttachmentPreviews } from "../components/composer/attachment-preview";
 import type { CompactionBlock } from "./live-runs/stream-blocks";
@@ -23,6 +23,8 @@ export type SessionLocalState = {
   compactionFailure?: CompactionBlock;
   bashUpdates: Readonly<Record<string, BashTaskUpdate>>;
   lastSendOptions?: ComposerSendOptions;
+  /** 侧边对话输入框选的模型；没选过时用主会话的。 */
+  selectedModelId?: ModelSelectionId;
   approvalPending: boolean;
   failed: boolean;
   /** 不在当前会话时跑完了一轮，还没打开看过；只在本窗口内存里，侧栏显示绿点。 */

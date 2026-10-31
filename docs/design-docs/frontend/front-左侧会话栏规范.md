@@ -177,6 +177,11 @@
 - 悬停、键盘聚焦或右键菜单打开时，行尾文字让位给操作按钮（不预留空位）。双击标题重命名。
 - Hover 时背景轻灰；当前选中态使用更深一点的浅灰底。
 
+### 侧边对话
+
+- 带 `sideChatParentId` 的会话不进侧栏列表（后端 `listPage` 也排除）。
+- 主会话行显示 GitFork 图标和数量（`sideChatCount`），`aria-label` 为「N 个侧边对话」；侧边对话通过右侧面板打开，见 `front-右侧面板与文件渲染规范.md`。
+
 ### 左侧 marker（唯一状态点）
 
 - marker 列只渲染一个可点击的 `session-status-dot`，点击查看状态名称和说明。

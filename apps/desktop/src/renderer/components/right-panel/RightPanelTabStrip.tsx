@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Loader2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 
@@ -23,6 +23,10 @@ export type RightPanelTabStripItem = {
   closing?: boolean;
   /** 关闭按钮 Tooltip 的替代文字，例如关闭失败的原因。 */
   closeHint?: string;
+  /** 标签前的小图标或状态点（侧边对话的运行中、未读）。 */
+  icon?: ReactNode;
+  /** 关闭按钮的动词，默认「关闭」（侧边对话是「收起」）。 */
+  closeVerb?: string;
 };
 
 // 右侧预留两个 chrome 控件（+ 新建对象 / 折叠面板）的宽度，tab 永远不会滑到按钮下方造成重叠。
@@ -133,6 +137,7 @@ export function RightPanelTabStrip({
               data-tab-id={tab.id}
               className={`${RIGHT_TAB_GROUP_BASE} ${isActive ? RIGHT_TAB_ACTIVE_CLASS : RIGHT_TAB_INACTIVE_CLASS}`}
             >
+              {tab.icon ? <span className="-mr-1 inline-flex shrink-0 items-center text-text-faint">{tab.icon}</span> : null}
               <button
                 className={RIGHT_TAB_LABEL_CLASS}
                 type="button"
@@ -148,14 +153,14 @@ export function RightPanelTabStrip({
                   <button
                     className={`${RIGHT_TAB_CLOSE_CLASS} ${isClosing ? "opacity-100" : ""}`}
                     type="button"
-                    aria-label={isClosing ? `正在关闭 ${tab.title}` : `关闭 ${tab.title}`}
+                    aria-label={isClosing ? `正在关闭 ${tab.title}` : `${tab.closeVerb ?? "关闭"} ${tab.title}`}
                     disabled={isClosing}
                     onClick={() => onClose(tab.id)}
                   >
                     {isClosing ? <Loader2 size={12} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <X size={12} strokeWidth={2.2} aria-hidden="true" />}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>{tab.closeHint ?? (isClosing ? "正在关闭…" : `关闭 ${tab.title}`)}</TooltipContent>
+                <TooltipContent>{tab.closeHint ?? (isClosing ? "正在关闭…" : `${tab.closeVerb ?? "关闭"} ${tab.title}`)}</TooltipContent>
               </Tooltip>
             </span>
           );
@@ -205,7 +210,7 @@ export function RightPanelTabStrip({
                     <button
                       type="button"
                       className={RIGHT_TAB_MENU_CLOSE_CLASS}
-                      aria-label={isClosing ? `正在关闭 ${tab.title}` : `关闭 ${tab.title}`}
+                      aria-label={isClosing ? `正在关闭 ${tab.title}` : `${tab.closeVerb ?? "关闭"} ${tab.title}`}
                       disabled={isClosing}
                       onClick={(event) => {
                         event.stopPropagation();

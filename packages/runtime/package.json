@@ -58,6 +58,7 @@
   "dependencies": {
     "@actspace/agent-host": "workspace:*",
     "@actspace/english-learning": "workspace:*",
+    "@actspace/side-chat": "workspace:*",
     "@actspace/boot": "workspace:*",
     "@actspace/bundle": "workspace:*",
     "@actspace/composition": "workspace:*",

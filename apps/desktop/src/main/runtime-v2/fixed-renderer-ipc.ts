@@ -56,6 +56,7 @@ import type { RuntimeV2UpdateCustomConnectionInput } from "@actspace/shared/runt
 import type { AppDataRoots } from "../app-paths";
 import { createIpcRegistrar, type IpcRegistrar } from "../ipc/registry";
 import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
+import { sideChatParentId } from "@actspace/shared/session-list-page";
 import type { PendingApprovalRegistry } from "../approval-registry";
 import { showArtifactContextMenu, showResolvedArtifactContextMenu } from "../artifact-context-menu-service";
 import { importComposerImage } from "../composer-attachment-service";
@@ -196,6 +197,16 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       newSessionId: randomUUID(),
     });
     return options.registry.readSessionProjection({ sessionId: forked.sessionId });
+  });
+  ipc.handle(contract.sessions.openSideChat, async (input) => {
+    const opened = await options.registry.openSideChat(input.parentSessionId);
+    const session = await options.registry.readSessionProjection({ sessionId: opened.snapshot.sessionId });
+    return { session, inheritedTurnCount: opened.inheritedTurnCount, runningTurnExcluded: opened.runningTurnExcluded };
+  });
+  ipc.handle(contract.sessions.listSideChats, async (input) => {
+    const items = await options.registry.listSessions();
+    const selected = items.filter((item) => !item.metadata.archived && sideChatParentId(item.lineage) === input.parentSessionId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return Promise.all(selected.map((item) => toSessionListItem(item, options.registry)));
   });
   ipc.handle(contract.sessions.pin, async (input) => {
     await options.registry.updateSessionMetadata(input);
@@ -805,6 +816,7 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
     updatedAt: item.updatedAt,
     accessState: item.accessState,
     isChildSession: item.lineage !== null,
+    ...(sideChatParentId(item.lineage) ? { sideChatParentId: sideChatParentId(item.lineage) } : {}),
     agentRunCount,
     agentForm: item.agentForm,
     agentMode: item.agentMode,

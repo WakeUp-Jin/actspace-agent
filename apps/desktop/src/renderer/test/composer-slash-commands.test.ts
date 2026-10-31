@@ -6,6 +6,7 @@ import {
   filterComposerSlashFunctions,
   filterComposerSlashSkills,
   parseComposerSlashQuery,
+  parseSideChatCommand,
 } from "../components/composer-slash-commands";
 
 function skill(input: Pick<SkillCatalogItem, "name" | "description" | "scope">): SkillCatalogItem {
@@ -40,6 +41,7 @@ describe("composer slash commands", () => {
       "compact",
       "status",
       "review",
+      "side",
     ]);
     expect(filterComposerSlashFunctions("pla").map((item) => item.id)).toEqual(["plan", "agent"]);
     expect(filterComposerSlashFunctions("CONTEXT").map((item) => item.id)).toEqual(["compact", "status"]);
@@ -47,6 +49,15 @@ describe("composer slash commands", () => {
     expect(filterComposerSlashFunctions("规划").map((item) => item.id)).toEqual(["plan", "agent"]);
     expect(filterComposerSlashFunctions("只读").map((item) => item.command)).toEqual(["/plan"]);
     expect(filterComposerSlashFunctions("missing")).toEqual([]);
+    expect(filterComposerSlashFunctions("侧边").map((item) => item.id)).toEqual(["side"]);
+  });
+
+  it("reads the question out of /side", () => {
+    expect(parseSideChatCommand("/side")).toBe("");
+    expect(parseSideChatCommand("/side  这个函数为什么慢？ ")).toBe("这个函数为什么慢？");
+    expect(parseSideChatCommand("/side 第一行\n第二行")).toBe("第一行\n第二行");
+    expect(parseSideChatCommand("/sidebar 问题")).toBeNull();
+    expect(parseSideChatCommand("请看 /side")).toBeNull();
   });
 
   it("filters and orders skills by scope and name", () => {

@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>侧边对话 Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #eaeae7;
+  --line: #deded9; --line-strong: #8c8c85; --track: #e9e9e5;
+  --text: #20201e; --muted: #676762; --faint: #72726b;
+  --action: #20201e; --on-action: #ffffff;
+  --success: #087a4b; --success-soft: #e5f2ea; --danger: #c74747; --danger-soft: #f8e9e9;
+  --warning: #91600e; --warning-soft: #f7eedb; --info: #3978b8; --info-soft: #e8f1f9;
+  --user-bubble: #ececE9;
+  --shadow-pop: 0 10px 30px rgba(0,0,0,.12), 0 1px 3px rgba(0,0,0,.08);
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --selected: #30312d; --hover: #2a2b27;
+  --line: #353630; --line-strong: #787870; --track: #3a3b35;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+  --action: #f1f1ed; --on-action: #181916;
+  --success: #36c783; --success-soft: #193a2b; --danger: #e06b6b; --danger-soft: #452525;
+  --warning: #d2a14d; --warning-soft: #3e321c; --info: #6ca6da; --info-soft: #1e3345;
+  --user-bubble: #30312d;
+  --shadow-pop: 0 10px 30px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.3);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 13px/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+textarea { font: inherit; color: inherit; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
+svg { flex-shrink: 0; }
+
+/* ---------- demo chrome ---------- */
+.demo-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; height: 46px; padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.demo-bar h1 { margin: 0 4px 0 0; font-size: 13px; font-weight: 600; }
+.demo-bar .tag { font-size: 11px; color: var(--faint); border: 1px solid var(--line); border-radius: 5px; padding: 0 6px; }
+.demo-bar .grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.demo-bar .sp { flex: 1; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+.ghost { padding: 3px 9px; border-radius: 6px; font-size: 12px; color: var(--muted); border: 1px solid var(--line); }
+.ghost:hover { background: var(--hover); color: var(--text); }
+
+.app { display: flex; height: calc(100vh - 46px); min-width: 1080px; }
+
+/* ---------- left sidebar ---------- */
+.side { width: 232px; flex-shrink: 0; border-right: 1px solid var(--line); padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; }
+.side .nav { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px; color: var(--muted); }
+.side .nav:hover { background: var(--hover); color: var(--text); }
+.side .sec { margin: 14px 8px 4px; font-size: 11.5px; color: var(--faint); }
+.side .row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 7px; color: var(--muted); white-space: nowrap; }
+.side .row .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.side .row.on { background: var(--selected); color: var(--text); font-weight: 500; }
+.side .row .badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--faint); font-weight: 400; }
+.side .row .run { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 1.2s infinite; }
+
+/* ---------- main conversation ---------- */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--surface); }
+.main-head { height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.main-head .title { font-weight: 600; }
+.main-head .meta { color: var(--faint); font-size: 12px; }
+.main-scroll { flex: 1; overflow-y: auto; }
+.thread { max-width: 720px; margin: 0 auto; padding: 22px 28px 28px; display: flex; flex-direction: column; gap: 18px; }
+.earlier { align-self: center; font-size: 12px; color: var(--faint); padding: 3px 10px; border-radius: 999px; background: var(--surface-subtle); }
+.u { align-self: flex-end; max-width: 78%; padding: 8px 12px; border-radius: 12px; background: var(--user-bubble); white-space: pre-wrap; }
+.a { color: var(--text); }
+.a p { margin: 0 0 6px; }
+.a code { font-family: var(--font-mono); font-size: 12px; background: var(--surface-subtle); padding: 0 4px; border-radius: 4px; }
+.tool { display: flex; align-items: center; gap: 6px; margin: 2px 0 6px; color: var(--faint); font-size: 12px; }
+.tool b { color: var(--muted); font-weight: 500; }
+.tool.blocked { color: var(--warning); }
+.tool.blocked b { color: var(--warning); }
+.spin { width: 12px; height: 12px; border-radius: 50%; border: 1.6px solid var(--line-strong); border-top-color: transparent; animation: rot .8s linear infinite; display: inline-block; }
+@keyframes rot { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: .35; } }
+.caret::after { content: "▍"; color: var(--faint); animation: pulse 1s infinite; }
+
+/* composer (shared) */
+.composer { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.04); position: relative; }
+.composer textarea { width: 100%; border: 0; outline: 0; resize: none; background: transparent; padding: 10px 12px 4px; min-height: 44px; max-height: 140px; line-height: 1.5; }
+.composer textarea::placeholder { color: var(--faint); }
+.c-foot { display: flex; align-items: center; gap: 4px; padding: 4px 6px 6px 8px; }
+.c-foot .sp { flex: 1; }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 7px; border-radius: 7px; font-size: 12px; color: var(--muted); position: relative; white-space: nowrap; }
+.chip:hover { background: var(--hover); color: var(--text); }
+.chip .inh { font-size: 10.5px; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; line-height: 15px; }
+.chip.perm-ro { color: var(--info); }
+.chip.perm-ask { color: var(--warning); }
+.chip.perm-auto { color: var(--danger); }
+.pill { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--surface-subtle); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.pill .mini { width: 34px; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.pill .mini i { display: block; height: 100%; background: var(--success); }
+.send { width: 28px; height: 28px; border-radius: 50%; background: var(--action); color: var(--on-action); display: inline-grid; place-items: center; }
+.send:disabled { opacity: .35; cursor: default; }
+.main-compose { max-width: 720px; width: 100%; margin: 0 auto; padding: 0 28px 18px; }
+
+/* menus / popovers */
+.menu { position: absolute; z-index: 50; min-width: 200px; padding: 4px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow-pop); }
+.menu .mi { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 7px; text-align: left; font-size: 12.5px; }
+.menu .mi:hover, .menu .mi.kb { background: var(--hover); }
+.menu .mi .d { color: var(--faint); font-size: 11.5px; margin-left: auto; }
+.menu .mi .ck { width: 14px; color: var(--text); }
+.menu .mh { padding: 6px 8px 2px; font-size: 11px; color: var(--faint); }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
+.menu .mi .desc { display: block; color: var(--faint); font-size: 11.5px; }
+
+/* ---------- right panel ---------- */
+.rp { flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--surface); position: relative; }
+.resizer { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 5; }
+.resizer:hover, .resizer.drag { background: linear-gradient(90deg, transparent 2px, var(--info) 2px 4px, transparent 4px); }
+.tabs { height: 44px; display: flex; align-items: center; gap: 4px; padding: 0 8px 0 10px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.tab-scroll { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.tab-scroll::-webkit-scrollbar { display: none; }
+.tab { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 9px; border-radius: 8px; color: var(--muted); font-size: 12.5px; flex-shrink: 0; position: relative; }
+.tab:hover { background: var(--hover); color: var(--text); }
+.tab.on { background: var(--surface-subtle); color: var(--text); font-weight: 500; }
+.tab .lbl { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab .x { width: 16px; height: 16px; border-radius: 4px; display: inline-grid; place-items: center; color: var(--faint); opacity: 0; }
+.tab:hover .x, .tab.on .x { opacity: 1; }
+.tab .x:hover { background: var(--line); color: var(--text); }
+.tab .unread { width: 6px; height: 6px; border-radius: 50%; background: var(--info); }
+.tab .ico { color: var(--faint); display: inline-flex; }
+.icon-btn { width: 28px; height: 28px; border-radius: 7px; display: inline-grid; place-items: center; color: var(--muted); flex-shrink: 0; }
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.rp-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* launcher */
+.launch { padding: 18px 14px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.launch .lh { font-size: 11.5px; color: var(--faint); padding: 2px 10px 6px; }
+.li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; text-align: left; width: 100%; }
+.li:hover { background: var(--hover); }
+.li .ic { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-subtle); display: inline-grid; place-items: center; color: var(--muted); }
+.li .nm { font-weight: 500; font-size: 13px; }
+.li .ds { display: block; color: var(--faint); font-size: 11.5px; font-weight: 400; }
+.li.primary .ic { background: var(--action); color: var(--on-action); border-color: transparent; }
+.li .when { margin-left: auto; color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+
+/* side chat */
+.sc { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sc-scroll { flex: 1; overflow-y: auto; }
+.sc-thread { padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.inherit { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--faint); white-space: nowrap; }
+.inherit::before, .inherit::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.sc-empty { text-align: center; color: var(--faint); font-size: 12px; padding: 34px 20px 10px; }
+.sc-empty .big { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.sc-empty .sugg { display: flex; flex-direction: column; gap: 6px; align-items: center; margin-top: 14px; }
+.sc-empty .sugg button { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.sc-empty .sugg button:hover { background: var(--hover); color: var(--text); }
+.sc .u { max-width: 88%; }
+.sc-compose { padding: 0 12px 12px; }
+
+/* context tab (static) */
+.ctx { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.card h3 { margin: 0 0 6px; font-size: 12.5px; }
+.bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--track); }
+
+/* notes drawer */
+.notes { position: fixed; right: 16px; top: 54px; width: 380px; max-height: calc(100vh - 70px); overflow-y: auto; z-index: 60; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow-pop); font-size: 12.5px; color: var(--muted); display: none; }
+.notes.on { display: block; }
+.notes h2 { margin: 0 0 6px; font-size: 13px; color: var(--text); }
+.notes h3 { margin: 12px 0 4px; font-size: 12.5px; color: var(--text); }
+.notes ul { margin: 0; padding-left: 18px; }
+.notes li { margin: 3px 0; }
+.notes code { font-family: var(--font-mono); font-size: 11.5px; background: var(--surface-subtle); padding: 0 4px; border-radius: 4px; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 80; padding: 8px 14px; border-radius: 8px; background: var(--action); color: var(--on-action); font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <h1>侧边对话</h1><span class="tag">交互 Demo · 数据全是假的</span>
+  <div class="grp">主题
+    <div class="seg" id="seg-theme"><button data-v="light" aria-pressed="true">浅色</button><button data-v="dark" aria-pressed="false">深色</button></div>
+  </div>
+  <div class="grp">主会话
+    <div class="seg" id="seg-main"><button data-v="idle" aria-pressed="true">空闲</button><button data-v="running" aria-pressed="false">运行中</button></div>
+  </div>
+  <span class="sp"></span>
+  <button class="ghost" id="btn-notes">交互说明</button>
+  <button class="ghost" id="btn-reset">重置</button>
+</div>
+
+<div class="app">
+  <aside class="side">
+    <button class="nav"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新建会话</button>
+    <button class="nav"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
+    <div class="sec">actspace-agent</div>
+    <div class="row on" id="side-main-row"><span class="t">梳理插件运行时</span><span id="side-badge"></span></div>
+    <div class="row"><span class="t">流式渲染卡顿排查</span></div>
+    <div class="row"><span class="t">模型设置页改版</span></div>
+    <div class="row"><span class="t">审批卡片样式</span></div>
+  </aside>
+
+  <section class="main">
+    <header class="main-head"><span class="title">梳理插件运行时</span><span class="meta">Opus 5.5 · 12 轮</span></header>
+    <div class="main-scroll" id="main-scroll"><div class="thread" id="main-thread"></div></div>
+    <div class="main-compose">
+      <div class="composer" id="main-composer">
+        <textarea id="main-input" rows="1" placeholder="继续提问，输入 /side 在右侧开侧边对话"></textarea>
+        <div class="c-foot">
+          <span class="chip">Opus 5.5</span>
+          <span class="chip">需审批</span>
+          <span class="sp"></span>
+          <span class="pill"><span class="mini"><i style="width:31%"></i></span>上下文 31%</span>
+          <button class="send" id="main-send" aria-label="发送"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="rp" id="rp" style="width:460px">
+    <div class="resizer" id="resizer" title="拖动调整宽度"></div>
+    <div class="tabs">
+      <div class="tab-scroll" id="tab-scroll" role="tablist" aria-label="右侧面板"></div>
+      <button class="icon-btn" id="btn-plus" aria-label="新建对象" title="新建对象"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="icon-btn" aria-label="收起右栏" title="收起右栏"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+    </div>
+    <div class="rp-body" id="rp-body"></div>
+  </aside>
+</div>
+
+<div class="notes" id="notes">
+  <h2>侧边对话：这个 Demo 想确认的交互</h2>
+  <h3>入口</h3>
+  <ul>
+    <li>右栏 <b>+</b> → 「侧边对话」（右栏为空时，启动列表第一项就是它）。</li>
+    <li>主输入框输入 <code>/side 问题</code>，回车后在右侧新开侧边对话，并直接把问题发过去。</li>
+  </ul>
+  <h3>继承</h3>
+  <ul>
+    <li>新开时复制主会话<b>截至上一轮结束</b>的上下文，之后两边互不影响。</li>
+    <li>主会话正在跑时开（顶部切「运行中」再试），进行中的那一轮不带进来，提示条会写明。</li>
+    <li>面板从空白开始，不重放主会话消息；开头一条居中分隔线「继承主会话 N 轮」，跟消息一起滚走，没有按钮。</li>
+    <li>上下文用量一开始就不是 0（继承来的内容算在里面）。</li>
+  </ul>
+  <h3>独立会话</h3>
+  <ul>
+    <li>可以同时开多个，各自流式输出；后台跑完的 tab 会亮一个小蓝点。</li>
+    <li>模型默认继承主会话（标「继承」），可以切；权限默认「只读」，可以切到「需审批 / 自动执行」。</li>
+    <li>只读时让它改文件会被拦下（输入里带「改」字试试）。</li>
+    <li>标题先叫「侧边对话 N」，发第一条消息后用消息内容做标题。</li>
+  </ul>
+  <h3>长期保存</h3>
+  <ul>
+    <li>关 tab 只是收起，<b>+</b> 菜单和启动列表里「本会话的侧边对话」可以再打开，内容都在。</li>
+    <li>左侧会话栏不单独列出侧边对话，只在主会话后面显示数量。</li>
+  </ul>
+  <h3>第一版不做</h3>
+  <ul>
+    <li>从某条历史消息分出、侧边对话里再分出、回流主会话 / send_message。</li>
+  </ul>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const I = {
+  branch: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 7v10M18 11c0 4-6 3-11 6"/></svg>',
+  branchL: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 7v10M18 11c0 4-6 3-11 6"/></svg>',
+  x: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  chev: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>',
+  down: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>',
+  send: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  stop: '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+  lock: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  eye: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  folder: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  term: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>',
+  bot: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>',
+};
+
+// 主会话 12 轮已完成的用户消息（继承列表用）
+const MAIN_TURNS = [
+  "先整体看一下这个仓库的插件运行时是怎么组织的",
+  "manifest.ts 和 plugin.ts 分别负责什么？",
+  "DEFAULT_HARNESS_ENTRIES 是在哪里被消费的",
+  "auto-review 插件是怎么拿到 llm.service 的",
+  "subagent 的子会话怎么创建，会继承父会话历史吗",
+  "SessionStore.fork 的边界校验具体检查了什么",
+  "forkMainSession 和 resumeMainSession 的关系",
+  "上下文引擎是从 Journal 重建上下文的吗",
+  "为什么侧栏会过滤 lineage 不为空的会话",
+  "HarnessControl.acquireForScope 有没有并发上限",
+  "画一下 boot.ts 里服务装配的顺序",
+  "总结一下：新加一个插件包要改哪些地方",
+];
+const MODELS = ["Opus 5.5", "Sonnet 5.5", "DeepSeek V4"];
+const PERMS = [
+  { id: "ro", label: "只读", desc: "只能读文件、搜索、回答" },
+  { id: "ask", label: "需审批", desc: "改文件、跑命令前先问你" },
+  { id: "auto", label: "自动执行", desc: "不再询问，直接执行" },
+];
+const SUGGESTIONS = ["对比一下 auto-review 和 subagent 的插件写法", "boot.ts 里如果漏注册会怎样报错？", "帮我把 manifest 的注释改清楚一点"];
+
+const REPLIES = [
+  { tools: [["读取", "packages/auto-review/src/plugin.ts"], ["读取", "packages/subagent/src/plugin.ts"]],
+    text: "接着主会话里聊到的插件结构：两者 manifest 写法一样，区别在 plugin.ts。auto-review 直接 `ctx.provide` 一个服务就结束；subagent 的 plugin.ts 只导出构造器，真正的工具注册放在 runtime 的 `harness-subagent-tools.ts` 里。所以「插件包 = 规则 + 服务」，「挂到 Harness 上」这一步仍然在 runtime 里手写。" },
+  { tools: [["搜索", "DEFAULT_HARNESS_ENTRIES"], ["读取", "packages/runtime/src/startup/boot.ts"]],
+    text: "如果只加了包、没写进 `DEFAULT_HARNESS_ENTRIES`，启动不会报错，插件只是不会被加载；如果写进去了但依赖的服务没人提供，装配阶段会在 inject 解析时报缺少服务。前面主会话那张装配顺序图里，第 3 步就是这次检查。" },
+  { tools: [["读取", "packages/session/journal/src/fork.ts"]],
+    text: "fork 的边界校验有三条：边界不能超过已落盘的 Journal；会话不能处于不可访问状态；边界处不能有没收尾的请求或工具调用。所以侧边对话要选「上一轮结束」的位置，而不是当前最新的序号。" },
+];
+
+let S;
+function initState() {
+  S = { theme: S?.theme || "light", mainRunning: false, chats: [], active: null, ctxOpen: false, nextN: 1, menu: null, replyIdx: 0, width: S?.width || 460, mainExtra: [] };
+}
+initState();
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("on"), 1800); }
+const chat = (id) => S.chats.find((c) => c.id === id);
+const openChats = () => S.chats.filter((c) => c.open);
+const closedChats = () => S.chats.filter((c) => !c.open);
+const mainDone = () => MAIN_TURNS.length + S.mainExtra.filter((t) => t.done).length;
+
+/* ---------------- main conversation ---------------- */
+function renderMain() {
+  const last = [
+    { u: MAIN_TURNS[10], a: "<p>装配大致分四步：读取 profile → 组装 Host 服务表 → 按 <code>DEFAULT_HARNESS_ENTRIES</code> 解析 inject/provide → 启动各插件的 <code>apply</code>。</p>" },
+    { u: MAIN_TURNS[11], a: "<p>新增一个插件包要改：包本身（manifest / plugin / lifecycle 测试）、<code>runtime/package.json</code> 依赖、<code>DEFAULT_HARNESS_ENTRIES</code> 和 <code>defaultHarnessEntrySource</code>；需要 Host 能力时再补 <code>boot.ts</code>。</p>" },
+  ];
+  let h = `<div class="earlier">前面还有 10 轮</div>`;
+  for (const t of last) h += `<div class="u">${esc(t.u)}</div><div class="a">${t.a}</div>`;
+  for (const t of S.mainExtra) {
+    h += `<div class="u">${esc(t.u)}</div>`;
+    h += t.done ? `<div class="a"><p>${fmt(t.a)}</p></div>`
+                : `<div class="a"><div class="tool"><span class="spin"></span><b>读取</b><span class="mono">packages/runtime/src/harness/default-harness-definition.ts</span></div><p class="caret">正在梳理</p></div>`;
+  }
+  $("main-thread").innerHTML = h;
+  $("main-scroll").scrollTop = 1e6;
+  const n = S.chats.length;
+  $("side-badge").innerHTML = (S.mainRunning ? '<span class="run" title="运行中"></span> ' : "") +
+    (n ? `<span class="badge" title="${n} 个侧边对话">${I.branch}${n}</span>` : "");
+  document.querySelector(".main-head .meta").textContent = `Opus 5.5 · ${mainDone()} 轮${S.mainRunning ? " · 运行中" : ""}`;
+}
+
+function setMainRunning(on) {
+  if (on && !S.mainRunning) {
+    S.mainExtra.push({ u: "再看看 harness 定义里每一项的三元组含义", a: "三元组依次是：入口 id、它提供的服务、它需要注入的服务。装配时按 inject 依赖排序。", done: false });
+  } else if (!on && S.mainRunning) {
+    const t = S.mainExtra.find((x) => !x.done); if (t) t.done = true;
+  }
+  S.mainRunning = on;
+  segSet("seg-main", on ? "running" : "idle");
+  renderMain();
+}
+
+/* ---------------- side chats ---------------- */
+function createChat(firstMessage) {
+  const n = S.nextN++;
+  const c = {
+    id: "sc" + n, n, title: null, open: true,
+    inherited: mainDone(),
+    excludedRunning: S.mainRunning,
+    model: MODELS[0], modelInherited: true, perm: "ro",
+    tokens: 61200, // 继承来的 token
+    messages: [], running: false, unread: false, inheritOpen: false,
+    createdAt: new Date(),
+  };
+  S.chats.push(c);
+  S.active = c.id;
+  render();
+  if (firstMessage) send(c.id, firstMessage);
+  else setTimeout(() => document.querySelector(".sc-compose textarea")?.focus(), 0);
+  return c;
+}
+
+function send(id, text) {
+  const c = chat(id); if (!c || c.running || !text.trim()) return;
+  if (!c.title) c.title = text.trim().slice(0, 18);
+  c.messages.push({ role: "user", text: text.trim() });
+  const wantsWrite = /改|修改|写入|删除/.test(text);
+  let reply;
+  if (wantsWrite && c.perm === "ro") {
+    reply = { tools: [["编辑", "packages/auto-review/src/manifest.ts", "blocked"]], text: "当前是只读模式，这次修改被拦下了。把输入框下方的权限切到「需审批」后再发一次，我改之前会先问你。" };
+  } else if (wantsWrite) {
+    reply = { tools: [["编辑", "packages/auto-review/src/manifest.ts"]], text: "已经把 manifest 里 contributions 的注释改清楚了（演示，没有真的改文件）。这次修改只发生在侧边对话里，主会话不知道。" };
+  } else {
+    reply = REPLIES[S.replyIdx++ % REPLIES.length];
+  }
+  const msg = { role: "assistant", tools: [], text: "", target: reply, streaming: true };
+  c.messages.push(msg);
+  c.running = true;
+  c.tokens += 1800 + text.length * 2;
+  render();
+  // 先依次出工具行，再逐字输出正文
+  let ti = 0;
+  const stepTool = () => {
+    if (ti < reply.tools.length) { msg.tools.push(reply.tools[ti++]); renderIf(c); setTimeout(stepTool, 650); }
+    else streamText();
+  };
+  let ci = 0;
+  const streamText = () => {
+    const tick = setInterval(() => {
+      ci = Math.min(reply.text.length, ci + 3);
+      msg.text = reply.text.slice(0, ci);
+      if (ci >= reply.text.length) {
+        clearInterval(tick); msg.streaming = false; c.running = false; c.tokens += reply.text.length * 3;
+        if (S.active !== c.id || !c.open) c.unread = true;
+        render(); return;
+      }
+      renderIf(c, true);
+    }, 30);
+    c.stop = () => { clearInterval(tick); msg.streaming = false; c.running = false; msg.text += "（已停止）"; render(); };
+  };
+  setTimeout(stepTool, 350);
+}
+
+function renderIf(c, light) {
+  if (light && S.active === c.id && c.open) { renderThread(c); return; }
+  render();
+}
+
+function closeChat(id) {
+  const c = chat(id); c.open = false;
+  if (S.active === id) { const o = openChats(); S.active = o.length ? o[o.length - 1].id : (S.ctxOpen ? "ctx" : null); }
+  render();
+  toast("已收起侧边对话，内容保留；在 + 里可以重新打开");
+}
+function reopenChat(id) { const c = chat(id); c.open = true; c.unread = false; S.active = id; S.menu = null; render(); }
+
+/* ---------------- right panel render ---------------- */
+function tabLabel(c) { return c.title || `侧边对话 ${c.n}`; }
+
+function renderTabs() {
+  let h = "";
+  if (S.ctxOpen) h += `<span class="tab ${S.active === "ctx" ? "on" : ""}" data-tab="ctx"><span class="lbl">上下文</span><button class="x" data-close="ctx" aria-label="关闭">${I.x}</button></span>`;
+  for (const c of openChats()) {
+    const ico = c.running ? '<span class="spin" style="width:11px;height:11px"></span>' : c.unread ? '<span class="unread"></span>' : `<span class="ico">${I.branch}</span>`;
+    h += `<span class="tab ${S.active === c.id ? "on" : ""}" data-tab="${c.id}" title="${esc(tabLabel(c))}">${ico}<span class="lbl">${esc(tabLabel(c))}</span><button class="x" data-close="${c.id}" aria-label="收起">${I.x}</button></span>`;
+  }
+  if (!h) h = `<span style="padding:0 6px;color:var(--muted);font-size:12.5px">右侧面板</span>`;
+  $("tab-scroll").innerHTML = h;
+}
+
+function launcherHtml(inMenu) {
+  const items = [
+    { id: "new-side", nm: "侧边对话", ds: "带着当前上下文另开一个对话", ic: I.branchL, primary: true },
+    { id: "x-sub", nm: "子 Agent", ds: "这次对话派出的一次性助手", ic: I.bot },
+    { id: "x-files", nm: "文件", ds: "浏览工作目录", ic: I.folder },
+    { id: "ctx", nm: "上下文", ds: "上下文用了多少", ic: I.eye },
+    { id: "x-term", nm: "终端", ds: "在这个目录里开终端", ic: I.term },
+  ];
+  let h = inMenu ? "" : `<div class="lh">打开</div>`;
+  for (const it of items) {
+    h += `<button class="li ${it.primary ? "primary" : ""}" data-launch="${it.id}"><span class="ic">${it.ic}</span><span><span class="nm">${it.nm}</span><span class="ds">${it.ds}</span></span></button>`;
+  }
+  const closed = closedChats();
+  if (closed.length) {
+    h += `<div class="lh" style="margin-top:12px">本会话的侧边对话 · 已收起</div>`;
+    for (const c of closed.slice().reverse()) {
+      const turns = c.messages.filter((m) => m.role === "user").length;
+      h += `<button class="li" data-reopen="${c.id}"><span class="ic">${I.branch}</span><span><span class="nm">${esc(tabLabel(c))}</span><span class="ds">${turns} 轮 · 继承到主会话第 ${c.inherited} 轮</span></span>${c.unread ? '<span class="when"><span class="unread" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--info)"></span> 有新回复</span>' : `<span class="when">${timeAgo(c.createdAt)}</span>`}</button>`;
+    }
+  }
+  return h;
+}
+function timeAgo(d) { const s = Math.round((Date.now() - d) / 1000); return s < 60 ? "刚刚" : `${Math.round(s / 60)} 分钟前`; }
+
+function renderBody() {
+  const body = $("rp-body");
+  if (!S.active) { body.innerHTML = `<div class="launch">${launcherHtml(false)}</div>`; return; }
+  if (S.active === "ctx") {
+    body.innerHTML = `<div class="ctx"><div class="card"><h3>主会话上下文</h3><div style="display:flex;justify-content:space-between;margin-bottom:6px"><b style="font-size:20px">61.2k</b><span style="color:var(--faint)">/ 200k · 31%</span></div><div class="bar"><span style="width:6%;background:#7d858b"></span><span style="width:8%;background:#7a68ad"></span><span style="width:17%;background:#b96831"></span></div></div><div style="color:var(--faint);font-size:12px">（已有的「上下文」面板，这里只是占位，演示它和侧边对话共用一条 tab。）</div></div>`;
+    return;
+  }
+  const c = chat(S.active);
+  body.innerHTML = `<div class="sc">
+    <div class="sc-scroll" id="sc-scroll"><div class="sc-thread" id="sc-thread"></div></div>
+    <div class="sc-compose">${composerHtml(c)}</div>
+  </div>`;
+  renderThread(c);
+}
+
+// 一条居中分隔线，跟消息一起滚走；只在刚打开时提示一下
+function inheritHtml(c) {
+  const ex = c.excludedRunning ? `，不含进行中的第 ${c.inherited + 1} 轮` : "";
+  return `<div class="inherit">继承主会话 ${c.inherited} 轮${ex}</div>`;
+}
+
+function renderThread(c) {
+  const el = $("sc-thread"); if (!el) return;
+  let h = inheritHtml(c);
+  if (!c.messages.length) {
+    h += `<div class="sc-empty"><div class="big">在这里另起一条线问，不打断主会话</div>默认只读，可以在下方切换。
+      <div class="sugg">${SUGGESTIONS.map((s) => `<button data-sugg="${esc(s)}">${esc(s)}</button>`).join("")}</div></div>`;
+  }
+  for (const m of c.messages) {
+    if (m.role === "user") { h += `<div class="u">${esc(m.text)}</div>`; continue; }
+    h += `<div class="a">`;
+    m.tools.forEach((t, i) => {
+      const live = m.streaming && i === m.tools.length - 1 && !m.text;
+      const blocked = t[2] === "blocked";
+      h += `<div class="tool ${blocked ? "blocked" : ""}">${live ? '<span class="spin"></span>' : blocked ? I.lock : '<span style="width:12px;text-align:center">·</span>'}<b>${t[0]}</b><span class="mono">${t[1]}</span>${blocked ? "<span>· 只读模式已拦截</span>" : ""}</div>`;
+    });
+    if (m.text || (m.streaming && !m.tools.length)) h += `<p class="${m.streaming ? "caret" : ""}">${fmt(m.text)}</p>`;
+    h += `</div>`;
+  }
+  el.innerHTML = h;
+  const sc = $("sc-scroll"); if (sc) sc.scrollTop = 1e6;
+  // 更新上下文用量
+  const pill = document.querySelector(".sc-compose .pill");
+  if (pill) pill.outerHTML = ctxPill(c);
+  const btn = document.querySelector(".sc-compose .send");
+  if (btn) { btn.innerHTML = c.running ? I.stop : I.send; btn.setAttribute("aria-label", c.running ? "停止" : "发送"); }
+}
+
+function ctxPill(c) {
+  const pct = Math.round((c.tokens / 200000) * 100);
+  return `<span class="pill" title="${(c.tokens / 1000).toFixed(1)}k / 200k，其中 61.2k 继承自主会话"><span class="mini"><i style="width:${pct}%"></i></span>上下文 ${pct}%</span>`;
+}
+
+function composerHtml(c) {
+  const p = PERMS.find((x) => x.id === c.perm);
+  return `<div class="composer" data-chat="${c.id}">
+    <textarea rows="1" placeholder="问点什么，不会影响主会话" data-input="${c.id}"></textarea>
+    <div class="c-foot">
+      <button class="chip" data-menu="model">${esc(c.model)}${c.modelInherited ? '<span class="inh">继承</span>' : ""} ${I.down}</button>
+      <button class="chip perm-${c.perm}" data-menu="perm">${c.perm === "ro" ? I.lock : ""}${p.label} ${I.down}</button>
+      <span class="sp"></span>
+      ${ctxPill(c)}
+      <button class="send" data-send="${c.id}" aria-label="${c.running ? "停止" : "发送"}">${c.running ? I.stop : I.send}</button>
+    </div>
+  </div>`;
+}
+
+/* ---------------- menus ---------------- */
+function openMenu(kind, anchor) {
+  closeMenu();
+  const r = anchor.getBoundingClientRect();
+  const m = document.createElement("div");
+  m.className = "menu"; m.id = "menu";
+  if (kind === "plus") {
+    m.style.width = "300px";
+    m.innerHTML = `<div class="launch" style="padding:2px">${launcherHtml(true)}</div>`;
+    document.body.appendChild(m);
+    m.style.top = r.bottom + 6 + "px"; m.style.left = Math.max(8, r.right - 300) + "px";
+  } else {
+    const c = chat(S.active);
+    if (kind === "model") {
+      m.innerHTML = `<div class="mh">模型</div>` + MODELS.map((x, i) => `<button class="mi" data-model="${x}"><span class="ck">${x === c.model ? "✓" : ""}</span>${x}${i === 0 ? '<span class="d">主会话在用</span>' : ""}</button>`).join("");
+    } else {
+      m.innerHTML = `<div class="mh">这个侧边对话的权限</div>` + PERMS.map((x) => `<button class="mi" data-perm="${x.id}"><span class="ck">${x.id === c.perm ? "✓" : ""}</span><span>${x.label}<span class="desc">${x.desc}</span></span></button>`).join("") + `<hr><div class="mh" style="padding-bottom:6px">只影响这个侧边对话，主会话不变</div>`;
+    }
+    document.body.appendChild(m);
+    m.style.left = r.left + "px"; m.style.top = r.top - m.offsetHeight - 6 + "px";
+  }
+  S.menu = kind;
+}
+function closeMenu() { $("menu")?.remove(); S.menu = null; }
+
+function slashMenu(show) {
+  const ex = $("slash"); if (!show) { ex?.remove(); return; }
+  if (ex) return;
+  const comp = $("main-composer");
+  const m = document.createElement("div");
+  m.className = "menu"; m.id = "slash";
+  m.style.cssText = "left:8px;bottom:calc(100% + 6px);width:340px";
+  m.innerHTML = `<button class="mi kb" data-slash="side">${I.branch}<span><b style="font-weight:500">/side</b> <span style="color:var(--muted)">[问题]</span><span class="desc">在右侧开侧边对话，继承到上一轮结束</span></span></button>`;
+  comp.appendChild(m);
+}
+
+/* ---------------- main render ---------------- */
+function render() {
+  renderMain();
+  renderTabs();
+  renderBody();
+}
+
+function segSet(id, v) { document.querySelectorAll(`#${id} button`).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
+
+/* ---------------- events ---------------- */
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button, .tab");
+  if (!t) { if (!e.target.closest(".menu")) closeMenu(); return; }
+
+  if (t.closest("#seg-theme")) { S.theme = t.dataset.v; document.documentElement.dataset.theme = S.theme; segSet("seg-theme", S.theme); return; }
+  if (t.closest("#seg-main")) { setMainRunning(t.dataset.v === "running"); return; }
+  if (t.id === "btn-notes") { $("notes").classList.toggle("on"); return; }
+  if (t.id === "btn-reset") { S.chats.forEach((c) => c.stop?.()); initState(); setMainRunning(false); segSet("seg-main", "idle"); render(); toast("已重置"); return; }
+  if (t.id === "btn-plus") { S.menu === "plus" ? closeMenu() : openMenu("plus", t); return; }
+
+  if (t.dataset.close) {
+    e.stopPropagation();
+    if (t.dataset.close === "ctx") { S.ctxOpen = false; if (S.active === "ctx") { const o = openChats(); S.active = o.length ? o[o.length - 1].id : null; } render(); }
+    else closeChat(t.dataset.close);
+    return;
+  }
+  if (t.dataset.tab) { S.active = t.dataset.tab; const c = chat(S.active); if (c) c.unread = false; render(); return; }
+
+  if (t.dataset.launch) {
+    closeMenu();
+    if (t.dataset.launch === "new-side") createChat();
+    else if (t.dataset.launch === "ctx") { S.ctxOpen = true; S.active = "ctx"; render(); }
+    else toast("Demo 里没有做这个面板");
+    return;
+  }
+  if (t.dataset.reopen) { closeMenu(); reopenChat(t.dataset.reopen); return; }
+  if (t.dataset.sugg) { send(S.active, t.dataset.sugg); return; }
+  if (t.dataset.send) {
+    const c = chat(t.dataset.send);
+    if (c.running) { c.stop?.(); return; }
+    const ta = document.querySelector(`[data-input="${c.id}"]`); const v = ta.value; ta.value = ""; send(c.id, v); return;
+  }
+  if (t.dataset.menu) { S.menu === t.dataset.menu ? closeMenu() : openMenu(t.dataset.menu, t); return; }
+  if (t.dataset.model) { const c = chat(S.active); c.model = t.dataset.model; c.modelInherited = t.dataset.model === MODELS[0]; closeMenu(); renderBody(); return; }
+  if (t.dataset.perm) { const c = chat(S.active); c.perm = t.dataset.perm; closeMenu(); renderBody(); toast(`这个侧边对话的权限改为「${PERMS.find((p) => p.id === c.perm).label}」`); return; }
+  if (t.dataset.slash) { const ta = $("main-input"); ta.value = "/side "; ta.focus(); slashMenu(false); return; }
+  if (t.id === "main-send") { submitMain(); return; }
+  if (!t.closest(".menu")) closeMenu();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closeMenu(); slashMenu(false); $("notes").classList.remove("on"); }
+  const ta = e.target.closest?.("textarea"); if (!ta) return;
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    if (ta.id === "main-input") submitMain();
+    else if (ta.dataset.input) { const c = chat(ta.dataset.input); if (c.running) return; const v = ta.value; ta.value = ""; send(c.id, v); }
+  }
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id === "main-input") slashMenu(/^\/s?i?d?e?$/.test(e.target.value) && e.target.value.length > 0);
+});
+
+function submitMain() {
+  const ta = $("main-input"); const v = ta.value.trim(); slashMenu(false);
+  if (!v) return;
+  const m = v.match(/^\/side\b\s*(.*)$/s);
+  if (m) { ta.value = ""; createChat(m[1] || null); toast(S.mainRunning ? "已在右侧开侧边对话（进行中的那一轮未带入）" : "已在右侧开侧边对话"); return; }
+  if (S.mainRunning) { toast("主会话正在运行（Demo 不演示排队）"); return; }
+  ta.value = "";
+  S.mainExtra.push({ u: v, a: "（主会话的假回复）这条消息只进入主会话；已经打开的侧边对话不会看到它。", done: false });
+  S.mainRunning = true; segSet("seg-main", "running"); renderMain();
+  setTimeout(() => { const t = S.mainExtra[S.mainExtra.length - 1]; t.done = true; S.mainRunning = false; segSet("seg-main", "idle"); renderMain(); }, 3500);
+}
+
+/* resize */
+(() => {
+  const rz = $("resizer"); let x0 = 0, w0 = 0;
+  rz.addEventListener("pointerdown", (e) => { x0 = e.clientX; w0 = $("rp").offsetWidth; rz.classList.add("drag"); rz.setPointerCapture(e.pointerId); });
+  rz.addEventListener("pointermove", (e) => { if (!rz.classList.contains("drag")) return; const w = Math.max(360, Math.min(760, w0 + x0 - e.clientX)); $("rp").style.width = w + "px"; });
+  rz.addEventListener("pointerup", () => rz.classList.remove("drag"));
+})();
+
+render();
+</script>
+</body>
+</html>

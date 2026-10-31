@@ -66,6 +66,8 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   getSessionPreview: "runtime-v2:fixed-renderer:get-session-preview",
   createSession: "runtime-v2:fixed-renderer:create-session",
   forkSession: "runtime-v2:fixed-renderer:fork-session",
+  openSideChat: "runtime-v2:fixed-renderer:open-side-chat",
+  listSideChats: "runtime-v2:fixed-renderer:list-side-chats",
   pinSession: "runtime-v2:fixed-renderer:pin-session",
   renameSession: "runtime-v2:fixed-renderer:rename-session",
   setSessionWorkspace: "runtime-v2:fixed-renderer:set-session-workspace",

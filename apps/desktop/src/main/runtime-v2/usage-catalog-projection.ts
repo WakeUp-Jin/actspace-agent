@@ -31,6 +31,8 @@ export function projectQueryCatalog(db: ProjectionDatabase, descriptor: SessionQ
     if (event.type === "turn/start" && row.agent_mode_revision === 0 && !h.createdWith.initialAgentMode && h.createdWith.presetId !== "actspace.chat" && (data.mode === "plan" || data.mode === "agent")) row.agent_mode = data.mode;
   }
   prepare(db, "UPDATE session_catalog SET title=?,workspace_root=?,pinned=?,archived=?,updated_at=?,agent_run_count=?,agent_mode=?,agent_mode_revision=? WHERE session_id=?").run(row.title, row.workspace_root, row.pinned, row.archived, row.updated_at, row.agent_run_count, row.agent_mode, row.agent_mode_revision, h.sessionId);
+  const lineage = h.lineage;
+  prepare(db, "UPDATE session_catalog SET is_child_session=?,side_chat_parent_id=? WHERE session_id=?").run(lineage ? 1 : 0, lineage?.origin === "side-chat" ? lineage.parentSessionId : null, h.sessionId);
   prepare(db, "UPDATE session_catalog SET has_pending_tasks=EXISTS(SELECT 1 FROM catalog_pending_tasks WHERE session_id=?) WHERE session_id=?").run(h.sessionId, h.sessionId);
   if (previous.title !== row.title) {
     prepare(db, "DELETE FROM session_search WHERE rowid IN (SELECT rowid FROM session_catalog WHERE session_id=?)").run(h.sessionId);

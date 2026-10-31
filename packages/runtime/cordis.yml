@@ -41,3 +41,6 @@
 - id: english-learning
   name: "@actspace/english-learning/plugin"
   inject: [agent.registry, session.runtime]
+- id: side-chat
+  name: "@actspace/side-chat/plugin"
+  inject: [session.runtime]

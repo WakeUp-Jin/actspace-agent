@@ -38,6 +38,8 @@ export type RightPanelTab = { id: string } & (
   | { kind: "terminalStarting"; title: string; requestId: string; sessionId: string }
   | { kind: "terminalError"; title: string; sessionId: string; message: string }
   | { kind: "terminal"; title: string; terminalId: string; sessionId: string; shellName: string }
+  // 侧边对话：只在它的主会话下显示。继承轮数等打开时才知道的事实随 tab 带着，重新打开时由会话窗口推算。
+  | { kind: "sideChat"; title: string; sessionId: string; parentSessionId: string; inheritedTurnCount?: number; runningTurnExcluded?: boolean }
 );
 
 export type RightPanelTabKind = RightPanelTab["kind"];

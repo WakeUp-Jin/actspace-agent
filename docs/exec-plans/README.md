@@ -25,6 +25,8 @@
 
 ## 最近完成
 
+- [侧边对话](completed/20261021-side-chat.md)：插件 `@actspace/side-chat`、`openSideChat` IPC、右栏 `sideChat` tab、`/side` 与侧栏数量完成；desktop 1986 项测试与前端检查通过；Electron 实机 1–7 未执行，见[执行摘要](../exec-runs/20261021-side-chat/execution-summary.md)。
+
 - [会话查询授权与替我审批](completed/20261018-permission-auto-review.md)：查询会话授权、判断插件、模型设置与结果审计完成；398 项定向测试通过，追加真实 Electron 交互、路由缺陷修复复验及原生 Computer Use；商业 Provider 未覆盖，见[执行摘要](../exec-runs/20261018-permission-auto-review/execution-summary.md)。
 
 - [Context 面板「路径」卡片](completed/20261018-context-paths-panel.md)：卡片、预判字段与 mock 完成，自动化测试和浏览器截图通过；交接文档 P1–P8 Electron 验收未执行，见[执行摘要](../exec-runs/20261018-context-paths-panel/execution-summary.md)。

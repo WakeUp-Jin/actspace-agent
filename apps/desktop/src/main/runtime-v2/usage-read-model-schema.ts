@@ -28,7 +28,8 @@ export function createReadModelSchema(db: DatabaseSync): void {
       agent_form TEXT,
       agent_mode TEXT,
       agent_mode_revision INTEGER,
-      has_pending_tasks INTEGER
+      has_pending_tasks INTEGER,
+      side_chat_parent_id TEXT
     ) STRICT;
     CREATE TABLE IF NOT EXISTS catalog_pending_tasks(session_id TEXT NOT NULL,task_id TEXT NOT NULL,run_id TEXT,state TEXT NOT NULL,PRIMARY KEY(session_id,task_id),FOREIGN KEY(session_id) REFERENCES session_catalog(session_id) ON DELETE CASCADE) STRICT;
     CREATE TABLE IF NOT EXISTS usage_activity (
@@ -94,6 +95,7 @@ export function createReadModelSchema(db: DatabaseSync): void {
     CREATE VIRTUAL TABLE IF NOT EXISTS session_search USING fts5(session_id UNINDEXED, content);
     CREATE TABLE IF NOT EXISTS index_state (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
   `);
+  db.exec("CREATE INDEX IF NOT EXISTS session_catalog_side_chat_idx ON session_catalog(side_chat_parent_id)");
   db.exec("CREATE INDEX IF NOT EXISTS session_catalog_page_idx ON session_catalog(archived, COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,''), pinned, updated_at DESC,session_id ASC)");
   createUsageJournalSchema(db);
   createUsageRollups(db);

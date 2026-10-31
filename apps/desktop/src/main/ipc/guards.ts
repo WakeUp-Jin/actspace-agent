@@ -81,6 +81,8 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   }],
   [contract.workspaces.listDir, shape({ workspaceRoot: "string?", relativePath: "string?" }, "Invalid workspace directory")],
   [contract.sessions.readArtifact, shape({ sessionId: "string", artifactPath: "string" }, "Invalid session artifact")],
+  [contract.sessions.openSideChat, shape({ parentSessionId: "string" }, "Invalid side chat parent")],
+  [contract.sessions.listSideChats, shape({ parentSessionId: "string" }, "Invalid side chat parent")],
   // 工作区路径
   [contract.workspaces.createFolder, shape({ parentRoot: "string", name: "string" }, "Invalid workspace folder")],
   [contract.workspaces.openInIde, shape({ workspaceId: "string" }, "Invalid workspace")],

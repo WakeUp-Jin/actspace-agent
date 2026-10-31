@@ -16,4 +16,11 @@ describe("optional durable worktree binding", () => {
     expect(fork.header.worktree).toEqual(worktree);
     expect(fork.header.cwd).toBe(worktree.workspaceRoot);
   });
+  it("accepts side-chat lineage and keeps the parent's delegation depth", () => {
+    const parent = createSessionHeader(base);
+    const seed = createSessionForkSeed({ parentHeader: parent, parentEvents: [], boundarySeq: -1, newSessionId: "side", createdAt: base.createdAt, createdWith: base.createdWith, registry, origin: "side-chat" });
+    expect(seed.header.lineage).toMatchObject({ parentSessionId: "source", origin: "side-chat", delegationDepth: 0 });
+    expect(() => validateSessionHeader(seed.header)).not.toThrow();
+    expect(() => createSessionHeader({ ...base, lineage: { parentSessionId: "source", parentBoundarySeq: -1, origin: "branch" as never, delegationDepth: 0 } })).toThrow("side-chat");
+  });
 });

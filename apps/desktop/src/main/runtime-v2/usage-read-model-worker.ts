@@ -40,7 +40,7 @@ type Message =
   | { id: string; type: "diagnostics" };
 type DbRow = { row_json: string; activity_id: string; session_id: string; session_title: string | null; started_at: string; kind: string; status: string; model: string | null; provider_id: string | null; connection_id: string | null; tool_name: string | null; agent_run_id: string };
 type Source = IndexedUsageSource & { querySource?: UsageJournalSource["querySource"] };
-type CatalogRow = { sessionId: string; title: string | null; revision: number; createdAt: string; updatedAt: string; workspaceRoot: string | null; worktree?: unknown; pinned: boolean; archived: boolean; accessState: string; isChildSession: boolean; agentRunCount: number; agentForm?: string; agentMode?: string; agentModeRevision?: number; querySource?: import("@actspace/session-storage").SessionQuerySource };
+type CatalogRow = { sessionId: string; title: string | null; revision: number; createdAt: string; updatedAt: string; workspaceRoot: string | null; worktree?: unknown; pinned: boolean; archived: boolean; accessState: string; isChildSession: boolean; sideChatParentId?: string; agentRunCount: number; agentForm?: string; agentMode?: string; agentModeRevision?: number; querySource?: import("@actspace/session-storage").SessionQuerySource };
 
 const root = String((workerData as { dataRoot: string }).dataRoot);
 const databasePath = join(root, "runtime-v2", "usage-read-model.sqlite");
@@ -124,6 +124,7 @@ async function open(): Promise<DatabaseSync> {
   memoryTemp = false;
   if (version === 0) createReadModelSchema(db);
   else if (["usage_write_mode", "read_model_builds", "usage_activity_session_idx", "context_state", "context_request_seq", "context_event_seq", "building_context_state"].some(name => !prepare(db!, "SELECT 1 FROM sqlite_master WHERE name=?").get(name))) throw new Error("Usage read model schema incomplete; rebuild required.");
+  addSideChatColumn(db);
   pruneSyncIndexes(db);
   enableUsageBatchWrites(db);
   return db;
@@ -172,7 +173,7 @@ async function sync(sources: readonly Source[], catalogRows: readonly CatalogRow
     });
     setTempStorage(database, allowMemoryTemp && !catalogRows.length && activeSessionIds === undefined && !existingReset);
   }
-  const catalog = prepare(database, "INSERT INTO session_catalog(session_id,title,revision,created_at,updated_at,workspace_root,worktree_json,pinned,archived,access_state,is_child_session,agent_run_count,agent_form,agent_mode,agent_mode_revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET title=excluded.title,revision=excluded.revision,created_at=excluded.created_at,updated_at=excluded.updated_at,workspace_root=excluded.workspace_root,worktree_json=excluded.worktree_json,pinned=excluded.pinned,archived=excluded.archived,access_state=excluded.access_state,is_child_session=excluded.is_child_session,agent_run_count=excluded.agent_run_count,agent_form=excluded.agent_form,agent_mode=excluded.agent_mode,agent_mode_revision=excluded.agent_mode_revision");
+  const catalog = prepare(database, "INSERT INTO session_catalog(session_id,title,revision,created_at,updated_at,workspace_root,worktree_json,pinned,archived,access_state,is_child_session,agent_run_count,agent_form,agent_mode,agent_mode_revision,side_chat_parent_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET title=excluded.title,revision=excluded.revision,created_at=excluded.created_at,updated_at=excluded.updated_at,workspace_root=excluded.workspace_root,worktree_json=excluded.worktree_json,pinned=excluded.pinned,archived=excluded.archived,access_state=excluded.access_state,is_child_session=excluded.is_child_session,agent_run_count=excluded.agent_run_count,agent_form=excluded.agent_form,agent_mode=excluded.agent_mode,agent_mode_revision=excluded.agent_mode_revision,side_chat_parent_id=excluded.side_chat_parent_id");
   if (!continuation) { database.exec("BEGIN IMMEDIATE"); syncing = true; }
   try {
     for (const row of catalogRows) {
@@ -181,7 +182,7 @@ async function sync(sources: readonly Source[], catalogRows: readonly CatalogRow
         prepare(database, "UPDATE session_catalog SET revision=? WHERE session_id=?").run(row.revision, row.sessionId);
         continue;
       }
-      catalog.run(row.sessionId, row.title, row.revision, new Date(row.createdAt).toISOString(), new Date(row.updatedAt).toISOString(), row.workspaceRoot, row.worktree === undefined ? null : JSON.stringify(row.worktree), row.pinned ? 1 : 0, row.archived ? 1 : 0, row.accessState, row.isChildSession ? 1 : 0, row.agentRunCount, row.agentForm ?? null, row.agentMode ?? null, row.agentModeRevision ?? null);
+      catalog.run(row.sessionId, row.title, row.revision, new Date(row.createdAt).toISOString(), new Date(row.updatedAt).toISOString(), row.workspaceRoot, row.worktree === undefined ? null : JSON.stringify(row.worktree), row.pinned ? 1 : 0, row.archived ? 1 : 0, row.accessState, row.isChildSession ? 1 : 0, row.agentRunCount, row.agentForm ?? null, row.agentMode ?? null, row.agentModeRevision ?? null, row.sideChatParentId ?? null);
       if (!previous || previous.title !== row.title) {
         prepare(database, "DELETE FROM session_search WHERE rowid IN (SELECT rowid FROM session_catalog WHERE session_id=?)").run(row.sessionId);
         prepare(database, "INSERT INTO session_search(rowid,session_id,content) SELECT rowid,session_id,COALESCE(title,'') FROM session_catalog WHERE session_id=?").run(row.sessionId);
@@ -292,7 +293,7 @@ function sessionPage(database: DatabaseSync, input: SessionListPageInput): Sessi
     if (input.search.length > 300) throw new Error("Usage search exceeds 300 characters.");
     const term = toFtsQuery(input.search);
     const limit = boundedInteger(input.limit, 50, 500);
-    const conditions = ["archived=0", "(session_id IN (SELECT session_id FROM session_search WHERE session_search MATCH ?) OR session_id IN (SELECT session_id FROM session_excerpt_search WHERE session_excerpt_search MATCH ?))"];
+    const conditions = ["archived=0", "side_chat_parent_id IS NULL", "(session_id IN (SELECT session_id FROM session_search WHERE session_search MATCH ?) OR session_id IN (SELECT session_id FROM session_excerpt_search WHERE session_excerpt_search MATCH ?))"];
     const args: (string | number)[] = [term, term];
     if (input.workspaceRoot !== undefined) { conditions.push("COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,'')=?"); args.push(input.workspaceRoot); }
     if (input.pinned !== undefined) { conditions.push("pinned=?"); args.push(Number(input.pinned)); }
@@ -301,11 +302,11 @@ function sessionPage(database: DatabaseSync, input: SessionListPageInput): Sessi
       if (!after) throw new Error("Usage cursor invalid; restart the search.");
       conditions.push("(updated_at < ? OR (updated_at=? AND session_id>?))"); args.push(after.updated_at, after.updated_at, input.after);
     }
-    const rows = boundedRows(prepare(database, `SELECT * FROM session_catalog WHERE ${conditions.join(" AND ")} ORDER BY updated_at DESC,session_id ASC LIMIT ?`).iterate(...args, limit + 1)) as Record<string, string | number | null>[];
+    const rows = boundedRows(prepare(database, `SELECT *,${SIDE_CHAT_COUNT} FROM session_catalog WHERE ${conditions.join(" AND ")} ORDER BY updated_at DESC,session_id ASC LIMIT ?`).iterate(...args, limit + 1)) as Record<string, string | number | null>[];
     return { items: rows.slice(0, limit).map(toSessionListItem), groups: [], indexing: false, failed: 0, ...(rows.length > limit ? { nextCursor: String(rows[limit - 1]!.session_id) } : {}) };
   }
   const groupRoot = "COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,'')";
-  const conditions = ["archived=0"];
+  const conditions = ["archived=0", "side_chat_parent_id IS NULL"];
   const args: (string | number)[] = [];
   if (input.workspaceRoot !== undefined) { conditions.push(`${groupRoot}=?`); args.push(input.workspaceRoot); }
   if (input.pinned !== undefined) { conditions.push("pinned=?"); args.push(input.pinned ? 1 : 0); }
@@ -328,7 +329,7 @@ function sessionPage(database: DatabaseSync, input: SessionListPageInput): Sessi
       pageArgs.push(after.updated_at, after.updated_at, after.session_id);
     }
     // Only this group's visible page crosses from SQLite into JavaScript.
-    const rows = boundedRows(prepare(database, `SELECT * FROM session_catalog WHERE archived=0 AND ${groupRoot}=? AND pinned=?${cursorWhere} ORDER BY updated_at DESC,session_id ASC LIMIT ?`).iterate(...pageArgs, limit + 1), pageBudget) as Record<string, string | number | null>[];
+    const rows = boundedRows(prepare(database, `SELECT *,${SIDE_CHAT_COUNT} FROM session_catalog WHERE archived=0 AND side_chat_parent_id IS NULL AND ${groupRoot}=? AND pinned=?${cursorWhere} ORDER BY updated_at DESC,session_id ASC LIMIT ?`).iterate(...pageArgs, limit + 1), pageBudget) as Record<string, string | number | null>[];
     items.push(...rows.slice(0, limit).map(toSessionListItem));
     groups.push({ workspaceRoot: group.group_root, pinned: group.pinned === 1, hasMore: rows.length > limit });
   }
@@ -336,9 +337,21 @@ function sessionPage(database: DatabaseSync, input: SessionListPageInput): Sessi
   return { items, groups, indexing: false, failed: 0 };
 }
 
+// Side chats are listed under their parent, never as sidebar rows of their own.
+const SIDE_CHAT_COUNT = "(SELECT COUNT(*) FROM session_catalog AS side WHERE side.side_chat_parent_id=session_catalog.session_id AND side.archived=0) AS side_chat_count";
+
+/** Schema-9 indexes created before side chats get the column in place; no rebuild. */
+function addSideChatColumn(database: DatabaseSync): void {
+  for (const table of ["session_catalog", "building_catalog_session_catalog", "building_usage_session_catalog"]) {
+    const columns = prepare(database, `PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (columns.length > 0 && !columns.some(column => column.name === "side_chat_parent_id")) database.exec(`ALTER TABLE ${table} ADD COLUMN side_chat_parent_id TEXT`);
+  }
+  database.exec("CREATE INDEX IF NOT EXISTS session_catalog_side_chat_idx ON session_catalog(side_chat_parent_id)");
+}
+
 function toSessionListItem(row: Record<string, string | number | null>) {
   const worktree = row.worktree_json ? JSON.parse(String(row.worktree_json)) : undefined;
-  return { ...(row.has_pending_tasks == null ? {} : { hasPendingTasks: Number(row.has_pending_tasks) === 1 }), id: String(row.session_id), title: String(row.title ?? "New chat"), updatedAt: String(row.updated_at ?? ""), workspaceRoot: row.workspace_root ? String(row.workspace_root) : undefined, ...(worktree ? { worktree } : {}), pinned: Number(row.pinned ?? 0) === 1, archived: Number(row.archived ?? 0) === 1, accessState: String(row.access_state ?? "read-write") as "read-write" | "degraded" | "browse-only" | "corrupt", isChildSession: Number(row.is_child_session ?? 0) === 1, agentRunCount: Number(row.agent_run_count ?? 0), ...(row.agent_form ? { agentForm: String(row.agent_form) as "agent" | "chat" } : {}), ...(row.agent_mode ? { agentMode: String(row.agent_mode) as "chat" | "plan" | "agent" } : {}), ...(row.agent_mode_revision == null ? {} : { agentModeRevision: Number(row.agent_mode_revision) }) };
+  return { ...(row.has_pending_tasks == null ? {} : { hasPendingTasks: Number(row.has_pending_tasks) === 1 }), id: String(row.session_id), title: String(row.title ?? "New chat"), updatedAt: String(row.updated_at ?? ""), workspaceRoot: row.workspace_root ? String(row.workspace_root) : undefined, ...(worktree ? { worktree } : {}), pinned: Number(row.pinned ?? 0) === 1, archived: Number(row.archived ?? 0) === 1, accessState: String(row.access_state ?? "read-write") as "read-write" | "degraded" | "browse-only" | "corrupt", isChildSession: Number(row.is_child_session ?? 0) === 1, agentRunCount: Number(row.agent_run_count ?? 0), ...(row.agent_form ? { agentForm: String(row.agent_form) as "agent" | "chat" } : {}), ...(row.agent_mode ? { agentMode: String(row.agent_mode) as "chat" | "plan" | "agent" } : {}), ...(row.agent_mode_revision == null ? {} : { agentModeRevision: Number(row.agent_mode_revision) }), ...(row.side_chat_parent_id ? { sideChatParentId: String(row.side_chat_parent_id) } : {}), ...(Number(row.side_chat_count ?? 0) > 0 ? { sideChatCount: Number(row.side_chat_count) } : {}) };
 }
 
 function activitySql(database: DatabaseSync, input: UsageStatisticsGetInput, scope: "session" | "global", range: UsageStatisticsGetInput["range"], title: string, rangeWhere: string, rangeArgs: (string | number)[], filterWhere: string, filterArgs: (string | number)[], rangeCount: number, selected?: { session_id: string; title: string | null }, metricSource?: string, rangeMetricSource?: string): UsageActivitySnapshot {

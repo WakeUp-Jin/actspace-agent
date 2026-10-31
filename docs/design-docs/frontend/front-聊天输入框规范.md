@@ -169,6 +169,7 @@ Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布
 - 菜单只包含 `Functions` 与 `Skills` 两个一级分组，并复用现有模式回调、Context / Review 入口、`/compact` 路由和 Skill registry。
 - `/` 与 `+` 是同一批能力的不同发现入口：`+` 偏鼠标、附件和多选，`/` 偏搜索、键盘和快捷调用；两者不要求展示完全相同的项目。
 - Slash 菜单与 `+` 面板、模型菜单、Context 弹窗互斥，不新增常驻按钮，也不改变 Composer 默认视觉密度。
+- `/side` 只在主对话 Composer 提供（需 `onOpenSideChat`，本地目标、非 Chat 形态）：菜单选择把输入替换为 `/side `，发送 `/side 问题` 在右侧新开侧边对话并把问题发到那里；侧边对话内的 Composer 不提供。两个 Composer 可同时挂载，菜单 DOM id 按实例生成（`composer-slash-menu-<id>`）。
 - 完整触发规则、命令清单、选择语义、键盘 / IME、可访问性、视觉和验收要求见 `docs/design-docs/frontend/front-composer-slash-command.md`。
 
 ### Chat / Plan / Agent 运行模式

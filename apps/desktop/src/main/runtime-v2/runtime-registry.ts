@@ -197,6 +197,16 @@ export class DesktopRuntimeV2Registry {
     } finally { this.#admittedWork--; }
   }
 
+  async openSideChat(parentSessionId: string): Promise<{ readonly snapshot: import("@actspace/shared/runtime-v2").RuntimeV2SessionSnapshot; readonly inheritedTurnCount: number; readonly runningTurnExcluded: boolean }> {
+    this.assertAdmission();
+    this.#admittedWork++;
+    try {
+      const opened = await this.requireApp().openSideChat(parentSessionId, randomUUID());
+      this.#emitDurableChanged(opened.snapshot.sessionId, opened.snapshot.throughJournalSeq, "session-forked");
+      return opened;
+    } finally { this.#admittedWork--; }
+  }
+
   async taskCommand(input: import("@actspace/shared/runtime-v2").TaskCommand) {
     this.assertAdmission();
     this.#admittedWork++;

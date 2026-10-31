@@ -23,6 +23,9 @@
     },
     {
       "path": "./../shared/tsconfig.build.json"
+    },
+    {
+      "path": "./../side-chat/tsconfig.build.json"
     }
   ]
 }

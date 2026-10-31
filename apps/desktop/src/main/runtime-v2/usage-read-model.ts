@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { RuntimeV2GlobalSessionSummary } from "@actspace/shared/runtime-v2";
+import { sideChatParentId } from "@actspace/shared/session-list-page";
 
 type QuerySource = import("@actspace/session-storage").SessionQuerySource;
 type Summary = Omit<RuntimeV2GlobalSessionSummary, "usage"> & { querySource?: QuerySource };
@@ -32,6 +33,7 @@ type CatalogRow = {
   archived: boolean;
   accessState: string;
   isChildSession: boolean;
+  sideChatParentId?: string;
   agentRunCount: number;
   agentForm?: string;
   agentMode?: string;
@@ -592,5 +594,5 @@ function fingerprintCatalog(summary: Summary): string {
 }
 
 function toCatalogRow(summary: Summary): CatalogRow {
-  return { sessionId: summary.sessionId, title: summary.title, revision: summary.throughJournalSeq, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), pinned: summary.pinned, archived: summary.archived, accessState: summary.accessState, isChildSession: summary.lineage !== null, agentRunCount: summary.completedTurnCount, agentForm: summary.agentForm, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, querySource: summary.querySource };
+  return { sessionId: summary.sessionId, title: summary.title, revision: summary.throughJournalSeq, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), pinned: summary.pinned, archived: summary.archived, accessState: summary.accessState, isChildSession: summary.lineage !== null, ...(sideChatParentId(summary.lineage) ? { sideChatParentId: sideChatParentId(summary.lineage) } : {}), agentRunCount: summary.completedTurnCount, agentForm: summary.agentForm, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, querySource: summary.querySource };
 }

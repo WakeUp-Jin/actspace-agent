@@ -21,6 +21,9 @@ importers:
       '@actspace/english-learning':
         specifier: workspace:*
         version: link:packages/english-learning
+      '@actspace/side-chat':
+        specifier: workspace:*
+        version: link:packages/side-chat
     devDependencies:
       esbuild:
         specifier: 0.21.5
@@ -122,6 +125,9 @@ importers:
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@actspace/side-chat':
+        specifier: workspace:*
+        version: link:../../packages/side-chat
       '@actspace/tools-approval':
         specifier: workspace:*
         version: link:../../packages/tools/approval
@@ -495,6 +501,9 @@ importers:
       '@actspace/shared':
         specifier: workspace:*
         version: link:../shared
+      '@actspace/side-chat':
+        specifier: workspace:*
+        version: link:../side-chat
     devDependencies:
       '@actspace/boot':
         specifier: workspace:*
@@ -1376,6 +1385,9 @@ importers:
       '@actspace/shared':
         specifier: workspace:*
         version: link:../shared
+      '@actspace/side-chat':
+        specifier: workspace:*
+        version: link:../side-chat
       '@actspace/subagent':
         specifier: workspace:*
         version: link:../subagent
@@ -1585,6 +1597,28 @@ importers:
 
   packages/shared:
     devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/side-chat:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session/journal
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
       typescript:
         specifier: ^5.8.3
         version: 5.9.3

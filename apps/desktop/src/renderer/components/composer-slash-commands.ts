@@ -5,7 +5,8 @@ export type ComposerSlashFunctionId =
   | "agent"
   | "compact"
   | "status"
-  | "review";
+  | "review"
+  | "side";
 
 export type ComposerSlashFunction = {
   id: ComposerSlashFunctionId;
@@ -52,7 +53,20 @@ export const COMPOSER_SLASH_FUNCTIONS: readonly ComposerSlashFunction[] = [
     description: "打开当前工作区的变更。",
     searchAliases: "Review changes Open the current workspace changes.",
   },
+  {
+    id: "side",
+    command: "/side",
+    label: "侧边对话",
+    description: "在右侧另起一条线问，不打断当前会话。",
+    searchAliases: "Side chat Ask in a separate conversation in the right panel.",
+  },
 ] as const;
+
+/** `/side 问题`：返回问题（可以为空）；不是这条命令时为 null。 */
+export function parseSideChatCommand(text: string): string | null {
+  const match = /^\/side(?:\s+([\s\S]*))?$/u.exec(text.trim());
+  return match ? (match[1] ?? "").trim() : null;
+}
 
 export function parseComposerSlashQuery(draft: string): string | null {
   if (!/^\/[^/\s]*$/u.test(draft)) return null;

@@ -67,7 +67,7 @@
 | `tool-system/` | 当前 Skill、Web/图片工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md` |
 | `execution-safety/` | v2 Tool Runtime、Host policy、权限模式、审批、Grant、Bash hard guard 和副作用恢复边界 | `docs/design-docs/execution-safety/README.md`、`docs/design-docs/execution-safety/agent-tool-permission-model.md` |
 | `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |
-| `collaboration/` | 当前一次性 Subagent / Explore | `docs/design-docs/collaboration/agent-subagent-runtime.md` |
+| `collaboration/` | 当前一次性 Subagent / Explore；侧边对话（右侧面板里从主会话分出的长期副线，`@actspace/side-chat`） | `docs/design-docs/collaboration/agent-subagent-runtime.md`、[侧边对话设计](collaboration/side-chat-design.md)、[前端 demo](frontend/side-chat-demo.html) |
 | `多智能体协作/` | Space 工作台、Actor 名册与一对一对话：多个 Actor 协作解决一个问题的产品与前端设计、demo 和头像素材 | [README](多智能体协作/README.md)、[Space 工作台设计](多智能体协作/front-space-工作台设计.md) |
 | `frontend/` | 桌面端视觉、主题、组件、工作台、页面和前端原型 | `README.md` |
 

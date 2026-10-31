@@ -8,9 +8,10 @@ import { SessionActionsContext, type SessionActionsValue } from "../session/sess
 import { SessionBrowseContext, type SessionBrowseState } from "../session/SessionBrowseContext";
 import { SessionLocalStoreContext, type SessionLocalStore } from "../session/session-local-store";
 import { RunTargetContext, type RunTargetValue } from "../target/run-target-context";
+import { SideChatRuntimeContext, type SideChatRuntimeValue } from "../components/right-panel/side-chat/side-chat-runtime";
 
 /**
- * App 的 Provider 嵌套（14 S7；15 T5 加入 RunTargetContext）。各 value 由 App 用 `useMemo` 生成，这里只负责按固定顺序挂上。
+ * App 的 Provider 嵌套（14 S7；15 T5 加入 RunTargetContext；侧边对话加入 SideChatRuntimeContext）。各 value 由 App 用 `useMemo` 生成，这里只负责按固定顺序挂上。
  */
 export function AppProviders({
   sessionStore,
@@ -20,6 +21,7 @@ export function AppProviders({
   composer,
   sessionActions,
   runTarget,
+  sideChat,
   children,
 }: {
   readonly sessionStore: ClientSessionStore;
@@ -29,6 +31,8 @@ export function AppProviders({
   readonly composer: ComposerContextValue;
   readonly sessionActions: SessionActionsValue;
   readonly runTarget: RunTargetValue;
+  /** 右栏侧边对话；单独渲染（测试）时可省略。 */
+  readonly sideChat?: SideChatRuntimeValue;
   readonly children: ReactNode;
 }) {
   return (
@@ -39,7 +43,9 @@ export function AppProviders({
             <RunTargetContext.Provider value={runTarget}>
               <ComposerContext.Provider value={composer}>
                 <SessionActionsContext.Provider value={sessionActions}>
-                  <RightPanelProvider>{children}</RightPanelProvider>
+                  <SideChatRuntimeContext.Provider value={sideChat ?? null}>
+                    <RightPanelProvider>{children}</RightPanelProvider>
+                  </SideChatRuntimeContext.Provider>
                 </SessionActionsContext.Provider>
               </ComposerContext.Provider>
             </RunTargetContext.Provider>
