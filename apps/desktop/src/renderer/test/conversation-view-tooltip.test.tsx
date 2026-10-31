@@ -180,7 +180,7 @@ describe("ConversationView tooltips", () => {
       const viewport = screen.getByLabelText("会话消息");
       Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1200 });
       Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 400 });
-      Object.defineProperty(viewport, "scrollTop", { configurable: true, writable: true, value: 800 });
+      Object.defineProperty(viewport, "scrollTop", { configurable: true, writable: true, value: 700 });
 
       act(() => {
         resizeCallback?.([], {} as ResizeObserver);
@@ -188,6 +188,79 @@ describe("ConversationView tooltips", () => {
 
       expect(viewport.scrollTop).toBe(1200);
       expect(observe).toHaveBeenCalled();
+    } finally {
+      globalThis.ResizeObserver = OriginalResizeObserver;
+    }
+  });
+
+  it("does not rebuild the ResizeObserver when messages keep updating while streaming", () => {
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    const OriginalResizeObserver = globalThis.ResizeObserver;
+    const Observer = vi.fn(() => ({ observe, unobserve: vi.fn(), disconnect }));
+    globalThis.ResizeObserver = Observer as unknown as typeof ResizeObserver;
+    try {
+      const view = (blocks: MessageBlock[]) => (
+        <TooltipProvider><RightPanelProvider>
+          <TestConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming />
+        </RightPanelProvider></TooltipProvider>
+      );
+      const { rerender } = render(view(messages));
+      const viewport = screen.getByLabelText("会话消息");
+      const observersAfterMount = Observer.mock.calls.length;
+      for (let step = 1; step <= 3; step += 1) {
+        rerender(view([messages[0], { ...messages[1], content: `${messages[1].kind === "assistant" ? messages[1].content : ""}${"。更多".repeat(step)}` } as MessageBlock]));
+      }
+      expect(Observer).toHaveBeenCalledTimes(observersAfterMount);
+      // The message viewport is observed once and never re-observed on later updates.
+      expect(observe.mock.calls.filter(([target]) => target === viewport)).toHaveLength(1);
+      expect(disconnect).not.toHaveBeenCalled();
+    } finally {
+      globalThis.ResizeObserver = OriginalResizeObserver;
+    }
+  });
+
+  it("keeps following the bottom when content grows past the threshold before the scroll event arrives", () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    const OriginalResizeObserver = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = vi.fn((callback: ResizeObserverCallback) => {
+      resizeCallback = callback;
+      return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+    }) as unknown as typeof ResizeObserver;
+    try {
+      renderConversation();
+      const viewport = screen.getByLabelText("会话消息");
+      let scrollHeight = 1200;
+      let scrollTop = 500;
+      const clientHeight = 400;
+      Object.defineProperty(viewport, "scrollHeight", { configurable: true, get: () => scrollHeight });
+      Object.defineProperty(viewport, "clientHeight", { configurable: true, value: clientHeight });
+      // Like a real browser, scrollTop is clamped to the scrollable range.
+      Object.defineProperty(viewport, "scrollTop", {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => { scrollTop = Math.min(value, scrollHeight - clientHeight); },
+      });
+
+      act(() => { resizeCallback?.([], {} as ResizeObserver); });
+      expect(scrollTop).toBe(800);
+
+      // Streaming adds >80px after the write and before the resulting scroll event is dispatched.
+      scrollHeight = 1400;
+      fireEvent.scroll(viewport);
+      expect(screen.queryByRole("button", { name: "滚动到底部" })).toBeNull();
+
+      act(() => { resizeCallback?.([], {} as ResizeObserver); });
+      expect(scrollTop).toBe(1000);
+      expect(screen.queryByRole("button", { name: "滚动到底部" })).toBeNull();
+
+      // An upward move is the user leaving the bottom: following stops and the button appears.
+      scrollTop = 300;
+      fireEvent.scroll(viewport);
+      expect(screen.getByRole("button", { name: "滚动到底部" })).toBeInTheDocument();
+      scrollHeight = 1600;
+      act(() => { resizeCallback?.([], {} as ResizeObserver); });
+      expect(scrollTop).toBe(300);
     } finally {
       globalThis.ResizeObserver = OriginalResizeObserver;
     }
@@ -304,7 +377,9 @@ describe("ConversationView tooltips", () => {
     Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1800 });
     Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 500 });
     Object.defineProperty(viewport, "clientWidth", { configurable: true, value: 900 });
-    Object.defineProperty(viewport, "scrollTop", { configurable: true, writable: true, value: 500 });
+    Object.defineProperty(viewport, "scrollTop", { configurable: true, writable: true, value: 1300 });
+    fireEvent.scroll(viewport);
+    viewport.scrollTop = 500;
     fireEvent.scroll(viewport);
 
     const scrollButton = screen.getByRole("button", { name: "滚动到底部" });

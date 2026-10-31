@@ -7,7 +7,7 @@ import {
 } from "./toolLogStyles";
 
 const THINKING_BLOCK_CLASS =
-  "message-row thinking-block max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)] animate-[rise-in_260ms_ease_both]";
+  "message-row thinking-block max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)] animate-[fade-in_260ms_ease_both]";
 const THINKING_TOGGLE_CLASS =
   "thinking-toggle flex items-center gap-2 border-0 bg-transparent p-0 text-act-md font-normal leading-[22px] text-text-faint";
 const THINKING_CONTENT_CLASS =

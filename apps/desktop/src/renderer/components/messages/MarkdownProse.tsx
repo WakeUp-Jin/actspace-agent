@@ -7,6 +7,7 @@ import { LANGUAGE_MODULES } from "../right-panel/highlight";
 import { loadAppearance } from "../../appearance/storage";
 import { MermaidDiagramBlock } from "./MermaidDiagramBlock";
 import { isFenceClosed, isMermaidLanguage } from "./mermaid-renderer";
+import { ReplyStreamingContext } from "./reply-streaming-context";
 import { splitMarkdownBlocks, type MarkdownBlock, type MarkdownBlockSplit } from "./markdown-blocks";
 
 /** Raw markdown of the block being rendered, so fence handlers can tell whether a streaming fence has closed. */
@@ -79,10 +80,11 @@ function MermaidFence({ children }: { children: ReactNode }) {
   return <MermaidDiagramBlock source={codeText(children).replace(/\n$/, "")} themeId={themeId} sourceView={children} />;
 }
 
-/** Closed ```mermaid fences become diagrams; everything else (including a still-streaming fence) stays a code block. */
+/** Closed ```mermaid fences become diagrams once the turn has finished; everything else (including fences streamed in this turn) stays a code block. */
 function MarkdownPre({ node, ...props }: ComponentPropsWithoutRef<"pre"> & { node?: PositionedNode }) {
   const markdown = useContext(MarkdownSourceContext);
-  if (isMermaidLanguage(fenceLanguage(props.children))) {
+  const turnStreaming = useContext(ReplyStreamingContext);
+  if (!turnStreaming && isMermaidLanguage(fenceLanguage(props.children))) {
     const start = node?.position?.start?.offset;
     const end = node?.position?.end?.offset;
     if (start !== undefined && end !== undefined && isFenceClosed(markdown.slice(start, end))) {
@@ -151,8 +153,9 @@ export const MarkdownProse = memo(function MarkdownProse({ content, onOpenWorksp
   const id = useId();
   const split = useRef<MarkdownBlockSplit | undefined>(undefined);
   split.current = splitMarkdownBlocks(content, split.current);
+  const streaming = useContext(ReplyStreamingContext);
   return (
-    <div className="markdown-prose act-code-hl">
+    <div className="markdown-prose act-code-hl" data-streaming={streaming ? "true" : undefined}>
       <WorkspaceFileContext.Provider value={onOpenWorkspaceFile}>
         <FootnotePrefixContext.Provider value={`user-content-${id.replace(/:/g, "")}-`}>
           {split.current.blocks.map((block) => <MarkdownBlockView key={block.start} block={block} />)}
