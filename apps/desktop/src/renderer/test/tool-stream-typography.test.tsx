@@ -74,7 +74,7 @@ describe("tool stream presentation preserves behavior", () => {
 
   it("shows compact Bash commands while retaining old diagnostic titles and output", async () => {
     render(<TooltipProvider><BashRunBlock message={{ ...base, kind: "bash", status: "success", title: "Bash completed in 85ms (exit 0, sandboxed=true).", command: "pwd", stdout: "/work", sandboxed: true, durationMs: 85, exitCode: 0 }} /></TooltipProvider>);
-    const toggle = screen.getByRole("button", { name: "Ran pwd" });
+    const toggle = screen.getByRole("button", { name: "Ran pwd 沙盒" });
     expect(within(toggle).queryByText(/85ms/)).not.toBeInTheDocument();
     await userEvent.click(toggle);
     expect(screen.getByText(/# summary: Bash completed in 85ms/)).toHaveTextContent("/work");

@@ -38,6 +38,17 @@ describe("background Bash card status", () => {
   });
 });
 
+describe("Bash execution environment", () => {
+  it("reads sandboxed from the structured environment fact", () => {
+    expect(bashPreview({ status: "completed", summary: "ok", detail: [{ label: "environment", value: { sandboxed: true } }] })).toMatchObject({ sandboxed: true });
+    expect(bashPreview({ ...launched, detail: [...launched.detail, { label: "environment", value: { sandboxed: false } }] })).toMatchObject({ sandboxed: false, background: true });
+  });
+
+  it("leaves historical results without the fact unknown instead of parsing the summary", () => {
+    expect(bashPreview({ status: "completed", summary: "Bash completed in 3ms (exit 0, sandboxed=true, sandbox=seatbelt)." })).not.toHaveProperty("sandboxed");
+  });
+});
+
 describe("Bash escalation justification", () => {
   it("carries the model's justification from the call arguments to the approval block", () => {
     const preview = toolPreview("bash", undefined, {} as never, { args: { command: "git push", sandbox_permissions: "require_escalated", justification: "Pushing needs the keychain." } }, undefined, "session", "run", "prepared");

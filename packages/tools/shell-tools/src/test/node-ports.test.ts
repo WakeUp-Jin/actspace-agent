@@ -72,7 +72,7 @@ describe("shell-tools ports", () => {
         console.info(JSON.stringify({ mode: mode.label, command, ms: Date.now() - started, summary: result.summary.split("\n")[0] }));
         expect(result.status).toBe(command.startsWith("git log") ? "failed" : "completed");
         expect(result.summary).toContain(mode.summary);
-        expect(result.detail).toBeUndefined();
+        expect(result.detail).toEqual([{ label: "environment", value: { sandboxed: !mode.noSandbox } }]);
       }
       const result = await invoke(ports.bash, { command: "printf ready; sleep 30", intent: "background boundary", blockMs: 30 }, "session", undefined, "", mode.noSandbox);
       expect(result.summary).toContain("block_timeout");
@@ -205,7 +205,7 @@ describe("shell-tools ports", () => {
     expect(foreground).toMatchObject({ status: "completed" }); expect(JSON.stringify(foreground)).toContain("hello");
     const background = await invoke(ports.bash, { command: "printf ready; sleep 30", intent: "verify background", blockMs: 0 });
     const taskId = JSON.stringify(background).match(/bash_[0-9a-f-]+/)?.[0]; expect(taskId).toBeTruthy();
-    expect(background.detail).toEqual([{ label: "background-task", value: { taskId, status: "running" } }]);
+    expect(background.detail).toEqual([{ label: "background-task", value: { taskId, status: "running" } }, { label: "environment", value: { sandboxed: false } }]);
     expect(ports.hasRunningBackgroundTask("session")).toBe(true);
     expect(ports.hasRunningBackgroundTask("other-session")).toBe(false);
     const source = lastHost.sources.get(taskId!)!;

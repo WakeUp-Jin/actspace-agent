@@ -1,4 +1,4 @@
-import { Box, ChevronDown, ChevronRight, MoreHorizontal, ShieldOff, TerminalSquare } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreHorizontal, ShieldCheck, ShieldOff, TerminalSquare } from "lucide-react";
 import { useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
@@ -56,17 +56,17 @@ export function BackgroundTag() {
   return <span className={BACKGROUND_TAG_CLASS}>后台</span>;
 }
 
-// 执行环境用图标表示：沙盒是默认态弱化显示；真实环境是例外态，警示色提示命令未受沙盒约束。
+// 执行环境只用图标表示：沙盒是打勾的盾牌；真实环境是划掉的盾牌，警示色提示命令未受沙盒约束。
 // 文字说明放在 aria-label / title 里，悬停可见。
 const SANDBOX_TITLE = "沙盒：命令在沙盒内运行";
 const REAL_ENV_TITLE = "真实环境：命令在沙盒外运行，可以访问整台电脑的文件和网络";
-const BASH_SANDBOX_ICON_CLASS = "bash-sandbox-badge inline-flex flex-none items-center text-text-faint";
+const BASH_SANDBOX_ICON_CLASS = "bash-sandbox-badge inline-flex flex-none items-center text-success";
 const BASH_REAL_ENV_ICON_CLASS = "bash-real-env-badge inline-flex flex-none items-center text-on-warning";
 const BASH_NOT_EXECUTED_BADGE_CLASS =
   "bash-not-executed-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
 
 function EnvironmentIcon({ sandboxed, className = "" }: { sandboxed: boolean; className?: string }) {
-  const Icon = sandboxed ? Box : ShieldOff;
+  const Icon = sandboxed ? ShieldCheck : ShieldOff;
   const title = sandboxed ? SANDBOX_TITLE : REAL_ENV_TITLE;
   return (
     <span
@@ -116,7 +116,7 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
         )}
         <span className={BASH_COMMAND_PREVIEW_CLASS} title={target}>{target}</span>
         <span className={BASH_RUN_TRAILING_CLASS}>
-          <EnvironmentBadge sandboxed={message.sandboxed === false ? false : undefined} notExecuted={message.notExecuted} />
+          <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} />
           {message.background ? <BackgroundTag /> : null}
           {chevron}
         </span>

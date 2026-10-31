@@ -72,7 +72,7 @@ describe("BashRunBlock tooltips", () => {
     expect(summary).toHaveClass("bash-run-summary", "flex-none", "whitespace-nowrap");
     expect(preview).toHaveClass("bash-command-preview", "min-w-0", "flex-1", "overflow-hidden", "text-ellipsis");
     expect(trailing).toHaveClass("bash-run-trailing", "flex-none");
-    expect(screen.queryByRole("img", { name: "沙盒" })).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "沙盒" })).toBeInTheDocument();
   });
 
   it("stops the shimmer once the background task reaches a terminal state", () => {
@@ -107,7 +107,7 @@ describe("BashRunBlock tooltips", () => {
     expect(screen.getByText("后台")).toBeInTheDocument();
   });
 
-  it("keeps routine sandbox metadata in execution details", async () => {
+  it("marks sandboxed commands with the sandbox shield and keeps the environment in details", async () => {
     renderBash({
       id: "bash-sbx-1",
       kind: "bash",
@@ -119,7 +119,10 @@ describe("BashRunBlock tooltips", () => {
       sandboxed: true,
     });
 
-    expect(screen.queryByRole("img", { name: "沙盒" })).not.toBeInTheDocument();
+    const badge = screen.getByRole("img", { name: "沙盒" });
+    expect(badge).toHaveClass("bash-sandbox-badge");
+    expect(badge).toHaveAttribute("title", expect.stringContaining("沙盒内运行"));
+    expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Ran/ }));
     expect(screen.getByText(/# environment: 沙盒/)).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "真实环境" })).not.toBeInTheDocument();

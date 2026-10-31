@@ -338,10 +338,11 @@ async function foreground(command: string, cwd: string, status: ProcessStatus, o
   }
   if (status.outputError !== undefined) return failed("BASH_OUTPUT_FAILED", `Failed to persist Bash output: ${status.outputError}`, true);
   const summary = `Bash ${status.exitCode === 0 ? "completed" : "failed"} in ${status.durationMs}ms (exit ${status.exitCode ?? "signal"}, sandboxed=${status.isolation === "sandboxed"}, sandbox=${status.sandbox}).`;
+  const detail = [environmentDetail(status.isolation === "sandboxed")];
   const image = status.exitCode === 0 && status.totalChars <= INLINE_OUTPUT_CHARS ? dataImage(status.output) : undefined;
   if (image !== undefined) {
     const artifact = await context.createArtifact({ bytes: Buffer.from(image.data, "base64"), mediaType: image.mediaType });
-    return { status: "completed", summary, modelOutput: [{ type: "text", text: summary }, { type: "artifact", artifact, label: "Bash image" }], artifacts: [artifact], renderer: { id: "actspace.image-gallery", schemaVersion: 1, props: { artifactIds: [artifact.artifactId] } } };
+    return { status: "completed", summary, modelOutput: [{ type: "text", text: summary }, { type: "artifact", artifact, label: "Bash image" }], artifacts: [artifact], detail, renderer: { id: "actspace.image-gallery", schemaVersion: 1, props: { artifactIds: [artifact.artifactId] } } };
   }
   const text = `${summary}\ncommand: ${command}\ncwd: ${cwd}\n\n${status.output || "(no output)"}${status.totalChars > status.output.length ? `\n[Output truncated; totalChars=${status.totalChars}]` : ""}`;
   let artifact;
@@ -354,14 +355,19 @@ async function foreground(command: string, cwd: string, status: ProcessStatus, o
   const modelText = hint === undefined ? text : `${text}\n\n${hint}`;
   const modelOutput = artifact === undefined ? [{ type: "text" as const, text: modelText }] : [{ type: "text" as const, text: modelText }, { type: "artifact" as const, artifact, label: "Full Bash output" }];
   return status.exitCode === 0
-    ? { status: "completed", summary, modelOutput, ...(artifact === undefined ? {} : { artifacts: [artifact] }) }
-    : { status: "failed", summary: text, modelOutput, ...(artifact === undefined ? {} : { artifacts: [artifact] }), failure: { code: "BASH_EXIT_NONZERO", message: text, retryable: false } };
+    ? { status: "completed", summary, modelOutput, ...(artifact === undefined ? {} : { artifacts: [artifact] }), detail }
+    : { status: "failed", summary: text, modelOutput, ...(artifact === undefined ? {} : { artifacts: [artifact] }), detail, failure: { code: "BASH_EXIT_NONZERO", message: text, retryable: false } };
 }
 
 function backgrounded(task: BashTask, reason: "explicit" | "block_timeout" | "already_running"): ToolBodyResult {
   const summary = `Bash task ${task.taskId} is running in the background (${reason}).`;
   const next = "You will be notified automatically when it finishes; continue with other work. Use task_output to inspect output or task_stop to stop it. Do not poll with sleep loops or repeated task_output.";
-  return { ...completed(`${summary}\noutput_path: ${task.outputPath}\n${next}`, summary), detail: [{ label: "background-task", value: { taskId: task.taskId, status: "running" } }] };
+  return { ...completed(`${summary}\noutput_path: ${task.outputPath}\n${next}`, summary), detail: [{ label: "background-task", value: { taskId: task.taskId, status: "running" } }, environmentDetail(task.sandboxed)] };
+}
+
+/** Where the command ran, as a fact the UI reads; the `sandboxed=` in the summary is prose for the model. */
+function environmentDetail(sandboxed: boolean) {
+  return { label: "environment", value: { sandboxed } };
 }
 
 type OutputSubscription = { readonly pattern: string; readonly reason: string; readonly debounceMs: number };
