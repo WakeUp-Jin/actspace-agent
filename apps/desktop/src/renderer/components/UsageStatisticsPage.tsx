@@ -63,16 +63,25 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
   const unknownTokens = summary?.unknownTokenRequestCounts;
   const requestCount = summary?.requestCount ?? 0;
   const totalInput = (summary?.inputTokens ?? 0) + (summary?.cacheReadTokens ?? 0) + (summary?.cacheWriteTokens ?? 0);
+  // 没有任何用量的请求（失败或未完成）单独成「请求失败或未完成」；缓存字段缺口只看已上报用量的请求。
+  const failedRequests = unknownTokens?.total ?? 0;
+  const unpricedRequests = cost?.unknownCostRequestCount ?? 0;
+  const partialInput = Math.max(0, (unknownTokens?.input ?? 0) - failedRequests);
+  const partialCache = Math.max(0, (unknownTokens?.cacheRead ?? 0) - failedRequests);
   // cacheWrite 未上报（OpenAI 兼容协议如 DeepSeek）按 0 计入分母，与 usage-cost / indexed-usage 一致。
-  const cacheRateIncomplete = Boolean(unknownTokens && (unknownTokens.input || unknownTokens.cacheRead));
+  const cacheRateIncomplete = partialInput > 0 || partialCache > 0;
   const hitRate = !cacheRateIncomplete && totalInput ? `${((summary?.cacheReadTokens ?? 0) / totalInput * 100).toFixed(1)}%` : "—";
-  const totalUnknown = unknownTokens?.total ?? 0;
-  const totalLabel = totalUnknown > 0 && totalUnknown < requestCount ? "已知 Token 合计" : "Token 用量";
   const totalDetail = [
     tokenPart("输入", summary?.inputTokens, unknownTokens?.input ?? 0, requestCount),
     tokenPart("输出", summary?.outputTokens, unknownTokens?.output ?? 0, requestCount),
-    totalUnknown > 0 ? `${totalUnknown} 次请求 Token 用量未知` : "",
-  ].filter(Boolean).join(" · ");
+  ].join(" · ");
+  const gapReasons = [
+    failedRequests > 0 ? `请求失败或未完成：${failedRequests} 次` : "",
+    unpricedRequests > 0 ? `模型未配置价格：${unpricedRequests} 次` : "",
+    partialCache > 0 ? `服务商未返回缓存字段：${partialCache} 次` : "",
+  ].filter(Boolean);
+  const gapRequests = failedRequests + unpricedRequests;
+  const gapNote = gapReasons.length === 0 ? "" : gapRequests > 0 ? `有 ${gapRequests} 次请求缺少用量或定价，数值为已知部分的合计` : "部分请求的服务商未返回缓存字段，数值为已知部分的合计";
   const rows = data?.rows ?? [];
   const counts = { requests: data?.tabCounts?.requests ?? data?.rowsPage.totalRows ?? 0, providers: data?.tabCounts?.providers ?? data?.aggregates?.providers.length ?? 0, models: data?.tabCounts?.models ?? data?.aggregates?.models.length ?? 0, tools: data?.tabCounts?.tools ?? data?.aggregates?.tools.length ?? 0 };
   const page = data?.rowsPage;
@@ -98,10 +107,11 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
       </div> : null}
       {isLoading && !data ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-act-sm text-text-faint">正在读取使用记录…</div> : <section aria-label="使用概览" className="-mt-5 grid grid-cols-4 gap-2.5 max-[800px]:grid-cols-2 max-[400px]:grid-cols-1">
         <Metric label="请求数" value={number(summary?.requestCount)} detail="模型调用" />
-        <Metric label={totalLabel} value={aggregateTokenValue(summary?.totalTokens, totalUnknown, requestCount)} detail={totalDetail} warn={totalUnknown > 0} />
-        <Metric label={cost?.knownCostRequestCount && cost.unknownCostRequestCount ? "已知费用" : "费用"} value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unknownCostRequestCount ? `${cost.knownCostRequestCount ? "另有 " : ""}${cost.unknownCostRequestCount} 次请求缺少费用依据` : cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : "按请求记录 · USD 汇总"} warn={Boolean(cost?.unknownCostRequestCount || cost?.unverifiedHistoricalRequestCount)} />
-        <Metric label="缓存命中率" value={hitRate} detail={tokenPart("缓存", summary?.cacheReadTokens, unknownTokens?.cacheRead ?? 0, requestCount)} warn={cacheRateIncomplete} />
+        <Metric label="Token 用量" value={aggregateTokenValue(summary?.totalTokens, failedRequests, requestCount)} detail={totalDetail} />
+        <Metric label="费用" value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : "按请求记录 · USD 汇总"} />
+        <Metric label="缓存命中率" value={hitRate} detail={tokenPart("缓存", summary?.cacheReadTokens, unknownTokens?.cacheRead ?? 0, requestCount)} />
       </section>}
+      {gapNote && !(isLoading && !data) ? <Tooltip><TooltipTrigger asChild><button type="button" className="-mt-3 w-fit max-w-full rounded-sm text-left text-act-xxs text-text-faint hover:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">{gapNote}</button></TooltipTrigger><TooltipContent className="max-w-[340px]"><ul className="m-0 list-none p-0">{gapReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></TooltipContent></Tooltip> : null}
       <section className="flex min-w-0 flex-col gap-3">
         <div className="mt-1 flex gap-5 overflow-x-auto border-b border-line" role="tablist" aria-label="统计分类">{tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} className={`-mb-px shrink-0 border-b-2 px-0.5 pb-2.5 text-act-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${tab === value ? "border-text-main text-text-main" : "border-transparent text-text-faint hover:text-text-main"}`} onClick={() => { setTab(value); setSearch(""); }}>{label} <span className="ml-1 text-act-xs font-normal tabular-nums text-text-subtle">{counts[value] ?? "—"}</span></button>)}</div>
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="日志筛选">
@@ -127,7 +137,7 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
                 <td className={cell}>{row.kind === "llm_request" ? <UsageHoverCard row={row} view="model"><span className="block truncate font-mono text-act-xs">{row.model?.replace(/^[^:]+:/, "") ?? "未知模型"}</span></UsageHoverCard> : <CellHint text={row.toolName ?? "未知工具"}><span className="block truncate">{row.toolName ?? "未知工具"}</span></CellHint>}</td>
                 <td className={cell}><CellHint text={row.sessionTitle ?? row.sessionId}><span className="block truncate text-text-muted">{row.sessionTitle ?? `未命名会话 · ${row.sessionId.slice(0, 8)}`}</span></CellHint></td>
                 <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : <UsageHoverCard row={row} view="tokens">{number(row.tokens.totalTokens)}</UsageHoverCard>}</td>
-                <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : row.costAmount == null || row.costCurrency !== "USD" ? <span className="text-text-subtle">未知</span> : formatUsageAmount(row.costAmount, "USD")}</td>
+                <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : row.costAmount == null || row.costCurrency !== "USD" ? (row.costProvenance?.reason === "model-price-unavailable" && row.tokens.totalTokens != null ? <CellHint text="该模型未配置价格"><span className="text-text-subtle">未知</span></CellHint> : <span className="text-text-subtle">未知</span>) : formatUsageAmount(row.costAmount, "USD")}</td>
                 <td className={numberCell}>{row.durationMs == null ? "—" : row.durationMs < 1000 ? `${Math.round(row.durationMs)}ms` : `${(row.durationMs / 1000).toFixed(2)}s`}</td>
                 <td className={`${cell} whitespace-nowrap`}><StatusDot tone={row.status === "error" ? "error" : row.status === "running" ? "ok" : row.status === "aborted" || row.status === "unknown" ? "warn" : "neutral"}>{labels[row.status]}</StatusDot></td>
               </tr>)}</tbody>
@@ -142,15 +152,14 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
   </main>;
 }
 
-function Metric({ label, value, detail, warn = false }: { label: string; value: string; detail: string; warn?: boolean }) {
-  return <div className="min-w-0 rounded-act-group border border-line bg-surface px-3.5 py-3"><div className="text-act-xs text-text-muted">{label}</div><div className="mb-0.5 mt-1 break-words text-act-xl font-semibold leading-tight tracking-tight tabular-nums">{value}</div><div className={`flex items-start gap-1.5 text-act-xxs leading-relaxed ${warn ? "text-warning" : "text-text-faint"}`}>{warn ? <span aria-hidden="true" className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" /> : null}<span>{detail}</span></div></div>;
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="min-w-0 rounded-act-group border border-line bg-surface px-3.5 py-3"><div className="text-act-xs text-text-muted">{label}</div><div className="mb-0.5 mt-1 break-words text-act-xl font-semibold leading-tight tracking-tight tabular-nums">{value}</div><div className="text-act-xxs leading-relaxed text-text-faint">{detail}</div></div>;
 }
 function aggregateTokenValue(value: number | undefined, unknownCount: number, requestCount: number) {
   return unknownCount > 0 && requestCount > 0 && unknownCount >= requestCount ? "—" : number(value);
 }
 function tokenPart(label: string, value: number | undefined, unknownCount: number, requestCount: number) {
-  const suffix = unknownCount > 0 ? `（${unknownCount} 次未知）` : "";
-  return `${label} ${aggregateTokenValue(value, unknownCount, requestCount)}${suffix}`;
+  return `${label} ${aggregateTokenValue(value, unknownCount, requestCount)}`;
 }
 function Empty({ search }: { search?: string }) { return <p className="py-12 text-center text-act-sm text-text-faint">{search ? "没有符合筛选条件的记录" : "所选时间范围内暂无使用记录"}</p>; }
 function AggregateTable({ rows, tools, search, pending }: { rows: UsageActivityAggregate[]; tools: boolean; search: string; pending: boolean }) {
