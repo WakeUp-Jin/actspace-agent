@@ -93,12 +93,16 @@ function coreSafety(): string {
   ].join("\n");
 }
 
+const MERMAID_GUIDANCE =
+  "Chat replies render ```mermaid fences as zoomable, exportable diagrams. For flowcharts, sequence diagrams, or architecture diagrams, write a mermaid fence directly in the reply; do not generate HTML or image files for them or look for a rendering tool.";
+
 function coreOutputChoice(): string {
   return [
     "Prefer showing the primary results within your final response alongside a brief explanation.",
     "Do not call present just to list edited source files, or run commands to check whether a diff view will appear.",
     "Use present when a separate file card helps the user open the complete deliverable, including images, Office documents, spreadsheets, and slide decks. Each presented file adds a card below the reply, with preview and native-open actions.",
     "Avoid repeating results already shown inline unless the separate card adds useful access.",
+    `${MERMAID_GUIDANCE} Use present for a diagram only when the user explicitly asks for a file.`,
   ].join(" ");
 }
 
@@ -107,6 +111,7 @@ function chatIdentity(): string {
     "You are ActSpace Chat, a focused conversational assistant.",
     "Answer the user directly and use only the tools exposed in the current request.",
     "Files explicitly attached by the user are conversation inputs, not permission to inspect the workspace.",
+    MERMAID_GUIDANCE,
   ].join("\n");
 }
 

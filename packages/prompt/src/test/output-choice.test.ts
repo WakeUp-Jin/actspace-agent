@@ -14,5 +14,14 @@ describe("output-choice guidance", () => {
     const section = createCoreContributors({ ...base, deliverables: true } as Parameters<typeof createCoreContributors>[0]).find(item => item.id === "core/output-choice");
     const value = (await section!.resolve({} as never)).value;
     expect(value).toContain("Do not call present just to list edited source files");
+    expect(value).toContain("```mermaid fences");
+    expect(value).toContain("only when the user explicitly asks for a file");
+  });
+
+  it("tells Chat mode that mermaid fences render without a present tool", async () => {
+    const identity = createCoreContributors({ ...base, profile: "chat" } as Parameters<typeof createCoreContributors>[0]).find(item => item.id === "core/identity");
+    const value = (await identity!.resolve({} as never)).value as string;
+    expect(value).toContain("```mermaid fences");
+    expect(value).not.toContain("present");
   });
 });
