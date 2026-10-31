@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceListDirInput, WorkspaceListDirResult, WorkspaceReadFileResult } from "@actspace/shared";
+import type { WorkspaceListDirInput, WorkspaceListDirResult, WorkspaceOpenFileInput, WorkspaceOpenFileResult, WorkspaceReadFileResult } from "@actspace/shared";
 import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
 import { WorkspaceFileTree } from "../components/right-panel/WorkspaceFileTree";
 import { setupBridge } from "./helpers/bridge";
@@ -29,11 +29,13 @@ function renderTree(workspaceRoot?: string) {
 function installBridge(overrides: {
   listWorkspaceDir?: (input: WorkspaceListDirInput) => Promise<WorkspaceListDirResult>;
   readWorkspaceFile?: () => Promise<WorkspaceReadFileResult>;
+  openWorkspaceFile?: (input: WorkspaceOpenFileInput) => Promise<WorkspaceOpenFileResult>;
 }) {
   setupBridge({
     "workspaces.listDir": overrides.listWorkspaceDir ?? (async () => ({ root: "/ws", relativePath: "", entries: [] })),
     "workspaces.readFile":
       overrides.readWorkspaceFile ?? (async () => ({ relativePath: "", renderKind: "text", size: 0, mtimeMs: 0, content: "" })),
+    "workspaces.openFile": overrides.openWorkspaceFile ?? (async () => ({ ok: true })),
   });
 }
 
@@ -120,6 +122,35 @@ describe("WorkspaceFileTree", () => {
       expect(screen.getByTestId("active-tab")).toHaveTextContent("text|typescript|main.ts");
     });
     expect(readWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/ws-selected", relativePath: "main.ts" });
+  });
+
+  it("opens an HTML file in the system browser instead of rendering it in the panel", async () => {
+    const readWorkspaceFile = vi.fn(async (): Promise<WorkspaceReadFileResult> => ({ relativePath: "report.html", renderKind: "html", size: 10, mtimeMs: 0, content: "<p>x</p>" }));
+    const openWorkspaceFile = vi.fn(async (): Promise<WorkspaceOpenFileResult> => ({ ok: true }));
+    installBridge({
+      listWorkspaceDir: async () => ({ root: "/ws", relativePath: "", entries: [{ name: "report.html", relativePath: "report.html", kind: "file", size: 10 }] }),
+      readWorkspaceFile,
+      openWorkspaceFile,
+    });
+
+    renderTree("/ws");
+    await userEvent.click(await screen.findByText("report.html"));
+
+    await waitFor(() => expect(openWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/ws", relativePath: "report.html", action: "open" }));
+    expect(readWorkspaceFile).not.toHaveBeenCalled();
+    expect(screen.getByTestId("active-tab")).toHaveTextContent("none");
+  });
+
+  it("explains in a tab when the browser cannot open the HTML file", async () => {
+    installBridge({
+      listWorkspaceDir: async () => ({ root: "/ws", relativePath: "", entries: [{ name: "report.htm", relativePath: "report.htm", kind: "file", size: 10 }] }),
+      openWorkspaceFile: async () => ({ ok: false, error: "open_failed", message: "no app" }),
+    });
+
+    renderTree("/ws");
+    await userEvent.click(await screen.findByText("report.htm"));
+
+    await waitFor(() => expect(screen.getByTestId("active-tab")).toHaveTextContent("text||report.htm"));
   });
 
   it("shows a read failure when listing the directory rejects", async () => {

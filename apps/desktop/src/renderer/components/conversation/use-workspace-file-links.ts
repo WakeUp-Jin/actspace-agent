@@ -5,6 +5,7 @@ import { openRemoteFile } from "../../hooks/remoteArtifact";
 import { useActiveSession } from "../../session/active-session-context";
 import { useRunTargetContext } from "../../target/run-target-context";
 import { useRightPanel } from "../right-panel/RightPanelContext";
+import { isHtmlFilePath, openHtmlInBrowser } from "../right-panel/open-html-in-browser";
 import { readFailureTab, tabFromFile } from "../right-panel/workspaceFileTab";
 import type { ReadMessageBlock } from "./render-message";
 
@@ -20,6 +21,7 @@ export function isSafeWorkspaceRelativePath(filePath: string): boolean {
 /**
  * 会话里点文件（读文件工具行、回复里的文件链接）在右侧面板打开：
  * 远端会话从 Host 读，本机从当前工作区读；读不到时打开一个说明失败的 Tab。
+ * 本机 HTML 文件交给系统浏览器打开，不在面板里渲染。
  */
 export function useWorkspaceFileLinks() {
   const { sessionId } = useActiveSession();
@@ -44,6 +46,11 @@ export function useWorkspaceFileLinks() {
       return;
     }
     if (!workspaceRoot || !isSafeWorkspaceRelativePath(relativePath)) return;
+    if (isHtmlFilePath(relativePath)) {
+      const error = await openHtmlInBrowser(workspaceRoot, relativePath);
+      if (error) openIfCurrent(readFailureTab(relativePath, relativePath.split(/[\\/]/).pop() || relativePath, { workspaceRoot }, error));
+      return;
+    }
     try {
       openIfCurrent(tabFromFile(await workspacesApi.readFile({ workspaceRoot, relativePath }), { workspaceRoot }));
     } catch {

@@ -2,10 +2,11 @@ import { openRemoteFile } from "../../hooks/remoteArtifact";
 import { dialogsApi } from "../../api/dialogs";
 import { workspacesApi } from "../../api/workspaces";
 import type { RightPanelTab } from "../right-panel/RightPanelContext";
+import { isHtmlFilePath, openHtmlInBrowser } from "../right-panel/open-html-in-browser";
 import { READ_ERROR_TEXT, tabFromFile } from "../right-panel/workspaceFileTab";
 
 /**
- * 在右侧面板打开本轮改动或交付的文件（工作区相对路径）。
+ * 在右侧面板打开本轮改动或交付的文件（工作区相对路径）；本地 HTML 文件改用系统浏览器打开。
  * 远端会话经 Host 读取；本地会话走 `workspaces.readFile`，复用文件树的同一套 Tab。
  * @returns 失败时给用户看的中文说明，成功返回 null。
  */
@@ -18,6 +19,7 @@ export async function openTurnFile({ sessionId, workspaceRoot, relativePath, ope
   try {
     if (sessionId && await openRemoteFile(sessionId, relativePath, openTab)) return null;
     if (!workspaceRoot) return "该文件不在当前工作区内，暂时不能预览。";
+    if (isHtmlFilePath(relativePath)) return await openHtmlInBrowser(workspaceRoot, relativePath);
     const result = await workspacesApi.readFile({ workspaceRoot, relativePath });
     if (result.error === "not_found" || result.error === "escapes_root") return READ_ERROR_TEXT[result.error];
     openTab(tabFromFile(result, { workspaceRoot }));
