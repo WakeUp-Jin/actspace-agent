@@ -15,7 +15,7 @@ describe("使用统计", () => {
     expect(within(overview).getAllByText(/^(请求数|Token 用量|费用|缓存命中率)$/).map((node) => node.textContent)).toEqual(["请求数", "Token 用量", "费用", "缓存命中率"]);
     expect(overview).not.toHaveTextContent(/已知|缺少|未知/);
     expect(overview.querySelector(".text-warning")).toBeNull();
-    const footnote = screen.getByRole("button", { name: "有 2 次请求缺少用量或定价，数值为已知部分的合计" });
+    const footnote = screen.getByText("有 2 次请求缺少用量或定价，数值为已知部分的合计");
     await userEvent.hover(footnote);
     const reasons = await screen.findByRole("tooltip");
     expect(reasons).toHaveTextContent("请求失败或未完成：1 次");
@@ -60,7 +60,7 @@ describe("使用统计", () => {
     const view = render(<UsageStatisticsPage snapshot={null} activitySnapshot={allUnknown} />);
     const metric = screen.getByText("Token 用量").parentElement;
     expect(metric).toHaveTextContent("—");
-    expect(screen.getByRole("button", { name: /有 2 次请求缺少用量或定价/ })).toBeInTheDocument();
+    expect(screen.getByText(/有 2 次请求缺少用量或定价/)).toBeInTheDocument();
     expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("—");
 
     await userEvent.click(screen.getByRole("tab", { name: /服务商/ }));
@@ -84,7 +84,7 @@ describe("使用统计", () => {
     const totalMetric = screen.getByText("Token 用量").parentElement;
     expect(totalMetric).toHaveTextContent("12");
     expect(totalMetric).not.toHaveTextContent("未知");
-    expect(screen.getByRole("button", { name: /有 2 次请求缺少用量或定价/ })).toBeInTheDocument();
+    expect(screen.getByText(/有 2 次请求缺少用量或定价/)).toBeInTheDocument();
   });
   it("ignores failed requests without usage when judging the cache rate, but hides it when a provider omits cache read", () => {
     const base = { ...data.summary, requestCount: 3, totalTokens: 1100, inputTokens: 100, outputTokens: 0, cacheReadTokens: 900, cacheWriteTokens: 0 };
@@ -98,7 +98,7 @@ describe("使用统计", () => {
   it("shows no footnote when every request has usage and a price", () => {
     const complete = { ...data, costSummary: { ...data.costSummary!, unknownCostRequestCount: 0 }, summary: { ...data.summary, unknownTokenRequestCounts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 2, reasoning: 0, total: 0 } } } as unknown as UsageActivitySnapshot;
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={complete} />);
-    expect(screen.queryByRole("button", { name: /缺少用量或定价|未返回缓存字段/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/缺少用量或定价|未返回缓存字段/)).not.toBeInTheDocument();
   });
   it("shows the cache hit rate when only cache write is unreported", () => {
     const openAiCompatible = {

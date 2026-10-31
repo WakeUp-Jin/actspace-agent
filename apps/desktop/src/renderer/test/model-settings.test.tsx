@@ -63,24 +63,28 @@ describe("设置 › 模型", () => {
   it("用途选择器：选模型保留合法档位，再选档位写入思考", async () => {
     await renderModels();
     await userEvent.click(screen.getByRole("button", { name: "轻量任务模型" }));
-    const list = await screen.findByRole("listbox", { name: "轻量任务可选模型" });
-    await userEvent.click(within(list).getByRole("option", { name: /Claude Haiku 4\.5/ }));
+    const list = await screen.findByRole("menu", { name: "轻量任务可选模型" });
+    await userEvent.click(within(list).getByRole("button", { name: /Claude Haiku 4\.5/ }));
     await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ utility: { model: relayKey("claude-haiku-4-5"), thinking: null } }));
 
-    await userEvent.click(screen.getByRole("radio", { name: /^开/ }));
+    // 档位在行上「编辑」打开的二级浮层里，和输入框的模型菜单一样。
+    await userEvent.click(screen.getByRole("button", { name: "轻量任务模型" }));
+    await userEvent.click(await screen.findByRole("button", { name: `编辑 ${relayKey("claude-haiku-4-5")} 选项` }));
+    await userEvent.click(screen.getByRole("menuitemradio", { name: /^开/ }));
     await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ utility: { model: relayKey("claude-haiku-4-5"), thinking: "high" } }));
   });
 
   it("看图只列能看图的模型；选「跟随」清空绑定", async () => {
     await renderModels();
     await userEvent.click(screen.getByRole("button", { name: "子 Agent 探索模型" }));
-    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "跟随会话默认" }));
+    await userEvent.click(within(await screen.findByRole("menu")).getByRole("button", { name: "跟随会话默认" }));
     await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ explore: { model: null, thinking: null } }));
 
     await userEvent.click(screen.getByRole("button", { name: "看图模型" }));
-    const list = await screen.findByRole("listbox", { name: "看图可选模型" });
-    expect(within(list).queryByRole("option", { name: /DeepSeek/ })).not.toBeInTheDocument();
-    expect(within(list).getByRole("option", { name: /Claude Sonnet 4\.5/ })).toBeInTheDocument();
+    const list = await screen.findByRole("menu", { name: "看图可选模型" });
+    expect(within(list).queryByRole("button", { name: /DeepSeek/ })).not.toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: /Claude Sonnet 4\.5/ })).toBeInTheDocument();
+    expect(within(list).getByText("只列出能看图的模型")).toBeInTheDocument();
   });
 
   it("添加官方连接：填 Key 后直接建好，弹窗里一个都不预选，勾了才添加", async () => {
