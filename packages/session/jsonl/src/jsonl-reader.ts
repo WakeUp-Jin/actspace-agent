@@ -1,9 +1,9 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { EventCodecRegistry } from "@actspace/session-journal";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { validateSessionHeader, type SessionHeaderV1 } from "@actspace/session-journal";
 import { validateSessionEvents, type SessionAccessState, type SessionValidationDiagnostic, type SessionValidationResult } from "@actspace/session-journal";
-import { SessionError } from "@actspace/session-journal";
 
 export type SessionInspection = {
   readonly journalPath: string;
@@ -13,7 +13,8 @@ export type SessionInspection = {
   readonly diagnostics: readonly SessionValidationDiagnostic[];
   readonly validation: SessionValidationResult | null;
   readonly tornTail: { readonly offset: number; readonly bytes: Buffer } | null;
-  readonly rawBytes: Buffer;
+  /** SHA-256 of the journal file as read. Large Journals are not kept in memory; callers that need the bytes re-read the file and compare digests. */
+  readonly contentDigest: string;
 };
 
 export async function inspectJsonlSession(
@@ -22,6 +23,7 @@ export async function inspectJsonlSession(
   expectedSessionId?: string,
 ): Promise<SessionInspection> {
   const bytes = await readFile(journalPath);
+  const contentDigest = createHash("sha256").update(bytes).digest("hex");
   const diagnostics: SessionValidationDiagnostic[] = [];
   let header: SessionHeaderV1 | null = null;
   const events: SessionEventEnvelopeV1[] = [];
@@ -47,20 +49,13 @@ export async function inspectJsonlSession(
     const validation = validateSessionEvents(events, registry);
     if (tornTail !== null) {
       diagnostics.push({ code: "INVALID_EVENT", seq: events.length, type: "physical/torn-tail", message: "Journal has a torn final line; explicit repair is required." });
-      return freezeInspection({ journalPath, header, events, accessState: "corrupt", diagnostics: [...validation.diagnostics, ...diagnostics], validation, tornTail, rawBytes: bytes });
+      return freezeInspection({ journalPath, header, events, accessState: "corrupt", diagnostics: [...validation.diagnostics, ...diagnostics], validation, tornTail, contentDigest });
     }
-    return freezeInspection({ journalPath, header, events, accessState: validation.accessState, diagnostics: validation.diagnostics, validation, tornTail: null, rawBytes: bytes });
+    return freezeInspection({ journalPath, header, events, accessState: validation.accessState, diagnostics: validation.diagnostics, validation, tornTail: null, contentDigest });
   } catch (error) {
     diagnostics.push({ code: "INVALID_EVENT", seq: events.length, type: "physical/invalid", message: error instanceof Error ? error.message : String(error) });
-    return freezeInspection({ journalPath, header, events, accessState: "corrupt", diagnostics, validation: null, tornTail, rawBytes: bytes });
+    return freezeInspection({ journalPath, header, events, accessState: "corrupt", diagnostics, validation: null, tornTail, contentDigest });
   }
-}
-
-export function exportCanonicalJsonl(inspection: SessionInspection): Buffer {
-  if (inspection.header === null || inspection.validation === null || inspection.tornTail !== null || inspection.accessState === "corrupt") {
-    throw new SessionError("SESSION_CORRUPT", "Canonical export requires a physically valid Journal.");
-  }
-  return Buffer.from(inspection.rawBytes);
 }
 
 function freezeInspection(value: SessionInspection): SessionInspection {
