@@ -602,7 +602,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
 }
 
 function withIdentity(block: MessageBlock, event: SessionEvent): MessageBlock {
-  return { ...block, runId: event.agentRunId, ...(event.sourceSeq === undefined ? {} : { sourceSeq: event.sourceSeq }) };
+  return { ...block, runId: event.agentRunId, ...(event.turnId === undefined ? {} : { turnId: event.turnId }), ...(event.sourceSeq === undefined ? {} : { sourceSeq: event.sourceSeq }) };
 }
 
 export function getLatestContextSnapshot(events: SessionEvent[]): ContextUsageSnapshot | null {

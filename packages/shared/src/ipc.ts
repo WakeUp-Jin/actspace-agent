@@ -733,6 +733,8 @@ export type SessionCreateInput = {
 
 export type SessionForkInput = {
   sessionId: string;
+  /** 从这一轮的助手回复分叉：保留到该轮结束；不传则整个会话分叉。 */
+  turnId?: string;
 };
 
 /** 从主会话分出侧边对话：截到上一轮结束，默认 Plan 模式。 */

@@ -165,6 +165,7 @@ export const TurnView = memo(function TurnView({
         <TurnActions
           completeTurn={Boolean(turn.user)}
           revealAlways={isLatest && !isActive}
+          turnActive={isActive}
           sessionId={sessionId}
           assistantMessages={assistantMessages}
         />

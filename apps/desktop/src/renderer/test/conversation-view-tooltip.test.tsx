@@ -100,7 +100,42 @@ function renderConversation(inputMessages: MessageBlock[] = messages) {
   );
 }
 
+function renderForkable(onFork: (sessionId: string, turnId?: string) => void, inputMessages: MessageBlock[], isStreaming = false) {
+  return render(
+    <TooltipProvider delayDuration={0}>
+      <RightPanelProvider>
+        <TestConversationView messages={inputMessages} contextSnapshot={null} sessionId="session-1" isStreaming={isStreaming} onForkSession={onFork} />
+      </RightPanelProvider>
+    </TooltipProvider>,
+  );
+}
+
+const durableMessages = messages.map((block) => ({ ...block, turnId: "turn-1" }) as MessageBlock);
+
 describe("ConversationView tooltips", () => {
+  it("forks from a finished reply with its turnId", async () => {
+    const onFork = vi.fn();
+    renderForkable(onFork, durableMessages);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "更多消息操作" }));
+    const item = within(await screen.findByRole("menu")).getByRole("menuitem", { name: "分叉会话" });
+    expect(item).not.toHaveAttribute("aria-disabled", "true");
+    await user.click(item);
+    expect(onFork).toHaveBeenCalledWith("session-1", "turn-1");
+  });
+
+  it("disables forking while the turn is running and explains why", async () => {
+    const onFork = vi.fn();
+    renderForkable(onFork, durableMessages, true);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "更多消息操作" }));
+    const item = within(await screen.findByRole("menu")).getByRole("menuitem", { name: "分叉会话" });
+    expect(item).toHaveAttribute("aria-disabled", "true");
+    expect(item).toHaveAttribute("title", "请等待当前轮次结束后再分叉");
+    await user.click(item);
+    expect(onFork).not.toHaveBeenCalled();
+  });
+
   it("opens the turn ⋯ menu from the keyboard, copies the request id and returns focus (16 T16b)", async () => {
     renderConversation();
     const user = userEvent.setup();

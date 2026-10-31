@@ -48,6 +48,7 @@ App 只负责把这些 store 装配起来、把事件接到对应的 store，以
 - **合并规则由 store 决定**：相邻的页按 seq 合并；不相邻的最新页替换整个窗口，早期页需要重新加载；修订号更旧的快照不覆盖新的。renderer 不手工拼接 events，不从 id 字符串解析 seq，也不为每页重算 `createMessageBlocks`。
 - 页请求和审批请求的版本号由 App 全局递增（`requestVersionRef`），`SessionLocalStore` 只记每个会话最近一次发出的号。不能改回按会话从 0 计数：evict 之后会话的计数会重来，在途的旧响应可能和新请求撞号。
 - 新建、分叉会话：`sessionsApi.create` / `fork` 返回的 projection 直接 `applyEnvelope` 进 store。
+- 从助手回复分叉：回复块带 `turnId`（来自 durable 事件，live 块没有），回复「…」菜单调用 `onForkSession(sessionId, turnId)`，`sessionsApi.fork({ sessionId, turnId })` 由 Host 用 `resolveTurnBoundary`（`@actspace/side-chat`）解析成该轮结束（含 run finish）的 Journal 边界；整会话分叉仍按当前末尾。该轮仍在运行（回复所在轮 `isActive`）或没有 turnId 时菜单项禁用，提示「请等待当前轮次结束后再分叉」。新会话标题 = 原标题 + 「（分叉）」，已带后缀不重复追加。分叉不继承可执行状态（队列由 `projectTasks` 按 sessionId 过滤，新会话为空）。
 
 ### 2.1 cell 保留（LRU）
 

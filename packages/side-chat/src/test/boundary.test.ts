@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCoreCodecRegistry, createSessionForkSeed, createSessionHeader, SessionJournal, type SessionEventCandidateV1 } from "@actspace/session-journal";
-import { resolveSideChatBoundary, SideChatError } from "../boundary.js";
+import { resolveSideChatBoundary, resolveTurnBoundary, SideChatError, TurnForkError } from "../boundary.js";
 
 const registry = createCoreCodecRegistry();
 const source = { ownerPluginId: "@actspace/core" } as const;
@@ -49,5 +49,35 @@ describe("resolveSideChatBoundary", () => {
     const journal = journalWith("running");
     try { resolveSideChatBoundary(journal.events, registry); expect.unreachable(); }
     catch (error) { expect(error).toMatchObject({ code: "SIDE_CHAT_NO_COMPLETED_TURN" }); }
+  });
+});
+
+describe("resolveTurnBoundary", () => {
+  it("ends right after the named Turn and leaves later Turns out", () => {
+    const journal = journalWith("done", "done", "done");
+    const boundary = resolveTurnBoundary(journal.events, registry, "t1");
+    expect(journal.events[boundary]).toMatchObject({ type: "turn/end", data: { turnId: "t1" } });
+    expect(journal.events.slice(0, boundary + 1).filter(event => event.type === "turn/end")).toHaveLength(2);
+  });
+
+  it("keeps extending until the caller's closed predicate accepts the prefix", () => {
+    const journal = journalWith("done");
+    journal.append(candidate("session/title-set", { title: "t" }));
+    const end = journal.events.findIndex(event => event.type === "turn/end");
+    expect(resolveTurnBoundary(journal.events, registry, "t0", prefix => prefix.length > end + 1)).toBe(end + 1);
+  });
+
+  it("refuses a running Turn, an unknown Turn and a never-closed prefix", () => {
+    const journal = journalWith("done", "running");
+    expect(() => resolveTurnBoundary(journal.events, registry, "t1")).toThrow(expect.objectContaining({ code: "FORK_TURN_RUNNING" }));
+    expect(() => resolveTurnBoundary(journal.events, registry, "missing")).toThrow(TurnForkError);
+    expect(() => resolveTurnBoundary(journal.events, registry, "t0", () => false)).toThrow(expect.objectContaining({ code: "FORK_TURN_UNAVAILABLE" }));
+  });
+
+  it("produces a prefix the fork seed accepts", () => {
+    const journal = journalWith("done", "done");
+    const boundarySeq = resolveTurnBoundary(journal.events, registry, "t0");
+    const header = createSessionHeader({ sessionId: "main", createdAt: "2026-10-21T00:00:00.000Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } });
+    expect(() => createSessionForkSeed({ parentHeader: header, parentEvents: journal.events, boundarySeq, newSessionId: "child", createdAt: "2026-10-21T00:00:01.000Z", createdWith: header.createdWith, registry })).not.toThrow();
   });
 });

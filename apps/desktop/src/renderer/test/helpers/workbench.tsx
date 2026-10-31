@@ -99,17 +99,18 @@ export function TestWorkbenchProviders({ activeSession, composer, sessionActions
 }
 
 type ConversationViewProps = ComponentProps<typeof ConversationView>;
-export type TestConversationViewProps = Partial<ConversationViewProps> & Partial<ActiveSessionValue> & Partial<ComposerContextValue> & LegacyRunTargetProps;
+export type TestConversationViewProps = Partial<ConversationViewProps> & Partial<ActiveSessionValue> & Partial<ComposerContextValue> & SessionActionsValue & LegacyRunTargetProps;
 
 /** ConversationView 自己的 contextSnapshot / contextState / isSessionReady 是合并后的值，仍作为 prop 传入。 */
 export function TestConversationView(props: TestConversationViewProps) {
   const own = ["contextSnapshot", "contextState", "isSessionReady"];
   const active = split<ActiveSessionValue>(props, ACTIVE_SESSION_KEYS, own);
   const composer = split<ComposerContextValue>(active.rest, COMPOSER_KEYS);
-  const runTarget = split<LegacyRunTargetProps>(composer.rest, RUN_TARGET_KEYS);
+  const actions = split<SessionActionsValue>(composer.rest, SESSION_ACTION_KEYS);
+  const runTarget = split<LegacyRunTargetProps>(actions.rest, RUN_TARGET_KEYS);
   const viewProps = { contextSnapshot: null, ...runTarget.rest } as ConversationViewProps;
   return (
-    <TestWorkbenchProviders activeSession={active.picked} composer={composer.picked} runTarget={runTarget.picked}>
+    <TestWorkbenchProviders activeSession={active.picked} composer={composer.picked} sessionActions={actions.picked} runTarget={runTarget.picked}>
       <ConversationView {...viewProps} />
     </TestWorkbenchProviders>
   );

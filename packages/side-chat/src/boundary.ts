@@ -9,6 +9,13 @@ export type SideChatBoundary = {
   readonly runningTurnExcluded: boolean;
 };
 
+export class TurnForkError extends Error {
+  constructor(readonly code: "FORK_TURN_NOT_FOUND" | "FORK_TURN_RUNNING" | "FORK_TURN_UNAVAILABLE", message: string) {
+    super(message);
+    this.name = "TurnForkError";
+  }
+}
+
 export class SideChatError extends Error {
   constructor(readonly code: "SIDE_CHAT_NO_COMPLETED_TURN", message: string) {
     super(message);
@@ -36,6 +43,30 @@ export function resolveSideChatBoundary(events: readonly SessionEventEnvelopeV1[
     return Object.freeze({ boundarySeq, inheritedTurnCount, runningTurnExcluded });
   }
   throw new SideChatError("SIDE_CHAT_NO_COMPLETED_TURN", "主会话还没有完成的一轮，暂时不能开侧边对话。");
+}
+
+/**
+ * Pick where a fork from one assistant reply ends: right after that Turn's `turn/end`,
+ * extended over the events that must travel with it (for example the Host's run-finish fact)
+ * until the prefix is quiet and `closed` agrees. Later Turns never come along.
+ */
+export function resolveTurnBoundary(
+  events: readonly SessionEventEnvelopeV1[],
+  registry: EventCodecRegistry,
+  turnId: string,
+  closed: (prefix: readonly SessionEventEnvelopeV1[]) => boolean = () => true,
+): number {
+  const start = events.findIndex(event => event.type === "turn/start" && (event.data as { turnId?: unknown }).turnId === turnId);
+  if (start < 0) throw new TurnForkError("FORK_TURN_NOT_FOUND", "找不到这一轮，无法从这里分叉。");
+  const end = events.findIndex((event, index) => index > start && event.type === "turn/end" && (event.data as { turnId?: unknown }).turnId === turnId);
+  if (end < 0) throw new TurnForkError("FORK_TURN_RUNNING", "请等待当前轮次结束后再分叉。");
+  const next = events.findIndex((event, index) => index > end && event.type === "turn/start");
+  const last = next < 0 ? events.length - 1 : next - 1;
+  for (let boundarySeq = end; boundarySeq <= last; boundarySeq++) {
+    const prefix = events.slice(0, boundarySeq + 1);
+    if (isQuietPrefix(prefix, registry) && closed(prefix)) return boundarySeq;
+  }
+  throw new TurnForkError("FORK_TURN_UNAVAILABLE", "这一轮之后的状态还没有收尾，暂时不能从这里分叉。");
 }
 
 function isQuietPrefix(events: readonly SessionEventEnvelopeV1[], registry: EventCodecRegistry): boolean {

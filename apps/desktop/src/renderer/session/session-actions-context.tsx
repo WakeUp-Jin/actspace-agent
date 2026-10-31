@@ -23,7 +23,8 @@ export type SessionActionsValue = {
   readonly onRenameSession?: (sessionId: string, title: string) => void;
   readonly onCopySessionId?: (sessionId: string) => void;
   readonly onCopyTranscript?: (sessionId: string) => void;
-  readonly onForkSession?: (sessionId: string) => void;
+  /** 不带 turnId：整个会话分叉；带 turnId：保留到那一轮结束。 */
+  readonly onForkSession?: (sessionId: string, turnId?: string) => void;
   readonly onArchiveSession?: (sessionId: string) => void;
   /** 取消归档；侧栏筛选显示已归档时用。 */
   readonly onRestoreSession?: (sessionId: string) => void;

@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useContext, useMemo, useRef, useState } from "react";
 import { Copy, Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { visualizeApi } from "../../api/visualize";
 import { cn } from "../ui/cn";
 import { useRightPanel } from "../right-panel/RightPanelContext";
+import { SessionActionsContext } from "../../session/session-actions-context";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { TurnUsagePill } from "./TurnUsagePill";
@@ -75,18 +76,22 @@ export function TurnActions({
   sessionId,
   completeTurn,
   revealAlways = false,
+  turnActive = false,
 }: {
   assistantMessages: AssistantMessageBlock[];
   sessionId: string | null;
   completeTurn: boolean;
   /** 最新一轮且已结束：不等悬停，一直显示。 */
   revealAlways?: boolean;
+  /** 这一轮还在运行：不能从它分叉。 */
+  turnActive?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [visualizeState, setVisualizeState] = useState<VisualizeState>("idle");
   const [visualizeError, setVisualizeError] = useState<string | null>(null);
   const visualizeHtmlRef = useRef<string | null>(null);
   const { openTab } = useRightPanel();
+  const onForkSession = useContext(SessionActionsContext)?.onForkSession;
   const latestAssistantMessage = assistantMessages[assistantMessages.length - 1];
   const copyText = useMemo(
     () => assistantMessages.map((message) => message.content).join("\n\n"),
@@ -101,6 +106,11 @@ export function TurnActions({
     await copyToClipboard(value);
     setMenuOpen(false);
   }
+
+  // 只有已落盘的回复带 turnId；运行中的这一轮和流式块不能分叉。
+  const forkTurnId = latestAssistantMessage.turnId;
+  const forkDisabled = turnActive || !onForkSession || !sessionId || !forkTurnId;
+  const forkLabel = turnActive ? "请等待当前轮次结束后再分叉" : "分叉会话";
 
   const visualizeTabId = `viz:${latestAssistantMessage.id}`;
 
@@ -208,7 +218,7 @@ export function TurnActions({
           <TooltipContent>更多操作</TooltipContent>
         </Tooltip>
         <MenuContent side="top" align="start" className="w-[178px]">
-          <MenuItem disabled>分叉会话</MenuItem>
+          <MenuItem disabled={forkDisabled} title={forkLabel} onSelect={() => { if (!forkDisabled) onForkSession(sessionId, forkTurnId); }}>分叉会话</MenuItem>
           <MenuItem onSelect={() => void handleCopy(copyText)}>复制消息</MenuItem>
           <MenuItem onSelect={() => void handleCopy(latestAssistantMessage.id)}>复制请求 ID</MenuItem>
           {visualizeState === "ready" || visualizeState === "error" ? (
