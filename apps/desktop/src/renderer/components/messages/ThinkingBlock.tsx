@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type { MessageBlock } from "@actspace/shared";
+import { hasVisibleText, type MessageBlock } from "@actspace/shared";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
@@ -26,6 +26,8 @@ export function ThinkingBlock({ message, className, replyCompleted = false }: {
   }, [replyCompleted]);
   const blockClassName = `${THINKING_BLOCK_CLASS} ${className ?? ""}`;
   const running = message.status === "running";
+  // Projections already drop invisible thinking; this guards any other source from rendering an empty body.
+  if (!hasVisibleText(message.content)) return null;
 
   return (
     <article className={blockClassName}>

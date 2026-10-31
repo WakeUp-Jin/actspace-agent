@@ -14,6 +14,7 @@ import {
   type UsageActivityStatus,
   type UsageActivityTokens,
   CNY_PER_USD,
+  hasVisibleText,
 } from "@actspace/shared";
 import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot, RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
@@ -257,7 +258,7 @@ function projectSurfaceNode(
     .filter((block) => block.type === "reasoning" && typeof block.text === "string")
     .map((block) => block.text as string)
     .join("");
-  if (reasoning.trim()) projected.push({ ...base, id: `${base.id}-thinking`, type: "thinking", payload: { title: "Thinking", content: reasoning, collapsedByDefault: true, model: request?.model, provider: request?.provider } });
+  if (hasVisibleText(reasoning)) projected.push({ ...base, id: `${base.id}-thinking`, type: "thinking", payload: { title: "Thinking", content: reasoning, collapsedByDefault: true, model: request?.model, provider: request?.provider } });
   projected.push({ ...base, type: "assistant_message", payload: { content: contentText(node.content, false), stopReason: "stop", model: request?.model ?? "default", provider: request?.provider ?? "default" } });
 }
 
