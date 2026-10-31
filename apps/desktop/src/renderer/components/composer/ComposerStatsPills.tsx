@@ -16,7 +16,7 @@ import {
 } from "./composer-stats";
 
 /**
- * 状态行右侧的两个会话累计胶囊：「N 轮 M 步 · 输出速度」和「总量 tok · 缓存命中」。
+ * 状态行右侧的两个会话累计胶囊：「N 轮 M 步 · 输出速度」和「累计 总量 tok · 缓存命中」。
  * 显示/隐藏/可点分支逐条照 DeepSeek Harness 的 `StatsPills.tsx`（详细模式），
  * 落位与面板见 docs/design-docs/frontend/front-聊天输入框规范.md。
  */
@@ -39,6 +39,9 @@ export type ComposerStatsOverlay = {
 type PillModel =
   | { readonly kind: "plain"; readonly label: readonly string[] }
   | { readonly kind: "dialog"; readonly label: readonly string[]; readonly ariaLabel: string; readonly dialog: StatDialog };
+
+const USAGE_DESCRIPTION = "每次模型请求的输入（含缓存）加输出之和；每一步都会重发上下文，所以远大于当前窗口占用。";
+const CACHE_HIT_FOOTNOTE = "缓存命中 = 缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），按累计计算。";
 
 const tokenCount = (value: string) => `${value} tok`;
 
@@ -66,7 +69,7 @@ export function activityPillModel(stats: ComposerSessionStats): PillModel | null
 }
 
 /**
- * Token 用量胶囊的模型：没有计费输入也没有输出时不显示。
+ * 会话累计消耗胶囊的模型：没有计费输入也没有输出时不显示。
  * @param usage - 全会话累计用量。
  * @returns 胶囊模型；不显示时为 null。
  */
@@ -77,7 +80,7 @@ export function usagePillModel(usage: RuntimeV2UsageSummary | null | undefined):
   const hit = formatCacheHitPercent(usage.cacheReadTokens, billedInput);
   const hitText = hit === null ? null : `缓存命中 ${hit}%`;
   const total = billedInput + usage.outputTokens;
-  const totalText = tokenCount(formatTokens(total));
+  const totalText = `累计 ${tokenCount(formatTokens(total))}`;
   const rows: StatRow[] = [];
   if (hit !== null) rows.push(["缓存命中", `${hit}%`]);
   rows.push(["未缓存输入", tokenCount(formatExactTokens(usage.inputTokens))]);
@@ -89,7 +92,13 @@ export function usagePillModel(usage: RuntimeV2UsageSummary | null | undefined):
     kind: "dialog",
     label,
     ariaLabel: label.join(" · "),
-    dialog: { title: "Token 用量", titleValue: tokenCount(formatExactTokens(total)), rows },
+    dialog: {
+      title: "会话累计消耗",
+      titleValue: tokenCount(formatExactTokens(total)),
+      description: USAGE_DESCRIPTION,
+      rows,
+      ...(hit !== null ? { footnote: CACHE_HIT_FOOTNOTE } : {}),
+    },
   };
 }
 
