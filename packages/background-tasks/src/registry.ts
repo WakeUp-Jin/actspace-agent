@@ -74,6 +74,19 @@ export class BackgroundTaskRegistry {
     return record(entry);
   }
 
+  /**
+   * The user stopped the task from the UI. Like `stop`, the task sends no completion notice;
+   * instead the model is told the user stopped it, at its next step, without being woken.
+   */
+  async stopByUser(sessionId: string, taskId: string): Promise<BackgroundTaskRecord> {
+    const entry = this.#require(sessionId, taskId);
+    if (entry.status !== "running") return record(entry);
+    await this.stop(sessionId, taskId, "user");
+    const { source } = entry;
+    await this.#enqueue(sessionId, renderTaskNotification(source, { status: "stopped", summary: `The user stopped background ${source.kind} task "${source.description}" from the app.`, body: "" }), { taskId, kind: source.kind, title: source.description, status: "stopped" });
+    return record(entry);
+  }
+
   /** Wait for one task, or any task already running at call time. Reporting a result suppresses its notification. */
   async wait(sessionId: string, options: { readonly taskId?: string; readonly timeoutMs: number; readonly signal?: AbortSignal }): Promise<BackgroundTaskWaitResult> {
     const candidates = options.taskId !== undefined ? [this.#require(sessionId, options.taskId)] : this.#owned(sessionId).filter(entry => entry.status === "running");
@@ -190,7 +203,8 @@ function record(entry: Entry): BackgroundTaskRecord {
   return Object.freeze({ taskId: source.taskId, kind: source.kind, sessionId: source.sessionId, callId: source.callId, description: source.description, status: entry.status, startedAt: entry.startedAt,
     ...(entry.endedAt === undefined ? {} : { endedAt: entry.endedAt }),
     ...(entry.terminal?.exitCode === undefined ? {} : { exitCode: entry.terminal.exitCode }),
-    ...(entry.terminal === undefined ? {} : { summary: entry.terminal.summary }) });
+    ...(entry.terminal === undefined ? {} : { summary: entry.terminal.summary }),
+    ...(source.bash === undefined ? {} : { bash: source.bash }) });
 }
 
 function core(data: RuntimeV2JsonValue) { return { type: "background/task", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }

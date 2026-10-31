@@ -1,4 +1,4 @@
-import { taskOperation } from "@actspace/shared/runtime-v2";
+import { taskOperation, type BackgroundBashTaskView } from "@actspace/shared/runtime-v2";
 
 import { SessionModeWriter } from "./session-commands.js";
 import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
@@ -62,12 +62,23 @@ export type ApplicationRunService = {
   isIdle?: () => boolean;
 };
 
-type AgentRuntimeService = { readonly runs: ApplicationRunService; readonly subagents?: { readonly activeCount: number }; readonly backgroundTasks?: { hasRunning(sessionId?: string): boolean } };
+/** The parts of `@actspace/background-tasks`' registry the application reads; kept structural like the other runtime services. */
+type BackgroundTaskRecordLike = Omit<BackgroundBashTaskView, "command" | "cwd" | "sandboxed"> & { readonly kind: string; readonly bash?: Pick<BackgroundBashTaskView, "command" | "cwd" | "sandboxed"> };
+type BackgroundTaskRegistryLike = {
+  hasRunning(sessionId?: string): boolean;
+  list(sessionId: string): readonly BackgroundTaskRecordLike[];
+  output(sessionId: string, taskId: string): Promise<{ readonly task: BackgroundTaskRecordLike; readonly output: { readonly text: string } }>;
+  stopByUser(sessionId: string, taskId: string): Promise<BackgroundTaskRecordLike>;
+};
+type AgentRuntimeService = { readonly runs: ApplicationRunService; readonly subagents?: { readonly activeCount: number }; readonly backgroundTasks?: BackgroundTaskRegistryLike };
 
 export type AgentApplicationContract = {
   readonly browserAvailable: () => Promise<boolean>;
   readonly taskCommand: (input: import("@actspace/shared/runtime-v2").TaskCommand) => Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>;
   readonly submitTask: (sessionId: string, submissionId: string, content: RuntimeV2JsonValue) => Promise<import("@actspace/shared/runtime-v2").TaskReceipt>;
+  readonly listBackgroundTasks: (sessionId: string) => readonly BackgroundBashTaskView[];
+  readonly readBackgroundTaskOutput: (sessionId: string, taskId: string) => Promise<import("@actspace/shared/runtime-v2").BackgroundTaskOutputView>;
+  readonly stopBackgroundTask: (sessionId: string, taskId: string) => Promise<BackgroundBashTaskView>;
   readonly isIdleForReconfigure: () => Promise<boolean>;
   readonly readSessionProjection: ApplicationSessionService["readProjection"];
   readonly readSessionObservation: ApplicationSessionService["readObservation"];
@@ -152,6 +163,21 @@ export class AgentApplication implements AgentApplicationContract {
       if (error && typeof error === "object" && "snapshot" in error && error.snapshot) return { snapshot: error.snapshot as import("@actspace/shared/runtime-v2").TaskSnapshot, error: error instanceof Error ? error.message : String(error) };
       throw error;
     }
+  }
+  /** Background Bash commands of a Session, newest first; background Agents are listed by the 子 Agent panel. */
+  listBackgroundTasks(sessionId: string): readonly BackgroundBashTaskView[] {
+    return (this.#backgroundTasks?.list(sessionId) ?? []).flatMap(task => { const view = bashTaskView(task); return view ? [view] : []; });
+  }
+  async readBackgroundTaskOutput(sessionId: string, taskId: string) {
+    const { task, output } = await this.#requireBackgroundTasks().output(sessionId, taskId);
+    return { task: requireBashTaskView(task), text: output.text };
+  }
+  async stopBackgroundTask(sessionId: string, taskId: string): Promise<BackgroundBashTaskView> {
+    return requireBashTaskView(await this.#requireBackgroundTasks().stopByUser(sessionId, taskId));
+  }
+  #requireBackgroundTasks(): BackgroundTaskRegistryLike {
+    if (!this.#backgroundTasks) throw new Error("Background tasks are unavailable in this runtime.");
+    return this.#backgroundTasks;
   }
   listSessions() { return this.#sessions.list(); }
   async isIdleForReconfigure(): Promise<boolean> {
@@ -365,3 +391,13 @@ export interface ApplicationEvents {
   "application/title-changing": (event: { sessionId: string }) => void;
 }
 declare module "@actspace/cordis-adapter" { interface DomainEvents extends ApplicationEvents {} }
+
+function bashTaskView(task: BackgroundTaskRecordLike): BackgroundBashTaskView | undefined {
+  if (task.kind !== "bash" || !task.bash) return undefined;
+  return { taskId: task.taskId, callId: task.callId, description: task.description, ...task.bash, status: task.status, startedAt: task.startedAt, ...(task.endedAt === undefined ? {} : { endedAt: task.endedAt }), ...(task.exitCode === undefined ? {} : { exitCode: task.exitCode }) };
+}
+function requireBashTaskView(task: BackgroundTaskRecordLike): BackgroundBashTaskView {
+  const view = bashTaskView(task);
+  if (!view) throw new Error(`Background task ${task.taskId} is not a Bash command.`);
+  return view;
+}

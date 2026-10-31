@@ -12,6 +12,9 @@ export type BackgroundTaskTerminal = {
   readonly exitCode?: number | null;
 };
 
+/** What a background Bash command is, for the 「后台任务」 panel. */
+export type BackgroundBashDetails = { readonly command: string; readonly cwd: string; readonly sandboxed: boolean };
+
 /** Non-blocking snapshot shown by `task_output`. */
 export type BackgroundTaskOutput = { readonly text: string; readonly outputPath?: string };
 
@@ -24,6 +27,8 @@ export interface BackgroundTaskSource {
   /** Tool call that started the task; the UI uses it to find the card. */
   readonly callId: string;
   readonly description: string;
+  /** Bash only: the command, where and how it runs. */
+  readonly bash?: BackgroundBashDetails;
   readonly done: Promise<BackgroundTaskTerminal>;
   output(): Promise<BackgroundTaskOutput>;
   stop(reason: string): Promise<void>;
@@ -40,6 +45,7 @@ export type BackgroundTaskRecord = {
   readonly endedAt?: number;
   readonly exitCode?: number | null;
   readonly summary?: string;
+  readonly bash?: BackgroundBashDetails;
 };
 
 export type BackgroundTaskWaitResult =

@@ -41,6 +41,9 @@ export const desktopBridgeContract = {
     command: invoke<RV2.TaskCommand, RV2.TaskCommandResult>(CH.taskCommand),
     submit: invoke<RV2.SubmitTaskInput, RV2.TaskSubmissionResult>(CH.submitTask),
     abort: invoke<S.AbortAgentRunInput, boolean>(CH.abortAgentRun),
+    listBackground: invoke<RV2.BackgroundTaskListInput, readonly RV2.BackgroundBashTaskView[]>(CH.listBackgroundTasks),
+    readBackgroundOutput: invoke<RV2.BackgroundTaskInput, RV2.BackgroundTaskOutputView>(CH.readBackgroundTaskOutput),
+    stopBackground: invoke<RV2.BackgroundTaskInput, RV2.BackgroundBashTaskView>(CH.stopBackgroundTask),
   },
   approvals: {
     submit: invoke<S.ApprovalDecideInput, S.ApprovalDecideResult>(CH.submitApproval),

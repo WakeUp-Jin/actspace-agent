@@ -79,3 +79,22 @@ export type BackgroundWakeContent = { readonly kind: typeof BACKGROUND_WAKE_KIND
 export function isBackgroundWake(content: RuntimeV2JsonValue | undefined): boolean {
   return !!content && typeof content === "object" && !Array.isArray(content) && "kind" in content && content.kind === BACKGROUND_WAKE_KIND;
 }
+
+/** A background Bash command as the right-panel 「后台任务」 shows it. Background Agents live in the 子 Agent panel. */
+export type BackgroundBashTaskView = {
+  readonly taskId: string;
+  /** Tool call that started it; the chat's Bash row carries the same id. */
+  readonly callId: string;
+  readonly description: string;
+  readonly command: string;
+  readonly cwd: string;
+  readonly sandboxed: boolean;
+  readonly status: "running" | "completed" | "failed" | "stopped" | "lost";
+  readonly startedAt: number;
+  readonly endedAt?: number;
+  readonly exitCode?: number | null;
+};
+export type BackgroundTaskListInput = { readonly sessionId: string };
+export type BackgroundTaskInput = { readonly sessionId: string; readonly taskId: string };
+/** `text` is the redacted tail of the output; earlier output is replaced by a one-line marker. */
+export type BackgroundTaskOutputView = { readonly task: BackgroundBashTaskView; readonly text: string };

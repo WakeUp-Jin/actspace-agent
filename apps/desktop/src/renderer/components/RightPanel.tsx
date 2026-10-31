@@ -1,3 +1,4 @@
+import { BackgroundTasksPanel } from "./right-panel/BackgroundTasksPanel";
 import { SubagentsPanel } from "./right-panel/SubagentsPanel";
 import { terminalDisplayTitle } from "./right-panel/terminal-title";
 import { Suspense, useContext, useEffect, useState } from "react";
@@ -6,6 +7,7 @@ import {
   FolderTree,
   GitBranch,
   GitFork,
+  Layers,
   Loader2,
   MessageSquare,
   SquareTerminal,
@@ -148,7 +150,7 @@ function SideChatTabIcon({ status }: { status: SessionUiStatusKind | undefined }
 }
 
 function isDevelopmentTab(tab: RightPanelTab): boolean {
-  return isWorkspaceFileTab(tab) || ["review", "turnReview", "subagents", "terminal", "terminalStarting", "terminalError"].includes(tab.kind);
+  return isWorkspaceFileTab(tab) || ["review", "turnReview", "subagents", "backgroundTasks", "terminal", "terminalStarting", "terminalError"].includes(tab.kind);
 }
 
 // 展示部分在 RightPanelTabStrip；这里只管普通会话的 Tab 来源和终端的异步关闭。
@@ -264,6 +266,8 @@ function RightPanelBody({
   if (tab.kind === "sideChat") return <SideChatView tab={tab} />;
 
   if (tab.kind === "subagents") return <SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} selected={tab.sessionId === sessionId ? tab.selected : undefined} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
+
+  if (tab.kind === "backgroundTasks") return <BackgroundTasksPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
 
   if (tab.kind === "replyHtml") {
     return <ReplyHtmlRenderView sessionId={tab.sessionId} />;
@@ -398,6 +402,14 @@ function RightPanelLauncher({
         icon: <MessageSquare size={15} strokeWidth={1.8} />,
         disabled: !sessionId,
         onClick: () => sessionId && openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId }),
+      },
+      {
+        id: "background-tasks",
+        label: "后台任务",
+        description: "在后台跑的命令",
+        icon: <Layers size={15} strokeWidth={1.8} />,
+        disabled: !sessionId,
+        onClick: () => sessionId && openTab({ id: "background-tasks", kind: "backgroundTasks", title: "后台任务", sessionId }),
       },
       {
         id: "files",

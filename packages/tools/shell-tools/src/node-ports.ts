@@ -267,7 +267,7 @@ class BashTaskRegistry {
       return terminal(task, await readFile(task.outputPath, "utf8").then((value) => value.slice(-NOTIFICATION_TAIL_CHARS)).catch(() => ""), await sandboxDenialHint(status, task.outputPath));
     });
     await this.background?.register({
-      taskId: task.taskId, kind: "bash", sessionId: task.sessionId, callId: task.callId, description: task.intent ?? task.command, done: task.completion,
+      taskId: task.taskId, kind: "bash", sessionId: task.sessionId, callId: task.callId, description: task.intent ?? task.command, bash: { command: task.command, cwd: task.cwd, sandboxed: task.sandboxed }, done: task.completion,
       output: async () => ({ text: await readTail(task.outputPath), outputPath: task.outputPath }),
       stop: async () => { this.#kill(task); await task.completion; },
     });

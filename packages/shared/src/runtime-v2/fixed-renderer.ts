@@ -1,6 +1,9 @@
 export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   bootstrapState: "runtime-v2:fixed-renderer:bootstrap-state",
   taskCommand: "runtime-v2:fixed-renderer:task-command",
+  listBackgroundTasks: "runtime-v2:fixed-renderer:list-background-tasks",
+  readBackgroundTaskOutput: "runtime-v2:fixed-renderer:read-background-task-output",
+  stopBackgroundTask: "runtime-v2:fixed-renderer:stop-background-task",
   submitTask: "runtime-v2:fixed-renderer:submit-task",
   abortAgentRun: "runtime-v2:fixed-renderer:abort-agent-run",
   agentStream: "runtime-v2:fixed-renderer:agent-stream",

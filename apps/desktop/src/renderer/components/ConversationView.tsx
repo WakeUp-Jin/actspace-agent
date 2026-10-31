@@ -12,6 +12,7 @@ import { useResponseAnnotationState } from "./messages/useResponseAnnotationStat
 import type { ComposerReviewSummary } from "./Composer";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
+import { BackgroundTaskLinkContext } from "./messages/BashRunBlock";
 import { CompactionRetryContext } from "./messages/CompactCommandBlock";
 import type { SessionMainView } from "./SessionViewToggle";
 import { TrajectoryView } from "./TrajectoryView";
@@ -159,6 +160,9 @@ export function ConversationView({
 
   const openAgentTranscript = useCallback((message: AgentMessageBlock) => {
     if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, selected: message });
+  }, [sessionId, openTab]);
+  const openBackgroundTask = useCallback((taskId: string) => {
+    if (sessionId) openTab({ id: "background-tasks", kind: "backgroundTasks", title: "后台任务", sessionId, focus: { taskId, revision: Date.now() } });
   }, [sessionId, openTab]);
   const openSubagentTrajectory = useCallback((childSessionId: string) => {
     if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, focus: { childSessionId, view: "trajectory", revision: Date.now() } });
@@ -329,6 +333,7 @@ export function ConversationView({
   return (
     <ResponseAnnotationContext.Provider value={annotations.contextValue}>
     <CompactionRetryContext.Provider value={onRetryCompaction}>
+    <BackgroundTaskLinkContext.Provider value={openBackgroundTask}>
     <main className={CONVERSATION_SHELL_CLASS}>
       <ResponseSelectionMenu
         scrollContainerRef={scrollContainerRef}
@@ -407,6 +412,7 @@ export function ConversationView({
         </div>
       ) : null}
     </main>
+    </BackgroundTaskLinkContext.Provider>
     </CompactionRetryContext.Provider>
     </ResponseAnnotationContext.Provider>
   );
