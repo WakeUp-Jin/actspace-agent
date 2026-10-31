@@ -7,6 +7,7 @@
   "components/composer/RunTargetRow.tsx": 1,
   "components/composer/SlashMenu.tsx": 3,
   "components/ContextPopup.tsx": 4,
+  "components/conversation/PinnedTurnPrompt.tsx": 1,
   "components/conversation/TurnActions.tsx": 3,
   "components/conversation/TurnUsagePill.tsx": 1,
   "components/ConversationTurnRail.tsx": 1,

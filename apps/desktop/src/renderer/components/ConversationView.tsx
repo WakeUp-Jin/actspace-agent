@@ -23,6 +23,7 @@ import { ConversationComposerSlot } from "./conversation/ConversationComposerSlo
 import type { AgentMessageBlock } from "./conversation/render-message";
 import { TurnNavigator, useTurnNavigator } from "./conversation/TurnNavigator";
 import { TurnView } from "./conversation/TurnView";
+import { PinnedTurnPrompt } from "./conversation/PinnedTurnPrompt";
 import { createTurnNavigationItems, groupMessagesIntoTurns, userInputHistory } from "./conversation/turns";
 import { useWorkspaceFileLinks } from "./conversation/use-workspace-file-links";
 
@@ -32,8 +33,9 @@ const MESSAGE_VIEWPORT_CLASS = "conversation-message-viewport relative col-start
 const MESSAGE_SCROLL_CLASS = "message-scroll h-full min-h-0 overflow-auto bg-surface pb-6 [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_SCROLL_INITIAL_CLASS =
   "message-scroll message-scroll-initial h-full min-h-0 overflow-auto bg-surface pb-6 [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]";
+const MESSAGE_COLUMN_WIDTH_CLASS = "w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))]";
 const MESSAGE_STACK_CLASS =
-  "message-stack mx-auto flex min-w-0 w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col gap-7 pb-7";
+  `message-stack mx-auto flex min-w-0 ${MESSAGE_COLUMN_WIDTH_CLASS} flex-col gap-7 pb-7`;
 // Composer 只挂一处（16 T14）：空会话时这一格叠在消息区上、居中显示（滚动与留白和原来放在消息区里时相同）；
 // 有消息后回到底部一行。切换只换两层 div 的 class，Composer 不重新挂载，焦点和输入法状态都还在。
 const INITIAL_COMPOSER_SCROLL_CLASS =
@@ -378,6 +380,9 @@ export function ConversationView({
               )}
           </section>
 
+          {isInitialComposer ? null : (
+            <PinnedTurnPrompt scrollRef={scrollContainerRef} turns={turns} className={MESSAGE_COLUMN_WIDTH_CLASS} onJump={navigateToTurn} />
+          )}
           <TurnNavigator
             items={turnNavigationItems}
             visible={turnNavigator.railVisible}

@@ -12,8 +12,8 @@ import { TurnActions } from "./TurnActions";
 import { finalAssistantMessages, getLatestTodoMessage, hasToolLikeItem, splitTurnMessages, workDurationMs, type ConversationTurn } from "./turns";
 
 const MESSAGE_TURN_CLASS = "message-turn relative flex min-w-0 flex-col gap-0";
-const TURN_PROMPT_CLASS =
-  "turn-prompt sticky top-0 z-12 min-w-0 bg-[image:var(--act-gradient-surface-fade)] py-4";
+// 提问卡片不吸顶，跟着内容滚走；滚出视野后由 PinnedTurnPrompt 在顶部叠一行。
+const TURN_PROMPT_CLASS = "turn-prompt min-w-0 py-4";
 const TURN_PROMPT_CARD_CLASS =
   "turn-prompt-card overflow-hidden rounded-act-lg border border-line bg-surface";
 const TURN_BODY_CLASS = "turn-body message-flow flex min-w-0 flex-col";
@@ -127,7 +127,7 @@ type TurnViewProps = {
   onOpenWorkspaceFile?: (path: string) => void;
 };
 
-/** 一轮对话：用户输入（吸顶）、过程和最终回复、轮尾（改动卡、交付卡、图片）、回复操作。 */
+/** 一轮对话：用户输入、过程和最终回复、轮尾（改动卡、交付卡、图片）、回复操作。 */
 export const TurnView = memo(function TurnView({
   turn,
   isActive,

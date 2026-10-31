@@ -8,6 +8,7 @@ import { loadEarlier } from "../../../session/session-pages";
 import { Composer, type ComposerSendOptions } from "../../Composer";
 import { useSessionDrafts } from "../../composer/composer-context";
 import { TurnView } from "../../conversation/TurnView";
+import { PinnedTurnPrompt } from "../../conversation/PinnedTurnPrompt";
 import { groupMessagesIntoTurns, userInputHistory } from "../../conversation/turns";
 import { useStickToBottom } from "../../conversation/use-stick-to-bottom";
 import { ScrollToBottomButton } from "../../ScrollToBottomButton";
@@ -22,7 +23,8 @@ type SideChatTab = Extract<RightPanelTab, { kind: "sideChat" }>;
 // 右栏比会话区窄：消息和输入框两侧只留 14px。
 const SIDE_CHAT_CLASS = "side-chat flex min-h-0 flex-1 flex-col bg-surface [--conversation-inline-padding:14px]";
 const SIDE_CHAT_SCROLL_CLASS = "h-full min-h-0 overflow-auto pb-4 [scrollbar-gutter:stable]";
-const SIDE_CHAT_STACK_CLASS = "mx-auto flex w-[calc(100%_-_28px)] max-w-(--conversation-content-width) flex-col gap-6 pt-3";
+const SIDE_CHAT_COLUMN_CLASS = "w-[calc(100%_-_28px)] max-w-(--conversation-content-width)";
+const SIDE_CHAT_STACK_CLASS = `mx-auto flex ${SIDE_CHAT_COLUMN_CLASS} flex-col gap-6 pt-3`;
 // 分隔线：居中的一行小字，两侧细线；随消息一起滚走，不是悬浮的提示条。
 const SIDE_CHAT_DIVIDER_CLASS =
   "m-0 flex items-center gap-2.5 text-act-xxs leading-4 text-text-faint before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line";
@@ -168,6 +170,7 @@ function SideChatBody({ tab, runtime }: { tab: SideChatTab; runtime: SideChatRun
             ))}
           </div>
         </div>
+        <PinnedTurnPrompt scrollRef={stick.scrollRef} turns={turns} className={SIDE_CHAT_COLUMN_CLASS} />
         {stick.awayFromBottom ? <ScrollToBottomButton onClick={stick.scrollToBottom} /> : null}
       </div>
       <div className="shrink-0 pb-3 pt-1">
