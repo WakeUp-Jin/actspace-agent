@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Search } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { ModelSelectionId } from "@actspace/shared";
 import type { CatalogModel, ModelCatalog, ModelCatalogGroup } from "../../target/use-model-catalog";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/Popover";
@@ -51,7 +51,7 @@ const MODEL_OPTIONS_MENU_BASE_CLASS =
 const MODEL_OPTIONS_WIDTH_PX = 210;
 const MODEL_OPTIONS_GAP_PX = 8;
 const MODEL_OPTIONS_ESTIMATED_HEIGHT_PX = 292;
-const DROPDOWN_LABEL_CLASS = "dropdown-label px-2 pb-1 pt-1.5 text-act-xxs font-medium text-text-faint";
+export const DROPDOWN_LABEL_CLASS = "dropdown-label px-2 pb-1 pt-1.5 text-act-xxs font-medium text-text-faint";
 const OPTION_SEPARATOR_CLASS = "mx-1 my-1 h-px bg-line";
 const OPTION_TOGGLE_ROW_CLASS =
   "option-toggle-row flex min-h-[34px] cursor-pointer items-center gap-2 rounded-act-md px-2 py-1.5 text-act-md text-text-main hover:bg-hover-overlay";
@@ -66,9 +66,9 @@ const TOGGLE_THUMB_CLASS =
   "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-act-knob transition-transform duration-(--motion-fast) ease-in-out";
 const TOGGLE_THUMB_ON_CLASS = "translate-x-3";
 const OPTION_EMPTY_CLASS = "px-2.5 py-2 text-act-md leading-5 text-text-faint";
-const OPTION_CHOICE_CLASS =
+export const OPTION_CHOICE_CLASS =
   "flex min-h-[32px] w-full items-center rounded-act-md border-0 bg-transparent px-2 text-left text-act-sm text-text-main transition-colors duration-(--motion-fast) ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
-const OPTION_CHOICE_LABEL_CLASS = "flex-1 capitalize";
+export const OPTION_CHOICE_LABEL_CLASS = "flex-1 capitalize";
 
 /** 本机模型的运行时选项（Thinking、推理强度）；远端模型没有，不显示「编辑」。 */
 export type ModelPickerOptions = {
@@ -81,12 +81,19 @@ export type ModelPickerOptions = {
   ) => void;
 };
 
+/** 行上「编辑」打开的二级浮层：哪些模型可编辑、浮层里放什么。输入框由 options 生成，设置页的用途自己给。 */
+export type ModelOptionsPanel = {
+  editable: (modelId: string) => boolean;
+  render: (modelId: string) => ReactNode;
+};
+
 type ModelListProps = {
   /** 15 的 `useModelCatalog`：本机按供应商 / 连接分组，远端一个以 Host 命名的分组。 */
   catalog: ModelCatalog;
   selectedModelId: string;
   onSelect: (modelId: string) => void;
   options?: ModelPickerOptions;
+  optionsPanel?: ModelOptionsPanel;
 };
 
 export type ModelPickerMenuProps = ModelListProps & {
@@ -96,6 +103,8 @@ export type ModelPickerMenuProps = ModelListProps & {
   ariaLabel?: string;
   /** 列在分组之前、不属于任何供应商的项（例如设置里的「未配置」）；搜索时隐藏。 */
   pinned?: readonly CatalogModel[];
+  /** 列表下方的一行说明（例如「只列出能看图的模型」）。 */
+  footer?: ReactNode;
 };
 
 export type ModelPickerProps = ModelListProps & {
@@ -158,7 +167,7 @@ export function ModelPicker({ open, onOpenChange, triggerLabel, triggerTitle, di
 // 只在打开时挂载：搜索词、正在编辑的模型这些状态随浮层关闭一起丢掉。
 // 设置页的模型下拉也复用这个菜单，外面自己包 Popover 和触发器。
 export function ModelPickerMenu({
-  catalog, selectedModelId, onSelect, options, side = "top", align = "start", ariaLabel = "模型", pinned = [],
+  catalog, selectedModelId, onSelect, options, optionsPanel, side = "top", align = "start", ariaLabel = "模型", pinned = [], footer,
 }: ModelPickerMenuProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredModelId, setHoveredModelId] = useState<string | null>(null);
@@ -186,7 +195,8 @@ export function ModelPickerMenu({
 
   const filteredGroups = filterModelGroups(catalog, searchQuery);
   const emptyText = modelListEmptyText(catalog);
-  const editingSpec = editingModelId === null ? undefined : options?.find(editingModelId);
+  const panel = optionsPanel ?? (options ? composerOptionsPanel(options) : undefined);
+  const editing = editingModelId !== null && panel?.editable(editingModelId) ? editingModelId : null;
   const pinnedRows = searchQuery.trim() ? [] : pinned;
   const originClass = MODEL_MENU_ORIGIN_CLASS[side][align];
 
@@ -263,7 +273,6 @@ export function ModelPickerMenu({
               const selected = spec.id === selectedModelId;
               const showEdit = hoveredModelId === spec.id || focusedModelId === spec.id || editingModelId === spec.id;
               const showDetail = showModelDetail(group, spec);
-              const editable = options?.find(spec.id);
               const enter = () => setHoveredModelId(spec.id);
               const leave = () => setHoveredModelId((currentId) => (currentId === spec.id ? null : currentId));
               return (
@@ -299,7 +308,7 @@ export function ModelPickerMenu({
                     </span>
                   </button>
                   <div className={`${MODEL_ROW_ACTIONS_CLASS} ${selected ? MODEL_ROW_ACTIONS_SELECTED_CLASS : ""}`}>
-                    {editable && isModelEditable(editable) ? (
+                    {panel?.editable(spec.id) ? (
                       <button
                         type="button"
                         className={MODEL_EDIT_BUTTON_CLASS}
@@ -333,13 +342,27 @@ export function ModelPickerMenu({
         ))}
         {filteredGroups.length === 0 ? <div className={MODEL_SEARCH_EMPTY_CLASS}>{emptyText}</div> : null}
       </div>
-      {editingSpec && options ? (
+      {footer ? <div className="border-t border-line/60 px-3 py-2 text-act-xxs text-text-faint">{footer}</div> : null}
+      {editing !== null && panel ? (
         <div className={optionsMenuClass} style={{ top: `${optionsOffset}px` }}>
-          <ModelOptionsBody spec={editingSpec} options={options} />
+          {panel.render(editing)}
         </div>
       ) : null}
     </PopoverContent>
   );
+}
+
+function composerOptionsPanel(options: ModelPickerOptions): ModelOptionsPanel {
+  return {
+    editable: (modelId) => {
+      const spec = options.find(modelId);
+      return Boolean(spec && isModelEditable(spec));
+    },
+    render: (modelId) => {
+      const spec = options.find(modelId);
+      return spec ? <ModelOptionsBody spec={spec} options={options} /> : null;
+    },
+  };
 }
 
 /** Options 的内容（Thinking、推理强度）：模型按钮浮层里贴行显示。 */
