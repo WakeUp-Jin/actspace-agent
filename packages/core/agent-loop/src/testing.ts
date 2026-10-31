@@ -15,6 +15,8 @@ export async function runToolStreamFixture(options: {
   retryPolicy?: import("@actspace/llm-service").LlmRetryPolicy;
   credential?: import("@actspace/llm-service").LlmCredential;
   subagent?: boolean;
+  /** Override the descriptor step budget (subagent defaults to 2). */
+  maxSteps?: number;
   createContextEngine?: import("./loop.js").AgentLoopOptions["createContextEngine"];
   contextSources?: import("@actspace/context-engine").ContextSourceRegistry;
   inputSource?: import("./loop.js").LoopInputSource;
@@ -88,7 +90,7 @@ export async function runToolStreamFixture(options: {
   const events: AgentLoopLiveEvent[] = [];
   const inbox = new MainAgentInbox(session);
   const loop = new AgentLoop({ createContextEngine: options.createContextEngine, contextSources: options.contextSources, session, tools, inbox, inputSource: options.inputSource,
-    descriptor: { ...MAIN_AGENT_DESCRIPTOR, ...(options.subagent ? { kind: "subagent" as const, maxSteps: 2 } : {}), routeId: "test", model: "test" }, scope: new AgentScope("main:test", undefined, "main:test"),
+    descriptor: { ...MAIN_AGENT_DESCRIPTOR, ...(options.subagent ? { kind: "subagent" as const, maxSteps: 2 } : {}), ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }), routeId: "test", model: "test" }, scope: new AgentScope("main:test", undefined, "main:test"),
     assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
     llm: new LlmService(routes, { resolve: async () => options.credential ?? ({ apiKey: "fixture" }) }),
     compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },

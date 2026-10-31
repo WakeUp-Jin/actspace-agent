@@ -88,6 +88,6 @@ Explore 返回普通 `SubagentTerminalResult`。固定 renderer 将 `actspace.ex
 
 ## 运行预算与实时展示（2026-09-15）
 
-两个内置 Preset 默认 300 步、30 分钟时限。第 300 步不暴露工具，只要求总结已确认事实与阻塞；终态仍是 step-limit，不把预算收尾当作任务成功。父取消继续级联。SUBAGENT_STEP_LIMIT / SUBAGENT_TIMEOUT 与部分发现返回主任务，保留 transcript 入口；不原样自动重试。工作区内找不到目标时应尽早说明，不能将无匹配直接推断为运行系统故障。
+两个内置 Preset 默认 1000 步、30 分钟时限。第 1000 步不暴露工具，只要求总结已确认事实与阻塞；终态仍是 step-limit，不把预算收尾当作任务成功。父取消继续级联。SUBAGENT_STEP_LIMIT / SUBAGENT_TIMEOUT 与部分发现返回主任务，保留 transcript 入口；不原样自动重试。工作区内找不到目标时应尽早说明，不能将无匹配直接推断为运行系统故障。
 
 主消息流使用主题感知轻边框两行入口。第二行从 child live event 的 parentSessionId / parentCallId 关联父工具调用：思考、分析、读取文件、搜索、并行工具数量、整理回复。正文增量只转换成状态，不展示其内容。重复阶段不重复发布；不同活动即时显示，不再用 400ms 合并丢弃短暂工具详情。工具结束后保留最近操作，例如“正在分析 · 刚读取 ConversationView.tsx”；失败工具显示“刚尝试读取”，并行状态保留最近一个仍在执行的工具对象，正文阶段仍只显示“正在整理回复”。敏感值按凭据形态过滤，不因文件名包含 token 等单词而整条清空。使用 180ms、4px 上移交叉淡入淡出；终态即时显示，reduced motion 禁用位移动画。详情仍在右侧 SubAgent 面板。

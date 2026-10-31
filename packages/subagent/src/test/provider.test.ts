@@ -51,12 +51,12 @@ describe("one-shot Subagent provider", () => {
     await parent.close(); await parentScope.dispose();
   });
 
-  it("restricts both built-in presets and provides a 300-step budget", () => {
+  it("restricts both built-in presets and provides a 1000-step budget", () => {
     const presets = createBuiltInPresets(["read_file", "list_directory", "grep", "glob", "bash", "write_file", "edit_file", "agent", "web_fetch"]);
     for (const preset of presets.list()) {
       expect(preset.allowedToolNames).toEqual(["glob", "grep", "list_directory", "read_file"]);
       expect(preset.readOnly).toBe(true);
-      expect(preset.maxSteps).toBe(300);
+      expect(preset.maxSteps).toBe(1000);
       expect(preset.maxDurationMs).toBe(1_800_000);
     }
   });
@@ -80,10 +80,10 @@ describe("one-shot Subagent provider", () => {
   it("persists the step-limit reason and partial findings", async () => {
     const { store, parent, parentScope } = await fixture();
     const provider = new OneShotSubagentProvider({ store, presets: createBuiltInPresets([]), manifestDigest: "manifest", plugins: [],
-      createLoop: () => ({ ...idleLifecycle(), runTurn: async () => ({ reason: "step-limit", steps: 300, finalText: "Target files were not found." }) }) as never });
+      createLoop: () => ({ ...idleLifecycle(), runTurn: async () => ({ reason: "step-limit", steps: 1000, finalText: "Target files were not found." }) }) as never });
     const result = await provider.invoke({ parentSession: parent, parentScope, parentCallId: "limit", presetId: "actspace.agent", task: "inspect", parentVisibleToolIds: [], delegationDepth: 0 });
     expect(result).toMatchObject({ status: "failed", text: "Target files were not found.", failure: { code: "SUBAGENT_STEP_LIMIT", retryable: false } });
-    expect(result.failure?.message).toContain("300");
+    expect(result.failure?.message).toContain("1000");
     const child = await store.inspect(result.childSessionId);
     expect(child.events.at(-1)).toMatchObject({ type: "delegation/child-terminal", data: { failure: { code: "SUBAGENT_STEP_LIMIT" }, text: result.text } });
     await parent.close(); await parentScope.dispose();

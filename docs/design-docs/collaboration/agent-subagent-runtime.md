@@ -167,4 +167,4 @@ outcome-unknown
 - 父上下文不会包含 child 全量 Journal；
 - child / parent 两侧都不会因失败留下未释放 Scope 或 writer lease。
 
-当前内置 Agent / Explore 均采用 300 步（最后一步无工具总结）与 30 分钟时限。限制原因、部分结果及父子 live 活动关联见 [Explore 与 Agent 只读边界](agent-explore-subagent.md)。
+当前内置 Agent / Explore 均采用 1000 步（最后一步无工具总结）与 30 分钟时限。限制原因、部分结果及父子 live 活动关联见 [Explore 与 Agent 只读边界](agent-explore-subagent.md)。

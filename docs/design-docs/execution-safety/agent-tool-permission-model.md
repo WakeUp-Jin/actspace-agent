@@ -357,7 +357,7 @@ type ApprovalRequest = {
 };
 ```
 
-请求固定十分钟过期。无法安全保存的请求使用空 suggestion，并把 lifetime 固定为 `once`。
+请求固定三小时过期（`approvalTimeoutMs` 可覆盖）；过期按拒绝处理，返回给模型的结果明确说明用户未响应，要求不要换命令重试。无法安全保存的请求使用空 suggestion，并把 lifetime 固定为 `once`。
 
 ```ts
 type ApprovalDecision =

@@ -33,7 +33,12 @@ export class TaskLedger {
   snapshot(): TaskSnapshot { return this.#snapshot; }
   get blocked(): boolean { return this.#blocked; }
 
-  submit(submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
+  /**
+   * `resumeWhenIdle`: a stop/failure leaves the queue paused, so a fresh message would sit behind a
+   * pause nobody asked it to honour. When nothing is running and nothing else waits, accept and resume
+   * in one commit. Older queued messages keep the whole queue paused until the user resumes it.
+   */
+  submit(submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null, options: { readonly resumeWhenIdle?: boolean } = {}): Promise<TaskReceipt> {
     // Capture before waiting: caller mutation must not change a queued submission.
     const captured = snapshotSessionJson(content);
     return this.#serialize(async () => {
@@ -44,7 +49,13 @@ export class TaskLedger {
       }
       if (continuationOf !== null && !["failed", "cancelled", "interrupted"].includes(this.#task(continuationOf).state)) this.#error("TASK_NOT_PENDING");
       const taskId = randomUUID();
-      await this.#commit([eventCandidate(TASK_EVENT, { op: "accept", sessionId: this.session.header.sessionId, taskId, submissionId, content: captured, continuationOf })]);
+      const snapshot = this.#snapshot;
+      const resume = options.resumeWhenIdle === true && snapshot.paused && snapshot.queue.length === 0
+        && !snapshot.runs.some(run => run.state === "running") && !snapshot.tasks.some(task => task.state === "claimed");
+      await this.#commit([
+        eventCandidate(TASK_EVENT, { op: "accept", sessionId: this.session.header.sessionId, taskId, submissionId, content: captured, continuationOf }),
+        ...(resume ? [eventCandidate(QUEUE_EVENT, { op: "resume", sessionId: this.session.header.sessionId })] : []),
+      ]);
       return this.#receipt(taskId);
     });
   }

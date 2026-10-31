@@ -132,7 +132,9 @@ export type SessionEventType =
   | "context_compaction"
   | "workspace_preparation"
   | "error"
-  | "agent_run_aborted";
+  | "agent_run_aborted"
+  /** 回合正常停下但需要提醒用户（例如步数上限）；中性提示，不是错误。 */
+  | "agent_run_notice";
 
 export type SessionEvent<TPayload = unknown> = {
   id: EventId;
@@ -722,6 +724,8 @@ export type MessageBlock = {
   runId?: string;
   /** durable 块对应事件的 sourceSeq；live 块和合成事件产生的块没有。 */
   sourceSeq?: number;
+  /** durable 块所在的 Journal turn；「从这条回复分叉」用它定位。live 块没有。 */
+  turnId?: string;
 } & (
   | {
       kind: "user";

@@ -85,7 +85,13 @@ export class HostRpc {
         await app.taskCommand({ sessionId: result.sessionId, op: "configure", configuration: { model: config.defaultModel } });
         observations.publish("host", { kind: "sessions-changed" }); return result;
       }
-      case "sessions.fork": fields(params, ["sessionId", "boundarySeq", "newSessionId"]); return app.forkMainSession(stringParam(params, "sessionId", 128), integerParam(params, "boundarySeq", Number.MAX_SAFE_INTEGER), stringParam(params, "newSessionId", 128));
+      case "sessions.fork": {
+        // 整个会话按 Journal 位置分叉；从助手回复分叉则给 turnId，由 Host 解析成该轮结束的边界。
+        fields(params, ["sessionId", "boundarySeq", "turnId", "newSessionId"]);
+        if ((params.boundarySeq === undefined) === (params.turnId === undefined)) throw new TypeError("sessions.fork needs exactly one of boundarySeq or turnId");
+        const boundary = params.turnId !== undefined ? { turnId: stringParam(params, "turnId", 128) } : integerParam(params, "boundarySeq", Number.MAX_SAFE_INTEGER);
+        return app.forkMainSession(stringParam(params, "sessionId", 128), boundary, stringParam(params, "newSessionId", 128));
+      }
       case "sessions.revokeGrant": {
         fields(params, ["sessionId", "grantId"]);
         const sessionId = stringParam(params, "sessionId", 128);

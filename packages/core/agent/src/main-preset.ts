@@ -8,8 +8,8 @@ export type MainAgentPreset = {
   readonly allowedToolNames: "all-except-web" | readonly ["web", "generate_image"];
 };
 
-const MAIN_DESCRIPTOR: AgentDescriptor = Object.freeze({ id: "actspace.main", version: 1, kind: "main", description: "ActSpace main Agent", presetId: "actspace.main", routeId: "default", model: "default", maxSteps: 32 });
-const CHAT_DESCRIPTOR: AgentDescriptor = Object.freeze({ id: "actspace.chat", version: 1, kind: "main", description: "ActSpace Chat", presetId: "actspace.chat", routeId: "default", model: "default", maxSteps: 32 });
+const MAIN_DESCRIPTOR: AgentDescriptor = Object.freeze({ id: "actspace.main", version: 1, kind: "main", description: "ActSpace main Agent", presetId: "actspace.main", routeId: "default", model: "default", maxSteps: 1000 });
+const CHAT_DESCRIPTOR: AgentDescriptor = Object.freeze({ id: "actspace.chat", version: 1, kind: "main", description: "ActSpace Chat", presetId: "actspace.chat", routeId: "default", model: "default", maxSteps: 1000 });
 
 export const MAIN_AGENT_PRESETS: Readonly<Record<MainAgentPresetId, MainAgentPreset>> = Object.freeze({
   "actspace.main": Object.freeze({ id: "actspace.main", descriptor: MAIN_DESCRIPTOR, promptProfile: "agent", allowedToolNames: "all-except-web" }),

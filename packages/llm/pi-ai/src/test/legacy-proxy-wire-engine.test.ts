@@ -212,6 +212,22 @@ describe("LegacyProxyWireEngine", () => {
     });
     await pool.dispose();
   });
+
+  it.each([
+    { name: "SDK 'Request timed out.'", error: () => new Error("Request timed out."), kind: "timeout", text: "请求 relay.example 超时" },
+    { name: "undici connect timeout behind a generic SDK error", error: () => new Error("Connection error.", { cause: Object.assign(new Error("Connect Timeout Error"), { code: "UND_ERR_CONNECT_TIMEOUT" }) }), kind: "timeout", text: "连接 relay.example 超时（10 秒内未建立连接）", causeCode: "UND_ERR_CONNECT_TIMEOUT" },
+    { name: "refused connection behind a generic SDK error", error: () => new Error("Connection error.", { cause: Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }) }), kind: "network", text: "无法连接 relay.example", causeCode: "ECONNREFUSED" },
+  ])("names the network problem for $name", async ({ error, kind, text, causeCode }) => {
+    const pool = proxyPool();
+    const engine = new LegacyProxyWireEngine({
+      route: "openai-completions", providerId: "fixture-provider", modelId: "fixture-model", baseUrl: "https://relay.example/v1", proxies: pool,
+      loadSdk: loaderFor("openai-completions", {}, (async function* (): AsyncIterable<Record<string, unknown>> { throw error(); })()),
+    });
+    const events: LlmStreamEvent[] = [];
+    for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
+    expect(events.at(-1)).toMatchObject({ type: "error", failure: { kind, retryable: true, message: expect.stringContaining(text), ...(causeCode === undefined ? {} : { causeCode }) } });
+    await pool.dispose();
+  });
 });
 
 function proxyPool(): ProviderProxyPool {

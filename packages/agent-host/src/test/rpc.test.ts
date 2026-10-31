@@ -54,3 +54,15 @@ it("revokes a session-owned grant through the typed Host API, including while dr
   await expect(rpc.dispatch("sessions.revokeGrant", { sessionId: "s1", grantId: "g1", selector: {} }, context)).rejects.toThrow("Unexpected");
   expect(revokeSessionGrant).toHaveBeenCalledOnce();
 });
+
+it("forks by Journal position or by assistant turn, never both and never neither", async () => {
+  const forkMainSession = vi.fn(async () => ({ sessionId: "child" }));
+  const rpc = new HostRpc({ state: () => "ready", application: { forkMainSession } } as unknown as HostRpcOptions);
+  await rpc.dispatch("sessions.fork", { sessionId: "p", boundarySeq: 7, newSessionId: "child" }, context);
+  expect(forkMainSession).toHaveBeenLastCalledWith("p", 7, "child");
+  await rpc.dispatch("sessions.fork", { sessionId: "p", turnId: "turn-1", newSessionId: "child" }, context);
+  expect(forkMainSession).toHaveBeenLastCalledWith("p", { turnId: "turn-1" }, "child");
+  await expect(rpc.dispatch("sessions.fork", { sessionId: "p", newSessionId: "child" }, context)).rejects.toThrow("exactly one");
+  await expect(rpc.dispatch("sessions.fork", { sessionId: "p", boundarySeq: 7, turnId: "turn-1", newSessionId: "child" }, context)).rejects.toThrow("exactly one");
+  expect(forkMainSession).toHaveBeenCalledTimes(2);
+});

@@ -3,7 +3,8 @@ import { taskOperation } from "@actspace/shared/runtime-v2";
 import { SessionModeWriter } from "./session-commands.js";
 import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 import type { EventCodecRegistry, SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { resolveSideChatBoundary } from "@actspace/side-chat";
+import { resolveSideChatBoundary, resolveTurnBoundary } from "@actspace/side-chat";
+import { projectTasks } from "./task-projection.js";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type {
@@ -85,7 +86,7 @@ export type AgentApplicationContract = {
   readonly exportSession: (sessionId: string) => Promise<string>;
   readonly createMainSession: (sessionId?: string, workspaceRoot?: string, agentForm?: MainAgentForm, worktree?: import("@actspace/shared").SessionWorktreeContext) => Promise<RuntimeV2SessionSnapshot>;
   readonly resumeMainSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
-  readonly forkMainSession: (parentSessionId: string, boundarySeq: number, newSessionId: string) => Promise<RuntimeV2SessionSnapshot>;
+  readonly forkMainSession: (parentSessionId: string, boundary: number | ForkBoundary, newSessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly openSideChat: (parentSessionId: string, newSessionId: string) => Promise<SideChatOpened>;
   readonly abortRun: (sessionId: string, reason?: string) => boolean;
   readonly isRunActive: (sessionId: string) => boolean;
@@ -96,6 +97,10 @@ export type AgentApplicationContract = {
   readonly updateSessionAgentMode: (sessionId: string, mode: RuntimeV2AgentMode, expectedRevision?: number) => Promise<RuntimeV2SessionSnapshot>;
   readonly revokeSessionGrant: (sessionId: string, grantId: string) => Promise<RuntimeV2SessionSnapshot>;
 };
+
+/** Fork at a Journal position, or at the end of one finished Turn (a fork from an assistant reply). */
+export type ForkBoundary = { readonly turnId: string };
+const FORK_TITLE_SUFFIX = "（分叉）";
 
 /** A side chat forked from the parent's last completed Turn. */
 export type SideChatOpened = {
@@ -198,10 +203,21 @@ export class AgentApplication implements AgentApplicationContract {
     return this.#sessions.snapshot(session);
   }
 
-  async forkMainSession(parentSessionId: string, boundarySeq: number, newSessionId: string): Promise<RuntimeV2SessionSnapshot> {
+  async forkMainSession(parentSessionId: string, boundary: number | ForkBoundary, newSessionId: string): Promise<RuntimeV2SessionSnapshot> {
+    await this.#sessions.getOpen(parentSessionId)?.flush();
     const parent = await this.#sessions.store.inspect(parentSessionId);
     if (parent.header === null) throw new Error(`Parent Session ${parentSessionId} has no header.`);
-    return this.#sessions.snapshot(await this.#fork(parent.header, boundarySeq, newSessionId, "fork"));
+    // A reply's fork ends with its Turn plus the Host's run-finish fact, so the copy holds no unfinished Run.
+    const boundarySeq = typeof boundary === "number" ? boundary : resolveTurnBoundary(
+      parent.events,
+      required<{ readonly registry: EventCodecRegistry }>(this.ctx, "session.journal").registry,
+      boundary.turnId,
+      prefix => { const tasks = projectTasks(parentSessionId, prefix); return tasks.runs.every(run => run.state !== "running") && tasks.tasks.every(task => task.state !== "claimed"); },
+    );
+    const forked = this.#sessions.snapshot(await this.#fork(parent.header, boundarySeq, newSessionId, "fork"));
+    const title = forked.metadata.title;
+    if (title === null || title.endsWith(FORK_TITLE_SUFFIX)) return forked;
+    return this.updateSessionMetadata(newSessionId, { title: `${title}${FORK_TITLE_SUFFIX}` });
   }
 
   /**

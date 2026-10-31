@@ -199,6 +199,14 @@ export function projectChatEvents(
       projected.push({ ...base, id: eventId(event), type: "agent_run_aborted", payload: { reason: "user" } });
       continue;
     }
+    if (event.type === "turn/end" && string(data.reason) === "step-limit") {
+      // turn/end 不带上限；步数打满时本轮 step/start 的数量就是上限。窗口截断导致数不出来时不写数字。
+      const turnId = string(data.turnId);
+      const steps = journal.filter(candidate => candidate.type === "step/start" && string(record(candidate.data).turnId) === turnId).length;
+      const limit = steps > 0 ? ` ${steps} 步` : "步数";
+      projected.push({ ...base, id: eventId(event), type: "agent_run_notice", payload: { message: `本轮达到${limit}上限，已停止。发送「继续」可以接着做。` } });
+      continue;
+    }
     if (event.type === "compaction/end") {
       const compactionId = string(data.compactionId);
       const started = findCompactionStart(journal, compactionId);

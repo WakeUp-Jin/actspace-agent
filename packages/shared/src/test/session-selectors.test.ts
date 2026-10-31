@@ -467,6 +467,20 @@ describe("session selectors", () => {
     }]);
   });
 
+  it("restores a step-limit notice as a muted status, not an error", () => {
+    const blocks = createMessageBlocks([{
+      id: "evt-limit",
+      sessionId: "session-limit",
+      agentRunId: "turn-limit",
+      type: "agent_run_notice",
+      timestamp: "2026-10-31T07:00:00.000Z",
+      schemaVersion: 2,
+      payload: { message: "本轮达到 1000 步上限，已停止。发送「继续」可以接着做。" },
+    }]);
+
+    expect(blocks).toEqual([expect.objectContaining({ kind: "status", content: "本轮达到 1000 步上限，已停止。发送「继续」可以接着做。", tone: "muted" })]);
+  });
+
   it("restores a completed delete_file result as a delete message block", () => {
     const blocks = createMessageBlocks([
       toolResultEvent({

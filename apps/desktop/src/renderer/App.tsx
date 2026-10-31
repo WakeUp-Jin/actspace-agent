@@ -1289,17 +1289,17 @@ export function App() {
     }
   }, [sessions]);
 
-  const handleForkSession = useCallback(async (sessionId: string) => {
+  const handleForkSession = useCallback(async (sessionId: string, turnId?: string) => {
+    // 整个会话分叉要等本轮结束；从某条已完成的回复分叉不带当前运行中的一轮，可以随时做。
     if (
       !sessionId ||
-      busySessionIds.has(sessionId) ||
-      approvalPendingSessionIds.has(sessionId)
+      (turnId === undefined && (busySessionIds.has(sessionId) || approvalPendingSessionIds.has(sessionId)))
     ) {
       return;
     }
 
     try {
-      const projection = await sessionsApi.fork({ sessionId });
+      const projection = await sessionsApi.fork(turnId === undefined ? { sessionId } : { sessionId, turnId });
       sessionStore.applyEnvelope(projection);
       const forked = projectChatWindow(projection);
       const refreshed = await readSidebarSessions();

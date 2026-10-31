@@ -575,6 +575,17 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
             tone: "muted",
           },
         ];
+      case "agent_run_notice":
+        return [
+          {
+            kind: "status",
+            id: event.id,
+            renderKey: nextRenderKey(event, "status"),
+            content: getOptionalString(event.payload as Record<string, unknown>, "message") ?? "",
+            createdAt: getDisplayTime(event.timestamp),
+            tone: "muted",
+          },
+        ];
       case "tool_call":
       case "llm_usage":
       case "context_snapshot":
@@ -592,7 +603,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
 }
 
 function withIdentity(block: MessageBlock, event: SessionEvent): MessageBlock {
-  return { ...block, runId: event.agentRunId, ...(event.sourceSeq === undefined ? {} : { sourceSeq: event.sourceSeq }) };
+  return { ...block, runId: event.agentRunId, ...(event.turnId === undefined ? {} : { turnId: event.turnId }), ...(event.sourceSeq === undefined ? {} : { sourceSeq: event.sourceSeq }) };
 }
 
 export function getLatestContextSnapshot(events: SessionEvent[]): ContextUsageSnapshot | null {

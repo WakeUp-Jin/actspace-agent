@@ -193,7 +193,7 @@ export class DesktopRuntimeV2Registry {
     this.assertAdmission();
     this.#admittedWork++;
     try {
-      const snapshot = await this.requireApp().forkMainSession(input.parentSessionId, input.boundarySeq, input.newSessionId);
+      const snapshot = await this.requireApp().forkMainSession(input.parentSessionId, "turnId" in input ? { turnId: input.turnId } : input.boundarySeq, input.newSessionId);
       this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-forked");
       return snapshot;
     } finally { this.#admittedWork--; }

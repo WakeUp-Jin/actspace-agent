@@ -18,7 +18,7 @@ export type RuntimeV2DesktopSnapshot = {
   readonly selectedSession: RuntimeV2SessionSnapshot | null;
   readonly workspaceRoot: string;
 };
-export type RuntimeV2ForkSessionInput = { readonly parentSessionId: string; readonly boundarySeq: number; readonly newSessionId: string };
+export type RuntimeV2ForkSessionInput = { readonly parentSessionId: string; readonly newSessionId: string } & ({ readonly boundarySeq: number } | { readonly turnId: string });
 export type RuntimeV2RequestRestartInput = { readonly reason: string; readonly source: string; readonly candidateDigest?: string };
 export type RuntimeV2UpdateSessionMetadataInput = { readonly sessionId: string; readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean };
 export type RuntimeV2ReadArtifactResult = { readonly artifactId: string; readonly mimeType: string; readonly bytesBase64: string };

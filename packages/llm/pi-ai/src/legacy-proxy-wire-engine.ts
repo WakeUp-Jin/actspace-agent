@@ -10,6 +10,7 @@ import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/l
 import type { PiAiArtifactReader, PiAiWireRoute } from "./pi-ai-stream.js";
 import { ProviderProxyError, ProviderProxyPool } from "@actspace/llm-service";
 import { redactLlmText } from "@actspace/llm-service";
+import { describeTransportFailure, transportCauseOf, transportKind } from "./transport-failure.js";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
 import { DeepSeekFileUploader } from "./deepseek-files.js";
@@ -121,7 +122,7 @@ async function* completionsStream(client: SdkClient, input: LlmAdapterDispatchIn
       if (usage != null) acc.usage = withOpenRouterCost(mapOpenAiUsage(usage), usage, input.credential.baseUrl ?? options.baseUrl);
     }
     yield terminalSeen ? done(acc, options.pricing ?? null) : { ...malformedStream(options.route), usage: calculateUsageCost(acc.usage, options.pricing ?? null) };
-  } catch (error) { yield { ...terminalFailure(error, input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
+  } catch (error) { yield { ...terminalFailure(error, input.signal, input.credential.baseUrl ?? options.baseUrl), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
 }
 
 async function* responsesStream(client: SdkClient, input: LlmAdapterDispatchInput, options: LegacyProxyWireEngineOptions): AsyncGenerator<LlmStreamEvent> {
@@ -156,7 +157,7 @@ async function* responsesStream(client: SdkClient, input: LlmAdapterDispatchInpu
       if (type === "response.failed" || type === "error") { const usage = (event.response as Record<string, unknown> | undefined)?.usage as Record<string, unknown> | undefined; if (usage) acc.usage = withOpenRouterCost(mapResponsesUsage(usage), usage, input.credential.baseUrl ?? options.baseUrl); yield { ...terminalFailure(new Error(responseError(event)), input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; return; }
     }
     yield terminalSeen ? done(acc, options.pricing ?? null) : { ...malformedStream(options.route), usage: calculateUsageCost(acc.usage, options.pricing ?? null) };
-  } catch (error) { yield { ...terminalFailure(error, input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
+  } catch (error) { yield { ...terminalFailure(error, input.signal, input.credential.baseUrl ?? options.baseUrl), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
 }
 
 async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInput, options: LegacyProxyWireEngineOptions): AsyncGenerator<LlmStreamEvent> {
@@ -191,7 +192,7 @@ async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInpu
       if (type === "message_stop") terminalSeen = true;
     }
     yield terminalSeen ? done(acc, options.pricing ?? null) : { ...malformedStream(options.route), usage: calculateUsageCost(acc.usage, options.pricing ?? null) };
-  } catch (error) { yield { ...terminalFailure(error, input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
+  } catch (error) { yield { ...terminalFailure(error, input.signal, input.credential.baseUrl ?? options.baseUrl), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
 }
 
 type OpenAiFileResolver = (sessionId: string, artifactId: string, artifact: { readonly data: Uint8Array; readonly mimeType: string }) => Promise<string>;
@@ -265,9 +266,11 @@ function anthropicMediaType(value: string): string { return ["image/jpeg", "imag
 function parseArguments(value: string): RuntimeV2JsonValue { try { return JSON.parse(value) as RuntimeV2JsonValue; } catch { return { $raw: value }; } }
 function accumulator(): Accumulator { return { text: [], reasoning: [], signatures: [], calls: new Map(), usage: unknownUsage(), stopReason: null }; }
 function done(acc: Accumulator, pricing: ModelPricingSnapshot | null): Extract<LlmStreamEvent, { type: "done" }> { const content: LlmContentBlock[] = []; const reasoning = acc.reasoning.join(""); if (reasoning || acc.signatures.length) content.push({ type: "reasoning", text: reasoning, ...(acc.signatures.at(-1) ? { signature: acc.signatures.at(-1) } : {}) }); const text = acc.text.join(""); if (text) content.push({ type: "text", text }); for (const call of [...acc.calls].sort(([left], [right]) => left - right).map(([, value]) => value)) content.push({ type: "tool-call", callId: call.callId, name: call.name, arguments: call.arguments }); return { type: "done", stopReason: acc.calls.size ? "tool-calls" : acc.stopReason, usage: calculateUsageCost(acc.usage, pricing), content }; }
-function terminalFailure(error: unknown, signal: AbortSignal): Extract<LlmStreamEvent, { type: "error" | "aborted" }> { if (signal.aborted || (error instanceof Error && error.name === "AbortError")) return { type: "aborted", reason: "LLM request aborted." }; return { type: "error", failure: classifyFailure(error) }; }
+function terminalFailure(error: unknown, signal: AbortSignal, endpoint?: string): Extract<LlmStreamEvent, { type: "error" | "aborted" }> { if (signal.aborted || (error instanceof Error && error.name === "AbortError")) return { type: "aborted", reason: "LLM request aborted." }; return { type: "error", failure: classifyFailure(error, endpoint) }; }
 function malformedStream(route: PiAiWireRoute): Extract<LlmStreamEvent, { type: "error" }> { return { type: "error", failure: { kind: "malformed-stream", message: `Provider stream for route ${route} ended without a terminal event.`, retryable: true, attempt: 1 } }; }
-function classifyFailure(error: unknown): LlmFailure {
+function classifyFailure(error: unknown, endpoint?: string): LlmFailure {
+  const cause = transportCauseOf(error);
+  const transport = transportKind(error instanceof Error ? error.message : String(error), cause.code);
   const raw = error instanceof Error ? error.message : String(error);
   const detail = providerErrorDetail(error);
   const message = redactLlmText(detail.message ? `${raw}: ${detail.message}` : raw).slice(0, 2_000);
@@ -281,13 +284,14 @@ function classifyFailure(error: unknown): LlmFailure {
     : httpStatus !== undefined && httpStatus >= 500 ? "provider"
     : /context|token limit/i.test(message) ? "context-overflow"
     : httpStatus === 400 || httpStatus === 404 || httpStatus === 422 ? "invalid-request"
-    : /timeout/i.test(message) ? "timeout"
-    : /network|fetch|socket|ECONN|DNS/i.test(message) ? "network"
+    : transport === "timeout" ? "timeout"
+    : transport === "network" || /network|fetch|socket|ECONN|DNS|connection error/i.test(message) ? "network"
     : /invalid|bad request/i.test(message) ? "invalid-request" : "unknown";
   const retryAfterMs = retryAfterMsFromUnknown(error);
   const code = providerCodeFromUnknown(error) ?? detail.code;
   return {
-    kind, message, retryable: ["rate-limit", "provider", "network", "timeout", "proxy"].includes(kind), attempt: 1,
+    kind, message: describeTransportFailure(kind, message, cause, endpoint), retryable: ["rate-limit", "provider", "network", "timeout", "proxy"].includes(kind), attempt: 1,
+    ...(cause.code === undefined || (kind !== "timeout" && kind !== "network") ? {} : { causeCode: cause.code }),
     ...(httpStatus === undefined ? {} : { httpStatus }),
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
     ...(code === undefined ? {} : { providerCode: redactLlmText(code).slice(0, 200) }),

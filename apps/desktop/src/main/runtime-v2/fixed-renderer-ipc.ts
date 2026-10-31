@@ -175,10 +175,13 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return options.registry.readSessionProjection({ sessionId: snapshot.sessionId });
   });
   ipc.handle(contract.sessions.fork, async (input) => {
-    const parent = await options.registry.inspectSession(input.sessionId);
+    // 整个会话分叉截到当前末尾；从助手回复分叉由 Host 把 turnId 解析成该轮结束的边界。
+    const boundary = input.turnId !== undefined
+      ? { turnId: input.turnId }
+      : { boundarySeq: (await options.registry.inspectSession(input.sessionId)).throughJournalSeq };
     const forked = await options.registry.forkSession({
       parentSessionId: input.sessionId,
-      boundarySeq: parent.throughJournalSeq,
+      ...boundary,
       newSessionId: randomUUID(),
     });
     return options.registry.readSessionProjection({ sessionId: forked.sessionId });

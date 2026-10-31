@@ -240,7 +240,7 @@ export class RemoteDesktopAdapter {
       case C.setSessionAgentMode: { const result = await call("sessions.update", { patch: { mode: input.mode, expectedRevision: input.expectedRevision } }) as { agentMode: string; agentModeRevision: number }; return { ok: true, mode: result.agentMode, revision: result.agentModeRevision }; }
       case C.setSessionPermissionMode: await call("sessions.update", { patch: { permissionMode: input.mode } }); return { ok: true, mode: input.mode };
       case C.revokeSessionGrant: await call("sessions.revokeGrant", { grantId: input.grantId }); return { ok: true };
-      case C.forkSession: { const parent = await observation(); const next = await call("sessions.fork", { boundarySeq: parent.snapshot.throughJournalSeq, newSessionId: randomUUID() }) as { sessionId: string }; return this.handle(C.getSessionPage, {}, { hostId: ref.hostId, sessionId: next.sessionId }); }
+      case C.forkSession: { const boundary = input.turnId !== undefined ? { turnId: input.turnId } : { boundarySeq: (await observation()).snapshot.throughJournalSeq }; const next = await call("sessions.fork", { ...boundary, newSessionId: randomUUID() }) as { sessionId: string }; return this.handle(C.getSessionPage, {}, { hostId: ref.hostId, sessionId: next.sessionId }); }
       case C.submitTask: {
         const paths = attachmentUploadSources(ref, input.attachments);
         if (typeof input.submissionId !== "string") throw new Error("Missing submission identity");
