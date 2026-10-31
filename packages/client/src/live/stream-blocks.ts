@@ -326,6 +326,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       status: tool.finished ? tool.preview.status : "running",
       subagentType: tool.preview.subagentType,
       agentKind: tool.preview.agentKind,
+      model: tool.preview.model,
       background: tool.preview.background,
       displayText: tool.preview.displayText,
       summary: tool.preview.summary,

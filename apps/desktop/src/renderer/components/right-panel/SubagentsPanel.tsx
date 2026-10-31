@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
 import { createMessageBlocks, type MessageBlock } from "@actspace/shared";
-import { AgentAvatar, AgentStatus } from "../messages/AgentIdentity";
+import { AgentAvatar, AgentStatus, agentModelLabel } from "../messages/AgentIdentity";
 import { MarkdownProse } from "../messages/MarkdownProse";
 import { renderMessageList } from "../conversation/render-message";
 import { sessionsApi } from "../../api/sessions";
@@ -94,7 +94,7 @@ export function SubagentsPanel({ sessionId, selected, focus }: { sessionId: stri
       <IconButton label="返回子 Agent 列表" tooltip="返回" onClick={() => setSelection(undefined)}><ArrowLeft size={16} /></IconButton>
       <SessionViewToggle view={view} onToggle={() => setView((current) => current === "chat" ? "trajectory" : "chat")} />
       <AgentAvatar message={active} size={28} />
-      <div className="min-w-0 flex-1"><h2 className="m-0 truncate text-act-sm font-medium" title={active.description}>{active.description}</h2><p className="m-0 mt-1 flex items-center gap-2 text-act-xs text-text-muted"><span>{kindLabel(active)}</span><span aria-hidden="true">·</span><AgentStatus status={active.status} /></p></div>
+      <div className="min-w-0 flex-1"><h2 className="m-0 truncate text-act-sm font-medium" title={active.description}>{active.description}</h2><p className="m-0 mt-1 flex min-w-0 items-center gap-2 text-act-xs text-text-muted"><span>{kindLabel(active)}</span>{agentModelLabel(active) ? <><span aria-hidden="true">·</span><span className="min-w-0 truncate" title={active.model}>{agentModelLabel(active)}</span></> : null}<span aria-hidden="true">·</span><AgentStatus status={active.status} /></p></div>
     </header>
     {view === "trajectory" ? <div className="flex min-h-0 flex-1 flex-col" aria-label="子 Agent 执行轨迹">
       {childId ? <TrajectoryView sessionId={childId} variant="panel" /> : <p className="p-5 text-act-sm text-text-muted">没有执行记录。</p>}
@@ -121,8 +121,9 @@ export function SubagentsPanel({ sessionId, selected, focus }: { sessionId: stri
             <AgentAvatar message={agent} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-act-sm text-text-main" title={agent.description}>{agent.description}</span>
-              <span className="mt-1 flex items-center gap-1.5 text-act-xs text-text-muted">
+              <span className="mt-1 flex min-w-0 items-center gap-1.5 text-act-xs text-text-muted">
                 <AgentStatus status={agent.status} /><span aria-hidden="true">·</span><span>{kindLabel(agent)}</span>
+                {agentModelLabel(agent) ? <><span aria-hidden="true">·</span><span className="min-w-0 truncate" title={agent.model}>{agentModelLabel(agent)}</span></> : null}
                 <span aria-hidden="true">·</span><span className="text-text-faint">{Math.floor((agent.stats?.durationMs ?? 0) / 1000)}s</span>
               </span>
             </span>

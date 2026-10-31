@@ -22,7 +22,7 @@ export type AgentLiveToolResult = { readonly status: "completed" | "failed" | "d
 export type AgentLiveFailure = { readonly kind: string; readonly message: string; readonly retryable: boolean; readonly [field: string]: unknown };
 export type AgentLiveEvent = LiveIdentity & (
   | (StreamPayload & { readonly requestId: string; readonly messageId: string })
-  | { readonly kind: "run-state"; readonly message: string; readonly requestId?: string; readonly failure?: AgentLiveFailure }
+  | { readonly kind: "run-state"; readonly message: string; readonly requestId?: string; readonly model?: string; readonly failure?: AgentLiveFailure }
   | { readonly kind: "tool-prepared"; readonly requestId: string; readonly callId: string; readonly name: string; readonly arguments: RuntimeV2JsonValue }
   | { readonly kind: "tool-started"; readonly requestId: string; readonly callId: string; readonly name: string }
   | { readonly kind: "tool-finished"; readonly requestId: string; readonly callId: string; readonly name: string; readonly result: AgentLiveToolResult; readonly resultEventId: string }

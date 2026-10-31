@@ -72,7 +72,7 @@ describe("BashRunBlock tooltips", () => {
     expect(summary).toHaveClass("bash-run-summary", "flex-none", "whitespace-nowrap");
     expect(preview).toHaveClass("bash-command-preview", "min-w-0", "flex-1", "overflow-hidden", "text-ellipsis");
     expect(trailing).toHaveClass("bash-run-trailing", "flex-none");
-    expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "沙盒" })).not.toBeInTheDocument();
   });
 
   it("stops the shimmer once the background task reaches a terminal state", () => {
@@ -119,10 +119,10 @@ describe("BashRunBlock tooltips", () => {
       sandboxed: true,
     });
 
-    expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "沙盒" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Ran/ }));
     expect(screen.getByText(/# environment: 沙盒/)).toBeInTheDocument();
-    expect(screen.queryByText("真实环境")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "真实环境" })).not.toBeInTheDocument();
   });
 
   it("shows a prominent real-environment badge for unsandboxed commands", () => {
@@ -137,9 +137,10 @@ describe("BashRunBlock tooltips", () => {
       sandboxed: false,
     });
 
-    const badge = screen.getByText("真实环境");
-    expect(badge).toBeInTheDocument();
+    const badge = screen.getByRole("img", { name: "真实环境" });
     expect(badge).toHaveClass("bash-real-env-badge");
+    expect(badge).toHaveAttribute("title", expect.stringContaining("沙盒外运行"));
+    expect(screen.queryByText("真实环境")).not.toBeInTheDocument();
   });
 
   it("shows no environment badge when sandboxed is unknown (historical data)", () => {
@@ -153,8 +154,8 @@ describe("BashRunBlock tooltips", () => {
       exitCode: 0,
     });
 
-    expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
-    expect(screen.queryByText("真实环境")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "沙盒" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "真实环境" })).not.toBeInTheDocument();
   });
 
   it("shows not executed when Bash was denied before process start", () => {
@@ -169,8 +170,8 @@ describe("BashRunBlock tooltips", () => {
     });
 
     expect(screen.getByText("未执行")).toBeInTheDocument();
-    expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
-    expect(screen.queryByText("真实环境")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "沙盒" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "真实环境" })).not.toBeInTheDocument();
   });
 
   it("shows the planned environment in a Bash approval card", () => {
@@ -185,7 +186,7 @@ describe("BashRunBlock tooltips", () => {
       sandboxed: true,
     });
 
-    expect(screen.getByText("沙盒")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "沙盒" })).toBeInTheDocument();
   });
 
   it("switches an approval card to not executed after deny", async () => {
@@ -205,7 +206,7 @@ describe("BashRunBlock tooltips", () => {
     await userEvent.click(screen.getByRole("button", { name: "拒绝" }));
 
     expect(await screen.findByText("未执行")).toBeInTheDocument();
-    expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "沙盒" })).not.toBeInTheDocument();
     expect(submitApproval).toHaveBeenCalledWith({
       requestId: "approval-deny-1",
       decision: "deny",
@@ -258,7 +259,7 @@ describe("BashRunBlock tooltips", () => {
     const { unmount } = renderBash(pending);
     const card = screen.getByRole("article");
     expect(card.querySelector(".bash-approval-command + .bash-approval-justification")).toHaveTextContent("Pushing over HTTPS needs the keychain.");
-    expect(screen.getByText("真实环境")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "真实环境" })).toBeInTheDocument();
     unmount();
     for (const message of [{ ...pending, justification: undefined }, { ...pending, status: "running" as const, approvalRequestId: undefined }]) {
       const view = renderBash(message);

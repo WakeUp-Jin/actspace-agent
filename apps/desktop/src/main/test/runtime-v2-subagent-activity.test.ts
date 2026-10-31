@@ -14,6 +14,9 @@ describe("subagent activity in the parent stream", () => {
     adapter.accept({ ...parent, kind: "tool-started" });
     const child = { sessionId: "child", parentSessionId: "parent", parentCallId: "delegate", agentRunId: "child-run", turnId: "child-turn", requestId: "child-request", messageId: "message" };
     const labels = () => events.flatMap((event) => event.sessionId === "parent" && event.type === "tool_call_streaming" && event.preview?.kind === "agent" ? [event.preview.displayText] : []);
+    adapter.accept({ ...child, kind: "run-state", message: "request-started", model: "deepseek-flash" });
+    const models = events.flatMap((event) => event.sessionId === "parent" && event.type === "tool_call_streaming" && event.preview?.kind === "agent" ? [event.preview.model] : []);
+    expect(models.at(-1)).toBe("deepseek-flash");
     adapter.accept({ ...child, kind: "reasoning-delta", message: "hidden reasoning" });
     adapter.accept({ ...child, kind: "tool-prepared", callId: "read", name: "read_file", arguments: { path: "/private/workspace/test.ts" } });
     adapter.accept({ ...child, kind: "tool-prepared", callId: "grep", name: "grep", arguments: { pattern: "secret=do-not-show" } });

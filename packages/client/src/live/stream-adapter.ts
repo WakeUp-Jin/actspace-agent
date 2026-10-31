@@ -38,6 +38,7 @@ export class FixedRendererStreamAdapter {
     if ((preview.kind === "write" || preview.kind === "edit_diff") && entry.phase !== "finished") {
       preview.generationProgress = { phase: entry.phase === "streaming" ? "generating" : entry.phase === "prepared" ? "preparing" : "saving", characters: entry.counter?.count ?? 0 };
     }
+    if (preview.kind === "agent" && entry.activity?.model) preview.model = entry.activity.model;
     if (preview.kind === "agent" && entry.childSessionId) preview.transcriptRef = { kind: "subagent_transcript", sessionId: entry.identity.sessionId, agentRunId: entry.identity.agentRunId, runId: entry.childSessionId };
     return preview;
   }

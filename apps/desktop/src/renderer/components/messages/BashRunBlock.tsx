@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, MoreHorizontal, TerminalSquare } from "lucide-react";
+import { Box, ChevronDown, ChevronRight, MoreHorizontal, ShieldOff, TerminalSquare } from "lucide-react";
 import { useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
@@ -56,23 +56,36 @@ export function BackgroundTag() {
   return <span className={BACKGROUND_TAG_CLASS}>后台</span>;
 }
 
-// 沙盒标签：沙盒是默认态弱化显示；真实环境是例外态，醒目提示用户命令未受沙盒约束
-const BASH_SANDBOX_BADGE_CLASS =
-  "bash-sandbox-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
-const BASH_REAL_ENV_BADGE_CLASS =
-  "bash-real-env-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-warning-soft px-1.5 py-px text-act-xs leading-4 font-medium text-on-warning";
+// 执行环境用图标表示：沙盒是默认态弱化显示；真实环境是例外态，警示色提示命令未受沙盒约束。
+// 文字说明放在 aria-label / title 里，悬停可见。
+const SANDBOX_TITLE = "沙盒：命令在沙盒内运行";
+const REAL_ENV_TITLE = "真实环境：命令在沙盒外运行，可以访问整台电脑的文件和网络";
+const BASH_SANDBOX_ICON_CLASS = "bash-sandbox-badge inline-flex flex-none items-center text-text-faint";
+const BASH_REAL_ENV_ICON_CLASS = "bash-real-env-badge inline-flex flex-none items-center text-on-warning";
 const BASH_NOT_EXECUTED_BADGE_CLASS =
   "bash-not-executed-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
+
+function EnvironmentIcon({ sandboxed, className = "" }: { sandboxed: boolean; className?: string }) {
+  const Icon = sandboxed ? Box : ShieldOff;
+  const title = sandboxed ? SANDBOX_TITLE : REAL_ENV_TITLE;
+  return (
+    <span
+      className={`${sandboxed ? BASH_SANDBOX_ICON_CLASS : BASH_REAL_ENV_ICON_CLASS}${className ? ` ${className}` : ""}`}
+      role="img"
+      aria-label={sandboxed ? "沙盒" : "真实环境"}
+      title={title}
+    >
+      <Icon size={14} strokeWidth={2} aria-hidden="true" />
+    </span>
+  );
+}
 
 function EnvironmentBadge({ sandboxed, notExecuted }: Pick<BashMessage, "sandboxed" | "notExecuted">) {
   if (notExecuted) {
     return <span className={BASH_NOT_EXECUTED_BADGE_CLASS}>未执行</span>;
   }
   if (sandboxed === undefined) return null;
-  if (sandboxed) {
-    return <span className={BASH_SANDBOX_BADGE_CLASS}>沙盒</span>;
-  }
-  return <span className={BASH_REAL_ENV_BADGE_CLASS}>真实环境</span>;
+  return <EnvironmentIcon sandboxed={sandboxed} />;
 }
 
 function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { message: BashMessage; replyCompleted?: boolean; onExpand?: () => void }) {
@@ -194,14 +207,7 @@ function BashApprovalEnvironment({ sandboxed, cwd }: Pick<BashMessage, "sandboxe
   const showCwd = Boolean(cwd && cwd !== "." && cwd !== "./");
   if (sandboxed === undefined && !showCwd) return null;
   return <>
-    {sandboxed === undefined ? null : (
-      <span
-        className="bash-approval-environment flex-none"
-        title={sandboxed ? "命令在沙盒内运行" : "命令会在沙盒外运行，可以访问整台电脑的文件和网络"}
-      >
-        {sandboxed ? "沙盒" : "真实环境"}
-      </span>
-    )}
+    {sandboxed === undefined ? null : <EnvironmentIcon sandboxed={sandboxed} className="bash-approval-environment" />}
     {sandboxed !== undefined && showCwd ? <span aria-hidden="true">·</span> : null}
     {showCwd ? <code className="min-w-0 truncate font-mono" title={cwd}>{cwd}</code> : null}
   </>;

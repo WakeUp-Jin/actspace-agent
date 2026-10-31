@@ -55,14 +55,14 @@ export function tabFromFile(result: WorkspaceReadFileResult, target?: WorkspaceF
   }
 }
 
-export function readFailureTab(relativePath: string, title: string, target?: WorkspaceFileTarget): RightPanelTab {
+export function readFailureTab(relativePath: string, title: string, target?: WorkspaceFileTarget, content = "读取文件失败。"): RightPanelTab {
   return {
     id: workspaceFileTabId(relativePath, target),
     workspaceRoot: target?.workspaceRoot,
     hostId: target?.hostId,
     kind: "text",
     title,
-    content: "读取文件失败。",
+    content,
     relativePath,
   };
 }

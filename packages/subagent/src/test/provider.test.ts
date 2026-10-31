@@ -61,6 +61,22 @@ describe("one-shot Subagent provider", () => {
     }
   });
 
+  it("reports the model the child requested in the terminal result and parent link", async () => {
+    const { store, parent, parentScope } = await fixture();
+    const provider = new OneShotSubagentProvider({ store, presets: createBuiltInPresets([]), manifestDigest: "manifest", plugins: [],
+      createLoop: ({ session }) => ({ ...idleLifecycle(), runTurn: async () => {
+        const append = (type: string, data: Record<string, unknown>) => session.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
+        await append("turn/start", { turnId: "turn", agentRunId: "run" });
+        await append("step/start", { turnId: "turn", stepId: "step", agentRunId: "run", stepIndex: 1 });
+        await append("request/header", { requestId: "request", turnId: "turn", stepId: "step", routeId: "default", model: "claude-sonnet-5-5", contextWindow: null, attempt: 1 });
+        return { reason: "completed", steps: 1, finalText: "done" };
+      } }) as never });
+    const result = await provider.invoke({ parentSession: parent, parentScope, parentCallId: "model", presetId: "actspace.agent", task: "inspect", parentVisibleToolIds: [], delegationDepth: 0 });
+    expect(result.model).toBe("claude-sonnet-5-5");
+    expect(parent.journal.events.find((event) => event.type === "delegation/completed")?.data).toMatchObject({ model: "claude-sonnet-5-5" });
+    await parent.close(); await parentScope.dispose();
+  });
+
   it("persists the step-limit reason and partial findings", async () => {
     const { store, parent, parentScope } = await fixture();
     const provider = new OneShotSubagentProvider({ store, presets: createBuiltInPresets([]), manifestDigest: "manifest", plugins: [],

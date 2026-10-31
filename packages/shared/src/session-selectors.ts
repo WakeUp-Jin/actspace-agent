@@ -281,6 +281,7 @@ function messageBlockFromToolPreview(
         status: preview.status,
         subagentType: preview.subagentType,
         agentKind: preview.agentKind,
+        model: preview.model,
         background: preview.background,
         displayText: preview.displayText,
         summary: preview.summary,

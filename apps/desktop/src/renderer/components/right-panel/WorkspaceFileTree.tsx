@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { WorkspaceDirEntry } from "@actspace/shared";
 import { useRightPanel, workspaceFileTabId, workspaceDirCacheKey } from "./RightPanelContext";
+import { isHtmlFilePath, openHtmlInBrowser } from "./open-html-in-browser";
 import { readFailureTab, tabFromFile } from "./workspaceFileTab";
 import { IconButton } from "../ui/IconButton";
 import { workspacesApi } from "../../api/workspaces";
@@ -231,6 +232,11 @@ function EntryRow({
     setOpening(true);
     const owner = ownership.current;
     try {
+      if (isHtmlFilePath(entry.relativePath)) {
+        const error = await openHtmlInBrowser(workspaceRoot, entry.relativePath);
+        if (error && owner === ownership.current) openTab(readFailureTab(entry.relativePath, entry.name, { workspaceRoot }, error));
+        return;
+      }
       const result = await api({ workspaceRoot, relativePath: entry.relativePath });
       if (owner === ownership.current) openTab(tabFromFile(result, { workspaceRoot }));
     } catch {
