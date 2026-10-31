@@ -123,6 +123,8 @@ export class OneShotSubagentProvider {
         result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status: "failed", text: "", durationMs: Date.now() - started, failure: { code: "SUBAGENT_PUBLICATION_FAILED", message: error instanceof Error ? error.message : String(error), retryable: false } });
       }
     }
+    const model = child ? lastRequestModel(child) : undefined;
+    if (model) result = Object.freeze({ ...result, model });
     run.holder.closed = true;
     const cleanup: PromiseSettledResult<void>[] = lifecycleFailure === undefined ? await Promise.allSettled([
       child?.close() ?? Promise.resolve(),
@@ -150,6 +152,16 @@ export class OneShotSubagentProvider {
   get activeCount(): number { return this.#active.size; }
 }
 
+function lastRequestModel(child: SessionHandle): string | undefined {
+  let model: string | undefined;
+  for (const event of child.journal.iterateEvents()) {
+    if (event.type !== "request/header") continue;
+    const value = (event.data as Record<string, unknown>).model;
+    if (typeof value === "string" && value) model = value;
+  }
+  return model;
+}
+
 function childProgress(child: SessionHandle): SubagentProgress {
   let steps = 0, toolCalls = 0;
   const recent: string[] = [];
@@ -170,7 +182,7 @@ function terminal(input: Omit<SubagentTerminalResult, "usage" | "toolUseCount" |
 function sessionParentPort(session: SessionHandle): ParentDelegationPort {
   return Object.freeze({
     recordRequested: async ({ invocationId, presetId, parentCallId, childSessionId }: Parameters<ParentDelegationPort["recordRequested"]>[0]) => { await session.append(core("delegation/requested", { invocationId, presetId, parentCallId, childSessionId })); await session.flush(); },
-    recordTerminal: async (result: SubagentTerminalResult) => { await session.append(core("delegation/completed", { invocationId: result.invocationId, childSessionId: result.childSessionId, presetId: result.presetId, status: result.status })); },
+    recordTerminal: async (result: SubagentTerminalResult) => { await session.append(core("delegation/completed", { invocationId: result.invocationId, childSessionId: result.childSessionId, presetId: result.presetId, status: result.status, ...(result.model ? { model: result.model } : {}) })); },
   });
 }
 

@@ -50,7 +50,7 @@ type EventIndex = {
   readonly lastRequestByStep: Map<string, string>;
   readonly toolByCall: Map<string, RuntimeV2ToolView>;
   readonly callData: Map<string, EventRecord>;
-  readonly childByCall: Map<string, { readonly childSessionId: string; readonly presetId: string; readonly status: string }>;
+  readonly childByCall: Map<string, { readonly childSessionId: string; readonly presetId: string; readonly status: string; readonly model?: string }>;
   /** Background task status by the tool call that started it, from `background/task` facts. */
   readonly backgroundByCall: Map<string, { readonly status: string }>;
 };
@@ -641,7 +641,7 @@ function toolActivityStatus(status: string | null): UsageActivityStatus {
 }
 
 function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): EventIndex {
-  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, { childSessionId: string; presetId: string; status: string }>(); const backgroundByCall = new Map<string, { status: string }>(); const callByTask = new Map<string, string>();
+  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, { childSessionId: string; presetId: string; status: string; model?: string }>(); const backgroundByCall = new Map<string, { status: string }>(); const callByTask = new Map<string, string>();
   const turnStarts = journal
     .filter((event) => event.type === "turn/start")
     .map((event) => {
@@ -689,7 +689,7 @@ function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly Sessio
     if (event.type === "delegation/completed") {
       const invocationId = string(data.invocationId); const completed = invocationId ? journal.find((candidate) => candidate.type === "delegation/requested" && string(record(candidate.data).invocationId) === invocationId) : undefined;
       const parentCallId = completed ? string(record(completed.data).parentCallId) : null;
-      if (parentCallId) childByCall.set(parentCallId, { childSessionId: string(data.childSessionId) ?? "", presetId: string(data.presetId) ?? childByCall.get(parentCallId)?.presetId ?? "unknown", status: string(data.status) ?? "completed" });
+      if (parentCallId) { const model = string(data.model); childByCall.set(parentCallId, { childSessionId: string(data.childSessionId) ?? "", presetId: string(data.presetId) ?? childByCall.get(parentCallId)?.presetId ?? "unknown", status: string(data.status) ?? "completed", ...(model ? { model } : {}) }); }
     }
   }
   return { runByTurn, turnByStep, runByInboxMessage, turnByInboxMessage, requestById, lastRequestByStep, toolByCall: new Map(snapshot.tools.map((tool) => [tool.callId, tool])), callData, childByCall, backgroundByCall };

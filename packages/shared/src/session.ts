@@ -398,6 +398,8 @@ export type AgentToolPreview = {
   subagentType: "explore";
   /** 主消息行展示的委托类型；缺省时兼容旧事件并按 Explore 处理。 */
   agentKind?: "agent" | "explore";
+  /** 子 Agent 实际请求的模型（request/header 的 model）；旧事件没有记录时缺省。 */
+  model?: string;
   /** 以 background=true 启动；卡片多一个「后台」标签，status 跟随 delegation/completed。 */
   background?: boolean;
   displayText: string;

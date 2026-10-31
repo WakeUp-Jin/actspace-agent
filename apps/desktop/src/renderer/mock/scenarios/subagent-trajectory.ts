@@ -13,7 +13,7 @@ import { seedSession, lastRunId } from "./seed";
 const CHILD_ID = "mock-subagent-durable";
 const SRC = "pi/packages/durable/src";
 
-function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeV2JsonValue>, summary: string, delegation?: { childSessionId: string; presetId: string }): void {
+function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeV2JsonValue>, summary: string, delegation?: { childSessionId: string; presetId: string; model?: string }): void {
   const message = appendMockMessage(db, session, "tool", "", runId);
   session.messages[session.messages.length - 1] = { ...message, role: "tool", tool: { name, args, result: { status: "completed", summary }, ...(delegation ? { delegation } : {}) } };
 }
@@ -47,7 +47,7 @@ export function subagentTrajectoryScenario({ db }: MockClock): MockHandlers | vo
   appendTool(db, parent, run, "bash", { command: `ls ${SRC}` }, "Bash completed in 18ms (exit 0, sandboxed=true).");
   appendMockMessage(db, parent, "assistant", "Let me delegate reading session/ and storage/ to an explorer so I can look at harness/ in parallel.", run);
   const child = seedChild(db, parent);
-  appendTool(db, parent, run, "agent", { description: "查看 durable 存储层", agent: "explore" }, "agent completed", { childSessionId: child.id, presetId: "explore" });
+  appendTool(db, parent, run, "agent", { description: "查看 durable 存储层", agent: "explore" }, "agent completed", { childSessionId: child.id, presetId: "explore", model: "claude-sonnet-5-5" });
   appendMockMessage(db, parent, "assistant", "Now let me look at harness/generation.ts and documents.ts briefly.", run);
   read(db, parent, run, "harness/generation.ts");
   read(db, parent, run, "documents.ts");
@@ -60,6 +60,7 @@ export function subagentTrajectoryScenario({ db }: MockClock): MockHandlers | vo
     displayText: "查看 durable 存储层",
     subagentType: "explore",
     agentKind: "explore",
+    model: "claude-sonnet-5-5",
     status: "completed",
     createdAt: child.createdAt,
     display: "panel",

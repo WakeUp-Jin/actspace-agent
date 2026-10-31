@@ -40,7 +40,7 @@ type StreamPayload =
   | { readonly kind: "tool-call-delta"; readonly callId: string; readonly name: string; readonly argumentsDelta: string };
 export type AgentLoopLiveEvent = LiveIdentity & (
   | (StreamPayload & { readonly requestId: string; readonly messageId: string })
-  | { readonly kind: "run-state"; readonly message: string; readonly requestId?: string; readonly failure?: LlmFailure }
+  | { readonly kind: "run-state"; readonly message: string; readonly requestId?: string; readonly model?: string; readonly failure?: LlmFailure }
   | { readonly kind: "tool-prepared"; readonly requestId: string; readonly callId: string; readonly name: string; readonly arguments: RuntimeV2JsonValue }
   | { readonly kind: "tool-started"; readonly requestId: string; readonly callId: string; readonly name: string }
   | { readonly kind: "tool-finished"; readonly requestId: string; readonly callId: string; readonly name: string; readonly result: ToolExecutionResult; readonly resultEventId: string }
@@ -200,7 +200,7 @@ export class AgentLoop {
         let activePrepared = prepared;
         while (output === undefined) {
           try {
-            this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, requestId, message: "request-started" });
+            this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, requestId, message: "request-started", model: activePrepared.request.model });
             const stream = await this.waterfall("llm/stream", { requestId, turnId, stepId, request: activePrepared.request, signal: controller.signal }, () => activePrepared.dispatch() as unknown as Promise<Awaited<ReturnType<typeof activePrepared.dispatch>>>);
             output = await collectStream(stream as AsyncIterable<LlmStreamEvent>, controller.signal, async (event) => {
               this.emitLive({ ...event.live, agentRunId, turnId, stepId, requestId, messageId: event.messageId });

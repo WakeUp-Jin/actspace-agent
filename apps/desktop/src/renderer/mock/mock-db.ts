@@ -46,7 +46,7 @@ export type MockToolCall = {
   /** tool/result 的 data（除 callId 外），例如 status、summary、modelOutput、detail。 */
   readonly result: Readonly<Record<string, RuntimeV2JsonValue>>;
   /** 这次调用委派出的子会话：紧跟 tool/call 投影一条 delegation/requested。 */
-  readonly delegation?: { readonly childSessionId: string; readonly presetId: string };
+  readonly delegation?: { readonly childSessionId: string; readonly presetId: string; readonly model?: string };
 };
 
 export type MockSession = {
@@ -248,6 +248,10 @@ function journal(session: MockSession): SessionEventEnvelopeV1[] {
         events.push({ ...base(message), seq: events.length, type: "delegation/requested", data: { invocationId: `${callId}:delegation`, presetId, parentCallId: callId, childSessionId }, surface: null });
       }
       events.push({ ...base(message), seq: events.length, type: "tool/result", data: { agentRunId: message.agentRunId, callId, ...message.tool.result }, surface: null });
+      if (message.tool.delegation?.model) {
+        const { childSessionId, presetId, model } = message.tool.delegation;
+        events.push({ ...base(message), seq: events.length, type: "delegation/completed", data: { invocationId: `${callId}:delegation`, presetId, childSessionId, status: "completed", model }, surface: null });
+      }
       continue;
     }
     if (message.role === "tool") continue;

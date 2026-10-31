@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import "./agent-activity.css";
-import { AgentAvatar, AgentStatus } from "./AgentIdentity";
+import { AgentAvatar, AgentStatus, agentModelLabel } from "./AgentIdentity";
 import { BackgroundTag } from "./BashRunBlock";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
@@ -65,6 +65,7 @@ export function AgentRunBlock({
   const isRunning = message.status === "running";
   const latest = latestActivity(message);
   const latestClass = message.error ? `${LATEST_CLASS} ${ERROR_LATEST_CLASS}` : LATEST_CLASS;
+  const model = agentModelLabel(message);
 
   return (
     <article className={`${BLOCK_CLASS}${className ? ` ${className}` : ""}`}>
@@ -83,6 +84,10 @@ export function AgentRunBlock({
           </div>
           <div className="flex min-w-0 items-center gap-1.5">
             <span className={TYPE_CLASS}>{kindLabel(message)}</span>
+            {model ? <>
+              <span aria-hidden="true" className="text-act-xs text-text-faint">·</span>
+              <span className={`${TYPE_CLASS} agent-run-model max-w-[40%] truncate`} title={message.model}>{model}</span>
+            </> : null}
             <span aria-hidden="true" className="text-act-xs text-text-faint">·</span>
             <div className={latestClass}><ActivityLine text={latest} running={isRunning} /></div>
           </div>

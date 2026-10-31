@@ -200,6 +200,16 @@ describe("AgentRunBlock", () => {
     expect(onOpenTranscript).toHaveBeenCalledWith(makeAgentBlock());
   });
 
+  it("shows the model the subagent requested, and nothing for older events without one", () => {
+    const { rerender } = render(<AgentRunBlock message={{ ...makeAgentBlock(), model: "claude-sonnet-5-5" }} />);
+    const model = screen.getByText("claude-sonnet-5-5");
+    expect(model).toHaveClass("agent-run-model", "truncate");
+    expect(model).toHaveAttribute("title", "claude-sonnet-5-5");
+
+    rerender(<AgentRunBlock message={makeAgentBlock()} />);
+    expect(document.querySelector(".agent-run-model")).toBeNull();
+  });
+
   it("shows event-derived activity without streaming model text", () => {
     render(
       <AgentRunBlock

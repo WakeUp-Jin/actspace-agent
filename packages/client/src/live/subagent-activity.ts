@@ -7,6 +7,8 @@ export class SubagentActivity {
   readonly tools = new Map<string, ToolActivity>();
   label = "正在思考";
   recent = "";
+  /** 最近一次请求实际使用的模型；只取事件里的 model 字段。 */
+  model: string | undefined;
   accept(event: AgentLiveEvent): string {
     if (event.kind === "tool-prepared") {
       const args = event.arguments && typeof event.arguments === "object" && !Array.isArray(event.arguments) ? event.arguments as Readonly<Record<string, unknown>> : {};
@@ -25,6 +27,7 @@ export class SubagentActivity {
     else if (event.kind === "reasoning-delta") this.label = "正在分析";
     else if (event.kind === "run-state") {
       if (event.message === "request-started" || event.message === "step-started") this.label = "正在思考";
+      if (event.message === "request-started" && event.model) this.model = event.model;
       if (["completed", "failed", "aborted", "step-limit"].includes(event.message)) {
         this.tools.clear();
         this.recent = "";

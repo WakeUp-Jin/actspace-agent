@@ -12,6 +12,8 @@ export type SubagentTerminalResult = {
   readonly usage: LlmUsage | null;
   readonly toolUseCount: number;
   readonly durationMs: number;
+  /** 子会话最后一次请求实际使用的模型；没有发出过请求时缺省。 */
+  readonly model?: string;
   readonly artifacts: readonly RuntimeV2ArtifactRef[];
   readonly failure: { readonly code: string; readonly message: string; readonly retryable: boolean } | null;
 };

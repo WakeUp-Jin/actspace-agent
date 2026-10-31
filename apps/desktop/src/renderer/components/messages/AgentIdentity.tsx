@@ -1,5 +1,5 @@
 import { Check, CircleAlert, Loader2, Square } from "lucide-react";
-import type { MessageBlock } from "@actspace/shared";
+import { resolveModelSpecByApiModel, type MessageBlock } from "@actspace/shared";
 import companion1 from "../../assets/subagents/companion-1.webp";
 import companion2 from "../../assets/subagents/companion-2.webp";
 import companion3 from "../../assets/subagents/companion-3.webp";
@@ -22,6 +22,12 @@ export function agentAvatarSource(message: AgentMessage): string {
     hash = Math.imul(hash ^ identity.charCodeAt(index), 16777619);
   }
   return companions[(hash >>> 0) % companions.length];
+}
+
+/** 子 Agent 用的模型：模型表里能找到就用显示名，否则原样显示请求里的模型 id。 */
+export function agentModelLabel(message: AgentMessage): string | undefined {
+  if (!message.model) return undefined;
+  return resolveModelSpecByApiModel(message.model)?.label ?? message.model;
 }
 
 export function AgentAvatar({ message, size = 32 }: { message: AgentMessage; size?: 28 | 32 }) {

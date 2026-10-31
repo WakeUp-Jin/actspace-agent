@@ -363,6 +363,10 @@ describe("live subagent projection", () => {
     const journal = [event(1, "tool/call", { callId: "call", name: "explore", args: { task: "Inspect UI" } }), event(2, "delegation/requested", { invocationId: "inv", parentCallId: "call", childSessionId: "child", presetId: "actspace.explore" })];
     expect(projectSubagentList(baseSnapshot({}), journal)).toEqual([expect.objectContaining({ kind: "agent", status: "running", description: "Inspect UI", transcriptRef: expect.objectContaining({ runId: "child" }) })]);
   });
+  it("carries the child's model recorded on delegation/completed", () => {
+    const journal = [event(1, "tool/call", { callId: "call", name: "agent", args: { task: "Inspect UI" } }), event(2, "delegation/requested", { invocationId: "inv", parentCallId: "call", childSessionId: "child", presetId: "actspace.agent" }), event(3, "delegation/completed", { invocationId: "inv", childSessionId: "child", presetId: "actspace.agent", status: "completed", model: "claude-sonnet-5-5" })];
+    expect(projectSubagentList(baseSnapshot({}), journal)).toEqual([expect.objectContaining({ kind: "agent", model: "claude-sonnet-5-5" })]);
+  });
   it("projects live text and thinking separately and removes chunks once the message is committed", () => {
     const journal = [event(1, "assistant/chunk", { messageId: "m", kind: "assistant-delta", content: "Hello" }), event(2, "assistant/chunk", { messageId: "m", kind: "reasoning-delta", content: "Thinking" }), event(3, "assistant/chunk", { messageId: "m", kind: "tool-call-delta", content: '{"path":', callId: "c" })];
     const live = projectSubagentTranscript(baseSnapshot({}), journal);
