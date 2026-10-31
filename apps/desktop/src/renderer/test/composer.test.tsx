@@ -320,6 +320,13 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByText("≈49K / 1M Token")).toBeVisible();
   });
 
+  it("explains the context ring on hover as the current window estimate, not the session total", async () => {
+    const user = userEvent.setup();
+    renderComposer({ contextSnapshot: { ...mockContextSnapshot, totalTokens: 32_400, maxTokens: 1_000_000, percentUsed: 3.24 } });
+    await user.hover(screen.getByRole("button", { name: "上下文用量 3%" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("当前上下文窗口占用 ≈32.4K / 1M（估算）");
+  });
+
   it("shows a fractional context estimate as <1% in the footer and popup", async () => {
     const user = userEvent.setup();
     renderComposer({ contextState: { ...mockContextState, totalEstimatedTokens: 4_200, maxTokens: 1_000_000, percentUsed: 0.42 } });

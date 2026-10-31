@@ -177,7 +177,8 @@ export const mockUsageActivity: UsageActivitySnapshot = {
     totalTokens: 30,
     unknownTokenRequestCounts: { input: 1, output: 1, cacheRead: 2, cacheWrite: 2, reasoning: 2, total: 1 },
     costUsd: 0.12,
-    costUnavailableCount: 2,
+    // 失败且没有 token 的请求没有费用依据可缺，所以不计入。
+    costUnavailableCount: 0,
   },
   rows: [
     {

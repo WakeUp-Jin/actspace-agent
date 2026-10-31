@@ -209,6 +209,9 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
     expect(screen.getByTestId("compact-right-panel-overlay")).toBeInTheDocument();
 
+    // 圆环的 Tooltip 也是 Radix 浮层，会先吃掉一次 Esc；失焦并移开指针后，Esc 才轮到右侧面板。
+    await user.unhover(usage);
+    usage.blur();
     await user.keyboard("{Escape}");
     expect(screen.queryByTestId("compact-right-panel-overlay")).not.toBeInTheDocument();
   });

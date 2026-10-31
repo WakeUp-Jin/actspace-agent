@@ -4,7 +4,11 @@ export function summarizeActivityCosts(rows: readonly UsageActivityRow[]): Usage
   const result: UsageCostSummary = { costUsd: 0, knownCostRequestCount: 0, unknownCostRequestCount: 0, unverifiedHistoricalRequestCount: 0 };
   for (const row of rows) {
     if (row.kind !== "llm_request") continue;
-    if (row.costAmount == null || row.costCurrency !== "USD") { result.unknownCostRequestCount += 1; continue; }
+    if (row.costAmount == null || row.costCurrency !== "USD") {
+      // 仅统计已有 token 用量但没有定价的请求；running 与无用量的失败请求没有费用依据可缺。
+      if (row.status !== "running" && row.tokens.totalTokens != null) result.unknownCostRequestCount += 1;
+      continue;
+    }
     result.knownCostRequestCount += 1;
     result.costUsd += row.costAmount;
     if (row.historicalUnverified) result.unverifiedHistoricalRequestCount += 1;
@@ -20,7 +24,7 @@ export function aggregateActivities(rows: readonly UsageActivityRow[]) {
       const key = kind === "tools" ? row.toolName ?? "未知工具" : `${row.providerId ?? "未知服务商"}/${row.connectionId ?? ""}${kind === "models" ? `/${row.model ?? "未知模型"}` : ""}`;
       const bucket = buckets.get(key) ?? []; bucket.push(row); buckets.set(key, bucket);
     }
-    return [...buckets].map(([key, items]) => ({ key, label: kind === "tools" ? items[0]!.toolName ?? "未知工具" : kind === "models" ? items[0]!.model ?? "未知模型" : items[0]!.providerId ?? "未知服务商", providerId: items[0]!.providerId, connectionId: items[0]!.connectionId, count: items.length, errorCount: items.filter((row) => row.status === "error").length, totalTokens: items.reduce((sum, row) => sum + (row.tokens.totalTokens ?? 0), 0), unknownTokenRequestCount: kind === "tools" ? 0 : items.filter((row) => row.kind === "llm_request" && row.tokens.totalTokens == null).length, durationMs: items.reduce((sum, row) => sum + (row.durationMs ?? 0), 0), costSummary: summarizeActivityCosts(items) })).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+    return [...buckets].map(([key, items]) => ({ key, label: kind === "tools" ? items[0]!.toolName ?? "未知工具" : kind === "models" ? items[0]!.model ?? "未知模型" : items[0]!.providerId ?? "未知服务商", providerId: items[0]!.providerId, connectionId: items[0]!.connectionId, count: items.length, errorCount: items.filter((row) => row.status === "error").length, totalTokens: items.reduce((sum, row) => sum + (row.tokens.totalTokens ?? 0), 0), unknownTokenRequestCount: kind === "tools" ? 0 : items.filter((row) => row.kind === "llm_request" && row.status !== "running" && row.tokens.totalTokens == null).length, durationMs: items.reduce((sum, row) => sum + (row.durationMs ?? 0), 0), costSummary: summarizeActivityCosts(items) })).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
   };
   return { providers: group("providers"), models: group("models"), tools: group("tools") };
 }

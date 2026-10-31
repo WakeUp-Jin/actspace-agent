@@ -107,11 +107,13 @@ describe("pill models", () => {
     const model = usagePillModel(usage({ inputTokens: 1_967, cacheReadTokens: 8_033, outputTokens: 2_240 }));
     expect(model).toEqual({
       kind: "dialog",
-      label: ["12.2K tok", "缓存命中 80%"],
-      ariaLabel: "12.2K tok · 缓存命中 80%",
+      label: ["累计 12.2K tok", "缓存命中 80%"],
+      ariaLabel: "累计 12.2K tok · 缓存命中 80%",
       dialog: {
-        title: "Token 用量",
+        title: "会话累计消耗",
         titleValue: "12,240 tok",
+        description: "每次模型请求的输入（含缓存）加输出之和；每一步都会重发上下文，所以远大于当前窗口占用。",
+        footnote: "缓存命中 = 缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），按累计计算。",
         rows: [["缓存命中", "80%"], ["未缓存输入", "1,967 tok"], ["缓存读取", "8,033 tok"], ["输出", "2,240 tok"]],
       },
     });
@@ -139,14 +141,16 @@ describe("ComposerStatsPills", () => {
     expect(document.querySelector("[data-composer-stat=usage]")).toBeNull();
   });
 
-  it("opens the Token 用量 dialog from the usage pill", async () => {
+  it("opens the 会话累计消耗 dialog from the usage pill", async () => {
     setProjection({ usage: usage({ inputTokens: 1_967, cacheReadTokens: 8_033, outputTokens: 2_240 }) });
     render(<ComposerStatsPills />);
-    const pill = screen.getByRole("button", { name: "12.2K tok · 缓存命中 80%" });
+    const pill = screen.getByRole("button", { name: "累计 12.2K tok · 缓存命中 80%" });
     expect(pill).toHaveAttribute("aria-haspopup", "dialog");
     await userEvent.click(pill);
-    const dialog = await screen.findByRole("dialog", { name: "Token 用量" });
+    const dialog = await screen.findByRole("dialog", { name: "会话累计消耗" });
     expect(dialog).toHaveTextContent("12,240 tok");
+    expect(dialog).toHaveTextContent("所以远大于当前窗口占用");
+    expect(dialog).toHaveTextContent("缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），按累计计算");
     expect(dialog).toHaveTextContent("未缓存输入1,967 tok");
     expect(pill).toHaveAttribute("aria-expanded", "true");
 
@@ -154,7 +158,7 @@ describe("ComposerStatsPills", () => {
     const outside = document.createElement("button");
     document.body.append(outside);
     await userEvent.click(outside);
-    expect(screen.queryByRole("dialog", { name: "Token 用量" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "会话累计消耗" })).toBeNull();
     outside.remove();
   });
 
@@ -162,10 +166,10 @@ describe("ComposerStatsPills", () => {
     setProjection({ usage: usage({ inputTokens: 10, outputTokens: 5 }) });
     const onOpenChange = vi.fn();
     const { rerender } = render(<ComposerStatsPills overlay={{ openStat: null, onOpenChange }} />);
-    await userEvent.click(screen.getByRole("button", { name: "15 tok · 缓存命中 0%" }));
+    await userEvent.click(screen.getByRole("button", { name: "累计 15 tok · 缓存命中 0%" }));
     expect(onOpenChange).toHaveBeenCalledWith("usage", true);
     expect(screen.queryByRole("dialog")).toBeNull();
     rerender(<ComposerStatsPills overlay={{ openStat: "usage", onOpenChange }} />);
-    expect(await screen.findByRole("dialog", { name: "Token 用量" })).toHaveTextContent("15 tok");
+    expect(await screen.findByRole("dialog", { name: "会话累计消耗" })).toHaveTextContent("15 tok");
   });
 });

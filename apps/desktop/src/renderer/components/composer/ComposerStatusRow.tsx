@@ -1,4 +1,4 @@
-import { formatShare } from "../../context-format";
+import { formatApproxTokens, formatShare, formatTokenCount } from "../../context-format";
 import { Folder, GitBranch, GitFork, Laptop, Server } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import type { ContextUsageSnapshot, SessionRunLocation } from "@actspace/shared";
@@ -27,6 +27,15 @@ export function contextUsageDisplay(snapshot: ContextUsageSnapshot | null) {
       : "var(--act-color-text-faint)";
   const percentLabel = formatShare(snapshot?.totalTokens ?? 0, snapshot?.maxTokens ?? 0);
   return { percentLabel, ringPercent, ringColor };
+}
+
+/** 圆环的悬停说明：当前窗口占用是估算值，和输入框下方「累计」胶囊的会话累计消耗不是一回事。 */
+export function contextUsageTooltip(snapshot: ContextUsageSnapshot | null): string {
+  if (!snapshot) return "当前上下文窗口占用暂无数据";
+  const used = formatApproxTokens(snapshot.totalTokens);
+  return snapshot.maxTokens > 0
+    ? `当前上下文窗口占用 ${used} / ${formatTokenCount(snapshot.maxTokens)}（估算）`
+    : `当前上下文窗口占用 ${used}（估算）`;
 }
 
 export type ComposerStatusRowProps = {
@@ -69,18 +78,23 @@ export function ComposerStatusRow({ form, target, notReady, host, remoteDescript
     <span className={USAGE_CLASS} aria-label="上下文用量暂不可用">—</span>
   ) : (
     // 原生 button（从 Composer 搬来）：状态行里的纯文字 + 圆环入口，没有 Button 的边框、内边距和字重。
-    <button className={USAGE_CLASS} type="button" aria-label={`上下文用量 ${display.percentLabel}`} aria-expanded={context.open} onClick={context.onToggle} data-context-usage-toggle="">
-      <span
-        className={USAGE_DOT_CLASS}
-        aria-hidden="true"
-        style={{
-          background: `conic-gradient(${display.ringColor} ${display.ringPercent}%, var(--act-color-border) ${display.ringPercent}%)`,
-          WebkitMask: USAGE_DOT_MASK,
-          mask: USAGE_DOT_MASK,
-        }}
-      />
-      <span>{display.percentLabel}</span>
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button className={USAGE_CLASS} type="button" aria-label={`上下文用量 ${display.percentLabel}`} aria-expanded={context.open} onClick={context.onToggle} data-context-usage-toggle="">
+          <span
+            className={USAGE_DOT_CLASS}
+            aria-hidden="true"
+            style={{
+              background: `conic-gradient(${display.ringColor} ${display.ringPercent}%, var(--act-color-border) ${display.ringPercent}%)`,
+              WebkitMask: USAGE_DOT_MASK,
+              mask: USAGE_DOT_MASK,
+            }}
+          />
+          <span>{display.percentLabel}</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{contextUsageTooltip(context.snapshot)}</TooltipContent>
+    </Tooltip>
   );
 
   // 右侧：会话累计胶囊（轮次/速度、Token 用量）+ context 圆环。

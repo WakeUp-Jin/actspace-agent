@@ -26,14 +26,15 @@ export function projectIndexedUsageActivity(sources: readonly IndexedUsageSource
     result.cacheWriteTokens += row.tokens.cacheWriteTokens ?? 0;
     result.reasoningTokens += row.tokens.reasoningTokens ?? 0;
     result.totalTokens += row.tokens.totalTokens ?? 0;
-    if (row.kind === "llm_request") {
+    // running 是未完成或中断残留，不计入缺口；与读模型 SQL 口径一致。
+    if (row.kind === "llm_request" && row.status !== "running") {
       if (row.tokens.inputTokens == null) result.unknownTokenRequestCounts.input++;
       if (row.tokens.outputTokens == null) result.unknownTokenRequestCounts.output++;
       if (row.tokens.cacheReadTokens == null) result.unknownTokenRequestCounts.cacheRead++;
       if (row.tokens.cacheWriteTokens == null) result.unknownTokenRequestCounts.cacheWrite++;
       if (row.tokens.reasoningTokens == null) result.unknownTokenRequestCounts.reasoning++;
       if (row.tokens.totalTokens == null) result.unknownTokenRequestCounts.total++;
-      if (row.costAmount == null) result.costUnavailableCount++;
+      if (row.costAmount == null && row.tokens.totalTokens != null) result.costUnavailableCount++;
     }
     if (row.costUsd !== null) result.costUsd = (result.costUsd ?? 0) + row.costUsd;
     return result;
