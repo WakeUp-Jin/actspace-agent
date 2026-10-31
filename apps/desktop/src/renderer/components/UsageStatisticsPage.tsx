@@ -63,7 +63,8 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
   const unknownTokens = summary?.unknownTokenRequestCounts;
   const requestCount = summary?.requestCount ?? 0;
   const totalInput = (summary?.inputTokens ?? 0) + (summary?.cacheReadTokens ?? 0) + (summary?.cacheWriteTokens ?? 0);
-  const cacheRateIncomplete = Boolean(unknownTokens && (unknownTokens.input || unknownTokens.cacheRead || unknownTokens.cacheWrite));
+  // cacheWrite 未上报（OpenAI 兼容协议如 DeepSeek）按 0 计入分母，与 usage-cost / indexed-usage 一致。
+  const cacheRateIncomplete = Boolean(unknownTokens && (unknownTokens.input || unknownTokens.cacheRead));
   const hitRate = !cacheRateIncomplete && totalInput ? `${((summary?.cacheReadTokens ?? 0) / totalInput * 100).toFixed(1)}%` : "—";
   const totalUnknown = unknownTokens?.total ?? 0;
   const totalLabel = totalUnknown > 0 && totalUnknown < requestCount ? "已知 Token 合计" : "Token 用量";
@@ -99,7 +100,7 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
         <Metric label="请求数" value={number(summary?.requestCount)} detail="模型调用" />
         <Metric label={totalLabel} value={aggregateTokenValue(summary?.totalTokens, totalUnknown, requestCount)} detail={totalDetail} warn={totalUnknown > 0} />
         <Metric label={cost?.knownCostRequestCount && cost.unknownCostRequestCount ? "已知费用" : "费用"} value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unknownCostRequestCount ? `${cost.knownCostRequestCount ? "另有 " : ""}${cost.unknownCostRequestCount} 次请求缺少费用依据` : cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : "按请求记录 · USD 汇总"} warn={Boolean(cost?.unknownCostRequestCount || cost?.unverifiedHistoricalRequestCount)} />
-        <Metric label="缓存命中率" value={hitRate} detail={tokenPart("缓存", summary?.cacheReadTokens, unknownTokens?.cacheRead ?? 0, requestCount)} warn={Boolean(unknownTokens && (unknownTokens.cacheRead || unknownTokens.input || unknownTokens.cacheWrite))} />
+        <Metric label="缓存命中率" value={hitRate} detail={tokenPart("缓存", summary?.cacheReadTokens, unknownTokens?.cacheRead ?? 0, requestCount)} warn={cacheRateIncomplete} />
       </section>}
       <section className="flex min-w-0 flex-col gap-3">
         <div className="mt-1 flex gap-5 overflow-x-auto border-b border-line" role="tablist" aria-label="统计分类">{tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} className={`-mb-px shrink-0 border-b-2 px-0.5 pb-2.5 text-act-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${tab === value ? "border-text-main text-text-main" : "border-transparent text-text-faint hover:text-text-main"}`} onClick={() => { setTab(value); setSearch(""); }}>{label} <span className="ml-1 text-act-xs font-normal tabular-nums text-text-subtle">{counts[value] ?? "—"}</span></button>)}</div>

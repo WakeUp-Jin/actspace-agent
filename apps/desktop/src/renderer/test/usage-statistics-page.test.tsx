@@ -61,6 +61,15 @@ describe("使用统计", () => {
     const cacheMetric = screen.getByText("缓存命中率").parentElement;
     expect(cacheMetric).toHaveTextContent("—");
   });
+  it("shows the cache hit rate when only cache write is unreported", () => {
+    const openAiCompatible = {
+      ...data,
+      summary: { ...data.summary, requestCount: 2, totalTokens: 1100, inputTokens: 100, outputTokens: 0, cacheReadTokens: 900, cacheWriteTokens: 0, unknownTokenRequestCounts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 2, reasoning: 0, total: 0 } },
+    } as unknown as UsageActivitySnapshot;
+    render(<UsageStatisticsPage snapshot={null} activitySnapshot={openAiCompatible} />);
+    const cacheMetric = screen.getByText("缓存命中率").parentElement;
+    expect(cacheMetric).toHaveTextContent("90.0%");
+  });
   it("sends search to the full query and preserves status and search on pagination", async () => {
     const refresh = vi.fn(); const next = vi.fn();
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, rowsPage: { page: 1, pageSize: 10, totalRows: 21, totalPages: 3 } }} onRefresh={refresh} onRequestPageChange={next} />);
