@@ -1,5 +1,5 @@
-import { Box, ChevronDown, ChevronRight, MoreHorizontal, ShieldOff, TerminalSquare } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, ChevronRight, MoreHorizontal, ShieldCheck, ShieldOff, TerminalSquare } from "lucide-react";
+import { createContext, useContext, useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { ApprovalActions, ApprovalCard, getCommandPrefixGrant, useApprovalDecision, useCommandPrefixGrantSuggestion } from "./ApprovalParts";
@@ -56,17 +56,22 @@ export function BackgroundTag() {
   return <span className={BACKGROUND_TAG_CLASS}>后台</span>;
 }
 
-// 执行环境用图标表示：沙盒是默认态弱化显示；真实环境是例外态，警示色提示命令未受沙盒约束。
+/** 点 bash 行的「后台」标签打开右侧「后台任务」并选中这条命令。只有主会话的消息流提供；没有时标签只是文字。 */
+export const BackgroundTaskLinkContext = createContext<((taskId: string) => void) | undefined>(undefined);
+const BACKGROUND_TAG_LINK_CLASS =
+  "cursor-pointer transition-colors hover:border-line-strong hover:text-text-main focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring";
+
+// 执行环境只用图标表示：沙盒是打勾的盾牌；真实环境是划掉的盾牌，警示色提示命令未受沙盒约束。
 // 文字说明放在 aria-label / title 里，悬停可见。
 const SANDBOX_TITLE = "沙盒：命令在沙盒内运行";
 const REAL_ENV_TITLE = "真实环境：命令在沙盒外运行，可以访问整台电脑的文件和网络";
-const BASH_SANDBOX_ICON_CLASS = "bash-sandbox-badge inline-flex flex-none items-center text-text-faint";
+const BASH_SANDBOX_ICON_CLASS = "bash-sandbox-badge inline-flex flex-none items-center text-success";
 const BASH_REAL_ENV_ICON_CLASS = "bash-real-env-badge inline-flex flex-none items-center text-on-warning";
 const BASH_NOT_EXECUTED_BADGE_CLASS =
   "bash-not-executed-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
 
-function EnvironmentIcon({ sandboxed, className = "" }: { sandboxed: boolean; className?: string }) {
-  const Icon = sandboxed ? Box : ShieldOff;
+export function EnvironmentIcon({ sandboxed, className = "" }: { sandboxed: boolean; className?: string }) {
+  const Icon = sandboxed ? ShieldCheck : ShieldOff;
   const title = sandboxed ? SANDBOX_TITLE : REAL_ENV_TITLE;
   return (
     <span
@@ -95,32 +100,51 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
   const target = message.commandPreview || message.command || "Bash command";
   // 前台执行中 / 后台仍在跑：标题走 shimmer 高光，让用户看出命令正在执行
   const isActive = message.status === "running";
+  const openBackgroundTask = useContext(BackgroundTaskLinkContext);
+  const backgroundTaskId = message.background ? message.backgroundTaskId : undefined;
+  // 标签可点时不能嵌在展开按钮里，挪到按钮后面并排。
+  const backgroundLink = backgroundTaskId && openBackgroundTask
+    ? (
+      <button
+        type="button"
+        className={`${BACKGROUND_TAG_CLASS} ${BACKGROUND_TAG_LINK_CLASS}`}
+        title="在右侧「后台任务」里查看输出"
+        onClick={() => openBackgroundTask(backgroundTaskId)}
+      >
+        后台
+      </button>
+    )
+    : null;
+
+  const toggle = (
+    <button
+      className={`${BASH_RUN_TOGGLE_CLASS}${backgroundLink ? " min-w-0 flex-1" : ""}${["failed", "denied", "expired"].includes(message.status) ? " text-on-danger" : ""}`}
+      type="button"
+      aria-expanded={expanded}
+      onClick={() => { if (!expanded) onExpand?.(); setExpanded((value) => !value); }}
+    >
+      {isActive ? (
+        <span
+          className={`${BASH_RUN_SUMMARY_CLASS} ${TOOL_LOG_LINE_TEXT_RUNNING_CLASS}`}
+          {...getToolLogRunningTextAttrs(summary)}
+        >
+          {summary}
+        </span>
+      ) : (
+        <span className={BASH_RUN_SUMMARY_CLASS}>{summary}</span>
+      )}
+      <span className={BASH_COMMAND_PREVIEW_CLASS} title={target}>{target}</span>
+      <span className={BASH_RUN_TRAILING_CLASS}>
+        <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} />
+        {message.background && !backgroundLink ? <BackgroundTag /> : null}
+        {chevron}
+      </span>
+    </button>
+  );
 
   return (
     <article className={`${BASH_RUN_CLASS} is-${message.status}`}>
-      <button
-        className={`${BASH_RUN_TOGGLE_CLASS}${["failed", "denied", "expired"].includes(message.status) ? " text-on-danger" : ""}`}
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => { if (!expanded) onExpand?.(); setExpanded((value) => !value); }}
-      >
-        {isActive ? (
-          <span
-            className={`${BASH_RUN_SUMMARY_CLASS} ${TOOL_LOG_LINE_TEXT_RUNNING_CLASS}`}
-            {...getToolLogRunningTextAttrs(summary)}
-          >
-            {summary}
-          </span>
-        ) : (
-          <span className={BASH_RUN_SUMMARY_CLASS}>{summary}</span>
-        )}
-        <span className={BASH_COMMAND_PREVIEW_CLASS} title={target}>{target}</span>
-        <span className={BASH_RUN_TRAILING_CLASS}>
-          <EnvironmentBadge sandboxed={message.sandboxed === false ? false : undefined} notExecuted={message.notExecuted} />
-          {message.background ? <BackgroundTag /> : null}
-          {chevron}
-        </span>
-      </button>
+      {backgroundLink ? <div className="flex items-center gap-[7px]">{toggle}{backgroundLink}</div> : toggle}
 
       {expanded ? (
         <div className={BASH_OUTPUT_SHELL_CLASS}>

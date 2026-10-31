@@ -84,6 +84,24 @@ describe("BackgroundTaskRegistry", () => {
     expect(wakes).toEqual([]);
   });
 
+  it("stops for the user and tells the model at its next step without waking", async () => {
+    const { registry, facts, inbox, wakes } = setup("parent");
+    const task = source("bash_1");
+    await registry.register({ ...task, bash: { command: "pnpm dev", cwd: "/work", sandboxed: true } });
+    expect(registry.get("parent", "bash_1")).toMatchObject({ bash: { command: "pnpm dev", cwd: "/work", sandboxed: true } });
+    await expect(registry.stopByUser("parent", "bash_1")).resolves.toMatchObject({ status: "stopped" });
+    expect(task.stopped).toEqual(["user"]);
+    expect(facts().at(-1)).toMatchObject({ op: "settle", status: "stopped", delivery: "stopped" });
+    const pending = inbox().pending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ source: "task_notification", notice: { taskId: "bash_1", kind: "bash", status: "stopped" } });
+    expect(String(pending[0]!.content)).toContain("The user stopped background bash task");
+    expect(wakes).toEqual([]);
+    // Stopping an ended task again neither stops nor notifies twice.
+    await registry.stopByUser("parent", "bash_1");
+    expect(inbox().pending()).toHaveLength(1);
+  });
+
   it("hides tasks owned by another Session", async () => {
     const { registry } = setup("parent", "other");
     await registry.register(source("bash_1", "other"));

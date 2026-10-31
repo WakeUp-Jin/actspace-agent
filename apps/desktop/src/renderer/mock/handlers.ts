@@ -86,6 +86,9 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         playbacks.get(sessionId)?.abort();
         return true;
       },
+      listBackground: async () => [],
+      readBackgroundOutput: async ({ taskId }) => { throw new Error(`Background task ${taskId} was not found.`); },
+      stopBackground: async ({ taskId }) => { throw new Error(`Background task ${taskId} was not found.`); },
     },
     approvals: {
       listPending: async ({ sessionId }) =>

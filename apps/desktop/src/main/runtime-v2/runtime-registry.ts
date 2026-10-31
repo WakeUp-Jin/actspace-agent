@@ -215,6 +215,18 @@ export class DesktopRuntimeV2Registry {
     try { return await this.requireApp().taskCommand(input); }
     finally { this.#admittedWork--; }
   }
+  listBackgroundTasks(sessionId: string) {
+    return this.requireApp().listBackgroundTasks(sessionId);
+  }
+  readBackgroundTaskOutput(sessionId: string, taskId: string) {
+    return this.requireApp().readBackgroundTaskOutput(sessionId, taskId);
+  }
+  async stopBackgroundTask(sessionId: string, taskId: string) {
+    this.assertAdmission();
+    this.#admittedWork++;
+    try { return await this.requireApp().stopBackgroundTask(sessionId, taskId); }
+    finally { this.#admittedWork--; }
+  }
   async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) {
     this.assertAdmission();
     this.#admittedWork++;

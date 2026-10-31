@@ -33,6 +33,8 @@ export type RightPanelTab = { id: string } & (
   | ({ kind: "text"; title: string; content: string; language?: string } & WorkspaceFileMeta)
   // focus：从轨迹详情「查看轨迹」打开时定位到这个子会话并停在指定视图；revision 每次点击递增，让已打开的 Tab 再次定位。
   | { kind: "subagents"; title: string; sessionId: string; selected?: Extract<import("@actspace/shared").MessageBlock, { kind: "agent" }>; focus?: SubagentFocus }
+  // focus：从 bash 行的「后台」标签打开时选中这条命令；revision 每次点击递增，让已打开的 Tab 再次定位。
+  | { kind: "backgroundTasks"; title: string; sessionId: string; focus?: BackgroundTaskFocus }
   | { kind: "context"; title: string }
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   // 某一轮的改动快照（轮尾改动卡点开）；index 是要选中的文件，revision 每次点击递增，让同一 Tab 重新跳到该文件。
@@ -46,6 +48,7 @@ export type RightPanelTab = { id: string } & (
 );
 
 export type SubagentFocus = { childSessionId: string; view: "chat" | "trajectory"; revision: number };
+export type BackgroundTaskFocus = { taskId: string; revision: number };
 
 export type RightPanelTabKind = RightPanelTab["kind"];
 

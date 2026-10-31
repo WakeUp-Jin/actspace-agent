@@ -258,6 +258,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   ipc.handle(contract.tasks.command, async (input) => options.registry.taskCommand(input));
+  ipc.handle(contract.tasks.listBackground, async (input) => options.registry.listBackgroundTasks(input.sessionId));
+  ipc.handle(contract.tasks.readBackgroundOutput, async (input) => options.registry.readBackgroundTaskOutput(input.sessionId, input.taskId));
+  ipc.handle(contract.tasks.stopBackground, async (input) => options.registry.stopBackgroundTask(input.sessionId, input.taskId));
   // Serialize duplicate preparation too: importing the same attachment twice must not change content identity.
   const submissions = new Map<string, Promise<unknown>>();
   ipc.handle(contract.tasks.submit, async (input) => {

@@ -1,11 +1,13 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { BackgroundBashTaskView, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { MockClock } from "../clock";
+import type { MockHandlers } from "../handlers";
 import { appendMockMessage, type MockDb, type MockRawEvent, type MockSession } from "../mock-db";
 import { seedSession } from "./seed";
 
 /**
  * 后台任务：第 1 轮后台跑测试、后台委派调研；第 2、3 轮由任务完成通知唤醒，以细分隔行开头；
- * 第 3 轮又起了一个仍在运行的后台 dev server。用来检查「后台」标签、卡片状态和唤醒分隔行。
+ * 第 3 轮又起了一个仍在运行的后台 dev server。用来检查「后台」标签、卡片状态和唤醒分隔行，
+ * 以及右侧「后台任务」面板：dev server 的输出每秒多一行，可以停止。
  */
 
 function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeV2JsonValue>, result: Record<string, RuntimeV2JsonValue>, after: (callId: string) => MockRawEvent[] = () => []): string {
@@ -35,13 +37,13 @@ function claim(messageId: string, notice: { taskId: string; kind: "bash" | "agen
   };
 }
 
-export function backgroundTasksScenario({ db }: MockClock): void {
+export function backgroundTasksScenario({ db }: MockClock): MockHandlers {
   const session = seedSession(db, { title: "后台跑测试并调研", minutesAgo: 1, turns: [["跑一下全量测试，同时让子 Agent 调研 Kimi Code 的后台任务工具。", null]] });
   const first = session.messages[session.messages.length - 1].agentRunId;
   appendTool(db, session, first, "bash", { command: "pnpm test", intent: "运行全量测试", blockMs: 0 }, {
     status: "completed", summary: "Bash command",
     modelOutput: [{ type: "text", text: "status: backgrounded\ntask_id: bash_mock_test" }],
-    detail: [{ label: "background-task", value: { taskId: "bash_mock_test", status: "running" } }],
+    detail: [{ label: "background-task", value: { taskId: "bash_mock_test", status: "running" } }, { label: "environment", value: { sandboxed: true } }],
   }, (callId) => [{ type: "background/task", data: { op: "start", taskId: "bash_mock_test", kind: "bash", callId, description: "运行全量测试", startedAt: new Date().toISOString() } }]);
   appendTool(db, session, first, "agent", { task: "调研 Kimi Code 的后台任务工具", background: true }, {
     status: "completed", summary: "Background agent started",
@@ -69,7 +71,60 @@ export function backgroundTasksScenario({ db }: MockClock): void {
   appendTool(db, session, third, "bash", { command: "pnpm dev", intent: "启动开发服务器", blockMs: 0 }, {
     status: "completed", summary: "Bash command",
     modelOutput: [{ type: "text", text: "status: backgrounded\ntask_id: bash_mock_dev" }],
-    detail: [{ label: "background-task", value: { taskId: "bash_mock_dev", status: "running" } }],
+    detail: [{ label: "background-task", value: { taskId: "bash_mock_dev", status: "running" } }, { label: "environment", value: { sandboxed: true } }],
   }, (callId) => [{ type: "background/task", data: { op: "start", taskId: "bash_mock_dev", kind: "bash", callId, description: "启动开发服务器", startedAt: new Date().toISOString() } }]);
   appendMockMessage(db, session, "assistant", "调研结论：Kimi Code 用统一登记表管理后台 Bash 与子 Agent，配四个任务工具。开发服务器已在后台启动。", third);
+  return backgroundBashHandlers(session.id);
+}
+
+const TEST_OUTPUT = [
+  "$ pnpm test",
+  "Scope: 14 of 15 workspace projects",
+  " ✓ packages/shared  test/message-blocks.test.ts (38 tests) 212ms",
+  " ✓ packages/background-tasks  test/registry.test.ts (14 tests) 182ms",
+  " ✓ apps/desktop  test/background-tasks-panel.test.tsx (6 tests) 118ms",
+  "",
+  " Test Files  86 passed (86)",
+  "      Tests  412 passed (412)",
+].join("\n");
+
+const DEV_OUTPUT = [
+  "$ pnpm dev",
+  "> @actspace/desktop@0.1.0 dev",
+  "  VITE v6.3.5  ready in 412 ms",
+  "  ➜  Local:   http://localhost:5173/",
+];
+
+/** 两条后台命令：跑完的测试、一直在跑的 dev server。dev server 每秒多一行 HMR 日志。 */
+function backgroundBashHandlers(sessionId: string): MockHandlers {
+  const startedAt = Date.now();
+  const tasks: BackgroundBashTaskView[] = [
+    { taskId: "bash_mock_test", callId: "mock-call-test", description: "运行全量测试", command: "pnpm test", cwd: "/Users/mock/actspace", sandboxed: true, status: "completed", startedAt: startedAt - 95_000, endedAt: startedAt - 41_000, exitCode: 0 },
+    { taskId: "bash_mock_dev", callId: "mock-call-dev", description: "启动开发服务器", command: "pnpm dev", cwd: "/Users/mock/actspace", sandboxed: true, status: "running", startedAt: startedAt - 12_000 },
+  ];
+  const find = (input: { sessionId: string; taskId: string }) => {
+    const index = input.sessionId === sessionId ? tasks.findIndex((task) => task.taskId === input.taskId) : -1;
+    if (index < 0) throw new Error(`Background task ${input.taskId} was not found.`);
+    return index;
+  };
+  const devOutput = (task: BackgroundBashTaskView) => {
+    const until = task.endedAt ?? Date.now();
+    const ticks = Math.max(0, Math.floor((until - startedAt) / 1000));
+    const lines = [...DEV_OUTPUT, ...Array.from({ length: ticks }, (_, index) => `  [vite] hmr update /src/App.tsx (x${index + 1})`)];
+    return task.status === "stopped" ? [...lines, "^C"].join("\n") : lines.join("\n");
+  };
+  return {
+    tasks: {
+      listBackground: async (input) => (input.sessionId === sessionId ? [...tasks] : []),
+      readBackgroundOutput: async (input) => {
+        const task = tasks[find(input)];
+        return { task, text: task.taskId === "bash_mock_dev" ? devOutput(task) : TEST_OUTPUT };
+      },
+      stopBackground: async (input) => {
+        const index = find(input);
+        if (tasks[index].status === "running") tasks[index] = { ...tasks[index], status: "stopped", endedAt: Date.now(), exitCode: null };
+        return tasks[index];
+      },
+    },
+  };
 }
